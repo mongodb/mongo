@@ -30,12 +30,61 @@
 
 #pragma once
 
+#include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/crypto/fle_stats_gen.h"
 #include "mongo/db/commands/server_status.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/util/concurrent_shared_values_map.h"
 #include "mongo/util/tick_source.h"
 
 
 namespace mongo {
+
+/**
+ * Thread-safe counter that only increments if a cooldown period has passed since the last
+ * increment.
+ */
+class RateLimitedCounter {
+public:
+    RateLimitedCounter(Milliseconds cooldown, TickSource* tickSource);
+
+    // Try to increment the counter by 1.
+    // Returns true on successful increment, or false if too early.
+    bool increment();
+
+    // Returns the current counter value.
+    long long getCount() const {
+        return _count.loadRelaxed();
+    }
+
+    // Increment the counter by the given amount regardless of the cooldown period.
+    void forceIncrement(long long amount = 1) {
+        _count.fetchAndAddRelaxed(amount);
+    }
+
+private:
+    TickSource* _tickSource;
+    const TickSource::Tick _ticksPerPeriod;
+    AtomicWord<long long> _count{0};
+    AtomicWord<TickSource::Tick> _lastUpdate{0};
+};
+
+/**
+ * Tracks and reports operation statistics about individual FLE2 collections.
+ */
+class FLEPerCollectionStats {
+public:
+    FLEPerCollectionStats(Milliseconds cooldown, TickSource* tickSource);
+
+    FLEPerCollectionStats& operator+=(const FLEPerCollectionStats& rhs);
+
+    void serialize(BSONObjBuilder* builder) const;
+
+    AtomicWord<long long> insertOpCounter{0};
+    RateLimitedCounter findOpCounter;
+    RateLimitedCounter updateOpCounter;
+    RateLimitedCounter deleteOpCounter;
+};
 
 /**
  * Tracks and reports statistics about the server-side Queryable Encryption integration.
@@ -49,6 +98,8 @@ public:
 
     // Return the global status section Singleton
     static FLEStatusSection& get();
+
+    static Milliseconds calculateOpCounterIncrementCooldownValue(const EncryptedFieldConfig& efc);
 
     // Report FLE metrics if any stat has been set.
     bool includeByDefault() const final {
@@ -103,7 +154,20 @@ public:
         accumulateStats(_compactStats.getEcoc(), stats.getEcoc());
     }
 
+    void updateStatsOnRegisterCollection(const NamespaceString& nss,
+                                         const EncryptedFieldConfig& efc);
+    void updateStatsOnDeregisterCollection(const NamespaceString& nss);
+
+    void incrementInsertCount(const NamespaceString& nss);
+    void incrementFindCount(const NamespaceString& nss);
+    void incrementUpdateCount(const NamespaceString& nss);
+    void incrementDeleteCount(const NamespaceString& nss);
+
 private:
+    std::shared_ptr<FLEPerCollectionStats> registerCollectionStats(const NamespaceString& nss,
+                                                                   const EncryptedFieldConfig& efc);
+    void deregisterCollectionStats(const NamespaceString& nss);
+
     static void accumulateStats(ECStats& left, const ECStats& right) {
         left.setRead(left.getRead() + right.getRead());
         left.setInserted(left.getInserted() + right.getInserted());
@@ -126,6 +190,12 @@ private:
 
     mutable Mutex _mutex = MONGO_MAKE_LATCH("FLECompactStats::_mutex");
     CompactStats _compactStats;
+
+    // Holds operation counters for each active FLE2 collection.
+    ConcurrentSharedValuesMap<NamespaceString, FLEPerCollectionStats> _collStatsMap;
+
+    // Holds operation counters for deleted FLE2 collections.
+    FLEPerCollectionStats _deletedCollStats;
 };
 
 }  // namespace mongo

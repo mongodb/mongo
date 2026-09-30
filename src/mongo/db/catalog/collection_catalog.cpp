@@ -31,6 +31,7 @@
 
 #include "collection_catalog.h"
 
+#include "mongo/crypto/fle_stats.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/uncommitted_catalog_updates.h"
 #include "mongo/db/commands/server_status.h"
@@ -2267,6 +2268,8 @@ void CollectionCatalog::_registerCollection(OperationContext* opCtx,
             }
             if (coll->getCollectionOptions().encryptedFieldConfig) {
                 _stats.queryableEncryption += 1;
+                FLEStatusSection::get().updateStatsOnRegisterCollection(
+                    nss, coll->getCollectionOptions().encryptedFieldConfig.value());
             }
             if (isCSFLE1Validator(coll->getValidatorDoc())) {
                 _stats.csfle += 1;
@@ -2346,6 +2349,7 @@ std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(
             }
             if (coll->getCollectionOptions().encryptedFieldConfig) {
                 _stats.queryableEncryption -= 1;
+                FLEStatusSection::get().updateStatsOnDeregisterCollection(ns);
             }
             if (isCSFLE1Validator(coll->getValidatorDoc())) {
                 _stats.csfle -= 1;

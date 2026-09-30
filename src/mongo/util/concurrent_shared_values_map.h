@@ -149,6 +149,15 @@ public:
         atomic_store(&_map, std::move(newMap));
     }
 
+    /**
+     * Returns the current map. This map will not observe changes to it performed concurrently. That
+     * is to say that the map won't see changes to the key-value pairings performed by other
+     * threads.
+     */
+    std::shared_ptr<const Map> getUnderlyingSnapshot() const {
+        return atomic_load(&_map);
+    }
+
 private:
     ConcurrentSharedValuesMap(std::shared_ptr<Map> otherMap) : _map(std::move(otherMap)){};
 

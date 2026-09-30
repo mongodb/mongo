@@ -40,6 +40,7 @@
 #include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/crypto/fle_crypto.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
+#include "mongo/crypto/fle_stats.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands/fle2_get_count_info_command_gen.h"
 #include "mongo/db/dbdirectclient.h"
@@ -371,6 +372,7 @@ insertSingleDocument(OperationContext* opCtx,
 
     validateInsertUpdatePayloads(efc.getFields(), *serverPayload);
 
+    FLEStatusSection::get().incrementInsertCount(edcNss);
     std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxns(opCtx);
 
     // The function that handles the transaction may outlive this function so we need to use
@@ -529,6 +531,11 @@ write_ops::DeleteCommandReply processDelete(OperationContext* opCtx,
         CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
     }
 
+    auto& edcNss = deleteRequest.getNamespace();
+    auto efc = EncryptionInformationHelpers::getAndValidateSchema(
+        edcNss, deleteRequest.getEncryptionInformation().value());
+    FLEStatusSection::get().incrementDeleteCount(edcNss);
+
     std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxns(opCtx);
 
     auto reply = std::make_shared<write_ops::DeleteCommandReply>();
@@ -549,7 +556,7 @@ write_ops::DeleteCommandReply processDelete(OperationContext* opCtx,
     auto expCtx = makeExpCtx(opCtx, ownedDeleteRequest, ownedDeleteOpEntry);
     // The function that handles the transaction may outlive this function so we need to use
     // shared_ptrs
-    auto deleteBlock = std::make_tuple(ownedDeleteRequest, expCtx);
+    auto deleteBlock = std::make_tuple(ownedDeleteRequest, expCtx, efc);
     auto sharedDeleteBlock = std::make_shared<decltype(deleteBlock)>(deleteBlock);
 
     auto swResult = trun->runNoThrow(
@@ -558,7 +565,7 @@ write_ops::DeleteCommandReply processDelete(OperationContext* opCtx,
                                                  ExecutorPtr txnExec) {
             FLEQueryInterfaceImpl queryImpl(txnClient, getGlobalServiceContext());
 
-            auto [deleteRequest2, expCtx2] = *sharedDeleteBlock.get();
+            auto [deleteRequest2, expCtx2, efc2] = *sharedDeleteBlock.get();
 
             if (MONGO_unlikely(fleCrudHangPreDelete.shouldFail())) {
                 LOGV2(6516702, "Hanging due to fleCrudHangPreDelete fail point");
@@ -566,7 +573,7 @@ write_ops::DeleteCommandReply processDelete(OperationContext* opCtx,
             }
 
 
-            *reply = processDelete(&queryImpl, expCtx2, deleteRequest2);
+            *reply = processDelete(&queryImpl, expCtx2, deleteRequest2, efc2);
 
             if (MONGO_unlikely(fleCrudHangDelete.shouldFail())) {
                 LOGV2(6371902, "Hanging due to fleCrudHangDelete fail point");
@@ -639,6 +646,11 @@ write_ops::UpdateCommandReply processUpdate(OperationContext* opCtx,
         CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
     }
 
+    auto& edcNss = updateRequest.getNamespace();
+    auto efc = EncryptionInformationHelpers::getAndValidateSchema(
+        edcNss, updateRequest.getEncryptionInformation().value());
+    FLEStatusSection::get().incrementUpdateCount(edcNss);
+
     std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxns(opCtx);
 
     // The function that handles the transaction may outlive this function so we need to use
@@ -656,7 +668,7 @@ write_ops::UpdateCommandReply processUpdate(OperationContext* opCtx,
     auto ownedUpdateOpEntry = ownedUpdateRequest.getUpdates()[0];
 
     auto expCtx = makeExpCtx(opCtx, ownedUpdateRequest, ownedUpdateOpEntry);
-    auto updateBlock = std::make_tuple(ownedUpdateRequest, expCtx);
+    auto updateBlock = std::make_tuple(ownedUpdateRequest, expCtx, efc);
     auto sharedupdateBlock = std::make_shared<decltype(updateBlock)>(updateBlock);
 
     auto swResult = trun->runNoThrow(
@@ -665,14 +677,14 @@ write_ops::UpdateCommandReply processUpdate(OperationContext* opCtx,
                                                  ExecutorPtr txnExec) {
             FLEQueryInterfaceImpl queryImpl(txnClient, getGlobalServiceContext());
 
-            auto [updateRequest2, expCtx2] = *sharedupdateBlock.get();
+            auto [updateRequest2, expCtx2, efc2] = *sharedupdateBlock.get();
 
             if (MONGO_unlikely(fleCrudHangPreUpdate.shouldFail())) {
                 LOGV2(6516703, "Hanging due to fleCrudHangPreUpdate fail point");
                 fleCrudHangPreUpdate.pauseWhileSet();
             }
 
-            *reply = processUpdate(&queryImpl, expCtx2, updateRequest2);
+            *reply = processUpdate(&queryImpl, expCtx2, updateRequest2, efc2);
 
             if (MONGO_unlikely(fleCrudHangUpdate.shouldFail())) {
                 LOGV2(6371901, "Hanging due to fleCrudHangUpdate fail point");
@@ -1021,13 +1033,10 @@ StatusWith<write_ops::InsertCommandReply> processInsert(
 
 write_ops::DeleteCommandReply processDelete(FLEQueryInterface* queryImpl,
                                             boost::intrusive_ptr<ExpressionContext> expCtx,
-                                            const write_ops::DeleteCommandRequest& deleteRequest) {
+                                            const write_ops::DeleteCommandRequest& deleteRequest,
+                                            const EncryptedFieldConfig& efc) {
 
-    auto edcNss = deleteRequest.getNamespace();
-    auto ei = deleteRequest.getEncryptionInformation().value();
-
-    auto efc = EncryptionInformationHelpers::getAndValidateSchema(edcNss, ei);
-
+    auto& edcNss = deleteRequest.getNamespace();
     int32_t stmtId = getStmtIdForWriteAt(deleteRequest, 0);
 
     auto newDeleteRequest = deleteRequest;
@@ -1079,12 +1088,11 @@ bool hasIndexedFieldsInSchema(const std::vector<EncryptedField>& fields) {
  */
 write_ops::UpdateCommandReply processUpdate(FLEQueryInterface* queryImpl,
                                             boost::intrusive_ptr<ExpressionContext> expCtx,
-                                            const write_ops::UpdateCommandRequest& updateRequest) {
+                                            const write_ops::UpdateCommandRequest& updateRequest,
+                                            const EncryptedFieldConfig& efc) {
 
-    auto edcNss = updateRequest.getNamespace();
+    auto& edcNss = updateRequest.getNamespace();
     auto ei = updateRequest.getEncryptionInformation().value();
-
-    auto efc = EncryptionInformationHelpers::getAndValidateSchema(edcNss, ei);
 
     const auto updateOpEntry = updateRequest.getUpdates()[0];
 
@@ -1295,13 +1303,17 @@ std::unique_ptr<BatchedCommandRequest> processFLEBatchExplain(
     if (request.getBatchType() == BatchedCommandRequest::BatchType_Delete) {
         auto deleteRequest = request.getDeleteRequest();
         auto newDeleteOp = deleteRequest.getDeletes()[0];
+        auto efc = EncryptionInformationHelpers::getAndValidateSchema(
+            request.getNS(), deleteRequest.getEncryptionInformation().value());
+
         newDeleteOp.setQ(fle::rewriteQuery(opCtx,
                                            getExpCtx(newDeleteOp),
                                            request.getNS(),
                                            deleteRequest.getEncryptionInformation().value(),
                                            newDeleteOp.getQ(),
                                            &getTransactionWithRetriesForMongoS,
-                                           fle::EncryptedCollScanModeAllowed::kAllow));
+                                           fle::EncryptedCollScanModeAllowed::kAllow,
+                                           efc));
         deleteRequest.setDeletes({newDeleteOp});
         deleteRequest.getWriteCommandRequestBase().setEncryptionInformation(
             makeEmptyProcessEncryptionInformation());
@@ -1313,6 +1325,8 @@ std::unique_ptr<BatchedCommandRequest> processFLEBatchExplain(
         auto encryptedCollScanModeAllowed = newUpdateOp.getUpsert()
             ? fle::EncryptedCollScanModeAllowed::kDisallow
             : fle::EncryptedCollScanModeAllowed::kAllow;
+        auto efc = EncryptionInformationHelpers::getAndValidateSchema(
+            request.getNS(), updateRequest.getEncryptionInformation().value());
 
         newUpdateOp.setQ(fle::rewriteQuery(opCtx,
                                            getExpCtx(newUpdateOp),
@@ -1320,7 +1334,8 @@ std::unique_ptr<BatchedCommandRequest> processFLEBatchExplain(
                                            updateRequest.getEncryptionInformation().value(),
                                            newUpdateOp.getQ(),
                                            &getTransactionWithRetriesForMongoS,
-                                           encryptedCollScanModeAllowed));
+                                           encryptedCollScanModeAllowed,
+                                           efc));
         updateRequest.setUpdates({newUpdateOp});
         updateRequest.getWriteCommandRequestBase().setEncryptionInformation(
             makeEmptyProcessEncryptionInformation());

@@ -103,5 +103,40 @@ TEST(ConcurrentSharedValuesMapTest, ReplaceWithOtherMap) {
     ASSERT_EQ(*ref2, "new value");
 }
 
+TEST(ConcurrentSharedValuesMapTest, ForEachTest) {
+    ConcurrentSharedValuesMap<int, std::string> map;
+
+    map.getOrEmplace(1, "value");
+    map.getOrEmplace(2, "value");
+    map.getOrEmplace(3, "value");
+
+    stdx::unordered_set<int> pendingToSee = {1, 2, 3};
+
+    for (auto snapshot = map.getUnderlyingSnapshot(); const auto& [key, value] : *snapshot) {
+        ASSERT_EQ(pendingToSee.erase(key), 1);
+    }
+
+    ASSERT_TRUE(pendingToSee.empty());
+
+    ConcurrentSharedValuesMap<int, std::string> emptyMap;
+    for (auto snapshot = emptyMap.getUnderlyingSnapshot(); const auto& unused : *snapshot) {
+        // This should not execute
+        (void)unused;
+        ASSERT_TRUE(false);
+    }
+}
+
+TEST(ConcurrentSharedValuesMapTest, TestSnapshotCanModifyValues) {
+    ConcurrentSharedValuesMap<int, AtomicWord<int>> map;
+
+    map.getOrEmplace(1, 1);
+    map.getOrEmplace(2, 1);
+    map.getOrEmplace(3, 1);
+
+    auto snapshot = map.getUnderlyingSnapshot();
+    snapshot->at(1)->addAndFetch(1);
+
+    ASSERT_EQ(map.find(1)->load(), 2);
+}
 }  // namespace
 }  // namespace mongo

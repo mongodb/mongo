@@ -488,6 +488,7 @@ BSONObj processFLEWriteExplainD(OperationContext* opCtx,
                                 const boost::optional<BSONObj>& letParameters,
                                 const BSONObj& query) {
     assertFLECrudNotYetProcessed(info);
+    auto efc = EncryptionInformationHelpers::getAndValidateSchema(nss, info);
     auto expCtx = make_intrusive<ExpressionContext>(
         opCtx, fle::collatorFromBSON(opCtx, collation), nss, runtimeConstants, letParameters);
     return fle::rewriteQuery(opCtx,
@@ -496,7 +497,8 @@ BSONObj processFLEWriteExplainD(OperationContext* opCtx,
                              info,
                              query,
                              &getTransactionWithRetriesForMongoD,
-                             fle::EncryptedCollScanModeAllowed::kAllow);
+                             fle::EncryptedCollScanModeAllowed::kAllow,
+                             efc);
 }
 
 std::pair<write_ops::FindAndModifyCommandRequest, OpMsgRequest>
