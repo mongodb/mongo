@@ -8,7 +8,7 @@ import click
 import structlog
 from pydantic.main import BaseModel
 
-from evergreen.api import EvergreenApi, RetryingEvergreenApi
+from evergreen.api import EvergreenApi
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
@@ -16,6 +16,7 @@ if __name__ == "__main__" and __package__ is None:
 
 # pylint: disable=wrong-import-position
 from buildscripts.util.cmdutils import enable_logging
+from buildscripts.util.evergreen_retry import get_extra_retry_evergreen_api
 from buildscripts.util.fileops import read_yaml_file
 from buildscripts.util.taskname import remove_gen_suffix
 
@@ -102,7 +103,7 @@ def main(expansion_file: str, evergreen_config: str, verbose: bool) -> None:
     """
     enable_logging(verbose)
     expansions = EvgExpansions.from_yaml_file(expansion_file)
-    evg_api = RetryingEvergreenApi.get_api(config_file=evergreen_config)
+    evg_api = get_extra_retry_evergreen_api(evergreen_config)
 
     activate_task(expansions, evg_api)
 

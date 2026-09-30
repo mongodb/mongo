@@ -4,5 +4,6 @@ pymongo == 4.3.3
 PyYAML == 5.3.1 # Pinned due to SERVER-79126 and linked BF
 types-PyYAML ~= 6.0.12.10
 requests >= 2.0.0, <= 2.26.0
+tenacity >= 5  # Used by buildscripts/mongosymb.py; was a transitive dep of evergreen.py <=3.4.4, dropped in 3.11.3
 typing-extensions >= 3.7.4
 referencing <= 0.35.1
