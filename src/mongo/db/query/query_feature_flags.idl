@@ -363,9 +363,9 @@ feature_flags:
     featureFlagSbeEqLookupUnwindHashJoin:
         description: "Enables executing $lookup-$unwind in SBE using the hash join strategy."
         cpp_varname: gFeatureFlagSbeEqLookupUnwindHashJoin
-        default: true
+        default: false
         fcv_gated: false
-        incremental_rollout_phase: rollout
+        incremental_rollout_phase: in_development
 
     featureFlagSbeEqLookupUnwindIndexedLoopJoin:
         description: "Enables executing $lookup-$unwind in SBE using the indexed loop join strategy."

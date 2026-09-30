@@ -20,7 +20,10 @@ const forceClassicEngineSet =
 const isFeatureFlagSbeFullEnabled = checkSbeFullFeatureFlagEnabled(db);
 const isSbeEnabled = checkSbeFullyEnabled(db);
 const isSbeGroupLookupOnly = checkSbeRestrictedOrFullyEnabled(db);
-const isLookupUnwindPushdownEnabled = isDeferredGetExecutorEnabled(db) && !forceClassicEngineSet;
+const isLookupUnwindPushdownEnabled =
+    isDeferredGetExecutorEnabled(db) &&
+    FeatureFlagUtil.isPresentAndEnabled(db, "SbeEqLookupUnwindHashJoin") &&
+    !forceClassicEngineSet;
 const isSbeTransformStagesEnabled =
     FeatureFlagUtil.isPresentAndEnabled(db, "SbeTransformStages") && !forceClassicEngineSet;
 

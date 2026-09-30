@@ -3,6 +3,7 @@
  *
  * @tags: [requires_sharding, uses_transactions]
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {
     aggPlanHasStage,
     assertEngine,
@@ -40,7 +41,12 @@ const viewName = "view_lookup_pushdown";
 let db = conn.getDB(name);
 const sbeEnabled = checkSbeRestrictedOrFullyEnabled(db);
 const sbeRestricted = checkSbeRestricted(db);
-const sbeEqLookupUnwindPushdownEnabled = isDeferredGetExecutorEnabled(db);
+const ffSbeEqLookupUnwindHashJoin = FeatureFlagUtil.isPresentAndEnabled(
+    db,
+    "SbeEqLookupUnwindHashJoin",
+);
+const sbeEqLookupUnwindPushdownEnabled =
+    isDeferredGetExecutorEnabled(db) && ffSbeEqLookupUnwindHashJoin;
 
 if (!sbeEnabled) {
     jsTest.log.info("Skipping test because SBE is disabled");

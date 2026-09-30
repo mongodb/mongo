@@ -309,6 +309,9 @@ try {
     saveParameterToRestore(
         "internalQuerySlotBasedExecutionHashJoinApproxMemoryUseInBytesBeforeSpill",
     );
+    // Pin the LU hash join strategy on so the output doesn't depend on the variant's IFR defaults.
+    saveParameterToRestore("featureFlagSbeEqLookupUnwindHashJoin");
+    setServerParameter("featureFlagSbeEqLookupUnwindHashJoin", true);
     section("HashLookupUnwind");
     setServerParameter(
         "internalQuerySlotBasedExecutionHashJoinApproxMemoryUseInBytesBeforeSpill",
