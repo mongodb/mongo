@@ -8837,6 +8837,11 @@ boost::intrusive_ptr<Expression> ExpressionInternalKeyStringValue::parse(
                       << typeName(expr.type()),
         expr.type() == BSONType::Object);
 
+    uassert(10131412,
+            "$_internalKeyStringValue is not allowed inside collection validators or profile "
+            "filters",
+            !expCtx->isParsingCollectionValidator && !expCtx->isProfileFilter);
+
     boost::intrusive_ptr<Expression> inputExpr;
     boost::intrusive_ptr<Expression> collationExpr;
 
@@ -8881,8 +8886,11 @@ Value ExpressionInternalKeyStringValue::evaluate(const Document& root, Variables
                 collation.isObject());
         auto collationBson = collation.getDocument().toBson();
 
-        auto collatorFactory =
-            CollatorFactoryInterface::get(getExpressionContext()->opCtx->getServiceContext());
+        auto* opCtx = getExpressionContext()->opCtx;
+        tassert(10131413,
+                "$_internalKeyStringValue with a collation requires an OperationContext",
+                opCtx);
+        auto collatorFactory = CollatorFactoryInterface::get(opCtx->getServiceContext());
         collator = uassertStatusOKWithContext(collatorFactory->makeFromBSON(collationBson),
                                               "Invalid collation spec");
     }

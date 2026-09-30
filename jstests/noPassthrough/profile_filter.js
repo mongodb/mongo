@@ -1,7 +1,7 @@
 /*
  * Test the usage and behavior of the 'filter' profiler option.
  *
- * @tags: [requires_sharding, requires_replication]
+ * @tags: [requires_fcv_80, requires_sharding, requires_replication]
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {findMatchingLogLine} from "jstests/libs/log.js";
@@ -124,6 +124,17 @@ function runTest(conn) {
         }
     }
     assert.commandWorked(db.setProfilingLevel(0, {filter: 'unset'}));
+    assert.eq(0, db.getProfilingLevel());
+
+    assert.commandFailedWithCode(
+        db.runCommand({
+            profile: isMongos ? 0 : 1,
+            filter: {
+                $expr: {$_internalKeyStringValue: {input: "$millis", collation: {locale: "en"}}},
+            },
+        }),
+        10131412,
+    );
     assert.eq(0, db.getProfilingLevel());
 
     // To catch mistakes, it's not allowed for the filter to reference fields that don't exist.

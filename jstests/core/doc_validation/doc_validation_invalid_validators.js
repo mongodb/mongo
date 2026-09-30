@@ -5,6 +5,7 @@
 //   # The test runs commands that are not allowed with security token: eval.
 //   not_allowed_with_signed_security_token,
 //   assumes_no_implicit_collection_creation_after_drop,
+//   requires_fcv_80,
 //   requires_non_retryable_commands,
 // ]
 
@@ -26,7 +27,15 @@ assert.commandFailed(db.createCollection(collName, {validator: {$near: {place: "
 assert.commandFailed(db.createCollection(collName, {validator: {$geoNear: {place: "holder"}}}));
 assert.commandFailed(db.createCollection(collName, {validator: {$nearSphere: {place: "holder"}}}));
 assert.commandFailed(
-    db.createCollection(collName, {validator: {$expr: {$eq: ["$a", "$$unbound"]}}}));
+    db.createCollection(collName, {validator: {$expr: {$eq: ["$a", "$$unbound"]}}}),
+);
+
+assert.commandFailedWithCode(
+    db.createCollection(collName, {
+        validator: {$expr: {$_internalKeyStringValue: {input: "$a", collation: {locale: "en"}}}},
+    }),
+    10131412,
+);
 
 // Verify we fail on admin, local and config databases.
 assert.commandFailed(
@@ -58,6 +67,13 @@ assert.commandFailedWithCode(db.runCommand({
     "validator": {$expr: {$_internalJsEmit: {eval: 'function() {}', this: {}}}}
 }),
                              4660801);
+assert.commandFailedWithCode(
+    db.runCommand({
+        "collMod": collName,
+        "validator": {$expr: {$_internalKeyStringValue: {input: "$a", collation: {locale: "en"}}}},
+    }),
+    10131412,
+);
 assert.commandFailed(db.runCommand({"collMod": collName, "validator": {$near: {place: "holder"}}}));
 assert.commandFailed(
     db.runCommand({"collMod": collName, "validator": {$geoNear: {place: "holder"}}}));
