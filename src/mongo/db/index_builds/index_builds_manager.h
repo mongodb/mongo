@@ -191,6 +191,14 @@ public:
     boost::optional<IndexBuildPhaseEnum> getPhase(const UUID& buildUUID) const;
 
     /**
+     * Provides passthrough access to MultiIndexBlock for the number of keys and bytes the build has
+     * written to the index tables. Returns boost::none if the build UUID does not refer to an
+     * active index build.
+     */
+    boost::optional<MultiIndexBlock::IndexBuildWriteStats> getNumKeysAndBytesWritten(
+        const UUID& buildUUID) const;
+
+    /**
      * Checks via invariant that the manager has no index builds presently.
      */
     void verifyNoIndexBuilds_forTestOnly();

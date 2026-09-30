@@ -221,7 +221,7 @@ public:
     //
 
     using OnNKeysLoadedFn = std::function<void()>;
-    using OnBytesWrittenFn = std::function<void(int64_t bytesWritten)>;
+    using OnBatchCommittedFn = std::function<void(int64_t keysWritten, int64_t bytesWritten)>;
 
     class [[MONGO_MOD_OPEN]] BulkBuilder {
     public:
@@ -260,8 +260,8 @@ public:
          * new CollectionPtr* and IndexCatalogEntry* entry that shall be used from this point on.
          * @param onNKeysLoaded - Called every onNKeysLoadedFnInterval committed
          * keys. Pass a no-op if periodic resume-state writes are not needed.
-         * @param onBytesWritten - Called once per committed batch with the number of bytes that
-         * batch wrote.
+         * @param onBatchCommitted - Called once per committed batch with the number of keys and
+         * the number of bytes that batch wrote to the index.
          * @param onNKeysLoadedFnInterval - The number of committed keys between invocations of
          * onNKeysLoaded. Must be >= 1.
          * @param keyBatchSize -  The maximum number of index keys that will be batched together
@@ -279,7 +279,7 @@ public:
                               const RecordIdHandlerFn& onDuplicateRecord,
                               const YieldFn& yieldFn,
                               const OnNKeysLoadedFn& onNKeysLoaded,
-                              const OnBytesWrittenFn& onBytesWritten,
+                              const OnBatchCommittedFn& onBatchCommitted,
                               int64_t onNKeysLoadedFnInterval,
                               size_t keyBatchSize,
                               size_t keyBatchBytes) = 0;

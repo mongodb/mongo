@@ -7,7 +7,11 @@
 #include "mongo/db/index_builds/index_builds_manager.h"
 #include "mongo/db/index_builds/repl_index_build_state.h"
 #include "mongo/db/index_builds/resumable_index_builds_gen.h"
-#include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
+#include "mongo/db/shard_role/shard_catalog/collection_options.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/otel/metrics/metric_names.h"
 #include "mongo/otel/metrics/metrics_test_util.h"
@@ -53,13 +57,15 @@ constexpr IndexBuildPhaseEnum kAllPhases[] = {IndexBuildPhaseEnum::kInitialized,
 constexpr IndexBuildOutcome kAllOutcomes[] = {
     IndexBuildOutcome::kSuccess, IndexBuildOutcome::kFailure, IndexBuildOutcome::kToBeResumed};
 
-class IndexBuildsDurationTest : public ServiceContextTest {
+class IndexBuildsDurationTest : public CatalogTestFixture {
 public:
-    void SetUp() override {
-        ServiceContextTest::SetUp();
+    void setUp() override {
+        CatalogTestFixture::setUp();
         if (!_capturer.canReadMetrics()) {
             GTEST_SKIP() << "Skipping test due to OTel metrics being unavailable in this build";
         }
+        ASSERT_OK(
+            storageInterface()->createCollection(operationContext(), _nss, CollectionOptions()));
     }
 
 protected:
@@ -80,20 +86,29 @@ protected:
     std::shared_ptr<ReplIndexBuildState> makeReplState(Date_t startTime) {
         return std::make_shared<ReplIndexBuildState>(
             UUID::gen(),
-            UUID::gen(),
+            acquireCollectionForWrite().uuid(),
             DatabaseName::createDatabaseName_forTest(boost::none, "test"),
             std::vector<IndexBuildInfo>{},
             IndexBuildProtocol::kTwoPhase,
             startTime);
     }
 
+    CollectionAcquisition acquireCollectionForWrite() {
+        return acquireCollection(operationContext(),
+                                 CollectionAcquisitionRequest::fromOpCtx(
+                                     operationContext(), _nss, AcquisitionPrerequisites::kWrite),
+                                 MODE_X);
+    }
+
     /**
      * Simulates running an index build with the given start phase and outcome, running for
-     * 'duration' milliseconds.
+     * 'duration' milliseconds. If 'setUp' is false, the build is registered and unregistered
+     * without ever being set up in the IndexBuildsManager, as when it fails before setup.
      */
     void runIndexBuild(IndexBuildPhaseEnum startPhase,
                        IndexBuildOutcome outcome,
-                       Milliseconds duration) {
+                       Milliseconds duration,
+                       bool setUp = true) {
         auto replState = makeReplState(Date_t::now() - duration);
 
         if (startPhase != IndexBuildPhaseEnum::kInitialized) {
@@ -101,9 +116,30 @@ protected:
         }
 
         ASSERT_OK(_activeIndexBuilds.registerIndexBuild(replState));
+        if (setUp) {
+            auto acq = acquireCollectionForWrite();
+            CollectionWriter collection(operationContext(), &acq);
+            auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
+            std::vector<IndexBuildInfo> indexes{
+                IndexBuildInfo(BSON("v" << 2 << "key" << BSON("a" << 1) << "name"
+                                        << "a_1"),
+                               fmt::format("index-{}", replState->buildUUID.toString()),
+                               *storageEngine)};
+            ASSERT_OK(_indexBuildsManager.setUpIndexBuild(operationContext(),
+                                                          collection,
+                                                          indexes,
+                                                          replState->buildUUID,
+                                                          MultiIndexBlock::kNoopOnInitFn));
+            // Nothing is built, so clean up the index before the build is unregistered.
+            _indexBuildsManager.abortIndexBuild(operationContext(),
+                                                collection,
+                                                replState->buildUUID,
+                                                MultiIndexBlock::kNoopOnCleanUpFn);
+        }
         _activeIndexBuilds.unregisterIndexBuild(&_indexBuildsManager, replState, outcome);
     }
 
+    const NamespaceString _nss = NamespaceString::createNamespaceString_forTest("test.coll");
     otel::metrics::OtelMetricsCapturer _capturer;
     IndexBuildsManager _indexBuildsManager;
     ActiveIndexBuilds _activeIndexBuilds;
@@ -196,6 +232,37 @@ TEST_F(IndexBuildsDurationTest, ClampsDurationWhenStartTimeIsInTheFuture) {
     EXPECT_EQ(data.count, 1UL);
     EXPECT_EQ(data.sum, 0);
     EXPECT_EQ(data.counts[0], 1UL);
+}
+
+TEST_F(IndexBuildsDurationTest, BuildThatIsNeverSetUpIsNotRecordedInCompletionHistograms) {
+    // The capturer throws KeyNotFound for an attribute combination that was never recorded.
+    const auto readFailureCount = [&](otel::metrics::MetricName name) -> uint64_t {
+        try {
+            return _capturer
+                .readInt64Histogram(name,
+                                    std::tuple{idl::serialize(IndexBuildPhaseEnum::kInitialized),
+                                               toString(IndexBuildOutcome::kFailure)})
+                .count;
+        } catch (const ExceptionFor<ErrorCodes::KeyNotFound>&) {
+            return 0;
+        }
+    };
+    const auto failedBefore =
+        _capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildsFailed);
+
+    runIndexBuild(IndexBuildPhaseEnum::kInitialized,
+                  IndexBuildOutcome::kFailure,
+                  Milliseconds(500),
+                  /*setUp=*/false);
+
+    // The build still counts as failed, but it did no work, so it is left out of the histograms.
+    EXPECT_EQ(_capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildsFailed),
+              failedBefore + 1);
+    for (auto name : {otel::metrics::MetricNames::kIndexBuildCompletedDurationMillis,
+                      otel::metrics::MetricNames::kIndexBuildCompletedKeysWritten,
+                      otel::metrics::MetricNames::kIndexBuildCompletedBytesWritten}) {
+        EXPECT_EQ(readFailureCount(name), 0UL) << name.getName();
+    }
 }
 
 }  // namespace

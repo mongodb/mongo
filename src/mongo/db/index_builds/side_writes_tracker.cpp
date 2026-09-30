@@ -215,10 +215,16 @@ Status SideWritesTracker::drainWritesIntoIndex(
     int64_t totalDeleted = 0;
     int64_t totalInserted = 0;
     int64_t totalBytesDrained = 0;
+    // Total keystring bytes this drain wrote to the index table, for both insertions and
+    // deletions. Unlike 'totalBytesDrained', which measures the side-table records read, this
+    // measures the index keys written.
+    int64_t totalKeyBytesWritten = 0;
     Timer timer;
     Microseconds durationLastUpdated{0};
     ON_BLOCK_EXIT([&] {
         recordIndexBuildSideWritesProcessedStats(0, 0, timer.elapsed() - durationLastUpdated);
+        _drainKeysWritten += totalInserted + totalDeleted;
+        _drainBytesWritten += totalKeyBytesWritten;
     });
 
     const int64_t appliedAtStart = _numApplied;
@@ -386,6 +392,7 @@ Status SideWritesTracker::drainWritesIntoIndex(
         _numApplied += batchSize;
         sideWritesDrainedCounter.add(batchSize);
         totalBytesDrained += batchSizeBytes;
+        totalKeyBytesWritten += batchKeyBytesInserted + batchKeyBytesDeleted;
         auto timeElapsed = timer.elapsed();
 
         recordIndexBuildSideWritesProcessedStats(batchSize,

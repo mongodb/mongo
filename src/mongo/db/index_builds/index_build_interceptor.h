@@ -112,6 +112,14 @@ public:
                                 TrackDuplicates trackDups,
                                 DrainYieldPolicy drainYieldPolicy);
 
+    /**
+     * Returns the cumulative number of keys and key bytes this interceptor's drains have written to
+     * the index table.
+     */
+    SideWritesTracker::DrainWriteStats getNumKeysAndBytesWritten() const {
+        return _sideWritesTracker.getNumKeysAndBytesWritten();
+    }
+
     [[MONGO_MOD_PRIVATE]] SkippedRecordTracker& getSkippedRecordTracker() {
         return _skippedRecordTracker;
     }

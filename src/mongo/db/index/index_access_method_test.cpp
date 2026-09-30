@@ -407,7 +407,7 @@ TEST_F(IndexAccessMethodBulkBuilder, CommitRejectsZeroInterval) {
                                     IndexAccessMethod::YieldFn{},
                                     IndexAccessMethod::OnNKeysLoadedFn{[]() {
                                     }},
-                                    IndexAccessMethod::OnBytesWrittenFn{[](int64_t) {
+                                    IndexAccessMethod::OnBatchCommittedFn{[](int64_t, int64_t) {
                                     }},
                                     /*onNKeysLoadedFnInterval=*/0,
                                     /*keyBatchSize=*/1,
@@ -471,30 +471,31 @@ TEST_F(IndexAccessMethodBulkBuilder, CommitWithoutDoneThrows) {
                                                 ContainerWriteBehavior::kDoNotReplicate);
     ASSERT(bulk);
 
-    ASSERT_THROWS_WITH_CHECK(bulk->commit(opCtx,
-                                          *shard_role_details::getRecoveryUnit(opCtx),
-                                          &*autoColl,
-                                          indexEntry,
-                                          /*dupsAllowed=*/true,
-                                          /*yieldIterations=*/0,
-                                          IndexAccessMethod::KeyHandlerFn{
-                                              [](const CollectionPtr&, const key_string::View&) {
-                                                  return Status::OK();
-                                              }},
-                                          IndexAccessMethod::RecordIdHandlerFn{},
-                                          IndexAccessMethod::YieldFn{},
-                                          IndexAccessMethod::OnNKeysLoadedFn{[]() {
-                                          }},
-                                          IndexAccessMethod::OnBytesWrittenFn{[](int64_t) {
-                                          }},
-                                          /*onNKeysLoadedFnInterval=*/1,
-                                          /*keyBatchSize=*/1,
-                                          /*keyBatchBytes=*/1024),
-                             DBException,
-                             [](const DBException& ex) {
-                                 EXPECT_EQ(ex.code(), 12723201);
-                                 assertionCount.tripwire.subtractAndFetch(1);
-                             });
+    ASSERT_THROWS_WITH_CHECK(
+        bulk->commit(
+            opCtx,
+            *shard_role_details::getRecoveryUnit(opCtx),
+            &*autoColl,
+            indexEntry,
+            /*dupsAllowed=*/true,
+            /*yieldIterations=*/0,
+            IndexAccessMethod::KeyHandlerFn{[](const CollectionPtr&, const key_string::View&) {
+                return Status::OK();
+            }},
+            IndexAccessMethod::RecordIdHandlerFn{},
+            IndexAccessMethod::YieldFn{},
+            IndexAccessMethod::OnNKeysLoadedFn{[]() {
+            }},
+            IndexAccessMethod::OnBatchCommittedFn{[](int64_t, int64_t) {
+            }},
+            /*onNKeysLoadedFnInterval=*/1,
+            /*keyBatchSize=*/1,
+            /*keyBatchBytes=*/1024),
+        DBException,
+        [](const DBException& ex) {
+            EXPECT_EQ(ex.code(), 12723201);
+            assertionCount.tripwire.subtractAndFetch(1);
+        });
 }
 
 /**

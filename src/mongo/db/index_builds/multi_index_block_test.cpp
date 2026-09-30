@@ -2081,6 +2081,114 @@ TEST_P(MultiIndexBlockMetricsTest, BasicMetrics) {
     }
 }
 
+TEST_P(MultiIndexBlockMetricsTest, WriteStatsCountKeysAndBytesWrittenToIndexTables) {
+    auto indexer = getIndexer();
+    configureIndexerForProtocol(indexer);
+
+    otel::metrics::OtelMetricsCapturer capturer;
+    const auto bulkLoadPhaseAttrs = std::tuple{idl::serialize(IndexBuildPhaseEnum::kBulkLoad)};
+    const auto drainPhaseAttrs = std::tuple{idl::serialize(IndexBuildPhaseEnum::kDrainWrites)};
+
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll(operationContext(), &acq);
+
+    auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
+    auto indexBuildInfo =
+        IndexBuildInfo(BSON("key" << BSON("a" << 1) << "name"
+                                  << "a_1"
+                                  << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion)),
+                       "index-1",
+                       *storageEngine);
+
+    // Nothing has been written to an index table yet.
+    EXPECT_EQ(indexer->getIndexTableWrites().numKeysWrittenBulkLoad, 0);
+    EXPECT_EQ(indexer->getIndexTableWrites().numBytesWrittenBulkLoad, 0);
+    EXPECT_EQ(indexer->getIndexTableWrites().numKeysWrittenSideWritesDrain, 0);
+    EXPECT_EQ(indexer->getIndexTableWrites().numBytesWrittenSideWritesDrain, 0);
+
+    {
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT_OK(indexer
+                      ->init(operationContext(),
+                             coll,
+                             {indexBuildInfo},
+                             MultiIndexBlock::kNoopOnInitFn,
+                             MultiIndexBlock::InitMode::SteadyState,
+                             boost::none)
+                      .getStatus());
+        wuow.commit();
+    }
+
+    {
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT_OK(Helpers::insert(operationContext(), coll.get(), BSON("_id" << 0 << "a" << 1)));
+        ASSERT_OK(Helpers::insert(operationContext(), coll.get(), BSON("_id" << 1 << "a" << 2)));
+        wuow.commit();
+    }
+    constexpr int64_t numDocsInColl = 2;
+
+    // The size of a key string with one field.
+    const auto sampleKeyStringSize =
+        static_cast<int64_t>(key_string::HeapBuilder(key_string::Version::kLatestVersion,
+                                                     BSON("" << 1),
+                                                     Ordering::make(BSON("x" << 1)),
+                                                     RecordId(1))
+                                 .getSize());
+    const int64_t expectedKeyStringBytes = sampleKeyStringSize * numDocsInColl;
+
+    // Scans the collection and bulk loads the sorted keys into the index table.
+    ASSERT_OK(indexer->insertAllDocumentsInCollection(operationContext(), getNSS()));
+
+    const auto afterBulkLoad = indexer->getIndexTableWrites();
+    EXPECT_EQ(afterBulkLoad.numKeysWrittenBulkLoad, numDocsInColl);
+    EXPECT_EQ(afterBulkLoad.numBytesWrittenBulkLoad, expectedKeyStringBytes);
+    // We should not have recorded any side writes.
+    EXPECT_EQ(afterBulkLoad.numKeysWrittenSideWritesDrain, 0);
+    EXPECT_EQ(afterBulkLoad.numBytesWrittenSideWritesDrain, 0);
+
+    if (capturer.canReadMetrics()) {
+        EXPECT_EQ(capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildKeysProcessed,
+                                            bulkLoadPhaseAttrs),
+                  afterBulkLoad.numKeysWrittenBulkLoad);
+        EXPECT_EQ(capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildBytesProcessed,
+                                            bulkLoadPhaseAttrs),
+                  afterBulkLoad.numBytesWrittenBulkLoad);
+    }
+
+    ASSERT_OK(indexer->drainBackgroundWrites(operationContext(),
+                                             RecoveryUnit::ReadSource::kNoTimestamp,
+                                             IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+
+    const auto afterDrain = indexer->getIndexTableWrites();
+    EXPECT_EQ(afterDrain.numKeysWrittenSideWritesDrain, numDocsInColl);
+    EXPECT_EQ(afterDrain.numBytesWrittenSideWritesDrain, expectedKeyStringBytes);
+    // The bulk load metrics should not have changed.
+    EXPECT_EQ(afterDrain.numKeysWrittenBulkLoad, afterBulkLoad.numKeysWrittenBulkLoad);
+    EXPECT_EQ(afterDrain.numBytesWrittenBulkLoad, afterBulkLoad.numBytesWrittenBulkLoad);
+
+    if (capturer.canReadMetrics()) {
+        EXPECT_EQ(capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildBytesProcessed,
+                                            drainPhaseAttrs),
+                  afterDrain.numBytesWrittenSideWritesDrain);
+        EXPECT_EQ(afterDrain.numKeysWrittenSideWritesDrain,
+                  capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildKeysProcessed,
+                                            drainPhaseAttrs));
+    }
+
+    {
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT_OK(indexer->commit(operationContext(),
+                                  coll.getWritableCollection(operationContext()),
+                                  MultiIndexBlock::kNoopOnCreateEachFn,
+                                  MultiIndexBlock::kNoopOnCommitFn));
+        wuow.commit();
+    }
+}
+
 INSTANTIATE_TEST_SUITE_P(,
                          MultiIndexBlockMetricsTest,
                          ::testing::Values(IndexBuildProtocol::kSinglePhase,

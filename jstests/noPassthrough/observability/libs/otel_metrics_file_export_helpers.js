@@ -182,6 +182,16 @@ export function getLatestMetrics(directory) {
 }
 
 /**
+ * Returns true if the data point's attributes include `{attrKey: attrValue}`.
+ */
+function dataPointHasAttribute(dp, attrKey, attrValue) {
+    return (
+        attrKey == null ||
+        (dp.attributes ?? []).some((a) => a.key === attrKey && a.value?.stringValue === attrValue)
+    );
+}
+
+/**
  * Finds the first data point in `record` whose metric name equals `metricName` and whose
  * attributes include `{attrKey: attrValue}`. `getDataPoints(metric)` selects the instrument
  * array (e.g. `metric.sum?.dataPoints`); `getValue(dp)` extracts the numeric payload.
@@ -192,14 +202,7 @@ function findDataPointByAttribute(record, metricName, attrKey, attrValue, getDat
     for (const metric of getFlatMetricsList(record)) {
         if (metric.name !== metricName) continue;
         for (const dp of getDataPoints(metric)) {
-            // A null/undefined attrKey means the metric has no attributes to key on, so the first
-            // data point is the only one.
-            const match =
-                attrKey == null ||
-                (dp.attributes ?? []).some(
-                    (a) => a.key === attrKey && a.value?.stringValue === attrValue,
-                );
-            if (match) return Number(getValue(dp));
+            if (dataPointHasAttribute(dp, attrKey, attrValue)) return Number(getValue(dp));
         }
     }
     return 0;
@@ -238,6 +241,77 @@ export function getHistogramCount(metricsDir, metricName, attrKey, attrValue) {
         (m) => m.histogram?.dataPoints ?? [],
         (dp) => dp.count ?? 0,
     );
+}
+
+/**
+ * Aggregates every data point of the histogram `metricName` whose attributes include
+ * `{attrKey: attrValue}`, across the latest record of every metrics file in `metricsDir`.
+ *
+ * @returns {{count: number, sum: number, bucketCounts: Array<number>, explicitBounds: Array<number>}}
+ *     The total count and sum, the element-wise total of the bucket counts, and the bucket bounds
+ *     shared by the matching points. The counts are 0 and the arrays empty if nothing matched.
+ */
+export function getHistogramByAttributeAcrossFiles(metricsDir, metricName, attrKey, attrValue) {
+    const result = {count: 0, sum: 0, bucketCounts: [], explicitBounds: []};
+    let foundMatch = false;
+    for (const file of findOtelFilesWithSuffix(metricsDir)) {
+        const record = readJsonlFile(file.name).at(-1);
+        for (const metric of getFlatMetricsList(record)) {
+            if (metric.name !== metricName) continue;
+            for (const dp of metric.histogram?.dataPoints ?? []) {
+                if (!dataPointHasAttribute(dp, attrKey, attrValue)) continue;
+                const bounds = (dp.explicitBounds ?? []).map(Number);
+                if (!foundMatch) {
+                    foundMatch = true;
+                    result.explicitBounds = bounds;
+                    result.bucketCounts = new Array(bounds.length + 1).fill(0);
+                }
+                assert.eq(
+                    result.explicitBounds,
+                    bounds,
+                    `data points of ${metricName} in ${metricsDir} have different bucket bounds`,
+                );
+                result.count += Number(dp.count ?? 0);
+                result.sum += Number(dp.sum ?? 0);
+                (dp.bucketCounts ?? []).forEach((c, i) => (result.bucketCounts[i] += Number(c)));
+            }
+        }
+    }
+    return result;
+}
+
+/**
+ * Waits for the count aggregated by `getHistogramByAttributeAcrossFiles` to equal `expected`.
+ */
+export function assertHistogramCountAcrossFilesSoon({
+    metricsDir,
+    metricName,
+    attrKey,
+    attrValue,
+    expected,
+}) {
+    const getCount = () =>
+        getHistogramByAttributeAcrossFiles(metricsDir, metricName, attrKey, attrValue).count;
+    assert.soon(
+        () => getCount() == expected,
+        () =>
+            `expected ${expected} ${attrKey}=${attrValue} observations of ${metricName} in ` +
+            `${metricsDir}, found ${getCount()}`,
+    );
+}
+
+/**
+ * Asserts that `observations`, as returned by `getHistogramByAttributeAcrossFiles`, has the bucket
+ * bounds `bounds` and holds a single observation, in the bucket that `value` falls into.
+ */
+export function assertHistogramSingleObservation(observations, bounds, value) {
+    assert.eq(observations.explicitBounds, bounds, "bucket bounds", {observations});
+    // A bucket covers (bounds[i - 1], bounds[i]], and the last bucket is everything above the last
+    // bound.
+    const expectedBucket = bounds.findIndex((bound) => value <= bound);
+    const expectedBucketCounts = new Array(bounds.length + 1).fill(0);
+    expectedBucketCounts[expectedBucket === -1 ? bounds.length : expectedBucket] = 1;
+    assert.eq(observations.bucketCounts, expectedBucketCounts, "bucket counts", {observations});
 }
 
 /**

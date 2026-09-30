@@ -327,6 +327,27 @@ public:
         return _phase;
     }
 
+    /**
+     * Running total number of keys and bytes written to the index tables by this index build,
+     * including deletions. The number of bytes is calculated as the total size of the key strings
+     * being written.
+     *
+     * More specifically, this tracks the number of keys and bytes written during
+     * the bulk load and side writes drain phases, since the collection scan phase does not itself
+     * write to an index table.
+     *
+     */
+    struct IndexBuildWriteStats {
+        int64_t numKeysWrittenBulkLoad = 0;
+        int64_t numBytesWrittenBulkLoad = 0;
+        int64_t numKeysWrittenSideWritesDrain = 0;
+        int64_t numBytesWrittenSideWritesDrain = 0;
+    };
+
+    IndexBuildWriteStats getIndexTableWrites() const {
+        return _indexWriteStats;
+    }
+
 private:
     struct IndexToBuild {
         std::unique_ptr<IndexBuildBlock> block;
@@ -472,6 +493,9 @@ private:
 
     // The current phase of the index build.
     IndexBuildPhaseEnum _phase = IndexBuildPhaseEnum::kInitialized;
+
+    // The number of keys and bytes written to the index tables so far by this index build.
+    IndexBuildWriteStats _indexWriteStats;
 
     // We cache the collection pointer for the collection scan phase. The collection pointer is
     // compared after yielding, which is used to indicate whether we need to refetch the index

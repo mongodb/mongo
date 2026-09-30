@@ -497,6 +497,10 @@ public:
 
     static constexpr MetricName kIndexBuildCompletedDurationMillis =
         MetricNameMaker::make("mongodb.index_builds.completed.duration_millis");
+    static constexpr MetricName kIndexBuildCompletedKeysWritten =
+        MetricNameMaker::make("mongodb.index_builds.completed.keys_written");
+    static constexpr MetricName kIndexBuildCompletedBytesWritten =
+        MetricNameMaker::make("mongodb.index_builds.completed.data_written");
     static constexpr MetricName kIndexBuildKeysProcessed =
         MetricNameMaker::make("mongodb.serverStatus.metrics.indexBuilds.keysProcessed");
     static constexpr MetricName kIndexBuildBytesProcessed =

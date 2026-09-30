@@ -9,6 +9,7 @@ import {describe, it} from "jstests/libs/mochalite.js";
 import {
     extractPrometheusMetricIntValue,
     extractPrometheusMetricTime,
+    getHistogramByAttributeAcrossFiles,
     getLatestMetrics,
     getLatestRawRecord,
 } from "jstests/noPassthrough/observability/libs/otel_metrics_file_export_helpers.js";
@@ -393,6 +394,125 @@ describe("getLatestMetrics", function () {
             const result = getLatestMetrics(dir);
             assert.eq(result.time, kTime3Ms);
         });
+    });
+});
+
+describe("getHistogramByAttributeAcrossFiles", function () {
+    const kBounds = [0, 10, 100];
+
+    function makeAttributedHistogramDataPoint(attributes, opts) {
+        return {
+            ...makeHistogramDataPoint(kTime1Ns, {explicitBounds: kBounds, ...opts}),
+            attributes: Object.entries(attributes).map(([key, value]) => ({
+                key,
+                value: {stringValue: value},
+            })),
+        };
+    }
+
+    it("returns zeroes and empty arrays when nothing matches", function () {
+        const dir = createTestDir("hist_attr_none");
+        writeMetricsFile(dir, "a-metrics.jsonl", [
+            makeRecord([
+                makeHistogramMetric("h", [
+                    makeAttributedHistogramDataPoint(
+                        {outcome: "failure"},
+                        {count: 1, sum: 5, bucketCounts: [0, 1, 0, 0]},
+                    ),
+                ]),
+            ]),
+        ]);
+
+        const result = getHistogramByAttributeAcrossFiles(dir, "h", "outcome", "success");
+        assert.eq(result, {count: 0, sum: 0, bucketCounts: [], explicitBounds: []});
+    });
+
+    it("combines every matching data point and ignores the others", function () {
+        const dir = createTestDir("hist_attr_points");
+        writeMetricsFile(dir, "a-metrics.jsonl", [
+            makeRecord([
+                makeHistogramMetric("h", [
+                    makeAttributedHistogramDataPoint(
+                        {start_phase: "initialized", outcome: "success"},
+                        {count: 2, sum: 7, bucketCounts: [0, 2, 0, 0]},
+                    ),
+                    makeAttributedHistogramDataPoint(
+                        {start_phase: "collection scan", outcome: "success"},
+                        {count: 1, sum: 50, bucketCounts: [0, 0, 1, 0]},
+                    ),
+                    makeAttributedHistogramDataPoint(
+                        {start_phase: "initialized", outcome: "failure"},
+                        {count: 4, sum: 400, bucketCounts: [0, 0, 0, 4]},
+                    ),
+                ]),
+                makeHistogramMetric("other", [
+                    makeAttributedHistogramDataPoint(
+                        {outcome: "success"},
+                        {count: 8, sum: 8, bucketCounts: [0, 8, 0, 0]},
+                    ),
+                ]),
+            ]),
+        ]);
+
+        const result = getHistogramByAttributeAcrossFiles(dir, "h", "outcome", "success");
+        assert.eq(result, {count: 3, sum: 57, bucketCounts: [0, 2, 1, 0], explicitBounds: kBounds});
+    });
+
+    it("combines the latest record of every file", function () {
+        const dir = createTestDir("hist_attr_files");
+        writeMetricsFile(dir, "node0-metrics.jsonl", [
+            makeRecord([
+                makeHistogramMetric("h", [
+                    makeAttributedHistogramDataPoint(
+                        {outcome: "success"},
+                        {count: 9, sum: 900, bucketCounts: [0, 0, 0, 9]},
+                    ),
+                ]),
+            ]),
+            makeRecord([
+                makeHistogramMetric("h", [
+                    makeAttributedHistogramDataPoint(
+                        {outcome: "success"},
+                        {count: 1, sum: 3, bucketCounts: [0, 1, 0, 0]},
+                    ),
+                ]),
+            ]),
+        ]);
+        writeMetricsFile(dir, "node1-metrics.jsonl", [
+            makeRecord([
+                makeHistogramMetric("h", [
+                    makeAttributedHistogramDataPoint(
+                        {outcome: "success"},
+                        {count: 1, sum: 20, bucketCounts: [0, 0, 1, 0]},
+                    ),
+                ]),
+            ]),
+        ]);
+        writeFile(dir + "/empty-metrics.jsonl", "");
+
+        const result = getHistogramByAttributeAcrossFiles(dir, "h", "outcome", "success");
+        assert.eq(result, {count: 2, sum: 23, bucketCounts: [0, 1, 1, 0], explicitBounds: kBounds});
+    });
+
+    it("combines every data point when no attribute is given", function () {
+        const dir = createTestDir("hist_attr_all");
+        writeMetricsFile(dir, "a-metrics.jsonl", [
+            makeRecord([
+                makeHistogramMetric("h", [
+                    makeAttributedHistogramDataPoint(
+                        {outcome: "success"},
+                        {count: 1, sum: 1, bucketCounts: [0, 1, 0, 0]},
+                    ),
+                    makeAttributedHistogramDataPoint(
+                        {outcome: "failure"},
+                        {count: 1, sum: 0, bucketCounts: [1, 0, 0, 0]},
+                    ),
+                ]),
+            ]),
+        ]);
+
+        const result = getHistogramByAttributeAcrossFiles(dir, "h");
+        assert.eq(result, {count: 2, sum: 1, bucketCounts: [1, 1, 0, 0], explicitBounds: kBounds});
     });
 });
 

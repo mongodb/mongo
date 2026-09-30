@@ -94,6 +94,20 @@ public:
     }
 
     /**
+     * Cumulative count of index keys written to the index table by this tracker's drains, and
+     * their total key string size in bytes. Both insertions and deletions are counted, since
+     * both write to the index table.
+     */
+    struct DrainWriteStats {
+        int64_t keysWritten = 0;
+        int64_t bytesWritten = 0;
+    };
+
+    DrainWriteStats getNumKeysAndBytesWritten() const {
+        return {_drainKeysWritten, _drainBytesWritten};
+    }
+
+    /**
      * Drops the temporary table. Requires a minimum timestamp to be provided, which acts as a lower
      * bound for the drop reaper, ensuring the table will stay alive until the oldest timestamp has
      * advanced past the drop time.
@@ -125,6 +139,8 @@ private:
     std::shared_ptr<Atomic<uint64_t>> _counter = std::make_shared<Atomic<uint64_t>>(0);
 
     uint64_t _numApplied{0};
+    int64_t _drainKeysWritten{0};
+    int64_t _drainBytesWritten{0};
 };
 
 }  // namespace mongo

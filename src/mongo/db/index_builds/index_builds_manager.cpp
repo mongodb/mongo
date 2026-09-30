@@ -452,6 +452,18 @@ boost::optional<IndexBuildPhaseEnum> IndexBuildsManager::getPhase(const UUID& bu
     return builderIt->second->getPhase();
 }
 
+boost::optional<MultiIndexBlock::IndexBuildWriteStats>
+IndexBuildsManager::getNumKeysAndBytesWritten(const UUID& buildUUID) const {
+    std::unique_lock<std::mutex> lk(_mutex);
+
+    auto builderIt = _builders.find(buildUUID);
+    if (builderIt == _builders.end()) {
+        return boost::none;
+    }
+
+    return builderIt->second->getIndexTableWrites();
+}
+
 void IndexBuildsManager::verifyNoIndexBuilds_forTestOnly() {
     std::lock_guard lk(_mutex);
     invariant(_builders.empty());

@@ -1398,7 +1398,10 @@ Status MultiIndexBlock::dumpInsertsFromBulk(
                 _writeIndexStateInfoToContainer(opCtx, i);
             })
                                       : IndexAccessMethod::OnNKeysLoadedFn([]() {}),
-            [shouldThrottleContainerWrites, &bytesSinceLastYield](int64_t bytesWritten) {
+            [this, shouldThrottleContainerWrites, &bytesSinceLastYield](int64_t keysWritten,
+                                                                        int64_t bytesWritten) {
+                _indexWriteStats.numKeysWrittenBulkLoad += keysWritten;
+                _indexWriteStats.numBytesWrittenBulkLoad += bytesWritten;
                 if (shouldThrottleContainerWrites) {
                     bytesSinceLastYield += bytesWritten;
                 }
@@ -1485,6 +1488,17 @@ Status MultiIndexBlock::drainBackgroundWrites(
                                                   const MultikeyPaths& paths) -> Status {
             return _recordRecoveredMultikeyPaths(opCtx, i, paths);
         };
+
+        // Update the number of keys and bytes written within a scope guard so that a drain which
+        // throws part way through still contributes the batches it committed before throwing.
+        const auto before = interceptor->getNumKeysAndBytesWritten();
+        ON_BLOCK_EXIT([&, interceptor] {
+            const auto after = interceptor->getNumKeysAndBytesWritten();
+            _indexWriteStats.numKeysWrittenSideWritesDrain +=
+                after.keysWritten - before.keysWritten;
+            _indexWriteStats.numBytesWrittenSideWritesDrain +=
+                after.bytesWritten - before.bytesWritten;
+        });
 
         auto status = interceptor->drainWritesIntoIndex(opCtx,
                                                         coll,
