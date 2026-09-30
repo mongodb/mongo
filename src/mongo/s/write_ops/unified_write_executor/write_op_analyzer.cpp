@@ -71,7 +71,12 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
     }
     const NamespaceString& bucketsNss = it->second;
 
-    if (routingCtx.hasNss(bucketsNss)) {
+    // Mirror CollectionRoutingInfoTargeter::_init()'s viewful-timeseries shape; bare map membership
+    // is client-forgeable.
+    if (!nss.isTimeseriesBucketsCollection() &&
+        !routingCtx.getCollectionRoutingInfo(nss).hasRoutingTable() &&
+        routingCtx.hasNss(bucketsNss) &&
+        routingCtx.getCollectionRoutingInfo(bucketsNss).hasRoutingTable()) {
         nss = bucketsNss;
         isViewfulTimeseries = true;
     }
