@@ -106,6 +106,7 @@ namespace mongo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(writeConflictInRenameCollCopyToTmp);
+MONGO_FAIL_POINT_DEFINE(hangRenameCollectionAcrossDatabasesBeforeFinalize);
 MONGO_FAIL_POINT_DEFINE(failRenameAfterFinalizeAndAfterSourceDrop);
 
 boost::optional<NamespaceString> getNamespaceFromUUID(OperationContext* opCtx, const UUID& uuid) {
@@ -544,12 +545,12 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
 
     boost::optional<Lock::DBLock> sourceDbLock;
     boost::optional<Lock::CollectionLock> sourceCollLock;
-    if (!shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(source, MODE_S)) {
+    if (!shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(source, MODE_X)) {
         // Lock the DB using MODE_IX to ensure we have the global lock in that mode, as to prevent
         // upgrade from MODE_IS to MODE_IX, which caused deadlock on systems not supporting Database
         // locking and should be avoided in general.
         sourceDbLock.emplace(opCtx, source.dbName(), MODE_IX);
-        sourceCollLock.emplace(opCtx, source, MODE_S);
+        sourceCollLock.emplace(opCtx, source, MODE_X);
     }
 
     boost::optional<Lock::DBLock> targetDBLock;
@@ -731,20 +732,41 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
         }
     }
 
+    // Lock the temporary and target collection in MODE_X. Since we still hold DB X lock, the lock
+    // ordering is irrelevant (we can't deadlock since no other thread can compete for those locks).
+    AutoGetCollection autoTmpColl(opCtx, tmpCollUUID, MODE_X);
+    if (!autoTmpColl) {
+        return Status(ErrorCodes::NamespaceNotFound,
+                      str::stream() << "Temporary collection '" << tmpName.toStringForErrorMsg()
+                                    << "' was removed while renaming collection across DBs");
+    }
+
+    Lock::CollectionLock targetCollLock(opCtx, target, MODE_X);
+
+    // Copy over all the data from source collection to temporary collection. For this we can
+    // drop the exclusive database lock on the target and just keep the locks on the temporary
+    // and destination collections.
+    if (targetDBLock) {
+        shard_role_details::getLocker(opCtx)->downgrade(
+            ResourceId(RESOURCE_DATABASE, target.dbName()), MODE_IX);
+
+        tassert(10142800,
+                "Target database should not be exclusively locked after the downgrade",
+                !shard_role_details::getLocker(opCtx)->isDbLockedForMode(target.dbName(), MODE_X));
+    }
+
+    tassert(10142801,
+            "Unexpected locks held during rename collection across databases",
+            shard_role_details::getLocker(opCtx)->isDbLockedForMode(source.dbName(), MODE_IX) &&
+                shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(source, MODE_X) &&
+                shard_role_details::getLocker(opCtx)->isDbLockedForMode(target.dbName(), MODE_IX) &&
+                shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(tmpName, MODE_X) &&
+                shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(target, MODE_X));
+
     {
         statsTracker.reset();
 
-        // Copy over all the data from source collection to temporary collection. For this we can
-        // drop the exclusive database lock on the target and grab an intent lock on the temporary
-        // collection.
-        targetDBLock.reset();
-
-        AutoGetCollection autoTmpColl(opCtx, tmpCollUUID, MODE_IX);
-        if (!autoTmpColl) {
-            return Status(ErrorCodes::NamespaceNotFound,
-                          str::stream() << "Temporary collection '" << tmpName.toStringForErrorMsg()
-                                        << "' was removed while renaming collection across DBs");
-        }
+        // Copy over all the data from source collection to temporary collection.
 
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         auto isOplogDisabledForTmpColl = replCoord->isOplogDisabledFor(opCtx, tmpName);
@@ -834,8 +856,12 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
                 return status;
         }
     }
-    sourceCollLock.reset();
-    sourceDbLock.reset();
+
+    hangRenameCollectionAcrossDatabasesBeforeFinalize.pauseWhileSet(opCtx);
+
+    // The functions below expect to work over the latest state of the collections,
+    // so abandon any snapshot that we may have acquired during the data copy.
+    shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
 
     // Getting here means we successfully built the target copy. We now do the final
     // in-place rename and remove the source collection.
@@ -1030,13 +1056,15 @@ Status renameCollection(OperationContext* opCtx,
     }
 
     StringData dropTargetMsg = options.dropTarget ? "yes"_sd : "no"_sd;
+    bool sameDB = source.isEqualDb(target);
     LOGV2(20400,
           "renameCollectionForCommand",
           "sourceNamespace"_attr = source,
           "targetNamespace"_attr = target,
-          "dropTarget"_attr = dropTargetMsg);
+          "dropTarget"_attr = dropTargetMsg,
+          "sameDB"_attr = sameDB);
 
-    if (source.isEqualDb(target))
+    if (sameDB)
         return renameCollectionWithinDB(opCtx, source, target, options);
     else {
         return renameCollectionAcrossDatabases(opCtx, source, target, options);
