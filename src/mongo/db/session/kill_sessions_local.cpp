@@ -81,10 +81,7 @@ void killSessionsAction(
     const auto catalog = SessionCatalog::get(opCtx);
 
     std::vector<SessionCatalog::KillToken> sessionKillTokens;
-    catalog->scanSessions(matcher, [&](const ObservableSession& session) {
-        if (filterFn(session))
-            sessionKillTokens.emplace_back(session.kill(reason));
-    });
+    sessionKillTokens = catalog->killSessions(matcher, reason, filterFn);
 
     for (auto& sessionKillToken : sessionKillTokens) {
         try {
