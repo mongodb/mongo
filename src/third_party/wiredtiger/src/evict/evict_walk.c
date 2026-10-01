@@ -1297,6 +1297,18 @@ __evict_try_queue_page(WT_SESSION_IMPL *session, WTI_EVICT_QUEUE *queue, WT_REF 
         return;
     }
 
+    /*
+     * Under precise checkpoints, avoid repeatedly queuing a restored leaf page when neither the
+     * pinned stable timestamp nor the oldest transaction ID has advanced, even during aggressive
+     * eviction.
+     */
+    if (modified && F_ISSET(ref, WT_REF_FLAG_LEAF) && F_ISSET(conn, WT_CONN_PRECISE_CHECKPOINT) &&
+      !F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT) &&
+      __wti_evict_restored_page_unchanged(session, page)) {
+        WT_STAT_CONN_INCR(session, eviction_server_skip_pages_restored_unchanged);
+        return;
+    }
+
     /* Evaluate dirty page candidacy, when eviction is not aggressive. */
     if (!__wt_evict_aggressive(session) && modified && __evict_skip_dirty_candidate(session, page))
         return;

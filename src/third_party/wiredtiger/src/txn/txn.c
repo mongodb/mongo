@@ -1412,7 +1412,7 @@ __wt_txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_BTREE *btree,
       (upd->type != WT_UPDATE_TOMBSTONE ||
         (upd->next != NULL && F_ISSET(upd->next, WT_UPDATE_PREPARE_RESTORED_FROM_DS))))
         resolve_case = RESOLVE_PREPARE_ON_DISK;
-    else if (__wt_btree_stays_in_memory(btree))
+    else if (F_ISSET(btree, WT_BTREE_IN_MEMORY))
         resolve_case = RESOLVE_IN_MEMORY;
     else
         resolve_case = RESOLVE_UPDATE_CHAIN;

@@ -453,6 +453,7 @@ conn_stats = [
     EvictStat('eviction_server_skip_pages_last_running', 'eviction server skips pages that are written with transactions greater than the last running'),
     EvictStat('eviction_server_skip_pages_prune_timestamp', 'eviction server skips pages that are written with transactions greater than the prune timestamp'),
     EvictStat('eviction_server_skip_pages_prune_timestamp_not_move', 'eviction server skips pages that have been reconciled previously at the same prune timestamp'),
+    EvictStat('eviction_server_skip_pages_restored_unchanged', 'eviction server skips restored pages whose pinned stable timestamp and oldest transaction ID have not moved since the last eviction'),
     EvictStat('eviction_server_skip_pages_retry', 'eviction server skips pages that previously failed eviction and likely will again'),
     EvictStat('eviction_server_skip_stable_trees', 'eviction server skips stable btrees in disagg'),
     EvictStat('eviction_server_skip_stale_disagg_pages', 'eviction server skips pages on an outdated disaggregated read-only btree that a reader still has open'),

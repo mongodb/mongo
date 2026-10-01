@@ -1630,7 +1630,7 @@ operator<<(std::ostream &out, const kv_workload &workload)
 inline std::ostream &
 operator<<(std::ostream &out, const std::shared_ptr<kv_workload> &workload)
 {
-    out << *workload.get();
+    out << *workload;
     return out;
 }
 

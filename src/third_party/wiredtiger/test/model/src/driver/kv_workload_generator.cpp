@@ -113,8 +113,8 @@ kv_workload_generator_spec::kv_workload_generator_spec()
  *     Create a new workload generator.
  */
 kv_workload_generator::kv_workload_generator(const kv_workload_generator_spec &spec, uint64_t seed)
-    : _workload_ptr(std::make_shared<kv_workload>()), _workload(*(_workload_ptr.get())),
-      _last_table_id(0), _last_txn_id(0), _random(seed), _spec(spec)
+    : _workload_ptr(std::make_shared<kv_workload>()), _workload(*_workload_ptr), _last_table_id(0),
+      _last_txn_id(0), _random(seed), _spec(spec)
 {
 }
 
@@ -196,7 +196,7 @@ kv_workload_generator::sequence_traversal::find_next_barrier(size_t start)
 {
     for (size_t i = start; i < _sequences.size(); i++) {
         kv_workload_sequence_ptr &seq = _sequences[i];
-        if (_barrier_fn(*seq.get()))
+        if (_barrier_fn(*seq))
             return seq->seq_no();
     }
     return _sequences.size();
@@ -418,7 +418,7 @@ kv_workload_generator::generate_transaction(size_t seq_no)
     /* Start the new transaction. */
     kv_workload_sequence_ptr txn_ptr =
       std::make_shared<kv_workload_sequence>(seq_no, kv_workload_sequence_type::transaction);
-    kv_workload_sequence &txn = *txn_ptr.get();
+    kv_workload_sequence &txn = *txn_ptr;
     txn << operation::begin_transaction(txn_id);
 
     /* If we're going to use "set commit timestamp," start with it. */

@@ -29,7 +29,6 @@
 import threading, time
 import wttest
 from wtthread import checkpoint_thread, named_checkpoint_thread
-from helper import simulate_crash_restart
 from wiredtiger import stat
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
@@ -207,22 +206,3 @@ class test_checkpoint(wttest.WiredTigerTestCase):
 
         # Now read the checkpoint.
         self.check(ds, self.second_checkpoint, expected)
-
-        # If we haven't died yet, pretend to crash and run RTS to see if the
-        # checkpoint was inconsistent.
-        # (This only works if we didn't reopen the connection, so don't bother if we did.)
-        #
-        # Disable this crosscheck until we have a more reliable way to generate inconsistent
-        # checkpoints (checkpoints with a torn transaction) on demand. The current method
-        # waits until the checkpoint has started to begin committing, but there's still a
-        # race where the checkpoint thread starts another checkpoint after the commit is
-        # finished. Consequently, occasional failures occur in the testbed, which are a waste
-        # of everyone's time.
-        #if not self.do_reopen:
-        #    simulate_crash_restart(self, ".", "RESTART")
-        #
-        #    # Make sure we did get an inconsistent checkpoint.
-        #    stat_cursor = self.session.open_cursor('statistics:', None, None)
-        #    inconsistent_ckpt = stat_cursor[stat.conn.txn_rts_inconsistent_ckpt][2]
-        #    stat_cursor.close()
-        #    self.assertGreater(inconsistent_ckpt, 0)

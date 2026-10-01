@@ -589,6 +589,7 @@ struct __wt_connection_stats {
     int64_t eviction_server_skip_pages_prune_timestamp_not_move;
     int64_t eviction_server_skip_pages_retry;
     int64_t eviction_server_skip_unwanted_pages;
+    int64_t eviction_server_skip_pages_restored_unchanged;
     int64_t eviction_server_skip_trees_walk_complete;
     int64_t eviction_server_skip_stable_trees;
     int64_t eviction_server_skip_unwanted_tree;

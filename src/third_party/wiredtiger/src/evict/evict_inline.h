@@ -1098,6 +1098,27 @@ __wti_evict_prune_ts_unmoved(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
+ * __wti_evict_restored_page_unchanged --
+ *     Return whether the last reconciliation's pinned stable timestamp and the last eviction
+ *     attempt's oldest transaction ID are still current for a restored page.
+ */
+static WT_INLINE bool
+__wti_evict_restored_page_unchanged(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+    WT_PAGE_MODIFY *mod;
+    wt_timestamp_t pinned_stable_ts;
+
+    mod = page->modify;
+    if (!FLD_ISSET(mod->restore_state, WT_PAGE_RS_RESTORED))
+        return (false);
+
+    pinned_stable_ts = __wt_txn_pinned_stable_timestamp(session);
+    return (pinned_stable_ts != WT_TS_NONE &&
+      mod->rec_pinned_stable_timestamp >= pinned_stable_ts &&
+      mod->rec_evict_attempt_oldest_id >= __wt_txn_oldest_id(session));
+}
+
+/*
  * __wti_evict_ckpt_ts_unmoved --
  *     Return whether the checkpoint timestamp has not advanced since the page's last
  *     reconciliation.

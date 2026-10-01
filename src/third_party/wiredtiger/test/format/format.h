@@ -448,6 +448,7 @@ typedef struct {
     WT_ITEM *key, _key;             /* read key */
     WT_ITEM *value, _value;         /* read value */
     WT_ITEM *new_value, _new_value; /* insert, modify or update value */
+    WT_ITEM mirror_value;           /* snapshot-isolation mirror read comparison */
 
     uint64_t last; /* truncate range */
     WT_ITEM *lastkey, _lastkey;
@@ -472,7 +473,8 @@ typedef struct {
     WT_MODIFY entries[MAX_MODIFY_ENTRIES];
     WT_ITEM moda, modb; /* Temporary buffers for modify checks */
 
-    int op_ret; /* Operation return. */
+    int op_ret;         /* Operation return. */
+    bool op_bound_read; /* Operation was a read with cursor bounds applied. */
 
 #define TINFO_RUNNING 1  /* Running */
 #define TINFO_COMPLETE 2 /* Finished */

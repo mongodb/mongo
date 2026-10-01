@@ -134,6 +134,8 @@ static WT_INLINE bool __wti_evict_prune_ts_unmoved(WT_SESSION_IMPL *session, WT_
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE bool __wti_evict_readgen_is_soon_or_wont_need(uint64_t *readgen)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+static WT_INLINE bool __wti_evict_restored_page_unchanged(WT_SESSION_IMPL *session, WT_PAGE *page)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE bool __wti_evict_updates_needed(WT_SESSION_IMPL *session, double *pct_fullp)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE double __wti_evict_dirty_target(WT_EVICT *evict)

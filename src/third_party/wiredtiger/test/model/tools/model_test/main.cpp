@@ -132,7 +132,7 @@ run_and_verify(std::shared_ptr<model::kv_workload> workload, const std::string &
     workload_out.open(workload_file);
     if (!workload_out.is_open())
         throw std::runtime_error("Failed to create file: " + workload_file);
-    workload_out << *workload.get();
+    workload_out << *workload;
     workload_out.close();
     if (!workload_out.good())
         throw std::runtime_error("Failed to close file: " + workload_file);
@@ -389,7 +389,7 @@ load_workload(const char *file)
         if (line.empty() || line[0] == '#')
             continue;
         try {
-            *workload.get() << model::operation::parse(line.c_str());
+            *workload << model::operation::parse(line.c_str());
         } catch (std::exception &e) {
             throw std::runtime_error("Error on line " + std::to_string(line_no) + ": " + e.what());
         }
@@ -614,7 +614,7 @@ reduce_counterexample(std::shared_ptr<model::kv_workload> workload, const std::s
 
                 model::kv_workload_sequence_ptr seq = std::make_shared<model::kv_workload_sequence>(
                   sequences.size(), model::kv_workload_sequence_type::transaction);
-                *seq.get() << op.operation;
+                *seq << op.operation;
                 op.seq_no = seq->seq_no();
                 sequences.push_back(seq);
                 txn_to_sequence[txn_id] = std::move(seq);
@@ -625,7 +625,7 @@ reduce_counterexample(std::shared_ptr<model::kv_workload> workload, const std::s
                     throw model::model_exception(
                       "Transaction ID does not exist: " + std::to_string(txn_id));
                 model::kv_workload_sequence_ptr seq = itr->second;
-                *seq.get() << op.operation;
+                *seq << op.operation;
                 op.seq_no = seq->seq_no();
 
                 /* Transaction end. */
@@ -637,7 +637,7 @@ reduce_counterexample(std::shared_ptr<model::kv_workload> workload, const std::s
             /* Non-transaction operations, such as set stable timestamp or crash. */
             model::kv_workload_sequence_ptr seq =
               std::make_shared<model::kv_workload_sequence>(sequences.size());
-            *seq.get() << op.operation;
+            *seq << op.operation;
             op.seq_no = seq->seq_no();
             sequences.push_back(std::move(seq));
 
@@ -696,7 +696,7 @@ reduce_counterexample(std::shared_ptr<model::kv_workload> workload, const std::s
         workload_out.open(workload_file);
         if (!workload_out.is_open())
             throw std::runtime_error("Failed to create file: " + workload_file);
-        workload_out << *w.get();
+        workload_out << *w;
         workload_out.close();
         if (!workload_out.good())
             throw std::runtime_error("Failed to close file: " + workload_file);
@@ -855,7 +855,7 @@ main(int argc, char *argv[])
 
             /* If we only want to print the workload, then do so. */
             if (print_only) {
-                std::cout << *workload.get();
+                std::cout << *workload;
                 continue;
             }
 
@@ -920,7 +920,7 @@ main(int argc, char *argv[])
 
             /* If we only want to print the workload, then do so. */
             if (print_only) {
-                std::cout << *workload.get();
+                std::cout << *workload;
                 break;
             }
 

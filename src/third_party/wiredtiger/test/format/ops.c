@@ -213,6 +213,7 @@ tinfo_teardown(void)
 
         __wt_buf_free(NULL, &tinfo->moda);
         __wt_buf_free(NULL, &tinfo->modb);
+        __wt_buf_free(NULL, &tinfo->mirror_value);
 
         snap_teardown(tinfo);
         key_gen_teardown(tinfo->key);
@@ -834,6 +835,48 @@ typedef enum {
     } while (0)
 
 /*
+ * mirror_check --
+ *     Check the table that just ran against the rest of its mirror group, then make its result the
+ *     reference the remaining tables are checked against.
+ */
+static void
+mirror_check(TINFO *tinfo, iso_level_t iso_level, thread_op op, int *expect_retp, bool *expect_setp,
+  const char *reference)
+{
+    TABLE *table;
+
+    table = tinfo->table;
+
+    /*
+     * Mirrors must see the same key space: a remove or blind modify must find the key on every
+     * mirror or none, and a snapshot-isolation read must see the same value too. A read under a
+     * weaker isolation level, or with cursor bounds applied, is exempt -- both can legitimately
+     * disagree across mirrors with no divergence involved. Insert, truncate, and update need no
+     * such check: the first two can't reach here except successfully, and truncate has its own
+     * range-based mirror verification.
+     */
+    if (op != MODIFY && op != REMOVE &&
+      !(op == READ && iso_level == ISOLATION_SNAPSHOT && !tinfo->op_bound_read))
+        return;
+
+    if (*expect_setp && tinfo->op_ret != *expect_retp)
+        testutil_die(0, "mirror mismatch: op %d on table %s returned %d, expected %d (%s)", (int)op,
+          table->uri, tinfo->op_ret, *expect_retp, reference);
+    if (*expect_setp && op == READ && tinfo->op_ret == 0 &&
+      (tinfo->value->size != tinfo->mirror_value.size ||
+        memcmp(tinfo->value->data, tinfo->mirror_value.data, tinfo->value->size) != 0))
+        testutil_die(
+          0, "mirror value mismatch: read on table %s differs (%s)", table->uri, reference);
+
+    /* This table's result is what the rest of the group is checked against. */
+    *expect_retp = tinfo->op_ret;
+    *expect_setp = true;
+    if (op == READ && tinfo->op_ret == 0)
+        testutil_check(
+          __wt_buf_set(NULL, &tinfo->mirror_value, tinfo->value->data, tinfo->value->size));
+}
+
+/*
  * table_op --
  *     Per-thread table operation.
  */
@@ -963,8 +1006,10 @@ table_op(TINFO *tinfo, bool intxn, iso_level_t iso_level, thread_op op, bool pau
     case READ:
         ++tinfo->search;
 
+        tinfo->op_bound_read = false;
         if (!positioned && GV(OPS_BOUND_CURSOR) && mmrand(&tinfo->extra_rnd, 1, 2) == 1) {
             bound_set = true;
+            tinfo->op_bound_read = true;
             /*
              * FIXME-WT-9883: It is possible that the underlying cursor is still positioned even
              * though the positioned variable is false. Reset the position through reset for now.
@@ -1110,9 +1155,9 @@ ops(void *arg)
     uint64_t rlog_key, rlog_lane, rlog_read_ts, rlog_replay_ts;
     uint32_t max_rows, ntries, range, rnd, snap_retries;
     u_int i, rlog_table_id, throttle_delay_max;
-    int rlog_ret;
+    int expect_ret, rlog_ret;
     const char *iso_config, *rlog_op_name;
-    bool greater_than, intxn, pause_writes, prepared, mirrored_truncate;
+    bool expect_set, greater_than, intxn, pause_writes, prepared, mirrored_truncate;
 
     tinfo = arg;
     mirrored_truncate = false;
@@ -1433,6 +1478,8 @@ rollback_retry:
 
         ret = 0;
         skip1 = skip2 = NULL;
+        expect_ret = 0;
+        expect_set = false;
         if (op == MODIFY && table->mirror) {
             tinfo->table = g.base_mirror;
             ret = table_op(tinfo, intxn, iso_level, op, pause_writes);
@@ -1453,6 +1500,8 @@ rollback_retry:
                 goto skip_operation;
 
             skip1 = g.base_mirror;
+            expect_ret = tinfo->op_ret;
+            expect_set = true;
         }
         if (ret == 0 && table != skip1) {
             tinfo->table = table;
@@ -1462,6 +1511,9 @@ rollback_retry:
                 goto rollback;
             if (GV(RUNS_PREDICTABLE_REPLAY))
                 rlog_ret = tinfo->op_ret;
+
+            if (ret == 0)
+                mirror_check(tinfo, iso_level, op, &expect_ret, &expect_set, "the base mirror");
             skip2 = table;
         }
         if (ret == 0 && table->mirror) {
@@ -1483,6 +1535,8 @@ rollback_retry:
                         goto rollback;
                     if (ret == WT_ROLLBACK)
                         break;
+                    mirror_check(tinfo, iso_level, op, &expect_ret, &expect_set,
+                      "an earlier mirror in the same group");
                 }
         }
 skip_operation:
@@ -1660,6 +1714,8 @@ read_row_worker(TINFO *tinfo, TABLE *table, WT_CURSOR *cursor, uint64_t keyno, W
     switch (ret) {
     case 0:
         testutil_check(cursor->get_value(cursor, value));
+        /* Copy the value out: the cursor is reset before the caller is done with it. */
+        testutil_check(__wt_buf_set(NULL, value, value->data, value->size));
         break;
     case WT_NOTFOUND:
         break;
