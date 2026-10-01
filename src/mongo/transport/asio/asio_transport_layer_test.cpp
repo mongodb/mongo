@@ -1224,6 +1224,7 @@ public:
     };
 
     void setUp() override {
+        ServiceContextTest::setUp();
         auto* svcCtx = getServiceContext();
         svcCtx->getService()->setServiceEntryPoint(
             std::make_unique<test::ServiceEntryPointUnimplemented>());
@@ -1234,6 +1235,7 @@ public:
 
     void tearDown() override {
         getServiceContext()->getTransportLayerManager()->shutdown();
+        ServiceContextTest::tearDown();
     }
 
     AsioTransportLayer& tla() {
@@ -1505,6 +1507,7 @@ public:
     virtual void configureSessionManager(FirstSessionManager& mgr) {}
 
     void setUp() override {
+        ServiceContextTest::setUp();
         auto pf = makePromiseFuture<std::shared_ptr<Session>>();
         auto sessionManager = std::make_unique<FirstSessionManager>(std::move(pf.promise));
         configureSessionManager(*sessionManager);
@@ -1525,6 +1528,7 @@ public:
     void tearDown() override {
         _connThread.reset();
         getServiceContext()->getTransportLayerManager()->shutdown();
+        ServiceContextTest::tearDown();
     }
 
     Client& client() {
@@ -2203,6 +2207,7 @@ public:
 
     void tearDown() override {
         getServiceContext()->getTransportLayerManager()->shutdown();
+        ServiceContextTest::tearDown();
     }
 
     MockSessionManagerCommonWithHook& sessionManager() {

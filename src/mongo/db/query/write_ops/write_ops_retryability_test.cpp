@@ -54,6 +54,7 @@ const BSONObj kNestedOplog(BSON("$sessionMigrateInfo" << 1));
 class WriteOpsRetryability : public ServiceContextMongoDTest {
 public:
     void setUp() override {
+        ServiceContextMongoDTest::setUp();
         auto serviceContext = getServiceContext();
         auto storageImpl = std::make_unique<repl::StorageInterfaceImpl>();
         repl::StorageInterface::set(serviceContext, std::move(storageImpl));

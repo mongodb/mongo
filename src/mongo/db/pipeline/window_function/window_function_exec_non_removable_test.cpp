@@ -207,6 +207,7 @@ TEST_F(WindowFunctionExecNonRemovableTest, CanReceiveSortByExpression) {
 class RankTest : public WindowFunctionExecNonRemovableTest {
 public:
     void setUp() override {
+        WindowFunctionExecNonRemovableTest::setUp();
         _mock = mockStage();
     }
 

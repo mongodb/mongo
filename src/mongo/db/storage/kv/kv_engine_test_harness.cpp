@@ -69,6 +69,7 @@ public:
 class KVEngineMDBCatalogTest : public ServiceContextTest {
 protected:
     void setUp() override {
+        ServiceContextTest::setUp();
         helper = KVHarnessHelper::create(getServiceContext());
         invariant(hasGlobalServiceContext());
     }

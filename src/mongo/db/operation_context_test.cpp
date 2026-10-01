@@ -261,6 +261,7 @@ public:
         : OperationTestWithMockClock(std::make_shared<ClockSourceMock>()) {}
 
     void setUp() override {
+        OperationContextTest::setUp();
         client = getServiceContext()->getService()->makeClient("OperationDeadlineTest");
     }
 

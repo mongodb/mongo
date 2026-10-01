@@ -39,6 +39,7 @@ protected:
     }
 
     void setUp() override {
+        ServiceContextTest::setUp();
         resetApplyParams();
     }
 

@@ -72,6 +72,7 @@ QuerySettings makeQuerySettings(const IndexHintSpecs& indexHints, bool setFramew
 class QuerySettingsClusterParameterTest : public ServiceContextTest {
 public:
     void setUp() final {
+        ServiceContextTest::setUp();
         _opCtx = cc().makeOperationContext();
     }
 

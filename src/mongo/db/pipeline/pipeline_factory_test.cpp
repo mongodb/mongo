@@ -127,6 +127,7 @@ void ensureMockGatedViewStageRegistered() {
 class MakePipelineFromViewDefinitionIfrTest : public AggregationContextFixture {
 protected:
     void setUp() override {
+        AggregationContextFixture::setUp();
         ensureMockGatedViewStageRegistered();
     }
 };

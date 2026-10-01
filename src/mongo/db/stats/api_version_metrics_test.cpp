@@ -29,10 +29,9 @@ class APIVersionMetricsTest : public SharedClockSourceAdapterServiceContextTest 
 
 public:
     void setUp() override {
+        SharedClockSourceAdapterServiceContextTest::setUp();
         apiParams = APIParameters();
     }
-
-    void tearDown() override {}
 
 protected:
     APIVersionMetricsTest() : APIVersionMetricsTest(std::make_shared<ClockSourceMock>()) {}

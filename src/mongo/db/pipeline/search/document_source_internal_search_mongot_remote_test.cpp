@@ -16,12 +16,14 @@ namespace {
 class InternalSearchMongotRemoteTest : service_context_test::WithSetupTransportLayer,
                                        public AggregationContextFixture {
     void setUp() override {
+        AggregationContextFixture::setUp();
         executor::startupSearchExecutorsIfNeeded(getServiceContext());
     }
 
     void tearDown() override {
         executor::beginSearchExecutorShutdown(getServiceContext());
         executor::shutdownSearchExecutorsIfNeeded(getServiceContext());
+        AggregationContextFixture::tearDown();
     }
 };
 

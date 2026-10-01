@@ -50,6 +50,7 @@ using namespace std::literals::string_view_literals;
 class GRPCTransportLayerTest : public ServiceContextTest {
 public:
     void setUp() override {
+        ServiceContextTest::setUp();
         auto svcCtx = getServiceContext();
 
         // Default SEP behavior is to fail.
@@ -71,6 +72,7 @@ public:
 
     void tearDown() override {
         ServiceExecutor::shutdownAll(getServiceContext(), Seconds{10});
+        ServiceContextTest::tearDown();
     }
 
     virtual std::unique_ptr<PeriodicRunner> newPeriodicRunner() {
@@ -414,6 +416,7 @@ public:
 
     void tearDown() override {
         _tl.reset();
+        GRPCTransportLayerTest::tearDown();
     }
 
     GRPCTransportLayer& transportLayer() {

@@ -52,11 +52,13 @@ public:
     }
 
     void setUp() override {
+        ServiceContextTest::setUp();
         _ie = std::make_unique<InlineExecutor>();
     }
 
     void tearDown() override {
         stop();
+        ServiceContextTest::tearDown();
     }
 
     InlineExecutor& getInlineExecutor() {

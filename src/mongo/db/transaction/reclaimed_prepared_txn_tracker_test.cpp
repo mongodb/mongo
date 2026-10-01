@@ -21,6 +21,7 @@ namespace {
 class ReclaimedPreparedTxnTrackerTest : public ServiceContextMongoDTest {
 public:
     void setUp() override {
+        ServiceContextMongoDTest::setUp();
         _opCtx = getClient()->makeOperationContext();
     }
 

@@ -29,6 +29,7 @@ const NamespaceString kDefaultTestNss =
 class DeleteKeyTest : public ServiceContextTest {
 public:
     void setUp() override {
+        ServiceContextTest::setUp();
         _opCtx = makeOperationContext();
     }
 

@@ -42,10 +42,12 @@ OperationContext* CatalogTestFixture::operationContext() const {
 }
 
 void CatalogTestFixture::setUp() {
+    ServiceContextTest::setUp();
     _opCtx = getClient()->makeOperationContext();
 }
 void CatalogTestFixture::tearDown() {
     _opCtx.reset();
+    ServiceContextTest::tearDown();
 }
 
 repl::StorageInterface* CatalogTestFixture::storageInterface() const {

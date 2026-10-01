@@ -49,6 +49,7 @@ ShardingTestFixtureCommon::~ShardingTestFixtureCommon() {
 }
 
 void ShardingTestFixtureCommon::setUp() {
+    ServiceContextTest::setUp();
     _opCtxHolder = makeOperationContext();
 
     ResourceYielderFactory::initialize(getServiceContext());
@@ -56,6 +57,7 @@ void ShardingTestFixtureCommon::setUp() {
 
 void ShardingTestFixtureCommon::tearDown() {
     _opCtxHolder.reset();
+    ServiceContextTest::tearDown();
 }
 
 void ShardingTestFixtureCommon::shutdownExecutorPool() {

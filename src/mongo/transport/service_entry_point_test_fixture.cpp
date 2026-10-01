@@ -54,6 +54,7 @@ MONGO_REGISTER_COMMAND(TestCmdSupportsWriteConcern).testOnly().forRouter().forSh
 WriteConcernOptions TestCmdSupportsWriteConcern::expectedWriteConcern;
 
 void ServiceEntryPointTestFixture::setUp() {
+    ServiceContextTest::setUp();
     // Minimal set up necessary for ServiceEntryPoint.
     auto service = getGlobalServiceContext();
     service->setStorageEngine(std::make_unique<StorageEngineMock>());

@@ -30,6 +30,7 @@ static constexpr auto collectionType = query_shape::CollectionType::kCollection;
 class UpdateKeyTest : public ServiceContextTest {
 public:
     void setUp() override {
+        ServiceContextTest::setUp();
         _opCtx = makeOperationContext();
     }
 

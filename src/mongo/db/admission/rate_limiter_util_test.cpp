@@ -78,6 +78,7 @@ public:
         : ServiceContextTest(_initContext(&_clockSpy, &_tickSource)) {}
 
     void setUp() override {
+        ServiceContextTest::setUp();
         static_cast<ClockSourceMock*>(getServiceContext()->getFastClockSource())->reset();
         _tickSource->reset(0);
     }
@@ -120,6 +121,7 @@ private:
 class RateLimiterWithMockClockTest : public ClockSourceMockServiceContextTest {
 public:
     void setUp() override {
+        ClockSourceMockServiceContextTest::setUp();
         static_cast<ClockSourceMock*>(getServiceContext()->getFastClockSource())->reset();
         static_cast<TickSourceMock<Milliseconds>*>(getServiceContext()->getTickSource())->reset(0);
     }
@@ -203,10 +205,6 @@ public:
         int64_t attemptedAdmissions;
         double tokensAcquired;
     };
-
-    void setUp() override {
-        RateLimiterWithMockClockTest::setUp();
-    }
 
     std::unique_ptr<RateLimiterMetricsRecorder> recorder() {
         return _policy.recorder();

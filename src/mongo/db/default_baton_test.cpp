@@ -17,6 +17,7 @@ namespace {
 class DefaultBatonTest : public ServiceContextTest {
 public:
     void setUp() override {
+        ServiceContextTest::setUp();
         _opCtx = cc().makeOperationContext();
     }
 

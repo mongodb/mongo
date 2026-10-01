@@ -27,6 +27,7 @@ public:
     }
 
     void setUp() override {
+        ServiceContextTest::setUp();
         _reactor = std::make_shared<GRPCReactor>();
         _ioThread = stdx::thread([&]() {
             _reactor->run();
@@ -37,6 +38,7 @@ public:
     void tearDown() override {
         _reactor->stop();
         _ioThread.join();
+        ServiceContextTest::tearDown();
     }
 
     const std::shared_ptr<GRPCReactor>& getReactor() {

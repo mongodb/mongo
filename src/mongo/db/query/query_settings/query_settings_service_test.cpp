@@ -147,6 +147,7 @@ public:
     static constexpr std::string_view kDbName = "foo"sv;
 
     void setUp() final {
+        ServiceContextTest::setUp();
         // Initialize the query settings.
         _opCtx = cc().makeOperationContext();
     }

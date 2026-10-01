@@ -44,6 +44,7 @@ public:
     ClassicStageBuilderTest() : ServiceContextMongoDTest(Options{}.useMockClock(true)) {}
 
     void setUp() override {
+        ServiceContextMongoDTest::setUp();
         _opCtx = makeOperationContext();
         _workingSet = std::make_unique<WorkingSet>();
 
@@ -60,6 +61,7 @@ public:
         _opCtx.reset();
         _workingSet.reset();
         _planStageQsnMap.clear();
+        ServiceContextMongoDTest::tearDown();
     }
 
     /**

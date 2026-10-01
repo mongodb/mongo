@@ -20,6 +20,7 @@ using namespace std::literals::string_view_literals;
 class InsertKeyTest : public ServiceContextTest {
 public:
     void setUp() override {
+        ServiceContextTest::setUp();
         _opCtx = makeOperationContext();
     }
 

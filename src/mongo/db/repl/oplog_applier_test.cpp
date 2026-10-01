@@ -84,6 +84,7 @@ protected:
 };
 
 void OplogApplierTest::setUp() {
+    ServiceContextTest::setUp();
     _buffer =
         std::make_unique<OplogBufferBlockingQueue>(kTestOplogBufferSize, kTestOplogBufferCount);
     _applier = std::make_unique<OplogApplierMock>(_buffer.get());
@@ -98,6 +99,7 @@ void OplogApplierTest::tearDown() {
     _opCtxHolder = {};
     _applier = {};
     _buffer = {};
+    ServiceContextTest::tearDown();
 }
 
 const DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "test"sv);

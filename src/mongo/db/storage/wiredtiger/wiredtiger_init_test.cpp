@@ -24,6 +24,7 @@ using namespace mongo;
 class WiredTigerFactoryTest : public ServiceContextTest {
 private:
     void setUp() override {
+        ServiceContextTest::setUp();
         ServiceContext* globalEnv = getGlobalServiceContext();
         ASSERT_TRUE(globalEnv);
         ASSERT_TRUE(isRegisteredStorageEngine(globalEnv, kWiredTigerEngineName));
@@ -35,6 +36,7 @@ private:
     void tearDown() override {
         wiredTigerGlobalOptions = _oldOptions;
         factory = nullptr;
+        ServiceContextTest::tearDown();
     }
 
     WiredTigerGlobalOptions _oldOptions;

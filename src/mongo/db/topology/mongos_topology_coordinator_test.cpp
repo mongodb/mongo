@@ -40,10 +40,9 @@ public:
     MongosTopoCoordTest() : MongosTopoCoordTest(std::make_shared<ClockSourceMock>()) {}
 
     void setUp() override {
+        SharedClockSourceAdapterServiceContextTest::setUp();
         _topo = std::make_unique<MongosTopologyCoordinator>();
     }
-
-    void tearDown() override {}
 
 protected:
     /**

@@ -27,6 +27,7 @@ static constexpr auto kCollectionType = query_shape::CollectionType::kCollection
 class WriteCmdShapeRegistrationTest : public ServiceContextTest {
 public:
     void setUp() override {
+        ServiceContextTest::setUp();
         _opCtx = makeOperationContext();
         QueryStatsStoreManager::getRateLimiter(getServiceContext()).configureWindowBased(-1);
         QueryStatsStoreManager::getWriteCmdRateLimiter(getServiceContext())

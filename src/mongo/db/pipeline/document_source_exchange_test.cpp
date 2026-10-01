@@ -143,6 +143,7 @@ class DocumentSourceExchangeTest : service_context_test::WithSetupTransportLayer
                                    public AggregationContextFixture {
 protected:
     void setUp() override {
+        AggregationContextFixture::setUp();
         _executor = executor::ThreadPoolTaskExecutor::create(
             ThreadPool::make({}), executor::makeNetworkInterface("ExchangeTest"));
         _executor->startup();
@@ -151,6 +152,7 @@ protected:
     void tearDown() override {
         _executor->shutdown();
         _executor.reset();
+        AggregationContextFixture::tearDown();
     }
 
     static const size_t strValLen = 27;

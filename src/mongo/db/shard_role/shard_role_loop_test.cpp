@@ -129,6 +129,7 @@ public:
 class ShardRoleLoopTest : public ServiceContextTest {
 protected:
     void setUp() override {
+        ServiceContextTest::setUp();
         // Initialize the StaleShardExceptionHandlerMock
         _staleShardExceptionHandlerMock = std::make_shared<StaleShardExceptionHandlerMock>();
 
@@ -154,8 +155,6 @@ protected:
         _uniqueOpCtx = makeOperationContext();
         _opCtx = _uniqueOpCtx.get();
     }
-
-    void tearDown() override {}
 
     ServiceContext::UniqueOperationContext _uniqueOpCtx;
     OperationContext* _opCtx;

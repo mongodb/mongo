@@ -44,9 +44,14 @@ namespace {
 /**
  * Sets up and tears down the test environment for `TopologyVersionObserver`
  */
-class TopologyVersionObserverTest : public ReplCoordTest {
+class BasicTopologyVersionObserverTest : public ReplCoordTest {
 protected:
-    BSONObj getConfigObj() {
+    void setUp() override {
+        ReplCoordTest::setUp();
+        assertStartSuccess(configObj, HostAndPort("node1", 12345));
+    }
+
+    const BSONObj configObj{[] {
         BSONObjBuilder configBuilder;
         configBuilder << "_id"
                       << "mySet";
@@ -58,12 +63,16 @@ protected:
                                                   << "node2:12345"));
         configBuilder << "protocolVersion" << 1;
         return configBuilder.obj();
-    }
+    }()};
 
+    unittest::MinimumLoggedSeverityGuard severityGuard{logv2::LogComponent::kDefault,
+                                                       logv2::LogSeverity::Debug(4)};
+};
+
+class TopologyVersionObserverTest : public BasicTopologyVersionObserverTest {
 public:
     void setUp() override {
-        auto configObj = getConfigObj();
-        assertStartSuccess(configObj, HostAndPort("node1", 12345));
+        BasicTopologyVersionObserverTest::setUp();
         ReplSetConfig config = assertMakeRSConfig(configObj);
         replCoord = getReplCoord();
 
@@ -86,6 +95,7 @@ public:
         observer->shutdown();
         ASSERT(observer->isShutdown());
         observer.reset();
+        BasicTopologyVersionObserverTest::tearDown();
     }
 
     auto getObserverCache() {
@@ -118,14 +128,11 @@ public:
     }
 
 protected:
-    ReplicationCoordinatorImpl* replCoord;
+    ReplicationCoordinatorImpl* replCoord{};
 
     const Milliseconds sleepTime = Milliseconds(100);
 
     std::unique_ptr<TopologyVersionObserver> observer;
-
-    unittest::MinimumLoggedSeverityGuard severityGuard{logv2::LogComponent::kDefault,
-                                                       logv2::LogSeverity::Debug(4)};
 };
 
 
@@ -259,15 +266,7 @@ TEST_F(TopologyVersionObserverTest, HandleQuiesceMode) {
     ASSERT(observer->isShutdown());
 }
 
-class TopologyVersionObserverInterruptedTest : public TopologyVersionObserverTest {
-public:
-    void setUp() override {
-        auto configObj = getConfigObj();
-        assertStartSuccess(configObj, HostAndPort("node1", 12345));
-    }
-
-    void tearDown() override {}
-};
+class TopologyVersionObserverInterruptedTest : public BasicTopologyVersionObserverTest {};
 
 TEST_F(TopologyVersionObserverInterruptedTest, ShutdownAlwaysInterruptsWorkerOperation) {
 

@@ -47,6 +47,7 @@ public:
     }
 
     void setUp() override {
+        ServiceContextTest::setUp();
         _opCtx = getGlobalServiceContext()->makeOperationContext(Client::getCurrent());
     }
 

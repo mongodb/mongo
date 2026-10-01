@@ -75,6 +75,7 @@ public:
     }
 
     void setUp() final {
+        ServiceContextTest::setUp();
         _opCtx = cc().makeOperationContext();
     }
 

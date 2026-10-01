@@ -38,6 +38,7 @@ GRPCConnectionStats getClientStats(std::shared_ptr<GRPCClient> client) {
 class GRPCClientTest : public ServiceContextTest {
 public:
     void setUp() override {
+        ServiceContextTest::setUp();
         getServiceContext()->setPeriodicRunner(makePeriodicRunner(getServiceContext()));
         _reactor = std::make_shared<GRPCReactor>();
         _ioThread = stdx::thread([this] {
@@ -52,6 +53,7 @@ public:
     void tearDown() override {
         _reactor->stop();
         _ioThread.join();
+        ServiceContextTest::tearDown();
     }
 
     std::shared_ptr<GRPCClient> makeClient(

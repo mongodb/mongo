@@ -58,6 +58,7 @@ public:
         : _nss(NamespaceString::createNamespaceString_forTest("unittests.multikey_paths")) {}
 
     void setUp() final {
+        ServiceContextMongoDTest::setUp();
         AutoGetCollection autoColl(_opCtx.get(), _nss, MODE_IX);
         auto db = autoColl.ensureDbExists(_opCtx.get());
 
@@ -67,16 +68,13 @@ public:
     }
 
     void tearDown() final {
-        AutoGetCollection autoColl(_opCtx.get(), _nss, MODE_X);
-        if (!autoColl) {
-            return;
+        if (AutoGetCollection autoColl(_opCtx.get(), _nss, MODE_X); autoColl) {
+            auto db = autoColl.getDb();
+            WriteUnitOfWork wuow(_opCtx.get());
+            ASSERT_OK(db->dropCollection(_opCtx.get(), _nss));
+            wuow.commit();
         }
-
-        auto db = autoColl.getDb();
-
-        WriteUnitOfWork wuow(_opCtx.get());
-        ASSERT_OK(db->dropCollection(_opCtx.get(), _nss));
-        wuow.commit();
+        ServiceContextMongoDTest::tearDown();
     }
 
     // Helper to refetch the Collection from the catalog in order to see any changes made to it

@@ -27,6 +27,7 @@ static const NamespaceString nss =
 class PlanCacheCommandsTest : public ServiceContextTest {
 public:
     void setUp() override {
+        ServiceContextTest::setUp();
         auto catalog = CollectionCatalog::get(_opCtx.get());
         std::shared_ptr<Collection> coll = std::make_shared<CollectionMock>(nss);
         catalog->onCreateCollection(_opCtx.get(), coll);
@@ -38,6 +39,7 @@ public:
 
     void tearDown() override {
         _collectionAcq.reset();
+        ServiceContextTest::tearDown();
     }
 
     OperationContext* opCtx() {

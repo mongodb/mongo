@@ -163,12 +163,14 @@ public:
         : _repair(repair), _preciseCheckpoints(preciseCheckpoints) {}
 
     void setUp() override {
+        ServiceContextTest::setUp();
         _helper = std::make_unique<WiredTigerKVHarnessHelper>(
             getServiceContext(), _repair, _preciseCheckpoints);
     }
 
     void tearDown() override {
         _helper.reset();
+        ServiceContextTest::tearDown();
     }
 
 protected:

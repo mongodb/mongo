@@ -22,6 +22,7 @@ namespace mongo::transport::grpc {
 class MockStubTest : public ServiceContextTest {
 public:
     void setUp() override {
+        ServiceContextTest::setUp();
         _fixtures = std::make_unique<MockStubTestFixtures>();
         _reactor = std::make_shared<GRPCReactor>();
     }

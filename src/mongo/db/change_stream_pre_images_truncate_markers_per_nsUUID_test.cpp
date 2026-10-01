@@ -628,6 +628,7 @@ public:
         : ServiceContextMongoDTest(Options{}.useMockClock(true)) {}
 
     void setUp() override {
+        ServiceContextMongoDTest::setUp();
         _opCtx = getClient()->makeOperationContext();
         auto service = getServiceContext();
         repl::StorageInterface::set(service, std::make_unique<repl::StorageInterfaceMock>());
@@ -644,6 +645,7 @@ public:
 
     void tearDown() override {
         _opCtx.reset();
+        ServiceContextMongoDTest::tearDown();
     }
 
     ClockSourceMock* clockSource() {

@@ -74,6 +74,7 @@ private:
 };
 
 void CatalogRAIITestFixture::setUp() {
+    ServiceContextTest::setUp();
     DatabaseShardingStateFactory::set(getServiceContext(),
                                       std::make_unique<DatabaseShardingStateFactoryMock>());
     DatabaseHolder::set(getServiceContext(), std::make_unique<DatabaseHolderMock>());
@@ -299,6 +300,7 @@ protected:
 };
 
 void ReadSourceScopeTest::setUp() {
+    ServiceContextTest::setUp();
     _opCtx = getClient()->makeOperationContext();
     shard_role_details::setRecoveryUnit(_opCtx.get(),
                                         std::make_unique<RecoveryUnitMock>(),

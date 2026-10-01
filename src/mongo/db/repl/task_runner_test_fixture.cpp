@@ -39,6 +39,7 @@ void TaskRunnerTest::destroyTaskRunner() {
 }
 
 void TaskRunnerTest::setUp() {
+    ServiceContextTest::setUp();
     _threadPool = ThreadPool::make({
         .poolName = "TaskRunnerTest",
         .onCreateThread =
@@ -54,6 +55,7 @@ void TaskRunnerTest::setUp() {
 void TaskRunnerTest::tearDown() {
     destroyTaskRunner();
     _threadPool.reset();
+    ServiceContextTest::tearDown();
 }
 
 }  // namespace repl

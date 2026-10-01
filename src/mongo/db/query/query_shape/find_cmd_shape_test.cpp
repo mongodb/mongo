@@ -39,6 +39,7 @@ struct RequestOptions {
 class FindCmdShapeTest : public ServiceContextTest {
 public:
     void setUp() final {
+        ServiceContextTest::setUp();
         _expCtx = make_intrusive<ExpressionContextForTest>();
     }
 

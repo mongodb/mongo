@@ -14,6 +14,7 @@ void NetworkInterfaceMockTest::startNetwork() {
 }
 
 void NetworkInterfaceMockTest::setUp() {
+    ServiceContextTest::setUp();
     _tearDownCalled = false;
 }
 
@@ -31,6 +32,7 @@ void NetworkInterfaceMockTest::tearDown() {
     net().signalWorkAvailable();
     executor().join();
     net().shutdown();
+    ServiceContextTest::tearDown();
 }
 }  // namespace executor
 }  // namespace mongo

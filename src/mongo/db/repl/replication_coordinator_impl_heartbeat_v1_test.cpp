@@ -552,6 +552,7 @@ TEST_F(ReplCoordHBV1SplitConfigTest, RejectMismatchedSetNameInHeartbeatResponse)
 class ReplCoordHBV1ReconfigTest : public ReplCoordHBV1Test {
 public:
     void setUp() override {
+        ReplCoordHBV1Test::setUp();
         BSONObj configBson =
             BSON("_id" << "mySet"
                        << "version" << initConfigVersion << "term" << initConfigTerm << "members"
