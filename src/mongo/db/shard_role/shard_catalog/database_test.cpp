@@ -838,6 +838,9 @@ public:
     bool shouldUseReplicatedFastCount() const override {
         return false;
     }
+    std::string getMainWiredTigerTableSettings() const override {
+        return "";
+    }
 };
 
 class RecordIdsReplicatedDatabaseTest : public DatabaseTest {

@@ -141,6 +141,7 @@ std::string WiredTigerIndex::generateAppMetadataString(const IndexConfig& config
 StatusWith<std::string> WiredTigerIndex::generateCreateString(const std::string& engineName,
                                                               const std::string& sysIndexConfig,
                                                               const std::string& collIndexConfig,
+                                                              const std::string& providerConfig,
                                                               std::string_view tableName,
                                                               const IndexConfig& config,
                                                               bool isLogged) {
@@ -148,7 +149,7 @@ StatusWith<std::string> WiredTigerIndex::generateCreateString(const std::string&
 
     // Separate out a prefix and suffix in the default string. User configuration will override
     // values in the prefix, but not values in the suffix.
-    ss << "type=file,internal_page_max=16k,leaf_page_max=16k,";
+    ss << "internal_page_max=16k,leaf_page_max=16k,";
     ss << "checksum=on,";
     if (wiredTigerGlobalOptions.useIndexPrefixCompression) {
         ss << "prefix_compression=true,";
@@ -194,10 +195,13 @@ StatusWith<std::string> WiredTigerIndex::generateCreateString(const std::string&
     // Index metadata
     ss << generateAppMetadataString(config);
     if (isLogged) {
-        ss << "log=(enabled=true)";
+        ss << "log=(enabled=true),";
     } else {
-        ss << "log=(enabled=false)";
+        ss << "log=(enabled=false),";
     }
+
+    ss << "type=file,";
+    ss << providerConfig;
 
     LOGV2_DEBUG(51779, 3, "index create string", "str"_attr = ss.ss.str());
     return StatusWith<std::string>(ss);

@@ -210,15 +210,13 @@ StatusWith<std::string> WiredTigerRecordStore::parseOptionsField(const BSONObj o
     return StatusWith<std::string>(ss.str());
 }
 
-std::string WiredTigerRecordStore::generateCreateString(
-    std::string_view tableName,
-    const WiredTigerRecordStore::WiredTigerTableConfig& wtTableConfig,
-    bool isOplog) {
+std::string WiredTigerRecordStore::generateCreateString(std::string_view tableName,
+                                                        const WiredTigerTableConfig& wtTableConfig,
+                                                        bool isOplog) {
 
     // Separate out a prefix and suffix in the default string. User configuration will
     // override values in the prefix, but not values in the suffix.
     str::stream ss;
-    ss << "type=file,";
     ss << "memory_page_max=" << wtTableConfig.memoryPageMax << ",";
     // Choose a higher split percent, since most usage is append only. Allow some space
     // for workloads where updates increase the size of documents.
@@ -234,13 +232,10 @@ std::string WiredTigerRecordStore::generateCreateString(
     ss << WiredTigerCustomizationHooksRegistry::get(getGlobalServiceContext())
               .getTableCreateConfig(tableName);
 
-    ss << wtTableConfig.extraCreateOptions << ",";
-
-    // By default, WiredTiger silently ignores a create table command if the specified ident already
-    // exists - even if the existing table has a different configuration.
-    //
-    // Enable the 'exclusive' flag so WiredTiger table creation fails if an ident already exists.
-    ss << "exclusive=true,";
+    // User-supplied configuration. First the global server parameters, then the options supplied
+    // for this specific table creation so that those override the defaults.
+    ss << wtTableConfig.serverParameterOptions << ",";
+    ss << wtTableConfig.customOptions << ",";
 
     // WARNING: No user-specified config can appear below this line. These options are required
     // for correct behavior of the server.
@@ -254,6 +249,12 @@ std::string WiredTigerRecordStore::generateCreateString(
 
     ss << ",value_format=u";
 
+    // By default, WiredTiger silently ignores a create table command if the specified ident already
+    // exists - even if the existing table has a different configuration.
+    //
+    // Enable the 'exclusive' flag so WiredTiger table creation fails if an ident already exists.
+    ss << ",exclusive=true";
+
     // Record store metadata
     ss << ",app_metadata=(formatVersion=" << kCurrentRecordStoreVersion;
     if (isOplog) {
@@ -262,10 +263,13 @@ std::string WiredTigerRecordStore::generateCreateString(
     ss << ")";
 
     if (wtTableConfig.logEnabled) {
-        ss << ",log=(enabled=true)";
+        ss << ",log=(enabled=true),";
     } else {
-        ss << ",log=(enabled=false)";
+        ss << ",log=(enabled=false),";
     }
+
+    ss << "type=file,";
+    ss << wtTableConfig.persistenceProviderSettings;
 
     return ss;
 }

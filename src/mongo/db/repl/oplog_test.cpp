@@ -540,6 +540,9 @@ public:
     bool shouldUseReplicatedFastCount() const override {
         return false;
     }
+    std::string getMainWiredTigerTableSettings() const override {
+        return "";
+    }
 };
 
 class ApplyCreateWithRecordIdsReplicatedTest : public OplogTest {

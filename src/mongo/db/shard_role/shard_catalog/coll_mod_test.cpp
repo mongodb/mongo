@@ -467,6 +467,10 @@ public:
         return true;
     }
 
+    std::string getMainWiredTigerTableSettings() const override {
+        return "";
+    }
+
     bool supportsAsyncOplogMarkerGeneration() const override {
         return false;
     }

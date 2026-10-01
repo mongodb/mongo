@@ -295,8 +295,6 @@ Status WiredTigerUtil::checkConfigStringBannedKeys(std::string_view config) {
                 "Enabling the WiredTiger 'import' option is not allowed in a configString"};
     }
 
-    // Collections and indexes are always created as type=file objects and mongod never sets
-    // 'source' itself, so the only value that should ever appear here is empty.
     WT_CONFIG_ITEM source;
     if (parser.get("source", &source) == 0 && source.len != 0) {
         return {ErrorCodes::BadValue,
@@ -1558,10 +1556,6 @@ Status WiredTigerUtil::canRunAutoCompact(bool isEphemeral) {
 uint64_t WiredTigerUtil::genTableId() {
     static Atomic<unsigned long long> nextTableId(WiredTigerUtil::kLastTableId);
     return nextTableId.fetchAndAdd(1);
-}
-
-std::string WiredTigerUtil::concatConfigs(const std::string& configA, const std::string& configB) {
-    return str::stream() << configA << "," << configB;
 }
 
 boost::optional<bool> WiredTigerConfigParser::isTableLoggingEnabled() const {

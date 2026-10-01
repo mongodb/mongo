@@ -73,6 +73,7 @@ public:
             WiredTigerIndex::generateCreateString(std::string{kWiredTigerEngineName},
                                                   "",
                                                   "",
+                                                  "",
                                                   NamespaceStringUtil::serializeForCatalog(nss),
                                                   config,
                                                   kIsLogged);
@@ -114,6 +115,7 @@ public:
                            ordering};
         StatusWith<std::string> result =
             WiredTigerIndex::generateCreateString(std::string{kWiredTigerEngineName},
+                                                  "",
                                                   "",
                                                   "",
                                                   NamespaceStringUtil::serializeForCatalog(nss),

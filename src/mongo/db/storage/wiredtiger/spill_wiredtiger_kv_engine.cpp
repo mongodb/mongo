@@ -120,7 +120,7 @@ std::unique_ptr<RecordStore> SpillWiredTigerKVEngine::makeInternalRecordStore(
     // We don't log writes to spill tables.
     wtTableConfig.logEnabled = false;
     wtTableConfig.blockCompressor = gSpillWiredTigerBlockCompressor;
-    wtTableConfig.extraCreateOptions = _rsOptions;
+    wtTableConfig.serverParameterOptions = _rsOptions;
     std::string config =
         WiredTigerRecordStore::generateCreateString({} /* internal table */, wtTableConfig);
 

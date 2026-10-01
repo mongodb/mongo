@@ -87,9 +87,12 @@ public:
         // Setting this larger than 10m can hurt latencies and throughput degradation if this
         // is the oplog. See SERVER-16247.
         std::string memoryPageMax{"10M"};
-        // Any additional configuration parameters for WT_SESSION::create() in the configuration
-        // string format.
-        std::string extraCreateOptions;
+        // Config string for server-wide table configuration parameters.
+        std::string serverParameterOptions;
+        // Config string for per-operation table configuration parameters supplied by the user.
+        std::string customOptions;
+        // Config string for configuration parameters set by the persistence provider.
+        std::string persistenceProviderSettings;
     };
 
     struct Params {

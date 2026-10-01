@@ -84,19 +84,64 @@ TEST(WiredTigerRecordStoreTest, GenerateCreateStringValidConfigStringOption) {
               std::string("prefix_compression=true,"));
 }
 
-TEST(WiredTigerRecordStoreTest, GenerateCreateStringOverridesValueFormat) {
+std::string_view getConfigString(const WiredTigerConfigParser& parser, const char* key) {
+    WT_CONFIG_ITEM item;
+    ASSERT_EQ(0, parser.get(key, &item));
+    return std::string_view(item.str, item.len);
+}
+
+TEST(WiredTigerRecordStoreTest, GenerateCreateStringCustomOptionsOverrideDefaults) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
 
     WiredTigerRecordStore::WiredTigerTableConfig wtTableConfig;
-    wtTableConfig.extraCreateOptions = "value_format=Q";
+    wtTableConfig.customOptions =
+        "memory_page_max=1GB,split_pct=50,leaf_value_max=1MB,"
+        "checksum=off,block_compressor=none,prefix_compression=true";
 
-    std::string createString = WiredTigerRecordStore::generateCreateString("collection-test",
-                                                                           wtTableConfig,
-                                                                           /*isOplog=*/false);
+    auto configString =
+        WiredTigerRecordStore::generateCreateString("collection-test", wtTableConfig);
+    WiredTigerConfigParser parser(configString);
+    EXPECT_EQ("1GB", getConfigString(parser, "memory_page_max"));
+    EXPECT_EQ("50", getConfigString(parser, "split_pct"));
+    EXPECT_EQ("1MB", getConfigString(parser, "leaf_value_max"));
+    EXPECT_EQ("off", getConfigString(parser, "checksum"));
+    EXPECT_EQ("none", getConfigString(parser, "block_compressor"));
+    EXPECT_EQ("true", getConfigString(parser, "prefix_compression"));
+}
 
-    ASSERT_STRING_CONTAINS(createString, "value_format=Q");
-    ASSERT_STRING_CONTAINS(createString, "value_format=u");
-    ASSERT_GT(createString.rfind("value_format=u"), createString.rfind("value_format=Q"));
+TEST(WiredTigerRecordStoreTest, GenerateCreateStringCustomOptionsOverrideServerParameterOptions) {
+    const auto harnessHelper(newRecordStoreHarnessHelper());
+
+    WiredTigerRecordStore::WiredTigerTableConfig wtTableConfig;
+    wtTableConfig.serverParameterOptions = "prefix_compression=false";
+    wtTableConfig.customOptions = "prefix_compression=true";
+    const std::string createString =
+        WiredTigerRecordStore::generateCreateString("collection-test", wtTableConfig);
+    WiredTigerConfigParser parser(createString);
+    EXPECT_EQ("true", getConfigString(parser, "prefix_compression"));
+}
+
+TEST(WiredTigerRecordStoreTest, GenerateCreateStringCustomOptionsCannotOverrideInternals) {
+    const auto harnessHelper(newRecordStoreHarnessHelper());
+
+    WiredTigerRecordStore::WiredTigerTableConfig wtTableConfig;
+    wtTableConfig.keyFormat = KeyFormat::Long;
+    wtTableConfig.logEnabled = true;
+    wtTableConfig.customOptions =
+        "key_format=S,value_format=Q,exclusive=false,app_metadata=(formatVersion=99),"
+        "log=(enabled=false),type=lsm";
+
+    const std::string createString =
+        WiredTigerRecordStore::generateCreateString("collection-test", wtTableConfig);
+    WiredTigerConfigParser parser(createString);
+    EXPECT_EQ("q", getConfigString(parser, "key_format"));
+    EXPECT_EQ("u", getConfigString(parser, "value_format"));
+    EXPECT_EQ("true", getConfigString(parser, "exclusive"));
+    EXPECT_EQ("file", getConfigString(parser, "type"));
+    EXPECT_EQ("(formatVersion=1)", getConfigString(parser, "app_metadata"));
+    const auto loggingEnabled = parser.isTableLoggingEnabled();
+    ASSERT(loggingEnabled);
+    EXPECT_EQ(true, *loggingEnabled);
 }
 
 TEST(WiredTigerRecordStoreTest, ConfigStringValueFormatOverridesUserSuppliedFormat) {

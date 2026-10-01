@@ -6,6 +6,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/bson/json.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/unittest/unittest.h"
 
 #include <boost/move/utility_core.hpp>
@@ -53,6 +54,40 @@ TEST(WiredTigerIndexTest, GenerateCreateStringInvalidConfigStringOption) {
 TEST(WiredTigerIndexTest, GenerateCreateStringValidConfigStringOption) {
     BSONObj spec = fromjson("{configString: 'prefix_compression=true'}");
     ASSERT_EQ(WiredTigerIndex::parseIndexOptions(spec), std::string("prefix_compression=true,"));
+}
+
+std::string_view getConfigString(const WiredTigerConfigParser& parser, const char* key) {
+    WT_CONFIG_ITEM item;
+    ASSERT_EQ(0, parser.get(key, &item));
+    return std::string_view(item.str, item.len);
+}
+
+TEST(WiredTigerIndexTest, GenerateCreateStringProviderConfigOverridesConfigStringType) {
+    if (!hasGlobalServiceContext()) {
+        setGlobalServiceContext(ServiceContext::make());
+    }
+
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.coll");
+    BSONObj spec = fromjson("{key: {a: 1}, name: 'a_1', v: 1}");
+    IndexConfig config{false /* isIdIndex */,
+                       false /* unique */,
+                       IndexConfig::kLatestIndexVersion,
+                       spec,
+                       "a_1",
+                       Ordering::allAscending()};
+
+    auto result =
+        WiredTigerIndex::generateCreateString(std::string{kWiredTigerEngineName},
+                                              "" /* sysIndexConfig */,
+                                              "type=file" /* collIndexConfig */,
+                                              "type=layered" /* providerConfig */,
+                                              NamespaceStringUtil::serializeForCatalog(nss),
+                                              config,
+                                              /*isLogged=*/false);
+    ASSERT_OK(result.getStatus());
+
+    WiredTigerConfigParser parser(result.getValue());
+    ASSERT_EQ("layered", getConfigString(parser, "type"));
 }
 
 }  // namespace

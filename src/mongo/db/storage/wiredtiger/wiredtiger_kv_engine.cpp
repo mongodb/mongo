@@ -1552,9 +1552,10 @@ Status WiredTigerKVEngine::_createRecordStore(const rss::PersistenceProvider& pr
     WiredTigerRecordStore::WiredTigerTableConfig wtTableConfig;
     wtTableConfig.keyFormat = keyFormat;
     wtTableConfig.blockCompressor = wiredTigerGlobalOptions.collectionBlockCompressor;
-    wtTableConfig.extraCreateOptions = _rsOptions;
     wtTableConfig.logEnabled = WiredTigerUtil::useTableLogging(
         provider, nss, _isReplSet, _shouldRecoverFromOplogAsStandalone);
+    wtTableConfig.serverParameterOptions = _rsOptions;
+    wtTableConfig.persistenceProviderSettings = provider.getMainWiredTigerTableSettings();
 
     if (customBlockCompressor) {
         wtTableConfig.blockCompressor = *customBlockCompressor;
@@ -1565,14 +1566,7 @@ Status WiredTigerKVEngine::_createRecordStore(const rss::PersistenceProvider& pr
     if (!customConfigString.isOK()) {
         return customConfigString.getStatus();
     }
-
-    // It's imperative that any custom options, beyond the default '_rsOptions' are appended at
-    // the end of the 'extraCreateOptions' for table configuration. WiredTiger will take the
-    // last value specified of a field in the config string. For example: if '_rsOptions' and
-    // the 'customConfigString' both specify field 'blockCompressor=<value>', the latter <value>
-    // will be used by WiredTiger.
-    wtTableConfig.extraCreateOptions = str::stream()
-        << _rsOptions << "," << customConfigString.getValue();
+    wtTableConfig.customOptions = customConfigString.getValue();
 
     if (nss.isOplog()) {
         wtTableConfig.memoryPageMax = provider.getWTMemoryPageMaxForOplogStrValue();
@@ -1775,10 +1769,9 @@ Status WiredTigerKVEngine::createSortedDataInterface(
     const boost::optional<mongo::BSONObj>& storageEngineIndexOptions) {
 
     std::string collIndexOptions;
-
     if (storageEngineIndexOptions) {
-        collIndexOptions = ::mongo::bson::extractElementAtDottedPath(
-                               *storageEngineIndexOptions, _canonicalName + ".configString")
+        collIndexOptions = bson::extractElementAtDottedPath(*storageEngineIndexOptions,
+                                                            _canonicalName + ".configString")
                                .str();
     }
 
@@ -1786,6 +1779,7 @@ Status WiredTigerKVEngine::createSortedDataInterface(
         _canonicalName,
         _indexOptions,
         collIndexOptions,
+        provider.getMainWiredTigerTableSettings(),
         NamespaceStringUtil::serializeForCatalog(nss),
         indexConfig,
         WiredTigerUtil::useTableLogging(
@@ -1913,7 +1907,8 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::makeInternalRecordStore(Recover
     wtTableConfig.blockCompressor = wiredTigerGlobalOptions.collectionBlockCompressor;
     // We don't log writes to temporary record stores.
     wtTableConfig.logEnabled = false;
-    wtTableConfig.extraCreateOptions = _rsOptions;
+    wtTableConfig.serverParameterOptions = _rsOptions;
+    wtTableConfig.persistenceProviderSettings = _provider.getMainWiredTigerTableSettings();
 
     std::string config =
         WiredTigerRecordStore::generateCreateString({} /* internal table */, wtTableConfig);
@@ -3228,11 +3223,15 @@ boost::optional<bool> WiredTigerKVEngine::getFlagFromStorageOptions(
 BSONObj WiredTigerKVEngine::setStorageTierToStorageOptions(const BSONObj& storageEngineOptions,
                                                            StorageTierLevelEnum value) const {
     const auto serializedValue = idlSerialize(value);
-    const auto configString =
-        WiredTigerUtil::getConfigStringFromStorageOptions(storageEngineOptions);
 
-    if (configString) {
-        WiredTigerConfigParser parser(*configString);
+    auto configString =
+        fmt::format("disaggregated=(storage_tier={}){}",
+                    serializedValue,
+                    value == StorageTierLevelEnum::cold ? ",leaf_page_max=128KB" : "");
+
+    if (auto storageOptionsConfig =
+            WiredTigerUtil::getConfigStringFromStorageOptions(storageEngineOptions)) {
+        WiredTigerConfigParser parser(*storageOptionsConfig);
         WT_CONFIG_ITEM disaggValue;
         if (parser.get("disaggregated", &disaggValue) == 0) {
             uassert(
@@ -3241,25 +3240,18 @@ BSONObj WiredTigerKVEngine::setStorageTierToStorageOptions(const BSONObj& storag
                 "argument or via the WT config string, no mix allowed",
                 !str::contains(std::string_view(disaggValue.str, disaggValue.len), "storage_tier"));
         }
+        configString += ",";
+        configString += *storageOptionsConfig;
     }
 
-    const std::string disaggConfigString =
-        fmt::format("disaggregated=(storage_tier={}){}",
-                    serializedValue,
-                    value == StorageTierLevelEnum::cold ? ",leaf_page_max=128KB" : "");
-
-    const auto newConfigString =
-        (configString ? WiredTigerUtil::concatConfigs(disaggConfigString, *configString)
-                      : disaggConfigString);
-
     auto isValidConfigStringStatus = WiredTigerUtil::checkTableCreationOptions(
-        BSON(WiredTigerUtil::kConfigStringField << newConfigString).firstElement());
+        BSON(WiredTigerUtil::kConfigStringField << configString).firstElement());
     tassert(ErrorCodes::InvalidOptions,
             str::stream() << "Invalid WiredTiger configuration string: "
                           << isValidConfigStringStatus.toString(),
             isValidConfigStringStatus.isOK());
 
-    return WiredTigerUtil::setConfigStringToStorageOptions(storageEngineOptions, newConfigString);
+    return WiredTigerUtil::setConfigStringToStorageOptions(storageEngineOptions, configString);
 }
 
 boost::optional<StorageTierLevelEnum> WiredTigerKVEngine::getStorageTierFromStorageOptions(
