@@ -289,8 +289,10 @@ __wt_txn_update_pinned_timestamp(WT_SESSION_IMPL *session, bool force)
 {
     WT_TXN_GLOBAL *txn_global;
     wt_timestamp_t last_pinned_timestamp, pinned_timestamp;
+    bool updated;
 
     txn_global = &S2C(session)->txn_global;
+    updated = false;
 
     /* Skip locking and scanning when the oldest timestamp is pinned. */
     if (__wt_atomic_load_bool_relaxed(&txn_global->oldest_is_pinned))
@@ -330,9 +332,16 @@ __wt_txn_update_pinned_timestamp(WT_SESSION_IMPL *session, bool force)
          * information.
          */
         __wt_atomic_store_bool_release(&txn_global->has_pinned_timestamp, true);
-        __wt_verbose_timestamp(session, pinned_timestamp, "Updated pinned timestamp");
+        updated = true;
     }
     __wt_writeunlock(session, &txn_global->rwlock);
+
+    /*
+     * Emit the verbose message after releasing the lock: the event handler runs on this thread and
+     * must not be able to block every other reader of the global timestamps.
+     */
+    if (updated)
+        __wt_verbose_timestamp(session, pinned_timestamp, "Updated pinned timestamp");
 }
 
 /*
@@ -349,9 +358,16 @@ __wt_txn_global_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
       step_down_ts;
     wt_timestamp_t last_ckpt_disagg_epoch, last_durable_ts, last_oldest_ts,
       last_stable_disagg_epoch, last_stable_ts, current_step_down_epoch, current_step_down_ts;
+    wt_timestamp_t out_of_order_oldest_ts, out_of_order_stable_ts;
     char ts_string[2][WT_TS_INT_STRING_SIZE];
     bool epochs_in_use, force, has_durable, has_oldest, has_stable, has_stable_disagg_epoch,
       has_step_down, has_step_down_epoch;
+    bool out_of_order, updated_durable, updated_oldest, updated_stable, updated_stable_disagg_epoch,
+      updated_step_down;
+
+    out_of_order_oldest_ts = out_of_order_stable_ts = WT_TS_NONE;
+    updated_durable = updated_oldest = updated_stable = updated_stable_disagg_epoch =
+      updated_step_down = out_of_order = false;
 
     txn_global = &S2C(session)->txn_global;
 
@@ -618,7 +634,7 @@ set:
         __wt_atomic_store_uint64_relaxed(&txn_global->durable_timestamp, durable_ts);
         __wt_atomic_store_bool_release(&txn_global->has_durable_timestamp, true);
         WT_STAT_CONN_INCR(session, txn_set_ts_durable_upd);
-        __wt_verbose_timestamp(session, durable_ts, "Updated global durable timestamp");
+        updated_durable = true;
     }
 
     if (has_oldest &&
@@ -628,7 +644,7 @@ set:
         __wt_atomic_store_bool_relaxed(&txn_global->oldest_is_pinned, false);
         __wt_atomic_store_bool_release(&txn_global->has_oldest_timestamp, true);
         WT_STAT_CONN_INCR(session, txn_set_ts_oldest_upd);
-        __wt_verbose_timestamp(session, oldest_ts, "Updated global oldest timestamp");
+        updated_oldest = true;
     }
 
     if (has_stable &&
@@ -638,7 +654,7 @@ set:
         __wt_atomic_store_bool_relaxed(&txn_global->stable_is_pinned, false);
         __wt_atomic_store_bool_release(&txn_global->has_stable_timestamp, true);
         WT_STAT_CONN_INCR(session, txn_set_ts_stable_upd);
-        __wt_verbose_timestamp(session, stable_ts, "Updated global stable timestamp");
+        updated_stable = true;
     }
 
     /* Stable disaggregated schema epoch cannot be forced to move backwards. */
@@ -650,8 +666,7 @@ set:
           &txn_global->stable_disaggregated_schema_epoch, stable_disagg_epoch);
         __wt_atomic_store_bool_release(&txn_global->has_stable_disaggregated_schema_epoch, true);
         WT_STAT_CONN_INCR(session, txn_set_ts_stable_disagg_epoch_upd);
-        __wt_verbose_timestamp(
-          session, stable_disagg_epoch, "Updated global stable disaggregated schema epoch");
+        updated_stable_disagg_epoch = true;
     }
 
     /*
@@ -670,14 +685,9 @@ set:
               &txn_global->step_down_disaggregated_schema_epoch, step_down_epoch);
         __wt_writeunlock(session, &txn_global->step_down_lock);
         WT_STAT_CONN_SET(session, txn_stepdown_ts_set, 1);
-        __wt_verbose_info(session, WT_VERB_TIMESTAMP, "Updated global step down timestamp to %s",
-          __wt_timestamp_to_string(step_down_ts, ts_string[0]));
-        if (has_step_down_epoch) {
+        if (has_step_down_epoch)
             WT_STAT_CONN_SET(session, txn_stepdown_epoch_set, 1);
-            __wt_verbose_info(session, WT_VERB_TIMESTAMP,
-              "Updated global step down disaggregated schema epoch to %s",
-              __wt_timestamp_to_string(step_down_epoch, ts_string[0]));
-        }
+        updated_step_down = true;
     }
 
     /*
@@ -689,17 +699,41 @@ set:
       __wt_atomic_load_uint64_relaxed(&txn_global->oldest_timestamp) >
         __wt_atomic_load_uint64_relaxed(&txn_global->stable_timestamp)) {
         WT_STAT_CONN_INCR(session, txn_set_ts_out_of_order);
-        __wt_verbose_debug1(session, WT_VERB_TIMESTAMP,
-          "set_timestamp: oldest timestamp %s must not be later than stable timestamp %s",
-          __wt_timestamp_to_string(
-            __wt_atomic_load_uint64_relaxed(&txn_global->oldest_timestamp), ts_string[0]),
-          __wt_timestamp_to_string(
-            __wt_atomic_load_uint64_relaxed(&txn_global->stable_timestamp), ts_string[1]));
+        out_of_order_oldest_ts = __wt_atomic_load_uint64_relaxed(&txn_global->oldest_timestamp);
+        out_of_order_stable_ts = __wt_atomic_load_uint64_relaxed(&txn_global->stable_timestamp);
+        out_of_order = true;
     }
 
     __wt_writeunlock(session, &txn_global->rwlock);
     if (has_step_down)
         __wt_spin_unlock(session, &S2C(session)->schema_lock);
+
+    /*
+     * Emit the verbose messages after releasing the lock: the event handler runs on this thread and
+     * must not be able to block every other reader of the global timestamps.
+     */
+    if (updated_durable)
+        __wt_verbose_timestamp(session, durable_ts, "Updated global durable timestamp");
+    if (updated_oldest)
+        __wt_verbose_timestamp(session, oldest_ts, "Updated global oldest timestamp");
+    if (updated_stable)
+        __wt_verbose_timestamp(session, stable_ts, "Updated global stable timestamp");
+    if (updated_stable_disagg_epoch)
+        __wt_verbose_timestamp(
+          session, stable_disagg_epoch, "Updated global stable disaggregated schema epoch");
+    if (updated_step_down) {
+        __wt_verbose_info(session, WT_VERB_TIMESTAMP, "Updated global step down timestamp to %s",
+          __wt_timestamp_to_string(step_down_ts, ts_string[0]));
+        if (has_step_down_epoch)
+            __wt_verbose_info(session, WT_VERB_TIMESTAMP,
+              "Updated global step down disaggregated schema epoch to %s",
+              __wt_timestamp_to_string(step_down_epoch, ts_string[0]));
+    }
+    if (out_of_order)
+        __wt_verbose_debug1(session, WT_VERB_TIMESTAMP,
+          "set_timestamp: oldest timestamp %s must not be later than stable timestamp %s",
+          __wt_timestamp_to_string(out_of_order_oldest_ts, ts_string[0]),
+          __wt_timestamp_to_string(out_of_order_stable_ts, ts_string[1]));
 
     if (has_oldest || has_stable)
         __wt_txn_update_pinned_timestamp(session, force);

@@ -96,3 +96,29 @@ class test_verify_disagg02(wttest.WiredTigerTestCase):
 
         session_follow.close()
         conn_follow.close()
+
+    def test_verify_duplicate_shared_btree_ids(self):
+        """
+        Same idea as the previous test, but for the shared metadata.
+        """
+        self.session.create(self.uri, self.table_cfg)
+        cursor = self.session.open_cursor(self.uri, None, None)
+        self.session.begin_transaction()
+        cursor['key'] = 'value'
+        cursor.close()
+        self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(10))
+        self.session.checkpoint()
+
+        sh_cursor = self.session.open_cursor('file:WiredTigerShared.wt_stable', None, None)
+        sh_cursor.set_key(f'file:{self.test_name}.wt_stable')
+        self.assertEqual(sh_cursor.search(), 0)
+        victim_config = sh_cursor.get_value()
+        sh_cursor.close()
+
+        sh_cursor = self.session.open_cursor('file:WiredTigerShared.wt_stable', None, 'overwrite')
+        sh_cursor['file:dup_entry.wt_stable'] = victim_config
+        sh_cursor.close()
+
+        with self.expectedStderrPattern('metadata corruption.*dup_entry'):
+            self.assertRaisesException(wiredtiger.WiredTigerError, lambda: self.session.verify(self.uri), '/WT_ERROR/')
+        self.ignoreStderrPatternIfExists('stable table verification failed')

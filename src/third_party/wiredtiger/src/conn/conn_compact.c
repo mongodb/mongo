@@ -725,11 +725,18 @@ __background_compact_server(void *arg)
 
     WT_STAT_CONN_SET(session, background_compact_running, 0);
 
-err:
+    /*
+     * Free the connection-level exclude list and configuration only on a clean exit. A concurrent
+     * background compaction caller can read and free that shared state under the lock, which this
+     * thread does not hold here; the clean exit path is reached only when the storage engine is
+     * closing, so no such caller is running. The error path skips this and panics, aborting the
+     * process, so any in-flight signal keeps operating on valid memory.
+     */
     __background_compact_exclude_list_clear(session, true);
     __background_compact_list_cleanup(session, BACKGROUND_COMPACT_CLEANUP_EXIT);
-
     __wt_free(session, conn->background_compact.config);
+
+err:
     __wt_scr_free(session, &config);
     __wt_scr_free(session, &next_uri);
     __wt_scr_free(session, &uri);
