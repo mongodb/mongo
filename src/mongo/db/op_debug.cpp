@@ -672,20 +672,6 @@ void OpDebug::append(OperationContext* opCtx,
     b.appendNumber("numYield", curop.numYields());
     OPDEBUG_APPEND_OPTIONAL(b, "nreturned", additiveMetrics.nreturned);
 
-    if (!curop.parent()) {
-        b.append("numInterruptChecks", opCtx->numInterruptChecks());
-
-        const bool reportAcquisitions = !opCtx->inMultiDocumentTransaction();
-        const auto& admCtx = ExecutionAdmissionContext::get(opCtx);
-        const auto* stats = opCtx->overdueInterruptCheckStats();
-        if ((reportAcquisitions && admCtx.getDelinquentAcquisitions() > 0) ||
-            (stats && stats->overdueInterruptChecks.loadRelaxed() > 0)) {
-            BSONObjBuilder sub;
-            appendDelinquentInfo(opCtx, sub, reportAcquisitions);
-            b.append("delinquencyInfo", sub.obj());
-        }
-    }
-
     addSpillingStats(spillingStatsPerStage,
                      sortTotalDataSizeBytes,
                      [&](const auto& name, const auto& value) { b.append(name, value); });
