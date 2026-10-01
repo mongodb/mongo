@@ -395,11 +395,7 @@ def main():
     suite = args.label or args.suite
 
     if not is_selectable(args.suite):
-        print(
-            f"Skipping test selection for {suite}: its tests are not files, so there is nothing "
-            f"to select between. Wrote {args.output}.",
-            file=sys.stderr,
-        )
+        # The test suite's tests are not files, so there is nothing to select between.
         with open(args.output, "w") as output:
             yaml.safe_dump({"suite": suite, "status": "disabled", "tests": []}, output)
         return
@@ -421,7 +417,6 @@ def main():
     # should look at, and resmoke fails the task on it; "disabled" is the ordinary state when
     # selection was not asked for, and is not an error.
     status = "failed" if failed else "disabled"
-    selected = False
     enabled, strategies = read_selection_settings(args.selection_settings)
     if tests and enabled:
         volatile = parse_volatile_status(args.volatile_status) if args.volatile_status else {}
@@ -445,7 +440,6 @@ def main():
         else:
             try:
                 tests = select_tests(tests, suite, volatile, strategies)
-                selected = True
                 status = "selected"
             except Exception:
                 # Fail open in the other direction: keep every discovered test. Test selection
@@ -464,54 +458,14 @@ def main():
     with open(args.output, "w") as output:
         yaml.safe_dump({"suite": suite, "status": status, "tests": tests}, output)
 
-    # Report to stderr, which Bazel surfaces as "INFO: From Executing genrule ...", so the
-    # outcome is visible in the build log without having to go find the output file.
-    report(suite, args.output, tests, discovered, failed)
-    if selected and len(tests) == discovered:
-        print(
-            f"Test selection ({tss_environment()}) did not narrow down any of the {discovered} "
-            f"tests for {suite} using strategies {strategies}.",
-            file=sys.stderr,
-        )
-    elif selected:
-        print(
-            f"Test selection ({tss_environment()}) narrowed {suite} from {discovered} to "
-            f"{len(tests)} tests using strategies {strategies}.",
-            file=sys.stderr,
-        )
-
-
-def report(suite: str, output: str, tests: list[str], discovered: int, failed: bool):
-    """Print what was written, so the outcome is visible in the build log.
-
-    'tests' is what ended up in the file, which is the selection when one was applied, so the
-    discovered count is reported separately rather than inferred from it.
-    """
     if failed:
         print(
-            f"FAILED to discover tests for {suite}: wrote {output} with an empty list "
+            f"FAILED to discover tests for {suite}: wrote {args.output} with an empty list "
             "(failing open, see the traceback above). Test selection will not be able to "
             "narrow this suite.",
             file=sys.stderr,
         )
         return
-
-    if not tests:
-        print(
-            f"WARNING: discovered 0 tests for {suite}, wrote {output}. This is not an error "
-            "if the suite is genuinely empty for this configuration, but is worth checking.",
-            file=sys.stderr,
-        )
-        return
-
-    if len(tests) == discovered:
-        print(f"Discovered {discovered} tests for {suite}, wrote {output}.", file=sys.stderr)
-    else:
-        print(
-            f"Discovered {discovered} tests for {suite}, wrote the selected {len(tests)} "
-            f"to {output}.",
-            file=sys.stderr,
-        )
 
 
 if __name__ == "__main__":

@@ -71,46 +71,6 @@ class TestDiscoverTests(unittest.TestCase):
         self.assertNotIn("--enableEvergreenApiTestSelection", seen["argv"])
 
 
-class TestReport(unittest.TestCase):
-    """The build log is the only place a developer sees whether this action worked."""
-
-    def _report(self, tests, failed, discovered=None):
-        stderr = io.StringIO()
-        discovered = len(tests) if discovered is None else discovered
-        with contextlib.redirect_stderr(stderr):
-            under_test.report("//pkg:suite", "out.yml", tests, discovered, failed)
-        return stderr.getvalue()
-
-    def test_success_reports_the_count_and_the_path(self):
-        output = self._report([f"t{i}.js" for i in range(25)], failed=False)
-        self.assertIn("Discovered 25 tests for //pkg:suite", output)
-        self.assertIn("out.yml", output)
-
-    def test_test_names_are_not_echoed(self):
-        # The file has the full list; the log only needs the counts and where to find them.
-        output = self._report(["a.js", "b.js"], failed=False)
-        self.assertNotIn("a.js", output)
-        self.assertNotIn("b.js", output)
-        self.assertEqual(1, len(output.strip().splitlines()))
-
-    def test_failure_is_reported_as_failure(self):
-        output = self._report([], failed=True)
-        self.assertIn("FAILED", output)
-        self.assertIn("//pkg:suite", output)
-
-    def test_a_narrowed_list_reports_both_counts(self):
-        # The file holds the selection, so the discovered count has to be stated separately or
-        # the line contradicts the selection message that follows it.
-        output = self._report(["a.js"], failed=False, discovered=1492)
-        self.assertIn("Discovered 1492 tests", output)
-        self.assertIn("wrote the selected 1", output)
-
-    def test_empty_list_without_failure_warns(self):
-        output = self._report([], failed=False)
-        self.assertIn("WARNING", output)
-        self.assertIn("0 tests", output)
-
-
 MAINLINE = {
     "project": "mongodb-mongo-master",
     "build_variant": "amazon-linux2023-arm64-static-compile",
@@ -499,15 +459,6 @@ class TestSelectionSummaryLine(unittest.TestCase):
             ):
                 under_test.main()
             return stderr.getvalue()
-
-    def test_says_it_did_not_narrow_when_nothing_was_removed(self):
-        output = self._run(["a.js", "b.js"], ["a.js", "b.js"])
-        self.assertIn("did not narrow down any of the 2 tests", output)
-        self.assertNotIn("narrowed //pkg:suite", output)
-
-    def test_reports_the_reduction_when_tests_were_removed(self):
-        output = self._run(["a.js", "b.js"], ["a.js"])
-        self.assertIn("narrowed //pkg:suite from 2 to 1 tests", output)
 
 
 class TestMainFailsOpen(unittest.TestCase):
