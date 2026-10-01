@@ -23,6 +23,9 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
+#include "mongo/logv2/log_severity.h"
+#include "mongo/unittest/log_capture.h"
+#include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
 
 #include <cstddef>
@@ -887,8 +890,102 @@ TEST_F(QueryPlannerTest, PreserveRecordIdOptionPrecludesSimpleSort) {
 
 TEST_F(QueryPlannerTest, NoLargeCollscanRejectsUnboundedCollscan) {
     params.mainCollectionInfo.options |= QueryPlannerParams::COLLECTION_EXCEEDS_SCAN_BYTES;
+    params.mainCollectionInfo.maxEstimatedScanBytesCollectionSize = 1000;
+    params.mainCollectionInfo.maxEstimatedScanBytesThreshold = 500;
+
+    unittest::MinimumLoggedSeverityGuard logSeverityGuard{logv2::LogComponent::kQuery,
+                                                          logv2::LogSeverity::Debug(2)};
+    unittest::LogCaptureGuard logs;
     runInvalidQuery(fromjson("{a: 1}"));
     assertNoSolutions();
+
+    // The main planning path (query_planner.cpp's QueryPlanner::plan()) should log the rejection
+    // at default verbosity so operators can see it without raising log verbosity.
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << 13466402)), 1);
+    ASSERT_EQ(logs.countBSONContainingSubset(
+                  BSON("attr" << BSON("namespace" << "test.collection" << "estimatedSize" << 1000
+                                                  << "threshold" << 500))),
+              1);
+}
+
+TEST_F(QueryPlannerTest, NoLargeCollscanRejectsUnboundedCollscanOnTailableCursor) {
+    // The tailable-cursor path (attemptCollectionScan()) is a distinct code path from the main
+    // plan() collScanRequired branch, and uses its own LOGV2 id.
+    params.mainCollectionInfo.options |= QueryPlannerParams::COLLECTION_EXCEEDS_SCAN_BYTES;
+    params.mainCollectionInfo.maxEstimatedScanBytesCollectionSize = 2000;
+    params.mainCollectionInfo.maxEstimatedScanBytesThreshold = 1000;
+
+    unittest::MinimumLoggedSeverityGuard logSeverityGuard{logv2::LogComponent::kQuery,
+                                                          logv2::LogSeverity::Debug(2)};
+    unittest::LogCaptureGuard logs;
+    runInvalidQueryAsCommand(fromjson("{find: 'collection', filter: {}, tailable: true}"));
+    assertNoSolutions();
+
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << 13466401)), 1);
+    ASSERT_EQ(logs.countBSONContainingSubset(
+                  BSON("attr" << BSON("namespace" << "test.collection" << "estimatedSize" << 2000
+                                                  << "threshold" << 1000))),
+              1);
+}
+
+TEST_F(QueryPlannerTest, NoLargeCollscanRejectsUnboundedCollscanOnCacheReplay) {
+    // planFromCache() re-checks COLLECTION_EXCEEDS_SCAN_BYTES on cache replay so that setting the
+    // parameter at runtime takes effect even for queries whose COLLSCAN was already cached; this
+    // is a third distinct code path from the two above, with its own LOGV2 id.
+    runQuery(fromjson("{a: 1}"));
+    assertNumSolutions(1U);
+    ASSERT_TRUE(solns.front()->cacheData);
+    ASSERT_EQ(solns.front()->cacheData->solnType, SolutionCacheData::COLLSCAN_SOLN);
+    auto cachedSolnData = solns.front()->cacheData->clone();
+
+    params.mainCollectionInfo.options |= QueryPlannerParams::COLLECTION_EXCEEDS_SCAN_BYTES;
+    params.mainCollectionInfo.maxEstimatedScanBytesCollectionSize = 3000;
+    params.mainCollectionInfo.maxEstimatedScanBytesThreshold = 1500;
+
+    unittest::MinimumLoggedSeverityGuard logSeverityGuard{logv2::LogComponent::kQuery,
+                                                          logv2::LogSeverity::Debug(2)};
+    unittest::LogCaptureGuard logs;
+    auto status = QueryPlanner::planFromCache(*cq, params, *cachedSolnData);
+    ASSERT_NOT_OK(status.getStatus());
+    ASSERT_EQ(status.getStatus().code(), ErrorCodes::NoQueryExecutionPlans);
+
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << 13466400)), 1);
+    ASSERT_EQ(logs.countBSONContainingSubset(
+                  BSON("attr" << BSON("namespace" << "test.collection" << "estimatedSize" << 3000
+                                                  << "threshold" << 1500))),
+              1);
+}
+
+TEST_F(QueryPlannerTest, RateLimitsRejectionLoggingByNamespace) {
+    // Unique namespaces avoid the file-scope suppressor state left by the "test.collection" tests.
+    params.mainCollectionInfo.options |= QueryPlannerParams::COLLECTION_EXCEEDS_SCAN_BYTES;
+    params.mainCollectionInfo.maxEstimatedScanBytesCollectionSize = 1000;
+    params.mainCollectionInfo.maxEstimatedScanBytesThreshold = 500;
+
+    // Capture at Debug(2) so downgraded lines are observed alongside Info.
+    unittest::MinimumLoggedSeverityGuard logSeverityGuard{logv2::LogComponent::kQuery,
+                                                          logv2::LogSeverity::Debug(2)};
+    unittest::LogCaptureGuard logs;
+
+    auto rejectionSeverities = [&](int32_t id) {
+        std::vector<std::string> severities;
+        for (const auto& obj : logs.getBSON()) {
+            if (obj.getIntField("id") == id) {
+                severities.push_back(std::string(obj.getStringField("s")));
+            }
+        }
+        return severities;
+    };
+
+    nss = NamespaceString::createNamespaceString_forTest("test.rateLimitedCollection");
+    // Info, then downgraded to Debug(2) on repeat, then Info for a different namespace.
+    runInvalidQuery(fromjson("{a: 1}"));
+    runInvalidQuery(fromjson("{a: 1}"));
+
+    nss = NamespaceString::createNamespaceString_forTest("test.rateLimitedOtherCollection");
+    runInvalidQuery(fromjson("{a: 1}"));
+
+    ASSERT_EQ(rejectionSeverities(13466402), std::vector<std::string>({"I", "D2", "I"}));
 }
 
 TEST_F(QueryPlannerTest, NoLargeCollscanAllowsCollscanWithLimit) {
