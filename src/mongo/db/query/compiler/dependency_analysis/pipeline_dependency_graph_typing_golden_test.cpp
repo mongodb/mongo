@@ -170,6 +170,43 @@ TEST_F(PipelineDependencyGraphTypingGoldenTest, MatchThenExhaustiveStage) {
     });
 }
 
+TEST_F(PipelineDependencyGraphTypingGoldenTest, MatchOnFieldsMadeMissingByExhaustiveStage) {
+    runVariation({
+        .name = "MatchOnFieldsMadeMissingByExhaustiveStage",
+        .pipeline = "[{$group: {_id: '$a'}},"
+                    " {$match: {x: {$not: {$type: 'array'}}}},"
+                    " {$match: {y: {$type: 'number'}}}]",
+        .paths = {"x", "y"},
+    });
+}
+
+TEST_F(PipelineDependencyGraphTypingGoldenTest, MatchDependingOnWholeDocument) {
+    runVariation({
+        .name = "MatchDependingOnWholeDocument",
+        .pipeline = "[{$match: {x: {$not: {$type: 'array'}}}},"
+                    " {$match: {$expr: {$eq: ['$$ROOT', {y: 1}]}}}]",
+        .paths = {"x"},
+    });
+}
+
+TEST_F(PipelineDependencyGraphTypingGoldenTest, MatchOnUnrelatedFields) {
+    runVariation({
+        .name = "MatchOnUnrelatedFields",
+        .pipeline = "[{$match: {foo: {$not: {$type: 'array'}}}},"
+                    " {$match: {foo: {$type: 'string'}}}]",
+        .paths = {"x"},
+    });
+}
+
+TEST_F(PipelineDependencyGraphTypingGoldenTest, MatchUnrelatedAndRelevantFields) {
+    runVariation({
+        .name = "MatchUnrelatedAndRelevantFields",
+        .pipeline = "[{$match: {x: {$not: {$type: 'array'}}}},"
+                    " {$match: {foo: {$type: 'string'}}}]",
+        .paths = {"x"},
+    });
+}
+
 TEST_F(PipelineDependencyGraphTypingGoldenTest, MatchDoesNotContradictConstant) {
     runVariation({
         .name = "MatchDoesNotContradictConstant",

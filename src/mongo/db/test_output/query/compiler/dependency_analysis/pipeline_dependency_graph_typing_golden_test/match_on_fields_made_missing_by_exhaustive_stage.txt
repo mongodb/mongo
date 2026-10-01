@@ -1,0 +1,38 @@
+VARIATION MatchOnFieldsMadeMissingByExhaustiveStage
+input: {
+    "pipeline": [
+        {
+            "$group": {
+                "_id": "$a",
+                "$willBeMerged": false
+            }
+        },
+        {
+            "$match": {
+                "x": {
+                    "$not": {
+                        "$type": "array"
+                    }
+                }
+            }
+        },
+        {
+            "$match": {
+                "y": {
+                    "$type": "number"
+                }
+            }
+        }
+    ]
+}
+output:
+  after $group:0
+    x: any
+    y: any
+  after $match:1
+    x: ~array
+    y: any
+  end of pipeline
+    x: ~array
+    y: number|array(S)
+

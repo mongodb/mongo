@@ -1,0 +1,32 @@
+VARIATION MatchDependingOnWholeDocument
+input: {
+    "pipeline": [
+        {
+            "$match": {
+                "x": {
+                    "$not": {
+                        "$type": "array"
+                    }
+                }
+            }
+        },
+        {
+            "$match": {
+                "$expr": {
+                    "$eq": [
+                        "$$ROOT",
+                        {
+                            "y": 1
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}
+output:
+  after $match:0
+    x: ~array
+  end of pipeline
+    x: ~array
+

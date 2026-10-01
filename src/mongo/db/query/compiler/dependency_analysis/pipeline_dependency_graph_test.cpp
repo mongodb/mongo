@@ -46,6 +46,8 @@ using namespace std::literals::string_view_literals;
 namespace mongo::pipeline::dependency_graph {
 namespace {
 
+using Stages = std::vector<const DocumentSource*>;
+
 class PipelineDependencyGraphTest : public unittest::Test {
 protected:
     void SetUp() override {
@@ -3832,6 +3834,38 @@ TEST_F(PipelineDependencyGraphTest, CanPathBeArrayWithTypePredicateMatchingArray
     setPipeline("[{$match: {x: {$type: 'double'}}}]");
     runTest([&] { ASSERT_TRUE(graph->canPathBeArray(nullptr, "x")); });
 }
+
+TEST_F(PipelineDependencyGraphTest, GetTypeSkipsMatchOnUnrelatedDeclaredField) {
+    setPipeline(R"([
+        {$project: {x: '$b', y: '$c'}},
+        {$match: {x: {$not: {$type: 'array'}}}},
+        {$match: {y: {$type: 'number'}}},
+        {$match: {$expr: {$eq: ['$$ROOT', {x: 1}]}}},
+        {$match: {z: {$type: 'string'}}}
+    ])");
+    runTest([&] {
+        ASSERT_EQ(graph->getPossiblyNarrowingStages_forTest(nullptr, "x"),
+                  (Stages{stages[1].get(), stages[3].get()}));
+        ASSERT_EQ(graph->getPossiblyNarrowingStages_forTest(nullptr, "y"),
+                  (Stages{stages[2].get(), stages[3].get()}));
+        ASSERT_EQ(graph->getPossiblyNarrowingStages_forTest(nullptr, "z"),
+                  (Stages{stages[3].get(), stages[4].get()}));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeDoesNotSkipMatchesOnOtherBaseDocumentFields) {
+    setPipeline(R"([
+        {$match: {x: {$not: {$type: 'array'}}}},
+        {$match: {y: {$type: 'number'}}}
+    ])");
+    runTest([&] {
+        // TODO(SERVER-135643): Base document fields are not represented in the graph as Field
+        // nodes, so we currently can't tell which stages depend on which base document fields.
+        ASSERT_EQ(graph->getPossiblyNarrowingStages_forTest(nullptr, "x"),
+                  (Stages{stages[0].get(), stages[1].get()}));
+    });
+}
+
 
 }  // namespace
 }  // namespace mongo::pipeline::dependency_graph

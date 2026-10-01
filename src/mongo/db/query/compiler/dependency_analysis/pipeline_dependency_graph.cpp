@@ -239,6 +239,10 @@ public:
         _dependsOnWholeDocument = true;
     }
 
+    bool contains(FieldId field) const {
+        return _dependsOnWholeDocument || _fields.contains(field);
+    }
+
 private:
     absl::flat_hash_set<FieldId> _fields;
     bool _dependsOnWholeDocument{false};
@@ -755,51 +759,61 @@ public:
     }
 
     Type getType(const DocumentSource* ds, PathRef path) const {
+        Type result = Type::any();
+        forEachPossiblyNarrowingStage(ds, path, [&](const DocumentSourceMatch& match) {
+            // The initial type describes the top-level document.
+            Type current = ts::narrowType(Type::anyObject(), match.getMatchExpression(), true);
+            if (!current.isNever()) {
+                current = ts::resolveFieldAccess(std::move(current), path);
+            }
+
+            result = ts::intersectType(std::move(result), std::move(current));
+            return !result.isNever();
+        });
+
+        return result;
+    }
+
+    /**
+     * Invokes the callback on each stage that might help us narrow the type of 'path' that is
+     * visible to 'ds'. The callback may return false to indicate that we should exit early, for
+     * example because the type was already narrowed to 'never'.
+     */
+    template <std::predicate<const DocumentSourceMatch&> Callback>
+    void forEachPossiblyNarrowingStage(const DocumentSource* ds,
+                                       PathRef path,
+                                       const Callback& cb) const {
         // TODO SERVER-135481: Handle dotted paths.
         if (path.find('.') != PathRef::npos) {
-            return Type::any();
+            return;
         }
-
-        // We first need to determine the range of relevant stages. Any $match within this range may
-        // allow us to constrain the set of possible types.
+        // We need to determine the range of relevant stages. Any $match within this range may allow
+        // us to constrain the set of possible types.
         //
         // The end of the range is the stage right before the current stage.
         const StageId end = getPreviousStageId(ds);
         if (!end) {
-            return Type::any();
+            return;
         }
-
         // The start of the range is the stage right after the stage that last modified the given
         // path.
-        const StageId start = [&] {
-            if (auto prev = getPrevModifyingStage(ds, path)) {
-                return StageId{getStageId(prev.get()).value + 1};
+        const auto [field, _] = lookupField(_stages[end].scope, parsePath(path));
+        const StageId start = [&]() {
+            if (!field) {
+                return StageId{0};
             }
-            return StageId{0};
+            ScopeId declaringScope = _fields[field].declaringScope;
+            return StageId{_scopes[declaringScope].stage.value + 1};
         }();
 
-        // Go through every $match in the range and try to narrow the type.
-        Type result = Type::any();
         for (StageId stageId = start; stageId <= end; stageId.value++) {
-            const auto* stage = _stages[stageId].documentSource.get();
-            const auto* match = dynamic_cast<const DocumentSourceMatch*>(stage);
-            if (!match) {
-                continue;
-            }
-
-            // The initial type describes the top-level document.
-            Type current = ts::narrowType(Type::anyObject(), match->getMatchExpression(), true);
-            if (current.isNever()) {
-                return Type::never();
-            }
-            current = ts::resolveFieldAccess(std::move(current), path);
-            result = ts::intersectType(std::move(result), std::move(current));
-            if (result.isNever()) {
-                return Type::never();
+            const Stage& stage = _stages[stageId];
+            const auto* source = stage.documentSource.get();
+            const auto* match = dynamic_cast<const DocumentSourceMatch*>(source);
+            if (match && stage.dependencies.contains(field) && !cb(*match)) {
+                return;
             }
         }
-
-        return result;
     }
 
     const DependencyGraph* getSubpipelineGraph(const DocumentSource* ds) const {
@@ -2365,6 +2379,16 @@ ts::Type DependencyGraph::getType(const DocumentSource* ds, PathRef path) const 
 
 ts::Type DependencyGraph::getType_forTest(const DocumentSource* ds, PathRef path) const {
     return getType(ds, path);
+}
+
+std::vector<const DocumentSource*> DependencyGraph::getPossiblyNarrowingStages_forTest(
+    const DocumentSource* ds, PathRef path) const {
+    std::vector<const DocumentSource*> result;
+    _impl->forEachPossiblyNarrowingStage(ds, path, [&](const DocumentSourceMatch& match) {
+        result.push_back(&match);
+        return true;
+    });
+    return result;
 }
 
 const DependencyGraph* DependencyGraph::getSubpipelineGraph(const DocumentSource* ds) const {

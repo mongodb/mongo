@@ -1,0 +1,27 @@
+VARIATION MatchUnrelatedAndRelevantFields
+input: {
+    "pipeline": [
+        {
+            "$match": {
+                "x": {
+                    "$not": {
+                        "$type": "array"
+                    }
+                }
+            }
+        },
+        {
+            "$match": {
+                "foo": {
+                    "$type": "string"
+                }
+            }
+        }
+    ]
+}
+output:
+  after $match:0
+    x: ~array
+  end of pipeline
+    x: ~array
+

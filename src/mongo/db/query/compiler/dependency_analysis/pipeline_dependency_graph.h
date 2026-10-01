@@ -199,6 +199,13 @@ public:
     type_system::Type getType_forTest(const DocumentSource* stage, PathRef path) const;
 
     /**
+     * Returns the stages we run type inference on when getType() is called for the given stage and
+     * path.
+     */
+    std::vector<const DocumentSource*> getPossiblyNarrowingStages_forTest(
+        const DocumentSource* stage, PathRef path) const;
+
+    /**
      * Returns the dependency graph for the sub-pipeline of the given stage (e.g. $lookup,
      * $unionWith), or nullptr if the stage has no sub-pipeline.
      */
