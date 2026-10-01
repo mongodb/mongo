@@ -510,7 +510,8 @@ void WindowStage::setPartition(int id) {
 
         for (size_t exprIdx = 0; exprIdx < windowInitCodes.size(); ++exprIdx) {
             if (windowInitCodes[exprIdx]) {
-                windowAccessors[exprIdx]->reset(_bytecode.run(windowInitCodes[exprIdx].get()));
+                windowAccessors[exprIdx]->reset(
+                    _bytecode.run(windowInitCodes[exprIdx].get()).moveToOwned());
             } else {
                 windowAccessors[exprIdx]->reset();
             }
@@ -602,7 +603,7 @@ PlanState WindowStage::getNext() {
                 for (size_t exprIdx = 0; exprIdx < windowAddCodes.size(); ++exprIdx) {
                     if (windowAddCodes[exprIdx]) {
                         windowAccessors[exprIdx]->reset(
-                            _bytecode.run(windowAddCodes[exprIdx].get()));
+                            _bytecode.run(windowAddCodes[exprIdx].get()).moveToOwned());
                     }
                 }
                 idRange.second = id;
@@ -641,7 +642,7 @@ PlanState WindowStage::getNext() {
                     for (size_t exprIdx = 0; exprIdx < windowRemoveCodes.size(); ++exprIdx) {
                         if (windowRemoveCodes[exprIdx]) {
                             windowAccessors[exprIdx]->reset(
-                                _bytecode.run(windowRemoveCodes[exprIdx].get()));
+                                _bytecode.run(windowRemoveCodes[exprIdx].get()).moveToOwned());
                         }
                     }
                     idRange.first = id + 1;

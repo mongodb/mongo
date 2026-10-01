@@ -126,6 +126,67 @@ function testSpillWithDifferentAccumulators() {
     changeSpillLimit({mode: "off", maxDocs: null});
 }
 
+function testLocfSpillWithWideDocuments() {
+    const pad = "P".repeat(9000);
+    const metadataValue = ObjectId("000400004141414141414141");
+    const numMetadataFields = 160;
+    const fieldName = (i) => "a" + i.toString().padStart(3, "0");
+    const expectedValue = BinData(0, "QUJDRA==");
+
+    assert(coll.drop());
+    const docs = [
+        {_id: 1, t: 1, v: expectedValue, pad: pad},
+        {_id: 2, t: 2, v: metadataValue, pad: pad},
+    ];
+    for (let i = 0; i < numMetadataFields; i++) {
+        docs[1][fieldName(i)] = metadataValue;
+    }
+    assert.commandWorked(coll.insert(docs));
+
+    const documentSnapshot = {pad: "$pad"};
+    for (let i = 0; i < numMetadataFields; i++) {
+        documentSnapshot[fieldName(i)] = "$" + fieldName(i);
+    }
+
+    changeSpillLimit({mode: "alwaysOn", maxDocs: 0});
+    try {
+        resetProfiler(db);
+        const results = coll
+            .aggregate(
+                [
+                    {
+                        $setWindowFields: {
+                            sortBy: {t: 1},
+                            output: {
+                                filledValue: {
+                                    $locf: {$cond: [{$eq: ["$t", 1]}, "$v", null]},
+                                },
+                                documents: {
+                                    $firstN: {input: documentSnapshot, n: 1},
+                                    window: {documents: ["unbounded", "current"]},
+                                },
+                            },
+                        },
+                    },
+                    {$project: {_id: 0, t: 1, filledValue: "$filledValue"}},
+                ],
+                {allowDiskUse: true, cursor: {batchSize: 2}},
+            )
+            .toArray();
+        assert.eq(2, results.length, "unexpected result count", {results});
+        assert.docEq(
+            [
+                {t: 1, filledValue: expectedValue},
+                {t: 2, filledValue: expectedValue},
+            ],
+            results,
+        );
+        checkProfilerForDiskWrite(db, "$setWindowFields");
+    } finally {
+        changeSpillLimit({mode: "off", maxDocs: null});
+    }
+}
+
 // Assert a small, in memory, partition and a larger partition that requires spilling to disk
 // returns correct results.
 function testSpillWithDifferentPartitions() {
@@ -408,6 +469,7 @@ function testErrorsWhenCantSpill() {
 
 // Run the tests.
 testSpillWithDifferentAccumulators();
+testLocfSpillWithWideDocuments();
 testSpillWithDifferentPartitions();
 // We don't execute setWindowFields in a sharded explain.
 if (!FixtureHelpers.isMongos(db)) {
