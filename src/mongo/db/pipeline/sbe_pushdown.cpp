@@ -611,7 +611,10 @@ bool findSbeCompatibleStagesForPushdown(
                                        : SbeCompatibility::requiresTrySbe) ||
             isTimeseriesCollection,
 
-        .unwind = meetsRequirements(SbeCompatibility::requiresSbeFull),
+        .unwind = meetsRequirements(cq->getExpCtx()->getIfrContext()->getSavedFlagValue(
+                                        feature_flags::gFeatureFlagSbeUnwind)
+                                        ? SbeCompatibility::requiresTrySbe
+                                        : SbeCompatibility::notCompatible),
 
         // Note: even if its sort pattern is SBE compatible, we cannot push down a $sort stage when
         // the pipeline is the shard part of a sorted-merge query on a sharded collection. It is

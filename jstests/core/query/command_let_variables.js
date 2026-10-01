@@ -22,7 +22,8 @@
 //
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {getPlanStage, getSingleNodeExplain, planHasStage} from "jstests/libs/query/analyze_plan.js";
-import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/query/sbe_util.js";
+import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const testDB = db.getSiblingDB("command_let_variables");
 const coll = testDB.command_let_variables;
@@ -131,7 +132,7 @@ let explain = assert.commandWorked(
 );
 
 if (!isMongos) {
-    if (checkSbeFullFeatureFlagEnabled(testDB)) {
+    if (checkSbeFullyEnabled(testDB) && FeatureFlagUtil.isPresentAndEnabled(testDB, "SbeUnwind")) {
         // $unwind should be pushed down to SBE.
         assert(planHasStage(testDB, explain, "UNWIND"), explain);
     } else {

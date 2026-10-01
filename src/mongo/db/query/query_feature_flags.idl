@@ -437,6 +437,13 @@ feature_flags:
         default: true
         incremental_rollout_phase: rollout
 
+    featureFlagSbeUnwind:
+        description: "Feature flag to enable pushing down $unwind stages to SBE."
+        cpp_varname: gFeatureFlagSbeUnwind
+        fcv_gated: false
+        default: false
+        incremental_rollout_phase: in_development
+
     featureFlagLookupWithPipelinesInSbe:
         description: "Feature flag to enable SBE to execute eligible $lookup stages containing subpipelines."
         cpp_varname: gFeatureFlagLookupWithPipelinesInSbe

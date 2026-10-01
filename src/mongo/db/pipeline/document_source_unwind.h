@@ -146,8 +146,8 @@ private:
     // one we already pushed down. boost::none means no push down has occurred yet.
     boost::optional<long long> _smallestLimitPushedDown;
 
-    // Standalone $unwind pushdown to SBE requires featureFlagSbeFull.
-    SbeCompatibility _sbeCompatibility{SbeCompatibility::requiresSbeFull};
+    // Standalone $unwind pushdown to SBE requires trySbeEngine.
+    SbeCompatibility _sbeCompatibility{SbeCompatibility::requiresTrySbe};
 };  // class DocumentSourceUnwind
 
 }  // namespace mongo
