@@ -52,14 +52,14 @@ exports_files(["codeowners-validator"])
 
     return None
 
-_codeowners_validator = repository_rule(
+codeowners_validator_repository = repository_rule(
     implementation = _codeowners_validator_download,
     attrs = {},
 )
 
 def codeowners_validator():
-    _codeowners_validator(name = "codeowners_validator")
+    codeowners_validator_repository(name = "codeowners_validator")
 
 codeowners_validator_extension = module_extension(
-    implementation = lambda ctx: _codeowners_validator(name = "codeowners_validator"),
+    implementation = lambda ctx: codeowners_validator_repository(name = "codeowners_validator"),
 )

@@ -823,12 +823,12 @@
     },
     "@@bazel_rules_mongo+//codeowners:codeowners_binary.bzl%codeowners_binary_extension": {
       "general": {
-        "bzlTransitiveDigest": "CWyptog6+HHNYA/q2HpgyU5CZBVdLjO/GBGop1ggDjs=",
+        "bzlTransitiveDigest": "E8ecmtg/wL3UvYDAolVGrgynN2jyWyPK9f5bvgGqBY0=",
         "usagesDigest": "DUfbbEkXiPXCkU7XiAPUkR9yI8zRc+EY7RrJg/EHpSc=",
         "recordedInputs": [],
         "generatedRepoSpecs": {
           "codeowners_binary": {
-            "repoRuleId": "@@bazel_rules_mongo+//codeowners:codeowners_binary.bzl%_codeowners_binary",
+            "repoRuleId": "@@bazel_rules_mongo+//codeowners:codeowners_binary.bzl%codeowners_binary_repository",
             "attributes": {}
           }
         }
@@ -836,12 +836,12 @@
     },
     "@@bazel_rules_mongo+//codeowners:codeowners_validator.bzl%codeowners_validator_extension": {
       "general": {
-        "bzlTransitiveDigest": "kYa8U9np+k6KX9scgW+iA+nlQhCLheaOqJVkCbyftmc=",
+        "bzlTransitiveDigest": "m1Tz7yR5yrmBWEQL7ta6XVFcw8T6hqYBl+mfXGvi0XE=",
         "usagesDigest": "kOTOxh0eIlUfT+j549+SQU9FCkK594xAyEHFtRCJiyQ=",
         "recordedInputs": [],
         "generatedRepoSpecs": {
           "codeowners_validator": {
-            "repoRuleId": "@@bazel_rules_mongo+//codeowners:codeowners_validator.bzl%_codeowners_validator",
+            "repoRuleId": "@@bazel_rules_mongo+//codeowners:codeowners_validator.bzl%codeowners_validator_repository",
             "attributes": {}
           }
         }

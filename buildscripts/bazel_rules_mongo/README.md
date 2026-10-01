@@ -83,6 +83,19 @@ normalized distribution name. If yours has a different shape (e.g. `//<pkg>:pkg`
 of `alias()` targets, name it `pypi`, or vendor this package and change `PYPI_HUB` in
 `bazel/uv/defs.bzl`.
 
+Alternatively, the codeowners repository rules can be pulled in directly with `use_repo_rule`
+instead of the module extensions
+
+```
+codeowners_validator_repository = use_repo_rule("@bazel_rules_mongo//codeowners:codeowners_validator.bzl", "codeowners_validator_repository")
+
+codeowners_validator_repository(name = "codeowners_validator")
+
+codeowners_binary_repository = use_repo_rule("@bazel_rules_mongo//codeowners:codeowners_binary.bzl", "codeowners_binary_repository")
+
+codeowners_binary_repository(name = "codeowners_binary")
+```
+
 5. Use the rule however you see fit! For example to add `bazel run codeowners` to your repo you can
    add the following to your root `BUILD.bazel` file
 

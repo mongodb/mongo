@@ -52,14 +52,14 @@ exports_files(["codeowners"])
 
     return None
 
-_codeowners_binary = repository_rule(
+codeowners_binary_repository = repository_rule(
     implementation = _codeowners_binary_download,
     attrs = {},
 )
 
 def codeowners_binary():
-    _codeowners_binary(name = "codeowners_binary")
+    codeowners_binary_repository(name = "codeowners_binary")
 
 codeowners_binary_extension = module_extension(
-    implementation = lambda ctx: _codeowners_binary(name = "codeowners_binary"),
+    implementation = lambda ctx: codeowners_binary_repository(name = "codeowners_binary"),
 )
