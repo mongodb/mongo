@@ -87,12 +87,11 @@ public:
     static std::string getQuerySettingsClusterParameterName();
 
     /**
-     * Checks the query settings eligibility of the current command referred by 'expCtx' for
-     * namespace 'nss'. Query settings are not eligible for IDHACK/Express queries, encrypted
-     * queries and queries run on internal or system collections.
+     * Checks the query settings eligibility of the current command referred by 'expCtx'. Query
+     * settings are not eligible for IDHACK/Express queries, encrypted queries and queries run on
+     * internal or system collections.
      */
-    static bool isEligibleForQuerySettings(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                           const NamespaceString& nss);
+    static bool isEligibleForQuerySettings(const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     /**
      * Applies 'settings.maxTimeMS' (if set) to the current operation's deadline. A no-op during
@@ -149,11 +148,10 @@ public:
     QuerySettings lookupQuerySettingsWithRejectionCheck(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const boost::optional<query_shape::QueryShapeHash>& queryShapeHash,
-        const NamespaceString& nss,
         const boost::optional<QuerySettings>& querySettingsFromOriginalCommand) const {
         // Ineligible queries (IDHACK/Express, FLE, internal/system namespaces) never receive query
         // settings, whether from persisted settings or supplied directly by the user.
-        if (!isEligibleForQuerySettings(expCtx, nss)) {
+        if (!isEligibleForQuerySettings(expCtx)) {
             return QuerySettings();
         }
 
@@ -188,7 +186,6 @@ public:
     void initializeSettingsForQuery(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const boost::optional<query_shape::QueryShapeHash>& queryShapeHash,
-        const NamespaceString& nss,
         const boost::optional<QuerySettings>& querySettingsFromOriginalCommand) const;
 
     /**

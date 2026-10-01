@@ -195,7 +195,7 @@ std::unique_ptr<CanonicalQuery> parseQueryAndBeginOperation(
     auto& querySettingsService = query_settings::QuerySettingsService::get(opCtx);
     auto& findReq = *parsedRequest->findCommandRequest;
     querySettingsService.initializeSettingsForQuery(
-        expCtx, queryShapeHash, nss, findReq.getQuerySettings());
+        expCtx, queryShapeHash, findReq.getQuerySettings());
 
     // Register query stats collection. Exclude queries with encrypted fields as indicated by the
     // inclusion of encryptionInformation in the request.
@@ -508,7 +508,7 @@ public:
             // Resolve the query settings for this operation.
             auto& querySettingsService = query_settings::QuerySettingsService::get(opCtx);
             querySettingsService.initializeSettingsForQuery(
-                expCtx, queryShapeHash, ns, parsedRequest->findCommandRequest->getQuerySettings());
+                expCtx, queryShapeHash, parsedRequest->findCommandRequest->getQuerySettings());
 
             auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
                 .expCtx = std::move(expCtx), .parsedFind = std::move(parsedRequest)});

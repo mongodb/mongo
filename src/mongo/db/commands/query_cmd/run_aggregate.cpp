@@ -976,7 +976,7 @@ void computeShapeAndRegisterQueryStats(const AggExState& aggExState,
     // Resolve the query settings for this operation.
     auto& querySettingsService = query_settings::QuerySettingsService::get(opCtx);
     querySettingsService.initializeSettingsForQuery(
-        expCtx, queryShapeHash, aggExState.getOriginalNss(), userRequest.getQuerySettings());
+        expCtx, queryShapeHash, userRequest.getQuerySettings());
 
     // If this is a query over a resolved view, we want to register query stats with the
     // original user-given request and pipeline, rather than the new request generated when

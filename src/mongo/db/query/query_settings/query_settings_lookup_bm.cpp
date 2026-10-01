@@ -314,7 +314,7 @@ public:
             auto queryShapeHash =
                 deferredShape().getValue()->sha256Hash(opCtx.get(), kSerializationContext);
             benchmark::DoNotOptimize(querySettingsService.lookupQuerySettingsWithRejectionCheck(
-                expCtx, queryShapeHash, ns, boost::none));
+                expCtx, queryShapeHash, boost::none));
         }
     }
 

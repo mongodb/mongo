@@ -158,7 +158,7 @@ public:
 
     boost::intrusive_ptr<ExpressionContext> expCtx() {
         if (!_expCtx) {
-            _expCtx = makeBlankExpressionContext(opCtx(), {NamespaceString()});
+            _expCtx = makeBlankExpressionContext(opCtx(), {nss()});
         }
 
         return _expCtx;
@@ -199,19 +199,18 @@ public:
     }
 
     void assertQuerySettingsLookup(const BSONObj& cmdBSON,
-                                   const query_shape::DeferredQueryShape& deferredShape,
-                                   const NamespaceString& nss) {
+                                   const query_shape::DeferredQueryShape& deferredShape) {
         {
             QuerySettingsService::initializeForRouter(getServiceContext());
-            assertQuerySettingsLookupWithoutRejectionCheckForRouter(cmdBSON, deferredShape, nss);
-            assertQuerySettingsLookupWithRejectionCheckForRouter(cmdBSON, deferredShape, nss);
+            assertQuerySettingsLookupWithoutRejectionCheckForRouter(cmdBSON, deferredShape);
+            assertQuerySettingsLookupWithRejectionCheckForRouter(cmdBSON, deferredShape);
         }
 
         {
             QuerySettingsService::initializeForShard(getServiceContext(),
                                                      nullptr /* setClusterParameterImplFn */);
-            assertQuerySettingsLookupWithoutRejectionCheckForShard(cmdBSON, deferredShape, nss);
-            assertQuerySettingsLookupWithRejectionCheckForShard(cmdBSON, deferredShape, nss);
+            assertQuerySettingsLookupWithoutRejectionCheckForShard(cmdBSON, deferredShape);
+            assertQuerySettingsLookupWithRejectionCheckForShard(cmdBSON, deferredShape);
         }
     }
 
@@ -219,9 +218,7 @@ public:
      * Ensures that QuerySettings lookup returns the correct settings for the corresponding query.
      */
     void assertQuerySettingsLookupWithoutRejectionCheckForRouter(
-        const BSONObj& cmdBSON,
-        const query_shape::DeferredQueryShape& deferredShape,
-        const NamespaceString& nss) {
+        const BSONObj& cmdBSON, const query_shape::DeferredQueryShape& deferredShape) {
         QuerySettings forceClassicEngineSettings;
         forceClassicEngineSettings.setQueryFramework(
             QueryFrameworkControlEnum::kForceClassicEngine);
@@ -230,7 +227,7 @@ public:
 
         // Ensure empty settings are returned if no settings are present in the system.
         ASSERT_EQ(service().lookupQuerySettingsWithRejectionCheck(
-                      expCtx(), hashForShape(deferredShape), nss, boost::none),
+                      expCtx(), hashForShape(deferredShape), boost::none),
                   QuerySettings());
 
         // Set { queryFramework: 'classic' } settings to 'cmdBSON'.
@@ -240,7 +237,7 @@ public:
         // Ensure that 'forceClassicEngineSettings' are returned during the lookup, after query
         // settings have been populated.
         ASSERT_EQ(service().lookupQuerySettingsWithRejectionCheck(
-                      expCtx(), hashForShape(deferredShape), nss, boost::none),
+                      expCtx(), hashForShape(deferredShape), boost::none),
                   forceClassicEngineSettings);
     }
 
@@ -248,9 +245,7 @@ public:
      * Ensures that QuerySettings lookup returns the correct settings for the corresponding query.
      */
     void assertQuerySettingsLookupWithoutRejectionCheckForShard(
-        const BSONObj& cmdBSON,
-        const query_shape::DeferredQueryShape& deferredShape,
-        const NamespaceString& nss) {
+        const BSONObj& cmdBSON, const query_shape::DeferredQueryShape& deferredShape) {
         QuerySettings forceClassicEngineSettings;
         forceClassicEngineSettings.setQueryFramework(
             QueryFrameworkControlEnum::kForceClassicEngine);
@@ -259,7 +254,7 @@ public:
 
         // Ensure empty settings are returned if no settings are present in the system.
         ASSERT_EQ(service().lookupQuerySettingsWithRejectionCheck(
-                      expCtx(), hashForShape(deferredShape), nss, boost::none),
+                      expCtx(), hashForShape(deferredShape), boost::none),
                   QuerySettings());
 
         // Set { queryFramework: 'classic' } settings to 'cmdBSON'.
@@ -270,7 +265,6 @@ public:
         ASSERT_EQ(service().lookupQuerySettingsWithRejectionCheck(
                       expCtx(),
                       hashForShape(deferredShape),
-                      nss,
                       boost::none /* querySettingsFromOriginalCommand */),
                   forceClassicEngineSettings);
 
@@ -281,7 +275,7 @@ public:
             // Ensure that settings passed to the method are being returned as opposed to performing
             // the QuerySettings lookup.
             ASSERT_EQ(service().lookupQuerySettingsWithRejectionCheck(
-                          expCtx(), hashForShape(deferredShape), nss, useSbeEngineSettings),
+                          expCtx(), hashForShape(deferredShape), useSbeEngineSettings),
                       useSbeEngineSettings);
 
             // Ensure that empty settings are returned if original command did not have any settings
@@ -289,7 +283,6 @@ public:
             ASSERT_EQ(service().lookupQuerySettingsWithRejectionCheck(
                           expCtx(),
                           hashForShape(deferredShape),
-                          nss,
                           boost::none /* querySettingsFromOriginalCommand */),
                       QuerySettings());
         }
@@ -300,9 +293,7 @@ public:
      * 'reject: true'.
      */
     void assertQuerySettingsLookupWithRejectionCheckForRouter(
-        const BSONObj& cmdBSON,
-        const query_shape::DeferredQueryShape& deferredShape,
-        const NamespaceString& nss) {
+        const BSONObj& cmdBSON, const query_shape::DeferredQueryShape& deferredShape) {
         // Set { reject: true } settings to 'cmdBSON'.
         QuerySettings querySettingsWithReject;
         querySettingsWithReject.setReject(true);
@@ -313,10 +304,10 @@ public:
         // rejected with QueryRejectedBySettings.
         if (CommandInvocation::get(opCtx())->shouldBypassQuerySettingsRejection()) {
             ASSERT_DOES_NOT_THROW(service().lookupQuerySettingsWithRejectionCheck(
-                expCtx(), hashForShape(deferredShape), nss, boost::none));
+                expCtx(), hashForShape(deferredShape), boost::none));
         } else {
             ASSERT_THROWS_CODE(service().lookupQuerySettingsWithRejectionCheck(
-                                   expCtx(), hashForShape(deferredShape), nss, boost::none),
+                                   expCtx(), hashForShape(deferredShape), boost::none),
                                DBException,
                                ErrorCodes::QueryRejectedBySettings);
         }
@@ -327,9 +318,7 @@ public:
      * 'reject: true'.
      */
     void assertQuerySettingsLookupWithRejectionCheckForShard(
-        const BSONObj& cmdBSON,
-        const query_shape::DeferredQueryShape& deferredShape,
-        const NamespaceString& nss) {
+        const BSONObj& cmdBSON, const query_shape::DeferredQueryShape& deferredShape) {
         // Set { reject: true } settings to 'cmdBSON'.
         QuerySettings querySettingsWithReject;
         querySettingsWithReject.setReject(true);
@@ -342,13 +331,11 @@ public:
             ASSERT_DOES_NOT_THROW(service().lookupQuerySettingsWithRejectionCheck(
                 expCtx(),
                 hashForShape(deferredShape),
-                nss,
                 boost::none /* querySettingsFromOriginalCommand */));
         } else {
             ASSERT_THROWS_CODE(service().lookupQuerySettingsWithRejectionCheck(
                                    expCtx(),
                                    hashForShape(deferredShape),
-                                   nss,
                                    boost::none /* querySettingsFromOriginalCommand */),
                                DBException,
                                ErrorCodes::QueryRejectedBySettings);
@@ -358,11 +345,10 @@ public:
         {
             InternalClientScope internalClientScope(opCtx());
             ASSERT_DOES_NOT_THROW(service().lookupQuerySettingsWithRejectionCheck(
-                expCtx(), hashForShape(deferredShape), nss, querySettingsWithReject));
+                expCtx(), hashForShape(deferredShape), querySettingsWithReject));
             ASSERT_DOES_NOT_THROW(service().lookupQuerySettingsWithRejectionCheck(
                 expCtx(),
                 hashForShape(deferredShape),
-                nss,
                 boost::none /* querySettingsFromOriginalCommand */));
         }
     }
@@ -401,13 +387,13 @@ TEST_F(QuerySettingsServiceTest, QuerySettingsLookupForFind) {
 
     {
         CommandInvocationScope invocationScope(opCtx());
-        assertQuerySettingsLookup(findCmdBSON, deferredShape, nss());
+        assertQuerySettingsLookup(findCmdBSON, deferredShape);
     }
     {
         // Re-run the lookup as an exempt invocation (e.g. explain): 'reject: true' must not apply.
         CommandInvocationScope invocationScope(opCtx(),
                                                /*shouldBypassQuerySettingsRejection=*/true);
-        assertQuerySettingsLookup(findCmdBSON, deferredShape, nss());
+        assertQuerySettingsLookup(findCmdBSON, deferredShape);
     }
 }
 
@@ -426,13 +412,13 @@ TEST_F(QuerySettingsServiceTest, QuerySettingsLookupForAgg) {
 
     {
         CommandInvocationScope invocationScope(opCtx());
-        assertQuerySettingsLookup(aggCmdBSON, deferredShape, nss());
+        assertQuerySettingsLookup(aggCmdBSON, deferredShape);
     }
     {
         // Re-run the lookup as an exempt invocation (e.g. explain): 'reject: true' must not apply.
         CommandInvocationScope invocationScope(opCtx(),
                                                /*shouldBypassQuerySettingsRejection=*/true);
-        assertQuerySettingsLookup(aggCmdBSON, deferredShape, nss());
+        assertQuerySettingsLookup(aggCmdBSON, deferredShape);
     }
 }
 
@@ -456,13 +442,13 @@ TEST_F(QuerySettingsServiceTest, QuerySettingsLookupForDistinct) {
 
     {
         CommandInvocationScope invocationScope(opCtx());
-        assertQuerySettingsLookup(distinctCmdBSON, deferredShape, nss());
+        assertQuerySettingsLookup(distinctCmdBSON, deferredShape);
     }
     {
         // Re-run the lookup as an exempt invocation (e.g. explain): 'reject: true' must not apply.
         CommandInvocationScope invocationScope(opCtx(),
                                                /*shouldBypassQuerySettingsRejection=*/true);
-        assertQuerySettingsLookup(distinctCmdBSON, deferredShape, nss());
+        assertQuerySettingsLookup(distinctCmdBSON, deferredShape);
     }
 }
 
@@ -478,7 +464,7 @@ TEST_F(QuerySettingsServiceTest, InitializeSettingsForQueryIsNoOpWhenNotStarted)
 
     // Resolution is skipped while no eligible command has begun, so the state and default settings
     // are unchanged even though non-default settings were supplied.
-    service().initializeSettingsForQuery(expCtx(), boost::none, nss(), settings);
+    service().initializeSettingsForQuery(expCtx(), boost::none, settings);
 
     ASSERT(std::holds_alternative<NotStarted>(getQuerySettingsStateForOp(opCtx())));
     ASSERT_EQ(forOp(opCtx()), QuerySettings());
@@ -493,7 +479,7 @@ TEST_F(QuerySettingsServiceTest, InitializeSettingsForQueryWithoutHashUsesOrigin
 
     // No query shape hash (query ineligible for lookup): settings are taken from those forwarded on
     // the original command.
-    service().initializeSettingsForQuery(expCtx(), boost::none, nss(), settings);
+    service().initializeSettingsForQuery(expCtx(), boost::none, settings);
 
     ASSERT(std::holds_alternative<QuerySettings>(getQuerySettingsStateForOp(opCtx())));
     ASSERT_EQ(forOp(opCtx()), settings);
@@ -503,7 +489,7 @@ TEST_F(QuerySettingsServiceTest, InitializeSettingsForQueryWithoutHashOrCommandR
     QuerySettingsService::initializeForTest(getServiceContext());
     getQuerySettingsStateForOp(opCtx()) = Pending{};
 
-    service().initializeSettingsForQuery(expCtx(), boost::none, nss(), boost::none);
+    service().initializeSettingsForQuery(expCtx(), boost::none, boost::none);
 
     // A default resolution collapses to 'Empty'.
     ASSERT(std::holds_alternative<Empty>(getQuerySettingsStateForOp(opCtx())));
@@ -519,10 +505,10 @@ TEST_F(QuerySettingsServiceTest, InitializeSettingsForQueryIsNoOpOnceResolved) {
     QuerySettings second;
     second.setQueryFramework(QueryFrameworkControlEnum::kTrySbeEngine);
 
-    service().initializeSettingsForQuery(expCtx(), boost::none, nss(), first);
+    service().initializeSettingsForQuery(expCtx(), boost::none, first);
     // A re-entrant resolution (view re-dispatch, nested direct-client query) must not overwrite the
     // settings already resolved for the outer query.
-    service().initializeSettingsForQuery(expCtx(), boost::none, nss(), second);
+    service().initializeSettingsForQuery(expCtx(), boost::none, second);
 
     ASSERT(std::holds_alternative<QuerySettings>(getQuerySettingsStateForOp(opCtx())));
     ASSERT_EQ(forOp(opCtx()), first);
@@ -611,12 +597,12 @@ TEST_F(QuerySettingsServiceTest, MergeClusterAndUserQuerySettingsOnRouter) {
     QuerySettings useSbeEngineSettings;
     useSbeEngineSettings.setQueryFramework(QueryFrameworkControlEnum::kTrySbeEngine);
     ASSERT_EQ(service().lookupQuerySettingsWithRejectionCheck(
-                  expCtx(), hashForShape(deferredShape), nss(), useSbeEngineSettings),
+                  expCtx(), hashForShape(deferredShape), useSbeEngineSettings),
               forceClassicEngineSettings);
 
     // With boost::none, cluster settings should be returned as-is.
     ASSERT_EQ(service().lookupQuerySettingsWithRejectionCheck(
-                  expCtx(), hashForShape(deferredShape), nss(), boost::none),
+                  expCtx(), hashForShape(deferredShape), boost::none),
               forceClassicEngineSettings);
 }
 
@@ -642,12 +628,12 @@ TEST_F(QuerySettingsServiceTest, MergeClusterAndUserQuerySettingsOnShard) {
     QuerySettings useSbeEngineSettings;
     useSbeEngineSettings.setQueryFramework(QueryFrameworkControlEnum::kTrySbeEngine);
     ASSERT_EQ(service().lookupQuerySettingsWithRejectionCheck(
-                  expCtx(), hashForShape(deferredShape), nss(), useSbeEngineSettings),
+                  expCtx(), hashForShape(deferredShape), useSbeEngineSettings),
               forceClassicEngineSettings);
 
     // With boost::none, cluster settings should be returned (standalone shard fallback).
     ASSERT_EQ(service().lookupQuerySettingsWithRejectionCheck(
-                  expCtx(), hashForShape(deferredShape), nss(), boost::none),
+                  expCtx(), hashForShape(deferredShape), boost::none),
               forceClassicEngineSettings);
 }
 
@@ -665,9 +651,8 @@ TEST_F(QuerySettingsServiceTest, LookupValidatesUserSuppliedQuerySettings) {
     const auto hash = hashForShape(deferredShape);
 
     // Unlike setQuerySettings, empty/default user settings are a no-op rather than an error.
-    ASSERT_EQ(
-        service().lookupQuerySettingsWithRejectionCheck(expCtx(), hash, nss(), QuerySettings()),
-        QuerySettings());
+    ASSERT_EQ(service().lookupQuerySettingsWithRejectionCheck(expCtx(), hash, QuerySettings()),
+              QuerySettings());
 
     // Two index hints for the same collection are rejected.
     QuerySettings duplicateHints =
@@ -675,7 +660,7 @@ TEST_F(QuerySettingsServiceTest, LookupValidatesUserSuppliedQuerySettings) {
                            IndexHintSpec(makeNsSpec("testCollA"sv), {IndexHint(BSON("b" << 1))})},
                           false /* setFramework */);
     ASSERT_THROWS_CODE(
-        service().lookupQuerySettingsWithRejectionCheck(expCtx(), hash, nss(), duplicateHints),
+        service().lookupQuerySettingsWithRejectionCheck(expCtx(), hash, duplicateHints),
         DBException,
         7746608);
 }
@@ -732,7 +717,7 @@ TEST_F(QuerySettingsServiceTest, MaxTimeMSFromSettingsIsAppliedOnLookup) {
                              {makeQueryShapeConfiguration(findCmdBSON, settingsWithMaxTimeMS)});
 
     service().lookupQuerySettingsWithRejectionCheck(
-        expCtx(), hashForShape(deferredShape), nss(), boost::none);
+        expCtx(), hashForShape(deferredShape), boost::none);
 
     // A finite deadline must have been set by the lookup.
     ASSERT_LT(opCtx()->getDeadline(), Date_t::max());
@@ -763,7 +748,7 @@ TEST_F(QuerySettingsServiceTest, MaxTimeMSFromSettingsLoosensExistingDeadline) {
                              {makeQueryShapeConfiguration(findCmdBSON, settingsWithMaxTimeMS)});
 
     service().lookupQuerySettingsWithRejectionCheck(
-        expCtx(), hashForShape(deferredShape), nss(), boost::none);
+        expCtx(), hashForShape(deferredShape), boost::none);
 
     // The deadline should now be ~60s from now, i.e. well beyond the original 100ms.
     ASSERT_GT(opCtx()->getDeadline(), tightDeadline);
@@ -794,7 +779,7 @@ TEST_F(QuerySettingsServiceTest, MaxTimeMSZeroRemovesDeadline) {
                              {makeQueryShapeConfiguration(findCmdBSON, settingsWithMaxTimeMSZero)});
 
     service().lookupQuerySettingsWithRejectionCheck(
-        expCtx(), hashForShape(deferredShape), nss(), boost::none);
+        expCtx(), hashForShape(deferredShape), boost::none);
 
     ASSERT_EQ(opCtx()->getDeadline(), Date_t::max());
 }
@@ -822,7 +807,7 @@ TEST_F(QuerySettingsServiceTest, MaxTimeMSFromSettingsIsNotAppliedForExplain) {
     ASSERT_EQ(opCtx()->getDeadline(), Date_t::max());
 
     service().lookupQuerySettingsWithRejectionCheck(
-        expCtx(), hashForShape(deferredShape), nss(), boost::none);
+        expCtx(), hashForShape(deferredShape), boost::none);
 
     ASSERT_EQ(opCtx()->getDeadline(), Date_t::max());
 }

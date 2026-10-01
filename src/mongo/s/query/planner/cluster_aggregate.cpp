@@ -561,8 +561,7 @@ ParsedAggregationPipeline parsePipelineAndRegisterQueryStats(
     // Resolve the query settings for this operation.
     {
         auto& service = query_settings::QuerySettingsService::get(opCtx);
-        service.initializeSettingsForQuery(
-            expCtx, queryShapeHash, nsStruct.executionNss, request.getQuerySettings());
+        service.initializeSettingsForQuery(expCtx, queryShapeHash, request.getQuerySettings());
     }
 
     // Skip query stats recording for queryable encryption queries.
@@ -1163,7 +1162,7 @@ void makeEOFExplainResult(OperationContext* opCtx,
     // 'runAggregateImpl' is never reached on this path, and serializing the explain output below
     // reads knobs that query settings may override.
     query_settings::QuerySettingsService::get(opCtx).initializeSettingsForQuery(
-        expCtx, queryShapeHash, namespaces.executionNss, request.getQuerySettings());
+        expCtx, queryShapeHash, request.getQuerySettings());
 
     explain_common::generateQueryShapeHash(opCtx, result);
     explain_common::generateServerInfo(result);

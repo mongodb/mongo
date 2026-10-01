@@ -691,7 +691,7 @@ std::unique_ptr<CanonicalQuery> ClusterFind::generateAndValidateCanonicalQuery(
     // Resolve the query settings for this operation.
     auto& querySettingsService = query_settings::QuerySettingsService::get(opCtx);
     querySettingsService.initializeSettingsForQuery(
-        expCtx, queryShapeHash, origNss, parsedFind->findCommandRequest->getQuerySettings());
+        expCtx, queryShapeHash, parsedFind->findCommandRequest->getQuerySettings());
 
     if (mustRegisterRequestToQueryStats) {
         query_stats::registerRequest(

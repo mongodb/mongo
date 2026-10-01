@@ -134,7 +134,7 @@ std::unique_ptr<CanonicalQuery> parseDistinctCmd(
     auto& querySettingsService = query_settings::QuerySettingsService::get(opCtx);
     auto& distinctReq = *parsedDistinct->distinctCommandRequest;
     querySettingsService.initializeSettingsForQuery(
-        expCtx, queryShapeHash, nss, distinctReq.getQuerySettings());
+        expCtx, queryShapeHash, distinctReq.getQuerySettings());
 
     // We do not collect queryStats on explain for distinct.
     if (!verbosity.has_value()) {

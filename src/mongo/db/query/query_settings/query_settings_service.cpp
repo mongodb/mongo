@@ -507,7 +507,6 @@ void checkQueryKnobOverrideErrors(const QuerySettings& settings,
 void QuerySettingsService::initializeSettingsForQuery(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const boost::optional<query_shape::QueryShapeHash>& queryShapeHash,
-    const NamespaceString& nss,
     const boost::optional<QuerySettings>& querySettingsFromOriginalCommand) const {
     using namespace query_settings_details;
     // A nested command running through DBDirectClient is part of the user command's execution: it
@@ -524,7 +523,7 @@ void QuerySettingsService::initializeSettingsForQuery(
     auto&& state = getQuerySettingsStateForOp(opCtx);
     if (std::holds_alternative<Pending>(state)) {
         auto settings = lookupQuerySettingsWithRejectionCheck(
-            expCtx, queryShapeHash, nss, querySettingsFromOriginalCommand);
+            expCtx, queryShapeHash, querySettingsFromOriginalCommand);
         // Collapse a default (no-op) resolution to 'Empty' so it is distinguishable from an
         // operation that actually installed settings.
         // TODO SERVER-XXXXXX: avoid re-inspecting the result here by having
@@ -833,7 +832,7 @@ void QuerySettingsService::applyMaxTimeMSFromSettings(
 }
 
 bool QuerySettingsService::isEligibleForQuerySettings(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx, const NamespaceString& nss) {
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     // Query settings can not be set for IDHACK queries.
     if (expCtx->isIdHackQuery()) {
         return false;
@@ -845,6 +844,7 @@ bool QuerySettingsService::isEligibleForQuerySettings(
     }
 
     // Query settings can not be set on internal dbs or system collections in user dbs.
+    const auto& nss = expCtx->getNamespaceString();
     if (nss.isOnInternalDb() || nss.isSystem()) {
         return false;
     }
