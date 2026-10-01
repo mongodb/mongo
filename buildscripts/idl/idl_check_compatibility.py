@@ -435,6 +435,8 @@ ALLOWED_NEW_ACCESS_CHECK_PRIVILEGES = dict(
         # The feature using 'queryStatsReadTransformed' has been backported to v7.0 but is not present
         # in the latest patch release. It is guarded by a feature flag so we are allowing this conflict here.
         AllowedNewPrivilege("cluster", ["queryStatsReadTransformed"], "queryStats"),
+        # Added for $changeStream showSystemEvents on whole-cluster streams (SERVER-135203).
+        AllowedNewPrivilege("collection", ["find", "changeStream"]),
     ],
     # This list is only used in unit-tests.
     complexChecksSupersetAllowed=[

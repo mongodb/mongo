@@ -36,6 +36,9 @@
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/basic_types.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/database_name.h"
@@ -116,6 +119,39 @@ constexpr StringData DocumentSourceChangeStream::kRegexAllCollectionsShowSystemE
 
 constexpr StringData DocumentSourceChangeStream::kRegexAllDBs;
 constexpr StringData DocumentSourceChangeStream::kRegexCmdColl;
+
+void DocumentSourceChangeStream::LiteParsed::_addShowSystemEventsPrivilegesIfNeeded(
+    PrivilegeVector* privileges) const {
+    const BSONElement showSystemEvents =
+        _spec.Obj()[DocumentSourceChangeStreamSpec::kShowSystemEventsFieldName];
+
+    // A non-boolean value is rejected later, when the spec is fully parsed.
+    if (!showSystemEvents.booleanSafe()) {
+        return;
+    }
+
+    // Db/cluster privileges exclude system collections, but the flag re-admits system.js, so
+    // those scopes need an explicit system.js grant.
+    constexpr auto systemJs = NamespaceString::kSystemDotJavascriptCollectionName;
+    switch (getChangeStreamType(_nss)) {
+        case ChangeStreamType::kSingleCollection:
+            // A collection stream only emits events for _nss, so system.js documents can only
+            // appear when the stream is opened on system.js itself, which the exact-namespace
+            // privilege above already covers.
+            return;
+        case ChangeStreamType::kSingleDatabase:
+            privileges->push_back(
+                Privilege(ResourcePattern::forExactNamespace(
+                              NamespaceStringUtil::deserialize(_nss.dbName(), systemJs)),
+                          actions));
+            return;
+        case ChangeStreamType::kAllChangesForCluster:
+            privileges->push_back(
+                Privilege(ResourcePattern::forCollectionName(_nss.tenantId(), systemJs), actions));
+            return;
+    }
+    MONGO_UNREACHABLE;
+}
 
 void DocumentSourceChangeStream::checkValueType(const Value v,
                                                 const StringData fieldName,
