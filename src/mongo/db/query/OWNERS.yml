@@ -303,3 +303,6 @@ filters:
     approvers:
       - 10gen/query-optimization
       - 10gen/query-execution
+  - "clustered_collection_scan*":
+    approvers:
+      - 10gen/query-optimization

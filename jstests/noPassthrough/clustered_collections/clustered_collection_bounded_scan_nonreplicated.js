@@ -18,6 +18,14 @@ const nonReplicatedDB = conn.getDB("local");
 const collName = "coll";
 const nonReplicatedColl = nonReplicatedDB[collName];
 
-testClusteredCollectionBoundedScan(nonReplicatedColl, {ts: 1}, true /*checkProfile*/);
+for (const multiRangeEnabled of [false, true]) {
+    assert.commandWorked(
+        conn.getDB("admin").adminCommand({
+            setParameter: 1,
+            featureFlagClusteredCollScanMultiRange: multiRangeEnabled,
+        }),
+    );
+    testClusteredCollectionBoundedScan(nonReplicatedColl, {ts: 1}, true /*checkProfile*/);
+}
 
 MongoRunner.stopMongod(conn);

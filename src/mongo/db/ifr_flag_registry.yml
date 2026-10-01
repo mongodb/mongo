@@ -42,6 +42,7 @@ release:
   featureFlagCMKRotation: {}
   featureFlagChangeStreamOptimizedUpdateLookup: {}
   featureFlagChangeStreamReaderV2: {}
+  featureFlagClusteredCollScanMultiRange: {}
   featureFlagCostBasedRanker: {}
   featureFlagExtensionsInsideHybridSearch: {}
   featureFlagExtractFieldPathsSbeStage: {}

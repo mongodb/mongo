@@ -100,18 +100,25 @@ export var FeatureFlagUtil = (function () {
     }
 
     function _getStatusLegacy(conn, ignoreFCV, flagDoc) {
+        const flagIsEnabled = flagDoc.value;
+        const flagShouldBeFCVGated = flagDoc.fcv_gated;
+
+        if (ignoreFCV) {
+            // The FCV document is replicated and may be stale on secondaries. If the caller
+            // doesn't care about FCV (e.g. isPresentAndEnabledOnAllNodes), skip reading it
+            // entirely — it would not affect the result anyway.
+            return flagIsEnabled ? FlagStatus.kEnabled : FlagStatus.kDisabled;
+        }
+
         const adminDB =
             typeof conn.getDB === "function" ? conn.getDB("admin") : conn.getSiblingDB("admin");
         const fcvDoc = adminDB.system.version.findOne({_id: "featureCompatibilityVersion"});
         assert(fcvDoc, "FCV document not found");
 
-        const flagIsEnabled = flagDoc.value;
         const flagVersionIsValid =
             MongoRunner.compareBinVersions(fcvDoc.version, flagDoc.version) >= 0;
 
-        const flagShouldBeFCVGated = flagDoc.fcv_gated;
-
-        if (flagIsEnabled && (!flagShouldBeFCVGated || ignoreFCV || flagVersionIsValid)) {
+        if (flagIsEnabled && (!flagShouldBeFCVGated || flagVersionIsValid)) {
             return FlagStatus.kEnabled;
         }
         return FlagStatus.kDisabled;
@@ -227,6 +234,82 @@ export var FeatureFlagUtil = (function () {
 
     /**
      *
+     * Wrapper around 'isPresentAndEnabled' that checks the flag on every serving node in the
+     * cluster (PRIMARY and SECONDARY members of each replica set, including config servers).
+     * Only useful for non-FCV-gated feature flags. FCV-gated feature flags' states are anyway
+     * replicated across the cluster, so this helper asserts that the given flag is not FCV-gated.
+     *
+     * @param 'db' - a database object connected to the cluster (standalone, replica set, or
+     *     sharded cluster).
+     * @param 'flagName' - the name of the flag you want to check, but *without* the
+     *     'featureFlag' prefix. For example, just "Toaster" instead of "featureFlagToaster."
+     *
+     * @returns true if the provided feature flag is known and enabled on every serving node in
+     *     the cluster. Returns false otherwise (either disabled or not known on at least one
+     *     node).
+     *
+     * This is useful in multiversion environments where individual nodes may be running different
+     * binary versions and a flag may not exist on older nodes. Unlike 'isPresentAndEnabled', which
+     * only checks a single node, this function ensures the flag is uniformly enabled across the
+     * entire cluster before returning true.
+     *
+     * Non-FCV-gated Feature flags are per-process server parameters, not replicated state, so reading
+     * them on a secondary reflects that node's actual configuration and cannot be stale.
+     * Non-serving nodes (STARTUP2, RECOVERING, etc.) are skipped via replSetGetStatus.
+     *
+     * This can be useful if you'd like to have your test conditionally add extra assertions, or
+     * conditionally change the assertion being made, like so:
+     *
+     *   // TODO SERVER-XYZ remove 'featureFlagMyFlag'.
+     *   if (FeatureFlagUtil.isPresentAndEnabledOnAllNodes(db, "MyFlag")) {
+     *       // Expect the new return value.
+     *   } else {
+     *       // Expect either the new or the old return value (depends on which node the request gets routed to).
+     *   }
+     *
+     * Note that this API should always be used with an accompanying TODO like the one in the
+     * example above. See isPresentAndEnabled.
+     */
+    function isPresentAndEnabledOnAllNodes(db, flagName) {
+        if (FixtureHelpers.isStandalone(db)) {
+            return FeatureFlagUtil.isPresentAndEnabled(
+                db.getMongo(),
+                flagName,
+                true /* ignoreFCV */,
+            );
+        }
+        const replicas = FixtureHelpers.getAllReplicas(db, true /* includeConfigServers */);
+        for (const rs of replicas) {
+            const status = assert.commandWorked(
+                rs.getPrimary().adminCommand({replSetGetStatus: 1}),
+            );
+            for (const member of status.members) {
+                // Skip STARTUP2, RECOVERING, etc. — only check nodes that can serve queries.
+                if (member.stateStr !== "PRIMARY" && member.stateStr !== "SECONDARY") continue;
+                const conn = new Mongo(member.name);
+                // Check that the feature flag is not FCV-gated.
+                // This logic only makes sense for non-FCV-gated flags.
+                const flagDoc = _getFeatureFlagDoc(conn, flagName);
+                if (typeof flagDoc !== "undefined") {
+                    assert.neq(
+                        flagDoc["fcv_gated"],
+                        true,
+                        "Cannot use isPresentAndEnabledOnAllNodes on FCV-gated feature flags.",
+                    );
+                }
+                try {
+                    if (!FeatureFlagUtil.isPresentAndEnabled(conn, flagName, true /* ignoreFCV */))
+                        return false;
+                } finally {
+                    conn.close();
+                }
+            }
+        }
+        return true;
+    }
+
+    /**
+     *
      * Wrapper around 'getStatus' - see that function for more details on the arguemnts.
      *
      * @param 'featureFlag' - the name of the flag you want to check, but *without* the
@@ -248,6 +331,7 @@ export var FeatureFlagUtil = (function () {
         FlagStatus: FlagStatus,
         isEnabled: isEnabled,
         isPresentAndEnabled: isPresentAndEnabled,
+        isPresentAndEnabledOnAllNodes: isPresentAndEnabledOnAllNodes,
         isPresentAndDisabled: isPresentAndDisabled,
         getFeatureFlagDoc: getFeatureFlagDoc,
         getFeatureFlagDocStatus: getFeatureFlagDocStatus,

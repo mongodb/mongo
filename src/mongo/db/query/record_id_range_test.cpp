@@ -171,4 +171,72 @@ TEST(RecordIdRangeTest, Compare_MaxOnlyRange) {
     ASSERT_EQ(r.compare(RecordId(6)), 1);
 }
 
+// ---------------------------------------------------------------------------
+// RecordIdRange::operator==
+// ---------------------------------------------------------------------------
+
+TEST(RecordIdRangeTest, EqualityOp_BothUnbounded) {
+    RecordIdRange a, b;
+    ASSERT_TRUE(a == b);
+}
+
+TEST(RecordIdRangeTest, EqualityOp_SelfComparison) {
+    auto r = makeRange(1, true, 5, false);
+    ASSERT_TRUE(r == r);
+}
+
+TEST(RecordIdRangeTest, EqualityOp_IdenticalBounds) {
+    auto a = makeRange(3, true, 7, false);
+    auto b = makeRange(3, true, 7, false);
+    ASSERT_TRUE(a == b);
+}
+
+TEST(RecordIdRangeTest, EqualityOp_MinOnlyEqual) {
+    auto a = makeRangeMinOnly(4, true);
+    auto b = makeRangeMinOnly(4, true);
+    ASSERT_TRUE(a == b);
+}
+
+TEST(RecordIdRangeTest, EqualityOp_MaxOnlyEqual) {
+    auto a = makeRangeMaxOnly(9, false);
+    auto b = makeRangeMaxOnly(9, false);
+    ASSERT_TRUE(a == b);
+}
+
+TEST(RecordIdRangeTest, EqualityOp_DifferentMinValue) {
+    auto a = makeRange(3, true, 7, true);
+    auto b = makeRange(4, true, 7, true);
+    ASSERT_FALSE(a == b);
+}
+
+TEST(RecordIdRangeTest, EqualityOp_DifferentMaxValue) {
+    auto a = makeRange(3, true, 7, true);
+    auto b = makeRange(3, true, 8, true);
+    ASSERT_FALSE(a == b);
+}
+
+TEST(RecordIdRangeTest, EqualityOp_DifferentMinInclusivity) {
+    auto a = makeRange(3, true, 7, true);
+    auto b = makeRange(3, false, 7, true);
+    ASSERT_FALSE(a == b);
+}
+
+TEST(RecordIdRangeTest, EqualityOp_DifferentMaxInclusivity) {
+    auto a = makeRange(3, true, 7, true);
+    auto b = makeRange(3, true, 7, false);
+    ASSERT_FALSE(a == b);
+}
+
+TEST(RecordIdRangeTest, EqualityOp_BoundedVsUnbounded) {
+    auto a = makeRange(3, true, 7, true);
+    RecordIdRange b;
+    ASSERT_FALSE(a == b);
+}
+
+TEST(RecordIdRangeTest, EqualityOp_MinOnlyVsMaxOnly) {
+    auto a = makeRangeMinOnly(5, true);
+    auto b = makeRangeMaxOnly(5, true);
+    ASSERT_FALSE(a == b);
+}
+
 }  // namespace

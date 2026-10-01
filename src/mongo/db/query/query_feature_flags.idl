@@ -496,3 +496,13 @@ feature_flags:
         default: true
         version: 9.0
         fcv_gated: true
+
+    featureFlagClusteredCollScanMultiRange:
+        description:
+            "Feature flag to enable non-contiguous (multi-range) clustered collection scans.
+            When enabled, the planner produces multiple disjoint RecordId ranges from $in and
+            disjoint $or predicates on the cluster key, allowing the scan to seek between
+            ranges rather than scanning the entire min-max span."
+        cpp_varname: gFeatureFlagClusteredCollScanMultiRange
+        fcv_gated: false
+        incremental_rollout_phase: release

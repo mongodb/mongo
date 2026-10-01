@@ -157,7 +157,7 @@ size_t getKeysExamined(StageType type, const SpecificStats* specific) {
  * documents examined by the stage.
  */
 size_t getDocsExamined(StageType type, const SpecificStats* specific) {
-    if (STAGE_COLLSCAN == type) {
+    if (STAGE_COLLSCAN == type || STAGE_COLLSCAN_MULTI_RANGE == type) {
         const CollectionScanStats* spec = static_cast<const CollectionScanStats*>(specific);
         return spec->docsTested;
     } else if (STAGE_FETCH == type) {
@@ -1352,6 +1352,13 @@ void PlanExplainerImpl::getSummaryStats(PlanSummaryStats* statsOut) const {
                     static_cast<const CollectionScanStats*>(collScan->getSpecificStats());
                 if (!collScanStats->tailable)
                     statsOut->collectionScansNonTailable++;
+                break;
+            }
+            case STAGE_COLLSCAN_MULTI_RANGE: {
+                statsOut->collectionScans++;
+                // Multi-range collscans are clustered.
+                // Clustered collscans are not tailable.
+                statsOut->collectionScansNonTailable++;
                 break;
             }
             default:

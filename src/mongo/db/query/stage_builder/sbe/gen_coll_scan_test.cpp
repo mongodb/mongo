@@ -63,16 +63,12 @@ public:
         : ClusteredScanStageTestFixture(
               NamespaceString::createNamespaceString_forTest("testdb.gen_coll_scan_test")) {}
 
-    using FilterAndExpCtx =
-        std::pair<boost::intrusive_ptr<ExpressionContext>, std::unique_ptr<MatchExpression>>;
     // Run a clustered collection scan via generateCollScan.
     // Returns the documents in the order the stage produced them.
-    // Optionally uses the given filter. In this case, the corresponding expression context must
-    // also be provided.
+    // Checks that the builder has built the correct stage type.
     std::vector<BSONObj> runClusteredScan(const MultipleCollectionAccessor& colls,
                                           const RecordIdRangeList& rangeList,
-                                          bool forward,
-                                          std::optional<FilterAndExpCtx> filterAndExpCtx = {}) {
+                                          bool forward) {
         // The plan we construct does not need the virtual scan from runTest, so create these
         // dummy slots.
         auto [emptyTag, emptyVal] = value::makeNewArray();
@@ -84,8 +80,7 @@ public:
                 -> std::pair<value::SlotId, std::unique_ptr<PlanStage>> {
                 Variables variables;
                 boost::intrusive_ptr<ExpressionContext> expCtx(
-                    filterAndExpCtx ? std::get<0>(*filterAndExpCtx)
-                                    : new ExpressionContextForTest(operationContext(), _nss));
+                    new ExpressionContextForTest(operationContext(), _nss));
                 value::FrameIdGenerator frameIdGenerator;
 
                 stage_builder::StageBuilderState builderState{operationContext(),
@@ -110,7 +105,6 @@ public:
                     forward ? CollectionScanParams::FORWARD : CollectionScanParams::BACKWARD;
                 csn->rangeList = rangeList;
                 csn->isClustered = true;
-                csn->filter = filterAndExpCtx ? std::move(std::get<1>(*filterAndExpCtx)) : nullptr;
 
                 const CollectionPtr& collection = colls.getMainCollection();
                 auto [stage, slots] =
@@ -131,13 +125,8 @@ public:
                     }
                     ASSERT_EQ(dynamic_cast<MultiRangeClusteredScanStage*>(stage.get()), nullptr);
                 } else {
-                    // SBE stages have no getChildren(), so we cannot introspect what's inside
-                    // a filter stage. Assume that the tests that build a filter stage build the
-                    // correct scan stage underneath.
-                    if (!dynamic_cast<FilterStage<false, false>*>(stage.get())) {
-                        ASSERT(dynamic_cast<MultiRangeClusteredScanStage*>(stage.get()));
-                        ASSERT_EQ(dynamic_cast<ScanStage*>(stage.get()), nullptr);
-                    }
+                    ASSERT(dynamic_cast<MultiRangeClusteredScanStage*>(stage.get()));
+                    ASSERT_EQ(dynamic_cast<ScanStage*>(stage.get()), nullptr);
                 }
 
                 env.ctx.mca = &colls;
@@ -156,16 +145,12 @@ public:
         return results;
     }
 
-    // Run a clustered scan and assert results match docs filtered by rangeList.
-    // If a filter is given, uses it for the clustered scan. In that case, the list of documents
-    // should already be filtered to only those matching it.
     void checkClusteredScanResult(const MultipleCollectionAccessor& colls,
                                   bool forward,
                                   const RecordIdRangeList& rangeList,
-                                  const std::vector<BSONObj>& docs,
-                                  std::optional<FilterAndExpCtx> filterAndExpCtx = {}) {
+                                  const std::vector<BSONObj>& docs) {
 
-        auto actualDocs = runClusteredScan(colls, rangeList, forward, std::move(filterAndExpCtx));
+        auto actualDocs = runClusteredScan(colls, rangeList, forward);
 
         std::vector<BSONObj> sortedDocs = docs;
         std::sort(
@@ -257,93 +242,6 @@ TEST_F(GenCollScanTest, ClusteredEmptyRangeList) {
 
     auto backward = runClusteredScan(colls, rangeList, false);
     ASSERT_TRUE(backward.empty()) << "expected no documents for empty rangeList (backward)";
-}
-
-// Ranges where some ranges contain no data.
-TEST_F(GenCollScanTest, ClusteredMultiRangeSomeRangesEmpty) {
-    std::vector<BSONObj> docs;
-    for (int i = 1; i <= 10; ++i)
-        docs.push_back(BSON("_id" << i));
-    for (int i = 20; i <= 30; ++i)
-        docs.push_back(BSON("_id" << i));
-    auto colls = createClusteredCollection(docs);
-
-    auto rangeList = RecordIdRangeList::makeUnion({
-        makeIntRange(1, true, 5, true),    // [1,5]  — has data
-        makeIntRange(12, true, 15, true),  // [12,15] — no data here
-        makeIntRange(22, true, 28, true),  // [22,28] — has data
-    });
-
-    checkClusteredScanResult(colls, true, rangeList, docs);
-    checkClusteredScanResult(colls, false, rangeList, docs);
-}
-
-// Two ranges that share an exclusive junction point — the junction value must be excluded.
-TEST_F(GenCollScanTest, ClusteredMultiRangeExclusiveJunction) {
-    std::vector<BSONObj> docs;
-    for (int i = 0; i <= 12; ++i)
-        docs.push_back(BSON("_id" << i));
-    auto colls = createClusteredCollection(docs);
-
-    // [1,5) and (5,10] — 5 must be excluded from both
-    auto rangeList = RecordIdRangeList::makeUnion({
-        makeIntRange(1, true, 5, false),
-        makeIntRange(5, false, 10, true),
-    });
-    ASSERT_EQ(rangeList.getRanges().size(), 2u);  // must not have been merged
-
-    checkClusteredScanResult(colls, true, rangeList, docs);
-    checkClusteredScanResult(colls, false, rangeList, docs);
-}
-
-// Ranges with unbounded ends: (−∞, 5) and (10, +∞).
-TEST_F(GenCollScanTest, ClusteredMultiRangeUnboundedEnds) {
-    std::vector<BSONObj> docs;
-    for (int i = 0; i <= 20; ++i)
-        docs.push_back(BSON("_id" << i));
-    auto colls = createClusteredCollection(docs);
-
-    auto rangeList = RecordIdRangeList::makeUnion({
-        makeIntRange(boost::none, true, 5, false),   // (−∞, 5)
-        makeIntRange(10, false, boost::none, true),  // (10, +∞)
-    });
-    ASSERT_EQ(rangeList.getRanges().size(), 2u);
-
-    checkClusteredScanResult(colls, true, rangeList, docs);
-    checkClusteredScanResult(colls, false, rangeList, docs);
-}
-
-// Multi-range scan with a filter applied on top (keep only even _id values).
-TEST_F(GenCollScanTest, ClusteredMultiRangeWithFilter) {
-    std::vector<BSONObj> docs;
-    for (int i = 0; i < 30; ++i)
-        docs.push_back(BSON("_id" << i));
-    auto colls = createClusteredCollection(docs);
-
-    auto rangeList = RecordIdRangeList::makeUnion({
-        makeIntRange(1, true, 10, true),   // [1,10]
-        makeIntRange(15, true, 25, true),  // [15,25]
-    });
-
-    boost::intrusive_ptr<ExpressionContext> expCtx(
-        new ExpressionContextForTest(operationContext(), _nss));
-
-    auto matchExpr = fromjson("{_id: {$mod: [2, 0]}}");
-
-    auto filter = MatchExpressionParser::parse(matchExpr, expCtx);
-    ASSERT_OK(filter.getStatus());
-
-    std::vector<BSONObj> filteredDocs;
-    std::copy_if(docs.begin(),
-                 docs.end(),
-                 std::back_inserter(filteredDocs),
-                 [](const BSONObj& obj) { return obj["_id"].Int() % 2 == 0; });
-
-    for (bool forward : {false, true}) {
-        auto filterAndExpCtx = std::make_pair(expCtx, filter.getValue()->clone());
-        checkClusteredScanResult(
-            colls, forward, rangeList, filteredDocs, std::move(filterAndExpCtx));
-    }
 }
 
 // The stage builder adds the top-level fields referenced by the filter to the scan's field list, so

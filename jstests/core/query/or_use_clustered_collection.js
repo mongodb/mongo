@@ -2,8 +2,8 @@
  * Verifies that $or queries on clustered collections produce plans with IXSCAN and
  * CLUSTERED_IXSCAN stages when possible.
  * @tags: [
- *   uses_explain,
- *   requires_fcv_71,
+ *  uses_explain,
+ *  requires_fcv_71,
  *  # Explain for the aggregate command cannot run within a multi-document transaction.
  *  does_not_support_transactions,
  *  # Refusing to run a test that issues an aggregation command with explain because it may return
@@ -17,6 +17,7 @@
  */
 
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {
     getAggPlanStages,
     getPlanStage,
@@ -46,11 +47,6 @@ for (let i = 0; i < numDocs; i++) {
     docs.push({b: textFields[i], a: i, _id: i, c: i * 2, d: [{e: i * 2}, {g: i / 2}], noIndex: i});
 }
 assert.commandWorked(coll.insertMany(docs));
-
-function haveShardMergeStage(winningPlan, stage = "SHARD_MERGE") {
-    let shardMergeStage = getPlanStages(winningPlan, stage);
-    return shardMergeStage.length > 0;
-}
 
 function assertCorrectResults({query, expectedDocIds, projection, limit, skip}) {
     // Test different find queries. With and without a sort, and with and without a projection.
@@ -337,8 +333,6 @@ validateQueryOR({
 });
 
 // TODO SERVER-77601 remove this function, once supported in SBE.
-// We prevented allowing MERGE_SORT plans with clustered collection scans, so the plan should
-// fallback to using a collection scan.
 function validateQuerySort() {
     let explain = coll
         .explain()
@@ -346,23 +340,49 @@ function validateQuerySort() {
         .sort({_id: 1})
         .finish();
     const winningPlan = getWinningPlanFromExplain(explain);
-    let expectedStageCount = {"MERGE_SORT": 0, "COLLSCAN": 1, "CLUSTERED_IXSCAN": 0, "OR": 0};
-    const shardMergeStage = haveShardMergeStage(winningPlan, "SHARD_MERGE_SORT");
-    const shards = "shards" in winningPlan;
-    for (let stage in expectedStageCount) {
-        let planStages = getPlanStages(winningPlan, stage);
+    // The disjoint $or may be planned as a single-range COLLSCAN (when the
+    // multi-range clustered collscan feature flag is off or the binary is old)
+    // or as a multi-range CLUSTERED_IXSCAN (when the flag is on).
+    // TODO SERVER-133667 remove 'featureFlagClusteredCollScanMultiRange'.
+    const multiRangeEnabled = FeatureFlagUtil.isPresentAndEnabledOnAllNodes(
+        db,
+        "ClusteredCollScanMultiRange",
+    );
+    for (const stage of ["MERGE_SORT", "OR"]) {
+        const planStages = getPlanStages(winningPlan, stage);
         assert(planStages, tojson(winningPlan));
-        if (shardMergeStage || shards) {
-            assert.gte(
-                planStages.length,
-                expectedStageCount[stage],
-                "Expected " + stage + " to appear, but got plan: " + tojson(winningPlan),
+        assert.eq(
+            planStages.length,
+            0,
+            "Expected " + stage + " to be absent, but got plan: " + tojson(winningPlan),
+        );
+    }
+    // If sharded: for each shard's winning plan. Otherwise, for the (single) winning plan.
+    for (const shard of winningPlan["shards"] ?? [winningPlan]) {
+        const collscanStages = getPlanStages(shard, "COLLSCAN");
+        const clusteredIxscanStages = getPlanStages(shard, "CLUSTERED_IXSCAN");
+        if (multiRangeEnabled) {
+            assert.eq(
+                collscanStages.length,
+                0,
+                "Expected no COLLSCAN with multi-range enabled, but got plan: " + tojson(shard),
+            );
+            assert.eq(
+                clusteredIxscanStages.length,
+                1,
+                "Expected CLUSTERED_IXSCAN with multi-range enabled, but got plan: " +
+                    tojson(shard),
             );
         } else {
+            // Flag off or old binary: the legacy planner treats $or as a black box, so no
+            // bounds are extracted and the scan is unbounded. A COLLSCAN on a clustered
+            // collection returns docs in _id order, satisfying the sort without MERGE_SORT.
+            // In a multiversion context, the query may land on a node with the flag on
+            // (CLUSTERED_IXSCAN) or off/old (COLLSCAN), so accept either.
             assert.eq(
-                planStages.length,
-                expectedStageCount[stage],
-                "Expected " + stage + " to appear, but got plan: " + tojson(winningPlan),
+                collscanStages.length + clusteredIxscanStages.length,
+                1,
+                "Expected either COLLSCAN or CLUSTERED_IXSCAN, but got plan: " + tojson(shard),
             );
         }
     }

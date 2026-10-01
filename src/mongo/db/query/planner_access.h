@@ -15,10 +15,12 @@
 #include "mongo/db/query/planner_ixselect.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/record_id_range.h"
+#include "mongo/db/query/record_id_range_list.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>
+#include <functional>
 #include <memory>
 #include <string_view>
 #include <vector>
@@ -176,26 +178,46 @@ public:
      *   (in) queryCollator - current query's collator
      *   (in) ccCollator - clustered collection's collator
      *   (in) clusterKeyFieldName - only "_id" is officially supported, but this may change someday
-     *   (out) recordRange - scan start/end bounds
-     *   (out) redundant - if provided, will be called with pointers to expressions which
-     *                     do not require a filter, _if_ the collection scan can enforce
-     *                     recordRange
+     *   (out) outRangeList - scan start/end bounds. This must initially be set to an unbounded
+     * RecordIdRangeList (which is the default constructor).
+     *   (out) outRangeListExact - if non-null, set to true iff the expression is entirely
+     * expressible as a range (eg. no non-range sub-conditions such as $mod,
+     * non-collation-compatible predicates, unsupported predicates). Only when this is true is
+     * outRangeList a tight representation of the expression's truth-set.
+     *   (in) visitor - if not null, a callback called in a post-order fashion for each node in the
+     * given expression that this function recurses into and has an exact range. Takes the following
+     * parameters:
+     *   - the node itself,
+     *   - the scan range inferred for its subtree.
      */
     [[nodiscard]] static bool handleRIDRangeScan(
         const MatchExpression* conjunct,
         const CollatorInterface* queryCollator,
         const CollatorInterface* ccCollator,
         std::string_view clusterKeyFieldName,
-        RecordIdRange& recordRange,
-        const std::function<void(const MatchExpression*)>& redundant = [](auto) {});
+        RecordIdRangeList& outRangeList,
+        bool* outRangeListExact = nullptr,
+        const std::function<void(const MatchExpression*, const RecordIdRangeList&)>& visitor =
+            nullptr);
 
     /**
-     * Removes elements from a MatchExpression tree, recursively.
+     * Removes from a MatchExpression tree any sub-expressions that are globally redundant given
+     * the scan's RecordId range list — i.e., conditions that are already enforced by the bounded
+     * collection scan and need not be re-evaluated as a filter.
      *
-     * Only descends into AndMatchExpressions.
+     * Descends into both $and and $or nodes.
      */
     static void simplifyFilter(std::unique_ptr<MatchExpression>& expr,
-                               const std::set<const MatchExpression*>& toRemove);
+                               const RecordIdRangeList& rangeList,
+                               const CollatorInterface* queryCollator,
+                               const CollatorInterface* ccCollator,
+                               std::string_view clusterKeyFieldName);
+
+    /**
+     * Returns true iff inner ⊆ outer (every RecordId in inner is also in outer).
+     */
+    static bool rangeListContainedIn(const RecordIdRangeList& inner,
+                                     const RecordIdRangeList& outer);
 
 private:
     /**

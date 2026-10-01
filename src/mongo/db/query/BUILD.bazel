@@ -477,6 +477,7 @@ mongo_cc_library(
 mongo_cc_library(
     name = "query_planner",
     srcs = [
+        "clustered_collection_scan.cpp",
         "distinct_access.cpp",
         "index_tag.cpp",
         "planner_access.cpp",
@@ -494,6 +495,7 @@ mongo_cc_library(
     ],
     deps = [
         ":max_estimated_scan_bytes_metrics",
+        ":query_knobs",
         ":record_id_range",
         "//src/mongo/db:query_expressions",
         "//src/mongo/db/commands/server_status:server_status_core",
@@ -753,6 +755,20 @@ mongo_cc_library(
         "query_planner_params",
         "query_solution_analyzer",
         "//src/mongo/db/pipeline",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "clustered_collection_scan_test",
+    srcs = [
+        "clustered_collection_scan_test.cpp",
+    ],
+    tags = ["mongo_unittest_third_group"],
+    deps = [
+        ":query_planner",
+        "//src/mongo/db/pipeline",
+        "//src/mongo/db/query/compiler/optimizer/index_bounds_builder:index_bounds_builder_test_fixture",
+        "//src/mongo/unittest",
     ],
 )
 

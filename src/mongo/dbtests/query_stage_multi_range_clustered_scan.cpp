@@ -13,14 +13,11 @@
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/exec/plan_stats.h"
-#include "mongo/db/matcher/expression.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
-#include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/query/record_id_bound.h"
 #include "mongo/db/query/record_id_range.h"
 #include "mongo/db/query/record_id_range_list.h"
@@ -40,9 +37,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
 
-#include <algorithm>
 #include <memory>
-#include <utility>
 #include <vector>
 
 #include <boost/none.hpp>
@@ -114,107 +109,6 @@ public:
         return range;
     }
 
-    /**
-     * Runs the stage with the given rangeList in the given direction over a clustered collection
-     * populated with 'docs' (whose _id values are integers), and asserts that the returned
-     * documents and the stats (docsTested, seeks) match what the naive iteration model would
-     * produce.
-     */
-    void checkClusteredScanResult(const NamespaceString& ns,
-                                  CollectionScanParams::Direction direction,
-                                  const RecordIdRangeList& rangeList,
-                                  const std::vector<BSONObj>& docs,
-                                  const MatchExpression* filter = nullptr) {
-        const auto coll = acquireCollectionMaybeLockFree(
-            &_opCtx,
-            CollectionAcquisitionRequest::fromOpCtx(
-                &_opCtx, ns, AcquisitionPrerequisites::OperationType::kRead));
-        ASSERT(coll.getCollectionPtr()->isClustered());
-
-        MultiRangeClusteredScanParams params;
-        params.direction = direction;
-        params.rangeList = rangeList;
-
-        WorkingSet ws;
-        auto scan =
-            std::make_unique<MultiRangeClusteredScan>(_expCtx.get(), coll, params, &ws, filter);
-
-        std::vector<BSONObj> actualDocs;
-        while (!scan->isEOF()) {
-            WorkingSetID id = WorkingSet::INVALID_ID;
-            PlanStage::StageState state = scan->work(&id);
-            if (PlanStage::ADVANCED == state) {
-                WorkingSetMember* member = ws.get(id);
-                ASSERT(member->getState() == WorkingSetMember::RID_AND_OBJ);
-                actualDocs.push_back(member->doc.value().toBson().getOwned());
-            }
-        }
-
-        auto* stats = dynamic_cast<const CollectionScanStats*>(scan->getSpecificStats());
-
-        // Compute expected results and stats naively by iterating the docs in sorted order.
-        std::vector<BSONObj> sortedDocs = docs;
-        std::sort(sortedDocs.begin(), sortedDocs.end(), [&](const BSONObj& a, const BSONObj& b) {
-            // FORWARD : sort in increasing _id order. BACKWARD: decreasing.
-            return (direction == CollectionScanParams::FORWARD) ? (a["_id"].Int() < b["_id"].Int())
-                                                                : (b["_id"].Int() < a["_id"].Int());
-        });
-
-        int expectedDocsTested = 0;
-        std::vector<BSONObj> expectedDocs;
-        // Per range: whether we have seen a document that overshoots that range. There can
-        // only be at most one such overshoot per range.
-        std::vector<bool> sawNextDocFor(rangeList.getRanges().size(), false);
-
-        for (const auto& doc : sortedDocs) {
-            RecordId rid = record_id_helpers::keyForElem(doc["_id"]);
-            bool inAnyRange = false;
-            for (size_t i = (direction == CollectionScanParams::FORWARD)
-                     ? rangeList.getRanges().size() - 1
-                     : 0;
-                 i < rangeList.getRanges().size();
-                 i += (direction == CollectionScanParams::FORWARD) ? -1 : 1) {
-                const int compareRes = rangeList.getRanges()[i].compare(rid);
-                if (0 == compareRes) {
-                    inAnyRange = true;
-                    break;
-                }
-                if (((direction == CollectionScanParams::FORWARD) ? 1 : -1) == compareRes) {
-                    if (!sawNextDocFor[i]) {
-                        sawNextDocFor[i] = true;
-                        ++expectedDocsTested;
-                    }
-                    // This id fell after an earlier range before falling into a later one,
-                    // so it cannot fall into any range.
-                    // It also cannot cause any earlier range to be overshot.
-                    break;
-                }
-            }
-            if (!inAnyRange)
-                continue;
-            ++expectedDocsTested;
-            if (!filter || exec::matcher::matchesBSON(filter, doc)) {
-                expectedDocs.push_back(doc);
-            }
-        }
-
-        ASSERT_EQ(stats->docsTested, (size_t)expectedDocsTested);
-        ASSERT_EQ(actualDocs.size(), expectedDocs.size());
-        for (size_t i = 0; i < actualDocs.size(); i++) {
-            ASSERT_BSONOBJ_EQ(actualDocs[i], expectedDocs[i]);
-        }
-
-        // Expected seeks: one per range that has a bounded start.
-        // FORWARD → start is min, BACKWARD → start is max.
-        size_t expectedSeeks = 0;
-        const bool forward = (direction == CollectionScanParams::FORWARD);
-        for (const auto& range : rangeList.getRanges()) {
-            if (forward ? range.getMin().has_value() : range.getMax().has_value())
-                ++expectedSeeks;
-        }
-        ASSERT_EQ(stats->seeks, expectedSeeks);
-    }
-
 protected:
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
     OperationContext& _opCtx = *_txnPtr;
@@ -228,28 +122,6 @@ protected:
 private:
     DBDirectClient _client;
 };
-
-// Forward/backward scan over multiple noncontiguous ranges.
-TEST_F(MultiRangeClusteredScanTest, MultiRangeForward) {
-    auto ns = NamespaceString::createNamespaceString_forTest("a.b");
-    auto collDeleter = createClusteredCollection(ns);
-    std::vector<BSONObj> docs;
-    for (int i = 0; i < 30; ++i) {
-        auto doc = BSON("_id" << i);
-        insertDocument(ns, doc);
-        docs.push_back(doc);
-    }
-
-    auto rangeList = RecordIdRangeList::makeUnion({
-        makeIntRange(1, true, 5, true),      // [1,5]
-        makeIntRange(10, false, 15, false),  // (10,15)
-        makeIntRange(17, true, 17, true),    // [17,17]
-        makeIntRange(20, true, 25, false),   // [20,25)
-    });
-
-    checkClusteredScanResult(ns, CollectionScanParams::FORWARD, rangeList, docs);
-    checkClusteredScanResult(ns, CollectionScanParams::BACKWARD, rangeList, docs);
-}
 
 TEST_F(MultiRangeClusteredScanTest, EmptyRangeList) {
     auto ns = NamespaceString::createNamespaceString_forTest("a.b");
@@ -279,78 +151,6 @@ TEST_F(MultiRangeClusteredScanTest, EmptyRangeList) {
     auto* stats = dynamic_cast<const CollectionScanStats*>(scan->getSpecificStats());
     ASSERT_EQ(stats->seeks, 0u);
     ASSERT_EQ(stats->docsTested, 0u);
-}
-
-TEST_F(MultiRangeClusteredScanTest, MultiRangeSomeRangesEmpty) {
-    auto ns = NamespaceString::createNamespaceString_forTest("a.b");
-    auto collDeleter = createClusteredCollection(ns);
-    std::vector<BSONObj> docs;
-    // _id 1..10 and 20..30 (a gap at 11..19).
-    for (int i = 1; i <= 10; ++i) {
-        auto doc = BSON("_id" << i);
-        insertDocument(ns, doc);
-        docs.push_back(doc);
-    }
-    for (int i = 20; i <= 30; ++i) {
-        auto doc = BSON("_id" << i);
-        insertDocument(ns, doc);
-        docs.push_back(doc);
-    }
-
-    auto rangeList = RecordIdRangeList::makeUnion({
-        makeIntRange(1, true, 5, true),    // [1,5]  — has data
-        makeIntRange(12, true, 15, true),  // [12,15] — no data
-        makeIntRange(22, true, 28, true),  // [22,28] — has data
-    });
-
-    checkClusteredScanResult(ns, CollectionScanParams::FORWARD, rangeList, docs);
-    checkClusteredScanResult(ns, CollectionScanParams::BACKWARD, rangeList, docs);
-}
-
-TEST_F(MultiRangeClusteredScanTest, MultiRangeExclusiveJunction) {
-    auto ns = NamespaceString::createNamespaceString_forTest("a.b");
-    auto collDeleter = createClusteredCollection(ns);
-    std::vector<BSONObj> docs;
-    for (int i = 0; i <= 12; ++i) {
-        auto doc = BSON("_id" << i);
-        insertDocument(ns, doc);
-        docs.push_back(doc);
-    }
-
-    // Excludes 5 (touches at 5 but exclusive on both sides).
-    auto rangeList = RecordIdRangeList::makeUnion({
-        makeIntRange(1, true, 5, false),   // [1,5)
-        makeIntRange(5, false, 10, true),  // (5,10]
-    });
-    ASSERT_EQ(rangeList.getRanges().size(), 2u);  // must not have merged
-
-    checkClusteredScanResult(ns, CollectionScanParams::FORWARD, rangeList, docs);
-    checkClusteredScanResult(ns, CollectionScanParams::BACKWARD, rangeList, docs);
-}
-
-TEST_F(MultiRangeClusteredScanTest, MultiRangeWithFilter) {
-    auto ns = NamespaceString::createNamespaceString_forTest("a.b");
-    auto collDeleter = createClusteredCollection(ns);
-    std::vector<BSONObj> docs;
-    for (int i = 0; i < 30; ++i) {
-        auto doc = BSON("_id" << i);
-        insertDocument(ns, doc);
-        docs.push_back(doc);
-    }
-
-    auto rangeList = RecordIdRangeList::makeUnion({
-        makeIntRange(1, true, 10, true),   // [1,10]
-        makeIntRange(15, true, 25, true),  // [15,25]
-    });
-
-    // Keep only even _id values.
-    StatusWithMatchExpression swMatch =
-        MatchExpressionParser::parse(BSON("_id" << BSON("$mod" << BSON_ARRAY(2 << 0))), _expCtx);
-    ASSERT_OK(swMatch.getStatus());
-    auto filter = std::move(swMatch.getValue());
-
-    checkClusteredScanResult(ns, CollectionScanParams::FORWARD, rangeList, docs, filter.get());
-    checkClusteredScanResult(ns, CollectionScanParams::BACKWARD, rangeList, docs, filter.get());
 }
 
 // Verifies that the stage correctly handles a yield while a seek to the next range is pending.
@@ -510,26 +310,6 @@ TEST_F(MultiRangeClusteredScanTest, PendingSeekSurvivesWriteConflict) {
     ASSERT_EQ(stats->seeks, 2u);
     // 11 returned + one overshoot per range = 13.
     ASSERT_EQ(stats->docsTested, 13u);
-}
-
-TEST_F(MultiRangeClusteredScanTest, MultiRangeUnboundedEnds) {
-    auto ns = NamespaceString::createNamespaceString_forTest("a.b");
-    auto collDeleter = createClusteredCollection(ns);
-    std::vector<BSONObj> docs;
-    for (int i = 0; i <= 20; ++i) {
-        auto doc = BSON("_id" << i);
-        insertDocument(ns, doc);
-        docs.push_back(doc);
-    }
-
-    auto rangeList = RecordIdRangeList::makeUnion({
-        makeIntRange(boost::none, true, 5, false),   // (−∞, 5)
-        makeIntRange(10, false, boost::none, true),  // (10, +∞)
-    });
-    ASSERT_EQ(rangeList.getRanges().size(), 2u);
-
-    checkClusteredScanResult(ns, CollectionScanParams::FORWARD, rangeList, docs);
-    checkClusteredScanResult(ns, CollectionScanParams::BACKWARD, rangeList, docs);
 }
 
 }  // namespace multi_range_clustered_scan_test

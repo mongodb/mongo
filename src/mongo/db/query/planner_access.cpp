@@ -26,6 +26,7 @@
 #include "mongo/db/matcher/expression_type.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/clustered_collection_scan.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection.h"
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
@@ -39,6 +40,7 @@
 #include "mongo/db/query/indexability.h"
 #include "mongo/db/query/planner_ixselect.h"
 #include "mongo/db/query/planner_wildcard_helpers.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/query_planner_common.h"
@@ -55,12 +57,12 @@
 #include "mongo/db/storage/key_format.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 #include <algorithm>
 #include <memory>
-#include <set>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -131,8 +133,8 @@ bool scansAreEquivalent(const QuerySolutionNode* lhs, const QuerySolutionNode* r
 }
 
 /**
- * If all nodes can provide the requested sort, returns a vector expressing which nodes must have
- * their index scans reversed to provide the sort. Otherwise, returns an empty vector.
+ * If all nodes can provide the requested sort, returns a vector expressing which nodes must
+ * have their index scans reversed to provide the sort. Otherwise, returns an empty vector.
  * 'nodes' must not be empty.
  */
 std::vector<bool> canProvideSortWithMergeSort(
@@ -154,9 +156,10 @@ std::vector<bool> canProvideSortWithMergeSort(
 }
 
 /**
- * Resolves the final direction hint to be used in collection scans, as there multiple mechanisms of
- * overriding the planner's direction decision. It does so by enforcing the following precedence:
- * timeseries traversal preference > query settings '$natural' hint > cursor '$natural' hint.
+ * Resolves the final direction hint to be used in collection scans, as there multiple
+ * mechanisms of overriding the planner's direction decision. It does so by enforcing the
+ * following precedence: timeseries traversal preference > query settings '$natural' hint >
+ * cursor '$natural' hint.
  */
 boost::optional<int> determineCollScanHintedDirection(const CanonicalQuery& query,
                                                       const QueryPlannerParams& params) {
@@ -254,55 +257,6 @@ bool isOplogTsLowerBoundPred(const mongo::MatchExpression* me) {
     return me->path() == repl::OpTime::kTimestampFieldName;
 }
 
-// True if the element type is affected by a collator (i.e. it is or contains a String).
-bool affectedByCollator(const BSONElement& element) {
-    switch (element.type()) {
-        case BSONType::string:
-            return true;
-        case BSONType::array:
-        case BSONType::object:
-            for (const auto& sub : element.Obj()) {
-                if (affectedByCollator(sub))
-                    return true;
-            }
-            return false;
-        default:
-            return false;
-    }
-}
-
-// Set 'curr' to 'newMin' if 'newMin' < 'curr'
-void setLowestRecord(boost::optional<RecordIdBound>& curr, const RecordIdBound& newMin) {
-    if (!curr || newMin.recordId() < curr->recordId()) {
-        curr = newMin;
-    }
-}
-
-// Set 'curr' to 'newMax' if 'newMax' > 'curr'
-void setHighestRecord(boost::optional<RecordIdBound>& curr, const RecordIdBound& newMax) {
-    if (!curr || newMax.recordId() > curr->recordId()) {
-        curr = newMax;
-    }
-}
-
-// Set 'curr' to 'newMin' if 'newMin' < 'curr'
-void setLowestRecord(boost::optional<RecordIdBound>& curr, const BSONObj& newMin) {
-    setLowestRecord(curr, RecordIdBound(record_id_helpers::keyForObj(newMin), newMin));
-}
-
-// Set 'curr' to 'newMax' if 'newMax' > 'curr'
-void setHighestRecord(boost::optional<RecordIdBound>& curr, const BSONObj& newMax) {
-    setHighestRecord(curr, RecordIdBound(record_id_helpers::keyForObj(newMax), newMax));
-}
-
-// Returns whether element is not affected by collators or query and collection collators are
-// compatible.
-bool compatibleCollator(const CollatorInterface* collCollator,
-                        const CollatorInterface* queryCollator,
-                        const BSONElement& element) {
-    bool compatible = CollatorInterface::collatorsMatch(queryCollator, collCollator);
-    return compatible || !affectedByCollator(element);
-}
 }  // namespace
 
 void QueryPlannerAccess::handleRIDRangeMinMax(const CanonicalQuery& query,
@@ -326,7 +280,9 @@ void QueryPlannerAccess::handleRIDRangeMinMax(const CanonicalQuery& query,
         direction == 1);
 
     boost::optional<RecordId> newMinRecord, newMaxRecord;
-    if (!maxObj.isEmpty() && compatibleCollator(ccCollator, queryCollator, maxObj.firstElement())) {
+    if (!maxObj.isEmpty() &&
+        ClusteredCollectionScanPlanner::compatibleCollator(
+            ccCollator, queryCollator, maxObj.firstElement())) {
         // max() is exclusive.
         // Assumes clustered collection scans are only supported with the forward direction.
         recordRange.maybeNarrowMax(
@@ -334,7 +290,9 @@ void QueryPlannerAccess::handleRIDRangeMinMax(const CanonicalQuery& query,
             false /* NOT inclusive*/);
     }
 
-    if (!minObj.isEmpty() && compatibleCollator(ccCollator, queryCollator, minObj.firstElement())) {
+    if (!minObj.isEmpty() &&
+        ClusteredCollectionScanPlanner::compatibleCollator(
+            ccCollator, queryCollator, minObj.firstElement())) {
         // The min() is inclusive as are bounded collection scans by default.
         recordRange.maybeNarrowMin(
             IndexBoundsBuilder::objFromElement(minObj.firstElement(), queryCollator),
@@ -347,78 +305,143 @@ void QueryPlannerAccess::handleRIDRangeMinMax(const CanonicalQuery& query,
     const CollatorInterface* queryCollator,
     const CollatorInterface* ccCollator,
     std::string_view clusterKeyFieldName,
-    RecordIdRange& recordRange,
-    const std::function<void(const MatchExpression*)>& redundant) {
+    RecordIdRangeList& outRangeList,
+    bool* outRangeListExact,
+    const std::function<void(const MatchExpression*, const RecordIdRangeList&)>& visitor) {
+    tassert(12591309, "outRangeList must initially be unbounded.", outRangeList.isUnbounded());
+
     if (conjunct == nullptr) {
         return false;
     }
 
+    // Handle $and: collect a range list from each child, then intersect them.
+    // Note that clustered indexes cannot be multi-key (because _id cannot be an array),
+    // so this is indeed a valid optimization.
     const AndMatchExpression* andMatchPtr = dynamic_cast<const AndMatchExpression*>(conjunct);
     if (andMatchPtr != nullptr) {
         bool atLeastOneConjunctCompatibleCollation = false;
+        bool allExact = true;
+        std::vector<RecordIdRangeList> conjunctRangeLists;
         for (size_t index = 0; index < andMatchPtr->numChildren(); index++) {
-            // Recursive call on each branch of 'andMatchPtr'.
-            if (handleRIDRangeScan(andMatchPtr->getChild(index),
+            const MatchExpression* branch = andMatchPtr->getChild(index);
+            RecordIdRangeList childRangeList;
+            bool branchExact = false;
+            if (handleRIDRangeScan(branch,
                                    queryCollator,
                                    ccCollator,
                                    clusterKeyFieldName,
-                                   recordRange,
-                                   redundant)) {
+                                   childRangeList,
+                                   &branchExact,
+                                   visitor)) {
                 atLeastOneConjunctCompatibleCollation = true;
             }
+            allExact &= branchExact;
+            conjunctRangeLists.push_back(std::move(childRangeList));
         }
 
+        outRangeList = RecordIdRangeList::intersect(std::move(conjunctRangeLists));
+        if (outRangeListExact) {
+            *outRangeListExact = allExact;
+        }
+        if (visitor && allExact) {
+            visitor(conjunct, outRangeList);
+        }
         // If one of the conjuncts excludes values of the cluster key which are affected by
         // collation, then the entire $and will also exclude those values.
         return atLeastOneConjunctCompatibleCollation;
     }
 
+    // Handle $or: bound each branch independently and take the union.
+    const OrMatchExpression* orMatchPtr = dynamic_cast<const OrMatchExpression*>(conjunct);
+    if (orMatchPtr != nullptr) {
+        std::vector<RecordIdRangeList> branchLists;
+        bool allBranchesCompatible = true;
+        bool allExact = true;
+        for (size_t i = 0; i < orMatchPtr->numChildren(); i++) {
+            const MatchExpression* branch = orMatchPtr->getChild(i);
+            RecordIdRangeList branchRangeList;
+            bool branchExact = false;
+            bool branchCompatible = handleRIDRangeScan(branch,
+                                                       queryCollator,
+                                                       ccCollator,
+                                                       clusterKeyFieldName,
+                                                       branchRangeList,
+                                                       &branchExact,
+                                                       visitor);
+            allBranchesCompatible &= branchCompatible;
+            allExact &= branchExact;
+            branchLists.push_back(std::move(branchRangeList));
+        }
+        outRangeList = RecordIdRangeList::unite(std::move(branchLists));
+        if (outRangeListExact) {
+            *outRangeListExact = allExact;
+        }
+        if (visitor && allExact) {
+            visitor(conjunct, outRangeList);
+        }
+        return allBranchesCompatible;
+    }
+
     // If 'conjunct' does not apply to the cluster key, return early here, as updating bounds based
     // on this conjunct is incorrect and can result in garbage bounds.
     if (conjunct->path() != clusterKeyFieldName) {
+        if (outRangeListExact) {
+            *outRangeListExact = false;
+        }
+        // Can skip calling the visitor here because a node not on the cluster key cannot have exact
+        // bounds.
         return false;
     }
 
     // TODO SERVER-62707: Allow $in with regex to use a clustered index.
     const InMatchExpression* inMatch = dynamic_cast<const InMatchExpression*>(conjunct);
     if (inMatch && !inMatch->hasRegex()) {
-        // Iterate through the $in equalities to find the min/max values. The min/max bounds for the
-        // collscan need to be loose enough to cover all of these values.
-        boost::optional<RecordIdBound> minBound;
-        boost::optional<RecordIdBound> maxBound;
-
+        // Build one point range per equality value and union them. This allows the execution
+        // engine to seek between disjoint intervals rather than scanning the entire min–max span.
+        std::vector<RecordIdRange> ranges;
         bool allEltsCollationCompatible = true;
         for (const BSONElement& element : inMatch->getEqualities()) {
-            if (compatibleCollator(ccCollator, queryCollator, element)) {
+            RecordIdRange r;
+            if (ClusteredCollectionScanPlanner::compatibleCollator(
+                    ccCollator, queryCollator, element)) {
+                // Represent elements with compatible collation in an $in array as exact
+                // point ranges.
                 const BSONObj collated = IndexBoundsBuilder::objFromElement(element, queryCollator);
-                setLowestRecord(minBound, collated);
-                setHighestRecord(maxBound, collated);
+                const RecordIdBound bound(record_id_helpers::keyForObj(collated), collated);
+                r.intersectRange(bound, bound, true /* minInclusive */, true /* maxInclusive */);
             } else {
-                // Set coarse min/max bounds based on type when we can't set tight bounds.
+                // Collation-incompatible element: use a coarse type range so the scan is at
+                // least bounded to the right BSON type.
                 allEltsCollationCompatible = false;
-
-                BSONObjBuilder bMin;
+                BSONObjBuilder bMin, bMax;
                 bMin.appendMinForType("", stdx::to_underlying(element.type()));
-                setLowestRecord(minBound, bMin.obj());
-
-                BSONObjBuilder bMax;
                 bMax.appendMaxForType("", stdx::to_underlying(element.type()));
-                setHighestRecord(maxBound, bMax.obj());
+                const BSONObj minObj = bMin.obj(), maxObj = bMax.obj();
+                r.intersectRange(RecordIdBound(record_id_helpers::keyForObj(minObj), minObj),
+                                 RecordIdBound(record_id_helpers::keyForObj(maxObj), maxObj),
+                                 true /* minInclusive */,
+                                 true /* maxInclusive */);
             }
+            ranges.push_back(std::move(r));
         }
-
-        // {min,max}RecordId will bound the range of ids scanned to the highest and lowest present
-        // in the InMatchExpression, but the filter is still required to filter to _exactly_ the
-        // requested matches.
-
-        // Finally, tighten the collscan bounds with the min/max bounds for the $in.
-        recordRange.intersectRange(minBound, maxBound);
+        outRangeList = RecordIdRangeList::makeUnion(std::move(ranges));
+        if (outRangeListExact) {
+            *outRangeListExact = allEltsCollationCompatible;
+        }
+        if (visitor && allEltsCollationCompatible) {
+            visitor(conjunct, outRangeList);
+        }
         return allEltsCollationCompatible;
     }
 
     auto match = dynamic_cast<const ComparisonMatchExpressionBase*>(conjunct);
     if (match == nullptr) {
-        return false;  // Not a comparison match expression.
+        if (outRangeListExact) {
+            *outRangeListExact = false;
+        }
+        // Can skip calling the visitor here because an unsupported node type
+        // cannot have exact bounds.
+        return false;
     }
 
     const BSONElement& element = match->getData();
@@ -428,6 +451,7 @@ void QueryPlannerAccess::handleRIDRangeMinMax(const CanonicalQuery& query,
         // semantics (consistent with `$expr{$gt:[a,b]}`).
         // For other comparisons which _do_ perform type bracketing, the RecordId bounds
         // may be tightened here.
+        RecordIdRange recordRange;
         BSONObjBuilder minb;
         minb.appendMinForType("", stdx::to_underlying(element.type()));
         recordRange.maybeNarrowMin(minb.obj(), true /* inclusive */);
@@ -435,11 +459,19 @@ void QueryPlannerAccess::handleRIDRangeMinMax(const CanonicalQuery& query,
         BSONObjBuilder maxb;
         maxb.appendMaxForType("", stdx::to_underlying(element.type()));
         recordRange.maybeNarrowMax(maxb.obj(), true /* inclusive */);
+
+        outRangeList = RecordIdRangeList(std::move(recordRange));
     }
 
-    bool compatible = compatibleCollator(ccCollator, queryCollator, element);
+    bool compatible =
+        ClusteredCollectionScanPlanner::compatibleCollator(ccCollator, queryCollator, element);
     if (!compatible) {
         // Collator affects probe and it's not compatible with collection's collator.
+        if (outRangeListExact) {
+            *outRangeListExact = false;
+        }
+        // Can skip calling the visitor here because a node with an incompatible collation
+        // cannot have exact bounds.
         return false;
     }
 
@@ -447,6 +479,7 @@ void QueryPlannerAccess::handleRIDRangeMinMax(const CanonicalQuery& query,
     // because the bounds exclude values that use it.
     const BSONObj collated = IndexBoundsBuilder::objFromElement(element, queryCollator);
     using MType = MatchExpression::MatchType;
+    RecordIdRange recordRange;
     switch (match->matchType()) {
         case MType::EQ:
         case MType::INTERNAL_EXPR_EQ:
@@ -470,42 +503,113 @@ void QueryPlannerAccess::handleRIDRangeMinMax(const CanonicalQuery& query,
             recordRange.maybeNarrowMin(collated, true /* inclusive */);
             break;
         default:
-            // This expr is _not_ redundant, it could not be re-expressed via {min,max} record
+            // Unknown match type. Cannot narrow the type-wide bounds, and we are not sure if the
+            // rangeList is exact anymore.
+            if (outRangeListExact) {
+                *outRangeListExact = false;
+            }
+            // Can skip calling the visitor here because an unsupported match type
+            // cannot have exact bounds.
             return true;
     }
-    // Report that this expression does not need to be retained in the filter
-    // _if_ recordRange is enforced - {min,max}Record will already apply equivalent
-    // limits.
-    redundant(match);
+    if (outRangeListExact) {
+        *outRangeListExact = true;
+    }
+    // Intersect the loose, type-wide RecordIdRange obtained above for non-internal expr comparisons
+    // (if any) with the point ranges obtained for comparisons with compatible collations.
+    outRangeList = RecordIdRangeList::intersect(
+        {std::move(outRangeList), RecordIdRangeList(std::move(recordRange))});
+    if (visitor) {
+        visitor(conjunct, outRangeList);
+    }
     return true;
 }
 
-void simplifyFilterInner(std::unique_ptr<MatchExpression>& expr,
-                         const std::set<const MatchExpression*>& toRemove) {
-    if (toRemove.contains(expr.get())) {
+// Returns true iff inner ⊆ outer (every RecordId in inner is also in outer).
+bool QueryPlannerAccess::rangeListContainedIn(const RecordIdRangeList& inner,
+                                              const RecordIdRangeList& outer) {
+    const auto intersection = RecordIdRangeList::intersect({inner, outer});
+    return intersection == inner;
+}
+
+namespace {
+
+// Recursively simplifies the expression tree by nulling out nodes in 'toRemove' (which are
+// trivially true for all scan results) and propagating that information upward:
+//   $and: trivially-true children are removed; an all-true $and is itself nulled (trivially true).
+//   $or:  if any branch becomes trivially true the whole $or is nulled (trivially true).
+// "Trivially true" is communicated as expr == nullptr after the call.
+//
+// Note: $nor and $not are intentionally NOT handled. A trivially-true child of $nor means
+// NOT(child) is trivially false, collapsing the $nor to false — the opposite of what nulling
+// would imply. Leaving them unchanged is conservative but correct.
+void applySimplifications(std::unique_ptr<MatchExpression>& expr,
+                          const stdx::unordered_set<const MatchExpression*>& toRemove) {
+    tassert(12591308, "Expected expr.", expr);
+
+    if (toRemove.count(expr.get())) {
         expr.reset();
         return;
     }
-    if (auto conjunct = dynamic_cast<AndMatchExpression*>(expr.get())) {
-        auto& childVector = *conjunct->getChildVector();
-        for (auto& child : childVector) {
-            simplifyFilterInner(child, toRemove);
+
+    if (auto* conjunct = dynamic_cast<AndMatchExpression*>(expr.get())) {
+        auto& children = *conjunct->getChildVector();
+        for (auto& child : children) {
+            applySimplifications(child, toRemove);
         }
-        // The recursive calls may have nulled some children; remove them from the
-        // conjunction.
-        childVector.erase(std::remove(childVector.begin(), childVector.end(), nullptr),
-                          childVector.end());
+        children.erase(std::remove(children.begin(), children.end(), nullptr), children.end());
         if (conjunct->isTriviallyTrue()) {
-            // Removing redundant children may have made this conjunct trivially true in turn;
-            // reset it.
             expr.reset();
         }
+        return;
+    }
+
+    if (auto* disjunct = dynamic_cast<OrMatchExpression*>(expr.get())) {
+        for (auto& branch : *disjunct->getChildVector()) {
+            applySimplifications(branch, toRemove);
+            if (!branch) {
+                expr.reset();
+                return;
+            }
+        }
+        return;
     }
 }
 
+}  // namespace
+
 void QueryPlannerAccess::simplifyFilter(std::unique_ptr<MatchExpression>& expr,
-                                        const std::set<const MatchExpression*>& toRemove) {
-    simplifyFilterInner(expr, toRemove);
+                                        const RecordIdRangeList& rangeList,
+                                        const CollatorInterface* queryCollator,
+                                        const CollatorInterface* ccCollator,
+                                        std::string_view clusterKeyFieldName) {
+    tassert(12591307, "Expected expr.", expr);
+
+    // We do a separate pass (after handleRIDRangeScan in makeCollectionScan) to identify redundant
+    // nodes. Those are nodes which a) can be expressed exactly as a range and b) the range of
+    // which covers the scan range for the root node. This has to be a pass separate from the
+    // initial handleRIDRangeScan pass because the redundancy of individual nodes depends on the
+    // scan range of the root node, and caching individual nodes' ranges implies O(n^2) memory
+    // complexity.
+    stdx::unordered_set<const MatchExpression*> toRemove;
+    RecordIdRangeList unused;
+    (void)QueryPlannerAccess::handleRIDRangeScan(
+        /* conjunct */ expr.get(),
+        queryCollator,
+        ccCollator,
+        clusterKeyFieldName,
+        /*outRangeList*/ unused,
+        /*outRangeListExact*/ nullptr,
+        [&](const MatchExpression* node, const RecordIdRangeList& nodeRange) {
+            if (QueryPlannerAccess::rangeListContainedIn(rangeList, nodeRange)) {
+                toRemove.insert(node);
+            }
+        });
+
+    // We remove the nodes identified as redundant by the visitor in a third pass.
+    // This lets handleRIDRangeScan take a const pointer to the MatchExpression.
+    applySimplifications(expr, toRemove);
+
     if (!expr) {
         // Simplifying the filter might remove everything; filter can't be left
         // null, so populate with a trivially true expression.
@@ -640,7 +744,6 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
     // be safely modified; a query which has compatible collation _given the current filter args_
     // could be cached and reused for a query with different args which _are_ affected by collation.
     const bool canSimplifyFilter = csn->hasCompatibleCollation;
-    std::set<const MatchExpression*> redundantExprs;
 
     if (csn->isClustered && !csn->resumeScanPoint) {
         // This is a clustered collection. Attempt to perform an efficient, bounded collection scan
@@ -649,25 +752,41 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
         // If so, then even if the query and collection collations differ, the collation difference
         // won't affect the query results. In that case, we can say hasCompatibleCollation is true.
 
-        RecordIdRange recordRange;
-        // Seed from any existing rangeList bounds (e.g. oplog timestamp bounds set above).
-        recordRange.intersectRange(csn->rangeList.outerBounds());
-        bool compatibleCollation = handleRIDRangeScan(
-            csn->filter.get(),
-            queryCollator,
-            collCollator,
-            clustered_util::getClusterKeyFieldName(params.clusteredInfo->getIndexSpec()),
-            recordRange,
-            [&](const auto& expr) { redundantExprs.insert(expr); });
-        csn->hasCompatibleCollation |= compatibleCollation;
+        const auto& ifrContext = query.getExpCtx()->getIfrContext();
+        const bool multiRangeCollScanEnabled = ifrContext &&
+            ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagClusteredCollScanMultiRange);
 
-        handleRIDRangeMinMax(query, csn->direction, queryCollator, collCollator, recordRange);
+        if (multiRangeCollScanEnabled) {
+            const std::string_view clusterKeyFieldName =
+                clustered_util::getClusterKeyFieldName(params.clusteredInfo->getIndexSpec());
 
-        csn->rangeList = RecordIdRangeList(recordRange);
-    }
+            RecordIdRangeList filterRangeList;
+            bool compatibleCollation = handleRIDRangeScan(csn->filter.get(),
+                                                          queryCollator,
+                                                          collCollator,
+                                                          clusterKeyFieldName,
+                                                          filterRangeList);
+            csn->hasCompatibleCollation |= compatibleCollation;
 
-    if (canSimplifyFilter) {
-        simplifyFilter(csn->filter, redundantExprs);
+            // Derive min/max bounds from explicit min()/max() cursor args.
+            RecordIdRange minMaxRange;
+            handleRIDRangeMinMax(query, csn->direction, queryCollator, collCollator, minMaxRange);
+
+            // Intersect: pre-existing rangeList, filter-derived ranges, and explicit min/max
+            // bounds.
+            csn->rangeList =
+                RecordIdRangeList::intersect({RecordIdRangeList(std::move(minMaxRange)),
+                                              std::move(csn->rangeList),
+                                              std::move(filterRangeList)});
+
+            if (canSimplifyFilter) {
+                simplifyFilter(
+                    csn->filter, csn->rangeList, queryCollator, collCollator, clusterKeyFieldName);
+            }
+        } else {
+            ClusteredCollectionScanPlanner::buildLegacyBounds(
+                csn.get(), query, params, queryCollator, collCollator, canSimplifyFilter);
+        }
     }
 
     return csn;

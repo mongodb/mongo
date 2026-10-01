@@ -88,6 +88,12 @@ public:
     auto makeSeekParams(bool forward) const
         -> boost::optional<std::tuple<const RecordId&, SeekableRecordCursor::BoundInclusion>>;
 
+    bool operator==(const RecordIdRange& o) const {
+        return this == &o ||
+            (_minInclusive == o._minInclusive && _maxInclusive == o._maxInclusive &&
+             _min == o._min && _max == o._max);
+    }
+
 private:
     // If present, this parameter sets the start point of a forward scan or the end point of a
     // reverse scan.
