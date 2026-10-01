@@ -190,111 +190,121 @@ ExecutorFuture<void> MoveRangeCoordinator::_runImpl(
     return ExecutorFuture<void>(**executor)
         .then(_buildPhaseHandler(
             Phase::kMigrate,
-            [this, anchor = shared_from_this(), token](OperationContext* opCtx) {
-                LOGV2(
-                    12894207, "MoveRangeCoordinator executing kMigrate", getCoordinatorLogAttrs());
+            _timePhase(Phase::kMigrate,
+                       [this, anchor = shared_from_this(), token](OperationContext* opCtx) {
+                           LOGV2(12894207,
+                                 "MoveRangeCoordinator executing kMigrate",
+                                 getCoordinatorLogAttrs());
 
-                // The MigrationSourceManager doesn't support resuming a chunk migration after a
-                // primary failover (new term). If this is not the first execution, abort so the
-                // caller can retry the migration from scratch.
-                uassert(ErrorCodes::RetriableRemoteCommandFailure,
-                        "MoveRangeCoordinator interrupted during data transfer",
-                        _firstExecution);
+                           // The MigrationSourceManager doesn't support resuming a chunk migration
+                           // after a primary failover (new term). If this is not the first
+                           // execution, abort so the caller can retry the migration from scratch.
+                           uassert(ErrorCodes::RetriableRemoteCommandFailure,
+                                   "MoveRangeCoordinator interrupted during data transfer",
+                                   _firstExecution);
 
-                _registerChunkOperationStarted(opCtx);
-                if (!_migrationAttempt) {
-                    _migrationAttempt.emplace(
-                        opCtx,
-                        token,
-                        nss(),
-                        _request,
-                        _doc.getWriteConcern().value_or(defaultMajorityWriteConcern()),
-                        _doc.getMigrationId());
-                }
-                uassertStatusOK(_migrationAttempt->migrate(opCtx));
-            }))
+                           _registerChunkOperationStarted(opCtx);
+                           if (!_migrationAttempt) {
+                               _migrationAttempt.emplace(
+                                   opCtx,
+                                   token,
+                                   nss(),
+                                   _request,
+                                   _doc.getWriteConcern().value_or(defaultMajorityWriteConcern()),
+                                   _doc.getMigrationId());
+                           }
+                           uassertStatusOK(_migrationAttempt->migrate(opCtx));
+                       })))
         .then(_buildPhaseHandler(
             Phase::kEnterCriticalSection,
-            [this, anchor = shared_from_this()](OperationContext* opCtx) {
-                LOGV2(12795314,
-                      "MoveRangeCoordinator executing kEnterCriticalSection",
-                      getCoordinatorLogAttrs());
+            _timePhase(
+                Phase::kEnterCriticalSection,
+                [this, anchor = shared_from_this()](OperationContext* opCtx) {
+                    LOGV2(12795314,
+                          "MoveRangeCoordinator executing kEnterCriticalSection",
+                          getCoordinatorLogAttrs());
 
-                // The MigrationSourceManager doesn't support resuming a chunk migration after a
-                // primary failover (new term). If this is not the first execution, abort so the
-                // caller can retry the migration from scratch.
-                uassert(ErrorCodes::RetriableRemoteCommandFailure,
-                        "MoveRangeCoordinator interrupted before entering the commit critical "
-                        "section",
-                        _firstExecution);
+                    // The MigrationSourceManager doesn't support resuming a chunk migration after a
+                    // primary failover (new term). If this is not the first execution, abort so the
+                    // caller can retry the migration from scratch.
+                    uassert(ErrorCodes::RetriableRemoteCommandFailure,
+                            "MoveRangeCoordinator interrupted before entering the commit critical "
+                            "section",
+                            _firstExecution);
 
-                tassert(12795311,
-                        "Migrate and enterCriticalSection must only run during the same term",
-                        _migrationAttempt.has_value());
+                    tassert(12795311,
+                            "Migrate and enterCriticalSection must only run during the same term",
+                            _migrationAttempt.has_value());
 
-                _migrationAttempt->promoteCriticalSection(opCtx);
+                    _migrationAttempt->promoteCriticalSection(opCtx);
 
-                // Persist the donor's pre-migration shard version for using it to build the global
-                // catalog commit on kGlobalCatalogCommit.
-                // We cannot read it during kGlobalCatalogCommit because, after a failover, it may
-                // no longer reflect the pre-migration shard version.
+                    // Persist the donor's pre-migration shard version for using it to build the
+                    // global catalog commit on kGlobalCatalogCommit. We cannot read it during
+                    // kGlobalCatalogCommit because, after a failover, it may no longer reflect the
+                    // pre-migration shard version.
 
-                auto newDoc = MoveRangeCoordinatorDocument(_doc);
-                newDoc.setDonorShardVersionPreMigration(
-                    _migrationAttempt->donorShardVersionPreMigration());
-                _updateStateDocument(opCtx, std::move(newDoc));
+                    auto newDoc = MoveRangeCoordinatorDocument(_doc);
+                    newDoc.setDonorShardVersionPreMigration(
+                        _migrationAttempt->donorShardVersionPreMigration());
+                    _updateStateDocument(opCtx, std::move(newDoc));
 
-                // Mark the commit as in progress before issuing it, so a MigrationSourceManager
-                // doesn't cancel the clone driver.
-                _migrationAttempt->markCommitInProgress();
-            }))
-        .then(_buildPhaseHandler(Phase::kGlobalCatalogCommit,
-                                 [this, anchor = shared_from_this()](OperationContext* opCtx) {
-                                     LOGV2(12894208,
-                                           "MoveRangeCoordinator executing kGlobalCatalogCommit",
-                                           getCoordinatorLogAttrs());
-                                     hangInMoveRangeCoordinatorGlobalCatalogCommit.pauseWhileSet(
-                                         opCtx);
+                    // Mark the commit as in progress before issuing it, so a MigrationSourceManager
+                    // doesn't cancel the clone driver.
+                    _migrationAttempt->markCommitInProgress();
+                })))
+        .then(_buildPhaseHandler(
+            Phase::kGlobalCatalogCommit,
+            _timePhase(Phase::kGlobalCatalogCommit,
+                       [this, anchor = shared_from_this()](OperationContext* opCtx) {
+                           LOGV2(12894208,
+                                 "MoveRangeCoordinator executing kGlobalCatalogCommit",
+                                 getCoordinatorLogAttrs());
+                           hangInMoveRangeCoordinatorGlobalCatalogCommit.pauseWhileSet(opCtx);
 
-                                     auto changedChunks = _commitToGlobalCatalog(opCtx);
+                           auto changedChunks = _commitToGlobalCatalog(opCtx);
 
-                                     // Persist the changed chunks so the shard catalog commit phase
-                                     // can install them even after a failover, without contacting
-                                     // the config server again.
-                                     auto newDoc = MoveRangeCoordinatorDocument(_doc);
-                                     newDoc.setChangedChunks(std::move(changedChunks));
-                                     _updateStateDocument(opCtx, std::move(newDoc));
-                                 }))
-        .then(_buildPhaseHandler(Phase::kPostGlobalCatalogCommit,
-                                 [this, anchor = shared_from_this()](OperationContext* opCtx) {
-                                     LOGV2(
-                                         12953604,
-                                         "MoveRangeCoordinator executing kPostGlobalCatalogCommit",
-                                         getCoordinatorLogAttrs());
-                                     _postGlobalCatalogCommit(opCtx);
-                                 }))
+                           // Persist the changed chunks so the shard catalog commit phase
+                           // can install them even after a failover, without contacting
+                           // the config server again.
+                           auto newDoc = MoveRangeCoordinatorDocument(_doc);
+                           newDoc.setChangedChunks(std::move(changedChunks));
+                           _updateStateDocument(opCtx, std::move(newDoc));
+                       })))
+        .then(_buildPhaseHandler(
+            Phase::kPostGlobalCatalogCommit,
+            _timePhase(Phase::kPostGlobalCatalogCommit,
+                       [this, anchor = shared_from_this()](OperationContext* opCtx) {
+                           LOGV2(12953604,
+                                 "MoveRangeCoordinator executing kPostGlobalCatalogCommit",
+                                 getCoordinatorLogAttrs());
+                           _postGlobalCatalogCommit(opCtx);
+                       })))
         .then(_buildPhaseHandler(
             Phase::kShardCatalogCommit,
-            [this, anchor = shared_from_this(), executor, token](OperationContext* opCtx) {
-                LOGV2(12795317,
-                      "MoveRangeCoordinator executing kShardCatalogCommit",
-                      getCoordinatorLogAttrs());
-                hangInMoveRangeCoordinatorShardCatalogCommit.pauseWhileSet(opCtx);
+            _timePhase(
+                Phase::kShardCatalogCommit,
+                [this, anchor = shared_from_this(), executor, token](OperationContext* opCtx) {
+                    LOGV2(12795317,
+                          "MoveRangeCoordinator executing kShardCatalogCommit",
+                          getCoordinatorLogAttrs());
+                    hangInMoveRangeCoordinatorShardCatalogCommit.pauseWhileSet(opCtx);
 
-                _commitToShardCatalog(opCtx, executor, token);
-            }))
-        .then(_buildPhaseHandler(Phase::kFinalizeMigration,
-                                 [this, anchor = shared_from_this()](OperationContext* opCtx) {
-                                     LOGV2(12894210,
-                                           "MoveRangeCoordinator executing kFinalizeMigration",
-                                           getCoordinatorLogAttrs());
+                    _commitToShardCatalog(opCtx, executor, token);
+                })))
+        .then(_buildPhaseHandler(
+            Phase::kFinalizeMigration,
+            _timePhase(Phase::kFinalizeMigration,
+                       [this, anchor = shared_from_this()](OperationContext* opCtx) {
+                           LOGV2(12894210,
+                                 "MoveRangeCoordinator executing kFinalizeMigration",
+                                 getCoordinatorLogAttrs());
 
-                                     // Release the donor critical section, then
-                                     // complete the migration (release the recipient critical
-                                     // section, schedule range deletion, forget the on-disk
-                                     // document) and signal joiners with success.
-                                     _releaseCriticalSectionAndFinalize(opCtx, Status::OK());
-                                 }))
+                           // Release the donor critical section, then
+                           // complete the migration (release the recipient critical
+                           // section, schedule range deletion, forget the on-disk
+                           // document) and signal joiners with success.
+                           _releaseCriticalSectionAndFinalize(opCtx, Status::OK());
+                       })))
         .onError([this, anchor = shared_from_this()](const Status& status) {
             const auto phase = _doc.getPhase();
 
@@ -330,6 +340,7 @@ ExecutorFuture<void> MoveRangeCoordinator::_runImpl(
             // only once, so a retry (or the abort cleanup) completes from the persisted document
             // instead. The destructor is not enough because the coordinator can stay alive after a
             // stepdown until the node steps up again.
+            _captureMigrationAttemptStats();
             _migrationAttempt.reset();
             return status;
         });
@@ -410,6 +421,81 @@ void MoveRangeCoordinator::MigrationAttempt::recordCommitSuccess(OperationContex
 void MoveRangeCoordinator::MigrationAttempt::finalize(OperationContext* opCtx) {
     AlternativeClientRegion acr(_ownedClient);
     _msm->finishCommit();
+}
+
+void MoveRangeCoordinator::MigrationAttempt::captureStats(TerminationStats* stats) {
+    auto* opCtx = _ownedOpCtx.get();
+    stats->docsCloned = _cloneMetrics.docsCloned(opCtx);
+    stats->bytesCloned = _cloneMetrics.bytesCloned(opCtx);
+    stats->cloneTimeMillis = _cloneMetrics.cloneTimeMillis(opCtx);
+    if (auto cloneStats = _msm->getLastCloneStats()) {
+        stats->cloneStats = std::move(cloneStats);
+    }
+}
+
+std::function<void(OperationContext*)> MoveRangeCoordinator::_timePhase(
+    Phase phase, std::function<void(OperationContext*)> fn) {
+    return [this, phase, fn = std::move(fn)](OperationContext* opCtx) {
+        Timer timer;
+        ScopeGuard recordGuard([&] { _recordPhaseMillis(phase, timer.millis()); });
+        fn(opCtx);
+    };
+}
+
+void MoveRangeCoordinator::_recordPhaseMillis(Phase phase, long long millis) {
+    const auto phaseName = std::string{idl::serialize(phase)};
+    auto& phases = _terminationStats.phasesMillis;
+    auto it = std::find_if(
+        phases.begin(), phases.end(), [&](const auto& entry) { return entry.first == phaseName; });
+    if (it != phases.end()) {
+        it->second += millis;
+    } else {
+        phases.emplace_back(phaseName, millis);
+    }
+}
+
+void MoveRangeCoordinator::_captureMigrationAttemptStats() {
+    if (_migrationAttempt) {
+        _migrationAttempt->captureStats(&_terminationStats);
+    }
+}
+
+void MoveRangeCoordinator::_appendTerminationStats(BSONObjBuilder* builder,
+                                                   const Status& outcome) const {
+    const auto& stats = _terminationStats;
+    if (!outcome.isOK()) {
+        builder->append("failedPhase", idl::serialize(_doc.getPhase()));
+    }
+
+    BSONObjBuilder lastPrimaryBuilder(builder->subobjStart("lastPrimary"));
+    lastPrimaryBuilder.append("recoveredFromDisk", _recoveredFromDisk);
+    lastPrimaryBuilder.append("totalTimeMillis", _coordinatorTimer.millis());
+
+    if (!stats.phasesMillis.empty()) {
+        BSONObjBuilder phasesBuilder(lastPrimaryBuilder.subobjStart("phasesMillis"));
+        for (const auto& [phaseName, millis] : stats.phasesMillis) {
+            phasesBuilder.append(phaseName, millis);
+        }
+    }
+
+    if (stats.docsCloned) {
+        BSONObjBuilder cloneBuilder(lastPrimaryBuilder.subobjStart("clone"));
+        cloneBuilder.append("docsCloned", *stats.docsCloned);
+        cloneBuilder.append("bytesCloned", *stats.bytesCloned);
+        cloneBuilder.append("cloneTimeMillis", *stats.cloneTimeMillis);
+    }
+
+    if (const auto& cloneStats = stats.cloneStats) {
+        {
+            BSONObjBuilder xferModsBuilder(lastPrimaryBuilder.subobjStart("xferMods"));
+            xferModsBuilder.append("deletes", cloneStats->xferModsDeletes);
+            xferModsBuilder.append("upserts", cloneStats->xferModsUpserts);
+        }
+        BSONObjBuilder sessionBuilder(lastPrimaryBuilder.subobjStart("sessionOplogEntries"));
+        sessionBuilder.append("toBeMigrated", cloneStats->sessionOplogEntriesToBeMigrated);
+        sessionBuilder.append("skippedLowerBound",
+                              cloneStats->sessionOplogEntriesSkippedLowerBound);
+    }
 }
 
 std::vector<BSONObj> MoveRangeCoordinator::_commitToGlobalCatalog(OperationContext* opCtx) {
@@ -695,7 +781,10 @@ void MoveRangeCoordinator::_releaseCriticalSectionAndFinalize(OperationContext* 
         infoBuilder.append("status", outcome.isOK() ? "success" : "failed");
         if (!outcome.isOK()) {
             infoBuilder.append("errorCode", ErrorCodes::errorString(outcome.code()));
+            infoBuilder.append("errorMsg", redact(outcome.reason()));
         }
+        _captureMigrationAttemptStats();
+        _appendTerminationStats(&infoBuilder, outcome);
         LOGV2(12960100,
               "MoveRange coordinator terminated",
               logv2::DynamicAttributes{getCoordinatorLogAttrs(), "info"_attr = infoBuilder.obj()});

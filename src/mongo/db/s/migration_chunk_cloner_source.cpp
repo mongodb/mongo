@@ -963,14 +963,17 @@ Status MigrationChunkClonerSource::nextModsBatch(OperationContext* opCtx, BSONOb
         return true;
     };
     long long totalDocSize = xferMods(&arrDel, &deleteList, 0, noopFn);
+    const long long numDeletesTransferred = arrDel.arrSize();
     arrDel.done();
 
+    long long numUpsertsTransferred = 0;
     if (deleteList.empty()) {
         BSONArrayBuilder arrUpd(builder->subarrayStart("reload"));
         auto findByIdWrapper = [opCtx, this](BSONObj idDoc, BSONObj* fullDoc) {
             return Helpers::findById(opCtx, this->nss(), idDoc, *fullDoc);
         };
         totalDocSize = xferMods(&arrUpd, &updateList, totalDocSize, findByIdWrapper);
+        numUpsertsTransferred = arrUpd.arrSize();
         arrUpd.done();
     }
 
@@ -978,6 +981,8 @@ Status MigrationChunkClonerSource::nextModsBatch(OperationContext* opCtx, BSONOb
 
     // Put back remaining ids we didn't consume
     std::unique_lock<std::mutex> lk(_mutex);
+    _numXferModsDeletesTransferred += numDeletesTransferred;
+    _numXferModsUpsertsTransferred += numUpsertsTransferred;
     _deleted.splice(_deleted.cbegin(), deleteList);
     _untransferredDeletesCounter = _deleted.size();
     _reload.splice(_reload.cbegin(), updateList);
@@ -1456,6 +1461,22 @@ MigrationChunkClonerSource::getSessionOplogEntriesSkippedSoFarLowerBound() {
 
 boost::optional<long long> MigrationChunkClonerSource::getSessionOplogEntriesToBeMigratedSoFar() {
     return _sessionCatalogSource->getSessionOplogEntriesToBeMigratedSoFar();
+}
+
+MigrationChunkClonerSource::CloneStats MigrationChunkClonerSource::getCloneStats() {
+    CloneStats stats;
+    {
+        std::lock_guard lk(_mutex);
+        stats.xferModsDeletes = _numXferModsDeletesTransferred;
+        stats.xferModsUpserts = _numXferModsUpsertsTransferred;
+    }
+    if (_sessionCatalogSource) {
+        stats.sessionOplogEntriesToBeMigrated =
+            _sessionCatalogSource->getSessionOplogEntriesToBeMigratedSoFar();
+        stats.sessionOplogEntriesSkippedLowerBound =
+            _sessionCatalogSource->getSessionOplogEntriesSkippedSoFarLowerBound();
+    }
+    return stats;
 }
 
 MigrationChunkClonerSource::CloneList::DocumentInFlightWithLock::DocumentInFlightWithLock(

@@ -229,6 +229,13 @@ public:
         return _entireOpTimer.millis();
     }
 
+    boost::optional<MigrationChunkClonerSource::CloneStats> getLastCloneStats() {
+        if (_cloneDriver) {
+            return _cloneDriver->getCloneStats();
+        }
+        return _lastCloneStats;
+    }
+
 private:
     // Private constructor, use the createMigrationSourceManager() factory method instead.
     MigrationSourceManager(OperationContext* opCtx,
@@ -374,6 +381,8 @@ private:
     // remove it, the CSRLock needs to be acquired in exclusive mode. To access it, the CSRlock has
     // to be acquired at least in shared mode. Available after cloning stage has completed.
     std::shared_ptr<MigrationChunkClonerSource> _cloneDriver;
+
+    boost::optional<MigrationChunkClonerSource::CloneStats> _lastCloneStats;
 
     // Contains logic for ensuring the donor's and recipient's config.rangeDeletions entries are
     // correctly updated based on whether the migration committed or aborted.

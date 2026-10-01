@@ -933,6 +933,10 @@ TEST_F(MigrationChunkClonerSourceTest, CorrectDocumentsFetched) {
 
             ASSERT_EQ(1U, modsObj["deleted"].Array().size());
             ASSERT_BSONOBJ_EQ(BSON("_id" << 199), modsObj["deleted"].Array()[0].Obj());
+
+            const auto cloneStats = cloner.getCloneStats();
+            ASSERT_EQ(1, cloneStats.xferModsDeletes);
+            ASSERT_EQ(2, cloneStats.xferModsUpserts);
         }
     }
 
@@ -1183,6 +1187,10 @@ TEST_F(MigrationChunkClonerSourceTest, ManySmallDocumentsTransferMods) {
             ASSERT_OK(cloner.nextModsBatch(operationContext(), &modsBuilder));
             const auto modsObj = modsBuilder.obj();
             ASSERT_EQ(modsObj["reload"].Array().size(), numDocuments);
+
+            const auto cloneStats = cloner.getCloneStats();
+            ASSERT_EQ(0, cloneStats.xferModsDeletes);
+            ASSERT_EQ(numDocuments, cloneStats.xferModsUpserts);
         }
     }
 

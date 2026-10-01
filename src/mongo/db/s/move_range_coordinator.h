@@ -14,9 +14,14 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/attribute_storage.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/timer.h"
 #include "mongo/util/uuid.h"
 
+#include <functional>
 #include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include <boost/optional.hpp>
 
@@ -109,6 +114,23 @@ private:
                                const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
                                const CancellationToken& token);
 
+    struct TerminationStats {
+        std::vector<std::pair<std::string, long long>> phasesMillis;
+        boost::optional<long long> docsCloned;
+        boost::optional<long long> bytesCloned;
+        boost::optional<long long> cloneTimeMillis;
+        boost::optional<MigrationChunkClonerSource::CloneStats> cloneStats;
+    };
+
+    std::function<void(OperationContext*)> _timePhase(Phase phase,
+                                                      std::function<void(OperationContext*)> fn);
+
+    void _recordPhaseMillis(Phase phase, long long millis);
+
+    void _captureMigrationAttemptStats();
+
+    void _appendTerminationStats(BSONObjBuilder* builder, const Status& outcome) const;
+
     class MigrationAttempt {
     public:
         MigrationAttempt(OperationContext* opCtx,
@@ -134,6 +156,8 @@ private:
         // Completes the migration coordinator on the same term that ran the commit (releasing the
         // recipient critical section). Honours waitForDelete.
         void finalize(OperationContext* opCtx);
+
+        void captureStats(TerminationStats* stats);
 
     private:
         class CloneMetricsSnapshot {
@@ -175,6 +199,8 @@ private:
     const std::shared_ptr<executor::TaskExecutor> _cleanupExecutor;
     boost::optional<MigrationAttempt> _migrationAttempt;
     boost::optional<ScopedDonateChunk> _scopedDonateChunk;
+    Timer _coordinatorTimer;
+    TerminationStats _terminationStats;
 };
 
 }  // namespace mongo

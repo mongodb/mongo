@@ -184,6 +184,13 @@ class MigrationChunkClonerSource {
     MigrationChunkClonerSource& operator=(const MigrationChunkClonerSource&) = delete;
 
 public:
+    struct CloneStats {
+        long long xferModsDeletes{0};
+        long long xferModsUpserts{0};
+        long long sessionOplogEntriesToBeMigrated{0};
+        long long sessionOplogEntriesSkippedLowerBound{0};
+    };
+
     MigrationChunkClonerSource(OperationContext* opCtx,
                                const ShardsvrMoveRange& request,
                                const WriteConcernOptions& writeConcern,
@@ -409,6 +416,8 @@ public:
      * Returns the number of session oplog entries that need to be sent to the destination shard.
      */
     boost::optional<long long> getSessionOplogEntriesToBeMigratedSoFar();
+
+    CloneStats getCloneStats();
 
 private:
     friend class LogOpForShardingHandler;
@@ -760,6 +769,9 @@ private:
 
     // Amount of delete xfer mods that have not yet reached the recipient.
     size_t _untransferredDeletesCounter{0};
+
+    long long _numXferModsDeletesTransferred{0};
+    long long _numXferModsUpsertsTransferred{0};
 
     // Amount of ops that are yet to be converted to update/delete xferMods.
     size_t _deferredUntransferredOpsCounter{0};

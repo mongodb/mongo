@@ -1168,6 +1168,10 @@ Status MigrationSourceManager::_cleanup(bool completeMigration) {
         return std::move(_cloneDriver);
     }();
 
+    if (cloneDriver) {
+        _lastCloneStats = cloneDriver->getCloneStats();
+    }
+
     // Exit the migration critical section. For the MoveRangeCoordinator path the donor critical
     // section is a recoverable critical section released by the coordinator during its
     // kFinalizeMigration phase, so _cleanup() must not touch it here.
