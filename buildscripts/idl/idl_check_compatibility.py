@@ -111,7 +111,10 @@ class AllowedNewPrivilege:
 ALLOWED_NEW_ACCESS_CHECK_PRIVILEGES: dict[str, list[AllowedNewPrivilege]] = dict(
     # Do not add any command other than the aggregate command or any privilege that is not required
     # only by an aggregation stage not present in previously released versions.
-    aggregate=[],
+    aggregate=[
+        # Added for $changeStream showSystemEvents on whole-cluster streams (SERVER-135203).
+        AllowedNewPrivilege("collection", ["find", "changeStream"]),
+    ],
     # This list is only used in unit-tests.
     complexChecksSupersetAllowed=[
         AllowedNewPrivilege("resourcePatternTwo", ["actionTypeTwo"]),
