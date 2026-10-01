@@ -121,6 +121,10 @@ public:
         return _validator.validatorDoc.getOwned();
     }
 
+    StatusWith<std::shared_ptr<MatchExpression>> getValidatorFilter() const final {
+        return _validator.filter;
+    }
+
     std::pair<DocumentValidationResult, Status> checkValidation(
         OperationContext* opCtx, const BSONObj& document) const final;
 

@@ -174,6 +174,44 @@ CollectionQueryInfo::PathArraynessCollectionState::operator=(
     return *this;
 }
 
+CollectionQueryInfo::SchemaTypeInfoCollectionState::SchemaTypeInfoCollectionState()
+    : schemaConstraints{std::make_shared<SchemaTypeInfo>()} {}
+
+CollectionQueryInfo::SchemaTypeInfoCollectionState::SchemaTypeInfoCollectionState(
+    const CollectionQueryInfo::SchemaTypeInfoCollectionState& other) {
+    schemaConstraints = other.snapshot();
+}
+
+CollectionQueryInfo::SchemaTypeInfoCollectionState&
+CollectionQueryInfo::SchemaTypeInfoCollectionState::operator=(
+    const CollectionQueryInfo::SchemaTypeInfoCollectionState& other) {
+    if (this == &other) {
+        return *this;
+    }
+
+    replace(other.snapshot());
+    return *this;
+}
+
+std::shared_ptr<const SchemaTypeInfo> CollectionQueryInfo::SchemaTypeInfoCollectionState::snapshot()
+    const {
+    auto readLock = rwMutex.readLock();
+    return schemaConstraints;
+}
+
+void CollectionQueryInfo::SchemaTypeInfoCollectionState::replace(
+    std::shared_ptr<const SchemaTypeInfo> schemaTypeInfo) {
+    auto writeLock = rwMutex.writeLock();
+    schemaConstraints = std::move(schemaTypeInfo);
+}
+
+void CollectionQueryInfo::SchemaTypeInfoCollectionState::publish(
+    pipeline::type_system::Type rootType) {
+    auto writeLock = rwMutex.writeLock();
+    auto nextEpoch = schemaConstraints->epoch() + 1;
+    schemaConstraints = std::make_shared<SchemaTypeInfo>(std::move(rootType), nextEpoch);
+}
+
 void CollectionQueryInfo::updatePathArraynessForSetMultikey(
     const IndexDescriptor& descriptor, const MultikeyPaths& multikeyPaths) const {
     if (PathArrayness::isIndexEligibleToAddToPathArrayness(descriptor) && !multikeyPaths.empty()) {
@@ -227,6 +265,22 @@ std::shared_ptr<const PathArrayness> CollectionQueryInfo::getPathArrayness() con
     return _pathArraynessState.pathArrayness;
 }
 
+void CollectionQueryInfo::rebuildSchemaTypeInfo(OperationContext* opCtx, const Collection* coll) {
+    SchemaTypeInfo inferred;
+    auto validatorDoc = coll->getValidatorDoc();
+    if (!validatorDoc.isEmpty() && coll->getValidationLevel() == ValidationLevelEnum::constraint) {
+        auto validatorFilter = coll->getValidatorFilter();
+        if (validatorFilter.isOK()) {
+            inferred.populateFromValidator(validatorFilter.getValue().get());
+        }
+    }
+    _schemaTypeInfoState.publish(inferred.getRootType());
+}
+
+std::shared_ptr<const SchemaTypeInfo> CollectionQueryInfo::getSchemaTypeInfo() const {
+    return _schemaTypeInfoState.snapshot();
+}
+
 void CollectionQueryInfo::init(OperationContext* opCtx, Collection* coll) {
     // Skip registering the index in a --repair, as the server will terminate after
     // the repair operation completes.
@@ -248,6 +302,9 @@ void CollectionQueryInfo::init(OperationContext* opCtx, Collection* coll) {
     rebuildIndexData(opCtx, coll);
     if (feature_flags::gFeatureFlagPathArrayness.isEnabled()) {
         rebuildPathArrayness(opCtx, coll);
+    }
+    if (feature_flags::gFeatureFlagQueryTypeInference.checkEnabled()) {
+        rebuildSchemaTypeInfo(opCtx, coll);
     }
 }
 

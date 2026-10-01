@@ -283,6 +283,8 @@ public:
 
     virtual BSONObj getValidatorDoc() const = 0;
 
+    virtual StatusWith<std::shared_ptr<MatchExpression>> getValidatorFilter() const = 0;
+
     /**
      * Returns 'kPass' with an ok Status if the document passes this collection's schema validator.
      *

@@ -101,3 +101,31 @@ mongo_cc_benchmark(
         "//src/mongo/db/query:query_test_service_context",
     ],
 )
+
+mongo_cc_library(
+    name = "schema_type_info",
+    srcs = [
+        "schema_type_info.cpp",
+    ],
+    hdrs = [
+        "schema_type_info.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:common",
+        "//src/mongo/db/query/compiler/type_system",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "schema_type_info_test",
+    srcs = [
+        "schema_type_info_test.cpp",
+    ],
+    tags = ["mongo_unittest_second_group"],
+    deps = [
+        ":schema_type_info",
+        "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/query/compiler/parsers/matcher:parsed_match_expression_for_test",
+    ],
+)

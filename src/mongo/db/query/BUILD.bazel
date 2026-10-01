@@ -983,6 +983,8 @@ mongo_cc_library(
         "//src/mongo/db:shard_role_api",
         "//src/mongo/db/fts:base_fts",
         "//src/mongo/db/query/compiler/metadata:path_arrayness",
+        "//src/mongo/db/query/compiler/metadata:schema_type_info",
+        "//src/mongo/db/query/compiler/parsers/matcher:matcher_parser",
         "//src/mongo/db/query/plan_cache:query_plan_cache",
         "//src/mongo/db/query/query_settings",
         "//src/mongo/db/query/query_stats",

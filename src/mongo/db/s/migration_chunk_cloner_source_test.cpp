@@ -187,6 +187,10 @@ public:
         return _coll->getValidatorDoc();
     }
 
+    StatusWith<std::shared_ptr<MatchExpression>> getValidatorFilter() const override {
+        return _coll->getValidatorFilter();
+    }
+
     std::pair<DocumentValidationResult, Status> checkValidation(
         OperationContext* opCtx, const BSONObj& document) const override {
         return _coll->checkValidation(opCtx, document);

@@ -88,6 +88,10 @@ public:
         return BSONObj();
     }
 
+    StatusWith<std::shared_ptr<MatchExpression>> getValidatorFilter() const override {
+        return StatusWith<std::shared_ptr<MatchExpression>>(nullptr);
+    }
+
     std::pair<DocumentValidationResult, Status> checkValidation(
         OperationContext* opCtx, const BSONObj& document) const override {
         MONGO_UNREACHABLE;

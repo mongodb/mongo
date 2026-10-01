@@ -4,6 +4,7 @@
 #pragma once
 
 #include "mongo/db/query/compiler/metadata/path_arrayness.h"
+#include "mongo/db/query/compiler/metadata/schema_type_info.h"
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"
 #include "mongo/db/query/plan_cache/plan_cache_indexability.h"
 #include "mongo/db/query/plan_cache/plan_cache_invalidator.h"
@@ -119,6 +120,17 @@ public:
 
     std::shared_ptr<const PathArrayness> getPathArrayness() const;
 
+    /**
+     * Rebuilds the SchemaTypeInfo from the collection's current document validator.
+     *
+     * When this runs:
+     * - At collection init/registration (see 'init').
+     * - Whenever the collection's validator is created or updated (e.g. via collMod).
+     */
+    void rebuildSchemaTypeInfo(OperationContext* opCtx, const Collection* coll);
+
+    std::shared_ptr<const SchemaTypeInfo> getSchemaTypeInfo() const;
+
 private:
     /**
      * Stores Clasic and SBE PlanCache-related state. Classic Plan Cache is stored per collection
@@ -174,11 +186,48 @@ private:
         mutable std::shared_ptr<const PathArrayness> pathArrayness;
     };
 
+    /**
+     * Wrapper around the SchemaTypeInfo pointer and the mutex protecting it together when
+     * collection query info is modified. Only the mutex is explicitly mutable so const can acquire
+     * a lock.
+     */
+    struct SchemaTypeInfoCollectionState {
+        SchemaTypeInfoCollectionState();
+
+        SchemaTypeInfoCollectionState(const SchemaTypeInfoCollectionState& other);
+        SchemaTypeInfoCollectionState& operator=(const SchemaTypeInfoCollectionState& other);
+
+        SchemaTypeInfoCollectionState(SchemaTypeInfoCollectionState&&) = delete;
+        SchemaTypeInfoCollectionState& operator=(SchemaTypeInfoCollectionState&&) = delete;
+
+        // Returns a snapshot of the current immutable SchemaTypeInfo. The returned shared_ptr
+        // remains valid after the read lock is released.
+        std::shared_ptr<const SchemaTypeInfo> snapshot() const;
+
+        // Replaces the current snapshot under the write lock. The supplied SchemaTypeInfo must be
+        // fully initialized and immutable; this does not advance its epoch.
+        void replace(std::shared_ptr<const SchemaTypeInfo> schemaTypeInfo);
+
+        // Publishes a new snapshot under the write lock and advances the epoch.
+        void publish(pipeline::type_system::Type rootType);
+
+    private:
+        // Mutex to protect concurrent writers from re-assigning the schemaConstraints pointer.
+        mutable WriteRarelyRWMutex rwMutex;
+
+        // All clones of CollectionQueryInfo will initially point to the same SchemaTypeInfo
+        // instance. Rebuilds publish a new immutable instance under rwMutex, allowing readers to
+        // retain a consistent snapshot.
+        std::shared_ptr<const SchemaTypeInfo> schemaConstraints;
+    };
+
     void updatePlanCacheIndexEntries(OperationContext* opCtx, const Collection* coll);
 
     std::shared_ptr<PlanCacheState> _planCacheState;
 
     PathArraynessCollectionState _pathArraynessState;
+
+    SchemaTypeInfoCollectionState _schemaTypeInfoState;
 };
 
 }  // namespace mongo

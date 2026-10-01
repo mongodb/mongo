@@ -41,6 +41,11 @@ public:
         wuow.commit();
     }
 
+    void createCollectionWithSchemaTypeInfo(const CollectionOptions& options) {
+        unittest::ServerParameterGuard featureFlag{"featureFlagQueryTypeInference", true};
+        ASSERT_OK(storageInterface()->createCollection(operationContext(), _kTestNss, options));
+    }
+
     void insertDocuments(const NamespaceString& nss, const std::vector<BSONObj> docs) {
         std::vector<InsertStatement> inserts{docs.begin(), docs.end()};
         const auto batchSize = 50000;
@@ -284,6 +289,79 @@ TEST_F(CollectionQueryInfoTest, PathArraynessUpdateForSetMultikeyIncrementsEpoch
                       ->epoch(),
                   epochBefore + 1);
     }
+}
+
+TEST_F(CollectionQueryInfoTest, SchemaTypeInfoUsesConstraintValidator) {
+    CollectionOptions options;
+    options.validator = BSON("x" << BSON("$type" << "string"));
+    options.validationLevel = ValidationLevelEnum::constraint;
+    createCollectionWithSchemaTypeInfo(options);
+
+    const auto coll = acquireCollectionForRead(operationContext(), _kTestNss);
+    const auto schemaTypeInfo =
+        CollectionQueryInfo::get(coll.getCollection().getCollectionPtr()).getSchemaTypeInfo();
+    ASSERT_EQ(schemaTypeInfo->epoch(), 1ULL);
+    ASSERT_TRUE(schemaTypeInfo->getRootType().getField("x").hasType(BSONType::string));
+    ASSERT_FALSE(schemaTypeInfo->getRootType().getField("x").hasType(BSONType::object));
+}
+
+TEST_F(CollectionQueryInfoTest, RebuildSchemaTypeInfoDirectly) {
+    CollectionOptions options;
+    options.validator = BSON("x" << BSON("$type" << "string"));
+    options.validationLevel = ValidationLevelEnum::constraint;
+    createCollectionWithSchemaTypeInfo(options);
+
+    const auto coll = acquireCollectionForRead(operationContext(), _kTestNss);
+    CollectionQueryInfo collectionQueryInfo;
+
+    collectionQueryInfo.rebuildSchemaTypeInfo(operationContext(),
+                                              coll.getCollection().getCollectionPtr().get());
+
+    const auto schemaTypeInfo = collectionQueryInfo.getSchemaTypeInfo();
+    ASSERT_EQ(schemaTypeInfo->epoch(), 1ULL);
+    ASSERT_TRUE(schemaTypeInfo->getRootType().getField("x").hasType(BSONType::string));
+    ASSERT_FALSE(schemaTypeInfo->getRootType().getField("x").hasType(BSONType::object));
+
+    collectionQueryInfo.rebuildSchemaTypeInfo(operationContext(),
+                                              coll.getCollection().getCollectionPtr().get());
+    ASSERT_EQ(collectionQueryInfo.getSchemaTypeInfo()->epoch(), 2ULL);
+    ASSERT_EQ(schemaTypeInfo->epoch(), 1ULL);
+}
+
+TEST_F(CollectionQueryInfoTest, SchemaTypeInfoWithoutValidatorRemainsAnyObject) {
+    createCollectionWithSchemaTypeInfo(CollectionOptions());
+
+    const auto coll = acquireCollectionForRead(operationContext(), _kTestNss);
+    const auto schemaTypeInfo =
+        CollectionQueryInfo::get(coll.getCollection().getCollectionPtr()).getSchemaTypeInfo();
+    ASSERT_EQ(schemaTypeInfo->epoch(), 1ULL);
+    ASSERT_TRUE(schemaTypeInfo->getRootType() == pipeline::type_system::Type::anyObject());
+}
+
+TEST_F(CollectionQueryInfoTest, SchemaTypeInfoIgnoresNonConstraintValidator) {
+    CollectionOptions options;
+    options.validator = BSON("x" << BSON("$type" << "string"));
+    options.validationLevel = ValidationLevelEnum::moderate;
+    createCollectionWithSchemaTypeInfo(options);
+
+    const auto coll = acquireCollectionForRead(operationContext(), _kTestNss);
+    const auto schemaTypeInfo =
+        CollectionQueryInfo::get(coll.getCollection().getCollectionPtr()).getSchemaTypeInfo();
+    ASSERT_EQ(schemaTypeInfo->epoch(), 1ULL);
+    ASSERT_TRUE(schemaTypeInfo->getRootType() == pipeline::type_system::Type::anyObject());
+}
+
+TEST_F(CollectionQueryInfoTest, SchemaTypeInfoIgnoresInvalidConstraintValidator) {
+    CollectionOptions options;
+    options.validator = BSON("x" << BSON("$unsupportedOperator" << 1));
+    options.validationLevel = ValidationLevelEnum::constraint;
+    createCollectionWithSchemaTypeInfo(options);
+
+    const auto coll = acquireCollectionForRead(operationContext(), _kTestNss);
+    const auto schemaTypeInfo =
+        CollectionQueryInfo::get(coll.getCollection().getCollectionPtr()).getSchemaTypeInfo();
+    ASSERT_EQ(schemaTypeInfo->epoch(), 1ULL);
+    ASSERT_TRUE(schemaTypeInfo->getRootType() == pipeline::type_system::Type::anyObject());
 }
 }  // namespace
 }  // namespace mongo
