@@ -55,6 +55,12 @@ public:
         return _rootType;
     }
 
+    /**
+     * Returns whether any component of 'path' could be an array, according to '_rootType'.
+     * A path whose traversal is not modelled by '_rootType' is conservatively treated as an array.
+     */
+    bool canPathBeArray(const FieldRef& path) const;
+
 private:
     // Inferred type of the collection's root document.
     pipeline::type_system::Type _rootType;

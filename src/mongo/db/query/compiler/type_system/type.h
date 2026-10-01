@@ -4,6 +4,7 @@
 #pragma once
 
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/field_ref.h"
 #include "mongo/db/matcher/matcher_type_set.h"
 #include "mongo/db/query/compiler/type_system/field_map.h"
 
@@ -205,6 +206,9 @@ public:
      * Returns 'never' if this type covers no object.
      */
     Type getField(std::string_view fieldName) const;
+
+    /// Returns whether any component of 'path' may have BSON type array.
+    bool canPathBeArray(const FieldRef& path) const;
 
     /**
      * Sets the type of the 'fieldName' field of the objects covered to 'fieldType'.

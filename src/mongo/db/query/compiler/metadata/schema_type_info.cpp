@@ -17,4 +17,8 @@ void SchemaTypeInfo::populateFromValidator(const MatchExpression* validator) {
     _rootType = narrowType(Type::anyObject(), validator, /*assumeTrue=*/true);
 }
 
+bool SchemaTypeInfo::canPathBeArray(const FieldRef& path) const {
+    return _rootType.canPathBeArray(path);
+}
+
 }  // namespace mongo

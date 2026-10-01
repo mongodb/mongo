@@ -547,6 +547,24 @@ TEST(TypeTest, GetFieldRequiresObjectType) {
     ASSERT_TASSERT_CODE(allValues(BSONType::string).getField("x"), 13459103);
 }
 
+TEST(TypeTest, CanPathBeArrayHandlesNonObjectTypes) {
+    ASSERT_FALSE(allValues(BSONType::string).canPathBeArray(FieldRef("x")));
+    ASSERT_FALSE(closedObject({}).canPathBeArray(FieldRef("x.y")));
+    ASSERT_TRUE(allValues(BSONType::array).canPathBeArray(FieldRef("x")));
+
+    auto mixed =
+        unionType(openObject({{"y", allValues(BSONType::array)}}), allValues(BSONType::string));
+    ASSERT_TRUE(openObject({{"x", mixed}}).canPathBeArray(FieldRef("x.y")));
+}
+
+TEST(TypeTest, CanPathBeArrayStopsAtScalarField) {
+    ASSERT_FALSE(openObject({{"x", allValues(BSONType::string)}}).canPathBeArray(FieldRef("x.y")));
+}
+
+TEST(TypeTest, CanPathBeArrayStopsAtNever) {
+    ASSERT_FALSE(Type::never().canPathBeArray(FieldRef("x.y")));
+}
+
 TEST(TypeTest, SetFieldNarrowsTheNamedField) {
     auto type = object(Extent::kAll);
     type.setField("x", allValues(BSONType::string));
