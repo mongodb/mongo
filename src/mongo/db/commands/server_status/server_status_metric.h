@@ -308,7 +308,7 @@ private:
 
 /** Trait for choosing a policy for a metric. */
 template <typename T>
-struct ServerStatusMetricPolicySelection {
+struct [[MONGO_MOD_PUBLIC]] ServerStatusMetricPolicySelection {
     using type = DefaultStatusMetricValuePolicy<T>;
 };
 template <typename T>
