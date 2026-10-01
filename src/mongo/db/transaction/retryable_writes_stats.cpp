@@ -67,7 +67,6 @@ void RetryableWritesStats::recordRetriedWriteDelay(Milliseconds delay) {
     _retriedWriteDelayMillis.increment(static_cast<uint64_t>(delayMs));
 }
 
-// TODO(SERVER-134507): Add call to this to include latency histogram stats in serverStatus.
 void RetryableWritesStats::appendRetriedWriteStats(BSONObjBuilder& bob) const {
     BSONArrayBuilder arr(bob.subarrayStart("retriedWritesDelayMillis"));
     for (auto&& bucket : _retriedWriteDelayMillis) {

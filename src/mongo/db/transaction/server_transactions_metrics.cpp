@@ -4,6 +4,7 @@
 #include "mongo/db/transaction/server_transactions_metrics.h"
 
 #include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/commands/server_status/server_status.h"
 #include "mongo/db/operation_context.h"
@@ -300,7 +301,15 @@ public:
             stats.setPreciseCheckpointRecovery(recoveryStats);
         }
 
-        return stats.toBSON();
+        // Append the retry-delay latency histogram alongside the IDL-generated TransactionsStats
+        // fields. A variable-length histogram isn't expressible as a fixed strict IDL field, so
+        // it is added as an extra field on the outer "transactions" BSON object.
+        auto retryStats = RetryableWritesStats::get(opCtx);
+        BSONObjBuilder result;
+        result.appendElements(stats.toBSON());
+        retryStats->appendRetriedWriteStats(result);
+
+        return result.obj();
     }
 };
 auto& transactionsSSS = *ServerStatusSectionBuilder<TransactionsSSS>("transactions").forShard();
