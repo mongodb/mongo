@@ -126,6 +126,10 @@ overrides:
   - task: multi_shard_multi_stmt_txn_kill_primary_jscore_passthrough
     exec_timeout: 240 # 4 hours
 
+  enterprise-rhel-8-64-bit-inmem:
+  - task: change_stream_optimization_fuzzer
+    exec_timeout: 600 # 10 hours
+
   enterprise-rhel-8-arm64:
   - task: aggregation_blockprocessing_fuzzer
     exec_timeout: 600 # 10 hours
