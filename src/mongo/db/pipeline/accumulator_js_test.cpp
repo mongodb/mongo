@@ -35,6 +35,7 @@
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/accumulator_js_reduce.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/expression_function.h"
 #include "mongo/db/pipeline/process_interface/standalone_process_interface.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/dbtests/dbtests.h"
@@ -304,6 +305,36 @@ TEST_F(MapReduceFixture, InternalJsReduceFailsIfDataArgumentDoesNotContainExpect
         Value(DOC("eval" << std::string("function(key, values) { return Array.sum(values); };")
                          << "data" << Value(Document())));
     assertProcessFailsWithCode<AccumulatorInternalJsReduce>(getExpCtx(), eval, argument, 31251);
+}
+
+TEST_F(MapReduceFixture, AccumulatorJsInvalidatesBsonWrapperRetainedByPriorFunctionCall) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx =
+        make_intrusive<ExpressionContextForTest>();
+
+    // A prior $function evaluation in the same operation stashes a non-owning wrapper for its
+    // argument in a JS global; the backing builder buffer is freed when the evaluation returns.
+    auto bsonExpr =
+        BSON("expr" << BSON("body"
+                            << "function(arg) { globalThis.__savedArg = arg; return 1; };"
+                            << "args" << BSON_ARRAY("$$ROOT") << "lang"
+                            << ExpressionFunction::kJavaScript));
+    auto stashExpr = ExpressionFunction::parse(
+        expCtx.get(), bsonExpr.firstElement(), expCtx->variablesParseState);
+    stashExpr->evaluate(Document{BSON("x" << 1)}, &expCtx->variables);
+
+    // The $accumulator init reads the retained wrapper on re-entry into the same operation-cached
+    // scope; it must be rejected rather than read as stale memory.
+    auto acc = AccumulatorJs::create(expCtx.get(),
+                                     "function() { return globalThis.__savedArg.x; }" /* init */,
+                                     "function(state) { return state; }" /* accumulate */,
+                                     "function(left, right) { return left; }" /* merge */,
+                                     boost::none /* finalize */);
+    const Value initArgs{BSON_ARRAY(1)};
+    ASSERT_THROWS_WITH_CHECK(
+        acc->startNewGroup(initArgs), AssertionException, [](const AssertionException& ex) {
+            ASSERT_STRING_CONTAINS(ex.toString(),
+                                   "Attempt to access an invalidated BSON Object in JS scope");
+        });
 }
 
 }  // namespace InternalJsReduce
