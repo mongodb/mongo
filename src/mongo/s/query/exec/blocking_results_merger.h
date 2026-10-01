@@ -148,6 +148,14 @@ public:
     }
 
     /**
+     * Re-enables high-water-mark advancement based on promised sort keys in the underlying
+     * 'AsyncResultsMerger'.
+     */
+    void enablePromisedSortKeyHighWaterMarkAdvancement() {
+        _arm->enablePromisedSortKeyHighWaterMarkAdvancement();
+    }
+
+    /**
      * Adds the already opened cursors and their potential results to the underlying
      * 'AsyncResultsMerger'.
      */

@@ -21,12 +21,6 @@ selector:
     - jstests/sharding/query/change_streams/change_stream_v2_topology_stage_state_transitions_database.js
     - jstests/sharding/query/change_streams/change_stream_resumes_on_v2_disable.js
 
-    # Test's assertNoChanges helper waits for the post-batch resume token to advance via
-    # the periodic no-op writer. In ignoreRemovedShards mode the V2 stage disables
-    # promise-based high-water-mark advancement, so the PBRT does not move on idle
-    # streams and the helper times out.
-    - jstests/sharding/query/change_streams/change_stream_no_orphans.js
-
   exclude_with_any_tags:
     # This suite runs change streams as v2; v1-pinned tests use scaffolding (e.g.
     # 'shardedAggregateHangBeforeEstablishingShardCursors') that v2 doesn't trigger.

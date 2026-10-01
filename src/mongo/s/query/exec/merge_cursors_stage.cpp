@@ -179,6 +179,10 @@ void MergeCursorsStage::disablePromisedSortKeyHighWaterMarkAdvancement() {
     _blockingResultsMerger->disablePromisedSortKeyHighWaterMarkAdvancement();
 }
 
+void MergeCursorsStage::enablePromisedSortKeyHighWaterMarkAdvancement() {
+    _blockingResultsMerger->enablePromisedSortKeyHighWaterMarkAdvancement();
+}
+
 void MergeCursorsStage::setNextHighWaterMarkDeterminingStrategy(
     NextHighWaterMarkDeterminingStrategyPtr nextHighWaterMarkDeterminer) {
     _blockingResultsMerger->setNextHighWaterMarkDeterminingStrategy(

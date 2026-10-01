@@ -180,6 +180,14 @@ public:
          * 'highWaterMark', using a high water mark token.
          */
         virtual void setHighWaterMark(Timestamp highWaterMark) = 0;
+
+        /**
+         * Enables or disables advancement of the client-visible high water mark based on the
+         * minimum promised sort key of the shards. Disabled while reading a bounded change stream
+         * segment in ignore-removed-shards mode, where a shard promise may point beyond the segment
+         * end and therefore must not be exposed to the client.
+         */
+        virtual void setPromisedSortKeyHighWaterMarkAdvancement(bool enabled) = 0;
     };
 
     /**

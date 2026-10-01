@@ -68,13 +68,13 @@ TEST_F(RouterStagePipelineTest, AllowsMonotonicallyIncreasingResumeTokens) {
 
 DEATH_TEST_REGEX_F(RouterStagePipelineDeathTest,
                    RejectsResumeTokenWhichGoesBackwards,
-                   "Tripwire assertion.*13479500") {
+                   "Tripwire assertion.*13536500") {
     auto stage = makeRouterStage(
         getExpCtx(),
         {makeChangeStreamEvent(Timestamp(2, 1)), makeChangeStreamEvent(Timestamp(1, 1))});
 
     ASSERT_OK(stage->next().getStatus());
-    ASSERT_THROWS_CODE(stage->next(), DBException, ErrorCodes::ChangeStreamFatalError);
+    ASSERT_THROWS_CODE(stage->next(), AssertionException, 13536500);
 }
 
 TEST_F(RouterStagePipelineTest, DoesNotRejectRepeatedResumeToken) {

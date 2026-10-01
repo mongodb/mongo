@@ -32,6 +32,13 @@ namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(throwErrorBeforeGetNext);
 
+// Test-only. When enabled, the change stream cursor does not advance its post-batch resume token
+// to a high-water-mark token when it runs out of results, but instead keeps the resume token of the
+// last returned event. This models the racy production situation where the shard has not yet
+// scanned past its last returned event, and makes it possible to deterministically test how the
+// router handles a shard promise that refers to an internally swallowed control event.
+MONGO_FAIL_POINT_DEFINE(changeStreamKeepLastEventResumeTokenAsPBRT);
+
 namespace {
 auto& changeStreamsLargeEventsFailedCounter =
     *MetricBuilder<Counter64>{"changeStreams.largeEventsFailed"};
@@ -179,6 +186,12 @@ void PlanExecutorPipeline::_performChangeStreamsAccounting(const boost::optional
 
         _setSpeculativeReadTimestamp();
     } else {
+        if (MONGO_unlikely(changeStreamKeepLastEventResumeTokenAsPBRT.shouldFail())) {
+            // Test-only: leave '_postBatchResumeToken' at the resume token of the last returned
+            // event instead of advancing it to a high-water-mark token.
+            return;
+        }
+
         // We ran out of results to return. Check whether the oplog cursor has moved forward since
         // the last recorded timestamp. Because we advance _latestOplogTimestamp for every event we
         // return, if the new time is higher than the last then we are guaranteed not to have

@@ -263,6 +263,14 @@ public:
                                             .toBson());
     }
 
+    void setPromisedSortKeyHighWaterMarkAdvancement(bool enabled) override {
+        if (enabled) {
+            _mergeCursors->enablePromisedSortKeyHighWaterMarkAdvancement();
+        } else {
+            _mergeCursors->disablePromisedSortKeyHighWaterMarkAdvancement();
+        }
+    }
+
     Timestamp getTimestampFromCurrentHighWaterMark() const override {
         // The high water mark returned by the 'AsyncResultsMerger' has the format
         // {"_data":"..."}, so we can parse it directly.
@@ -1380,8 +1388,17 @@ ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingStartingChangeStrea
                         "expecting no config server cursor to be open",
                         !_params->cursorManager->isCursorOnConfigServerOpen());
 
+                // This is a bounded segment: a shard promise may point beyond the segment end, so
+                // do not let it advance the client-visible high water mark.
+                _params->cursorManager->setPromisedSortKeyHighWaterMarkAdvancement(false);
+
                 _setState(State::kFetchingDegradedGettingChangeEvent);
             } else {
+                // Unbounded segment: promises from the current shard set are valid, so allow them
+                // to advance the client-visible high water mark again. This keeps the post-batch
+                // resume token moving forward while shards are idle.
+                _params->cursorManager->setPromisedSortKeyHighWaterMarkAdvancement(true);
+
                 _setState(State::kFetchingNormalGettingChangeEvent);
             }
             return boost::none;
@@ -1459,6 +1476,10 @@ ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingNormalGettingChange
                 } else {
                     // Adjust end timestamp of the current segment and transition to degraded mode.
                     _segmentEndTimestamp = extractTimestampFromDocument(input.getDocument()) + 1;
+
+                    // This segment is now bounded, so shard promises may point beyond its end. Do
+                    // not let them advance the client-visible high water mark.
+                    _params->cursorManager->setPromisedSortKeyHighWaterMarkAdvancement(false);
 
                     LOGV2_DEBUG(10657543,
                                 3,

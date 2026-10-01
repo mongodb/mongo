@@ -124,6 +124,10 @@ void CursorManagerMock::setHighWaterMark(Timestamp highWaterMark) {
     _restoredHighWaterMark.emplace(highWaterMark);
 }
 
+void CursorManagerMock::setPromisedSortKeyHighWaterMarkAdvancement(bool enabled) {
+    _promisedSortKeyHighWaterMarkAdvancement.emplace(enabled);
+}
+
 Timestamp CursorManagerMock::getTimestampFromCurrentHighWaterMark() const {
     tassert(10657540,
             "expecting high watermark timestamp to be set in test",
@@ -141,6 +145,10 @@ boost::optional<bool> CursorManagerMock::getUndoNextMode() const {
 
 boost::optional<Timestamp> CursorManagerMock::getRestoredHighWaterMark() const {
     return _restoredHighWaterMark;
+}
+
+boost::optional<bool> CursorManagerMock::getPromisedSortKeyHighWaterMarkAdvancement() const {
+    return _promisedSortKeyHighWaterMarkAdvancement;
 }
 
 void CursorManagerMock::setTimestampForCurrentHighWaterMark(Timestamp ts) {
