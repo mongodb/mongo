@@ -398,6 +398,11 @@ feature_flags:
         cpp_varname: gFeatureFlagPipelinedOplogApplier
         default: false
         fcv_gated: false
+    featureFlagAllocationTimeMemoryTracking:
+        description: "Enable allocation time memory tracking."
+        cpp_varname: gFeatureFlagAllocationTimeMemoryTracking
+        default: false
+        fcv_gated: false
 
 server_parameters:
     allowDirectSystemBucketsAccess:
