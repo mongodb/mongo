@@ -5,6 +5,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/exec/sbe/stages/block_hashagg.h"
+#include "mongo/db/exec/sbe/stages/compact_hash_agg.h"
 #include "mongo/db/exec/sbe/stages/hash_agg.h"
 #include "mongo/db/exec/sbe/util/spilling.h"
 #include "mongo/db/exec/sbe/values/value.h"
@@ -288,5 +289,6 @@ void HashAggBaseStage<Derived>::checkMemoryUsageAndSpillIfNecessary(MemoryCheckD
 
 template class HashAggBaseStage<HashAggStage>;
 template class HashAggBaseStage<BlockHashAggStage>;
+template class HashAggBaseStage<CompactHashAggStage>;
 }  // namespace sbe
 }  // namespace mongo
