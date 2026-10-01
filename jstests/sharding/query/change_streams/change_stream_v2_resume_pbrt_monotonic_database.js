@@ -13,6 +13,7 @@ import {describe, before, afterEach, after} from "jstests/libs/mochalite.js";
 import {ChangeStreamTest, ChangeStreamWatchMode} from "jstests/libs/query/change_stream_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
+    kDataDistributions,
     runChainedResumePbrtMonotonicTest,
     runResumePbrtMonotonicTests,
     setupShardedCollection,

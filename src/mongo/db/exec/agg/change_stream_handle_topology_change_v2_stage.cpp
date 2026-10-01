@@ -77,6 +77,13 @@ public:
 
         _mergeCursors->recognizeControlEvents();
 
+        // In ignore-removed-shards mode, promises made by a shard can be withdrawn when that shard
+        // is removed. Do not let the AsyncResultsMerger advance its high water mark from those
+        // promises; doing so would allow the client-visible post-batch resume token to regress.
+        if (_changeStream.getReadMode() == ChangeStreamReadMode::kIgnoreRemovedShards) {
+            _mergeCursors->disablePromisedSortKeyHighWaterMarkAdvancement();
+        }
+
         _initializationResumeToken = ResumeToken(resumeTokenData);
         LOGV2_DEBUG(12163604,
                     5,
@@ -84,7 +91,7 @@ public:
                     "changeStream"_attr = _changeStream.toString(),
                     "resumeToken"_attr = _initializationResumeToken,
                     "resumeTokenClusterTime"_attr = resumeTokenData.clusterTime);
-        setHighWaterMark(_initializationResumeToken.getClusterTime());
+        _mergeCursors->setHighWaterMark(_initializationResumeToken.toBSON());
 
         _originalAggregateCommand = expCtx->getOriginalAggregateCommand().getOwned();
     }

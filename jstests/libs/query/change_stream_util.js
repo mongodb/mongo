@@ -418,13 +418,6 @@ export function ChangeStreamTest(_db, options) {
             if (events) {
                 for (let i = 0; i < events.length; i++) {
                     const eventToken = events[i]._id;
-                    if (
-                        !eventToken ||
-                        typeof eventToken !== "object" ||
-                        !eventToken.hasOwnProperty("_data")
-                    ) {
-                        continue;
-                    }
                     if (previousToken) {
                         assertNotRegressed(eventToken, previousToken, "event token at index " + i);
                     }
@@ -966,10 +959,22 @@ export function ChangeStreamTest(_db, options) {
      * {fullDocument: "updateLookup"}) are merged in; the watchMode-derived and resumeAfter fields
      * take precedence over them.
      */
-    self.getChangeStreamStage = function (watchMode, resumeAfter, extraOptions = {}) {
+    self.getChangeStreamStage = function (
+        watchMode,
+        resumeAfter,
+        startAtOperationTime,
+        extraOptions = {},
+    ) {
+        if (resumeAfter && startAtOperationTime) {
+            throw new Error("cannot use both resumeAfter and startAtOperationTime");
+        }
+
         const changeStreamDoc = {...extraOptions};
         if (resumeAfter) {
             changeStreamDoc.resumeAfter = resumeAfter;
+        }
+        if (startAtOperationTime) {
+            changeStreamDoc.startAtOperationTime = startAtOperationTime;
         }
 
         if (watchMode == ChangeStreamWatchMode.kCluster) {
@@ -983,13 +988,29 @@ export function ChangeStreamTest(_db, options) {
      * collection. Will resume from a given point if resumeAfter is specified. Any 'options' are
      * merged into the $changeStream stage (e.g. {fullDocument: "updateLookup"}).
      */
-    self.getChangeStream = function ({watchMode, coll, resumeAfter, options = {}}) {
+    self.getChangeStream = function ({
+        watchMode,
+        coll,
+        resumeAfter,
+        startAtOperationTime,
+        batchSize = 0,
+        options = {},
+    }) {
         return self.startWatchingChanges({
-            pipeline: [{$changeStream: self.getChangeStreamStage(watchMode, resumeAfter, options)}],
+            pipeline: [
+                {
+                    $changeStream: self.getChangeStreamStage(
+                        watchMode,
+                        resumeAfter,
+                        startAtOperationTime,
+                        options,
+                    ),
+                },
+            ],
             collection: watchMode == ChangeStreamWatchMode.kCollection ? coll : 1,
-            // Use a batch size of 0 to prevent any notifications from being returned in the first
+            // Use a default batch size of 0 to prevent any notifications from being returned in the first
             // batch. These would be ignored by ChangeStreamTest.getOneChange().
-            aggregateOptions: {cursor: {batchSize: 0}},
+            aggregateOptions: {cursor: {batchSize}},
         });
     };
 

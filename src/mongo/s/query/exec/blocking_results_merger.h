@@ -124,11 +124,27 @@ public:
     }
 
     /**
+     * Same as 'getHighWaterMark()', but intended for use when producing the post-batch resume token
+     * that will be returned to the client.
+     */
+    BSONObj getHighWaterMarkForClient() {
+        return _arm->getHighWaterMarkForClient();
+    }
+
+    /**
      * Sets the current high water mark of the underlying 'AsyncResultsMerger'. Notably this allows
      * to set the high water mark to a timestamp earlier than the current high water mark.
      */
     void setHighWaterMark(const BSONObj& highWaterMark) {
         _arm->setHighWaterMark(highWaterMark);
+    }
+
+    /**
+     * Disables high-water-mark advancement based on promised sort keys in the underlying
+     * 'AsyncResultsMerger'.
+     */
+    void disablePromisedSortKeyHighWaterMarkAdvancement() {
+        _arm->disablePromisedSortKeyHighWaterMarkAdvancement();
     }
 
     /**

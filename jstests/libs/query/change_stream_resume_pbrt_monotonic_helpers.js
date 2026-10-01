@@ -131,7 +131,7 @@ function resumeAndAssertNotRegressed({
 }
 
 function captureEventTokens({ctx, watchMode, distribution}) {
-    assert.commandWorked(ctx.coll.deleteMany({}));
+    assertDropCollection(ctx.db, ctx.coll.getName());
 
     const cursor = ctx.cst.getChangeStream({
         watchMode,

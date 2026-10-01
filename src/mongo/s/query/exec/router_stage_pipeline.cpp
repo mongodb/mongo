@@ -74,7 +74,7 @@ std::size_t RouterStagePipeline::getNumRemotes() const {
 }
 
 BSONObj RouterStagePipeline::getPostBatchResumeToken() {
-    return _mergeCursorsStage ? _mergeCursorsStage->getHighWaterMark() : BSONObj();
+    return _mergeCursorsStage ? _mergeCursorsStage->getHighWaterMarkForClient() : BSONObj();
 }
 
 BSONObj RouterStagePipeline::_validateAndConvertToBSON(const Document& event) {
@@ -82,6 +82,7 @@ BSONObj RouterStagePipeline::_validateAndConvertToBSON(const Document& event) {
     if (!_mergePipeline->getContext()->isTailableAwaitData()) {
         return event.toBson();
     }
+
     // Confirm that the document _id field matches the original resume token in the sort key field.
     auto eventBSON = event.toBson();
     auto resumeToken = event.metadata().getSortKey();
@@ -97,6 +98,21 @@ BSONObj RouterStagePipeline::_validateAndConvertToBSON(const Document& event) {
                           << (eventBSON["_id"] ? BSON("_id" << eventBSON["_id"]) : BSONObj()),
             (resumeToken.getType() == BSONType::object) &&
                 idField.binaryEqual(resumeToken.getDocument().toBson()));
+
+    // Confirm that the resume token has not regressed compared to the previously returned event.
+    // It is possible to receive the _same_ resume token again in case sharded DDL operations from
+    // different shards have the same cluster time.
+    const auto currentResumeTokenData =
+        resumeToken.getDocument()[ResumeToken::kDataFieldName].getString();
+    if (_previousResumeTokenData) {
+        tassert(13479500,
+                str::stream() << "Encountered an event whose resume token regressed to before the "
+                                 "previously returned resume token. Previous: "
+                              << *_previousResumeTokenData
+                              << " but found: " << currentResumeTokenData,
+                currentResumeTokenData >= *_previousResumeTokenData);
+    }
+    _previousResumeTokenData = std::move(currentResumeTokenData);
 
     // Return the event in BSONObj form, minus the $sortKey metadata.
     return eventBSON;
