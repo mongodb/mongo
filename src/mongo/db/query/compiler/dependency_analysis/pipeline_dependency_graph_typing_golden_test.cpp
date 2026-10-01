@@ -119,7 +119,7 @@ TEST_F(PipelineDependencyGraphTypingGoldenTest, ContradictingMatchesYieldNever) 
         .pipeline = "[{$match: {x: {$type: 'number'}}},"
                     " {$match: {x: {$type: 'string'}}},"
                     " {$match: {x: {$not: {$type: 'array'}}}}]",
-        .paths = {"x"},
+        .paths = {"x", "x.y"},
     });
 }
 
@@ -260,6 +260,28 @@ TEST_F(PipelineDependencyGraphTypingGoldenTest, MatchThenModifySubpath) {
         .pipeline = "[{$match: {x: {$not: {$type: 'array'}}}},"
                     " {$set: {'x.y': 1}}]",
         .paths = {"x"},
+    });
+}
+
+// Narrowing 'x' no longer constrains 'x.y' once 'x.y' is modified.
+TEST_F(PipelineDependencyGraphTypingGoldenTest, DottedPathAfterSubpathModification) {
+    runVariation({
+        .name = "DottedPathAfterSubpathModification",
+        .pipeline = "[{$match: {x: {$type: 'number'}}},"
+                    " {$match: {x: {$not: {$type: 'array'}}}},"
+                    " {$set: {'x.y': '$a'}}]",
+        .paths = {"x.y", "x.y.z"},
+    });
+}
+
+// The $match stages depend on 'x' rather than on the 'x.y' field declared by $set.
+TEST_F(PipelineDependencyGraphTypingGoldenTest, MatchOnPrefixOfDeclaredSubpath) {
+    runVariation({
+        .name = "MatchOnPrefixOfDeclaredSubpath",
+        .pipeline = "[{$set: {'x.y': '$a'}},"
+                    " {$match: {x: {$type: 'number'}}},"
+                    " {$match: {x: {$not: {$type: 'array'}}}}]",
+        .paths = {"x", "x.y"},
     });
 }
 

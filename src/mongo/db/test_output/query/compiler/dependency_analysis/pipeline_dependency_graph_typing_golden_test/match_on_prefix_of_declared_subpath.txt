@@ -1,17 +1,17 @@
-VARIATION ContradictingMatchesYieldNever
+VARIATION MatchOnPrefixOfDeclaredSubpath
 input: {
     "pipeline": [
         {
-            "$match": {
+            "$set": {
                 "x": {
-                    "$type": "number"
+                    "y": "$a"
                 }
             }
         },
         {
             "$match": {
                 "x": {
-                    "$type": "string"
+                    "$type": "number"
                 }
             }
         },
@@ -27,13 +27,13 @@ input: {
     ]
 }
 output:
-  after $match:0
-    x: number|array(S)
+  after $set:0
+    x: any
     x.y: any
   after $match:1
-    x: array(S)
+    x: number|array(S)
     x.y: any
   end of pipeline
-    x: never
-    x.y: never
+    x: number
+    x.y: missing
 

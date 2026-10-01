@@ -25,5 +25,5 @@ output:
     x.y: any
   end of pipeline
     x: number
-    x.y: any
+    x.y: missing
 

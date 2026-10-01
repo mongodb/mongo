@@ -3775,8 +3775,7 @@ TEST_F(PipelineDependencyGraphTest, CanPathBeArrayNotArrayTypePredicate) {
     runTest([&] {
         ASSERT_TRUE(graph->canPathBeArray(stages[0].get(), "x"));
         ASSERT_FALSE(graph->canPathBeArray(nullptr, "x"));
-        // TODO(SERVER-135481) We should be able to determine that this is not an array.
-        ASSERT_TRUE(graph->canPathBeArray(nullptr, "x.y"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "x.y"));
     });
 }
 
@@ -3850,6 +3849,68 @@ TEST_F(PipelineDependencyGraphTest, GetTypeSkipsMatchOnUnrelatedDeclaredField) {
                   (Stages{stages[2].get(), stages[3].get()}));
         ASSERT_EQ(graph->getPossiblyNarrowingStages_forTest(nullptr, "z"),
                   (Stages{stages[3].get(), stages[4].get()}));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeOfDottedPathConsidersMatchesOnPrefix) {
+    setPipeline(R"([
+        {$set: {x: '$b', y: '$c'}},
+        {$match: {x: {$not: {$type: 'array'}}}},
+        {$match: {y: {$type: 'number'}}}
+    ])");
+    runTest([&] {
+        ASSERT_EQ(graph->getPossiblyNarrowingStages_forTest(nullptr, "x.a"),
+                  (Stages{stages[1].get()}));
+        ASSERT_EQ(graph->getPossiblyNarrowingStages_forTest(nullptr, "y.a.b"),
+                  (Stages{stages[2].get()}));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeConsidersMatchesOnPathAndItsPrefixes) {
+    setPipeline(R"([
+        {$set: {'x.y.z': '$a'}},
+        {$match: {'x.y.z': {$type: 'number'}}},
+        {$match: {'x.y': {$type: 'object'}}},
+        {$match: {x: {$type: 'object'}}}
+    ])");
+    runTest([&] {
+        ASSERT_EQ(graph->getPossiblyNarrowingStages_forTest(nullptr, "x.y.z"),
+                  (Stages{stages[1].get(), stages[2].get(), stages[3].get()}));
+    });
+}
+
+// TODO(SERVER-135797): A $match on any path under 'x' may narrow the type of 'x' and its subpaths,
+// so none of these stages should be skipped.
+TEST_F(PipelineDependencyGraphTest, GetTypeSkipsMatchesOnSubpathsAndSiblings) {
+    setPipeline(R"([
+        {$set: {'x.y': '$a', 'x.z': '$b'}},
+        {$match: {'x.y': {$type: 'number'}}},
+        {$match: {'x.z': {$type: 'number'}}},
+        {$match: {x: {$type: 'object'}}}
+    ])");
+    runTest([&] {
+        // In reality, all three $match stages can help us narrow down the type of 'x'.
+        ASSERT_EQ(graph->getPossiblyNarrowingStages_forTest(nullptr, "x"),
+                  (Stages{stages[3].get()}));
+        ASSERT_EQ(graph->getPossiblyNarrowingStages_forTest(nullptr, "x.y"),
+                  (Stages{stages[1].get(), stages[3].get()}));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetTypeConsidersMatchesOnIndexedPaths) {
+    setPipeline(R"([
+        {$set: {'x.y': '$a', w: '$b'}},
+        {$match: {'x.0.y': {$type: 'number'}}},
+        {$match: {'x.0': {$type: 'number'}}},
+        {$match: {'w.0': {$type: 'number'}}}
+    ])");
+    runTest([&] {
+        // A $match on a path with an array index depends on the prefix before the index, i.e. 'x'.
+        for (auto&& path : {"x", "x.y", "x.0", "x.0.y"}) {
+            ASSERT_EQ(graph->getPossiblyNarrowingStages_forTest(nullptr, path),
+                      (Stages{stages[1].get(), stages[2].get()}))
+                << path;
+        }
     });
 }
 

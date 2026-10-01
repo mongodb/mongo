@@ -440,6 +440,11 @@ void updateMetadataForConstant(FieldMetadata& metadata, const Value& value) {
     metadata.knownToBeMissing = false;
 }
 
+/// Returns an iterator consisting of the individual path components that make up 'path'.
+auto splitPath(PathRef path) {
+    return absl::StrSplit(path, absl::ByChar('.'));
+}
+
 /**
  * Extracts the remaining suffix from a dotted path string after skipping 'count' path components.
  */
@@ -759,18 +764,20 @@ public:
     }
 
     Type getType(const DocumentSource* ds, PathRef path) const {
-        Type result = Type::any();
+        // We first infer type of the whole top-level document and then resolve the type of the
+        // requested path against the result.
+        Type result = Type::anyObject();
         forEachPossiblyNarrowingStage(ds, path, [&](const DocumentSourceMatch& match) {
-            // The initial type describes the top-level document.
-            Type current = ts::narrowType(Type::anyObject(), match.getMatchExpression(), true);
-            if (!current.isNever()) {
-                current = ts::resolveFieldAccess(std::move(current), path);
-            }
-
-            result = ts::intersectType(std::move(result), std::move(current));
+            result = ts::narrowType(std::move(result), match.getMatchExpression(), true);
             return !result.isNever();
         });
 
+        for (auto field : splitPath(path)) {
+            if (result.isNever()) {
+                break;
+            }
+            result = ts::resolveFieldAccess(std::move(result), field);
+        }
         return result;
     }
 
@@ -783,10 +790,6 @@ public:
     void forEachPossiblyNarrowingStage(const DocumentSource* ds,
                                        PathRef path,
                                        const Callback& cb) const {
-        // TODO SERVER-135481: Handle dotted paths.
-        if (path.find('.') != PathRef::npos) {
-            return;
-        }
         // We need to determine the range of relevant stages. Any $match within this range may allow
         // us to constrain the set of possible types.
         //
@@ -795,22 +798,37 @@ public:
         if (!end) {
             return;
         }
+
+        FieldList fullPath;
+        const auto [leaf, _] = lookupField(_stages[end].scope, parsePath(path), &fullPath);
+        fullPath.push_back(leaf);
+
         // The start of the range is the stage right after the stage that last modified the given
         // path.
-        const auto [field, _] = lookupField(_stages[end].scope, parsePath(path));
+        const FieldId topLevelFieldId = fullPath.front();
         const StageId start = [&]() {
-            if (!field) {
+            if (!topLevelFieldId) {
                 return StageId{0};
             }
-            ScopeId declaringScope = _fields[field].declaringScope;
+            ScopeId declaringScope = _fields[topLevelFieldId].declaringScope;
             return StageId{_scopes[declaringScope].stage.value + 1};
         }();
+
+        // We skip any stage that doesn't depend on the given path.
+        const auto dependsOnPath = [&](const Stage& stage) {
+            for (auto&& field : fullPath) {
+                if (stage.dependencies.contains(field)) {
+                    return true;
+                }
+            }
+            return false;
+        };
 
         for (StageId stageId = start; stageId <= end; stageId.value++) {
             const Stage& stage = _stages[stageId];
             const auto* source = stage.documentSource.get();
             const auto* match = dynamic_cast<const DocumentSourceMatch*>(source);
-            if (match && stage.dependencies.contains(field) && !cb(*match)) {
+            if (match && dependsOnPath(stage) && !cb(*match)) {
                 return;
             }
         }
@@ -2281,7 +2299,7 @@ private:
      */
     ParsedPath internPath(PathRef path) {
         ParsedPath vec;
-        for (auto s : absl::StrSplit(path, absl::ByChar('.'))) {
+        for (auto s : splitPath(path)) {
             vec.push_back(_strings.intern({s.begin(), s.end()}));
         }
         return vec;
@@ -2293,8 +2311,7 @@ private:
      */
     ParsedPath parsePath(PathRef path) const {
         ParsedPath vec;
-
-        for (auto s : absl::StrSplit(path, absl::ByChar('.'))) {
+        for (auto s : splitPath(path)) {
             auto id = _strings.lookup({s.begin(), s.end()});
             vec.push_back(id);
         }

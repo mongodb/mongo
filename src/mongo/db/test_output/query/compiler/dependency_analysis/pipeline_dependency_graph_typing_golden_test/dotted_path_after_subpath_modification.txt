@@ -1,4 +1,4 @@
-VARIATION ContradictingMatchesYieldNever
+VARIATION DottedPathAfterSubpathModification
 input: {
     "pipeline": [
         {
@@ -11,16 +11,16 @@ input: {
         {
             "$match": {
                 "x": {
-                    "$type": "string"
+                    "$not": {
+                        "$type": "array"
+                    }
                 }
             }
         },
         {
-            "$match": {
+            "$set": {
                 "x": {
-                    "$not": {
-                        "$type": "array"
-                    }
+                    "y": "$a"
                 }
             }
         }
@@ -28,12 +28,12 @@ input: {
 }
 output:
   after $match:0
-    x: number|array(S)
     x.y: any
+    x.y.z: any
   after $match:1
-    x: array(S)
-    x.y: any
+    x.y: missing
+    x.y.z: missing
   end of pipeline
-    x: never
-    x.y: never
+    x.y: any
+    x.y.z: any
 
