@@ -699,7 +699,7 @@ TEST(BSONValidateFast, InvalidObjectWithInvalidSizeInNestedObjectWithId) {
     const Status status = validateBSON(x);
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(status.reason(),
-                  "Nested BSON object has to be at least 5 bytes (decoded length: 4) in element "
+                  "Nested BSON object has to be at least 5 bytes: decoded length 4 in element "
                   "with field name 'nested.2.invalid' in object with _id: 1");
 }
 
@@ -713,7 +713,7 @@ TEST(BSONValidateFast, InvalidObjectWithZeroSizeInNestedObjectWithId) {
     const Status status = validateBSON(x);
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(status.reason(),
-                  "Nested BSON object has to be at least 5 bytes (decoded length: 0) in element "
+                  "Nested BSON object has to be at least 5 bytes: decoded length 0 in element "
                   "with field name 'nested.2.invalid' in object with _id: 1");
 }
 
@@ -727,7 +727,7 @@ TEST(BSONValidateFast, InvalidObjectWithNegativeSizeInNestedObjectWithId) {
     const Status status = validateBSON(x);
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(status.reason(),
-                  "Nested BSON object has to be at least 5 bytes (decoded length: -999) in element "
+                  "Nested BSON object has to be at least 5 bytes: decoded length -999 in element "
                   "with field name 'nested.2.invalid' in object with _id: 1");
 }
 
@@ -741,7 +741,7 @@ TEST(BSONValidateFast, InvalidObjectWithNegativeSizeInNestedObjectWithIdWithoutA
     const Status status = validateBSON(x);
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(status.reason(),
-                  "Nested BSON object has to be at least 5 bytes (decoded length: -888) in element "
+                  "Nested BSON object has to be at least 5 bytes: decoded length -888 in element "
                   "with field name 'nested.invalid' in object with _id: 1");
 }
 
@@ -754,7 +754,7 @@ TEST(BSONValidateFast, InvalidObjectWithNegativeSizeInNestedObjectWithIdTopLevel
     const Status status = validateBSON(x);
     ASSERT_NOT_OK(status);
     ASSERT_EQUALS(status.reason(),
-                  "Nested BSON object has to be at least 5 bytes (decoded length: -777) in element "
+                  "Nested BSON object has to be at least 5 bytes: decoded length -777 in element "
                   "with field name 'invalid' in object with _id: 1");
 }
 

@@ -90,10 +90,42 @@ static constexpr const char* kBSONValidationNonConformantReason =
 static constexpr const char* kBSONValidationObjectTooLargeReason =
     "Detected one or more documents in this collection exceeding BSON object size limit. For more "
     "info, see logs with log id 10869900";
-static constexpr char kOutOfOrderDocumentError[] = "Detected out-of-order documents. See logs.";
-static constexpr char kInvalidDocumentError[] = "Detected one or more invalid documents. See logs.";
+static constexpr char kOutOfOrderDocumentError[] =
+    "Detected out-of-order documents. For more info, see logs with log id 12890000.";
+static constexpr char kInvalidDocumentError[] =
+    "Detected one or more invalid documents. For more info, see logs with log id 4835001.";
 static constexpr char kNotEnoughSpaceToReportCorruptionWarning[] =
     "Not all corrupted records are listed due to size limitations.";
+
+// Builds the disambiguated, low-cardinality warning for a NonConformantBSON validation failure.
+// validateBSON() passes back a fixed, data-free description of the specific failing check
+// out-of-band via 'description'; when present it is surfaced so the different ways a document can
+// be non-conformant are distinguishable from the results alone, without grepping the per-document
+// log entry (6825900).
+std::string _describeBSONNonConformantResult(const boost::optional<std::string>& description) {
+    if (description) {
+        return fmt::format(
+            "Detected one or more documents in this collection not conformant to BSON "
+            "specifications: {}. For more info, see logs with log id 6825900",
+            *description);
+    }
+    return kBSONValidationNonConformantReason;
+}
+
+// Builds the disambiguated error message for a BSON validation failure that returns from
+// validateRecord (the 12395400 path: InvalidBSON, InvalidBSONColumn, and generic codes such as
+// Overflow). The specific failing check is passed back from validateBSON() out-of-band via
+// 'description', a fixed, data-free string: the results say only which check failed. The status'
+// own reason is deliberately not used here, as it carries per-document data (observed lengths, the
+// offending element's field path, and the document's _id); that detail belongs in the 12395400 log
+// entry only.
+std::string _describeBSONValidationError(const Status& status,
+                                         const boost::optional<std::string>& description) {
+    return fmt::format(
+        "BSON validation failed with error '{}': {}. For more info, see logs with log id 12395400",
+        ErrorCodes::errorString(status.code()),
+        description.value_or("uncategorized validation failure"));
+}
 
 const char* _describeDocumentValidationResult(Collection::DocumentValidationResult cvr) {
     using NCR = Collection::DocumentValidationResult::NonComplianceReason;
@@ -403,13 +435,14 @@ auto ValidateAdaptor::validateRecord(OperationContext* opCtx,
     bool compliantDocument{true};
     bool validDocument{true};
     {
+        boost::optional<std::string> bsonValidationDescription;
         const Status bsonValidationStatus = validateBSON(record.data.data(),
                                                          record.data.size(),
                                                          _validateState->getBSONValidateMode(),
-                                                         validationVersion);
+                                                         validationVersion,
+                                                         &bsonValidationDescription);
 
         if (!bsonValidationStatus.isOK()) {
-            bool includeReason{false};
             switch (bsonValidationStatus.code()) {
                 case ErrorCodes::NonConformantBSON:
                     LOGV2_WARNING_OPTIONS(6825900,
@@ -418,28 +451,20 @@ auto ValidateAdaptor::validateRecord(OperationContext* opCtx,
                                           "recordId"_attr = record.id,
                                           "reason"_attr = bsonValidationStatus);
                     compliantDocument = false;
-                    results.addWarning(kBSONValidationNonConformantReason);
+                    results.addWarning(_describeBSONNonConformantResult(bsonValidationDescription));
                     break;
-                case ErrorCodes::InvalidBSONColumn:
-                    // For these cases, include the reason with the validation results, the
-                    // cardinality of reasons is bounded.  For other error messages, keep these
-                    // separate.
-                    includeReason = true;
-                    [[fallthrough]];
                 default:
+                    // The failing check is named in the returned error message via the
+                    // description passed back out-of-band, so the message stays bounded rather
+                    // than embedding per-document data.
                     LOGV2_ERROR_OPTIONS(12395400,
                                         {logv2::LogTruncation::Disabled},
                                         "Error occurred during BSON validation",
                                         "recordId"_attr = record.id,
                                         "reason"_attr = bsonValidationStatus);
                     return {.status = bsonValidationStatus,
-                            .errorMessage = fmt::format(
-                                "BSON validation failed with error '{}'{}. For more info, "
-                                "see logs "
-                                "with log id 12395400",
-                                ErrorCodes::errorString(bsonValidationStatus.code()),
-                                includeReason ? fmt::format(": {}", bsonValidationStatus.reason())
-                                              : std::string("")),
+                            .errorMessage = _describeBSONValidationError(bsonValidationStatus,
+                                                                         bsonValidationDescription),
                             .compliantDocument = compliantDocument,
                             .validDocument = validDocument};
             }
@@ -1033,6 +1058,13 @@ auto ValidateAdaptor::traverseRecordStoreImpl(OperationContext* opCtx,
             // duplicated here as well.
             if ((prevRecordId.isValid() && prevRecordId > record->id) ||
                 MONGO_unlikely(failRecordStoreTraversal.shouldFail())) {
+                LOGV2_ERROR_OPTIONS(12890000,
+                                    {logv2::LogTruncation::Disabled},
+                                    "Document corruption details - Detected out-of-order document "
+                                    "during record store traversal",
+                                    logAttrs(_validateState->nss()),
+                                    "prevRecordId"_attr = prevRecordId,
+                                    "recordId"_attr = record->id);
                 results.validateResults.addError(kOutOfOrderDocumentError);
             }
 
@@ -1222,7 +1254,8 @@ auto ValidateAdaptor::traverseRecordStoreImpl(OperationContext* opCtx,
                                 "recordId"_attr = record->id,
                                 "collectionUUID"_attr = coll->uuid(),
                                 "record"_attr = record->data.toBson(),
-                                "reason"_attr = description);
+                                "reason"_attr = description,
+                                "status"_attr = schemaValidationStatus);
                             results.validateResults.addError(description);
                         } else {
                             LOGV2_WARNING_OPTIONS(
@@ -1231,7 +1264,8 @@ auto ValidateAdaptor::traverseRecordStoreImpl(OperationContext* opCtx,
                                 "Document is not compliant with the collection's schema",
                                 logAttrs(coll->ns()),
                                 "recordId"_attr = record->id,
-                                "reason"_attr = description);
+                                "reason"_attr = description,
+                                "status"_attr = schemaValidationStatus);
                             results.validateResults.addWarning(description);
                         }
                         break;
