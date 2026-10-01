@@ -1,6 +1,8 @@
 /**
  * Smoke tests for v2 collection-level change streams, ignoreRemovedShards mode in a sharded
- * cluster.
+ * cluster. Also asserts the 'changeStreams.shardTargeting' serverStatus metrics recorded while
+ * draining the stream (state-machine entries, the degraded gauge staying balanced, control events,
+ * and placement-history lookups).
  *
  * @tags: [
  *   # Whitebox test tied to collection-scope removed-shard bookkeeping; breaks once upconverted.
@@ -39,6 +41,10 @@ import {
     withBalancerEnabled,
 } from "jstests/libs/query/change_stream_util.js";
 import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
+import {
+    readShardTargetingDelta,
+    ServerStatusMetrics,
+} from "jstests/libs/query/change_stream_metrics_util.js";
 
 describe("$changeStream v2, ignoreRemovedShards mode", function () {
     let st;
@@ -323,36 +329,51 @@ describe("$changeStream v2, ignoreRemovedShards mode", function () {
             true,
         );
 
-        // Open a change stream and compare the events.
-        csTest = new ChangeStreamTest(db);
-        const csCursor = csTest.startWatchingChanges({
-            pipeline: [
-                {
-                    $changeStream: {
-                        version: "v2",
-                        ignoreRemovedShards: true,
-                        startAtOperationTime,
+        // Open a change stream and compare the events. The metrics window spans cursor
+        // establishment through the drain: the topology-handler stage enters degraded mode while
+        // establishing the first bounded segment over the removed shard (the cursor is opened with
+        // a default batchSize, so the pipeline runs before the first batch returns) and exits it
+        // during the drain, so the degraded gauge must end balanced at its starting value.
+        const drainDelta = ServerStatusMetrics.withServerStatusMetrics(db, () => {
+            csTest = new ChangeStreamTest(db);
+            const csCursor = csTest.startWatchingChanges({
+                pipeline: [
+                    {
+                        $changeStream: {
+                            version: "v2",
+                            ignoreRemovedShards: true,
+                            startAtOperationTime,
+                        },
                     },
-                },
-            ],
-            collection: coll,
-        });
+                ],
+                collection: coll,
+            });
 
-        // Read events until invalidation. We only expect to see events from shard1 and shard2.
-        csTest.assertNextChangesEqual({
-            cursor: csCursor,
-            expectedChanges: [
-                buildExpectedInsertEvent(st.shard1, {_id: 1, a: 1}, {_id: 1}),
-                buildExpectedInsertEvent(st.shard1, {_id: 3, a: -1}),
-                buildExpectedInsertEvent(st.shard2, {_id: 2, a: 2}),
-                buildExpectedInsertEvent(st.shard2, {_id: 4, a: 1}),
-                buildExpectedInsertEvent(st.shard1, {_id: -2, a: -2}),
-                buildExpectedEventForNamespace("drop"),
-                buildExpectedEventWithoutNamespace("invalidate"),
-            ],
-        });
+            // Read events until invalidation. We only expect to see events from shard1 and shard2.
+            csTest.assertNextChangesEqual({
+                cursor: csCursor,
+                expectedChanges: [
+                    buildExpectedInsertEvent(st.shard1, {_id: 1, a: 1}, {_id: 1}),
+                    buildExpectedInsertEvent(st.shard1, {_id: 3, a: -1}),
+                    buildExpectedInsertEvent(st.shard2, {_id: 2, a: 2}),
+                    buildExpectedInsertEvent(st.shard2, {_id: 4, a: 1}),
+                    buildExpectedInsertEvent(st.shard1, {_id: -2, a: -2}),
+                    buildExpectedEventForNamespace("drop"),
+                    buildExpectedEventWithoutNamespace("invalidate"),
+                ],
+            });
 
-        csTest.assertNoChange(csCursor);
+            csTest.assertNoChange(csCursor);
+        });
+        const drainMetrics = readShardTargetingDelta(drainDelta);
+        assert.gte(drainMetrics.topologyState.fetchingDegradedGettingChangeEvent, 1, {
+            drainMetrics,
+        });
+        assert.gte(drainMetrics.topologyState.fetchingNormalGettingChangeEvent, 1, {drainMetrics});
+        assert.eq(drainMetrics.topologyState.final, 1, {drainMetrics});
+        // Degraded mode was entered and exited within the window: the gauge must be balanced.
+        assert.eq(drainMetrics.degraded, 0, {drainMetrics});
+        assert.gte(drainMetrics.placementHistoryLookup.ok, 1, {drainMetrics});
     });
 
     it("returns events in ignoreRemovedShards mode after multiple shards have been removed", () => {
@@ -382,33 +403,45 @@ describe("$changeStream v2, ignoreRemovedShards mode", function () {
             true,
         );
 
-        // Open a change stream and compare the events.
-        csTest = new ChangeStreamTest(db);
-        const csCursor = csTest.startWatchingChanges({
-            pipeline: [
-                {
-                    $changeStream: {
-                        version: "v2",
-                        ignoreRemovedShards: true,
-                        startAtOperationTime,
+        // Open a change stream and compare the events, wrapped as in the previous test: the
+        // topology-handler stage enters degraded mode establishing the bounded segment over the
+        // removed shards and exits it during the drain, so the degraded gauge ends balanced.
+        const drainDelta = ServerStatusMetrics.withServerStatusMetrics(db, () => {
+            csTest = new ChangeStreamTest(db);
+            const csCursor = csTest.startWatchingChanges({
+                pipeline: [
+                    {
+                        $changeStream: {
+                            version: "v2",
+                            ignoreRemovedShards: true,
+                            startAtOperationTime,
+                        },
                     },
-                },
-            ],
-            collection: coll,
-        });
+                ],
+                collection: coll,
+            });
 
-        // Read events until invalidation. We only expect to see events from shard2.
-        csTest.assertNextChangesEqual({
-            cursor: csCursor,
-            expectedChanges: [
-                buildExpectedInsertEvent(st.shard2, {_id: 2, a: 2}),
-                buildExpectedInsertEvent(st.shard2, {_id: 4, a: 1}),
-                buildExpectedEventForNamespace("drop"),
-                buildExpectedEventWithoutNamespace("invalidate"),
-            ],
-        });
+            // Read events until invalidation. We only expect to see events from shard2.
+            csTest.assertNextChangesEqual({
+                cursor: csCursor,
+                expectedChanges: [
+                    buildExpectedInsertEvent(st.shard2, {_id: 2, a: 2}),
+                    buildExpectedInsertEvent(st.shard2, {_id: 4, a: 1}),
+                    buildExpectedEventForNamespace("drop"),
+                    buildExpectedEventWithoutNamespace("invalidate"),
+                ],
+            });
 
-        csTest.assertNoChange(csCursor);
+            csTest.assertNoChange(csCursor);
+        });
+        const drainMetrics = readShardTargetingDelta(drainDelta);
+        assert.gte(drainMetrics.topologyState.fetchingDegradedGettingChangeEvent, 1, {
+            drainMetrics,
+        });
+        assert.gte(drainMetrics.topologyState.fetchingNormalGettingChangeEvent, 1, {drainMetrics});
+        assert.eq(drainMetrics.topologyState.final, 1, {drainMetrics});
+        assert.eq(drainMetrics.degraded, 0, {drainMetrics});
+        assert.gte(drainMetrics.placementHistoryLookup.ok, 1, {drainMetrics});
     });
 
     it("returns events in ignoreRemovedShards mode after shard has been removed, showExpandedEvents", () => {
@@ -426,40 +459,51 @@ describe("$changeStream v2, ignoreRemovedShards mode", function () {
         // Execute the operations on the collection and then remove shard2.
         executeCollectionOperations([st.shard2], () => {}, true);
 
-        // Open a change stream and compare the events.
-        csTest = new ChangeStreamTest(db);
-        const csCursor = csTest.startWatchingChanges({
-            pipeline: [
-                {
-                    $changeStream: {
-                        version: "v2",
-                        ignoreRemovedShards: true,
-                        showExpandedEvents: true,
-                        startAtOperationTime,
+        // Open a change stream and compare the events, wrapped as in the first test: entering and
+        // exiting degraded mode across the drain leaves the gauge balanced.
+        const drainDelta = ServerStatusMetrics.withServerStatusMetrics(db, () => {
+            csTest = new ChangeStreamTest(db);
+            const csCursor = csTest.startWatchingChanges({
+                pipeline: [
+                    {
+                        $changeStream: {
+                            version: "v2",
+                            ignoreRemovedShards: true,
+                            showExpandedEvents: true,
+                            startAtOperationTime,
+                        },
                     },
-                },
-            ],
-            collection: coll,
-        });
+                ],
+                collection: coll,
+            });
 
-        // Read events until invalidation. We only expect to see events from shard0 and shard1.
-        csTest.assertNextChangesEqual({
-            cursor: csCursor,
-            expectedChanges: [
-                buildExpectedEventForNamespace("create"),
-                buildExpectedEventForNamespace("shardCollection"),
-                buildExpectedInsertEvent(st.shard0, {_id: -1, a: -1}, {_id: -1}),
-                buildExpectedInsertEvent(st.shard1, {_id: 1, a: 1}, {_id: 1}),
-                buildExpectedInsertEvent(st.shard0, {_id: -3, a: -3}, {_id: -3}),
-                buildExpectedEventForNamespace("reshardCollection"),
-                buildExpectedInsertEvent(st.shard1, {_id: 3, a: -1}),
-                buildExpectedInsertEvent(st.shard1, {_id: -2, a: -2}),
-                buildExpectedEventForNamespace("drop"),
-                buildExpectedEventWithoutNamespace("invalidate"),
-            ],
-        });
+            // Read events until invalidation. We only expect to see events from shard0 and shard1.
+            csTest.assertNextChangesEqual({
+                cursor: csCursor,
+                expectedChanges: [
+                    buildExpectedEventForNamespace("create"),
+                    buildExpectedEventForNamespace("shardCollection"),
+                    buildExpectedInsertEvent(st.shard0, {_id: -1, a: -1}, {_id: -1}),
+                    buildExpectedInsertEvent(st.shard1, {_id: 1, a: 1}, {_id: 1}),
+                    buildExpectedInsertEvent(st.shard0, {_id: -3, a: -3}, {_id: -3}),
+                    buildExpectedEventForNamespace("reshardCollection"),
+                    buildExpectedInsertEvent(st.shard1, {_id: 3, a: -1}),
+                    buildExpectedInsertEvent(st.shard1, {_id: -2, a: -2}),
+                    buildExpectedEventForNamespace("drop"),
+                    buildExpectedEventWithoutNamespace("invalidate"),
+                ],
+            });
 
-        csTest.assertNoChange(csCursor);
+            csTest.assertNoChange(csCursor);
+        });
+        const drainMetrics = readShardTargetingDelta(drainDelta);
+        assert.gte(drainMetrics.topologyState.fetchingDegradedGettingChangeEvent, 1, {
+            drainMetrics,
+        });
+        assert.gte(drainMetrics.topologyState.fetchingNormalGettingChangeEvent, 1, {drainMetrics});
+        assert.eq(drainMetrics.topologyState.final, 1, {drainMetrics});
+        assert.eq(drainMetrics.degraded, 0, {drainMetrics});
+        assert.gte(drainMetrics.placementHistoryLookup.ok, 1, {drainMetrics});
     });
 
     it("returns only new events in ignoreRemovedShards mode after all original shards were decommissioned", () => {
@@ -502,7 +546,9 @@ describe("$changeStream v2, ignoreRemovedShards mode", function () {
 
                 jsTest.log.info(`Added new shard: ${newShard.shardName}`);
 
-                // Make the new shard the primary for the database.
+                // Make the new shard the primary for the database. No change stream is open yet at
+                // this point, so this is not observed by any targeter and does not increment the
+                // movePrimary control-event counter.
                 assert.commandWorked(
                     st.s.adminCommand({
                         movePrimary: coll.getDB().getName(),
@@ -527,22 +573,27 @@ describe("$changeStream v2, ignoreRemovedShards mode", function () {
         extraReplicaSetsToRemove.push(newShard);
 
         // Open a change stream and compare the events.
-        csTest = new ChangeStreamTest(db);
-        const csCursor = csTest.startWatchingChanges({
-            pipeline: [
-                {
-                    $changeStream: {
-                        version: "v2",
-                        ignoreRemovedShards: true,
-                        startAtOperationTime,
+        let csCursor;
+        const openDelta = ServerStatusMetrics.withServerStatusMetrics(db, () => {
+            csTest = new ChangeStreamTest(db);
+            csCursor = csTest.startWatchingChanges({
+                pipeline: [
+                    {
+                        $changeStream: {
+                            version: "v2",
+                            ignoreRemovedShards: true,
+                            startAtOperationTime,
+                        },
                     },
-                },
-            ],
-            collection: coll,
-        });
+                ],
+                collection: coll,
+            });
 
-        // There should be no events returned since all original shards have been decommissioned.
-        csTest.assertNoChange(csCursor);
+            // There should be no events returned since all original shards have been decommissioned.
+            csTest.assertNoChange(csCursor);
+        });
+        const openMetrics = readShardTargetingDelta(openDelta);
+        assert.gte(openMetrics.placementHistoryLookup.ok, 1, {openMetrics});
 
         // Insert a few documents on the just-added shard.
         insertDocumentOnShard({_id: 6, a: 6}, newShard);
@@ -586,7 +637,9 @@ describe("$changeStream v2, ignoreRemovedShards mode", function () {
         assertDropCollection(db, coll.getName());
 
         // Move the database primary to shard3 to allow removing shard0, then remove shard0. After
-        // removal, shard0's oplog (including all events above) is no longer accessible.
+        // removal, shard0's oplog (including all events above) is no longer accessible. No change
+        // stream is open yet at this point, so this movePrimary is not observed by any targeter and
+        // does not increment the movePrimary control-event counter.
         withBalancerEnabled(st.s, () => {
             assert.commandWorked(
                 st.s.adminCommand({
@@ -603,23 +656,27 @@ describe("$changeStream v2, ignoreRemovedShards mode", function () {
         // Open a retroactive collection-level change stream on the dropped collection.
         const comment = "only_shard_removed";
         csTest = new ChangeStreamTest(db);
-        const csCursor = csTest.startWatchingChanges({
-            pipeline: [
-                {
-                    $changeStream: {
-                        version: "v2",
-                        ignoreRemovedShards: true,
-                        startAtOperationTime,
+        let csCursor;
+        const openDelta = ServerStatusMetrics.withServerStatusMetrics(db, () => {
+            csCursor = csTest.startWatchingChanges({
+                pipeline: [
+                    {
+                        $changeStream: {
+                            version: "v2",
+                            ignoreRemovedShards: true,
+                            startAtOperationTime,
+                        },
                     },
-                },
-            ],
-            collection: coll,
-            aggregateOptions: {comment, cursor: {batchSize: 0}},
-        });
+                ],
+                collection: coll,
+                aggregateOptions: {comment, cursor: {batchSize: 0}},
+            });
 
-        // No events should be observed. All events (inserts, drop) occurred on shard0, which has
-        // been removed. Since the drop event is not visible, no invalidate event is synthesized.
-        csTest.assertNoChange(csCursor);
+            // No events should be observed. All events (inserts, drop) occurred on shard0, which has
+            // been removed. Since the drop event is not visible, no invalidate event is synthesized.
+            csTest.assertNoChange(csCursor);
+        });
+        assert.gte(readShardTargetingDelta(openDelta).placementHistoryLookup.ok, 1, {openDelta});
 
         // The collection is not present, so we expect only its primary shard to be tracked.
         assertOpenCursors(
@@ -699,29 +756,33 @@ describe("$changeStream v2, ignoreRemovedShards mode", function () {
         // Open a retroactive change stream on the dropped collection.
         const comment = "last_shard_removed";
         csTest = new ChangeStreamTest(db);
-        const csCursor = csTest.startWatchingChanges({
-            pipeline: [
-                {
-                    $changeStream: {
-                        version: "v2",
-                        ignoreRemovedShards: true,
-                        startAtOperationTime,
+        let csCursor;
+        const openDelta = ServerStatusMetrics.withServerStatusMetrics(db, () => {
+            csCursor = csTest.startWatchingChanges({
+                pipeline: [
+                    {
+                        $changeStream: {
+                            version: "v2",
+                            ignoreRemovedShards: true,
+                            startAtOperationTime,
+                        },
                     },
-                },
-            ],
-            collection: coll.getName(),
-            aggregateOptions: {comment, cursor: {batchSize: 0}},
-        });
+                ],
+                collection: coll.getName(),
+                aggregateOptions: {comment, cursor: {batchSize: 0}},
+            });
 
-        csTest.assertNextChangesEqual({
-            cursor: csCursor,
-            expectedChanges: [
-                buildExpectedInsertEvent(st.shard0, {_id: 0, a: 0}, {_id: 0}),
-                buildExpectedInsertEvent(st.shard0, {_id: 1, a: 1}, {_id: 1}),
-            ],
-        });
+            csTest.assertNextChangesEqual({
+                cursor: csCursor,
+                expectedChanges: [
+                    buildExpectedInsertEvent(st.shard0, {_id: 0, a: 0}, {_id: 0}),
+                    buildExpectedInsertEvent(st.shard0, {_id: 1, a: 1}, {_id: 1}),
+                ],
+            });
 
-        csTest.assertNoChange(csCursor);
+            csTest.assertNoChange(csCursor);
+        });
+        assert.gte(readShardTargetingDelta(openDelta).placementHistoryLookup.ok, 1, {openDelta});
 
         assertOpenCursors(
             st,
@@ -736,24 +797,31 @@ describe("$changeStream v2, ignoreRemovedShards mode", function () {
         const startAtOperationTime = getClusterTime(db);
 
         // Open a change stream on a non-existing collection in ignoreRemovedShards mode from the
-        // original start point, and assume that there are no events.
+        // original start point, and assume that there are no events. The never-existing
+        // collection's database installs the db-absent targeter state.
         const comment = "non_existing_collection";
         csTest = new ChangeStreamTest(db);
-        const csCursor = csTest.startWatchingChanges({
-            pipeline: [
-                {
-                    $changeStream: {
-                        version: "v2",
-                        ignoreRemovedShards: true,
-                        startAtOperationTime,
+        let csCursor;
+        const openDelta = ServerStatusMetrics.withServerStatusMetrics(db, () => {
+            csCursor = csTest.startWatchingChanges({
+                pipeline: [
+                    {
+                        $changeStream: {
+                            version: "v2",
+                            ignoreRemovedShards: true,
+                            startAtOperationTime,
+                        },
                     },
-                },
-            ],
-            collection: coll.getName(),
-            aggregateOptions: {comment, cursor: {batchSize: 0}},
-        });
+                ],
+                collection: coll.getName(),
+                aggregateOptions: {comment, cursor: {batchSize: 0}},
+            });
 
-        csTest.assertNoChange(csCursor);
+            csTest.assertNoChange(csCursor);
+        });
+        const openMetrics = readShardTargetingDelta(openDelta);
+        assert.eq(openMetrics.targeterScope.collection.dbAbsent, 1, {openMetrics});
+        assert.gte(openMetrics.placementHistoryLookup.ok, 1, {openMetrics});
 
         assertOpenCursors(st, [], /*expectedConfigCursor=*/ true, cursorCommentFilter(comment));
     });

@@ -8,6 +8,7 @@
 #include "mongo/db/pipeline/change_stream_reader_context.h"
 #include "mongo/db/pipeline/change_stream_shard_targeter.h"
 #include "mongo/db/pipeline/historical_placement_fetcher.h"
+#include "mongo/s/change_streams/change_stream_shard_targeter_metrics.h"
 #include "mongo/s/change_streams/change_stream_shard_targeter_state_event_handler.h"
 #include "mongo/util/modules.h"
 
@@ -24,8 +25,12 @@ namespace mongo {
 class ChangeStreamShardTargeterBase : public ChangeStreamShardTargeter,
                                       public ChangeStreamShardTargeterStateEventHandlingContext {
 public:
-    explicit ChangeStreamShardTargeterBase(std::unique_ptr<HistoricalPlacementFetcher> fetcher)
-        : _fetcher(std::move(fetcher)) {}
+    ChangeStreamShardTargeterBase(std::unique_ptr<HistoricalPlacementFetcher> fetcher,
+                                  ShardTargeterScopeMetricsRecorder scopeMetrics,
+                                  ShardTargeterControlEventMetricsRecorder controlEventMetrics)
+        : _fetcher(std::move(fetcher)),
+          _scopeMetrics(scopeMetrics),
+          _controlEventMetrics(controlEventMetrics) {}
 
     HistoricalPlacementFetcher& getHistoricalPlacementFetcher() const override;
 
@@ -93,6 +98,13 @@ private:
      * underlying collection/database. Set by the constructor and always present.
      */
     std::unique_ptr<HistoricalPlacementFetcher> _fetcher;
+
+    /**
+     * Metrics recorders for this targeter's scope (collection/database) and for control events;
+     * shared by all subclasses of this base class.
+     */
+    ShardTargeterScopeMetricsRecorder _scopeMetrics;
+    ShardTargeterControlEventMetricsRecorder _controlEventMetrics;
 };
 
 }  // namespace mongo

@@ -5,6 +5,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
+#include "mongo/db/exec/agg/change_stream_handle_topology_change_v2_metrics.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/global_catalog/type_shard.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
@@ -814,9 +815,15 @@ REGISTER_AGG_STAGE_MAPPING(_internalChangeStreamHandleTopologyChangeV2,
 
 ChangeStreamHandleTopologyChangeV2Stage::ChangeStreamHandleTopologyChangeV2Stage(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    std::shared_ptr<ChangeStreamHandleTopologyChangeV2Stage::Parameters> params)
+    std::shared_ptr<ChangeStreamHandleTopologyChangeV2Stage::Parameters> params,
+    ChangeStreamTopologyChangeV2MetricsRecorder metrics)
     : Stage(DocumentSourceChangeStreamHandleTopologyChangeV2::kStageName, expCtx),
-      _params(std::move(params)) {}
+      _params(std::move(params)),
+      _metrics(metrics) {}
+
+ChangeStreamHandleTopologyChangeV2Stage::~ChangeStreamHandleTopologyChangeV2Stage() {
+    _decrementDegradedIfCounted();
+}
 
 std::string_view ChangeStreamHandleTopologyChangeV2Stage::stateToString(
     ChangeStreamHandleTopologyChangeV2Stage::State state) {
@@ -1003,7 +1010,71 @@ void ChangeStreamHandleTopologyChangeV2Stage::_setState(
                 "changeStream"_attr = _params->changeStream,
                 "resumeTokenClusterTime"_attr = _params->resumeToken.clusterTime);
 
+    // Count the entry into the new state. Only reached for transitions that passed the validation
+    // above, so 'kUninitialized' (forbidden as a transition target) is never recorded.
+    _recordStateEntry(newState);
+
+    // Maintain the currently-degraded gauge: +1 when this stream enters degraded mode, -1 when it
+    // leaves. The validation above guarantees '_state != newState', so exactly one of the branches
+    // below can fire. '_degradedCounted' makes the adjustment idempotent across 'doDispose()' and
+    // any post-dispose transition.
+    if (newState == State::kFetchingDegradedGettingChangeEvent && !_degradedCounted) {
+        _metrics.incrementDegraded();
+        _degradedCounted = true;
+    } else if (_state == State::kFetchingDegradedGettingChangeEvent && _degradedCounted) {
+        _metrics.decrementDegraded();
+        _degradedCounted = false;
+    }
+
     _state = newState;
+}
+
+void ChangeStreamHandleTopologyChangeV2Stage::_recordStateEntry(State newState) const {
+    switch (newState) {
+        case State::kWaiting:
+            _metrics.waiting.add(1);
+            return;
+        case State::kFetchingInitialization:
+            _metrics.fetchingInitialization.add(1);
+            return;
+        case State::kFetchingGettingChangeEvent:
+            _metrics.fetchingGettingChangeEvent.add(1);
+            return;
+        case State::kFetchingStartingChangeStreamSegment:
+            _metrics.fetchingStartingChangeStreamSegment.add(1);
+            return;
+        case State::kFetchingNormalGettingChangeEvent:
+            _metrics.fetchingNormalGettingChangeEvent.add(1);
+            return;
+        case State::kFetchingDegradedGettingChangeEvent:
+            _metrics.fetchingDegradedGettingChangeEvent.add(1);
+            return;
+        case State::kDowngrading:
+            _metrics.downgrading.add(1);
+            return;
+        case State::kFinal:
+            _metrics.final.add(1);
+            return;
+        case State::kUninitialized:
+            // Transitions back to 'kUninitialized' are forbidden (tassert in _setState()).
+            break;
+    }
+    MONGO_UNREACHABLE_TASSERT(13565600);
+}
+
+void ChangeStreamHandleTopologyChangeV2Stage::doDispose() {
+    // A stage torn down while in degraded mode never leaves it via a state transition, so
+    // decrement the gauge here. '_decrementDegradedIfCounted()' guards against
+    // double-decrementing if a transition out of degraded mode already ran, or against disposing
+    // a non-degraded stage.
+    _decrementDegradedIfCounted();
+}
+
+void ChangeStreamHandleTopologyChangeV2Stage::_decrementDegradedIfCounted() {
+    if (_degradedCounted) {
+        _metrics.decrementDegraded();
+        _degradedCounted = false;
+    }
 }
 
 void ChangeStreamHandleTopologyChangeV2Stage::_assertState(

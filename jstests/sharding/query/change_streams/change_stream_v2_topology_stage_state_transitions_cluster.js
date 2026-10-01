@@ -35,6 +35,10 @@ import {
     CreateDatabaseCommand,
     ShardCollectionCommand,
 } from "jstests/libs/util/change_stream/change_stream_commands.js";
+import {
+    readShardTargetingDelta,
+    ServerStatusMetrics,
+} from "jstests/libs/query/change_stream_metrics_util.js";
 
 // String names produced by stateToString() and recorded in log attr.previous / attr.new.
 const S = Object.freeze({
@@ -152,15 +156,25 @@ describe("ChangeStreamHandleTopologyChangeV2Stage: state transitions", () => {
                 aggregateOptions: {comment, cursor: {batchSize: 0}},
             });
 
-            awaitV2StageStateTransitions(
-                st.s,
-                logOffset,
-                [
-                    {from: S.Uninitialized, to: S.FetchingInitialization},
-                    {from: S.FetchingInitialization, to: S.FetchingGettingChangeEvent},
-                ],
-                () => csTest.assertNoChange(csCursor),
-            );
+            const transitionsDelta = ServerStatusMetrics.withServerStatusMetrics(db, () => {
+                awaitV2StageStateTransitions(
+                    st.s,
+                    logOffset,
+                    [
+                        {from: S.Uninitialized, to: S.FetchingInitialization},
+                        {from: S.FetchingInitialization, to: S.FetchingGettingChangeEvent},
+                    ],
+                    () => csTest.assertNoChange(csCursor),
+                );
+            });
+            const transitionsMetrics = readShardTargetingDelta(transitionsDelta);
+            assert.eq(transitionsMetrics.topologyState.fetchingInitialization, 1, {
+                transitionsMetrics,
+            });
+            assert.eq(transitionsMetrics.topologyState.fetchingGettingChangeEvent, 1, {
+                transitionsMetrics,
+            });
+            assert.eq(transitionsMetrics.targeterScope.allDatabases, 1, {transitionsMetrics});
 
             assertOpenCursors(
                 st,
@@ -216,19 +230,35 @@ describe("ChangeStreamHandleTopologyChangeV2Stage: state transitions", () => {
                 aggregateOptions: {comment, cursor: {batchSize: 0}},
             });
 
-            awaitV2StageStateTransitions(
-                st.s,
-                logOffset,
-                [
-                    {from: S.Uninitialized, to: S.FetchingInitialization},
-                    {from: S.FetchingInitialization, to: S.FetchingStartingChangeStreamSegment},
-                    {
-                        from: S.FetchingStartingChangeStreamSegment,
-                        to: S.FetchingNormalGettingChangeEvent,
-                    },
-                ],
-                () => csTest.assertNoChange(csCursor),
-            );
+            const transitionsDelta = ServerStatusMetrics.withServerStatusMetrics(db, () => {
+                awaitV2StageStateTransitions(
+                    st.s,
+                    logOffset,
+                    [
+                        {from: S.Uninitialized, to: S.FetchingInitialization},
+                        {
+                            from: S.FetchingInitialization,
+                            to: S.FetchingStartingChangeStreamSegment,
+                        },
+                        {
+                            from: S.FetchingStartingChangeStreamSegment,
+                            to: S.FetchingNormalGettingChangeEvent,
+                        },
+                    ],
+                    () => csTest.assertNoChange(csCursor),
+                );
+            });
+            const transitionsMetrics = readShardTargetingDelta(transitionsDelta);
+            assert.eq(transitionsMetrics.topologyState.fetchingInitialization, 1, {
+                transitionsMetrics,
+            });
+            assert.eq(transitionsMetrics.topologyState.fetchingStartingChangeStreamSegment, 1, {
+                transitionsMetrics,
+            });
+            assert.eq(transitionsMetrics.topologyState.fetchingNormalGettingChangeEvent, 1, {
+                transitionsMetrics,
+            });
+            assert.eq(transitionsMetrics.targeterScope.allDatabases, 1, {transitionsMetrics});
 
             assertOpenCursors(
                 st,

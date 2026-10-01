@@ -1,7 +1,8 @@
 /**
  * White-box integration tests for database-level change stream v2 shard targeting in strict mode.
  * Verifies observable shard-targeting behavior: which shards have open cursors after each lifecycle
- * event, and that placement history is consulted at the right times.
+ * event, and that placement history is consulted at the right times. Also asserts that each
+ * lifecycle event is recorded in the 'changeStreams.shardTargeting' serverStatus metrics.
  *
  * Unlike the collection-level targeter, the database targeter delegates handleMoveChunk() to
  * handlePlacementRefresh() (full re-evaluation), so moveChunk events produce kPlacementRefresh
@@ -39,6 +40,10 @@ import {
     ReshardCollectionCommand,
     MovePrimaryCommand,
 } from "jstests/libs/util/change_stream/change_stream_commands.js";
+import {
+    readShardTargetingDelta,
+    ServerStatusMetrics,
+} from "jstests/libs/query/change_stream_metrics_util.js";
 
 const {
     kCollOrDbShardTargeterInitStrictMode: kInitStrictMode,
@@ -137,15 +142,22 @@ describe("database v2 strict whitebox", function () {
             aggregateOptions: {comment, cursor: {batchSize: 0}},
         });
 
-        awaitLogMessageCodes(st.s, [kInitStrictMode], () => csTest.assertNoChange(csCursor), {
-            [kInitStrictMode]: (attr) => assertExpectedShardsInLog(attr, 2),
+        // Opening the cursor consults the placement history and installs the db-present targeter
+        // state, both observable in the shard-targeting metrics on the mongos.
+        const initialDelta = ServerStatusMetrics.withServerStatusMetrics(db, () => {
+            awaitLogMessageCodes(st.s, [kInitStrictMode], () => csTest.assertNoChange(csCursor), {
+                [kInitStrictMode]: (attr) => assertExpectedShardsInLog(attr, 2),
+            });
+            assertOpenCursors(
+                st,
+                [st.shard0.shardName, st.shard1.shardName],
+                /*expectedConfigCursor=*/ false,
+                cursorCommentFilter(comment),
+            );
         });
-        assertOpenCursors(
-            st,
-            [st.shard0.shardName, st.shard1.shardName],
-            /*expectedConfigCursor=*/ false,
-            cursorCommentFilter(comment),
-        );
+        const initialMetrics = readShardTargetingDelta(initialDelta);
+        assert.gte(initialMetrics.placementHistoryLookup.ok, 1, {initialMetrics});
+        assert.eq(initialMetrics.targeterScope.database.dbPresent, 1, {initialMetrics});
     });
 
     it("unsharded collection - single shard cursor", function () {
@@ -160,15 +172,20 @@ describe("database v2 strict whitebox", function () {
             aggregateOptions: {comment, cursor: {batchSize: 0}},
         });
 
-        awaitLogMessageCodes(st.s, [kInitStrictMode], () => csTest.assertNoChange(csCursor), {
-            [kInitStrictMode]: (attr) => assertExpectedShardsInLog(attr, 1),
+        const initialDelta = ServerStatusMetrics.withServerStatusMetrics(db, () => {
+            awaitLogMessageCodes(st.s, [kInitStrictMode], () => csTest.assertNoChange(csCursor), {
+                [kInitStrictMode]: (attr) => assertExpectedShardsInLog(attr, 1),
+            });
+            assertOpenCursors(
+                st,
+                [st.shard0.shardName],
+                /*expectedConfigCursor=*/ false,
+                cursorCommentFilter(comment),
+            );
         });
-        assertOpenCursors(
-            st,
-            [st.shard0.shardName],
-            /*expectedConfigCursor=*/ false,
-            cursorCommentFilter(comment),
-        );
+        const initialMetrics = readShardTargetingDelta(initialDelta);
+        assert.gte(initialMetrics.placementHistoryLookup.ok, 1, {initialMetrics});
+        assert.eq(initialMetrics.targeterScope.database.dbPresent, 1, {initialMetrics});
     });
 
     it("database does not exist - DbAbsent to DbPresent transition", function () {
@@ -183,22 +200,33 @@ describe("database v2 strict whitebox", function () {
             aggregateOptions: {comment, cursor: {batchSize: 0}},
         });
 
-        awaitLogMessageCodes(st.s, [kInitStrictMode], () => csTest.assertNoChange(csCursor), {
-            [kInitStrictMode]: (attr) => assertExpectedShardsInLog(attr, 0),
+        // Opening on a non-existing database installs the db-absent targeter state.
+        const absentDelta = ServerStatusMetrics.withServerStatusMetrics(db, () => {
+            awaitLogMessageCodes(st.s, [kInitStrictMode], () => csTest.assertNoChange(csCursor), {
+                [kInitStrictMode]: (attr) => assertExpectedShardsInLog(attr, 0),
+            });
+            assertOpenCursors(
+                st,
+                /*expectedDataShards=*/ [],
+                /*expectedConfigCursor=*/ true,
+                cursorCommentFilter(comment),
+                st.configRS.getPrimary(),
+            );
         });
-        assertOpenCursors(
-            st,
-            /*expectedDataShards=*/ [],
-            /*expectedConfigCursor=*/ true,
-            cursorCommentFilter(comment),
-            st.configRS.getPrimary(),
-        );
+        const absentMetrics = readShardTargetingDelta(absentDelta);
+        assert.gte(absentMetrics.placementHistoryLookup.ok, 1, {absentMetrics});
+        assert.eq(absentMetrics.targeterScope.database.dbAbsent, 1, {absentMetrics});
 
         // Create DB to trigger DbAbsent -> DbPresent transition.
-        new CreateDatabaseCommand({dbName, primaryShard: st.shard2.shardName}).execute(st.s);
-        awaitLogMessageCodes(st.s, [kDbAbsentEvent], () => csTest.assertNoChange(csCursor), {
-            [kDbAbsentEvent]: (attr) => assertExpectedShardsInLog(attr, 1),
+        const createdDelta = ServerStatusMetrics.withServerStatusMetrics(db, () => {
+            new CreateDatabaseCommand({dbName, primaryShard: st.shard2.shardName}).execute(st.s);
+            awaitLogMessageCodes(st.s, [kDbAbsentEvent], () => csTest.assertNoChange(csCursor), {
+                [kDbAbsentEvent]: (attr) => assertExpectedShardsInLog(attr, 1),
+            });
         });
+        const createdMetrics = readShardTargetingDelta(createdDelta);
+        assert.eq(createdMetrics.controlEvents.databaseCreated, 1, {createdMetrics});
+        assert.eq(createdMetrics.targeterScope.database.dbPresent, 1, {createdMetrics});
         assertOpenCursors(
             st,
             [st.shard2.shardName],
@@ -247,51 +275,58 @@ describe("database v2 strict whitebox", function () {
             cursorCommentFilter(comment),
         );
 
-        // Step 1: Move [10, MaxKey) to shard1 - placement refresh re-evaluates, cursors on shard0 + shard1.
-        assert.commandWorked(
-            db.adminCommand({
-                moveChunk: coll.getFullName(),
-                find: {_id: 10},
-                to: st.shard1.shardName,
-                _waitForDelete: true,
-            }),
-        );
-        awaitLogMessageCodes(st.s, [kPlacementRefresh], () => csTest.assertNoChange(csCursor));
-        assertOpenCursors(
-            st,
-            [st.shard0.shardName, st.shard1.shardName],
-            /*expectedConfigCursor=*/ false,
-            cursorCommentFilter(comment),
-        );
+        // Each of the three moveChunk operations below surfaces as exactly one moveChunk control
+        // event on the stream, each observed by the shard targeter.
+        const moveChunkDelta = ServerStatusMetrics.withServerStatusMetrics(db, () => {
+            // Step 1: Move [10, MaxKey) to shard1 - placement refresh re-evaluates, cursors on shard0 + shard1.
+            assert.commandWorked(
+                db.adminCommand({
+                    moveChunk: coll.getFullName(),
+                    find: {_id: 10},
+                    to: st.shard1.shardName,
+                    _waitForDelete: true,
+                }),
+            );
+            awaitLogMessageCodes(st.s, [kPlacementRefresh], () => csTest.assertNoChange(csCursor));
+            assertOpenCursors(
+                st,
+                [st.shard0.shardName, st.shard1.shardName],
+                /*expectedConfigCursor=*/ false,
+                cursorCommentFilter(comment),
+            );
 
-        // Step 2: Move [-10, 10) to shard2 - placement refresh, now 3 shards.
-        assert.commandWorked(
-            db.adminCommand({
-                moveChunk: coll.getFullName(),
-                find: {_id: 0},
-                to: st.shard2.shardName,
-                _waitForDelete: true,
-            }),
-        );
-        awaitLogMessageCodes(st.s, [kPlacementRefresh], () => csTest.assertNoChange(csCursor));
-        assertOpenCursors(
-            st,
-            [st.shard0.shardName, st.shard1.shardName, st.shard2.shardName],
-            /*expectedConfigCursor=*/ false,
-            cursorCommentFilter(comment),
-        );
+            // Step 2: Move [-10, 10) to shard2 - placement refresh, now 3 shards.
+            assert.commandWorked(
+                db.adminCommand({
+                    moveChunk: coll.getFullName(),
+                    find: {_id: 0},
+                    to: st.shard2.shardName,
+                    _waitForDelete: true,
+                }),
+            );
+            awaitLogMessageCodes(st.s, [kPlacementRefresh], () => csTest.assertNoChange(csCursor));
+            assertOpenCursors(
+                st,
+                [st.shard0.shardName, st.shard1.shardName, st.shard2.shardName],
+                /*expectedConfigCursor=*/ false,
+                cursorCommentFilter(comment),
+            );
 
-        // Step 3: Move [MinKey, -10) to shard1 - all chunks off shard0, but shard0 is still
-        // the DB primary so the database targeter keeps a cursor there.
-        assert.commandWorked(
-            db.adminCommand({
-                moveChunk: coll.getFullName(),
-                find: {_id: -20},
-                to: st.shard1.shardName,
-                _waitForDelete: true,
-            }),
-        );
-        awaitLogMessageCodes(st.s, [kPlacementRefresh], () => csTest.assertNoChange(csCursor));
+            // Step 3: Move [MinKey, -10) to shard1 - all chunks off shard0, but shard0 is still
+            // the DB primary so the database targeter keeps a cursor there.
+            assert.commandWorked(
+                db.adminCommand({
+                    moveChunk: coll.getFullName(),
+                    find: {_id: -20},
+                    to: st.shard1.shardName,
+                    _waitForDelete: true,
+                }),
+            );
+            awaitLogMessageCodes(st.s, [kPlacementRefresh], () => csTest.assertNoChange(csCursor));
+        });
+        assert.eq(readShardTargetingDelta(moveChunkDelta).controlEvents.moveChunk, 3, {
+            moveChunkDelta,
+        });
         assertOpenCursors(
             st,
             [st.shard0.shardName, st.shard1.shardName, st.shard2.shardName],
@@ -325,8 +360,15 @@ describe("database v2 strict whitebox", function () {
             cursorCommentFilter(comment),
         );
 
-        new MovePrimaryCommand({dbName, collName, targetShard: targetShardId}).execute(st.s);
-        awaitLogMessageCodes(st.s, [kPlacementRefresh], () => csTest.assertNoChange(csCursor));
+        // movePrimary surfaces as one movePrimary control event and triggers a placement refresh
+        // (a placement-history lookup) on the targeter.
+        const movePrimaryDelta = ServerStatusMetrics.withServerStatusMetrics(db, () => {
+            new MovePrimaryCommand({dbName, collName, targetShard: targetShardId}).execute(st.s);
+            awaitLogMessageCodes(st.s, [kPlacementRefresh], () => csTest.assertNoChange(csCursor));
+        });
+        const movePrimaryMetrics = readShardTargetingDelta(movePrimaryDelta);
+        assert.eq(movePrimaryMetrics.controlEvents.movePrimary, 1, {movePrimaryMetrics});
+        assert.gte(movePrimaryMetrics.placementHistoryLookup.ok, 1, {movePrimaryMetrics});
         assertOpenCursors(
             st,
             [targetShardId],
@@ -389,15 +431,22 @@ describe("database v2 strict whitebox", function () {
         const collCtx = {exists: true, shardKeySpec: {_id: 1}};
         const newShardKey = {a: 1};
         const chunkCount = 2;
-        new ReshardCollectionCommand({
-            dbName,
-            collName,
-            shardSet: targetShards,
-            collectionCtx: collCtx,
-            shardKey: newShardKey,
-            numInitialChunks: chunkCount,
-        }).execute(st.s);
-        awaitLogMessageCodes(st.s, [kPlacementRefresh], () => csTest.assertNoChange(csCursor));
+        // Resharding surfaces as a namespacePlacementChanged control event and triggers a
+        // placement refresh (a placement-history lookup) on the targeter.
+        const reshardDelta = ServerStatusMetrics.withServerStatusMetrics(db, () => {
+            new ReshardCollectionCommand({
+                dbName,
+                collName,
+                shardSet: targetShards,
+                collectionCtx: collCtx,
+                shardKey: newShardKey,
+                numInitialChunks: chunkCount,
+            }).execute(st.s);
+            awaitLogMessageCodes(st.s, [kPlacementRefresh], () => csTest.assertNoChange(csCursor));
+        });
+        const reshardMetrics = readShardTargetingDelta(reshardDelta);
+        assert.eq(reshardMetrics.controlEvents.namespacePlacementChanged, 1, {reshardMetrics});
+        assert.gte(reshardMetrics.placementHistoryLookup.ok, 1, {reshardMetrics});
         // shard0 is still the DB primary, so the database targeter keeps a cursor there
         // even though no collection chunks reside on it after resharding.
         assertOpenCursors(

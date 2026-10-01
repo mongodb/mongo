@@ -18,7 +18,9 @@ namespace mongo {
 class DatabaseChangeStreamShardTargeterImpl : public ChangeStreamShardTargeterBase {
 public:
     DatabaseChangeStreamShardTargeterImpl(std::unique_ptr<HistoricalPlacementFetcher> fetcher)
-        : ChangeStreamShardTargeterBase(std::move(fetcher)) {}
+        : ChangeStreamShardTargeterBase(std::move(fetcher),
+                                        getDatabaseShardTargeterScopeMetricsRecorder(),
+                                        getShardTargeterControlEventMetricsRecorder()) {}
 
     std::unique_ptr<ChangeStreamShardTargeterStateEventHandler> createDbAbsentHandler()
         const override;

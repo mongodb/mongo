@@ -1116,6 +1116,7 @@ mongo_cc_library(
         "//src/mongo/db/exec/agg:change_stream_check_topology_change_stage.cpp",
         "//src/mongo/db/exec/agg:change_stream_ensure_resume_token_present_stage.cpp",
         "//src/mongo/db/exec/agg:change_stream_handle_topology_change_stage.cpp",
+        "//src/mongo/db/exec/agg:change_stream_handle_topology_change_v2_metrics.cpp",
         "//src/mongo/db/exec/agg:change_stream_handle_topology_change_v2_stage.cpp",
         "//src/mongo/db/exec/agg:change_stream_inject_control_events_stage.cpp",
         "//src/mongo/db/exec/agg:change_stream_split_large_event_stage.cpp",
@@ -1380,6 +1381,7 @@ mongo_cc_unit_test(
 mongo_cc_unit_test(
     name = "change_stream_handle_topology_change_v2_stage_test",
     srcs = [
+        "change_stream_handle_topology_change_v2_metrics_test.cpp",
         "document_source_change_stream_handle_topology_change_v2_cursor_management_and_error_handling_test.cpp",
         "document_source_change_stream_handle_topology_change_v2_invalid_state_transitions_test.cpp",
         "document_source_change_stream_handle_topology_change_v2_stage_properties_test.cpp",
@@ -1406,6 +1408,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/exec/document_value:document_value_test_util",
         "//src/mongo/db/repl:oplog_entry",
         "//src/mongo/db/repl:oplog_entry_test_helpers",
+        "//src/mongo/otel/metrics:metrics_test_util",
         "//src/mongo/unittest",
         "//src/mongo/util:mock_periodic_runner",
         "//src/mongo/util:version_impl",

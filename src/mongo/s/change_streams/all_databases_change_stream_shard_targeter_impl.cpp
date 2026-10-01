@@ -65,6 +65,7 @@ ShardTargeterDecision AllDatabasesChangeStreamShardTargeterImpl::handleEvent(
         11138106, 3, STAGE_LOG_PREFIX "Handling event", "controlEvent"_attr = event.toString());
 
     auto controlEvent = parseControlEvent(event);
+    _controlEventMetrics.recordControlEvent(controlEvent);
 
     return readerContext.inDegradedMode()
         ? _eventHandler->handleEventInDegradedMode(opCtx, controlEvent, *this, readerContext)
@@ -164,5 +165,6 @@ void AllDatabasesChangeStreamShardTargeterImpl::setEventHandler(
                 "previousEventHandler"_attr = _eventHandler ? _eventHandler->toString() : "none",
                 "newEventHandler"_attr = eventHandler->toString());
     _eventHandler = std::move(eventHandler);
+    _scopeMetrics.recordTransition();
 }
 }  // namespace mongo

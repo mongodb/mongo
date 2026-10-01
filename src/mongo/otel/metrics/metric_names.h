@@ -434,6 +434,104 @@ public:
     static constexpr MetricName kChangeStreamCursorBytesRead =
         MetricNameMaker::make("mongodb.serverStatus.metrics.changeStreams.cursor.bytesRead");
 
+    // Per-state entry counters for the v2 change stream topology-handler stage's state machine.
+    // 'kUninitialized' has no counter: it is the initial state and transitions back to it are
+    // forbidden, so an entry counter would read zero forever.
+    static constexpr MetricName kChangeStreamShardTargetingTopologyStateWaiting =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.shardTargeting.topologyState.waiting");
+    static constexpr MetricName kChangeStreamShardTargetingTopologyStateFetchingInitialization =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.shardTargeting.topologyState."
+            "fetchingInitialization");
+    static constexpr MetricName kChangeStreamShardTargetingTopologyStateFetchingGettingChangeEvent =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.shardTargeting.topologyState."
+            "fetchingGettingChangeEvent");
+    static constexpr MetricName
+        kChangeStreamShardTargetingTopologyStateFetchingStartingChangeStreamSegment =
+            MetricNameMaker::make(
+                "mongodb.serverStatus.metrics.changeStreams.shardTargeting.topologyState."
+                "fetchingStartingChangeStreamSegment");
+    static constexpr MetricName
+        kChangeStreamShardTargetingTopologyStateFetchingNormalGettingChangeEvent =
+            MetricNameMaker::make(
+                "mongodb.serverStatus.metrics.changeStreams.shardTargeting.topologyState."
+                "fetchingNormalGettingChangeEvent");
+    static constexpr MetricName
+        kChangeStreamShardTargetingTopologyStateFetchingDegradedGettingChangeEvent =
+            MetricNameMaker::make(
+                "mongodb.serverStatus.metrics.changeStreams.shardTargeting.topologyState."
+                "fetchingDegradedGettingChangeEvent");
+    static constexpr MetricName kChangeStreamShardTargetingTopologyStateDowngrading =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.shardTargeting.topologyState.downgrading");
+    static constexpr MetricName kChangeStreamShardTargetingTopologyStateFinal =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.shardTargeting.topologyState.final");
+
+    // Gauge for the number of v2 change streams currently in degraded mode.
+    static constexpr MetricName kChangeStreamShardTargetingDegraded =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.changeStreams.shardTargeting.degraded");
+
+    // Per-(scope, db-presence) counters for the v2 change stream shard targeters' event-handler
+    // installations. The collection- and database-scoped targeters install a db-present or
+    // db-absent handler whenever they (re-)initialize; the all-databases targeter does not use
+    // the db-present/db-absent split and gets a single install counter.
+    static constexpr MetricName kChangeStreamShardTargetingTargeterScopeCollectionDbPresent =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.shardTargeting.targeterScope.collection."
+            "dbPresent");
+    static constexpr MetricName kChangeStreamShardTargetingTargeterScopeCollectionDbAbsent =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.shardTargeting.targeterScope.collection."
+            "dbAbsent");
+    static constexpr MetricName kChangeStreamShardTargetingTargeterScopeDatabaseDbPresent =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.shardTargeting.targeterScope.database."
+            "dbPresent");
+    static constexpr MetricName kChangeStreamShardTargetingTargeterScopeDatabaseDbAbsent =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.shardTargeting.targeterScope.database."
+            "dbAbsent");
+    static constexpr MetricName kChangeStreamShardTargetingTargeterScopeAllDatabases =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.shardTargeting.targeterScope.allDatabases");
+
+    // Counters for the control events observed by the v2 change stream shard targeter.
+    static constexpr MetricName kChangeStreamShardTargetingControlEventMoveChunk =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.shardTargeting.controlEvents.moveChunk");
+    static constexpr MetricName kChangeStreamShardTargetingControlEventMovePrimary =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.shardTargeting.controlEvents.movePrimary");
+    static constexpr MetricName kChangeStreamShardTargetingControlEventNamespacePlacementChanged =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.shardTargeting.controlEvents."
+            "namespacePlacementChanged");
+    static constexpr MetricName kChangeStreamShardTargetingControlEventDatabaseCreated =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.shardTargeting.controlEvents."
+            "databaseCreated");
+
+    // Outcome counters and latency histogram for the placement-history lookups issued by the v2
+    // change stream shard targeter (all callers of HistoricalPlacementFetcherImpl::fetch()).
+    static constexpr MetricName kChangeStreamShardTargetingPlacementHistoryLookupOk =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.shardTargeting.placementHistoryLookup.ok");
+    static constexpr MetricName kChangeStreamShardTargetingPlacementHistoryLookupFutureClusterTime =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.shardTargeting.placementHistoryLookup."
+            "futureClusterTime");
+    static constexpr MetricName kChangeStreamShardTargetingPlacementHistoryLookupNotAvailable =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.shardTargeting.placementHistoryLookup."
+            "notAvailable");
+    static constexpr MetricName kChangeStreamShardTargetingPlacementHistoryLookupLatencyMillis =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.shardTargeting.placementHistoryLookup."
+            "latencyMillis");
+
     // Storage Execution Team Metrics
     static constexpr MetricName kIndexBuildsActive =
         MetricNameMaker::make("mongodb.serverStatus.indexBuilds.active");

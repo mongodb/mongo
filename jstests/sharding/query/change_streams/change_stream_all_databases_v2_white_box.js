@@ -29,6 +29,10 @@ import {
     assertOpenCursors,
     V2TargeterLogCodes,
 } from "jstests/libs/query/change_stream_util.js";
+import {
+    readShardTargetingDelta,
+    ServerStatusMetrics,
+} from "jstests/libs/query/change_stream_metrics_util.js";
 
 const {
     kClusterShardTargeterInitStrictMode: kInitStrictMode,
@@ -123,9 +127,17 @@ describe("$changeStream v2", function () {
             {_id: 2, a: 2},
             {_id: 3, a: 3},
         ]);
-        awaitLogMessageCodes(st.s, [kSetEventHandler, kInitStrictMode], () => {
-            csTest.getNextChanges(csCursor, 2);
+        // Opening the stream installs the all-databases targeter's event handler (counted in its
+        // single targeterScope.allDatabases counter; it does not use the db-present/db-absent
+        // split) and consults the placement history.
+        const openDelta = ServerStatusMetrics.withServerStatusMetrics(db, () => {
+            awaitLogMessageCodes(st.s, [kSetEventHandler, kInitStrictMode], () => {
+                csTest.getNextChanges(csCursor, 2);
+            });
         });
+        const openMetrics = readShardTargetingDelta(openDelta);
+        assert.gte(openMetrics.targeterScope.allDatabases, 1, {openMetrics});
+        assert.gte(openMetrics.placementHistoryLookup.ok, 1, {openMetrics});
 
         let commentFilter = {
             "cursor.originatingCommand.comment": jsTestName(),
@@ -142,26 +154,42 @@ describe("$changeStream v2", function () {
             {comment: jsTestName(), cursor: {batchSize: 0}},
             {version: "v2"},
         );
-        awaitLogMessageCodes(st.s, [kSetEventHandler, kInitStrictMode], () => {
-            csTest.assertNoChange(csCursor);
+        // Opening the stream installs the all-databases targeter's event handler, even though no
+        // databases exist yet.
+        const openDelta = ServerStatusMetrics.withServerStatusMetrics(db, () => {
+            awaitLogMessageCodes(st.s, [kSetEventHandler, kInitStrictMode], () => {
+                csTest.assertNoChange(csCursor);
+            });
         });
+        const openMetrics = readShardTargetingDelta(openDelta);
+        assert.gte(openMetrics.targeterScope.allDatabases, 1, {openMetrics});
 
         let commentFilter = {
             "cursor.originatingCommand.comment": jsTestName(),
         };
         assertOpenCursors(st, [], true, commentFilter);
 
-        // Create a collection and test events are handled properly.
-        assert.commandWorked(
-            db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}),
-        );
-        assertCreateCollection(db, coll.getName());
-        assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
-        coll.insert([{_id: -1, a: -1}]);
+        // Creating the database surfaces as a databaseCreated control event and triggers a
+        // placement refresh (a placement-history lookup) on the targeter.
+        const createdDelta = ServerStatusMetrics.withServerStatusMetrics(db, () => {
+            // Create a collection and test events are handled properly.
+            assert.commandWorked(
+                db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}),
+            );
+            assertCreateCollection(db, coll.getName());
+            assert.commandWorked(
+                db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}),
+            );
+            coll.insert([{_id: -1, a: -1}]);
 
-        awaitLogMessageCodes(st.s, [kPlacementRefresh], () => {
-            let s = csTest.getOneChange(csCursor);
+            awaitLogMessageCodes(st.s, [kPlacementRefresh], () => {
+                // Result unused; only waiting for the change to arrive.
+                csTest.getOneChange(csCursor);
+            });
         });
+        const createdMetrics = readShardTargetingDelta(createdDelta);
+        assert.eq(createdMetrics.controlEvents.databaseCreated, 1, {createdMetrics});
+        assert.gte(createdMetrics.placementHistoryLookup.ok, 1, {createdMetrics});
 
         // Assert cursor is open on primary data shard.
         assertOpenCursors(st, [st.shard0.shardName], true, commentFilter);
@@ -179,16 +207,19 @@ describe("$changeStream v2", function () {
             {version: "v2"},
         );
 
-        awaitLogMessageCodes(st.s, [kSetEventHandler, kInitStrictMode], () => {
-            csTest.assertNoChange(csCursor);
+        // Opening the stream installs the all-databases targeter's event handler.
+        const openDelta = ServerStatusMetrics.withServerStatusMetrics(db, () => {
+            awaitLogMessageCodes(st.s, [kSetEventHandler, kInitStrictMode], () => {
+                csTest.assertNoChange(csCursor);
+            });
         });
+        const openMetrics = readShardTargetingDelta(openDelta);
+        assert.gte(openMetrics.targeterScope.allDatabases, 1, {openMetrics});
 
         coll.insertMany([
             {_id: -1, a: -1},
             {_id: 1, a: 1},
         ]);
-
-        let configConn = st.configRS.getPrimary();
 
         let commentFilter = {
             "cursor.originatingCommand.comment": jsTestName(),
@@ -198,21 +229,26 @@ describe("$changeStream v2", function () {
         // Assert cursor opened on the primary data shard.
         assertOpenCursors(st, [st.shard0.shardName], true, commentFilter);
 
-        // Create a second collection.
+        // Create a second collection. Enabling sharding on its database surfaces as a
+        // databaseCreated control event and triggers a placement refresh on the targeter.
         const db2 = st.s.getDB(jsTestName() + "_2");
-        assert.commandWorked(
-            db.adminCommand({enableSharding: db2.getName(), primaryShard: st.shard0.shardName}),
-        );
-
         const coll2Name = `${jsTestName()}` + "_2";
         const coll2 = db2.getCollection(coll2Name);
-        assertCreateCollection(db2, coll2.getName());
-        assert.commandWorked(
-            db2.adminCommand({shardCollection: coll2.getFullName(), key: {_id: 1}}),
-        );
-        awaitLogMessageCodes(st.s, [kPlacementRefresh], () => {
-            csTest.assertNoChange(csCursor);
+        const createdDelta = ServerStatusMetrics.withServerStatusMetrics(db, () => {
+            assert.commandWorked(
+                db.adminCommand({enableSharding: db2.getName(), primaryShard: st.shard0.shardName}),
+            );
+            assertCreateCollection(db2, coll2.getName());
+            assert.commandWorked(
+                db2.adminCommand({shardCollection: coll2.getFullName(), key: {_id: 1}}),
+            );
+            awaitLogMessageCodes(st.s, [kPlacementRefresh], () => {
+                csTest.assertNoChange(csCursor);
+            });
         });
+        const createdMetrics = readShardTargetingDelta(createdDelta);
+        assert.eq(createdMetrics.controlEvents.databaseCreated, 1, {createdMetrics});
+        assert.gte(createdMetrics.placementHistoryLookup.ok, 1, {createdMetrics});
 
         coll2.insertMany([
             {_id: -2, a: -2},
@@ -264,34 +300,39 @@ describe("$changeStream v2", function () {
         };
         assertOpenCursors(st, [st.shard0.shardName, st.shard1.shardName], true, commentFilter);
 
-        // Move the chunk currently on shard1 to shard2
-        assert.commandWorked(
-            db.adminCommand({
-                moveChunk: coll.getFullName(),
-                find: {_id: 1},
-                to: st.shard2.shardName,
-                _waitForDelete: true,
-            }),
-        );
+        // Each moveChunk surfaces as one moveChunk control event observed by the all-databases
+        // targeter.
+        const moveChunkDelta = ServerStatusMetrics.withServerStatusMetrics(db, () => {
+            // Move the chunk currently on shard1 to shard2
+            assert.commandWorked(
+                db.adminCommand({
+                    moveChunk: coll.getFullName(),
+                    find: {_id: 1},
+                    to: st.shard2.shardName,
+                    _waitForDelete: true,
+                }),
+            );
 
-        awaitLogMessageCodes(st.s, [kPlacementRefresh], () => {
-            csTest.assertNoChange(csCursor);
+            awaitLogMessageCodes(st.s, [kPlacementRefresh], () => {
+                csTest.assertNoChange(csCursor);
+            });
+
+            // Move the whole collection to shard2. Since the parent database has shard0 as its primary, there will be open cursors on both of them.
+            assert.commandWorked(
+                db.adminCommand({
+                    moveChunk: coll.getFullName(),
+                    find: {_id: -1},
+                    to: st.shard2.shardName,
+                    _waitForDelete: true,
+                }),
+            );
+
+            awaitLogMessageCodes(st.s, [kPlacementRefresh], () => {
+                csTest.assertNoChange(csCursor);
+            });
         });
-
-        assertOpenCursors(st, [st.shard0.shardName, st.shard2.shardName], true, commentFilter);
-
-        // Move the whole collection to shard2. Since the parent database has shard0 as its primary, there will be open cursors on both of them.
-        assert.commandWorked(
-            db.adminCommand({
-                moveChunk: coll.getFullName(),
-                find: {_id: -1},
-                to: st.shard2.shardName,
-                _waitForDelete: true,
-            }),
-        );
-
-        awaitLogMessageCodes(st.s, [kPlacementRefresh], () => {
-            csTest.assertNoChange(csCursor);
+        assert.eq(readShardTargetingDelta(moveChunkDelta).controlEvents.moveChunk, 2, {
+            moveChunkDelta,
         });
 
         coll.insert([{_id: 2, a: 2}]);
@@ -319,17 +360,24 @@ describe("$changeStream v2", function () {
 
         assertOpenCursors(st, [st.shard0.shardName], true, commentFilter);
 
-        // Make shard1 the primary for the database.
-        assert.commandWorked(
-            st.s.adminCommand({
-                movePrimary: coll.getDB().getName(),
-                to: st.shard1.shardName,
-            }),
-        );
+        // movePrimary surfaces as one movePrimary control event and triggers a placement refresh
+        // (a placement-history lookup) on the targeter.
+        const movePrimaryDelta = ServerStatusMetrics.withServerStatusMetrics(db, () => {
+            // Make shard1 the primary for the database.
+            assert.commandWorked(
+                st.s.adminCommand({
+                    movePrimary: coll.getDB().getName(),
+                    to: st.shard1.shardName,
+                }),
+            );
 
-        awaitLogMessageCodes(st.s, [kPlacementRefresh], () => {
-            csTest.assertNoChange(csCursor);
+            awaitLogMessageCodes(st.s, [kPlacementRefresh], () => {
+                csTest.assertNoChange(csCursor);
+            });
         });
+        const movePrimaryMetrics = readShardTargetingDelta(movePrimaryDelta);
+        assert.eq(movePrimaryMetrics.controlEvents.movePrimary, 1, {movePrimaryMetrics});
+        assert.gte(movePrimaryMetrics.placementHistoryLookup.ok, 1, {movePrimaryMetrics});
 
         assertOpenCursors(st, [st.shard1.shardName], true, commentFilter);
 
@@ -375,18 +423,25 @@ describe("$changeStream v2", function () {
         coll.insert([{_id: 1, a: 1}]);
         assert.soon(() => csTest.getOneChange(csCursor));
 
-        assert.commandWorked(
-            st.s.adminCommand({
-                reshardCollection: coll.getFullName(),
-                key: {a: 1},
-                numInitialChunks: 1,
-                demoMode: true,
-            }),
-        );
+        // Resharding surfaces as a namespacePlacementChanged control event and triggers a
+        // placement refresh (a placement-history lookup) on the targeter.
+        const reshardDelta = ServerStatusMetrics.withServerStatusMetrics(db, () => {
+            assert.commandWorked(
+                st.s.adminCommand({
+                    reshardCollection: coll.getFullName(),
+                    key: {a: 1},
+                    numInitialChunks: 1,
+                    demoMode: true,
+                }),
+            );
 
-        awaitLogMessageCodes(st.s, [kPlacementRefresh], () => {
-            csTest.assertNoChange(csCursor);
+            awaitLogMessageCodes(st.s, [kPlacementRefresh], () => {
+                csTest.assertNoChange(csCursor);
+            });
         });
+        const reshardMetrics = readShardTargetingDelta(reshardDelta);
+        assert.eq(reshardMetrics.controlEvents.namespacePlacementChanged, 1, {reshardMetrics});
+        assert.gte(reshardMetrics.placementHistoryLookup.ok, 1, {reshardMetrics});
 
         coll.insert([{_id: 2, a: 2}]);
         assert.soon(() => csTest.getOneChange(csCursor), "expected change event for {a: 2} ");

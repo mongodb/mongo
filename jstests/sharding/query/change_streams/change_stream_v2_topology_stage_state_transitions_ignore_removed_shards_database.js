@@ -32,6 +32,10 @@ import {
     awaitV2StageStateTransitions,
     waitForClusterTime,
 } from "jstests/libs/query/change_stream_util.js";
+import {
+    readShardTargetingDelta,
+    ServerStatusMetrics,
+} from "jstests/libs/query/change_stream_metrics_util.js";
 
 // String names produced by stateToString() and recorded in log attr.previous / attr.new.
 const S = Object.freeze({
@@ -184,26 +188,47 @@ describe("ChangeStreamHandleTopologyChangeV2Stage: IRS degraded-mode state trans
                 aggregateOptions: {comment, cursor: {batchSize: 0}},
             });
 
-            awaitV2StageStateTransitions(
-                st.s,
-                logOffset,
-                [
-                    {from: S.FetchingInitialization, to: S.FetchingStartingChangeStreamSegment},
-                    {
-                        from: S.FetchingStartingChangeStreamSegment,
-                        to: S.FetchingDegradedGettingChangeEvent,
-                    },
-                    {
-                        from: S.FetchingDegradedGettingChangeEvent,
-                        to: S.FetchingStartingChangeStreamSegment,
-                    },
-                    {
-                        from: S.FetchingStartingChangeStreamSegment,
-                        to: S.FetchingNormalGettingChangeEvent,
-                    },
-                ],
-                () => csTest.assertNoChange(csCursor),
-            );
+            const transitionsDelta = ServerStatusMetrics.withServerStatusMetrics(db, () => {
+                awaitV2StageStateTransitions(
+                    st.s,
+                    logOffset,
+                    [
+                        {from: S.FetchingInitialization, to: S.FetchingStartingChangeStreamSegment},
+                        {
+                            from: S.FetchingStartingChangeStreamSegment,
+                            to: S.FetchingDegradedGettingChangeEvent,
+                        },
+                        {
+                            from: S.FetchingDegradedGettingChangeEvent,
+                            to: S.FetchingStartingChangeStreamSegment,
+                        },
+                        {
+                            from: S.FetchingStartingChangeStreamSegment,
+                            to: S.FetchingNormalGettingChangeEvent,
+                        },
+                    ],
+                    () => csTest.assertNoChange(csCursor),
+                );
+            });
+            const transitionsMetrics = readShardTargetingDelta(transitionsDelta);
+            assert.eq(transitionsMetrics.topologyState.fetchingInitialization, 1, {
+                transitionsMetrics,
+            });
+            assert.eq(transitionsMetrics.topologyState.fetchingStartingChangeStreamSegment, 2, {
+                transitionsMetrics,
+            });
+            assert.eq(transitionsMetrics.topologyState.fetchingDegradedGettingChangeEvent, 1, {
+                transitionsMetrics,
+            });
+            assert.eq(transitionsMetrics.topologyState.fetchingNormalGettingChangeEvent, 1, {
+                transitionsMetrics,
+            });
+            assert.eq(transitionsMetrics.degraded, 0, {transitionsMetrics});
+            // The event handler is reinstalled on each Starting-segment entry (2 here), always
+            // reporting db-present since some shards survive.
+            assert.eq(transitionsMetrics.targeterScope.database.dbPresent, 2, {
+                transitionsMetrics,
+            });
 
             assertOpenCursors(
                 st,
@@ -273,32 +298,48 @@ describe("ChangeStreamHandleTopologyChangeV2Stage: IRS degraded-mode state trans
                 aggregateOptions: {comment, cursor: {batchSize: 0}},
             });
 
-            const changes = csTest.getNextChanges(csCursor, 4, true);
-            assert.sameMembers(
-                changes.map((c) => c.fullDocument._id),
-                [-10, -20, -30, -40],
-            );
+            const transitionsDelta = ServerStatusMetrics.withServerStatusMetrics(db, () => {
+                const changes = csTest.getNextChanges(csCursor, 4, true);
+                assert.sameMembers(
+                    changes.map((c) => c.fullDocument._id),
+                    [-10, -20, -30, -40],
+                );
 
-            awaitV2StageStateTransitions(
-                st.s,
-                logOffset,
-                [
-                    {from: S.FetchingInitialization, to: S.FetchingStartingChangeStreamSegment},
-                    {
-                        from: S.FetchingStartingChangeStreamSegment,
-                        to: S.FetchingDegradedGettingChangeEvent,
-                    },
-                    {
-                        from: S.FetchingDegradedGettingChangeEvent,
-                        to: S.FetchingStartingChangeStreamSegment,
-                    },
-                    {
-                        from: S.FetchingStartingChangeStreamSegment,
-                        to: S.FetchingNormalGettingChangeEvent,
-                    },
-                ],
-                () => csTest.assertNoChange(csCursor),
-            );
+                awaitV2StageStateTransitions(
+                    st.s,
+                    logOffset,
+                    [
+                        {from: S.FetchingInitialization, to: S.FetchingStartingChangeStreamSegment},
+                        {
+                            from: S.FetchingStartingChangeStreamSegment,
+                            to: S.FetchingDegradedGettingChangeEvent,
+                        },
+                        {
+                            from: S.FetchingDegradedGettingChangeEvent,
+                            to: S.FetchingStartingChangeStreamSegment,
+                        },
+                        {
+                            from: S.FetchingStartingChangeStreamSegment,
+                            to: S.FetchingNormalGettingChangeEvent,
+                        },
+                    ],
+                    () => csTest.assertNoChange(csCursor),
+                );
+            });
+            const transitionsMetrics = readShardTargetingDelta(transitionsDelta);
+            assert.eq(transitionsMetrics.topologyState.fetchingInitialization, 1, {
+                transitionsMetrics,
+            });
+            assert.eq(transitionsMetrics.topologyState.fetchingStartingChangeStreamSegment, 2, {
+                transitionsMetrics,
+            });
+            assert.eq(transitionsMetrics.topologyState.fetchingDegradedGettingChangeEvent, 1, {
+                transitionsMetrics,
+            });
+            assert.eq(transitionsMetrics.topologyState.fetchingNormalGettingChangeEvent, 1, {
+                transitionsMetrics,
+            });
+            assert.eq(transitionsMetrics.degraded, 0, {transitionsMetrics});
 
             assertOpenCursors(
                 st,
@@ -387,44 +428,60 @@ describe("ChangeStreamHandleTopologyChangeV2Stage: IRS degraded-mode state trans
                 aggregateOptions: {comment, cursor: {batchSize: 0}},
             });
 
-            const changes = csTest.getNextChanges(csCursor, 4, true);
-            assert.sameMembers(
-                changes.map((c) => c.fullDocument._id),
-                [100, 200, 300, -300],
-            );
+            const transitionsDelta = ServerStatusMetrics.withServerStatusMetrics(db, () => {
+                const changes = csTest.getNextChanges(csCursor, 4, true);
+                assert.sameMembers(
+                    changes.map((c) => c.fullDocument._id),
+                    [100, 200, 300, -300],
+                );
 
-            awaitV2StageStateTransitions(
-                st.s,
-                logOffset,
-                [
-                    {from: S.FetchingInitialization, to: S.FetchingStartingChangeStreamSegment},
-                    {
-                        from: S.FetchingStartingChangeStreamSegment,
-                        to: S.FetchingNormalGettingChangeEvent,
-                    },
-                    {
-                        from: S.FetchingNormalGettingChangeEvent,
-                        to: S.FetchingDegradedGettingChangeEvent,
-                    },
-                    {
-                        from: S.FetchingDegradedGettingChangeEvent,
-                        to: S.FetchingStartingChangeStreamSegment,
-                    },
-                    {
-                        from: S.FetchingStartingChangeStreamSegment,
-                        to: S.FetchingDegradedGettingChangeEvent,
-                    },
-                    {
-                        from: S.FetchingDegradedGettingChangeEvent,
-                        to: S.FetchingStartingChangeStreamSegment,
-                    },
-                    {
-                        from: S.FetchingStartingChangeStreamSegment,
-                        to: S.FetchingNormalGettingChangeEvent,
-                    },
-                ],
-                () => csTest.assertNoChange(csCursor),
-            );
+                awaitV2StageStateTransitions(
+                    st.s,
+                    logOffset,
+                    [
+                        {from: S.FetchingInitialization, to: S.FetchingStartingChangeStreamSegment},
+                        {
+                            from: S.FetchingStartingChangeStreamSegment,
+                            to: S.FetchingNormalGettingChangeEvent,
+                        },
+                        {
+                            from: S.FetchingNormalGettingChangeEvent,
+                            to: S.FetchingDegradedGettingChangeEvent,
+                        },
+                        {
+                            from: S.FetchingDegradedGettingChangeEvent,
+                            to: S.FetchingStartingChangeStreamSegment,
+                        },
+                        {
+                            from: S.FetchingStartingChangeStreamSegment,
+                            to: S.FetchingDegradedGettingChangeEvent,
+                        },
+                        {
+                            from: S.FetchingDegradedGettingChangeEvent,
+                            to: S.FetchingStartingChangeStreamSegment,
+                        },
+                        {
+                            from: S.FetchingStartingChangeStreamSegment,
+                            to: S.FetchingNormalGettingChangeEvent,
+                        },
+                    ],
+                    () => csTest.assertNoChange(csCursor),
+                );
+            });
+            const transitionsMetrics = readShardTargetingDelta(transitionsDelta);
+            assert.eq(transitionsMetrics.topologyState.fetchingInitialization, 1, {
+                transitionsMetrics,
+            });
+            assert.eq(transitionsMetrics.topologyState.fetchingStartingChangeStreamSegment, 3, {
+                transitionsMetrics,
+            });
+            assert.eq(transitionsMetrics.topologyState.fetchingNormalGettingChangeEvent, 2, {
+                transitionsMetrics,
+            });
+            assert.eq(transitionsMetrics.topologyState.fetchingDegradedGettingChangeEvent, 2, {
+                transitionsMetrics,
+            });
+            assert.eq(transitionsMetrics.degraded, 0, {transitionsMetrics});
 
             assertOpenCursors(
                 st,

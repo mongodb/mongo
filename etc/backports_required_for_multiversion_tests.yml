@@ -174,6 +174,14 @@ last-continuous:
       ticket: SERVER-127745
     - test_file: jstests/sharding/index_commands_shard_targeting.js
       ticket: SERVER-131386
+    - test_file: jstests/sharding/query/change_streams/change_stream_all_databases_v2_white_box.js
+      ticket: SERVER-135656
+    - test_file: jstests/sharding/query/change_streams/change_stream_collection_v2_ignore_removed_shards_smoke.js
+      ticket: SERVER-135656
+    - test_file: jstests/sharding/query/change_streams/change_stream_collection_v2_strict_whitebox.js
+      ticket: SERVER-135656
+    - test_file: jstests/sharding/query/change_streams/change_stream_database_v2_strict_whitebox.js
+      ticket: SERVER-135656
     - test_file: jstests/sharding/query/change_streams/change_stream_metrics_update_lookup.js
       ticket: SERVER-133661
     - test_file: jstests/sharding/query/change_streams/change_stream_metrics_update_lookup.js
@@ -192,6 +200,18 @@ last-continuous:
       ticket: SERVER-134795
     - test_file: jstests/sharding/query/change_streams/change_stream_v2_resume_pbrt_monotonic_database.js
       ticket: SERVER-134795
+    - test_file: jstests/sharding/query/change_streams/change_stream_v2_topology_stage_state_transitions_cluster.js
+      ticket: SERVER-135656
+    - test_file: jstests/sharding/query/change_streams/change_stream_v2_topology_stage_state_transitions_collection.js
+      ticket: SERVER-135656
+    - test_file: jstests/sharding/query/change_streams/change_stream_v2_topology_stage_state_transitions_database.js
+      ticket: SERVER-135656
+    - test_file: jstests/sharding/query/change_streams/change_stream_v2_topology_stage_state_transitions_ignore_removed_shards_cluster.js
+      ticket: SERVER-135656
+    - test_file: jstests/sharding/query/change_streams/change_stream_v2_topology_stage_state_transitions_ignore_removed_shards_collection.js
+      ticket: SERVER-135656
+    - test_file: jstests/sharding/query/change_streams/change_stream_v2_topology_stage_state_transitions_ignore_removed_shards_database.js
+      ticket: SERVER-135656
     - test_file: jstests/sharding/query/search/internal_search_id_lookup_ddl_concurrency.js
       ticket: SERVER-134581
     - test_file: jstests/sharding/query/search/internal_search_id_lookup_ddl_concurrency.js
@@ -299,6 +319,14 @@ last-lts:
       ticket: SERVER-127745
     - test_file: jstests/sharding/index_commands_shard_targeting.js
       ticket: SERVER-131386
+    - test_file: jstests/sharding/query/change_streams/change_stream_all_databases_v2_white_box.js
+      ticket: SERVER-135656
+    - test_file: jstests/sharding/query/change_streams/change_stream_collection_v2_ignore_removed_shards_smoke.js
+      ticket: SERVER-135656
+    - test_file: jstests/sharding/query/change_streams/change_stream_collection_v2_strict_whitebox.js
+      ticket: SERVER-135656
+    - test_file: jstests/sharding/query/change_streams/change_stream_database_v2_strict_whitebox.js
+      ticket: SERVER-135656
     - test_file: jstests/sharding/query/change_streams/change_stream_metrics_update_lookup.js
       ticket: SERVER-133661
     - test_file: jstests/sharding/query/change_streams/change_stream_metrics_update_lookup.js
@@ -317,6 +345,18 @@ last-lts:
       ticket: SERVER-134795
     - test_file: jstests/sharding/query/change_streams/change_stream_v2_resume_pbrt_monotonic_database.js
       ticket: SERVER-134795
+    - test_file: jstests/sharding/query/change_streams/change_stream_v2_topology_stage_state_transitions_cluster.js
+      ticket: SERVER-135656
+    - test_file: jstests/sharding/query/change_streams/change_stream_v2_topology_stage_state_transitions_collection.js
+      ticket: SERVER-135656
+    - test_file: jstests/sharding/query/change_streams/change_stream_v2_topology_stage_state_transitions_database.js
+      ticket: SERVER-135656
+    - test_file: jstests/sharding/query/change_streams/change_stream_v2_topology_stage_state_transitions_ignore_removed_shards_cluster.js
+      ticket: SERVER-135656
+    - test_file: jstests/sharding/query/change_streams/change_stream_v2_topology_stage_state_transitions_ignore_removed_shards_collection.js
+      ticket: SERVER-135656
+    - test_file: jstests/sharding/query/change_streams/change_stream_v2_topology_stage_state_transitions_ignore_removed_shards_database.js
+      ticket: SERVER-135656
     - test_file: jstests/sharding/query/search/internal_search_id_lookup_ddl_concurrency.js
       ticket: SERVER-134581
     - test_file: jstests/sharding/query/search/internal_search_id_lookup_ddl_concurrency.js
