@@ -65,11 +65,11 @@ assert.commandWorked(
 );
 
 /** Runs an aggregation on `coll`, asserts it returns a valid size document. */
-function assertAggSucceedsWithUserRangeBSON(coll, pipeline, msg) {
+function assertAggSucceedsWithUserRangeBSON(coll, pipeline) {
     const res = coll.aggregate(pipeline).toArray();
-    assert.gte(res.length, 1, msg);
+    assert.gte(res.length, 1, `expected the query to return at least one document`);
     const sz = Object.bsonsize(res[0]);
-    assert.lte(sz, bsonMaxSizeLimit, `${msg}: expected doc size <= 16 MB, got ${sz}`);
+    assert.lte(sz, bsonMaxSizeLimit, `expected doc size <= 16 MB`);
     return res;
 }
 
@@ -91,8 +91,8 @@ function assertAggSucceedsWithInternalRangeBSON(coll, pipeline, msg) {
     const res = coll.aggregate(pipeline).toArray();
     assert.gte(res.length, 1, msg);
     const sz = Object.bsonsize(res[0]);
-    assert.gt(sz, bsonMaxSizeLimit, `${msg}: expected doc size > 16 MB, got ${sz}`);
-    assert.lt(sz, bsonInternalSizeLimit, `${msg}: expected doc size < 16 MB + 16 KB, got ${sz}`);
+    assert.gt(sz, bsonMaxSizeLimit, `${msg}: expected doc size > 16 MB`);
+    assert.lt(sz, bsonInternalSizeLimit, `${msg}: expected doc size < 16 MB + 16 KB`);
     return res;
 }
 
@@ -112,35 +112,35 @@ function testGroupPush() {
     );
 }
 
-function testGroupNonLastStage() {
-    // $group + $push of collExactPlusOne, which pushes the BSON size slightly above 16 MB.
+function testGroupPushNonLastStage() {
+    // Size limit: does not trigger.
+    //
+    // $group + $push that produces a document slightly above 16 MB, but still under the internal limit.
     assertAggSucceedsWithInternalRangeBSON(
         collExactPlusOne,
         [{$group: {_id: null, all: {$push: "$$ROOT"}}}, {$limit: 1}],
         "$group + $push (non-last stage) result just over 16 MB in internal range should succeed",
     );
 
-    // ~20 MB result (collMany) exceeds BSONObjMaxInternalSize - fails.
+    // Size limit: triggers.
+    //
+    // $group + $push that produces a document of approximately 20 MB.
     assertAggFailsBSONTooLarge(
         collMany,
         [{$group: {_id: null, all: {$push: "$$ROOT"}}}, {$limit: 1}],
         "$group + $push (non-last stage) with ~20 MB result should fail with BSONObjectTooLarge",
     );
 
-    // Two groups: "small" (_id: 0, 5 docs × 20 KB ≈ 100 KB) and "large" (_id: 1, 995 docs ×
-    // 20 KB ≈ 20 MB). $limit: 1 returns only the small group.
-    // If size validation ran intra-stage (at group construction time), the pipeline would fail
-    // when the large group is built. Since validation is deferred to the return point only, the
-    // pipeline succeeds.
-    assertAggSucceedsWithUserRangeBSON(
-        collMany,
-        [
-            {$group: {_id: {$cond: [{$lt: ["$_id", 5]}, 0, 1]}, all: {$push: "$data"}}},
-            {$sort: {_id: 1}},
-            {$limit: 1},
-        ],
-        "two groups (small + oversized): returning only the small group should succeed",
-    );
+    // Size limit: does not trigger.
+    //
+    // $group + $push resulting in two documents, the first of 100 KB and the second of 20 MB.
+    // $sort + $limit will then exclude the second and return just the first, which is under the
+    // size limit.
+    assertAggSucceedsWithUserRangeBSON(collMany, [
+        {$group: {_id: {$cond: [{$lt: ["$_id", 5]}, 0, 1]}, all: {$push: "$data"}}},
+        {$sort: {_id: 1}},
+        {$limit: 1},
+    ]);
 }
 
 function testAddFields() {
@@ -162,11 +162,9 @@ function testAddFields() {
 
 function testProject() {
     // Projected doc < 16 MB — succeeds.
-    const r = assertAggSucceedsWithUserRangeBSON(
-        collExact,
-        [{$project: {_id: 0, result: {$concat: [{$toString: "$_id"}, {$toString: "$_id"}]}}}],
-        "$project + $concat: doc < 16 MB should succeed",
-    );
+    const r = assertAggSucceedsWithUserRangeBSON(collExact, [
+        {$project: {_id: 0, result: {$concat: [{$toString: "$_id"}, {$toString: "$_id"}]}}},
+    ]);
     const sz = Object.bsonsize(r[0]);
     assert.lt(sz, bsonMaxSizeLimit, `expected projected doc < 16 MB, got ${sz}`);
 
@@ -235,9 +233,30 @@ function testTrialRun() {
     assertAggFailsBSONTooLarge(coll, pipeline);
 }
 
+function testConvertIntermediaryDocument() {
+    // Size limit: does not trigger. A $convert should be able to turn a document of
+    // exactly max user size into BinData, which is then passed over to a hash function.
+    // Before SERVER-135206, BinData would throw without allowing this valid intermediary
+    // document.
+    assertAggSucceedsWithUserRangeBSON(collExact, [
+        {
+            $project: {
+                _id: 0,
+                hash: {
+                    $hash: {
+                        algorithm: "xxh64",
+                        input: {$convert: {input: "$$ROOT", to: "binData"}},
+                    },
+                },
+            },
+        },
+    ]);
+}
+
 it("$group + $push", testGroupPush);
-it("$group + $push (non-last stage)", testGroupNonLastStage);
+it("$group + $push (non-last stage)", testGroupPushNonLastStage);
 it("$addFields", testAddFields);
 it("$project", testProject);
 it("SBE to classic split", testSbeToClassicSplit);
 it("Plan cache trial run", testTrialRun);
+it("$convert (non-last stage)", testConvertIntermediaryDocument);
