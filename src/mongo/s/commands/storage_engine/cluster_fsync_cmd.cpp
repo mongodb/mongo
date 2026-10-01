@@ -67,10 +67,28 @@ public:
         return Status::OK();
     }
 
-    void unlockLockedShards(OperationContext* opCtx, const DatabaseName& dbname) {
-        auto request = OpMsgRequestBuilder::create(
-            auth::ValidatedTenancyScope::get(opCtx), dbname, BSON("fsyncUnlock" << 1));
-        auto response = CommandHelpers::runCommandDirectly(opCtx, request);
+    void unlockLockedShards(OperationContext* opCtx,
+                            const DatabaseName& dbname,
+                            const std::set<ShardId>& lockedShards) {
+        std::vector<AsyncRequestsSender::Request> requests;
+
+        for (const ShardId& shardId : lockedShards) {
+            requests.emplace_back(shardId, BSON("fsyncUnlock" << 1));
+        }
+
+        auto responses = gatherResponses(opCtx,
+                                         dbname,
+                                         NamespaceString(dbname),
+                                         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                         Shard::RetryPolicy::kStrictlyNotIdempotent,
+                                         requests);
+
+        std::string unlockErrmsg;
+        BSONObjBuilder rawResult;
+        const auto response = appendRawResponses(opCtx, &unlockErrmsg, &rawResult, responses);
+        if (!response.responseOK) {
+            LOGV2_WARNING(781491, "Unlocking of shards failed", "error"_attr = unlockErrmsg);
+        }
     }
 
     bool errmsgRun(OperationContext* opCtx,
@@ -102,7 +120,10 @@ public:
         result.append("all", rawResult.obj());
         if (!response.responseOK) {
             if (cmdObj["lock"].trueValue()) {
-                unlockLockedShards(opCtx, dbName);
+                // Unlock only the shards this command locked. The caller may not have the unlock
+                // privilege, and fsyncUnlock on any other shard would release a lock held by
+                // someone else.
+                unlockLockedShards(opCtx, dbName, response.shardsWithSuccessResponses);
             }
             return false;
         }
