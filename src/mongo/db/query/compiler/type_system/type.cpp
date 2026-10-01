@@ -178,6 +178,15 @@ std::string renderUnion(const TypeSet& typeSet, const std::string& objectRenderi
     return rendered;
 }
 
+/// Renders 'typeSet' as the negation of the types it does not cover, such as '~(null|array)'.
+std::string renderNegation(const TypeSet& typeSet) {
+    const std::string negatedUnion = renderUnion(complement(typeSet));
+    if (negatedUnion.find('|') == std::string::npos) {
+        return fmt::format("~{}", negatedUnion);
+    }
+    return fmt::format("~({})", negatedUnion);
+}
+
 /// Returns the type of unset fields (any or missing).
 Type impliedType(Open open) {
     return isOpen(open) ? Type::any() : Type::missing();
@@ -351,13 +360,7 @@ std::string TypeSet::toDebugString() const {
     // This will happen generally when more types are included than excluded.
     // Since the four numeric types print as 'number' it is easier to produce this string and
     // compare the length than to try to count how many types will be rendered.
-    const std::string negatedUnion = renderUnion(complement(*this));
-    std::string negative;
-    if (negatedUnion.find('|') == std::string::npos) {
-        negative = fmt::format("~{}", negatedUnion);
-    } else {
-        negative = fmt::format("~({})", negatedUnion);
-    }
+    const std::string negative = renderNegation(*this);
 
     const std::string positive = renderUnion(*this);
     return negative.size() < positive.size() ? negative : positive;
@@ -498,7 +501,11 @@ std::string Type::toDebugString() const {
     if (isAnyObject(_shape)) {
         return _typeSet.toDebugString();
     }
-    return renderUnion(_typeSet, renderShape(_shape));
+    const std::string shape = renderShape(_shape);
+    const std::string negative =
+        fmt::format("{}|{}", renderNegation(withoutType(_typeSet, BSONType::object)), shape);
+    const std::string positive = renderUnion(_typeSet, shape);
+    return negative.size() < positive.size() ? negative : positive;
 }
 
 Type unionType(Type lhs, Type rhs) {

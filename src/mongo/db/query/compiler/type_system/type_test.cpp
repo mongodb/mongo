@@ -896,10 +896,37 @@ TEST(TypeTest, ObjectRendersInSortOrderWithinAUnion) {
     ASSERT_EQ(type.toDebugString(), "{x: string}|array");
 }
 
-TEST(TypeTest, ObjectWithKnownFieldsNeverRendersAsANegation) {
+TEST(TypeTest, ObjectWithKnownFieldsAloneRendersItsFields) {
     auto type = intersectType(openObject({{"x", allValues(BSONType::string)}}),
                               complement(allValues(BSONType::array)));
     ASSERT_EQ(type.toDebugString(), "{x: string, ...}");
+}
+
+TEST(TypeTest, ObjectWithKnownFieldsAmongEveryOtherTypeRendersAsNegation) {
+    auto type = unionType(complement(object(Extent::kAll)), openObject({{"y", Type::missing()}}));
+    // The syntax means "not an object or (if an object) an object of this shape".
+    // This is shorter than the positive case, which is to construct a union of all BSON types,
+    // with the shape in place of 'object'.
+    ASSERT_EQ(type.toDebugString(), "~object|{y: missing, ...}");
+}
+
+TEST(TypeTest, NegationBesideObjectWithKnownFieldsKeepsSubsetSuffix) {
+    auto nonObjects =
+        complement(unionType(object(Extent::kAll), Type(BSONType::array, Extent::kSubset)));
+    auto type = unionType(nonObjects, openObject({{"y", Type::missing()}}));
+    // The syntax extends to multiple excluded types, same as normal union.
+    ASSERT_EQ(type.toDebugString(), "~(object|array(S))|{y: missing, ...}");
+}
+
+TEST(TypeTest, NegationBesideObjectWithKnownFieldsRendersInSortOrder) {
+    auto nonObjects = complement(unionType(object(Extent::kAll), allValues(BSONType::null)));
+    auto type = unionType(nonObjects, openObject({{"y", Type::missing()}}));
+    ASSERT_EQ(type.toDebugString(), "~(null|object)|{y: missing, ...}");
+}
+
+TEST(TypeTest, NestedNegationBesideObjectWithKnownFieldsRendersInsideField) {
+    auto field = unionType(complement(object(Extent::kAll)), openObject({{"y", Type::missing()}}));
+    ASSERT_EQ(openObject({{"a", field}}).toDebugString(), "{a: ~object|{y: missing, ...}, ...}");
 }
 
 TEST(TypeTest, UnionOfTypesWithoutKnownFieldsHasNoShape) {

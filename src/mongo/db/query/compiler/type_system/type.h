@@ -216,8 +216,8 @@ public:
     bool operator==(const Type& other) const;
 
     /**
-     * Renders the type in the debug syntax, such as 'any', 'number|string', '~array' or
-     * '{x: number, ...}'.
+     * Renders the type in the debug syntax, such as 'any', 'number|string', '~array',
+     * '{x: number, ...}' or '~object|{x: number, ...}'.
      */
     std::string toDebugString() const;
 
