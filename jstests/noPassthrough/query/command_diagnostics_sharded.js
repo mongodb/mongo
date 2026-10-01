@@ -135,7 +135,6 @@ const defaultExpCtxLog = [
     "forcePlanCache: ",
     "sbeCompatibility: ",
     "sbeGroupCompatibility: ",
-    "sbeWindowCompatibility: ",
     "sbePipelineCompatibility: ",
     "subPipelineDepth: ",
 ];

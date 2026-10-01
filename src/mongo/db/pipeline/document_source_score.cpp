@@ -208,8 +208,7 @@ boost::intrusive_ptr<DocumentSource> buildSetWindowFieldsStage(
             window_function::Expression::parse(
                 BSON("$minMaxScaler" << BSON("input" << BSON("$meta" << "score"))),
                 sortPattern,
-                expCtx.get())}},
-        SbeCompatibility::notCompatible);
+                expCtx.get())}});
 }
 
 /**

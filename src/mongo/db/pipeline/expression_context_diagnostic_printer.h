@@ -42,7 +42,6 @@ struct ExpressionContextPrinter {
         field("forcePlanCache", expCtx->getForcePlanCache());
         field("sbeCompatibility", fmt::underlying(expCtx->getSbeCompatibility()));
         field("sbeGroupCompatibility", fmt::underlying(expCtx->getSbeGroupCompatibility()));
-        field("sbeWindowCompatibility", fmt::underlying(expCtx->getSbeWindowCompatibility()));
         field("sbePipelineCompatibility", fmt::underlying(expCtx->getSbePipelineCompatibility()));
         field("subPipelineDepth", expCtx->getSubPipelineDepth());
         out = fmt::format_to(out, "}}");

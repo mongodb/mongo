@@ -65,8 +65,7 @@ boost::intrusive_ptr<DocumentSource> setWindowFields(const auto& expCtx,
         std::vector<WindowFunctionStatement>{WindowFunctionStatement{
             rankFieldName,
             window_function::Expression::parse(
-                BSON("$rank" << BSONObj()), dummySortPattern, expCtx.get())}},
-        SbeCompatibility::notCompatible);
+                BSON("$rank" << BSONObj()), dummySortPattern, expCtx.get())}});
 }
 
 /**

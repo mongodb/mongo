@@ -283,9 +283,7 @@ public:
                               std::string accumulatorName,
                               boost::intrusive_ptr<::mongo::Expression> input,
                               WindowBounds bounds)
-        : Expression(expCtx, std::move(accumulatorName), std::move(input), std::move(bounds)) {
-        expCtx->setSbeWindowCompatibility(SbeCompatibility::notCompatible);
-    }
+        : Expression(expCtx, std::move(accumulatorName), std::move(input), std::move(bounds)) {}
 };
 
 /**
@@ -1062,9 +1060,7 @@ public:
         : Expression(expCtx, std::move(accumulatorName), std::move(input), std::move(bounds)),
           _ps(std::move(ps)),
           _method(method),
-          _intializeExpr(std::move(initializeExpr)) {
-        expCtx->setSbeWindowCompatibility(SbeCompatibility::notCompatible);
-    }
+          _intializeExpr(std::move(initializeExpr)) {}
 
     Value serialize(const query_shape::SerializationOptions& opts) const final;
 

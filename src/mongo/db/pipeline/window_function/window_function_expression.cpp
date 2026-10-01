@@ -409,7 +409,6 @@ boost::intrusive_ptr<Expression> ExpressionMinMaxScaler::parse(
     auto bounds = getMinMaxScalerWindowBoundsFromSpec(minMaxScalerSpec, sortBy, expCtx);
     auto minMaxArgs = getMinMaxScalerArgumentsFromSpec(minMaxScalerSpec, expCtx);
 
-    expCtx->setSbeWindowCompatibility(SbeCompatibility::notCompatible);
     return make_intrusive<ExpressionMinMaxScaler>(
         expCtx, minMaxArgs.input, std::move(bounds), std::move(minMaxArgs.minAndMax));
 }

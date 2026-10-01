@@ -908,14 +908,6 @@ public:
         _params.sbeGroupCompatibility = sbeGroupCompatibility;
     }
 
-    SbeCompatibility getSbeWindowCompatibility() const {
-        return _params.sbeWindowCompatibility;
-    }
-
-    void setSbeWindowCompatibility(SbeCompatibility sbeWindowCompatibility) {
-        _params.sbeWindowCompatibility = sbeWindowCompatibility;
-    }
-
     SbeCompatibility getSbePipelineCompatibility() const {
         return _params.sbePipelineCompatibility;
     }
@@ -1195,11 +1187,6 @@ protected:
         // being parsed using this expression context. This value is transient and gets
         // reset for every $group stage we parse. Each $group stage has its own per-stage flag.
         SbeCompatibility sbeGroupCompatibility = SbeCompatibility::noRequirements;
-        // The lowest SBE compatibility level of all window functions in the
-        // $_internalSetWindowFields stage currently being parsed using this expression context.
-        // This value is transient and gets reset for every $_internalSetWindowFields stage we
-        // parse. Each $_internalSetWindowFields stage has its own per-stage flag.
-        SbeCompatibility sbeWindowCompatibility = SbeCompatibility::noRequirements;
         // In some situations we could lower the collection access and, maybe, a prefix of a
         // pipeline to SBE but doing so would prevent a specific optimization that exists in the
         // classic engine from being applied. Until we implement the same optimization in SBE, we

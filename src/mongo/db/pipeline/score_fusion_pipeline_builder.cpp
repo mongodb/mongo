@@ -295,11 +295,12 @@ boost::intrusive_ptr<DocumentSource> builtSetWindowFieldsStageForMinMaxScalerNor
         expCtx,
         boost::none,  // partitionBy
         sortPattern,
-        std::vector<WindowFunctionStatement>{WindowFunctionStatement{
-            internalFieldsScore,  // output field
-            window_function::Expression::parse(
-                BSON("$minMaxScaler" << BSON("input" << dollarScore)), sortPattern, expCtx.get())}},
-        SbeCompatibility::notCompatible);
+        std::vector<WindowFunctionStatement>{
+            WindowFunctionStatement{internalFieldsScore,  // output field
+                                    window_function::Expression::parse(
+                                        BSON("$minMaxScaler" << BSON("input" << dollarScore)),
+                                        sortPattern,
+                                        expCtx.get())}});
 }
 
 /**

@@ -73,7 +73,6 @@ public:
     ExpressionContextBuilder& originalAggregateCommand(BSONObj);
     ExpressionContextBuilder& sbeCompatibility(SbeCompatibility);
     ExpressionContextBuilder& sbeGroupCompatibility(SbeCompatibility);
-    ExpressionContextBuilder& sbeWindowCompatibility(SbeCompatibility);
     ExpressionContextBuilder& sbePipelineCompatibility(SbeCompatibility);
     ExpressionContextBuilder& serverSideJsConfig(const ExpressionContext::ServerSideJsConfig&);
     ExpressionContextBuilder& subPipelineDepth(long long);

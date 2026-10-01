@@ -316,12 +316,6 @@ ExpressionContextBuilder& ExpressionContextBuilder::sbeGroupCompatibility(
     return *this;
 }
 
-ExpressionContextBuilder& ExpressionContextBuilder::sbeWindowCompatibility(
-    SbeCompatibility sbeWindowCompatibility) {
-    params.sbeWindowCompatibility = sbeWindowCompatibility;
-    return *this;
-}
-
 ExpressionContextBuilder& ExpressionContextBuilder::sbePipelineCompatibility(
     SbeCompatibility sbePipelineCompatibility) {
     params.sbePipelineCompatibility = sbePipelineCompatibility;

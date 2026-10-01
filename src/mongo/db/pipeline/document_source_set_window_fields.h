@@ -63,8 +63,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     boost::optional<boost::intrusive_ptr<Expression>> partitionBy,
     boost::optional<SortPattern> sortBy,
-    std::vector<WindowFunctionStatement> outputFields,
-    SbeCompatibility sbeCompatibility);
+    std::vector<WindowFunctionStatement> outputFields);
 
 }  // namespace document_source_set_window_fields
 
@@ -83,13 +82,11 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         boost::optional<boost::intrusive_ptr<Expression>> partitionBy,
         boost::optional<SortPattern> sortBy,
-        std::vector<WindowFunctionStatement> outputFields,
-        SbeCompatibility sbeCompatibility)
+        std::vector<WindowFunctionStatement> outputFields)
         : DocumentSource(kStageName, expCtx),
           _partitionBy(partitionBy),
           _sortBy(std::move(sortBy)),
-          _outputFields(std::move(outputFields)),
-          _sbeCompatibility(sbeCompatibility) {};
+          _outputFields(std::move(outputFields)) {};
 
     GetModPathsReturn getModifiedPaths() const final {
         OrderedPathSet outputPaths;
@@ -161,10 +158,6 @@ public:
     Value serialize(const query_shape::SerializationOptions& opts =
                         query_shape::SerializationOptions{}) const final;
 
-    SbeCompatibility sbeCompatibility() const {
-        return _sbeCompatibility;
-    }
-
     boost::optional<boost::intrusive_ptr<Expression>> getPartitionBy() const {
         return _partitionBy;
     }
@@ -182,8 +175,6 @@ private:
     boost::optional<boost::intrusive_ptr<Expression>> _partitionBy;
     boost::optional<SortPattern> _sortBy;
     std::vector<WindowFunctionStatement> _outputFields;
-
-    SbeCompatibility _sbeCompatibility = SbeCompatibility::noRequirements;
 };
 
 }  // namespace mongo

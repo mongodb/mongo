@@ -124,7 +124,6 @@ list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::createFro
     FieldRefSet fieldSet;
     std::vector<FieldRef> backingRefs;
 
-    expCtx->setSbeWindowCompatibility(SbeCompatibility::noRequirements);
     std::vector<WindowFunctionStatement> outputFields;
     const auto& output = spec.getOutput();
     backingRefs.reserve(output.nFields());
@@ -136,22 +135,15 @@ list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::createFro
                 fieldSet.insert(&backingRefs.back(), &conflict));
         outputFields.push_back(WindowFunctionStatement::parse(outputElem, sortBy, expCtx.get()));
     }
-    auto sbeCompatibility =
-        std::min(expCtx->getSbeWindowCompatibility(), expCtx->getSbeCompatibility());
 
-    return create(expCtx,
-                  std::move(partitionBy),
-                  std::move(sortBy),
-                  std::move(outputFields),
-                  sbeCompatibility);
+    return create(expCtx, std::move(partitionBy), std::move(sortBy), std::move(outputFields));
 }
 
 list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::create(
     const intrusive_ptr<ExpressionContext>& expCtx,
     optional<intrusive_ptr<Expression>> partitionBy,
     optional<SortPattern> sortBy,
-    std::vector<WindowFunctionStatement> outputFields,
-    SbeCompatibility sbeCompatibility) {
+    std::vector<WindowFunctionStatement> outputFields) {
 
     // Starting with an input like this:
     //     {$setWindowFields: {partitionBy: {$foo: "$x"}, sortBy: {y: 1}, output: {...}}}
@@ -281,11 +273,8 @@ list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::create(
     }
 
     // $_internalSetWindowFields
-    result.push_back(make_intrusive<DocumentSourceInternalSetWindowFields>(expCtx,
-                                                                           simplePartitionByExpr,
-                                                                           std::move(sortBy),
-                                                                           std::move(outputFields),
-                                                                           sbeCompatibility));
+    result.push_back(make_intrusive<DocumentSourceInternalSetWindowFields>(
+        expCtx, simplePartitionByExpr, std::move(sortBy), std::move(outputFields)));
 
     // $unset
     if (complexPartitionBy) {
@@ -305,17 +294,14 @@ intrusive_ptr<DocumentSource> DocumentSourceInternalSetWindowFields::optimize() 
     }
 
     if (_outputFields.size() > 0) {
-        // Calculate the new expression SBE compatibility after optimization without overwriting
-        // the previous SBE compatibility value. See the optimize() function for $group for a more
-        // detailed explanation.
-        auto expCtx = _outputFields[0].expr->expCtx();
-        TemporarySbeCompatibilityGuard guard(expCtx, SbeCompatibility::noRequirements);
-
+        // Optimizing the output expressions may lower the expression context's SBE compatibility.
+        // Guard it so that optimizing this stage, which never runs in SBE, doesn't affect the SBE
+        // eligibility of other stages sharing the same expression context.
+        TemporarySbeCompatibilityGuard guard(_outputFields[0].expr->expCtx(),
+                                             SbeCompatibility::noRequirements);
         for (auto&& outputField : _outputFields) {
             outputField.expr->optimize();
         }
-
-        _sbeCompatibility = std::min(_sbeCompatibility, expCtx->getSbeCompatibility());
     }
     return this;
 }
@@ -366,16 +352,13 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalSetWindowFields::crea
         sortBy.emplace(*sortSpec, expCtx);
     }
 
-    expCtx->setSbeWindowCompatibility(SbeCompatibility::noRequirements);
     std::vector<WindowFunctionStatement> outputFields;
     for (auto&& elem : spec.getOutput()) {
         outputFields.push_back(WindowFunctionStatement::parse(elem, sortBy, expCtx.get()));
     }
-    auto sbeCompatibility =
-        std::min(expCtx->getSbeWindowCompatibility(), expCtx->getSbeCompatibility());
 
     return make_intrusive<DocumentSourceInternalSetWindowFields>(
-        expCtx, partitionBy, sortBy, outputFields, sbeCompatibility);
+        expCtx, partitionBy, sortBy, outputFields);
 }
 
 DocumentSourceContainer::iterator DocumentSourceInternalSetWindowFields::optimizeAt(
