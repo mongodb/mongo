@@ -58,5 +58,31 @@ boost::optional<FlushResult> flush(OperationContext* opCtx,
                                    SizeCountTimestampStore& timestampStore,
                                    const OplogScanResult& batch);
 
+/**
+ * Writes a no-op watermark entry to the oplog, marking the cutoff point for the next replicated
+ * metadata checkpoint. The watermark's timestamp becomes the checkpoint's valid-as-of timestamp.
+ *
+ * The following diagram shows the oplog entries for one checkpoint, in timestamp order:
+ *
+ *   ...---[user writes]-----[W]----------[[M][TS]]---...
+ *                          ts = T      ts = T' (T' > T)
+ *
+ * Key:
+ *
+ *   [user writes]  Replicated writes to fast-count-eligible collections. Each contributes a delta
+ *                  that will later be flushed.
+ *
+ *   [W]            The watermark: a no-op entry whose timestamp T is the valid-as-of timestamp for
+ *                  the next checkpoint.
+ *
+ *   [M]            The metadata store container write: one per collection in the batch, persisting
+ *                  the collection's replicated metadata with valid-as-of = T.
+ *
+ *   [TS]           The timestamps store container write: advances the global valid-as-of to T.
+ *
+ * The watermark message (`kWatermarkMsg`) distinguishes this no-op from other no-op entries.
+ */
+void writeWatermark(OperationContext* opCtx);
+
 }  // namespace flusher
 }  // namespace mongo::replicated_fast_count

@@ -24,6 +24,7 @@ namespace mongo::replicated_fast_count::oplog_tailer {
 namespace {
 
 using test_helpers::makeOplogEntry;
+using test_helpers::makeWatermarkOplogEntry;
 using test_helpers::NsAndUUID;
 using test_helpers::scanForAccurateSizeCount;
 using test_helpers::writeToOplog;
@@ -57,12 +58,15 @@ protected:
 };
 
 TEST_F(OplogTailerTest, ScanFromBeginningAccountsAllVisibleEntries) {
+    otel::metrics::OtelMetricsCapturer capturer;
+
     writeToOplog(
         _opCtx,
         makeOplogEntry(Timestamp(1, 1), _collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/10));
     writeToOplog(
         _opCtx,
         makeOplogEntry(Timestamp(1, 2), _collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/20));
+    writeToOplog(_opCtx, makeWatermarkOplogEntry(Timestamp(1, 3)));
 
     SizeCountCheckpointBuffer buffer(oplogUuid(), /*lastBufferedRid=*/boost::none);
     bufferNewOplogEntries(_opCtx, buffer);
@@ -78,11 +82,17 @@ TEST_F(OplogTailerTest, ScanFromBeginningAccountsAllVisibleEntries) {
                  ReplicatedMetadataDelta{
                      .metadata = {.sizeCount = scanForAccurateSizeCount(
                                       _opCtx, NamespaceString::kRsOplogNamespace)}}}},
-        .lastTimestamp = Timestamp(1, 2)};
+        .lastTimestamp = Timestamp(1, 3)};
     EXPECT_EQ(checkedOutBuffer, expectedCheckedOutBuffer);
 
     buffer.acknowledgeFlush();
     EXPECT_FALSE(buffer.checkoutForFlush().has_value());
+
+    if (capturer.canReadMetrics()) {
+        EXPECT_EQ(capturer.readInt64Counter(
+                      otel::metrics::MetricNames::kReplicatedFastCountTailerWatermarksSeen),
+                  1);
+    }
 }
 
 TEST_F(OplogTailerTest, ScanFromBeginningOnEmptyOplogMakesNoProgress) {
@@ -104,6 +114,8 @@ TEST_F(OplogTailerTest, TimestampAfterLastBufferedRidDoesNotDoubleCount) {
 }
 
 TEST_F(OplogTailerTest, MultipleIterationsAccumulateInBuffer) {
+    otel::metrics::OtelMetricsCapturer capturer;
+
     SizeCountCheckpointBuffer buffer(oplogUuid(), /*lastBufferedRid=*/boost::none);
 
     // First scan sees one entry.
@@ -113,7 +125,7 @@ TEST_F(OplogTailerTest, MultipleIterationsAccumulateInBuffer) {
 
     bufferNewOplogEntries(_opCtx, buffer);
 
-    // Second scan sees two entries.
+    // Second scan sees two more entries.
     writeToOplog(
         _opCtx,
         makeOplogEntry(Timestamp(1, 2), _collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/20));
@@ -123,9 +135,26 @@ TEST_F(OplogTailerTest, MultipleIterationsAccumulateInBuffer) {
 
     bufferNewOplogEntries(_opCtx, buffer);
 
+    // Third scan consumes the watermark, cutting the accumulated batch.
+    writeToOplog(_opCtx, makeWatermarkOplogEntry(Timestamp(1, 4)));
+
+    if (capturer.canReadMetrics()) {
+        EXPECT_EQ(capturer.readInt64Counter(
+                      otel::metrics::MetricNames::kReplicatedFastCountTailerWatermarksSeen),
+                  0);
+    }
+
+    bufferNewOplogEntries(_opCtx, buffer);
+
+    if (capturer.canReadMetrics()) {
+        EXPECT_EQ(capturer.readInt64Counter(
+                      otel::metrics::MetricNames::kReplicatedFastCountTailerWatermarksSeen),
+                  1);
+    }
+
     const boost::optional<OplogScanResult> checkedOutBuffer = buffer.checkoutForFlush();
     ASSERT_TRUE(checkedOutBuffer.has_value());
-    EXPECT_EQ(checkedOutBuffer->lastTimestamp, Timestamp(1, 3));
+    EXPECT_EQ(checkedOutBuffer->lastTimestamp, Timestamp(1, 4));
     const OplogScanResult expectedCheckedOutBuffer{
         .deltas =
             ReplicatedMetadataDeltas{
@@ -139,7 +168,7 @@ TEST_F(OplogTailerTest, MultipleIterationsAccumulateInBuffer) {
                  ReplicatedMetadataDelta{
                      .metadata = {.sizeCount = scanForAccurateSizeCount(
                                       _opCtx, NamespaceString::kRsOplogNamespace)}}}},
-        .lastTimestamp = Timestamp(1, 3)};
+        .lastTimestamp = Timestamp(1, 4)};
     EXPECT_EQ(checkedOutBuffer, expectedCheckedOutBuffer);
 
     buffer.acknowledgeFlush();
@@ -188,6 +217,7 @@ TEST_F(OplogTailerTest, RetriesScanOnWriteConflict) {
     writeToOplog(
         _opCtx,
         makeOplogEntry(Timestamp(1, 2), _collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/20));
+    writeToOplog(_opCtx, makeWatermarkOplogEntry(Timestamp(1, 3)));
 
     SizeCountCheckpointBuffer buffer(oplogUuid(), /*lastBufferedRid=*/boost::none);
 
@@ -209,7 +239,7 @@ TEST_F(OplogTailerTest, RetriesScanOnWriteConflict) {
                  ReplicatedMetadataDelta{
                      .metadata = {.sizeCount = scanForAccurateSizeCount(
                                       _opCtx, NamespaceString::kRsOplogNamespace)}}}},
-        .lastTimestamp = Timestamp(1, 2)};
+        .lastTimestamp = Timestamp(1, 3)};
     EXPECT_EQ(checkedOutBuffer, expectedCheckedOutBuffer);
 
     buffer.acknowledgeFlush();

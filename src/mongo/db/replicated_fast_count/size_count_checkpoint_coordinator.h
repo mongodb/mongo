@@ -48,12 +48,6 @@ public:
      */
     void requestFlush();
 
-    /**
-     * Performs a synchronous oplog tailing iteration then flush iteration.
-     */
-    // TODO(SERVER-134965): Remove.
-    void flushSync_ForTest(OperationContext* opCtx);
-
     bool isRunning_ForTest() const;
     bool isFlushRequested_ForTest() const;
 

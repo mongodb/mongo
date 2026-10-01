@@ -27,6 +27,15 @@ void incrementInsertCount();
 
 void incrementUpdateCount();
 
+void incrementWatermarksWrittenCount();
+void incrementTailerWatermarksSeenCount();
+/**
+ * Accumulates the time the flusher spent blocked in
+ * `SizeCountCheckpointBuffer::awaitCheckoutForFlush()` waiting for the oplog tailer to cut a
+ * batch at a watermark.
+ */
+void recordWatermarkAwaitTime(Milliseconds waitTime);
+
 /**
  * Records metrics for a successful flush. Updates flush timing, success count, and
  * flushed-document counters.

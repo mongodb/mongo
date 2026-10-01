@@ -104,6 +104,33 @@ auto& updateCounter = MetricsService::instance().createInt64Counter(
     {.serverStatusOptions = ServerStatusOptions{.dottedPath = "replicatedFastCount.updateCount",
                                                 .role = ClusterRole::None}});
 
+// The number of watermark entries written to the oplog.
+auto& watermarksWrittenCounter = MetricsService::instance().createInt64Counter(
+    MetricNames::kReplicatedFastCountWatermarksWritten,
+    "Total number of replicated fast count watermark entries written to the oplog",
+    MetricUnit::kEvents,
+    {.serverStatusOptions = ServerStatusOptions{
+         .dottedPath = "replicatedFastCount.watermarksWritten", .role = ClusterRole::None}});
+
+// The number of watermark entries observed by the oplog tailer during checkpoint scans.
+auto& tailerWatermarksSeenCounter = MetricsService::instance().createInt64Counter(
+    MetricNames::kReplicatedFastCountTailerWatermarksSeen,
+    "Total number of replicated fast count watermark entries observed by the oplog tailer",
+    MetricUnit::kEvents,
+    {.serverStatusOptions = ServerStatusOptions{
+         .dottedPath = "replicatedFastCount.tailer.watermarksSeen", .role = ClusterRole::None}});
+
+// Total time the flusher spent blocked waiting for the oplog tailer to cut a batch at a
+// watermark.
+auto& watermarkAwaitTimeMsTotalCounter = MetricsService::instance().createInt64Counter(
+    MetricNames::kReplicatedFastCountWatermarkAwaitTimeMsTotal,
+    "Total time in milliseconds the flusher spent waiting for the oplog tailer to cut a batch at "
+    "a replicated fast count watermark",
+    MetricUnit::kMilliseconds,
+    {.serverStatusOptions =
+         ServerStatusOptions{.dottedPath = "replicatedFastCount.flush.watermarkAwaitTime.total",
+                             .role = ClusterRole::None}});
+
 // Gauge for the number of seconds between the most recently applied oplog entry and the most
 // recently persisted fastcount checkpoint. A large value indicates the fastcount checkpoint is
 // falling behind replication.
@@ -160,6 +187,18 @@ void incrementInsertCount() {
 
 void incrementUpdateCount() {
     updateCounter.add(1);
+}
+
+void incrementWatermarksWrittenCount() {
+    watermarksWrittenCounter.add(1);
+}
+
+void incrementTailerWatermarksSeenCount() {
+    tailerWatermarksSeenCounter.add(1);
+}
+
+void recordWatermarkAwaitTime(Milliseconds waitTime) {
+    watermarkAwaitTimeMsTotalCounter.add(waitTime.count());
 }
 
 void recordFlush(Date_t startTime, size_t batchSize) {

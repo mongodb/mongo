@@ -171,25 +171,8 @@ void ReplicatedFastCountManager::shutdown(OperationContext* opCtx) {
     }
 
     if (!_isUnderTest) {
-        // Join the checkpointer threads before the final flush.
+        // Join the checkpointer threads.
         checkpointer.reset();
-
-        // Final synchronous flush after checkpoint coordinator threads have stopped.
-        try {
-            advanceCheckpoint(opCtx, *_sizeCountStore, *_timestampStore);
-        } catch (const DBException& ex) {
-            if (ex.code() == ErrorCodes::InterruptedDueToReplStateChange ||
-                ex.code() == ErrorCodes::NotWritablePrimary) {
-                LOGV2_DEBUG(12101806,
-                            2,
-                            "ReplicatedFastCountManager final checkpoint flush interrupted",
-                            "error"_attr = ex.toStatus());
-            } else {
-                LOGV2_WARNING(12101807,
-                              "ReplicatedFastCountManager failed to flush on shutdown",
-                              "error"_attr = ex.toStatus());
-            }
-        }
     }
 
     LOGV2(12101800, "ReplicatedFastCountManager stopped");
@@ -563,12 +546,6 @@ void ReplicatedFastCountManager::flushAsync() {
     if (_checkpointer) {
         _checkpointer->requestFlush();
     }
-}
-
-void ReplicatedFastCountManager::flushSync_ForTest(OperationContext* opCtx) {
-    std::lock_guard lock(_checkpointerMutex);
-    invariant(_checkpointer, "flushSync_ForTest() requires startup() to have been called");
-    _checkpointer->flushSync_ForTest(opCtx);
 }
 
 void ReplicatedFastCountManager::disablePeriodicWrites_ForTest() {

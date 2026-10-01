@@ -5,7 +5,9 @@
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_test_helpers.h"
-#include "mongo/db/storage/ident.h"
+#include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
+#include "mongo/otel/metrics/metric_names.h"
+#include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/tassert_guard.h"
 #include "mongo/unittest/unittest.h"
@@ -17,7 +19,10 @@
 namespace mongo::replicated_fast_count {
 namespace {
 
+using otel::metrics::MetricNames;
+using otel::metrics::OtelMetricsCapturer;
 using test_helpers::makeOplogEntry;
+using test_helpers::makeWatermarkOplogEntry;
 using test_helpers::NsAndUUID;
 using test_helpers::OplogCursorMock;
 
@@ -36,13 +41,28 @@ TEST(SizeCountCheckpointBufferTest, EmptyBufferStartsWithoutWork) {
     EXPECT_FALSE(buffer.checkoutForFlush().has_value());
 }
 
-TEST(SizeCountCheckpointBufferTest, CheckoutGetsScannedDeltas) {
+// Batches are only ever cut at no-op watermarks. A scan without one never produces a batch.
+TEST(SizeCountCheckpointBufferTest, ScanWithoutWatermarkNeverCutsBatch) {
+    const NsAndUUID coll{.nss = NamespaceString::createNamespaceString_forTest("collA"),
+                         .uuid = UUID::gen()};
+
+    SizeCountCheckpointBuffer buffer(UUID::gen(), boost::none);
+    OplogCursorMock cursor(
+        {makeOplogEntry(Timestamp(3, 3), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/25)});
+
+    buffer.scanToNoHolesEOF(cursor);
+
+    EXPECT_FALSE(buffer.checkoutForFlush().has_value());
+}
+
+TEST(SizeCountCheckpointBufferTest, WatermarkCutsBatch) {
     const UUID oplogUuid = UUID::gen();
     const NsAndUUID coll{.nss = NamespaceString::createNamespaceString_forTest("collA"),
                          .uuid = UUID::gen()};
 
     const std::list<repl::OplogEntry> entries{
-        makeOplogEntry(Timestamp(3, 3), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/25)};
+        makeOplogEntry(Timestamp(3, 3), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/25),
+        makeWatermarkOplogEntry(Timestamp(3, 4))};
     SizeCountCheckpointBuffer buffer(oplogUuid, boost::none);
     OplogCursorMock cursor(entries);
 
@@ -60,7 +80,8 @@ TEST(SizeCountCheckpointBufferTest, CheckoutGetsScannedDeltas) {
                      .metadata = {.sizeCount = CollectionSizeCount{.size = 25, .count = 1}}}},
                 {oplogUuid,
                  ReplicatedMetadataDelta{.metadata = {.sizeCount = expectedOplogSizeCount}}}},
-        .lastTimestamp = Timestamp(3, 3)};
+        // The watermark terminates the batch, so its timestamp is the batch's lastTimestamp.
+        .lastTimestamp = Timestamp(3, 4)};
 
     EXPECT_EQ(checkedOutBuffer, expectedCheckedOutBuffer);
 }
@@ -78,7 +99,8 @@ TEST(SizeCountCheckpointBufferTest, MultipleScansAccumulateIntoOneCheckout) {
     }
     const std::list<repl::OplogEntry> entries{
         makeOplogEntry(Timestamp(2, 1), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/10),
-        makeOplogEntry(Timestamp(2, 2), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/20)};
+        makeOplogEntry(Timestamp(2, 2), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/20),
+        makeWatermarkOplogEntry(Timestamp(2, 3))};
     {
         OplogCursorMock cursor(entries);
         buffer.scanToNoHolesEOF(cursor);
@@ -95,7 +117,7 @@ TEST(SizeCountCheckpointBufferTest, MultipleScansAccumulateIntoOneCheckout) {
                      .metadata = {.sizeCount = CollectionSizeCount{.size = 30, .count = 2}}}},
                 {oplogUuid,
                  ReplicatedMetadataDelta{.metadata = {.sizeCount = expectedOplogSizeCount}}}},
-        .lastTimestamp = Timestamp(2, 2)};
+        .lastTimestamp = Timestamp(2, 3)};
 
     EXPECT_EQ(checkedOutBuffer, expectedCheckedOutBuffer);
 }
@@ -109,7 +131,8 @@ TEST(SizeCountCheckpointBufferTest, PendingAccumulatesEntriesWhileInFlightHasBat
     // Accumulate first batch and check it out, but do not acknowledge it yet.
     {
         const std::list<repl::OplogEntry> entries{
-            makeOplogEntry(Timestamp(3, 3), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/25)};
+            makeOplogEntry(Timestamp(3, 3), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/25),
+            makeWatermarkOplogEntry(Timestamp(3, 4))};
         OplogCursorMock cursor(entries);
 
         buffer.scanToNoHolesEOF(cursor);
@@ -126,7 +149,7 @@ TEST(SizeCountCheckpointBufferTest, PendingAccumulatesEntriesWhileInFlightHasBat
                          .metadata = {.sizeCount = CollectionSizeCount{.size = 25, .count = 1}}}},
                     {oplogUuid,
                      ReplicatedMetadataDelta{.metadata = {.sizeCount = expectedOplogSizeCount}}}},
-            .lastTimestamp = Timestamp(3, 3)};
+            .lastTimestamp = Timestamp(3, 4)};
 
         EXPECT_EQ(checkedOutBuffer, expectedCheckedOutBuffer);
     }
@@ -135,6 +158,7 @@ TEST(SizeCountCheckpointBufferTest, PendingAccumulatesEntriesWhileInFlightHasBat
     {
         const std::list<repl::OplogEntry> entries{
             makeOplogEntry(Timestamp(3, 3), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/25),
+            makeWatermarkOplogEntry(Timestamp(3, 4)),
             makeOplogEntry(Timestamp(4, 4), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/14)};
         OplogCursorMock cursor(entries);
 
@@ -142,12 +166,24 @@ TEST(SizeCountCheckpointBufferTest, PendingAccumulatesEntriesWhileInFlightHasBat
 
         // Acknowledge previous batch so checkout can return the new write.
         buffer.acknowledgeFlush();
+    }
 
+    // Scan to watermark, which cuts the next batch, then check it out.
+    {
+        const std::list<repl::OplogEntry> entries{
+            makeOplogEntry(Timestamp(3, 3), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/25),
+            makeWatermarkOplogEntry(Timestamp(3, 4)),
+            makeOplogEntry(Timestamp(4, 4), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/14),
+            makeWatermarkOplogEntry(Timestamp(4, 5))};
+        OplogCursorMock cursor(entries);
+
+        buffer.scanToNoHolesEOF(cursor);
         const boost::optional<OplogScanResult> checkedOutBuffer = buffer.checkoutForFlush();
         ASSERT_TRUE(checkedOutBuffer.has_value());
 
-        const CollectionSizeCount expectedOplogSizeCount =
-            calculateOplogSizeCount(std::list<repl::OplogEntry>{entries.back()});
+        // The scan above accumulates the last two elements in `entries`.
+        const CollectionSizeCount expectedOplogSizeCount = calculateOplogSizeCount(
+            std::list<repl::OplogEntry>{*std::prev(entries.end(), 2), entries.back()});
         const OplogScanResult expectedCheckedOutBuffer{
             .deltas =
                 ReplicatedMetadataDeltas{
@@ -156,7 +192,7 @@ TEST(SizeCountCheckpointBufferTest, PendingAccumulatesEntriesWhileInFlightHasBat
                          .metadata = {.sizeCount = CollectionSizeCount{.size = 14, .count = 1}}}},
                     {oplogUuid,
                      ReplicatedMetadataDelta{.metadata = {.sizeCount = expectedOplogSizeCount}}}},
-            .lastTimestamp = Timestamp(4, 4)};
+            .lastTimestamp = Timestamp(4, 5)};
 
         EXPECT_EQ(checkedOutBuffer, expectedCheckedOutBuffer);
     }
@@ -169,7 +205,8 @@ TEST(SizeCountCheckpointBufferTest, InFlightBatchIsRetriedUntilAcknowledged) {
 
     SizeCountCheckpointBuffer buffer(oplogUuid, boost::none);
     const std::list<repl::OplogEntry> entries{
-        makeOplogEntry(Timestamp(6, 6), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/40)};
+        makeOplogEntry(Timestamp(6, 6), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/40),
+        makeWatermarkOplogEntry(Timestamp(6, 7))};
     OplogCursorMock cursor(entries);
 
     buffer.scanToNoHolesEOF(cursor);
@@ -188,20 +225,20 @@ TEST(SizeCountCheckpointBufferTest, InFlightBatchIsRetriedUntilAcknowledged) {
                      .metadata = {.sizeCount = CollectionSizeCount{.size = 40, .count = 1}}}},
                 {oplogUuid,
                  ReplicatedMetadataDelta{.metadata = {.sizeCount = expectedOplogSizeCount}}}},
-        .lastTimestamp = Timestamp(6, 6)};
+        .lastTimestamp = Timestamp(6, 7)};
 
     EXPECT_EQ(retried, expectedCheckedOutBuffer);
     EXPECT_EQ(first, retried);
 }
 
 TEST(SizeCountCheckpointBufferTest, AcknowledgeFlushSuccessClearsInFlight) {
-    const UUID oplogUuid = UUID::gen();
     const NsAndUUID coll{.nss = NamespaceString::createNamespaceString_forTest("collA"),
                          .uuid = UUID::gen()};
 
-    SizeCountCheckpointBuffer buffer(oplogUuid, boost::none);
+    SizeCountCheckpointBuffer buffer(UUID::gen(), boost::none);
     OplogCursorMock cursor(
-        {makeOplogEntry(Timestamp(2, 2), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/10)});
+        {makeOplogEntry(Timestamp(2, 2), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/10),
+         makeWatermarkOplogEntry(Timestamp(2, 3))});
     buffer.scanToNoHolesEOF(cursor);
 
     EXPECT_TRUE(buffer.checkoutForFlush().has_value());
@@ -222,7 +259,8 @@ TEST(SizeCountCheckpointBufferTest, ScanAfterAcknowledgementIsIndependent) {
     // First scan.
     {
         const std::list<repl::OplogEntry> entries{
-            makeOplogEntry(Timestamp(2, 1), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/10)};
+            makeOplogEntry(Timestamp(2, 1), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/10),
+            makeWatermarkOplogEntry(Timestamp(2, 2))};
         OplogCursorMock cursor(entries);
 
         buffer.scanToNoHolesEOF(cursor);
@@ -239,7 +277,7 @@ TEST(SizeCountCheckpointBufferTest, ScanAfterAcknowledgementIsIndependent) {
                          .metadata = {.sizeCount = CollectionSizeCount{.size = 10, .count = 1}}}},
                     {oplogUuid,
                      ReplicatedMetadataDelta{.metadata = {.sizeCount = expectedOplogSizeCount}}}},
-            .lastTimestamp = Timestamp(2, 1)};
+            .lastTimestamp = Timestamp(2, 2)};
 
         EXPECT_EQ(checkedOutBuffer, expectedCheckedOutBuffer);
     }
@@ -250,7 +288,9 @@ TEST(SizeCountCheckpointBufferTest, ScanAfterAcknowledgementIsIndependent) {
     {
         const std::list<repl::OplogEntry> entries{
             makeOplogEntry(Timestamp(2, 1), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/10),
-            makeOplogEntry(Timestamp(3, 1), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/20)};
+            makeWatermarkOplogEntry(Timestamp(2, 2)),
+            makeOplogEntry(Timestamp(3, 1), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/20),
+            makeWatermarkOplogEntry(Timestamp(3, 2))};
         OplogCursorMock cursor(entries);
 
         buffer.scanToNoHolesEOF(cursor);
@@ -258,8 +298,8 @@ TEST(SizeCountCheckpointBufferTest, ScanAfterAcknowledgementIsIndependent) {
         const boost::optional<OplogScanResult> checkedOutBuffer = buffer.checkoutForFlush();
         ASSERT_TRUE(checkedOutBuffer.has_value());
 
-        const CollectionSizeCount expectedOplogSizeCount =
-            calculateOplogSizeCount(std::list<repl::OplogEntry>{entries.back()});
+        const CollectionSizeCount expectedOplogSizeCount = calculateOplogSizeCount(
+            std::list<repl::OplogEntry>{*(std::next(entries.begin(), 2)), entries.back()});
         const OplogScanResult expectedCheckedOutBuffer{
             .deltas =
                 ReplicatedMetadataDeltas{
@@ -268,9 +308,61 @@ TEST(SizeCountCheckpointBufferTest, ScanAfterAcknowledgementIsIndependent) {
                          .metadata = {.sizeCount = CollectionSizeCount{.size = 20, .count = 1}}}},
                     {oplogUuid,
                      ReplicatedMetadataDelta{.metadata = {.sizeCount = expectedOplogSizeCount}}}},
-            .lastTimestamp = Timestamp(3, 1)};
+            .lastTimestamp = Timestamp(3, 2)};
 
         EXPECT_EQ(checkedOutBuffer, expectedCheckedOutBuffer);
+    }
+}
+
+// A watermark seen while a batch is already in flight is folded into _pending like any other
+// record, and the in-flight batch is left untouched.
+TEST(SizeCountCheckpointBufferTest, WatermarkWithExistingInFlightFoldsIntoPending) {
+    const UUID oplogUuid = UUID::gen();
+    const NsAndUUID coll{.nss = NamespaceString::createNamespaceString_forTest("collA"),
+                         .uuid = UUID::gen()};
+
+    SizeCountCheckpointBuffer buffer(oplogUuid, boost::none);
+
+    {
+        const std::list<repl::OplogEntry> entries{
+            makeOplogEntry(Timestamp(2, 1), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/10),
+            makeWatermarkOplogEntry(Timestamp(2, 2)),
+            makeOplogEntry(Timestamp(2, 3), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/20),
+            makeWatermarkOplogEntry(Timestamp(2, 4))};
+
+        OplogCursorMock cursor(entries);
+        buffer.scanToNoHolesEOF(cursor);
+
+        // The first watermark cut the first batch, and the second was folded into _pending.
+        const boost::optional<OplogScanResult> batch = buffer.checkoutForFlush();
+        ASSERT_TRUE(batch.has_value());
+        EXPECT_EQ(batch->deltas.at(coll.uuid).metadata.sizeCount,
+                  (CollectionSizeCount{.size = 10, .count = 1}));
+        EXPECT_EQ(batch->lastTimestamp, Timestamp(2, 2));
+
+        buffer.acknowledgeFlush();
+    }
+
+    {
+        const std::list<repl::OplogEntry> entries{
+            makeOplogEntry(Timestamp(2, 1), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/10),
+            makeWatermarkOplogEntry(Timestamp(2, 2)),
+            makeOplogEntry(Timestamp(2, 3), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/20),
+            makeWatermarkOplogEntry(Timestamp(2, 4)),
+            makeOplogEntry(Timestamp(2, 5), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/30),
+            makeWatermarkOplogEntry(Timestamp(2, 6))};
+
+        OplogCursorMock cursor(entries);
+        buffer.scanToNoHolesEOF(cursor);
+
+        // The second and third watermark are combined into _pending, so we lose the second
+        // watermark.
+        // TODO(SERVER-135085): Is this the behavior we want?
+        const boost::optional<OplogScanResult> batch = buffer.checkoutForFlush();
+        ASSERT_TRUE(batch.has_value());
+        EXPECT_EQ(batch->deltas.at(coll.uuid).metadata.sizeCount,
+                  (CollectionSizeCount{.size = 50, .count = 2}));
+        EXPECT_EQ(batch->lastTimestamp, Timestamp(2, 6));
     }
 }
 
@@ -299,7 +391,8 @@ TEST(SizeCountCheckpointBufferTest, DropThenImportAcrossScansYieldsDroppedAndRec
     const std::list<repl::OplogEntry> entries{
         test_helpers::makeDropOplogEntry(Timestamp(2, 1), coll),
         test_helpers::makeImportCollectionOplogEntry(
-            Timestamp(2, 2), coll, /*numRecords=*/3, /*dataSize=*/90)};
+            Timestamp(2, 2), coll, /*numRecords=*/3, /*dataSize=*/90),
+        makeWatermarkOplogEntry(Timestamp(2, 3))};
     {
         OplogCursorMock cursor(entries);
         buffer.scanToNoHolesEOF(cursor);
@@ -318,28 +411,27 @@ TEST(SizeCountCheckpointBufferTest, DropThenImportAcrossScansYieldsDroppedAndRec
                      .state = DDLState::kDroppedAndRecreated}},
                 {oplogUuid,
                  ReplicatedMetadataDelta{.metadata = {.sizeCount = expectedOplogSizeCount}}}},
-        .lastTimestamp = Timestamp(2, 2)};
+        .lastTimestamp = Timestamp(2, 3)};
 
     EXPECT_EQ(checkedOutBuffer, expectedCheckedOutBuffer);
 }
 
 TEST(SizeCountCheckpointBufferTest, CreateThenDropWithinScanCancelsOut) {
-    const UUID oplogUuid = UUID::gen();
     const NsAndUUID coll{.nss = NamespaceString::createNamespaceString_forTest("test", "collA"),
                          .uuid = UUID::gen()};
 
-    SizeCountCheckpointBuffer buffer(oplogUuid, boost::none);
+    SizeCountCheckpointBuffer buffer(UUID::gen(), boost::none);
     OplogCursorMock cursor({test_helpers::makeCreateOplogEntry(Timestamp(2, 1), coll),
-                            test_helpers::makeDropOplogEntry(Timestamp(2, 2), coll)});
+                            test_helpers::makeDropOplogEntry(Timestamp(2, 2), coll),
+                            makeWatermarkOplogEntry(Timestamp(2, 3))});
     buffer.scanToNoHolesEOF(cursor);
 
     const boost::optional<OplogScanResult> checkedOutBuffer = buffer.checkoutForFlush();
-    // The drop is a real (non-internal) entry, so the interval has work and a batch is cut.
     ASSERT_TRUE(checkedOutBuffer.has_value());
     // The create and drop cancel out, so the collection delta is gone.
     EXPECT_FALSE(checkedOutBuffer->deltas.contains(coll.uuid));
     ASSERT_TRUE(checkedOutBuffer->lastTimestamp.has_value());
-    EXPECT_EQ(*checkedOutBuffer->lastTimestamp, Timestamp(2, 2));
+    EXPECT_EQ(*checkedOutBuffer->lastTimestamp, Timestamp(2, 3));
 }
 
 TEST(SizeCountCheckpointBufferTest, PartialScanThenWriteConflictDoesNotDoubleCount) {
@@ -351,6 +443,7 @@ TEST(SizeCountCheckpointBufferTest, PartialScanThenWriteConflictDoesNotDoubleCou
         makeOplogEntry(Timestamp(2, 1), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/10),
         makeOplogEntry(Timestamp(2, 2), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/20),
         makeOplogEntry(Timestamp(2, 3), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/30),
+        makeWatermarkOplogEntry(Timestamp(2, 4)),
     };
 
     SizeCountCheckpointBuffer buffer(oplogUuid, boost::none);
@@ -377,7 +470,7 @@ TEST(SizeCountCheckpointBufferTest, PartialScanThenWriteConflictDoesNotDoubleCou
                      .metadata = {.sizeCount = CollectionSizeCount{.size = 60, .count = 3}}}},
                 {oplogUuid,
                  ReplicatedMetadataDelta{.metadata = {.sizeCount = expectedOplogSizeCount}}}},
-        .lastTimestamp = Timestamp(2, 3)};
+        .lastTimestamp = Timestamp(2, 4)};
     EXPECT_EQ(checkedOutBuffer, expectedCheckedOutBuffer);
 }
 
@@ -398,6 +491,7 @@ TEST(SizeCountCheckpointBufferTest, PartialScanThenWriteConflictFoldsEachHashOnc
         makeOplogEntry(Timestamp(2, 1), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/10, kHashA),
         makeOplogEntry(Timestamp(2, 2), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/20, kHashB),
         makeOplogEntry(Timestamp(2, 3), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/30, kHashC),
+        makeWatermarkOplogEntry(Timestamp(2, 4)),
     };
 
     SizeCountCheckpointBuffer buffer(oplogUuid, boost::none);
@@ -432,15 +526,16 @@ TEST(SizeCountCheckpointBufferTest, SeekExactDoesNotDoubleCountLastBufferedRid) 
     const std::list<repl::OplogEntry> entries{
         makeOplogEntry(Timestamp(2, 1), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/10),
         makeOplogEntry(Timestamp(2, 2), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/20),
-        makeOplogEntry(Timestamp(2, 3), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/30)};
+        makeOplogEntry(Timestamp(2, 3), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/30),
+        makeWatermarkOplogEntry(Timestamp(2, 4))};
     OplogCursorMock cursor(entries);
     buffer.scanToNoHolesEOF(cursor);
 
     const boost::optional<OplogScanResult> checkedOutBuffer = buffer.checkoutForFlush();
     ASSERT_TRUE(checkedOutBuffer.has_value());
 
-    const CollectionSizeCount expectedOplogSizeCount =
-        calculateOplogSizeCount(std::list<repl::OplogEntry>{entries.back()});
+    const CollectionSizeCount expectedOplogSizeCount = calculateOplogSizeCount(
+        std::list<repl::OplogEntry>{*(std::next(entries.begin(), 2)), entries.back()});
     const OplogScanResult expectedCheckedOutBuffer{
         .deltas =
             ReplicatedMetadataDeltas{
@@ -449,7 +544,7 @@ TEST(SizeCountCheckpointBufferTest, SeekExactDoesNotDoubleCountLastBufferedRid) 
                      .metadata = {.sizeCount = CollectionSizeCount{.size = 30, .count = 1}}}},
                 {oplogUuid,
                  ReplicatedMetadataDelta{.metadata = {.sizeCount = expectedOplogSizeCount}}}},
-        .lastTimestamp = Timestamp(2, 3)};
+        .lastTimestamp = Timestamp(2, 4)};
 
     EXPECT_EQ(checkedOutBuffer, expectedCheckedOutBuffer);
 }
@@ -465,7 +560,8 @@ TEST(SizeCountCheckpointBufferTest, LostLastBufferedRidResumesFromNextEntry) {
     const std::list<repl::OplogEntry> entries{
         makeOplogEntry(Timestamp(1, 1), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/100),
         makeOplogEntry(Timestamp(5, 1), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/10),
-        makeOplogEntry(Timestamp(5, 2), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/20)};
+        makeOplogEntry(Timestamp(5, 2), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/20),
+        makeWatermarkOplogEntry(Timestamp(5, 3))};
 
     {
         OplogCursorMock cursor(entries);
@@ -473,15 +569,15 @@ TEST(SizeCountCheckpointBufferTest, LostLastBufferedRidResumesFromNextEntry) {
     }
     {
         OplogCursorMock cursor(entries);
-        ASSERT_NO_THROW(buffer.scanToNoHolesEOF(cursor));
+        buffer.scanToNoHolesEOF(cursor);
     }
 
     const boost::optional<OplogScanResult> checkedOutBuffer = buffer.checkoutForFlush();
     ASSERT_TRUE(checkedOutBuffer.has_value());
 
-    // The follow-up scan resumes at (5, 1) and consumes up through (5, 2).
+    // The follow-up scan resumes at (5, 1) and consumes up through the watermark at (5, 3).
     const CollectionSizeCount expectedOplogSizeCount = calculateOplogSizeCount(
-        std::list<repl::OplogEntry>{*(std::next(entries.begin(), 1)), entries.back()});
+        std::list<repl::OplogEntry>{std::next(entries.begin(), 1), entries.end()});
     const OplogScanResult expectedCheckedOutBuffer{
         .deltas =
             ReplicatedMetadataDeltas{
@@ -490,7 +586,39 @@ TEST(SizeCountCheckpointBufferTest, LostLastBufferedRidResumesFromNextEntry) {
                      .metadata = {.sizeCount = CollectionSizeCount{.size = 30, .count = 2}}}},
                 {oplogUuid,
                  ReplicatedMetadataDelta{.metadata = {.sizeCount = expectedOplogSizeCount}}}},
-        .lastTimestamp = Timestamp(5, 2)};
+        .lastTimestamp = Timestamp(5, 3)};
+
+    EXPECT_EQ(checkedOutBuffer, expectedCheckedOutBuffer);
+}
+
+TEST(SizeCountCheckpointBufferTest, LostLastBufferedRidResumesOntoWatermarkCutsBatch) {
+    const UUID oplogUuid = UUID::gen();
+    const RecordId lastBufferedRid(Timestamp(2, 1).asULL());
+    SizeCountCheckpointBuffer buffer(oplogUuid, lastBufferedRid);
+
+    // The only entry in the oplog is a watermark, so after successfully resuming, the in-flight
+    // batch should be immediately cut.
+    const std::list<repl::OplogEntry> entries{makeWatermarkOplogEntry(Timestamp(2, 2))};
+
+    {
+        OplogCursorMock cursor(entries);
+        ASSERT_TASSERT_CODE(buffer.scanToNoHolesEOF(cursor), 12101812);
+    }
+    {
+        OplogCursorMock cursor(entries);
+        buffer.scanToNoHolesEOF(cursor);
+    }
+
+    const boost::optional<OplogScanResult> checkedOutBuffer = buffer.checkoutForFlush();
+    ASSERT_TRUE(checkedOutBuffer.has_value());
+
+    const CollectionSizeCount expectedOplogSizeCount = calculateOplogSizeCount(entries);
+    const OplogScanResult expectedCheckedOutBuffer{
+        .deltas =
+            ReplicatedMetadataDeltas{
+                {oplogUuid,
+                 ReplicatedMetadataDelta{.metadata = {.sizeCount = expectedOplogSizeCount}}}},
+        .lastTimestamp = Timestamp(2, 2)};
 
     EXPECT_EQ(checkedOutBuffer, expectedCheckedOutBuffer);
 }
@@ -505,10 +633,12 @@ TEST(SizeCountCheckpointBufferTest, RepeatedLostLastBufferedRidTassertsOncePerEp
 
     const std::list<repl::OplogEntry> episodeOneEntries{
         makeOplogEntry(Timestamp(5, 1), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/10),
-        makeOplogEntry(Timestamp(5, 2), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/20)};
+        makeOplogEntry(Timestamp(5, 2), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/20),
+        makeWatermarkOplogEntry(Timestamp(5, 3))};
     const std::list<repl::OplogEntry> episodeTwoEntries{
         makeOplogEntry(Timestamp(6, 1), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/30),
-        makeOplogEntry(Timestamp(6, 2), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/40)};
+        makeOplogEntry(Timestamp(6, 2), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/40),
+        makeWatermarkOplogEntry(Timestamp(6, 3))};
 
     // Episode one: the (2, 1) start point is lost.
     {
@@ -517,24 +647,127 @@ TEST(SizeCountCheckpointBufferTest, RepeatedLostLastBufferedRidTassertsOncePerEp
     }
     {
         OplogCursorMock cursor(episodeOneEntries);
-        ASSERT_NO_THROW(buffer.scanToNoHolesEOF(cursor));
+        buffer.scanToNoHolesEOF(cursor);
     }
-    // Episode two: the recovered start point (5, 2) is lost again.
+    // The watermark at (5, 3) cut the first batch. Acknowledge it before the next episode.
+    const boost::optional<OplogScanResult> firstBatch = buffer.checkoutForFlush();
+    ASSERT_TRUE(firstBatch.has_value());
+    EXPECT_EQ(firstBatch->deltas.at(coll.uuid).metadata.sizeCount,
+              (CollectionSizeCount{.size = 30, .count = 2}));
+    EXPECT_EQ(firstBatch->lastTimestamp, Timestamp(5, 3));
+    buffer.acknowledgeFlush();
+
+    // Episode two: the recovered start point (5, 3) is lost again.
     {
         OplogCursorMock cursor(episodeTwoEntries);
         ASSERT_TASSERT_CODE(buffer.scanToNoHolesEOF(cursor), 12101812);
     }
     {
         OplogCursorMock cursor(episodeTwoEntries);
-        ASSERT_NO_THROW(buffer.scanToNoHolesEOF(cursor));
+        buffer.scanToNoHolesEOF(cursor);
     }
 
     const boost::optional<OplogScanResult> checkedOutBuffer = buffer.checkoutForFlush();
     ASSERT_TRUE(checkedOutBuffer.has_value());
     EXPECT_EQ(checkedOutBuffer->deltas.at(coll.uuid).metadata.sizeCount,
-              (CollectionSizeCount{.size = 100, .count = 4}));
+              (CollectionSizeCount{.size = 70, .count = 2}));
     ASSERT_TRUE(checkedOutBuffer->lastTimestamp.has_value());
-    EXPECT_EQ(*checkedOutBuffer->lastTimestamp, Timestamp(6, 2));
+    EXPECT_EQ(*checkedOutBuffer->lastTimestamp, Timestamp(6, 3));
+}
+
+TEST(SizeCountCheckpointBufferTest, ReadyForWatermarkIsFalseOnFreshBuffer) {
+    SizeCountCheckpointBuffer buffer(UUID::gen(), boost::none);
+
+    // The pending accumulator has consumed nothing, so there is no work to watermark.
+    EXPECT_FALSE(buffer.readyForWatermark());
+}
+
+TEST(SizeCountCheckpointBufferTest, ReadyForWatermarkIsTrueWithPendingWorkAndNoInFlightBatch) {
+    const NsAndUUID coll{.nss = NamespaceString::createNamespaceString_forTest("collA"),
+                         .uuid = UUID::gen()};
+
+    SizeCountCheckpointBuffer buffer(UUID::gen(), boost::none);
+    OplogCursorMock cursor(
+        {makeOplogEntry(Timestamp(2, 1), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/10)});
+    buffer.scanToNoHolesEOF(cursor);
+
+    EXPECT_TRUE(buffer.readyForWatermark());
+}
+
+TEST(SizeCountCheckpointBufferTest, ReadyForWatermarkIsFalseWhenInFlightBatchExists) {
+    const NsAndUUID coll{.nss = NamespaceString::createNamespaceString_forTest("collA"),
+                         .uuid = UUID::gen()};
+
+    SizeCountCheckpointBuffer buffer(UUID::gen(), boost::none);
+    OplogCursorMock cursor(
+        {makeOplogEntry(Timestamp(2, 1), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/10),
+         makeWatermarkOplogEntry(Timestamp(2, 2))});
+    buffer.scanToNoHolesEOF(cursor);
+
+    EXPECT_FALSE(buffer.readyForWatermark());
+}
+
+// The blocking await needs an OperationContext for interruption support.
+class SizeCountCheckpointBufferAwaitTest : public CatalogTestFixture {};
+
+TEST_F(SizeCountCheckpointBufferAwaitTest, AwaitReturnsImmediatelyWhenInFlightBatchExists) {
+    const NsAndUUID coll{.nss = NamespaceString::createNamespaceString_forTest("collA"),
+                         .uuid = UUID::gen()};
+
+    SizeCountCheckpointBuffer buffer(UUID::gen(), boost::none);
+    OplogCursorMock cursor(
+        {makeOplogEntry(Timestamp(2, 1), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/10),
+         makeWatermarkOplogEntry(Timestamp(2, 2))});
+    buffer.scanToNoHolesEOF(cursor);
+
+    // The batch was already cut by the scan, so the await returns without waiting.
+    const OplogScanResult batch = buffer.awaitCheckoutForFlush(operationContext());
+    EXPECT_EQ(batch.lastTimestamp, Timestamp(2, 2));
+}
+
+TEST_F(SizeCountCheckpointBufferAwaitTest, AwaitBlocksWhenNoBatchExists) {
+    const NsAndUUID coll{.nss = NamespaceString::createNamespaceString_forTest("collA"),
+                         .uuid = UUID::gen()};
+
+    SizeCountCheckpointBuffer buffer(UUID::gen(), boost::none);
+    OplogScanResult batch;
+    stdx::thread waiter([&]() { batch = buffer.awaitCheckoutForFlush(operationContext()); });
+
+    OplogCursorMock cursor(
+        {makeOplogEntry(Timestamp(2, 1), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/10),
+         makeWatermarkOplogEntry(Timestamp(2, 2))});
+    buffer.scanToNoHolesEOF(cursor);
+
+    waiter.join();
+    EXPECT_EQ(batch.lastTimestamp, Timestamp(2, 2));
+}
+
+TEST_F(SizeCountCheckpointBufferAwaitTest, AwaitRecordsElapsedWaitTime) {
+    OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    const NsAndUUID coll{.nss = NamespaceString::createNamespaceString_forTest("collA"),
+                         .uuid = UUID::gen()};
+
+    SizeCountCheckpointBuffer buffer(UUID::gen(), boost::none);
+    OplogScanResult batch;
+    stdx::thread waiter([&]() { batch = buffer.awaitCheckoutForFlush(operationContext()); });
+
+    // Delay the batch cut so the waiter is guaranteed to block for at least this long.
+    constexpr auto kWaitTime = Milliseconds(100);
+    sleepFor(kWaitTime);
+
+    OplogCursorMock cursor(
+        {makeOplogEntry(Timestamp(2, 1), coll, repl::OpTypeEnum::kInsert, /*sizeDelta=*/10),
+         makeWatermarkOplogEntry(Timestamp(2, 2))});
+    buffer.scanToNoHolesEOF(cursor);
+
+    waiter.join();
+    EXPECT_EQ(batch.lastTimestamp, Timestamp(2, 2));
+    EXPECT_GE(capturer.readInt64Counter(MetricNames::kReplicatedFastCountWatermarkAwaitTimeMsTotal),
+              kWaitTime.count());
 }
 
 DEATH_TEST(SizeCountCheckpointBufferDeathTest, LastBufferedRidBeforeEntries, "12101812") {

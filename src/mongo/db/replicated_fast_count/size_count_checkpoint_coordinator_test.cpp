@@ -26,6 +26,8 @@ namespace {
 
 using otel::metrics::MetricNames;
 using otel::metrics::OtelMetricsCapturer;
+using test_helpers::waitForFlush;
+using test_helpers::waitForFlushFailpoint;
 
 class SizeCountCheckpointCoordinatorTest : public CatalogTestFixture {
 public:
@@ -61,6 +63,11 @@ protected:
         return _timestampStore->read(_opCtx);
     }
 
+    boost::optional<SizeCountStore::Entry> readMetadataStore(UUID uuid) {
+        Lock::GlobalLock lk(_opCtx, MODE_IS);
+        return _sizeCountStore->read(_opCtx, uuid);
+    }
+
     OperationContext* _opCtx = nullptr;
     std::unique_ptr<SizeCountStore> _sizeCountStore;
     std::unique_ptr<SizeCountTimestampStore> _timestampStore;
@@ -75,18 +82,13 @@ TEST_F(SizeCountCheckpointCoordinatorTest, MultipleRequestFlushCallsBeforeFlushA
     ASSERT_TRUE(_coordinator->isFlushRequested_ForTest());
 }
 
-TEST_F(SizeCountCheckpointCoordinatorTest, FlushSyncWithEmptyTimestampStoreIsNoOp) {
-    const auto initial = readTimestampStore();
-    _coordinator->flushSync_ForTest(_opCtx);
-    ASSERT_EQ(readTimestampStore(), initial);
-}
-
 class SizeCountCheckpointCoordinatorWithOplogTest : public SizeCountCheckpointCoordinatorTest {
 protected:
     void setUp() override {
         SizeCountCheckpointCoordinatorTest::setUp();
-        ASSERT_OK(storageInterface()->createCollection(
-            operationContext(), _collA.nss, CollectionOptions{.uuid = _collA.uuid}));
+        // Register an OpObserver so that watermark entries written by the flusher thread are
+        // actually written to the oplog.
+        test_helpers::registerOpObserverForTest(getServiceContext());
     }
 
     void writeInsert(Timestamp ts, int32_t sizeDelta = 10) {
@@ -94,6 +96,12 @@ protected:
             operationContext(),
             test_helpers::makeOplogEntry(ts, _collA, repl::OpTypeEnum::kInsert, sizeDelta));
         repl::signalOplogWaiters();
+    }
+
+
+    Timestamp waitForFlush() {
+        return test_helpers::waitForFlush(
+            _opCtx, *_timestampStore, [&] { _coordinator->requestFlush(); });
     }
 
     const test_helpers::NsAndUUID _collA{
@@ -116,17 +124,7 @@ TEST_F(SizeCountCheckpointCoordinatorWithOplogTest, FlushFailureIncrementsFlushF
     writeInsert(Timestamp(1, 1));
 
     // Spawn a separate thread to requestFlush() until the failpoint is reached.
-    Atomic<bool> stop{false};
-    stdx::thread driver([&] {
-        while (!stop.load()) {
-            repl::signalOplogWaiters();
-            _coordinator->requestFlush();
-            sleepmillis(10);
-        }
-    });
-    failFp.waitForOneNewEntry();
-    stop.store(true);
-    driver.join();
+    waitForFlushFailpoint(failFp, [&] { _coordinator->requestFlush(); });
 
     // The destructor joins the flush thread. The join cannot return until the thread has run the
     // loop's catch (incrementing the failure metric) and exited, so the assertions need no
@@ -141,8 +139,17 @@ TEST_F(SizeCountCheckpointCoordinatorWithOplogTest, FlushFailureIncrementsFlushF
     EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountFlushedDocsTotal), 0);
 }
 
-TEST_F(SizeCountCheckpointCoordinatorWithOplogTest,
-       FlushSyncWithNoNewDataPreservesPersistedTimestamp) {
+TEST_F(SizeCountCheckpointCoordinatorWithOplogTest, FlushWithNoNewDataIsNoop) {
+    FailPointEnableBlock sleepFp("sleepAfterFlush");
+    _coordinator->startup(getServiceContext());
+    // Spawn a separate thread to requestFlush() until the failpoint is reached because there is a
+    // race between calling startup() and calling requestFlush().
+    waitForFlushFailpoint(sleepFp, [&] { _coordinator->requestFlush(); });
+
+    ASSERT_FALSE(readTimestampStore().has_value());
+}
+
+TEST_F(SizeCountCheckpointCoordinatorWithOplogTest, FlushWithNoNewDataPreservesPersistedTimestamp) {
     const Timestamp persistedTs(10, 5);
     {
         Lock::GlobalLock writeLock(_opCtx, MODE_IX);
@@ -150,25 +157,52 @@ TEST_F(SizeCountCheckpointCoordinatorWithOplogTest,
         _timestampStore->write(_opCtx, persistedTs);
         wuow.commit();
     }
-
-    // Write an oplog entry at persistedTs so bootstrap can seekExact to it (simulating that the
-    // previous checkpoint run had processed up to this point and the entry is still in the oplog).
+    // Write an oplog entry at persistedTs so scanToNoHolesEOF() can seekExact() to it (simulating
+    // that the previous checkpoint run had processed up to this point and the entry is still in the
+    // oplog).
     writeInsert(persistedTs);
 
     auto coordinator = std::make_unique<SizeCountCheckpointCoordinator>(
         *_sizeCountStore, *_timestampStore, oplogUuid(), persistedTs);
-    coordinator->flushSync_ForTest(_opCtx);
+
+    FailPointEnableBlock sleepFp("sleepAfterFlush");
+    coordinator->startup(getServiceContext());
+    // Spawn a separate thread to requestFlush() until the failpoint is reached because there is a
+    // race between calling startup() and calling requestFlush().
+    waitForFlushFailpoint(sleepFp, [&] { coordinator->requestFlush(); });
 
     ASSERT_EQ(readTimestampStore(), boost::optional<Timestamp>(persistedTs));
 }
 
-TEST_F(SizeCountCheckpointCoordinatorWithOplogTest, FlushSyncAdvancesTimestampAfterTailCycle) {
-    const Timestamp ts(10, 1);
-    writeInsert(ts);
+TEST_F(SizeCountCheckpointCoordinatorWithOplogTest, FlushAdvancesTimestampAfterTailCycle) {
+    _coordinator->startup(getServiceContext());
+    EXPECT_FALSE(readTimestampStore().has_value());
 
-    _coordinator->flushSync_ForTest(_opCtx);
+    writeInsert(Timestamp(10, 1));
 
-    ASSERT_EQ(readTimestampStore(), boost::optional<Timestamp>(ts));
+    const Timestamp validAsOf = waitForFlush();
+
+    EXPECT_EQ(readTimestampStore(), validAsOf);
+}
+
+TEST_F(SizeCountCheckpointCoordinatorWithOplogTest, FailedFlushRetries) {
+    _coordinator->startup(getServiceContext());
+    writeInsert(Timestamp(10, 1), /*sizeDelta=*/50);
+
+    {
+        FailPointEnableBlock failFp("failDuringFlush");
+
+        // Spawn a separate thread to requestFlush() until the failpoint is reached because there is
+        // a race between calling startup() and calling requestFlush().
+        waitForFlushFailpoint(failFp, [&] { _coordinator->requestFlush(); });
+    }
+
+    const Timestamp validAsOf = waitForFlush();
+
+    EXPECT_EQ(readTimestampStore(), validAsOf);
+    EXPECT_EQ(readMetadataStore(_collA.uuid),
+              (SizeCountStore::Entry{
+                  .timestamp = validAsOf, .size = 50, .count = 1, .hash = boost::none}));
 }
 
 TEST_F(SizeCountCheckpointCoordinatorTest,
@@ -253,11 +287,17 @@ protected:
     void setUp() override {
         CatalogTestFixture::setUp();
         _opCtx = operationContext();
+
+        // Register an OpObserver so that watermark entries written by the flusher thread are
+        // actually written to the oplog and then seen in waitForFlush() below.
+        test_helpers::registerOpObserverForTest(getServiceContext());
+
         auto stores = test_helpers::createContainerFastCountStores(_opCtx);
         _sizeCountStore = std::move(stores.sizeCountStore);
         _timestampStore = std::move(stores.timestampStore);
         _coordinator = std::make_unique<SizeCountCheckpointCoordinator>(
             *_sizeCountStore, *_timestampStore, oplogUuid(), Timestamp::min());
+        _coordinator->startup(getServiceContext());
     }
 
     void tearDown() override {
@@ -270,10 +310,14 @@ protected:
         return oplogRead.getCollection()->uuid();
     }
 
-    // Runs one tail-then-flush cycle: the tailer buffers everything newly visible in the oplog and
-    // the flusher persists it.
-    void flush() {
-        _coordinator->flushSync_ForTest(_opCtx);
+    // Runs one watermark-terminated tail-then-flush cycle: writes a no-op watermark at a fresh
+    // synthetic timestamp, tails the oplog so the buffer cuts the batch at it, then flushes.
+    // Returns the watermark's timestamp, which is the valid-as-of the flush persists.
+    Timestamp flush() {
+        const Timestamp watermarkTs = nextTs();
+        test_helpers::writeToOplog(_opCtx, test_helpers::makeWatermarkOplogEntry(watermarkTs));
+        waitForFlush(_opCtx, *_timestampStore, [&] { _coordinator->requestFlush(); });
+        return watermarkTs;
     }
 
     void writeOplogEntry(const repl::OplogEntry& entry) {
@@ -337,19 +381,34 @@ protected:
     std::unique_ptr<SizeCountStore> _sizeCountStore;
     std::unique_ptr<SizeCountTimestampStore> _timestampStore;
     std::unique_ptr<SizeCountCheckpointCoordinator> _coordinator;
+
+    // Monotonically increasing oplog timestamp allocation. Every entry the test writes — CRUD
+    // and watermarks alike — must be strictly greater than the previous one, mirroring real
+    // oplog slot allocation; the buffer's resume logic keys off these timestamps.
+    // The base seconds sit above the wall clock so that any watermark the flusher writes itself,
+    // whose timestamp is allocated from the clock, lands behind the tailer's cursor and is never
+    // consumed.
+    static constexpr uint32_t kTestOplogSecs = 2000000000;
+    uint32_t _nextInc = 0;
+
+    Timestamp nextTs() {
+        return Timestamp(kTestOplogSecs, ++_nextInc);
+    }
 };
 
 // The `h` on a single oplog entry is parsed out of the oplog and lands in the persisted
 // entry. The oplog collection's own entry carries no hash, since its deltas are byte counts of
 // records rather than document contributions.
 TEST_F(SizeCountCheckpointCoordinatorHashTest, HashOnOplogEntryPersistedOnCheckpoint) {
-    const Timestamp ts{1, 1};
+    const Timestamp ts = nextTs();
     writeCrudEntry(ts, _collA, repl::OpTypeEnum::kInsert, 10 /*sizeDelta=*/, kHashA);
 
-    flush();
+    // The flush terminates the batch at a freshly written watermark, whose timestamp becomes
+    // the checkpoint's valid-as-of.
+    const Timestamp expectedValidAsOf = flush();
 
     const SizeCountStore::Entry expectedEntry{
-        .timestamp = ts, .size = 10, .count = 1, .hash = kHashA};
+        .timestamp = expectedValidAsOf, .size = 10, .count = 1, .hash = kHashA};
     const auto entry = readSizeCount(_collA.uuid);
     ASSERT_TRUE(entry.has_value());
     EXPECT_EQ(expectedEntry, *entry);
@@ -362,16 +421,16 @@ TEST_F(SizeCountCheckpointCoordinatorHashTest, HashOnOplogEntryPersistedOnCheckp
 // The hashes on the entries scanned within one checkpoint are XOR-folded into the persisted
 // hash.
 TEST_F(SizeCountCheckpointCoordinatorHashTest, HashesWithinCheckpointAreXorFolded) {
-    writeCrudEntry(Timestamp(1, 1), _collA, repl::OpTypeEnum::kInsert, 10 /*sizeDelta=*/, kHashA);
-    writeCrudEntry(Timestamp(1, 2), _collA, repl::OpTypeEnum::kInsert, 20 /*sizeDelta=*/, kHashB);
+    writeCrudEntry(nextTs(), _collA, repl::OpTypeEnum::kInsert, 10 /*sizeDelta=*/, kHashA);
+    writeCrudEntry(nextTs(), _collA, repl::OpTypeEnum::kInsert, 20 /*sizeDelta=*/, kHashB);
     // An update's `h` is already the pre-image XOR the post-image, so it folds in like any other
     // contribution and leaves the count unchanged.
-    writeCrudEntry(Timestamp(1, 3), _collA, repl::OpTypeEnum::kUpdate, 5 /*sizeDelta=*/, kHashC);
+    writeCrudEntry(nextTs(), _collA, repl::OpTypeEnum::kUpdate, 5 /*sizeDelta=*/, kHashC);
 
-    flush();
+    const Timestamp expectedValidAsOf = flush();
 
     const SizeCountStore::Entry expectedEntry{
-        .timestamp = Timestamp(1, 3), .size = 35, .count = 2, .hash = kHashA ^ kHashB ^ kHashC};
+        .timestamp = expectedValidAsOf, .size = 35, .count = 2, .hash = kHashA ^ kHashB ^ kHashC};
     const auto entry = readSizeCount(_collA.uuid);
     ASSERT_TRUE(entry.has_value());
     EXPECT_EQ(expectedEntry, *entry);
@@ -380,12 +439,12 @@ TEST_F(SizeCountCheckpointCoordinatorHashTest, HashesWithinCheckpointAreXorFolde
 // Deleting the document that was inserted folds its contribution back out, leaving the hash
 // of an empty collection. The persisted hash is 0, which is distinct from an absent hash.
 TEST_F(SizeCountCheckpointCoordinatorHashTest, InsertThenDeleteFoldsBackToEmptyCollectionHash) {
-    writeCrudEntry(Timestamp(1, 1), _collA, repl::OpTypeEnum::kInsert, 10 /*sizeDelta=*/, kHashA);
-    writeCrudEntry(Timestamp(1, 2), _collA, repl::OpTypeEnum::kDelete, -10 /*sizeDelta=*/, kHashA);
+    writeCrudEntry(nextTs(), _collA, repl::OpTypeEnum::kInsert, 10 /*sizeDelta=*/, kHashA);
+    writeCrudEntry(nextTs(), _collA, repl::OpTypeEnum::kDelete, -10 /*sizeDelta=*/, kHashA);
 
-    flush();
+    const Timestamp expectedValidAsOf = flush();
 
-    const SizeCountStore::Entry expectedEntry{.timestamp = Timestamp(1, 2),
+    const SizeCountStore::Entry expectedEntry{.timestamp = expectedValidAsOf,
                                               .size = 0,
                                               .count = 0,
                                               .hash = kEmptyCollectionValidationHash};
@@ -397,14 +456,13 @@ TEST_F(SizeCountCheckpointCoordinatorHashTest, InsertThenDeleteFoldsBackToEmptyC
 // An entry that carries a size delta but no `h` invalidates the hash for the whole
 // checkpoint, so no hash is persisted even though the size and count still are.
 TEST_F(SizeCountCheckpointCoordinatorHashTest, EntryWithoutHashInvalidatesPersistedHash) {
-    writeCrudEntry(Timestamp(1, 1), _collA, repl::OpTypeEnum::kInsert, 10 /*sizeDelta=*/, kHashA);
-    writeCrudEntry(
-        Timestamp(1, 2), _collA, repl::OpTypeEnum::kInsert, 20 /*sizeDelta=*/, boost::none);
+    writeCrudEntry(nextTs(), _collA, repl::OpTypeEnum::kInsert, 10 /*sizeDelta=*/, kHashA);
+    writeCrudEntry(nextTs(), _collA, repl::OpTypeEnum::kInsert, 20 /*sizeDelta=*/, boost::none);
 
-    flush();
+    const Timestamp expectedValidAsOf = flush();
 
     const SizeCountStore::Entry expectedEntry{
-        .timestamp = Timestamp(1, 2), .size = 30, .count = 2, .hash = boost::none};
+        .timestamp = expectedValidAsOf, .size = 30, .count = 2, .hash = boost::none};
     const auto entry = readSizeCount(_collA.uuid);
     ASSERT_TRUE(entry.has_value());
     EXPECT_EQ(expectedEntry, *entry);
@@ -413,21 +471,23 @@ TEST_F(SizeCountCheckpointCoordinatorHashTest, EntryWithoutHashInvalidatesPersis
 // A later checkpoint folds its hashes into the one already persisted rather than replacing
 // it.
 TEST_F(SizeCountCheckpointCoordinatorHashTest, HashFoldsIntoPersistedHashAcrossCheckpoints) {
-    writeCrudEntry(Timestamp(1, 1), _collA, repl::OpTypeEnum::kInsert, 10 /*sizeDelta=*/, kHashA);
+    writeCrudEntry(nextTs(), _collA, repl::OpTypeEnum::kInsert, 10 /*sizeDelta=*/, kHashA);
 
-    flush();
+    const Timestamp expectedValidAsOf1 = flush();
     {
+        const SizeCountStore::Entry expectedEntry{
+            .timestamp = expectedValidAsOf1, .size = 10, .count = 1, .hash = kHashA};
         const auto entry = readSizeCount(_collA.uuid);
         ASSERT_TRUE(entry.has_value());
-        EXPECT_EQ(entry->hash, kHashA);
+        EXPECT_EQ(expectedEntry, *entry);
     }
 
-    writeCrudEntry(Timestamp(1, 2), _collA, repl::OpTypeEnum::kInsert, 20 /*sizeDelta=*/, kHashB);
+    writeCrudEntry(nextTs(), _collA, repl::OpTypeEnum::kInsert, 20 /*sizeDelta=*/, kHashB);
 
-    flush();
+    const Timestamp expectedValidAsOf2 = flush();
 
     const SizeCountStore::Entry expectedEntry{
-        .timestamp = Timestamp(1, 2), .size = 30, .count = 2, .hash = kHashA ^ kHashB};
+        .timestamp = expectedValidAsOf2, .size = 30, .count = 2, .hash = kHashA ^ kHashB};
     const auto entry = readSizeCount(_collA.uuid);
     ASSERT_TRUE(entry.has_value());
     EXPECT_EQ(expectedEntry, *entry);
@@ -436,17 +496,16 @@ TEST_F(SizeCountCheckpointCoordinatorHashTest, HashFoldsIntoPersistedHashAcrossC
 // A checkpoint that cannot account for every contribution clears the hash a previous
 // checkpoint persisted, so a stale value is never left behind as if it were still valid.
 TEST_F(SizeCountCheckpointCoordinatorHashTest, MissingHashInLaterCheckpointClearsPersistedHash) {
-    writeCrudEntry(Timestamp(1, 1), _collA, repl::OpTypeEnum::kInsert, 10 /*sizeDelta=*/, kHashA);
+    writeCrudEntry(nextTs(), _collA, repl::OpTypeEnum::kInsert, 10 /*sizeDelta=*/, kHashA);
 
     flush();
 
-    writeCrudEntry(
-        Timestamp(1, 2), _collA, repl::OpTypeEnum::kInsert, 20 /*sizeDelta=*/, boost::none);
+    writeCrudEntry(nextTs(), _collA, repl::OpTypeEnum::kInsert, 20 /*sizeDelta=*/, boost::none);
 
-    flush();
+    const Timestamp expectedValidAsOf = flush();
 
     const SizeCountStore::Entry expectedEntry{
-        .timestamp = Timestamp(1, 2), .size = 30, .count = 2, .hash = boost::none};
+        .timestamp = expectedValidAsOf, .size = 30, .count = 2, .hash = boost::none};
     const auto entry = readSizeCount(_collA.uuid);
     ASSERT_TRUE(entry.has_value());
     EXPECT_EQ(expectedEntry, *entry);
@@ -455,17 +514,16 @@ TEST_F(SizeCountCheckpointCoordinatorHashTest, MissingHashInLaterCheckpointClear
 // Once a collection's persisted hash has been invalidated, later checkpoints do not resume
 // tracking it, because a hash folded over only part of the collection's history is not usable.
 TEST_F(SizeCountCheckpointCoordinatorHashTest, InvalidatedHashIsNotResumedByLaterCheckpoint) {
-    writeCrudEntry(
-        Timestamp(1, 1), _collA, repl::OpTypeEnum::kInsert, 10 /*sizeDelta=*/, boost::none);
+    writeCrudEntry(nextTs(), _collA, repl::OpTypeEnum::kInsert, 10 /*sizeDelta=*/, boost::none);
 
     flush();
 
-    writeCrudEntry(Timestamp(1, 2), _collA, repl::OpTypeEnum::kInsert, 20 /*sizeDelta=*/, kHashA);
+    writeCrudEntry(nextTs(), _collA, repl::OpTypeEnum::kInsert, 20 /*sizeDelta=*/, kHashA);
 
-    flush();
+    const Timestamp expectedValidAsOf = flush();
 
     const SizeCountStore::Entry expectedEntry{
-        .timestamp = Timestamp(1, 2), .size = 30, .count = 2, .hash = boost::none};
+        .timestamp = expectedValidAsOf, .size = 30, .count = 2, .hash = boost::none};
     const auto entry = readSizeCount(_collA.uuid);
     ASSERT_TRUE(entry.has_value());
     EXPECT_EQ(expectedEntry, *entry);
@@ -480,27 +538,26 @@ TEST_F(SizeCountCheckpointCoordinatorHashTest, HashStaysAbsentForCollectionTrack
         _opCtx,
         *_sizeCountStore,
         _collA.uuid,
-        SizeCountStore::Entry{
-            .timestamp = Timestamp(1, 1), .size = 100, .count = 3, .hash = boost::none});
+        SizeCountStore::Entry{.timestamp = nextTs(), .size = 100, .count = 3, .hash = boost::none});
 
-    writeCrudEntry(Timestamp(1, 2), _collA, repl::OpTypeEnum::kInsert, 10 /*sizeDelta=*/, kHashA);
+    writeCrudEntry(nextTs(), _collA, repl::OpTypeEnum::kInsert, 10 /*sizeDelta=*/, kHashA);
 
-    flush();
+    const Timestamp expectedValidAsOf1 = flush();
     {
         const SizeCountStore::Entry expectedEntry{
-            .timestamp = Timestamp(1, 2), .size = 110, .count = 4, .hash = boost::none};
+            .timestamp = expectedValidAsOf1, .size = 110, .count = 4, .hash = boost::none};
         const auto entry = readSizeCount(_collA.uuid);
         ASSERT_TRUE(entry.has_value());
         EXPECT_EQ(expectedEntry, *entry);
     }
 
     // A second checkpoint does not pick the hash back up either.
-    writeCrudEntry(Timestamp(1, 3), _collA, repl::OpTypeEnum::kInsert, 20 /*sizeDelta=*/, kHashB);
+    writeCrudEntry(nextTs(), _collA, repl::OpTypeEnum::kInsert, 20 /*sizeDelta=*/, kHashB);
 
-    flush();
+    const Timestamp expectedValidAsOf2 = flush();
 
     const SizeCountStore::Entry expectedEntry{
-        .timestamp = Timestamp(1, 3), .size = 130, .count = 5, .hash = boost::none};
+        .timestamp = expectedValidAsOf2, .size = 130, .count = 5, .hash = boost::none};
     const auto entry = readSizeCount(_collA.uuid);
     ASSERT_TRUE(entry.has_value());
     EXPECT_EQ(expectedEntry, *entry);
@@ -509,30 +566,29 @@ TEST_F(SizeCountCheckpointCoordinatorHashTest, HashStaysAbsentForCollectionTrack
 // Each collection accumulates only its own contributions, and one collection's missing hash
 // does not invalidate another's.
 TEST_F(SizeCountCheckpointCoordinatorHashTest, HashesTrackedPerCollection) {
-    writeCrudEntry(Timestamp(1, 1), _collA, repl::OpTypeEnum::kInsert, 10 /*sizeDelta=*/, kHashA);
-    writeCrudEntry(Timestamp(1, 2), _collB, repl::OpTypeEnum::kInsert, 20 /*sizeDelta=*/, kHashB);
-    writeCrudEntry(
-        Timestamp(1, 3), _collB, repl::OpTypeEnum::kInsert, 30 /*sizeDelta=*/, boost::none);
+    writeCrudEntry(nextTs(), _collA, repl::OpTypeEnum::kInsert, 10 /*sizeDelta=*/, kHashA);
+    writeCrudEntry(nextTs(), _collB, repl::OpTypeEnum::kInsert, 20 /*sizeDelta=*/, kHashB);
+    writeCrudEntry(nextTs(), _collB, repl::OpTypeEnum::kInsert, 30 /*sizeDelta=*/, boost::none);
 
-    flush();
+    const Timestamp expectedValidAsOf = flush();
 
     const auto entryA = readSizeCount(_collA.uuid);
     ASSERT_TRUE(entryA.has_value());
     EXPECT_EQ((SizeCountStore::Entry{
-                  .timestamp = Timestamp(1, 3), .size = 10, .count = 1, .hash = kHashA}),
+                  .timestamp = expectedValidAsOf, .size = 10, .count = 1, .hash = kHashA}),
               *entryA);
 
     const auto entryB = readSizeCount(_collB.uuid);
     ASSERT_TRUE(entryB.has_value());
     EXPECT_EQ((SizeCountStore::Entry{
-                  .timestamp = Timestamp(1, 3), .size = 50, .count = 2, .hash = boost::none}),
+                  .timestamp = expectedValidAsOf, .size = 50, .count = 2, .hash = boost::none}),
               *entryB);
 }
 
 // Hashes on the inner operations of an `applyOps` entry are folded the same way as those on
 // standalone entries.
 TEST_F(SizeCountCheckpointCoordinatorHashTest, HashesOnApplyOpsInnerOpsAreFolded) {
-    const Timestamp ts{1, 1};
+    const Timestamp ts = nextTs();
 
     BSONArrayBuilder innerOpsBuilder;
     innerOpsBuilder.append(BSON("op" << "i"
@@ -557,29 +613,30 @@ TEST_F(SizeCountCheckpointCoordinatorHashTest, HashesOnApplyOpsInnerOpsAreFolded
     }};
     writeOplogEntry(applyOpsEntry);
 
-    flush();
+    const Timestamp expectedValidAsOf = flush();
 
     const auto entryA = readSizeCount(_collA.uuid);
     ASSERT_TRUE(entryA.has_value());
-    EXPECT_EQ(
-        (SizeCountStore::Entry{.timestamp = ts, .size = 30, .count = 2, .hash = kHashA ^ kHashB}),
-        *entryA);
+    EXPECT_EQ((SizeCountStore::Entry{
+                  .timestamp = expectedValidAsOf, .size = 30, .count = 2, .hash = kHashA ^ kHashB}),
+              *entryA);
 
     const auto entryB = readSizeCount(_collB.uuid);
     ASSERT_TRUE(entryB.has_value());
-    EXPECT_EQ((SizeCountStore::Entry{.timestamp = ts, .size = 30, .count = 1, .hash = kHashC}),
+    EXPECT_EQ((SizeCountStore::Entry{
+                  .timestamp = expectedValidAsOf, .size = 30, .count = 1, .hash = kHashC}),
               *entryB);
 }
 
 // A collection created and written to within the same checkpoint takes the insert path into
 // the store, and the created collection's identity hash folds together with the write's hash.
 TEST_F(SizeCountCheckpointCoordinatorHashTest, HashPersistedForCollectionCreatedInCheckpoint) {
-    writeOplogEntry(test_helpers::makeCreateOplogEntry(Timestamp(1, 1), _collA));
-    writeCrudEntry(Timestamp(1, 2), _collA, repl::OpTypeEnum::kInsert, 10 /*sizeDelta=*/, kHashA);
+    writeOplogEntry(test_helpers::makeCreateOplogEntry(nextTs(), _collA));
+    writeCrudEntry(nextTs(), _collA, repl::OpTypeEnum::kInsert, 10 /*sizeDelta=*/, kHashA);
 
-    flush();
+    const Timestamp expectedValidAsOf = flush();
 
-    const SizeCountStore::Entry expectedEntry{.timestamp = Timestamp(1, 2),
+    const SizeCountStore::Entry expectedEntry{.timestamp = expectedValidAsOf,
                                               .size = 10,
                                               .count = 1,
                                               .hash = kEmptyCollectionValidationHash ^ kHashA};
@@ -592,10 +649,10 @@ TEST_F(SizeCountCheckpointCoordinatorHashTest, HashPersistedForCollectionCreated
 // empty-collection hash like any other contribution. Creation establishes a present hash, so this
 // adjusts a known value rather than seeding an absent one.
 TEST_F(SizeCountCheckpointCoordinatorHashTest, RepairHashDiffFoldsIntoCreatedCollectionHash) {
-    writeOplogEntry(test_helpers::makeCreateOplogEntry(Timestamp(1, 1), _collA));
-    writeCrudEntry(Timestamp(1, 2), _collA, repl::OpTypeEnum::kInsert, 10 /*sizeDelta=*/, kHashA);
+    writeOplogEntry(test_helpers::makeCreateOplogEntry(nextTs(), _collA));
+    writeCrudEntry(nextTs(), _collA, repl::OpTypeEnum::kInsert, 10 /*sizeDelta=*/, kHashA);
     writeOplogEntry(repl::DurableOplogEntry{repl::DurableOplogEntryParams{
-        .opTime = repl::OpTime(Timestamp(1, 3), 1),
+        .opTime = repl::OpTime(nextTs(), 1),
         .opType = repl::OpTypeEnum::kNoop,
         .nss = NamespaceString(),
         .oField = BSON("msg" << "Repairing collection's replicated metadata with diffs"),
@@ -604,9 +661,9 @@ TEST_F(SizeCountCheckpointCoordinatorHashTest, RepairHashDiffFoldsIntoCreatedCol
         .wallClockTime = Date_t::now(),
     }});
 
-    flush();
+    const Timestamp validAsOf = flush();
 
-    const SizeCountStore::Entry expectedEntry{.timestamp = Timestamp(1, 3),
+    const SizeCountStore::Entry expectedEntry{.timestamp = validAsOf,
                                               .size = 10,
                                               .count = 1,
                                               .hash =
@@ -619,11 +676,11 @@ TEST_F(SizeCountCheckpointCoordinatorHashTest, RepairHashDiffFoldsIntoCreatedCol
 // A collection created with no writes persists the hash of an empty collection, which later
 // contributions fold into.
 TEST_F(SizeCountCheckpointCoordinatorHashTest, CreateWithoutWritesPersistsEmptyCollectionHash) {
-    writeOplogEntry(test_helpers::makeCreateOplogEntry(Timestamp(1, 1), _collA));
+    writeOplogEntry(test_helpers::makeCreateOplogEntry(nextTs(), _collA));
 
-    flush();
+    const Timestamp expectedValidAsOf1 = flush();
     {
-        const SizeCountStore::Entry expectedEntry{.timestamp = Timestamp(1, 1),
+        const SizeCountStore::Entry expectedEntry{.timestamp = expectedValidAsOf1,
                                                   .size = 0,
                                                   .count = 0,
                                                   .hash = kEmptyCollectionValidationHash};
@@ -632,12 +689,12 @@ TEST_F(SizeCountCheckpointCoordinatorHashTest, CreateWithoutWritesPersistsEmptyC
         EXPECT_EQ(expectedEntry, *entry);
     }
 
-    writeCrudEntry(Timestamp(1, 2), _collA, repl::OpTypeEnum::kInsert, 10 /*sizeDelta=*/, kHashA);
+    writeCrudEntry(nextTs(), _collA, repl::OpTypeEnum::kInsert, 10 /*sizeDelta=*/, kHashA);
 
-    flush();
+    const Timestamp expectedValidAsOf2 = flush();
 
     const SizeCountStore::Entry expectedEntry{
-        .timestamp = Timestamp(1, 2), .size = 10, .count = 1, .hash = kHashA};
+        .timestamp = expectedValidAsOf2, .size = 10, .count = 1, .hash = kHashA};
     const auto entry = readSizeCount(_collA.uuid);
     ASSERT_TRUE(entry.has_value());
     EXPECT_EQ(expectedEntry, *entry);
@@ -646,21 +703,21 @@ TEST_F(SizeCountCheckpointCoordinatorHashTest, CreateWithoutWritesPersistsEmptyC
 // Dropping a collection removes its persisted entry, hash included, and re-creating the same
 // UUID starts a fresh hash rather than resurrecting the dropped one.
 TEST_F(SizeCountCheckpointCoordinatorHashTest, DropRemovesPersistedHashAndRecreateStartsFresh) {
-    writeCrudEntry(Timestamp(1, 1), _collA, repl::OpTypeEnum::kInsert, 10 /*sizeDelta=*/, kHashA);
+    writeCrudEntry(nextTs(), _collA, repl::OpTypeEnum::kInsert, 10 /*sizeDelta=*/, kHashA);
 
     flush();
 
-    writeOplogEntry(test_helpers::makeDropOplogEntry(Timestamp(1, 2), _collA));
+    writeOplogEntry(test_helpers::makeDropOplogEntry(nextTs(), _collA));
 
     flush();
     EXPECT_FALSE(readSizeCount(_collA.uuid).has_value());
 
-    writeOplogEntry(test_helpers::makeCreateOplogEntry(Timestamp(1, 3), _collA));
-    writeCrudEntry(Timestamp(1, 4), _collA, repl::OpTypeEnum::kInsert, 20 /*sizeDelta=*/, kHashB);
+    writeOplogEntry(test_helpers::makeCreateOplogEntry(nextTs(), _collA));
+    writeCrudEntry(nextTs(), _collA, repl::OpTypeEnum::kInsert, 20 /*sizeDelta=*/, kHashB);
 
-    flush();
+    const Timestamp expectedValidAsOf = flush();
 
-    const SizeCountStore::Entry expectedEntry{.timestamp = Timestamp(1, 4),
+    const SizeCountStore::Entry expectedEntry{.timestamp = expectedValidAsOf,
                                               .size = 20,
                                               .count = 1,
                                               .hash = kEmptyCollectionValidationHash ^ kHashB};
@@ -672,19 +729,17 @@ TEST_F(SizeCountCheckpointCoordinatorHashTest, DropRemovesPersistedHashAndRecrea
 // A `truncateRange` does not carry the hashes of the records it removed, so their
 // contributions cannot be folded back out and the persisted hash is invalidated.
 TEST_F(SizeCountCheckpointCoordinatorHashTest, TruncateRangeInvalidatesPersistedHash) {
-    writeCrudEntry(Timestamp(1, 1), _collA, repl::OpTypeEnum::kInsert, 100 /*sizeDelta=*/, kHashA);
+    writeCrudEntry(nextTs(), _collA, repl::OpTypeEnum::kInsert, 100 /*sizeDelta=*/, kHashA);
 
     flush();
 
-    test_helpers::writeToOplog(
-        _opCtx,
-        test_helpers::makeTruncateRangeOplogEntry(
-            Timestamp(1, 2), _collA, 40 /*bytesDeleted=*/, 1 /*docsDeleted=*/));
+    writeOplogEntry(test_helpers::makeTruncateRangeOplogEntry(
+        nextTs(), _collA, 40 /*bytesDeleted=*/, 1 /*docsDeleted=*/));
 
-    flush();
+    const Timestamp expectedValidAsOf = flush();
 
     const SizeCountStore::Entry expectedEntry{
-        .timestamp = Timestamp(1, 2), .size = 60, .count = 0, .hash = boost::none};
+        .timestamp = expectedValidAsOf, .size = 60, .count = 0, .hash = boost::none};
     const auto entry = readSizeCount(_collA.uuid);
     ASSERT_TRUE(entry.has_value());
     EXPECT_EQ(expectedEntry, *entry);
@@ -693,14 +748,13 @@ TEST_F(SizeCountCheckpointCoordinatorHashTest, TruncateRangeInvalidatesPersisted
 // An imported collection's existing documents were never hashed, so the entry it creates
 // carries a size and count but no hash.
 TEST_F(SizeCountCheckpointCoordinatorHashTest, ImportCollectionPersistsNoHash) {
-    test_helpers::writeToOplog(_opCtx,
-                               test_helpers::makeImportCollectionOplogEntry(
-                                   Timestamp(1, 1), _collA, 3 /*numRecords=*/, 300 /*dataSize=*/));
+    writeOplogEntry(test_helpers::makeImportCollectionOplogEntry(
+        nextTs(), _collA, 3 /*numRecords=*/, 300 /*dataSize=*/));
 
-    flush();
+    const Timestamp expectedValidAsOf = flush();
 
     const SizeCountStore::Entry expectedEntry{
-        .timestamp = Timestamp(1, 1), .size = 300, .count = 3, .hash = boost::none};
+        .timestamp = expectedValidAsOf, .size = 300, .count = 3, .hash = boost::none};
     const auto entry = readSizeCount(_collA.uuid);
     ASSERT_TRUE(entry.has_value());
     EXPECT_EQ(expectedEntry, *entry);
@@ -711,11 +765,11 @@ TEST_F(SizeCountCheckpointCoordinatorHashTest, ImportCollectionPersistsNoHash) {
 // while the size and count still advance.
 // TODO SERVER-133315: Carry the transaction's accumulated hash on the commitTransaction entry.
 TEST_F(SizeCountCheckpointCoordinatorHashTest, PreparedTxnCommitInvalidatesPersistedHash) {
-    writeCrudEntry(Timestamp(1, 1), _collA, repl::OpTypeEnum::kInsert, 10 /*sizeDelta=*/, kHashA);
+    writeCrudEntry(nextTs(), _collA, repl::OpTypeEnum::kInsert, 10 /*sizeDelta=*/, kHashA);
 
     flush();
 
-    const Timestamp prepareTs{1, 2};
+    const Timestamp prepareTs = nextTs();
     BSONArrayBuilder innerOpsBuilder;
     innerOpsBuilder.append(BSON("op" << "i"
                                      << "ns" << _collA.nss.ns_forTest() << "ui" << _collA.uuid
@@ -736,7 +790,7 @@ TEST_F(SizeCountCheckpointCoordinatorHashTest, PreparedTxnCommitInvalidatesPersi
     commitMetadata.setSz(50);
     commitMetadata.setCt(1);
     const repl::OplogEntry commitEntry = repl::DurableOplogEntry{repl::DurableOplogEntryParams{
-        .opTime = repl::OpTime(Timestamp(1, 3), 1),
+        .opTime = repl::OpTime(nextTs(), 1),
         .opType = repl::OpTypeEnum::kCommand,
         .nss = NamespaceString::kAdminCommandNamespace,
         .oField = BSON("commitTransaction" << 1),
@@ -747,10 +801,10 @@ TEST_F(SizeCountCheckpointCoordinatorHashTest, PreparedTxnCommitInvalidatesPersi
     }};
     writeOplogEntry(commitEntry);
 
-    flush();
+    const Timestamp expectedValidAsOf = flush();
 
     const SizeCountStore::Entry expectedEntry{
-        .timestamp = Timestamp(1, 3), .size = 60, .count = 2, .hash = boost::none};
+        .timestamp = expectedValidAsOf, .size = 60, .count = 2, .hash = boost::none};
     const auto entry = readSizeCount(_collA.uuid);
     ASSERT_TRUE(entry.has_value());
     EXPECT_EQ(expectedEntry, *entry);
@@ -761,25 +815,24 @@ TEST_F(SizeCountCheckpointCoordinatorHashTest, PreparedTxnCommitInvalidatesPersi
 // TODO SERVER-133719: Change this to a death test if we decide to invariant upon not having a size
 // delta with a hash delta.
 TEST_F(SizeCountCheckpointCoordinatorHashTest, HashWithNoSizeDeltaStillFoldsIntoPersistedHash) {
-    writeCrudEntry(Timestamp(1, 1), _collA, repl::OpTypeEnum::kInsert, 10 /*sizeDelta=*/, kHashA);
+    writeCrudEntry(nextTs(), _collA, repl::OpTypeEnum::kInsert, 10 /*sizeDelta=*/, kHashA);
 
     SingleOpSizeMetadata hashOnlyMetadata;
     hashOnlyMetadata.setH(kHashB);
-    test_helpers::writeToOplog(_opCtx,
-                               repl::DurableOplogEntry{repl::DurableOplogEntryParams{
-                                   .opTime = repl::OpTime(Timestamp(1, 2), 1),
-                                   .opType = repl::OpTypeEnum::kInsert,
-                                   .nss = _collA.nss,
-                                   .uuid = _collA.uuid,
-                                   .oField = BSONObj(),
-                                   .sizeMetadata = repl::OplogEntrySizeMetadata{hashOnlyMetadata},
-                                   .wallClockTime = Date_t::now(),
-                               }});
+    writeOplogEntry(repl::DurableOplogEntry{repl::DurableOplogEntryParams{
+        .opTime = repl::OpTime(nextTs(), 1),
+        .opType = repl::OpTypeEnum::kInsert,
+        .nss = _collA.nss,
+        .uuid = _collA.uuid,
+        .oField = BSONObj(),
+        .sizeMetadata = repl::OplogEntrySizeMetadata{hashOnlyMetadata},
+        .wallClockTime = Date_t::now(),
+    }});
 
-    flush();
+    const Timestamp expectedValidAsOf = flush();
 
     const SizeCountStore::Entry expectedEntry{
-        .timestamp = Timestamp(1, 2), .size = 10, .count = 1, .hash = kHashA ^ kHashB};
+        .timestamp = expectedValidAsOf, .size = 10, .count = 1, .hash = kHashA ^ kHashB};
     const auto entry = readSizeCount(_collA.uuid);
     ASSERT_TRUE(entry.has_value());
     EXPECT_EQ(expectedEntry, *entry);
@@ -788,17 +841,15 @@ TEST_F(SizeCountCheckpointCoordinatorHashTest, HashWithNoSizeDeltaStillFoldsInto
 // The hashes buffered across a chained (unprepared) transaction's applyOps entries become visible
 // together when the chain's terminal entry commits, and fold into one persisted hash.
 TEST_F(SizeCountCheckpointCoordinatorHashTest, ChainedTxnHashPersistedOnCommit) {
-    const Timestamp partialTs{1, 1};
+    const Timestamp partialTs = nextTs();
     writeOplogEntry(makeChainedApplyOps(partialTs, kHashA, repl::OpTime()));
-    test_helpers::writeToOplog(
-        _opCtx,
-        makeChainedApplyOps(
-            Timestamp(1, 2), kHashB, repl::OpTime(partialTs, 1), /*isPartialTxn=*/false));
+    writeOplogEntry(
+        makeChainedApplyOps(nextTs(), kHashB, repl::OpTime(partialTs, 1), /*isPartialTxn=*/false));
 
-    flush();
+    const Timestamp expectedValidAsOf = flush();
 
     const SizeCountStore::Entry expectedEntry{
-        .timestamp = Timestamp(1, 2), .size = 20, .count = 2, .hash = kHashA ^ kHashB};
+        .timestamp = expectedValidAsOf, .size = 20, .count = 2, .hash = kHashA ^ kHashB};
     const auto entry = readSizeCount(_collA.uuid);
     ASSERT_TRUE(entry.has_value());
     EXPECT_EQ(expectedEntry, *entry);
@@ -807,7 +858,7 @@ TEST_F(SizeCountCheckpointCoordinatorHashTest, ChainedTxnHashPersistedOnCommit) 
 // A chain that never reaches its terminal entry contributes nothing, so no hash is persisted for
 // the collection it wrote to.
 TEST_F(SizeCountCheckpointCoordinatorHashTest, UnterminatedChainPersistsNoHash) {
-    writeOplogEntry(makeChainedApplyOps(Timestamp(1, 1), kHashA, repl::OpTime()));
+    writeOplogEntry(makeChainedApplyOps(nextTs(), kHashA, repl::OpTime()));
 
     flush();
 

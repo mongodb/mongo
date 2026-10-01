@@ -597,6 +597,13 @@ public:
         "mongodb.serverStatus.metrics.replicatedFastCount.flush.retriedCount");
     static constexpr MetricName kReplicatedFastCountTailerRetriedScanCount = MetricNameMaker::make(
         "mongodb.serverStatus.metrics.replicatedFastCount.tailer.retriedScanCount");
+    static constexpr MetricName kReplicatedFastCountWatermarksWritten =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.replicatedFastCount.watermarksWritten");
+    static constexpr MetricName kReplicatedFastCountTailerWatermarksSeen = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.replicatedFastCount.tailer.watermarksSeen");
+    static constexpr MetricName kReplicatedFastCountWatermarkAwaitTimeMsTotal =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.replicatedFastCount.flush.watermarkAwaitTime.total");
 
     static constexpr MetricName kInternodeConsistencyHashMismatchInsert = MetricNameMaker::make(
         "mongodb.serverStatus.metrics.repl.internodeConsistency.hashMismatch.insert");

@@ -4,6 +4,10 @@
 #include "mongo/db/replicated_fast_count/size_count_checkpoint_flusher.h"
 
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer/op_observer_impl.h"
+#include "mongo/db/op_observer/op_observer_registry.h"
+#include "mongo/db/op_observer/operation_logger_impl.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_metrics.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_test_helpers.h"
 #include "mongo/db/replicated_fast_count/size_count_store.h"
@@ -32,6 +36,10 @@ public:
 protected:
     void setUp() override {
         CatalogTestFixture::setUp();
+
+        // Register an OpObserver so that watermark entries written in writeWatermark() are actually
+        // written to the oplog.
+        test_helpers::registerOpObserverForTest(getServiceContext());
 
         auto stores = test_helpers::createContainerFastCountStores(operationContext());
         sizeCountStore = std::move(stores.sizeCountStore);
@@ -129,6 +137,43 @@ TEST_F(FlusherTest, FlushRetriesOnWriteConflict) {
     EXPECT_EQ(entry->timestamp, Timestamp(1, 1));
     EXPECT_EQ(entry->size, 10);
     EXPECT_EQ(entry->count, 1);
+}
+
+TEST_F(FlusherTest, WriteWatermarkWritesNoopEntry) {
+    OtelMetricsCapturer capturer;
+
+    writeWatermark(operationContext());
+
+    const std::vector<repl::OplogEntry> noopEntries = test_helpers::getOplogEntriesMatching(
+        operationContext(), [](const repl::OplogEntry& entry) {
+            return entry.getOpType() == repl::OpTypeEnum::kNoop &&
+                entry.getObject()["msg"].valueStringData() == kWatermarkMsg;
+        });
+    ASSERT_EQ(noopEntries.size(), 1);
+
+    if (capturer.canReadMetrics()) {
+        EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountWatermarksWritten), 1);
+    }
+}
+
+TEST_F(FlusherTest, WriteWatermarkRetriesOnWriteConflict) {
+    OtelMetricsCapturer capturer;
+
+    const std::unique_ptr<FailPointEnableBlock> failPoint = enableWriteConflictForWrites(
+        FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 1});
+
+    writeWatermark(operationContext());
+
+    const std::vector<repl::OplogEntry> noopEntries = test_helpers::getOplogEntriesMatching(
+        operationContext(), [](const repl::OplogEntry& entry) {
+            return entry.getOpType() == repl::OpTypeEnum::kNoop &&
+                entry.getObject()["msg"].valueStringData() == kWatermarkMsg;
+        });
+    ASSERT_EQ(noopEntries.size(), 1);
+
+    if (capturer.canReadMetrics()) {
+        EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountWatermarksWritten), 1);
+    }
 }
 
 using FlusherTestDeathTest = FlusherTest;

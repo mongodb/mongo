@@ -8,6 +8,7 @@
 #include "mongo/util/uuid.h"
 
 #include <cstdint>
+#include <string_view>
 
 #include <absl/container/flat_hash_map.h>
 #include <boost/container/flat_map.hpp>
@@ -16,6 +17,12 @@
 namespace mongo {
 
 inline constexpr int64_t kEmptyCollectionValidationHash = 0;
+
+/**
+ * The `o.msg` value identifying a no-op oplog entry as a replicated collection metadata
+ * watermark.
+ */
+inline constexpr std::string_view kWatermarkMsg = "replicated collection metadata watermark";
 
 /**
  * Combines two validation hashes with XOR, which is its own inverse: folding a contribution in and

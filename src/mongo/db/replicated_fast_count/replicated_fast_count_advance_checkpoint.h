@@ -77,6 +77,7 @@ size_t persistCheckpointSnapshot(OperationContext* opCtx,
  * advances its global valid-as-of timestamp, even in absence of oplog entries with size and count
  * deltas, to ensure forward progress through the oplog.
  */
+// TODO(SERVER-134962): Remove this function and rename files.
 size_t advanceCheckpoint(OperationContext* opCtx,
                          SizeCountStore& sizeCountStore,
                          SizeCountTimestampStore& timestampStore);

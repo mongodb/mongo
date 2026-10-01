@@ -110,14 +110,6 @@ void SizeCountCheckpointCoordinator::requestFlush() {
     _flushRequestCv.notify_one();
 }
 
-void SizeCountCheckpointCoordinator::flushSync_ForTest(OperationContext* opCtx) {
-    oplog_tailer::bufferNewOplogEntries(opCtx, _buffer);
-    if (auto batch = _buffer.checkoutForFlush()) {
-        flusher::flush(opCtx, _sizeCountStore, _timestampStore, *batch);
-        _buffer.acknowledgeFlush();
-    }
-}
-
 bool SizeCountCheckpointCoordinator::isFlushRequested_ForTest() const {
     std::lock_guard lk(_flushRequestMutex);
     return _flushRequested;
@@ -184,9 +176,24 @@ void SizeCountCheckpointCoordinator::_runFlushThread(ServiceContext* service) {
                 _flushRequested = false;
             }
 
+            // Check if an in-flight batch already exists. This can happen if a previous flush
+            // failed.
+            boost::optional<OplogScanResult> batch = _buffer.checkoutForFlush();
+
+            // TODO(SERVER-135085): There exists a TOCTOU race condition here between checking the
+            // tailer has consumed the watermark entry and emitting the next watermark entry. If the
+            // tailer has not seen a pre-existing watermark entry when we call checkoutForFlush()
+            // and readyForWatermark() here, we erroneously emit a new watermark. This can happen
+            // when we emit a watermark then fault/step down. scanToNoHolesEOF() must tolerate this.
+            if (!batch && _buffer.readyForWatermark()) {
+                // Write a watermark so that the oplog tailer can cut the next batch.
+                flusher::writeWatermark(opCtx);
+                // Block until the oplog tailer has caught up to the watermark entry.
+                batch = _buffer.awaitCheckoutForFlush(opCtx);
+            }
+
             const Date_t flushStart = Date_t::now();
             boost::optional<flusher::FlushResult> result = boost::none;
-            const auto batch = _buffer.checkoutForFlush();
             hangAfterReplicatedFastCountSnapshot.pauseWhileSet();
             if (batch.has_value()) {
                 result = flusher::flush(opCtx, _sizeCountStore, _timestampStore, *batch);

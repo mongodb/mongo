@@ -3,10 +3,33 @@
 
 #include "mongo/db/replicated_fast_count/size_count_checkpoint_buffer.h"
 
+#include "mongo/db/replicated_fast_count/replicated_fast_count_metrics.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_size_count.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo::replicated_fast_count {
+namespace {
+
+/**
+ * Returns true if the raw oplog BSON is a no-op watermark entry, i.e. a noop ('n') carrying
+ * `o.msg == kWatermarkMsg`.
+ */
+bool isWatermarkNoop(const BSONObj& raw) {
+    const BSONElement opElem = raw.getField("op");
+    if (opElem.type() != BSONType::string || opElem.valueStringData() != "n") {
+        return false;
+    }
+    const BSONElement oElem = raw.getField("o");
+    if (!oElem.isABSONObj()) {
+        return false;
+    }
+    const BSONObj o = oElem.Obj();
+    const BSONElement msgElem = o.getField("msg");
+    return msgElem.type() == BSONType::string && msgElem.valueStringData() == kWatermarkMsg;
+}
+
+}  // namespace
 
 SizeCountCheckpointBuffer::SizeCountCheckpointBuffer(UUID oplogUuid,
                                                      boost::optional<RecordId> lastBufferedRid)
@@ -16,27 +39,21 @@ SizeCountCheckpointBuffer::SizeCountCheckpointBuffer(UUID oplogUuid,
 }
 
 boost::optional<OplogScanResult> SizeCountCheckpointBuffer::checkoutForFlush() {
-    if (_inFlight) {
-        // A previous flush has not been acknowledged yet. Retry the same batch.
-        return _inFlight;
-    }
-
-    OplogScanResult result;
-    {
-        std::lock_guard lk(_mutex);
-        // Cut the _pending accumulator into a flushable batch and reset _pending.
-        result = _pending->finish();
-        _pending.emplace(_accumulatorOptions);
-    }
-
-    if (!result.lastTimestamp) {
-        // finish() leaves lastTimestamp unset when no size/count entries were accumulated. We
-        // return early so we do not advance the checkpoint for untracked entries.
-        return boost::none;
-    }
-
-    _inFlight = std::move(result);
+    std::lock_guard lk(_mutex);
     return _inFlight;
+}
+
+bool SizeCountCheckpointBuffer::readyForWatermark() const {
+    std::lock_guard lk(_mutex);
+    return !_inFlight.has_value() && _pending->hasPendingWork();
+}
+
+OplogScanResult SizeCountCheckpointBuffer::awaitCheckoutForFlush(OperationContext* opCtx) {
+    const Date_t start = Date_t::now();
+    std::unique_lock lk(_mutex);
+    opCtx->waitForConditionOrInterrupt(_batchReady, lk, [&] { return _inFlight.has_value(); });
+    recordWatermarkAwaitTime(Date_t::now() - start);
+    return *_inFlight;
 }
 
 void SizeCountCheckpointBuffer::scanToNoHolesEOF(SeekableRecordCursor& cursor) {
@@ -63,6 +80,9 @@ void SizeCountCheckpointBuffer::scanToNoHolesEOF(SeekableRecordCursor& cursor) {
                 // Unset the flag so the next loss of the last buffered record is a new anomaly and
                 // gets its own tassert.
                 _reportedLostLastBufferedRid = false;
+                if (isWatermarkNoop(record->data.toBson())) {
+                    _handleWatermark();
+                }
             }
         }
     }
@@ -72,10 +92,27 @@ void SizeCountCheckpointBuffer::scanToNoHolesEOF(SeekableRecordCursor& cursor) {
     while (boost::optional<Record> record = cursor.next()) {
         _pending->consumeRecord(*record);
         _lastBufferedRid = record->id;
+        // TODO(SERVER-135085): Update this loop to not swallow multiple watermarks. We want one
+        // checkpoint per watermark, so we need to stop accumulating in _pending past this point.
+        if (isWatermarkNoop(record->data.toBson())) {
+            _handleWatermark();
+        }
     }
 }
 
 void SizeCountCheckpointBuffer::acknowledgeFlush() {
+    std::lock_guard lk(_mutex);
     _inFlight.reset();
+}
+
+void SizeCountCheckpointBuffer::_handleWatermark() {
+    incrementTailerWatermarksSeenCount();
+    if (!_inFlight.has_value()) {
+        // Cut the accumulated batch, the watermark included, so its timestamp is the
+        // batch's lastTimestamp.
+        _inFlight = _pending->finish();
+        _pending.emplace(_accumulatorOptions);
+        _batchReady.notify_one();
+    }
 }
 }  // namespace mongo::replicated_fast_count

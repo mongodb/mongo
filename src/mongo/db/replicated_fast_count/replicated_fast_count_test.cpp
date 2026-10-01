@@ -30,6 +30,7 @@ namespace {
 
 using test_helpers::checkCommittedSizeCount;
 using test_helpers::checkUncommittedSizeCount;
+using test_helpers::waitForFlush;
 
 class ReplicatedFastCountTest : public CatalogTestFixture {
 public:
@@ -48,10 +49,6 @@ protected:
             std::make_unique<OpObserverImpl>(std::make_unique<OperationLoggerImpl>()));
 
         _fastCountManager = &ReplicatedFastCountManager::get(_opCtx->getServiceContext());
-        // Allow for control over when we write to our internal container for testing. We only
-        // write to the internal container when we explicitly call
-        // ReplicatedFastCountManager::flushSync_ForTest().
-        _fastCountManager->disablePeriodicWrites_ForTest();
 
         setUpReplicatedFastCount(_opCtx);
 
@@ -83,12 +80,23 @@ protected:
     }
 
     /**
-     * Signals the fast count manager to shut down if it has not already done so.
+     * Shuts down the `ReplicatedFastCountManager`, joining its tailer and flusher threads before
+     * the ServiceContext is destroyed.
      */
     void shutdownFastCountManager() {
         if (_fastCountManager != nullptr) {
+            _fastCountManager->shutdown(_opCtx);
             _fastCountManager = nullptr;
         }
+    }
+
+    /**
+     * Requests a flush and blocks until the valid-as-of timestamp advances since this function was
+     * called.
+     */
+    void flush() {
+        const auto stores = _fastCountManager->getSizeCountStores_ForTest();
+        waitForFlush(_opCtx, *stores.second, [&] { _fastCountManager->flushAsync(); });
     }
 
     OperationContext* _opCtx;
@@ -230,7 +238,7 @@ TEST_F(ReplicatedFastCountTest, DirtyMetadataWrittenToInternalContainer) {
                                                         /*expectedSize=*/0);
 
     // Manually trigger an iteration to write dirty metadata to the internal container.
-    _fastCountManager->flushSync_ForTest(_opCtx);
+    flush();
 
     test_helpers::checkFastCountMetadataInInternalStore(_opCtx,
                                                         _uuid1,
@@ -270,7 +278,7 @@ TEST_F(ReplicatedFastCountTest, DirtyMetadataWrittenAsSingleApplyOpsEntry) {
                              docGeneratorForInsert,
                              sampleDocForInsert);
 
-    _fastCountManager->flushSync_ForTest(_opCtx);
+    flush();
 
     auto applyOpsEntries = test_helpers::getApplyOpsForFastCountStore(_opCtx);
 
@@ -314,7 +322,7 @@ TEST_F(ReplicatedFastCountTest, UpdatesWrittenToApplyOpsCorrectly) {
                              docGeneratorForInsert,
                              sampleDocForInsert);
 
-    _fastCountManager->flushSync_ForTest(_opCtx);
+    flush();
 
     // Now, dirty metadata for the same collections, and check that an applyOps entry with the
     // correct update information is generated.
@@ -349,7 +357,7 @@ TEST_F(ReplicatedFastCountTest, UpdatesWrittenToApplyOpsCorrectly) {
                              sampleDocForInsert,
                              sampleDocForUpdate);
 
-    _fastCountManager->flushSync_ForTest(_opCtx);
+    flush();
 
     auto applyOpsEntry = test_helpers::getLatestApplyOpsForFastCountStore(_opCtx);
 
@@ -382,7 +390,7 @@ TEST_F(ReplicatedFastCountTest, MixedUpdatesAndInsertInApplyOps) {
                              docGeneratorForInsert,
                              sampleDocForInsert);
 
-    _fastCountManager->flushSync_ForTest(_opCtx);
+    flush();
 
     test_helpers::insertDocs(_opCtx,
                              _fastCountManager,
@@ -410,7 +418,7 @@ TEST_F(ReplicatedFastCountTest, MixedUpdatesAndInsertInApplyOps) {
 
     ASSERT_OK(storageInterface()->dropCollection(_opCtx, _nss3));
 
-    _fastCountManager->flushSync_ForTest(_opCtx);
+    flush();
 
     auto applyOpsEntry = test_helpers::getLatestApplyOpsForFastCountStore(_opCtx);
 
@@ -443,12 +451,12 @@ TEST_F(ReplicatedFastCountTest, DropsWrittenToApplyOpsCorrectly) {
                              docGeneratorForInsert,
                              sampleDocForInsert);
 
-    _fastCountManager->flushSync_ForTest(_opCtx);
+    flush();
 
     ASSERT_OK(storageInterface()->dropCollection(_opCtx, _nss1));
 
     // We should detect that we dropped the collection _nss1 and delete the fast count entry for it.
-    _fastCountManager->flushSync_ForTest(_opCtx);
+    flush();
 
     auto applyOpsEntry = test_helpers::getLatestApplyOpsForFastCountStore(_opCtx);
 
@@ -470,7 +478,7 @@ TEST_F(ReplicatedFastCountTest, InsertsAndDropToCollectionSameFlush) {
                              docGeneratorForInsert,
                              sampleDocForInsert);
 
-    _fastCountManager->flushSync_ForTest(_opCtx);
+    flush();
 
     test_helpers::insertDocs(_opCtx,
                              _fastCountManager,
@@ -483,7 +491,7 @@ TEST_F(ReplicatedFastCountTest, InsertsAndDropToCollectionSameFlush) {
 
     ASSERT_OK(storageInterface()->dropCollection(_opCtx, _nss1));
 
-    _fastCountManager->flushSync_ForTest(_opCtx);
+    flush();
 
     auto applyOpsEntry = test_helpers::getLatestApplyOpsForFastCountStore(_opCtx);
 

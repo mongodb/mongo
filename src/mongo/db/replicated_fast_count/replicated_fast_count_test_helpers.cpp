@@ -7,10 +7,14 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/import_collection_oplog_entry_gen.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer/op_observer_impl.h"
+#include "mongo/db/op_observer/op_observer_registry.h"
+#include "mongo/db/op_observer/operation_logger_impl.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/container_oplog_entry_gen.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_interface_local.h"
 #include "mongo/db/repl/truncate_range_oplog_entry_gen.h"
@@ -19,6 +23,7 @@
 #include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_uncommitted_changes.h"
 #include "mongo/db/replicated_fast_count/size_count_store.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
 #include "mongo/db/shard_role/shard_role.h"
@@ -28,6 +33,8 @@
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/platform/atomic.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/time_support.h"
 
@@ -715,6 +722,16 @@ repl::OplogEntry makeDropOplogEntry(Timestamp ts, NsAndUUID userColl) {
     }};
 }
 
+repl::OplogEntry makeWatermarkOplogEntry(Timestamp ts) {
+    return repl::DurableOplogEntry{repl::DurableOplogEntryParams{
+        .opTime = repl::OpTime(ts, 1),
+        .opType = repl::OpTypeEnum::kNoop,
+        .nss = NamespaceString{},
+        .oField = BSON("msg" << kWatermarkMsg),
+        .wallClockTime = Date_t::now(),
+    }};
+}
+
 repl::OplogEntry makeImportCollectionOplogEntry(
     Timestamp ts, NsAndUUID userColl, int64_t numRecords, int64_t dataSize, bool dryRun) {
 
@@ -802,4 +819,55 @@ ContainerFastCountStores createContainerFastCountStores(OperationContext* opCtx)
 std::span<const char> bsonSpan(const BSONObj& obj) {
     return std::span<const char>{obj.objdata(), static_cast<size_t>(obj.objsize())};
 };
+
+void registerOpObserverForTest(ServiceContext* service) {
+    auto* registry = dynamic_cast<OpObserverRegistry*>(service->getOpObserver());
+    ASSERT(registry);
+    registry->addObserver(
+        std::make_unique<OpObserverImpl>(std::make_unique<OperationLoggerImpl>()));
+}
+
+Timestamp waitForFlush(OperationContext* opCtx,
+                       SizeCountTimestampStore& timestampStore,
+                       std::function<void()> requestFlush) {
+    constexpr Seconds kWaitDeadline{30};
+    const Date_t deadline = Date_t::now() + kWaitDeadline;
+    auto readValidAsOf = [&] {
+        Lock::GlobalLock lk(opCtx, MODE_IS);
+        return timestampStore.read(opCtx);
+    };
+    const Timestamp afterTs = readValidAsOf().value_or(Timestamp::min());
+    // Retry in a loop because the tailer may not have buffered the work yet, in which case the
+    // flush cycle is a no-op.
+    while (readValidAsOf().value_or(Timestamp::min()) <= afterTs && Date_t::now() < deadline) {
+        requestFlush();
+        // The fixture does not run the oplog visibility thread, which is what wakes the tailer's
+        // capped-insert notifier in production. Signal as a stand-in so the tailer rescans after
+        // the flusher writes its watermark.
+        repl::signalOplogWaiters();
+        sleepFor(Milliseconds(10));
+    }
+    const boost::optional<Timestamp> newValidAsOf = readValidAsOf();
+    invariant(
+        newValidAsOf.has_value() && newValidAsOf > afterTs,
+        "waitForFlush(): checkpoint valid-as-of did not advance past the requested timestamp");
+    return *newValidAsOf;
+}
+
+void waitForFlushFailpoint(FailPointEnableBlock& fp, std::function<void()> requestFlush) {
+    // We need to spawn a thread because the Failpoint API does not provide a non-blocking way to
+    // check the number of times the failpoint has been entered.
+    // TODO(SERVER-135644): Remove this thread spawn.
+    Atomic<bool> stop{false};
+    stdx::thread driver([&] {
+        while (!stop.load()) {
+            repl::signalOplogWaiters();
+            requestFlush();
+            sleepFor(Milliseconds(10));
+        }
+    });
+    fp.waitForOneNewEntry();
+    stop.store(true);
+    driver.join();
+}
 }  // namespace mongo::replicated_fast_count::test_helpers

@@ -52,6 +52,9 @@ TEST(ReplicatedFastCountMetricsTest, MetricsInitialization) {
              MetricNames::kReplicatedFastCountTailerFailureCount,
              MetricNames::kReplicatedFastCountFlushRetriedCount,
              MetricNames::kReplicatedFastCountTailerRetriedScanCount,
+             MetricNames::kReplicatedFastCountWatermarksWritten,
+             MetricNames::kReplicatedFastCountTailerWatermarksSeen,
+             MetricNames::kReplicatedFastCountWatermarkAwaitTimeMsTotal,
          }) {
         EXPECT_EQ(capturer.readInt64Counter(counterName), 0);
     }
@@ -145,6 +148,29 @@ TEST(ReplicatedFastCountMetricsTest, RetriedTailerScanCounterIncrement) {
 
     EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountTailerRetriedScanCount),
               2);
+}
+
+TEST(ReplicatedFastCountMetricsTest, WatermarkCountersIncrement) {
+    OtelMetricsCapturer capturer;
+
+    incrementWatermarksWrittenCount();
+    incrementWatermarksWrittenCount();
+    incrementWatermarksWrittenCount();
+    incrementTailerWatermarksSeenCount();
+    incrementTailerWatermarksSeenCount();
+
+    EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountWatermarksWritten), 3);
+    EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountTailerWatermarksSeen), 2);
+}
+
+TEST(ReplicatedFastCountMetricsTest, WatermarkAwaitTimeTotalAccumulates) {
+    OtelMetricsCapturer capturer;
+
+    recordWatermarkAwaitTime(Milliseconds(5));
+    recordWatermarkAwaitTime(Milliseconds(7));
+
+    EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountWatermarkAwaitTimeMsTotal),
+              12);
 }
 
 TEST(ReplicatedFastCountMetricsTest, FlushedDocsTotalUpdatedAfterFlushes) {

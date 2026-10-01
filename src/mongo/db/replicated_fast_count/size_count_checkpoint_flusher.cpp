@@ -3,27 +3,44 @@
 #include "mongo/db/replicated_fast_count/size_count_checkpoint_flusher.h"
 
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_advance_checkpoint.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_metrics.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_size_count.h"
 #include "mongo/db/replicated_fast_count/size_count_store.h"
 #include "mongo/db/replicated_fast_count/size_count_timestamp_store.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/storage/write_unit_of_work.h"
-#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
+namespace mongo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(failDuringFlush);
 MONGO_FAIL_POINT_DEFINE(hangBeforePersistingNewFastCountEntries);
+
+const BSONObj kWatermarkMsgObj = BSON("msg" << kWatermarkMsg);
 }  // namespace
+}  // namespace mongo
 
 namespace mongo::replicated_fast_count::flusher {
+
+void writeWatermark(OperationContext* opCtx) {
+    writeConflictRetry(opCtx, "writeWatermark", NamespaceString::kRsOplogNamespace, [&] {
+        Lock::GlobalLock writeLock(opCtx, MODE_IX);
+
+        WriteUnitOfWork wuow(opCtx);
+        opCtx->getClient()->getServiceContext()->getOpObserver()->onOpMessage(opCtx,
+                                                                              kWatermarkMsgObj);
+        wuow.commit();
+    });
+    incrementWatermarksWrittenCount();
+}
 
 boost::optional<FlushResult> flush(OperationContext* opCtx,
                                    SizeCountStore& sizeCountStore,

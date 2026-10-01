@@ -94,7 +94,7 @@ public:
     void startup(OperationContext* opCtx);
 
     /**
-     * Signals the checkpoint coordinator to stop and flushes final changes synchronously.
+     * Signals the checkpoint coordinator to stop.
      *
      * This function is idempotent since shutdown() may be called when the coordinator was never
      * started or has already been shut down.
@@ -193,13 +193,6 @@ public:
     void onFlushAllFiles() override {
         flushAsync();
     }
-
-    /**
-     * Flushes data synchronously on the caller's thread. The calling thread must be able to take a
-     * MODE_IX lock. Requires periodic writes to be disabled.
-     */
-    // TODO(SERVER-134965): Remove.
-    void flushSync_ForTest(OperationContext* opCtx);
 
     /**
      * Disables periodic background writes of metadata for testing purposes. Must be called before
