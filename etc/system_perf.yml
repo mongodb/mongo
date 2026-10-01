@@ -4,6 +4,7 @@ modules:
     repo: dsi
     prefix: ${workdir}/src
     branch: master
+    clone_depth: 100
 
 include:
   ### lint_yaml trim start ###
