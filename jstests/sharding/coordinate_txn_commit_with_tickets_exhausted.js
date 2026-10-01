@@ -4,6 +4,7 @@
  *
  * @tags: [
  *   requires_fcv_70,
+ *   multiversion_incompatible,
  *   uses_transactions,
  *   uses_multi_shard_transaction,
  *   uses_prepare_transaction,
