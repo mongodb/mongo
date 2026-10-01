@@ -60,6 +60,7 @@
 #include "mongo/db/vector_clock.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/pcre_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -162,21 +163,20 @@ std::string DocumentSourceChangeStream::getNsRegexForChangeStream(
     switch (type) {
         case ChangeStreamType::kSingleCollection:
             // Match the target namespace exactly.
-            return "^" +
-                // Change streams will only be enabled in serverless when multitenancy and
-                // featureFlag are on, therefore we don't have a tenantid prefix.
-                regexEscapeNsForChangeStream(
-                       NamespaceStringUtil::serialize(nss, expCtx->serializationCtxt)) +
-                "$";
+            // Change streams will only be enabled in serverless when multitenancy and
+            // featureFlag are on, therefore we don't have a tenantid prefix.
+            return fmt::format("^{}$",
+                               pcre_util::quoteMeta(
+                                   NamespaceStringUtil::serialize(nss, expCtx->serializationCtxt)));
         case ChangeStreamType::kSingleDatabase:
             // Match all namespaces that start with db name, followed by ".", then NOT followed by
             // '$' or 'system.' unless 'showSystemEvents' is set.
-            return "^" +
-                // Change streams will only be enabled in serverless when multitenancy and
-                // featureFlag are on, therefore we don't have a tenantid prefix.
-                regexEscapeNsForChangeStream(
-                       DatabaseNameUtil::serialize(nss.dbName(), expCtx->serializationCtxt)) +
-                "\\." + resolveAllCollectionsRegex(expCtx);
+            // Change streams will only be enabled in serverless when multitenancy and
+            // featureFlag are on, therefore we don't have a tenantid prefix.
+            return fmt::format("^{}\\.{}",
+                               pcre_util::quoteMeta(DatabaseNameUtil::serialize(
+                                   nss.dbName(), expCtx->serializationCtxt)),
+                               resolveAllCollectionsRegex(expCtx));
         case ChangeStreamType::kAllChangesForCluster:
             // Match all namespaces that start with any db name other than admin, config, or local,
             // followed by ".", then NOT '$' or 'system.' unless 'showSystemEvents' is set.
@@ -193,10 +193,9 @@ std::string DocumentSourceChangeStream::getViewNsRegexForChangeStream(
         case ChangeStreamType::kSingleDatabase:
             // For a single database, match any events on the system.views collection on that
             // database.
-            return "^" +
-                regexEscapeNsForChangeStream(
-                       DatabaseNameUtil::serialize(nss.dbName(), expCtx->serializationCtxt)) +
-                "\\.system.views$";
+            return fmt::format("^{}\\.system\\.views$",
+                               pcre_util::quoteMeta(DatabaseNameUtil::serialize(
+                                   nss.dbName(), expCtx->serializationCtxt)));
         case ChangeStreamType::kAllChangesForCluster:
             // Match all system.views collections on all databases.
             return kRegexAllDBs + "\\.system.views$";
@@ -213,7 +212,7 @@ std::string DocumentSourceChangeStream::getCollRegexForChangeStream(
     switch (type) {
         case ChangeStreamType::kSingleCollection:
             // Match the target collection exactly.
-            return "^" + regexEscapeNsForChangeStream(nss.coll()) + "$";
+            return fmt::format("^{}$", pcre_util::quoteMeta(nss.coll()));
         case ChangeStreamType::kSingleDatabase:
         case ChangeStreamType::kAllChangesForCluster:
             // Match any collection; database filtering will be done elsewhere.
@@ -231,28 +230,15 @@ std::string DocumentSourceChangeStream::getCmdNsRegexForChangeStream(
         case ChangeStreamType::kSingleCollection:
         case ChangeStreamType::kSingleDatabase:
             // Match the target database command namespace exactly.
-            return "^" +
-                regexEscapeNsForChangeStream(NamespaceStringUtil::serialize(
-                    nss.getCommandNS(), SerializationContext::stateDefault())) +
-                "$";
+            return fmt::format("^{}$",
+                               pcre_util::quoteMeta(NamespaceStringUtil::serialize(
+                                   nss.getCommandNS(), SerializationContext::stateDefault())));
         case ChangeStreamType::kAllChangesForCluster:
             // Match all command namespaces on any database.
             return kRegexAllDBs + "\\." + kRegexCmdColl;
         default:
             MONGO_UNREACHABLE;
     }
-}
-
-std::string DocumentSourceChangeStream::regexEscapeNsForChangeStream(StringData source) {
-    std::string result = "";
-    std::string escapes = "*+|()^?[]./\\$";
-    for (const char& c : source) {
-        if (escapes.find(c) != std::string::npos) {
-            result.append("\\");
-        }
-        result += c;
-    }
-    return result;
 }
 
 Timestamp DocumentSourceChangeStream::getStartTimeForNewStream(

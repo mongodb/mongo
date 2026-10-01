@@ -65,6 +65,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/pcre_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 
@@ -779,13 +780,14 @@ std::unique_ptr<MatchExpression> matchRewriteGenericNamespace(
                 // the predicate is on 'coll', match that collection in all DBs.
                 auto nsRegex = [&]() {
                     if (fieldName == "db") {
-                        return "^" +
-                            DocumentSourceChangeStream::regexEscapeNsForChangeStream(nsElem.str()) +
-                            "\\." + DocumentSourceChangeStream::resolveAllCollectionsRegex(expCtx);
+                        return fmt::format(
+                            "^{}\\.{}",
+                            pcre_util::quoteMeta(nsElem.valueStringDataSafe()),
+                            DocumentSourceChangeStream::resolveAllCollectionsRegex(expCtx));
                     }
-                    return DocumentSourceChangeStream::kRegexAllDBs + "\\." +
-                        DocumentSourceChangeStream::regexEscapeNsForChangeStream(nsElem.str()) +
-                        "$";
+                    return fmt::format("{}\\.{}$",
+                                       DocumentSourceChangeStream::kRegexAllDBs,
+                                       pcre_util::quoteMeta(nsElem.valueStringDataSafe()));
                 }();
 
                 return std::make_unique<RegexMatchExpression>(nsField, nsRegex, "");

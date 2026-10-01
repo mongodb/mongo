@@ -674,6 +674,64 @@ TEST_F(ChangeStreamStageTest, ShowMigrationsFailsOnMongos) {
         DSChangeStream::createFromBson(spec.firstElement(), expCtx), AssertionException, 31123);
 }
 
+TEST_F(ChangeStreamStageTest, ChangeStreamBuiltInRegexesSingleCollection) {
+    auto expCtx = getExpCtx();
+
+    auto nss = NamespaceString::createNamespaceString_forTest("unittest"_sd, "someCollection"_sd);
+    expCtx->ns = nss;
+
+    ASSERT_EQ("^unittest\\.someCollection$",
+              DocumentSourceChangeStream::getNsRegexForChangeStream(expCtx));
+
+    ASSERT_EQ("^someCollection$", DocumentSourceChangeStream::getCollRegexForChangeStream(expCtx));
+
+    ASSERT_EQ("^unittest\\.\\$cmd$",
+              DocumentSourceChangeStream::getCmdNsRegexForChangeStream(expCtx));
+}
+
+TEST_F(ChangeStreamStageTest, ChangeStreamBuiltInRegexesSingleDatabase) {
+    auto expCtx = getExpCtx();
+
+    auto nss = NamespaceString::makeCollectionlessAggregateNSS(
+        NamespaceString::createNamespaceString_forTest("unittest"_sd).dbName());
+    expCtx->ns = nss;
+
+    ASSERT_EQ(fmt::format("^unittest\\.{}", DocumentSourceChangeStream::kRegexAllCollections),
+              DocumentSourceChangeStream::getNsRegexForChangeStream(expCtx));
+
+    ASSERT_EQ("^unittest\\.system\\.views$",
+              DocumentSourceChangeStream::getViewNsRegexForChangeStream(expCtx));
+
+    ASSERT_EQ(fmt::format("^{}", DocumentSourceChangeStream::kRegexAllCollections),
+              DocumentSourceChangeStream::getCollRegexForChangeStream(expCtx));
+
+    ASSERT_EQ("^unittest\\.\\$cmd$",
+              DocumentSourceChangeStream::getCmdNsRegexForChangeStream(expCtx));
+}
+
+TEST_F(ChangeStreamStageTest, ChangeStreamBuiltInRegexesWholeCluster) {
+    auto expCtx = getExpCtx();
+
+    auto nss = NamespaceString::createNamespaceString_forTest("admin"_sd);
+    expCtx->ns = nss;
+
+    ASSERT_EQ(fmt::format("{}\\.{}",
+                          DocumentSourceChangeStream::kRegexAllDBs,
+                          DocumentSourceChangeStream::kRegexAllCollections),
+              DocumentSourceChangeStream::getNsRegexForChangeStream(expCtx));
+
+    ASSERT_EQ(fmt::format("{}\\.system.views$", DocumentSourceChangeStream::kRegexAllDBs),
+              DocumentSourceChangeStream::getViewNsRegexForChangeStream(expCtx));
+
+    ASSERT_EQ(fmt::format("^{}", DocumentSourceChangeStream::kRegexAllCollections),
+              DocumentSourceChangeStream::getCollRegexForChangeStream(expCtx));
+
+    ASSERT_EQ(fmt::format("{}\\.{}",
+                          DocumentSourceChangeStream::kRegexAllDBs,
+                          DocumentSourceChangeStream::kRegexCmdColl),
+              DocumentSourceChangeStream::getCmdNsRegexForChangeStream(expCtx));
+}
+
 TEST_F(ChangeStreamStageTest, TransformInsertDocKeyXAndId) {
     auto insert = makeOplogEntry(OpTypeEnum::kInsert,            // op type
                                  nss,                            // namespace
