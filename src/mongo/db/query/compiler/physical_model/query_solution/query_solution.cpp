@@ -1870,15 +1870,8 @@ void GroupNode::appendToString(str::stream* ss, int indent) const {
     *ss << nodeStageTypeToString(this) << '\n';
     addIndent(ss, indent + 1);
     *ss << "key = ";
-    auto idx = 0;
-    if (auto exprObj = dynamic_cast<const ExpressionObject*>(groupByExpression.get()); exprObj) {
-        for (auto&& [groupName, expr] : exprObj->getChildExpressions()) {
-            if (idx > 0) {
-                *ss << ", ";
-            }
-            *ss << "{" << groupName << ": " << exprObj->serialize().toString() << "}";
-            ++idx;
-        }
+    if (dynamic_cast<const ExpressionObject*>(groupByExpression.get())) {
+        *ss << groupByExpression->serialize().toString();
     } else {
         *ss << "{_id: " << groupByExpression->serialize().toString() << "}";
     }

@@ -1660,6 +1660,160 @@ TEST(QuerySolutionTest, GroupNodeWithIndexScan) {
     verifyClone(node);
 }
 
+std::unique_ptr<GroupNode> makeGroupNodeForToStringTest(
+    ExpressionContext* expCtx, boost::intrusive_ptr<Expression> groupByExpression) {
+    auto scanNode = std::make_unique<IndexScanNode>(
+        expCtx->getNamespaceString(), buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1)));
+    scanNode->bounds.isSimpleRange = true;
+    scanNode->bounds.startKey = BSON("a" << 1 << "b" << 1);
+    scanNode->bounds.endKey = BSON("a" << 1 << "b" << 1);
+    auto sumAcc = AccumulationStatement::parseAccumulationStatement(
+        expCtx, BSON("sum" << BSON("$sum" << "$a")).firstElement(), expCtx->variablesParseState);
+    auto cntAcc = AccumulationStatement::parseAccumulationStatement(
+        expCtx, BSON("cnt" << BSON("$sum" << 1)).firstElement(), expCtx->variablesParseState);
+    std::vector<AccumulationStatement> accs;
+    accs.push_back(std::move(sumAcc));
+    accs.push_back(std::move(cntAcc));
+    auto node = std::make_unique<GroupNode>(
+        std::move(scanNode), groupByExpression, std::move(accs), false, false, false);
+    node->computeProperties();
+    return node;
+}
+
+TEST(QuerySolutionTest, GroupNodeToString) {
+    QueryTestServiceContext serviceCtx;
+    auto opCtx = serviceCtx.makeOperationContext();
+    const auto expCtx = ExpressionContextBuilder{}
+                            .opCtx(opCtx.get())
+                            .ns(NamespaceString::createNamespaceString_forTest("test.dummy"))
+                            .build();
+    auto groupByExpression = Expression::parseObject(
+        expCtx.get(), BSON("a" << "$a" << "b" << "$b"), expCtx->variablesParseState);
+    auto node = makeGroupNodeForToStringTest(expCtx.get(), groupByExpression);
+
+    ASSERT_EQ(node->toString(),
+              R"gold(GROUP
+---key = {a: "$a", b: "$b"}
+---accs = [{sum: {$sum: "$a"}}, {cnt: {$sum: {$const: 1}}}]
+---nodeId = 0
+---fetched = 1
+---sortedByDiskLoc = 0
+---providedSorts = {baseSortPattern: {}, ignoredFields: []}
+---Child:
+------IXSCAN
+---------ns = test.dummy
+---------indexName = test_foo
+---------keyPattern = { a: 1, b: 1 }
+---------direction = 1
+---------bounds = [{ a: 1, b: 1 }, { a: 1, b: 1 })
+---------nodeId = 0
+---------fetched = 0
+---------sortedByDiskLoc = 1
+---------providedSorts = {baseSortPattern: {}, ignoredFields: [a, b]}
+)gold");
+}
+
+TEST(QuerySolutionTest, GroupNodeToStringWithSingleFieldKey) {
+    QueryTestServiceContext serviceCtx;
+    auto opCtx = serviceCtx.makeOperationContext();
+    const auto expCtx = ExpressionContextBuilder{}
+                            .opCtx(opCtx.get())
+                            .ns(NamespaceString::createNamespaceString_forTest("test.dummy"))
+                            .build();
+    auto groupByExpression =
+        Expression::parseObject(expCtx.get(), BSON("a" << "$a"), expCtx->variablesParseState);
+    auto node = makeGroupNodeForToStringTest(expCtx.get(), groupByExpression);
+
+    ASSERT_EQ(node->toString(),
+              R"gold(GROUP
+---key = {a: "$a"}
+---accs = [{sum: {$sum: "$a"}}, {cnt: {$sum: {$const: 1}}}]
+---nodeId = 0
+---fetched = 1
+---sortedByDiskLoc = 0
+---providedSorts = {baseSortPattern: {}, ignoredFields: []}
+---Child:
+------IXSCAN
+---------ns = test.dummy
+---------indexName = test_foo
+---------keyPattern = { a: 1, b: 1 }
+---------direction = 1
+---------bounds = [{ a: 1, b: 1 }, { a: 1, b: 1 })
+---------nodeId = 0
+---------fetched = 0
+---------sortedByDiskLoc = 1
+---------providedSorts = {baseSortPattern: {}, ignoredFields: [a, b]}
+)gold");
+}
+
+TEST(QuerySolutionTest, GroupNodeToStringWithNestedDocumentKey) {
+    QueryTestServiceContext serviceCtx;
+    auto opCtx = serviceCtx.makeOperationContext();
+    const auto expCtx = ExpressionContextBuilder{}
+                            .opCtx(opCtx.get())
+                            .ns(NamespaceString::createNamespaceString_forTest("test.dummy"))
+                            .build();
+    auto groupByExpression = Expression::parseObject(
+        expCtx.get(), BSON("x" << BSON("y" << "$a")), expCtx->variablesParseState);
+    auto node = makeGroupNodeForToStringTest(expCtx.get(), groupByExpression);
+
+    ASSERT_EQ(node->toString(),
+              R"gold(GROUP
+---key = {x: {y: "$a"}}
+---accs = [{sum: {$sum: "$a"}}, {cnt: {$sum: {$const: 1}}}]
+---nodeId = 0
+---fetched = 1
+---sortedByDiskLoc = 0
+---providedSorts = {baseSortPattern: {}, ignoredFields: []}
+---Child:
+------IXSCAN
+---------ns = test.dummy
+---------indexName = test_foo
+---------keyPattern = { a: 1, b: 1 }
+---------direction = 1
+---------bounds = [{ a: 1, b: 1 }, { a: 1, b: 1 })
+---------nodeId = 0
+---------fetched = 0
+---------sortedByDiskLoc = 1
+---------providedSorts = {baseSortPattern: {}, ignoredFields: [a, b]}
+)gold");
+}
+
+TEST(QuerySolutionTest, GroupNodeToStringWithArrayKey) {
+    QueryTestServiceContext serviceCtx;
+    auto opCtx = serviceCtx.makeOperationContext();
+    const auto expCtx = ExpressionContextBuilder{}
+                            .opCtx(opCtx.get())
+                            .ns(NamespaceString::createNamespaceString_forTest("test.dummy"))
+                            .build();
+    auto groupByExpression =
+        Expression::parseOperand(expCtx.get(),
+                                 BSON("" << BSON_ARRAY("$a" << "$b")).firstElement(),
+                                 expCtx->variablesParseState);
+    auto node = makeGroupNodeForToStringTest(expCtx.get(), groupByExpression);
+
+    ASSERT_EQ(node->toString(),
+              R"gold(GROUP
+---key = {_id: ["$a", "$b"]}
+---accs = [{sum: {$sum: "$a"}}, {cnt: {$sum: {$const: 1}}}]
+---nodeId = 0
+---fetched = 1
+---sortedByDiskLoc = 0
+---providedSorts = {baseSortPattern: {}, ignoredFields: []}
+---Child:
+------IXSCAN
+---------ns = test.dummy
+---------indexName = test_foo
+---------keyPattern = { a: 1, b: 1 }
+---------direction = 1
+---------bounds = [{ a: 1, b: 1 }, { a: 1, b: 1 })
+---------nodeId = 0
+---------fetched = 0
+---------sortedByDiskLoc = 1
+---------providedSorts = {baseSortPattern: {}, ignoredFields: [a, b]}
+)gold");
+}
+
 TEST(QuerySolutionTest, StreamingGroupNodeWithIndexScan) {
     QueryTestServiceContext serviceCtx;
     auto opCtx = serviceCtx.makeOperationContext();
@@ -1728,7 +1882,7 @@ TEST(QuerySolutionTest, StreamingGroupNodeToString) {
 
     ASSERT_EQ(node.toString(),
               R"gold(STREAMING_GROUP
----key = {a: {a: "$a", b: "$b"}}, {b: {a: "$a", b: "$b"}}
+---key = {a: "$a", b: "$b"}
 ---accs = [{sum: {$sum: "$a"}}, {cnt: {$sum: {$const: 1}}}]
 ---streamingKey = [a, b]
 ---nodeId = 0
