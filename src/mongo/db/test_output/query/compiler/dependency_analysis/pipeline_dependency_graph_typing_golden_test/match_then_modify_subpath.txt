@@ -1,0 +1,29 @@
+VARIATION MatchThenModifySubpath
+input: {
+    "pipeline": [
+        {
+            "$match": {
+                "x": {
+                    "$not": {
+                        "$type": "array"
+                    }
+                }
+            }
+        },
+        {
+            "$set": {
+                "x": {
+                    "y": {
+                        "$const": 1
+                    }
+                }
+            }
+        }
+    ]
+}
+output:
+  after $match:0
+    x: ~array
+  end of pipeline
+    x: any
+

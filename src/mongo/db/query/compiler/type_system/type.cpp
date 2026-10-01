@@ -588,4 +588,22 @@ Type narrowField(Type input, std::string_view fieldName, Type fieldType) {
     }
     return Type(input._typeSet, std::move(input._shape));
 }
+
+Type resolveFieldAccess(Type input, std::string_view fieldName) {
+    tassert(13459501, "Cannot access a field of a type covering no value", !input.isNever());
+    if (input.hasOnlyType(BSONType::object)) {
+        return input.getField(fieldName);
+    }
+    // Any field access involving an array input results in 'any', because we currently don't model
+    // array contents or array traversal semantics.
+    if (input.hasType(BSONType::array)) {
+        return Type::any();
+    }
+    // Field access on a scalar value results in 'missing', not 'never', which matches MQL
+    // semantics. The input may also cover objects, whose field type must be kept.
+    if (!input.hasType(BSONType::object)) {
+        return Type::missing();
+    }
+    return unionType(input.getField(fieldName), Type::missing());
+}
 }  // namespace mongo::pipeline::type_system

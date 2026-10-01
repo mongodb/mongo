@@ -13,6 +13,7 @@
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/compiler/dependency_analysis/document_transformation_helpers.h"
+#include "mongo/db/query/compiler/type_system/matcher_typing.h"
 #include "mongo/util/dynamic_bitset.h"
 #include "mongo/util/string_map.h"
 
@@ -29,6 +30,8 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo::pipeline::dependency_graph {
+
+namespace ts = type_system;
 namespace {
 /**
  * Strongly typed alias for int to avoid mixing IDs of different types.
@@ -567,6 +570,8 @@ private:
 
 class DependencyGraph::Impl {
 public:
+    using Type = ts::Type;
+
     explicit Impl(const DocumentSourceContainer& container,
                   DocumentSourceContainer::const_iterator endIt,
                   CanPathBeArray canPathBeArray = defaultCanPathBeArray)
@@ -733,6 +738,54 @@ public:
         }
 
         MONGO_UNREACHABLE_TASSERT(11939201);
+    }
+
+    Type getType(const DocumentSource* ds, PathRef path) const {
+        // TODO SERVER-135481: Handle dotted paths.
+        if (path.find('.') != PathRef::npos) {
+            return Type::any();
+        }
+
+        // We first need to determine the range of relevant stages. Any $match within this range may
+        // allow us to constrain the set of possible types.
+        //
+        // The end of the range is the stage right before the current stage.
+        const StageId end = getPreviousStageId(ds);
+        if (!end) {
+            return Type::any();
+        }
+
+        // The start of the range is the stage right after the stage that last modified the given
+        // path.
+        const StageId start = [&] {
+            if (auto prev = getPrevModifyingStage(ds, path)) {
+                return StageId{getStageId(prev.get()).value + 1};
+            }
+            return StageId{0};
+        }();
+
+        // Go through every $match in the range and try to narrow the type.
+        Type result = Type::any();
+        for (StageId stageId = start; stageId <= end; stageId.value++) {
+            const auto* stage = _stages[stageId].documentSource.get();
+            const auto* match = dynamic_cast<const DocumentSourceMatch*>(stage);
+            if (!match) {
+                continue;
+            }
+
+            // The initial type describes the top-level document.
+            Type current = ts::narrowType(Type::anyObject(), match->getMatchExpression(), true);
+            if (current.isNever()) {
+                return Type::never();
+            }
+            current = ts::resolveFieldAccess(std::move(current), path);
+            result = ts::intersectType(std::move(result), std::move(current));
+            if (result.isNever()) {
+                return Type::never();
+            }
+        }
+
+        return result;
     }
 
     const DependencyGraph* getSubpipelineGraph(const DocumentSource* ds) const {
@@ -2290,6 +2343,14 @@ bool DependencyGraph::canPathBeArray(const DocumentSource* ds, PathRef path) con
 
 boost::optional<Value> DependencyGraph::getConstant(const DocumentSource* ds, PathRef path) const {
     return _impl->getConstant(ds, path);
+}
+
+ts::Type DependencyGraph::getType(const DocumentSource* ds, PathRef path) const {
+    return _impl->getType(ds, path);
+}
+
+ts::Type DependencyGraph::getType_forTest(const DocumentSource* ds, PathRef path) const {
+    return getType(ds, path);
 }
 
 const DependencyGraph* DependencyGraph::getSubpipelineGraph(const DocumentSource* ds) const {

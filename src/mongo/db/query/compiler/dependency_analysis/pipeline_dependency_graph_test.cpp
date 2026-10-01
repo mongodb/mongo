@@ -3721,5 +3721,47 @@ TEST_F(PipelineDependencyGraphTest, GetBaseDocumentFieldAliasExclusionThenRename
     });
 }
 
+TEST_F(PipelineDependencyGraphTest, GetTypeAfterUnionWith) {
+    setPipeline(R"([
+        {$match: {x: {$not: {$type: 'array'}}}},
+        {$unionWith: {
+            coll: "coll_c",
+            pipeline: [{$match: {x: {$not: {$type: 'array'}}}}]
+        }}
+    ])");
+    runTest([&] {
+        ASSERT_EQ(graph->getType_forTest(stages[0].get(), "x").toDebugString(), "any");
+        ASSERT_EQ(graph->getType_forTest(stages[1].get(), "x").toDebugString(), "~array");
+        auto* subGraph = graph->getSubpipelineGraph(stages[1].get());
+        ASSERT_TRUE(subGraph);
+        ASSERT_EQ(subGraph->getType_forTest(nullptr, "x").toDebugString(), "~array");
+        // In theory, we could union the types from both branches, but this is currently not
+        // supported.
+        ASSERT_EQ(graph->getType_forTest(nullptr, "x").toDebugString(), "any");
+    });
+}
+
+
+TEST_F(PipelineDependencyGraphTest, GetTypeAfterLookupOnUnrelatedField) {
+    // Similar to the above in the sense that we are dealing with a subpipeline. However in this
+    // case, the subpipeline only affects 'docs.*', so we can keep the narrowed type on 'x'.
+    setPipeline(R"([
+        {$match: {x: {$not: {$type: 'array'}}}},
+        {$lookup: {
+            from: "coll_b",
+            as: "docs",
+            pipeline: [{$match: {x: {$not: {$type: 'array'}}}}]
+        }}
+    ])");
+    runTest([&] {
+        ASSERT_EQ(graph->getType_forTest(nullptr, "x").toDebugString(), "~array");
+        // For now, don't propagate type information from the subpipeline to the top-level pipeline.
+        ASSERT_EQ(graph->getType_forTest(nullptr, "docs.x").toDebugString(), "any");
+        auto* subGraph = graph->getSubpipelineGraph(stages[1].get());
+        ASSERT_TRUE(subGraph);
+        ASSERT_EQ(subGraph->getType_forTest(nullptr, "x").toDebugString(), "~array");
+    });
+}
+
 }  // namespace
 }  // namespace mongo::pipeline::dependency_graph

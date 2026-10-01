@@ -1005,6 +1005,45 @@ TEST(TypeTest, UnionAgreesWhetherOrNotTheShapeIsShared) {
     ASSERT_EQ(unionType(std::move(unshared), rhs), unionType(std::move(shared), rhs));
 }
 
+TEST(TypeTest, ResolveFieldAccessOnObjectReadsTheField) {
+    auto input = openObject({{"x", allValues(BSONType::string)}});
+    ASSERT_EQ(resolveFieldAccess(input, "x"), allValues(BSONType::string));
+    ASSERT_EQ(resolveFieldAccess(input, "y"), Type::any());
+    ASSERT_EQ(resolveFieldAccess(closedObject({}), "x"), Type::missing());
+}
+
+TEST(TypeTest, ResolveFieldAccessOnScalarIsMissing) {
+    ASSERT_EQ(resolveFieldAccess(allValues(BSONType::string), "x"), Type::missing());
+}
+
+TEST(TypeTest, ResolveFieldAccessOnPossibleArrayIsAny) {
+    auto input =
+        unionType(openObject({{"x", allValues(BSONType::string)}}), allValues(BSONType::array));
+    ASSERT_EQ(resolveFieldAccess(input, "x"), Type::any());
+}
+
+TEST(TypeTest, ResolveFieldAccessOnMixedObjectAndScalarKeepsMissing) {
+    auto input =
+        unionType(openObject({{"x", allValues(BSONType::string)}}), allValues(BSONType::numberInt));
+    ASSERT_EQ(resolveFieldAccess(input, "x"),
+              unionType(allValues(BSONType::string), Type::missing()));
+}
+
+TEST(TypeTest, ResolveFieldAccessOnNestedObject) {
+    auto input = openObject({{"a",
+                              closedObject({{"b", allValues(BSONType::string)},
+                                            {"items", allValues(BSONType::array)}})}});
+    auto a = resolveFieldAccess(input, "a");
+    ASSERT_EQ(resolveFieldAccess(a, "b"), allValues(BSONType::string));
+    ASSERT_EQ(resolveFieldAccess(a, "missing"), Type::missing());
+    ASSERT_EQ(resolveFieldAccess(a, "items"), allValues(BSONType::array));
+    ASSERT_EQ(resolveFieldAccess(resolveFieldAccess(a, "items"), "x"), Type::any());
+}
+
+TEST(TypeTest, ResolveFieldAccessRejectsNever) {
+    ASSERT_TASSERT_CODE(resolveFieldAccess(Type::never(), "x"), 13459501);
+}
+
 }  // namespace
 
 }  // namespace mongo::pipeline::type_system

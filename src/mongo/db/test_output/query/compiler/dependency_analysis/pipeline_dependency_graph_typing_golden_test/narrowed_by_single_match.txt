@@ -1,0 +1,18 @@
+VARIATION NarrowedBySingleMatch
+input: {
+    "pipeline": [
+        {
+            "$match": {
+                "x": {
+                    "$type": "number"
+                }
+            }
+        }
+    ]
+}
+output:
+  end of pipeline
+    x: number|array(S)
+    x.y: any
+    y: any
+

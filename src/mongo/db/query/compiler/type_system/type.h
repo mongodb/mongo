@@ -272,4 +272,9 @@ Type complement(Type type);
  */
 Type narrowField(Type input, std::string_view fieldName, Type fieldType);
 
+/**
+ * Returns the type describing the value 'fieldName' resolves to in a value of the input type.
+ */
+Type resolveFieldAccess(Type input, std::string_view fieldName);
+
 }  // namespace mongo::pipeline::type_system

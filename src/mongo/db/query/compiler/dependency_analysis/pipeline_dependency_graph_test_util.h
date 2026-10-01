@@ -1,7 +1,8 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
-#include "src/mongo/db/query/compiler/dependency_analysis/pipeline_dependency_graph.h"
+#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/query/compiler/dependency_analysis/pipeline_dependency_graph.h"
 
 namespace mongo::pipeline::dependency_graph {
 /**
@@ -16,4 +17,14 @@ inline void recomputeAndAssert(DependencyGraph& graph, const Pipeline& pipeline,
     }
     func();
 }
+
+/**
+ * Produces a formatted string representation of the pipeline for golden testing.
+ */
+std::string toString(const Pipeline& pipeline);
+
+/**
+ * Parses the given json string into a pipeline.
+ */
+std::unique_ptr<Pipeline> parsePipeline(const std::string& inputPipeJson);
 }  // namespace mongo::pipeline::dependency_graph

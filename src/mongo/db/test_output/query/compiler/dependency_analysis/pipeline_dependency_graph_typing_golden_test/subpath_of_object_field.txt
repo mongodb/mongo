@@ -1,0 +1,29 @@
+VARIATION SubpathOfObjectField
+input: {
+    "pipeline": [
+        {
+            "$match": {
+                "x": {
+                    "$type": "object"
+                }
+            }
+        },
+        {
+            "$match": {
+                "x": {
+                    "$not": {
+                        "$type": "array"
+                    }
+                }
+            }
+        }
+    ]
+}
+output:
+  after $match:0
+    x: object|array(S)
+    x.y: any
+  end of pipeline
+    x: object
+    x.y: any
+

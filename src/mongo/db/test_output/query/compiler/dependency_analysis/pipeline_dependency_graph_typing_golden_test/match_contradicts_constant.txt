@@ -1,0 +1,25 @@
+VARIATION MatchContradictsConstant
+input: {
+    "pipeline": [
+        {
+            "$set": {
+                "y": {
+                    "$const": "str"
+                }
+            }
+        },
+        {
+            "$match": {
+                "y": {
+                    "$type": "array"
+                }
+            }
+        }
+    ]
+}
+output:
+  after $set:0
+    y: any
+  end of pipeline
+    y: array
+

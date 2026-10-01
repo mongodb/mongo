@@ -1,0 +1,40 @@
+VARIATION MatchThenExhaustiveStage
+input: {
+    "pipeline": [
+        {
+            "$match": {
+                "x": {
+                    "$not": {
+                        "$type": "array"
+                    }
+                }
+            }
+        },
+        {
+            "$group": {
+                "_id": "$a",
+                "$willBeMerged": false
+            }
+        },
+        {
+            "$match": {
+                "_id": {
+                    "$not": {
+                        "$type": "array"
+                    }
+                }
+            }
+        }
+    ]
+}
+output:
+  after $match:0
+    x: ~array
+    _id: any
+  after $group:1
+    x: any
+    _id: any
+  end of pipeline
+    x: any
+    _id: ~array
+

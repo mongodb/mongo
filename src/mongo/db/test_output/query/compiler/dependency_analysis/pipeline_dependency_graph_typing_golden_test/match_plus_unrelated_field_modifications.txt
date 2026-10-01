@@ -1,0 +1,35 @@
+VARIATION MatchPlusUnrelatedFieldModifications
+input: {
+    "pipeline": [
+        {
+            "$match": {
+                "x": {
+                    "$not": {
+                        "$type": "array"
+                    }
+                }
+            }
+        },
+        {
+            "$set": {
+                "y": {
+                    "$const": 1
+                }
+            }
+        },
+        {
+            "$project": {
+                "z": false,
+                "_id": true
+            }
+        }
+    ]
+}
+output:
+  after $match:0
+    x: ~array
+  after $set:1
+    x: ~array
+  end of pipeline
+    x: ~array
+

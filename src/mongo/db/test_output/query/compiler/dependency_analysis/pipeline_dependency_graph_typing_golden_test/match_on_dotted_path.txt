@@ -1,0 +1,19 @@
+VARIATION MatchOnDottedPath
+input: {
+    "pipeline": [
+        {
+            "$match": {
+                "x.y": {
+                    "$not": {
+                        "$type": "array"
+                    }
+                }
+            }
+        }
+    ]
+}
+output:
+  end of pipeline
+    x: any
+    x.y: any
+

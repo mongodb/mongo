@@ -1,0 +1,25 @@
+VARIATION MatchBeforeModifyingStage
+input: {
+    "pipeline": [
+        {
+            "$match": {
+                "x": {
+                    "$not": {
+                        "$type": "array"
+                    }
+                }
+            }
+        },
+        {
+            "$set": {
+                "x": "$y"
+            }
+        }
+    ]
+}
+output:
+  after $match:0
+    x: ~array
+  end of pipeline
+    x: any
+

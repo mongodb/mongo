@@ -8,6 +8,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
+#include "mongo/db/query/compiler/type_system/type.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>
@@ -193,6 +194,11 @@ public:
     boost::optional<Value> getConstant(const DocumentSource* stage, PathRef path) const;
 
     /**
+     * Returns the result of getType(). Only used for testing.
+     */
+    type_system::Type getType_forTest(const DocumentSource* stage, PathRef path) const;
+
+    /**
      * Returns the dependency graph for the sub-pipeline of the given stage (e.g. $lookup,
      * $unionWith), or nullptr if the stage has no sub-pipeline.
      */
@@ -309,6 +315,17 @@ public:
     BSONObj toBSON() const;
 
 private:
+    /**
+     * Returns the type of the path at the input of 'stage'. If nothing can be said about the type,
+     * returns Type::any(). If 'stage' is nullptr, the path is evaluated as it appears at the end of
+     * the pipeline.
+     *
+     * The result is the type of the aggregation expression '$<path>'. This is not necessarily the
+     * same type the matcher sees for 'path', since the matcher's array traversal semantics are
+     * different in some cases.
+     */
+    type_system::Type getType(const DocumentSource* stage, PathRef path) const;
+
     class Impl;
     std::unique_ptr<Impl> _impl;
 };
