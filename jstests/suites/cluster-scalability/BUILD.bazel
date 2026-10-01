@@ -63,7 +63,7 @@ resmoke_suite_test(
         "//jstests/sharding/libs:all_subpackage_javascript_files",
         "//jstests/sharding/libs:proxy_protocol_server",
     ] + SHARDING_DATA,
-    shard_count = 50,
+    shard_count = 100,
     tags = [
         "ci-release-critical",
         "common",

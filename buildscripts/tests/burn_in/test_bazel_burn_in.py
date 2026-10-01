@@ -89,6 +89,33 @@ class TestCreateBurnInTarget(unittest.TestCase):
     @patch(ns("buildozer.bd_print"))
     @patch("builtins.open", new_callable=mock_open)
     @patch(ns("parse_bazel_target"))
+    def test_create_burn_in_target_overrides_shard_count_above_native_cap(
+        self, mock_parse, mock_open_file, mock_bd_print, mock_bd_set, mock_bd_remove, mock_bd_move
+    ):
+        """A suite sharded past Bazel's native cap of 50 must still burn in with one shard."""
+        target_original = "//jstests:big_config"
+        target_burn_in = "//jstests:big_burn_in_find_js"
+
+        mock_parse.side_effect = [
+            ("jstests/BUILD.bazel", "big"),
+            ("jstests/BUILD.bazel", "big_burn_in_find_js"),
+        ]
+        mock_rule = (
+            'resmoke_suite_test(\n    name = "big",\n    resmoke_args = [],\n'
+            "    shard_count = 60,\n)"
+        )
+        mock_bd_print.side_effect = [mock_rule, "[]"]
+
+        under_test.create_burn_in_target(target_original, target_burn_in, "jstests/core/find.js")
+
+        mock_bd_set.assert_any_call([target_burn_in], "shard_count", "1")
+
+    @patch(ns("buildozer.bd_move"))
+    @patch(ns("buildozer.bd_remove"))
+    @patch(ns("buildozer.bd_set"))
+    @patch(ns("buildozer.bd_print"))
+    @patch("builtins.open", new_callable=mock_open)
+    @patch(ns("parse_bazel_target"))
     def test_create_burn_in_target_basic(
         self, mock_parse, mock_open_file, mock_bd_print, mock_bd_set, mock_bd_remove, mock_bd_move
     ):

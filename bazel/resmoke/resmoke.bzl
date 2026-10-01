@@ -1,7 +1,7 @@
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 load("//bazel:test_exec_properties.bzl", "test_exec_properties")
 load("//bazel/resmoke:.resmoke_suites_derived.bzl", "SUITE_SELECTORS")
-load("@rules_python//python:defs.bzl", "py_test")
+load("@rules_python//python:defs.bzl", "py_binary")
 
 def _config_fuzz_seed_file_impl(ctx):
     seed_file = ctx.actions.declare_file(ctx.label.name + ".txt")
@@ -193,6 +193,10 @@ def _resolve_suite_srcs(config):
 
     return None
 
+# Bazel fails analysis for a native shard_count above this ("Having more than 50 shards is
+# indicative of poor test organization"). Suites needing more go through the _forced_shards_transition.
+_MAX_NATIVE_SHARD_COUNT = 50
+
 def _dep_target_name(dep):
     """Extract the target name from a label string, e.g. '//pkg:name' → 'name'."""
     if ":" in dep:
@@ -326,8 +330,6 @@ def resmoke_suite_test(
         "//conditions:default": [],
     })
 
-    deps_path = ":".join(["$(location %s)" % dep for dep in deps])
-
     default_data = [
         generated_config,
         python_imports_target,
@@ -424,65 +426,232 @@ def resmoke_suite_test(
             "//conditions:default": [],
         })
 
-    py_test(
-        name = name,
+    # Resmoke test-target attribute values, extracted into locals so the pieces are
+    # named and reusable. The data/deps/args/env of the test target are each built
+    # here and passed to py_test below.
+    data_attr = select({
+        # Skip user-provided data during cquery — it may include targets that require
+        # C++ toolchain resolution, which fails when --noincompatible_enable_cc_toolchain_resolution is set.
+        "//bazel/resmoke:skip_deps_for_cquery_enabled": cquery_safe_data,
+        "//conditions:default": data + cquery_safe_data,
+    }) + select({
+        "//bazel/resmoke:installed_dist_test_enabled": ["//:installed-dist-test"],
+        "//conditions:default": [],
+    })
+
+    # The server binaries (mongod/mongos/mongo). Empty under installed-dist-test
+    # (prebuilt servers) and during cquery.
+    server_deps_attr = select({
+        "//bazel/resmoke:installed_dist_test_enabled": [],
+        "//bazel/resmoke:skip_deps_for_cquery_enabled": [],
+        "//conditions:default": deps,
+    })
+
+    args_attr = [
+        "run",
+        "--suites=$(location %s)" % native.package_relative_label(generated_config),
+        "--releasesFile=$(location //src/mongo/util/version:releases.yml)",
+        "--archiveMode=directory",
+        "--archiveLimitMb=500",
+        "--testTimeout=$(RESMOKE_TEST_TIMEOUT)",
+        "--historicTestRuntimes=$(location :%s)" % historic_runtimes,
+        "--mongoVersionFile=$(location //bazel/resmoke:resmoke_mongo_version)",
+    ] + [
+        "--multiversionDir=$(location %s)" % native.package_relative_label(dep)
+        for dep in multiversion_deps
+    ] + [
+        "--tagFile=$(location %s)" % native.package_relative_label(tag)
+        for tag in multiversion_exclude_tags
+    ] + extra_args + resmoke_args
+
+    env_attr = {
+        "LOCAL_RESOURCES": "$(LOCAL_RESOURCES)",
+        "GIT_PYTHON_REFRESH": "quiet",  # Ignore "Bad git executable" error when importing git python. Git commands will still error if run.
+        "PYTHON_IMPORTS_FILE": "$(location %s)" % native.package_relative_label(python_imports_target),
+    } | seed_env | ({
+        "MULTIVERSION_CONFIG_FILE": "$(location //bazel/resmoke:multiversion_config)",
+        "MULTIVERSION_VERSIONS": ",".join([
+            dep.rsplit(":", 1)[1] if ":" in dep else dep
+            for dep in multiversion_deps
+        ]),
+    } if multiversion_deps else {})
+
+    # The resmoke Python program. Not run directly (the _resmoke_test wrapper execs
+    # it), so it is tagged manual.
+    py_binary(
+        name = name + "_bin",
         srcs = [resmoke_shim],
-        data = select({
-            # Skip user-provided data during cquery — it may include targets that require
-            # C++ toolchain resolution, which fails when --noincompatible_enable_cc_toolchain_resolution is set.
-            "//bazel/resmoke:skip_deps_for_cquery_enabled": cquery_safe_data,
-            "//conditions:default": data + cquery_safe_data,
-        }) + select({
-            "//bazel/resmoke:installed_dist_test_enabled": ["//:installed-dist-test"],
-            "//conditions:default": [],
-        }),
+        data = data_attr,
         deps = [
             resmoke,
             "//buildscripts:bazel_local_resources",
-        ] + select({
-            "//bazel/resmoke:installed_dist_test_enabled": [],
-            "//bazel/resmoke:skip_deps_for_cquery_enabled": [],
-            "//conditions:default": deps,
-        }),
+        ] + server_deps_attr,
         main = resmoke_shim,
-        args = [
-            "run",
-            "--suites=$(location %s)" % native.package_relative_label(generated_config),
-            "--releasesFile=$(location //src/mongo/util/version:releases.yml)",
-            "--archiveMode=directory",
-            "--archiveLimitMb=500",
-            "--testTimeout=$(RESMOKE_TEST_TIMEOUT)",
-            "--historicTestRuntimes=$(location :%s)" % historic_runtimes,
-            "--mongoVersionFile=$(location //bazel/resmoke:resmoke_mongo_version)",
-        ] + [
-            "--multiversionDir=$(location %s)" % native.package_relative_label(dep)
-            for dep in multiversion_deps
-        ] + [
-            "--tagFile=$(location %s)" % native.package_relative_label(tag)
-            for tag in multiversion_exclude_tags
-        ] + extra_args + resmoke_args,
+        tags = ["manual"],
+        target_compatible_with = target_compatible_with,
+    )
+
+    # Bazel caps the native shard_count attribute at 50. Above that, pin the attribute at the cap
+    # and let the rule transition force the real count, so a suite still shards 50 ways if the
+    # transition is disabled (--no//bazel/resmoke:support_extended_shard_count) rather than collapsing to a
+    # single shard.
+    shard_count = kwargs.pop("shard_count", None)
+    forced_shards = 0
+    if shard_count != None and shard_count > _MAX_NATIVE_SHARD_COUNT:
+        forced_shards = shard_count
+        shard_count = _MAX_NATIVE_SHARD_COUNT
+    if shard_count != None:
+        kwargs["shard_count"] = shard_count
+
+    _resmoke_test(
+        name = name,
+        forced_shards = forced_shards,
+        resmoke_bin = ":" + name + "_bin",
+        server_deps = server_deps_attr,
+        data = data_attr,
+        resmoke_args = args_attr,
+        resmoke_env = env_attr,
         tags = tags + ["no-cache", "resources:port_block:1", "resmoke_suite_test"],
         target_compatible_with = target_compatible_with,
         timeout = timeout,
         size = size,
-        env = {
-            "LOCAL_RESOURCES": "$(LOCAL_RESOURCES)",
-            "GIT_PYTHON_REFRESH": "quiet",  # Ignore "Bad git executable" error when importing git python. Git commands will still error if run.
-            "PYTHON_IMPORTS_FILE": "$(location %s)" % native.package_relative_label(python_imports_target),
-        } | seed_env | ({
-            "MULTIVERSION_CONFIG_FILE": "$(location //bazel/resmoke:multiversion_config)",
-            "MULTIVERSION_VERSIONS": ",".join([
-                dep.rsplit(":", 1)[1] if ":" in dep else dep
-                for dep in multiversion_deps
-            ]),
-        } if multiversion_deps else {}) | select({
-            "//bazel/resmoke:installed_dist_test_enabled": {},
-            "//bazel/resmoke:skip_deps_for_cquery_enabled": {},
-            "//conditions:default": {"DEPS_PATH": deps_path},
-        }),
         exec_properties = exec_properties | test_exec_properties(tags),
         toolchains = [
             "//bazel/resmoke:test_timeout",
         ],
         **kwargs
     )
+
+# ---------------------------------------------------------------------------
+# _resmoke_test rule (private; the public entry point is the resmoke_suite_test macro).
+#
+# This is essentially a reimplementation of py_test that wraps a resmoke py_binary,
+# but allows us to customize with features that py_test doesn't natively support or
+# can extend (eg. collect code coverage).
+#
+# A resmoke suite is a Python program (the resmoke shim) that boots mongod/mongos
+# subprocesses. This rule wraps the resmoke py_binary in a small launcher that
+# reproduces the args/env a py_test applies (with $(location)/make-variable
+# expansion), so the target behaves the same as a py_test.
+# ---------------------------------------------------------------------------
+def _resmoke_test_impl(ctx):
+    resmoke_bin = ctx.executable.resmoke_bin
+
+    # Expand $(location ...) against every target that can be referenced, and
+    # make-variables ($(RESMOKE_TEST_TIMEOUT) from the test_timeout toolchain,
+    # $(LOCAL_RESOURCES) from a --define) via ctx.var.
+    expansion_targets = ctx.attr.data + ctx.attr.server_deps + [ctx.attr.resmoke_bin]
+
+    def expand(s):
+        # Native py_test expands $(location) in args/env to the runfiles-relative
+        # (rootpath) form, but ctx.expand_location maps $(location) to the exec path.
+        # Rewrite to $(rootpath) so paths resolve the same way resmoke expects.
+        s = s.replace("$(location ", "$(rootpath ").replace("$(locations ", "$(rootpaths ")
+        s = ctx.expand_location(s, expansion_targets)
+        return ctx.expand_make_variables("resmoke_test", s, ctx.var)
+
+    def sh_quote(s):
+        # Wrap in single quotes, escaping embedded single quotes.
+        return "'" + s.replace("'", "'\\''") + "'"
+
+    expanded_args = [expand(a) for a in ctx.attr.resmoke_args]
+    expanded_env = {k: expand(v) for k, v in ctx.attr.resmoke_env.items()}
+
+    # resmoke locates the server binaries (mongod/mongos/...) via DEPS_PATH. Resolve
+    # each server_dep to its executable rather than a $(rootpath): a binary built with
+    # separate debug info produces multiple output files (e.g. mongos + mongos.debug),
+    # which the singular $(rootpath) rejects. The native py_test this rule replaced
+    # resolved such a label to the target's executable, so we reproduce that here.
+    server_bins = [dep[DefaultInfo].files_to_run.executable for dep in ctx.attr.server_deps]
+    if server_bins:
+        expanded_env["DEPS_PATH"] = ":".join([b.short_path for b in server_bins])
+
+    env_exports = "".join(
+        ["export {}={}\n".format(k, sh_quote(v)) for k, v in expanded_env.items()],
+    )
+    args_str = " ".join([sh_quote(a) for a in expanded_args])
+
+    # The launcher locates the resmoke py_binary under the runfiles tree and execs it.
+    # bazel test (and RBE) materialize the runfiles tree and set RUNFILES_DIR; if
+    # neither RUNFILES_DIR nor a manifest is set we fall back to the adjacent
+    # <launcher>.runfiles directory.
+    launcher = ctx.actions.declare_file(ctx.label.name + "_launcher.sh")
+    ctx.actions.write(
+        output = launcher,
+        is_executable = True,
+        content = """#!/usr/bin/env bash
+set -euo pipefail
+if [[ -z "${{RUNFILES_DIR:-}}" && -z "${{RUNFILES_MANIFEST_FILE:-}}" ]]; then
+  if [[ -d "$0.runfiles" ]]; then
+    export RUNFILES_DIR="$0.runfiles"
+  fi
+fi
+{env_exports}exec "{resmoke_bin}" {args} "$@"
+""".format(
+            env_exports = env_exports,
+            # The py_binary executable lives in the runfiles under _main/<short_path>.
+            resmoke_bin = "${RUNFILES_DIR}/_main/" + resmoke_bin.short_path,
+            args = args_str,
+        ),
+    )
+
+    # Seed with the data files and the server executables that DEPS_PATH points at, so
+    # those exact binaries are staged rather than relying on each dep's default_runfiles
+    # to carry its own executable.
+    runfiles = ctx.runfiles(files = ctx.files.data + server_bins)
+    runfiles = runfiles.merge(ctx.attr.resmoke_bin[DefaultInfo].default_runfiles)
+    for dep in ctx.attr.server_deps + ctx.attr.data:
+        runfiles = runfiles.merge(dep[DefaultInfo].default_runfiles)
+
+    return [
+        DefaultInfo(executable = launcher, runfiles = runfiles),
+        RunEnvironmentInfo(environment = expanded_env),
+    ]
+
+# Bazel rejects a native shard_count above 50. Suites that need more shards than that get their
+# shard count from --test_sharding_strategy instead, set here per target so it applies to this
+# suite alone rather than to every test in the invocation.
+def _forced_shards_transition_impl(settings, attr):
+    if attr.forced_shards == 0:
+        return {}
+    if not settings["//bazel/resmoke:support_extended_shard_count"]:
+        return {}
+    return {"//command_line_option:test_sharding_strategy": "forced=%d" % attr.forced_shards}
+
+_forced_shards_transition = transition(
+    implementation = _forced_shards_transition_impl,
+    inputs = ["//bazel/resmoke:support_extended_shard_count"],
+    outputs = ["//command_line_option:test_sharding_strategy"],
+)
+
+_resmoke_test = rule(
+    implementation = _resmoke_test_impl,
+    cfg = _forced_shards_transition,
+    attrs = {
+        "forced_shards": attr.int(
+            doc = "Set by the resmoke_suite_test macro when shard_count exceeds the native cap; " +
+                  "forces this many shards via a configuration transition. 0 leaves sharding to " +
+                  "the native shard_count attribute.",
+        ),
+        "resmoke_bin": attr.label(
+            mandatory = True,
+            executable = True,
+            cfg = "target",
+            doc = "The resmoke py_binary to run.",
+        ),
+        "server_deps": attr.label_list(
+            doc = "Server binaries (mongod/mongos/mongo).",
+        ),
+        "data": attr.label_list(
+            allow_files = True,
+            doc = "Runtime data dependencies (configs, jstests, certs).",
+        ),
+        "resmoke_args": attr.string_list(
+            doc = "Arguments passed to resmoke; support $(location) and make-vars.",
+        ),
+        "resmoke_env": attr.string_dict(
+            doc = "Environment for the test; values support $(location) and make-vars.",
+        ),
+    },
+    test = True,
+)

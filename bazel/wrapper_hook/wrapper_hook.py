@@ -143,6 +143,11 @@ def main():
         if any(arg.startswith("--include_mongot") for arg in args):
             os.makedirs("mongot-localdev", exist_ok=True)
 
+        # resmoke_suite_test tests get their shard count from a rule transition that sets
+        # --test_sharding_strategy, which would silently overrule the requested strategy.
+        if any(arg.startswith("--test_sharding_strategy") for arg in args):
+            args.append("--//bazel/resmoke:support_extended_shard_count=False")
+
         engflow_auth(args)
         write_workstation_bazelrc(args)
         write_wrapper_hook_bazelrc(args)

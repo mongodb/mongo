@@ -404,23 +404,23 @@ def _build_tag_query(tags: list[str], target_pattern: str) -> str:
     positive_tags = [t for t in tags if not t.startswith("-")]
     negative_tags = [t[1:] for t in tags if t.startswith("-")]
 
-    excluded_parts = [
-        f"attr(tags, '\\bincompatible_with_bazel_remote_test(?![a-zA-Z0-9_-])', kind('py_test', {target_pattern}))"
-    ]
-    for tag in negative_tags:
-        excluded_parts.append(
-            f"attr(tags, '\\b{tag}(?![a-zA-Z0-9_-])', kind('py_test', {target_pattern}))"
+    def tagged(tag: str) -> str:
+        # resmoke_suite_test targets carrying `tag` as a whole word (the negative
+        # lookahead prevents matching tag prefixes). The macro expands to the custom
+        # _resmoke_test rule, and the ci-*/exclusion tags this query filters on are
+        # only ever applied to resmoke suites, so no other rule kind is relevant.
+        return (
+            f"attr(tags, '\\b{tag}(?![a-zA-Z0-9_-])', " f"kind('_resmoke_test', {target_pattern}))"
         )
+
+    excluded_parts = [tagged("incompatible_with_bazel_remote_test")]
+    excluded_parts += [tagged(tag) for tag in negative_tags]
     excluded = " + ".join(excluded_parts)
 
     if len(positive_tags) == 1:
-        inclusion = f"attr(tags, '\\b{positive_tags[0]}(?![a-zA-Z0-9_-])', kind('py_test', {target_pattern}))"
+        inclusion = tagged(positive_tags[0])
     else:
-        tag_queries = [
-            f"attr(tags, '\\b{tag}(?![a-zA-Z0-9_-])', kind('py_test', {target_pattern}))"
-            for tag in positive_tags
-        ]
-        inclusion = f"({' + '.join(tag_queries)})"
+        inclusion = f"({' + '.join(tagged(tag) for tag in positive_tags)})"
 
     return f"{inclusion} - ({excluded})"
 
@@ -443,6 +443,10 @@ def _variant_cquery_flags(variant, resmoke_task, expansions) -> tuple[list[str],
     cquery_flags.append("--noincompatible_enable_cc_toolchain_resolution")
     cquery_flags.append("--repo_env=no_c++_toolchain=1")
     cquery_flags.append("--keep_going")
+    # Suites with shard_count above Bazel's native cap of 50 get their shard count from a rule
+    # transition, and Bazel omits a target whose own transition changed its configuration from
+    # cquery output. Turning the flag off makes the transition a no-op so the targets are visible.
+    cquery_flags.append("--//bazel/resmoke:support_extended_shard_count=False")
 
     if " " in target_pattern and not target_pattern.startswith("set("):
         target_pattern = f"set({target_pattern})"
@@ -488,15 +492,17 @@ def query_targets(
             candidate_set,
             "--output=starlark",
             "--starlark:expr",
-            'target.label if "IncompatiblePlatformProvider" not in providers(target) else ""',
+            "str(target.label) + "
+            '(" INCOMPATIBLE" if "IncompatiblePlatformProvider" in providers(target) else " OK")',
         ]
     )
     result = subprocess.run(cquery_cmd, capture_output=True, text=True)
-    compatible = {
-        line.strip().removeprefix("@@")
-        for line in result.stdout.strip().split("\n")
-        if line.strip()
-    }
+    compatible = set()
+    for line in result.stdout.splitlines():
+        label, _, verdict = line.strip().rpartition(" ")
+        if verdict == "OK":
+            compatible.add(label.removeprefix("@@").removeprefix("@"))
+
     targets = [c for c in candidates if c in compatible]
     print(f"Variant {variant.name}: Found {len(targets)} targets total", file=sys.stderr)
 
