@@ -22,6 +22,7 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
 #include <algorithm>
@@ -3761,6 +3762,75 @@ TEST_F(PipelineDependencyGraphTest, GetTypeAfterLookupOnUnrelatedField) {
         ASSERT_TRUE(subGraph);
         ASSERT_EQ(subGraph->getType_forTest(nullptr, "x").toDebugString(), "~array");
     });
+}
+
+TEST_F(PipelineDependencyGraphTest, CanPathBeArrayNotArrayTypePredicate) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setPipeline(R"([
+        {$match: {x: {$type: 'double'}}},
+        {$match: {x: {$not: {$type: 'array'}}}}
+    ])");
+    runTest([&] {
+        ASSERT_TRUE(graph->canPathBeArray(stages[0].get(), "x"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "x"));
+        // TODO(SERVER-135481) We should be able to determine that this is not an array.
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "x.y"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, CanPathBeArrayNotArrayTypePredicateOnDottedPath) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setPipeline(R"([
+        {$match: {'x': {$not: {$type: 'array'}}}},
+        {$match: {'x.y': {$not: {$type: 'array'}}}}
+    ])");
+    runTest([&] {
+        ASSERT_TRUE(graph->canPathBeArray(stages[0].get(), "x"));
+        ASSERT_TRUE(graph->canPathBeArray(stages[0].get(), "x.y"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "x"));
+        // TODO(SERVER-135481,SERVER-134936) We should be able to determine that this is not an
+        // array.
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "x.y"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, CanPathBeArrayNotArrayTypePredicateAfterRename) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setPipeline(R"([
+        {$set: {x: '$y'}},
+        {$match: {x: {$not: {$type: 'array'}}}}
+    ])");
+    runTest([&] {
+        ASSERT_TRUE(graph->canPathBeArray(stages[1].get(), "x"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "x"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, CanPathBeArrayNotArrayTypePredicateBeforeRename) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setPipeline(R"([
+        {$match: {y: {$not: {$type: 'array'}}}},
+        {$set: {x: '$y'}}
+    ])");
+    runTest([&] {
+        ASSERT_FALSE(graph->canPathBeArray(stages[1].get(), "y"));
+        ASSERT_TRUE(graph->canPathBeArray(stages[1].get(), "x"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "y"));
+        // TODO(SERVER-135568) We should be able to deduce that "x" can't be an array.
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "x"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, CanPathBeArrayIgnoresTypeWhenFeatureFlagDisabled) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", false};
+    setPipeline("[{$match: {x: {$not: {$type: 'array'}}}}]");
+    runTest([&] { ASSERT_TRUE(graph->canPathBeArray(nullptr, "x")); });
+}
+
+TEST_F(PipelineDependencyGraphTest, CanPathBeArrayWithTypePredicateMatchingArrayElements) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setPipeline("[{$match: {x: {$type: 'double'}}}]");
+    runTest([&] { ASSERT_TRUE(graph->canPathBeArray(nullptr, "x")); });
 }
 
 }  // namespace

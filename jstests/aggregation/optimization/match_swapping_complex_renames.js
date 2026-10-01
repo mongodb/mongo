@@ -10,6 +10,7 @@
  *   assumes_unsharded_collection,
  * ]
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {describe, it} from "jstests/libs/mochalite.js";
 import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
 
@@ -249,6 +250,26 @@ runTest({
     positive: {
         docs: [{x: 42}, {x: 99}, {x: 42}],
         index: {x: 1},
+        expectedCount: 2,
+    },
+});
+
+const typeInferenceEnabled = FeatureFlagUtil.isPresentAndEnabled(
+    db,
+    "featureFlagQueryTypeInference",
+);
+
+runTest({
+    name: "$match non-array type predicate + $addFields complex rename {a: '$x.y'}",
+    pipeline: [
+        {$match: {x: {$not: {$type: "array"}}}},
+        {$addFields: {a: "$x.y"}},
+        {$match: {a: 42}},
+    ],
+    [typeInferenceEnabled ? "positive" : "negative"]: {
+        // 'x.y' is multikey here.
+        docs: [{x: {y: 42}}, {x: {y: 99}}, {x: {y: 42}}, {x: [{y: 42}]}],
+        index: {"x.y": 1},
         expectedCount: 2,
     },
 });

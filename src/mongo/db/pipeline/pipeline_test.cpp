@@ -4802,6 +4802,27 @@ TEST_F(PipelineOptimizationTest, MatchSwapsPastComplexRenameWhenNonArray) {
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
+TEST_F(PipelineOptimizationTest, MatchSwapsPastComplexRenameWhenTypeIsNonArray) {
+    unittest::ServerParameterGuard featureFlag{"featureFlagQueryTypeInference", true};
+    std::string inputPipe =
+        "["
+        " {$match: {x: {$not: {$type: 'array'}}}},"
+        " {$addFields: {a: '$x.y'}},"
+        " {$match: {a: 42}}"
+        "]";
+    std::string outputPipe =
+        "["
+        " {$match: {$and: [{'x.y': {$eq: 42}}, {x: {$not: {$type: [4]}}}]}},"
+        " {$addFields: {a: '$x.y'}}"
+        "]";
+    std::string serializedPipe =
+        "["
+        " {$match: {$and: [{x: {$not: {$type: 'array'}}}, {'x.y': {$eq: 42}}]}},"
+        " {$addFields: {a: '$x.y'}}"
+        "]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
 // After $set{x: 1}, x is known non-array. The subsequent $set{x: {y: 1}} inherits x's non-array
 // metadata and establishes x.y as non-array too, so {a: "$x.y.z"} is a safe rename.
 TEST_F(PipelineOptimizationTest, MatchSwapsPastDeeperComplexRenameWhenNonArray) {

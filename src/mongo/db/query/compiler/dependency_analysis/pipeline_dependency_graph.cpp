@@ -14,6 +14,7 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/compiler/dependency_analysis/document_transformation_helpers.h"
 #include "mongo/db/query/compiler/type_system/matcher_typing.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/util/dynamic_bitset.h"
 #include "mongo/util/string_map.h"
 
@@ -633,6 +634,19 @@ public:
     }
 
     bool canPathBeArray(const DocumentSource* ds, PathRef path) const {
+        if (!canPathBeArrayFromFieldMetadata(ds, path)) {
+            return false;
+        }
+        if (!feature_flags::gFeatureFlagQueryTypeInference.checkEnabled()) {
+            return true;
+        }
+        return getType(ds, path).hasType(BSONType::array);
+    }
+
+    /// Determines whether the field can be an array. For base document fields, which are not
+    /// represented as Field nodes, checks the PathArrayness API. For fields introduced by stages,
+    /// arrayness is determined by inspecting the FieldMetadata associated with the Field node.
+    bool canPathBeArrayFromFieldMetadata(const DocumentSource* ds, PathRef path) const {
         auto stageId = getPreviousStageId(ds);
         if (!stageId) {
             // Empty pipeline - all paths come from the base collection.

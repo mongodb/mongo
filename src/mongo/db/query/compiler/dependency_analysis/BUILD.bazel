@@ -76,6 +76,7 @@ mongo_cc_library(
     ],
     deps = [
         ":dependency_analysis",
+        "//src/mongo/db/query:query_knobs",
         "//src/mongo/db/query/compiler/metadata:path_arrayness",
         "//src/mongo/db/query/compiler/type_system",
     ],
@@ -105,6 +106,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/exec/document_value:document_value_test_util",
         "//src/mongo/db/pipeline",
         "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/unittest:server_parameter_guard",
     ],
 )
 
