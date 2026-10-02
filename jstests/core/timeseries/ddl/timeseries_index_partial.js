@@ -23,7 +23,6 @@ import {
     getRejectedPlan,
     getRejectedPlans,
 } from "jstests/libs/query/analyze_plan.js";
-import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
 
 const coll = db[jsTestName()];
 const timeField = "time";
@@ -53,7 +52,6 @@ function resetCollection(collation) {
             "v": 2,
             "key": {"control.min.time": 1, "control.max.time": 1},
             "name": "time_1",
-            "collation": {"locale": "simple"},
         };
         extraBucketIndexes.push(addCollation(extraBucketIndexesShardedSpec, collation));
     }
@@ -63,24 +61,18 @@ function resetCollection(collation) {
         "v": 2,
         "key": {"meta": 1, "control.min.time": 1, "control.max.time": 1},
         "name": "m_1_time_1",
-        "collation": {"locale": "simple"},
     };
     extraBucketIndexes.push(addCollation(extraBucketIndexesSpec, collation));
 }
 
 resetCollection();
 
-let index = coll.getIndexes()[0];
-let actualIndexes = getTimeseriesCollForRawOps(coll).getIndexes(kRawOperationSpec);
-
-// Check that the default index has simple collation.
-
-// TODO (SERVER-122417) Remove these workarounds once v9.0 branches out.
-index = IndexCatalogHelpers.addSimpleCollationToIndexIfMissing(db, index);
-actualIndexes = IndexCatalogHelpers.addSimpleCollationToIndexesIfMissing(db, actualIndexes);
-
-assert.eq(index.collation.locale, "simple");
-assert.sameMembers(actualIndexes, extraBucketIndexes);
+// Check that there is no collation in the default index.
+assert.eq(coll.getIndexes()[0].collation, null);
+assert.sameMembers(
+    getTimeseriesCollForRawOps(coll).getIndexes(kRawOperationSpec),
+    extraBucketIndexes,
+);
 
 assert.commandWorked(
     coll.insert([
@@ -235,19 +227,12 @@ assert.commandFailedWithCode(coll.createIndex({a: 1}, {partialFilterExpression: 
     }
 
     assert.commandWorked(coll.dropIndex({a: 1}));
-
-    // Check that the default index has simple collation.
-    let index = coll.getIndexes()[0];
-    let actualIndexes = getTimeseriesCollForRawOps(coll).getIndexes(kRawOperationSpec);
-
-    // Set the collation to simple if it is not present, which happens on older versions.
-    // TODO (SERVER-122417) Remove these workarounds once v9.0 branches out.
-    index = IndexCatalogHelpers.addSimpleCollationToIndexIfMissing(db, index);
-    actualIndexes = IndexCatalogHelpers.addSimpleCollationToIndexesIfMissing(db, actualIndexes);
-
-    assert.eq(index.collation.locale, "simple");
-    assert.sameMembers(actualIndexes, extraBucketIndexes);
-
+    // Check that there is no collation in the default index.
+    assert.eq(coll.getIndexes()[0].collation, null);
+    assert.sameMembers(
+        getTimeseriesCollForRawOps(coll).getIndexes(kRawOperationSpec),
+        extraBucketIndexes,
+    );
     assert.gt(ixscanInWinningPlan, 0);
 }
 
@@ -267,15 +252,7 @@ assert.commandWorked(
         },
     ),
 );
-let actualBucketIndexes = getTimeseriesCollForRawOps(coll).getIndexes(kRawOperationSpec);
-
-// Set the collation to simple if it is not present, which happens on older versions.
-// TODO (SERVER-122417) Remove this workaround once v9.0 branches out.
-actualBucketIndexes = IndexCatalogHelpers.addSimpleCollationToIndexesIfMissing(
-    db,
-    actualBucketIndexes,
-);
-
+const actualBucketIndexes = getTimeseriesCollForRawOps(coll).getIndexes(kRawOperationSpec);
 assert.sameMembers(
     actualBucketIndexes,
     extraBucketIndexes.concat([
@@ -283,7 +260,6 @@ assert.sameMembers(
             "v": 2,
             "key": {"control.min.a": 1, "control.max.a": 1},
             "name": "a_1",
-            "collation": {"locale": "simple"},
 
             "partialFilterExpression": {
                 // Meta predicates are pushed down verbatim.
@@ -319,7 +295,6 @@ assert.sameMembers(
                         {b: {$gte: 0}},
                     ],
                 },
-                "collation": {"locale": "simple"},
                 v: 2,
             },
         },

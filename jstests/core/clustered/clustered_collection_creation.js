@@ -6,6 +6,7 @@
  * non-replicated collections.
  *
  * @tags: [
+ *   requires_fcv_53,
  *   does_not_support_stepdowns,
  *   # Write and read on "local" db with multi clients cannot match the expected response.
  *   multi_clients_incompatible,
@@ -15,7 +16,6 @@ import {ClusteredCollectionUtil} from "jstests/libs/clustered_collections/cluste
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {PersistenceProviderUtil} from "jstests/libs/server-rss/persistence_provider_util.js";
 import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
-import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
 
 const validateCompoundSecondaryIndexes = function (db, coll, clusterKey) {
     const clusterKeyField = Object.keys(clusterKey)[0];
@@ -46,24 +46,16 @@ const overrideIndexType = function (clusterKey, indexType) {
 const validateCreateIndexOnClusterKey = function (db, collName, fullCreateOptions) {
     const clusterKey = fullCreateOptions.clusteredIndex.key;
 
-    let listIndexes0 = db[collName].getIndexes();
-    const listIndexesClusteredIndex = listIndexes0[0];
+    const listIndexes0 = assert.commandWorked(db[collName].runCommand("listIndexes"));
+    const listIndexesClusteredIndex = listIndexes0.cursor.firstBatch[0];
 
     // Expect listIndexes to append the 'clustered' field to it's clusteredIndex output.
     assert.docEq(listIndexesClusteredIndex.key, clusterKey);
     assert.eq(listIndexesClusteredIndex.clustered, true);
 
-    // createIndexes should be a no-op with the 'clustered' option.
-
-    // Remove the 'collation' field from the clustered index spec, since specifying a collation is
-    // not allowed for clustered indexes. This is because clustered indexes are always getting the
-    // collection default collation.
-    let clusteredIndexSpec = {...listIndexesClusteredIndex};
-    if (clusteredIndexSpec.collation) {
-        delete clusteredIndexSpec.collation;
-    }
+    // no-op with the 'clustered' option.
     assert.commandWorked(
-        db[collName].runCommand({createIndexes: collName, indexes: [clusteredIndexSpec]}),
+        db[collName].runCommand({createIndexes: collName, indexes: [listIndexesClusteredIndex]}),
     );
 
     // no-op without the 'clustered' option.
@@ -87,14 +79,11 @@ const validateCreateIndexOnClusterKey = function (db, collName, fullCreateOption
     );
 
     // The listIndexes output should be unchanged.
-    let listIndexes1 = db[collName].getIndexes();
-
-    // Standardize index specs to account for possible differences in listIndexes output across FCVs.
-    // TODO (SERVER-122417) Remove this workaround once v9.0 branches out.
-    listIndexes1 = IndexCatalogHelpers.addSimpleCollationToIndexesIfMissing(db, listIndexes1);
-    listIndexes0 = IndexCatalogHelpers.addSimpleCollationToIndexesIfMissing(db, listIndexes0);
-
-    assert.sameMembers(listIndexes1, listIndexes0);
+    const listIndexes1 = assert.commandWorked(db[collName].runCommand("listIndexes"));
+    assert.eq(listIndexes1.cursor.firstBatch.length, listIndexes0.cursor.firstBatch.length);
+    for (let i = 0; i < listIndexes1.cursor.firstBatch.length; ++i) {
+        assert.docEq(listIndexes1.cursor.firstBatch[i], listIndexes0.cursor.firstBatch[i]);
+    }
 
     // It's possible to create 'hashed','2d','2dsphere' and 'text' indexes on the cluster key.
     assert.commandWorked(db[collName].createIndex(overrideIndexType(clusterKey, "hashed")));
@@ -107,8 +96,8 @@ const validateCreateIndexOnClusterKey = function (db, collName, fullCreateOption
     );
     assert.commandWorked(db[collName].createIndex(overrideIndexType(clusterKey, "text")));
 
-    const finalIndexes = db[collName].getIndexes();
-    assert.eq(finalIndexes.length, 5);
+    const finalIndexes = assert.commandWorked(db[collName].runCommand("listIndexes"));
+    assert.eq(finalIndexes.cursor.firstBatch.length, 5);
 };
 
 // It is illegal to drop the clusteredIndex. Verify that the various ways of dropping the

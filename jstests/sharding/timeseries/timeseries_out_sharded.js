@@ -237,7 +237,6 @@ function timeseriesDefaultIndex() {
             [timeField]: 1,
         },
         "name": metaField + "_1_" + timeField + "_1",
-        "collation": {"locale": "simple"},
     };
 }
 

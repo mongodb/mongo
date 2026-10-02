@@ -38,3 +38,5 @@
 - featureFlagUniqueShardIdentifiers
 # TODO SERVER-130858: Enable in the all-feature-flags variant.
 - featureFlagContinuousInternodeValidationPerDocument
+# TODO SERVER-136165: Remove or re-enable featureFlagListIndexesAlwaysIncludesSimpleCollation.
+- featureFlagListIndexesAlwaysIncludesSimpleCollation

@@ -21,7 +21,6 @@
  * ]
  */
 import {TimeseriesAggTests} from "jstests/core/timeseries/libs/timeseries_agg_helpers.js";
-import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
 import {
     isViewfulTimeseriesOnlySuite,
     isViewlessTimeseriesOnlySuite,
@@ -117,10 +116,7 @@ function runOutAndCompareResults({
         }
 
         let containsDefaultIndex = false;
-        for (let index of outColl.getIndexes()) {
-            // TODO (SERVER-122417) Remove this workaround once v9.0 branches out.
-            index = IndexCatalogHelpers.addSimpleCollationToIndexIfMissing(testDB, index);
-
+        for (const index of outColl.getIndexes()) {
             if (
                 index == timeseriesDefaultIndex() ||
                 bsonUnorderedFieldsCompare(index, timeseriesDefaultIndex()) == 0
@@ -216,7 +212,6 @@ function timeseriesDefaultIndex() {
             [timeField]: 1,
         },
         "name": metaField + "_1_" + timeField + "_1",
-        "collation": {"locale": "simple"},
     };
 }
 

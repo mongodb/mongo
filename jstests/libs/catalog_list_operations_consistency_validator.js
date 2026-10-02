@@ -25,7 +25,6 @@ import {
     getTimeseriesBucketsColl,
 } from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {getRawOperationSpec} from "jstests/libs/raw_operation_utils.js";
 import {PersistenceProviderUtil} from "jstests/libs/server-rss/persistence_provider_util.js";
@@ -310,17 +309,6 @@ function mapListCatalogToListIndexesEntry(listCatalogEntry) {
                     ? Math.floor(mdIndexSpec.expireAfterSeconds)
                     : 2147483647,
             }),
-            // Adding the simple collation to the $listCatalog entry to be able to compare the index specs.
-            // TODO (SERVER-119573) Remove this once listCatalog returns the simple collation explicitly.
-            ...(mdIndexSpec.collation === undefined && {collation: {locale: "simple"}}),
-            ...(mdIndexSpec.originalSpec !== undefined && {
-                originalSpec: {
-                    ...mdIndexSpec.originalSpec,
-                    ...(mdIndexSpec.originalSpec.collation === undefined && {
-                        collation: {locale: "simple"},
-                    }),
-                },
-            }),
         };
     });
 
@@ -345,9 +333,6 @@ function mapListCatalogToListIndexesEntry(listCatalogEntry) {
                       unique: true,
                   }),
             ...(mdOptions.collation !== undefined && {collation: mdOptions.collation}),
-            // Adding the simple collation to the $listCatalog entry to be able to compare the index specs.
-            // TODO (SERVER-119573) Remove this once listCatalog returns the simple collation explicitly.
-            ...(mdOptions.collation === undefined && {collation: {locale: "simple"}}),
             ...(mdOptions.expireAfterSeconds !== undefined && {
                 expireAfterSeconds: mdOptions.expireAfterSeconds,
             }),
@@ -472,7 +457,7 @@ function isViewListCatalogEntry(listCatalogEntry) {
     return !listCatalogEntry.md?.options.uuid;
 }
 
-function validateListCatalogToListIndexesConsistency(db, listCatalog, listIndexes, shouldAssert) {
+function validateListCatalogToListIndexesConsistency(listCatalog, listIndexes, shouldAssert) {
     // Sorting function to ignore irrelevant ordering differences while comparing.
     function sortCollectionIndexesInPlace(indexList) {
         indexList.sort((a, b) => a.name.localeCompare(b.name)); // Sort by collection.
@@ -499,8 +484,7 @@ function validateListCatalogToListIndexesConsistency(db, listCatalog, listIndexe
                     // TODO (SERVER-97749): Don't delete 'background' field once we
                     // handle it properly
                     delete index.background;
-                    // TODO (SERVER-122417) Remove this workaround once v9.0 branches out.
-                    return IndexCatalogHelpers.addSimpleCollationToIndexIfMissing(db, index);
+                    return index;
                 }),
             ],
         })),
@@ -527,7 +511,6 @@ function validateListCatalogToListIndexesConsistency(db, listCatalog, listIndexe
 }
 
 function validateCatalogListOperationsConsistency(
-    db,
     listCatalog,
     listCollections,
     listIndexes,
@@ -542,7 +525,7 @@ function validateCatalogListOperationsConsistency(
             isDbReadOnly,
             ignoreRecordIdsReplicatedOption,
             shouldAssert,
-        ) && validateListCatalogToListIndexesConsistency(db, listCatalog, listIndexes, shouldAssert)
+        ) && validateListCatalogToListIndexesConsistency(listCatalog, listIndexes, shouldAssert)
     );
 }
 
@@ -619,7 +602,6 @@ export function assertCatalogListOperationsConsistencyForCollection(collection) 
         listCatalog = filterListCatalogEntriesFromShardsWithoutChunks(db, listCatalog);
 
         validateCatalogListOperationsConsistency(
-            db,
             listCatalog,
             listCollections,
             listIndexes,
@@ -881,7 +863,6 @@ export function assertCatalogListOperationsConsistencyForDb(db, tenantId) {
         if (
             collIndexes !== null &&
             !validateListCatalogToListIndexesConsistency(
-                db,
                 catalogInfoForIndexes,
                 collIndexes,
                 shouldAssert,

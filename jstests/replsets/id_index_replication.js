@@ -31,7 +31,6 @@ function testOplogEntryIdIndexSpec(collectionName, idIndexSpec) {
 
 assert.commandWorked(primaryDB.createCollection("without_version"));
 let allIndexes = primaryDB.without_version.getIndexes();
-allIndexes = IndexCatalogHelpers.convertListIndexesResponseToStorageIndexFormat(allIndexes);
 let spec = IndexCatalogHelpers.findByKeyPattern(allIndexes, {_id: 1});
 assert.neq(null, spec, "_id index not found: " + tojson(allIndexes));
 assert.eq(2, spec.v, "Expected primary to build a v=2 _id index: " + tojson(spec));
@@ -41,7 +40,6 @@ assert.commandWorked(
     primaryDB.createCollection("version_v2", {idIndex: {key: {_id: 1}, name: "_id_", v: 2}}),
 );
 allIndexes = primaryDB.version_v2.getIndexes();
-allIndexes = IndexCatalogHelpers.convertListIndexesResponseToStorageIndexFormat(allIndexes);
 spec = IndexCatalogHelpers.findByKeyPattern(allIndexes, {_id: 1});
 assert.neq(null, spec, "_id index not found: " + tojson(allIndexes));
 assert.eq(2, spec.v, "Expected primary to build a v=2 _id index: " + tojson(spec));
@@ -51,7 +49,6 @@ assert.commandWorked(
     primaryDB.createCollection("version_v1", {idIndex: {key: {_id: 1}, name: "_id_", v: 1}}),
 );
 allIndexes = primaryDB.version_v1.getIndexes();
-allIndexes = IndexCatalogHelpers.convertListIndexesResponseToStorageIndexFormat(allIndexes);
 spec = IndexCatalogHelpers.findByKeyPattern(allIndexes, {_id: 1});
 assert.neq(null, spec, "_id index not found: " + tojson(allIndexes));
 assert.eq(1, spec.v, "Expected primary to build a v=1 _id index: " + tojson(spec));
@@ -62,7 +59,6 @@ rst.awaitReplication();
 // Verify that the secondary built _id indexes with the same version as on the primary.
 
 allIndexes = secondaryDB.without_version.getIndexes();
-allIndexes = IndexCatalogHelpers.convertListIndexesResponseToStorageIndexFormat(allIndexes);
 spec = IndexCatalogHelpers.findByKeyPattern(allIndexes, {_id: 1});
 assert.neq(null, spec, "_id index not found: " + tojson(allIndexes));
 assert.eq(
@@ -72,7 +68,6 @@ assert.eq(
 );
 
 allIndexes = secondaryDB.version_v2.getIndexes();
-allIndexes = IndexCatalogHelpers.convertListIndexesResponseToStorageIndexFormat(allIndexes);
 spec = IndexCatalogHelpers.findByKeyPattern(allIndexes, {_id: 1});
 assert.neq(null, spec, "_id index not found: " + tojson(allIndexes));
 assert.eq(
@@ -82,7 +77,6 @@ assert.eq(
 );
 
 allIndexes = secondaryDB.version_v1.getIndexes();
-allIndexes = IndexCatalogHelpers.convertListIndexesResponseToStorageIndexFormat(allIndexes);
 spec = IndexCatalogHelpers.findByKeyPattern(allIndexes, {_id: 1});
 assert.neq(null, spec, "_id index not found: " + tojson(allIndexes));
 assert.eq(1, spec.v, "Expected secondary to implicitly build a v=1 _id index: " + tojson(spec));
