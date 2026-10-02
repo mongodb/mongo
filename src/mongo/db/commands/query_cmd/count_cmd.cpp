@@ -261,7 +261,7 @@ public:
             }};
 
             CurOp::get(opCtx)->debug().ensureQueryShapeHash(opCtx, [&]() {
-                return shape_helpers::computeQueryShapeHash(expCtx, deferredShape, ns);
+                return shape_helpers::computeQueryShapeHash(expCtx, deferredShape);
             });
 
             auto statusWithPlanExecutor =
@@ -513,7 +513,7 @@ public:
             }};
             boost::optional<query_shape::QueryShapeHash> queryShapeHash =
                 CurOp::get(opCtx)->debug().ensureQueryShapeHash(opCtx, [&]() {
-                    return shape_helpers::computeQueryShapeHash(expCtx, deferredShape, ns);
+                    return shape_helpers::computeQueryShapeHash(expCtx, deferredShape);
                 });
 
             query_stats::registerRequest(opCtx, _ns, [&]() {

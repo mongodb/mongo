@@ -60,7 +60,7 @@ void computeHashAndMaybeRegister(OperationContext* opCtx,
             // batch rather than a single op.
             if (nOps > 1)
                 return boost::none;
-            return shape_helpers::computeQueryShapeHash(expCtx, deferredShape, ns);
+            return shape_helpers::computeQueryShapeHash(expCtx, deferredShape);
         });
 
     if (skipRegistration)

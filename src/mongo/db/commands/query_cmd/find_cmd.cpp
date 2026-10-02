@@ -189,7 +189,7 @@ std::unique_ptr<CanonicalQuery> parseQueryAndBeginOperation(
         return shape_helpers::tryMakeShape<query_shape::FindCmdShape>(*parsedRequest, expCtx);
     }};
     auto queryShapeHash = CurOp::get(opCtx)->debug().ensureQueryShapeHash(
-        opCtx, [&]() { return shape_helpers::computeQueryShapeHash(expCtx, deferredShape, nss); });
+        opCtx, [&]() { return shape_helpers::computeQueryShapeHash(expCtx, deferredShape); });
 
     // Resolve the query settings for this operation.
     auto& querySettingsService = query_settings::QuerySettingsService::get(opCtx);
@@ -502,7 +502,7 @@ public:
                                                                               expCtx);
             }};
             auto queryShapeHash = CurOp::get(opCtx)->debug().ensureQueryShapeHash(opCtx, [&]() {
-                return shape_helpers::computeQueryShapeHash(expCtx, deferredShape, ns);
+                return shape_helpers::computeQueryShapeHash(expCtx, deferredShape);
             });
 
             // Resolve the query settings for this operation.

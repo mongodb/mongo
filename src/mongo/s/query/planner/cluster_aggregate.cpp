@@ -554,9 +554,8 @@ ParsedAggregationPipeline parsePipelineAndRegisterQueryStats(
             *pipeline,
             expCtx);
     }};
-    auto queryShapeHash = CurOp::get(opCtx)->debug().ensureQueryShapeHash(opCtx, [&]() {
-        return shape_helpers::computeQueryShapeHash(expCtx, deferredShape, nsStruct.executionNss);
-    });
+    auto queryShapeHash = CurOp::get(opCtx)->debug().ensureQueryShapeHash(
+        opCtx, [&]() { return shape_helpers::computeQueryShapeHash(expCtx, deferredShape); });
 
     // Resolve the query settings for this operation.
     {
@@ -1154,9 +1153,8 @@ void makeEOFExplainResult(OperationContext* opCtx,
             *pipeline,
             expCtx);
     }};
-    auto queryShapeHash = CurOp::get(opCtx)->debug().ensureQueryShapeHash(opCtx, [&]() {
-        return shape_helpers::computeQueryShapeHash(expCtx, deferredShape, namespaces.executionNss);
-    });
+    auto queryShapeHash = CurOp::get(opCtx)->debug().ensureQueryShapeHash(
+        opCtx, [&]() { return shape_helpers::computeQueryShapeHash(expCtx, deferredShape); });
 
     // Resolve the query settings for this operation. The regular resolution point in
     // 'runAggregateImpl' is never reached on this path, and serializing the explain output below

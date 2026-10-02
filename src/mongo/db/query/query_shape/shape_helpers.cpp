@@ -107,7 +107,6 @@ boost::optional<query_shape::QueryShapeHash> computeQueryShapeHash(
 boost::optional<query_shape::QueryShapeHash> computeQueryShapeHash(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const query_shape::DeferredQueryShape& deferredShape,
-    const NamespaceString& nss,
     bool skipInternalClientCheck) {
     // TODO: SERVER-102484 Provide fast path QueryShape and QueryShapeHash computation for Express
     // queries.
@@ -120,8 +119,10 @@ boost::optional<query_shape::QueryShapeHash> computeQueryShapeHash(
         return boost::none;
     }
 
-    return computeQueryShapeHash(
-        expCtx->getOperationContext(), deferredShape, nss, skipInternalClientCheck);
+    return computeQueryShapeHash(expCtx->getOperationContext(),
+                                 deferredShape,
+                                 expCtx->getNamespaceString(),
+                                 skipInternalClientCheck);
 }
 
 }  // namespace mongo::shape_helpers

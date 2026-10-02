@@ -113,7 +113,6 @@ void appendNamespaceShape(BSONObjBuilder& bob,
 boost::optional<query_shape::QueryShapeHash> computeQueryShapeHash(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const query_shape::DeferredQueryShape& deferredShape,
-    const NamespaceString& nss,
     bool skipInternalClientCheck = false);
 
 boost::optional<query_shape::QueryShapeHash> computeQueryShapeHash(

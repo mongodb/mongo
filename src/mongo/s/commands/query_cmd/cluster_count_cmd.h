@@ -120,9 +120,8 @@ inline void createShapeAndRegisterQueryStats(const boost::intrusive_ptr<Expressi
             rawDataForShape);
     }};
     boost::optional<query_shape::QueryShapeHash> queryShapeHash =
-        CurOp::get(opCtx)->debug().ensureQueryShapeHash(opCtx, [&]() {
-            return shape_helpers::computeQueryShapeHash(expCtx, deferredShape, nss);
-        });
+        CurOp::get(opCtx)->debug().ensureQueryShapeHash(
+            opCtx, [&]() { return shape_helpers::computeQueryShapeHash(expCtx, deferredShape); });
 
     query_stats::registerRequest(opCtx, nss, [&]() {
         uassertStatusOKWithContext(deferredShape->getStatus(), "Failed to compute query shape");
@@ -506,7 +505,7 @@ public:
                     }};
 
                     CurOp::get(opCtx)->debug().ensureQueryShapeHash(opCtx, [&]() {
-                        return shape_helpers::computeQueryShapeHash(expCtx, deferredShape, nss);
+                        return shape_helpers::computeQueryShapeHash(expCtx, deferredShape);
                     });
 
                     auto numShards =

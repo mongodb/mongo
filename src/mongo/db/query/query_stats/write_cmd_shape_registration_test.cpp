@@ -59,7 +59,7 @@ public:
     ParsedUpdate makeUpdate(write_ops::UpdateCommandRequest& ucr) {
         auto& op = ucr.getUpdates().front();
         _updateRequest.emplace(op);
-        _updateRequest->setNamespaceString(kTestNss);
+        _updateRequest->setNamespaceString(ucr.getNamespace());
         _updateExpCtx = ExpressionContextBuilder{}.fromRequest(opCtx(), *_updateRequest).build();
         return uassertStatusOK(parsed_update_command::parse(
             _updateExpCtx, &*_updateRequest, makeExtensionsCallback<ExtensionsCallbackNoop>()));
@@ -174,6 +174,17 @@ TEST_F(WriteCmdShapeRegistrationTest, UpdateRegistersKeyForModifierUpdate) {
         opCtx(), _updateExpCtx, ucr, parsedUpdate, kCollectionType);
     ASSERT_NE(queryStatsInfo().key, nullptr);
     ASSERT_TRUE(queryStatsInfo().keyHash.has_value());
+}
+
+TEST_F(WriteCmdShapeRegistrationTest, UpdateOnSystemCollectionHasNoQueryShapeHash) {
+    const auto systemNss = NamespaceString::createNamespaceString_forTest("testDB.system.js");
+    auto ucr = makeUpdateCmd();
+    ucr.setNamespace(systemNss);
+    auto parsedUpdate = makeUpdate(ucr);
+
+    computeShapeAndRegisterQueryStats<UpdateTypes>(
+        opCtx(), _updateExpCtx, ucr, parsedUpdate, kCollectionType);
+    ASSERT_FALSE(CurOp::get(opCtx())->debug().getQueryShapeHash().has_value());
 }
 
 // Update: replacement update (supported) registers a key.

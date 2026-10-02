@@ -109,7 +109,7 @@ boost::optional<query_shape::DeferredQueryShape> computeAndStoreQueryShapeHash(
                 return boost::none;
             }
             return shape_helpers::computeQueryShapeHash(
-                expCtx, deferredShape, wholeOp.getNamespace(), true /*skipInternalClientCheck*/);
+                expCtx, deferredShape, true /*skipInternalClientCheck*/);
         });
 
     return deferredShape;
