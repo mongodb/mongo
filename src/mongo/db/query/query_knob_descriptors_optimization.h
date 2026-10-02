@@ -89,6 +89,10 @@ inline Atomic<bool>& gKnobNoTableScan = storageGlobalParams.noTableScan;
          kInternalQueryPlannerGenerateCoveredWholeIndexScansName,                         \
          internalQueryPlannerGenerateCoveredWholeIndexScans,                              \
          getPlannerGenerateCoveredWholeIndexScans)                                        \
+    KNOB(kPlannerEnableCountScanForUnfilteredCount,                                       \
+         kInternalQueryPlannerEnableCountScanForUnfilteredCountName,                      \
+         internalQueryPlannerEnableCountScanForUnfilteredCount,                           \
+         getPlannerEnableCountScanForUnfilteredCount)                                     \
     KNOB(kPlannerMaxIndexedSolutions,                                                     \
          kInternalQueryPlannerMaxIndexedSolutionsName,                                    \
          internalQueryPlannerMaxIndexedSolutions,                                         \

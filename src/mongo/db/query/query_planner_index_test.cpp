@@ -1394,6 +1394,57 @@ TEST_F(QueryPlannerTest, EmptyQueryWithoutProjectionUsesCollscan) {
     assertSolutionExists("{cscan: {dir: 1}}");
 }
 
+TEST_F(QueryPlannerTest, EmptyQueryForCountUsesCountScanOnIdIndex) {
+    // An unfiltered aggregation $count reaches the planner as a count-like query with an empty
+    // predicate. Even in the presence of inapplicable secondary indexes, the planner should
+    // enumerate a COUNT_SCAN of the _id index instead of only a collection scan.
+    addIndex(BSON("a" << 1));
+    setIsCountLike();
+    runQuery(BSONObj());
+    assertNumSolutions(1);
+    assertSolutionExists(
+        "{count_scan: {pattern: {_id: 1}, startKey: [{'$minKey': 1}], endKey: [{'$maxKey': 1}], "
+        "startKeyInclusive: true, endKeyInclusive: true}}");
+}
+
+TEST_F(QueryPlannerTest, EmptyQueryForCountFallsBackToCollscanWhenKnobDisabled) {
+    addIndex(BSON("a" << 1));
+    setIsCountLike();
+    QueryKnobGuardForTest knobGuard(
+        opCtx.get(),
+        std::string_view{"internalQueryPlannerEnableCountScanForUnfilteredCount"},
+        false);
+    runQuery(BSONObj());
+    assertNumSolutions(1);
+    assertSolutionExists("{cscan: {dir: 1}}");
+}
+
+TEST_F(QueryPlannerTest, EmptyQueryForCountFallsBackToCollscanWithShardFilter) {
+    // Shard filtering requires the documents themselves, so the planner should fall back to a
+    // collection scan in that case.
+    addIndex(BSON("a" << 1));
+    setIsCountLike();
+    params.mainCollectionInfo.options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
+    runQuery(BSONObj());
+    assertNumSolutions(1);
+    assertSolutionExists("{sharding_filter: {node: {cscan: {dir: 1}}}}");
+}
+
+TEST_F(QueryPlannerTest, EmptyQueryForCountPlansWholeIndexScanWithSkipAndLimit) {
+    // The planner wraps the solutions in LIMIT/SKIP stages for the count command's skip and
+    // limit; the enforcing CountStage is added above the plan root in getExecutorCount(). The
+    // LIMIT root prevents turnIxscanIntoCount() from converting the whole index scan into a
+    // COUNT_SCAN, so the fallback solution is a whole index scan over the _id index.
+    addIndex(BSON("a" << 1));
+    setIsCountLike();
+    runQuerySkipLimit(BSONObj(), 5, 10);
+    assertNumSolutions(2);
+    assertSolutionExists(
+        "{limit: {n: 10, node: {skip: {n: 5, node: {ixscan: {pattern: {_id: 1}, "
+        "bounds: {_id: [['MinKey', 'MaxKey', true, true]]}}}}}}}");
+    assertSolutionExists("{limit: {n: 10, node: {skip: {n: 5, node: {cscan: {dir: 1}}}}}}");
+}
+
 TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCoveredIxscanIfEnabled) {
     params.mainCollectionInfo.options = QueryPlannerParams::GENERATE_COVERED_IXSCANS;
     addIndex(BSON("a" << 1));

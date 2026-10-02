@@ -68,13 +68,6 @@ for (const indexSpec of wildcardIndexes) {
     assert.neq(null, countScan, explain);
     assert.eq(expectedPattern, countScan.keyPattern, countScan);
 
-    // $count of entire collection does not COUNT_SCAN.
-    assert.eq(9, coll.find().itcount());
-    assert.eq(9, coll.aggregate([{$count: "count"}]).next().count);
-    explain = coll.explain().aggregate([{$count: "count"}]);
-    countScan = getAggPlanStage(explain, "COUNT_SCAN");
-    assert.eq(null, countScan, explain);
-
     // When the count consists of multiple intervals, we cannot use COUNT_SCAN.
     assert.eq(2, coll.count({a: {$in: [3, 4]}}));
     assert.eq(2, coll.find({a: {$in: [3, 4]}}).itcount());

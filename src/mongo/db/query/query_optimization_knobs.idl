@@ -677,6 +677,22 @@ server_parameters:
                 fcv:
                     min: "9.0"
 
+    internalQueryPlannerEnableCountScanForUnfilteredCount:
+        description: >-
+            Allow the planner to generate a COUNT_SCAN of the _id index for count requests with
+            no query predicate, rather than falling back to a COLLSCAN.
+        set_at: [startup, runtime]
+        cpp_varname: "internalQueryPlannerEnableCountScanForUnfilteredCount"
+        cpp_vartype: Atomic<bool>
+        default: true
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: plannerEnableCountScanForUnfilteredCount
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
+
     internalQueryPlannerUseMultiplannerForSingleSolutions:
         description: >-
             Forces planner to use multiplanning even if there is only one solution present.

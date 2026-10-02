@@ -58,6 +58,7 @@
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/search/mongot_cursor.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_options_gen.h"
+#include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/util/assert_util.h"
@@ -1758,6 +1759,22 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
         (params.mainCollectionInfo.options & QueryPlannerParams::COLLECTION_EXCEEDS_SCAN_BYTES) &&
         !QueryPlannerCommon::hasEffectiveLimit(query)) {
         collscanRequested = false;
+    }
+
+    // If there are no indexed alternatives, but this is a count request without a query predicate,
+    // we can use a COUNT_SCAN of the entire _id index (if it exists). Shard filtering requires the
+    // documents themselves, so a count scan cannot be used in that case.
+    if (out.empty() && query.isCountLike() && query.getQueryObj().isEmpty() &&
+        !(params.mainCollectionInfo.options & QueryPlannerParams::INCLUDE_SHARD_FILTER) &&
+        query.getExpCtx()
+            ->getQueryKnobConfiguration()
+            .getPlannerEnableCountScanForUnfilteredCount()) {
+        for (auto&& index : params.mainCollectionInfo.indexes) {
+            if (IndexDescriptor::isIdIndexPattern(index.keyPattern)) {
+                out.push_back(buildWholeIXSoln(index, query, queryContext, params));
+                break;
+            }
+        }
     }
 
     // No indexed plans?  We must provide a collscan if possible or else we can't run the query.

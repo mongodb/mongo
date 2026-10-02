@@ -276,7 +276,10 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
                     1,
                 );
             },
-            planSummary: "COLLSCAN",
+            // The unfiltered $group + $sum plans a COUNT_SCAN over the _id index.
+            // When the collection is sharded the shard's plan requires shard filtering,
+            // so the planner enumerates a COLLSCAN with a shard filter instead.
+            planSummary: isRemoteShardCurOp ? "COLLSCAN" : "COUNT_SCAN { _id: 1 }",
             queryFramework: sbeRestrictedOrEnabled ? "sbe" : "classic",
             currentOpFilter: commandOrOriginatingCommand(
                 {
