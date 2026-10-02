@@ -100,11 +100,11 @@ std::unique_ptr<TaskExecutorPool> makeShardingTaskExecutorPool(
     const auto poolSize = taskExecutorPoolSize.value_or(TaskExecutorPool::getSuggestedPoolSize());
 
     for (size_t i = 0; i < poolSize; ++i) {
-        auto exec = makeShardingTaskExecutor(
-            executor::makeNetworkInterface("TaskExecutorPool-" + std::to_string(i),
-                                           std::make_unique<ShardingNetworkConnectionHook>(),
-                                           metadataHookBuilder(),
-                                           connPoolOptions));
+        auto exec = makeShardingTaskExecutor(executor::makeNetworkInterface(
+            "TaskExecutorPool-" + std::to_string(i),
+            {.connectionHook = std::make_unique<ShardingNetworkConnectionHook>(),
+             .metadataHook = metadataHookBuilder(),
+             .connectionPoolOptions = connPoolOptions}));
 
         executors.emplace_back(std::move(exec));
     }
@@ -171,11 +171,13 @@ Status initializeGlobalShardingState(
 
     auto network = executor::makeNetworkInterface(
         "Sharding-Fixed",
-        std::make_unique<ShardingNetworkConnectionHook>(),
-        hookBuilder(),
-        connPoolOptions,
-        transport::TransportProtocol::MongoRPC,
-        serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer));
+        {
+            .connectionHook = std::make_unique<ShardingNetworkConnectionHook>(),
+            .metadataHook = hookBuilder(),
+            .connectionPoolOptions = connPoolOptions,
+            .trackRequestCounts =
+                serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer),
+        });
     auto networkPtr = network.get();
     auto executorPool = makeShardingTaskExecutorPool(
         std::move(network), hookBuilder, connPoolOptions, taskExecutorPoolSize);

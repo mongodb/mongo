@@ -48,7 +48,7 @@ std::unique_ptr<NetworkInterface> NetworkInterfaceIntegrationFixture::_makeNet(
 
     switch (protocol) {
         case transport::TransportProtocol::MongoRPC:
-            return makeNetworkInterface(instanceName, nullptr, nullptr, opts);
+            return makeNetworkInterface(instanceName, {.connectionPoolOptions = std::move(opts)});
         case transport::TransportProtocol::GRPC:
 #ifdef MONGO_CONFIG_GRPC
             return makeNetworkInterfaceGRPC(instanceName);
@@ -80,8 +80,7 @@ void NetworkInterfaceIntegrationFixture::createNet() {
 
     switch (protocol) {
         case transport::TransportProtocol::MongoRPC:
-            _fixtureNet =
-                makeNetworkInterface("FixtureNet", nullptr, nullptr, ConnectionPool::Options());
+            _fixtureNet = makeNetworkInterface("FixtureNet");
             break;
         case transport::TransportProtocol::GRPC:
 #ifdef MONGO_CONFIG_GRPC

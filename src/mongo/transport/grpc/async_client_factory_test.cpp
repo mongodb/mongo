@@ -529,9 +529,7 @@ public:
 
         _net = executor::makeNetworkInterfaceWithClientFactory(
             "MockGRPCAsyncClientFactoryTest",
-            std::make_shared<GRPCAsyncClientFactory>("MockGRPCAsyncClientFactoryTest"),
-            nullptr,
-            false);
+            std::make_shared<GRPCAsyncClientFactory>("MockGRPCAsyncClientFactoryTest"));
         _net->startup();
     }
 

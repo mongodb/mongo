@@ -43,7 +43,7 @@ auto makeReplicationExecutor(ServiceContext* serviceContext) {
                                        ClientOperationKillableByStepdown{false});
                 },
         }),
-        executor::makeNetworkInterface("ReplNetwork", nullptr, std::move(hookList)));
+        executor::makeNetworkInterface("ReplNetwork", {.metadataHook = std::move(hookList)}));
 }
 }  // namespace
 

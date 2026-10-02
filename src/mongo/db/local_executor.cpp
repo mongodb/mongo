@@ -61,7 +61,7 @@ std::shared_ptr<executor::TaskExecutor> createLocalExecutor(ServiceContext* serv
                                        ClientOperationKillableByStepdown{false});
                 },
         }),
-        executor::makeNetworkInterface(name + "Network", nullptr, std::move(hookList)));
+        executor::makeNetworkInterface(name + "Network", {.metadataHook = std::move(hookList)}));
 }
 
 }  // namespace mongo

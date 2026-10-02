@@ -932,8 +932,8 @@ void MirrorMaestroImpl::init(ServiceContext* serviceContext) {
                 [] { return gMirrorMaestroConnPoolMaxSize.load(); },
                 "MirrorMaestroDynamicLimitController");
         };
-        return executor::makeNetworkInterface(
-            std::string{kMirrorMaestroName}, {}, {}, std::move(options));
+        return executor::makeNetworkInterface(std::string{kMirrorMaestroName},
+                                              {.connectionPoolOptions = std::move(options)});
     };
 
     _executor = executor::ThreadPoolTaskExecutor::create(

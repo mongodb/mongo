@@ -80,8 +80,7 @@ public:
 
     void setUp() override {
         if (!unittest::shouldUseGRPCEgress()) {
-            _ni = makeNetworkInterface(
-                kNetworkInterfaceInstanceName, nullptr, nullptr, ConnectionPool::Options());
+            _ni = makeNetworkInterface(kNetworkInterfaceInstanceName);
         } else {
 #ifdef MONGO_CONFIG_GRPC
             _ni = makeNetworkInterfaceGRPC(kNetworkInterfaceInstanceName);

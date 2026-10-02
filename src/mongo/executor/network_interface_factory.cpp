@@ -31,55 +31,50 @@ std::string makeInstanceName(std::string_view name) {
     return fmt::format("NetworkInterfaceTL-{}", name);
 }
 
-std::unique_ptr<NetworkInterface> makeNetworkInterface(std::string_view instanceName) {
-    return makeNetworkInterface(instanceName, nullptr, nullptr);
-}
-
 std::unique_ptr<NetworkInterface> makeNetworkInterface(
-    std::string_view instanceName,
-    std::unique_ptr<NetworkConnectionHook> hook,
-    std::unique_ptr<rpc::EgressMetadataHook> metadataHook,
-    ConnectionPool::Options connPoolOptions,
-    transport::TransportProtocol protocol,
-    bool trackRequestCounts) {
+    std::string_view instanceName, ConnectionPoolNetworkInterfaceOptions options) {
     // instanceName flows into PooledAsyncClientFactory::_name which is sent as the
     // applicationName in the hello handshake for every connection this interface opens.
     // An empty name would make those connections invisible to server-side policies that
     // identify internal clients by appName (e.g. ingress rate limiting exemptions).
     dassert(!instanceName.empty(), "makeNetworkInterface requires a non-empty instanceName");
 
+    auto connPoolOptions = std::move(options.connectionPoolOptions);
     if (!connPoolOptions.egressConnectionCloserManager && hasGlobalServiceContext()) {
         connPoolOptions.egressConnectionCloserManager =
             &EgressConnectionCloserManager::get(getGlobalServiceContext());
     }
 
+    auto clientFactory =
+        std::make_shared<PooledAsyncClientFactory>(makeInstanceName(instanceName),
+                                                   std::move(connPoolOptions),
+                                                   std::move(options.connectionHook),
+                                                   options.protocol);
     return makeNetworkInterfaceWithClientFactory(
         instanceName,
-        std::make_shared<PooledAsyncClientFactory>(
-            makeInstanceName(instanceName), std::move(connPoolOptions), std::move(hook), protocol),
-        std::move(metadataHook),
-        trackRequestCounts);
+        std::move(clientFactory),
+        {.metadataHook = std::move(options.metadataHook),
+         .trackRequestCounts = options.trackRequestCounts});
 }
 
 #ifdef MONGO_CONFIG_GRPC
-std::unique_ptr<NetworkInterface> makeNetworkInterfaceGRPC(
-    std::string_view instanceName, std::unique_ptr<rpc::EgressMetadataHook> metadataHook) {
+std::unique_ptr<NetworkInterface> makeNetworkInterfaceGRPC(std::string_view instanceName,
+                                                           NetworkInterfaceOptions options) {
     return makeNetworkInterfaceWithClientFactory(
         instanceName,
         std::make_shared<transport::grpc::GRPCAsyncClientFactory>(makeInstanceName(instanceName)),
-        std::move(metadataHook));
+        std::move(options));
 }
 #endif
 
 std::unique_ptr<NetworkInterface> makeNetworkInterfaceWithClientFactory(
     std::string_view instanceName,
     std::shared_ptr<AsyncClientFactory> clientFactory,
-    std::unique_ptr<rpc::EgressMetadataHook> metadataHook,
-    bool trackRequestCounts) {
+    NetworkInterfaceOptions options) {
     return std::make_unique<NetworkInterfaceTL>(makeInstanceName(instanceName),
                                                 std::move(clientFactory),
-                                                std::move(metadataHook),
-                                                trackRequestCounts);
+                                                std::move(options.metadataHook),
+                                                options.trackRequestCounts);
 }
 
 }  // namespace executor

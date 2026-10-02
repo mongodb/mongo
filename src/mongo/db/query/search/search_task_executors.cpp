@@ -68,17 +68,16 @@ struct State {
 #endif
         } else {
             mongotExecutorNetworkInterface = makeNetworkInterface(
-                kMongotExecutorName, nullptr, nullptr, makeMongotConnPoolOptions());
+                kMongotExecutorName, {.connectionPoolOptions = makeMongotConnPoolOptions()});
 
             // Make a separate search index management NetworkInterface that's independently
             // configurable.
             ConnectionPool::Options searchIndexPoolOptions;
             searchIndexPoolOptions.skipAuthentication =
                 globalSearchIndexParams.skipAuthToSearchIndexServer;
-            searchIdxNetworkInterface = makeNetworkInterface(kSearchIndexManagementExecutorName,
-                                                             nullptr,
-                                                             nullptr,
-                                                             std::move(searchIndexPoolOptions));
+            searchIdxNetworkInterface =
+                makeNetworkInterface(kSearchIndexManagementExecutorName,
+                                     {.connectionPoolOptions = std::move(searchIndexPoolOptions)});
         }
 
         auto mongotThreadPool =

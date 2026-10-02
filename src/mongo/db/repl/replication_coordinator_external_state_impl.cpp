@@ -174,7 +174,7 @@ auto makeTaskExecutor(ServiceContext* service,
     auto networkName = threadName + "Network";
     return executor::ThreadPoolTaskExecutor::create(
         makeThreadPool(poolName, threadName),
-        executor::makeNetworkInterface(networkName, nullptr, std::move(hookList)));
+        executor::makeNetworkInterface(networkName, {.metadataHook = std::move(hookList)}));
 }
 
 /**

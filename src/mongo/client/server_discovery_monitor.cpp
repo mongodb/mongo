@@ -586,8 +586,8 @@ std::shared_ptr<executor::TaskExecutor> ServerDiscoveryMonitor::_setupExecutor(
         return executor;
 
     auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
-    auto net = executor::makeNetworkInterface(
-        "ServerDiscoveryMonitor-TaskExecutor", nullptr, std::move(hookList));
+    auto net = executor::makeNetworkInterface("ServerDiscoveryMonitor-TaskExecutor",
+                                              {.metadataHook = std::move(hookList)});
     auto pool = std::make_unique<executor::NetworkInterfaceThreadPool>(net.get());
     auto result = ThreadPoolTaskExecutor::create(std::move(pool), std::move(net));
     result->startup();

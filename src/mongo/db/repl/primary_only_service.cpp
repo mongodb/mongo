@@ -353,8 +353,8 @@ void PrimaryOnlyService::startup(OperationContext* opCtx) {
                     primaryOnlyServiceStateForClient(client).primaryOnlyService = this;
                 },
         }),
-        executor::makeNetworkInterface(
-            fmt::format("{}Network", serviceName), nullptr, std::move(hookList)));
+        executor::makeNetworkInterface(fmt::format("{}Network", serviceName),
+                                       {.metadataHook = std::move(hookList)}));
     _setHasExecutor(lk);
 
     _executor->startup();

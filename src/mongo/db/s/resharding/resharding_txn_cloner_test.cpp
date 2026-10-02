@@ -592,8 +592,8 @@ private:
                         AuthorizationSession::get(*client)->grantInternalAuthorization();
                     },
             }),
-            executor::makeNetworkInterface(
-                "TestReshardCloneConfigTransactionsNetwork", nullptr, std::move(hookList)));
+            executor::makeNetworkInterface("TestReshardCloneConfigTransactionsNetwork",
+                                           {.metadataHook = std::move(hookList)}));
 
         return executor;
     }

@@ -81,7 +81,8 @@ public:
         if (!unittest::shouldUseGRPCEgress()) {
             ConnectionPool::Options cpOptions{};
             cpOptions.minConnections = 0;
-            net = makeNetworkInterface(std::string{name}, nullptr, nullptr, std::move(cpOptions));
+            net = makeNetworkInterface(std::string{name},
+                                       {.connectionPoolOptions = std::move(cpOptions)});
         } else {
 #ifdef MONGO_CONFIG_GRPC
             net = makeNetworkInterfaceGRPC(kNetworkInterfaceGRPCInstanceName);

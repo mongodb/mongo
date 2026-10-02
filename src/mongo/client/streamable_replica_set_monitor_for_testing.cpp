@@ -30,10 +30,9 @@ void StreamableReplicaSetMonitorForTesting::setup(const MongoURI& uri) {
     auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
     auto networkConnectionHook = std::make_unique<ReplicaSetMonitorManagerNetworkConnectionHook>();
 
-    std::shared_ptr<executor::NetworkInterface> networkInterface =
-        executor::makeNetworkInterface("ReplicaSetMonitor-TestTaskExecutor",
-                                       std::move(networkConnectionHook),
-                                       std::move(hookList));
+    std::shared_ptr<executor::NetworkInterface> networkInterface = executor::makeNetworkInterface(
+        "ReplicaSetMonitor-TestTaskExecutor",
+        {.connectionHook = std::move(networkConnectionHook), .metadataHook = std::move(hookList)});
     _connectionManager = std::make_unique<ReplicaSetMonitorConnectionManager>(networkInterface);
     _stats = std::make_shared<ReplicaSetMonitorManagerStats>();
 

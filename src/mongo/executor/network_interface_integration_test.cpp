@@ -1451,8 +1451,10 @@ public:
 protected:
     std::unique_ptr<NetworkInterface> _makeNet(std::string instanceName,
                                                transport::TransportProtocol protocol) override {
-        return makeNetworkInterface(
-            instanceName, std::move(_hook), nullptr, makeDefaultConnectionPoolOptions(), protocol);
+        return makeNetworkInterface(instanceName,
+                                    {.connectionHook = std::move(_hook),
+                                     .connectionPoolOptions = makeDefaultConnectionPoolOptions(),
+                                     .protocol = protocol});
     }
 
 private:

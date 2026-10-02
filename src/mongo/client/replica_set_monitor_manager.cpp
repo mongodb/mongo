@@ -133,7 +133,8 @@ void ReplicaSetMonitorManager::_setupTaskExecutorAndStats(WithLock) {
     auto networkConnectionHook = std::make_unique<ReplicaSetMonitorManagerNetworkConnectionHook>();
 
     std::shared_ptr<NetworkInterface> networkInterface = executor::makeNetworkInterface(
-        "ReplicaSetMonitor-TaskExecutor", std::move(networkConnectionHook), std::move(hookList));
+        "ReplicaSetMonitor-TaskExecutor",
+        {.connectionHook = std::move(networkConnectionHook), .metadataHook = std::move(hookList)});
     _connectionManager = std::make_unique<ReplicaSetMonitorConnectionManager>(networkInterface);
 
     auto pool = std::make_unique<NetworkInterfaceThreadPool>(networkInterface.get());

@@ -1378,7 +1378,8 @@ auto makeReplicaSetNodeExecutor(ServiceContext* serviceContext) {
                 },
         }),
         executor::makeNetworkInterface(
-            "ReplNodeDbWorkerNetwork", nullptr, makeShardingEgressHooksList(serviceContext)));
+            "ReplNodeDbWorkerNetwork",
+            {.metadataHook = makeShardingEgressHooksList(serviceContext)}));
 }
 
 void setUpReplicaSetDDLHooks(ServiceContext* serviceContext) {

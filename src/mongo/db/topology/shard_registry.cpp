@@ -342,7 +342,8 @@ void ShardRegistry::startupPeriodicReloader(OperationContext* opCtx) {
     hookList->addHook(std::make_unique<rpc::VectorClockMetadataHook>(opCtx->getServiceContext()));
 
     // construct task executor
-    auto net = executor::makeNetworkInterface("ShardRegistryUpdater", nullptr, std::move(hookList));
+    auto net = executor::makeNetworkInterface("ShardRegistryUpdater",
+                                              {.metadataHook = std::move(hookList)});
     auto netPtr = net.get();
     _executor = executor::ThreadPoolTaskExecutor::create(
         std::make_unique<executor::NetworkInterfaceThreadPool>(netPtr), std::move(net));

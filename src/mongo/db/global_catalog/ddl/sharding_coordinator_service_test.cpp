@@ -89,8 +89,7 @@ public:
                         Client::initThread(threadName, getGlobalServiceContext()->getService());
                     },
             }),
-            executor::makeNetworkInterface(
-                "ShardingCoordinatorServiceTestNetwork", nullptr, nullptr));
+            executor::makeNetworkInterface("ShardingCoordinatorServiceTestNetwork"));
         executor->startup();
         return executor;
     }

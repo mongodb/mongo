@@ -71,7 +71,7 @@ public:
             TransientSSLParams params(clusterConnection);
             return params;
         }());
-        return makeNetworkInterface(instanceName, nullptr, nullptr, std::move(options));
+        return makeNetworkInterface(instanceName, {.connectionPoolOptions = std::move(options)});
     }
 
     void tearDown() override {

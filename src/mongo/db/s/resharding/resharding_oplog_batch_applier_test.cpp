@@ -241,8 +241,8 @@ public:
                         AuthorizationSession::get(*client)->grantInternalAuthorization();
                     },
             }),
-            executor::makeNetworkInterface(
-                "TestReshardOplogBatchApplierNetwork", nullptr, std::move(hookList)));
+            executor::makeNetworkInterface("TestReshardOplogBatchApplierNetwork",
+                                           {.metadataHook = std::move(hookList)}));
 
         executor->startup();
         return executor;

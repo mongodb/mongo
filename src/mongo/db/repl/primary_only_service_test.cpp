@@ -356,8 +356,8 @@ public:
                         Client::initThread(threadName, getGlobalServiceContext()->getService());
                     },
             }),
-            executor::makeNetworkInterface(
-                "PrimaryOnlyServiceTestNetwork", nullptr, std::move(hookList)));
+            executor::makeNetworkInterface("PrimaryOnlyServiceTestNetwork",
+                                           {.metadataHook = std::move(hookList)}));
         executor->startup();
         return executor;
     }

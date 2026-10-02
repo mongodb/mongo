@@ -468,8 +468,8 @@ protected:
                         AuthorizationSession::get(*client)->grantInternalAuthorization();
                     },
             }),
-            executor::makeNetworkInterface(
-                "TestReshardOplogApplicationNetwork", nullptr, std::move(hookList)));
+            executor::makeNetworkInterface("TestReshardOplogApplicationNetwork",
+                                           {.metadataHook = std::move(hookList)}));
 
         return executor;
     }

@@ -192,8 +192,8 @@ public:
                             AuthorizationSession::get(*client)->grantInternalAuthorization();
                         },
                 }),
-                executor::makeNetworkInterface(
-                    "TestReshardCloneCollectionNetwork", nullptr, std::move(hookList)));
+                executor::makeNetworkInterface("TestReshardCloneCollectionNetwork",
+                                               {.metadataHook = std::move(hookList)}));
             executor->startup();
 
             ForwardableOperationMetadata fom(opCtx);
