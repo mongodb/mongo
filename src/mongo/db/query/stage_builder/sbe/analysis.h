@@ -340,6 +340,10 @@ inline bool hasNonSpecificEffects(const FieldEffects& effects) {
     return effects.hasFieldsWithEffects(&isNonSpecificEffect);
 }
 
+inline bool effectIsDropOrAdd(FieldEffect e) {
+    return e == FieldEffect::kDrop || e == FieldEffect::kAdd;
+}
+
 FieldSet makeAllowedFieldSet(bool isInclusion,
                              const std::vector<std::string>& paths,
                              const std::vector<ProjectNode>& nodes);

@@ -273,6 +273,421 @@ Engine: classic
 ### Plan
 Engine: classic
 
+## 4. Dotted as path, unwind: { "$unwind" : "$a.b" }
+
+### Pipeline
+```json
+[
+	{
+		"$lookup" : {
+			"from" : "foreignDotted",
+			"localField" : "lkey",
+			"foreignField" : "fkey",
+			"as" : "a.b"
+		}
+	},
+	{
+		"$unwind" : "$a.b"
+	}
+]
+```
+### Options
+```json
+{ "allowDiskUse" : true }
+```
+### Results
+```text
+{ "_id" : 0, "lkey" : 1, "a" : { "x" : 10, "b" : { "_id" : 10, "fkey" : 1, "c" : 100 } } }
+{ "_id" : 0, "lkey" : 1, "a" : { "x" : 10, "b" : { "_id" : 11, "fkey" : 1, "c" : 200 } } }
+{ "_id" : 2, "lkey" : [ 1, 3 ], "a" : { "b" : { "_id" : 10, "fkey" : 1, "c" : 100 } } }
+{ "_id" : 2, "lkey" : [ 1, 3 ], "a" : { "b" : { "_id" : 11, "fkey" : 1, "c" : 200 } } }
+{ "_id" : 2, "lkey" : [ 1, 3 ], "a" : { "b" : { "_id" : 12, "fkey" : 3, "c" : 300 } } }
+{ "_id" : 3, "lkey" : 3, "a" : { "b" : { "_id" : 12, "fkey" : 3, "c" : 300 } } }
+{ "_id" : 4, "a" : { "x" : 1, "b" : { "_id" : 13, "fkey" : null, "c" : 400 } } }
+{ "_id" : 5, "lkey" : null, "a" : { "b" : { "_id" : 13, "fkey" : null, "c" : 400 } } }
+```
+### Plan
+Engine: classic
+
+### Pipeline
+```json
+[
+	{
+		"$lookup" : {
+			"from" : "foreignDotted",
+			"localField" : "lkey",
+			"foreignField" : "fkey",
+			"as" : "a.b"
+		}
+	},
+	{
+		"$unwind" : "$a.b"
+	},
+	{
+		"$match" : {
+			"a" : {
+				"$exists" : true
+			}
+		}
+	}
+]
+```
+### Options
+```json
+{ "allowDiskUse" : true }
+```
+### Results
+```text
+{ "_id" : 0, "lkey" : 1, "a" : { "x" : 10, "b" : { "_id" : 10, "fkey" : 1, "c" : 100 } } }
+{ "_id" : 0, "lkey" : 1, "a" : { "x" : 10, "b" : { "_id" : 11, "fkey" : 1, "c" : 200 } } }
+{ "_id" : 2, "lkey" : [ 1, 3 ], "a" : { "b" : { "_id" : 10, "fkey" : 1, "c" : 100 } } }
+{ "_id" : 2, "lkey" : [ 1, 3 ], "a" : { "b" : { "_id" : 11, "fkey" : 1, "c" : 200 } } }
+{ "_id" : 2, "lkey" : [ 1, 3 ], "a" : { "b" : { "_id" : 12, "fkey" : 3, "c" : 300 } } }
+{ "_id" : 3, "lkey" : 3, "a" : { "b" : { "_id" : 12, "fkey" : 3, "c" : 300 } } }
+{ "_id" : 4, "a" : { "x" : 1, "b" : { "_id" : 13, "fkey" : null, "c" : 400 } } }
+{ "_id" : 5, "lkey" : null, "a" : { "b" : { "_id" : 13, "fkey" : null, "c" : 400 } } }
+```
+### Plan
+Engine: classic
+
+### Pipeline
+```json
+[
+	{
+		"$lookup" : {
+			"from" : "foreignDotted",
+			"localField" : "lkey",
+			"foreignField" : "fkey",
+			"as" : "a.b"
+		}
+	},
+	{
+		"$unwind" : "$a.b"
+	},
+	{
+		"$match" : {
+			"a.b" : {
+				"$exists" : true
+			}
+		}
+	}
+]
+```
+### Options
+```json
+{ "allowDiskUse" : true }
+```
+### Results
+```text
+{ "_id" : 0, "lkey" : 1, "a" : { "x" : 10, "b" : { "_id" : 10, "fkey" : 1, "c" : 100 } } }
+{ "_id" : 0, "lkey" : 1, "a" : { "x" : 10, "b" : { "_id" : 11, "fkey" : 1, "c" : 200 } } }
+{ "_id" : 2, "lkey" : [ 1, 3 ], "a" : { "b" : { "_id" : 10, "fkey" : 1, "c" : 100 } } }
+{ "_id" : 2, "lkey" : [ 1, 3 ], "a" : { "b" : { "_id" : 11, "fkey" : 1, "c" : 200 } } }
+{ "_id" : 2, "lkey" : [ 1, 3 ], "a" : { "b" : { "_id" : 12, "fkey" : 3, "c" : 300 } } }
+{ "_id" : 3, "lkey" : 3, "a" : { "b" : { "_id" : 12, "fkey" : 3, "c" : 300 } } }
+{ "_id" : 4, "a" : { "x" : 1, "b" : { "_id" : 13, "fkey" : null, "c" : 400 } } }
+{ "_id" : 5, "lkey" : null, "a" : { "b" : { "_id" : 13, "fkey" : null, "c" : 400 } } }
+```
+### Plan
+Engine: classic
+
+### Pipeline
+```json
+[
+	{
+		"$lookup" : {
+			"from" : "foreignDotted",
+			"localField" : "lkey",
+			"foreignField" : "fkey",
+			"as" : "a.b"
+		}
+	},
+	{
+		"$unwind" : "$a.b"
+	},
+	{
+		"$match" : {
+			"a.b.c" : {
+				"$gt" : 150
+			}
+		}
+	}
+]
+```
+### Options
+```json
+{ "allowDiskUse" : true }
+```
+### Results
+```text
+{ "_id" : 0, "lkey" : 1, "a" : { "x" : 10, "b" : { "_id" : 11, "fkey" : 1, "c" : 200 } } }
+{ "_id" : 2, "lkey" : [ 1, 3 ], "a" : { "b" : { "_id" : 11, "fkey" : 1, "c" : 200 } } }
+{ "_id" : 2, "lkey" : [ 1, 3 ], "a" : { "b" : { "_id" : 12, "fkey" : 3, "c" : 300 } } }
+{ "_id" : 3, "lkey" : 3, "a" : { "b" : { "_id" : 12, "fkey" : 3, "c" : 300 } } }
+{ "_id" : 4, "a" : { "x" : 1, "b" : { "_id" : 13, "fkey" : null, "c" : 400 } } }
+{ "_id" : 5, "lkey" : null, "a" : { "b" : { "_id" : 13, "fkey" : null, "c" : 400 } } }
+```
+### Plan
+Engine: classic
+
+### Pipeline
+```json
+[
+	{
+		"$lookup" : {
+			"from" : "foreignDotted",
+			"localField" : "lkey",
+			"foreignField" : "fkey",
+			"as" : "a.b"
+		}
+	},
+	{
+		"$unwind" : "$a.b"
+	},
+	{
+		"$match" : {
+			"a" : {
+				"$exists" : true
+			},
+			"a.b.c" : {
+				"$gt" : 150
+			}
+		}
+	}
+]
+```
+### Options
+```json
+{ "allowDiskUse" : true }
+```
+### Results
+```text
+{ "_id" : 0, "lkey" : 1, "a" : { "x" : 10, "b" : { "_id" : 11, "fkey" : 1, "c" : 200 } } }
+{ "_id" : 2, "lkey" : [ 1, 3 ], "a" : { "b" : { "_id" : 11, "fkey" : 1, "c" : 200 } } }
+{ "_id" : 2, "lkey" : [ 1, 3 ], "a" : { "b" : { "_id" : 12, "fkey" : 3, "c" : 300 } } }
+{ "_id" : 3, "lkey" : 3, "a" : { "b" : { "_id" : 12, "fkey" : 3, "c" : 300 } } }
+{ "_id" : 4, "a" : { "x" : 1, "b" : { "_id" : 13, "fkey" : null, "c" : 400 } } }
+{ "_id" : 5, "lkey" : null, "a" : { "b" : { "_id" : 13, "fkey" : null, "c" : 400 } } }
+```
+### Plan
+Engine: classic
+
+## 5. Dotted as path, unwind: { "$unwind" : { "path" : "$a.b", "preserveNullAndEmptyArrays" : true } }
+
+### Pipeline
+```json
+[
+	{
+		"$lookup" : {
+			"from" : "foreignDotted",
+			"localField" : "lkey",
+			"foreignField" : "fkey",
+			"as" : "a.b"
+		}
+	},
+	{
+		"$unwind" : {
+			"path" : "$a.b",
+			"preserveNullAndEmptyArrays" : true
+		}
+	}
+]
+```
+### Options
+```json
+{ "allowDiskUse" : true }
+```
+### Results
+```text
+{ "_id" : 0, "lkey" : 1, "a" : { "x" : 10, "b" : { "_id" : 10, "fkey" : 1, "c" : 100 } } }
+{ "_id" : 0, "lkey" : 1, "a" : { "x" : 10, "b" : { "_id" : 11, "fkey" : 1, "c" : 200 } } }
+{ "_id" : 1, "lkey" : 2, "a" : { } }
+{ "_id" : 2, "lkey" : [ 1, 3 ], "a" : { "b" : { "_id" : 10, "fkey" : 1, "c" : 100 } } }
+{ "_id" : 2, "lkey" : [ 1, 3 ], "a" : { "b" : { "_id" : 11, "fkey" : 1, "c" : 200 } } }
+{ "_id" : 2, "lkey" : [ 1, 3 ], "a" : { "b" : { "_id" : 12, "fkey" : 3, "c" : 300 } } }
+{ "_id" : 3, "lkey" : 3, "a" : { "b" : { "_id" : 12, "fkey" : 3, "c" : 300 } } }
+{ "_id" : 4, "a" : { "x" : 1, "b" : { "_id" : 13, "fkey" : null, "c" : 400 } } }
+{ "_id" : 5, "lkey" : null, "a" : { "b" : { "_id" : 13, "fkey" : null, "c" : 400 } } }
+```
+### Plan
+Engine: classic
+
+### Pipeline
+```json
+[
+	{
+		"$lookup" : {
+			"from" : "foreignDotted",
+			"localField" : "lkey",
+			"foreignField" : "fkey",
+			"as" : "a.b"
+		}
+	},
+	{
+		"$unwind" : {
+			"path" : "$a.b",
+			"preserveNullAndEmptyArrays" : true
+		}
+	},
+	{
+		"$match" : {
+			"a" : {
+				"$exists" : true
+			}
+		}
+	}
+]
+```
+### Options
+```json
+{ "allowDiskUse" : true }
+```
+### Results
+```text
+{ "_id" : 0, "lkey" : 1, "a" : { "x" : 10, "b" : { "_id" : 10, "fkey" : 1, "c" : 100 } } }
+{ "_id" : 0, "lkey" : 1, "a" : { "x" : 10, "b" : { "_id" : 11, "fkey" : 1, "c" : 200 } } }
+{ "_id" : 1, "lkey" : 2, "a" : { } }
+{ "_id" : 2, "lkey" : [ 1, 3 ], "a" : { "b" : { "_id" : 10, "fkey" : 1, "c" : 100 } } }
+{ "_id" : 2, "lkey" : [ 1, 3 ], "a" : { "b" : { "_id" : 11, "fkey" : 1, "c" : 200 } } }
+{ "_id" : 2, "lkey" : [ 1, 3 ], "a" : { "b" : { "_id" : 12, "fkey" : 3, "c" : 300 } } }
+{ "_id" : 3, "lkey" : 3, "a" : { "b" : { "_id" : 12, "fkey" : 3, "c" : 300 } } }
+{ "_id" : 4, "a" : { "x" : 1, "b" : { "_id" : 13, "fkey" : null, "c" : 400 } } }
+{ "_id" : 5, "lkey" : null, "a" : { "b" : { "_id" : 13, "fkey" : null, "c" : 400 } } }
+```
+### Plan
+Engine: classic
+
+### Pipeline
+```json
+[
+	{
+		"$lookup" : {
+			"from" : "foreignDotted",
+			"localField" : "lkey",
+			"foreignField" : "fkey",
+			"as" : "a.b"
+		}
+	},
+	{
+		"$unwind" : {
+			"path" : "$a.b",
+			"preserveNullAndEmptyArrays" : true
+		}
+	},
+	{
+		"$match" : {
+			"a.b" : {
+				"$exists" : true
+			}
+		}
+	}
+]
+```
+### Options
+```json
+{ "allowDiskUse" : true }
+```
+### Results
+```text
+{ "_id" : 0, "lkey" : 1, "a" : { "x" : 10, "b" : { "_id" : 10, "fkey" : 1, "c" : 100 } } }
+{ "_id" : 0, "lkey" : 1, "a" : { "x" : 10, "b" : { "_id" : 11, "fkey" : 1, "c" : 200 } } }
+{ "_id" : 2, "lkey" : [ 1, 3 ], "a" : { "b" : { "_id" : 10, "fkey" : 1, "c" : 100 } } }
+{ "_id" : 2, "lkey" : [ 1, 3 ], "a" : { "b" : { "_id" : 11, "fkey" : 1, "c" : 200 } } }
+{ "_id" : 2, "lkey" : [ 1, 3 ], "a" : { "b" : { "_id" : 12, "fkey" : 3, "c" : 300 } } }
+{ "_id" : 3, "lkey" : 3, "a" : { "b" : { "_id" : 12, "fkey" : 3, "c" : 300 } } }
+{ "_id" : 4, "a" : { "x" : 1, "b" : { "_id" : 13, "fkey" : null, "c" : 400 } } }
+{ "_id" : 5, "lkey" : null, "a" : { "b" : { "_id" : 13, "fkey" : null, "c" : 400 } } }
+```
+### Plan
+Engine: classic
+
+### Pipeline
+```json
+[
+	{
+		"$lookup" : {
+			"from" : "foreignDotted",
+			"localField" : "lkey",
+			"foreignField" : "fkey",
+			"as" : "a.b"
+		}
+	},
+	{
+		"$unwind" : {
+			"path" : "$a.b",
+			"preserveNullAndEmptyArrays" : true
+		}
+	},
+	{
+		"$match" : {
+			"a.b.c" : {
+				"$gt" : 150
+			}
+		}
+	}
+]
+```
+### Options
+```json
+{ "allowDiskUse" : true }
+```
+### Results
+```text
+{ "_id" : 0, "lkey" : 1, "a" : { "x" : 10, "b" : { "_id" : 11, "fkey" : 1, "c" : 200 } } }
+{ "_id" : 2, "lkey" : [ 1, 3 ], "a" : { "b" : { "_id" : 11, "fkey" : 1, "c" : 200 } } }
+{ "_id" : 2, "lkey" : [ 1, 3 ], "a" : { "b" : { "_id" : 12, "fkey" : 3, "c" : 300 } } }
+{ "_id" : 3, "lkey" : 3, "a" : { "b" : { "_id" : 12, "fkey" : 3, "c" : 300 } } }
+{ "_id" : 4, "a" : { "x" : 1, "b" : { "_id" : 13, "fkey" : null, "c" : 400 } } }
+{ "_id" : 5, "lkey" : null, "a" : { "b" : { "_id" : 13, "fkey" : null, "c" : 400 } } }
+```
+### Plan
+Engine: classic
+
+### Pipeline
+```json
+[
+	{
+		"$lookup" : {
+			"from" : "foreignDotted",
+			"localField" : "lkey",
+			"foreignField" : "fkey",
+			"as" : "a.b"
+		}
+	},
+	{
+		"$unwind" : {
+			"path" : "$a.b",
+			"preserveNullAndEmptyArrays" : true
+		}
+	},
+	{
+		"$match" : {
+			"a" : {
+				"$exists" : true
+			},
+			"a.b.c" : {
+				"$gt" : 150
+			}
+		}
+	}
+]
+```
+### Options
+```json
+{ "allowDiskUse" : true }
+```
+### Results
+```text
+{ "_id" : 0, "lkey" : 1, "a" : { "x" : 10, "b" : { "_id" : 11, "fkey" : 1, "c" : 200 } } }
+{ "_id" : 2, "lkey" : [ 1, 3 ], "a" : { "b" : { "_id" : 11, "fkey" : 1, "c" : 200 } } }
+{ "_id" : 2, "lkey" : [ 1, 3 ], "a" : { "b" : { "_id" : 12, "fkey" : 3, "c" : 300 } } }
+{ "_id" : 3, "lkey" : 3, "a" : { "b" : { "_id" : 12, "fkey" : 3, "c" : 300 } } }
+{ "_id" : 4, "a" : { "x" : 1, "b" : { "_id" : 13, "fkey" : null, "c" : 400 } } }
+{ "_id" : 5, "lkey" : null, "a" : { "b" : { "_id" : 13, "fkey" : null, "c" : 400 } } }
+```
+### Plan
+Engine: classic
+
 
 
 [jsTest] ----

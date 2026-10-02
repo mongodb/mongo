@@ -2400,10 +2400,6 @@ std::vector<const QuerySolutionNode*> getProjectionDescendants(const QuerySoluti
 
     return descendants;
 }
-
-inline bool effectIsDropOrAdd(FieldEffect e) {
-    return e == FieldEffect::kDrop || e == FieldEffect::kAdd;
-}
 }  // namespace
 
 std::unique_ptr<SlotBasedStageBuilder::ResultPlan> SlotBasedStageBuilder::getResultPlan(

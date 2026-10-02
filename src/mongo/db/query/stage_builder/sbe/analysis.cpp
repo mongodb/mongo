@@ -742,6 +742,31 @@ void QsnAnalysis::analyzeQsNode(const QuerySolutionNode* qsNode, QsnInfo& qsnInf
 
             return;
         }
+        case STAGE_EQ_LOOKUP_UNWIND: {
+            auto eqLookup = static_cast<const EqLookupNode*>(qsNode);
+
+            if (eqLookup->joinField.getPathLength() > 1 || eqLookup->unwindSpec->indexPath ||
+                eqLookup->unwindSpec->preserveNullAndEmptyArrays) {
+                qsnInfo.setPostimageAllowedFields(&kUniverseFieldSet);
+                return;
+            }
+
+            FieldEffects::CreatedFieldVectorType createdFieldVec;
+            createdFieldVec.emplace_back(eqLookup->joinField.fullPath(), FieldEffect::kSet);
+
+            auto effects = FieldEffects(
+                FieldSet::makeUniverseSet(), FieldSet::makeEmptySet(), createdFieldVec);
+
+            const auto& preimageAllowedFields =
+                *getQsnInfo(qsNode->children[0]).postimageAllowedFields;
+            auto effectsOverPreimage = FieldEffects(preimageAllowedFields);
+            effectsOverPreimage.compose(effects);
+
+            qsnInfo.effects.emplace(std::move(effects));
+
+            qsnInfo.setPostimageAllowedFields(effectsOverPreimage.getAllowedFields());
+            return;
+        }
         case STAGE_PROJECTION_DEFAULT:
         case STAGE_PROJECTION_COVERED:
         case STAGE_PROJECTION_SIMPLE: {

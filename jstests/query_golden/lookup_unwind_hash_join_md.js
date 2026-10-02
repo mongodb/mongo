@@ -61,6 +61,29 @@ db.foreign.drop();
 assert.commandWorked(db.local.insertMany(localDocs));
 assert.commandWorked(db.foreign.insertMany(foreignDocs));
 
+// Data for the dotted "as" path runs: "a" is an object with siblings, missing, a conflicting
+// scalar, and an object with a preexisting "a.b".
+const dottedLocalDocs = [
+    {_id: 0, lkey: 1, a: {x: 10}},
+    {_id: 1, lkey: 2},
+    {_id: 2, lkey: [1, 3], a: 5},
+    {_id: 3, lkey: 3},
+    {_id: 4, a: {x: 1, b: "preexisting"}},
+    {_id: 5, lkey: null, a: {}},
+];
+
+const dottedForeignDocs = [
+    {_id: 10, fkey: 1, c: 100},
+    {_id: 11, fkey: 1, c: 200},
+    {_id: 12, fkey: 3, c: 300},
+    {_id: 13, fkey: null, c: 400},
+];
+
+db.localDotted.drop();
+db.foreignDotted.drop();
+assert.commandWorked(db.localDotted.insertMany(dottedLocalDocs));
+assert.commandWorked(db.foreignDotted.insertMany(dottedForeignDocs));
+
 // Pin the strategy flags so the plans depend only on the engine mode, not the build's flags.
 const strategyFlags = {
     featureFlagSbeEqLookupUnwindHashJoin: true,
@@ -76,13 +99,13 @@ for (const [flag, value] of Object.entries(strategyFlags)) {
     assert.commandWorked(db.adminCommand({setParameter: 1, [flag]: value}));
 }
 
-function runPipeline(pipeline, options) {
+function runPipeline(collName, pipeline, options) {
     subSection("Pipeline");
     code(tojson(pipeline));
     subSection("Options");
     code(tojsononeline(options));
 
-    const cmd = Object.assign({aggregate: "local", pipeline: pipeline, cursor: {}}, options);
+    const cmd = Object.assign({aggregate: collName, pipeline: pipeline, cursor: {}}, options);
     const res = db.runCommand(cmd);
     subSection("Results");
     if (res.ok !== 1) {
@@ -92,7 +115,7 @@ function runPipeline(pipeline, options) {
     }
 
     subSection("Plan");
-    const explain = db.local.explain().aggregate(pipeline, options);
+    const explain = db.getCollection(collName).explain().aggregate(pipeline, options);
     line(`Engine: ${explain.explainVersion === "2" ? "SBE" : "classic"}`);
     const winningPlan = getQueryPlanner(explain).winningPlan;
     const queryPlan = winningPlan.queryPlan || winningPlan;
@@ -103,6 +126,15 @@ function runPipeline(pipeline, options) {
     if (winningPlan.slotBasedPlan) {
         line(`Slots: ${winningPlan.slotBasedPlan.slots}`);
         code(winningPlan.slotBasedPlan.stages.replace(uuidRegex, '@""'), "text");
+    }
+    // SBE plans that are not fully pushed into the query system only show the $cursor subplan
+    // above; print the remaining aggregation stages (e.g. a $lookup that absorbed a $match).
+    if (explain.explainVersion === "2" && Array.isArray(explain.stages)) {
+        const stagesAboveCursor = explain.stages.filter((stage) => !stage.$cursor);
+        if (stagesAboveCursor.length > 0) {
+            line("Stages above the cursor:");
+            code(tojson(stagesAboveCursor).replace(uuidRegex, '@""'));
+        }
     }
     linebreak();
 }
@@ -115,7 +147,38 @@ try {
         suffixStages.forEach((suffix) => {
             aggOptions.forEach((options) => {
                 const pipeline = [lookup, unwind].concat(suffix);
-                runPipeline(pipeline, options);
+                runPipeline("local", pipeline, options);
+            });
+        });
+    });
+
+    // $lookup with a dotted "as" path and parent stages reading a prefix of the "as" path ("a"),
+    // the full "as" path ("a.b"), and a path deeper than the "as" path ("a.b.c").
+    const dottedLookup = {
+        $lookup: {from: "foreignDotted", localField: "lkey", foreignField: "fkey", as: "a.b"},
+    };
+
+    const dottedUnwinds = [
+        {$unwind: "$a.b"},
+        {$unwind: {path: "$a.b", preserveNullAndEmptyArrays: true}},
+    ];
+
+    const dottedSuffixStages = [
+        [],
+        [{$match: {a: {$exists: true}}}],
+        [{$match: {"a.b": {$exists: true}}}],
+        [{$match: {"a.b.c": {$gt: 150}}}],
+        [{$match: {a: {$exists: true}, "a.b.c": {$gt: 150}}}],
+    ];
+
+    dottedUnwinds.forEach((unwind) => {
+        section(`Dotted as path, unwind: ${tojsononeline(unwind)}`);
+        linebreak();
+
+        dottedSuffixStages.forEach((suffix) => {
+            aggOptions.forEach((options) => {
+                const pipeline = [dottedLookup, unwind].concat(suffix);
+                runPipeline("localDotted", pipeline, options);
             });
         });
     });
