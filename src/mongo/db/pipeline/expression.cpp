@@ -2551,9 +2551,8 @@ intrusive_ptr<Expression> ExpressionNary::optimize() {
                 if (constExpressions.size() > 1) {
                     ExpressionVector childrenSave = std::move(_children);
                     _children = std::move(constExpressions);
-                    optimizedOperands.emplace_back(ExpressionConstant::create(
-                        getExpressionContext(),
-                        evaluate(Document(), &(getExpressionContext()->variables))));
+                    optimizedOperands.emplace_back(
+                        ExpressionConstant::create(getExpressionContext(), foldConstant()));
                     _children = std::move(childrenSave);
                 } else {
                     optimizedOperands.insert(
@@ -2577,9 +2576,8 @@ intrusive_ptr<Expression> ExpressionNary::optimize() {
 
         if (constExpressions.size() > 1) {
             _children = std::move(constExpressions);
-            optimizedOperands.emplace_back(ExpressionConstant::create(
-                getExpressionContext(),
-                evaluate(Document(), &(getExpressionContext()->variables))));
+            optimizedOperands.emplace_back(
+                ExpressionConstant::create(getExpressionContext(), foldConstant()));
         } else {
             optimizedOperands.insert(
                 optimizedOperands.end(), constExpressions.begin(), constExpressions.end());
