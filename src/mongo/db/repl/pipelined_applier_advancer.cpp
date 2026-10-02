@@ -23,6 +23,9 @@ PipelinedApplierAdvancer::PipelinedApplierAdvancer(PipelinedApplierBatchTracker&
 }
 
 PipelinedApplierAdvancer::~PipelinedApplierAdvancer() {
+    if (_thread.joinable()) {
+        _batchTracker.onWorkerAbandonment();
+    }
     shutdownAndJoin();
 }
 

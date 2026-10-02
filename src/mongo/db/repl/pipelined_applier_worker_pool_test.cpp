@@ -10,6 +10,7 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/unittest/join_thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/scopeguard.h"
@@ -59,6 +60,25 @@ protected:
         _blocking = false;
         _gateCv.notify_all();
     }
+
+    // RAII type to block workers while in-scope and release workers upon destruction.
+    // Optionally takes a pointer to a PipelinedApplierWorkerPool to shutdown and join after the
+    // workers are released.
+    struct ScopedBlockedWorkers {
+        ScopedBlockedWorkers(PipelinedApplierWorkerPoolTest* test,
+                             PipelinedApplierWorkerPool* poolToShutdown = nullptr)
+            : _test(test), _poolToShutdown(poolToShutdown) {
+            _test->blockWorkers();
+        }
+        ~ScopedBlockedWorkers() {
+            _test->releaseWorkers();
+            if (_poolToShutdown) {
+                _poolToShutdown->shutdownAndJoin();
+            }
+        }
+        PipelinedApplierWorkerPoolTest* const _test;
+        PipelinedApplierWorkerPool* const _poolToShutdown;
+    };
 
     // Blocks until at least n ops have been recorded as consumed.
     void waitForConsumedCount(size_t n) {
@@ -187,38 +207,30 @@ TEST_F(PipelinedApplierWorkerPoolTest, ShutdownWithIdleWorkers) {
 TEST_F(PipelinedApplierWorkerPoolTest, ShutdownUnderLoadConsumesEveryItem) {
     const size_t kNumWorkers = 8;
     auto pool = makePool(kNumWorkers);
-    blockWorkers();
-
-    // Give each worker one item and wait until every worker is held mid-consumption.
     std::vector<std::vector<Timestamp>> enqueued(kNumWorkers);
-    for (size_t w = 0; w < kNumWorkers; ++w) {
-        enqueued[w].push_back(enqueueItem(*pool, w));
-    }
-    waitForConsumedCount(kNumWorkers);
 
-    // Fill every queue while its worker is held, then start the shutdown from another thread
-    // (shutdownAndJoin blocks on the held workers). This exercises a shutdown that begins with
-    // undrained queues and workers mid-consumption.
-    for (int i = 0; i < 500; ++i) {
+    {
+        ScopedBlockedWorkers _{this, pool.get()};
+
+        // Give each worker one item and wait until every worker is held mid-consumption.
         for (size_t w = 0; w < kNumWorkers; ++w) {
             enqueued[w].push_back(enqueueItem(*pool, w));
         }
-    }
-    stdx::thread shutdownThread([&] { pool->shutdownAndJoin(); });
-    // If an assertion below throws, still unblock the workers and join before unwinding.
-    ON_BLOCK_EXIT([&] {
-        releaseWorkers();
-        if (shutdownThread.joinable()) {
-            shutdownThread.join();
+        waitForConsumedCount(kNumWorkers);
+
+        // Fill every queue while its worker is held, then start the shutdown from another thread
+        // (shutdownAndJoin blocks on the held workers). This exercises a shutdown that begins with
+        // undrained queues and workers mid-consumption.
+        for (int i = 0; i < 500; ++i) {
+            for (size_t w = 0; w < kNumWorkers; ++w) {
+                enqueued[w].push_back(enqueueItem(*pool, w));
+            }
         }
-    });
 
-    // The held workers pin the shutdown: nothing beyond the first items can have been consumed.
-    ASSERT_EQ(consumedCount(), kNumWorkers);
-
-    // Allow the workers to drain their queues.
-    releaseWorkers();
-    shutdownThread.join();
+        // The held workers pin the in-flight shutdown: nothing beyond the first items can have
+        // been consumed while shutdown is running but workers are blocked.
+        ASSERT_EQ(consumedCount(), kNumWorkers);
+    }
 
     // Every enqueued item must still be consumed, in FIFO order, before shutdown completes.
     for (size_t w = 0; w < kNumWorkers; ++w) {
