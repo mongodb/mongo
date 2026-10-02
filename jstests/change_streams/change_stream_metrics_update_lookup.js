@@ -35,9 +35,12 @@ import {withClusteredColl, withCollation} from "jstests/libs/query/collection_co
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 // A compound _id with a Timestamp component (to exercise non-scalar key encoding), fully derived
-// from 'seed' so equal seeds yield equal ids and no field is collation-sensitive.
+// from 'seed' so equal seeds yield equal ids. The string 'a' component keeps the id
+// collation-sensitive, so the collation configs exercise collation-aware key encoding of a
+// string nested inside a compound key, on both the _id_-index seek and the clustered-RecordId
+// seek paths.
 function compoundId(seed) {
-    return {a: seed, b: Timestamp(seed, 1)};
+    return {a: `s${seed}`, b: Timestamp(seed, 1)};
 }
 
 describe("change stream updateLookup single-document-lookup metrics", function () {

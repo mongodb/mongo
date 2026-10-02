@@ -55,7 +55,10 @@ const configs = [{name: "default", collOpts: {}, optimizedIdLookup: true}]
     .concat(optimizedIdLookupOffConfig);
 
 const oid = ObjectId();
-const compound = {a: 1, b: 2};
+// The string 'a' keeps the compound shape collation-sensitive (a string nested inside the
+// compound key exercises collation-aware encoding of subobject fields) for both the found and
+// the missing compound shapes below.
+const compound = {a: "comp", b: 2};
 const docs = [
     {_id: 1, x: "scalar"},
     {_id: "str", x: "string"},
@@ -109,9 +112,10 @@ describe("$_internalSearchIdLookup", function () {
             // asserted exactly too.
             it("drops missing/absent `_id`s, including non-scalar ones, mixed into the same batch, correctly attributed per engine", function () {
                 // Fixed input: 1 (found), null (declines in SBE), "missing-str" (not found),
-                // oid (found), {a:9,b:9} (not found, compound), compound (found, compound),
-                // undefined (dropped by enrich() before performLookup, so absent from both cells
-                // below), minKey/maxKey/true (each declines in SBE). SBE handles every other encodable
+                // oid (found), {a:"missing",b:9} (not found, compound), compound (found,
+                // compound), undefined (dropped by enrich() before performLookup, so absent from
+                // both cells below), minKey/maxKey/true (each declines in SBE). SBE handles every
+                // other encodable
                 // _id shape directly, on clustered and non-clustered collections alike, compound
                 // included.
                 //
@@ -134,7 +138,7 @@ describe("$_internalSearchIdLookup", function () {
                             null,
                             "missing-str",
                             oid,
-                            {a: 9, b: 9},
+                            {a: "missing", b: 9},
                             compound,
                             undefined,
                             MinKey(),
