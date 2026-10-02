@@ -188,6 +188,8 @@ public:
     /**
      * Blocks until '_arm' has been killed, which involves cleaning up any remote cursors managed
      * by this results merger.
+     * Must be called on the OperationContext's own thread because the implementation writes
+     * deadline state while running without interruption.
      */
     void kill(OperationContext* opCtx);
 
