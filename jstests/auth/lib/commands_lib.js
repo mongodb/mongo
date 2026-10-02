@@ -8753,7 +8753,7 @@ export const authCommandsLib = {
                 pipeline: [{$_internalSearchIdLookup: {}}],
                 cursor: {},
             },
-            testcases: testcases_transformationOnly,
+            testcases: testcases_transformationOnlyExpectFail, // Not allowed in user requests.
         },
         {
             testname: "aggregate_$_internalSetWindowFields",

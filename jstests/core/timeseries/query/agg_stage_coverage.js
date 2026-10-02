@@ -69,13 +69,6 @@ for (let i = 0; i < 10; i++) {
 // These are stages that will error when run on a timeseries collection.
 const errorTests = [
     {
-        stage: "$_internalSearchIdLookup",
-        pipeline: [{$_internalSearchIdLookup: {}}],
-        expectedErrorCodes: [
-            10557302, // check for 'canRunOnTimeseries' failed.
-        ],
-    },
-    {
         stage: "$_analyzeShardKeyReadWriteDistribution",
         pipeline: [
             {
@@ -342,6 +335,9 @@ const skippedStages = [
     "$searchBeta",
     "$listSearchIndexes",
     "$setVariableFromSubPipeline",
+
+    // Internal stage produced during search pipeline expansion.
+    "$_internalSearchIdLookup",
 
     // Stages tested in 'agg_stage_coverage_internal_client.js', since they require extra setup.
     "$mergeCursors",

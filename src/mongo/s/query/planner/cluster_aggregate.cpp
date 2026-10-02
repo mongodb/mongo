@@ -1223,16 +1223,16 @@ bool needsCollectionRouter(const LiteParsedPipeline& lpp, const RetryState& stat
 }
 }  // namespace
 
-Status ClusterAggregate::runAggregate(
-    OperationContext* opCtx,
-    const Namespaces& namespaces,
-    AggregateCommandRequest& request,
-    const LiteParsedPipeline& liteParsedPipeline,
-    const PrivilegeVector& privileges,
-    boost::optional<ExplainOptions::Verbosity> verbosity,
-    BSONObjBuilder* result,
-    StringData comment,
-    std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext) {
+Status ClusterAggregate::runAggregate(OperationContext* opCtx,
+                                      const Namespaces& namespaces,
+                                      AggregateCommandRequest& request,
+                                      const LiteParsedPipeline& liteParsedPipeline,
+                                      const PrivilegeVector& privileges,
+                                      boost::optional<ExplainOptions::Verbosity> verbosity,
+                                      BSONObjBuilder* result,
+                                      StringData comment,
+                                      std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext,
+                                      bool alreadyDesugared) {
     // Use the provided IFRContext if available, otherwise create a new one. This ensures consistent
     // flag values throughout the operation, including retries on view errors.
     if (!ifrContext) {
@@ -1241,6 +1241,7 @@ Status ClusterAggregate::runAggregate(
 
     RetryState retryState;
     retryState.currentNamespaces = namespaces;
+    retryState.alreadyDesugared = alreadyDesugared;
 
     // Main retry body.
     auto body = [&](RetryState& state) -> Status {
@@ -1582,15 +1583,25 @@ Status ClusterAggregate::retryOnViewOrIFRKickbackError(
     auto resolved = PipelineResolver::buildResolvedMongosViewRequest(
         opCtx, request, resolvedView, requestedNss, verbosity, ifrContext, helpers);
 
-    // Now call runAggregate with the resolved namespace and request.
+    // When view resolution returns a LiteParsedPipeline, the resolved pipeline has already been
+    // desugared. Thread it and the 'alreadyDesugared' signal through so runAggregate does not
+    // re-validate the resolved pipeline under the external client, which would reject
+    // server-generated internal stages.
+    const bool alreadyDesugared = resolved.liteParsedPipeline.has_value();
+    LiteParsedPipeline liteParsedPipeline = alreadyDesugared
+        ? std::move(*resolved.liteParsedPipeline)
+        : LiteParsedPipeline(resolved.resolvedRequest);
+
     return runAggregate(opCtx,
                         Namespaces{requestedNss, resolvedView.getNamespace()},
                         resolved.resolvedRequest,
+                        liteParsedPipeline,
                         privileges,
                         verbosity,
                         result,
                         "ClusterAggregate::retryOnViewOrIFRKickbackError"_sd,
-                        ifrContext);
+                        ifrContext,
+                        alreadyDesugared);
 }
 
 }  // namespace mongo
