@@ -103,7 +103,7 @@ TEST_F(VersionContextDecorationTest, FixedOperationFCVRegionReentrancy) {
 
 TEST_F(VersionContextDecorationTest, FixedOperationFCVRegionSetDuringFcvTransition) {
     auto failPoint = globalFailPointRegistry().find("waitBeforeFixedOperationFCVRegionRaceCheck");
-    failPoint->setMode(FailPoint::alwaysOn);
+    FailPointEnableBlock failPointBlock(failPoint);
 
     // (Generic FCV reference): used for testing
     // Set FCV to last-lts
@@ -112,9 +112,11 @@ TEST_F(VersionContextDecorationTest, FixedOperationFCVRegionSetDuringFcvTransiti
     // Make the FixedOperationFCVRegion constructor race with a FCV transition (last-lts to latest),
     // then check that the target FCV version has been set
     unittest::JoinThread setFcvToLatestThread([&] {
-        failPoint->waitForTimesEntered(1);
+        failPointBlock.waitForOneNewEntry();
 
         serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLatest);
+        // Explicitly disable to release the blocked FixedOperationFCVRegion constructor.
+        // `failPointBlock` only provides cleanup if the test exits early.
         failPoint->setMode(FailPoint::off);
     });
 

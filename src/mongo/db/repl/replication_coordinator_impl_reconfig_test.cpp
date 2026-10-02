@@ -2551,7 +2551,7 @@ TEST_F(ReplCoordTest, StepUpReconfigConcurrentWithForceHeartbeatReconfig) {
 
         // For force reconfigs, we do allow them to proceed even if we are in drain mode, so make
         // sure it is in progress, stuck at the failpoint before completion.
-        fpb->waitForTimesEntered(1);
+        fpb.waitForOneNewEntry();
 
         // At this point the heartbeat reconfig should be in progress but blocked from completion by
         // the failpoint. We now let drain mode complete. The step up reconfig should be interrupted

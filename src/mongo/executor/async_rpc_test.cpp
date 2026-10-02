@@ -1354,7 +1354,7 @@ TEST_F(AsyncRPCTestFixture, UseOperationKeyWhenProvided) {
 TEST_F(AsyncRPCTestFixture, CancelAfterNetworkResponse) {
     auto pauseAfterNetworkResponseFailPoint =
         globalFailPointRegistry().find("pauseAsyncRPCAfterNetworkResponse");
-    pauseAfterNetworkResponseFailPoint->setMode(FailPoint::alwaysOn);
+    FailPointEnableBlock pauseAfterNetworkResponse(pauseAfterNetworkResponseFailPoint);
     std::unique_ptr<Targeter> targeter = std::make_unique<LocalHostTargeter>();
     auto opCtxHolder = makeOperationContext();
     DatabaseName testDbName = DatabaseName::createDatabaseName_forTest(boost::none, "testdb");
@@ -1376,7 +1376,7 @@ TEST_F(AsyncRPCTestFixture, CancelAfterNetworkResponse) {
     });
 
     // Cancel after network response received in the TaskExecutor.
-    pauseAfterNetworkResponseFailPoint->waitForTimesEntered(1);
+    pauseAfterNetworkResponse.waitForOneNewEntry();
     source.cancel();
     pauseAfterNetworkResponseFailPoint->setMode(FailPoint::off);
 
