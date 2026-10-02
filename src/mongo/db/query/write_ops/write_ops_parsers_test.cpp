@@ -375,6 +375,31 @@ TEST(CommandWriteOpsParsers, UpdateCommandRequest) {
     }
 }
 
+// Pins the IDL declaration of 'sort' as 'object_owned' - this fails if it is changed back to
+// 'object'. The parsed sort outlives its wire message: it reaches 'MergeSortStats::sortPattern',
+// which the plan cache retains in its debug info and $planCacheStats serializes later.
+// The bulkWrite equivalent is BulkWriteTest::UpdateSortIsOwned in bulk_write_exec_test.cpp.
+TEST(CommandWriteOpsParsers, UpdateSortIsOwned) {
+    const auto ns = NamespaceString::createNamespaceString_forTest("test", "foo");
+    const BSONObj sort = BSON("c" << 1);
+    auto rawUpdate =
+        BSON("q" << BSON("x" << 1) << "u" << BSON("$inc" << BSON("x" << 1)) << "sort" << sort);
+    auto cmd = BSON("update" << ns.coll() << "updates" << BSON_ARRAY(rawUpdate));
+    for (bool seq : {false, true}) {
+        // Parse inside a lambda so that the OpMsgRequest, and the buffer it owns, is destroyed
+        // before the parsed request is inspected.
+        auto op = [&] {
+            auto request = toOpMsg(ns.db_forTest(), cmd, seq);
+            return UpdateOp::parse(request);
+        }();
+
+        const auto& parsedSort = op.getUpdates()[0].getSort();
+        ASSERT(parsedSort);
+        ASSERT_TRUE(parsedSort->isOwned());
+        ASSERT_BSONOBJ_EQ(*parsedSort, sort);
+    }
+}
+
 TEST(CommandWriteOpsParsers, UpdateWithPipeline) {
     const auto ns = NamespaceString::createNamespaceString_forTest("test", "foo");
     const BSONObj query = BSON("q" << BSON("x" << 1));
