@@ -31,6 +31,9 @@
 #include "mongo/db/pipeline/document_source_change_stream.h"
 
 #include "mongo/bson/simple_bsonelement_comparator.h"
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/bson/bson_helper.h"
 #include "mongo/db/feature_compatibility_version_documentation.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
@@ -60,6 +63,7 @@
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/vector_clock.h"
+#include "mongo/util/namespace_string_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -110,6 +114,38 @@ constexpr StringData DocumentSourceChangeStream::kRegexAllCollectionsShowSystemE
 
 constexpr StringData DocumentSourceChangeStream::kRegexAllDBs;
 constexpr StringData DocumentSourceChangeStream::kRegexCmdColl;
+
+void DocumentSourceChangeStream::LiteParsed::_addShowSystemEventsPrivilegesIfNeeded(
+    PrivilegeVector* privileges) const {
+    const BSONElement showSystemEvents =
+        _spec.Obj()[DocumentSourceChangeStreamSpec::kShowSystemEventsFieldName];
+
+    // A non-boolean value is rejected later, when the spec is fully parsed.
+    if (!showSystemEvents.booleanSafe()) {
+        return;
+    }
+
+    // Db/cluster privileges exclude system collections, but the flag re-admits system.js, so
+    // those scopes need an explicit system.js grant.
+    constexpr auto systemJs = NamespaceString::kSystemDotJavascriptCollectionName;
+    switch (getChangeStreamType(_nss)) {
+        case ChangeStreamType::kSingleCollection:
+            // A collection stream only emits events for _nss, so system.js documents can only
+            // appear when the stream is opened on system.js itself, which the exact-namespace
+            // privilege above already covers.
+            return;
+        case ChangeStreamType::kSingleDatabase:
+            privileges->push_back(Privilege(
+                ResourcePattern::forExactNamespace(
+                    NamespaceStringUtil::parseNamespaceFromRequest(_nss.dbName(), systemJs)),
+                actions));
+            return;
+        case ChangeStreamType::kAllChangesForCluster:
+            privileges->push_back(Privilege(ResourcePattern::forCollectionName(systemJs), actions));
+            return;
+    }
+    MONGO_UNREACHABLE;
+}
 
 void DocumentSourceChangeStream::checkValueType(const Value v,
                                                 const StringData fieldName,
