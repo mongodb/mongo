@@ -6,3 +6,15 @@ py_library(
     srcs = glob(["*.py"]),
     visibility = ["//visibility:public"],
 )
+
+py_test(
+    name = "test_simulate_crash",
+    srcs = [
+        "__init__.py",
+        "test_simulate_crash.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/resmokelib",
+    ],
+)
