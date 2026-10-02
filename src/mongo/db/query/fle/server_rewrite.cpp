@@ -333,7 +333,7 @@ void processFindCommand(OperationContext* opCtx,
 
     auto efc = EncryptionInformationHelpers::getAndValidateSchema(
         nss, findCommand->getEncryptionInformation().value());
-    FLEStatusSection::get().incrementFindCount(nss, efc);
+    FLEStatusSection::get().incrementFindCount(nss);
 
     findCommand->setFilter(rewriteQuery(opCtx,
                                         expCtx,
