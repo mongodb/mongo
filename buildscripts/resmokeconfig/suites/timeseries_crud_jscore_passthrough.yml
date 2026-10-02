@@ -54,6 +54,8 @@ selector:
   - jstests/core/write/find_and_modify/find_and_modify_server7660.js
   # updateOne sort.
   - jstests/core/write/update/updateOne_sort.js
+  # Uses updateOne with a sort, and $planCacheStats must be the first pipeline stage.
+  - jstests/core/query/plan_cache/plan_cache_write_sort_pattern.js
   # Incompatible find command option.
   - jstests/core/min_max_hashed_index.js # min
   - jstests/core/query/expr/expr.js # divide

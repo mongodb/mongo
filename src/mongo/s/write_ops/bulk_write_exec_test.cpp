@@ -6434,6 +6434,40 @@ TEST(BulkWriteTest, getApproximateSize) {
     ASSERT_EQUALS(item.getApproximateSize(), item.serialize().objsize());
 }
 
+// A bulkWrite update op's sort reaches 'MergeSortStats::sortPattern' via UpdateRequest, and the
+// plan cache retains it in its debug info long after the wire message is gone. It must therefore be
+// an owned BSONObj rather than a view into the request buffer. See the sibling test
+// CommandWriteOpsParsers::UpdateSortIsOwned for the update command's equivalent field.
+TEST(BulkWriteTest, UpdateSortIsOwned) {
+    const BSONObj sort = BSON("c" << 1);
+    auto cmd =
+        BSON("bulkWrite" << 1 << "ops"
+                         << BSON_ARRAY(BSON("update"
+                                            << 0 << "filter" << BSON("x" << 1) << "updateMods"
+                                            << BSON("$inc" << BSON("x" << 1)) << "sort" << sort))
+                         << "nsInfo"
+                         << BSON_ARRAY(BSON("ns"
+                                            << "test.foo"))
+                         << "$db"
+                         << "admin");
+
+    // Parse inside a lambda so the Message backing the request is destroyed before the parsed
+    // request is inspected.
+    auto op = [&] {
+        OpMsgBuilder msgBuilder;
+        msgBuilder.setBody(cmd);
+        Message msg = msgBuilder.finishWithoutSizeChecking();
+        auto request = OpMsgRequest::parse(msg);
+        return BulkWriteCommandRequest::parse(IDLParserContext{"bulkWrite"}, request);
+    }();
+
+    const auto& updateOp = std::get<BulkWriteUpdateOp>(op.getOps()[0]);
+    const auto& parsedSort = updateOp.getSort();
+    ASSERT(parsedSort);
+    ASSERT_TRUE(parsedSort->isOwned());
+    ASSERT_BSONOBJ_EQ(*parsedSort, sort);
+}
+
 }  // namespace
 
 }  // namespace mongo

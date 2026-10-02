@@ -95,7 +95,12 @@ namespace impl {
         } else {
             findCommand->setFilter(request.getQuery());
         }
-        findCommand->setSort(request.getSort());
+        // The plan cache retains this sort past the request, so it must be owned. The empty
+        // case is skipped because 'getSort()' returns a static unowned empty BSONObj that
+        // getOwned() would copy.
+        if (const auto& sort = request.getSort(); !sort.isEmpty()) {
+            findCommand->setSort(sort.getOwned());
+        }
         findCommand->setHint(request.getHint());
         findCommand->setCollation(request.getCollation().getOwned());
 

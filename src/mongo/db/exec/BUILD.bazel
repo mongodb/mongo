@@ -123,6 +123,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/exec:exclusion_projection_executor_test.cpp",
         "//src/mongo/db/exec:find_projection_executor_test.cpp",
         "//src/mongo/db/exec:inclusion_projection_executor_test.cpp",
+        "//src/mongo/db/exec:plan_stats_test.cpp",
         "//src/mongo/db/exec:projection_executor_builder_test.cpp",
         "//src/mongo/db/exec:projection_executor_redaction_test.cpp",
         "//src/mongo/db/exec:projection_executor_test.cpp",

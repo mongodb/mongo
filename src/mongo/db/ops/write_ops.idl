@@ -273,7 +273,7 @@ structs:
             sort:
                 description: "Determines which document the operation modifies if the query selects
                               multiple documents."
-                type: object
+                type: object_owned
                 optional: true
                 stability: unstable
             arrayFilters:
