@@ -59,6 +59,10 @@ last-patch:
       ticket: SERVER-132650
     - test_file: jstests/replsets/clean_shutdown_log.js
       ticket: SERVER-132245
+    - test_file: jstests/replsets/initial_sync_clean_shutdown_sync_source.js
+      ticket: SERVER-132245
+    - test_file: jstests/replsets/initial_sync_data_consistent_after_sync_source_clean_restart.js
+      ticket: SERVER-132245
     - test_file: jstests/sharding/index_builds/resharding_recipient_buildindex_stepup_deadlock.js
       ticket: SERVER-127745
     - test_file: jstests/sharding/internal_txns/retryable_writes_oplog_entries.js
@@ -171,6 +175,10 @@ last-continuous:
     - test_file: jstests/replsets/arbiter_afterClusterTime_read_concern.js
       ticket: SERVER-130759
     - test_file: jstests/replsets/clean_shutdown_log.js
+      ticket: SERVER-132245
+    - test_file: jstests/replsets/initial_sync_clean_shutdown_sync_source.js
+      ticket: SERVER-132245
+    - test_file: jstests/replsets/initial_sync_data_consistent_after_sync_source_clean_restart.js
       ticket: SERVER-132245
     - test_file: jstests/replsets/initial_sync_replSetGetStatus.js
       ticket: SERVER-121218
@@ -691,8 +699,12 @@ last-lts:
       ticket: SERVER-119413
     - test_file: jstests/replsets/index_builds/rollback_index_build_start_abort.js
       ticket: SERVER-103955
+    - test_file: jstests/replsets/initial_sync_clean_shutdown_sync_source.js
+      ticket: SERVER-132245
     - test_file: jstests/replsets/initial_sync_collStats_resumes_after_network_error.js
       ticket: SERVER-94259
+    - test_file: jstests/replsets/initial_sync_data_consistent_after_sync_source_clean_restart.js
+      ticket: SERVER-132245
     - test_file: jstests/replsets/initial_sync_during_stepdown.js
       ticket: SERVER-89664
     - test_file: jstests/replsets/initial_sync_index_conflict_recreate.js

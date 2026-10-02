@@ -63,6 +63,14 @@ private:
     Status checkRollBackIdIsUnchanged();
 
     /**
+     * Checks whether the sync source has cleanly shut down since this attempt captured its
+     * baseline, which could have rolled back writes this cloner has already read. Returns a
+     * retriable status if the sync source could not be reached, and throws InitialSyncFailure if it
+     * did restart in a way that makes the attempt unsafe.
+     */
+    Status checkCleanShutdownIsUnchanged();
+
+    /**
      * Does validity checks on the sync source.  If the sync source is now no longer usable,
      * throws an exception. Returns a not-OK status if a network error occurs or if the sync
      * source is temporarily unusable (e.g. restarting).

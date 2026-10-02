@@ -16,7 +16,12 @@ namespace repl {
 TEST(InitialSyncSharedDataTest, SingleFailedOperation) {
     Days timeout(1);
     ClockSourceMock clock;
-    InitialSyncSharedData data(1 /* rollBackId */, timeout, &clock);
+    InitialSyncSharedData data(1 /* rollBackId */,
+                               false /* cleanShutdownCheckEnabled */,
+                               -1 /* baseCleanShutdownId */,
+                               Timestamp() /* beginApplyingTimestamp */,
+                               timeout,
+                               &clock);
 
     std::unique_lock<InitialSyncSharedData> lk(data);
     // No current outage.
@@ -51,7 +56,12 @@ TEST(InitialSyncSharedDataTest, SingleFailedOperation) {
 TEST(InitialSyncSharedDataTest, SequentialFailedOperations) {
     Days timeout(1);
     ClockSourceMock clock;
-    InitialSyncSharedData data(1 /* rollBackId */, timeout, &clock);
+    InitialSyncSharedData data(1 /* rollBackId */,
+                               false /* cleanShutdownCheckEnabled */,
+                               -1 /* baseCleanShutdownId */,
+                               Timestamp() /* beginApplyingTimestamp */,
+                               timeout,
+                               &clock);
 
     std::unique_lock<InitialSyncSharedData> lk(data);
     // No current outage.
@@ -113,7 +123,12 @@ TEST(InitialSyncSharedDataTest, SequentialFailedOperations) {
 TEST(InitialSyncSharedDataTest, OverlappingFailedOperations) {
     Days timeout(1);
     ClockSourceMock clock;
-    InitialSyncSharedData data(1 /* rollBackId */, timeout, &clock);
+    InitialSyncSharedData data(1 /* rollBackId */,
+                               false /* cleanShutdownCheckEnabled */,
+                               -1 /* baseCleanShutdownId */,
+                               Timestamp() /* beginApplyingTimestamp */,
+                               timeout,
+                               &clock);
 
     std::unique_lock<InitialSyncSharedData> lk(data);
     // No current outage.
@@ -171,7 +186,12 @@ TEST(InitialSyncSharedDataTest, OverlappingFailedOperations) {
 TEST(InitialSyncSharedDataTest, OperationTimesOut) {
     Seconds timeout(5);
     ClockSourceMock clock;
-    InitialSyncSharedData data(1 /* rollBackId */, timeout, &clock);
+    InitialSyncSharedData data(1 /* rollBackId */,
+                               false /* cleanShutdownCheckEnabled */,
+                               -1 /* baseCleanShutdownId */,
+                               Timestamp() /* beginApplyingTimestamp */,
+                               timeout,
+                               &clock);
 
     InitialSyncSharedData::RetryableOperation op1;
     InitialSyncSharedData::RetryableOperation op2;

@@ -22,6 +22,28 @@ protected:
 
     UUID _initialSyncId = UUID::gen();
     static constexpr int kInitialRollbackId = 1;
+
+    // Stands for a sync source that has already recorded some clean shutdowns. Deliberately neither
+    // kNoCleanShutdownId, which is the separate "no history at all" case, nor small enough that a
+    // base versus base + 1 mistake could still match by coincidence.
+    static constexpr long long kBaseCleanShutdownId = 5;
+    static const Timestamp kBeginApplyingTimestamp;
+
+    /**
+     * Builds a find response for the clean shutdown check the cloners run whenever they retry a
+     * stage. The check's find uses limit 1, so it carries at most one document: boost::none for
+     * "the sync source has recorded no clean shutdown since our baseline", or the single document
+     * the check should pass judgement on.
+     *
+     * The mock server ignores filters, so a test states the outcome it wants directly rather than
+     * seeding documents and relying on the query to select among them.
+     */
+    static BSONObj makeCleanShutdownFindResponse(boost::optional<BSONObj> doc = boost::none);
+
+    /**
+     * Builds a clean shutdown document, for handing to makeCleanShutdownFindResponse().
+     */
+    static BSONObj makeCleanShutdownDoc(long long id, Timestamp lastCheckpointTs);
 };
 
 }  // namespace repl

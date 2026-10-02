@@ -10,7 +10,9 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/initial_sync/clean_shutdown_checker.h"
 #include "mongo/db/repl/initial_sync/repl_sync_shared_data.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_consistency_markers_gen.h"
 #include "mongo/db/repl/replication_consistency_markers_impl.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -123,7 +125,11 @@ Status InitialSyncBaseCloner::checkSyncSourceIsStillValid() {
     if (!status.isOK())
         return status;
 
-    return checkRollBackIdIsUnchanged();
+    status = checkRollBackIdIsUnchanged();
+    if (!status.isOK())
+        return status;
+
+    return checkCleanShutdownIsUnchanged();
 }
 
 Status InitialSyncBaseCloner::checkInitialSyncIdIsUnchanged() {
@@ -174,6 +180,49 @@ Status InitialSyncBaseCloner::checkRollBackIdIsUnchanged() {
             str::stream() << "Rollback occurred on our sync source " << getSource()
                           << " during initial sync",
             rollBackId == getSharedData()->getRollBackId());
+    return Status::OK();
+}
+
+Status InitialSyncBaseCloner::checkCleanShutdownIsUnchanged() {
+    // Whether this attempt checks at all was decided when it started, so that every site agrees
+    // and the baseline below is always one we actually observed.
+    if (!getSharedData()->isCleanShutdownCheckEnabled()) {
+        return Status::OK();
+    }
+
+    auto baseCleanShutdownId = getSharedData()->getBaseCleanShutdownId();
+
+    BSONObj info;
+    try {
+        getClient()->runCommand(NamespaceString::kCleanShutdownLogNamespace.dbName(),
+                                makeCleanShutdownCheckFindCmd(baseCleanShutdownId),
+                                info);
+    } catch (DBException& e) {
+        if (ErrorCodes::isRetriableError(e)) {
+            // This check exists precisely because the sync source may have restarted, so failing to
+            // reach it is the expected case rather than an edge case. Return instead of throwing so
+            // that the stage is retried, reconnects, and gets to observe the document the restarted
+            // sync source writes during its own startup.
+            static constexpr char errorMsg[] =
+                "Failed while attempting to check the sync source for clean shutdowns after "
+                "re-connect";
+            LOGV2_DEBUG(13224503, 1, errorMsg, "error"_attr = e);
+            return e.toStatus().withContext(errorMsg);
+        }
+        throw;
+    }
+
+    auto docs = uassertStatusOK(extractFirstBatch(info));
+    boost::optional<BSONObj> firstDocAfterBase;
+    if (!docs.empty()) {
+        firstDocAfterBase = docs.front();
+    }
+
+    // Only a genuine verdict throws, which fails the attempt rather than retrying it.
+    uassertStatusOK(checkCleanShutdownResult(firstDocAfterBase,
+                                             baseCleanShutdownId,
+                                             getSharedData()->getBeginApplyingTimestamp(),
+                                             getSource()));
     return Status::OK();
 }
 

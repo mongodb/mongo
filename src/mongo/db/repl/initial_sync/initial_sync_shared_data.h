@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/initial_sync/repl_sync_shared_data.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/concurrency/with_lock.h"
@@ -22,13 +23,33 @@ private:
 public:
     typedef boost::optional<RetryingOperation> RetryableOperation;
 
-    InitialSyncSharedData(int rollBackId, Milliseconds allowedOutageDuration, ClockSource* clock)
+    InitialSyncSharedData(int rollBackId,
+                          bool cleanShutdownCheckEnabled,
+                          long long baseCleanShutdownId,
+                          Timestamp beginApplyingTimestamp,
+                          Milliseconds allowedOutageDuration,
+                          ClockSource* clock)
         : ReplSyncSharedData(clock),
           _rollBackId(rollBackId),
+          _cleanShutdownCheckEnabled(cleanShutdownCheckEnabled),
+          _baseCleanShutdownId(baseCleanShutdownId),
+          _beginApplyingTimestamp(beginApplyingTimestamp),
           _allowedOutageDuration(allowedOutageDuration) {}
 
     int getRollBackId() const {
         return _rollBackId;
+    }
+
+    bool isCleanShutdownCheckEnabled() const {
+        return _cleanShutdownCheckEnabled;
+    }
+
+    long long getBaseCleanShutdownId() const {
+        return _baseCleanShutdownId;
+    }
+
+    Timestamp getBeginApplyingTimestamp() const {
+        return _beginApplyingTimestamp;
     }
 
     int getRetryingOperationsCount(WithLock lk) {
@@ -149,6 +170,21 @@ private:
 
     // Rollback ID at start of initial sync.
     const int _rollBackId;
+
+    // Whether this attempt checks its sync source for clean shutdowns. Read once from
+    // enableInitialSyncCleanShutdownCheck when the attempt starts, so that every site agrees for
+    // the whole attempt and the baseline below cannot be missing while the checks are running.
+    // Changing the parameter takes effect on the next attempt.
+    const bool _cleanShutdownCheckEnabled;
+
+    // The _id of the sync source's most recent clean shutdown when this attempt started, or
+    // kNoCleanShutdownId if it had recorded none. Only meaningful when the check is enabled.
+    const long long _baseCleanShutdownId;
+
+    // The timestamp at or after which oplog replay covers everything this attempt cloned. The
+    // cloners compare the sync source's checkpoint timestamp against it to decide whether a clean
+    // shutdown could have lost writes they already read.
+    const Timestamp _beginApplyingTimestamp;
 
     /**
      * This object must be locked when accessing the members below.
