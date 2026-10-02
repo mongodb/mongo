@@ -1416,6 +1416,7 @@ CardinalityEstimate SamplingEstimatorImpl::estimateNDV(
     // is lazily computed and cached.
     size_t sampleNDV = countNDV(fields, _sample, bounds);
     if (!_uniqueDocCount) {
+        // TODO SERVER-135986: Fix unique document count for projected samples
         _uniqueDocCount = countUniqueDocuments(_sample);
     }
     if (sampleNDV == *_uniqueDocCount) {
@@ -1440,6 +1441,7 @@ CardinalityEstimate SamplingEstimatorImpl::estimateNDV(
 
     // Note that we use '_sampleSize' instead of '_uniqueDocCount' here because the method of
     // moments estimator that we use assumes that we perform sampling with replacement.
+    // TODO SERVER-135994: NDV with bounds on sample is not scaled
     CardinalityEstimate estimate = newtonRaphsonNDV(sampleNDV, _sampleSize);
     LOGV2_DEBUG(11158506,
                 5,

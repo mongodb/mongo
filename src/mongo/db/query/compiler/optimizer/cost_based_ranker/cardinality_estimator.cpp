@@ -564,7 +564,33 @@ CEResult CardinalityEstimator::estimateIndexSeeks(const IndexBounds& bounds, boo
      * preceding fields.
      *
      * * NDV(a) * NumIntervals(b) * 1 * 1
+     *
+     * *POINT INTERVALS*
+     *
+     * A point interval has NDV=1 and does not multiply the seek count. Leading point intervals
+     * (before the first non-point interval) are still included in the NDV computation, because they
+     * restrict which keys the scan can reach:
+     *
+     * a: [[0, 0]], b: [[0, 9]], c: [[0, 0]]
+     *
+     *  NDV((a, b)) * NumIntervals(c), with the sample filtered by a: [[0, 0]] && b: [[0, 9]]
+     *
+     * Point intervals after the first non-point interval are removed from the NDV computation: the
+     * scan still seeks for every distinct value of the preceding non-point fields, whether or not
+     * the later points match. This can overestimate when the point is selective and is followed by
+     * another non-point field, but never underestimates the seeks on the preceding fields.
+     *
+     * a: [[0, 9]], b: [[0, 0]], c: [[0, 0]]
+     *
+     *  NDV(a) * NumIntervals(c)
      */
+
+    // An empty OIL means no index keys can match; there will be no key for the ixscan to seek to.
+    if (std::any_of(oils.begin(), oils.end(), [](const OrderedIntervalList& oil) {
+            return oil.intervals.empty();
+        })) {
+        return zeroCE;
+    }
 
     // Trailing fully open intervals do not change the number of seeks - a cursor will only need
     // to seek after encountering a key which does not match the current bounds.
@@ -575,33 +601,26 @@ CEResult CardinalityEstimator::estimateIndexSeeks(const IndexBounds& bounds, boo
     if (!oils.empty()) {
         // This is the last (rightmost) field with a non-fully-open interval.
         // A single seek will be required per interval for this field.
-        if (oils.back().intervals.empty()) {
-            // This field has no intervals; there will be no key for the
-            // ixscan to seek to to start, and no documents returned.
-            return zeroCE;
-        }
         seekEstimate *= oils.back().intervals.size();
         oils.pop_back();
     }
 
-    // Remove point OILs (NDV=1, contribute a factor of 1 to seeks) and empty OILs in a single
-    // pass. Track whether any empty OIL is encountered - an empty OIL means no index keys can
-    // match.
-    bool isEmptyInterval = false;
-    std::erase_if(oils, [&](const OrderedIntervalList& oil) {
-        if (oil.intervals.empty()) {
-            isEmptyInterval = true;
-        }
-        return oil.intervals.empty() || oil.isPoint();
-    });
-
-    if (isEmptyInterval) {
-        return zeroCE;
-    }
-
-    if (oils.empty()) {
+    // Detect the first non-point OIL, keep leading point OILs and remove trailing point OILs.
+    auto isPoint = [](const OrderedIntervalList& oil) {
+        return oil.isPoint();
+    };
+    auto firstNonPoint = std::find_if_not(oils.begin(), oils.end(), isPoint);
+    // If all remaining OILs are point intervals (or 'oils' is empty), the NDV is at most 1 and we
+    // can skip the calculation.
+    if (firstNonPoint == oils.end()) {
         return CardinalityEstimate{CardinalityType{seekEstimate}, EstimationSource::Sampling};
     }
+
+    // Leading point OILs are kept in the NDV computation: although they do not multiply the seek
+    // count, they restrict which keys the scan can reach. Point OILs after the first non-point OIL
+    // are removed: the scan still seeks for every distinct value of the preceding non-point fields,
+    // whether or not the later point intervals match.
+    oils.erase(std::remove_if(firstNonPoint, oils.end(), isPoint), oils.end());
 
     std::vector<ce::FieldPathAndEqSemantics> fieldAndEqs;
     for (const auto& oil : oils) {

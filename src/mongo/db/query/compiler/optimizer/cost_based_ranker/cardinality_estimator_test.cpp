@@ -1493,7 +1493,11 @@ TYPED_TEST(EqualityPrefixTypedTest, NonFullyOpen_FullyOpen_FullyOpen_MultiInterv
 // works backwards through the OILs:
 //  1. Trailing fully-open OILs are stripped (they never cause a seek).
 //  2. The first non-open OIL contributes numIntervals seeks.
-//  3. Each remaining (leading) OIL contributes NDV seeks; point OILs contribute NDV=1.
+//  3. The remaining (leading) OILs contribute NDV seeks. Leading point OILs (before the first
+//     non-point OIL) contribute NDV=1 but are still passed to estimateNDV, since they restrict
+//     which keys are reachable. Point OILs after the first non-point OIL are removed. If all
+//     remaining OILs are point intervals, the NDV is at most 1 and the estimateNDV calculation is
+//     skipped.
 //  4. An empty OIL anywhere yields zeroCE (no seeks, no docs).
 
 // A minimal SamplingEstimator mock. Only estimateNDV and estimateNDVMultiKey are implemented;
@@ -1531,13 +1535,15 @@ public:
         MONGO_UNIMPLEMENTED;
     }
     CardinalityEstimate estimateNDV(
-        const std::vector<ce::FieldPathAndEqSemantics>&,
+        const std::vector<ce::FieldPathAndEqSemantics>& fields,
         boost::optional<std::span<const OrderedIntervalList>> bounds) const override {
+        recordNDVArgs(fields, bounds);
         return makeCard(bounds ? _ndvBounded : _ndv);
     }
     CardinalityEstimate estimateNDVMultiKey(
-        const std::vector<ce::FieldPathAndEqSemantics>&,
+        const std::vector<ce::FieldPathAndEqSemantics>& fields,
         boost::optional<std::span<const OrderedIntervalList>> bounds) const override {
+        recordNDVArgs(fields, bounds);
         return makeCard(bounds ? _ndvMultiKeyBounded : _ndvMultiKey);
     }
     CardinalityEstimate getCollCard() const override {
@@ -1553,7 +1559,25 @@ public:
         return {};
     }
 
+    // Field names and bound names passed to the most recent NDV call.
+    mutable std::vector<std::string> lastNDVFields;
+    mutable std::vector<std::string> lastNDVBoundNames;
+
 private:
+    void recordNDVArgs(const std::vector<ce::FieldPathAndEqSemantics>& fields,
+                       boost::optional<std::span<const OrderedIntervalList>> bounds) const {
+        lastNDVFields.clear();
+        lastNDVBoundNames.clear();
+        for (const auto& field : fields) {
+            lastNDVFields.push_back(field.path.fullPath());
+        }
+        if (bounds) {
+            for (const auto& oil : *bounds) {
+                lastNDVBoundNames.push_back(oil.name);
+            }
+        }
+    }
+
     double _ndv;
     double _ndvMultiKey;
     double _ndvBounded;
@@ -1707,6 +1731,75 @@ TEST(CardinalityEstimator, IndexSeeks_PointRangeTrailingOpen) {
     ASSERT_OK(result);
     // c stripped; b is first non-open, 1 interval; a is point -> no change. seek = 1.
     ASSERT_EQ(result.getValue(), makeCard(1.0));
+}
+
+// A leading point OIL must be kept in the NDV computation: it does not multiply the seek count, but
+// it restricts which keys the scan can reach (SERVER-135566).
+TEST(CardinalityEstimator, IndexSeeks_PointPrefixKeptInNDV) {
+    // The bounded NDV is 0 when no sampled documents match the point interval on 'a'.
+    MockSamplingEstimator mock{/*ndv=*/1000.0, /*ndvMultiKey=*/boost::none, /*ndvBounded=*/0.0};
+    IndexBounds bounds;
+    bounds.fields.push_back(makePointOil("a"));
+    bounds.fields.push_back(makeRangeOil("b"));
+    bounds.fields.push_back(makePointOil("c"));
+    auto result = estimateIndexSeeks(mock, bounds, /*multiKey=*/false);
+    ASSERT_OK(result);
+    // c contributes 1 seek; NDV((a, b)) with bounds is 0, clamped to 1: seek = 1.
+    ASSERT_EQ(result.getValue(), makeCard(1.0));
+    std::vector<std::string> expected{"a", "b"};
+    ASSERT_EQ(mock.lastNDVFields, expected);
+    ASSERT_EQ(mock.lastNDVBoundNames, expected);
+}
+
+// A point OIL after a range does not restrict the index seeks: the scan still seeks for every
+// distinct value of the range field. It must be removed from the NDV computation.
+TEST(CardinalityEstimator, IndexSeeks_PointAfterRangeRemovedFromNDV) {
+    MockSamplingEstimator mock{/*ndv=*/10.0};
+    IndexBounds bounds;
+    bounds.fields.push_back(makeRangeOil("a"));
+    bounds.fields.push_back(makePointOil("b"));
+    bounds.fields.push_back(makePointOil("c"));
+    auto result = estimateIndexSeeks(mock, bounds, /*multiKey=*/false);
+    ASSERT_OK(result);
+    // c contributes 1 seek; b is removed; NDV(a) = 10: seek = 10.
+    ASSERT_EQ(result.getValue(), makeCard(10.0));
+    std::vector<std::string> expected{"a"};
+    ASSERT_EQ(mock.lastNDVFields, expected);
+    ASSERT_EQ(mock.lastNDVBoundNames, expected);
+}
+
+// Only the leading point OILs are kept.
+TEST(CardinalityEstimator, IndexSeeks_OnlyLeadingPointsKeptInNDV) {
+    MockSamplingEstimator mock{/*ndv=*/10.0};
+    IndexBounds bounds;
+    bounds.fields.push_back(makePointOil("a"));
+    bounds.fields.push_back(makeRangeOil("b"));
+    bounds.fields.push_back(makePointOil("c"));
+    bounds.fields.push_back(makeRangeOil("d"));
+    bounds.fields.push_back(makePointOil("e"));
+    auto result = estimateIndexSeeks(mock, bounds, /*multiKey=*/false);
+    ASSERT_OK(result);
+    // e contributes 1 seek; a is kept; c is removed; NDV((a, b, d)) = 10: seek = 10.
+    ASSERT_EQ(result.getValue(), makeCard(10.0));
+    std::vector<std::string> expected{"a", "b", "d"};
+    ASSERT_EQ(mock.lastNDVFields, expected);
+    ASSERT_EQ(mock.lastNDVBoundNames, expected);
+}
+
+// If all OILs preceding the last non-open field are point intervals, estimateNDV is not called.
+TEST(CardinalityEstimator, IndexSeeks_AllPointPrefixSkipsNDV) {
+    // Any NDV call would return 100 and inflate the estimate.
+    MockSamplingEstimator mock{/*ndv=*/100.0};
+    IndexBounds bounds;
+    bounds.fields.push_back(makePointOil("a"));
+    bounds.fields.push_back(makePointOil("b"));
+    bounds.fields.push_back(makeRangeOil("c"));
+    auto result = estimateIndexSeeks(mock, bounds, /*multiKey=*/false);
+    ASSERT_OK(result);
+    // c contributes 1 seek; a and b are point intervals, so estimateNDV is not called: seek = 1.
+    ASSERT_EQ(result.getValue(), makeCard(1.0));
+    ASSERT_TRUE(mock.lastNDVFields.empty());
+    ASSERT_TRUE(mock.lastNDVBoundNames.empty());
 }
 
 // Multikey index uses estimateNDVMultiKey rather than estimateNDV, producing a different estimate.

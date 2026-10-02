@@ -132,4 +132,18 @@ describe("samplingCE with dotted paths sharing an array-valued prefix", function
             expectedSeeks: 3,
         });
     });
+
+    it("point prefix restricts the multikey NDV of the following range", function () {
+        // No document has x: 0, so the scan seeks once and finds nothing. Without keeping the
+        // leading point interval on 'x', estimateNDV([d.a], ...) over d.a >= 0 would count 2 keys.
+        assertEstimateMatchesActual({
+            index: {x: 1, "d.a": 1, "e": 1},
+            doc: {x: 1, d: [{a: 0}, {a: 1}], e: 0},
+            query: {x: 0, "d.a": {$gte: 0}, e: {$eq: 0}},
+            expectedIndexName: "x_1_d.a_1_e_1",
+            // estimateNDV([{x, d.a}], ...) with bounds x: [0, 0] matches no keys, so the NDV is
+            // clamped to 1. The trailing equality on 'e' adds a multiplication factor of 1.
+            expectedSeeks: 1,
+        });
+    });
 });
