@@ -77,9 +77,19 @@ size_t countNDV(const std::vector<FieldPathAndEqSemantics>& fields,
                 11158501, "Should always find at least one element at path in document", it.more());
 
             const auto elt = it.next();
-            tassert(11158502,
-                    "Encountered unexpected array in NDV computation",
-                    elt.element().type() != BSONType::array);
+            // This function is used for index scan nodes with non-multikey indices.
+            // If we see a document with an array-valued field, it must have been inserted
+            // after planning.
+            if (elt.element().type() == BSONType::array) {
+                // TODO(SERVER-132305): This can be removed after we switch to using the
+                // PathArrayness api.
+                uasserted(
+                    ErrorCodes::QueryPlanKilled,
+                    str::stream()
+                        << "query plan killed :: non-array path became multikey during yield: "
+                           "path="
+                        << field.path.fullPath());
+            }
             if (elt.element().isNull() && !field.isExprEq) {
                 // Use $eq equality semantics, which consider null & missing to be equal. We don't
                 // set this field in the doc when it is null, which results in us treating missing &
