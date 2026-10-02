@@ -8,6 +8,7 @@
 #include "mongo/db/extension/host_connector/adapter/host_services_adapter.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/host_services.h"
+#include "mongo/db/extension/sdk/test_extension_factory.h"
 #include "mongo/db/extension/sdk/tests/shared_test_stages.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_match.h"
@@ -78,6 +79,104 @@ TEST_F(DocumentSourceExtensionForQueryShapeTest,
 
     auto serialized = expandable->serialize(query_shape::SerializationOptions{});
     ASSERT_BSONOBJ_EQ(serialized.getDocument().toBson(), rawStage);
+}
+
+// -----------------------------------------------------------------------------
+// The host must reject extension stages whose query shape is not a single-field
+// {$stageName: ...} object because these shapes would otherwise be stored in the $queryStats store
+// and fail re-parse when later read back.
+// -----------------------------------------------------------------------------
+namespace {
+enum class StubShapeKind { kEmpty, kMultiField, kSingleField, kWrongName };
+
+class StubShapeParseNode
+    : public sdk::TestParseNode<sdk::shared_test_stages::TransformAggStageAstNode> {
+public:
+    StubShapeParseNode(std::string_view stageName,
+                       const mongo::BSONObj& arguments,
+                       StubShapeKind kind)
+        : sdk::TestParseNode<sdk::shared_test_stages::TransformAggStageAstNode>(stageName,
+                                                                                arguments),
+          _kind(kind) {}
+
+    mongo::BSONObj getQueryShape(const sdk::QueryShapeOptsHandle&) const override {
+        switch (_kind) {
+            case StubShapeKind::kEmpty:
+                return mongo::BSONObj();
+            case StubShapeKind::kMultiField:
+                return BSON("a" << 1 << "b" << 2);
+            case StubShapeKind::kSingleField:
+                return BSON(getName() << mongo::BSONObj());
+            case StubShapeKind::kWrongName:
+                return BSON("$other" << mongo::BSONObj());
+        }
+        MONGO_UNREACHABLE;
+    }
+
+    std::unique_ptr<sdk::AggStageParseNode> clone() const override {
+        return std::make_unique<StubShapeParseNode>(getName(), _arguments, _kind);
+    }
+
+private:
+    StubShapeKind _kind;
+};
+
+class StubShapeDescriptor
+    : public sdk::TestStageDescriptor<"$stubShape", StubShapeParseNode, false> {
+public:
+    explicit StubShapeDescriptor(StubShapeKind kind) : _kind(kind) {}
+
+    std::unique_ptr<sdk::AggStageParseNode> parse(mongo::BSONObj stageBson) const override {
+        auto arguments = sdk::validateStageDefinition(stageBson, kStageName, false);
+        return std::make_unique<StubShapeParseNode>(kStageName, arguments, _kind);
+    }
+
+private:
+    StubShapeKind _kind;
+};
+}  // namespace
+
+TEST_F(DocumentSourceExtensionForQueryShapeTest, RejectsEmptyExtensionQueryShape) {
+    sdk::ExtensionAggStageDescriptorAdapter descriptor{
+        std::make_unique<StubShapeDescriptor>(StubShapeKind::kEmpty)};
+    auto expandable = host::DocumentSourceExtensionForQueryShape::create(
+        getExpCtx(), BSON("$stubShape" << BSONObj()), AggStageDescriptorHandle(&descriptor));
+    ASSERT_THROWS_CODE(
+        expandable->serialize(query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions),
+        AssertionException,
+        13462501);
+}
+
+TEST_F(DocumentSourceExtensionForQueryShapeTest, RejectsMultiFieldExtensionQueryShape) {
+    sdk::ExtensionAggStageDescriptorAdapter descriptor{
+        std::make_unique<StubShapeDescriptor>(StubShapeKind::kMultiField)};
+    auto expandable = host::DocumentSourceExtensionForQueryShape::create(
+        getExpCtx(), BSON("$stubShape" << BSONObj()), AggStageDescriptorHandle(&descriptor));
+    ASSERT_THROWS_CODE(
+        expandable->serialize(query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions),
+        AssertionException,
+        13462501);
+}
+
+TEST_F(DocumentSourceExtensionForQueryShapeTest, RejectsWrongStageNameExtensionQueryShape) {
+    sdk::ExtensionAggStageDescriptorAdapter descriptor{
+        std::make_unique<StubShapeDescriptor>(StubShapeKind::kWrongName)};
+    auto expandable = host::DocumentSourceExtensionForQueryShape::create(
+        getExpCtx(), BSON("$stubShape" << BSONObj()), AggStageDescriptorHandle(&descriptor));
+    ASSERT_THROWS_CODE(
+        expandable->serialize(query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions),
+        AssertionException,
+        13462502);
+}
+
+TEST_F(DocumentSourceExtensionForQueryShapeTest, AcceptsSingleFieldExtensionQueryShape) {
+    sdk::ExtensionAggStageDescriptorAdapter descriptor{
+        std::make_unique<StubShapeDescriptor>(StubShapeKind::kSingleField)};
+    auto expandable = host::DocumentSourceExtensionForQueryShape::create(
+        getExpCtx(), BSON("$stubShape" << BSONObj()), AggStageDescriptorHandle(&descriptor));
+    auto serialized =
+        expandable->serialize(query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions);
+    ASSERT_EQ(serialized.getDocument().toBson().nFields(), 1);
 }
 
 }  // namespace mongo::extension

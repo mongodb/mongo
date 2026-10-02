@@ -436,7 +436,7 @@ public:
     }
 
     BSONObj getQueryShape(const sdk::QueryShapeOptsHandle&) const override {
-        return BSONObj();
+        return BSON(_name << BSONObj());
     }
 
     BSONObj toBsonForLog() const override {
@@ -480,7 +480,7 @@ public:
     }
 
     BSONObj getQueryShape(const sdk::QueryShapeOptsHandle&) const override {
-        return BSONObj();
+        return BSON(_name << _args);
     }
 
     BSONObj toBsonForLog() const override {

@@ -72,7 +72,7 @@ public:
     }
 
     mongo::BSONObj getQueryShape(const sdk::QueryShapeOptsHandle&) const override {
-        return mongo::BSONObj();
+        return BSON(_name << _arguments);
     }
 
     mongo::BSONObj toBsonForLog() const override {
