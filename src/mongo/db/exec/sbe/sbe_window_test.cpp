@@ -583,4 +583,96 @@ TEST_F(WindowStageTest, ClosedBeforeOpenWindowTest) {
 
     assertFinalMemoryTrackerState(&windowStage->getMemoryTracker(), true /*allowZeroInUseMemory*/);
 }
+
+TEST_F(WindowStageTest, RemoveExpressionResultIsOwned) {
+    auto ctx = makeCompileCtx();
+    const std::string firstValue(128, 'a');
+    const std::string secondValue(128, 'b');
+    auto [dataTag, dataVal] = stage_builder::makeValue(
+        BSON_ARRAY(BSON_ARRAY(1 << firstValue) << BSON_ARRAY(2 << secondValue)));
+    auto [slots, inputStage] = generateVirtualScanMulti(2, dataTag, dataVal);
+    auto boundSlot = slots[0];
+    auto valueSlot = slots[1];
+    auto boundTestingSlot = generateSlotId();
+    auto valueTestingSlot = generateSlotId();
+    auto windowSlot = generateSlotId();
+
+    WindowStage::Window window;
+    window.windowExprSlots.push_back(windowSlot);
+    window.lowBoundExpr = makeE<EPrimBinary>(
+        EPrimBinary::greaterEq, makeVariable(boundTestingSlot), makeVariable(boundSlot));
+    window.highBoundExpr = makeE<EPrimBinary>(
+        EPrimBinary::lessEq, makeVariable(boundTestingSlot), makeVariable(boundSlot));
+    window.initExprs.push_back(nullptr);
+    window.addExprs.push_back(makeVariable(valueSlot));
+    window.removeExprs.push_back(makeVariable(valueSlot));
+
+    std::vector<WindowStage::Window> windows;
+    windows.emplace_back(std::move(window));
+    auto windowStage = makeS<WindowStage>(std::move(inputStage),
+                                          value::SlotVector{boundSlot, valueSlot},
+                                          value::SlotVector{boundTestingSlot, valueTestingSlot},
+                                          0,
+                                          std::move(windows),
+                                          boost::none,
+                                          false,
+                                          kEmptyPlanNodeId);
+
+    prepareTree(ctx.get(), windowStage.get());
+    auto resultAccessor = windowStage->getAccessor(*ctx, windowSlot);
+    windowStage->open(false);
+
+    ASSERT_EQ(PlanState::ADVANCED, windowStage->getNext());
+    ASSERT_EQ(PlanState::ADVANCED, windowStage->getNext());
+    auto [resultTag, resultValue] = resultAccessor->getViewOfValue();
+    ASSERT_TRUE(value::isString(resultTag));
+    ASSERT_EQ(firstValue, value::getStringView(resultTag, resultValue));
+
+    windowStage->close();
+}
+
+TEST_F(WindowStageTest, InitExpressionResultIsOwned) {
+    auto ctx = makeCompileCtx();
+    const std::string firstValue(128, 'a');
+    const std::string secondValue(128, 'b');
+    auto [dataTag, dataVal] = stage_builder::makeValue(
+        BSON_ARRAY(BSON_ARRAY(1 << firstValue) << BSON_ARRAY(2 << secondValue)));
+    auto [slots, inputStage] = generateVirtualScanMulti(2, dataTag, dataVal);
+    auto boundSlot = slots[0];
+    auto valueSlot = slots[1];
+    auto boundTestingSlot = generateSlotId();
+    auto valueTestingSlot = generateSlotId();
+    auto windowSlot = generateSlotId();
+
+    WindowStage::Window window;
+    window.windowExprSlots.push_back(windowSlot);
+    window.highBoundExpr = makeE<EPrimBinary>(
+        EPrimBinary::lessEq, makeVariable(boundTestingSlot), makeVariable(boundSlot));
+    window.initExprs.push_back(makeVariable(valueSlot));
+    window.addExprs.push_back(nullptr);
+    window.removeExprs.push_back(nullptr);
+
+    std::vector<WindowStage::Window> windows;
+    windows.emplace_back(std::move(window));
+    auto windowStage = makeS<WindowStage>(std::move(inputStage),
+                                          value::SlotVector{boundSlot, valueSlot},
+                                          value::SlotVector{boundTestingSlot, valueTestingSlot},
+                                          0,
+                                          std::move(windows),
+                                          boost::none,
+                                          false,
+                                          kEmptyPlanNodeId);
+
+    prepareTree(ctx.get(), windowStage.get());
+    auto resultAccessor = windowStage->getAccessor(*ctx, windowSlot);
+    windowStage->open(false);
+
+    ASSERT_EQ(PlanState::ADVANCED, windowStage->getNext());
+    ASSERT_EQ(PlanState::ADVANCED, windowStage->getNext());
+    auto [resultTag, resultValue] = resultAccessor->getViewOfValue();
+    ASSERT_TRUE(value::isString(resultTag));
+    ASSERT_EQ(firstValue, value::getStringView(resultTag, resultValue));
+
+    windowStage->close();
+}
 }  // namespace mongo::sbe
