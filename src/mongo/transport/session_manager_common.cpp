@@ -14,6 +14,7 @@
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
+#include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/unordered_map.h"
@@ -23,6 +24,7 @@
 #include "mongo/transport/session_workflow.h"
 #include "mongo/transport/transport_options_gen.h"
 #include "mongo/util/clock_source.h"
+#include "mongo/util/net/connection_purpose.h"
 #include "mongo/util/observable_mutex.h"
 #include "mongo/util/observable_mutex_registry.h"
 #include "mongo/util/processinfo.h"
@@ -146,6 +148,14 @@ std::size_t getSupportedMax() {
     return supportedMax;
 }
 
+auto& peerEstablishedTimeGauge() {
+    static auto& gauge = otel::metrics::MetricsService::instance().createInt64Gauge<int64_t>(
+        otel::metrics::MetricNames::kReplicationPrimaryPeerEstablishedTime,
+        "Time at which the current session for this ID was established. Set to 0 if no session",
+        otel::metrics::MetricUnit::kMilliseconds,
+        replicationIdAttribute());
+    return gauge;
+}
 }  // namespace
 
 /**
@@ -487,6 +497,16 @@ void SessionManagerCommon::onClientDisconnect(Client* client) {
     if (session && session->isConnectedToPriorityPort()) {
         _prioritySessions.decrement();
     }
+    if (session) {
+        if (getConnectionPurpose(session.get()) != ConnectionPurpose::kReplication) {
+            return;
+        }
+        const auto id = getReplicationId(session.get());
+        invariant(id.has_value());
+        std::scoped_lock lock(_replicationPeerMutex);
+        _replicationPeerSlots.reset(id.value());
+        peerEstablishedTimeGauge().set(0, {id.value()});
+    }
 }
 
 bool SessionManagerCommon::isPrivileged(const Session& session) const {
@@ -495,4 +515,30 @@ bool SessionManagerCommon::isPrivileged(const Session& session) const {
         (maxIncomingConnsOverride && session.isExemptedByCIDRList(*maxIncomingConnsOverride));
 }
 
+void SessionManagerCommon::markReplicationSession(Client* client) {
+    auto& session = client->session();
+    if (!session) {
+        return;
+    }
+    auto& purpose = getConnectionPurpose(session.get());
+    if (purpose == ConnectionPurpose::kReplication) {
+        return;
+    }
+    purpose = ConnectionPurpose::kReplication;
+
+    std::scoped_lock lock(_replicationPeerMutex);
+    for (size_t i = 0; i < _replicationPeerSlots.size(); i++) {
+        if (!_replicationPeerSlots.test(i)) {
+            _replicationPeerSlots.set(i);
+            getReplicationId(session.get()) = i;
+            peerEstablishedTimeGauge().set(
+                _svcCtx->getFastClockSource()->now().toMillisSinceEpoch(), {i});
+            return;
+        }
+    }
+    LOGV2_WARNING(
+        13439300,
+        "All replication peer slots are full, unsetting connection purpose for marked session");
+    purpose = ConnectionPurpose::kDefault;
+}
 }  // namespace mongo::transport

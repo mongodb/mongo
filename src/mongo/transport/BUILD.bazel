@@ -332,6 +332,7 @@ mongo_cc_library(
         "//src/mongo/util:clock_sources",
         "//src/mongo/util:processinfo",
         "//src/mongo/util/concurrency:spin_lock",
+        "//src/mongo/util/net:connection_purpose",
         "//src/mongo/util/net:ssl_manager",
     ],
 )

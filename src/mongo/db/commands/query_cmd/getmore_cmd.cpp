@@ -68,6 +68,7 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/rpc/rewrite_state_change_errors.h"
+#include "mongo/transport/session_manager.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/decorable.h"
@@ -928,6 +929,11 @@ public:
             // oplog read request.
             boost::optional<ScopedAdmissionPriority<ExecutionAdmissionContext>> admissionPriority;
             if (cmd.getTerm() && nss == NamespaceString::kRsOplogNamespace) {
+                // only mark as replication if term is not dummy value
+                if (auto* sm = transport::SessionManager::get(opCtx->getClient());
+                    *cmd.getTerm() >= 0) {
+                    sm->markReplicationSession(opCtx->getClient());
+                }
                 // Validate term before acquiring locks.
                 auto replCoord = repl::ReplicationCoordinator::get(opCtx);
                 // Note: updateTerm returns ok if term stayed the same.

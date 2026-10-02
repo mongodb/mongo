@@ -46,6 +46,16 @@ NetworkCounter::NetworkCounter()
           MetricNames::kNetworkIngressBytesOut,
           "Total number of logical bytes sent to ingress (wire-protocol) clients.",
           MetricUnit::kBytes)),
+      _replicationPrimaryLogicalBytesOut(MetricsService::instance().createInt64Counter<int64_t>(
+          MetricNames::kReplicationPrimaryLogicalBytesOut,
+          "Total number of logical bytes sent to secondaries over replication connections",
+          MetricUnit::kBytes,
+          replicationIdAttribute())),
+      _replicationPrimaryPhysicalBytesOut(MetricsService::instance().createInt64Counter<int64_t>(
+          MetricNames::kReplicationPrimaryPhysicalBytesOut,
+          "Total number of physical bytes sent to secondaries over replication connections",
+          MetricUnit::kBytes,
+          replicationIdAttribute())),
       _egressLogicalBytesIn(MetricsService::instance().createInt64Counter(
           MetricNames::kNetworkEgressBytesIn,
           "Total number of logical bytes received on egress (outbound client) connections.",
@@ -96,8 +106,16 @@ void NetworkCounter::hitPhysicalIn(ConnectionType connectionType,
     }
 }
 
-void NetworkCounter::hitPhysicalOut(ConnectionType connectionType, long long bytes) {
+void NetworkCounter::hitPhysicalOut(ConnectionType connectionType,
+                                    long long bytes,
+                                    ConnectionPurpose connectionPurpose,
+                                    boost::optional<int64_t> replicationId) {
     static const int64_t MAX = 1ULL << 60;
+    if (connectionType == ConnectionType::kIngress &&
+        connectionPurpose == ConnectionPurpose::kReplication) {
+        invariant(replicationId.has_value());
+        _replicationPrimaryPhysicalBytesOut.add(bytes, {replicationId.value()});
+    }
     auto& ref = connectionType == ConnectionType::kIngress ? _ingressPhysicalBytesOut
                                                            : _egressPhysicalBytesOut;
 
@@ -129,8 +147,15 @@ void NetworkCounter::hitLogicalIn(ConnectionType connectionType,
     }
 }
 
-void NetworkCounter::hitLogicalOut(ConnectionType connectionType, long long bytes) {
+void NetworkCounter::hitLogicalOut(ConnectionType connectionType,
+                                   long long bytes,
+                                   ConnectionPurpose connectionPurpose,
+                                   boost::optional<int64_t> replicationId) {
     if (connectionType == ConnectionType::kIngress) {
+        if (connectionPurpose == ConnectionPurpose::kReplication) {
+            invariant(replicationId.has_value());
+            _replicationPrimaryLogicalBytesOut.add(bytes, {replicationId.value()});
+        }
         _ingressLogicalBytesOut.add(bytes);
     } else {
         _egressLogicalBytesOut.add(bytes);
@@ -166,11 +191,13 @@ void NetworkCounter::append(BSONObjBuilder& b) {
     egressBuilder.done();
 
     BSONObjBuilder replBuilder(b.subobjStart("repl"));
+
     BSONObjBuilder replSecondaryBuilder(replBuilder.subobjStart("secondary"));
     replSecondaryBuilder.append("physicalBytesIn",
                                 _replicationSecondaryPhysicalBytesIn.valueForLegacyUse());
     replSecondaryBuilder.append("bytesIn", _replicationSecondaryLogicalBytesIn.valueForLegacyUse());
     replSecondaryBuilder.done();
+
     replBuilder.done();
 
     b.append("numSlowDNSOperations", _numSlowDNSOperations.valueForLegacyUse());

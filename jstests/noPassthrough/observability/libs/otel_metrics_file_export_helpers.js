@@ -181,13 +181,20 @@ export function getLatestMetrics(directory) {
     return result;
 }
 
+/** Returns an attribute value as a string, no matter the underlying type. */
+function attributeValueToString(value) {
+    return value?.stringValue ?? value?.intValue;
+}
+
 /**
  * Returns true if the data point's attributes include `{attrKey: attrValue}`.
  */
 function dataPointHasAttribute(dp, attrKey, attrValue) {
     return (
         attrKey == null ||
-        (dp.attributes ?? []).some((a) => a.key === attrKey && a.value?.stringValue === attrValue)
+        (dp.attributes ?? []).some(
+            (a) => a.key === attrKey && attributeValueToString(a.value) === String(attrValue),
+        )
     );
 }
 

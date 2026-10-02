@@ -5,6 +5,7 @@
 
 #include "mongo/base/counter.h"
 #include "mongo/db/client.h"
+#include "mongo/db/repl/repl_set_config.h"
 #include "mongo/transport/client_transport_observer.h"
 #include "mongo/transport/session_manager.h"
 #include "mongo/util/cancellation.h"
@@ -58,6 +59,8 @@ public:
     std::vector<std::pair<SessionId, std::string>> getOpenSessionIDs() const override;
 
     virtual SessionStats getSessionStats() const;
+
+    void markReplicationSession(Client* client) override;
 
     void onLoadBalancerPeerSet(bool isLoadBalancerPeer) override;
 
@@ -118,6 +121,12 @@ protected:
     // External observer which may receive client connect/disconnect events.
     std::vector<std::shared_ptr<ClientTransportObserver>> _observers;
     CancellationSource _shutdownSource;
+
+    // Protects the bitset of replication peers.
+    std::mutex _replicationPeerMutex;
+    // This bitset keeps track of which peer IDs are currently in use. These IDs are used to
+    // distinguish replication sessions for metrics purposes
+    std::bitset<repl::ReplSetConfig::kMaxMembers> _replicationPeerSlots;
 };
 
 /**

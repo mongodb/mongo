@@ -30,6 +30,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
+        "//src/mongo/otel/metrics:metrics_attributes",
     ],
 )
 

@@ -71,6 +71,30 @@ TEST(NetworkCounterOtelTest, ReplicationEgressCountersAreExported) {
     EXPECT_EQ(1, capturer.readInt64Counter(MetricNames::kNetworkEgressNumRequests));
 }
 
+TEST(NetworkCounterOtelTest, ReplicationIngressCountersAreExported) {
+    OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        GTEST_SKIP() << "OTel not available";
+    }
+
+    NetworkCounter nc;
+
+    nc.hitLogicalOut(
+        NetworkCounter::ConnectionType::kIngress, 200, ConnectionPurpose::kReplication, 0);
+
+    EXPECT_EQ(200,
+              capturer.readInt64Counter(MetricNames::kReplicationPrimaryLogicalBytesOut,
+                                        std::make_tuple(int64_t{0})));
+    // replication metrics should still be counted towards total
+    EXPECT_EQ(200, capturer.readInt64Counter(MetricNames::kNetworkIngressBytesOut));
+
+    nc.hitPhysicalOut(
+        NetworkCounter::ConnectionType::kIngress, 200, ConnectionPurpose::kReplication, 0);
+    EXPECT_EQ(200,
+              capturer.readInt64Counter(MetricNames::kReplicationPrimaryPhysicalBytesOut,
+                                        std::make_tuple(int64_t{0})));
+}
+
 TEST(NetworkCounterOtelTest, EgressCountersAreExported) {
     OtelMetricsCapturer capturer;
     if (!capturer.canReadMetrics()) {

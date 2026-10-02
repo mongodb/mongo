@@ -336,7 +336,8 @@ Future<void> CommonAsioSession::sinkMessageImpl(Message message, const BatonHand
         .then([this, message /*keep the buffer alive*/]() {
             auto connectionType = isIngress() ? NetworkCounter::ConnectionType::kIngress
                                               : NetworkCounter::ConnectionType::kEgress;
-            globalNetworkCounter().hitPhysicalOut(connectionType, message.size());
+            globalNetworkCounter().hitPhysicalOut(
+                connectionType, message.size(), getConnectionPurpose(this), getReplicationId(this));
         })
         .onCompletion([this](Status status) {
             _asyncOpState.complete();

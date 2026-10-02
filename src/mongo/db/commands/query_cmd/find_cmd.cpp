@@ -106,6 +106,7 @@
 #include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/query_analysis_sampler_util.h"
 #include "mongo/transport/session.h"
+#include "mongo/transport/session_manager.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
@@ -652,6 +653,10 @@ public:
             // oplog read request.
             boost::optional<ScopedAdmissionPriority<ExecutionAdmissionContext>> admissionPriority;
             if (term && isOplogNss) {
+                // only mark as replication if term is not dummy value
+                if (auto* sm = transport::SessionManager::get(opCtx->getClient()); *term >= 0) {
+                    sm->markReplicationSession(opCtx->getClient());
+                }
                 if (MONGO_unlikely(hangBeforeFetcherFindCommandOnOplog.shouldFail())) {
                     LOGV2(10616500,
                           "Hit hangBeforeFetcherFindCommandOnOplog enabled, hanging while set");

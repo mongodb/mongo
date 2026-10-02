@@ -6,6 +6,11 @@
  */
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {
+    awaitMetrics,
+    getCounterByAttribute,
+    otelFileExportParams,
+} from "jstests/noPassthrough/observability/libs/otel_metrics_file_export_helpers.js";
 
 const kPayloadSize = 1024;
 
@@ -13,10 +18,16 @@ describe("replication-specific network metrics", function () {
     let rs;
     let primary;
     let secondary;
+    let metricsDir;
 
     before(function () {
+        const {metricsDir: dir, otelParams} = otelFileExportParams(jsTestName());
+        metricsDir = dir;
+
         // Setup replication test, two nodes, one default (primary), and one that can never become the primary
-        rs = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0}}]});
+        rs = new ReplSetTest({
+            nodes: [{setParameter: otelParams}, {rsConfig: {priority: 0}}],
+        });
         rs.startSet();
         rs.initiate();
         // Block until set is fully operational
@@ -31,7 +42,7 @@ describe("replication-specific network metrics", function () {
         }
     });
 
-    describe("records bytes sent over replication connections", function () {
+    describe("records bytes served as secondary over replication connections", function () {
         let initialLogicalBytes, finalLogicalBytes;
         let initialPhysicalBytes, finalPhysicalBytes;
         let initialEgressBytes, finalEgressBytes;
@@ -87,6 +98,75 @@ describe("replication-specific network metrics", function () {
             );
         });
 
+        after(function () {
+            assert.commandWorked(primary.getDB("test").dropDatabase());
+        });
+    });
+
+    describe("records bytes served as source over replication connections", function () {
+        const kSourceLogicalOut = "mongodb.network.repl.source.bytes_out";
+        const kSourcePhysicalOut = "mongodb.network.repl.source.physical_bytes_out";
+
+        const getLogicalOut = () =>
+            getCounterByAttribute(metricsDir, kSourceLogicalOut, "peer_id", 0);
+        const getPhysicalOut = () =>
+            getCounterByAttribute(metricsDir, kSourcePhysicalOut, "peer_id", 0);
+        let initialLogicalBytes, finalLogicalBytes;
+        let initialPhysicalBytes, finalPhysicalBytes;
+        let initialIngressBytes, finalIngressBytes;
+
+        before(function () {
+            initialLogicalBytes = getLogicalOut();
+            initialPhysicalBytes = getPhysicalOut();
+            initialIngressBytes = assert.commandWorked(primary.adminCommand({serverStatus: 1}))
+                .network.bytesOut;
+
+            assert.commandWorked(
+                primary
+                    .getDB("test")
+                    .foo.insert(
+                        {_id: 1, payload: "a".repeat(kPayloadSize)},
+                        {writeConcern: {w: 2}},
+                    ),
+            );
+
+            assert.soon(
+                () =>
+                    getLogicalOut() - initialLogicalBytes >= kPayloadSize &&
+                    getPhysicalOut() > initialPhysicalBytes,
+                () =>
+                    `logical ${getLogicalOut()} (initial ${initialLogicalBytes}), physical ${getPhysicalOut()} (initial ${initialPhysicalBytes})`,
+            );
+
+            finalLogicalBytes = getLogicalOut();
+            finalPhysicalBytes = getPhysicalOut();
+            finalIngressBytes = assert.commandWorked(primary.adminCommand({serverStatus: 1}))
+                .network.bytesOut;
+        });
+
+        it("increments logical byte counter", function () {
+            assert.gte(
+                finalLogicalBytes - kPayloadSize,
+                initialLogicalBytes,
+                "Primary should have incremented logical byte counter",
+            );
+        });
+
+        it("increments physical byte counter", function () {
+            assert.gt(
+                finalPhysicalBytes,
+                initialPhysicalBytes,
+                "Primary should have incremented physical byte counter",
+            );
+        });
+
+        it("increments normal ingress byte counter", function () {
+            assert.gte(
+                finalIngressBytes - kPayloadSize,
+                initialIngressBytes,
+                "Replication traffic should be counted in normal ingress counters as well",
+            );
+        });
         after(function () {
             assert.commandWorked(primary.getDB("test").dropDatabase());
         });

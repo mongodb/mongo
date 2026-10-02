@@ -185,6 +185,7 @@ mongo_cc_library(
         "//src/mongo/db/storage:index_entry_comparison",
         "//src/mongo/otel/metrics:otel_metrics_service",
         "//src/mongo/util/concurrency:spin_lock",
+        "//src/mongo/util/net:connection_purpose",
     ],
 )
 

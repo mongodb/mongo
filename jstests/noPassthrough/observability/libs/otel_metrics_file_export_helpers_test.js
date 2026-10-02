@@ -9,6 +9,7 @@ import {describe, it} from "jstests/libs/mochalite.js";
 import {
     extractPrometheusMetricIntValue,
     extractPrometheusMetricTime,
+    getCounterByAttribute,
     getHistogramByAttributeAcrossFiles,
     getLatestMetrics,
     getLatestRawRecord,
@@ -708,5 +709,43 @@ describe("extractPrometheusMetricTime", function () {
             extractPrometheusMetricTime(/*metricsText=*/ "target_info{} 99 1700000055555\n"),
             1700000055555,
         );
+    });
+});
+
+describe("getCounterByAttribute", function () {
+    function makeAttributeDataPoint(value, attributes) {
+        return {...makeDataPoint(value, kTime1Ms), attributes};
+    }
+
+    function writeCounter(dir, dataPoints) {
+        writeMetricsFile(dir, "attributes-metrics.jsonl", [
+            makeRecord([makeSumMetric("counter", dataPoints)]),
+        ]);
+    }
+
+    it("matches a string-valued attribute", function () {
+        const dir = createTestDir("string_attribute");
+        writeCounter(dir, [
+            makeAttributeDataPoint(1, [{key: "foo", value: {stringValue: "bar"}}]),
+            makeAttributeDataPoint(2, [{key: "foo", value: {stringValue: "baz"}}]),
+        ]);
+        assert.eq(getCounterByAttribute(dir, "counter", "foo", "bar"), 1);
+        assert.eq(getCounterByAttribute(dir, "counter", "foo", "baz"), 2);
+    });
+
+    it("matches an int-valued attribute when passed a number", function () {
+        const dir = createTestDir("int_attribute_number");
+        writeCounter(dir, [
+            makeAttributeDataPoint(1, [{key: "id", value: {intValue: "0"}}]),
+            makeAttributeDataPoint(2, [{key: "id", value: {intValue: "1"}}]),
+        ]);
+        assert.eq(getCounterByAttribute(dir, "counter", "id", 0), 1);
+        assert.eq(getCounterByAttribute(dir, "counter", "id", 1), 2);
+    });
+
+    it("matches an int-valued attribute when passed a string", function () {
+        const dir = createTestDir("int_attribute_string");
+        writeCounter(dir, [makeAttributeDataPoint(3, [{key: "id", value: {intValue: "2"}}])]);
+        assert.eq(getCounterByAttribute(dir, "counter", "id", "2"), 3);
     });
 });

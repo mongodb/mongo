@@ -38,6 +38,19 @@ protected:
     SessionManager() = default;
 
 public:
+    static SessionManager* get(Client* client) {
+        if (client) {
+            if (const auto& session = client->session()) {
+                if (const auto tl = session->getTransportLayer()) {
+                    if (const auto sm = tl->getSessionManager()) {
+                        return sm;
+                    }
+                }
+            }
+        }
+        return nullptr;
+    }
+
     virtual ~SessionManager() = default;
 
     /**
@@ -122,6 +135,12 @@ public:
      * the number of sessions on the loadBalancer port accordingly.
      */
     virtual void onLoadBalancerPeerSet(bool isLoadBalancerPeer) = 0;
+
+    /**
+     * Permanently marks this session as for replication, which only affects how it reports metrics.
+     * Should be called as soon as ingress sessions are identified as for replication.
+     */
+    virtual void markReplicationSession(Client* client) {}
 
     HelloMetrics helloMetrics;
     BackpressureConnectionMetrics backpressureConnectionMetrics;

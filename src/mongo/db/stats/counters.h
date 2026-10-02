@@ -51,7 +51,10 @@ public:
     void hitPhysicalIn(ConnectionType connectionType,
                        long long bytes,
                        ConnectionPurpose connectionPurpose = ConnectionPurpose::kDefault);
-    void hitPhysicalOut(ConnectionType connectionType, long long bytes);
+    void hitPhysicalOut(ConnectionType connectionType,
+                        long long bytes,
+                        ConnectionPurpose connectionPurpose = ConnectionPurpose::kDefault,
+                        boost::optional<int64_t> replicationId = boost::none);
 
     // Increment the counters for the number of bytes passed out of the TransportLayer to the
     // server
@@ -59,7 +62,10 @@ public:
     void hitLogicalIn(ConnectionType connectionType,
                       long long bytes,
                       ConnectionPurpose connectionPurpose = ConnectionPurpose::kDefault);
-    void hitLogicalOut(ConnectionType connectionType, long long bytes);
+    void hitLogicalOut(ConnectionType connectionType,
+                       long long bytes,
+                       ConnectionPurpose connectionPurpose = ConnectionPurpose::kDefault,
+                       boost::optional<int64_t> replicationId = boost::none);
 
     // Increment the counter for the number of slow dns resolution operations.
     void incrementNumSlowDNSOperations();
@@ -98,6 +104,8 @@ private:
     otel::metrics::Counter<int64_t>& _ingressLogicalBytesIn;
     otel::metrics::Counter<int64_t>& _ingressNumRequests;
     otel::metrics::Counter<int64_t>& _ingressLogicalBytesOut;
+    otel::metrics::Counter<int64_t, int64_t>& _replicationPrimaryLogicalBytesOut;
+    otel::metrics::Counter<int64_t, int64_t>& _replicationPrimaryPhysicalBytesOut;
 
     // Logical egress counters.
     otel::metrics::Counter<int64_t>& _egressLogicalBytesIn;

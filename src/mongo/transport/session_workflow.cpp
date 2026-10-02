@@ -998,7 +998,10 @@ void SessionWorkflow::Impl::_acceptResponse(DbResponse response) {
     // the dbresponses continue to indicate the exhaust stream should continue.
     _nextWork = work.synthesizeExhaust(response);
 
-    globalNetworkCounter().hitLogicalOut(NetworkCounter::ConnectionType::kIngress, toSink.size());
+    globalNetworkCounter().hitLogicalOut(NetworkCounter::ConnectionType::kIngress,
+                                         toSink.size(),
+                                         getConnectionPurpose(session().get()),
+                                         getReplicationId(session().get()));
 
     beforeCompressingExhaustResponse.executeIf(
         [&](auto&&) {}, [&](auto&&) { return work.hasCompressorId() && _nextWork; });

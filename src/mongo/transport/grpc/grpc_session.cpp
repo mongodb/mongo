@@ -153,7 +153,8 @@ IngressSession::~IngressSession() {
 StatusWith<Message> IngressSession::_readFromStream() {
     if (auto maybeBuffer = _stream->read()) {
         globalNetworkCounter().hitPhysicalIn(NetworkCounter::ConnectionType::kIngress,
-                                             MsgData::ConstView(maybeBuffer->get()).getLen());
+                                             MsgData::ConstView(maybeBuffer->get()).getLen(),
+                                             getConnectionPurpose(this));
         return Message(std::move(*maybeBuffer));
     }
 
@@ -170,7 +171,9 @@ StatusWith<Message> IngressSession::_readFromStream() {
 Status IngressSession::_writeToStream(Message message) {
     if (_stream->write(message.sharedBuffer())) {
         globalNetworkCounter().hitPhysicalOut(NetworkCounter::ConnectionType::kIngress,
-                                              message.size());
+                                              message.size(),
+                                              getConnectionPurpose(this),
+                                              getReplicationId(this));
         return Status::OK();
     }
 
@@ -270,7 +273,8 @@ Future<Message> EgressSession::_asyncReadFromStream() {
         .then([this, msg = std::move(msg)]() {
             _updateWireVersion();
             globalNetworkCounter().hitPhysicalIn(NetworkCounter::ConnectionType::kEgress,
-                                                 MsgData::ConstView(msg->get()).getLen());
+                                                 MsgData::ConstView(msg->get()).getLen(),
+                                                 getConnectionPurpose(this));
             return Message(std::move(*msg));
         });
 }
@@ -293,8 +297,11 @@ Future<void> EgressSession::_asyncWriteToStream(Message message) {
                     : termStatus;
             });
         })
-        .then([msgLen]() {
-            globalNetworkCounter().hitPhysicalOut(NetworkCounter::ConnectionType::kEgress, msgLen);
+        .then([msgLen, this]() {
+            globalNetworkCounter().hitPhysicalOut(NetworkCounter::ConnectionType::kEgress,
+                                                  msgLen,
+                                                  getConnectionPurpose(this),
+                                                  getReplicationId(this));
         });
 }
 
