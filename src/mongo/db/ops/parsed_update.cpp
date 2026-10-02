@@ -134,7 +134,12 @@ Status ParsedUpdate::parseQueryToCQ() {
     // projection during canonicalization.
     auto findCommand = std::make_unique<FindCommandRequest>(_request->getNamespaceString());
     findCommand->setFilter(_request->getQuery());
-    findCommand->setSort(_request->getSort());
+    // The plan cache retains this sort past the request, so it must be owned. The empty case
+    // is skipped because 'getSort()' returns a static unowned empty BSONObj that getOwned()
+    // would copy.
+    if (const auto& sort = _request->getSort(); !sort.isEmpty()) {
+        findCommand->setSort(sort.getOwned());
+    }
     findCommand->setHint(_request->getHint());
 
     // We get the collation off the ExpressionContext because it may contain a collection-default

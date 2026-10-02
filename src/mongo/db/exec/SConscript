@@ -137,6 +137,7 @@ env.CppUnitTest(
         "projection_executor_test.cpp",
         "projection_executor_utils_test.cpp",
         "projection_executor_wildcard_access_test.cpp",
+        "plan_stats_test.cpp",
         "queued_data_stage_test.cpp",
         "sort_test.cpp",
         "working_set_test.cpp",

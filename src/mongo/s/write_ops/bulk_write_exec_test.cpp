@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/idl/idl_parser.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog_cache_test_fixture.h"
@@ -611,6 +612,38 @@ TEST_F(BulkWriteExecTest, CollectionDroppedBeforeRefreshingTargeters) {
 // TODO(SERVER-72790): Test refreshing targeters on stale config errors, including the case where
 // NoProgressMade is returned if stale config retry doesn't make any progress after
 // kMaxRoundsWithoutProgress.
+
+// Pins the IDL declaration of BulkWriteUpdateOp's 'sort' as 'object_owned' - this fails if it is
+// changed back to 'object'. The parsed sort outlives the BSON it came from: it reaches
+// 'MergeSortStats::sortPattern', which the plan cache retains in its debug info and
+// $planCacheStats serializes later.
+TEST(BulkWriteExecTest, UpdateSortIsOwned) {
+    const BSONObj sort = BSON("c" << 1);
+
+    // Parse inside a lambda so that 'cmd', and the buffer it owns, is destroyed before the parsed
+    // request is inspected.
+    auto request = [&] {
+        BSONObj cmd = BSON("bulkWrite"
+                           << 1 << "ops"
+                           << BSON_ARRAY(BSON("update"
+                                              << 0 << "filter" << BSON("x" << 1) << "updateMods"
+                                              << BSON("$inc" << BSON("x" << 1)) << "sort" << sort))
+                           << "nsInfo"
+                           << BSON_ARRAY(BSON("ns"
+                                              << "test.foo"))
+                           << "$db"
+                           << "admin");
+        return BulkWriteCommandRequest::parse(IDLParserContext{"bulkWrite"}, cmd);
+    }();
+
+    // BulkWriteCRUDOp is the idiomatic accessor for the ops variant on this branch.
+    const BulkWriteCRUDOp op(request.getOps()[0]);
+    ASSERT_EQ(op.getType(), BulkWriteCRUDOp::kUpdate);
+    const auto* updateOp = op.getUpdate();
+    ASSERT(updateOp->getSort());
+    ASSERT_TRUE(updateOp->getSort()->isOwned());
+    ASSERT_BSONOBJ_EQ(*updateOp->getSort(), sort);
+}
 
 }  // namespace
 
