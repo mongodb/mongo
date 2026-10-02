@@ -34,6 +34,7 @@ RESMOKE_FUNCS = frozenset(
     {
         "run tests",
         "run tests with aws credentials",
+        "run disagg tests with format matrix credentials",
         GEN_TASK_FUNC,
         "run benchmark tests",
         "run streams tests",
