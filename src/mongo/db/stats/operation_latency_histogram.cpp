@@ -246,6 +246,7 @@ void appendHistograms(HistogramsType& histograms,
                       bool slowMSBucketsOnly,
                       bool includeEmptyBuckets,
                       int logBucketScalingFactor,
+                      bool includeTransactions,
                       BSONObjBuilder& builder) {
     static_assert(static_cast<int>(Command::ReadWriteType::kCommand) == 0);
     static_assert(static_cast<int>(Command::ReadWriteType::kRead) == 1);
@@ -256,6 +257,10 @@ void appendHistograms(HistogramsType& histograms,
         kNames = {"commands"sv, "reads"sv, "writes"sv, "transactions"sv};
 
     for (size_t i = 0; i < kNames.size(); ++i) {
+        if (!includeTransactions &&
+            i == static_cast<size_t>(Command::ReadWriteType::kTransaction)) {
+            continue;
+        }
         appendHistogram(histograms[i],
                         kNames[i],
                         includeHistograms,
@@ -286,7 +291,8 @@ std::vector<double> makeOperationLatencyBucketBoundaries() {
 
 OperationLatencyHistogram::OperationLatencyHistogram(const Options& options)
     : _includeEmptyBuckets(options.includeEmptyBuckets),
-      _logBucketScalingFactor(options.logBucketScalingFactor) {}
+      _logBucketScalingFactor(options.logBucketScalingFactor),
+      _includeTransactions(options.includeTransactions) {}
 
 void OperationLatencyHistogram::increment(uint64_t latency,
                                           Command::ReadWriteType type,
@@ -302,12 +308,14 @@ void OperationLatencyHistogram::append(bool includeHistograms,
                      slowMSBucketsOnly,
                      _includeEmptyBuckets,
                      _logBucketScalingFactor,
+                     _includeTransactions,
                      *builder);
 }
 
 AtomicOperationLatencyHistogram::AtomicOperationLatencyHistogram(const Options& options)
     : _includeEmptyBuckets(options.includeEmptyBuckets),
-      _logBucketScalingFactor(options.logBucketScalingFactor) {}
+      _logBucketScalingFactor(options.logBucketScalingFactor),
+      _includeTransactions(options.includeTransactions) {}
 
 void AtomicOperationLatencyHistogram::increment(uint64_t latency,
                                                 Command::ReadWriteType type,
@@ -323,6 +331,7 @@ void AtomicOperationLatencyHistogram::append(bool includeHistograms,
                      slowMSBucketsOnly,
                      _includeEmptyBuckets,
                      _logBucketScalingFactor,
+                     _includeTransactions,
                      *builder);
 }
 

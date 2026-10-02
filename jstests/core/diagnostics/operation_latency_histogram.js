@@ -30,6 +30,10 @@
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {assertHistogramDiffEq, getHistogramStats} from "jstests/libs/stats.js";
 
+const isMultiversion =
+    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
+    Boolean(TestData.multiversionBinVersion);
+
 const dbName = "operationalLatencyHistogramTest";
 // Skipping the collection from dbcheck during the test.
 const collName = dbName + "_coll_temp";
@@ -60,6 +64,12 @@ let histogramTypes = ["reads", "writes", "commands"];
 
 assert(stats.hasOwnProperty("localTime"));
 assert(stats.hasOwnProperty("latencyStats"));
+// Older binaries still report the per-collection transactions bucket.
+if (!isMultiversion) {
+    assert(!stats.latencyStats.hasOwnProperty("transactions"), "unexpected transactions bucket", {
+        stats,
+    });
+}
 
 histogramTypes.forEach(function (key) {
     assert(stats.latencyStats.hasOwnProperty(key));

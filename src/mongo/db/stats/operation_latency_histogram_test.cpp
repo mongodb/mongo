@@ -48,6 +48,20 @@ TEST(OperationLatencyHistogram, EnsureIncrementsStored) {
     ASSERT_TRUE(out["transactions"]["latencies"].eoo());
 }
 
+TEST(AtomicOperationLatencyHistogram, ExcludeTransactionsWhenRequested) {
+    AtomicOperationLatencyHistogram hist({.includeTransactions = false});
+    hist.increment(100, Command::ReadWriteType::kTransaction, false);
+
+    BSONObjBuilder outBuilder;
+    hist.append(false, false, &outBuilder);
+    BSONObj out = outBuilder.done();
+
+    ASSERT_FALSE(out.hasField("transactions"));
+    ASSERT_TRUE(out.hasField("reads"));
+    ASSERT_TRUE(out.hasField("writes"));
+    ASSERT_TRUE(out.hasField("commands"));
+}
+
 TEST(OperationLatencyHistogram, CheckBucketCountsAndTotalLatency) {
     OperationLatencyHistogram hist;
     // Increment at the boundary, boundary+1, and boundary-1.

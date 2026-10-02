@@ -108,7 +108,8 @@ public:
         UsageData remove;
         UsageData commands;
 
-        AtomicOperationLatencyHistogram opLatencyHistogram;
+        // Per-collection transaction stats are not populated, so omit the empty transaction bucket.
+        AtomicOperationLatencyHistogram opLatencyHistogram{{.includeTransactions = false}};
 
         // Sticky: once any op sets this false, it stays false. See updateCollectionData()
         // for why a relaxed read-then-conditional-store is safe.

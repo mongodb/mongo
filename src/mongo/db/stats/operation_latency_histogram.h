@@ -51,6 +51,12 @@ struct OperationLatencyHistogramOptions {
      * the number of fields added when calling `append`. This should always be at least 1.
      */
     int logBucketScalingFactor = 1;
+
+    /*
+     * If false, the `transactions` histogram is excluded when calling `append`. This is useful for
+     * instances that never record transactions.
+     */
+    bool includeTransactions = true;
 };
 
 /**
@@ -75,8 +81,8 @@ public:
     void increment(uint64_t latency, Command::ReadWriteType type, bool isQueryableEncryptionOp);
 
     /**
-     * Appends the four histograms with latency totals and operation counts. If `slowMSBucketsOnly`
-     * is true, values above `slowMSBucketsOnly` are aggregated into a single bucket. The recorded
+     * Appends the histograms with latency totals and operation counts. If `slowMSBucketsOnly` is
+     * true, values above `slowMSBucketsOnly` are aggregated into a single bucket. The recorded
      * value of this bucket won't be exactly `slowMSBucketsOnly` but will be the smallest available
      * bucket threshold above it.
      */
@@ -85,6 +91,7 @@ public:
 private:
     bool _includeEmptyBuckets;
     int _logBucketScalingFactor;
+    bool _includeTransactions;
     std::array<HistogramType, operation_latency_histogram_details::kHistogramsCount> _histograms;
 };
 
@@ -101,6 +108,7 @@ public:
 private:
     bool _includeEmptyBuckets;
     int _logBucketScalingFactor;
+    bool _includeTransactions;
     std::array<HistogramType, operation_latency_histogram_details::kHistogramsCount> _histograms;
 };
 }  // namespace mongo
