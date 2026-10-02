@@ -356,7 +356,7 @@ void PlanEnumeratorContext::enumerateJoinSubsets() {
     }
 
     // Log each subset separately to avoid logging too much in one line.
-    if (logv2::shouldLog(logv2::LogComponent::kQuery, logv2::LogSeverity::Debug(5))) {
+    if (logv2::shouldLog(logv2::LogComponent::kQueryJoin, logv2::LogSeverity::Debug(5))) {
         for (size_t level = 0; level < _joinSubsets.size(); level++) {
             for (auto&& subset : _joinSubsets[level]) {
                 LOGV2_DEBUG(13200900,
