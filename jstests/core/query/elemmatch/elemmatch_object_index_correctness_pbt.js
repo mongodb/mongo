@@ -17,7 +17,6 @@
  * exclude_from_timeseries_crud_passthrough,
  * ]
  */
-import {isFCVgte} from "jstests/libs/feature_compatibility_version.js";
 import {getDifferentlyShapedQueries} from "jstests/libs/property_test_helpers/common_properties.js";
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
 import {
@@ -127,13 +126,9 @@ jsTest.log.info("$elemMatch index coverage", {
     numQueries,
 });
 assert.gt(numQueries, 0, "no $elemMatch query was generated");
-// Checked here rather than with a requires_fcv_83 tag, because that tag would also stop this test
-// from running in the FCV upgrade and downgrade passthroughs.
-if (isFCVgte(db, "8.3")) {
-    assert.gte(
-        numQueriesWithIndexedPlan / numQueries,
-        minIndexedPlanRatio,
-        "too few $elemMatch queries had an index plan available",
-        {numQueriesWithIndexedPlan, numQueries, minIndexedPlanRatio},
-    );
-}
+assert.gte(
+    numQueriesWithIndexedPlan / numQueries,
+    minIndexedPlanRatio,
+    "too few $elemMatch queries had an index plan available",
+    {numQueriesWithIndexedPlan, numQueries, minIndexedPlanRatio},
+);

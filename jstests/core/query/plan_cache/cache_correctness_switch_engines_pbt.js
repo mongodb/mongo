@@ -17,7 +17,6 @@
  * multiversion_incompatible
  * ]
  */
-import {isFCVgte} from "jstests/libs/feature_compatibility_version.js";
 import {createCorrectnessProperty} from "jstests/libs/property_test_helpers/common_properties.js";
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
 import {
@@ -34,8 +33,6 @@ if (isSlowBuild(db)) {
     jsTest.log.info("Returning early because debug is on, opt is off, or a sanitizer is enabled.");
     quit();
 }
-
-const is83orAbove = isFCVgte(db, "8.3");
 
 const numRuns = 15;
 const numQueriesPerRun = 25;
@@ -69,7 +66,7 @@ const projectRequiredFields = {$project: {_id: 0, a: 1, b: 1}};
 
 const classicAndSbeQueryPairArb = fc
     .record({
-        prefixFamily: findLayerOnlyPipeline({is83orAbove}),
+        prefixFamily: findLayerOnlyPipeline(),
         runClassicFirst: fc.boolean(),
     })
     .map(({prefixFamily, runClassicFirst}) => {

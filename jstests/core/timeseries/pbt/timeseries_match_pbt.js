@@ -12,7 +12,6 @@
  * ]
  */
 
-import {isFCVgte} from "jstests/libs/feature_compatibility_version.js";
 import {createCorrectnessProperty} from "jstests/libs/property_test_helpers/common_properties.js";
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
 import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workload_models.js";
@@ -25,8 +24,6 @@ if (isSlowBuild(db)) {
     quit();
 }
 
-const is83orAbove = isFCVgte(db, "8.3");
-
 const numRuns = 40;
 const numQueriesPerRun = 40;
 
@@ -34,7 +31,7 @@ const controlColl = db[`${jsTestName()}_control`];
 const experimentColl = db[`${jsTestName()}_experiment`];
 
 const correctnessProperty = createCorrectnessProperty(controlColl, experimentColl);
-const aggModel = matchFirstStageAggModel({isTS: true, is83orAbove: is83orAbove});
+const aggModel = matchFirstStageAggModel({isTS: true});
 
 testProperty(
     correctnessProperty,

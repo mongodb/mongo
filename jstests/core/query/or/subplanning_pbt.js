@@ -13,7 +13,6 @@
  * requires_getmore,
  * ]
  */
-import {isFCVgte} from "jstests/libs/feature_compatibility_version.js";
 import {createCacheCorrectnessProperty} from "jstests/libs/property_test_helpers/common_properties.js";
 import {topLevelOrAggModel} from "jstests/libs/property_test_helpers/common_models.js";
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
@@ -26,8 +25,6 @@ if (isSlowBuild(db)) {
     quit();
 }
 
-const is83orAbove = isFCVgte(db, "8.3");
-
 const numRuns = 15;
 const numQueriesPerRun = 20;
 
@@ -38,7 +35,7 @@ const experimentColl = db.subplanning_pbt_experiment;
 // cache.
 const correctnessProperty = createCacheCorrectnessProperty(controlColl, experimentColl);
 
-const aggModel = topLevelOrAggModel({is83orAbove: is83orAbove});
+const aggModel = topLevelOrAggModel();
 
 // Test with a regular collection.
 testProperty(

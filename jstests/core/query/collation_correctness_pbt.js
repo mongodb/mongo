@@ -10,7 +10,6 @@
  * ]
  */
 
-import {isFCVgte} from "jstests/libs/feature_compatibility_version.js";
 import {getQueryAndOptionsModel} from "jstests/libs/property_test_helpers/models/query_models.js";
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
 import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workload_models.js";
@@ -34,8 +33,6 @@ if (isSlowBuild(db)) {
     quit();
 }
 
-const is83orAbove = isFCVgte(db, "8.3");
-
 const numRuns = 40;
 const numQueriesPerRun = 40;
 
@@ -56,13 +53,7 @@ const allowedStages = [
     addFieldsVarArb,
     getSortArb(),
 ];
-const aggModel = getQueryAndOptionsModel({
-    allowCollation: true,
-    allowedStages: allowedStages,
-}).filter(
-    // Older versions suffer from SERVER-101007
-    ({pipeline}) => is83orAbove || !JSON.stringify(pipeline).includes('"$elemMatch"'),
-);
+const aggModel = getQueryAndOptionsModel({allowCollation: true, allowedStages: allowedStages});
 
 testProperty(
     correctnessProperty,

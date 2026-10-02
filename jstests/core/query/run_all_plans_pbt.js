@@ -26,7 +26,6 @@
  * requires_fcv_82,
  * ]
  */
-import {isFCVgte} from "jstests/libs/feature_compatibility_version.js";
 import {getDifferentlyShapedQueries} from "jstests/libs/property_test_helpers/common_properties.js";
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
 import {getQueryAndOptionsModel} from "jstests/libs/property_test_helpers/models/query_models.js";
@@ -101,12 +100,7 @@ function hintedQueryHasSameResultsAsControlCollScan(getQuery, testHelpers) {
     return {passed: true};
 }
 
-const is83orAbove = isFCVgte(db, "8.3");
-
-const aggModel = getQueryAndOptionsModel().filter(
-    // Older versions suffer from SERVER-101007
-    ({pipeline}) => is83orAbove || !JSON.stringify(pipeline).includes('"$elemMatch"'),
-);
+const aggModel = getQueryAndOptionsModel();
 
 // Test with a regular collection.
 testProperty(

@@ -15,13 +15,11 @@
  * does_not_support_stepdowns
  * ]
  */
-import {isFCVgte} from "jstests/libs/feature_compatibility_version.js";
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
 import {getQueryAndOptionsModel} from "jstests/libs/property_test_helpers/models/query_models.js";
 import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workload_models.js";
 import {testProperty} from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
-import {getNestedProperties} from "jstests/libs/query/analyze_plan.js";
 import {createRepeatQueriesUseCacheProperty} from "jstests/libs/property_test_helpers/common_properties.js";
 
 if (isSlowBuild(db)) {
@@ -29,17 +27,12 @@ if (isSlowBuild(db)) {
     quit();
 }
 
-const is83orAbove = isFCVgte(db, "8.3");
-
 const numRuns = 100;
 const numQueriesPerRun = 40;
 
 const experimentColl = db[jsTestName()];
 
-const aggModel = getQueryAndOptionsModel({isTS: true}).filter(
-    // Older versions suffer from SERVER-101007
-    ({pipeline}) => is83orAbove || getNestedProperties(pipeline, "$elemMatch").length == 0,
-);
+const aggModel = getQueryAndOptionsModel({isTS: true});
 
 testProperty(
     createRepeatQueriesUseCacheProperty(experimentColl),

@@ -22,7 +22,6 @@
  * ]
  */
 
-import {isFCVgte} from "jstests/libs/feature_compatibility_version.js";
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
 import {
     getAggPipelineArb,
@@ -40,7 +39,6 @@ import {
     checkSortResults,
     makeBehavioralPropertyFn,
 } from "jstests/libs/property_test_helpers/common_properties.js";
-import {getNestedProperties} from "jstests/libs/query/analyze_plan.js";
 import {
     getSingleFieldProjectArb,
     getMultipleFieldProjectArb,
@@ -50,8 +48,6 @@ if (isSlowBuild(db)) {
     jsTest.log.info("Returning early because debug is on, opt is off, or a sanitizer is enabled.");
     quit();
 }
-
-const is83orAbove = isFCVgte(db, "8.3");
 
 const numRuns = 20;
 
@@ -119,10 +115,6 @@ for (const {stageArb, checkResultsFn, failMsg} of testCases) {
     const startOfPipelineArb = getAggPipelineArb({deterministicBag: false, isTS: true});
     const aggModel = fc
         .record({startOfPipeline: startOfPipelineArb, lastStage: stageArb})
-        .filter(({startOfPipeline, _}) => {
-            // Older versions suffer from SERVER-112844
-            return is83orAbove || getNestedProperties(startOfPipeline, "$elemMatch").length == 0;
-        })
         .map(function ({startOfPipeline, lastStage}) {
             return {"pipeline": [...startOfPipeline, lastStage], "options": {}};
         });

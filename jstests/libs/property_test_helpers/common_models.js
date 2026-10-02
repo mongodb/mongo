@@ -25,7 +25,6 @@ import {
 import {groupArb} from "jstests/libs/property_test_helpers/models/group_models.js";
 import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workload_models.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
-import {getNestedProperties} from "jstests/libs/query/analyze_plan.js";
 import {oneof} from "jstests/libs/property_test_helpers/models/model_utils.js";
 
 export function createStabilityWorkload(numQueriesPerRun) {
@@ -60,151 +59,73 @@ export function createStabilityWorkload(numQueriesPerRun) {
     });
 }
 
-export function addFieldsFirstStageAggModel({isTS = false, is83orAbove = true} = {}) {
-    let aggArb = fc.record({
-        addFieldsStage: fc.oneof(addFieldsConstArb, addFieldsVarArb),
-        restOfPipeline: getAggPipelineArb({isTS: isTS}),
-    });
-
-    // Older versions suffer from SERVER-101007
-    // TODO SERVER-114269 remove this check.
-    if (!is83orAbove) {
-        aggArb = aggArb.filter(
-            ({_, restOfPipeline}) => getNestedProperties(restOfPipeline, "$elemMatch").length == 0,
-        );
-    }
-
-    return aggArb.map(({addFieldsStage, restOfPipeline}) => {
-        return {"pipeline": [addFieldsStage, ...restOfPipeline], "options": {}};
-    });
+export function addFieldsFirstStageAggModel({isTS = false} = {}) {
+    return fc
+        .record({
+            addFieldsStage: fc.oneof(addFieldsConstArb, addFieldsVarArb),
+            restOfPipeline: getAggPipelineArb({isTS: isTS}),
+        })
+        .map(({addFieldsStage, restOfPipeline}) => {
+            return {"pipeline": [addFieldsStage, ...restOfPipeline], "options": {}};
+        });
 }
 
-export function matchFirstStageAggModel({isTS = false, is83orAbove = true} = {}) {
-    let aggArb = fc.record({
-        matchStage: getMatchArb(),
-        restOfPipeline: getAggPipelineArb({isTS: isTS}),
-    });
-
-    // Older versions suffer from SERVER-101007
-    // TODO SERVER-114269 remove this check.
-    if (!is83orAbove) {
-        aggArb = aggArb.filter(
-            ({matchStage, restOfPipeline}) =>
-                getNestedProperties(matchStage, "$elemMatch").length == 0 &&
-                getNestedProperties(restOfPipeline, "$elemMatch").length == 0,
-        );
-    }
-
-    return aggArb.map(({matchStage, restOfPipeline}) => {
-        return {"pipeline": [matchStage, ...restOfPipeline], "options": {}};
-    });
+export function matchFirstStageAggModel({isTS = false} = {}) {
+    return fc
+        .record({
+            matchStage: getMatchArb(),
+            restOfPipeline: getAggPipelineArb({isTS: isTS}),
+        })
+        .map(({matchStage, restOfPipeline}) => {
+            return {"pipeline": [matchStage, ...restOfPipeline], "options": {}};
+        });
 }
 
-export function groupThenMatchAggModel({isTS = false, is83orAbove = true} = {}) {
-    let aggArb = fc.record({
-        matchStage: getMatchArb(),
-        groupStage: groupArb,
-    });
-
-    // Older versions suffer from SERVER-101007
-    // TODO SERVER-114269 remove this check.
-    if (!is83orAbove) {
-        aggArb = aggArb.filter(
-            ({matchStage, groupStage}) => getNestedProperties(matchStage, "$elemMatch").length == 0,
-        );
-    }
-
-    return aggArb.map(({matchStage, groupStage}) => {
-        return {"pipeline": [groupStage, matchStage], "options": {}};
-    });
+export function groupThenMatchAggModel({isTS = false} = {}) {
+    return fc
+        .record({
+            matchStage: getMatchArb(),
+            groupStage: groupArb,
+        })
+        .map(({matchStage, groupStage}) => {
+            return {"pipeline": [groupStage, matchStage], "options": {}};
+        });
 }
 
-export function trySbeRestrictedPushdownEligibleAggModel(
-    foreignName,
-    {isTS = false, is83orAbove = true} = {},
-) {
-    let aggArb = fc.record({
-        pipeline: getTrySbeRestrictedPushdownEligibleAggPipelineArb(foreignName, {isTS: isTS}),
-    });
-    // Older versions suffer from SERVER-101007
-    // TODO SERVER-114269 remove this check.
-    if (!is83orAbove) {
-        aggArb = aggArb.filter(
-            ({pipeline}) => getNestedProperties(pipeline, "$elemMatch").length == 0,
-        );
-    }
-    return aggArb.map(({pipeline}) => {
-        return {pipeline, "options": {}};
-    });
+export function trySbeRestrictedPushdownEligibleAggModel(foreignName, {isTS = false} = {}) {
+    const pipelineArb = getTrySbeRestrictedPushdownEligibleAggPipelineArb(foreignName, {isTS});
+    return pipelineArb.map((pipeline) => ({pipeline, "options": {}}));
 }
 
-export function trySbeEnginePushdownEligibleAggModel(
-    foreignName,
-    {isTS = false, is83orAbove = true} = {},
-) {
-    let aggArb = fc.record({
-        pipeline: getTrySbeEnginePushdownEligibleAggPipelineArb(foreignName, {isTS: isTS}),
-    });
-    // Older versions suffer from SERVER-101007
-    // TODO SERVER-114269 remove this check.
-    if (!is83orAbove) {
-        aggArb = aggArb.filter(
-            ({pipeline}) => getNestedProperties(pipeline, "$elemMatch").length == 0,
-        );
-    }
-    return aggArb.map(({pipeline}) => {
-        return {pipeline, "options": {}};
-    });
+export function trySbeEnginePushdownEligibleAggModel(foreignName, {isTS = false} = {}) {
+    const pipelineArb = getTrySbeEnginePushdownEligibleAggPipelineArb(foreignName, {isTS});
+    return pipelineArb.map((pipeline) => ({pipeline, "options": {}}));
 }
 
-export function sbeFullPushdownEligibleAggModel(
-    foreignName,
-    {isTS = false, is83orAbove = true} = {},
-) {
-    let aggArb = fc.record({
-        pipeline: getSbeFullPushdownEligibleAggPipelineArb(foreignName, {isTS: isTS}),
-    });
-    // Older versions suffer from SERVER-101007
-    // TODO SERVER-114269 remove this check.
-    if (!is83orAbove) {
-        aggArb = aggArb.filter(
-            ({pipeline}) => getNestedProperties(pipeline, "$elemMatch").length == 0,
-        );
-    }
-    return aggArb.map(({pipeline}) => {
-        return {pipeline, "options": {}};
-    });
+export function sbeFullPushdownEligibleAggModel(foreignName, {isTS = false} = {}) {
+    const pipelineArb = getSbeFullPushdownEligibleAggPipelineArb(foreignName, {isTS});
+    return pipelineArb.map((pipeline) => ({pipeline, "options": {}}));
 }
 
-export function projectFirstStageAggModel({isTS = false, is83orAbove = true} = {}) {
-    let aggArb = fc.record({
-        projectStage: fc.oneof(simpleProjectArb, multipleFieldProjectArb, computedProjectArb),
-        restOfPipeline: getAggPipelineArb({isTS: isTS}),
-    });
-
-    // Older versions suffer from SERVER-101007
-    // TODO SERVER-114269 remove this check.
-    if (!is83orAbove) {
-        aggArb = aggArb.filter(
-            ({_, restOfPipeline}) => getNestedProperties(restOfPipeline, "$elemMatch").length == 0,
-        );
-    }
-
-    return aggArb.map(({projectStage, restOfPipeline}) => {
-        return {"pipeline": [projectStage, ...restOfPipeline], "options": {}};
-    });
+export function projectFirstStageAggModel({isTS = false} = {}) {
+    return fc
+        .record({
+            projectStage: fc.oneof(simpleProjectArb, multipleFieldProjectArb, computedProjectArb),
+            restOfPipeline: getAggPipelineArb({isTS: isTS}),
+        })
+        .map(({projectStage, restOfPipeline}) => {
+            return {"pipeline": [projectStage, ...restOfPipeline], "options": {}};
+        });
 }
 
 // Creates a model for {$match: {$or: ...}} expressions.
-export function topLevelOrAggModel({is83orAbove = true} = {}) {
+export function topLevelOrAggModel() {
     const matchWithTopLevelOrArb = getMatchPredicateSpec()
         .singleCompoundPredicate.filter((pred) => {
             // This filter will pass 1/3rd of the time. Since generating
             // queries is quick, this isn't a concern.
             return Object.keys(pred).includes("$or");
         })
-        // Older versions suffer from SERVER-101007
-        .filter((pred) => is83orAbove || !JSON.stringify(pred).includes('"$elemMatch"'))
         .map((pred) => {
             return {$match: pred};
         });
@@ -212,10 +133,7 @@ export function topLevelOrAggModel({is83orAbove = true} = {}) {
     const aggModel = fc
         .record({
             orMatch: matchWithTopLevelOrArb,
-            query: getQueryAndOptionsModel().filter(
-                // Older versions suffer from SERVER-101007
-                ({pipeline}) => is83orAbove || !JSON.stringify(pipeline).includes('"$elemMatch"'),
-            ),
+            query: getQueryAndOptionsModel(),
         })
         .map(({orMatch, query}) => {
             return {
@@ -228,17 +146,12 @@ export function topLevelOrAggModel({is83orAbove = true} = {}) {
 }
 
 // Creates a model where all stages are eligible to be pushed to the find layer.
-export function findLayerOnlyPipeline({is83orAbove = true} = {}) {
-    const matchModel = getMatchArb().filter(
-        // Older versions suffer from SERVER-101007
-        // TODO SERVER-114269 remove this check.
-        (match) => is83orAbove || !JSON.stringify(match).includes('"$elemMatch"'),
-    );
+export function findLayerOnlyPipeline() {
     // Limit/skip are not included so results are deterministic.
     const findLayerStageArb = oneof(
         simpleProjectArb,
         multipleFieldProjectArb,
-        matchModel,
+        getMatchArb(),
         getSortArb(),
     );
     return fc.array(findLayerStageArb, {minLength: 0, maxLength: 4});
