@@ -158,6 +158,8 @@ public:
 
 protected:
     NamespaceString nss;
+    unittest::ServerParameterGuard _hashJoinParamGuard{"featureFlagSbeEqLookupUnwindHashJoin",
+                                                       true};
 };
 
 // Test selection of IXSCAN + FETCH + LU plans.

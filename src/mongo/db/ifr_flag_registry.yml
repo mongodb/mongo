@@ -32,7 +32,6 @@
 
 rollout:
   featureFlagGetExecutorDeferredEngineChoice: {}
-  featureFlagSbeEqLookupUnwindHashJoin: {}
   featureFlagSbeEqLookupUnwindLocalCollscan: {}
   featureFlagSbeEqLookupUnwindLocalComplexDataAccessPlans: {}
   featureFlagSbeEqLookupUnwindLocalIxscanFetch: {}
