@@ -860,7 +860,10 @@ struct MergeSortStats : public SpecificStats {
     MergeSortStats() = default;
 
     std::unique_ptr<SpecificStats> clone() const final {
-        return std::make_unique<MergeSortStats>(*this);
+        auto specific = std::make_unique<MergeSortStats>(*this);
+        // BSON objects have to be explicitly copied.
+        specific->sortPattern = sortPattern.getOwned();
+        return specific;
     }
 
     uint64_t estimateObjectSizeInBytes() const override {
