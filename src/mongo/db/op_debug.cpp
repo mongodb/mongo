@@ -672,6 +672,20 @@ void OpDebug::append(OperationContext* opCtx,
     b.appendNumber("numYield", curop.numYields());
     OPDEBUG_APPEND_OPTIONAL(b, "nreturned", additiveMetrics.nreturned);
 
+    if (!curop.parent()) {
+        b.append("numInterruptChecks", opCtx->numInterruptChecks());
+
+        const bool reportAcquisitions = !opCtx->inMultiDocumentTransaction();
+        const auto& admCtx = ExecutionAdmissionContext::get(opCtx);
+        const auto* stats = opCtx->overdueInterruptCheckStats();
+        if ((reportAcquisitions && admCtx.getDelinquentAcquisitions() > 0) ||
+            (stats && stats->overdueInterruptChecks.loadRelaxed() > 0)) {
+            BSONObjBuilder sub;
+            appendDelinquentInfo(opCtx, sub, reportAcquisitions);
+            b.append("delinquencyInfo", sub.obj());
+        }
+    }
+
     addSpillingStats(spillingStatsPerStage,
                      sortTotalDataSizeBytes,
                      [&](const auto& name, const auto& value) { b.append(name, value); });
@@ -1093,6 +1107,24 @@ std::function<BSONObj(OpDebug::AppendArgs)> OpDebug::appendStaged(OperationConte
     });
     addIfNeeded("nreturned", [](auto field, auto args, auto& b) {
         OPDEBUG_APPEND_OPTIONAL(b, field, args.op.getAdditiveMetrics().nreturned);
+    });
+    addIfNeeded("numInterruptChecks", [](auto field, auto args, auto& b) {
+        if (!args.curop.parent()) {
+            b.append(field, args.opCtx->numInterruptChecks());
+        }
+    });
+    addIfNeeded("delinquencyInfo", [](auto field, auto args, auto& b) {
+        if (!args.curop.parent()) {
+            const bool reportAcquisitions = !args.opCtx->inMultiDocumentTransaction();
+            const auto& admCtx = ExecutionAdmissionContext::get(args.opCtx);
+            const auto* stats = args.opCtx->overdueInterruptCheckStats();
+            if ((reportAcquisitions && admCtx.getDelinquentAcquisitions() > 0) ||
+                (stats && stats->overdueInterruptChecks.loadRelaxed() > 0)) {
+                BSONObjBuilder sub;
+                appendDelinquentInfo(args.opCtx, sub, reportAcquisitions);
+                b.append(field, sub.obj());
+            }
+        }
     });
 
     addIfNeeded("planCacheShapeHash", [](auto field, auto args, auto& b) {

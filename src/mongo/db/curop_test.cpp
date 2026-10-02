@@ -709,6 +709,7 @@ TEST(CurOpTest, OptionalAdditiveMetricsNotDisplayedIfUninitialized) {
                                          "command",
                                          "opid",
                                          "numYield",
+                                         "numInterruptChecks",
                                          "locks",
                                          "millis",
                                          "micros",
@@ -1314,6 +1315,103 @@ TEST(CurOpTest, ReportStateIncludesDelinquentStatsIfNonZero) {
                   200 - interval.count());
         ASSERT_EQ(state["delinquencyInfo"]["overdueInterruptApproxMaxMillis"].Number(),
                   200 - interval.count());
+    }
+}
+
+TEST(CurOpTest, AppendIncludesDelinquentStatsIfNonZero) {
+    unittest::ServerParameterGuard enableDelinquentTracking("featureFlagRecordDelinquentMetrics",
+                                                            true);
+    unittest::ServerParameterGuard alwaysTrackInterrupts("overdueInterruptCheckSamplingRate", 1);
+
+    QueryTestServiceContext serviceContext;
+    auto tickSourcePtr = dynamic_cast<TickSourceMock<Nanoseconds>*>(
+        serviceContext.getServiceContext()->getTickSource());
+    tickSourcePtr->advance(Milliseconds{100});
+
+    auto opCtx = serviceContext.makeOperationContext();
+    auto curOp = CurOp::get(*opCtx);
+    curOp->setTickSource_forTest(tickSourcePtr);
+    curOp->setNS(WithLock::withoutLock(),
+                 NamespaceString::createNamespaceString_forTest("test", "foo"));
+    curOp->ensureStarted();
+
+    auto appendProfileDoc = [&]() {
+        BSONObjBuilder bob;
+        curOp->debug().append(opCtx.get(),
+                              SingleThreadedLockStats{},
+                              FlowControlTicketholder::CurOp{},
+                              SingleThreadedStorageMetrics{},
+                              0 /*prepareReadConflicts*/,
+                              true /*omitCommand*/,
+                              bob);
+        return bob.obj();
+    };
+
+    // If the delinquent stats are zero, they are *not* included in the profile document.
+    {
+        BSONObj doc = appendProfileDoc();
+        ASSERT_FALSE(doc.hasField("delinquencyInfo"));
+        ASSERT_TRUE(doc.hasField("numInterruptChecks"));
+    }
+
+    // If the delinquent stats are not zero, they *are* included in the profile document.
+    {
+        ExecutionAdmissionContext::get(opCtx.get()).recordDelinquentAcquisition(Milliseconds(20));
+        ExecutionAdmissionContext::get(opCtx.get()).recordDelinquentAcquisition(Milliseconds(10));
+        BSONObj doc = appendProfileDoc();
+        ASSERT_TRUE(doc.hasField("delinquencyInfo"));
+        ASSERT_EQ(doc["delinquencyInfo"]["totalDelinquentAcquisitions"].Long(), 2);
+        ASSERT_EQ(doc["delinquencyInfo"]["totalAcquisitionDelinquencyMillis"].Long(), 30);
+        ASSERT_EQ(doc["delinquencyInfo"]["maxAcquisitionDelinquencyMillis"].Long(), 20);
+    }
+
+    {
+        tickSourcePtr->advance(Milliseconds{200});
+        opCtx->checkForInterrupt();
+        BSONObj doc = appendProfileDoc();
+
+        const Milliseconds interval{gOverdueInterruptCheckIntervalMillis.load()};
+
+        ASSERT_TRUE(doc.hasField("numInterruptChecks")) << doc.toString();
+        ASSERT_EQ(doc["numInterruptChecks"].Number(), 1);
+
+        ASSERT_TRUE(doc.hasField("delinquencyInfo"));
+        ASSERT_EQ(doc["delinquencyInfo"]["overdueInterruptChecks"].Number(), 1);
+        ASSERT_EQ(doc["delinquencyInfo"]["overdueInterruptTotalMillis"].Number(),
+                  200 - interval.count());
+        ASSERT_EQ(doc["delinquencyInfo"]["overdueInterruptApproxMaxMillis"].Number(),
+                  200 - interval.count());
+    }
+}
+
+TEST(CurOpTest, AppendStagedIncludesDelinquentFields) {
+    unittest::ServerParameterGuard enableDelinquentTracking("featureFlagRecordDelinquentMetrics",
+                                                            true);
+    unittest::ServerParameterGuard alwaysTrackInterrupts("overdueInterruptCheckSamplingRate", 1);
+
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+    auto* curop = CurOp::get(*opCtx);
+
+    // profile_filter.js requires every field append() emits to be filterable via appendStaged().
+    StringSet requestedFields = {"numInterruptChecks", "delinquencyInfo"};
+    auto makeDoc = OpDebug::appendStaged(opCtx.get(), requestedFields, /*needWholeDocument=*/false);
+    auto stagedDoc = [&]() {
+        return makeDoc(OpDebug::AppendArgs{opCtx.get(), curop->debug(), *curop});
+    };
+
+    {
+        BSONObj doc = stagedDoc();
+        ASSERT_TRUE(doc.hasField("numInterruptChecks"));
+        ASSERT_FALSE(doc.hasField("delinquencyInfo"));
+    }
+
+    {
+        ExecutionAdmissionContext::get(opCtx.get()).recordDelinquentAcquisition(Milliseconds(20));
+        BSONObj doc = stagedDoc();
+        ASSERT_TRUE(doc.hasField("delinquencyInfo"));
+        ASSERT_EQ(doc["delinquencyInfo"]["totalDelinquentAcquisitions"].Long(), 1);
+        ASSERT_EQ(doc["delinquencyInfo"]["maxAcquisitionDelinquencyMillis"].Long(), 20);
     }
 }
 
