@@ -13,9 +13,6 @@
  *  assumes_no_implicit_cursor_exhaustion,
  *  # This test assumes that query stats is enabled, but it may be disabled by the config fuzzer.
  *  does_not_support_config_fuzzer,
- *  # TODO(SERVER-130442) Investigate why percentage-based sampling on these builds causes time outs.
- *  tsan_incompatible,
- *  incompatible_aubsan,
  * ]
  *
  */
@@ -97,26 +94,19 @@ export const $config = (function () {
         };
     })();
 
-    let internalQueryStatsRateLimit;
     let internalQueryStatsCacheSize;
     let internalQueryStatsSampleRate;
 
     let setup = function (db, collName, cluster) {
-        internalQueryStatsRateLimit = setParameterOnAllNodes({
-            cluster: cluster,
-            paramName: "internalQueryStatsRateLimit",
-            newValue: -1,
-        });
         internalQueryStatsCacheSize = setParameterOnAllNodes({
             cluster: cluster,
             paramName: "internalQueryStatsCacheSize",
             newValue: "1MB",
         });
-        // TODO(SERVER-130442) Investigate changing sample rate to 1.
         internalQueryStatsSampleRate = setParameterOnAllNodes({
             cluster: cluster,
             paramName: "internalQueryStatsSampleRate",
-            newValue: 0,
+            newValue: 1,
         });
 
         assert.commandWorked(db[collName].createIndex({i: 1}));
@@ -128,11 +118,6 @@ export const $config = (function () {
     };
 
     let teardown = function (db, collName, cluster) {
-        setParameterOnAllNodes({
-            cluster: cluster,
-            paramName: "internalQueryStatsRateLimit",
-            newValue: internalQueryStatsRateLimit,
-        });
         setParameterOnAllNodes({
             cluster: cluster,
             paramName: "internalQueryStatsCacheSize",
