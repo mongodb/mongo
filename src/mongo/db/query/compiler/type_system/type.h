@@ -165,6 +165,15 @@ public:
     /// A type covering BSONType::object.
     static Type anyObject();
 
+    /// A type covering BSONType::array.
+    static Type anyArray();
+
+    /// A type covering a subset of BSONType::array.
+    static Type someArray();
+
+    /// A type covering any value except BSONType::object or BSONType::array
+    static Type anyScalar();
+
     /// A type covering the type of 'value'. Generally a kSubset, except for singleton types.
     static Type fromValue(const Value& value);
 

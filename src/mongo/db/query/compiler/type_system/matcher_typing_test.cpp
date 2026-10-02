@@ -3,11 +3,13 @@
 
 #include "mongo/db/query/compiler/type_system/matcher_typing.h"
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/tassert_guard.h"
 #include "mongo/unittest/unittest.h"
 
@@ -44,6 +46,99 @@ ElementPath traversedPath(std::string_view path) {
 
 ElementPath noLeafTraversalPath(std::string_view path) {
     return ElementPath(path, ElementPath::LeafArrayBehavior::kNoTraversal);
+}
+
+/// Returns boolean indicating whether 'object' is one of the values 'type' covers.
+bool admitsObject(const Type& type, const BSONObj& object) {
+    if (!type.hasType(BSONType::object)) {
+        return false;
+    }
+
+    const auto& shape = type.getShape_forTest();
+    for (const auto& [fieldName, fieldType] : shape.fields) {
+        const BSONElement fieldValue = object[fieldName];
+        if (!fieldType.hasType(fieldValue.type())) {
+            return false;
+        }
+        if (fieldValue.type() == BSONType::object && !admitsObject(fieldType, fieldValue.Obj())) {
+            return false;
+        }
+    }
+
+    if (!isOpen(shape.open)) {
+        for (auto&& field : object) {
+            if (!shape.fields.find(field.fieldNameStringData())) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+/**
+ * Generates all nested arrays/objects up to the given depth that contain field names 'b', 'c', '0'
+ * or '', and values 1, null, {} or [].
+ *
+ * For example, depth=3 generates documents like {a: [{b: [1]}]}, {a: {'': {c: []}}} and
+ * {a: {0: [null]}}.
+ */
+std::vector<BSONObj> nestedDocuments(size_t depth) {
+    // Each value is held as the only element of a wrapping object.
+    std::vector<BSONObj> values = {
+        BSON("" << 1), BSON("" << BSONNULL), BSON("" << BSONObj()), BSON("" << BSONArray())};
+    for (size_t level = 0; level < depth; ++level) {
+        std::vector<BSONObj> nested = values;
+        for (auto&& wrapped : values) {
+            const BSONElement value = wrapped.firstElement();
+            nested.push_back(BSON("" << BSON_ARRAY(value)));
+            for (std::string_view fieldName : {"b", "c", "0", ""}) {
+                nested.push_back(BSON("" << BSON(fieldName << value)));
+            }
+        }
+        values = std::move(nested);
+    }
+
+    std::vector<BSONObj> documents = {BSONObj()};
+    for (auto&& wrapped : values) {
+        documents.push_back(BSON("a" << wrapped.firstElement()));
+    }
+    return documents;
+}
+
+/// Returns true if the matcher's traversal of 'path' produces a value of a type in 'constraint'.
+bool traversalProducesMatch(const ElementPath& path,
+                            const BSONObj& document,
+                            const Type& constraint) {
+    BSONElementIterator cursor(&path, document);
+    while (cursor.more()) {
+        if (constraint.hasType(cursor.next().element().type())) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Asserts that the narrowed type admits every document for which traversalProducesMatch() returns
+ * 'assumeTrue'.
+ */
+void assertNarrowPathAdmitsEveryMatchingDocument(const std::vector<BSONObj>& documents,
+                                                 const ElementPath& path,
+                                                 const Type& constraint,
+                                                 bool assumeTrue) {
+    const Type narrowed = matcher::narrowPath(Type::anyObject(), path, constraint, assumeTrue);
+    for (const auto& document : documents) {
+        if (traversalProducesMatch(path, document, constraint) != assumeTrue) {
+            continue;
+        }
+        ASSERT_TRUE(admitsObject(narrowed, document))
+            << path.fieldRef().dottedField() << " constraint " << constraint.toDebugString()
+            << " assumeTrue " << assumeTrue << " leaf traversal "
+            << (path.leafArrayBehavior() == ElementPath::LeafArrayBehavior::kTraverse)
+            << " legacy null semantics " << path.legacyDottedPathNullSemantics() << " admits "
+            << document.toString() << " but inferred " << narrowed.toDebugString();
+    }
 }
 
 /// Narrows the 'inputType' by 'expr' and returns the result.
@@ -142,25 +237,28 @@ TEST(MatcherPathTypingTest, UnsupportedLeafArrayNarrowsNothing) {
     auto input =
         openObject({{"x", unionType(allValues(BSONType::numberInt), allValues(BSONType::string))}});
     auto constraint = allValues(BSONType::numberInt);
-    auto path = ElementPath("x", ElementPath::LeafArrayBehavior::kTraverseOmitArray);
-    ASSERT_EQ(matcher::narrowPath(input, path, constraint, true).toDebugString(),
-              input.toDebugString());
-    ASSERT_EQ(matcher::narrowPath(input, path, constraint, false).toDebugString(),
-              input.toDebugString());
-}
-
-TEST(MatcherPathTypingTest, UnsupportedDottedPathNarrowsNothing) {
-    auto input =
-        openObject({{"x", unionType(allValues(BSONType::numberInt), allValues(BSONType::string))}});
-    auto constraint = allValues(BSONType::numberInt);
-    for (auto leafBehaviour : {ElementPath::LeafArrayBehavior::kTraverse,
-                               ElementPath::LeafArrayBehavior::kNoTraversal,
-                               ElementPath::LeafArrayBehavior::kTraverseOmitArray}) {
-        auto path = ElementPath("x.y", leafBehaviour);
+    for (std::string_view dottedPath : {"x", "x.y"}) {
+        auto path = ElementPath(dottedPath, ElementPath::LeafArrayBehavior::kTraverseOmitArray);
         ASSERT_EQ(matcher::narrowPath(input, path, constraint, true).toDebugString(),
                   input.toDebugString());
         ASSERT_EQ(matcher::narrowPath(input, path, constraint, false).toDebugString(),
                   input.toDebugString());
+    }
+}
+
+TEST(MatcherPathTypingTest, UnsupportedNonLeafArrayNarrowsNothing) {
+    auto input = openObject({{"a", allValues(BSONType::numberInt)}});
+    auto constraint = allValues(BSONType::string);
+    for (auto nonLeafArrayBehavior : {ElementPath::NonLeafArrayBehavior::kNoTraversal,
+                                      ElementPath::NonLeafArrayBehavior::kMatchSubpath}) {
+        for (std::string_view dottedPath : {"a", "a.b"}) {
+            auto path = ElementPath(
+                dottedPath, ElementPath::LeafArrayBehavior::kTraverse, nonLeafArrayBehavior);
+            ASSERT_EQ(matcher::narrowPath(input, path, constraint, true).toDebugString(),
+                      input.toDebugString());
+            ASSERT_EQ(matcher::narrowPath(input, path, constraint, false).toDebugString(),
+                      input.toDebugString());
+        }
     }
 }
 
@@ -252,11 +350,152 @@ TEST(MatcherPathTypingTest, NarrowPathOnMissingFieldLeavesNoDocument) {
               "never");
 }
 
-TEST(MatcherPathTypingTest, NarrowPathOnDottedPathDoesNotNarrow) {
-    auto input = Type::anyObject();
+TEST(MatcherPathTypingTest, NarrowDottedPathTraversesObjectsAndArrays) {
+    ASSERT_EQ(matcher::narrowPath(
+                  Type::anyObject(), traversedPath("a.b"), allValues(BSONType::numberInt), true)
+                  .toDebugString(),
+              "{a: {b: int|array(S), ...}|array(S), ...}");
+}
+
+TEST(MatcherPathTypingTest, NarrowLongerDottedPathTraversesEveryComponent) {
+    ASSERT_EQ(matcher::narrowPath(
+                  Type::anyObject(), traversedPath("a.b.c"), allValues(BSONType::numberInt), true)
+                  .toDebugString(),
+              "{a: {b: {c: int|array(S), ...}|array(S), ...}|array(S), ...}");
+}
+
+// On an object, numeric path components are treated as normal field names. On an array, they
+// refer to array indexes.
+TEST(MatcherPathTypingTest, NarrowDottedPathTreatsNumericComponentAsFieldOfObjectAndAsArrayIndex) {
+    ASSERT_EQ(matcher::narrowPath(
+                  Type::anyObject(), traversedPath("a.0"), allValues(BSONType::numberInt), true)
+                  .toDebugString(),
+              "{a: {0: int|array(S), ...}|array(S), ...}");
+}
+
+TEST(MatcherPathTypingTest, NarrowDottedPathWithoutLeafTraversalKeepsArraysOnPrefix) {
+    ASSERT_EQ(
+        matcher::narrowPath(
+            Type::anyObject(), noLeafTraversalPath("a.b"), allValues(BSONType::numberInt), true)
+            .toDebugString(),
+        "{a: {b: int, ...}|array(S), ...}");
+}
+
+TEST(MatcherPathTypingTest, NegatedNarrowDottedPathKeepsScalarsOnPrefix) {
+    ASSERT_EQ(matcher::narrowPath(
+                  Type::anyObject(), traversedPath("a.b"), allValues(BSONType::numberInt), false)
+                  .toDebugString(),
+              "{a: ~(object|array(S))|{b: ~(int|array(S)), ...}, ...}");
+}
+
+TEST(MatcherPathTypingTest, NarrowDottedPathToMissingKeepsScalarsOnPrefix) {
+    // This is the same as narrowing {'a.b': null}, which matches any document where 'a' is a
+    // scalar value.
+    auto constraint = unionType(Type::missing(), allValues(BSONType::null));
+    // The array on 'a' can't be e.g. [{b: 1}]. Hence only a subset of arrays is covered.
+    ASSERT_EQ(matcher::narrowPath(Type::anyObject(), traversedPath("a.b"), constraint, true)
+                  .toDebugString(),
+              "{a: ~(object|array(S))|{b: missing|null|array(S), ...}, ...}");
+}
+
+TEST(MatcherPathTypingTest, NarrowDottedPathOnScalarPrefixLeavesNoDocument) {
+    auto input = openObject({{"a", allValues(BSONType::numberInt)}});
     ASSERT_EQ(matcher::narrowPath(input, traversedPath("a.b"), allValues(BSONType::numberInt), true)
                   .toDebugString(),
-              input.toDebugString());
+              "never");
+}
+
+TEST(MatcherPathTypingTest, NarrowDottedPathToMissingOnScalarPrefixKeepsTheOriginalType) {
+    auto input = openObject({{"a", allValues(BSONType::numberInt)}});
+    auto constraint = unionType(Type::missing(), allValues(BSONType::null));
+    ASSERT_EQ(matcher::narrowPath(input, traversedPath("a.b"), constraint, true).toDebugString(),
+              "{a: int, ...}");
+}
+
+TEST(MatcherPathTypingTest, NegatedNarrowDottedPathOnScalarPrefixKeepsTheOriginalType) {
+    auto input = openObject({{"a", allValues(BSONType::numberInt)}});
+    ASSERT_EQ(
+        matcher::narrowPath(input, traversedPath("a.b"), allValues(BSONType::numberInt), false)
+            .toDebugString(),
+        "{a: int, ...}");
+}
+
+TEST(MatcherPathTypingTest, NegatedNarrowDottedPathToMissingOnScalarPrefixLeavesNoDocument) {
+    auto input = openObject({{"a", allValues(BSONType::numberInt)}});
+    auto constraint = unionType(Type::missing(), allValues(BSONType::null));
+    ASSERT_EQ(matcher::narrowPath(input, traversedPath("a.b"), constraint, false).toDebugString(),
+              "never");
+}
+
+TEST(MatcherPathTypingTest, NarrowDottedPathOnMissingPrefix) {
+    auto input = closedObject({});
+    ASSERT_EQ(matcher::narrowPath(input, traversedPath("a.b"), allValues(BSONType::numberInt), true)
+                  .toDebugString(),
+              "never");
+    auto constraint = unionType(Type::missing(), allValues(BSONType::null));
+    ASSERT_EQ(matcher::narrowPath(input, traversedPath("a.b"), constraint, true).toDebugString(),
+              "{}");
+}
+
+TEST(MatcherPathTypingTest, NarrowDottedPathOnNonArrayPrefixLeavesOnlyObjects) {
+    auto input = openObject({{"a", complement(Type::anyArray())}});
+    ASSERT_EQ(matcher::narrowPath(input, traversedPath("a.b"), allValues(BSONType::numberInt), true)
+                  .toDebugString(),
+              "{a: {b: int|array(S), ...}, ...}");
+}
+
+TEST(MatcherPathTypingTest, NarrowDottedPathKeepsKnownFieldsOfPrefix) {
+    auto input = openObject({{"a", openObject({{"x", allValues(BSONType::string)}})}});
+    ASSERT_EQ(matcher::narrowPath(input, traversedPath("a.b"), allValues(BSONType::numberInt), true)
+                  .toDebugString(),
+              "{a: {b: int|array(S), x: string, ...}, ...}");
+}
+
+TEST(MatcherPathTypingTest, NarrowDottedPathToDisjointTypeLeavesNoDocument) {
+    auto input = openObject({{"a", openObject({{"b", allValues(BSONType::string)}})}});
+    ASSERT_EQ(matcher::narrowPath(input, traversedPath("a.b"), allValues(BSONType::numberInt), true)
+                  .toDebugString(),
+              "never");
+}
+
+TEST(MatcherPathTypingTest, NarrowDottedPathOnClosedPrefix) {
+    auto input = openObject({{"a", closedObject({})}});
+    ASSERT_EQ(matcher::narrowPath(input, traversedPath("a.b"), allValues(BSONType::numberInt), true)
+                  .toDebugString(),
+              "never");
+    auto constraint = unionType(Type::missing(), allValues(BSONType::null));
+    ASSERT_EQ(matcher::narrowPath(input, traversedPath("a.b"), constraint, true).toDebugString(),
+              "{a: {}, ...}");
+}
+
+TEST(MatcherPathTypingTest, NarrowPathAdmitsEveryDocumentTheTraversalLeavesPossible) {
+    const auto documents = nestedDocuments(3);
+    const std::vector<Type> constraints = {
+        allValues(BSONType::numberInt),
+        allValues(BSONType::null),
+        Type::missing(),
+        unionType(Type::missing(), allValues(BSONType::null)),
+        Type::anyArray(),
+        Type::anyObject(),
+        unionType(allValues(BSONType::numberInt), Type::anyArray()),
+        complement(Type::missing()),
+        Type::any(),
+    };
+    for (bool legacyNullSemantics : {true, false}) {
+        unittest::ServerParameterGuard legacyGuard{"internalQueryLegacyDottedPathNullSemantics",
+                                                   legacyNullSemantics};
+        for (std::string_view dottedPath :
+             {"a", "a.b", "a.b.c", "a.0", "a.0.b", "a.b.0", "a.", "a..b"}) {
+            for (auto leafBehavior : {ElementPath::LeafArrayBehavior::kTraverse,
+                                      ElementPath::LeafArrayBehavior::kNoTraversal}) {
+                const ElementPath path(dottedPath, leafBehavior);
+                for (const auto& constraint : constraints) {
+                    assertNarrowPathAdmitsEveryMatchingDocument(documents, path, constraint, true);
+                    assertNarrowPathAdmitsEveryMatchingDocument(documents, path, constraint, false);
+                }
+            }
+        }
+    }
 }
 
 TEST(MatcherPathTypingTest, NarrowPathOnEmptyPathDoesNotNarrow) {
@@ -275,10 +514,18 @@ TEST(MatcherPathTypingTest, NarrowPathOnUnsatisfiableInputIsReturnedUnchanged) {
 
 TEST(MatcherPathTypingTest, NarrowPathOnNonObjectType) {
     auto input = allValues(BSONType::string);
-    // TODO(SERVER-134936): Implement narrowing on non-object (does nothing now).
     ASSERT_EQ(matcher::narrowPath(input, traversedPath("x"), allValues(BSONType::numberInt), true)
                   .toDebugString(),
+              "never");
+    ASSERT_EQ(matcher::narrowPath(input, traversedPath("x"), Type::missing(), true).toDebugString(),
               "string");
+}
+
+TEST(MatcherPathTypingTest, NarrowPathOnObjectOrNonObjectTypeKeepsOnlyObjects) {
+    auto input = unionType(Type::anyObject(), allValues(BSONType::string));
+    ASSERT_EQ(matcher::narrowPath(input, traversedPath("x"), allValues(BSONType::numberInt), true)
+                  .toDebugString(),
+              "{x: int|array(S), ...}");
 }
 
 TEST(MatcherPathTypingTest, NarrowPathToNumberSetKeepsOnlyOverlappingNumericType) {
@@ -822,14 +1069,12 @@ TEST(MatcherTypingTest, TypeOnSeveralPathsLeavesNoDocumentWhenOnePathIsDisjoint)
     ASSERT_EQ(narrowedDebugString(predicate, input), expected);
 }
 
-TEST(MatcherTypingTest, UnsupportedDottedPathDoesNotBlockOtherPaths) {
+TEST(MatcherTypingTest, TypeOnDottedAndNonDottedPathsNarrowsBoth) {
     auto input = Type::anyObject();
     auto predicate =
         "{x: {$type: 'number'}, "
         " 'a.b': {$type: 'string'}}";
-    // TODO(SERVER-134936): Handle dotted paths.
-    // Until dotted paths are handled, we should still do inference on non-dotted paths.
-    auto expected = "{x: number|array(S), ...}";
+    auto expected = "{a: {b: string|array(S), ...}|array(S), x: number|array(S), ...}";
     ASSERT_TRUE(matches(predicate, "{x: 1, a: {b: 'str'}}"));
     ASSERT_FALSE(matches(predicate, "{x: 'str', a: {b: 'str'}}"));
     ASSERT_EQ(narrowedDebugString(predicate, input), expected);
@@ -1060,6 +1305,121 @@ TEST(MatcherTypingTest, OrOfNorNarrowsByBoth) {
     ASSERT_TRUE(matches(predicate, "{x: [1]}"));
     ASSERT_FALSE(matches(predicate, "{x: ['str']}"));
     ASSERT_EQ(narrowedDebugString(predicate, input), expected);
+}
+
+TEST(MatcherTypingTest, TypeOnDottedPathNarrowsEveryComponent) {
+    auto input = Type::anyObject();
+    auto predicate = "{'a.b': {$type: 'number'}}";
+    auto expected = "{a: {b: number|array(S), ...}|array(S), ...}";
+    ASSERT_TRUE(matches(predicate, "{a: {b: 1}}"));
+    ASSERT_TRUE(matches(predicate, "{a: [{b: 1}]}"));
+    ASSERT_TRUE(matches(predicate, "{a: {b: [1]}}"));
+    ASSERT_FALSE(matches(predicate, "{a: 1}"));
+    ASSERT_EQ(narrowedDebugString(predicate, input), expected);
+}
+
+TEST(MatcherTypingTest, NegatedTypeArrayOnDottedPathNarrowsOnlyObjectsOnPrefix) {
+    auto predicate = "{'a.b': {$not: {$type: 'array'}}}";
+    ASSERT_TRUE(matches(predicate, "{a: 1}"));
+    ASSERT_TRUE(matches(predicate, "{a: [{b: 1}]}"));
+    ASSERT_FALSE(matches(predicate, "{a: {b: [1]}}"));
+    // 'a' may hold any value, but an object holds no array at 'b'.
+    ASSERT_EQ(narrowedDebugString(predicate, Type::anyObject()),
+              "{a: ~(object|array(S))|{b: ~array, ...}, ...}");
+}
+
+TEST(MatcherTypingTest, TypeNullOnDottedPathLeavesNoScalarOnPrefix) {
+    auto input = Type::anyObject();
+    auto predicate = "{'a.b': {$type: 'null'}}";
+    // $type: 'null' does not match missing, which is what a scalar produces for 'a.b'.
+    auto expected = "{a: {b: null|array(S), ...}|array(S), ...}";
+    ASSERT_TRUE(matches(predicate, "{a: {b: null}}"));
+    ASSERT_FALSE(matches(predicate, "{a: 5}"));
+    ASSERT_EQ(narrowedDebugString(predicate, input), expected);
+}
+
+TEST(MatcherTypingTest, NegatedTypeNullOnDottedPathKeepsScalarsOnPrefix) {
+    auto predicate = "{'a.b': {$not: {$type: 'null'}}}";
+    ASSERT_TRUE(matches(predicate, "{a: 5}"));
+    ASSERT_FALSE(matches(predicate, "{a: {b: null}}"));
+    ASSERT_EQ(narrowedDebugString(predicate, Type::anyObject()),
+              "{a: ~(object|array(S))|{b: ~(null|array(S)), ...}, ...}");
+}
+
+TEST(MatcherTypingTest, SuccessiveNarrowingOfEveryPrefixRemovesEveryArray) {
+    Type narrowed = Type::anyObject();
+    for (auto query : {"{'a.b.c': {$type: 'number'}}",
+                       "{a: {$not: {$type: 'array'}}}",
+                       "{'a.b': {$not: {$type: 'array'}}}",
+                       "{'a.b.c': {$not: {$type: 'array'}}}"}) {
+        narrowed = narrowType(std::move(narrowed), parseMatchExpr(query).get(), true);
+    }
+    ASSERT_EQ(narrowed.toDebugString(), "{a: {b: {c: number, ...}, ...}, ...}");
+}
+
+TEST(MatcherTypingTest, AndOfNonArrayPrefixAndDottedPathLeavesOnlyObjectsOnPrefix) {
+    auto input = Type::anyObject();
+    auto predicate =
+        "{$and: [{a: {$not: {$type: 'array'}}}, "
+        "        {'a.b': {$type: 'number'}}]}";
+    auto expected = "{a: {b: number|array(S), ...}, ...}";
+    ASSERT_TRUE(matches(predicate, "{a: {b: 1}}"));
+    ASSERT_FALSE(matches(predicate, "{a: [{b: 1}]}"));
+    ASSERT_FALSE(matches(predicate, "{a: 1}"));
+    ASSERT_EQ(narrowedDebugString(predicate, input), expected);
+}
+
+TEST(MatcherTypingTest, OrOfDottedPathsNarrowsToTheUnionOfTheirLeaves) {
+    auto input = Type::anyObject();
+    auto predicate =
+        "{$or: [{'a.b': {$type: 'number'}}, "
+        "       {'a.b': {$type: 'string'}}]}";
+    auto expected = "{a: {b: number|string|array(S), ...}|array(S), ...}";
+    ASSERT_TRUE(matches(predicate, "{a: {b: 1}}"));
+    ASSERT_TRUE(matches(predicate, "{a: [{b: 'str'}]}"));
+    ASSERT_FALSE(matches(predicate, "{a: {b: true}}"));
+    ASSERT_EQ(narrowedDebugString(predicate, input), expected);
+}
+
+TEST(MatcherTypingTest, NorOfDottedPathsRemovesTheTypeOfEveryLeaf) {
+    auto input = openObject({{"a", Type::anyObject()}});
+    auto predicate =
+        "{$nor: [{'a.b': {$type: 'number'}}, "
+        "        {'a.c': {$type: 'string'}}]}";
+    auto expected = "{a: {b: ~(number|array(S)), c: ~(string|array(S)), ...}, ...}";
+    ASSERT_TRUE(matches(predicate, "{a: {b: 'str', c: 1}}"));
+    ASSERT_TRUE(matches(predicate, "{a: {}}"));
+    ASSERT_FALSE(matches(predicate, "{a: {b: 1}}"));
+    ASSERT_FALSE(matches(predicate, "{a: {c: ['str']}}"));
+    ASSERT_EQ(narrowedDebugString(predicate, input), expected);
+}
+
+TEST(MatcherTypingTest, NarrowingOnDottedPathAdmitsEveryDocumentMatcherLeavesPossible) {
+    const auto documents = nestedDocuments(3);
+    for (auto query : {"{'a.b': {$type: 'number'}}",
+                       "{'a.b': {$type: 'null'}}",
+                       "{'a.b': {$type: 'array'}}",
+                       "{'a.b': {$type: 'object'}}",
+                       "{'a.b.c': {$type: 'number'}}",
+                       "{'a.0': {$type: 'number'}}",
+                       "{'a.0.b': {$type: 'number'}}",
+                       "{'a.b.0': {$type: ['null', 'array']}}",
+                       "{'a.b': {$not: {$type: 'number'}}}",
+                       "{'a.b': {$not: {$type: 'array'}}}",
+                       "{'a.b.c': {$not: {$type: 'null'}}}"}) {
+        const auto expr = parseMatchExpr(query);
+        for (bool assumeTrue : {true, false}) {
+            const Type narrowed = narrowType(Type::anyObject(), expr.get(), assumeTrue);
+            for (const auto& document : documents) {
+                if (matches(expr.get(), document) != assumeTrue) {
+                    continue;
+                }
+                ASSERT_TRUE(admitsObject(narrowed, document))
+                    << query << " assumeTrue " << assumeTrue << " admits " << document
+                    << " but inferred " << narrowed.toDebugString();
+            }
+        }
+    }
 }
 
 TEST(MatcherTypingTest, NarrowingAdmitsEveryDocumentMatcherLeavesPossible) {

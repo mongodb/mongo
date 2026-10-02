@@ -9,11 +9,23 @@ input: {
                     }
                 }
             }
+        },
+        {
+            "$match": {
+                "x": {
+                    "$not": {
+                        "$type": "array"
+                    }
+                }
+            }
         }
     ]
 }
 output:
-  end of pipeline
-    x: any
+  after $match:0
+    x: ~(object|array(S))|{y: ~array, ...}
     x.y: any
+  end of pipeline
+    x: ~(object|array)|{y: ~array, ...}
+    x.y: ~array
 

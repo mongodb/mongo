@@ -15,6 +15,9 @@
 namespace mongo::pipeline::type_system {
 namespace {
 
+using LeafArrayBehavior = ElementPath::LeafArrayBehavior;
+using NonLeafArrayBehavior = ElementPath::NonLeafArrayBehavior;
+
 /// Returns the type to assume when the predicate is always true.
 Type narrowByAlwaysTrue(Type inputType, bool assumeTrue) {
     // Under negation nothing matches.
@@ -176,6 +179,27 @@ Type addMatchingArrays(Type constraint) {
     // kSubset).
     return unionType(std::move(constraint), Type(BSONType::array, Extent::kSubset));
 }
+
+/// Returns a type describing documents where traversing 'fieldRef' can produce 'leaf'.
+/// Assumes NonLeafArrayBehavior == kTraverse.
+Type documentTypeFromLeaf(const FieldRef& fieldRef, Type leaf) {
+    Type prefixTypes = Type::someArray();
+    // Traversing a scalar value produces missing. Hence a scalar type along the path prefix is
+    // only possible if the leaf can be missing.
+    if (leaf.hasType(BSONType::eoo)) {
+        prefixTypes = unionType(std::move(prefixTypes), Type::anyScalar());
+    }
+
+    // Build the full nested Type based on what we know about the leaf. E.g. for the path "a.b.c",
+    // the full type would be {a: prefixTypes | {b: prefixTypes | {c: leaf}}}.
+    Type result = std::move(leaf);
+    for (auto i = fieldRef.numParts(); i-- > 0;) {
+        Type object = Type::anyObject();
+        object.setField(fieldRef.getPart(i), std::move(result));
+        result = unionType(prefixTypes, std::move(object));
+    }
+    return result;
+}
 }  // namespace
 
 Type narrowPath(Type inputType, const ElementPath& path, Type constraint, bool assumeTrue) {
@@ -183,32 +207,39 @@ Type narrowPath(Type inputType, const ElementPath& path, Type constraint, bool a
     if (inputType.isNever()) {
         return inputType;
     }
-    if (path.fieldRef().numParts() != 1) {
-        // TODO(SERVER-134936): Handle dotted paths.
+
+    const FieldRef& fieldRef = path.fieldRef();
+    if (fieldRef.empty()) {
         return inputType;
     }
-    if (!inputType.hasOnlyType(BSONType::object)) {
-        // TODO(SERVER-134936): Handle path traversal into non-object.
-        return inputType;
+
+    switch (path.nonLeafArrayBehavior()) {
+        case NonLeafArrayBehavior::kTraverse:
+            // Currently the only supported mode.
+            break;
+        case NonLeafArrayBehavior::kNoTraversal:
+        case NonLeafArrayBehavior::kMatchSubpath:
+            // Not implemented. The predicates that are currently supported only specify kTraverse.
+            return inputType;
     }
 
     Type matched = std::move(constraint);
     switch (path.leafArrayBehavior()) {
-        case ElementPath::LeafArrayBehavior::kTraverse:
+        case LeafArrayBehavior::kTraverse:
             // In this mode, arrays are traversed, and we may be matching a value inside the array.
             matched = addMatchingArrays(std::move(matched));
             break;
-        case ElementPath::LeafArrayBehavior::kNoTraversal:
+        case LeafArrayBehavior::kNoTraversal:
             // Arrays are not traversed, so the value itself is the only candidate.
             break;
-        case ElementPath::LeafArrayBehavior::kTraverseOmitArray:
+        case LeafArrayBehavior::kTraverseOmitArray:
             // Not implemented, since MatchExpressions do not specify it.
             return inputType;
     }
 
-    // The final field type depends on whether we matched or not.
-    Type fieldType = assumeTrue ? std::move(matched) : complement(matched);
-    return narrowField(std::move(inputType), path.fieldRef().getPart(0), std::move(fieldType));
+    Type leaf = assumeTrue ? std::move(matched) : complement(matched);
+    Type docType = documentTypeFromLeaf(fieldRef, std::move(leaf));
+    return intersectType(std::move(inputType), std::move(docType));
 }
 
 }  // namespace matcher

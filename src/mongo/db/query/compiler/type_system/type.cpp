@@ -427,6 +427,18 @@ Type Type::anyObject() {
     return Type(BSONType::object, Extent::kAll);
 }
 
+Type Type::anyArray() {
+    return Type(BSONType::array, Extent::kAll);
+}
+
+Type Type::someArray() {
+    return Type(BSONType::array, Extent::kSubset);
+}
+
+Type Type::anyScalar() {
+    return complement(unionType(Type::anyObject(), Type::anyArray()));
+}
+
 Type Type::fromValue(const Value& value) {
     return Type(TypeSet::fromValue(value));
 }

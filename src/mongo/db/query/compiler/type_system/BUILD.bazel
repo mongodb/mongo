@@ -54,5 +54,6 @@ mongo_cc_unit_test(
         ":type_system",
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/query/compiler/parsers/matcher:parsed_match_expression_for_test",
+        "//src/mongo/unittest:server_parameter_guard",
     ],
 )

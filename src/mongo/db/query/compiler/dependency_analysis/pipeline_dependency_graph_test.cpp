@@ -3789,9 +3789,7 @@ TEST_F(PipelineDependencyGraphTest, CanPathBeArrayNotArrayTypePredicateOnDottedP
         ASSERT_TRUE(graph->canPathBeArray(stages[0].get(), "x"));
         ASSERT_TRUE(graph->canPathBeArray(stages[0].get(), "x.y"));
         ASSERT_FALSE(graph->canPathBeArray(nullptr, "x"));
-        // TODO(SERVER-135481,SERVER-134936) We should be able to determine that this is not an
-        // array.
-        ASSERT_TRUE(graph->canPathBeArray(nullptr, "x.y"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "x.y"));
     });
 }
 

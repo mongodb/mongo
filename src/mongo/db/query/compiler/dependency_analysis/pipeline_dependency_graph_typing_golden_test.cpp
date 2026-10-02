@@ -245,11 +245,11 @@ TEST_F(PipelineDependencyGraphTypingGoldenTest, SubpathOfObjectField) {
     });
 }
 
-// Narrowing on a dotted path is not implemented yet.
 TEST_F(PipelineDependencyGraphTypingGoldenTest, MatchOnDottedPath) {
     runVariation({
         .name = "MatchOnDottedPath",
-        .pipeline = "[{$match: {'x.y': {$not: {$type: 'array'}}}}]",
+        .pipeline = "[{$match: {'x.y': {$not: {$type: 'array'}}}},"
+                    " {$match: {'x': {$not: {$type: 'array'}}}}]",
         .paths = {"x", "x.y"},
     });
 }
