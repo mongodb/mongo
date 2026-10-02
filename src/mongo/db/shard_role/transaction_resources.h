@@ -449,6 +449,7 @@ struct [[MONGO_MOD_NEEDS_REPLACEMENT]] TransactionResources {
     // TransactionResources resources and the yielded state is contained in the structure below.
     struct YieldedStateHolder {
         Locker::LockSnapshot yieldedLocker;
+        boost::optional<rss::consensus::IntentRegistry::Intent> yieldedIntent;
     };
     boost::optional<YieldedStateHolder> yielded;
 

@@ -169,6 +169,25 @@ public:
             return _result == LOCK_OK;
         }
 
+        /**
+         * Deregisters the replication intent declared by this lock and returns it, or returns
+         * boost::none if none was declared. The caller is responsible for stashing the returned
+         * intent and handing it back to reacquireIntent().
+         *
+         * Used when yielding. A yielded operation releases its locks through the Locker, which
+         * bypasses this object, so without this the intent would outlive the resources it
+         * represents and keep blocking replication state transitions.
+         */
+        boost::optional<rss::consensus::IntentRegistry::Intent> releaseIntent();
+
+        /**
+         * Re-declares an intent previously released by releaseIntent(). Throws
+         * InterruptedDueToReplStateChange, InterruptedAtShutdown or NotWritablePrimary if that
+         * intent is no longer compatible with the current replication state, in which case the
+         * operation must not resume and this lock is left without an intent.
+         */
+        void reacquireIntent(rss::consensus::IntentRegistry::Intent intent);
+
     private:
         /**
          * Constructor helper functions, to handle skipping or taking the RSTL lock.
@@ -305,6 +324,14 @@ public:
 
         LockMode mode() const {
             return _mode;
+        }
+
+        /**
+         * The global lock this DBLock acquired on our behalf. Never null for a constructed DBLock.
+         */
+        GlobalLock* getGlobalLock() {
+            invariant(_globalLock);
+            return _globalLock.get_ptr();
         }
 
     private:
