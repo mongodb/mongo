@@ -356,13 +356,31 @@ TEST_F(FLEStatsTest, OperationCountersSectionIsPresent) {
     ASSERT_EQ(0, counters["deletes"].Long());
 }
 
+TEST_F(FLEStatsTest, IncrementOpCounterOnUnregisteredNamespaceIsNoop) {
+    const auto nss = NamespaceString::createNamespaceString_forTest("test.coll");
+
+    // incrementing counters on an unregistered namespace is a no-op
+    instance->incrementFindCount(nss);
+    instance->incrementInsertCount(nss);
+    instance->incrementUpdateCount(nss);
+    instance->incrementDeleteCount(nss);
+
+    auto obj = instance->generateSection(opCtx, BSONElement());
+    auto counters = obj["operationCounters"].Obj();
+    ASSERT_EQ(0, counters["inserts"].Long());
+    ASSERT_EQ(0, counters["finds"].Long());
+    ASSERT_EQ(0, counters["updates"].Long());
+    ASSERT_EQ(0, counters["deletes"].Long());
+}
+
 TEST_F(FLEStatsTest, IncrementInsertCountAlwaysIncrements) {
     const auto nss = NamespaceString::createNamespaceString_forTest("test.coll");
     const auto efc = buildTestEncryptedFieldConfig(1);  // contention doesn't matter
 
-    instance->incrementInsertCount(nss, efc);
-    instance->incrementInsertCount(nss, efc);
-    instance->incrementInsertCount(nss, efc);
+    instance->updateStatsOnRegisterCollection(nss, efc);
+    instance->incrementInsertCount(nss);
+    instance->incrementInsertCount(nss);
+    instance->incrementInsertCount(nss);
 
     auto obj = instance->generateSection(opCtx, BSONElement());
     ASSERT_EQ(3, obj["operationCounters"].Obj()["inserts"].Long());
@@ -372,11 +390,12 @@ TEST_F(FLEStatsTest, IncrementFindUpdateDeleteCount) {
     const auto nss = NamespaceString::createNamespaceString_forTest("test.coll");
     const auto efc = buildTestEncryptedFieldConfig(1);
 
-    instance->incrementFindCount(nss, efc);
-    instance->incrementFindCount(nss, efc);
-    instance->incrementUpdateCount(nss, efc);
-    instance->incrementDeleteCount(nss, efc);
-    instance->incrementDeleteCount(nss, efc);
+    instance->updateStatsOnRegisterCollection(nss, efc);
+    instance->incrementFindCount(nss);
+    instance->incrementFindCount(nss);
+    instance->incrementUpdateCount(nss);
+    instance->incrementDeleteCount(nss);
+    instance->incrementDeleteCount(nss);
 
     auto obj = instance->generateSection(opCtx, BSONElement());
     auto counters = obj["operationCounters"].Obj();
@@ -399,30 +418,32 @@ TEST_F(FLEStatsTest, IncrementFindUpdateDeleteCountRateLimited) {
             ASSERT_EQ(counters["deletes"].Long(), expectedDeletes);
         };
 
+    instance->updateStatsOnRegisterCollection(nss, efc);
+
     // First increments always succeed.
-    instance->incrementFindCount(nss, efc);
-    instance->incrementUpdateCount(nss, efc);
-    instance->incrementDeleteCount(nss, efc);
+    instance->incrementFindCount(nss);
+    instance->incrementUpdateCount(nss);
+    instance->incrementDeleteCount(nss);
     validateCounters(1, 1, 1);
 
     // Increments immediately after don't register.
-    instance->incrementFindCount(nss, efc);
-    instance->incrementUpdateCount(nss, efc);
-    instance->incrementDeleteCount(nss, efc);
+    instance->incrementFindCount(nss);
+    instance->incrementUpdateCount(nss);
+    instance->incrementDeleteCount(nss);
     validateCounters(1, 1, 1);
 
     // Increments just before the period ends don't register
     tickSource->advance(delay - Milliseconds(1));
-    instance->incrementFindCount(nss, efc);
-    instance->incrementUpdateCount(nss, efc);
-    instance->incrementDeleteCount(nss, efc);
+    instance->incrementFindCount(nss);
+    instance->incrementUpdateCount(nss);
+    instance->incrementDeleteCount(nss);
     validateCounters(1, 1, 1);
 
     // Increments at the period end register
     tickSource->advance(Milliseconds(1));
-    instance->incrementFindCount(nss, efc);
-    instance->incrementUpdateCount(nss, efc);
-    instance->incrementDeleteCount(nss, efc);
+    instance->incrementFindCount(nss);
+    instance->incrementUpdateCount(nss);
+    instance->incrementDeleteCount(nss);
     validateCounters(2, 2, 2);
 }
 
@@ -430,11 +451,13 @@ TEST_F(FLEStatsTest, OperationCountersPersistAfterDeregister) {
     const auto nss = NamespaceString::createNamespaceString_forTest("test.coll");
     const auto efc = buildTestEncryptedFieldConfig(1);
 
-    instance->incrementInsertCount(nss, efc);
-    instance->incrementInsertCount(nss, efc);
-    instance->incrementFindCount(nss, efc);
-    instance->incrementUpdateCount(nss, efc);
-    instance->incrementDeleteCount(nss, efc);
+    instance->updateStatsOnRegisterCollection(nss, efc);
+
+    instance->incrementInsertCount(nss);
+    instance->incrementInsertCount(nss);
+    instance->incrementFindCount(nss);
+    instance->incrementUpdateCount(nss);
+    instance->incrementDeleteCount(nss);
 
     // Deregister moves per-collection stats into _deletedCollStats.
     instance->updateStatsOnDeregisterCollection(nss, efc);
@@ -453,17 +476,21 @@ TEST_F(FLEStatsTest, OperationCountersAggregateMultipleCollections) {
     const auto nss3 = NamespaceString::createNamespaceString_forTest("test.coll3");
     const auto efc = buildTestEncryptedFieldConfig(1);
 
-    instance->incrementInsertCount(nss1, efc);
-    instance->incrementInsertCount(nss1, efc);
-    instance->incrementUpdateCount(nss1, efc);
+    instance->updateStatsOnRegisterCollection(nss1, efc);
+    instance->updateStatsOnRegisterCollection(nss2, efc);
+    instance->updateStatsOnRegisterCollection(nss3, efc);
 
-    instance->incrementInsertCount(nss2, efc);
-    instance->incrementDeleteCount(nss2, efc);
-    instance->incrementFindCount(nss2, efc);
+    instance->incrementInsertCount(nss1);
+    instance->incrementInsertCount(nss1);
+    instance->incrementUpdateCount(nss1);
 
-    instance->incrementInsertCount(nss3, efc);
-    instance->incrementUpdateCount(nss3, efc);
-    instance->incrementFindCount(nss3, efc);
+    instance->incrementInsertCount(nss2);
+    instance->incrementDeleteCount(nss2);
+    instance->incrementFindCount(nss2);
+
+    instance->incrementInsertCount(nss3);
+    instance->incrementUpdateCount(nss3);
+    instance->incrementFindCount(nss3);
     // remove nss3 and merge its stats into _deletedCollStats
     instance->updateStatsOnDeregisterCollection(nss3, efc);
 

@@ -194,24 +194,28 @@ void FLEStatusSection::clearIndexTypeStats() {
     _indexTypeStats = {};
 }
 
-void FLEStatusSection::incrementInsertCount(const NamespaceString& nss,
-                                            const EncryptedFieldConfig& efc) {
-    registerCollectionStats(nss, efc)->insertOpCounter.fetchAndAddRelaxed(1);
+void FLEStatusSection::incrementInsertCount(const NamespaceString& nss) {
+    if (auto statsp = _collStatsMap.find(nss); statsp != nullptr) {
+        statsp->insertOpCounter.fetchAndAddRelaxed(1);
+    }
 }
 
-void FLEStatusSection::incrementFindCount(const NamespaceString& nss,
-                                          const EncryptedFieldConfig& efc) {
-    registerCollectionStats(nss, efc)->findOpCounter.increment();
+void FLEStatusSection::incrementFindCount(const NamespaceString& nss) {
+    if (auto statsp = _collStatsMap.find(nss); statsp != nullptr) {
+        statsp->findOpCounter.increment();
+    }
 }
 
-void FLEStatusSection::incrementUpdateCount(const NamespaceString& nss,
-                                            const EncryptedFieldConfig& efc) {
-    registerCollectionStats(nss, efc)->updateOpCounter.increment();
+void FLEStatusSection::incrementUpdateCount(const NamespaceString& nss) {
+    if (auto statsp = _collStatsMap.find(nss); statsp != nullptr) {
+        statsp->updateOpCounter.increment();
+    }
 }
 
-void FLEStatusSection::incrementDeleteCount(const NamespaceString& nss,
-                                            const EncryptedFieldConfig& efc) {
-    registerCollectionStats(nss, efc)->deleteOpCounter.increment();
+void FLEStatusSection::incrementDeleteCount(const NamespaceString& nss) {
+    if (auto statsp = _collStatsMap.find(nss); statsp != nullptr) {
+        statsp->deleteOpCounter.increment();
+    }
 }
 
 std::shared_ptr<FLEPerCollectionStats> FLEStatusSection::registerCollectionStats(

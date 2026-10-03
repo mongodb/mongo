@@ -439,7 +439,7 @@ insertSingleDocument(OperationContext* opCtx,
 
     validateInsertUpdatePayloads(opCtx, efc.getFields(), *serverPayload);
 
-    FLEStatusSection::get().incrementInsertCount(edcNss, efc);
+    FLEStatusSection::get().incrementInsertCount(edcNss);
     std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxns(opCtx);
 
     // The function that handles the transaction may outlive this function so we need to use
@@ -608,7 +608,7 @@ write_ops::DeleteCommandReply processDelete(OperationContext* opCtx,
     auto& edcNss = deleteRequest.getNamespace();
     auto efc = EncryptionInformationHelpers::getAndValidateSchema(
         edcNss, deleteRequest.getEncryptionInformation().value());
-    FLEStatusSection::get().incrementDeleteCount(edcNss, efc);
+    FLEStatusSection::get().incrementDeleteCount(edcNss);
 
     std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxns(opCtx);
 
@@ -731,7 +731,7 @@ write_ops::UpdateCommandReply processUpdate(OperationContext* opCtx,
     auto& edcNss = updateRequest.getNamespace();
     auto efc = EncryptionInformationHelpers::getAndValidateSchema(
         edcNss, updateRequest.getEncryptionInformation().value());
-    FLEStatusSection::get().incrementUpdateCount(edcNss, efc);
+    FLEStatusSection::get().incrementUpdateCount(edcNss);
 
     std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxns(opCtx);
 

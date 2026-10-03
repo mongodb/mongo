@@ -175,10 +175,10 @@ public:
                                            const EncryptedFieldConfig& efc);
     void clearIndexTypeStats();
 
-    void incrementInsertCount(const NamespaceString& nss, const EncryptedFieldConfig& efc);
-    void incrementFindCount(const NamespaceString& nss, const EncryptedFieldConfig& efc);
-    void incrementUpdateCount(const NamespaceString& nss, const EncryptedFieldConfig& efc);
-    void incrementDeleteCount(const NamespaceString& nss, const EncryptedFieldConfig& efc);
+    void incrementInsertCount(const NamespaceString& nss);
+    void incrementFindCount(const NamespaceString& nss);
+    void incrementUpdateCount(const NamespaceString& nss);
+    void incrementDeleteCount(const NamespaceString& nss);
 
 private:
     void updateIndexTypeStats(const EncryptedFieldConfig& efc, bool subtract);
