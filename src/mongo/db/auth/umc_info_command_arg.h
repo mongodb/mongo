@@ -61,27 +61,32 @@ namespace auth {
 template <typename T, bool enableForAllDBs>
 class MONGO_MOD_PUBLIC UMCInfoCommandArg {
 public:
-    UMCInfoCommandArg() : UMCInfoCommandArg(AllOnCurrentDB{}) {}
     static_assert(std::is_same<UserName, T>::value || std::is_same<RoleName, T>::value,
                   "UMCInfoCommandArg only valid with T = UserName | RoleName");
 
     using Single = std::variant<T, std::string>;
     using Multiple = std::vector<Single>;
 
+    struct AllForAllDBs {};
+
+    UMCInfoCommandArg() : _value(AllOnCurrentDB{}) {}
     explicit UMCInfoCommandArg(Single value) : _value(std::move(value)) {}
     explicit UMCInfoCommandArg(Multiple values) : _value(std::move(values)) {}
+    explicit UMCInfoCommandArg(AllForAllDBs opt)
+    requires enableForAllDBs
+        : _value(std::move(opt)) {}
 
     static UMCInfoCommandArg parseFromBSON(const boost::optional<TenantId> tenantId,
                                            const BSONElement& elem,
                                            const SerializationContext&) {
         if (elem.isNumber() && (elem.safeNumberLong() == 1)) {
-            return UMCInfoCommandArg(AllOnCurrentDB{});
+            return UMCInfoCommandArg{};
         }
-        if (enableForAllDBs && (elem.type() == BSONType::object) &&
-            (elem.Obj()[kForAllDBs].trueValue())) {
-            return UMCInfoCommandArg(AllForAllDBs{});
+        if constexpr (enableForAllDBs) {
+            if ((elem.type() == BSONType::object) && (elem.Obj()[kForAllDBs].trueValue())) {
+                return UMCInfoCommandArg(AllForAllDBs{});
+            }
         }
-
         if (elem.type() == BSONType::array) {
             Multiple values;
             for (const auto& v : elem.Obj()) {
@@ -171,10 +176,6 @@ private:
     static constexpr StringData kForAllDBs = "forAllDBs"_sd;
 
     struct AllOnCurrentDB {};
-    struct AllForAllDBs {};
-
-    explicit UMCInfoCommandArg(AllOnCurrentDB opt) : _value(std::move(opt)) {}
-    explicit UMCInfoCommandArg(AllForAllDBs opt) : _value(std::move(opt)) {}
 
     static Single parseNamedElement(const BSONElement& elem,
                                     const boost::optional<TenantId> tenantId) {

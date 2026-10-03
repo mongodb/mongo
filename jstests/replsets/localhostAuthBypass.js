@@ -7,6 +7,7 @@ let replSetName = "replsets_server-6591";
 let keyfile = "jstests/libs/key1";
 let username = "foo";
 let password = "bar";
+let externalUsername = "CN=external-user,OU=Testing,O=MongoDB";
 
 import {get_ipaddr} from "jstests/libs/network/host_ipaddr.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
@@ -14,6 +15,14 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 let createUser = function (mongo) {
     print("============ adding a user.");
     mongo.getDB("admin").createUser({user: username, pwd: password, roles: jsTest.adminUserRoles});
+};
+
+let createExternalUser = function (mongo) {
+    print("============ adding a user on $external.");
+    assert.commandWorked(
+        mongo.getDB("$external").runCommand({createUser: externalUsername, roles: []}),
+        "the localhost exception should permit createUser on $external",
+    );
 };
 
 let assertCannotRunCommands = function (mongo, isPrimary) {
@@ -227,7 +236,41 @@ let runNonlocalTest = function (ipAddr) {
     shutdown(rs);
 };
 
+// A user on the $external database is a privilege document in admin.system.users, so creating one
+// must disable the localhost exception, exactly as creating a user on the admin database does.
+let runExternalUserTest = function () {
+    print("=====================");
+    print("starting replica set: $external user closes the localhost exception");
+    print("=====================");
+    const rs = start(false);
+    let host = "localhost:" + rs.getPort(rs.getPrimary());
+
+    let mongo = new Mongo(host);
+
+    assertCannotRunCommands(mongo, true);
+
+    createExternalUser(mongo);
+
+    // The set now has a privilege document, so the exception must be closed. In particular, an
+    // unauthenticated loopback connection must no longer be able to create an admin user.
+    assertCannotRunCommands(mongo, true);
+    assert.commandFailedWithCode(
+        mongo.getDB("admin").runCommand({createUser: username, pwd: password, roles: jsTest.adminUserRoles}),
+        ErrorCodes.Unauthorized,
+        "the localhost exception remained open after creating a user on $external",
+    );
+    assert.commandFailedWithCode(
+        mongo.getDB("$external").runCommand({createUser: "CN=otr,OU=test,O=mdb", roles: []}),
+        ErrorCodes.Unauthorized,
+        "the localhost exception remained open after creating a user on $external",
+    );
+
+    shutdown(rs);
+};
+
 runTest(false);
 runTest(true);
 
 runNonlocalTest(get_ipaddr());
+
+runExternalUserTest();

@@ -237,6 +237,10 @@ last-continuous:
       ticket: SERVER-131326
     - test_file: jstests/noPassthrough/network/min_wait_streaming_hello_mongos.js
       ticket: SERVER-132650
+    - test_file: jstests/sharding/localhostAuthBypass.js
+      ticket: SERVER-134872
+    - test_file: jstests/replsets/localhostAuthBypass.js
+      ticket: SERVER-134872
     - test_file: jstests/sharding/query/graph_lookup/graph_lookup_spill_on_merging_shard.js
       ticket: SERVER-130431
     - test_file: jstests/sharding/reshard_collection_hashed_prefix_with_zones.js
@@ -414,6 +418,8 @@ last-lts:
       ticket: SERVER-89664
     - test_file: jstests/replsets/read_operations_during_step_up.js
       ticket: SERVER-89664
+    - test_file: jstests/replsets/localhostAuthBypass.js
+      ticket: SERVER-134872
     - test_file: jstests/replsets/unconditional_step_down.js
       ticket: SERVER-89664
     - test_file: jstests/sharding/conn_pool_stats.js
@@ -434,6 +440,8 @@ last-lts:
       ticket: SERVER-83760
     - test_file: jstests/replsets/catchup_ignores_old_heartbeats.js
       ticket: SERVER-86674
+    - test_file: jstests/sharding/localhostAuthBypass.js
+      ticket: SERVER-134872
     - test_file: jstests/sharding/query/graph_lookup/graph_lookup_spill_on_merging_shard.js
       ticket: SERVER-130431
     - test_file: jstests/sharding/reshard_collection_hashed_prefix_with_zones.js
