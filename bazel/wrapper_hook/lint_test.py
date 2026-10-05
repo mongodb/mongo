@@ -350,7 +350,7 @@ class RunRulesLintTest(unittest.TestCase):
                         [
                             "bazel",
                             "query",
-                            'kind(".* rule", same_pkg_direct_rdeps(//:foo.py)) except attr("tags", "manual", kind(".* rule", same_pkg_direct_rdeps(//:foo.py)))',
+                            '(kind(".* rule", same_pkg_direct_rdeps(//:foo.py)) union attr("crate", ".*", same_pkg_direct_rdeps(kind(".* rule", same_pkg_direct_rdeps(//:foo.py))))) except attr("tags", "manual", (kind(".* rule", same_pkg_direct_rdeps(//:foo.py)) union attr("crate", ".*", same_pkg_direct_rdeps(kind(".* rule", same_pkg_direct_rdeps(//:foo.py))))))',
                             "--output=label",
                         ],
                     )
@@ -593,7 +593,7 @@ class ExistingPythonFilesTest(unittest.TestCase):
                 [
                     "bazel",
                     "query",
-                    'kind(".* rule", same_pkg_direct_rdeps(//buildscripts/copybara:generate_evergreen.py)) except attr("tags", "manual", kind(".* rule", same_pkg_direct_rdeps(//buildscripts/copybara:generate_evergreen.py)))',
+                    '(kind(".* rule", same_pkg_direct_rdeps(//buildscripts/copybara:generate_evergreen.py)) union attr("crate", ".*", same_pkg_direct_rdeps(kind(".* rule", same_pkg_direct_rdeps(//buildscripts/copybara:generate_evergreen.py))))) except attr("tags", "manual", (kind(".* rule", same_pkg_direct_rdeps(//buildscripts/copybara:generate_evergreen.py)) union attr("crate", ".*", same_pkg_direct_rdeps(kind(".* rule", same_pkg_direct_rdeps(//buildscripts/copybara:generate_evergreen.py))))))',
                     "--output=label",
                 ],
             )
@@ -618,6 +618,33 @@ class ExistingPythonFilesTest(unittest.TestCase):
                 [
                     "//buildscripts/copybara:generate_evergreen",
                     "//buildscripts/copybara:generate_evergreen_test",
+                ],
+            )
+
+    def test_get_rules_lint_targets_for_source_labels_includes_crate_test_targets(self):
+        # rust_test(crate = ":lib") recompiles the library's sources (including #[cfg(test)]
+        # modules) without depending on the source files directly, so the owner query must also
+        # find crate-based tests in the library's package.
+        def fake_run(args, **kwargs):
+            self.assertIn('attr("crate", ".*", same_pkg_direct_rdeps(', args[2])
+            return subprocess.CompletedProcess(
+                args,
+                0,
+                stdout=(
+                    "//src/mongo/db/modules/enterprise/src/mfp/plugin:message_filter_plugin\n"
+                    "//src/mongo/db/modules/enterprise/src/mfp/plugin:message_filter_plugin_test\n"
+                ),
+            )
+
+        with mock.patch.object(lint.subprocess, "run", side_effect=fake_run):
+            self.assertEqual(
+                lint._get_rules_lint_targets_for_source_labels(
+                    "bazel",
+                    ["//src/mongo/db/modules/enterprise/src/mfp/plugin:dylib/src/test.rs"],
+                ),
+                [
+                    "//src/mongo/db/modules/enterprise/src/mfp/plugin:message_filter_plugin",
+                    "//src/mongo/db/modules/enterprise/src/mfp/plugin:message_filter_plugin_test",
                 ],
             )
 

@@ -880,10 +880,15 @@ def _get_rules_lint_targets_for_source_labels(
 
     for source_label in source_labels:
         owner_rules = f'kind(".* rule", same_pkg_direct_rdeps({source_label}))'
+        # rust_test targets created with `crate = ":lib"` compile the library's sources (including
+        # #[cfg(test)] modules) but depend on the library rule rather than on the individual source
+        # files, so same_pkg_direct_rdeps on the source does not find them.
+        crate_test_rules = f'attr("crate", ".*", same_pkg_direct_rdeps({owner_rules}))'
+        relevant_rules = f"({owner_rules} union {crate_test_rules})"
         # Manual targets are often negative analysis fixtures. They intentionally fail during
         # analysis and must not be pulled into the rules_lint build just because they depend on a
         # changed source file.
-        query = f'{owner_rules} except attr("tags", "manual", {owner_rules})'
+        query = f'{relevant_rules} except attr("tags", "manual", {relevant_rules})'
         query_options = _get_bazel_query_options(bazel_options)
         result = subprocess.run(
             [
