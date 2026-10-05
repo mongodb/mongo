@@ -57,6 +57,7 @@
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 
@@ -484,13 +485,15 @@ void validateEncryptedFieldConfig(const EncryptedFieldConfig* config) {
         uassert(
             7406900,
             "Encrypted State Collection name should follow enxcol_.<collection>.esc naming pattern",
-            NamespaceString::isFLE2StateCollection(config->getEscCollection().get()));
+            NamespaceStringUtil::deserialize(DatabaseName{}, config->getEscCollection().get())
+                .isFLE2EscCollection());
     }
     if (config->getEcocCollection()) {
         uassert(7406902,
                 "Encrypted Compaction Collection name should follow enxcol_.<collection>.ecoc "
                 "naming pattern",
-                NamespaceString::isFLE2StateCollection(config->getEcocCollection().get()));
+                NamespaceStringUtil::deserialize(DatabaseName{}, config->getEcocCollection().get())
+                    .isFLE2EcocCollection());
     }
     for (const auto& field : config->getFields()) {
         UUID keyId = field.getKeyId();

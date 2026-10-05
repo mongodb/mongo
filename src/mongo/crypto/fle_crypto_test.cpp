@@ -2373,7 +2373,7 @@ EncryptedFieldConfig getTestEncryptedFieldConfig() {
 }
 
 TEST(EncryptionInformation, RoundTrip) {
-    NamespaceString ns = NamespaceString::createNamespaceString_forTest("test.test");
+    NamespaceString ns = NamespaceString::createNamespaceString_forTest("test.coll");
 
     EncryptedFieldConfig efc = getTestEncryptedFieldConfig();
     auto obj = EncryptionInformationHelpers::encryptionInformationSerialize(ns, efc);
@@ -2402,7 +2402,7 @@ TEST(EncryptionInformation, BadSchema) {
 }
 
 TEST(EncryptionInformation, MissingStateCollection) {
-    NamespaceString ns = NamespaceString::createNamespaceString_forTest("test.test");
+    NamespaceString ns = NamespaceString::createNamespaceString_forTest("test.coll");
 
     {
         EncryptedFieldConfig efc = getTestEncryptedFieldConfig();

@@ -997,6 +997,8 @@ last-continuous:
     ticket: SERVER-133282
   - test_file: jstests/sharding/localhostAuthBypass.js
     ticket: SERVER-134872
+  - test_file: jstests/fle2/create_encrypted_collection.js
+    ticket: SERVER-130498
   suites: null
 last-lts:
   all:
@@ -2056,4 +2058,6 @@ last-lts:
     ticket: SERVER-133282
   - test_file: jstests/sharding/localhostAuthBypass.js
     ticket: SERVER-134872
+  - test_file: jstests/fle2/create_encrypted_collection.js
+    ticket: SERVER-130498
   suites: null

@@ -1423,6 +1423,9 @@ public:
     static EncryptedFieldConfig getAndValidateSchema(const NamespaceString& nss,
                                                      const EncryptionInformation& ei);
 
+    static void validateStateCollectionNamespaces(const NamespaceString& nss,
+                                                  const EncryptedFieldConfig& ef);
+
     static constexpr int64_t kFLEMaxContentionFactor = 200'000;
 
     /**
