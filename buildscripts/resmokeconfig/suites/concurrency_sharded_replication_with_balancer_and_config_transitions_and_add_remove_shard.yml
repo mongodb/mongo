@@ -68,7 +68,7 @@ selector:
     # waiting for the range deleter to finish. As a result, we might decommision a shard before all
     # open cursors can finish, such that tests using getMore must be skipped.
 
-    # Connects directly to shards that might have been decomissioned, which leads to network errors.
+    # Connects directly to shards that might have been decommissioned, which leads to network errors.
     - jstests/concurrency/fsm_workloads/cleanup_orphaned_with_balancer.js
 
     # Tests that perform shard addition, shard removal, or movePrimary operations,

@@ -337,10 +337,10 @@ class _AddRemoveShardThread(threading.Thread):
                     self._current_config_mode = self.DEDICATED
                     removed_shard_fixture = self._fixture.configsvr
                 else:
-                    self.logger.info("Decomissioning removed shard " + shard_id + ".")
+                    self.logger.info("Decommissioning removed shard " + shard_id + ".")
                     shard_obj = self._fixture.get_shard_object(shard_host)
                     removed_shard_fixture = shard_obj
-                    self._decomission_removed_shard(shard_obj)
+                    self._decommission_removed_shard(shard_obj)
 
                 self._run_post_remove_shard_checks(removed_shard_fixture, shard_id)
 
@@ -355,9 +355,9 @@ class _AddRemoveShardThread(threading.Thread):
 
                 # Always end with with same shard list at the test end as at startup.
 
-                # If we decomissioned the shard, restart it before adding it back.
+                # If we decommissioned the shard, restart it before adding it back.
                 if shard_id != "config":
-                    self.logger.info("Restarting decomissioned shard " + shard_id + ".")
+                    self.logger.info("Restarting decommissioned shard " + shard_id + ".")
                     shard_obj.setup()
 
                 self._transition_to_config_shard_or_add_shard(shard_id, shard_host)
@@ -592,7 +592,7 @@ class _AddRemoveShardThread(threading.Thread):
         )
         return result
 
-    def _decomission_removed_shard(self, shard_obj):
+    def _decommission_removed_shard(self, shard_obj):
         direct_shard_conn = pymongo.MongoClient(shard_obj.get_driver_connection_url())
 
         with shard_obj.removeshard_teardown_mutex:
@@ -603,7 +603,7 @@ class _AddRemoveShardThread(threading.Thread):
                 # to be empty
                 if len(list(direct_shard_conn.config.system.sharding_ddl_coordinators.find())) != 0:
                     self.logger.info(
-                        "Waiting for config.system.sharding_ddl_coordinators to be empty before decomissioning."
+                        "Waiting for config.system.sharding_ddl_coordinators to be empty before decommissioning."
                     )
                     return False
 
@@ -612,24 +612,24 @@ class _AddRemoveShardThread(threading.Thread):
                     != 0
                 ):
                     self.logger.info(
-                        "Waiting for config.localReshardingOperations.recipient to be empty before decomissioning."
+                        "Waiting for config.localReshardingOperations.recipient to be empty before decommissioning."
                     )
                     return False
 
                 if len(list(direct_shard_conn.config.transaction_coordinators.find())) != 0:
                     self.logger.info(
-                        "Waiting for config.transaction_coordinators to be empty before decomissioning."
+                        "Waiting for config.transaction_coordinators to be empty before decommissioning."
                     )
                     return False
 
                 # TODO SERVER-91474 Wait for ongoing transactions to finish on participants
                 if self._get_number_of_ongoing_transactions(direct_shard_conn) != 0:
                     self.logger.info(
-                        "Waiting for ongoing transactions to commit or abort before decomissioning."
+                        "Waiting for ongoing transactions to commit or abort before decommissioning."
                     )
                     return False
 
-                # TODO SERVER-50144 Wait for config.rangeDeletions to be empty before decomissioning
+                # TODO SERVER-50144 Wait for config.rangeDeletions to be empty before decommissioning
 
                 all_dbs = direct_shard_conn.admin.command({"listDatabases": 1})
                 for db in all_dbs["databases"]:
@@ -653,7 +653,7 @@ class _AddRemoveShardThread(threading.Thread):
             shard_obj.removeshard_teardown_marker = True
             teardown_handler.teardown(shard_obj, "shard")
             if not teardown_handler.was_successful():
-                msg = "Error when decomissioning shard."
+                msg = "Error when decommissioning shard."
                 self.logger.error(msg)
                 raise errors.ServerFailure(teardown_handler.get_error_message())
 

@@ -158,7 +158,7 @@ class TestIdleRequestReceivedMidDraining(unittest.TestCase):
     def setUp(self):
         self.lifecycle = mock.MagicMock(spec=lifecycle_interface.FileBasedThreadLifecycle)
         self.thread, _ = _make_thread(life_cycle=self.lifecycle)
-        self.thread._decomission_removed_shard = mock.MagicMock()
+        self.thread._decommission_removed_shard = mock.MagicMock()
         self.thread._run_post_remove_shard_checks = mock.MagicMock()
         self.thread._check_and_reshard_if_index_inconsistent = mock.MagicMock()
 
@@ -177,7 +177,7 @@ class TestIdleRequestReceivedMidDraining(unittest.TestCase):
         self.thread.run()
 
         self.thread._transition_to_dedicated_or_remove_shard.assert_called_once_with("shard-rs0")
-        self.thread._decomission_removed_shard.assert_not_called()
+        self.thread._decommission_removed_shard.assert_not_called()
         self.thread._run_post_remove_shard_checks.assert_not_called()
 
     def test_transition_raises_idle_request_received_when_lifecycle_signals_idle(self):
