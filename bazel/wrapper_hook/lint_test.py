@@ -493,6 +493,35 @@ class RunRulesLintTest(unittest.TestCase):
         self.assertEqual(patched, 0)
 
 
+class GitignoredFilesTest(unittest.TestCase):
+    """Tests for the git check-ignore filtering used by target coverage."""
+
+    def _mock_check_ignore(self, returncode: int, stdout: str):
+        return mock.patch.object(
+            lint.subprocess,
+            "run",
+            return_value=mock.Mock(returncode=returncode, stdout=stdout, stderr=""),
+        )
+
+    def test_returns_ignored_paths(self):
+        with self._mock_check_ignore(0, "a.js\0b.py\0") as run_mock:
+            ignored = lint._gitignored_files(["a.js", "b.py", "c.js"])
+        self.assertEqual(ignored, {"a.js", "b.py"})
+        args, kwargs = run_mock.call_args
+        self.assertEqual(args[0], ["git", "check-ignore", "--stdin", "-z"])
+        self.assertEqual(kwargs["input"], "a.js\0b.py\0c.js")
+
+    def test_no_ignored_paths(self):
+        # check-ignore exits 1 when nothing is ignored; that is not an error.
+        with self._mock_check_ignore(1, ""):
+            self.assertEqual(lint._gitignored_files(["a.js"]), set())
+
+    def test_unexpected_failure_raises(self):
+        with self._mock_check_ignore(128, ""):
+            with self.assertRaises(subprocess.CalledProcessError):
+                lint._gitignored_files(["a.js"])
+
+
 class ExistingPythonFilesTest(unittest.TestCase):
     def test_filters_deleted_python_paths(self):
         files_to_lint = [
