@@ -207,12 +207,17 @@ assert.soon(
 );
 
 try {
-    // Abort remaining transactions while handling temporarily unavailable errors
-    let numTemporarilyUnavailable = 0;
+    // Abort remaining transactions. A session can only already be gone because cache pressure
+    // killed it, so either error code is evidence of a cache-pressure abort.
+    let numAbortedByCachePressure = 0;
     for (let i = 0; i < sessions.length; i++) {
         let res = sessions[i].abortTransaction_forTesting();
-        if (res.ok == 0 && res.code == ErrorCodes.TemporarilyUnavailable) {
-            numTemporarilyUnavailable++;
+        if (
+            res.ok == 0 &&
+            (res.code == ErrorCodes.TemporarilyUnavailable ||
+                res.code == ErrorCodes.NoSuchTransaction)
+        ) {
+            numAbortedByCachePressure++;
         }
         // End the session now, while the server is still up, instead of leaving it for the shell's
         // GC finalizer to clean up after stopSet() has already killed the server. Otherwise, every
@@ -221,10 +226,10 @@ try {
         sessions[i].endSession();
     }
 
-    // At least one of the transactions should return with the temporarily unavailable error code.
+    // At least one of the transactions should have been aborted by cache pressure.
     assert(
-        numTemporarilyUnavailable > 0,
-        "Expected TemporarilyUnavailable error but none occurred.",
+        numAbortedByCachePressure > 0,
+        "Expected a transaction aborted by cache pressure but none occurred.",
     );
     jsTestLog("All transactions aborted as expected.");
 } finally {
