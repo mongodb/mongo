@@ -19,11 +19,20 @@ var keyfile = "jstests/libs/key1";
 var numShards = 2;
 var username = "foo";
 var password = "bar";
+var externalUsername = "CN=external-user,OU=Testing,O=MongoDB";
 var adhocShard = 0;
 
 var createUser = function(mongo) {
     print("============ adding a user.");
     mongo.getDB("admin").createUser({user: username, pwd: password, roles: jsTest.adminUserRoles});
+};
+
+var createExternalUser = function(mongo) {
+    print("============ adding a user on $external.");
+    assert.commandWorked(
+        mongo.getDB("$external").runCommand({createUser: externalUsername, roles: []}),
+        "the localhost exception should permit createUser on $external",
+    );
 };
 
 var addUsersToEachShard = function(st) {
@@ -243,4 +252,48 @@ extraShards.forEach(function(rs) {
     rs.stopSet();
 });
 st.stop();
+
+// A user on the $external database is a privilege document in admin.system.users, so creating one
+// through mongos must disable the cluster-wide localhost exception, exactly as creating a user on
+// the admin database does.
+var runExternalUserTest = function() {
+    print("=====================");
+    print("starting shards: $external user closes the localhost exception");
+    print("=====================");
+    let externalSt = start();
+
+    let mongo = new Mongo(externalSt.s.host);
+
+    assertCannotRunCommands(mongo, externalSt);
+
+    createExternalUser(mongo);
+
+    // The cluster now has a privilege document, so the exception must be closed. In particular, an
+    // unauthenticated loopback connection must no longer be able to create an admin user.
+    assertCannotRunCommands(mongo, externalSt);
+    assert.commandFailedWithCode(
+        mongo.getDB("admin").runCommand(
+            {createUser: username, pwd: password, roles: jsTest.adminUserRoles}),
+        ErrorCodes.Unauthorized,
+        "the localhost exception remained open after creating a user on $external",
+    );
+    assert.commandFailedWithCode(
+        mongo.getDB("$external").runCommand({createUser: "CN=otr,OU=test,O=mdb", roles: []}),
+        ErrorCodes.Unauthorized,
+        "the localhost exception remained open after creating a user on $external",
+    );
+
+    // Bootstrap an admin user over the keyfile so that the cluster can be shut down. The localhost
+    // exception can no longer be used for this.
+    authutil.asCluster(externalSt.s, keyfile, function() {
+        assert.commandWorked(
+            externalSt.s.getDB("admin").runCommand(
+                {createUser: username, pwd: password, roles: jsTest.adminUserRoles}),
+        );
+    });
+    authenticate(externalSt.s);
+    externalSt.stop();
+};
+
+runExternalUserTest();
 })();

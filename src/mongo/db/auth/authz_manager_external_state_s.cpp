@@ -258,7 +258,8 @@ Status AuthzManagerExternalStateMongos::rolesExist(OperationContext* opCtx,
 }
 
 bool AuthzManagerExternalStateMongos::hasAnyPrivilegeDocuments(OperationContext* opCtx) {
-    BSONObj usersInfoCmd = BSON("usersInfo" << 1);
+    BSONObj usersInfoCmd =
+        BSON("usersInfo" << BSON("forAllDBs" << true) << "showCustomData" << false);
     BSONObjBuilder userBuilder;
     bool ok = Grid::get(opCtx)->catalogClient()->runUserManagementReadCommand(
         opCtx, "admin", usersInfoCmd, &userBuilder);

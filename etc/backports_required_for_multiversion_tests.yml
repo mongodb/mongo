@@ -719,6 +719,8 @@ last-continuous:
     ticket: SERVER-132650
   - test_file: jstests/replsets/sync_source_override_secondary_read_preference.js
     ticket: SERVER-104343
+  - test_file: jstests/sharding/localhostAuthBypass.js
+    ticket: SERVER-134872
   suites: null
 last-lts:
   all:
@@ -1490,4 +1492,6 @@ last-lts:
     ticket: SERVER-132650
   - test_file: jstests/replsets/sync_source_override_secondary_read_preference.js
     ticket: SERVER-104343
+  - test_file: jstests/sharding/localhostAuthBypass.js
+    ticket: SERVER-134872
   suites: null
