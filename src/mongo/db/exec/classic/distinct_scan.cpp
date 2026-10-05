@@ -217,17 +217,17 @@ PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
                                                view.getVersion());
 
     switch (_checker.checkKey(dehydratedKey, &_seekPoint)) {
-        case IndexBoundsChecker::MUST_ADVANCE: {
+        case KeyState::MUST_ADVANCE: {
             // Try again next time. The checker has adjusted the _seekPoint.
             return PlanStage::NEED_TIME;
         }
-        case IndexBoundsChecker::DONE: {
+        case KeyState::DONE: {
             // There won't be a next time.
             _commonStats.isEOF = true;
             _cursor.reset();
             return IS_EOF;
         }
-        case IndexBoundsChecker::VALID: {
+        case KeyState::VALID: {
             if (_replaceUndefinedWithNull) {
                 // The empty array gets the same group key as the 'undefined' BSON value but
                 // produces a null group key when unwound. Note that rewriting undefined to null

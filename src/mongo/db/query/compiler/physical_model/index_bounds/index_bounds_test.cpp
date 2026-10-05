@@ -735,29 +735,29 @@ TEST(IndexBoundsCheckerTest, CheckEnd) {
     IndexBoundsChecker it(&bounds, BSON("foo" << 1 << "bar" << 1), 1);
 
     IndexSeekPoint seekPoint;
-    IndexBoundsChecker::KeyState state;
+    KeyState state;
 
     // Start at something in our range.
     state = it.checkKey(BSON("" << 7 << "" << 1), &seekPoint);
-    ASSERT_EQUALS(state, IndexBoundsChecker::VALID);
+    ASSERT_EQUALS(state, KeyState::VALID);
 
     // Second field moves past the end, but we're not done, since there's still an interval in
     // the previous field that the key hasn't advanced to.
     state = it.checkKey(BSON("" << 20 << "" << 5), &seekPoint);
-    ASSERT_EQUALS(state, IndexBoundsChecker::MUST_ADVANCE);
+    ASSERT_EQUALS(state, KeyState::MUST_ADVANCE);
     ASSERT_EQUALS(seekPoint.prefixLen, 1);
     ASSERT_EQUALS(seekPoint.firstExclusive, 0);
 
     // The next index key is in the second interval for 'foo' and there is a valid interval for
     // 'bar'.
     state = it.checkKey(BSON("" << 22 << "" << 1), &seekPoint);
-    ASSERT_EQUALS(state, IndexBoundsChecker::VALID);
+    ASSERT_EQUALS(state, KeyState::VALID);
 
     // The next index key is very close to the end of the open interval for foo, and it's past
     // the interval for 'bar'.  Since the interval for foo is open, we are asked to move
     // forward, since we possibly could.
     state = it.checkKey(BSON("" << 29.9 << "" << 5), &seekPoint);
-    ASSERT_EQUALS(state, IndexBoundsChecker::MUST_ADVANCE);
+    ASSERT_EQUALS(state, KeyState::MUST_ADVANCE);
     ASSERT_EQUALS(seekPoint.prefixLen, 1);
     ASSERT_EQUALS(seekPoint.firstExclusive, 0);
 }
@@ -776,15 +776,15 @@ TEST(IndexBoundsCheckerTest, MoveIntervalForwardToNextInterval) {
     IndexBoundsChecker it(&bounds, BSON("foo" << 1 << "bar" << 1), 1);
 
     IndexSeekPoint seekPoint;
-    IndexBoundsChecker::KeyState state;
+    KeyState state;
 
     // Start at something in our range.
     state = it.checkKey(BSON("" << 7 << "" << 1), &seekPoint);
-    ASSERT_EQUALS(state, IndexBoundsChecker::VALID);
+    ASSERT_EQUALS(state, KeyState::VALID);
 
     // "foo" moves between two intervals.
     state = it.checkKey(BSON("" << 20.5 << "" << 1), &seekPoint);
-    ASSERT_EQUALS(state, IndexBoundsChecker::MUST_ADVANCE);
+    ASSERT_EQUALS(state, KeyState::MUST_ADVANCE);
     ASSERT_EQUALS(seekPoint.prefixLen, 0);
     // Should be told to move exactly to the next interval's beginning.
     ASSERT_EQUALS(seekPoint.keySuffix[0].numberInt(), 21);
@@ -804,15 +804,15 @@ TEST(IndexBoundsCheckerTest, MoveIntervalForwardManyIntervals) {
     IndexBoundsChecker it(&bounds, BSON("foo" << 1), 1);
 
     IndexSeekPoint seekPoint;
-    IndexBoundsChecker::KeyState state;
+    KeyState state;
 
     // Start at something in our range.
     state = it.checkKey(BSON("" << 7), &seekPoint);
-    ASSERT_EQUALS(state, IndexBoundsChecker::VALID);
+    ASSERT_EQUALS(state, KeyState::VALID);
 
     // "foo" moves forward a few intervals.
     state = it.checkKey(BSON("" << 42), &seekPoint);
-    ASSERT_EQUALS(state, IndexBoundsChecker::VALID);
+    ASSERT_EQUALS(state, KeyState::VALID);
 }
 
 TEST(IndexBoundsCheckerTest, SimpleCheckKey) {
@@ -828,33 +828,33 @@ TEST(IndexBoundsCheckerTest, SimpleCheckKey) {
     IndexBoundsChecker it(&bounds, BSON("foo" << 1 << "bar" << 1), 1);
 
     IndexSeekPoint seekPoint;
-    IndexBoundsChecker::KeyState state;
+    KeyState state;
 
     // Start at something in our range.
     state = it.checkKey(BSON("" << 7 << "" << 1), &seekPoint);
-    ASSERT_EQUALS(state, IndexBoundsChecker::VALID);
+    ASSERT_EQUALS(state, KeyState::VALID);
 
     // The rightmost key is past the range.  We should be told to move past the key before the
     // one whose interval we exhausted.
     state = it.checkKey(BSON("" << 7 << "" << 5.00001), &seekPoint);
-    ASSERT_EQUALS(state, IndexBoundsChecker::MUST_ADVANCE);
+    ASSERT_EQUALS(state, KeyState::MUST_ADVANCE);
     ASSERT_EQUALS(seekPoint.prefixLen, 1);
     ASSERT_EQUALS(seekPoint.firstExclusive, 0);
 
     // Move a little forward, but note that the rightmost key isn't in the interval yet.
     state = it.checkKey(BSON("" << 7.2 << "" << 0), &seekPoint);
-    ASSERT_EQUALS(state, IndexBoundsChecker::MUST_ADVANCE);
+    ASSERT_EQUALS(state, KeyState::MUST_ADVANCE);
     ASSERT_EQUALS(seekPoint.prefixLen, 1);
     ASSERT_EQUALS(seekPoint.keySuffix[1].numberInt(), 0);
     ASSERT_EQUALS(seekPoint.firstExclusive, 1);
 
     // Move to the edge of both intervals, 20,5
     state = it.checkKey(BSON("" << 20 << "" << 5), &seekPoint);
-    ASSERT_EQUALS(state, IndexBoundsChecker::VALID);
+    ASSERT_EQUALS(state, KeyState::VALID);
 
     // And a little beyond.
     state = it.checkKey(BSON("" << 20 << "" << 5.1), &seekPoint);
-    ASSERT_EQUALS(state, IndexBoundsChecker::DONE);
+    ASSERT_EQUALS(state, KeyState::DONE);
 }
 
 TEST(IndexBoundsCheckerTest, FirstKeyMovedIsOKSecondKeyMustMove) {
@@ -871,15 +871,15 @@ TEST(IndexBoundsCheckerTest, FirstKeyMovedIsOKSecondKeyMustMove) {
     IndexBoundsChecker it(&bounds, BSON("foo" << 1 << "bar" << 1), 1);
 
     IndexSeekPoint seekPoint;
-    IndexBoundsChecker::KeyState state;
+    KeyState state;
 
     // Start at something in our range.
     state = it.checkKey(BSON("" << 0 << "" << 1), &seekPoint);
-    ASSERT_EQUALS(state, IndexBoundsChecker::VALID);
+    ASSERT_EQUALS(state, KeyState::VALID);
 
     // First key moves to next interval, second key needs to be advanced.
     state = it.checkKey(BSON("" << 10 << "" << -1), &seekPoint);
-    ASSERT_EQUALS(state, IndexBoundsChecker::MUST_ADVANCE);
+    ASSERT_EQUALS(state, KeyState::MUST_ADVANCE);
     ASSERT_EQUALS(seekPoint.prefixLen, 1);
     ASSERT_EQUALS(seekPoint.keySuffix[1].numberInt(), 0);
     ASSERT_EQUALS(seekPoint.firstExclusive, 1);
@@ -902,24 +902,24 @@ TEST(IndexBoundsCheckerTest, SecondIntervalMustRewind) {
     IndexBoundsChecker it(&bounds, idx, 1);
 
     IndexSeekPoint seekPoint;
-    IndexBoundsChecker::KeyState state;
+    KeyState state;
 
     state = it.checkKey(BSON("" << 25 << "" << 0), &seekPoint);
-    ASSERT_EQUALS(state, IndexBoundsChecker::VALID);
+    ASSERT_EQUALS(state, KeyState::VALID);
 
     state = it.checkKey(BSON("" << 25 << "" << 1), &seekPoint);
-    ASSERT_EQUALS(state, IndexBoundsChecker::MUST_ADVANCE);
+    ASSERT_EQUALS(state, KeyState::MUST_ADVANCE);
     ASSERT_EQUALS(seekPoint.prefixLen, 1);
     ASSERT_EQUALS(seekPoint.keySuffix[1].numberInt(), 9);
     ASSERT_EQUALS(seekPoint.firstExclusive, -1);
 
     state = it.checkKey(BSON("" << 25 << "" << 9), &seekPoint);
-    ASSERT_EQUALS(state, IndexBoundsChecker::VALID);
+    ASSERT_EQUALS(state, KeyState::VALID);
 
     // First key moved forward.  The second key moved back to a valid state but it's behind
     // the interval that the checker thought it was in.
     state = it.checkKey(BSON("" << 26 << "" << 0), &seekPoint);
-    ASSERT_EQUALS(state, IndexBoundsChecker::VALID);
+    ASSERT_EQUALS(state, KeyState::VALID);
 }
 
 TEST(IndexBoundsCheckerTest, SimpleCheckKeyBackwards) {
@@ -938,33 +938,33 @@ TEST(IndexBoundsCheckerTest, SimpleCheckKeyBackwards) {
     IndexBoundsChecker it(&bounds, idx, 1);
 
     IndexSeekPoint seekPoint;
-    IndexBoundsChecker::KeyState state;
+    KeyState state;
 
     // Start at something in our range.
     state = it.checkKey(BSON("" << 20 << "" << 5), &seekPoint);
-    ASSERT_EQUALS(state, IndexBoundsChecker::VALID);
+    ASSERT_EQUALS(state, KeyState::VALID);
 
     // The rightmost key is past the range.  We should be told to move past the key before the
     // one whose interval we exhausted.
     state = it.checkKey(BSON("" << 20 << "" << 0), &seekPoint);
-    ASSERT_EQUALS(state, IndexBoundsChecker::MUST_ADVANCE);
+    ASSERT_EQUALS(state, KeyState::MUST_ADVANCE);
     ASSERT_EQUALS(seekPoint.prefixLen, 1);
     ASSERT_EQUALS(seekPoint.firstExclusive, 0);
 
     // Move a little forward, but note that the rightmost key isn't in the interval yet.
     state = it.checkKey(BSON("" << 19 << "" << 6), &seekPoint);
-    ASSERT_EQUALS(state, IndexBoundsChecker::MUST_ADVANCE);
+    ASSERT_EQUALS(state, KeyState::MUST_ADVANCE);
     ASSERT_EQUALS(seekPoint.prefixLen, 1);
     ASSERT_EQUALS(seekPoint.keySuffix[1].numberInt(), 5);
     ASSERT_EQUALS(seekPoint.firstExclusive, -1);
 
     // Move to the edge of both intervals
     state = it.checkKey(BSON("" << 7 << "" << 0.01), &seekPoint);
-    ASSERT_EQUALS(state, IndexBoundsChecker::VALID);
+    ASSERT_EQUALS(state, KeyState::VALID);
 
     // And a little beyond.
     state = it.checkKey(BSON("" << 7 << "" << 0), &seekPoint);
-    ASSERT_EQUALS(state, IndexBoundsChecker::DONE);
+    ASSERT_EQUALS(state, KeyState::DONE);
 }
 
 TEST(IndexBoundsCheckerTest, CheckEndBackwards) {
@@ -984,29 +984,29 @@ TEST(IndexBoundsCheckerTest, CheckEndBackwards) {
     IndexBoundsChecker it(&bounds, idx, -1);
 
     IndexSeekPoint seekPoint;
-    IndexBoundsChecker::KeyState state;
+    KeyState state;
 
     // Start at something in our range.
     state = it.checkKey(BSON("" << 30 << "" << 1), &seekPoint);
-    ASSERT_EQUALS(state, IndexBoundsChecker::VALID);
+    ASSERT_EQUALS(state, KeyState::VALID);
 
     // Second field moves past the end, but we're not done, since there's still an interval in
     // the previous field that the key hasn't advanced to.
     state = it.checkKey(BSON("" << 30 << "" << 5), &seekPoint);
-    ASSERT_EQUALS(state, IndexBoundsChecker::MUST_ADVANCE);
+    ASSERT_EQUALS(state, KeyState::MUST_ADVANCE);
     ASSERT_EQUALS(seekPoint.prefixLen, 1);
     ASSERT_EQUALS(seekPoint.firstExclusive, 0);
 
     // The next index key is in the second interval for 'foo' and there is a valid interval for
     // 'bar'.
     state = it.checkKey(BSON("" << 20 << "" << 1), &seekPoint);
-    ASSERT_EQUALS(state, IndexBoundsChecker::VALID);
+    ASSERT_EQUALS(state, KeyState::VALID);
 
     // The next index key is very close to the end of the open interval for foo, and it's past
     // the interval for 'bar'.  Since the interval for foo is open, we are asked to move
     // forward, since we possibly could.
     state = it.checkKey(BSON("" << 7.001 << "" << 5), &seekPoint);
-    ASSERT_EQUALS(state, IndexBoundsChecker::MUST_ADVANCE);
+    ASSERT_EQUALS(state, KeyState::MUST_ADVANCE);
     ASSERT_EQUALS(seekPoint.prefixLen, 1);
     ASSERT_EQUALS(seekPoint.firstExclusive, 0);
 }
@@ -1016,15 +1016,15 @@ TEST(IndexBoundsCheckerTest, CheckEndBackwards) {
 //
 
 /**
- * Returns string representation of IndexBoundsChecker::Location.
+ * Returns string representation of Location.
  */
-std::string toString(IndexBoundsChecker::Location location) {
+std::string toString(IntervalPosition location) {
     switch (location) {
-        case IndexBoundsChecker::BEHIND:
+        case IntervalPosition::BEHIND:
             return "BEHIND";
-        case IndexBoundsChecker::WITHIN:
+        case IntervalPosition::WITHIN:
             return "WITHIN";
-        case IndexBoundsChecker::AHEAD:
+        case IntervalPosition::AHEAD:
             return "AHEAD";
     }
     MONGO_UNREACHABLE;
@@ -1040,7 +1040,7 @@ std::string toString(IndexBoundsChecker::Location location) {
 void testFindIntervalForField(int key,
                               const BSONObj& pointsObj,
                               const int expectedDirection,
-                              IndexBoundsChecker::Location expectedLocation,
+                              IntervalPosition expectedLocation,
                               size_t expectedIntervalIndex) {
     // Create key BSONElement.
     BSONObj keyObj = BSON("" << key);
@@ -1055,7 +1055,7 @@ void testFindIntervalForField(int key,
         oil.intervals.push_back(Interval(BSON("" << j << "" << j), true, true));
     }
     size_t intervalIndex = 0;
-    IndexBoundsChecker::Location location =
+    IntervalPosition location =
         IndexBoundsChecker::findIntervalForField(keyElt, oil, expectedDirection, &intervalIndex);
     if (expectedLocation != location) {
         str::stream ss;
@@ -1065,8 +1065,8 @@ void testFindIntervalForField(int key,
         FAIL(std::string(ss));
     }
     // Check interval index if location is BEHIND or WITHIN.
-    if ((IndexBoundsChecker::BEHIND == expectedLocation ||
-         IndexBoundsChecker::WITHIN == expectedLocation) &&
+    if ((IntervalPosition::BEHIND == expectedLocation ||
+         IntervalPosition::WITHIN == expectedLocation) &&
         expectedIntervalIndex != intervalIndex) {
         str::stream ss;
         ss << "Unexpected interval index from findIntervalForField: key=" << keyElt
@@ -1080,65 +1080,65 @@ void testFindIntervalForField(int key,
 TEST(IndexBoundsCheckerTest, FindIntervalForField) {
     // No intervals
     BSONObj pointsObj = fromjson("{points: []}");
-    testFindIntervalForField(5, pointsObj, 1, IndexBoundsChecker::AHEAD, 0U);
-    testFindIntervalForField(5, pointsObj, -1, IndexBoundsChecker::AHEAD, 0U);
+    testFindIntervalForField(5, pointsObj, 1, IntervalPosition::AHEAD, 0U);
+    testFindIntervalForField(5, pointsObj, -1, IntervalPosition::AHEAD, 0U);
 
     // One interval
     pointsObj = fromjson("{points: [5]}");
-    testFindIntervalForField(4, pointsObj, 1, IndexBoundsChecker::BEHIND, 0U);
-    testFindIntervalForField(5, pointsObj, 1, IndexBoundsChecker::WITHIN, 0U);
-    testFindIntervalForField(6, pointsObj, 1, IndexBoundsChecker::AHEAD, 0U);
+    testFindIntervalForField(4, pointsObj, 1, IntervalPosition::BEHIND, 0U);
+    testFindIntervalForField(5, pointsObj, 1, IntervalPosition::WITHIN, 0U);
+    testFindIntervalForField(6, pointsObj, 1, IntervalPosition::AHEAD, 0U);
 
     // One interval - reverse direction
     pointsObj = fromjson("{points: [5]}");
-    testFindIntervalForField(6, pointsObj, -1, IndexBoundsChecker::BEHIND, 0U);
-    testFindIntervalForField(5, pointsObj, -1, IndexBoundsChecker::WITHIN, 0U);
-    testFindIntervalForField(4, pointsObj, -1, IndexBoundsChecker::AHEAD, 0U);
+    testFindIntervalForField(6, pointsObj, -1, IntervalPosition::BEHIND, 0U);
+    testFindIntervalForField(5, pointsObj, -1, IntervalPosition::WITHIN, 0U);
+    testFindIntervalForField(4, pointsObj, -1, IntervalPosition::AHEAD, 0U);
 
     // Two intervals
     // Verifies off-by-one handling in upper bound of binary search.
     pointsObj = fromjson("{points: [5, 7]}");
-    testFindIntervalForField(4, pointsObj, 1, IndexBoundsChecker::BEHIND, 0U);
-    testFindIntervalForField(5, pointsObj, 1, IndexBoundsChecker::WITHIN, 0U);
-    testFindIntervalForField(6, pointsObj, 1, IndexBoundsChecker::BEHIND, 1U);
-    testFindIntervalForField(7, pointsObj, 1, IndexBoundsChecker::WITHIN, 1U);
-    testFindIntervalForField(8, pointsObj, 1, IndexBoundsChecker::AHEAD, 0U);
+    testFindIntervalForField(4, pointsObj, 1, IntervalPosition::BEHIND, 0U);
+    testFindIntervalForField(5, pointsObj, 1, IntervalPosition::WITHIN, 0U);
+    testFindIntervalForField(6, pointsObj, 1, IntervalPosition::BEHIND, 1U);
+    testFindIntervalForField(7, pointsObj, 1, IntervalPosition::WITHIN, 1U);
+    testFindIntervalForField(8, pointsObj, 1, IntervalPosition::AHEAD, 0U);
 
     // Two intervals - reverse direction
     // Verifies off-by-one handling in upper bound of binary search.
     pointsObj = fromjson("{points: [7, 5]}");
-    testFindIntervalForField(8, pointsObj, -1, IndexBoundsChecker::BEHIND, 0U);
-    testFindIntervalForField(7, pointsObj, -1, IndexBoundsChecker::WITHIN, 0U);
-    testFindIntervalForField(6, pointsObj, -1, IndexBoundsChecker::BEHIND, 1U);
-    testFindIntervalForField(5, pointsObj, -1, IndexBoundsChecker::WITHIN, 1U);
-    testFindIntervalForField(4, pointsObj, -1, IndexBoundsChecker::AHEAD, 0U);
+    testFindIntervalForField(8, pointsObj, -1, IntervalPosition::BEHIND, 0U);
+    testFindIntervalForField(7, pointsObj, -1, IntervalPosition::WITHIN, 0U);
+    testFindIntervalForField(6, pointsObj, -1, IntervalPosition::BEHIND, 1U);
+    testFindIntervalForField(5, pointsObj, -1, IntervalPosition::WITHIN, 1U);
+    testFindIntervalForField(4, pointsObj, -1, IntervalPosition::AHEAD, 0U);
 
     // Multiple intervals - odd number of intervals.
     pointsObj = fromjson("{points: [1, 3, 5, 7, 9]}");
-    testFindIntervalForField(0, pointsObj, 1, IndexBoundsChecker::BEHIND, 0U);
-    testFindIntervalForField(1, pointsObj, 1, IndexBoundsChecker::WITHIN, 0U);
-    testFindIntervalForField(2, pointsObj, 1, IndexBoundsChecker::BEHIND, 1U);
-    testFindIntervalForField(3, pointsObj, 1, IndexBoundsChecker::WITHIN, 1U);
-    testFindIntervalForField(4, pointsObj, 1, IndexBoundsChecker::BEHIND, 2U);
-    testFindIntervalForField(5, pointsObj, 1, IndexBoundsChecker::WITHIN, 2U);
-    testFindIntervalForField(6, pointsObj, 1, IndexBoundsChecker::BEHIND, 3U);
-    testFindIntervalForField(7, pointsObj, 1, IndexBoundsChecker::WITHIN, 3U);
-    testFindIntervalForField(8, pointsObj, 1, IndexBoundsChecker::BEHIND, 4U);
-    testFindIntervalForField(9, pointsObj, 1, IndexBoundsChecker::WITHIN, 4U);
-    testFindIntervalForField(10, pointsObj, 1, IndexBoundsChecker::AHEAD, 0U);
+    testFindIntervalForField(0, pointsObj, 1, IntervalPosition::BEHIND, 0U);
+    testFindIntervalForField(1, pointsObj, 1, IntervalPosition::WITHIN, 0U);
+    testFindIntervalForField(2, pointsObj, 1, IntervalPosition::BEHIND, 1U);
+    testFindIntervalForField(3, pointsObj, 1, IntervalPosition::WITHIN, 1U);
+    testFindIntervalForField(4, pointsObj, 1, IntervalPosition::BEHIND, 2U);
+    testFindIntervalForField(5, pointsObj, 1, IntervalPosition::WITHIN, 2U);
+    testFindIntervalForField(6, pointsObj, 1, IntervalPosition::BEHIND, 3U);
+    testFindIntervalForField(7, pointsObj, 1, IntervalPosition::WITHIN, 3U);
+    testFindIntervalForField(8, pointsObj, 1, IntervalPosition::BEHIND, 4U);
+    testFindIntervalForField(9, pointsObj, 1, IntervalPosition::WITHIN, 4U);
+    testFindIntervalForField(10, pointsObj, 1, IntervalPosition::AHEAD, 0U);
 
     // Multiple intervals - even number of intervals, reverse direction
     // Interval order has to match direction.
     pointsObj = fromjson("{points: [7, 5, 3, 1]}");
-    testFindIntervalForField(8, pointsObj, -1, IndexBoundsChecker::BEHIND, 0U);
-    testFindIntervalForField(7, pointsObj, -1, IndexBoundsChecker::WITHIN, 0U);
-    testFindIntervalForField(6, pointsObj, -1, IndexBoundsChecker::BEHIND, 1U);
-    testFindIntervalForField(5, pointsObj, -1, IndexBoundsChecker::WITHIN, 1U);
-    testFindIntervalForField(4, pointsObj, -1, IndexBoundsChecker::BEHIND, 2U);
-    testFindIntervalForField(3, pointsObj, -1, IndexBoundsChecker::WITHIN, 2U);
-    testFindIntervalForField(2, pointsObj, -1, IndexBoundsChecker::BEHIND, 3U);
-    testFindIntervalForField(1, pointsObj, -1, IndexBoundsChecker::WITHIN, 3U);
-    testFindIntervalForField(0, pointsObj, -1, IndexBoundsChecker::AHEAD, 0U);
+    testFindIntervalForField(8, pointsObj, -1, IntervalPosition::BEHIND, 0U);
+    testFindIntervalForField(7, pointsObj, -1, IntervalPosition::WITHIN, 0U);
+    testFindIntervalForField(6, pointsObj, -1, IntervalPosition::BEHIND, 1U);
+    testFindIntervalForField(5, pointsObj, -1, IntervalPosition::WITHIN, 1U);
+    testFindIntervalForField(4, pointsObj, -1, IntervalPosition::BEHIND, 2U);
+    testFindIntervalForField(3, pointsObj, -1, IntervalPosition::WITHIN, 2U);
+    testFindIntervalForField(2, pointsObj, -1, IntervalPosition::BEHIND, 3U);
+    testFindIntervalForField(1, pointsObj, -1, IntervalPosition::WITHIN, 3U);
+    testFindIntervalForField(0, pointsObj, -1, IntervalPosition::AHEAD, 0U);
 }
 
 }  // namespace

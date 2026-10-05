@@ -360,13 +360,13 @@ bool matchesInterval(const OrderedIntervalList& oil, BSONElement val) {
                             const std::pair<BSONElement, Interval::Direction>& valAndDirection) {
                              return IndexBoundsChecker::intervalCmp(
                                         interval, valAndDirection.first, valAndDirection.second) ==
-                                 IndexBoundsChecker::AHEAD;
+                                 IntervalPosition::AHEAD;
                          });
 
     if (it == oil.intervals.end()) {
         return false;
     }
-    return IndexBoundsChecker::intervalCmp(*it, val, direction) == IndexBoundsChecker::WITHIN;
+    return IndexBoundsChecker::intervalCmp(*it, val, direction) == IntervalPosition::WITHIN;
 }
 
 }  // namespace mongo::ce

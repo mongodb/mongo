@@ -204,6 +204,24 @@ size_t estimate(const IndexBoundsChecker&);
 }  // namespace sbe::size_estimator
 
 /**
+ * The states of a key from an index scan. See IndexBoundsChecker::checkKey.
+ */
+enum class KeyState {
+    VALID,
+    MUST_ADVANCE,
+    DONE,
+};
+
+/**
+ * Relative position of a key to an interval.
+ */
+enum class IntervalPosition {
+    BEHIND = -1,
+    WITHIN = 0,
+    AHEAD = 1,
+};
+
+/**
  * A helper used by IndexScan to navigate an index.
  */
 class IndexBoundsChecker {
@@ -226,15 +244,6 @@ public:
      * should emit no results.
      */
     bool getStartSeekPoint(IndexSeekPoint* out);
-
-    /**
-     * The states of a key from an index scan.  See checkKey below.
-     */
-    enum KeyState {
-        VALID,
-        MUST_ADVANCE,
-        DONE,
-    };
 
     /**
      * Is 'key' a valid key?  Note that this differs from checkKey, which assumes that it
@@ -282,21 +291,12 @@ public:
                                      bool forward);
 
     /**
-     * Relative position of a key to an interval.
-     */
-    enum Location {
-        BEHIND = -1,
-        WITHIN = 0,
-        AHEAD = 1,
-    };
-
-    /**
      * Returns BEHIND/WITHIN/AHEAD for a single interval. 'direction' must be derived from
      * OrderedIntervalList::computeDirection()
      */
-    static Location intervalCmp(const Interval& interval,
-                                const BSONElement& key,
-                                Interval::Direction direction);
+    static IntervalPosition intervalCmp(const Interval& interval,
+                                        const BSONElement& key,
+                                        Interval::Direction direction);
 
     /**
      * If 'elt' is in any interval, return WITHIN and set 'newIntervalIndex' to the index of the
@@ -311,10 +311,10 @@ public:
      *
      * TODO(efficiency): Start search from a given index.
      */
-    static Location findIntervalForField(const BSONElement& elt,
-                                         const OrderedIntervalList& oil,
-                                         int expectedDirection,
-                                         size_t* newIntervalIndex);
+    static IntervalPosition findIntervalForField(const BSONElement& elt,
+                                                 const OrderedIntervalList& oil,
+                                                 int expectedDirection,
+                                                 size_t* newIntervalIndex);
 
     const IndexBounds* bounds() const {
         return _bounds;
@@ -351,7 +351,7 @@ public:
      * 'where' is the leftmost field that isn't in the interval we think it is.
      * 'what' is the orientation of the field with respect to that interval.
      */
-    bool findLeftmostProblem(const KeyComponents& key, size_t* where, Location* what) const;
+    bool findLeftmostProblem(const KeyComponents& key, size_t* where, IntervalPosition* what) const;
 
     /**
      * Returns true if it's possible to advance any of the first 'fieldsToCheck' fields of 'key'
@@ -372,7 +372,7 @@ public:
      */
     void buildSeekPoint(const KeyComponents& key,
                         size_t prefixLen,
-                        Location where,
+                        IntervalPosition where,
                         IndexSeekPoint* out) const;
 
 private:

@@ -153,13 +153,13 @@ static void scanWildcardMetadataKeys(OperationContext* opCtx,
                                                    view.getVersion());
 
         switch (checker.checkKey(dehydratedKey, &seekPoint)) {
-            case IndexBoundsChecker::VALID:
+            case KeyState::VALID:
                 multikeyPaths->emplace(extractMultikeyPathFromIndexKey(
                     {.key = dehydratedKey, .loc = *view.getRecordId()}));
                 view = cursor->nextKeyValueView(ru);
                 break;
 
-            case IndexBoundsChecker::MUST_ADVANCE: {
+            case KeyState::MUST_ADVANCE: {
                 ++stats->numSeeks;
                 key_string::Builder builder(sortedDataInterface->getKeyStringVersion(),
                                             sortedDataInterface->getOrdering());
@@ -170,7 +170,7 @@ static void scanWildcardMetadataKeys(OperationContext* opCtx,
                 break;
             }
 
-            case IndexBoundsChecker::DONE:
+            case KeyState::DONE:
                 view.reset();
                 break;
 

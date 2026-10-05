@@ -585,35 +585,36 @@ bool IndexBoundsChecker::getStartSeekPoint(IndexSeekPoint* out) {
 
 namespace {
 
-IndexBoundsChecker::Location intervalCmpImpl(const Interval& interval,
-                                             const BSONElement& key,
-                                             int expectedDirection) {
+IntervalPosition intervalCmpImpl(const Interval& interval,
+                                 const BSONElement& key,
+                                 int expectedDirection) {
     int cmp = sgn(key.woCompare(interval.start, false));
     bool startOK = (cmp == expectedDirection) || (cmp == 0 && interval.startInclusive);
     if (!startOK) {
-        return IndexBoundsChecker::BEHIND;
+        return IntervalPosition::BEHIND;
     }
     cmp = sgn(key.woCompare(interval.end, false));
     bool endOK = (cmp == -expectedDirection) || (cmp == 0 && interval.endInclusive);
     if (!endOK) {
-        return IndexBoundsChecker::AHEAD;
+        return IntervalPosition::AHEAD;
     }
-    return IndexBoundsChecker::WITHIN;
+    return IntervalPosition::WITHIN;
 }
 
 }  // namespace
 
 bool IndexBoundsChecker::findLeftmostProblem(const KeyComponents& key,
                                              size_t* where,
-                                             Location* what) const {
+                                             IntervalPosition* what) const {
     // For each field in the index key, see if it's in the interval it should be.
     for (size_t i = 0; i < _curInterval.size(); ++i) {
         const OrderedIntervalList& field = _bounds->fields[i];
         const Interval& currentInterval = field.intervals[_curInterval[i]];
-        Location cmp = intervalCmpImpl(currentInterval, key.values[i], _expectedDirection[i]);
+        IntervalPosition cmp =
+            intervalCmpImpl(currentInterval, key.values[i], _expectedDirection[i]);
 
         // If it's not in the interval we think it is...
-        if (0 != cmp) {
+        if (IntervalPosition::WITHIN != cmp) {
             *where = i;
             *what = cmp;
             return true;
@@ -659,9 +660,9 @@ bool IndexBoundsChecker::isValidKey(const BSONObj& key) {
     while (it.more()) {
         BSONElement elt = it.next();
         size_t whichInterval;
-        Location loc = findIntervalForField(
+        IntervalPosition loc = findIntervalForField(
             elt, _bounds->fields[curOil], _expectedDirection[curOil], &whichInterval);
-        if (WITHIN != loc) {
+        if (IntervalPosition::WITHIN != loc) {
             return false;
         }
         ++curOil;
@@ -669,15 +670,14 @@ bool IndexBoundsChecker::isValidKey(const BSONObj& key) {
     return true;
 }
 
-IndexBoundsChecker::KeyState IndexBoundsChecker::checkKeyWithEndPosition(
-    const BSONObj& currentKey,
-    IndexSeekPoint* query,
-    key_string::Builder& endKey,
-    Ordering ord,
-    bool forward) {
+KeyState IndexBoundsChecker::checkKeyWithEndPosition(const BSONObj& currentKey,
+                                                     IndexSeekPoint* query,
+                                                     key_string::Builder& endKey,
+                                                     Ordering ord,
+                                                     bool forward) {
     auto state = checkKey(currentKey, query);
     endKey.resetToEmpty(ord);
-    if (state == VALID && !_bounds->fields.back().isPoint()) {
+    if (state == KeyState::VALID && !_bounds->fields.back().isPoint()) {
         auto size = _keyValues.size();
         std::vector<const BSONElement*> out(size);
         key_string::Discriminator discriminator;
@@ -708,14 +708,11 @@ namespace {
 bool isKeyAheadOfInterval(const Interval& interval,
                           const std::pair<BSONElement, int>& keyAndDirection) {
     return intervalCmpImpl(interval, keyAndDirection.first, keyAndDirection.second) ==
-        IndexBoundsChecker::AHEAD;
+        IntervalPosition::AHEAD;
 }
 
 template <typename Checker, typename Key, typename SeekPoint>
-typename Checker::KeyState checkKeyGeneric(Checker& checker, const Key& key, SeekPoint* seekPoint) {
-    using KeyState = typename Checker::KeyState;
-    using Location = typename Checker::Location;
-
+KeyState checkKeyGeneric(Checker& checker, const Key& key, SeekPoint* seekPoint) {
     auto& curInterval = checker.curInterval();
     const auto* bounds = checker.bounds();
     const auto& expectedDirection = checker.expectedDirection();
@@ -725,7 +722,7 @@ typename Checker::KeyState checkKeyGeneric(Checker& checker, const Key& key, See
     const auto keyComponents = checker.parseKey(key);
 
     size_t firstNonContainedField;
-    Location orientation;
+    IntervalPosition orientation;
 
     if (!checker.findLeftmostProblem(keyComponents, &firstNonContainedField, &orientation)) {
         // All fields in the index are within the current interval.  Caller can use the key.
@@ -733,7 +730,7 @@ typename Checker::KeyState checkKeyGeneric(Checker& checker, const Key& key, See
     }
 
     // Field number 'firstNonContainedField' of the index key is before its current interval.
-    if (Location::BEHIND == orientation) {
+    if (IntervalPosition::BEHIND == orientation) {
         // It's behind our current interval, but our current interval could be wrong.  Start all
         // intervals from firstNonContainedField to the right over...
         for (size_t i = firstNonContainedField; i < curInterval.size(); ++i) {
@@ -749,13 +746,13 @@ typename Checker::KeyState checkKeyGeneric(Checker& checker, const Key& key, See
     }
 
     // Field number 'firstNonContainedField' of the index key is before all current intervals.
-    if (Location::BEHIND == orientation) {
+    if (IntervalPosition::BEHIND == orientation) {
         // Tell the caller to move forward to the start of the current interval.
         checker.buildSeekPoint(keyComponents, firstNonContainedField, orientation, seekPoint);
         return KeyState::MUST_ADVANCE;
     }
 
-    MONGO_verify(Location::AHEAD == orientation);
+    MONGO_verify(IntervalPosition::AHEAD == orientation);
 
     // Field number 'firstNonContainedField' of the index key is after interval we think it's
     // in.  Fields 0 through 'firstNonContained-1' are within their current intervals and we can
@@ -764,18 +761,19 @@ typename Checker::KeyState checkKeyGeneric(Checker& checker, const Key& key, See
         // Find the interval that contains our field.
         size_t newIntervalForField;
 
-        Location where = Checker::findIntervalForField(keyComponents.values[firstNonContainedField],
-                                                       bounds->fields[firstNonContainedField],
-                                                       expectedDirection[firstNonContainedField],
-                                                       &newIntervalForField);
+        IntervalPosition where =
+            Checker::findIntervalForField(keyComponents.values[firstNonContainedField],
+                                          bounds->fields[firstNonContainedField],
+                                          expectedDirection[firstNonContainedField],
+                                          &newIntervalForField);
 
-        if (Location::WITHIN == where) {
+        if (IntervalPosition::WITHIN == where) {
             // Found a new interval for field firstNonContainedField.  Move our internal choice
             // of interval to that.
             curInterval[firstNonContainedField] = newIntervalForField;
             // Let's find valid intervals for fields to the right.
             ++firstNonContainedField;
-        } else if (Location::BEHIND == where) {
+        } else if (IntervalPosition::BEHIND == where) {
             // firstNonContained field is between the intervals (newIntervalForField-1) and
             // newIntervalForField.  We have to tell the caller to move forward until he at
             // least hits our new current interval.
@@ -789,7 +787,7 @@ typename Checker::KeyState checkKeyGeneric(Checker& checker, const Key& key, See
             checker.buildSeekPoint(keyComponents, firstNonContainedField, where, seekPoint);
             return KeyState::MUST_ADVANCE;
         } else {
-            MONGO_verify(Location::AHEAD == where);
+            MONGO_verify(IntervalPosition::AHEAD == where);
             // Field number 'firstNonContainedField' cannot possibly be placed into an interval,
             // as it is already past its last possible interval.  The caller must move forward
             // to a key with a greater value for the previous field.
@@ -815,7 +813,7 @@ typename Checker::KeyState checkKeyGeneric(Checker& checker, const Key& key, See
 
 }  // namespace
 
-IndexBoundsChecker::KeyState IndexBoundsChecker::checkKey(const BSONObj& key, IndexSeekPoint* out) {
+KeyState IndexBoundsChecker::checkKey(const BSONObj& key, IndexSeekPoint* out) {
     out->keySuffix.resize(_curInterval.size());
     return checkKeyGeneric(*this, key, out);
 }
@@ -837,16 +835,16 @@ IndexBoundsChecker::KeyComponents IndexBoundsChecker::parseKey(const BSONObj& ke
 
 void IndexBoundsChecker::buildSeekPoint(const KeyComponents& key,
                                         size_t prefixLen,
-                                        Location where,
+                                        IntervalPosition where,
                                         IndexSeekPoint* out) const {
     tassert(13180101,
             "`buildSeekPoint` must be called with `where` being ahead or behind",
-            where == BEHIND || where == AHEAD);
+            where == IntervalPosition::BEHIND || where == IntervalPosition::AHEAD);
 
     out->keyPrefix = key.obj.getOwned();
     out->prefixLen = static_cast<int>(prefixLen);
 
-    if (where == AHEAD) {
+    if (where == IntervalPosition::AHEAD) {
         out->firstExclusive = static_cast<int>(prefixLen) - 1;
         return;
     }
@@ -862,9 +860,9 @@ void IndexBoundsChecker::buildSeekPoint(const KeyComponents& key,
 }
 
 // static
-IndexBoundsChecker::Location IndexBoundsChecker::intervalCmp(const Interval& interval,
-                                                             const BSONElement& key,
-                                                             Interval::Direction direction) {
+IntervalPosition IndexBoundsChecker::intervalCmp(const Interval& interval,
+                                                 const BSONElement& key,
+                                                 Interval::Direction direction) {
     // Point intervals (eg. [x,x]) have Direction kDirectionNone. We default to the ascending
     // operator in this case.
     const int intDir = (direction == Interval::Direction::kDirectionDescending) ? -1 : 1;
@@ -872,11 +870,10 @@ IndexBoundsChecker::Location IndexBoundsChecker::intervalCmp(const Interval& int
 }
 
 // static
-IndexBoundsChecker::Location IndexBoundsChecker::findIntervalForField(
-    const BSONElement& elt,
-    const OrderedIntervalList& oil,
-    const int expectedDirection,
-    size_t* newIntervalIndex) {
+IntervalPosition IndexBoundsChecker::findIntervalForField(const BSONElement& elt,
+                                                          const OrderedIntervalList& oil,
+                                                          const int expectedDirection,
+                                                          size_t* newIntervalIndex) {
     // Binary search for interval.
     // Intervals are ordered in the same direction as our keys.
     // Key behind all intervals: [BEHIND, ..., BEHIND]
@@ -892,17 +889,17 @@ IndexBoundsChecker::Location IndexBoundsChecker::findIntervalForField(
 
     // Key ahead of all intervals.
     if (i == oil.intervals.end()) {
-        return AHEAD;
+        return IntervalPosition::AHEAD;
     }
 
     // Found either interval containing key or left-most BEHIND interval.
     *newIntervalIndex = std::distance(oil.intervals.begin(), i);
 
     // Additional check to determine if interval contains key.
-    Location where = intervalCmpImpl(*i, elt, expectedDirection);
+    IntervalPosition where = intervalCmpImpl(*i, elt, expectedDirection);
     tassert(11051913,
             "Expect the element to be either behind, or within the interval",
-            BEHIND == where || WITHIN == where);
+            IntervalPosition::BEHIND == where || IntervalPosition::WITHIN == where);
 
     return where;
 }

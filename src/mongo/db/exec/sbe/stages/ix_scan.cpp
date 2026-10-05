@@ -749,15 +749,15 @@ bool GenericIndexScanStage::validateKey(const SortedDataKeyValueView& key) {
 
         switch (_checker->checkKeyWithEndPosition(
             bsonKey, &_seekPoint, _endKey, _params.ord, _forward)) {
-            case IndexBoundsChecker::VALID:
+            case KeyState::VALID:
                 _scanState = ScanState::kScanning;
                 return true;
 
-            case IndexBoundsChecker::DONE:
+            case KeyState::DONE:
                 _scanState = ScanState::kFinished;
                 return false;
 
-            case IndexBoundsChecker::MUST_ADVANCE:
+            case KeyState::MUST_ADVANCE:
                 _scanState = ScanState::kNeedSeek;
                 return false;
         }

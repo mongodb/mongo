@@ -195,14 +195,14 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
 
     if (!view.isEmpty() && _checker) {
         switch (_checker->checkKey(dehydratedKey, &_seekPoint)) {
-            case IndexBoundsChecker::VALID:
+            case KeyState::VALID:
                 break;
 
-            case IndexBoundsChecker::DONE:
+            case KeyState::DONE:
                 view.reset();
                 break;
 
-            case IndexBoundsChecker::MUST_ADVANCE:
+            case KeyState::MUST_ADVANCE:
                 _scanState = NEED_SEEK;
                 return PlanStage::NEED_TIME;
         }
