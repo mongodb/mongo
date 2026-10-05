@@ -21,13 +21,6 @@ const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");
 const db = conn.getDB("test");
 
-// The tests expect that memory metrics appear right after memory is used. Decrease the threshold
-// for rate-limiting writes to CurOp. Otherwise, we may report no memory usage if the memory used <
-// limit.
-assert.commandWorked(
-    db.adminCommand({setParameter: 1, internalQueryMaxWriteToCurOpMemoryUsageBytes: 256}),
-);
-
 const stageName = "$_internalSetWindowFields";
 
 const collName = jsTestName();

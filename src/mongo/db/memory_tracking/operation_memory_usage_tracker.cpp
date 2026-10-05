@@ -23,7 +23,8 @@ const OperationContext::Decoration<std::shared_ptr<OperationMemoryUsageTracker>>
 }  // namespace
 
 OperationMemoryUsageTracker::OperationMemoryUsageTracker(OperationContext* opCtx)
-    : SimpleMemoryUsageTracker(MemoryUsageLimit{query_knobs::kMaxMemoryUsageBytesPerOperation}),
+    : SimpleMemoryUsageTracker(MemoryUsageLimit{query_knobs::kMaxMemoryUsageBytesPerOperation},
+                               internalQueryMaxWriteToCurOpMemoryUsageBytes.loadRelaxed()),
       _opCtx(opCtx) {}
 
 /**
@@ -156,8 +157,7 @@ void OperationMemoryUsageTracker::attachToOpCtxIfAvailable(
     }
     if (reportToCurOp == ReportToCurOp::kYes) {
         tracker->_opCtx = opCtx;
-        CurOp::get(opCtx)->setMemoryTrackingStats(tracker->inUseTrackedMemoryBytes(),
-                                                  tracker->peakTrackedMemoryBytes());
+        tracker->flushToCurOp();
     } else {
         // Reset tracker _opCtx to not report to curOp.
         tracker->_opCtx = nullptr;

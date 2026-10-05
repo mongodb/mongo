@@ -33,11 +33,6 @@ function setUpColl(conn) {
     assert.commandWorked(
         db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}),
     );
-    // Decrease the threshold for rate-limiting writes to CurOp so the op-wide peak is reported to
-    // the profiler even though the projection only uses a small amount of memory.
-    assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryMaxWriteToCurOpMemoryUsageBytes: 256}),
-    );
     return {db, coll};
 }
 
@@ -69,6 +64,10 @@ function getProjectionStage(coll) {
         setParameter: {
             featureFlagQueryMemoryTracking: true,
             featureFlagExpressionMemoryTracking: true,
+            // This test verifies that the projection's memory usage reaches the profiler. The
+            // operation-wide tracker only writes to CurOp once usage crosses this chunk size, and
+            // the projection stays below the 1MB default, so report every update.
+            internalQueryMaxWriteToCurOpMemoryUsageBytes: 1,
         },
     });
     assert.neq(null, conn, "mongod was unable to start up");

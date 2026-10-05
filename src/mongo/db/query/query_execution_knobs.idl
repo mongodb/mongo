@@ -47,7 +47,7 @@ server_parameters:
     internalQueryMaxWriteToCurOpMemoryUsageBytes:
         mod_visibility: needs_replacement
         description: >-
-            Maximum amount of memory bytes tracked by a stage's memory tracker before writing to CurOp.
+            Chunk size, in bytes, governing when a memory usage tracker writes to CurOp.
         set_at: [startup, runtime]
         cpp_varname: "internalQueryMaxWriteToCurOpMemoryUsageBytes"
         cpp_vartype: Atomic<int>

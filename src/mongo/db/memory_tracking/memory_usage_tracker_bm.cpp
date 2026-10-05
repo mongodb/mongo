@@ -51,18 +51,18 @@ constexpr int64_t kBaseUsage = 64 * 1024;
 
 /**
  * The three-level chain a $group builds: a per-accumulator child tracker, the stage's own base
- * tracker (the only level with chunking enabled), and the operation-wide root that owns the CurOp
- * callback. Levels are heap-allocated so the parent pointers stay valid.
+ * tracker, and the operation-wide root that owns the CurOp callback (the only level with chunking
+ * enabled). Levels are heap-allocated so the parent pointers stay valid.
  */
 struct TrackerChain {
     explicit TrackerChain(int64_t chunkSize) {
-        root = std::make_unique<RootTracker>(MemoryUsageLimit{kNoLimit}, 0 /* chunkSize */);
+        root = std::make_unique<RootTracker>(MemoryUsageLimit{kNoLimit}, chunkSize);
         // Stands in for the real CurOp write, which is more expensive than this counter. The
         // benchmarks that report on every update measure the call and the surrounding branch, not
         // the cost of touching CurOp's atomics.
         root->setWriteToCurOp([counter = reportCount.get()](int64_t, int64_t) { ++(*counter); });
         stage = std::make_unique<SimpleMemoryUsageTracker>(
-            root.get(), MemoryUsageLimit{kNoLimit}, chunkSize);
+            root.get(), MemoryUsageLimit{kNoLimit}, 0 /*chunkSize*/);
         child = std::make_unique<SimpleMemoryUsageTracker>(stage.get(), MemoryUsageLimit{kNoLimit});
     }
 
@@ -105,11 +105,12 @@ void BM_AddZeroDeltaChain(benchmark::State& state) {
 BENCHMARK(BM_AddZeroDeltaChain);
 
 /**
- * Non-zero updates on a single tracker with chunking disabled: the update itself with no division
- * and no chain walk.
+ * Non-zero updates on a single tracker with no CurOp callback: the bare update -- no chain walk,
+ * no chunk check, no report. Baseline for the chain benchmarks: addInternal() returns before the
+ * chunk logic, so the chunk size is irrelevant here.
  */
-void BM_AddNonZeroNoChunking(benchmark::State& state) {
-    SimpleMemoryUsageTracker tracker{MemoryUsageLimit{kNoLimit}, 0 /* chunkSize */};
+void BM_AddNonZeroBareUpdate(benchmark::State& state) {
+    SimpleMemoryUsageTracker tracker{MemoryUsageLimit{kNoLimit}};
     tracker.add(kBaseUsage);
     int64_t delta = 64;
     for (auto _ : state) {
@@ -119,7 +120,7 @@ void BM_AddNonZeroNoChunking(benchmark::State& state) {
     }
     benchmark::DoNotOptimize(tracker.inUseTrackedMemoryBytes());
 }
-BENCHMARK(BM_AddNonZeroNoChunking);
+BENCHMARK(BM_AddNonZeroBareUpdate);
 
 /**
  * Non-zero updates that stay inside the chunk already reported, through the full chain. This is the

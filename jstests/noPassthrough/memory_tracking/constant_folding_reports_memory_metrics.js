@@ -40,6 +40,10 @@ function runPipelineAndGetProfilerEntry(db, coll) {
         setParameter: {
             featureFlagQueryMemoryTracking: true,
             featureFlagExpressionMemoryTracking: true,
+            // This test verifies that constant folding's memory usage reaches the profiler. The
+            // operation-wide tracker only writes to CurOp once usage crosses this chunk size, and
+            // the folded $concatArrays stays below the 1MB default, so report every update.
+            internalQueryMaxWriteToCurOpMemoryUsageBytes: 1,
         },
     });
     assert.neq(null, conn, "mongod was unable to start up");

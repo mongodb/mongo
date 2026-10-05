@@ -31,6 +31,7 @@ public:
     SimpleMemoryUsageTracker(SimpleMemoryUsageTracker&&) = default;
     SimpleMemoryUsageTracker& operator=(SimpleMemoryUsageTracker&&) = default;
 
+    // 'chunkSize' of 0 or 1 both mean "no chunking" (see '_chunkSize'); either is clamped to 1.
     SimpleMemoryUsageTracker(SimpleMemoryUsageTracker* base,
                              MemoryUsageLimit maxAllowedMemoryUsageBytes,
                              int64_t chunkSize = 0);
@@ -58,8 +59,9 @@ public:
         if (diff == 0) {
             return;
         }
-        addInternal(diff, true /* report */);
+        addInternal(diff);
     }
+
 
     /**
      * Defined inline so that callers reach the zero-diff early return in 'add()' without paying for
@@ -163,15 +165,22 @@ protected:
      */
     void setWriteToCurOp(std::function<void(int64_t, int64_t)> writeToCurOp);
 
-private:
     /**
-     * Accumulates 'diff' into this tracker and propagates the exact diff up the base chain.
-     * 'report' indicates whether the originating add() should be reported to CurOp; it is
-     * overridden by any tracker in the chain that has chunking enabled, based on whether a chunk
-     * boundary was crossed. The root tracker performs the actual CurOp write (reporting the exact
-     * in-use total) when 'report' is true.
+     * Publishes the current exact totals through '_writeToCurOp' for publishes made outside of
+     * addInternal()'s chunk-crossing path -- e.g. when a stashed tracker is reattached to a resumed
+     * getMore's opCtx. Consumes the "never reported" state, so the return-to-zero rule still drives
+     * CurOp back to zero after a release that follows the publish.
      */
-    MONGO_COMPILER_NOINLINE void addInternal(int64_t diff, bool report);
+    void flushToCurOp() {
+        if (!_writeToCurOp) {
+            return;
+        }
+
+        reportToCurOp();
+        _lastReportedLowerBound = _inUseTrackedMemoryBytes == 0
+            ? -1
+            : (_inUseTrackedMemoryBytes / _chunkSize) * _chunkSize;
+    }
 
     /**
      * Invokes '_writeToCurOp' with the current totals. Kept out of line so that addInternal() has
@@ -187,6 +196,15 @@ private:
      * buffer on its stack -- it passes two int64_t by reference to the callback and nothing else.
      */
     MONGO_COMPILER_NO_STACK_PROTECTOR void reportToCurOp() const;
+
+private:
+    /**
+     * Accumulates 'diff' into this tracker and propagates the exact diff up the base chain.
+     * Chunking gates the CurOp write. With '_chunkSize == 1' every update reports; with it larger,
+     * only a chunk boundary crossing reports. Once a report has happened, a later return to zero
+     * always reports, so CurOp is not left holding a stale value.
+     */
+    MONGO_COMPILER_NOINLINE void addInternal(int64_t diff);
 
     /**
      * Called after the memory limit has already been checked to assert that the current usage
@@ -204,16 +222,18 @@ private:
     // Tracks the current memory footprint.
     int64_t _inUseTrackedMemoryBytes = 0;
 
-    // If set to a value > 0, memory usage updates will only be written to CurOp if the usage
-    // surpasses this size. Writing to CurOp involves lock contention, so in performance-sensitive
-    // situations, we should set a non-zero size. If 0, no chunking is performed.
+    // This tracker's '_writeToCurOp' is only invoked when usage surpasses this size. Writing to
+    // CurOp involves lock contention, so in performance-sensitive situations, we should set a
+    // non-1 size. Constructors clamp the requested chunkSize to at least 1: 1 means "report every
+    // change," equivalent to what callers pass as 0 to mean "no chunking." Only meaningful on a
+    // tracker that has '_writeToCurOp' set -- it never affects what is propagated to '_base'.
     //
     // Kept adjacent to the counters above rather than after '_writeToCurOp' so that every field
     // touched by the addInternal() hot path lies within the first bytes of the object.
-    int64_t _chunkSize = 0;
+    int64_t _chunkSize;
 
-    // Last lower-bound chunk reported to CurOp.
-    int64_t _lastReportedLowerBound = 0;
+    // Last lower-bound chunk reported to CurOp. -1 indicates that no chunk has been reported yet.
+    int64_t _lastReportedLowerBound = -1;
 
     MemoryUsageLimit _maxAllowedMemoryUsageBytes;
 

@@ -22,8 +22,6 @@ const serverParams = {
     setParameter: {
         // Needed to avoid spilling to disk, which changes memory metrics.
         allowDiskUseByDefault: false,
-        // Needed so that chunked memory tracking reaches CurOp
-        internalQueryMaxWriteToCurOpMemoryUsageBytes: 128,
         // 'forceIncreasedSpilling' should not be enabled for the following tests.
         internalQuerySlotBasedExecutionHashAggIncreasedSpilling: "never",
     },

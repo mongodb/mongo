@@ -564,7 +564,7 @@ public:
     using SimpleMemoryUsageTracker::SimpleMemoryUsageTracker;
 };
 
-TEST(SimpleMemoryUsageTrackerTest, ChunkingDecouplesBasePropagationFromCurOpReporting) {
+TEST(SimpleMemoryUsageTrackerTest, ChunkingOnNonRootTrackerDoesNotGateCurOpReporting) {
     constexpr int64_t kChunkSize = 100;
     constexpr int64_t kBig = 10 * 1024 * 1024;
 
@@ -572,7 +572,8 @@ TEST(SimpleMemoryUsageTrackerTest, ChunkingDecouplesBasePropagationFromCurOpRepo
     int64_t lastReportedInUse = -1;
     int64_t lastReportedPeak = -1;
 
-    // The op-wide tracker is the root: no base, but it reports to CurOp.
+    // The op-wide tracker is the root: no base, and no chunking of its own, so every change to it
+    // reports to CurOp.
     TestableMemoryUsageTracker opTracker{MemoryUsageLimit{kBig}};
     opTracker.setWriteToCurOp([&](int64_t inUse, int64_t peak) {
         ++curOpWriteCount;
@@ -580,38 +581,22 @@ TEST(SimpleMemoryUsageTrackerTest, ChunkingDecouplesBasePropagationFromCurOpRepo
         lastReportedPeak = peak;
     });
 
-    // The stage tracker chunks its reporting to CurOp.
+    // A chunkSize set here is inert: this tracker has no '_writeToCurOp' of its own, so chunking
+    // only ever gates a write that never happens on this object. '_base' still gets every diff
+    // exactly, so the root reports on every one of this tracker's updates regardless.
     SimpleMemoryUsageTracker stageTracker{&opTracker, MemoryUsageLimit{kBig}, kChunkSize};
 
-    // Within the first chunk [0, 100): the op-wide tracker must see the exact total, but nothing
-    // is reported to CurOp yet.
     stageTracker.add(50);
     ASSERT_EQ(opTracker.inUseTrackedMemoryBytes(), 50);
     ASSERT_EQ(opTracker.peakTrackedMemoryBytes(), 50);
-    ASSERT_EQ(curOpWriteCount, 0);
-
-    // Crossing into chunk [100, 200) triggers a single CurOp write. Both the base total and the
-    // value reported to CurOp are exact (110)
-    stageTracker.add(60);
-    ASSERT_EQ(opTracker.inUseTrackedMemoryBytes(), 110);
-    ASSERT_EQ(opTracker.peakTrackedMemoryBytes(), 110);
     ASSERT_EQ(curOpWriteCount, 1);
-    ASSERT_EQ(lastReportedInUse, 110);
-    ASSERT_EQ(lastReportedPeak, 110);
-
-    // Another update that stays within chunk [100, 200) propagates exactly to the base but does
-    // not write to CurOp.
-    stageTracker.add(30);
-    ASSERT_EQ(opTracker.inUseTrackedMemoryBytes(), 140);
-    ASSERT_EQ(curOpWriteCount, 1);
-
-    // Releasing memory back across a chunk boundary reports again with the exact in-use total (50).
-    stageTracker.add(-90);
-    ASSERT_EQ(opTracker.inUseTrackedMemoryBytes(), 50);
-    ASSERT_EQ(curOpWriteCount, 2);
     ASSERT_EQ(lastReportedInUse, 50);
-    // Peak is exact and monotonically non-decreasing.
-    ASSERT_EQ(lastReportedPeak, 140);
+    ASSERT_EQ(lastReportedPeak, 50);
+
+    stageTracker.add(30);
+    ASSERT_EQ(opTracker.inUseTrackedMemoryBytes(), 80);
+    ASSERT_EQ(curOpWriteCount, 2);
+    ASSERT_EQ(lastReportedInUse, 80);
 }
 
 TEST(SimpleMemoryUsageTrackerTest, ChunkingOnIntermediateTrackerStillPropagatesExactlyToRoot) {
@@ -621,7 +606,9 @@ TEST(SimpleMemoryUsageTrackerTest, ChunkingOnIntermediateTrackerStillPropagatesE
     int curOpWriteCount = 0;
     int64_t lastReportedInUse = -1;
 
-    // Chain: leaf (no chunking) -> mid (chunking) -> root (reports to CurOp).
+    // Chain: leaf (no chunking) -> mid (chunking, but inert since it has no '_writeToCurOp') ->
+    // root (reports to CurOp, unchunked). Verifies that a chunkSize set two hops away from the
+    // root does not disturb exact propagation of every diff up the chain.
     TestableMemoryUsageTracker rootTracker{MemoryUsageLimit{kBig}};
     rootTracker.setWriteToCurOp([&](int64_t inUse, int64_t peak) {
         ++curOpWriteCount;
@@ -631,15 +618,16 @@ TEST(SimpleMemoryUsageTrackerTest, ChunkingOnIntermediateTrackerStillPropagatesE
     SimpleMemoryUsageTracker leafTracker{&midTracker, MemoryUsageLimit{kBig}};
 
     leafTracker.add(50);
-    // Exact propagation all the way to the root, but no CurOp write within the first chunk.
+    // Exact propagation all the way to the root, and the root -- being unchunked -- reports on
+    // every update regardless of mid's (inert) chunking.
     ASSERT_EQ(rootTracker.inUseTrackedMemoryBytes(), 50);
     ASSERT_EQ(midTracker.inUseTrackedMemoryBytes(), 50);
-    ASSERT_EQ(curOpWriteCount, 0);
-
-    leafTracker.add(60);  // mid crosses into [100, 200)
-    ASSERT_EQ(rootTracker.inUseTrackedMemoryBytes(), 110);
     ASSERT_EQ(curOpWriteCount, 1);
-    // CurOp reports the exact in-use total (110), gated by the mid tracker's chunk crossing.
+    ASSERT_EQ(lastReportedInUse, 50);
+
+    leafTracker.add(60);
+    ASSERT_EQ(rootTracker.inUseTrackedMemoryBytes(), 110);
+    ASSERT_EQ(curOpWriteCount, 2);
     ASSERT_EQ(lastReportedInUse, 110);
 }
 
@@ -649,24 +637,81 @@ TEST(SimpleMemoryUsageTrackerTest, ChunkingReportsZeroWhenFullyReleased) {
 
     int64_t lastReportedInUse = -1;
 
-    TestableMemoryUsageTracker opTracker{MemoryUsageLimit{kBig}};
+    // Chunking is only meaningful on the tracker that owns '_writeToCurOp' -- here, the root
+    // itself, which is also the one being updated directly (no separate stage tracker needed).
+    TestableMemoryUsageTracker opTracker{MemoryUsageLimit{kBig}, kChunkSize};
     opTracker.setWriteToCurOp([&](int64_t inUse, int64_t peak) { lastReportedInUse = inUse; });
-    SimpleMemoryUsageTracker stageTracker{&opTracker, MemoryUsageLimit{kBig}, kChunkSize};
 
     // Grow past a chunk boundary so CurOp holds a non-zero value.
-    stageTracker.add(150);
+    opTracker.add(150);
     ASSERT_EQ(lastReportedInUse, 150);
 
     // Release down into the first chunk: this crossing reports the exact value (30).
-    stageTracker.add(-120);
-    ASSERT_EQ(stageTracker.inUseTrackedMemoryBytes(), 30);
+    opTracker.add(-120);
+    ASSERT_EQ(opTracker.inUseTrackedMemoryBytes(), 30);
     ASSERT_EQ(lastReportedInUse, 30);
 
     // Fully release the remaining memory. This stays within the first chunk (no boundary crossing),
-    // but CurOp must still be driven back to zero rather than left stale at 30.
-    stageTracker.add(-30);
-    ASSERT_EQ(stageTracker.inUseTrackedMemoryBytes(), 0);
+    // but CurOp must still be driven back to zero rather than left stale at 30, since a report has
+    // already happened.
+    opTracker.add(-30);
     ASSERT_EQ(opTracker.inUseTrackedMemoryBytes(), 0);
+    ASSERT_EQ(lastReportedInUse, 0);
+}
+
+TEST(SimpleMemoryUsageTrackerTest, ChunkingReportsNothingBeforeFirstCrossing) {
+    constexpr int64_t kChunkSize = 100;
+    constexpr int64_t kBig = 10 * 1024 * 1024;
+
+    int curOpWriteCount = 0;
+
+    TestableMemoryUsageTracker opTracker{MemoryUsageLimit{kBig}, kChunkSize};
+    opTracker.setWriteToCurOp([&](int64_t inUse, int64_t peak) { ++curOpWriteCount; });
+
+    // Grow and fully release, never crossing the first chunk boundary. CurOp was never written to,
+    // so there is nothing stale to correct -- unlike ChunkingReportsZeroWhenFullyReleased, the
+    // return to zero here must not itself force a report.
+    opTracker.add(50);
+    opTracker.add(-50);
+    ASSERT_EQ(opTracker.inUseTrackedMemoryBytes(), 0);
+    ASSERT_EQ(curOpWriteCount, 0);
+}
+
+TEST(SimpleMemoryUsageTrackerTest, ChunkingAfterReturnToZeroBehavesLikeNeverReported) {
+    constexpr int64_t kChunkSize = 100;
+    constexpr int64_t kBig = 10 * 1024 * 1024;
+
+    int curOpWriteCount = 0;
+    int64_t lastReportedInUse = -1;
+
+    TestableMemoryUsageTracker opTracker{MemoryUsageLimit{kBig}, kChunkSize};
+    opTracker.setWriteToCurOp([&](int64_t inUse, int64_t peak) {
+        ++curOpWriteCount;
+        lastReportedInUse = inUse;
+    });
+
+    // Grow past the first boundary and release back to zero: one report for the crossing, one for
+    // the return to zero, after which the tracker is back in the "never reported" state.
+    opTracker.add(150);
+    ASSERT_EQ(curOpWriteCount, 1);
+    ASSERT_EQ(lastReportedInUse, 150);
+    opTracker.add(-150);
+    ASSERT_EQ(curOpWriteCount, 2);
+    ASSERT_EQ(lastReportedInUse, 0);
+
+    // From that state, sub-chunk growth must not report again -- the return to zero re-armed the
+    // "never reported" state rather than leaving chunking behind.
+    opTracker.add(50);
+    ASSERT_EQ(curOpWriteCount, 2);
+
+    // But crossing the first boundary reports again, with the exact total.
+    opTracker.add(kChunkSize);
+    ASSERT_EQ(curOpWriteCount, 3);
+    ASSERT_EQ(lastReportedInUse, 150);
+
+    // And the cycle repeats: releasing back to zero reports once more.
+    opTracker.add(-150);
+    ASSERT_EQ(curOpWriteCount, 4);
     ASSERT_EQ(lastReportedInUse, 0);
 }
 
@@ -674,23 +719,24 @@ TEST(SimpleMemoryUsageTrackerTest, ChunkingReportsZeroWhenFullyReleased) {
 constexpr int64_t kChunkSizeForTest = 100;
 
 /**
- * The chunk-crossing path reaches the new lower bound by stepping one chunk when the crossing is to
- * an adjacent chunk and by dividing otherwise. Walk usage across boundaries in both directions, by
- * one chunk and by many, and assert that every crossing reports the exact total -- i.e. that all
- * three ways of computing the bound agree.
+ * Walk usage across chunk boundaries in both directions, by one chunk and by several at once, and
+ * assert that every crossing reports the exact total, while updates that stay within a chunk report
+ * nothing.
+ *
+ * Chunks the root tracker directly, since chunking is only meaningful on the tracker that owns
+ * '_writeToCurOp'.
  */
 std::pair<int64_t, int64_t> getLastReportedValues(int64_t initialValue, int64_t nextValue) {
     constexpr int64_t kBig = 10 * 1024 * 1024;
 
     int64_t lastReportedInUse = -1;
 
-    TestableMemoryUsageTracker opTracker{MemoryUsageLimit{kBig}};
+    TestableMemoryUsageTracker opTracker{MemoryUsageLimit{kBig}, kChunkSizeForTest};
     opTracker.setWriteToCurOp([&](int64_t inUse, int64_t peak) { lastReportedInUse = inUse; });
-    SimpleMemoryUsageTracker stageTracker{&opTracker, MemoryUsageLimit{kBig}, kChunkSizeForTest};
 
-    stageTracker.add(initialValue);
-    stageTracker.add(nextValue);
-    return {lastReportedInUse, stageTracker.inUseTrackedMemoryBytes()};
+    opTracker.add(initialValue);
+    opTracker.add(nextValue);
+    return {lastReportedInUse, opTracker.inUseTrackedMemoryBytes()};
 }
 
 TEST(SimpleMemoryUsageTrackerTest, ChunkingReportsInitialCrossing) {
@@ -738,7 +784,8 @@ TEST(SimpleMemoryUsageTrackerTest, ChunkingReportsDownwardCrossingAcrossMultiple
 }
 
 TEST(SimpleMemoryUsageTrackerTest, ChunkingDoesNotReportGoingToZeroInSameChunk) {
-    ASSERT_THAT(getLastReportedValues(50, -50), std::pair(0, 0))
+    // Never crosses the first chunk boundary, so nothing is ever reported.
+    ASSERT_THAT(getLastReportedValues(50, -50), std::pair(-1, 0))
         << "From within the first chunk down to zero.";
 }
 

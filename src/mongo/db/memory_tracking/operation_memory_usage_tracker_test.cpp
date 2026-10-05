@@ -95,6 +95,11 @@ protected:
     void runTest(F createMock) {
         unittest::ServerParameterGuard featureFlagController("featureFlagQueryMemoryTracking",
                                                              true);
+        // runTest verifies that the stage's memory usage reaches CurOp. The operation-wide
+        // tracker latches its chunk size from this knob at creation and only writes to CurOp once
+        // usage crosses it; each document stays below the 1MB default, so report every update.
+        unittest::ServerParameterGuard chunkSizeGuard(
+            "internalQueryMaxWriteToCurOpMemoryUsageBytes", 1);
         int64_t inUseTrackedMemBytes, peakTrackedMemBytes;
 
         std::tie(inUseTrackedMemBytes, peakTrackedMemBytes) = getCurOpMemoryStats();
@@ -201,6 +206,51 @@ TEST_F(OperationMemoryUsageTrackerTest, StageTrackersAreStandaloneWhenOperationT
         OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForStage(*expCtx));
     assertStandalone(OperationMemoryUsageTracker::createMemoryUsageTrackerForStage(*expCtx));
     assertStandalone(OperationMemoryUsageTracker::createChunkedMemoryUsageTrackerForStage(*expCtx));
+}
+
+/**
+ * The attach-time publish must consume the "never reported" state. A tracker that never crossed a
+ * chunk boundary before being stashed publishes its exact totals on reattach, and a later release
+ * to zero must still report through the return-to-zero rule -- otherwise CurOp keeps a stale
+ * non-zero value for the resumed operation.
+ */
+TEST_F(OperationMemoryUsageTrackerTest, AttachPublishConsumesNeverReportedState) {
+    unittest::ServerParameterGuard featureFlagController("featureFlagQueryMemoryTracking", true);
+    // A large chunk size keeps every update in this test below the first boundary, so nothing is
+    // reported through addInternal() and the tracker stays in the "never reported" state.
+    unittest::ServerParameterGuard chunkSizeGuard("internalQueryMaxWriteToCurOpMemoryUsageBytes",
+                                                  10 * 1024 * 1024);
+
+    auto expCtx = getExpCtx();
+    OperationContext* opCtx = expCtx->getOperationContext();
+
+    auto stageTracker =
+        OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(*expCtx);
+    stageTracker.add(100);
+
+    // Sub-chunk usage never reaches CurOp on its own.
+    ASSERT_EQ(getCurOpMemoryStats().first, 0);
+
+    // Stash the tracker (as a cursor does between getMores) and reattach it: the attach publishes
+    // the exact totals to CurOp even though no boundary was ever crossed.
+    auto opTracker = OperationMemoryUsageTracker::detachFromOpCtxIfAvailable(opCtx);
+    OperationMemoryUsageTracker::attachToOpCtxIfAvailable(opCtx, std::move(opTracker));
+    auto [inUseTrackedMemBytes, peakTrackedMemBytes] = getCurOpMemoryStats();
+    ASSERT_EQ(inUseTrackedMemBytes, 100);
+    ASSERT_GT(peakTrackedMemBytes, 0);
+
+    // An increase that stays within the same chunk must not report: consuming the "never reported"
+    // state does not turn chunking off.
+    stageTracker.add(150);
+    std::tie(inUseTrackedMemBytes, peakTrackedMemBytes) = getCurOpMemoryStats();
+    ASSERT_EQ(inUseTrackedMemBytes, 100);
+
+    // Releasing all memory must drive CurOp back to zero rather than leave it stale at 100: the
+    // publish above consumed the "never reported" state. The peak reflects the high-water mark.
+    stageTracker.add(-250);
+    std::tie(inUseTrackedMemBytes, peakTrackedMemBytes) = getCurOpMemoryStats();
+    ASSERT_EQ(inUseTrackedMemBytes, 0);
+    ASSERT_EQ(peakTrackedMemBytes, 250);
 }
 
 /**

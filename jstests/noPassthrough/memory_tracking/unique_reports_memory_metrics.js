@@ -29,12 +29,6 @@ if (!checkSbeFullyEnabled(db)) {
     quit();
 }
 
-// The tests expect that memory metrics appear right after memory is used. Decrease the threshold
-// for rate-limiting writes to CurOp. Otherwise, we may report no memory usage if the memory used is
-// less than the limit.
-assert.commandWorked(
-    db.adminCommand({setParameter: 1, internalQueryMaxWriteToCurOpMemoryUsageBytes: 16}),
-);
 assert.commandWorked(
     db.adminCommand({setParameter: 1, internalQueryMaxWriteToServerStatusMemoryUsageBytes: 1}),
 );

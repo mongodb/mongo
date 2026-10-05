@@ -99,11 +99,6 @@ public:
         MemoryUsageLimit maxMemoryUsageBytes = MemoryUsageLimit{
             std::numeric_limits<int64_t>::max()});
 
-    void propagateStatsToCurOp() const {
-        CurOp::get(_opCtx)->setMemoryTrackingStats(inUseTrackedMemoryBytes(),
-                                                   peakTrackedMemoryBytes());
-    }
-
     /**
      * Detach the operation's memory tracker from the operation context. Returns a co-owning
      * reference to it (or nullptr if there was none).
