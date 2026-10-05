@@ -22,6 +22,27 @@ export class WorkloadAndOverSingleField extends PipelineWorkload {
     }
 }
 
+export class WorkloadAndOverSingleFieldWithInclusionProjection extends PipelineWorkload {
+    /*
+     * Version of WorkloadAndOverSingleField that has an inclusion projection at the end,
+     * making it eligible for running timeseries queries using block processing.
+     */
+    scale() {
+        // SERVER-131961 SBE: Stack overflow with many conditions to a $match, index
+        return Math.min(1000, super.scale());
+    }
+
+    pipeline(dataset) {
+        let match = [];
+
+        for (let i = 0; i < this.scale(); i++) {
+            match.push({"f0": {$lt: Math.max(this.scale(), dataset.scale()) + i}});
+        }
+
+        return [{$match: {$and: match}}, {$project: {_id: 0, f0: 1}}];
+    }
+}
+
 export class WorkloadOrOverSingleField extends PipelineWorkload {
     scale() {
         // SERVER-96119 SBE: Stack overflow with many conditions to a $match, index
@@ -43,6 +64,31 @@ export class WorkloadOrOverSingleField extends PipelineWorkload {
     }
 }
 
+export class WorkloadOrOverSingleFieldWithInclusionProjection extends PipelineWorkload {
+    /*
+     * Version of WorkloadOrOverSingleField that has an inclusion projection at the end,
+     * making it eligible for running timeseries queries using block processing.
+     */
+    scale() {
+        // SERVER-131961 SBE: Stack overflow with many conditions to a $match, index
+        return Math.min(1000, super.scale());
+    }
+
+    pipeline(dataset) {
+        let match = [];
+
+        for (let i = 0; i < this.scale(); i++) {
+            // Those conditions all evaluate to False
+            match.push({"f0": {$gt: this.scale() + i}});
+        }
+
+        // This condition evaluates to True
+        match.push({"f0": {$lt: dataset.scale()}});
+
+        return [{$match: {$or: match}}, {$project: {_id: 0, f0: 1}}];
+    }
+}
+
 export class WorkloadAndPlusOrOverSingleField extends PipelineWorkload {
     pipeline() {
         let match = [];
@@ -52,6 +98,22 @@ export class WorkloadAndPlusOrOverSingleField extends PipelineWorkload {
         }
 
         return [{$match: {$and: match}}, {$unset: "_id"}];
+    }
+}
+
+export class WorkloadAndPlusOrOverSingleFieldWithInclusionProjection extends PipelineWorkload {
+    /*
+     * Version of WorkloadAndPlusOrOverSingleField that has an inclusion projection at the end,
+     * making it eligible for running timeseries queries using block processing.
+     */
+    pipeline() {
+        let match = [];
+
+        for (let i = 0; i < this.scale(); i++) {
+            match.push({$or: [{f0: {$lt: this.scale() - i}}, {f0: {$gte: 0}}]});
+        }
+
+        return [{$match: {$and: match}}, {$project: {_id: 0, f0: 1}}];
     }
 }
 
@@ -68,6 +130,26 @@ export class WorkloadOrPlusAndOverSingleField extends PipelineWorkload {
         match.push({$and: [{f0: {$lt: this.scale()}}, {f0: {$gte: 0}}]});
 
         return [{$match: {$or: match}}, {$unset: "_id"}];
+    }
+}
+
+export class WorkloadOrPlusAndOverSingleFieldWithInclusionProjection extends PipelineWorkload {
+    /*
+     * Version of WorkloadOrPlusAndOverSingleField that has an inclusion projection at the end,
+     * making it eligible for running timeseries queries using block processing.
+     */
+    pipeline() {
+        let match = [];
+
+        for (let i = 0; i < this.scale(); i++) {
+            // These conditions all evaluate to False
+            match.push({$and: [{f0: {$gt: this.scale()}}, {f0: {$gte: 0}}]});
+        }
+
+        // This condition evaluates to True
+        match.push({$and: [{f0: {$lt: this.scale()}}, {f0: {$gte: 0}}]});
+
+        return [{$match: {$or: match}}, {$project: {_id: 0, f0: 1}}];
     }
 }
 
@@ -168,6 +250,16 @@ export class WorkloadIn extends PipelineWorkload {
     /** $in */
     pipeline() {
         return [{$match: {f0: {$in: range(this.scale())}}}, {$unset: "_id"}];
+    }
+}
+
+export class WorkloadInWithInclusionProjection extends PipelineWorkload {
+    /*
+     * Version of WorkloadIn that has an inclusion projection at the end,
+     * making it eligible for running timeseries queries using block processing.
+     */
+    pipeline() {
+        return [{$match: {f0: {$in: range(this.scale())}}}, {$project: {_id: 0, f0: 1}}];
     }
 }
 
