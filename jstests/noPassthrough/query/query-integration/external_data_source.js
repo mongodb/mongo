@@ -326,13 +326,13 @@ function testSimpleAggregationsOverExternalDataSource(pipeDir) {
         _writeTestPipeBsonFile(
             pipeName1,
             objsPerPipe,
-            "jstests/noPassthrough/query/external_data_source.bson",
+            "jstests/noPassthrough/query/query-integration/external_data_source.bson",
             pipeDir,
         );
         _writeTestPipeBsonFile(
             pipeName2,
             objsPerPipe,
-            "jstests/noPassthrough/query/external_data_source.bson",
+            "jstests/noPassthrough/query/query-integration/external_data_source.bson",
             pipeDir,
         );
         let cursor = db.coll.aggregate([{$project: {_id: 0}}], {

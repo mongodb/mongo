@@ -24,7 +24,7 @@ const kUrlProtocolFile = "file://";
 // Fixture file: a single 12-byte BSON document with a valid top-level size but an embedded array
 // element "a" whose nested size is -4.
 const kMalformedBsonFixture =
-    "jstests/noPassthrough/query/external_data_source_malformed_bson_fixture.bson";
+    "jstests/noPassthrough/query/query-integration/external_data_source_malformed_bson_fixture.bson";
 
 // Kept small to pin the boundary exactly; a larger overshoot only makes the fixture bigger.
 const kOvershoot = 25;
