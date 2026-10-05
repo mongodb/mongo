@@ -48,6 +48,7 @@ executor:
       set_parameters:
         enableElectionHandoff: 0
         enableTestCommands: 1
+        failpoint.disableReplicatedFastCount: "{mode: 'alwaysOn'}"
         failpoint.overrideRecordIdsReplicatedFalse: "{mode: 'alwaysOn'}"
         internalQueryStatsErrorsAreCommandFatal: true
         internalQueryStatsSampleRate: 1.0

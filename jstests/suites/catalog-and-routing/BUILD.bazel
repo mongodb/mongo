@@ -286,7 +286,6 @@ resmoke_suite_test(
     tags = [
         "ci-default",
         "jscore",
-        "requires_replicated_fast_count_recovery",
     ],
     deps = [
         "//src/mongo/db:mongod",
@@ -382,7 +381,6 @@ resmoke_suite_test(
         "ci-default",
         "jscore",
         "replica_sets",
-        "requires_replicated_fast_count_recovery",
         "suggested_excluding_required__for_devprod_mitigation_only",
     ],
     deps = [
@@ -623,7 +621,6 @@ resmoke_suite_test(
     tags = [
         "ci-default",
         "jscore",
-        "requires_replicated_fast_count_recovery",
     ],
     deps = [
         "//src/mongo/db:mongod",
@@ -770,7 +767,6 @@ resmoke_suite_test(
     shard_count = 50,
     tags = [
         "ci-default",
-        "requires_replicated_fast_count_recovery",
         "sharding",
     ],
     deps = [
@@ -804,7 +800,6 @@ resmoke_suite_test(
     shard_count = 49,
     tags = [
         "ci-default",
-        "requires_replicated_fast_count_recovery",
         "sharding",
     ],
     deps = [

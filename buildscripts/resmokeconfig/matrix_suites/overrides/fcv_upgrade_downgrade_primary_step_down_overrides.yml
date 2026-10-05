@@ -153,6 +153,7 @@
                 rollback: 2
               storage:
                 recovery: 2
+            failpoint.disableReplicatedFastCount: "{mode: 'alwaysOn'}"
             failpoint.overrideRecordIdsReplicatedFalse: "{mode: 'alwaysOn'}"
         all_nodes_electable: true
         num_nodes: 3
