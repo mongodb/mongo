@@ -1,4 +1,5 @@
-// Check db name duplication constraint SERVER-2111
+// Check that a database name differing only in case from an existing database is rejected
+// (SERVER-2111).
 // @tags: [
 //   # The simulate_atlas_proxy override in multi-tenant mode might choose different
 //   # prefixes for each sibling DB in this test.
@@ -7,27 +8,22 @@
 //   assumes_no_implicit_collection_creation_on_get_collection,
 // ]
 
-let a = db.getSiblingDB("dbcasetest_dbnamea");
-let b = db.getSiblingDB("dbcasetest_dbnameA");
+const a = db.getSiblingDB("dbcasetest_dbnamea");
+const b = db.getSiblingDB("dbcasetest_dbnameA");
 
-a.dropDatabase();
-b.dropDatabase();
+assert.commandWorked(a.dropDatabase());
+assert.commandWorked(b.dropDatabase());
 
-assert.commandWorked(a.foo.save({x: 1}));
+assert.commandWorked(a.foo.insert({x: 1}));
+assert.commandFailedWithCode(b.foo.insert({x: 1}), ErrorCodes.DatabaseDifferCase);
 
-let res = b.foo.save({x: 1});
-assert.writeError(res);
+const dbNames = db.getMongo().getDBNames();
+assert.contains(a.getName(), dbNames);
+assert(!dbNames.includes(b.getName()), dbNames);
 
-assert.neq(-1, db.getMongo().getDBNames().indexOf(a.getName()));
-assert.eq(-1, db.getMongo().getDBNames().indexOf(b.getName()));
-printjson(db.getMongo().getDBs().databases);
+assert.commandWorked(a.dropDatabase());
+assert.commandWorked(b.dropDatabase());
 
-a.dropDatabase();
-b.dropDatabase();
-
-let ai = db.getMongo().getDBNames().indexOf(a.getName());
-let bi = db.getMongo().getDBNames().indexOf(b.getName());
-// One of these dbs may exist if there is a secondary active, but they must
-// not both exist.
-assert(ai == -1 || bi == -1);
-printjson(db.getMongo().getDBs().databases);
+// One of these dbs may exist if there is a secondary active, but they must not both exist.
+const after = db.getMongo().getDBNames();
+assert(!after.includes(a.getName()) || !after.includes(b.getName()), after);

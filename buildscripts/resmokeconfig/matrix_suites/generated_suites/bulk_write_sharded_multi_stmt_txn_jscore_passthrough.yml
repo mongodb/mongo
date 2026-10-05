@@ -76,7 +76,6 @@ selector:
     - jstests/core/**/bulk_api_unordered.js
     - jstests/core/**/commands_with_uuid.js
     - jstests/core/**/dbcase.js
-    - jstests/core/**/dbcase2.js
     - jstests/core/**/explain_execution_error.js
     - jstests/core/**/expr.js
     - jstests/core/**/find9.js

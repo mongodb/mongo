@@ -66,12 +66,10 @@
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/stdx/unordered_set.h"
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/hex.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/producer_consumer_queue.h"
 #include "mongo/util/quick_exit.h"
@@ -114,63 +112,6 @@ bool isWriteableStorageEngine() {
     return storageGlobalParams.engine != "devnull";
 }
 
-void logOfflineValidateResults(const ValidateResults& validateResults) {
-    BSONObjBuilder results;
-    validateResults.appendToResultObj(&results, /*debug=*/false);
-    LOGV2_OPTIONS(9437301,
-                  {logv2::LogTruncation::Disabled},
-                  "Offline validation result",
-                  "results"_attr = results.done());
-}
-
-/**
- * Opens a database during startup, attributing failures to the database being opened.
- */
-Database* openDbDuringStartup(OperationContext* opCtx,
-                              const DatabaseName& dbName,
-                              DatabaseHolder* databaseHolder = nullptr) try {
-    if (!databaseHolder) {
-        databaseHolder = DatabaseHolder::get(opCtx);
-    }
-    return databaseHolder->openDb(opCtx, dbName);
-} catch (const ExceptionFor<ErrorCodes::BadValue>& ex) {
-    const auto name = dbName.toStringForResourceId();
-    LOGV2_ERROR(13340100,
-                "Failed to open database during startup. If the database name is reported as not "
-                "being valid, the durable catalog is likely corrupt and the deployment should be "
-                "restored from a backup",
-                logAttrs(dbName),
-                "databaseNameBytes"_attr = hexblob::encode(name),
-                "error"_attr = redact(ex));
-    throw;
-}
-
-/**
- * Opens a database for offline validation, returning false if it could not be opened.
- * Notably, by catching naming exceptions during database opening, validate can
- * continue operating.
- */
-bool openDbForOfflineValidation(OperationContext* opCtx,
-                                const DatabaseName& dbName,
-                                DatabaseHolder* databaseHolder) try {
-    openDbDuringStartup(opCtx, dbName, databaseHolder);
-    return true;
-} catch (const ExceptionFor<ErrorCodes::BadValue>& ex) {
-    LOGV2_WARNING(13340101,
-                  "Skipping validation of a database that could not be opened",
-                  logAttrs(dbName),
-                  "databaseNameBytes"_attr = hexblob::encode(dbName.toStringForResourceId()),
-                  "error"_attr = redact(ex));
-
-    // Report the skipped database through the same channel as a validated collection.
-    ValidateResults validateResults;
-    validateResults.addError(str::stream() << "Database could not be opened, so none of its "
-                                              "collections were validated: "
-                                           << ex.toString());
-    logOfflineValidateResults(validateResults);
-    return false;
-}
-
 // Attempt to restore the featureCompatibilityVersion document if it is missing.
 // The optional parameter `startupTimeElapsedBuilder` is for adding time elapsed of tasks done in
 // this function into one single builder that records the time elapsed during startup. Its default
@@ -186,7 +127,7 @@ Status restoreMissingFeatureCompatibilityVersionDocument(
     if (!db) {
         LOGV2(20998, "Re-creating admin database that was dropped.");
     }
-    db = openDbDuringStartup(opCtx, fcvNss.dbName(), databaseHolder);
+    db = databaseHolder->openDb(opCtx, fcvNss.dbName());
     invariant(db);
 
     // If the server configuration collection, which contains the FCV document, does not exist, then
@@ -383,7 +324,7 @@ void openDatabases(OperationContext* opCtx, Func&& onDatabase) {
     auto dbNames = catalog::listDatabases();
     for (const auto& dbName : dbNames) {
         LOGV2_DEBUG(21010, 1, "    Opening database: {dbName}", "dbName"_attr = dbName);
-        auto db = openDbDuringStartup(opCtx, dbName, databaseHolder);
+        auto db = databaseHolder->openDb(opCtx, dbName);
         invariant(db);
         onDatabase(db->name());
     }
@@ -393,12 +334,14 @@ void openDatabases(OperationContext* opCtx, Func&& onDatabase) {
  * Returns 'true' if this server has a configuration document in local.system.replset.
  */
 bool hasReplSetConfigDoc(OperationContext* opCtx) {
+    auto databaseHolder = DatabaseHolder::get(opCtx);
+
     // We open the "local" database before reading to ensure the in-memory catalog entries for the
     // 'kSystemReplSetNamespace' collection have been populated if the collection exists. If the
     // "local" database doesn't exist at this point yet, then it will be created.
     const auto nss = NamespaceString::kSystemReplSetNamespace;
 
-    openDbDuringStartup(opCtx, nss.dbName());
+    databaseHolder->openDb(opCtx, nss.dbName());
     BSONObj config;
     return Helpers::getSingleton(opCtx, nss, config);
 }
@@ -717,10 +660,12 @@ void startupRepair(OperationContext* opCtx,
     auto catalog = CollectionCatalog::get(opCtx);
     if (auto fcvColl = catalog->lookupCollectionByNamespace(
             opCtx, NamespaceString::kServerConfigurationNamespace)) {
+        auto databaseHolder = DatabaseHolder::get(opCtx);
+
         SectionScopedTimer scopedTimer(svcCtx->getFastClockSource(),
                                        TimedSectionId::repairServerConfigNamespace,
                                        startupTimeElapsedBuilder);
-        openDbDuringStartup(opCtx, fcvColl->ns().dbName());
+        databaseHolder->openDb(opCtx, fcvColl->ns().dbName());
         fassertNoTrace(4805000,
                        repair::repairCollection(
                            opCtx, storageEngine, NamespaceString::kServerConfigurationNamespace));
@@ -869,7 +814,12 @@ StatusWith<bool> offlineValidateCollection(OperationContext* opCtx,
         return e.toStatus();
     }
 
-    logOfflineValidateResults(validateResults);
+    BSONObjBuilder results;
+    validateResults.appendToResultObj(&results, /*debug=*/false);
+    LOGV2_OPTIONS(9437301,
+                  {logv2::LogTruncation::Disabled},
+                  "Offline validation result",
+                  "results"_attr = results.done());
     return validateResults.isValid();
 }
 
@@ -900,15 +850,9 @@ OfflineValidateResults offlineValidateParallel(OperationContext* opCtx,
             SerializationContext(SerializationContext::Source::Catalog))};
     });
     auto databaseHolder = DatabaseHolder::get(opCtx);
-    const auto unopenedDbNames = std::invoke([&] {
-        stdx::unordered_set<DatabaseName> unopenedDbNames;
-        for (const auto& dbName : dbNames) {
-            if (MONGO_unlikely(!openDbForOfflineValidation(opCtx, dbName, databaseHolder))) {
-                unopenedDbNames.insert(dbName);
-            }
-        }
-        return unopenedDbNames;
-    });
+    for (const auto& dbName : dbNames) {
+        databaseHolder->openDb(opCtx, dbName);
+    }
 
     globalWriteLock.reset();
     Lock::GlobalLock catalogLock(opCtx, MODE_IS);
@@ -919,9 +863,6 @@ OfflineValidateResults offlineValidateParallel(OperationContext* opCtx,
     // large collection from being picked up late and running as a long tail.
     std::vector<std::pair<long long, NamespaceString>> collectionsBySize;
     for (const auto& dbName : dbNames) {
-        if (MONGO_unlikely(unopenedDbNames.contains(dbName))) {
-            continue;
-        }
         for (const auto& coll : catalog->range(dbName)) {
             collectionsBySize.emplace_back(coll->dataSize(opCtx), NamespaceString{coll->ns()});
         }
@@ -931,11 +872,9 @@ OfflineValidateResults offlineValidateParallel(OperationContext* opCtx,
     // deterministic.
     std::sort(collectionsBySize.begin(), collectionsBySize.end(), std::greater<>());
 
-    // A database that could not be opened was not examined, so validation neither completed nor
-    // came back clean.
     synchronized_value<OfflineValidateResults> results{OfflineValidateResults{
-        .allValidationComplete = unopenedDbNames.empty(),
-        .allResultsValid = unopenedDbNames.empty(),
+        .allValidationComplete = true,
+        .allResultsValid = true,
     }};
 
     if (collectionsBySize.empty()) {
@@ -1052,6 +991,7 @@ OfflineValidateResults offlineValidate(OperationContext* opCtx) {
 
     OfflineValidateResults offlineValidateResults;
 
+    auto databaseHolder = DatabaseHolder::get(opCtx);
     const auto dbNames = std::invoke([opCtx]() -> std::vector<DatabaseName> {
         if (gValidateDbName.empty()) {
             return CollectionCatalog::get(opCtx)->getAllDbNames();
@@ -1062,20 +1002,10 @@ OfflineValidateResults offlineValidate(OperationContext* opCtx) {
             gValidateDbName.data(),
             SerializationContext(SerializationContext::Source::Catalog))};
     });
-    auto databaseHolder = DatabaseHolder::get(opCtx);
-    stdx::unordered_set<DatabaseName> unopenedDbNames;
     for (const auto& dbName : dbNames) {
-        if (MONGO_unlikely(!openDbForOfflineValidation(opCtx, dbName, databaseHolder))) {
-            // The database was not examined, so validation neither completed nor came back clean.
-            unopenedDbNames.insert(dbName);
-            offlineValidateResults.allValidationComplete = false;
-            offlineValidateResults.allResultsValid = false;
-        }
+        databaseHolder->openDb(opCtx, dbName);
     }
     for (const auto& dbName : dbNames) {
-        if (MONGO_unlikely(unopenedDbNames.contains(dbName))) {
-            continue;
-        }
         const auto [isComplete, isValid] = offlineValidateDb(opCtx, dbName);
         offlineValidateResults.allValidationComplete =
             offlineValidateResults.allValidationComplete && isComplete;
