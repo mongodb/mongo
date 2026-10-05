@@ -90,11 +90,6 @@ TEST_F(FlusherTest, FlushPersistsBatch) {
 }
 
 TEST_F(FlusherTest, FlushWithNoNewWorkIsNoOp) {
-    OtelMetricsCapturer capturer;
-    if (!capturer.canReadMetrics()) {
-        GTEST_SKIP() << "Skipping test due to OTel metrics being unavailable in this build";
-    }
-
     // No persisted timestamp.
     {
         const OplogScanResult batch{
