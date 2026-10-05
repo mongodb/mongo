@@ -209,6 +209,10 @@ def mongod_program(
             "9.1.0",
         )
 
+    # TODO SERVER-136165: Remove or re-enable featureFlagListIndexesAlwaysIncludesSimpleCollation.
+    if version.parse(bin_version) >= version.parse("9.0"):
+        suite_set_parameters["featureFlagListIndexesAlwaysIncludesSimpleCollation"] = "false"
+
     if "grpcPort" not in mongod_options and suite_set_parameters.get("featureFlagGRPC"):
         mongod_options["grpcPort"] = network.PortAllocator.next_fixture_port(job_num)
 

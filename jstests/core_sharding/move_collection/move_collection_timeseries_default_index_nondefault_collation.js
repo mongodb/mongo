@@ -17,7 +17,6 @@
  * ]
  */
 import {getRandomShardName} from "jstests/libs/cluster_helpers/sharded_cluster_fixture_helpers.js";
-import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
 
 const coll = db[jsTestName()];
 
@@ -28,12 +27,8 @@ assert.commandWorked(
     db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}),
 );
 {
-    // TODO (SERVER-122417) Remove this workaround once v9.0 branches out.
-    const index = IndexCatalogHelpers.addSimpleCollationToIndexIfMissing(
-        db,
-        coll.getIndexByKey({m: 1, t: 1}),
-    );
-    assert(index && index.collation && index.collation.locale === "simple", tojson(index));
+    const index = coll.getIndexByKey({m: 1, t: 1});
+    assert(index && !index.collation, tojson(index));
 }
 
 // Drop the default index and re-create it using a non-default collation

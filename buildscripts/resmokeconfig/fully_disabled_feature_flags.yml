@@ -44,3 +44,5 @@
 - featureFlagServerStatusMetricsFiltering
 - featureFlagReplSetGetStatusMetricsFiltering
 - featureFlagCollStatsMetricsFiltering
+# TODO SERVER-136165: Remove or re-enable featureFlagListIndexesAlwaysIncludesSimpleCollation.
+- featureFlagListIndexesAlwaysIncludesSimpleCollation

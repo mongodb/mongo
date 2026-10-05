@@ -1385,6 +1385,14 @@ function appendSetParameterArgs(argArray) {
                 }
             }
         } else if (baseProgramName === "mongod") {
+            // TODO SERVER-136165: Remove or re-enable featureFlagListIndexesAlwaysIncludesSimpleCollation.
+            if (programMajorMinorVersion >= 900) {
+                argArray.push(
+                    "--setParameter",
+                    "featureFlagListIndexesAlwaysIncludesSimpleCollation=false",
+                );
+            }
+
             if (jsTestOptions().roleGraphInvalidationIsFatal) {
                 argArray.push(...["--setParameter", "roleGraphInvalidationIsFatal=true"]);
             }
