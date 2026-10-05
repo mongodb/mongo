@@ -116,7 +116,7 @@ struct BSONHolder {
     bool _resolved;
     bool _readOnly;
     bool _altered;
-    StringMap<bool> _removed;
+    StringSet _removed;
 };
 
 BSONHolder* getValidHolder(JSContext* cx, JSObject* obj) {
@@ -204,10 +204,8 @@ void BSONInfo::enumerate(JSContext* cx,
     while (i.more()) {
         BSONElement e = i.next();
 
-        // TODO SERVER-122826: when we get heterogeneous set lookup, switch to std::string_view
-        // rather than involving the temporary string
         auto fieldNameStringData = e.fieldNameStringData();
-        if (holder->_removed.find(std::string{fieldNameStringData}) != holder->_removed.end())
+        if (holder->_removed.contains(fieldNameStringData))
             continue;
 
         ValueReader(cx, &val).fromStringData(fieldNameStringData);
@@ -246,11 +244,8 @@ void BSONInfo::setProperty(JSContext* cx,
             uasserted(ErrorCodes::BadValue, "Read only object");
         }
 
-        auto iter = holder->_removed.find(IdWrapper(cx, id).toString());
-
-        if (iter != holder->_removed.end()) {
-            holder->_removed.erase(iter);
-        }
+        JSStringWrapper jsstr;
+        holder->_removed.erase(IdWrapper(cx, id).toStringData(&jsstr));
 
         holder->_altered = true;
     }
@@ -274,7 +269,7 @@ void BSONInfo::delProperty(JSContext* cx,
         holder->_altered = true;
 
         JSStringWrapper jsstr;
-        holder->_removed[IdWrapper(cx, id).toStringData(&jsstr)] = true;
+        holder->_removed.emplace(IdWrapper(cx, id).toStringData(&jsstr));
     }
 
     result.succeed();
@@ -295,7 +290,7 @@ void BSONInfo::resolve(JSContext* cx, JS::HandleObject obj, JS::HandleId id, boo
     auto sname = idw.toStringData(&jsstr);
     if (sname.find('\0') != std::string::npos)
         return;
-    if (!holder->_readOnly && holder->_removed.find(std::string{sname}) != holder->_removed.end())
+    if (!holder->_readOnly && holder->_removed.contains(sname))
         return;
     if (!holder->_obj.hasField(sname))
         return;
