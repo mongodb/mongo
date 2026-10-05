@@ -302,5 +302,51 @@ TEST_F(TimeseriesUpdateDeleteUtilTest, TranslateUpdateRename) {
                        AssertionException,
                        ErrorCodes::InvalidOptions);
 }
+
+TEST_F(TimeseriesUpdateDeleteUtilTest, TranslateQueryEmptyMetaFieldEmptyQuery) {
+    ASSERT_BSONOBJ_EQ(timeseries::translateQuery(BSONObj(), ""), BSONObj());
+}
+
+TEST_F(TimeseriesUpdateDeleteUtilTest, TranslateQueryEmptyMetaFieldOnMetaField) {
+    ASSERT_BSONOBJ_EQ(timeseries::translateQuery(BSON("" << 1), ""), BSON("meta" << 1));
+}
+
+TEST_F(TimeseriesUpdateDeleteUtilTest, TranslateQueryEmptyMetaFieldDotted) {
+    ASSERT_BSONOBJ_EQ(timeseries::translateQuery(BSON(".a" << 1), ""), BSON("meta.a" << 1));
+}
+
+TEST_F(TimeseriesUpdateDeleteUtilTest, TranslateQueryEmptyMetaFieldNonMetaField) {
+    ASSERT_THROWS_CODE(timeseries::translateQuery(BSON("value" << 1), ""),
+                       AssertionException,
+                       ErrorCodes::InvalidOptions);
+}
+
+TEST_F(TimeseriesUpdateDeleteUtilTest, TranslateQueryNonMetaField) {
+    ASSERT_THROWS_CODE(timeseries::translateQuery(BSON("value" << 1), _metaField),
+                       AssertionException,
+                       ErrorCodes::InvalidOptions);
+}
+
+TEST_F(TimeseriesUpdateDeleteUtilTest, TranslateUpdateEmptyMetaField) {
+    auto swUpdate = timeseries::translateUpdate(
+        write_ops::UpdateModification::parseFromClassicUpdate(BSON("$set" << BSON("" << 2))),
+        std::string_view{""});
+    ASSERT_OK(swUpdate.getStatus());
+    ASSERT_BSONOBJ_EQ(swUpdate.getValue().getUpdateModifier(), BSON("$set" << BSON("meta" << 2)));
+}
+
+TEST_F(TimeseriesUpdateDeleteUtilTest, TranslateUpdateEmptyMetaFieldNonMetaField) {
+    auto swUpdate = timeseries::translateUpdate(
+        write_ops::UpdateModification::parseFromClassicUpdate(BSON("$set" << BSON("value" << 2))),
+        std::string_view{""});
+    ASSERT_EQ(swUpdate.getStatus().code(), ErrorCodes::InvalidOptions);
+}
+
+TEST_F(TimeseriesUpdateDeleteUtilTest, TranslateUpdateNonMetaField) {
+    auto swUpdate = timeseries::translateUpdate(
+        write_ops::UpdateModification::parseFromClassicUpdate(BSON("$set" << BSON("value" << 2))),
+        _metaField);
+    ASSERT_EQ(swUpdate.getStatus().code(), ErrorCodes::InvalidOptions);
+}
 }  // namespace
 }  // namespace mongo

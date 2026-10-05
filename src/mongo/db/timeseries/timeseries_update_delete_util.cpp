@@ -151,8 +151,6 @@ void replaceQueryMetaFieldName(mutablebson::Element elem,
 }  // namespace
 
 BSONObj translateQuery(const BSONObj& query, std::string_view metaField) {
-    invariant(!metaField.empty());
-
     mutablebson::Document queryDoc(query);
     for (auto queryElem = queryDoc.root().leftChild(); queryElem.ok();
          queryElem = queryElem.rightSibling()) {
