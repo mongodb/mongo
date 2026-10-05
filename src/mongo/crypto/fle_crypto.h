@@ -1044,11 +1044,15 @@ public:
     static BSONObj encryptionInformationSerialize(const NamespaceString& nss,
                                                   const BSONObj& encryptedFields);
     static BSONObj encryptionInformationSerialize(const BSONObj& schema);
+
     /**
      * Get a schema from EncryptionInformation and ensure the esc/ecoc are setup correctly.
      */
     static EncryptedFieldConfig getAndValidateSchema(const NamespaceString& nss,
                                                      const EncryptionInformation& ei);
+
+    static void validateStateCollectionNamespaces(const NamespaceString& nss,
+                                                  const EncryptedFieldConfig& ef);
 
     /**
      * checkTagLimitsAndStorageNotExceeded throws if either of the following conditions are met:

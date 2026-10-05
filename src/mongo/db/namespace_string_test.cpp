@@ -670,5 +670,46 @@ TEST_F(NamespaceStringTest, CheckFormatNamespaceEmptyCollMultitenancy) {
     ASSERT_EQ(nssEmptyColl.toString_forTest(), "dbTest");
 }
 
+TEST_F(NamespaceStringTest, IsFLE2StateCollection) {
+    const auto escNss = NamespaceString::createNamespaceString_forTest("test", "enxcol_.f.esc");
+    const auto ecocNss = NamespaceString::createNamespaceString_forTest("test", "enxcol_.f.ecoc");
+    const auto ecocCompactNss =
+        NamespaceString::createNamespaceString_forTest("test", "enxcol_.f.ecoc.compact");
+
+    const std::vector<std::string> badEdcNames = {
+        "", ".", ".foo", "$foo", "fo$o", std::string("fo\0o", 4)};
+
+    ASSERT_TRUE(NamespaceString::isFLE2StateCollection(escNss.coll()));
+    ASSERT_TRUE(escNss.isFLE2StateCollection());
+    ASSERT_TRUE(escNss.isFLE2EscCollection());
+    ASSERT_FALSE(escNss.isFLE2EcocCollection());
+
+    ASSERT_TRUE(NamespaceString::isFLE2StateCollection(ecocNss.coll()));
+    ASSERT_TRUE(ecocNss.isFLE2StateCollection());
+    ASSERT_FALSE(ecocNss.isFLE2EscCollection());
+    ASSERT_TRUE(ecocNss.isFLE2EcocCollection());
+
+    ASSERT_TRUE(NamespaceString::isFLE2StateCollection(ecocCompactNss.coll()));
+    ASSERT_TRUE(ecocCompactNss.isFLE2StateCollection());
+    ASSERT_FALSE(ecocCompactNss.isFLE2EcocCollection());
+
+    for (const auto& edcName : badEdcNames) {
+        const auto coll = fmt::format("enxcol_.{}.ecoc", edcName);
+        ASSERT_FALSE(NamespaceString::isFLE2StateCollection(coll));
+
+        // Collection names with embedded null chars fail during NamespaceString construction.
+        if (coll.find('\0') != std::string::npos) {
+            ASSERT_THROWS_CODE(NamespaceString::createNamespaceString_forTest("test", coll),
+                               DBException,
+                               ErrorCodes::InvalidNamespace);
+            continue;
+        }
+        const auto ns = NamespaceString::createNamespaceString_forTest("test", coll);
+        ASSERT_FALSE(ns.isFLE2StateCollection());
+        ASSERT_FALSE(ns.isFLE2EcocCollection());
+        ASSERT_FALSE(ns.isFLE2EscCollection());
+    }
+}
+
 }  // namespace
 }  // namespace mongo

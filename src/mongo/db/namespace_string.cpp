@@ -59,6 +59,27 @@ static const absl::flat_hash_set<NamespaceString> globallyUniqueConfigDbCollecti
     NamespaceString::kConfigMongosNamespace,
     NamespaceString::kLogicalSessionsNamespace};
 
+enum class FLE2StateCollectionNameType { kInvalid, kEsc, kEcoc, kEcocCompact };
+FLE2StateCollectionNameType resolveFLE2StateCollectionNameType(StringData coll) {
+    FLE2StateCollectionNameType type = FLE2StateCollectionNameType::kInvalid;
+    if (!coll.starts_with(fle2Prefix)) {
+        return type;
+    }
+    coll.remove_prefix(fle2Prefix.length());
+    if (coll.ends_with(fle2EscSuffix)) {
+        coll.remove_suffix(fle2EscSuffix.length());
+        type = FLE2StateCollectionNameType::kEsc;
+    } else if (coll.ends_with(fle2EcocSuffix)) {
+        coll.remove_suffix(fle2EcocSuffix.length());
+        type = FLE2StateCollectionNameType::kEcoc;
+    } else if (coll.ends_with(fle2EcocCompactSuffix)) {
+        coll.remove_suffix(fle2EcocCompactSuffix.length());
+        type = FLE2StateCollectionNameType::kEcocCompact;
+    }
+    return NamespaceString::validCollectionName(coll) ? type
+                                                      : FLE2StateCollectionNameType::kInvalid;
+}
+
 }  // namespace
 
 bool NamespaceString::isListCollectionsCursorNS() const {
@@ -312,15 +333,20 @@ bool NamespaceString::isConfigTransactionsCollection() const {
     return ns() == kSessionTransactionsTableNamespace.ns();
 }
 
+bool NamespaceString::isFLE2EcocCollection() const {
+    return resolveFLE2StateCollectionNameType(coll()) == FLE2StateCollectionNameType::kEcoc;
+}
+
+bool NamespaceString::isFLE2EscCollection() const {
+    return resolveFLE2StateCollectionNameType(coll()) == FLE2StateCollectionNameType::kEsc;
+}
+
 bool NamespaceString::isFLE2StateCollection() const {
-    return coll().starts_with(fle2Prefix) &&
-        (coll().ends_with(fle2EscSuffix) || coll().ends_with(fle2EcocSuffix) ||
-         coll().ends_with(fle2EcocCompactSuffix));
+    return resolveFLE2StateCollectionNameType(coll()) != FLE2StateCollectionNameType::kInvalid;
 }
 
 bool NamespaceString::isFLE2StateCollection(StringData coll) {
-    return coll.starts_with(fle2Prefix) &&
-        (coll.ends_with(fle2EscSuffix) || coll.ends_with(fle2EcocSuffix));
+    return resolveFLE2StateCollectionNameType(coll) != FLE2StateCollectionNameType::kInvalid;
 }
 
 bool NamespaceString::isSystemStatsCollection() const {
