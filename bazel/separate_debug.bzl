@@ -28,6 +28,18 @@ gdb_index_message = rule(
     },
 )
 
+def flat_solib_name(short_path):
+    """
+    Map a library's workspace-relative path to a unique, flat file name in _solib_<cpu>.
+
+    Binaries record the solib file name in DT_NEEDED (our libraries set no SONAME), and Bazel
+    adds one RUNPATH entry per distinct solib directory. A flat name derived from the full path
+    keeps RUNPATH to a single entry while making every library name unique, so a stale library
+    left in the output tree after a target moves packages can never be loaded in place of the
+    current one. Escaping follows Bazel's own solib mangling ("_" -> "_U", "/" -> "_S").
+    """
+    return "lib" + short_path.replace("_", "_U").replace("/", "_S")
+
 def get_inputs_and_outputs(ctx, shared_ext, static_ext, debug_ext):
     """
     Determines and generates the inputs and outputs.
@@ -64,14 +76,20 @@ def get_inputs_and_outputs(ctx, shared_ext, static_ext, debug_ext):
             if shared_lib:
                 basename = shared_lib.basename[:-len(WITH_DEBUG_SUFFIX + shared_ext + CC_SHARED_LIBRARY_SUFFIX)]
 
+            output_bin = ctx.actions.declare_file(basename + shared_ext)
+
+            # Regular libraries are installed under their flat solib name, so name the debug info
+            # to match. This keeps the debuglink, the installed debug file, and the installed
+            # library consistent for tools that pair "<lib>" with "<lib>.debug" by name.
+            # cc_shared_library outputs keep their plain names.
+            debug_basename = basename + shared_ext if shared_lib else flat_solib_name(output_bin.short_path)
             if ctx.attr.enabled:
                 if debug_ext == MAC_DEBUG_FOLDER_EXTENSION:
-                    debug_info = ctx.actions.declare_directory(basename + shared_ext + debug_ext)
+                    debug_info = ctx.actions.declare_directory(debug_basename + debug_ext)
                 else:
-                    debug_info = ctx.actions.declare_file(basename + shared_ext + debug_ext)
+                    debug_info = ctx.actions.declare_file(debug_basename + debug_ext)
             else:
                 debug_info = None
-            output_bin = ctx.actions.declare_file(basename + shared_ext)
             input_bin = shared_input
             if shared_lib:
                 input_bin = shared_lib
@@ -182,8 +200,12 @@ def create_new_ccinfo_library(ctx, cc_toolchain, shared_lib, static_lib, cc_shar
 
         if shared_lib or static_lib:
             binary_linker_inputs = ctx.attr.binary_with_debug[CcInfo].linking_context.linker_inputs.to_list()
-            if shared_lib:
+            if shared_lib and cc_shared_library != None:
+                # cc_shared_library outputs keep their plain, package-relative names (see
+                # get_inputs_and_outputs).
                 so_path = shared_lib.path.replace(ctx.bin_dir.path + "/", "")
+            elif shared_lib:
+                so_path = flat_solib_name(shared_lib.short_path)
             else:
                 so_path = ""
             direct_lib = cc_common.create_library_to_link(
