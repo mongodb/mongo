@@ -649,7 +649,11 @@ Status _parseQueryStatsAndReturnEmptyResult(
     // never happens on the sharding node for single shard/sharded cluster with unsharded collection
     // topologies.
     try {
-        performValidationChecks(opCtx, request, liteParsedPipeline);
+        // As in runAggregateImpl(): validate only the original (pre-desugar) pipeline; an
+        // already-desugared resolved-view pipeline contains server-generated internal stages.
+        if (!alreadyDesugared) {
+            performValidationChecks(opCtx, request, liteParsedPipeline);
+        }
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
@@ -764,7 +768,12 @@ Status runAggregateImpl(OperationContext* opCtx,
     BSONObjBuilder result;
     AggregateCommandRequest request{req};
 
-    performValidationChecks(opCtx, request, liteParsedPipeline);
+    // An already-desugared resolved-view pipeline was validated pre-desugar on the first pass;
+    // re-validating would wrongly reject server-generated internal stages (e.g. the
+    // kInternal-only $_internalSearchIdLookup) under the user's client.
+    if (!alreadyDesugared) {
+        performValidationChecks(opCtx, request, liteParsedPipeline);
+    }
 
     const auto isSharded = [](OperationContext* opCtx, const NamespaceString& nss) {
         // Note that if this decision is stale, and a collection has transitioned from sharded to
@@ -1453,7 +1462,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                                         state.resolvedView,
                                                         state.originalRequest,
                                                         verbosity,
-                                                        result);
+                                                        result,
+                                                        state.alreadyDesugared);
         }
 
         // Return the final status (either from routing or aggregation).
