@@ -865,5 +865,24 @@ TEST_F(SizeCountCheckpointCoordinatorHashTest, UnterminatedChainPersistsNoHash) 
     EXPECT_FALSE(readSizeCount(_collA.uuid).has_value());
 }
 
+TEST_F(SizeCountCheckpointCoordinatorHashTest, FlushRecordsInsertAndUpdateMetrics) {
+    OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        GTEST_SKIP() << "Skipping test due to OTel metrics being unavailable in this build";
+    }
+
+    writeCrudEntry(nextTs(), _collA, repl::OpTypeEnum::kInsert, 10 /*sizeDelta=*/, kHashA);
+    flush();
+
+    EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountInsertCount), 2);
+    EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountUpdateCount), 0);
+
+    writeCrudEntry(nextTs(), _collA, repl::OpTypeEnum::kInsert, 20 /*sizeDelta=*/, kHashB);
+    flush();
+
+    EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountInsertCount), 2);
+    EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountUpdateCount), 2);
+}
+
 }  // namespace
 }  // namespace mongo::replicated_fast_count

@@ -46,36 +46,50 @@ ReplicatedMetadataCheckpointSnapshot materializeCheckpointSnapshot(
             .validAsOf = scanResult.lastTimestamp.value_or(scanStartAfterTS)};
 }
 
-size_t persistCheckpointSnapshot(OperationContext* opCtx,
-                                 const ReplicatedMetadataCheckpointSnapshot& checkpoint,
-                                 SizeCountStore& sizeCountStore,
-                                 SizeCountTimestampStore& timestampStore) {
-    size_t entryWriteCount = 0;
+CheckpointWriteCounts persistCheckpointSnapshot(
+    OperationContext* opCtx,
+    const ReplicatedMetadataCheckpointSnapshot& checkpoint,
+    SizeCountStore& sizeCountStore,
+    SizeCountTimestampStore& timestampStore) {
+    CheckpointWriteCounts writeCounts{.entryWriteCount = 0, .insertCount = 0, .updateCount = 0};
     for (const auto& [uuid, entry] : checkpoint.updatedCollections) {
         switch (entry.state) {
             case DDLState::kCreated: {
-                sizeCountStore.insert(opCtx,
-                                      uuid,
-                                      SizeCountStore::Entry{.timestamp = checkpoint.validAsOf,
-                                                            .size = entry.metadata.sizeCount.size,
-                                                            .count = entry.metadata.sizeCount.count,
-                                                            .hash = entry.metadata.hash});
-                entryWriteCount++;
+                const boost::optional<SizeCountStore::Entry> oldValue = sizeCountStore.insert(
+                    opCtx,
+                    uuid,
+                    SizeCountStore::Entry{.timestamp = checkpoint.validAsOf,
+                                          .size = entry.metadata.sizeCount.size,
+                                          .count = entry.metadata.sizeCount.count,
+                                          .hash = entry.metadata.hash});
+                massert(12299200,
+                        fmt::format("Did not expect pre-existing entry for uuid={} in "
+                                    "SizeCountStore for collection create",
+                                    uuid.toString()),
+                        !oldValue.has_value());
+                writeCounts.entryWriteCount++;
+                writeCounts.insertCount++;
                 break;
             }
             case DDLState::kDropped: {
-                entryWriteCount += sizeCountStore.remove(opCtx, uuid);
+                writeCounts.entryWriteCount += sizeCountStore.remove(opCtx, uuid);
                 break;
             }
             case DDLState::kDroppedAndRecreated:
             case DDLState::kNone: {
-                sizeCountStore.write(opCtx,
-                                     uuid,
-                                     SizeCountStore::Entry{.timestamp = checkpoint.validAsOf,
-                                                           .size = entry.metadata.sizeCount.size,
-                                                           .count = entry.metadata.sizeCount.count,
-                                                           .hash = entry.metadata.hash});
-                entryWriteCount++;
+                const boost::optional<SizeCountStore::Entry> oldValue = sizeCountStore.insert(
+                    opCtx,
+                    uuid,
+                    SizeCountStore::Entry{.timestamp = checkpoint.validAsOf,
+                                          .size = entry.metadata.sizeCount.size,
+                                          .count = entry.metadata.sizeCount.count,
+                                          .hash = entry.metadata.hash});
+                if (oldValue.has_value()) {
+                    writeCounts.updateCount++;
+                } else {
+                    writeCounts.insertCount++;
+                }
+                writeCounts.entryWriteCount++;
                 break;
             }
             default:
@@ -87,7 +101,7 @@ size_t persistCheckpointSnapshot(OperationContext* opCtx,
     // point.
     timestampStore.write(opCtx, checkpoint.validAsOf);
 
-    return entryWriteCount;
+    return writeCounts;
 }
 
 size_t advanceCheckpoint(OperationContext* opCtx,
@@ -109,11 +123,11 @@ size_t advanceCheckpoint(OperationContext* opCtx,
     }
 
     WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::nonAtomicGroup);
-    const size_t entryWriteCount =
+    const CheckpointWriteCounts writeCounts =
         persistCheckpointSnapshot(opCtx, checkpoint, sizeCountStore, timestampStore);
     wuow.commit();
 
-    return entryWriteCount;
+    return writeCounts.entryWriteCount;
 }
 
 }  // namespace mongo::replicated_fast_count

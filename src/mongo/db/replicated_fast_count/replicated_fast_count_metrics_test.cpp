@@ -62,8 +62,10 @@ TEST(ReplicatedFastCountMetricsTest, MetricsInitialization) {
 
 TEST(ReplicatedFastCountMetricsTest, FlushSuccessCounterIncrementsViaRecordFlush) {
     OtelMetricsCapturer capturer;
-    recordFlush(Date_t::now(), /*batchSize=*/1);
-    recordFlush(Date_t::now(), /*batchSize=*/1);
+    const CheckpointWriteCounts writeCounts{
+        .entryWriteCount = 1, .insertCount = 0, .updateCount = 0};
+    recordFlush(Date_t::now(), writeCounts);
+    recordFlush(Date_t::now(), writeCounts);
 
     EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountFlushSuccessCount), 2);
 }
@@ -175,11 +177,26 @@ TEST(ReplicatedFastCountMetricsTest, WatermarkAwaitTimeTotalAccumulates) {
 
 TEST(ReplicatedFastCountMetricsTest, FlushedDocsTotalUpdatedAfterFlushes) {
     OtelMetricsCapturer capturer;
-    recordFlush(Date_t::now(), /*batchSize=*/3);
-    recordFlush(Date_t::now(), /*batchSize=*/7);
-    recordFlush(Date_t::now(), /*batchSize=*/1);
+    recordFlush(Date_t::now(),
+                CheckpointWriteCounts{.entryWriteCount = 3, .insertCount = 0, .updateCount = 0});
+    recordFlush(Date_t::now(),
+                CheckpointWriteCounts{.entryWriteCount = 7, .insertCount = 0, .updateCount = 0});
+    recordFlush(Date_t::now(),
+                CheckpointWriteCounts{.entryWriteCount = 1, .insertCount = 0, .updateCount = 0});
 
     EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountFlushedDocsTotal), 11);
+}
+
+TEST(ReplicatedFastCountMetricsTest, InsertAndUpdateCountersRecordedViaRecordFlush) {
+    OtelMetricsCapturer capturer;
+
+    recordFlush(Date_t::now(),
+                CheckpointWriteCounts{.entryWriteCount = 3, .insertCount = 1, .updateCount = 2});
+    recordFlush(Date_t::now(),
+                CheckpointWriteCounts{.entryWriteCount = 2, .insertCount = 2, .updateCount = 0});
+
+    EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountInsertCount), 3);
+    EXPECT_EQ(capturer.readInt64Counter(MetricNames::kReplicatedFastCountUpdateCount), 2);
 }
 
 class ReplicatedFastCountManagerMetricsTest : public CatalogTestFixture {
@@ -205,32 +222,6 @@ protected:
     ReplicatedFastCountManager* _fastCountManager;
     OtelMetricsCapturer _capturer;
 };
-
-// TODO SERVER-122992: Re-enable once the number of entries inserted versus updated are
-// communicated.
-// TEST_F(ReplicatedFastCountManagerMetricsTest,
-// InsertAndUpdateCountersIncrementViaFlush) {
-//     const UUID uuid = UUID::gen();
-//     boost::container::flat_map<UUID, CollectionSizeCount> changes;
-//     changes[uuid] = {/*count=*/1, /*size=*/100};
-//     _fastCountManager->commit(changes);
-//     _fastCountManager->flushSync_ForTest(operationContext());
-//
-//     // After flushing, at least the above change should be inserted.
-//     EXPECT_GE(
-//         _capturer.readInt64Counter(MetricNames::kReplicatedFastCountInsertCount),
-//         1);
-//
-//     changes[uuid] = {/*count=*/1, /*size=*/50};
-//     _fastCountManager->commit(changes);
-//     _fastCountManager->flushSync_ForTest(operationContext());
-//
-//     // The above change should update the existing document.
-//     EXPECT_GE(
-//         _capturer.readInt64Counter(MetricNames::kReplicatedFastCountUpdateCount),
-//         1);
-// }
-//
 
 TEST(ReplicatedFastCountMetricsTest, CheckpointOplogEntriesProcessedCounterIncrements) {
     OtelMetricsCapturer capturer;

@@ -74,7 +74,7 @@ boost::optional<FlushResult> flush(OperationContext* opCtx,
         hangBeforePersistingNewFastCountEntries.pauseWhileSet();
 
         WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::nonAtomicGroup);
-        const size_t entryWriteCount =
+        const CheckpointWriteCounts writeCounts =
             persistCheckpointSnapshot(opCtx, checkpoint, sizeCountStore, timestampStore);
         wuow.commit();
 
@@ -82,7 +82,7 @@ boost::optional<FlushResult> flush(OperationContext* opCtx,
             .previousValidAsOfTS = currentValidAsOf,
             .newValidAsOfTS = checkpoint.validAsOf,
             .checkpointBufferSize = batch.deltas.size(),
-            .entryWriteCount = entryWriteCount,
+            .writeCounts = writeCounts,
             .flushAttempts = flushAttempts,
         };
     });

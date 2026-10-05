@@ -98,8 +98,10 @@ boost::optional<SizeCountStore::Entry> SizeCountStore::read(OperationContext* op
     return SizeCountStore::parseContainerValue(*result);
 }
 
-void SizeCountStore::write(OperationContext* opCtx, UUID uuid, const Entry& entry) {
-    assertInWriteUnitOfWorkAndLocked(opCtx, "write");
+boost::optional<SizeCountStore::Entry> SizeCountStore::insert(OperationContext* opCtx,
+                                                              UUID uuid,
+                                                              const SizeCountStore::Entry& entry) {
+    assertInWriteUnitOfWorkAndLocked(opCtx, "insert");
 
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
     auto& container = _getStringKeyedContainer();
@@ -107,18 +109,17 @@ void SizeCountStore::write(OperationContext* opCtx, UUID uuid, const Entry& entr
 
     auto cursor = container.getCursor(ru);
     const auto previousValue = cursor->find(keySpan);
-
+    const boost::optional<SizeCountStore::Entry> previousEntry = previousValue.has_value()
+        ? boost::make_optional<SizeCountStore::Entry>(
+              SizeCountStore::parseContainerValue(*previousValue))
+        : boost::none;
     const auto hashToWrite = [&]() -> boost::optional<int64_t> {
         // Check if a previous entry exists and contains a hash.
-        if (previousValue.has_value()) {
-            const SizeCountStore::Entry previousEntry =
-                SizeCountStore::parseContainerValue(*previousValue);
-            if (!previousEntry.hash.has_value()) {
-                // The pre-existing entry does not already contain a hash. Do not write a hash,
-                // regardless of the hash in `entry`. This accounts for collections with size/count
-                // metadata created before hash validation was enabled.
-                return boost::none;
-            }
+        if (previousEntry.has_value() && !previousEntry->hash.has_value()) {
+            // The pre-existing entry does not already contain a hash. Do not write a hash,
+            // regardless of the hash in `entry`. This accounts for collections with size/count
+            // metadata created before hash validation was enabled.
+            return boost::none;
         }
         return entry.hash;
     }();
@@ -135,6 +136,8 @@ void SizeCountStore::write(OperationContext* opCtx, UUID uuid, const Entry& entr
     } else {
         massertStatusOK(container_write::insert(opCtx, ru, container, keySpan, valueSpan));
     }
+
+    return previousEntry;
 }
 
 void SizeCountStore::writeToTable(OperationContext* opCtx, UUID uuid, const Entry& entry) {
@@ -150,16 +153,6 @@ void SizeCountStore::writeToTable(OperationContext* opCtx, UUID uuid, const Entr
     // safely use container::ExistingKeyPolicy::Overwrite.
     massertStatusOK(
         container.insert(ru, keySpan, valSpan, container::ExistingKeyPolicy::overwrite));
-}
-
-void SizeCountStore::insert(OperationContext* opCtx, UUID uuid, const Entry& entry) {
-    assertInWriteUnitOfWorkAndLocked(opCtx, "insert");
-
-    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
-    auto& container = _getStringKeyedContainer();
-    auto val = entryToContainerValue(entry);
-    massertStatusOK(
-        container_write::insert(opCtx, ru, container, uuidToContainerKey(uuid), bsonToSpan(val)));
 }
 
 size_t SizeCountStore::remove(OperationContext* opCtx, UUID uuid) {

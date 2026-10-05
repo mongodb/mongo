@@ -761,14 +761,15 @@ void writeToOplog(OperationContext* opCtx, const repl::OplogEntry& oplogEntry) {
     wuow.commit();
 }
 
-void insertSizeCountEntry(OperationContext* opCtx,
-                          SizeCountStore& store,
-                          UUID uuid,
-                          const SizeCountStore::Entry& entry) {
+boost::optional<SizeCountStore::Entry> insertSizeCountEntry(OperationContext* opCtx,
+                                                            SizeCountStore& store,
+                                                            UUID uuid,
+                                                            const SizeCountStore::Entry& entry) {
     Lock::GlobalLock writeLock(opCtx, MODE_IX);
     WriteUnitOfWork wuow(opCtx);
-    store.write(opCtx, uuid, entry);
+    const boost::optional<SizeCountStore::Entry> oldValue = store.insert(opCtx, uuid, entry);
     wuow.commit();
+    return oldValue;
 }
 
 void insertSizeCountTimestamp(OperationContext* opCtx,

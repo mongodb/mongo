@@ -11,6 +11,18 @@ namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class ServiceContext;
 
+namespace replicated_fast_count {
+
+struct CheckpointWriteCounts {
+    size_t entryWriteCount;
+    size_t insertCount;
+    size_t updateCount;
+
+    bool operator==(const CheckpointWriteCounts&) const = default;
+};
+
+}  // namespace replicated_fast_count
+
 /**
  * Free functions wrapping the ReplicatedFastCountManager OpenTelemetry metric instruments. All
  * metrics are reported via OTel and serverStatus.
@@ -37,10 +49,10 @@ void incrementTailerWatermarksSeenCount();
 void recordWatermarkAwaitTime(Milliseconds waitTime);
 
 /**
- * Records metrics for a successful flush. Updates flush timing, success count, and
- * flushed-document counters.
+ * Records metrics for a successful flush. Updates flush timing, success count, flushed-document
+ * counters, and the insert/update write counters from `writeCounts`.
  */
-void recordFlush(Date_t startTime, size_t batchSize);
+void recordFlush(Date_t startTime, replicated_fast_count::CheckpointWriteCounts writeCounts);
 
 /**
  * Free functions for recording checkpoint oplog scan metrics. These functions are safe to call from

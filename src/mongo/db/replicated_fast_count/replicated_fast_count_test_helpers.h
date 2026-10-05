@@ -432,16 +432,15 @@ void writeToOplog(OperationContext* opCtx, const repl::OplogEntry& oplogEntry);
 /**
  * Inserts an entry into `store` for the provided `uuid`.
  */
-// TODO(SERVER-122992): Assert return value is false.
-void insertSizeCountEntry(OperationContext* opCtx,
-                          SizeCountStore& store,
-                          UUID uuid,
-                          const SizeCountStore::Entry& entry);
+boost::optional<SizeCountStore::Entry> insertSizeCountEntry(OperationContext* opCtx,
+                                                            SizeCountStore& store,
+                                                            UUID uuid,
+                                                            const SizeCountStore::Entry& entry);
 
 /**
  * Inserts a timestamp into `store`.
  */
-// TODO(SERVER-122992): Assert return value is false.
+// TODO(SERVER-136271): Return boost::optional<Timestamp>.
 void insertSizeCountTimestamp(OperationContext* opCtx,
                               SizeCountTimestampStore& store,
                               Timestamp timestamp);

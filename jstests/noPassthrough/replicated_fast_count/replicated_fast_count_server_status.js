@@ -119,9 +119,8 @@ describe("fast count server status metric", function () {
             () => {
                 const metrics = getMetrics(this.db);
                 return (
-                    // TODO SERVER-122992: Enforce correct update / inserts.
-                    // metrics.insertCount >= 1 &&
-                    // metrics.updateCount >= 1 &&
+                    metrics.insertCount >= 1 &&
+                    metrics.updateCount >= 1 &&
                     metrics.flushedDocs.total >= 6
                 );
             },

@@ -216,10 +216,12 @@ void SizeCountCheckpointCoordinator::_runFlushThread(ServiceContext* service) {
                       "previousValidAsOfTS"_attr = result->previousValidAsOfTS,
                       "newValidAsOfTS"_attr = result->newValidAsOfTS,
                       "checkpointBufferSize"_attr = result->checkpointBufferSize,
-                      "entryWriteCount"_attr = result->entryWriteCount,
+                      "entryWriteCount"_attr = result->writeCounts.entryWriteCount,
+                      "insertCount"_attr = result->writeCounts.insertCount,
+                      "updateCount"_attr = result->writeCounts.updateCount,
                       "flushAttempts"_attr = result->flushAttempts,
                       "duration"_attr = duration);
-                recordFlush(flushStart, result->entryWriteCount);
+                recordFlush(flushStart, result->writeCounts);
             } else {
                 LOGV2_DEBUG(13195101,
                             3,

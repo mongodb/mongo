@@ -3,6 +3,7 @@
 #pragma once
 
 #include "mongo/db/operation_context.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_metrics.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_streaming_oplog_delta_accumulator.h"
 
 namespace mongo::replicated_fast_count {
@@ -33,11 +34,11 @@ struct FlushResult {
     size_t checkpointBufferSize;
 
     /**
-     * The number of entries written to the fast count metadata store. This value is <=
-     * `checkpointBufferSize` because some deltas can be skipped. See
+     * The counts of the writes persisted to the fast count metadata store. `entryWriteCount` is
+     * <= `checkpointBufferSize` because some deltas can be skipped. See
      * `persistCheckpointSnapshot()`.
      */
-    size_t entryWriteCount;
+    CheckpointWriteCounts writeCounts;
 
     /**
      * The number of attempts required to successfully flush the checkpoint to the fast count

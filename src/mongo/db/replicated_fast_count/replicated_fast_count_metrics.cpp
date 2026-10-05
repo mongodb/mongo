@@ -201,12 +201,14 @@ void recordWatermarkAwaitTime(Milliseconds waitTime) {
     watermarkAwaitTimeMsTotalCounter.add(waitTime.count());
 }
 
-void recordFlush(Date_t startTime, size_t batchSize) {
+void recordFlush(Date_t startTime, replicated_fast_count::CheckpointWriteCounts writeCounts) {
     const int64_t elapsedMs = (Date_t::now() - startTime).count();
 
     flushSuccessCounter.add(1);
     flushTimeMsTotalCounter.add(elapsedMs);
-    flushedDocsTotalCounter.add(static_cast<int64_t>(batchSize));
+    flushedDocsTotalCounter.add(static_cast<int64_t>(writeCounts.entryWriteCount));
+    insertCounter.add(static_cast<int64_t>(writeCounts.insertCount));
+    updateCounter.add(static_cast<int64_t>(writeCounts.updateCount));
 }
 
 void recordAppliedOpTime(const Timestamp& ts) {

@@ -161,7 +161,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, AdvancesExistingSizeCountAndTim
     {
         Lock::GlobalLock writeLock(opCtx, MODE_IX);
         WriteUnitOfWork wuow(opCtx);
-        sizeCountStore->write(
+        sizeCountStore->insert(
             opCtx,
             collA.uuid,
             SizeCountStore::Entry{.timestamp = Timestamp(1, 1), .size = 100, .count = 3});
@@ -201,7 +201,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, NoReplicatedSizeCountInOplogFor
     {
         Lock::GlobalLock writeLock(opCtx, MODE_IX);
         WriteUnitOfWork wuow(opCtx);
-        sizeCountStore->write(
+        sizeCountStore->insert(
             opCtx,
             collA.uuid,
             SizeCountStore::Entry{.timestamp = Timestamp(1, 1), .size = 100, .count = 3});
@@ -238,7 +238,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, TimestampUpdatedForSum0SizeCoun
     {
         Lock::GlobalLock writeLock(opCtx, MODE_IX);
         WriteUnitOfWork wuow(opCtx);
-        sizeCountStore->write(
+        sizeCountStore->insert(
             opCtx,
             collA.uuid,
             SizeCountStore::Entry{.timestamp = Timestamp(1, 1), .size = 100, .count = 3});
@@ -310,7 +310,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest,
     {
         Lock::GlobalLock writeLock(opCtx, MODE_IX);
         WriteUnitOfWork wuow(opCtx);
-        sizeCountStore->write(
+        sizeCountStore->insert(
             opCtx,
             collA.uuid,
             SizeCountStore::Entry{.timestamp = Timestamp(1, 1), .size = 100, .count = 3});
@@ -460,7 +460,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, DropCollectionRemovesEntry) {
     {
         Lock::GlobalLock writeLock(opCtx, MODE_IX);
         WriteUnitOfWork wuow(opCtx);
-        sizeCountStore->write(
+        sizeCountStore->insert(
             opCtx,
             collA.uuid,
             SizeCountStore::Entry{.timestamp = Timestamp(1, 1), .size = 100, .count = 5});
@@ -612,7 +612,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, TruncateRangeAppliesNegativeDel
     {
         Lock::GlobalLock writeLock(opCtx, MODE_IX);
         WriteUnitOfWork wuow(opCtx);
-        sizeCountStore->write(
+        sizeCountStore->insert(
             opCtx,
             collA.uuid,
             SizeCountStore::Entry{.timestamp = Timestamp(1, 1), .size = 200, .count = 5});
@@ -667,7 +667,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, TruncateRangeOnlyAffectsTargetC
     {
         Lock::GlobalLock writeLock(opCtx, MODE_IX);
         WriteUnitOfWork wuow(opCtx);
-        sizeCountStore->write(
+        sizeCountStore->insert(
             opCtx,
             collA.uuid,
             SizeCountStore::Entry{.timestamp = Timestamp(1, 1), .size = 100, .count = 4});
@@ -915,11 +915,11 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, OplogTruncationUpdatesOplogFast
     {
         Lock::GlobalLock writeLock(opCtx, MODE_IX);
         WriteUnitOfWork wuow(opCtx);
-        sizeCountStore->write(opCtx,
-                              oplogUuid,
-                              SizeCountStore::Entry{.timestamp = Timestamp(1, 1),
-                                                    .size = oplogStartingSize,
-                                                    .count = oplogStartingCount});
+        sizeCountStore->insert(opCtx,
+                               oplogUuid,
+                               SizeCountStore::Entry{.timestamp = Timestamp(1, 1),
+                                                     .size = oplogStartingSize,
+                                                     .count = oplogStartingCount});
         timestampStore->write(opCtx, Timestamp(1, 1));
         wuow.commit();
     }
@@ -953,11 +953,11 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest,
     {
         Lock::GlobalLock writeLock(opCtx, MODE_IX);
         WriteUnitOfWork wuow(opCtx);
-        sizeCountStore->write(opCtx,
-                              oplogUuid,
-                              SizeCountStore::Entry{.timestamp = Timestamp(1, 1),
-                                                    .size = oplogStartingSize,
-                                                    .count = oplogStartingCount});
+        sizeCountStore->insert(opCtx,
+                               oplogUuid,
+                               SizeCountStore::Entry{.timestamp = Timestamp(1, 1),
+                                                     .size = oplogStartingSize,
+                                                     .count = oplogStartingCount});
         timestampStore->write(opCtx, Timestamp(1, 1));
         wuow.commit();
     }

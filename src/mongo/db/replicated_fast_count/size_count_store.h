@@ -76,19 +76,15 @@ public:
     [[nodiscard]] boost::optional<Entry> read(OperationContext* opCtx, UUID uuid) const;
 
     /**
-     * Upserts `entry` into the store. `entry` will overwrite any pre-existing document for `uuid`.
+     * Inserts a `UUID` to `Entry` key-value pair into the `SizeCountStore`.
      *
-     * If `entry.hash` is `boost::none`, the hash and its key, `kHashKey`, are not written.
-     */
-    void write(OperationContext* opCtx, UUID uuid, const Entry& entry);
-
-    /**
-     * Inserts `entry` into the store. If an entry for `uuid` already exists, this operation will
-     * throw a DBException.
+     * If the `SizeCountStore` did not have this `uuid` key present, `boost::none` is returned. If
+     * the `SizeCountStore` did have this `uuid` key present, the value is updated, and the old
+     * value is returned.
      *
-     * If `entry.hash` is `boost::none`, the hash and its key, `kHashKey`, are not written.
+     * If `entry.hash` is `boost::none`, the hash and its key, `kHashKey`, are not inserted.
      */
-    void insert(OperationContext* opCtx, UUID uuid, const Entry& entry);
+    boost::optional<Entry> insert(OperationContext* opCtx, UUID uuid, const Entry& entry);
 
     /**
      * Removes the entry for `uuid` from the store if one exists, otherwise does nothing.

@@ -219,6 +219,7 @@ mongo_cc_library(
     ],
     deps = [
         "replicated_fast_count_delta_utils",
+        "replicated_fast_count_metrics",
         "replicated_fast_count_streaming_oplog_delta_accumulator",
         "size_count_store",
         "size_count_timestamp_store",
@@ -319,6 +320,7 @@ mongo_cc_unit_test(
         "size_count_store",
         "size_count_timestamp_store",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
+        "//src/mongo/otel/metrics:metrics_test_util",
     ],
 )
 
