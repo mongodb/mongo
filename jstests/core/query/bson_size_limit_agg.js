@@ -199,7 +199,14 @@ function testSbeToClassicSplit() {
         // First $project is in SBE, and the second one should run in classic.
         const stages = getAggPlanStages(explain, "$project");
         assert(stages[0].$project.hasOwnProperty("_id"));
-        assert.eq(stages.length, 1);
+
+        if (explain.shards) {
+            // In this scan query spanning multiple shards, each shard will run one $project on the agg part, and
+            // getAggPlanStages collects them all.
+            assert.eq(stages.length, Object.keys(explain.shards).length, explain);
+        } else {
+            assert.eq(stages.length, 1, explain);
+        }
     }
 }
 
