@@ -457,6 +457,21 @@ server_parameters:
             gt: 0
         redact: false
 
+    internalQuerySlotBasedExecutionBlockProcessingMaxRecursiveOpArgs:
+        mod_visibility: needs_replacement
+        description: >-
+            Maximum number of arguments of an n-ary operation (e.g. $and, $or, $add, $multiply)
+            or of the branches of a $switch that the SBE vectorizer will attempt to convert to
+            block processing. Expressions exceeding this limit are not vectorized, to avoid
+            generating deeply recursive trees.
+        set_at: [startup, runtime]
+        cpp_varname: "internalQuerySlotBasedExecutionBlockProcessingMaxRecursiveOpArgs"
+        cpp_vartype: Atomic<int>
+        default: 100
+        validator:
+            gt: 0
+        redact: false
+
     internalQueryMaxDocValidationErrorConsideredValues:
         mod_visibility: needs_replacement
         description: >-

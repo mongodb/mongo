@@ -43,6 +43,33 @@ export class WorkloadSwitch extends PipelineWorkload {
     }
 }
 
+export class WorkloadSwitchOneFieldManyDocs extends PipelineWorkload {
+    /**
+     * $switch with many branches. We explicitly generate conditions that
+     * are false in order to cause all branches to be attempted.
+     * The $match at the beginning makes SBE eligible when working on timeseries.
+     * The $group at the end ensures we get a single result even in presence
+     * of many documents in the collection.
+     */
+    pipeline() {
+        let branches = [];
+
+        for (let i = 0; i < this.scale(); i++) {
+            branches.push({case: {$eq: [`$f0`, this.scale() + i]}, then: i});
+        }
+
+        return [
+            {$match: {"f0": {$lte: this.scale()}}},
+            {$project: {"result": {$switch: {branches: branches, default: "no match"}}}},
+            {$group: {"_id": "$result"}},
+        ];
+    }
+
+    result() {
+        return [{"_id": "no match"}];
+    }
+}
+
 export class WorkloadCond extends PipelineWorkload {
     /**
      * $cond with many levels of nesting

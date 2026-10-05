@@ -102,6 +102,34 @@ export class DatasetOneField extends Dataset {
         return range(this.scale()).map((i) => ({f0: i}));
     }
 }
+
+export class DatasetTimeseriesOneField extends Dataset {
+    workloads() {
+        return [
+            OperatorWorkloads.WorkloadSwitchOneFieldManyDocs,
+            MatchWorkloads.WorkloadAndOverSingleFieldWithInclusionProjection,
+            MatchWorkloads.WorkloadAndPlusOrOverSingleFieldWithInclusionProjection,
+            MatchWorkloads.WorkloadInWithInclusionProjection,
+            MatchWorkloads.WorkloadOrOverSingleFieldWithInclusionProjection,
+            MatchWorkloads.WorkloadOrPlusAndOverSingleFieldWithInclusionProjection,
+        ];
+    }
+
+    populate(db) {
+        db.createCollection(this.collection(), {
+            timeseries: {timeField: "t", metaField: "m"},
+        });
+        const coll = db.getCollection(this.collection());
+        for (let i = 0; i < this.scale(); i++) {
+            assert.commandWorked(coll.insert({t: new Date(i), m: 0, f0: i}));
+        }
+    }
+
+    data() {
+        return range(this.scale()).map((i) => ({f0: i}));
+    }
+}
+
 export class DatasetOneStringField extends Dataset {
     workloads() {
         return [
@@ -509,4 +537,5 @@ export const DATASETS = [
     DatasetLongValueTextIndex,
     DatasetSharded,
     DatasetNestedJSON,
+    DatasetTimeseriesOneField,
 ];

@@ -4,6 +4,7 @@
 #include "mongo/db/query/stage_builder/sbe/vectorizer.h"
 
 #include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
+#include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/stage_builder/sbe/abt/explain.h"
 #include "mongo/db/query/stage_builder/sbe/gen_abt_helpers.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr.h"
@@ -506,6 +507,12 @@ Vectorizer::Tree Vectorizer::operator()(const abt::ABT& n, const abt::NaryOp& op
         case abt::Operations::Or:
         case abt::Operations::Add:
         case abt::Operations::Mult: {
+            // Avoid generating deep recursive trees.
+            if (op.nodes().size() >
+                static_cast<size_t>(
+                    internalQuerySlotBasedExecutionBlockProcessingMaxRecursiveOpArgs.load())) {
+                return {{}, TypeSignature::kAnyScalarType, {}};
+            }
             return vectorizeNaryHelper(op, 0);
         }
         default:
@@ -1157,6 +1164,12 @@ Vectorizer::Tree Vectorizer::vectorizeSwitchHelper(const abt::Switch& op, size_t
 }
 
 Vectorizer::Tree Vectorizer::operator()(const abt::ABT& n, const abt::Switch& op) {
+    // Avoid generating deep recursive trees.
+    if (op.getNumBranches() >
+        static_cast<size_t>(
+            internalQuerySlotBasedExecutionBlockProcessingMaxRecursiveOpArgs.load())) {
+        return {{}, TypeSignature::kAnyScalarType, {}};
+    }
     // A switch is syntactic sugar for if(cond0) then then0 else (if (cond1) then then1 else (...)).
     // We process it using recursion so that we don't risk to generate a vectorized code that
     // processes a branch on a value that has been guarded by a previous "if" branch.
