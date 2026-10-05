@@ -385,6 +385,34 @@ INSTANTIATE_TEST_SUITE_P(
         return info.param.name;
     });
 
+TEST_F(ValidateStateTest, ShouldNotEnforceFastCountAndSizeWithReadTimestamp) {
+    const ValidationOptions options(ValidateMode::kForegroundFullEnforceFastCountAndSize,
+                                    RepairMode::kNone,
+                                    /*logDiagnostics=*/false,
+                                    currentValidationVersion,
+                                    /*verifyConfigurationOverride=*/boost::none,
+                                    /*readTimestamp=*/Timestamp(1, 1));
+    ValidateState validateState(operationContext(), kNss, options);
+    const FastCountType fastCountType = validateState.getDetectedFastCountType(operationContext());
+    EXPECT_FALSE(validateState.shouldEnforceFastCount(operationContext(), fastCountType));
+    EXPECT_FALSE(validateState.shouldEnforceFastSize(operationContext(), fastCountType));
+}
+
+TEST_F(ValidateStateWithoutSizeStorerTest, ShouldNotEnforceFastCountAndSizeWithReadTimestamp) {
+    createReplicatedFastCountContainers(operationContext());
+    const ValidationOptions options(ValidateMode::kForegroundFullEnforceFastCountAndSize,
+                                    RepairMode::kNone,
+                                    /*logDiagnostics=*/false,
+                                    currentValidationVersion,
+                                    /*verifyConfigurationOverride=*/boost::none,
+                                    /*readTimestamp=*/Timestamp(1, 1));
+    ValidateState validateState(operationContext(), kNss, options);
+    const FastCountType fastCountType = validateState.getDetectedFastCountType(operationContext());
+    EXPECT_EQ(fastCountType, FastCountType::replicated);
+    EXPECT_FALSE(validateState.shouldEnforceFastCount(operationContext(), fastCountType));
+    EXPECT_FALSE(validateState.shouldEnforceFastSize(operationContext(), fastCountType));
+}
+
 DEATH_TEST(FastCountToStringDeathTest, DiesOnBadFastCountType, "11853100") {
     toString(static_cast<FastCountType>(-1));
 }

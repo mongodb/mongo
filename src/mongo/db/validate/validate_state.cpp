@@ -182,6 +182,9 @@ bool ValidateState::shouldEnforceFastCount(OperationContext* opCtx, FastCountTyp
     if (isBackground()) {
         return false;
     }
+    if (getReadTimestamp()) {
+        return false;
+    }
     if (rss::ReplicatedStorageService::get(opCtx)
             .getPersistenceProvider()
             .shouldUseReplicatedFastCount()) {
@@ -200,6 +203,9 @@ bool ValidateState::shouldEnforceFastSize(OperationContext* opCtx, FastCountType
         return false;
     }
     if (isBackground()) {
+        return false;
+    }
+    if (getReadTimestamp()) {
         return false;
     }
     if (rss::ReplicatedStorageService::get(opCtx)
