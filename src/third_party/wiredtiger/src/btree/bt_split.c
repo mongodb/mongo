@@ -2567,11 +2567,12 @@ __wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, WT_MULTI *multi)
      *
      * Build the new page.
      *
-     * Allocate a WT_REF, the error path calls routines that free memory. The only field we need to
-     * set is the record number, as it's used by the search routines.
+     * Allocate a WT_REF, the error path calls routines that free memory. Set the record number for
+     * the search routines and the type flags which are checked when the page is built.
      */
     WT_RET(__wt_calloc_one(session, &new));
     new->ref_recno = ref->ref_recno;
+    F_SET(new, F_MASK(ref, WT_REF_FLAG_INTERNAL | WT_REF_FLAG_LEAF));
 
     WT_ERR(__split_multi_inmem(session, page, multi, new));
 

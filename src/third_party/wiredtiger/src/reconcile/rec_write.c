@@ -1970,7 +1970,8 @@ __rec_split_write_supd(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_CHUNK
             else
                 upd = r->supd[i].ins->upd;
             /* Only count the size if we need to restore or have an onpage value. */
-            if (r->supd[i].onpage_upd != NULL || r->supd[i].restore) {
+            if ((r->supd[i].onpage_upd != NULL || r->supd[i].restore) &&
+              r->supd[i].count_for_split) {
                 r->supd_memsize += __wt_update_list_memsize(upd);
                 ++r->supd_onpage_or_restore;
             }

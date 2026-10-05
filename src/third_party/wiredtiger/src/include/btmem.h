@@ -275,7 +275,8 @@ struct __wt_save_upd {
     WT_UPDATE *onpage_tombstone;
     WT_UPDATE *free_upds; /* Updates to be freed */
     WT_TIME_WINDOW tw;
-    bool restore; /* Whether to restore this saved update chain */
+    bool restore;         /* Whether to restore this saved update chain */
+    bool count_for_split; /* Whether the saved update counts toward the split estimate */
 };
 
 /*

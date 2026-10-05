@@ -643,7 +643,6 @@ struct __wt_cursor {
     int __F(reserve)(WT_CURSOR *cursor);
     /*! @} */
 
-#ifndef DOXYGEN
     /*!
      * If the cursor is opened on a checkpoint, return a unique identifier for the checkpoint;
      * otherwise return 0.
@@ -655,7 +654,6 @@ struct __wt_cursor {
      * @errors
      */
     uint64_t __F(checkpoint_id)(WT_CURSOR *cursor);
-#endif
 
     /*!
      * Close the cursor.
@@ -1056,9 +1054,12 @@ struct __wt_session {
      * not opened.  If \c statistics is not configured\, the default configuration is the database
      * configuration.  The "clear" configuration resets statistics after gathering them\, where
      * appropriate (for example\, a cache size statistic is not cleared\, while the count of cursor
-     * insert operations will be cleared). See @ref statistics for more information., a list\, with
-     * values chosen from the following options: \c "all"\, \c "cache_walk"\, \c "fast"\, \c
-     * "clear"\, \c "size"\, \c "tree_walk"; default empty.}
+     * insert operations will be cleared). At most one of the "otel_" options may also be configured
+     * to specify an OTel metric type.  "otel_none" specifies that only metrics without an OTel
+     * metric type are gathered.  See @ref statistics for more information., a list\, with values
+     * chosen from the following options: \c "all"\, \c "cache_walk"\, \c "clear"\, \c "fast"\, \c
+     * "otel_counters"\, \c "otel_gauges"\, \c "otel_histograms"\, \c "otel_none"\, \c "size"\, \c
+     * "tree_walk"; default empty.}
      * @config{target, if non-empty\, back up the given list of objects; valid only for a backup
      * data source., a list of strings; default empty.}
      * @configend

@@ -1658,11 +1658,17 @@ static const uint8_t
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 1, 1, 2, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7};
+const char __WT_CONFIG_CHOICE_otel_counters[] = "otel_counters";
+const char __WT_CONFIG_CHOICE_otel_gauges[] = "otel_gauges";
+const char __WT_CONFIG_CHOICE_otel_histograms[] = "otel_histograms";
+const char __WT_CONFIG_CHOICE_otel_none[] = "otel_none";
 const char __WT_CONFIG_CHOICE_size[] = "size";
 
 static const char *confchk_statistics2_choices[] = {__WT_CONFIG_CHOICE_all,
-  __WT_CONFIG_CHOICE_cache_walk, __WT_CONFIG_CHOICE_fast, __WT_CONFIG_CHOICE_clear,
-  __WT_CONFIG_CHOICE_size, __WT_CONFIG_CHOICE_tree_walk, NULL};
+  __WT_CONFIG_CHOICE_cache_walk, __WT_CONFIG_CHOICE_clear, __WT_CONFIG_CHOICE_fast,
+  __WT_CONFIG_CHOICE_otel_counters, __WT_CONFIG_CHOICE_otel_gauges,
+  __WT_CONFIG_CHOICE_otel_histograms, __WT_CONFIG_CHOICE_otel_none, __WT_CONFIG_CHOICE_size,
+  __WT_CONFIG_CHOICE_tree_walk, NULL};
 
 static const WT_CONFIG_CHECK confchk_WT_SESSION_open_cursor[] = {
   {"append", "boolean", NULL, NULL, NULL, 0, NULL, WT_CONFIG_COMPILED_TYPE_BOOLEAN, 76, INT64_MIN,
@@ -1704,8 +1710,9 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_open_cursor[] = {
   {"skip_sort_check", "boolean", NULL, NULL, NULL, 0, NULL, WT_CONFIG_COMPILED_TYPE_BOOLEAN, 151,
     INT64_MIN, INT64_MAX, NULL},
   {"statistics", "list", NULL,
-    "choices=[\"all\",\"cache_walk\",\"fast\",\"clear\","
-    "\"size\",\"tree_walk\"]",
+    "choices=[\"all\",\"cache_walk\",\"clear\",\"fast\","
+    "\"otel_counters\",\"otel_gauges\",\"otel_histograms\","
+    "\"otel_none\",\"size\",\"tree_walk\"]",
     NULL, 0, NULL, WT_CONFIG_COMPILED_TYPE_LIST, 152, INT64_MIN, INT64_MAX,
     confchk_statistics2_choices},
   {"target", "list", NULL, NULL, NULL, 0, NULL, WT_CONFIG_COMPILED_TYPE_LIST, 153, INT64_MIN,

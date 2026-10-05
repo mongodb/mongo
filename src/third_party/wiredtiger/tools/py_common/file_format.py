@@ -104,7 +104,8 @@ def wtdecode_file_object(b, nbytes, opts: DecodeOptions):
             if page.success:
                 page.print_page(split=opts.split,
                                 decode_as_bson=opts.bson,
-                                disagg=opts.disagg)
+                                disagg=opts.disagg,
+                                history_store=opts.history_store)
                 if page.pagestats:
                     PageStats.outfile_stats_end(opts.output,
                                                page.page_header,

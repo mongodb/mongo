@@ -43,6 +43,9 @@ struct __wt_process {
 };
 extern WT_PROCESS __wt_process;
 
+/* Connection methods share the default session. The method's name is kept per thread instead. */
+extern WT_THREAD_LOCAL const char *__wt_conn_api_name;
+
 typedef enum __wt_background_compact_cleanup_stat_type {
     BACKGROUND_COMPACT_CLEANUP_EXIT,      /* Cleanup when the thread exits */
     BACKGROUND_COMPACT_CLEANUP_OFF,       /* Cleanup when the thread is disabled */

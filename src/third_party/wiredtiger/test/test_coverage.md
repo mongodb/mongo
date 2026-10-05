@@ -13,7 +13,7 @@
 |Checkpoint||[test_checkpoint02.py](../test/suite/test_checkpoint02.py)
 |Checkpoint|Checkpoint Cleanup|[test_cc02.py](../test/suite/test_cc02.py)
 |Checkpoint|History Store|[test_checkpoint03.py](../test/suite/test_checkpoint03.py)
-|Checkpoint|Metadata|[test_checkpoint_snapshot01.py](../test/suite/test_checkpoint_snapshot01.py)
+|Checkpoint|Metadata|[test_checkpoint_id.py](../test/suite/test_checkpoint_id.py), [test_checkpoint_snapshot01.py](../test/suite/test_checkpoint_snapshot01.py)
 |Checkpoint|Recovery|[test_bug029.py](../test/suite/test_bug029.py), [test_truncate30.py](../test/suite/test_truncate30.py)
 |Compression||[test_dictionary01.py](../test/suite/test_dictionary01.py), [test_dictionary02.py](../test/suite/test_dictionary02.py), [test_dictionary03.py](../test/suite/test_dictionary03.py), [test_dictionary04.py](../test/suite/test_dictionary04.py)
 |Config Api||[test_base02.py](../test/suite/test_base02.py), [test_config02.py](../test/suite/test_config02.py)

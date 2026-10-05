@@ -1079,6 +1079,28 @@ __wti_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref, const void *image, uint3
     alloc_entries = 0;
 
     /*
+     * Eviction trusts the reference's internal/leaf flag, taken from the parent's address cell.
+     * Reject a mismatch before parsing in the cell walks below.
+     */
+    if (ref != NULL && !__wt_ref_type_matches_page(ref, dsk->type)) {
+        F_SET_ATOMIC_32(S2C(session), WT_CONN_DATA_CORRUPTION);
+        if (!__wt_ref_type_mismatch_returns_error(session))
+            WT_RET_PANIC(session, WT_ERROR, "page type does not match reference type");
+        WT_RET_MSG(session, WT_ERROR, "page type does not match reference type");
+    }
+
+    /*
+     * The reference only distinguishes internal from leaf, so a cross-format page can slip past the
+     * check above and be misread through the wrong page union. Check the tree's format too.
+     */
+    if (!__wt_page_type_matches_btree(S2BT(session), dsk->type)) {
+        F_SET_ATOMIC_32(S2C(session), WT_CONN_DATA_CORRUPTION);
+        if (!__wt_ref_type_mismatch_returns_error(session))
+            WT_RET_PANIC(session, WT_ERROR, "page type does not belong in this tree");
+        WT_RET_MSG(session, WT_ERROR, "page type does not belong in this tree");
+    }
+
+    /*
      * Figure out how many underlying objects the page references so we can allocate them along with
      * the page.
      */

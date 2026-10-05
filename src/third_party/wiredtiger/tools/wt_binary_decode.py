@@ -91,6 +91,8 @@ def decode_wt_binary_input(filename, opts: DecodeOptions):
 
 
 def wtdecode(filename, opts: DecodeOptions):
+    if not opts.history_store and os.path.basename(filename) == 'WiredTigerHS.wt':
+        opts.history_store = True
     if opts.dumpin:
         decode_dumpin_input(filename, opts)
     elif opts.disagg_table:

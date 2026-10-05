@@ -66,6 +66,24 @@ static int __verify_row_leaf_key_order(WT_SESSION_IMPL *, WT_REF *, WT_VSTUFF *)
 static int __verify_tree(WT_SESSION_IMPL *, WT_REF *, WT_CELL_UNPACK_ADDR *, WT_VSTUFF *);
 static int __verify_unique_btree_ids(WT_SESSION_IMPL *);
 
+#ifdef HAVE_DIAGNOSTIC
+/*
+ * __verify_lock_held --
+ *     Check that the session holds a lock verify depends on. A schema operation running under a
+ *     transaction uses an internal session that inherits the outer session's lock flags while the
+ *     outer session owns the lock, so accept an inherited flag on an internal session when the lock
+ *     is held.
+ */
+static WT_INLINE bool
+__verify_lock_held(WT_SESSION_IMPL *session, WT_SPINLOCK *lock, uint32_t flag)
+{
+    if (__wt_spin_owned(session, lock))
+        return (true);
+    return (F_ISSET(session, WT_SESSION_INTERNAL) && FLD_ISSET(session->lock_flags, flag) &&
+      __wt_spin_locked(session, lock));
+}
+#endif
+
 /*
  * __verify_config --
  *     Debugging: verification supports dumping pages in various formats.
@@ -586,8 +604,10 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
     const char *name;
     bool bm_start, quit, skip_hs;
 
-    WT_ASSERT_SPINLOCK_OWNED(session, &S2C(session)->checkpoint_lock);
-    WT_ASSERT_SPINLOCK_OWNED(session, &S2C(session)->schema_lock);
+    WT_ASSERT(session,
+      __verify_lock_held(session, &S2C(session)->checkpoint_lock, WT_SESSION_LOCKED_CHECKPOINT));
+    WT_ASSERT(
+      session, __verify_lock_held(session, &S2C(session)->schema_lock, WT_SESSION_LOCKED_SCHEMA));
 
     btree = S2BT(session);
     bm = btree->bm;
@@ -650,9 +670,9 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
           "violation as the ingest table does not get checkpointed.",
           name);
 
-    /* Inform the underlying block manager we're verifying. */
-    WT_ERR(bm->verify_start(bm, session, ckptbase, cfg));
+    /* Set before the call, a failed start can leave state that only verify end frees. */
     bm_start = true;
+    WT_ERR(bm->verify_start(bm, session, ckptbase, cfg));
 
     /*
      * Announce the object being verified. Info-level verify messages are normally disabled in
@@ -976,6 +996,9 @@ __verify_tree(
         printf("%s  %s%s", __tree_stack(vs), F_ISSET(ref, WT_REF_FLAG_INTERNAL) ? "INTERNAL" : "",
           F_ISSET(ref, WT_REF_FLAG_LEAF) ? "LEAF" : "");
     }
+
+    if (!__wt_ref_type_matches_page(ref, page->type))
+        WT_RET_MSG(session, WT_ERROR, "page type does not match reference type");
 
     /*
      * The page's physical structure was verified when it was read into memory by the read server

@@ -7478,9 +7478,8 @@ buildvariants:
       distros: ubuntu2004-large
     - name: format-stress-test-disagg-switch-tsan-stepdown-async
       distros: ubuntu2004-large
-    # FIXME-WT-18743: Enable once concurrent connection API calls no longer race under TSan.
-    # - name: schema-disagg-abort-smoke-test-disagg-1
-    #   distros: ubuntu2004-large
+    - name: schema-disagg-abort-smoke-test-disagg-1
+      distros: ubuntu2004-large
     - name: format-stress-test-tsan
       distros: ubuntu2004-large
     # FIXME-WT-16309: Enable the common test format tag for TSAN
@@ -8280,9 +8279,8 @@ buildvariants:
       distros: amazon2023.3-arm64-large
     - name: format-stress-test-disagg-switch-tsan-stepdown-async
       distros: amazon2023.3-arm64-large
-    # FIXME-WT-18743: Enable once concurrent connection API calls no longer race under TSan.
-    # - name: schema-disagg-abort-smoke-test-disagg-1
-    #   distros: amazon2023.3-arm64-large
+    - name: schema-disagg-abort-smoke-test-disagg-1
+      distros: amazon2023.3-arm64-large
     - name: unit-test-hook-parallel-checkpoint-tsan
     - name: format-stress-test-tsan
       distros: amazon2023.3-arm64-large

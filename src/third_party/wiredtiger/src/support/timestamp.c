@@ -371,12 +371,20 @@ __wt_time_aggregate_validate(
  *     Value time window validation against a stable point.
  */
 static int
-__time_value_validate_parent_stable(WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw, bool silent)
+__time_value_validate_parent_stable(
+  WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw, bool from_delta, bool silent)
 {
     wt_timestamp_t stable;
     char time_string[WT_TIME_STRING_SIZE], ts_string[WT_TS_INT_STRING_SIZE];
 
-    stable = __wt_get_stable_timestamp(session);
+    /*
+     * A page rebuilt from a base image and deltas can hold cells with timestamps under an empty
+     * parent aggregate: reconciliation clears obsolete windows for the aggregate and the full
+     * image, but the delta cells and the unchanged base cells keep theirs. Comparing those with the
+     * stable timestamp of the verifying connection fails when it is unset, as on a follower, so use
+     * the checkpoint's timestamp instead.
+     */
+    stable = from_delta ? S2BT(session)->checkpoint_timestamp : __wt_get_stable_timestamp(session);
 
     if (tw->durable_start_ts > stable)
         WT_TIME_ERROR("a durable start time after");
@@ -614,6 +622,6 @@ __wt_time_value_validate(WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw, WT_TIME_A
     if (parent == NULL || WT_IS_METADATA(session->dhandle))
         return (0);
     return (WT_TIME_AGGREGATE_IS_EMPTY(parent) ?
-        __time_value_validate_parent_stable(session, tw, silent) :
+        __time_value_validate_parent_stable(session, tw, from_delta, silent) :
         __time_value_validate_parent(session, tw, parent, from_delta, silent));
 }

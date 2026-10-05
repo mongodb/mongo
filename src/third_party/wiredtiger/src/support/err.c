@@ -339,8 +339,11 @@ __eventv(WT_SESSION_IMPL *session, bool is_json, int error, uint32_t log_id, con
             WT_ERROR_APPEND(p, remain, ", %s", prefix);
     }
 
-    /* Session name. */
-    if ((prefix = session->name) != NULL) {
+    /* Session name: on the default session, the connection method this thread is running. */
+    prefix = __wt_conn_api_name != NULL && session == S2C(session)->default_session ?
+      __wt_conn_api_name :
+      session->name;
+    if (prefix != NULL) {
         if (is_json)
             WT_ERROR_APPEND(p, remain, "\"session_name\":\"%s\",", prefix);
         else

@@ -189,6 +189,95 @@ class test_stat_cursor_dsrc_error(wttest.WiredTigerTestCase):
                 lambda: self.session.open_cursor(
                 'statistics:' + self.uri, None, config), msg)
 
+# Test the OTel type configuration options are accepted individually.
+class test_stat_cursor_otel_config(wttest.WiredTigerTestCase):
+    test_name = __qualname__
+    pfx = test_name
+
+    uri = [
+        ('otel_config_1', dict(uri='file:' + pfx, dataset=SimpleDataSet)),
+        ('otel_config_2', dict(uri='table:' + pfx, dataset=SimpleDataSet)),
+        ('otel_config_3', dict(uri='table:' + pfx, dataset=ComplexDataSet)),
+    ]
+    otel = [
+        ('none', dict(otel='otel_none')),
+        ('counters', dict(otel='otel_counters')),
+        ('gauges', dict(otel='otel_gauges')),
+        ('histograms', dict(otel='otel_histograms')),
+    ]
+
+    scenarios = make_scenarios(uri, otel)
+    conn_config = 'statistics=(all)'
+
+    def test_stat_cursor_otel_config(self):
+        self.dataset(self, self.uri, 100).populate()
+        config = 'statistics=(fast,' + self.otel + ')'
+        self.session.open_cursor('statistics:' + self.uri, None, config)
+
+# Test OTel type error combinations.
+class test_stat_cursor_otel_error(wttest.WiredTigerTestCase):
+    test_name = __qualname__
+    pfx = test_name
+
+    uri = [
+        ('otel_error_1', dict(uri='file:' + pfx, dataset=SimpleDataSet)),
+        ('otel_error_2', dict(uri='table:' + pfx, dataset=SimpleDataSet)),
+        ('otel_error_3', dict(uri='table:' + pfx, dataset=ComplexDataSet)),
+    ]
+
+    scenarios = make_scenarios(uri)
+    conn_config = 'statistics=(all)'
+
+    def test_stat_cursor_otel_error(self):
+        self.dataset(self, self.uri, 100).populate()
+        args = ['otel_none', 'otel_counters', 'otel_gauges', 'otel_histograms']
+        for i in list(itertools.permutations(args, 2)):
+            config = 'statistics=(fast,' + i[0] + ',' + i[1] + ')'
+            msg = '/Only one of/'
+            self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+                lambda: self.session.open_cursor(
+                'statistics:' + self.uri, None, config), msg)
+
+    def test_stat_cursor_otel_error_conn(self):
+        args = ['otel_none', 'otel_counters', 'otel_gauges', 'otel_histograms']
+        for i in list(itertools.permutations(args, 2)):
+            config = 'create,statistics=(' + i[0] + ',' + i[1] + ')'
+            msg = '/not a permitted choice|Only one of/'
+            self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+                lambda: self.wiredtiger_open('.', config), msg)
+
+# Test that an OTel-only "statistics" configuration inherits the connection's default statistics
+# type.
+class test_stat_cursor_otel_inherits_default(wttest.WiredTigerTestCase):
+    test_name = __qualname__
+    pfx = test_name
+
+    uri = [
+        ('otel_inherit_1', dict(uri='file:' + pfx, dataset=SimpleDataSet)),
+        ('otel_inherit_2', dict(uri='table:' + pfx, dataset=SimpleDataSet)),
+        ('otel_inherit_3', dict(uri='table:' + pfx, dataset=ComplexDataSet)),
+    ]
+
+    scenarios = make_scenarios(uri)
+    conn_config = 'statistics=(tree_walk)'
+
+    def test_stat_cursor_otel_inherits_default(self):
+        self.dataset(self, self.uri, 100).populate()
+
+        # btree_entries is used across counters, so we open the stat cursor with OTel config first
+        # to make sure that it doesn't give a stale value from a previous cursor's walk.
+        cursor = self.session.open_cursor(
+            'statistics:' + self.uri, None, 'statistics=(otel_counters)')
+        otel_entries = cursor[stat.dsrc.btree_entries][2]
+        cursor.close()
+
+        cursor = self.session.open_cursor('statistics:' + self.uri, None, None)
+        default_entries = cursor[stat.dsrc.btree_entries][2]
+        cursor.close()
+
+        self.assertGreater(default_entries, 0)
+        self.assertEqual(otel_entries, default_entries)
+
 # Test data-source cache walk statistics
 class test_stat_cursor_dsrc_cache_walk(wttest.WiredTigerTestCase):
     test_name = __qualname__

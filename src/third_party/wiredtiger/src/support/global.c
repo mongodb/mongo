@@ -8,8 +8,9 @@
 
 #include "wt_internal.h"
 
-WT_PROCESS __wt_process;             /* Per-process structure */
-static int __wt_pthread_once_failed; /* If initialization failed */
+WT_PROCESS __wt_process;                               /* Per-process structure */
+WT_THREAD_LOCAL const char *__wt_conn_api_name = NULL; /* Connection method name for this thread */
+static int __wt_pthread_once_failed;                   /* If initialization failed */
 
 /*
  * This is the list of the timing stress configuration names and flags. It is a global structure

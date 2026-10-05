@@ -383,6 +383,7 @@ OPLOG
 OPTRACK
 OPTYPE
 OR'd
+OTel
 OVFL
 ObWgfvgw
 Og
@@ -1590,6 +1591,7 @@ ori
 origcnt
 os
 ostream
+otel
 overcount
 oversized
 ovfl

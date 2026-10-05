@@ -37,6 +37,12 @@
 #define WT_GCC_FUNC_ATTRIBUTE(x)
 #define WT_GCC_FUNC_DECL_ATTRIBUTE(x)
 
+#ifdef __cplusplus
+#define WT_THREAD_LOCAL thread_local
+#else
+#define WT_THREAD_LOCAL __declspec(thread)
+#endif
+
 /*
  * WT_COMPILER_BARRIER --
  *	MSVC implementation of WT_COMPILER_BARRIER.
