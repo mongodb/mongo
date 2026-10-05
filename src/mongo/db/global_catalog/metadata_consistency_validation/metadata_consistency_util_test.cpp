@@ -698,6 +698,54 @@ TEST_F(MetadataConsistencyTest, FindInconsistentDatabaseVersionInShardCatalogCac
         inconsistencies);
 }
 
+void setFcvChangeTimestamp(OperationContext* opCtx, Timestamp changeTimestamp) {
+    DBDirectClient client(opCtx);
+    client.update(NamespaceString::kServerConfigurationNamespace,
+                  BSON("_id" << multiversion::kParameterName),
+                  BSON("$set" << BSON("changeTimestamp" << changeTimestamp)),
+                  false /* upsert */,
+                  false /* multi */);
+}
+
+TEST_F(MetadataConsistencyTest, WhenDelayedSecondarySnapshotPredatesFcvChange_ThenNoInconsistency) {
+    Timestamp dbTimestamp{1, 0};
+    DatabaseType dbInGlobalCatalog{_dbName, kMyShardName, {_dbUuid, dbTimestamp}};
+
+    {
+        auto scopedDsr = DatabaseShardingStateMock::acquire(operationContext(), _dbName);
+        scopedDsr->setDbMetadata(operationContext(), dbInGlobalCatalog);
+    }
+    setFcvChangeTimestamp(operationContext(), Timestamp{10, 0});
+
+    const auto inconsistencies = metadata_consistency_util::checkDatabaseMetadataConsistency(
+        operationContext(),
+        dbInGlobalCatalog,
+        metadata_consistency_util::RSNodeMode::kDelayedSecondary,
+        Timestamp{5, 0});
+
+    ASSERT_TRUE(inconsistencies.empty());
+}
+
+TEST_F(MetadataConsistencyTest, WhenDelayedSecondarySnapshotFollowsFcvChange_ThenInconsistency) {
+    Timestamp dbTimestamp{1, 0};
+    DatabaseType dbInGlobalCatalog{_dbName, kMyShardName, {_dbUuid, dbTimestamp}};
+
+    {
+        auto scopedDsr = DatabaseShardingStateMock::acquire(operationContext(), _dbName);
+        scopedDsr->setDbMetadata(operationContext(), dbInGlobalCatalog);
+    }
+    setFcvChangeTimestamp(operationContext(), Timestamp{10, 0});
+
+    const auto inconsistencies = metadata_consistency_util::checkDatabaseMetadataConsistency(
+        operationContext(),
+        dbInGlobalCatalog,
+        metadata_consistency_util::RSNodeMode::kDelayedSecondary,
+        Timestamp{10, 0});
+
+    assertOneInconsistencyFound(
+        MetadataInconsistencyTypeEnum::kMissingDatabaseMetadataInShardCatalog, inconsistencies);
+}
+
 TEST_F(MetadataConsistencyTest, FindEmptyDurableDatabaseMetadataInShard) {
     Timestamp dbTimestamp{1, 0};
     DatabaseType dbInGlobalCatalog{_dbName, kMyShardName, {_dbUuid, dbTimestamp}};

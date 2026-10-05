@@ -4,6 +4,7 @@
 #pragma once
 
 #include "mongo/base/status.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/global_catalog/metadata_consistency_validation/metadata_consistency_types_gen.h"
 #include "mongo/db/global_catalog/type_collection.h"
 #include "mongo/db/global_catalog/type_database_gen.h"
@@ -193,7 +194,8 @@ std::vector<MetadataInconsistencyItem> checkCollectionShardingMetadataConsistenc
 std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistency(
     OperationContext* opCtx,
     const DatabaseType& dbInGlobalCatalog,
-    RSNodeMode rsMode = RSNodeMode::kPrimary);
+    RSNodeMode rsMode = RSNodeMode::kPrimary,
+    boost::optional<Timestamp> shardCatalogReadTimestamp = boost::none);
 
 /**
  * Checks that this shard's config database shard catalog collections match the current FCV
