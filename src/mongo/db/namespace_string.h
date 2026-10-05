@@ -527,7 +527,13 @@ public:
     bool isFLE2EcocCollection() const;
 
     /**
-     * Returns whether the specified namespace is <database>.enxcol_.<.+>.(esc|ecoc).
+     * Returns whether the specified namespace is an FLE2 ESC collection:
+     * <database>.enxcol_.<.+>.esc .
+     */
+    bool isFLE2EscCollection() const;
+
+    /**
+     * Returns whether the specified namespace is <database>.enxcol_.<.+>.(esc|ecoc|ecoc.compact).
      */
     bool isFLE2StateCollection() const;
 

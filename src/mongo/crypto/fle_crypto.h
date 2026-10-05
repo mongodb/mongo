@@ -1017,11 +1017,15 @@ public:
     static BSONObj encryptionInformationSerialize(const NamespaceString& nss,
                                                   const BSONObj& encryptedFields);
     static BSONObj encryptionInformationSerialize(const BSONObj& schema);
+
     /**
      * Get a schema from EncryptionInformation and ensure the esc/ecoc are setup correctly.
      */
     static EncryptedFieldConfig getAndValidateSchema(const NamespaceString& nss,
                                                      const EncryptionInformation& ei);
+
+    static void validateStateCollectionNamespaces(const NamespaceString& nss,
+                                                  const EncryptedFieldConfig& ef);
 
     // Range-indexed fields can only have at most 129 tags (128 edges for decimal128 + 1 root)
     // per OST.

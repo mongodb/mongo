@@ -3598,6 +3598,8 @@ EncryptedFieldConfig EncryptionInformationHelpers::getAndValidateSchema(
 
     uassert(6371207, "Expected a value for escCollection", efc.getEscCollection().has_value());
     uassert(6371208, "Expected a value for ecocCollection", efc.getEcocCollection().has_value());
+    EncryptionInformationHelpers::validateStateCollectionNamespaces(nss, efc);
+
     uassert(8575606,
             "Collection contains the 'rangePreview' query type which is deprecated. Please "
             "recreate the collection with the 'range' query type.",
@@ -3623,6 +3625,28 @@ EncryptedFieldConfig EncryptionInformationHelpers::getAndValidateSchema(
                 !hasQueryType(efc, QueryTypeEnum::SubstringPreviewDeprecated));
     }
     return efc;
+}
+
+void EncryptionInformationHelpers::validateStateCollectionNamespaces(
+    const NamespaceString& nss, const EncryptedFieldConfig& ef) {
+    if (ef.getEscCollection().has_value()) {
+        auto expected = fmt::format("enxcol_.{}.esc", nss.coll());
+        const auto actual = ef.getEscCollection().value();
+        uassert(13049800,
+                fmt::format("Namespace specified in escCollection '{}' is invalid for this "
+                            "queryable encryption collection",
+                            actual),
+                actual == expected);
+    }
+    if (ef.getEcocCollection().has_value()) {
+        auto expected = fmt::format("enxcol_.{}.ecoc", nss.coll());
+        const auto actual = ef.getEcocCollection().value();
+        uassert(13049801,
+                fmt::format("Namespace specified in ecocCollection '{}' is invalid for this "
+                            "queryable encryption collection",
+                            actual),
+                actual == expected);
+    }
 }
 
 void EncryptionInformationHelpers::checkTagLimitsAndStorageNotExceeded(
