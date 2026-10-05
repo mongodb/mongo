@@ -53,7 +53,8 @@ void _writeNoopOplogEntry(OperationContext* opCtx,
             boost::none,
             boost::none,
             boost::none);
-        UncommittedFastCountChanges::getForWrite(opCtx).record(
+        UncommittedFastCountChanges::record(
+            opCtx,
             collection.nss(),
             collection.uuid(),
             UncommittedFastCountChange{.delta = {.size = metadata.getSz().value_or(0),

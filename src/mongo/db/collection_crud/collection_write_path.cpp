@@ -408,7 +408,8 @@ Status insertDocumentsImpl(OperationContext* opCtx,
             /*fromMigrate=*/makeFromMigrateForInserts(opCtx, nss, begin, end, fromMigrate),
             /*defaultFromMigrate=*/fromMigrate);
         if (isReplicatedFastCountEnabled(opCtx)) {
-            UncommittedFastCountChanges::getForWrite(opCtx).record(
+            UncommittedFastCountChanges::record(
+                opCtx,
                 collection->ns(),
                 collection->uuid(),
                 UncommittedFastCountChange{
@@ -786,7 +787,8 @@ void updateDocument(OperationContext* opCtx,
     opCtx->getServiceContext()->getOpObserver()->onUpdate(opCtx, onUpdateArgs);
 
     if (isReplicatedFastCountEnabled(opCtx)) {
-        UncommittedFastCountChanges::getForWrite(opCtx).record(
+        UncommittedFastCountChanges::record(
+            opCtx,
             collection->ns(),
             collection->uuid(),
             UncommittedFastCountChange{
@@ -890,7 +892,8 @@ StatusWith<BSONObj> updateDocumentWithDamages(OperationContext* opCtx,
 
     opCtx->getServiceContext()->getOpObserver()->onUpdate(opCtx, onUpdateArgs);
     if (isReplicatedFastCountEnabled(opCtx)) {
-        UncommittedFastCountChanges::getForWrite(opCtx).record(
+        UncommittedFastCountChanges::record(
+            opCtx,
             collection->ns(),
             collection->uuid(),
             UncommittedFastCountChange{
@@ -991,7 +994,8 @@ void deleteDocument(OperationContext* opCtx,
         opCtx, collection, stmtId, doc.value(), documentKey, deleteArgs);
 
     if (isReplicatedFastCountEnabled(opCtx)) {
-        UncommittedFastCountChanges::getForWrite(opCtx).record(
+        UncommittedFastCountChanges::record(
+            opCtx,
             collection->ns(),
             collection->uuid(),
             UncommittedFastCountChange{
@@ -1068,7 +1072,8 @@ repl::OpTime truncateRange(OperationContext* opCtx,
     opCtx->getServiceContext()->getOpObserver()->onTruncateRange(
         opCtx, collection, minRecordId, maxRecordId, bytesDeleted, docsDeleted, opTime);
     if (isReplicatedFastCountEnabled(opCtx)) {
-        UncommittedFastCountChanges::getForWrite(opCtx).record(
+        UncommittedFastCountChanges::record(
+            opCtx,
             collection->ns(),
             collection->uuid(),
             UncommittedFastCountChange{

@@ -2172,7 +2172,6 @@ void TransactionParticipant::Participant::restorePreparedTxnFromPreciseCheckpoin
     if (isReplicatedFastCountEnabled(opCtx)) {
         if (const auto& sizeMetadata = p().preparedSizeMetadata) {
             const auto catalog = CollectionCatalog::get(opCtx);
-            auto& uncommittedChanges = UncommittedFastCountChanges::getForWrite(opCtx);
             for (const auto& metadata : *sizeMetadata) {
                 const Collection* collection =
                     catalog->lookupCollectionByUUID(opCtx, metadata.getUuid());
@@ -2181,7 +2180,8 @@ void TransactionParticipant::Participant::restorePreparedTxnFromPreciseCheckpoin
                                     "in config.transactions with UUID {}",
                                     metadata.getUuid().toString()),
                         collection);
-                uncommittedChanges.record(
+                UncommittedFastCountChanges::record(
+                    opCtx,
                     collection->ns(),
                     metadata.getUuid(),
                     UncommittedFastCountChange{

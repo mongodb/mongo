@@ -186,7 +186,8 @@ bool performUnreplicatedTruncate(OperationContext* opCtx,
     if (isReplicatedFastCountEnabled(opCtx)) {
         const boost::optional<UUID> uuid = oplog.uuid();
         invariant(uuid.has_value());
-        UncommittedFastCountChanges::getForWrite(opCtx).record(
+        UncommittedFastCountChanges::record(
+            opCtx,
             NamespaceString::kRsOplogNamespace,
             *uuid,
             UncommittedFastCountChange{

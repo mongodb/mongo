@@ -187,7 +187,8 @@ void cappedDeleteUntilBelowConfiguredMaximum(OperationContext* opCtx,
     }
 
     if (isReplicatedFastCountEnabled(opCtx)) {
-        UncommittedFastCountChanges::getForWrite(opCtx).record(
+        UncommittedFastCountChanges::record(
+            opCtx,
             collection->ns(),
             collection->uuid(),
             UncommittedFastCountChange{

@@ -14,54 +14,51 @@ namespace {
 // Decoration on the Snapshot to ensure the uncommitted changes are preserved across the lifetime of
 // a multi-document transaction.
 const auto getUncommittedFastCountChanges =
-    RecoveryUnit::Snapshot::declareDecoration<std::shared_ptr<UncommittedFastCountChanges>>();
+    RecoveryUnit::Snapshot::declareDecoration<std::unique_ptr<UncommittedFastCountChanges>>();
 
-std::shared_ptr<UncommittedFastCountChanges>& getUncommittedFastCountChangeFromOpCtx(
+std::unique_ptr<UncommittedFastCountChanges>& getUncommittedFastCountChangeFromOpCtx(
     OperationContext* opCtx) {
     return getUncommittedFastCountChanges(
         shard_role_details::getRecoveryUnit(opCtx)->getSnapshot());
 }
 }  // namespace
 
-const UncommittedFastCountChanges& UncommittedFastCountChanges::getForRead(
-    OperationContext* opCtx) {
-    // TODO SERVER-119919: Re-evaluate why this bypasses reference counting.
-    std::shared_ptr<UncommittedFastCountChanges>& ptr =
+CollectionSizeCount UncommittedFastCountChanges::find(OperationContext* opCtx, UUID uuid) {
+    const std::unique_ptr<UncommittedFastCountChanges>& ptr =
         getUncommittedFastCountChangeFromOpCtx(opCtx);
     if (ptr) {
-        return *ptr;
+        return ptr->_find(uuid);
     }
-
-    static UncommittedFastCountChanges empty;
-    return empty;
+    return {};
 }
 
-
-UncommittedFastCountChanges& UncommittedFastCountChanges::getForWrite(OperationContext* opCtx) {
-    std::shared_ptr<UncommittedFastCountChanges>& ptr =
+void UncommittedFastCountChanges::record(OperationContext* opCtx,
+                                         const NamespaceString& nss,
+                                         UUID uuid,
+                                         UncommittedFastCountChange change) {
+    std::unique_ptr<UncommittedFastCountChanges>& ptr =
         getUncommittedFastCountChangeFromOpCtx(opCtx);
-    if (ptr) {
-        return *ptr;
+    if (!ptr) {
+        ptr = std::make_unique<UncommittedFastCountChanges>();
+
+        shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+            [](OperationContext* opCtx, boost::optional<Timestamp> commitTime) {
+                auto& fn = getFastCountCommitFn();
+
+                invariant(fn, "FastCountCommitFn is not set");
+
+                auto& ptr = getUncommittedFastCountChangeFromOpCtx(opCtx);
+                invariant(ptr, "UncommittedFastCountChanges instance is not set");
+                fn(opCtx, ptr->_trackedChanges);
+                // The 'RecoveryUnit::Snapshot' is reset on commit, so decorations like the
+                // UncommittedFastCountChanges don't need manual cleanup.
+            });
     }
 
-    auto changes = std::make_shared<UncommittedFastCountChanges>();
-
-    ptr = std::move(changes);
-
-    shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-        [](OperationContext* opCtx, boost::optional<Timestamp> commitTime) {
-            auto& fn = getFastCountCommitFn();
-
-            invariant(fn, "FastCountCommitFn is not set");
-
-            fn(opCtx, getUncommittedFastCountChangeFromOpCtx(opCtx)->_trackedChanges);
-            // The 'RecoveryUnit::Snapshot' is reset on commit, so decorations like the
-            // UncommittedFastCountChanges don't need manual cleanup.
-        });
-    return *ptr;
+    ptr->_record(nss, uuid, change);
 }
 
-CollectionSizeCount UncommittedFastCountChanges::find(const UUID& uuid) const {
+CollectionSizeCount UncommittedFastCountChanges::_find(UUID uuid) const {
     auto it = _trackedChanges.find(uuid);
     if (it != _trackedChanges.end()) {
         return it->second.delta;
@@ -69,9 +66,9 @@ CollectionSizeCount UncommittedFastCountChanges::find(const UUID& uuid) const {
     return {};
 }
 
-void UncommittedFastCountChanges::record(const NamespaceString& nss,
-                                         const UUID& uuid,
-                                         UncommittedFastCountChange change) {
+void UncommittedFastCountChanges::_record(const NamespaceString& nss,
+                                          UUID uuid,
+                                          UncommittedFastCountChange change) {
     if (!isReplicatedFastCountEligible(nss)) {
         return;
     }
@@ -89,6 +86,4 @@ void UncommittedFastCountChanges::record(const NamespaceString& nss,
     }
     collChanges.delta = collChanges.delta + change.delta;
 }
-
 }  // namespace mongo
-

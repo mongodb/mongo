@@ -269,7 +269,8 @@ Status insertDocumentsForOplog(OperationContext* opCtx,
     }
 
     if (isReplicatedFastCountEnabled(opCtx)) {
-        UncommittedFastCountChanges::getForWrite(opCtx).record(
+        UncommittedFastCountChanges::record(
+            opCtx,
             oplogCollection->ns(),
             oplogCollection->uuid(),
             UncommittedFastCountChange{

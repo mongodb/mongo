@@ -797,9 +797,10 @@ TEST_F(PreparedSizeMetadataTest, RestorePreciseCheckpointSeedsUncommittedFastCou
 
     // Before restoring, no uncommitted fast count changes have been seeded.
     {
-        const auto& uncommitted = UncommittedFastCountChanges::getForRead(_opCtx);
-        EXPECT_EQ(uncommitted.find(_uuid1), (CollectionSizeCount{.size = 0, .count = 0}));
-        EXPECT_EQ(uncommitted.find(_uuid2), (CollectionSizeCount{.size = 0, .count = 0}));
+        EXPECT_EQ(UncommittedFastCountChanges::find(_opCtx, _uuid1),
+                  (CollectionSizeCount{.size = 0, .count = 0}));
+        EXPECT_EQ(UncommittedFastCountChanges::find(_opCtx, _uuid2),
+                  (CollectionSizeCount{.size = 0, .count = 0}));
     }
 
     // Restoring from the checkpoint record re-seeds the uncommitted fast count changes from the
@@ -809,10 +810,9 @@ TEST_F(PreparedSizeMetadataTest, RestorePreciseCheckpointSeedsUncommittedFastCou
         restoreFromCheckpointAndGetSession(_opCtx, sessionId, txnNumber, std::move(recoveryRecord));
 
     {
-        const auto& uncommitted = UncommittedFastCountChanges::getForRead(_opCtx);
-        EXPECT_EQ(uncommitted.find(_uuid1),
+        EXPECT_EQ(UncommittedFastCountChanges::find(_opCtx, _uuid1),
                   (CollectionSizeCount{.size = docA.objsize() + docB.objsize(), .count = 2}));
-        EXPECT_EQ(uncommitted.find(_uuid2),
+        EXPECT_EQ(UncommittedFastCountChanges::find(_opCtx, _uuid2),
                   (CollectionSizeCount{.size = docC.objsize(), .count = 1}));
     }
 }

@@ -35,34 +35,26 @@ using UncommittedFastCountChangeMap = boost::container::flat_map<UUID, Uncommitt
 class [[MONGO_MOD_PUBLIC]] UncommittedFastCountChanges {
 public:
     /**
-     * Returns an immutable reference to the UncommittedFastCountChanges instance associated with
-     * this particular OperationContext, returning an empty instance if none exist.
-     */
-    static const UncommittedFastCountChanges& getForRead(OperationContext* opCtx);
-
-    /**
-     * Returns a mutable reference to the UncommittedFastCountChanges instance associated with
-     * this particular OperationContext, creating one if none exist.
-     *
-     * If an instance is created, a callback will be registered for the RecoveryUnit attached to the
-     * OperationContext that will update the changes tracked in _trackedChanges.
-     */
-    static UncommittedFastCountChanges& getForWrite(OperationContext* opCtx);
-
-    /**
      * Given a collection UUID, returns the current uncommitted value of size and count for that
      * collection. If the collection UUID does not exist, an empty CollectionSizeCount is returned.
      */
-    CollectionSizeCount find(const UUID& uuid) const;
+    static CollectionSizeCount find(OperationContext* opCtx, UUID uuid);
 
     /**
-     * Records a change in count and size for the given collection UUID. This is a no-op when both
-     * deltas are zero or if the provided namespace string is not eligible to be tracked by the
-     * replicated fast count collection.
+     * Records a change in size and count for the given collection UUID. This is a no-op when both
+     * deltas are zero or if the provided namespace string is not eligible to be tracked by
+     * replicated fast count.
      */
-    void record(const NamespaceString& nss, const UUID& uuid, UncommittedFastCountChange change);
+    static void record(OperationContext* opCtx,
+                       const NamespaceString& nss,
+                       UUID uuid,
+                       UncommittedFastCountChange change);
 
 private:
+    void _record(const NamespaceString& nss, UUID uuid, UncommittedFastCountChange change);
+
+    CollectionSizeCount _find(UUID uuid) const;
+
     // Map of collection UUID to its uncommitted size/count delta and the RecordStore that delta
     // must be applied to on commit.
     UncommittedFastCountChangeMap _trackedChanges;
