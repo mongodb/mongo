@@ -270,8 +270,7 @@ protected:
 
     TestKeyVault _keyVault;
 
-    NamespaceString _edcNs =
-        NamespaceString::createNamespaceString_forTest("test.enxcol_.coll.edc");
+    NamespaceString _edcNs = NamespaceString::createNamespaceString_forTest("test.coll");
     NamespaceString _escNs =
         NamespaceString::createNamespaceString_forTest("test.enxcol_.coll.esc");
     NamespaceString _ecocNs =

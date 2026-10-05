@@ -321,6 +321,9 @@ public:
                         repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() ==
                             repl::ReplicationCoordinator::Mode::modeReplSet);
 
+                EncryptionInformationHelpers::validateStateCollectionNamespaces(
+                    cmd.getNamespace(), cmd.getEncryptedFields().get());
+
                 if (hasQueryType(cmd.getEncryptedFields().get(), QueryTypeEnum::RangePreview)) {
                     uassert(
                         6775220,
