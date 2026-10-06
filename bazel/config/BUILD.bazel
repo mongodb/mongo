@@ -1,5 +1,5 @@
 load("@bazel_skylib//lib:selects.bzl", "selects")
-load("@rules_python//python:defs.bzl", "py_binary")
+load("@rules_python//python:defs.bzl", "py_binary", "py_test")
 load(
     "@bazel_skylib//rules:common_settings.bzl",
     "bool_flag",
@@ -3465,4 +3465,13 @@ selects.config_setting_group(
         "//bazel/platforms:amazon_linux_2",
         "@platforms//cpu:aarch64",
     ],
+)
+
+py_test(
+    name = "mongo_config_header_test",
+    srcs = [
+        "//src/mongo:mongo_config_header.py",
+        "//src/mongo:mongo_config_header_test.py",
+    ],
+    main = "//src/mongo:mongo_config_header_test.py",
 )

@@ -145,7 +145,7 @@ bazel_evergreen_shutils::extract_config_flags() {
   }' <<<"$all"
 }
 
-# Adds --config=public-release-rbe or --config=public-release-local if this is a release-ish build.
+# Selects release binary settings and, for distributable builds, release infrastructure settings.
 bazel_evergreen_shutils::maybe_release_flag() {
     local local_arg="$1"
     if [[ -n "${MONGO_VERSION_OVERRIDE:-}" ]]; then
@@ -154,6 +154,9 @@ bazel_evergreen_shutils::maybe_release_flag() {
         echo "$local_arg --config=public-release-rbe" # release with RBE (Remote Build Execution)
     elif [[ "${is_patch:-}" == "true" || -z "${push_bucket:-}" || "${compiling_for_test:-}" == "true" ]]; then
         echo "$local_arg" # non-release
+    elif [[ "${release_binary_only:-}" == "true" ]]; then
+        # Preserve release binary settings for test archives without release execution/cache settings.
+        echo "$local_arg --config=release-binary"
     else
         echo "$local_arg --config=public-release-local" # release without RBE (Remote Build Execution)
     fi

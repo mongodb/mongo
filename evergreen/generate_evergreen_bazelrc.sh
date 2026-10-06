@@ -107,3 +107,10 @@ echo "coverage --config=no-remote-exec" >>.bazelrc.evergreen
 if [[ -n "${bazelrc_flags:-}" ]]; then
     echo "common ${bazelrc_flags}" >>.bazelrc.evergreen
 fi
+
+# The same variant schedules build tasks on ARM64 and target tests on s390x.
+# Apply cross flags only on its ARM64 build host so native unit/integration
+# tasks retain the native GCC toolchain and can execute their test binaries.
+if [[ -n "${mongo_s390x_cross_config:-}" && "$(uname -m)" == "aarch64" ]]; then
+    echo "build --config=${mongo_s390x_cross_config}" >>.bazelrc.evergreen
+fi

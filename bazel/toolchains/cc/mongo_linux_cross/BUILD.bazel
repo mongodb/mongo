@@ -1,0 +1,26 @@
+load(":mongo_linux_cross_toolchain_test.bzl", "matrix_test")
+load(":target_platform_check.bzl", "s390x_rust_toolchain_check", "s390x_target_platform_check")
+
+exports_files(glob([
+    "*.bzl",
+    "*.tmpl",
+]))
+
+matrix_test(name = "cross_toolchain_matrix_test")
+
+s390x_target_platform_check(
+    name = "s390x_target_platform_check",
+    target_compatible_with = ["@platforms//cpu:s390x"],
+)
+
+s390x_rust_toolchain_check(
+    name = "s390x_rust_toolchain_check",
+    target_compatible_with = ["@platforms//cpu:s390x"],
+)
+
+cc_binary(
+    name = "cross_smoke",
+    testonly = True,
+    srcs = ["cross_smoke.cpp"],
+    target_compatible_with = ["@platforms//cpu:s390x"],
+)

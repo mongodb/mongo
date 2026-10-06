@@ -326,3 +326,5 @@ filegroup(
         "//src/mongo/util/options_parser:startup_options.h",
     ],
 )
+
+exports_files(["mongo_config_header_test.py"])

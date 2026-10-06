@@ -71,8 +71,8 @@ def generate_config_header_impl(ctx):
 
     # Strip sysroot-related flags so that the embedded build info is
     # identical regardless of whether a local RBE sysroot is used.
-    compiler_flags = _strip_sysroot_flags(compiler_flags)
-    link_flags = _strip_sysroot_flags(link_flags)
+    build_info_compiler_flags = _strip_sysroot_flags(compiler_flags)
+    build_info_link_flags = _strip_sysroot_flags(link_flags)
     env_flags = cc_common.get_environment_variables(
         feature_configuration = feature_configuration,
         action_name = ACTION_NAMES.cpp_compile,
@@ -87,9 +87,11 @@ def generate_config_header_impl(ctx):
                 key: ctx.expand_make_variables("generate_config_header_expand", val, ctx.var),
             }
 
+    expanded_extra_definitions["TARGET_ARCH"] = cc_toolchain.cpu
+
     expanded_extra_definitions |= {
-        "compile_variables": " ".join(compiler_flags + ctx.attr.cpp_opts),
-        "linkflags": " ".join(link_flags + ctx.attr.cpp_linkflags),
+        "compile_variables": " ".join(build_info_compiler_flags + ctx.attr.cpp_opts),
+        "linkflags": " ".join(build_info_link_flags + ctx.attr.cpp_linkflags),
         "cpp_defines": " ".join(ctx.attr.cpp_defines),
     }
 
