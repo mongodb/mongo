@@ -48,6 +48,11 @@ private:
 
     bool isInCriticalSection(Phase phase) const override;
 
+    std::set<NamespaceString> _conflictingIndexBuildNamespaces(ShardingCoordinator& self,
+                                                               OperationContext* opCtx) override {
+        return {};
+    }
+
     void _verifyInput() const;
 
     bool _isPristineReplicaset(OperationContext* opCtx, RemoteCommandTargeter& targeter) const;

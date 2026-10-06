@@ -435,7 +435,51 @@ void MovePrimaryCoordinator::logChange(OperationContext* opCtx,
         opCtx, fmt::format("movePrimary.{}", what), NamespaceString(_dbName), details.obj());
 }
 
+std::set<NamespaceString> MovePrimaryCoordinator::_conflictingIndexBuildNamespaces(
+    ShardingCoordinator&, OperationContext* opCtx) {
+    // movePrimary clones untracked unsharded collections only. An index build on a sharded
+    // collection in this database does not conflict with the move.
+    const auto colls = getUntrackedUnshardedCollections(opCtx);
+    return {colls.begin(), colls.end()};
+}
+
 std::vector<NamespaceString> MovePrimaryCoordinator::getCollectionsToClone(
+    OperationContext* opCtx) const {
+    auto collectionsToClone = getUntrackedUnshardedCollections(opCtx);
+
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    bool timeseriesReshardingSupported = fcvSnapshot.isVersionInitialized() &&
+        resharding::gFeatureFlagReshardingForTimeseries.isEnabled(fcvSnapshot);
+
+    for (const auto& nss : collectionsToClone) {
+        movePrimaryFailIfNeedToCloneMovableCollections.executeIf(
+            [&](const BSONObj& data) {
+                if (isMovableUnshardedCollection(nss, timeseriesReshardingSupported)) {
+                    AutoGetCollection autoColl(opCtx, nss, MODE_IS);
+                    uassert(9046501,
+                            str::stream() << "Found a user collection to clone: "
+                                          << nss.toStringForErrorMsg(),
+                            !autoColl);
+                }
+            },
+            [&](const BSONObj& data) {
+                if (!data.hasField("comment")) {
+                    return true;
+                }
+                // If this failpoint is configured with a "comment", only fail the command if
+                // its "comment" matches the failpoint's "comment".
+                if (!opCtx->getComment()) {
+                    return false;
+                }
+                return opCtx->getComment()->checkAndGetStringData() ==
+                    data.getStringField("comment");
+            });
+    }
+
+    return collectionsToClone;
+}
+
+std::vector<NamespaceString> MovePrimaryCoordinator::getUntrackedUnshardedCollections(
     OperationContext* opCtx) const {
     const auto allCollections = [&] {
         std::vector<NamespaceString> colls;
@@ -473,36 +517,6 @@ std::vector<NamespaceString> MovePrimaryCoordinator::getCollectionsToClone(
                         collectionsToIgnore.cbegin(),
                         collectionsToIgnore.cend(),
                         std::back_inserter(collectionsToClone));
-
-    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    bool timeseriesReshardingSupported = fcvSnapshot.isVersionInitialized() &&
-        resharding::gFeatureFlagReshardingForTimeseries.isEnabled(fcvSnapshot);
-
-    for (const auto& nss : collectionsToClone) {
-        movePrimaryFailIfNeedToCloneMovableCollections.executeIf(
-            [&](const BSONObj& data) {
-                if (isMovableUnshardedCollection(nss, timeseriesReshardingSupported)) {
-                    AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-                    uassert(9046501,
-                            str::stream() << "Found a user collection to clone: "
-                                          << nss.toStringForErrorMsg(),
-                            !autoColl);
-                }
-            },
-            [&](const BSONObj& data) {
-                if (!data.hasField("comment")) {
-                    return true;
-                }
-                // If this failpoint is configured with a "comment", only fail the command if
-                // its "comment" matches the failpoint's "comment".
-                if (!opCtx->getComment()) {
-                    return false;
-                }
-                return opCtx->getComment()->checkAndGetStringData() ==
-                    data.getStringField("comment");
-            });
-    }
-
     return collectionsToClone;
 }
 

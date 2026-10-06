@@ -134,6 +134,11 @@ std::set<NamespaceString> InitializePlacementHistoryCoordinator::_getAdditionalL
     return {NamespaceString::kConfigsvrShardsNamespace};
 }
 
+std::set<NamespaceString> InitializePlacementHistoryCoordinator::_conflictingIndexBuildNamespaces(
+    ShardingCoordinator& self, OperationContext* opCtx) {
+    return {self.originalNss()};
+}
+
 ExecutorFuture<void> InitializePlacementHistoryCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {

@@ -255,6 +255,9 @@ protected:
     virtual void _checkCoordinatorPreconditions(OperationContext* opCtx, bool afterAcquiringLocks) {
     }
 
+    virtual void _checkIndexBuildsInProgress(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                             const CancellationToken& token) {}
+
     virtual ExecutorFuture<void> _acquireLocksAsync(
         OperationContext* opCtx,
         std::shared_ptr<executor::ScopedTaskExecutor> executor,

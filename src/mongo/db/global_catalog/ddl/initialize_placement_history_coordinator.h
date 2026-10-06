@@ -27,6 +27,9 @@ protected:
 private:
     std::set<NamespaceString> _getAdditionalLocksToAcquire(OperationContext* opCtx) override;
 
+    std::set<NamespaceString> _conflictingIndexBuildNamespaces(ShardingCoordinator& self,
+                                                               OperationContext* opCtx) override;
+
     bool _mustAlwaysMakeProgress() override;
 
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,

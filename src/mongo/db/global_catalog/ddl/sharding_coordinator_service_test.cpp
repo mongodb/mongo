@@ -7,6 +7,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/global_catalog/ddl/migration_blocking_operation_coordinator.h"
 #include "mongo/db/global_catalog/ddl/sharding_coordinator_external_state_for_test.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_test_grid.h"
 #include "mongo/db/repl/primary_only_service_test_fixture.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/shard_role/ddl/ddl_lock_manager.h"
@@ -26,6 +27,7 @@
 #include "mongo/util/time_support.h"
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -57,6 +59,10 @@ public:
         _testExecutor = makeTestExecutor();
 
         DDLLockManager::get(getServiceContext())->setRecoverable(ddlService());
+
+        // Coordinators check for in-progress index builds via Grid on first execution.
+        auto gridOpCtx = makeOperationContext();
+        _grid.emplace(gridOpCtx.get());
     }
 
     void stepUp(OperationContext* opCtx) {
@@ -212,6 +218,7 @@ protected:
     std::shared_ptr<executor::TaskExecutor> _testExecutor;
     std::unique_ptr<ShardingCoordinatorExternalStateFactoryForTest> _externalStateFactory;
     std::shared_ptr<ShardingCoordinatorExternalStateForTest> _externalState;
+    std::optional<ShardingCoordinatorTestGrid> _grid;
 };
 
 TEST_F(ShardingCoordinatorServiceTest, StateTransitions) {

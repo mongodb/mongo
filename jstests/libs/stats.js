@@ -34,9 +34,10 @@ export function assertHistogramDiffEq(db, coll, lastHistogram, readDiff, writeDi
 
     // In some cases, the actual result could contain more results than expected because some
     // background commands could sneak in. For instance, a checkDB command run against a replica set
-    // runs an extra "listIndex" command.
+    // runs an extra "listIndexes" command, and sharded DDL probes for in-progress index builds
+    // with another listIndexes.
     let allowedDiff = 0;
-    if (FixtureHelpers.isReplSet(db)) {
+    if (FixtureHelpers.isReplSet(db) || FixtureHelpers.isMongos(db)) {
         // The checkDB command could be run multiple times in a short period of time.
         allowedDiff = 3;
     }
@@ -89,9 +90,10 @@ export function assertTopDiffEq(db, coll, lastTop, key, expectedCountDiff) {
 
     // In some cases, the actual result could contain more results than expected because some
     // background commands could sneak in. For instance, a checkDB command run against a replica set
-    // runs an extra "listIndexes" command.
+    // runs an extra "listIndexes" command, and sharded DDL probes for in-progress index builds
+    // with another listIndexes.
     let allowedDiff = 0;
-    if (FixtureHelpers.isReplSet(db)) {
+    if (FixtureHelpers.isReplSet(db) || FixtureHelpers.isMongos(db)) {
         // The checkDB command could be run mutiple times in a short period of time.
         allowedDiff = 3;
     }

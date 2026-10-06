@@ -25,6 +25,13 @@ protected:
                          OperationContext* opCtx,
                          bool afterAcquiringLocks);
 
+    std::set<NamespaceString> _locksToAcquire(ShardingCoordinator& self, OperationContext* opCtx);
+
+    virtual std::set<NamespaceString> _conflictingIndexBuildNamespaces(ShardingCoordinator& self,
+                                                                       OperationContext* opCtx) {
+        return _locksToAcquire(self, opCtx);
+    }
+
     virtual std::set<NamespaceString> _getAdditionalLocksToAcquire(OperationContext* opCtx);
 
     ExecutorFuture<void> _acquireAllDDLLocksAsync(
@@ -34,6 +41,11 @@ protected:
         const CancellationToken& token);
 
     void _releaseDDLLocks(OperationContext* opCtx);
+
+    void _checkIndexBuildsInProgressGeneric(ShardingCoordinator& self,
+                                            OperationContext* opCtx,
+                                            std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                            const CancellationToken& token);
 
 private:
     template <typename T>
@@ -85,6 +97,13 @@ private:
 
     void _checkCoordinatorPreconditions(OperationContext* opCtx, bool afterAcquiringLocks) final {
         this->_checkDBVersion(*this, opCtx, afterAcquiringLocks);
+    }
+
+    void _checkIndexBuildsInProgress(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                     const CancellationToken& token) final {
+        auto opCtxHolder = makeOperationContext(/*deprioritizable=*/false);
+        auto* opCtx = opCtxHolder.get();
+        this->_checkIndexBuildsInProgressGeneric(*this, opCtx, executor, token);
     }
 
     ExecutorFuture<void> _acquireLocksAsync(OperationContext* opCtx,
@@ -142,6 +161,13 @@ private:
 
     void _checkCoordinatorPreconditions(OperationContext* opCtx, bool afterAcquiringLocks) final {
         checkDBVersion(opCtx, afterAcquiringLocks);
+    }
+
+    void _checkIndexBuildsInProgress(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                     const CancellationToken& token) final {
+        auto opCtxHolder = makeOperationContext(/*deprioritizable=*/false);
+        auto* opCtx = opCtxHolder.get();
+        this->_checkIndexBuildsInProgressGeneric(*this, opCtx, executor, token);
     }
 
     ExecutorFuture<void> _acquireLocksAsync(OperationContext* opCtx,

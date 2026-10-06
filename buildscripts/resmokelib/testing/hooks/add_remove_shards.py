@@ -533,6 +533,11 @@ class _AddRemoveShardThread(threading.Thread):
             # collections to clone.
             return True
 
+        if code == self._BACKGROUND_OPERATION_IN_PROGRESS_FOR_NAMESPACE:
+            # This is an error thrown if there is an index build in the background during some ddl
+            # operation (eg the movePrimary)
+            return True
+
         return False
 
     def _is_expected_transition_error_code(self, code):

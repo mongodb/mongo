@@ -60,6 +60,9 @@ private:
 
     std::set<NamespaceString> _getAdditionalLocksToAcquire(OperationContext* opCtx) override;
 
+    std::set<NamespaceString> _conflictingIndexBuildNamespaces(ShardingCoordinator& self,
+                                                               OperationContext* opCtx) override;
+
     boost::optional<RenameCollectionResponse> _response;
     const RenameCollectionRequest _request;
 };

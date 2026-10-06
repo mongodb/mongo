@@ -4,13 +4,18 @@
 #include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator.h"
 
 #include "mongo/db/global_catalog/ddl/sharding_coordinator_external_state_for_test.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_test_grid.h"
 #include "mongo/db/repl/primary_only_service_test_fixture.h"
 #include "mongo/db/shard_role/lock_manager/locker.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/versioning_protocol/database_version.h"
+#include "mongo/executor/network_interface_factory.h"
+#include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/unittest/server_parameter_guard.h"
+#include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/scopeguard.h"
 
 #include <memory>
 
@@ -252,6 +257,221 @@ TEST_F(ShardingDDLCoordinatorTest, NonAuthoritativeDDLRetriesOnFCVTransition) {
                       ->run(_scopedExecutor, CancellationToken::uncancelable());
     ASSERT_THROWS_CODE(
         future.get(), DBException, ErrorCodes::DDLCoordinatorMustRetryDueToFCVTransition);
+}
+
+std::shared_ptr<executor::TaskExecutor> makeMultiThreadTestExecutor() {
+    auto executor = executor::ThreadPoolTaskExecutor::create(
+        ThreadPool::make({
+            .poolName = "ShardingDDLCoordinatorIndexBuildTest",
+            .threadNamePrefix = "ShardingDDLCoordinatorIndexBuildTest-",
+            .minThreads = 2,
+            .maxThreads = 4,
+            .onCreateThread =
+                [](const std::string& threadName) {
+                    Client::initThread(threadName, getGlobalServiceContext()->getService());
+                },
+        }),
+        executor::makeNetworkInterface("ShardingDDLCoordinatorIndexBuildTest"));
+    executor->startup();
+    return executor;
+}
+
+ShardingCoordinatorMetadata makeAuthoritativeMetadata(const NamespaceString& nss,
+                                                      CoordinatorTypeEnum type) {
+    ShardingCoordinatorMetadata coordinatorMetadata(ShardingCoordinatorId(nss, type));
+    coordinatorMetadata.setForwardableOpMetadata(ForwardableOperationMetadata{});
+    coordinatorMetadata.setAuthoritativeMetadataAccessLevel(
+        AuthoritativeMetadataAccessLevelEnum::kWritesAndReadsAllowed);
+    coordinatorMetadata.setDatabaseVersion(DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
+    return coordinatorMetadata;
+}
+
+ShardingCoordinatorMetadata makeAuthoritativeDropCollectionMetadata(const NamespaceString& nss) {
+    return makeAuthoritativeMetadata(nss, CoordinatorTypeEnum::kDropCollection);
+}
+
+std::set<std::string> listIndexesTargets(const IndexBuildCommandLog& log) {
+    std::set<std::string> targets;
+    for (const auto& cmd : log.commands()) {
+        if (cmd.name == "listIndexes") {
+            targets.insert(cmd.host + " " + cmd.db + "." + cmd.coll);
+        }
+    }
+    return targets;
+}
+
+TEST_F(ShardingDDLCoordinatorTest, FailsEarlyWhenIndexBuildInProgress) {
+    auto opCtx = makeOperationContext();
+    ShardingCoordinatorTestGrid grid(opCtx.get(), IndexBuildProgress::kInProgress);
+
+    auto nss = NamespaceString::createNamespaceString_forTest("test", "foo");
+    auto coordinator = std::make_shared<ShardingDDLCoordinatorTest::TestShardingDDLCoordinator>(
+        static_cast<ShardingCoordinatorService*>(_service),
+        makeAuthoritativeDropCollectionMetadata(nss),
+        std::set<NamespaceString>{});
+
+    auto executor = makeMultiThreadTestExecutor();
+    auto scopedExecutor = std::make_shared<executor::ScopedTaskExecutor>(executor);
+    ScopeGuard shutdownExecutor([&] {
+        scopedExecutor.reset();
+        executor->shutdown();
+        executor->join();
+    });
+    auto future = static_cast<repl::PrimaryOnlyService::Instance*>(coordinator.get())
+                      ->run(scopedExecutor, CancellationToken::uncancelable());
+    ASSERT_THROWS_CODE(
+        future.get(), DBException, ErrorCodes::BackgroundOperationInProgressForNamespace);
+}
+
+TEST_F(ShardingDDLCoordinatorTest, ContinuesWhenNoIndexBuildInProgress) {
+    auto opCtx = makeOperationContext();
+    ShardingCoordinatorTestGrid grid(opCtx.get(), IndexBuildProgress::kNone);
+
+    auto nss = NamespaceString::createNamespaceString_forTest("test", "foo");
+    auto coordinator = std::make_shared<ShardingDDLCoordinatorTest::TestShardingDDLCoordinator>(
+        static_cast<ShardingCoordinatorService*>(_service),
+        makeAuthoritativeDropCollectionMetadata(nss),
+        std::set<NamespaceString>{});
+
+    auto executor = makeMultiThreadTestExecutor();
+    auto scopedExecutor = std::make_shared<executor::ScopedTaskExecutor>(executor);
+    ScopeGuard shutdownExecutor([&] {
+        scopedExecutor.reset();
+        executor->shutdown();
+        executor->join();
+    });
+    auto future = static_cast<repl::PrimaryOnlyService::Instance*>(coordinator.get())
+                      ->run(scopedExecutor, CancellationToken::uncancelable());
+    ASSERT_OK(future.getNoThrow());
+}
+
+TEST_F(ShardingDDLCoordinatorTest, DatabaseCheckQueriesOnlyShardsThatReportedTheCollection) {
+    auto opCtx = makeOperationContext();
+    auto commandLog = std::make_shared<IndexBuildCommandLog>();
+    IndexBuildCheckOptions options;
+    options.shardNames = {"shard0", "shard1"};
+    options.collectionsByHost = {{"shard0", {"collA"}}, {"shard1", {"collB"}}};
+    options.viewsByHost = {{"shard0", {"collView"}}};
+    options.commandLog = commandLog;
+    ShardingCoordinatorTestGrid grid(opCtx.get(), options);
+
+    auto nss = NamespaceString::createNamespaceString_forTest(
+        DatabaseName::createDatabaseName_forTest(boost::none, "test"));
+    ASSERT_TRUE(nss.isDbOnly());
+    auto coordinator = std::make_shared<ShardingDDLCoordinatorTest::TestShardingDDLCoordinator>(
+        static_cast<ShardingCoordinatorService*>(_service),
+        makeAuthoritativeMetadata(nss, CoordinatorTypeEnum::kDropDatabase),
+        std::set<NamespaceString>{});
+
+    auto executor = makeMultiThreadTestExecutor();
+    auto scopedExecutor = std::make_shared<executor::ScopedTaskExecutor>(executor);
+    ScopeGuard shutdownExecutor([&] {
+        scopedExecutor.reset();
+        executor->shutdown();
+        executor->join();
+    });
+    auto future = static_cast<repl::PrimaryOnlyService::Instance*>(coordinator.get())
+                      ->run(scopedExecutor, CancellationToken::uncancelable());
+    ASSERT_OK(future.getNoThrow());
+
+    ASSERT_EQ(listIndexesTargets(*commandLog),
+              (std::set<std::string>{"shard0 test.collA", "shard1 test.collB"}));
+}
+
+TEST_F(ShardingDDLCoordinatorTest, DatabaseCheckStillFailsWhenOwningShardHasIndexBuild) {
+    auto opCtx = makeOperationContext();
+    auto commandLog = std::make_shared<IndexBuildCommandLog>();
+    IndexBuildCheckOptions options;
+    options.shardNames = {"shard0", "shard1"};
+    options.collectionsByHost = {{"shard0", {"collA"}}, {"shard1", {"collB"}}};
+    options.namespacesWithIndexBuild = {"test.collA"};
+    options.commandLog = commandLog;
+    ShardingCoordinatorTestGrid grid(opCtx.get(), options);
+
+    auto nss = NamespaceString::createNamespaceString_forTest(
+        DatabaseName::createDatabaseName_forTest(boost::none, "test"));
+    auto coordinator = std::make_shared<ShardingDDLCoordinatorTest::TestShardingDDLCoordinator>(
+        static_cast<ShardingCoordinatorService*>(_service),
+        makeAuthoritativeMetadata(nss, CoordinatorTypeEnum::kDropDatabase),
+        std::set<NamespaceString>{});
+
+    auto executor = makeMultiThreadTestExecutor();
+    auto scopedExecutor = std::make_shared<executor::ScopedTaskExecutor>(executor);
+    ScopeGuard shutdownExecutor([&] {
+        scopedExecutor.reset();
+        executor->shutdown();
+        executor->join();
+    });
+    auto future = static_cast<repl::PrimaryOnlyService::Instance*>(coordinator.get())
+                      ->run(scopedExecutor, CancellationToken::uncancelable());
+    ASSERT_THROWS_CODE(
+        future.get(), DBException, ErrorCodes::BackgroundOperationInProgressForNamespace);
+
+    const auto targets = listIndexesTargets(*commandLog);
+    ASSERT_TRUE(targets.contains("shard0 test.collA"));
+    ASSERT_FALSE(targets.contains("shard1 test.collA"));
+}
+
+TEST_F(ShardingDDLCoordinatorTest, ConfigNamespaceIsCheckedOnTheConfigServer) {
+    auto opCtx = makeOperationContext();
+    auto commandLog = std::make_shared<IndexBuildCommandLog>();
+    IndexBuildCheckOptions options;
+    options.shardNames = {"shard0", "shard1"};
+    options.indexBuilds = IndexBuildProgress::kInProgress;
+    options.commandLog = commandLog;
+    ShardingCoordinatorTestGrid grid(opCtx.get(), options);
+
+    auto nss = NamespaceString::kConfigsvrPlacementHistoryNamespace;
+    auto coordinator = std::make_shared<ShardingDDLCoordinatorTest::TestShardingDDLCoordinator>(
+        static_cast<ShardingCoordinatorService*>(_service),
+        makeAuthoritativeMetadata(nss, CoordinatorTypeEnum::kDropCollection),
+        std::set<NamespaceString>{});
+
+    auto executor = makeMultiThreadTestExecutor();
+    auto scopedExecutor = std::make_shared<executor::ScopedTaskExecutor>(executor);
+    ScopeGuard shutdownExecutor([&] {
+        scopedExecutor.reset();
+        executor->shutdown();
+        executor->join();
+    });
+    auto future = static_cast<repl::PrimaryOnlyService::Instance*>(coordinator.get())
+                      ->run(scopedExecutor, CancellationToken::uncancelable());
+    auto status = future.getNoThrow();
+    ASSERT_EQ(listIndexesTargets(*commandLog),
+              (std::set<std::string>{"config config.placementHistory"}));
+    ASSERT_EQ(status.code(), ErrorCodes::BackgroundOperationInProgressForNamespace);
+}
+
+TEST_F(ShardingDDLCoordinatorTest, CollectionCheckStillContactsEveryShard) {
+    auto opCtx = makeOperationContext();
+    auto commandLog = std::make_shared<IndexBuildCommandLog>();
+    IndexBuildCheckOptions options;
+    options.shardNames = {"shard0", "shard1"};
+    options.commandLog = commandLog;
+    ShardingCoordinatorTestGrid grid(opCtx.get(), options);
+
+    auto nss = NamespaceString::createNamespaceString_forTest("test", "foo");
+    auto coordinator = std::make_shared<ShardingDDLCoordinatorTest::TestShardingDDLCoordinator>(
+        static_cast<ShardingCoordinatorService*>(_service),
+        makeAuthoritativeDropCollectionMetadata(nss),
+        std::set<NamespaceString>{});
+
+    auto executor = makeMultiThreadTestExecutor();
+    auto scopedExecutor = std::make_shared<executor::ScopedTaskExecutor>(executor);
+    ScopeGuard shutdownExecutor([&] {
+        scopedExecutor.reset();
+        executor->shutdown();
+        executor->join();
+    });
+    auto future = static_cast<repl::PrimaryOnlyService::Instance*>(coordinator.get())
+                      ->run(scopedExecutor, CancellationToken::uncancelable());
+    ASSERT_OK(future.getNoThrow());
+
+    ASSERT_EQ(listIndexesTargets(*commandLog),
+              (std::set<std::string>{"shard0 test.foo", "shard1 test.foo"}));
+    for (const auto& cmd : commandLog->commands()) {
+        ASSERT_NE(cmd.name, "listCollections");
+    }
 }
 
 }  // namespace mongo

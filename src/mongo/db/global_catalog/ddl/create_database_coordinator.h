@@ -28,6 +28,11 @@ public:
 protected:
     bool isInCriticalSection(Phase phase) const override;
 
+    std::set<NamespaceString> _conflictingIndexBuildNamespaces(ShardingCoordinator& self,
+                                                               OperationContext* opCtx) override {
+        return {};
+    }
+
 private:
     bool _mustAlwaysMakeProgress() override {
         return _doc.getPhase() >= Phase::kEnterCriticalSectionOnPrimary;

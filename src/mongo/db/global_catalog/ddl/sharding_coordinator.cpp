@@ -59,6 +59,8 @@ MONGO_FAIL_POINT_DEFINE(hangNonAuthoritativeDDLBeforeDDLLock);
 //   - 'nss' (optional): string matching the coordinator's original namespace. If omitted, the
 //   coordinator is matched regardless of its namespace.
 MONGO_FAIL_POINT_DEFINE(suspendDDLCoordinatorOnPhase);
+// Pauses on the first execution, after the in-progress index build check and before _runImpl.
+MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildInProgressCheck);
 
 ShardingCoordinatorMetadata extractShardingCoordinatorMetadata(const BSONObj& coorDoc) {
     return ShardingCoordinatorMetadata::parse(coorDoc,
@@ -331,7 +333,10 @@ SemiFuture<void> ShardingCoordinator::run(std::shared_ptr<executor::ScopedTaskEx
             return status;
         })
         .then([this, executor, token, anchor = shared_from_this()] {
-            return AsyncTry([this, executor, token] {
+            return AsyncTry([this,
+                             executor,
+                             token,
+                             indexBuildCheckShouldRun = _firstExecution]() mutable {
                        // If the coordinator has already decided to abort, head straight to cleanup.
                        // The causality barrier below must not run on this path: cleanup is terminal
                        // and may need to contact participants that are unreachable (e.g. the very
@@ -345,6 +350,12 @@ SemiFuture<void> ShardingCoordinator::run(std::shared_ptr<executor::ScopedTaskEx
                            // retryable writes issued by previous executions before doing any work.
                            // This is done implicitly here so individual coordinators don't have to.
                            _performCausalityBarrier(executor, token);
+                       }
+
+                       if (indexBuildCheckShouldRun) {
+                           _checkIndexBuildsInProgress(executor, token);
+                           indexBuildCheckShouldRun = false;
+                           hangAfterIndexBuildInProgressCheck.pauseWhileSet();
                        }
 
                        return _runImpl(executor, token);

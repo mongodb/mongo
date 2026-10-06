@@ -6,10 +6,13 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/global_catalog/ddl/migration_blocking_operation_coordinator_v2_gen.h"
 #include "mongo/db/global_catalog/ddl/sharding_coordinator_external_state_for_test.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_test_grid.h"
 #include "mongo/db/repl/primary_only_service_test_fixture.h"
 #include "mongo/db/versioning_protocol/stale_exception.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/death_test.h"
+
+#include <optional>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -65,6 +68,8 @@ protected:
 
         _opCtxHolder = makeOperationContext();
         _opCtx = _opCtxHolder.get();
+        // The coordinator checks for in-progress index builds via Grid as soon as it starts.
+        _grid.emplace(_opCtx);
     }
 
     // Creating the instance eagerly kicks off the migration-blocking work asynchronously.
@@ -119,6 +124,7 @@ protected:
     std::shared_ptr<Instance> _instance;
     ServiceContext::UniqueOperationContext _opCtxHolder;
     OperationContext* _opCtx;
+    std::optional<ShardingCoordinatorTestGrid> _grid;
     std::unique_ptr<ShardingCoordinatorExternalStateFactoryForTest> _externalStateFactory;
     std::shared_ptr<ShardingCoordinatorExternalStateForTest> _externalState;
 };

@@ -47,6 +47,9 @@ protected:
 
     bool isInCriticalSection(Phase phase) const override;
 
+    std::set<NamespaceString> _conflictingIndexBuildNamespaces(ShardingCoordinator& self,
+                                                               OperationContext* opCtx) override;
+
 private:
     void appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const override;
     bool _mustAlwaysMakeProgress() override;
@@ -80,6 +83,11 @@ private:
      * the recipient is expected to clone.
      */
     std::vector<NamespaceString> getCollectionsToClone(OperationContext* opCtx) const;
+
+    /**
+     * Same set as getCollectionsToClone(), without the movePrimary failpoint.
+     */
+    std::vector<NamespaceString> getUntrackedUnshardedCollections(OperationContext* opCtx) const;
 
     /**
      * Ensures that there are no orphaned collections in the recipient's catalog data, asserting
