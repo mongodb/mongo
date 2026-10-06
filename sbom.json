@@ -14,7 +14,7 @@
     "tools": [
       {
         "name": "Endor Labs Inc",
-        "version": "v1.7.1149"
+        "version": "v1.7.1177"
       }
     ],
     "component": {
@@ -2129,13 +2129,7 @@
         {
           "license": {
             "id": "MIT",
-            "acknowledgement": "declared"
-          }
-        },
-        {
-          "license": {
-            "name": "MIT",
-            "acknowledgement": "declared"
+            "acknowledgement": "concluded"
           }
         }
       ],
@@ -2145,11 +2139,6 @@
         {
           "url": "https://github.com/scons/scons.git",
           "type": "distribution"
-        },
-        {
-          "url": "https://api.clearlydefined.io/definitions/pypi/pypi/-/scons/4.9.1",
-          "comment": "License metadata retrieved via clearlydefined.io lookup.",
-          "type": "evidence"
         },
         {
           "url": "https://github.com/SCons/scons",
@@ -2165,8 +2154,7 @@
         "licenses": [
           {
             "license": {
-              "name": "MIT",
-              "acknowledgement": "declared"
+              "id": "MIT"
             }
           }
         ]
@@ -2257,19 +2245,7 @@
         {
           "license": {
             "id": "Apache-2.0",
-            "acknowledgement": "declared"
-          }
-        },
-        {
-          "license": {
-            "name": "Apache-2.0",
-            "acknowledgement": "declared"
-          }
-        },
-        {
-          "license": {
-            "name": "OTHER",
-            "acknowledgement": "declared"
+            "acknowledgement": "concluded"
           }
         }
       ],
@@ -2279,16 +2255,6 @@
         {
           "url": "https://pypi.org/project/ocspresponder/",
           "type": "distribution"
-        },
-        {
-          "url": "https://api.clearlydefined.io/definitions/pypi/pypi/-/ocspresponder/0.5.0",
-          "comment": "License metadata retrieved via clearlydefined.io lookup.",
-          "type": "evidence"
-        },
-        {
-          "url": "https://api.deps.dev/v3/systems/pypi/packages/%2Focspresponder/versions/0.5.0",
-          "comment": "License metadata retrieved via deps.dev lookup.",
-          "type": "evidence"
         },
         {
           "url": "https://github.com/threema-ch/ocspresponder",
@@ -2304,14 +2270,7 @@
         "licenses": [
           {
             "license": {
-              "name": "Apache-2.0",
-              "acknowledgement": "declared"
-            }
-          },
-          {
-            "license": {
-              "name": "OTHER",
-              "acknowledgement": "declared"
+              "id": "Apache-2.0"
             }
           }
         ]
@@ -2452,13 +2411,7 @@
         {
           "license": {
             "id": "MIT",
-            "acknowledgement": "declared"
-          }
-        },
-        {
-          "license": {
-            "name": "MIT",
-            "acknowledgement": "declared"
+            "acknowledgement": "concluded"
           }
         }
       ],
@@ -2468,11 +2421,6 @@
         {
           "url": "https://pypi.org/project/ocspbuilder/",
           "type": "distribution"
-        },
-        {
-          "url": "https://api.clearlydefined.io/definitions/pypi/pypi/-/ocspbuilder/0.10.2",
-          "comment": "License metadata retrieved via clearlydefined.io lookup.",
-          "type": "evidence"
         },
         {
           "url": "https://github.com/wbond/ocspbuilder",
@@ -2488,8 +2436,7 @@
         "licenses": [
           {
             "license": {
-              "name": "MIT",
-              "acknowledgement": "declared"
+              "id": "MIT"
             }
           }
         ]
@@ -2675,6 +2622,5 @@
     {
       "ref": "pkg:pypi/scons@4.9.1"
     }
-  ],
-  "vulnerabilities": []
+  ]
 }
