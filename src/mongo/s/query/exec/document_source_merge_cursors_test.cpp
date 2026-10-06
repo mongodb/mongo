@@ -30,6 +30,7 @@
 #include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
+#include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/query/client_cursor/cursor_id.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/query/datetime/date_time_support.h"
@@ -43,6 +44,7 @@
 #include "mongo/executor/thread_pool_mock.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/s/query/exec/async_results_merger_params_gen.h"
+#include "mongo/s/query/exec/merge_cursors_stage.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
@@ -247,6 +249,70 @@ TEST_F(DocumentSourceMergeCursorsTest, ShouldReportEOFWithNoCursors) {
     auto source = DocumentSourceMergeCursors::create(expCtx, std::move(armParams));
     auto stage = exec::agg::buildStage(source);
     ASSERT_TRUE(stage->getNext().isEOF());
+}
+
+// Builds a $mergeCursors stage over two already-exhausted remotes, which is enough to exercise the
+// high water mark accessors without having to schedule any network responses.
+exec::agg::MergeCursorsStage* buildMergeCursorsStageWithExhaustedRemotes(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const NamespaceString& nss,
+    boost::intrusive_ptr<exec::agg::Stage>& stageOut) {
+    AsyncResultsMergerParams armParams;
+    armParams.setNss(nss);
+    std::vector<RemoteCursor> cursors;
+    cursors.emplace_back(
+        makeRemoteCursor(kTestShardIds[0],
+                         kTestShardHosts[0],
+                         CursorResponse(expCtx->getNamespaceString(), kExhaustedCursorID, {})));
+    cursors.emplace_back(
+        makeRemoteCursor(kTestShardIds[1],
+                         kTestShardHosts[1],
+                         CursorResponse(expCtx->getNamespaceString(), kExhaustedCursorID, {})));
+    armParams.setRemotes(std::move(cursors));
+
+    stageOut =
+        exec::agg::buildStage(DocumentSourceMergeCursors::create(expCtx, std::move(armParams)));
+    auto* mergeCursorsStage = dynamic_cast<exec::agg::MergeCursorsStage*>(stageOut.get());
+    ASSERT_TRUE(mergeCursorsStage);
+    return mergeCursorsStage;
+}
+
+TEST_F(DocumentSourceMergeCursorsTest, ShouldReportNoHighWaterMarkClusterTimeWhenNoneIsTracked) {
+    boost::intrusive_ptr<exec::agg::Stage> stage;
+    auto* mergeCursorsStage =
+        buildMergeCursorsStageWithExhaustedRemotes(getExpCtx(), getTenantIdNss(), stage);
+
+    // The remotes are not change stream cursors, so the results merger tracks no high water mark at
+    // all.
+    ASSERT_BSONOBJ_EQ(mergeCursorsStage->getHighWaterMark(), BSONObj());
+    ASSERT_FALSE(mergeCursorsStage->getHighWaterMarkClusterTime());
+}
+
+TEST_F(DocumentSourceMergeCursorsTest, ShouldReportClusterTimeOfHighWaterMarkResumeToken) {
+    boost::intrusive_ptr<exec::agg::Stage> stage;
+    auto* mergeCursorsStage =
+        buildMergeCursorsStageWithExhaustedRemotes(getExpCtx(), getTenantIdNss(), stage);
+
+    const Timestamp clusterTime(42, 7);
+    mergeCursorsStage->setHighWaterMark(
+        ResumeToken::makeHighWaterMarkToken(clusterTime, ResumeTokenData::kDefaultTokenVersion)
+            .toDocument()
+            .toBson());
+
+    ASSERT_EQ(*mergeCursorsStage->getHighWaterMarkClusterTime(), clusterTime);
+}
+
+TEST_F(DocumentSourceMergeCursorsTest, ShouldReportNoHighWaterMarkClusterTimeForNonResumeToken) {
+    boost::intrusive_ptr<exec::agg::Stage> stage;
+    auto* mergeCursorsStage =
+        buildMergeCursorsStageWithExhaustedRemotes(getExpCtx(), getTenantIdNss(), stage);
+
+    // A high water mark which is not a change stream resume token carries no cluster time. We must
+    // report that we have none rather than failing to parse it.
+    mergeCursorsStage->setHighWaterMark(BSON("x" << 1));
+
+    ASSERT_BSONOBJ_EQ(mergeCursorsStage->getHighWaterMark(), BSON("x" << 1));
+    ASSERT_FALSE(mergeCursorsStage->getHighWaterMarkClusterTime());
 }
 
 // Returns the shards registered by the fixture's setUp(), for answering the config.shards find that

@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "mongo/db/exec/agg/high_water_mark_provider.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/s/query/exec/blocking_results_merger.h"
 #include "mongo/s/query/exec/shard_tag.h"
@@ -20,7 +21,7 @@ namespace mongo {
 namespace exec {
 namespace agg {
 
-class MergeCursorsStage final : public Stage {
+class MergeCursorsStage final : public Stage, public HighWaterMarkProvider {
 public:
     MergeCursorsStage(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                       const std::shared_ptr<BlockingResultsMerger>& blockingResultsMerger);
@@ -34,8 +35,8 @@ public:
     std::size_t getNumRemotes() const;
     /**
      * Returns the high water mark sort key for the given cursor, if it exists; otherwise, returns
-     * an empty BSONObj. Calling this method causes the underlying BlockingResultsMerger to be
-     * populated and assumes ownership of the remote cursors.
+     * an empty BSONObj. As a side effect, this can advance the high water mark of the underlying
+     * results merger, which only happens when the merger has no result ready to return.
      */
     BSONObj getHighWaterMark();
 
@@ -44,6 +45,16 @@ public:
      * that will be returned to the client.
      */
     BSONObj getHighWaterMarkForClient();
+
+    /**
+     * Returns the cluster time of the high water mark tracked by the underlying results merger, or
+     * boost::none if it does not track one, or if the high water mark it tracks is not a change
+     * stream resume token.
+     *
+     * Shares the side effect of 'getHighWaterMark()' described above: asking for the high water
+     * mark can advance it.
+     */
+    boost::optional<Timestamp> getHighWaterMarkClusterTime() override;
 
     bool remotesExhausted() const;
     Status setAwaitDataTimeout(Milliseconds awaitDataTimeout);

@@ -7,6 +7,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/agg/cursor_stage.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/catalog_resource_handle.h"
@@ -429,6 +430,115 @@ TEST_F(DSCursorTest, EmptyDocumentsUsesCountOnlyPlanExecutorInterface) {
     }
     ASSERT(cursorStage->getNext().isEOF());
     ASSERT(*calledGetNextWithoutOutput);
+    cursorStage->dispose();
+}
+
+/**
+ * MockPlanExecutor instance which reports a scan position in the oplog, as an oplog collection scan
+ * does. The reported position advances past the documents the scan returns, which is what lets a
+ * resumable oplog scan report progress even when it returns nothing.
+ */
+class MockPlanExecutorForOplogScan : public MockPlanExecutorBase {
+public:
+    MockPlanExecutorForOplogScan(OperationContext* opCtx,
+                                 std::vector<BSONObj> data,
+                                 Timestamp latestOplogTimestamp)
+        : MockPlanExecutorBase(opCtx, std::move(data)),
+          _latestOplogTimestamp(latestOplogTimestamp) {}
+
+    void saveState() override {}
+
+    void restoreState(const RestoreContext& context) override {}
+
+    void detachFromOperationContext() override {}
+
+    void reattachToOperationContext(OperationContext* opCtx) override {}
+
+    Timestamp getLatestOplogTimestamp() const override {
+        return _latestOplogTimestamp;
+    }
+
+private:
+    const Timestamp _latestOplogTimestamp;
+};
+
+/**
+ * Builds a $cursor stage over 'bsons' with the given resume tracking behaviour, reporting
+ * 'latestOplogTimestamp' as the position of the underlying scan.
+ */
+boost::intrusive_ptr<exec::agg::CursorStage> makeOplogScanCursorStage(
+    OperationContext* opCtx,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    std::vector<BSONObj> bsons,
+    Timestamp latestOplogTimestamp,
+    DocumentSourceCursor::ResumeTrackingType resumeTrackingType) {
+    auto exec = std::make_unique<MockPlanExecutorForOplogScan>(
+        opCtx, std::move(bsons), latestOplogTimestamp);
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> execWithDeleter(
+        std::move(exec).release(), PlanExecutor::Deleter{opCtx});
+
+    MultipleCollectionAccessor collections;
+    auto stasher = make_intrusive<ShardRoleTransactionResourcesStasherForPipeline>();
+    auto cursor = DocumentSourceCursor::create(std::move(execWithDeleter),
+                                               expCtx,
+                                               DocumentSourceCursor::CursorType::kRegular,
+                                               resumeTrackingType);
+    cursor->bindCatalogInfo(collections, stasher);
+    cursor->setCatalogResourceHandle_forTest(
+        make_intrusive<MockDSCursorCatalogResourceHandle>(std::make_shared<bool>(false)));
+    auto stage = exec::agg::buildStage(cursor);
+    auto* cursorStage = dynamic_cast<exec::agg::CursorStage*>(stage.get());
+    ASSERT_TRUE(cursorStage);
+    return boost::intrusive_ptr<exec::agg::CursorStage>(cursorStage);
+}
+
+TEST_F(DSCursorTest, ReportsNoHighWaterMarkClusterTimeBeforeTheFirstBatchIsLoaded) {
+    auto cursorStage = makeOplogScanCursorStage(getOpCtx(),
+                                                getExpCtx(),
+                                                {BSON("ts" << Timestamp(100, 1))},
+                                                Timestamp(200, 1),
+                                                DocumentSourceCursor::ResumeTrackingType::kOplog);
+
+    // Nothing has been read yet, so we know nothing about where the scan is.
+    ASSERT_FALSE(cursorStage->getHighWaterMarkClusterTime());
+
+    cursorStage->dispose();
+}
+
+TEST_F(DSCursorTest, ReportsHighWaterMarkClusterTimeForAResumableOplogScan) {
+    auto cursorStage = makeOplogScanCursorStage(getOpCtx(),
+                                                getExpCtx(),
+                                                {BSON("ts" << Timestamp(100, 1))},
+                                                Timestamp(200, 1),
+                                                DocumentSourceCursor::ResumeTrackingType::kOplog);
+
+    // While there is a document to return, the reported position is that document's timestamp: the
+    // scan may have read further ahead, but the documents it read have not been returned yet.
+    ASSERT_TRUE(cursorStage->getNext().isAdvanced());
+    ASSERT_EQ(*cursorStage->getHighWaterMarkClusterTime(), Timestamp(100, 1));
+
+    // Once the batch is drained we can report the position the scan itself reached, which is what
+    // makes the high water mark advance over oplog entries which produce no result.
+    ASSERT_TRUE(cursorStage->getNext().isEOF());
+    ASSERT_EQ(*cursorStage->getHighWaterMarkClusterTime(), Timestamp(200, 1));
+
+    cursorStage->dispose();
+}
+
+TEST_F(DSCursorTest, ReportsNoHighWaterMarkClusterTimeForANonResumableScan) {
+    auto cursorStage = makeOplogScanCursorStage(getOpCtx(),
+                                                getExpCtx(),
+                                                {BSON("ts" << Timestamp(100, 1))},
+                                                Timestamp(200, 1),
+                                                DocumentSourceCursor::ResumeTrackingType::kNone);
+
+    // This scan is not resumable, so its position says nothing about which events have been
+    // produced and must not be reported as a high water mark.
+    ASSERT_TRUE(cursorStage->getNext().isAdvanced());
+    ASSERT_FALSE(cursorStage->getHighWaterMarkClusterTime());
+    ASSERT_TRUE(cursorStage->getNext().isEOF());
+    ASSERT_FALSE(cursorStage->getHighWaterMarkClusterTime());
+
     cursorStage->dispose();
 }
 

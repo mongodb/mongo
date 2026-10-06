@@ -218,6 +218,21 @@ public:
         return pExpCtx;
     }
 
+    /**
+     * Walks the chain of stages that feed into this stage, starting with its immediate source and
+     * proceeding towards the source of the pipeline. Invokes 'callback' on each stage in turn until
+     * either the callback returns false or there are no more stages to visit. The callback must be
+     * callable as 'bool(Stage&)'; returning true continues the walk, returning false stops it.
+     */
+    template <typename Callback>
+    void forEachSourceStage(Callback&& callback) {
+        for (Stage* source = pSource; source; source = source->pSource) {
+            if (!callback(*source)) {
+                break;
+            }
+        }
+    }
+
     virtual void detachFromOperationContext() {}
 
     virtual void reattachToOperationContext(OperationContext* opCtx) {}

@@ -239,11 +239,11 @@ void CursorStage::_updateOplogTimestamp() {
         const auto& ts = _currentBatch.peekFront().getField(repl::OpTime::kTimestampFieldName);
         invariant(ts.getType() == BSONType::timestamp);
         _latestOplogTimestamp = ts.getTimestamp();
-        return;
+    } else {
+        // If we have no more results to return, advance to the latest oplog timestamp.
+        tassert(9047700, "expecting _sharedState to be present", _sharedState->exec);
+        _latestOplogTimestamp = _sharedState->exec->getLatestOplogTimestamp();
     }
-
-    // If we have no more results to return, advance to the latest oplog timestamp.
-    _latestOplogTimestamp = _sharedState->exec->getLatestOplogTimestamp();
 }
 
 void CursorStage::_updateNonOplogResumeToken() {

@@ -358,17 +358,20 @@ export function isResumableChangeStreamError(error) {
 }
 
 /**
- * Polls getMore until it fails with a resumable change stream error.
+ * Polls getMore until it fails with the expected error. Returns the failing getMore response.
  */
 export function assertGetMoreFailsWithExpectedError({db, cursorId, collName, expectedError, msg}) {
+    let errorResponse;
     assert.soon(function () {
         const res = db.runCommand({getMore: cursorId, collection: collName});
         if (res.ok === 0) {
             assert(expectedError(res), "Unexpected error: " + tojson(res), {res});
+            errorResponse = res;
             return true;
         }
         return false;
     }, msg);
+    return errorResponse;
 }
 
 /**

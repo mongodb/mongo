@@ -5,6 +5,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/exec/agg/high_water_mark_provider.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/plan_stats.h"
@@ -29,7 +30,7 @@ namespace agg {
 /**
  * Constructs and returns Documents from the BSONObj objects produced by a supplied PlanExecutor.
  */
-class CursorStage : public Stage {
+class CursorStage : public Stage, public HighWaterMarkProvider {
 public:
     using CursorType = DocumentSourceCursor::CursorType;
     using ResumeTrackingType = DocumentSourceCursor::ResumeTrackingType;
@@ -44,6 +45,18 @@ public:
     ~CursorStage() override;
 
     Timestamp getLatestOplogTimestamp() const {
+        return _latestOplogTimestamp;
+    }
+
+    /**
+     * For a resumable oplog scan, the high water mark is the position the scan has reached, which
+     * is what 'getLatestOplogTimestamp()' tracks. Returns boost::none for any other cursor, and
+     * before the first batch has been loaded.
+     */
+    boost::optional<Timestamp> getHighWaterMarkClusterTime() override {
+        if (_resumeTrackingType != ResumeTrackingType::kOplog || _latestOplogTimestamp.isNull()) {
+            return boost::none;
+        }
         return _latestOplogTimestamp;
     }
 

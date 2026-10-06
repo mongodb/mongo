@@ -4,6 +4,7 @@
 #include "mongo/s/query/exec/merge_cursors_stage.h"
 
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/platform/compiler.h"
@@ -98,6 +99,7 @@ GetNextResult MergeCursorsStage::doGetNext() {
     if (next.isEOF()) {
         return GetNextResult::makeEOF();
     }
+
     Document doc = Document::fromBsonWithMetaData(*next.getResult());
     if (MONGO_unlikely(doc.metadata().isChangeStreamControlEvent())) {
         // Special handling needed for control events here to avoid an assertion failure in the
@@ -134,6 +136,19 @@ BSONObj MergeCursorsStage::getHighWaterMark() {
 
 BSONObj MergeCursorsStage::getHighWaterMarkForClient() {
     return _blockingResultsMerger->getHighWaterMarkForClient();
+}
+
+boost::optional<Timestamp> MergeCursorsStage::getHighWaterMarkClusterTime() {
+    BSONObj highWaterMark = getHighWaterMark();
+
+    // The results merger tracks a high water mark for any sorted tailable cursor, but it is only a
+    // change stream resume token, and therefore only carries a cluster time, when the cursors being
+    // merged are change stream cursors. Report no high water mark for anything else rather than
+    // failing to parse it as a resume token.
+    if (!highWaterMark.hasField(ResumeToken::kDataFieldName)) {
+        return boost::none;
+    }
+    return ResumeToken::extractClusterTime(highWaterMark);
 }
 
 bool MergeCursorsStage::remotesExhausted() const {

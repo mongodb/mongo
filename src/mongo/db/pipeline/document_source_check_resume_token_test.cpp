@@ -8,6 +8,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/agg/change_stream_ensure_resume_token_present_stage.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/exec/agg/high_water_mark_provider.h"
 #include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/classic/collection_scan.h"
 #include "mongo/db/exec/classic/plan_stage.h"
@@ -194,7 +195,7 @@ private:
  *     kPauseExecution, these events are stored only in the ChangeStreamMockStage queue with no
  *     corresponding entry in the ChangeStreamOplogCollectionMock queue.
  */
-class ChangeStreamMockStage : public exec::agg::MockStage {
+class ChangeStreamMockStage : public exec::agg::MockStage, public exec::agg::HighWaterMarkProvider {
 public:
     // The collection holder is guaranteed to be valid for the lifetime of the test. The
     // CollectionPtr initialization is safe.
@@ -239,6 +240,18 @@ public:
         return _collScan->getCommonStats()->isEOF;
     }
 
+    /**
+     * Reports the position the underlying scan has reached, so that downstream change stream stages
+     * can determine how far the scan has progressed even when it produces no events.
+     */
+    boost::optional<Timestamp> getHighWaterMarkClusterTime() override {
+        if (!_collScan) {
+            return boost::none;
+        }
+        auto latestOplogTimestamp = _collScan->getLatestOplogTimestamp();
+        return latestOplogTimestamp.isNull() ? boost::none
+                                             : boost::make_optional(latestOplogTimestamp);
+    }
 
 protected:
     exec::agg::GetNextResult doGetNext() override {
@@ -247,6 +260,7 @@ protected:
             _collScan = std::make_unique<CollectionScan>(
                 pExpCtx.get(), _collectionAcq, _params, &_ws, _filter.get());
         }
+
         while (true) {
             // If the next result is a pause, return it and don't collscan.
             auto nextResult = MockStage::doGetNext();
@@ -281,8 +295,7 @@ protected:
                     ASSERT(nextResult.isAdvanced());
                     mutableDoc["_id"] = nextResult.getDocument()["_id"];
                     mutableDoc.metadata().setSortKey(nextResult.getDocument()["_id"], true);
-                    auto frozen = mutableDoc.freeze();
-                    return frozen;
+                    return mutableDoc.freeze();
                 }
                 case PlanStage::NEED_TIME:
                     continue;
@@ -893,6 +906,64 @@ TEST_F(CheckResumeTokenTest, ShouldSucceedWithNoDocuments) {
 
     auto checkResumeToken = createEnsureResumeTokenPresentStage(resumeTimestamp, "0");
     ASSERT_TRUE(checkResumeToken->getNext().isEOF());
+}
+
+TEST_F(CheckResumeTokenTest, ShouldFailWhenHighWaterMarkSurpassesTokenAndStreamProducesNoEvents) {
+    Timestamp resumeTimestamp(100, 1);
+
+    auto checkResumeToken = createEnsureResumeTokenPresentStage(resumeTimestamp, "1");
+
+    // The oplog contains no entry matching the resume token, and none of its entries produce an
+    // event in the stream. The scan nonetheless advances beyond the resume point, which is enough
+    // for us to conclude that the resume token can never appear.
+    addOplogEntryOnOtherNS(resumeTimestamp);
+    addOplogEntryOnOtherNS(resumeTimestamp + 1);
+
+    ASSERT_THROWS_CODE(
+        checkResumeToken->getNext(), AssertionException, ErrorCodes::ChangeStreamFatalError);
+}
+
+TEST_F(CheckResumeTokenTest, ShouldNotFailWhenHighWaterMarkIsAtResumeTokenClusterTime) {
+    Timestamp resumeTimestamp(100, 2);
+
+    auto checkResumeToken = createEnsureResumeTokenPresentStage(resumeTimestamp, "1");
+
+    // The scan has only reached the resume token's own cluster time, so the event which produced
+    // the resume token may still be in flight. We must not fail the stream yet.
+    addOplogEntryOnOtherNS(resumeTimestamp);
+
+    ASSERT_TRUE(checkResumeToken->getNext().isEOF());
+}
+
+TEST_F(CheckResumeTokenTest, ShouldNotFailWhenHighWaterMarkSurpassesTokenAfterTokenWasSeen) {
+    Timestamp resumeTimestamp(100, 1);
+
+    auto checkResumeToken = createEnsureResumeTokenPresentStage(resumeTimestamp, "1");
+
+    // The resume token is present in the stream, so advancing the scan beyond it must not fail the
+    // stream; we are simply waiting for the event which follows the resume point.
+    addOplogEntryOnTestNS(resumeTimestamp, "1");
+    addOplogEntryOnOtherNS(resumeTimestamp + 1);
+
+    ASSERT_TRUE(checkResumeToken->getNext().isEOF());
+}
+
+TEST_F(CheckResumeTokenTest,
+       ShouldFailWhenHighWaterMarkSurpassesTokenAfterSwallowingEventAtSameClusterTime) {
+    Timestamp resumeTimestamp(100, 2);
+
+    auto checkResumeToken = createEnsureResumeTokenPresentStage(resumeTimestamp, "1");
+
+    // This event sorts before the resume token at the same cluster time, so it is swallowed without
+    // the stream failing; we may still see the resume token in a subsequent event.
+    addOplogEntryOnTestNS(resumeTimestamp, "0");
+
+    // Once the scan moves beyond the resume token's cluster time without having produced any
+    // further event, we know that the resume token is absent.
+    addOplogEntryOnOtherNS(resumeTimestamp + 1);
+
+    ASSERT_THROWS_CODE(
+        checkResumeToken->getNext(), AssertionException, ErrorCodes::ChangeStreamFatalError);
 }
 
 TEST_F(CheckResumabilityTest, ShouldSucceedIfResumeTokenIsPresentAndEarliestOplogEntryBeforeToken) {
