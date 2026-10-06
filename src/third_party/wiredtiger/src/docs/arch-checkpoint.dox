@@ -150,6 +150,15 @@ as it may be referenced by older checkpoints, once the older checkpoint is delet
 to be used. If the freed pages exist at the end of the file the file can be truncated. Otherwise
 compaction will need to be initiated to shrink the file, see: WT_SESSION::compact.
 
+A page is only discarded when every record on it is obsolete. A page that still holds a live record
+is kept, along with any obsolete values on it, until something else dirties the page and it is
+reconciled again. The \c btree_obsolete_inline_bytes statistics, gathered by the tree walk that
+collects \c all statistics, report how many bytes of row-store value payload such retained values
+occupy; the mixed variant isolates pages that also hold a live record. Overflow values, dictionary
+copies and cell headers are not counted. The walk reads each page's cached image, so a page that
+checkpoint has reconciled but which remains in cache may report values the checkpoint already
+dropped: treat the total as an upper bound.
+
 \anchor checkpoint-internal-callers
 # Internal callers #
 WiredTiger may call checkpoint internally at any time. These can occur during:

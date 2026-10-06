@@ -75,7 +75,11 @@ static const char *const __stats_dsrc_desc[] = {
   "btree: maximum leaf page value size",
   "btree: maximum tree depth",
   "btree: number of key/value pairs",
+  "btree: obsolete inline value bytes",
+  "btree: obsolete inline value bytes on mixed pages",
   "btree: overflow pages",
+  "btree: pages analyzed for obsolete inline values",
+  "btree: pages with obsolete inline values",
   "btree: row-store empty values",
   "btree: row-store internal pages",
   "btree: row-store leaf page recent average entries (EWMA), or UINT64_MAX if never tracked and "
@@ -598,7 +602,11 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
     stats->btree_maxleafvalue = 0;
     stats->btree_maximum_depth = 0;
     stats->btree_entries = 0;
+    stats->btree_obsolete_inline_bytes = 0;
+    stats->btree_obsolete_inline_bytes_mixed = 0;
     stats->btree_overflow = 0;
+    stats->btree_obsolete_inline_analyzed = 0;
+    stats->btree_obsolete_inline_pages = 0;
     stats->btree_row_empty_values = 0;
     stats->btree_row_internal = 0;
     stats->btree_row_leaf_avg_entries = 0;
@@ -1075,7 +1083,11 @@ __wt_stat_dsrc_aggregate_single(WT_DSRC_STATS *from, WT_DSRC_STATS *to)
     if (from->btree_maximum_depth > to->btree_maximum_depth)
         to->btree_maximum_depth = from->btree_maximum_depth;
     to->btree_entries += from->btree_entries;
+    to->btree_obsolete_inline_bytes += from->btree_obsolete_inline_bytes;
+    to->btree_obsolete_inline_bytes_mixed += from->btree_obsolete_inline_bytes_mixed;
     to->btree_overflow += from->btree_overflow;
+    to->btree_obsolete_inline_analyzed += from->btree_obsolete_inline_analyzed;
+    to->btree_obsolete_inline_pages += from->btree_obsolete_inline_pages;
     to->btree_row_empty_values += from->btree_row_empty_values;
     to->btree_row_internal += from->btree_row_internal;
     to->btree_row_leaf_avg_entries += from->btree_row_leaf_avg_entries;
@@ -1588,7 +1600,12 @@ __wt_stat_dsrc_aggregate(WT_DSRC_STATS **from, WT_DSRC_STATS *to)
     if ((v = WT_STAT_DSRC_READ(from, btree_maximum_depth)) > to->btree_maximum_depth)
         to->btree_maximum_depth = v;
     to->btree_entries += WT_STAT_DSRC_READ(from, btree_entries);
+    to->btree_obsolete_inline_bytes += WT_STAT_DSRC_READ(from, btree_obsolete_inline_bytes);
+    to->btree_obsolete_inline_bytes_mixed +=
+      WT_STAT_DSRC_READ(from, btree_obsolete_inline_bytes_mixed);
     to->btree_overflow += WT_STAT_DSRC_READ(from, btree_overflow);
+    to->btree_obsolete_inline_analyzed += WT_STAT_DSRC_READ(from, btree_obsolete_inline_analyzed);
+    to->btree_obsolete_inline_pages += WT_STAT_DSRC_READ(from, btree_obsolete_inline_pages);
     to->btree_row_empty_values += WT_STAT_DSRC_READ(from, btree_row_empty_values);
     to->btree_row_internal += WT_STAT_DSRC_READ(from, btree_row_internal);
     to->btree_row_leaf_avg_entries += WT_STAT_DSRC_READ(from, btree_row_leaf_avg_entries);

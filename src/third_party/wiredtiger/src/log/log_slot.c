@@ -182,11 +182,10 @@ retry:
     __wt_atomic_add_uint32(&slot->slot_end_lsn.l.offset, (uint32_t)end_offset);
     WT_STAT_CONN_INCRV(session, log_slot_consolidated, end_offset);
     /*
-     * XXX Would like to change so one piece of code advances the LSN.
+     * FIXME-WT-18493 Would like to change so one piece of code advances the LSN.
      */
     WT_ASSIGN_LSN(&log->alloc_lsn, &slot->slot_end_lsn);
-    WT_ASSERT(
-      session, log->alloc_lsn.l.file >= __wt_atomic_load_uint32_relaxed(&log->write_lsn.l.file));
+    WT_ASSERT(session, __wt_lsn_file(&log->alloc_lsn) >= __wt_lsn_file(&log->write_lsn));
     return (0);
 }
 

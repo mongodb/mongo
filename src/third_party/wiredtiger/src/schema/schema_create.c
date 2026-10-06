@@ -360,6 +360,13 @@ __create_file(
             WT_ERR(__wt_import_repair(session, uri, &fileconf));
         }
 
+        /*
+         * Imported configuration bypasses API configuration checks, check it before it reaches the
+         * metadata.
+         */
+        if (import)
+            WT_ERR(__wt_config_check(session, WT_CONFIG_REF(session, file_meta), fileconf, 0));
+
         /* Strip any configuration settings that should not be persisted. */
         filecfg[1] = fileconf;
         filecfg[2] = NULL;

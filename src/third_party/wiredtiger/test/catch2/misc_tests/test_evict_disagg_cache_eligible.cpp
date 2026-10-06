@@ -76,6 +76,7 @@ struct eligibility_fixture {
     /* Value-initialized, so every field the gate does not care about reads as zero. */
     WT_DATA_HANDLE dhandle{};
     WT_BTREE btree{};
+    WT_KEYED_ENCRYPTOR kencryptor{};
     WT_BM bm{};
     WT_BLOCK_DISAGG block_disagg{};
     WT_PAGE_LOG_HANDLE plhandle{};
@@ -213,6 +214,9 @@ provoke(eligibility_fixture &f, WTI_EVICT_VICTIM_REASON reason)
         break;
     case WTI_EVICT_VICTIM_COLD_TIER:
         f.btree.storage_tier = WT_BTREE_STORAGE_TIER_COLD;
+        break;
+    case WTI_EVICT_VICTIM_ENCRYPTED:
+        f.btree.kencryptor = &f.kencryptor;
         break;
     case WTI_EVICT_VICTIM_COUNT:
         /* Not a reason; the loop below never reaches it. */

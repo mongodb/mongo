@@ -314,13 +314,29 @@ __reconcile_post_wrapup(
 
 /*
  * __rec_timeline_publish --
- *     Stamp a reconciliation as finished. Eviction reports these timings after reconciliation
- *     returns, and does so whether or not it succeeded.
+ *     Stamp a reconciliation as finished, and warn if it took more than a minute. Eviction reports
+ *     these timings after reconciliation returns, and does so whether or not it succeeded.
  */
-static WT_INLINE void
-__rec_timeline_publish(WT_SESSION_IMPL *session, WT_RECONCILE_TIMELINE *timeline)
+static void
+__rec_timeline_publish(WT_SESSION_IMPL *session, WT_RECONCILE_TIMELINE *timeline, uint32_t flags)
 {
     timeline->reconcile_finish = __wt_clock(session);
+
+    uint64_t rec_us = WT_CLOCKDIFF_US(timeline->reconcile_finish, timeline->reconcile_start);
+    if (rec_us <= WT_MINUTE * WT_MILLION)
+        return;
+
+    const char *operation = "Reconciliation";
+    if (LF_ISSET(WT_REC_EVICT))
+        operation = "Eviction";
+    else if (LF_ISSET(WT_REC_CHECKPOINT))
+        operation = "Checkpoint";
+    uint64_t build_us = WT_CLOCKDIFF_US(timeline->image_build_finish, timeline->image_build_start);
+    uint64_t hs_wrapup_us = WT_CLOCKDIFF_US(timeline->hs_wrapup_finish, timeline->hs_wrapup_start);
+    __wt_verbose_warning(session, WT_VERB_RECONCILE,
+      "%s took more than 1 minute (%" PRIu64 "us) reconciling %s. Building disk image took %" PRIu64
+      "us. History store wrapup took %" PRIu64 "us.",
+      operation, rec_us, S2BT(session)->dhandle->name, build_us, hs_wrapup_us);
 }
 
 /*
@@ -463,7 +479,7 @@ __reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage, u
         WT_IGNORE_RET(__reconcile_post_wrapup(session, r, page, flags, page_lockedp));
 
         /* Publish what was measured before the failure; stale timings are worse than partial. */
-        __rec_timeline_publish(session, timeline);
+        __rec_timeline_publish(session, timeline, flags);
 
         /*
          * This return statement covers non-panic error scenarios; any failure beyond this point is
@@ -500,7 +516,7 @@ __reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage, u
             goto err;
 
         /* The nested root write measured a different page; report this one. */
-        __rec_timeline_publish(session, timeline);
+        __rec_timeline_publish(session, timeline, flags);
         return (0);
     }
 
@@ -515,7 +531,7 @@ __reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage, u
      * Track the longest reconciliation and time spent in each reconciliation stage, ignoring races
      * (it's just a statistic).
      */
-    __rec_timeline_publish(session, timeline);
+    __rec_timeline_publish(session, timeline, flags);
 
     rec_hs_wrapup = WT_CLOCKDIFF_MS(timeline->hs_wrapup_finish, timeline->hs_wrapup_start);
     rec_img_build = WT_CLOCKDIFF_MS(timeline->image_build_finish, timeline->image_build_start);
@@ -1332,8 +1348,6 @@ __wti_rec_split_init(
         r->space_avail = r->page_size - WT_PAGE_HEADER_WRITE_SIZE(btree);
     } else {
         r->split_size = __wt_split_page_size(btree->split_pct, r->page_size, btree->allocsize);
-        /* FIXME-WT-14881: Temporary hack to ensure we don't run out of space when rewriting deltas.
-         */
         r->space_avail = r->split_size - WT_PAGE_HEADER_WRITE_SIZE(btree);
         r->min_split_size =
           __wt_split_page_size(WT_BTREE_MIN_SPLIT_PCT, r->page_size, btree->allocsize);
@@ -1352,7 +1366,6 @@ __wti_rec_split_init(
      */
     corrected_page_size = r->page_size;
     WT_RET(bm->write_size(bm, session, &corrected_page_size));
-    /* FIXME-WT-14881: Temporary hack to ensure we don't run out of space when rewriting deltas. */
     r->disk_img_buf_size = WT_ALIGN(WT_MAX(corrected_page_size, r->split_size), btree->allocsize);
 
     /* Initialize the first split chunk. */

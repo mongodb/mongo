@@ -1843,6 +1843,9 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
             /* Other operations don't need timestamps. */
             break;
         case WT_TXN_OP_FOLLOWER_TRUNCATE:
+            /* Apply the timestamp rules to a truncate recorded as a range. */
+            WT_ERR(__wt_txn_timestamp_usage_check(
+              session, op->btree, txn->time_point.commit_timestamp, WT_TS_NONE));
             __wti_mark_committed_truncate_table(session, op);
             break;
         }

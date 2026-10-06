@@ -517,7 +517,7 @@ __verify_one_checkpoint(
             ckpt->size = vs->total_block_size;
             vs->size_fixed = true;
         } else {
-            __wt_verbose_warning(session, WT_VERB_VERIFY,
+            __wt_verbose_level_id(session, 1881000, WT_VERB_VERIFY, WT_VERBOSE_WARNING,
               "checkpoint size %" PRIu64 " does not match accumulated block size %" PRIu64,
               ckpt->size, vs->total_block_size);
 #ifdef HAVE_DIAGNOSTIC

@@ -89,6 +89,7 @@ typedef enum {
     WTI_EVICT_VICTIM_CACHE_UNAVAILABLE, /* The page log's cache is not currently accepting puts. */
     WTI_EVICT_VICTIM_CHECKPOINT_CURSOR, /* The btree is open under a checkpoint cursor. */
     WTI_EVICT_VICTIM_COLD_TIER,         /* Cold collections must not displace hot pages. */
+    WTI_EVICT_VICTIM_ENCRYPTED,         /* The cached image would not be encrypted. */
     WTI_EVICT_VICTIM_INVALID_PAGE_ID,   /* The block metadata holds no valid page id. */
     WTI_EVICT_VICTIM_NO_BLOCK_MANAGER,  /* The btree has no disaggregated block manager. */
     WTI_EVICT_VICTIM_NO_DISAGG_INFO,    /* The page carries no disaggregated block metadata. */

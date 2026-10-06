@@ -28,7 +28,7 @@
 #
 # Error conditions when trying to import files.
 
-import os, shutil
+import os, re, shutil
 import wiredtiger
 from test_import01 import test_import_base
 
@@ -139,3 +139,32 @@ class test_import02(test_import_base):
         # We should get an error back.
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.create(self.uri, import_config), '/No such file or directory/')
+
+    def test_file_import_invalid_metadata(self):
+        self.session.create(self.uri, self.create_config)
+        self.session.checkpoint()
+
+        # Export the metadata with a value that would be rejected by a regular create.
+        c = self.session.open_cursor('metadata:', None, None)
+        original_db_file_config = re.sub(r'split_pct=\d+', 'split_pct=4294967296', c[self.uri])
+        c.close()
+
+        self.close_conn()
+        newdir = 'IMPORT_DB'
+        shutil.rmtree(newdir, ignore_errors=True)
+        os.mkdir(newdir)
+        self.conn = self.setUpConnectionOpen(newdir)
+        self.session = self.setUpSessionOpen(self.conn)
+        self.copy_file(self.original_db_file, '.', newdir)
+
+        import_config = 'import=(enabled,repair=false,file_metadata=(' + \
+            original_db_file_config + '))'
+
+        # The import fails the same way a create would, and leaves no metadata behind.
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.create(self.uri, import_config),
+            '/Value too large for key .split_pct./')
+        c = self.session.open_cursor('metadata:', None, None)
+        c.set_key(self.uri)
+        self.assertEqual(c.search(), wiredtiger.WT_NOTFOUND)
+        c.close()

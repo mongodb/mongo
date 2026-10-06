@@ -11,10 +11,6 @@ race:src/support/stat.c
 # around usages of these functions.
 race:__wt_tsan_suppress_*
 
-# FIXME-WT-16301 __log_newfile mutates log manager state (log->fileid, alloc_lsn) without synchronizing
-# with concurrent readers such as __compute_min_lognum and __log_fsync_file.
-race:__log_newfile
-
 # __disagg_deferred_ckpt_queued is intentionally unsafe to avoid taking the deferred checkpoint queue
 # lock: a stale answer only delays the pickup server's next look at the queue.
 race:__disagg_deferred_ckpt_queued
