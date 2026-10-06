@@ -213,46 +213,6 @@ struct AddAggsAvgInputs : public AccumInputs {
     SbExpr count;
 };
 
-struct AddCovarianceInputs : public AccumInputs {
-    AddCovarianceInputs(SbExpr covarianceX, SbExpr covarianceY)
-        : covarianceX(std::move(covarianceX)), covarianceY(std::move(covarianceY)) {}
-
-    AccumInputsPtr clone() const final;
-
-    SbExpr covarianceX;
-    SbExpr covarianceY;
-};
-
-struct AddRankInputs : public AccumInputs {
-    AddRankInputs(SbExpr inputExpr, SbExpr isAscending)
-        : inputExpr(std::move(inputExpr)), isAscending(std::move(isAscending)) {}
-
-    AccumInputsPtr clone() const final;
-
-    SbExpr inputExpr;
-    SbExpr isAscending;
-};
-
-struct AddIntegralInputs : public AccumInputs {
-    AddIntegralInputs(SbExpr inputExpr, SbExpr sortBy)
-        : inputExpr(std::move(inputExpr)), sortBy(std::move(sortBy)) {}
-
-    AccumInputsPtr clone() const final;
-
-    SbExpr inputExpr;
-    SbExpr sortBy;
-};
-
-struct AddLinearFillInputs : public AccumInputs {
-    AddLinearFillInputs(SbExpr inputExpr, SbExpr sortBy)
-        : inputExpr(std::move(inputExpr)), sortBy(std::move(sortBy)) {}
-
-    AccumInputsPtr clone() const final;
-
-    SbExpr inputExpr;
-    SbExpr sortBy;
-};
-
 struct AddTopBottomNInputs : public AccumInputs {
     AddTopBottomNInputs(SbExpr value, SbExpr sortBy, SbExpr sortSpec)
         : value(std::move(value)), sortBy(std::move(sortBy)), sortSpec(std::move(sortSpec)) {}
@@ -293,64 +253,12 @@ struct InitAccumNInputs : public AccumInputs {
     SbExpr isGroupAccum;
 };
 
-struct InitExpMovingAvgInputs : public AccumInputs {
-    InitExpMovingAvgInputs(SbExpr inputExpr) : inputExpr(std::move(inputExpr)) {}
-
-    AccumInputsPtr clone() const final;
-
-    SbExpr inputExpr;
-};
-
-struct InitIntegralInputs : public AccumInputs {
-    InitIntegralInputs(SbExpr inputExpr) : inputExpr(std::move(inputExpr)) {}
-
-    AccumInputsPtr clone() const final;
-
-    SbExpr inputExpr;
-};
-
 struct FinalizeTopBottomNInputs : public AccumInputs {
     FinalizeTopBottomNInputs(SbExpr sortSpec) : sortSpec(std::move(sortSpec)) {}
 
     AccumInputsPtr clone() const final;
 
     SbExpr sortSpec;
-};
-
-struct FinalizeDerivativeInputs : public AccumInputs {
-    FinalizeDerivativeInputs(
-        SbExpr unit, SbExpr inputFirst, SbExpr sortByFirst, SbExpr inputLast, SbExpr sortByLast)
-        : unit(std::move(unit)),
-          inputFirst(std::move(inputFirst)),
-          sortByFirst(std::move(sortByFirst)),
-          inputLast(std::move(inputLast)),
-          sortByLast(std::move(sortByLast)) {}
-
-    AccumInputsPtr clone() const final;
-
-    SbExpr unit;
-    SbExpr inputFirst;
-    SbExpr sortByFirst;
-    SbExpr inputLast;
-    SbExpr sortByLast;
-};
-
-struct FinalizeLinearFillInputs : public AccumInputs {
-    FinalizeLinearFillInputs(SbExpr sortBy) : sortBy(std::move(sortBy)) {}
-
-    AccumInputsPtr clone() const final;
-
-    SbExpr sortBy;
-};
-
-struct FinalizeWindowFirstLastInputs : public AccumInputs {
-    FinalizeWindowFirstLastInputs(SbExpr inputExpr, SbExpr defaultVal)
-        : inputExpr(std::move(inputExpr)), defaultVal(std::move(defaultVal)) {}
-
-    AccumInputsPtr clone() const final;
-
-    SbExpr inputExpr;
-    SbExpr defaultVal;
 };
 
 struct CombineAggsTopBottomNInputs : public AccumInputs {

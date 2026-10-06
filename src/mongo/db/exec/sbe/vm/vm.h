@@ -185,123 +185,14 @@ enum AggStdDevValueElems {
 };
 
 /**
- * This enum defines indices into an 'Array' that store state for rank expressions.
- *
- * The array contains three elements:
- * - The element at index `kLastValue` is the last value.
- * - The element at index `kLastValueIsNothing` is true if the last value is nothing.
- * - The element at index `kLastRank` is the rank of the last value.
- * - The element at index `kSameRankCount` is how many values are of the same rank as the last
- * value.
- * - The element at index `kSortSpec` is the sort spec object used to generate sort key for adjacent
- * value comparison.
- */
-enum AggRankElems {
-    kLastValue,
-    kLastValueIsNothing,
-    kLastRank,
-    kSameRankCount,
-    kSortSpec,
-    kRankArraySize
-};
-
-/**
  * This enum defines indices into an 'Array' that returns the result of accumulators that track the
  * size of accumulated values, such as 'addToArrayCapped' and 'addToSetCapped'.
  */
 enum class AggArrayWithSize { kValues = 0, kSizeOfValues, kLast = kSizeOfValues + 1 };
 
 /**
- * This enum defines indices into an 'Array' that stores the state for $expMovingAvg accumulator
- */
-enum class AggExpMovingAvgElems { kResult, kAlpha, kIsDecimal, kSizeOfArray };
-
-/**
- * This enum defines indices into an 'Array' that stores the state for $sum window function
- * accumulator. Index `kSumAcc` stores the accumulator state of aggDoubleDoubleSum. Rest of the
- * indices store respective count of values encountered.
- */
-enum class AggRemovableSumElems {
-    kSumAcc,
-    kNanCount,
-    kPosInfinityCount,
-    kNegInfinityCount,
-    kDoubleCount,
-    kDecimalCount,
-    kSizeOfArray
-};
-
-/**
- * This enum defines indices into an 'Array' that stores the state for $integral accumulator
- * Element at `kInputQueue` stores the queue of input values
- * Element at `kSortByQueue` stores the queue of sortBy values
- * Element at `kIntegral` stores the integral over the current window
- * Element at `kNanCount` stores the count of NaN values encountered
- * Element at `kunitMillis` stores the date unit (Null if not valid)
- * Element at `kIsNonRemovable` stores whether it belongs to a non-removable window
- */
-enum class AggIntegralElems {
-    kInputQueue,
-    kSortByQueue,
-    kIntegral,
-    kNanCount,
-    kUnitMillis,
-    kIsNonRemovable,
-    kMaxSizeOfArray
-};
-
-/**
- * This enum defines indices into an 'Array' that stores the state for $derivative accumulator
- * Element at `kInputQueue` stores the queue of input values
- * Element at `kSortByQueue` stores the queue of sortBy values
- * Element at `kunitMillis` stores the date unit (Null if not valid)
- */
-enum class AggDerivativeElems { kInputQueue, kSortByQueue, kUnitMillis, kMaxSizeOfArray };
-
-/**
- * This enum defines indices into an 'Array' that stores the state for a queue backed by a
- * circular array
- * Element at `kArray` stores the underlying array thats holds the elements. This should be
- * initialized to a non-zero size initially.
- * Element at `kStartIdx` stores the start position of the queue
- * Element at `kQueueSize` stores the size of the queue
- * The empty values in the array are filled with Null
- */
-enum class ArrayQueueElems { kArray, kStartIdx, kQueueSize, kSizeOfArray };
-
-/**
- * This enum defines indices into an 'Array' that store state for the removable
- * $covarianceSamp/$covariancePop expressions.
- */
-enum class AggCovarianceElems { kSumX, kSumY, kCXY, kCount, kSizeOfArray };
-
-/**
- * This enum defines indices into an 'Array' that store state for the removable
- * $stdDevSamp/$stdDevPop expressions.
- */
-enum class AggRemovableStdDevElems { kSum, kM2, kCount, kNonFiniteCount, kSizeOfArray };
-
-/**
- * This enum defines indices into an `Array` that store state for $linearFill
- * X, Y refers to sortby field and input field respectively
- * At any time, (X1, Y1) and (X2, Y2) defines two end-points with non-null input values
- * with zero or more null input values in between. Count stores the number of values left
- * till (X2, Y2). Initially it is equal to number of values between (X1, Y1) and (X2, Y2),
- * exclusive of first and inclusive of latter. It is decremented after each finalize call,
- * till this segment is exhausted and after which we find next segement(new (X2, Y2)
- * while (X1, Y1) is set to previous (X2, Y2))
- */
-enum class AggLinearFillElems { kX1, kY1, kX2, kY2, kPrevX, kCount, kSizeOfArray };
-
-/**
- * This enum defines indices into an 'Array' that store state for $firstN/$lastN
- * window functions
- */
-enum class AggFirstLastNElems { kQueue, kN, kSizeOfArray };
-
-/**
  * This enum defines indices into an 'Array' that store state for $minN/$maxN/$topN/$bottomN
- * window functions.
+ * accumulators.
  * Element at `kValues` stores the accmulator data structure with the elements
  * Element at `kN` stores an integer with the number of values minN/maxN should return
  * Element at `kMemUsage`stores the size of the multiset in bytes
@@ -413,8 +304,6 @@ public:
     }
 
     static std::pair<value::TypeTags, value::Value> genericInitializeDoubleDoubleSumState();
-    static std::tuple<value::Array*, int64_t, int64_t, int64_t, int64_t, int64_t>
-    genericRemovableSumState(value::Array* state);
     static void genericResetDoubleDoubleSumState(value::Array* state);
 
     /**
@@ -932,86 +821,6 @@ private:
     template <AccumulatorMinMaxN::MinMaxSense S>
     value::TagValueMaybeOwned builtinAggMinMaxNFinalize(ArityType arity);
 
-    value::TagValueMaybeOwned builtinAggRank(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRankColl(ArityType arity);
-    value::TagValueMaybeOwned builtinAggDenseRank(ArityType arity);
-    value::TagValueMaybeOwned builtinAggDenseRankColl(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRankFinalize(ArityType arity);
-    value::TagValueMaybeOwned builtinAggExpMovingAvg(ArityType arity);
-    value::TagValueOwned builtinAggExpMovingAvgFinalize(ArityType arity);
-    template <int sign>
-    value::TagValueMaybeOwned builtinAggRemovableSum(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRemovableSumFinalize(ArityType arity);
-    template <int sign>
-    void aggRemovableSumImpl(value::Array* state, value::TypeTags rhsTag, value::Value rhsVal);
-    value::TagValueMaybeOwned aggRemovableSumFinalizeImpl(value::Array* state);
-    template <class T, int sign>
-    void updateRemovableSumAccForIntegerType(value::Array* sumAcc,
-                                             value::TypeTags rhsTag,
-                                             value::Value rhsVal);
-    value::TagValueMaybeOwned builtinAggIntegralInit(ArityType arity);
-    value::TagValueMaybeOwned builtinAggIntegralAdd(ArityType arity);
-    value::TagValueMaybeOwned builtinAggIntegralRemove(ArityType arity);
-    value::TagValueMaybeOwned builtinAggIntegralFinalize(ArityType arity);
-    value::TagValueMaybeOwned integralOfTwoPointsByTrapezoidalRule(
-        value::TagValueView prevInput,
-        value::TagValueView prevSortByVal,
-        value::TagValueView newInput,
-        value::TagValueView newSortByVal);
-    value::TagValueMaybeOwned builtinAggDerivativeFinalize(ArityType arity);
-    value::TagValueMaybeOwned aggRemovableAvgFinalizeImpl(value::Array* sumState, int64_t count);
-    value::TagValueMaybeOwned builtinAggCovarianceAdd(ArityType arity);
-    value::TagValueMaybeOwned builtinAggCovarianceRemove(ArityType arity);
-    value::TagValueMaybeOwned builtinAggCovarianceFinalize(ArityType arity, bool isSamp);
-    value::TagValueMaybeOwned builtinAggCovarianceSampFinalize(ArityType arity);
-    value::TagValueMaybeOwned builtinAggCovariancePopFinalize(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRemovablePushAdd(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRemovablePushRemove(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRemovablePushFinalize(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRemovableConcatArraysInit(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRemovableConcatArraysAdd(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRemovableConcatArraysRemove(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRemovableConcatArraysFinalize(ArityType arity);
-    template <int quantity>
-    void aggRemovableStdDevImpl(value::TagValueView state, value::TagValueView input);
-    value::TagValueMaybeOwned builtinAggRemovableStdDevAdd(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRemovableStdDevRemove(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRemovableStdDevFinalize(ArityType arity, bool isSamp);
-    value::TagValueMaybeOwned builtinAggRemovableStdDevSampFinalize(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRemovableStdDevPopFinalize(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRemovableAvgFinalize(ArityType arity);
-    value::TagValueMaybeOwned builtinAggFirstLastNInit(ArityType arity);
-    value::TagValueMaybeOwned builtinAggFirstLastNAdd(ArityType arity);
-    value::TagValueMaybeOwned builtinAggFirstLastNRemove(ArityType arity);
-    template <AccumulatorFirstLastN::Sense S>
-    value::TagValueMaybeOwned builtinAggFirstLastNFinalize(ArityType arity);
-    value::TagValueMaybeOwned builtinAggLinearFillCanAdd(ArityType arity);
-    value::TagValueMaybeOwned builtinAggLinearFillAdd(ArityType arity);
-    value::TagValueMaybeOwned builtinAggLinearFillFinalize(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRemovableSetCommonInit(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRemovableSetCommonCollInit(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRemovableAddToSetAdd(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRemovableAddToSetRemove(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRemovableSetUnionAdd(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRemovableSetUnionRemove(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRemovableSetCommonFinalize(ArityType arity);
-    value::TagValueMaybeOwned aggRemovableMinMaxNInitImpl(CollatorInterface* collator);
-    value::TagValueMaybeOwned builtinAggRemovableMinMaxNCollInit(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRemovableMinMaxNInit(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRemovableMinMaxNAdd(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRemovableMinMaxNRemove(ArityType arity);
-    template <AccumulatorMinMaxN::MinMaxSense S>
-    value::TagValueMaybeOwned builtinAggRemovableMinMaxNFinalize(ArityType arity);
-    value::TagValueMaybeOwned linearFillInterpolate(value::TagValueView x1,
-                                                    value::TagValueView y1,
-                                                    value::TagValueView x2,
-                                                    value::TagValueView y2,
-                                                    value::TagValueView x);
-    value::TagValueMaybeOwned builtinAggRemovableTopBottomNInit(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRemovableTopBottomNAdd(ArityType arity);
-    value::TagValueMaybeOwned builtinAggRemovableTopBottomNRemove(ArityType arity);
-    template <TopBottomSense>
-    value::TagValueMaybeOwned builtinAggRemovableTopBottomNFinalize(ArityType arity);
 
     // Block builtins
 

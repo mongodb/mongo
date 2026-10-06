@@ -13,10 +13,8 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/db/pipeline/accumulator.h"
-#include "mongo/db/pipeline/accumulator_for_window_functions.h"
 #include "mongo/db/pipeline/accumulator_multi.h"
 #include "mongo/db/pipeline/expression.h"
-#include "mongo/db/pipeline/window_function/window_function_expression.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr.h"
@@ -45,22 +43,6 @@ AccumInputsPtr AddAggsAvgInputs::clone() const {
     return std::make_unique<AddAggsAvgInputs>(inputExpr.clone(), count.clone());
 }
 
-AccumInputsPtr AddCovarianceInputs::clone() const {
-    return std::make_unique<AddCovarianceInputs>(covarianceX.clone(), covarianceY.clone());
-}
-
-AccumInputsPtr AddRankInputs::clone() const {
-    return std::make_unique<AddRankInputs>(inputExpr.clone(), isAscending.clone());
-}
-
-AccumInputsPtr AddIntegralInputs::clone() const {
-    return std::make_unique<AddIntegralInputs>(inputExpr.clone(), sortBy.clone());
-}
-
-AccumInputsPtr AddLinearFillInputs::clone() const {
-    return std::make_unique<AddLinearFillInputs>(inputExpr.clone(), sortBy.clone());
-}
-
 AccumInputsPtr AddTopBottomNInputs::clone() const {
     return std::make_unique<AddTopBottomNInputs>(value.clone(), sortBy.clone(), sortSpec.clone());
 }
@@ -86,32 +68,8 @@ AccumInputsPtr InitAccumNInputs::clone() const {
     return std::make_unique<InitAccumNInputs>(maxSize.clone(), isGroupAccum.clone());
 }
 
-AccumInputsPtr InitExpMovingAvgInputs::clone() const {
-    return std::make_unique<InitExpMovingAvgInputs>(inputExpr.clone());
-}
-
-AccumInputsPtr InitIntegralInputs::clone() const {
-    return std::make_unique<InitIntegralInputs>(inputExpr.clone());
-}
-
 AccumInputsPtr FinalizeTopBottomNInputs::clone() const {
     return std::make_unique<FinalizeTopBottomNInputs>(sortSpec.clone());
-}
-
-AccumInputsPtr FinalizeDerivativeInputs::clone() const {
-    return std::make_unique<FinalizeDerivativeInputs>(unit.clone(),
-                                                      inputFirst.clone(),
-                                                      sortByFirst.clone(),
-                                                      inputLast.clone(),
-                                                      sortByLast.clone());
-}
-
-AccumInputsPtr FinalizeLinearFillInputs::clone() const {
-    return std::make_unique<FinalizeLinearFillInputs>(sortBy.clone());
-}
-
-AccumInputsPtr FinalizeWindowFirstLastInputs::clone() const {
-    return std::make_unique<FinalizeWindowFirstLastInputs>(inputExpr.clone(), defaultVal.clone());
 }
 
 AccumInputsPtr CombineAggsTopBottomNInputs::clone() const {
@@ -1335,264 +1293,6 @@ SbExpr buildFinalizeMinMaxN(const AccumOp& acc,
     }
 }
 
-SbExpr::Vector buildAccumAggsCovariance(const AccumOp& acc,
-                                        std::unique_ptr<AddCovarianceInputs> inputs,
-                                        StageBuilderState& state) {
-    auto argX = std::move(inputs->covarianceX);
-    auto argY = std::move(inputs->covarianceY);
-
-    SbExprBuilder b(state);
-
-    return SbExpr::makeSeq(
-        b.makeFunction(sbe::EFn::kAggCovarianceAdd, std::move(argX), std::move(argY)));
-}
-
-SbExpr buildFinalizeCovarianceSamp(const AccumOp& acc,
-                                   StageBuilderState& state,
-                                   const SbSlotVector& slots) {
-    SbExprBuilder b(state);
-
-    tassert(7820814, "Incorrect number of arguments", slots.size() == 1);
-    SbExpr::Vector exprs;
-    for (auto slot : slots) {
-        exprs.push_back(slot);
-    }
-    return b.makeFunction(sbe::EFn::kAggCovarianceSampFinalize, std::move(exprs));
-}
-
-SbExpr buildFinalizeCovariancePop(const AccumOp& acc,
-                                  StageBuilderState& state,
-                                  const SbSlotVector& slots) {
-    SbExprBuilder b(state);
-
-    tassert(7820815, "Incorrect number of arguments", slots.size() == 1);
-    SbExpr::Vector exprs;
-    for (auto slot : slots) {
-        exprs.push_back(slot);
-    }
-    return b.makeFunction(sbe::EFn::kAggCovariancePopFinalize, std::move(exprs));
-}
-
-SbExpr::Vector buildInitializeExpMovingAvg(const AccumOp& acc,
-                                           std::unique_ptr<InitExpMovingAvgInputs> inputs,
-                                           StageBuilderState& state) {
-    SbExprBuilder b(state);
-
-    auto alphaExpr = std::move(inputs->inputExpr);
-
-    return SbExpr::makeSeq(b.makeFunction(sbe::EFn::kNewArray,
-                                          b.makeNullConstant(),
-                                          std::move(alphaExpr),
-                                          b.makeBoolConstant(false)));
-}
-
-SbExpr::Vector buildAccumAggsExpMovingAvg(const AccumOp& acc,
-                                          std::unique_ptr<AddSingleInput> inputs,
-                                          StageBuilderState& state) {
-    SbExprBuilder b(state);
-    return SbExpr::makeSeq(
-        b.makeFunction(sbe::EFn::kAggExpMovingAvg, std::move(inputs->inputExpr)));
-}
-
-SbExpr buildFinalizeExpMovingAvg(const AccumOp& acc,
-                                 StageBuilderState& state,
-                                 const SbSlotVector& slots) {
-    SbExprBuilder b(state);
-    tassert(7996802, "Incorrect number of arguments", slots.size() == 1);
-    return b.makeFunction(sbe::EFn::kAggExpMovingAvgFinalize, slots[0]);
-}
-
-SbExpr::Vector buildAccumAggsLocf(const AccumOp& acc,
-                                  std::unique_ptr<AddSingleInput> inputs,
-                                  StageBuilderState& state) {
-    SbExprBuilder b(state);
-
-    auto frameId = state.frameIdGenerator->generate();
-    auto binds = SbExpr::makeSeq(std::move(inputs->inputExpr));
-    auto var = SbVar{frameId, 0};
-
-    auto e =
-        b.makeIf(b.generateNullMissingOrUndefined(var), b.makeFunction(sbe::EFn::kAggState), var);
-
-    auto localBind = b.makeLet(frameId, std::move(binds), std::move(e));
-
-    return SbExpr::makeSeq(std::move(localBind));
-}
-
-SbExpr::Vector buildAccumAggsDocumentNumber(const AccumOp& acc,
-                                            std::unique_ptr<AddSingleInput> inputs,
-                                            StageBuilderState& state) {
-    SbExprBuilder b(state);
-    return SbExpr::makeSeq(b.makeFunction(sbe::EFn::kSum, b.makeInt64Constant(1)));
-}
-
-SbExpr::Vector buildAccumAggsRankImpl(const sbe::EFn rankFuncName,
-                                      const sbe::EFn collRankFuncName,
-                                      const AccumOp& acc,
-                                      SbExpr input,
-                                      SbExpr sortOrder,
-                                      StageBuilderState& state) {
-    SbExprBuilder b(state);
-
-    auto collatorSlot = state.getCollatorSlot();
-
-    if (collatorSlot) {
-        return SbExpr::makeSeq(b.makeFunction(
-            collRankFuncName, std::move(input), std::move(sortOrder), SbVar{*collatorSlot}));
-    } else {
-        return SbExpr::makeSeq(
-            b.makeFunction(rankFuncName, std::move(input), std::move(sortOrder)));
-    }
-}
-
-SbExpr::Vector buildAccumAggsRank(const AccumOp& acc,
-                                  std::unique_ptr<AddRankInputs> inputs,
-                                  StageBuilderState& state) {
-    auto input = std::move(inputs->inputExpr);
-    auto sortOrder = std::move(inputs->isAscending);
-
-    return buildAccumAggsRankImpl(sbe::EFn::kAggRank,
-                                  sbe::EFn::kAggRankColl,
-                                  acc,
-                                  std::move(input),
-                                  std::move(sortOrder),
-                                  state);
-}
-
-SbExpr buildFinalizeRank(const AccumOp& acc, StageBuilderState& state, const SbSlotVector& slots) {
-    SbExprBuilder b(state);
-
-    tassert(7996805, "Incorrect number of arguments", slots.size() == 1);
-    return b.makeFunction(sbe::EFn::kAggRankFinalize, slots[0]);
-}
-
-SbExpr::Vector buildAccumAggsDenseRank(const AccumOp& acc,
-                                       std::unique_ptr<AddRankInputs> inputs,
-                                       StageBuilderState& state) {
-    auto input = std::move(inputs->inputExpr);
-    auto sortOrder = std::move(inputs->isAscending);
-
-    return buildAccumAggsRankImpl(sbe::EFn::kAggDenseRank,
-                                  sbe::EFn::kAggDenseRankColl,
-                                  acc,
-                                  std::move(input),
-                                  std::move(sortOrder),
-                                  state);
-}
-
-SbExpr::Vector buildInitializeIntegral(const AccumOp& acc,
-                                       std::unique_ptr<InitIntegralInputs> inputs,
-                                       StageBuilderState& state) {
-    SbExprBuilder b(state);
-
-    auto unitExpr = std::move(inputs->inputExpr);
-
-    return SbExpr::makeSeq(
-        b.makeFunction(sbe::EFn::kAggIntegralInit, std::move(unitExpr), b.makeBoolConstant(true)));
-}
-
-SbExpr::Vector buildAccumAggsIntegral(const AccumOp& acc,
-                                      std::unique_ptr<AddIntegralInputs> inputs,
-                                      StageBuilderState& state) {
-    auto input = std::move(inputs->inputExpr);
-    auto sortBy = std::move(inputs->sortBy);
-
-    SbExprBuilder b(state);
-
-    return SbExpr::makeSeq(
-        b.makeFunction(sbe::EFn::kAggIntegralAdd, std::move(input), std::move(sortBy)));
-}
-
-SbExpr buildFinalizeIntegral(const AccumOp& acc,
-                             StageBuilderState& state,
-                             const SbSlotVector& slots) {
-    SbExprBuilder b(state);
-
-    tassert(7996809, "Incorrect number of arguments", slots.size() == 1);
-    return b.makeFunction(sbe::EFn::kAggIntegralFinalize, slots[0]);
-}
-
-SbExpr::Vector buildAccumAggsDerivative(const AccumOp& acc, StageBuilderState& state) {
-    SbExprBuilder b(state);
-    return SbExpr::makeSeq(b.makeFunction(sbe::EFn::kSum, b.makeInt64Constant(1)));
-}
-
-SbExpr buildFinalizeDerivative(const AccumOp& acc,
-                               std::unique_ptr<FinalizeDerivativeInputs> inputs,
-                               StageBuilderState& state,
-                               const SbSlotVector& slots) {
-    SbExprBuilder b(state);
-
-    tassert(8085504, "Expected a single slot", slots.size() == 1);
-
-    auto unit = std::move(inputs->unit);
-    auto inputFirst = std::move(inputs->inputFirst);
-    auto sortByFirst = std::move(inputs->sortByFirst);
-    auto inputLast = std::move(inputs->inputLast);
-    auto sortByLast = std::move(inputs->sortByLast);
-
-    return b.makeIf(
-        b.makeBooleanOpTree(abt::Operations::And,
-                            b.makeFunction(sbe::EFn::kExists, slots[0]),
-                            b.makeBinaryOp(abt::Operations::Gt, slots[0], b.makeInt64Constant(0))),
-        b.makeFunction(sbe::EFn::kAggDerivativeFinalize,
-                       std::move(unit),
-                       std::move(inputFirst),
-                       std::move(sortByFirst),
-                       std::move(inputLast),
-                       std::move(sortByLast)),
-        b.makeNullConstant());
-}
-
-SbExpr::Vector buildInitializeLinearFill(const AccumOp& acc, StageBuilderState& state) {
-    SbExprBuilder b(state);
-    return SbExpr::makeSeq(b.makeFunction(sbe::EFn::kNewArray,
-                                          b.makeNullConstant(),
-                                          b.makeNullConstant(),
-                                          b.makeNullConstant(),
-                                          b.makeNullConstant(),
-                                          b.makeNullConstant(),
-                                          b.makeInt64Constant(0)));
-}
-
-AccumInputsPtr buildAccumExprsLinearFill(const AccumOp& acc,
-                                         std::unique_ptr<AddLinearFillInputs> inputs,
-                                         StageBuilderState& state) {
-    SbExprBuilder b(state);
-
-    inputs->inputExpr = b.makeFillEmptyNull(std::move(inputs->inputExpr));
-    return inputs;
-}
-
-SbExpr::Vector buildAccumAggsLinearFill(const AccumOp& acc,
-                                        std::unique_ptr<AddLinearFillInputs> inputs,
-                                        StageBuilderState& state) {
-    auto input = std::move(inputs->inputExpr);
-    auto sortBy = std::move(inputs->sortBy);
-
-    SbExprBuilder b(state);
-
-    return SbExpr::makeSeq(
-        b.makeFunction(sbe::EFn::kAggLinearFillAdd, std::move(input), std::move(sortBy)));
-}
-
-SbExpr buildFinalizeLinearFill(const AccumOp& acc,
-                               std::unique_ptr<FinalizeLinearFillInputs> inputs,
-                               StageBuilderState& state,
-                               const SbSlotVector& inputSlots) {
-    SbExprBuilder b(state);
-
-    tassert(7971213,
-            str::stream() << "Expected one input slot for finalization of " << acc.getOpName()
-                          << ", got: " << inputSlots.size(),
-            inputSlots.size() == 1);
-    auto inputVar = inputSlots[0];
-
-    auto sortBy = std::move(inputs->sortBy);
-
-    return b.makeFunction(sbe::EFn::kAggLinearFillFinalize, std::move(inputVar), std::move(sortBy));
-}
-
 boost::optional<AddBlockExprs> buildAccumBlockExprsSingleInput(
     const AccumOp& acc,
     std::unique_ptr<AddSingleInput> inputsIn,
@@ -1863,36 +1563,6 @@ static const StringDataMap<AccumOpInfo> accumOpInfoMap = {
                  .buildFinalize = makeBuildFn(&buildFinalizeCount),
                  .buildCombineAggs = makeBuildFn(&buildCombineAggsCount)}},
 
-    // CovariancePop
-    {AccumulatorCovariancePop::kName,
-     AccumOpInfo{.buildAddAggs = makeBuildFn(&buildAccumAggsCovariance),
-                 .buildFinalize = makeBuildFn(&buildFinalizeCovariancePop)}},
-
-    // CovarianceSamp
-    {AccumulatorCovarianceSamp::kName,
-     AccumOpInfo{.buildAddAggs = makeBuildFn(&buildAccumAggsCovariance),
-                 .buildFinalize = makeBuildFn(&buildFinalizeCovarianceSamp)}},
-
-    // DenseRank
-    {AccumulatorDenseRank::kName,
-     AccumOpInfo{.buildAddAggs = makeBuildFn(&buildAccumAggsDenseRank),
-                 .buildFinalize = makeBuildFn(&buildFinalizeRank)}},
-
-    // Derivative
-    {window_function::ExpressionDerivative::kName,
-     AccumOpInfo{.buildAddAggs = makeBuildFn(&buildAccumAggsDerivative),
-                 .buildFinalize = makeBuildFn(&buildFinalizeDerivative)}},
-
-    // DocumentNumber
-    {AccumulatorDocumentNumber::kName,
-     AccumOpInfo{.buildAddAggs = makeBuildFn(&buildAccumAggsDocumentNumber)}},
-
-    // ExpMovingAvg
-    {AccumulatorExpMovingAvg::kName,
-     AccumOpInfo{.buildAddAggs = makeBuildFn(&buildAccumAggsExpMovingAvg),
-                 .buildInit = makeBuildFn(&buildInitializeExpMovingAvg),
-                 .buildFinalize = makeBuildFn(buildFinalizeExpMovingAvg)}},
-
     // First
     {AccumulatorFirst::kName,
      AccumOpInfo{.buildSinglePurposeAccum =
@@ -1908,12 +1578,6 @@ static const StringDataMap<AccumOpInfo> accumOpInfoMap = {
                  .buildFinalize = makeBuildFn(&buildFinalizeFirstN),
                  .buildCombineAggs = makeBuildFn(&buildCombineAggsFirstN)}},
 
-    // Integral
-    {AccumulatorIntegral::kName,
-     AccumOpInfo{.buildAddAggs = makeBuildFn(&buildAccumAggsIntegral),
-                 .buildInit = makeBuildFn(&buildInitializeIntegral),
-                 .buildFinalize = makeBuildFn(&buildFinalizeIntegral)}},
-
     // Last
     {AccumulatorLast::kName,
      AccumOpInfo{.buildAddExprs = makeBuildFn(&buildAccumExprsFirstLast),
@@ -1927,16 +1591,6 @@ static const StringDataMap<AccumOpInfo> accumOpInfoMap = {
                  .buildInit = makeBuildFn(&buildInitializeAccumN),
                  .buildFinalize = makeBuildFn(&buildFinalizeLastN),
                  .buildCombineAggs = makeBuildFn(&buildCombineAggsLastN)}},
-
-    // LinearFill
-    {window_function::ExpressionLinearFill::kName,
-     AccumOpInfo{.buildAddExprs = makeBuildFn(&buildAccumExprsLinearFill),
-                 .buildAddAggs = makeBuildFn(&buildAccumAggsLinearFill),
-                 .buildInit = makeBuildFn(&buildInitializeLinearFill),
-                 .buildFinalize = makeBuildFn(&buildFinalizeLinearFill)}},
-
-    // Locf
-    {AccumulatorLocf::kName, AccumOpInfo{.buildAddAggs = makeBuildFn(&buildAccumAggsLocf)}},
 
     // Max
     {AccumulatorMax::kName,
@@ -1985,11 +1639,6 @@ static const StringDataMap<AccumOpInfo> accumOpInfoMap = {
                  .buildAddAggs = makeBuildFn(&buildAccumAggsPush),
                  .buildFinalize = makeBuildFn(&buildFinalizeCappedAccumulator),
                  .buildCombineAggs = makeBuildFn(&buildCombineAggsPush)}},
-
-    // Rank
-    {AccumulatorRank::kName,
-     AccumOpInfo{.buildAddAggs = makeBuildFn(&buildAccumAggsRank),
-                 .buildFinalize = makeBuildFn(&buildFinalizeRank)}},
 
     // SetUnion
     {AccumulatorSetUnion::kName,
