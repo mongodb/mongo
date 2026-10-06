@@ -8,6 +8,16 @@ import {
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 
+// Stop further fast-check runs and shrinking after 20 minutes. Checked before each run, so one
+// in-flight example can still finish. An interrupt after only passing runs succeeds; an interrupt
+// while shrinking a real failure still fails.
+export const kPbtInterruptAfterTimeLimitMs = 20 * 60 * 1000;
+
+function pbtInterruptAfterTimeLimitMs() {
+    const fcParams = TestData.fastCheckParameters || {};
+    return fcParams.interruptAfterTimeLimit ?? kPbtInterruptAfterTimeLimitMs;
+}
+
 /*
  * Given a query family and an index in [0-numLeafParameters), we replace the leaves of the query
  * with the corresponding constant at that index.
@@ -297,6 +307,7 @@ export function testProperty(
         {
             seed,
             numRuns,
+            interruptAfterTimeLimit: pbtInterruptAfterTimeLimitMs(),
             reporter: reporter(propertyFn, namespaces),
             examples,
             ...(counterexamplePath && {path: counterexamplePath}),

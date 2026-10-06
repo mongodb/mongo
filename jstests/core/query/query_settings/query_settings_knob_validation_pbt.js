@@ -28,6 +28,7 @@ import {
 } from "jstests/libs/collection_drop_recreate.js";
 import {getExplainCommand} from "jstests/libs/cmd_object_utils.js";
 import {buildQueryKnobsModel} from "jstests/libs/property_test_helpers/models/query_knob_models.js";
+import {kPbtInterruptAfterTimeLimitMs} from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 import {runWithParamsAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
@@ -146,7 +147,11 @@ jsTest.log.info(
         seed,
 );
 try {
-    fc.assert(fc.property(queryKnobsModel, assertKnobValidationParity), {seed, numRuns});
+    fc.assert(fc.property(queryKnobsModel, assertKnobValidationParity), {
+        seed,
+        numRuns,
+        interruptAfterTimeLimit: kPbtInterruptAfterTimeLimitMs,
+    });
 } finally {
     assertDropCollection(db, coll.getName());
 }

@@ -2405,7 +2405,8 @@ class RunPlugin(PluginInterface):
             type=fast_check_params_parser,
             help=(
                 "JSON string of parameters for fast-check property-based tests. "
-                "Supported keys: numRuns, seed, replayPath, path, endOnFailure, minCommands, maxCommands"
+                "Supported keys: numRuns, seed, replayPath, path, endOnFailure, minCommands, "
+                "maxCommands, interruptAfterTimeLimit"
             ),
         )
 

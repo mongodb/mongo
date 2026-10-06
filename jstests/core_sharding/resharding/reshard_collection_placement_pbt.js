@@ -13,6 +13,7 @@
  * ]
  */
 import {after, describe, it} from "jstests/libs/mochalite.js";
+import {kPbtInterruptAfterTimeLimitMs} from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 import {getShardNames} from "jstests/sharding/libs/sharding_util.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
@@ -207,6 +208,7 @@ describe("reshardCollection placement (zones/shardDistribution) property", funct
         fc.assert(fc.property(modelArbitrary, reshardPlacementProperty), {
             numRuns: examples.length + randomSweepSize,
             examples,
+            interruptAfterTimeLimit: kPbtInterruptAfterTimeLimitMs,
         });
     });
 });

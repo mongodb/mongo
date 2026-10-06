@@ -9,6 +9,7 @@
  * ]
  */
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
+import {kPbtInterruptAfterTimeLimitMs} from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
 
 if (isSlowBuild(db)) {
@@ -62,7 +63,7 @@ fc.assert(
         }
         return true;
     }),
-    {seed, numRuns: 100},
+    {seed, numRuns: 100, interruptAfterTimeLimit: kPbtInterruptAfterTimeLimitMs},
 );
 
 assert.commandWorked(adminDB.runCommand({ping: 1}));

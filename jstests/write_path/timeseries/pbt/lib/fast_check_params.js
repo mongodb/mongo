@@ -1,3 +1,5 @@
+import {kPbtInterruptAfterTimeLimitMs} from "jstests/libs/property_test_helpers/property_testing_utils.js";
+
 export const getFcParams = () => {
     return TestData.fastCheckParameters || {};
 };
@@ -10,6 +12,7 @@ export const getFcAssertArgs = () => {
         seed: fcParams.seed,
         endOnFailure: fcParams.endOnFailure !== undefined ? fcParams.endOnFailure : isSeeded,
         path: fcParams.path,
+        interruptAfterTimeLimit: fcParams.interruptAfterTimeLimit ?? kPbtInterruptAfterTimeLimitMs,
     };
 
     jsTest.log.info("FAST_CHECK_PARAMETERS", {
