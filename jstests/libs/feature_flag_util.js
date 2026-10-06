@@ -286,7 +286,8 @@ export var FeatureFlagUtil = (function () {
             for (const member of status.members) {
                 // Skip STARTUP2, RECOVERING, etc. — only check nodes that can serve queries.
                 if (member.stateStr !== "PRIMARY" && member.stateStr !== "SECONDARY") continue;
-                const conn = new Mongo(member.name);
+                // Hosts from replSetGetStatus are MongoRPC addresses and must not use gRPC.
+                const conn = new Mongo(member.name, undefined, {gRPC: false});
                 // Check that the feature flag is not FCV-gated.
                 // This logic only makes sense for non-FCV-gated flags.
                 const flagDoc = _getFeatureFlagDoc(conn, flagName);
