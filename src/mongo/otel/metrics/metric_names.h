@@ -686,6 +686,8 @@ public:
         MetricNameMaker::make("mongodb.serverStatus.indexBuilds.total");
     static constexpr MetricName kIndexBuildPhasesCommit =
         MetricNameMaker::make("mongodb.serverStatus.indexBuilds.phases.commit");
+    static constexpr MetricName kIndexBuildsLastCommittedMillis = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.indexBuilds.phases.lastCommittedMillis");
 
     static constexpr MetricName kIndexBulkBuilderNumSorted =
         MetricNameMaker::make("mongodb.serverStatus.indexBulkBuilder.numSorted");

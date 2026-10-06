@@ -1,5 +1,5 @@
 /**
- * Validates index build activity, completion, and failure metrics.
+ * Validates index build activity, completion, duration, and failure metrics.
  *
  * @tags: [requires_otel_build, requires_replication]
  */
@@ -18,7 +18,11 @@ const {metricsDir, otelParams} = otelFileExportParams(jsTestName());
 const rst = new ReplSetTest({
     nodes: [
         {
-            setParameter: {...otelParams},
+            setParameter: {
+                ...otelParams,
+                openTelemetryExportIntervalMillis: 500,
+                openTelemetryExportTimeoutMillis: 200,
+            },
         },
     ],
 });
@@ -62,7 +66,8 @@ waitForIndexStatusMetrics(
         metrics.active === 0 &&
         metrics.started === 0 &&
         metrics.succeeded === 0 &&
-        metrics.failed === 0,
+        metrics.failed === 0 &&
+        metrics.lastCommittedMillis === 0,
     "Expected index build metrics to start at zero",
 );
 
@@ -83,18 +88,26 @@ waitForIndexStatusMetrics(
     "Expected active gauge to reflect successful in-progress build",
 );
 
+// Pause the build so its committed duration is at least a second.
+sleep(1000);
 IndexBuildTest.resumeIndexBuilds(primary);
 awaitSuccess();
 
-waitForIndexStatusMetrics(
+const {lastCommittedMillis} = waitForIndexStatusMetrics(
     metricsDir,
     successStart,
     (metrics) =>
         metrics.active === 0 &&
         metrics.started === 1 &&
         metrics.succeeded === 1 &&
-        metrics.failed === 0,
-    "Expected completed counter to increment after successful build",
+        metrics.failed === 0 &&
+        metrics.lastCommittedMillis >= 1000,
+    "Expected completed counter and last committed duration to update after successful build",
+);
+assert.eq(
+    lastCommittedMillis,
+    testDB.serverStatus().metrics.indexBuilds.phases.lastCommittedMillis,
+    "OTel and serverStatus should report the same last committed duration",
 );
 
 jsTest.log.info("Running failing unique index build");
@@ -130,8 +143,10 @@ waitForIndexStatusMetrics(
         metrics.active === 0 &&
         metrics.started === 2 &&
         metrics.succeeded === 1 &&
-        metrics.failed === 1,
-    "Expected failed counter to increment after duplicate-key build failure",
+        metrics.failed === 1 &&
+        metrics.lastCommittedMillis === lastCommittedMillis,
+    "Expected failed counter to increment after duplicate-key build failure, without changing the " +
+        "last committed duration",
 );
 
 jsTest.log.info("Running externally aborted index build");

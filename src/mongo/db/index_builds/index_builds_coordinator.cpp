@@ -67,7 +67,10 @@
 #include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/otel/metrics/metric_unit.h"
 #include "mongo/otel/metrics/metrics_counter.h"
+#include "mongo/otel/metrics/metrics_gauge.h"
+#include "mongo/otel/metrics/metrics_metric.h"
 #include "mongo/otel/metrics/metrics_service.h"
+#include "mongo/otel/metrics/server_status_options.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/message.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
@@ -96,9 +99,12 @@
 namespace mongo {
 using namespace std::literals::string_view_literals;
 namespace {
+using otel::metrics::GaugeOptions;
 using otel::metrics::MetricNames;
 using otel::metrics::MetricsService;
 using otel::metrics::MetricUnit;
+using otel::metrics::ReportingPolicy;
+using otel::metrics::ServerStatusOptions;
 
 MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildFirstDrain);
 MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildDumpsInsertsFromBulk);
@@ -129,6 +135,15 @@ auto& indexBuildsPhasesCommitMetric =
     MetricsService::instance().createInt64Counter(MetricNames::kIndexBuildPhasesCommit,
                                                   "Total number of index build commits.",
                                                   MetricUnit::kCount);
+
+auto& lastCommittedMillisGauge = MetricsService::instance().createInt64Gauge(
+    MetricNames::kIndexBuildsLastCommittedMillis,
+    "Duration of the last committed index build.",
+    MetricUnit::kMilliseconds,
+    GaugeOptions{.serverStatusOptions =
+                     ServerStatusOptions{.dottedPath = "indexBuilds.phases.lastCommittedMillis",
+                                         .role = ClusterRole::ShardServer},
+                 .reportingPolicy = ReportingPolicy::kIfCurrentlyNonZero});
 
 /**
  * Aggregate metrics for index builds reported via server status.
@@ -169,7 +184,6 @@ public:
         phases.append("processConstraintsViolationTableOnCommit",
                       processConstraintsViolationTableOnCommit.loadRelaxed());
         phases.append("commit", commit.loadRelaxed());
-        phases.append("lastCommittedMillis", lastCommittedMillis.loadRelaxed());
         phases.append("lastTimeBetweenCommitOplogAndCommitMillis",
                       lastTimeBetweenCommitOplogAndCommitMillis.loadRelaxed());
         phases.append("lastTimeBetweenCommitOplogAndCommitMillisStartupRecovery",
@@ -221,8 +235,6 @@ public:
     Atomic<int> processConstraintsViolationTableOnCommit{0};
     Atomic<int> commit{0};
 
-    // The duration of the last committed index build.
-    Atomic<int64_t> lastCommittedMillis{0};
     // The duration between receiving the commitIndexBuild oplog entry and committing the index
     // build for steady state replication for the last committed index build.
     Atomic<int64_t> lastTimeBetweenCommitOplogAndCommitMillis;
@@ -668,14 +680,13 @@ auto_get_collection::Options makeAutoGetCollectionOptions(
 
 
 /**
- * Stores the duration of the most recently committed index build in the indexBuilds server
- * status section.
+ * Stores the duration of the most recently committed index build.
  */
 void storeLastCommittedDuration(const ReplIndexBuildState& replState) {
     const auto metrics = replState.getIndexBuildMetrics();
     const auto now = Date_t::now();
     const auto elapsedTime = (now - metrics.startTime).count();
-    indexBuildsSSS.lastCommittedMillis.store(elapsedTime);
+    lastCommittedMillisGauge.set(elapsedTime);
 }
 
 /**

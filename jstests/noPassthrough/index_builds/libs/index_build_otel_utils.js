@@ -19,6 +19,9 @@ export function getIndexStatusMetrics(metricsDir, afterDate) {
         succeeded: metrics["mongodb.serverStatus.indexBuilds.succeeded"]?.value ?? 0,
         failed: metrics["mongodb.serverStatus.indexBuilds.failed"]?.value ?? 0,
         toBeResumed: metrics["mongodb.serverStatus.indexBuilds.to_be_resumed"]?.value ?? 0,
+        lastCommittedMillis:
+            metrics["mongodb.serverStatus.metrics.indexBuilds.phases.lastCommittedMillis"]?.value ??
+            0,
     };
 }
 

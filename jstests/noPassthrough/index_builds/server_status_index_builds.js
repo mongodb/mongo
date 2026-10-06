@@ -190,7 +190,7 @@ describe("lastCommittedMillis", function () {
     });
 
     it("during steady state", () => {
-        assert.eq(0, this.db.serverStatus().indexBuilds.phases.lastCommittedMillis);
+        assert.eq(0, this.db.serverStatus().metrics.indexBuilds.phases.lastCommittedMillis);
 
         // Hang index build before completion to extend duration.
         const fp = configureFailPoint(this.primary, "hangIndexBuildBeforeCommit");
@@ -208,11 +208,11 @@ describe("lastCommittedMillis", function () {
         // Wait for the parallel shell to exit.
         awaitCreateIndex();
 
-        assert.lt(1000, this.db.serverStatus().indexBuilds.phases.lastCommittedMillis);
+        assert.lt(1000, this.db.serverStatus().metrics.indexBuilds.phases.lastCommittedMillis);
     });
 
     it("on resume", () => {
-        assert.eq(0, this.db.serverStatus().indexBuilds.phases.lastCommittedMillis);
+        assert.eq(0, this.db.serverStatus().metrics.indexBuilds.phases.lastCommittedMillis);
 
         // Hang index build before completion to require resume.
         const fp = configureFailPoint(this.primary, "hangIndexBuildBeforeCommit");
@@ -247,11 +247,11 @@ describe("lastCommittedMillis", function () {
         // Ensure index build is completed before reading metrics.
         ResumableIndexBuildTest.assertCompleted(this.primary, this.coll, [buildUUID], ["a_1"]);
 
-        assert.lt(0, this.db.serverStatus().indexBuilds.phases.lastCommittedMillis);
+        assert.lt(0, this.db.serverStatus().metrics.indexBuilds.phases.lastCommittedMillis);
     });
 
     it("on restart", function () {
-        assert.eq(0, this.db.serverStatus().indexBuilds.phases.lastCommittedMillis);
+        assert.eq(0, this.db.serverStatus().metrics.indexBuilds.phases.lastCommittedMillis);
 
         // Hang index build before completion to require restart.
         const fp = configureFailPoint(this.primary, "hangIndexBuildBeforeCommit");
@@ -294,7 +294,7 @@ describe("lastCommittedMillis", function () {
         // Ensure index build is completed before reading metrics.
         ResumableIndexBuildTest.assertCompleted(this.primary, this.coll, [buildUUID], ["a_1"]);
 
-        assert.lt(0, this.db.serverStatus().indexBuilds.phases.lastCommittedMillis);
+        assert.lt(0, this.db.serverStatus().metrics.indexBuilds.phases.lastCommittedMillis);
     });
 
     afterEach(() => {
