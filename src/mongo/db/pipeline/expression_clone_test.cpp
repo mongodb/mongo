@@ -4,8 +4,10 @@
 #include "mongo/base/initializer.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/collation/collator_interface_mock.h"
 
 #include <functional>
 
@@ -33,10 +35,10 @@ MONGO_INITIALIZER_GENERAL(InitExpressionsForCloneTest, ("EndExpressionRegistrati
         fromjson("{$concatArrays: [[], '$foo']}"),
         fromjson(R"({
             $convert: {
-                input: '$foo', 
-                to: 'binData', 
-                format: 'uuid', 
-                onError: 'xyz', 
+                input: '$foo',
+                to: 'binData',
+                format: 'uuid',
+                onError: 'xyz',
                 onNull: 'abc'
             }
         })"),
@@ -45,23 +47,23 @@ MONGO_INITIALIZER_GENERAL(InitExpressionsForCloneTest, ("EndExpressionRegistrati
             "{$dateDiff: {startDate: '$foo', endDate: '$foo', unit: '$foo', timezone: '$foo'}}"),
         fromjson(R"({
             $dateFromParts: {
-                year: '$year', 
-                month: '$month', 
-                day: '$day', 
-                hour: '$hour', 
-                minute: '$minute', 
-                second: '$second', 
-                millisecond: '$ms', 
+                year: '$year',
+                month: '$month',
+                day: '$day',
+                hour: '$hour',
+                minute: '$minute',
+                second: '$second',
+                millisecond: '$ms',
                 timezone: '$tz'
             }
         })"),
         fromjson("{$dateToParts: {date: '$foo', timezone: '$tz', iso8601: '$x'}}"),
         fromjson(R"({
             $dateFromString: {
-                dateString: '$foo', 
-                timezone: '$tz', 
-                format: '$format', 
-                onNull: 'null', 
+                dateString: '$foo',
+                timezone: '$tz',
+                format: '$format',
+                onNull: 'null',
                 onError: 'error'
             }
         })"),
@@ -71,10 +73,10 @@ MONGO_INITIALIZER_GENERAL(InitExpressionsForCloneTest, ("EndExpressionRegistrati
             "{$dateToString: {date: '$foo', format: '$format', onNull: 'null', timezone: '$tz'}}"),
         fromjson(R"({
             $dateTrunc: {
-                date: '$foo', 
-                unit: '$foo', 
-                binSize: '$foo', 
-                timezone: '$foo', 
+                date: '$foo',
+                unit: '$foo',
+                binSize: '$foo',
+                timezone: '$foo',
                 startOfWeek: '$foo'
             }
         })"),
@@ -239,8 +241,8 @@ MONGO_INITIALIZER_GENERAL(InitExpressionsForCloneTest, ("EndExpressionRegistrati
         fromjson("{$rand: {}}"),
         fromjson(R"({
             $reduce: {
-                input: '$foo', 
-                initialValue: 1, 
+                input: '$foo',
+                initialValue: 1,
                 in: { $multiply: [ '$$value', '$$this' ]}
             }
         })"),
@@ -264,9 +266,9 @@ MONGO_INITIALIZER_GENERAL(InitExpressionsForCloneTest, ("EndExpressionRegistrati
         fromjson(R"({
             $switch: {
                 branches: [
-                    {case: {$eq: ['$foo', 1]}, then: 'foo'}, 
+                    {case: {$eq: ['$foo', 1]}, then: 'foo'},
                     {case: {$eq: ['$bar', 0]}, then: 'bar'}
-                ], 
+                ],
                 default: null
             }
         })"),
@@ -372,6 +374,39 @@ TEST(ExpressionCloneTest, CloneUsesCorrectExpressionContext) {
         assertClone(*origExpr, newExpCtx.get(), exprSpec);
         // Passing the same context.
         assertClone(*origExpr, exprCtx.get(), exprSpec);
+    }
+}
+
+// Asserts that the clone uses the collator of the provided context, not the original one, by
+// giving the two contexts different collators and destroying the original before evaluation.
+TEST(ExpressionCloneTest, CloneUsesCollatorOfProvidedExpressionContext) {
+    auto makeExpCtx = [] {
+        auto expCtx = make_intrusive<ExpressionContextForTest>();
+        expCtx->setCollator(
+            std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kAlwaysEqual));
+        return expCtx;
+    };
+    // Clone context with collator which reverses strings when comparing.
+    // The test input [ac, ba] will be sorted [ba, ac].
+    auto cloneExpCtx = make_intrusive<ExpressionContextForTest>();
+    cloneExpCtx->setCollator(
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString));
+
+    const std::pair<BSONObj, Value> testCases[] = {
+        {fromjson("{$sortArray: {input: ['ac', 'ba'], sortBy: 1}}"),
+         Value(BSON_ARRAY("ba" << "ac"))},
+        {fromjson("{$topN: {input: ['ac', 'ba'], n: 1, sortBy: 1}}"), Value(BSON_ARRAY("ba"))},
+        {fromjson("{$top: {input: ['ac', 'ba'], sortBy: 1}}"), Value(std::string("ba"))},
+        {fromjson("{$bottomN: {input: ['ac', 'ba'], n: 1, sortBy: 1}}"), Value(BSON_ARRAY("ac"))},
+        {fromjson("{$bottom: {input: ['ac', 'ba'], sortBy: 1}}"), Value(std::string("ac"))},
+    };
+
+    for (auto&& [exprSpec, expected] : testCases) {
+        auto expCtx = makeExpCtx();
+        auto cloned = makeExpression(expCtx.get(), exprSpec).first->clone(*cloneExpCtx);
+        expCtx.reset();
+        auto result = cloned->evaluate(MutableDocument().freeze(), &cloneExpCtx->variables);
+        ASSERT_VALUE_EQ(result, expected);
     }
 }
 

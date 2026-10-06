@@ -3921,6 +3921,14 @@ public:
     }
 };
 
+namespace detail {
+/// Clones 'sortBy' with the provided 'expCtx'.
+inline PatternValueCmp clonePatternValueCmp(const PatternValueCmp& sortBy,
+                                            const ExpressionContext& expCtx) {
+    return PatternValueCmp(sortBy.sortPattern, sortBy.getOriginalElement(), expCtx.getCollator());
+}
+}  // namespace detail
+
 class ExpressionSortArray final : public Expression {
 public:
     static constexpr auto kName = "$sortArray"sv;
@@ -3961,7 +3969,8 @@ public:
     }
 
     boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
-        return make_intrusive<ExpressionSortArray>(&expCtx, cloneChild(_kInput, expCtx), _sortBy);
+        return make_intrusive<ExpressionSortArray>(
+            &expCtx, cloneChild(_kInput, expCtx), detail::clonePatternValueCmp(_sortBy, expCtx));
     }
 
 private:
@@ -4044,8 +4053,10 @@ public:
     }
 
     boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
-        return make_intrusive<ExpressionTopN>(
-            &expCtx, cloneChild(_kN, expCtx), cloneChild(_kInput, expCtx), _sortBy);
+        return make_intrusive<ExpressionTopN>(&expCtx,
+                                              cloneChild(_kN, expCtx),
+                                              cloneChild(_kInput, expCtx),
+                                              detail::clonePatternValueCmp(_sortBy, expCtx));
     }
 
 private:
@@ -4095,7 +4106,8 @@ public:
     }
 
     boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
-        return make_intrusive<ExpressionTop>(&expCtx, cloneChild(_kInput, expCtx), _sortBy);
+        return make_intrusive<ExpressionTop>(
+            &expCtx, cloneChild(_kInput, expCtx), detail::clonePatternValueCmp(_sortBy, expCtx));
     }
 
 private:
@@ -4149,8 +4161,10 @@ public:
     }
 
     boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
-        return make_intrusive<ExpressionBottomN>(
-            &expCtx, cloneChild(_kN, expCtx), cloneChild(_kInput, expCtx), _sortBy);
+        return make_intrusive<ExpressionBottomN>(&expCtx,
+                                                 cloneChild(_kN, expCtx),
+                                                 cloneChild(_kInput, expCtx),
+                                                 detail::clonePatternValueCmp(_sortBy, expCtx));
     }
 
 private:
@@ -4200,7 +4214,8 @@ public:
     }
 
     boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
-        return make_intrusive<ExpressionBottom>(&expCtx, cloneChild(_kInput, expCtx), _sortBy);
+        return make_intrusive<ExpressionBottom>(
+            &expCtx, cloneChild(_kInput, expCtx), detail::clonePatternValueCmp(_sortBy, expCtx));
     }
 
 private:
