@@ -613,6 +613,10 @@ deletion information to the packing code.}
 @row{timestamp_inline.h, Macro, \c WT_TIME_AGGREGATE_UPDATE_PAGE_DEL,
 Akin to \c WT_TIME_AGGREGATE_UPDATE but for a \c WT_PAGE_DELETED; used in internal page
 reconciliation.}
+@row{timestamp_inline.h, Macro, \c WT_TIME_AGGREGATE_MERGE_PAGE_DEL,
+Replace the stop information in an aggregate unpacked from a \c WT_CELL_ADDR_DEL cell with the
+global stop point supplied by its \c WT_PAGE_DELETED; the unpacked stop information describes
+the child page before the truncate and cannot be used as-is.}
 
 @row{txn_inline.h, Function, \c __wt_txn_op_delete_apply_prepare_state,
 The code for updating \c WT_PAGE_DELETED at prepare time.}
@@ -713,8 +717,12 @@ page type.}
 @row{bt_vrfy.c, Hook, in \c __verify_tree,
 Allow namespace gaps in VLCS.}
 @row{bt_vrfy.c, Hook, in \c __verify_page_content_int,
-Handle deleted-address cells.}
+Handle deleted-address cells: validate the effective aggregate\, that is\, the unpacked
+aggregate with the page deletion applied as its stop point.}
 
+@row{bt_vrfy_dsk.c, Hook, in \c __verify_dsk_addr_validity,
+Validate the effective aggregate for deleted-address cells rather than the stale stop
+information unpacked from the cell.}
 @row{bt_vrfy_dsk.c, Function, \c __verify_dsk_addr_page_del,
 Validate and crosscheck the page deletion information discovered in on-disk address
 cells.}

@@ -236,3 +236,57 @@ TEST_CASE("Cell Fast Truncate: prepare flag on non-fast-truncate addr cell marks
     CHECK(unpack.page_del.txnid == 0);
     CHECK(unpack.page_del.selected_for_write == false);
 }
+
+TEST_CASE("Cell Fast Truncate: effective aggregate is contained by an old wide parent",
+  "[cell][fast_truncate][time_aggregate]")
+{
+    auto session_mock = setup_mock_session();
+    WT_SESSION_IMPL *session = session_mock->get_wt_session_impl();
+
+    WT_CELL cell;
+    memset(&cell, 0, sizeof(cell));
+    build_ft_addr_del_cell(&cell, false, 10, 20, 30);
+
+    WT_PAGE_HEADER dsk = make_ft_page_header();
+    WT_CELL_UNPACK_ADDR unpack;
+    memset(&unpack, 0, sizeof(unpack));
+    __wt_cell_unpack_addr(session, &dsk, &cell, &unpack);
+
+    WT_TIME_AGGREGATE effective_ta, old_parent;
+    WT_TIME_AGGREGATE_COPY(&effective_ta, &unpack.ta);
+    WT_TIME_AGGREGATE_MERGE_PAGE_DEL(&effective_ta, &unpack.page_del);
+    WT_TIME_AGGREGATE_COPY(&old_parent, &effective_ta);
+    old_parent.newest_stop_ts = WT_TS_MAX;
+    old_parent.newest_stop_txn = WT_TXN_MAX;
+
+    CHECK(effective_ta.newest_stop_ts == 20);
+    CHECK(old_parent.newest_stop_ts == WT_TS_MAX);
+    CHECK(__wt_time_aggregate_validate(session, &effective_ta, &old_parent, true) == 0);
+}
+
+TEST_CASE("Cell Fast Truncate: effective aggregate is required by a tightened parent",
+  "[cell][fast_truncate][time_aggregate]")
+{
+    auto session_mock = setup_mock_session();
+    WT_SESSION_IMPL *session = session_mock->get_wt_session_impl();
+
+    WT_CELL cell;
+    memset(&cell, 0, sizeof(cell));
+    build_ft_addr_del_cell(&cell, false, 10, 20, 30);
+
+    WT_PAGE_HEADER dsk = make_ft_page_header();
+    WT_CELL_UNPACK_ADDR unpack;
+    memset(&unpack, 0, sizeof(unpack));
+    __wt_cell_unpack_addr(session, &dsk, &cell, &unpack);
+
+    WT_TIME_AGGREGATE effective_ta, tightened_parent;
+    WT_TIME_AGGREGATE_COPY(&effective_ta, &unpack.ta);
+    WT_TIME_AGGREGATE_MERGE_PAGE_DEL(&effective_ta, &unpack.page_del);
+    WT_TIME_AGGREGATE_COPY(&tightened_parent, &effective_ta);
+
+    CHECK(unpack.ta.newest_stop_ts == WT_TS_MAX);
+    CHECK(effective_ta.newest_stop_ts == 20);
+    CHECK(tightened_parent.newest_stop_ts == 20);
+    CHECK(__wt_time_aggregate_validate(session, &unpack.ta, &tightened_parent, true) == EINVAL);
+    CHECK(__wt_time_aggregate_validate(session, &effective_ta, &tightened_parent, true) == 0);
+}

@@ -244,6 +244,21 @@
             (ta)->oldest_stop_txn = WT_MIN((page_del)->txnid, (ta)->oldest_stop_txn);     \
     } while (0)
 
+/*
+ * Merge a page deletion as the global stop point for every record in an aggregate. The aggregate
+ * unpacked from a deleted-address cell describes the child page as it was before the truncate, so
+ * its stop information is stale and must be replaced.
+ */
+#define WT_TIME_AGGREGATE_MERGE_PAGE_DEL(ta, page_del)                                \
+    do {                                                                              \
+        (ta)->newest_stop_durable_ts = (page_del)->pg_del_durable_ts;                 \
+        (ta)->newest_txn = (page_del)->txnid;                                         \
+        (ta)->newest_stop_ts = (page_del)->pg_del_start_ts;                           \
+        (ta)->newest_stop_txn = (page_del)->txnid;                                    \
+        if ((page_del)->txnid != WT_TXN_NONE)                                         \
+            (ta)->oldest_stop_txn = WT_MIN((page_del)->txnid, (ta)->oldest_stop_txn); \
+    } while (0)
+
 /* Merge an aggregated time window into another - choosing the most conservative value from each. */
 #define WT_TIME_AGGREGATE_MERGE(session, dest, source)                                        \
     do {                                                                                      \

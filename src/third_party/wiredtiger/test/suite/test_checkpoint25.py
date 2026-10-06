@@ -73,7 +73,7 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         cursor = self.session.open_cursor(uri)
         self.session.begin_transaction()
         for i in range(1, nrows + 1):
-            cursor[ds.key(i)] = value
+            cursor[ds.key(i)] = value(i)
             if i % 101 == 0:
                 self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(ts))
                 self.session.begin_transaction()
@@ -105,7 +105,8 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         count = 0
         zcount = 0
         for k, v in cursor:
-            self.assertEqual(v, value)
+            i = ds.reverse_key_by_format(k, ds.key_format)
+            self.assertEqual(v, value(i))
             count += 1
         self.assertEqual(count, nrows)
         self.assertEqual(zcount, 0)
@@ -121,14 +122,18 @@ class test_checkpoint(wttest.WiredTigerTestCase):
             config=self.extraconfig)
         ds.populate()
 
-        value_a = "aaaaa" * 100
+        # Every row gets a distinct value. Variable-length column store run-length encodes
+        # runs of identical values, which packs the whole table into a handful of leaf pages
+        # and leaves the truncate range with no interior page to fast-delete.
+        def value(i):
+            return "{}-{}".format(i, "aaaaa" * 100)
 
         # Pin oldest and stable timestamps to 5.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(5) +
             ',stable_timestamp=' + self.timestamp_str(5))
 
         # Write some data at time 10.
-        self.large_updates(uri, ds, nrows, value_a, 10)
+        self.large_updates(uri, ds, nrows, value, 10)
 
         # Mark it stable.
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(10))
@@ -160,7 +165,7 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         # Read the checkpoint.
         nonzeros = nrows // 2
         zeros = nrows - nonzeros
-        self.check(ds, self.first_checkpoint, nrows, 0, value_a, 15)
-        self.check(ds, self.first_checkpoint, nonzeros, zeros, value_a, 25)
-        self.check(ds, self.first_checkpoint, nonzeros, zeros, value_a, None) # default read ts
-        self.check(ds, self.first_checkpoint, nonzeros, zeros, value_a, 0) # no read ts
+        self.check(ds, self.first_checkpoint, nrows, 0, value, 15)
+        self.check(ds, self.first_checkpoint, nonzeros, zeros, value, 25)
+        self.check(ds, self.first_checkpoint, nonzeros, zeros, value, None) # default read ts
+        self.check(ds, self.first_checkpoint, nonzeros, zeros, value, 0) # no read ts
