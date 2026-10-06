@@ -14,7 +14,7 @@
     "tools": [
       {
         "name": "Endor Labs Inc",
-        "version": "v1.7.1149"
+        "version": "v1.7.1177"
       }
     ],
     "component": {
@@ -273,10 +273,10 @@
       "evidence": {
         "occurrences": [
           {
-            "location": "src/mongo/shell/linenoise.h"
+            "location": "src/mongo/shell/linenoise.cpp"
           },
           {
-            "location": "src/mongo/shell/linenoise.cpp"
+            "location": "src/mongo/shell/linenoise.h"
           }
         ],
         "licenses": [
@@ -609,7 +609,7 @@
         },
         {
           "license": {
-            "name": "Public Domain",
+            "name": "Public-Domain",
             "acknowledgement": "declared"
           }
         }
@@ -632,20 +632,17 @@
         "licenses": [
           {
             "license": {
-              "id": "BSD-3-Clause",
-              "acknowledgement": "declared"
+              "id": "BSD-3-Clause"
             }
           },
           {
             "license": {
-              "id": "LGPL-2.1-or-later",
-              "acknowledgement": "declared"
+              "id": "LGPL-2.1-or-later"
             }
           },
           {
             "license": {
-              "name": "Public Domain",
-              "acknowledgement": "declared"
+              "name": "Public Domain"
             }
           }
         ]
@@ -1244,20 +1241,17 @@
         "licenses": [
           {
             "license": {
-              "id": "Apache-2.0",
-              "acknowledgement": "declared"
+              "id": "Apache-2.0"
             }
           },
           {
             "license": {
-              "id": "BSD-3-Clause",
-              "acknowledgement": "declared"
+              "id": "BSD-3-Clause"
             }
           },
           {
             "license": {
-              "id": "HPND",
-              "acknowledgement": "declared"
+              "id": "HPND"
             }
           }
         ]
@@ -2792,19 +2786,7 @@
         {
           "license": {
             "id": "Apache-2.0",
-            "acknowledgement": "declared"
-          }
-        },
-        {
-          "license": {
-            "name": "Apache-2.0",
-            "acknowledgement": "declared"
-          }
-        },
-        {
-          "license": {
-            "name": "OTHER",
-            "acknowledgement": "declared"
+            "acknowledgement": "concluded"
           }
         }
       ],
@@ -2814,16 +2796,6 @@
         {
           "url": "https://pypi.org/project/ocspresponder/",
           "type": "distribution"
-        },
-        {
-          "url": "https://api.clearlydefined.io/definitions/pypi/pypi/-/ocspresponder/0.5.0",
-          "comment": "License metadata retrieved via clearlydefined.io lookup.",
-          "type": "evidence"
-        },
-        {
-          "url": "https://api.deps.dev/v3/systems/pypi/packages/%2Focspresponder/versions/0.5.0",
-          "comment": "License metadata retrieved via deps.dev lookup.",
-          "type": "evidence"
         },
         {
           "url": "https://github.com/threema-ch/ocspresponder",
@@ -2839,14 +2811,7 @@
         "licenses": [
           {
             "license": {
-              "name": "Apache-2.0",
-              "acknowledgement": "declared"
-            }
-          },
-          {
-            "license": {
-              "name": "OTHER",
-              "acknowledgement": "declared"
+              "id": "Apache-2.0"
             }
           }
         ]
@@ -3037,13 +3002,7 @@
         {
           "license": {
             "id": "MIT",
-            "acknowledgement": "declared"
-          }
-        },
-        {
-          "license": {
-            "name": "MIT",
-            "acknowledgement": "declared"
+            "acknowledgement": "concluded"
           }
         }
       ],
@@ -3053,11 +3012,6 @@
         {
           "url": "https://pypi.org/project/ocspbuilder/",
           "type": "distribution"
-        },
-        {
-          "url": "https://api.clearlydefined.io/definitions/pypi/pypi/-/ocspbuilder/0.10.2",
-          "comment": "License metadata retrieved via clearlydefined.io lookup.",
-          "type": "evidence"
         },
         {
           "url": "https://github.com/wbond/ocspbuilder",
@@ -3073,8 +3027,7 @@
         "licenses": [
           {
             "license": {
-              "name": "MIT",
-              "acknowledgement": "declared"
+              "id": "MIT"
             }
           }
         ]
@@ -3296,6 +3249,5 @@
     {
       "ref": "pkg:pypi/ocspresponder@0.5.0"
     }
-  ],
-  "vulnerabilities": []
+  ]
 }
