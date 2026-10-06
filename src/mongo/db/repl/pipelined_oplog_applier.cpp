@@ -11,6 +11,7 @@
 #include "mongo/db/repl/oplog_applier_impl.h"
 #include "mongo/db/repl/oplog_applier_utils.h"
 #include "mongo/db/repl/oplog_entry_or_grouped_inserts.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/logv2/log.h"
@@ -137,8 +138,10 @@ void PipelinedOplogApplier::_dispatchOps(OperationContext* opCtx, std::vector<Op
     using WorkItem = PipelinedApplierWorkerPool::WorkItem;
     const size_t numWorkers = _workerPool.numWorkers();
     invariant(!ops.empty());
+
     // Preserve the original batch boundary before expansion can remove the final entry.
-    const OpTimeAndWallTime lastOpTime{ops.back().getOpTime(), ops.back().getWallClockTime()};
+    const OpTimeAndWallTime batchEnd{ops.back().getOpTime(), ops.back().getWallClockTime()};
+    OpTimeAndWallTime lastRegisteredOpTime{};
 
     // Packed container ops write several keys in one entry; hashing the whole entry would not
     // agree with the hash of any single key, so a packed op and a later op on one of its keys
@@ -160,6 +163,35 @@ void PipelinedOplogApplier::_dispatchOps(OperationContext* opCtx, std::vector<Op
         ++opsPerWorker[workerIdx];
     };
 
+    auto flushPerWorkerBuffer = [&]() -> void {
+        if (routedOps.empty()) {
+            return;
+        }
+        // Each worker slice of ops is sized before any op is moved into it, so it never reallocates
+        // upon insertion.
+        std::vector<WorkItem> items(numWorkers);
+        for (size_t workerIdx = 0; workerIdx < numWorkers; ++workerIdx) {
+            items[workerIdx].ops.reserve(opsPerWorker[workerIdx]);
+        }
+        for (auto& [workerIdx, op] : routedOps) {
+            items[workerIdx].ops.push_back(std::move(*op));
+        }
+        lastRegisteredOpTime = {routedOps.back().second->getOpTime(),
+                                routedOps.back().second->getWallClockTime()};
+
+        // Count worker slices assigned ops in this batch, as not all workers may have received ops.
+        const auto participatingWorkers = std::count_if(
+            opsPerWorker.begin(), opsPerWorker.end(), [](size_t count) { return count != 0; });
+        auto remainingWorkers = _batchTracker.addBatch(lastRegisteredOpTime,
+                                                       static_cast<uint32_t>(participatingWorkers));
+        for (size_t workerIdx = 0; workerIdx < numWorkers; ++workerIdx) {
+            if (!items[workerIdx].ops.empty()) {
+                items[workerIdx].batchRemainingWorkers = remainingWorkers;
+                _workerPool.enqueue(workerIdx, std::move(items[workerIdx]));
+            }
+        }
+    };
+
     for (auto& op : ops) {
         switch (_router.classify(op)) {
             case OpClass::kPipelined:
@@ -173,31 +205,31 @@ void PipelinedOplogApplier::_dispatchOps(OperationContext* opCtx, std::vector<Op
                 }
                 break;
             }
-            case OpClass::kRequiresInline:
-                MONGO_UNIMPLEMENTED;
+            case OpClass::kRequiresInline: {
+                flushPerWorkerBuffer();
+                routedOps.clear();
+                derivedOps.clear();
+                std::fill(opsPerWorker.begin(), opsPerWorker.end(), 0ull);
+                if (!_drainWorkers()) {
+                    return;
+                }
+                auto optionalOpTime = _applyOpInline(opCtx, op);
+                if (!optionalOpTime.has_value()) {
+                    // TODO(SERVER-136053): Propagate shutdown failure to `_run`
+                    return;
+                }
+                lastRegisteredOpTime = optionalOpTime.get();
+                break;
+            }
         }
     }
 
-    // Each worker slice of ops is sized before any op is moved into it, so it never reallocates
-    // upon insertion.
-    std::vector<WorkItem> items(numWorkers);
-    for (size_t workerIdx = 0; workerIdx < numWorkers; ++workerIdx) {
-        items[workerIdx].ops.reserve(opsPerWorker[workerIdx]);
-    }
-    for (auto& [workerIdx, op] : routedOps) {
-        items[workerIdx].ops.push_back(std::move(*op));
-    }
-
-    // Count worker slices assigned ops in this batch, as not all workers may have received ops.
-    const auto participatingWorkers = std::count_if(
-        opsPerWorker.begin(), opsPerWorker.end(), [](size_t count) { return count != 0; });
-    auto remainingWorkers =
-        _batchTracker.addBatch(lastOpTime, static_cast<uint32_t>(participatingWorkers));
-    for (size_t workerIdx = 0; workerIdx < numWorkers; ++workerIdx) {
-        if (!items[workerIdx].ops.empty()) {
-            items[workerIdx].batchRemainingWorkers = remainingWorkers;
-            _workerPool.enqueue(workerIdx, std::move(items[workerIdx]));
-        }
+    flushPerWorkerBuffer();
+    // If the final entry in the batch was a packed operation that produced zero worker ops when
+    // expanded, then expansion would have removed that entry from the batch vector.
+    // Ensure that, if this happens, we still publish the original final optime.
+    if (lastRegisteredOpTime < batchEnd) {
+        _batchTracker.addBatch(batchEnd, 0);
     }
 }
 
@@ -219,6 +251,41 @@ void PipelinedOplogApplier::_publishBatch(
     hangBeforePipelinedApplierPublish.pauseWhileSet();
     _replCoord->setMyLastAppliedOpTimeAndWallTimeForward(batch.lastOpTime);
     signalOplogWaiters();
+}
+
+boost::optional<OpTimeAndWallTime> PipelinedOplogApplier::_applyOpInline(OperationContext* opCtx,
+                                                                         const OplogEntry& entry) {
+    // Reuses the dispatcher's per-batch opCtx: _run already owns one bound to this Client, and
+    // ServiceContext refuses a second concurrent opCtx on the same Client (tassert 4946801).
+    Status status = [&] {
+        try {
+            return opCtx->runWithoutInterruptionExceptAtGlobalShutdown(
+                [&] { return applyWorkItem(opCtx, getOptions(), {{entry}}); });
+        } catch (const DBException& ex) {
+            return ex.toStatus();
+        }
+    }();
+    if (MONGO_unlikely(!status.isOK())) {
+        // A global-shutdown interrupt abandons the item unapplied; lastApplied stays below this
+        // batch and restart recovery re-applies it.
+        if (ErrorCodes::isShutdownError(status.code())) {
+            LOGV2(13474700,
+                  "Pipelined oplog applier interrupted by shutdown while trying to apply op inline",
+                  "error"_attr = redact(status));
+            return boost::none;
+        }
+        LOGV2_FATAL(13474701,
+                    "Pipelined oplog applier failed to apply a work item inline",
+                    "op"_attr = entry.toBSONForLogging(),
+                    "error"_attr = redact(status));
+    }
+    OpTimeAndWallTime opTimeAndWallTime{entry.getOpTime(), entry.getWallClockTime()};
+    auto counter = _batchTracker.addBatch(opTimeAndWallTime, 1);
+    _batchTracker.onWorkerCompletion(std::move(counter));
+    if (!_waitForAdvancerIdle()) {
+        return boost::none;
+    }
+    return opTimeAndWallTime;
 }
 
 Status applyWorkItem(OperationContext* opCtx,

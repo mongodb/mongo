@@ -1321,9 +1321,155 @@ DEATH_TEST_REGEX_F(PipelinedOplogApplierRunDeathTest,
                                BSON("applyOps" << BSON_ARRAY(BSONObj())))});
 }
 
+TEST_F(PipelinedOplogApplierRunTest, AppliesAndPublishesASingleInlineOpBatch) {
+    auto createOp = makeCreateCollectionOplogEntry(_opCtx.get(), nextOpTime(), kNss);
+
+    applyThroughBuffer({createOp});
+
+    ASSERT_TRUE(collectionExists(_opCtx.get(), kNss));
+    assertPublished(createOp);
+}
+
+TEST_F(PipelinedOplogApplierRunTest, AppliesAndPublishesSeveralInlineOpBatches) {
+    const auto nssA = NamespaceString::createNamespaceString_forTest("test.poa_inline_a");
+    const auto nssB = NamespaceString::createNamespaceString_forTest("test.poa_inline_b");
+    const auto nssC = NamespaceString::createNamespaceString_forTest("test.poa_inline_c");
+    auto createA = makeCreateCollectionOplogEntry(_opCtx.get(), nextOpTime(), nssA);
+    auto createB = makeCreateCollectionOplogEntry(_opCtx.get(), nextOpTime(), nssB);
+    auto createC = makeCreateCollectionOplogEntry(_opCtx.get(), nextOpTime(), nssC);
+
+    applyThroughBuffer({createA, createB, createC});
+
+    ASSERT_TRUE(collectionExists(_opCtx.get(), nssA));
+    ASSERT_TRUE(collectionExists(_opCtx.get(), nssB));
+    ASSERT_TRUE(collectionExists(_opCtx.get(), nssC));
+    assertPublished(createC);
+}
+
+// Inline ops share the buffer with pipelined ops without losing or reordering anything: pipelined
+// ops before the inline are applied first, the inline runs, and pipelined ops after the inline
+// (which may target the newly-created collection) are applied last. The final lastApplied is the
+// last op in the buffer.
+TEST_F(PipelinedOplogApplierRunTest, AppliesPipelinedOpsBeforeAndAfterInlineOp) {
+    createCollectionWithUuid(_opCtx.get(), kNss);
+
+    // Two inserts into a pre-existing collection, a createCollection inline, then two inserts
+    // into the newly-created collection.
+    auto ins0 = insertOp(kNss, BSON("_id" << 0));
+    auto ins1 = insertOp(kNss, BSON("_id" << 1));
+    auto createOther = makeCreateCollectionOplogEntry(_opCtx.get(), nextOpTime(), kOtherNss);
+    auto ins2 = insertOp(kOtherNss, BSON("_id" << 100));
+    auto ins3 = insertOp(kOtherNss, BSON("_id" << 101));
+
+    applyThroughBuffer({ins0, ins1, createOther, ins2, ins3});
+
+    ASSERT_TRUE(collectionExists(_opCtx.get(), kOtherNss));
+    assertCollectionContainsExactly(kNss, {BSON("_id" << 0), BSON("_id" << 1)});
+    assertCollectionContainsExactly(kOtherNss, {BSON("_id" << 100), BSON("_id" << 101)});
+    assertPublished(ins3);
+}
+
+
+// A batch that ends with an inline op preceded by pipelined ops registers batchEnd via the
+// inline application path (not the fallback in _dispatchOps): lastApplied still reaches the
+// inline op's opTime/wallTime.
+TEST_F(PipelinedOplogApplierRunTest, PublishesInlineOpWhenItIsTheLastOpInABatch) {
+    createCollectionWithUuid(_opCtx.get(), kNss);
+    auto ins0 = insertOp(kNss, BSON("_id" << 0));
+    auto ins1 = insertOp(kNss, BSON("_id" << 1));
+    auto createOther = makeCreateCollectionOplogEntry(_opCtx.get(), nextOpTime(), kOtherNss);
+
+    applyThroughBuffer({ins0, ins1, createOther});
+
+    ASSERT_TRUE(collectionExists(_opCtx.get(), kOtherNss));
+    assertCollectionContainsExactly(kNss, {BSON("_id" << 0), BSON("_id" << 1)});
+    assertPublished(createOther);
+}
+
+// Push an inline op to the buffer while an applier worker is paused.
+// The applier should always wait for draining to complete before applying the inline op.
+// Since the worker is stuck applying a prior batch, the inline op should not be applied and
+// lastApplied should not be advanced until the worker is unpaused.
+TEST_F(PipelinedOplogApplierRunTest, WaitsForInflightPipelinedBatchToDrainBeforeInlineOp) {
+    createCollectionWithUuid(_opCtx.get(), kNss);
+
+    // Force one op per batch so the inline op arrives strictly after the held insert.
+    setServerParameter("replBatchLimitOperations", 1);
+
+    // `true` when the applier has started applying the inline op.
+    WaitableAtomic<bool> createCalled{false};
+    _opObserver->onCreateCollectionFn =
+        [&](auto*, const auto&, const auto&, const auto&, const auto&, auto) {
+            createCalled.store(true);
+            createCalled.notifyAll();
+        };
+
+    // Get _id to pause worker on.
+    const int heldId = idRoutedTo(0);
+    auto& held = watchWriteOf(heldId, true /* hold */);
+
+    // Push operation that worker will get stuck on.
+    pushToBuffer({insertOp(kNss, BSON("_id" << heldId))});
+    startApplier();
+    waitForGate(held);
+
+    // Push an inline op while the worker is paused.
+    // The dispatcher will drain first, so the observer must not fire yet.
+    auto createOther = makeCreateCollectionOplogEntry(_opCtx.get(), nextOpTime(), kOtherNss);
+    pushToBuffer({createOther});
+
+    // Give the dispatcher a chance to move; we should still be stuck waiting for the drain, and
+    // draining is stuck waiting for the worker to apply.
+    ASSERT_EQ(createCalled.waitFor(false, Milliseconds(500)), boost::none);
+    ASSERT_FALSE(collectionExists(_opCtx.get(), kOtherNss));
+
+    // Release the held worker; the pipelined batch drains, and only then does the inline op run.
+    held.release.set();
+    ASSERT_TRUE(createCalled.waitFor(false, Seconds(60)));
+    finishApplier();
+
+    // Ensure that the inline op was successfully applied.
+    ASSERT_TRUE(collectionExists(_opCtx.get(), kOtherNss));
+    assertCollectionContainsExactly(kNss, {BSON("_id" << heldId)});
+    assertPublished(createOther);
+}
+
+// If an inline op is interrupted by a global-shutdown-class error, the applier abandons that op
+// and bails: the failing op is not applied, no later op in the buffer is applied, and lastApplied
+// stays where it was so restart recovery re-applies from here.
+TEST_F(PipelinedOplogApplierRunTest, ShutdownDuringInlineOpDoesNotPublish) {
+    auto* replCoord = ReplicationCoordinator::get(serviceContext);
+    const auto before = replCoord->getMyLastAppliedOpTimeAndWallTime();
+
+    // Fail the very first inline op with a shutdown-class error.
+    _opObserver->onCreateCollectionFn =
+        [](auto*, const auto&, const auto&, const auto&, const auto&, auto) {
+            uasserted(ErrorCodes::InterruptedAtShutdown,
+                      "injected global shutdown during inline op");
+        };
+
+    // The first create is the one that will be interrupted; the second must not be applied
+    // because the applier bailed before reaching it.
+    auto createFirst = makeCreateCollectionOplogEntry(_opCtx.get(), nextOpTime(), kNss);
+    auto createSecond = makeCreateCollectionOplogEntry(_opCtx.get(), nextOpTime(), kOtherNss);
+
+    applyThroughBuffer({createFirst, createSecond});
+
+    ASSERT_FALSE(collectionExists(_opCtx.get(), kNss));
+    ASSERT_FALSE(collectionExists(_opCtx.get(), kOtherNss));
+    ASSERT_EQ(replCoord->getMyLastAppliedOpTimeAndWallTime(), before);
+}
+
+// Any non-shutdown error from an inline op is unrecoverable: the applier fasserts with the
+// inline-application fatal code (13474701) rather than silently skipping the op.
 DEATH_TEST_REGEX_F(PipelinedOplogApplierRunDeathTest,
-                   AnOpRequiringInlineApplicationIsUnimplemented,
-                   "Hit a MONGO_UNIMPLEMENTED") {
+                   FassertsWhenInlineOpFailsFatally,
+                   "13474701.*failed to apply a work item inline") {
+    _opObserver->onCreateCollectionFn =
+        [](auto*, const auto&, const auto&, const auto&, const auto&, auto) {
+            uasserted(ErrorCodes::OperationFailed,
+                      "injected unrecoverable failure during inline op");
+        };
     applyThroughBuffer({makeCreateCollectionOplogEntry(_opCtx.get(), nextOpTime(), kNss)});
 }
 

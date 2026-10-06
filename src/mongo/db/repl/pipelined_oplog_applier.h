@@ -66,6 +66,14 @@ private:
     // Requires dispatch to be paused.
     [[nodiscard]] bool _waitForAdvancerIdle();
 
+    // Applies a single kRequiresInline op on the dispatcher thread, using the caller's opCtx.
+    // Registers the op as its own single-worker batch with the tracker, waits for the advancer to
+    // publish it, and returns the published OpTimeAndWallTime on success. Returns boost::none if a
+    // global shutdown interrupted application, leaving lastApplied unchanged so restart recovery
+    // re-applies the op. Requires the worker pool and advancer to already be drained.
+    [[nodiscard]] boost::optional<OpTimeAndWallTime> _applyOpInline(OperationContext* opCtx,
+                                                                    const OplogEntry& entry);
+
     // Publishes a completed batch's replication progress and wakes oplog waiters.
     void _publishBatch(const PipelinedApplierBatchTracker::InflightBatch& batch);
 
