@@ -1077,13 +1077,22 @@ def test_uninstall_is_complete(test_args: TestArgs):
             raise RuntimeError("Failed to uninstall cleanly, found: {}".format(path))
 
 
-def parse_package_test_arguments(package_args: List[str]) -> Tuple[str, List[str], bool]:
+def parse_package_test_arguments(package_args: List[str]) -> Tuple[str, List[str], bool, str]:
     """Parse package_test.py arguments after the log path and edition."""
 
     skip_system_library_check = "--skip-system-library-check" in package_args
     package_args = [
         package_arg for package_arg in package_args if package_arg != "--skip-system-library-check"
     ]
+    package_kind = "server"
+    if "--package-kind" in package_args:
+        kind_index = package_args.index("--package-kind")
+        if kind_index + 1 >= len(package_args):
+            raise ValueError("Missing value for --package-kind (expected one of: server, crypt_v1)")
+        package_kind = package_args[kind_index + 1]
+        if package_kind not in ("server", "crypt_v1"):
+            raise ValueError("Unsupported package kind: {}".format(package_kind))
+        package_args = package_args[:kind_index] + package_args[kind_index + 2 :]
     package_platform = ""
     if package_args and package_args[0] == "--platform":
         if len(package_args) < 2:
@@ -1091,7 +1100,7 @@ def parse_package_test_arguments(package_args: List[str]) -> Tuple[str, List[str
         package_platform = package_args[1]
         package_args = package_args[2:]
 
-    return package_platform, package_args, skip_system_library_check
+    return package_platform, package_args, skip_system_library_check, package_kind
 
 
 def main() -> int:
@@ -1100,6 +1109,7 @@ def main() -> int:
     if len(sys.argv) < 5 or sys.argv[2] != "--edition":
         print(
             "Usage: {} <log-path> --edition <edition> [--platform <platform>] "
+            "[--package-kind <server|crypt_v1>] "
             "[--skip-system-library-check] "
             "<package-url> [package-url ...]".format(sys.argv[0])
         )
@@ -1108,8 +1118,8 @@ def main() -> int:
     configure_logging(sys.argv[1])
     expected_edition = sys.argv[3]
     try:
-        package_platform, package_urls, skip_system_library_check = parse_package_test_arguments(
-            sys.argv[4:]
+        package_platform, package_urls, skip_system_library_check, expected_package_kind = (
+            parse_package_test_arguments(sys.argv[4:])
         )
     except ValueError as exc:
         logging.error(str(exc))
@@ -1142,6 +1152,13 @@ def main() -> int:
     test_args = get_test_args(package_manager, package_files, package_platform)
     logging.info("Test Args:\n%s", json.dumps(test_args, sort_keys=True, indent=4))
     logging.info("Detected package kind: %s", test_args["package_kind"])
+    if test_args["package_kind"] != expected_package_kind:
+        logging.error(
+            "Expected %s packages, but detected %s packages",
+            expected_package_kind,
+            test_args["package_kind"],
+        )
+        return 1
 
     if test_args["package_kind"] == "server":
         run_server_package_tests(test_args, expected_edition, skip_system_library_check)

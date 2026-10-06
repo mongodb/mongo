@@ -289,6 +289,12 @@ py_test(
 )
 
 py_test(
+    name = "wrapper_util_test",
+    srcs = ["wrapper_util_test.py"],
+    deps = [":wrapper_hook"],
+)
+
+py_test(
     name = "wrapper_scripts_test",
     srcs = [
         "wrapper_scripts_test.py",

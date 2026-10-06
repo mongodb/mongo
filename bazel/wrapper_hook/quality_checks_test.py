@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import io
+import os
 import pathlib
 import subprocess
 import unittest
@@ -156,6 +157,24 @@ class RunQualityChecksTest(unittest.TestCase):
         self.assertIn("--bazel-startup-option=--output_base=/tmp/bazel", command)
         self.assertIn("--bazel-option=--config=local", command)
         self.assertIn("--bazel-option=--//bazel/config:build_atlas=False", command)
+
+    def test_child_does_not_inherit_closed_wrapper_descriptor_numbers(self):
+        with mock.patch.dict(
+            os.environ,
+            {
+                "MONGO_WRAPPER_STDOUT_FD": "3",
+                "MONGO_WRAPPER_STDERR_FD": "4",
+                "QUALITY_CHECK_TEST_VALUE": "preserved",
+            },
+        ):
+            quality_checks.run_quality_checks(
+                "/opt/bazel", ["run", "lint", "--fix"], runner=self.runner
+            )
+            env = self.runner.call_args.kwargs["env"]
+            self.assertNotIn("MONGO_WRAPPER_STDOUT_FD", env)
+            self.assertNotIn("MONGO_WRAPPER_STDERR_FD", env)
+            self.assertEqual(env["QUALITY_CHECK_TEST_VALUE"], "preserved")
+            self.assertEqual(os.environ["MONGO_WRAPPER_STDERR_FD"], "4")
 
     def test_does_not_invoke_runner_for_real_bazel_target(self):
         response = quality_checks.run_quality_checks(

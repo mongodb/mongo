@@ -1,5 +1,6 @@
 import gzip
 import pathlib
+import sys
 import tempfile
 import unittest
 from unittest import mock
@@ -210,6 +211,7 @@ libcurl.so.4 => /lib/aarch64-linux-gnu/libcurl.so.4 (0x0000ffff)
                 "ubuntu2404",
                 ["package.tgz"],
                 True,
+                "server",
             ),
             under_test.parse_package_test_arguments(
                 ["--platform", "ubuntu2404", "--skip-system-library-check", "package.tgz"]
@@ -218,9 +220,86 @@ libcurl.so.4 => /lib/aarch64-linux-gnu/libcurl.so.4 (0x0000ffff)
 
     def test_defaults_to_running_system_library_check(self):
         self.assertEqual(
-            ("ubuntu2404", ["package.tgz"], False),
+            ("ubuntu2404", ["package.tgz"], False, "server"),
             under_test.parse_package_test_arguments(["--platform", "ubuntu2404", "package.tgz"]),
         )
+
+    def test_parses_crypt_package_kind(self):
+        self.assertEqual(
+            ("ubuntu2404", ["package.tgz"], False, "crypt_v1"),
+            under_test.parse_package_test_arguments(
+                ["--platform", "ubuntu2404", "--package-kind", "crypt_v1", "package.tgz"]
+            ),
+        )
+
+    def test_invalid_package_kind_is_rejected(self):
+        for package_args, expected_error in (
+            (
+                ["--package-kind"],
+                r"Missing value for --package-kind \(expected one of: server, crypt_v1\)",
+            ),
+            (
+                ["--package-kind", "unknown", "package.tgz"],
+                "Unsupported package kind: unknown",
+            ),
+        ):
+            with self.subTest(package_args=package_args):
+                with self.assertRaisesRegex(ValueError, expected_error):
+                    under_test.parse_package_test_arguments(package_args)
+
+    def test_server_test_rejects_crypt_only_packages(self):
+        with (
+            mock.patch.object(
+                sys, "argv", ["test.py", "test.log", "--edition", "enterprise", "package.tgz"]
+            ),
+            mock.patch.object(under_test, "configure_logging"),
+            mock.patch.object(
+                under_test, "download_extract_all_packages", return_value=["crypt.rpm"]
+            ),
+            mock.patch.object(under_test, "run_and_log", return_value=mock.Mock(returncode=0)),
+            mock.patch.object(under_test, "run_apt_test"),
+            mock.patch.object(
+                under_test, "get_test_args", return_value={"package_kind": "crypt_v1"}
+            ),
+            mock.patch.object(under_test, "test_install_is_complete") as check_install,
+            mock.patch.object(under_test, "test_uninstall"),
+            mock.patch.object(under_test, "test_uninstall_is_complete"),
+        ):
+            self.assertEqual(1, under_test.main())
+            check_install.assert_not_called()
+
+    def test_crypt_test_accepts_crypt_only_packages(self):
+        with (
+            mock.patch.object(
+                sys,
+                "argv",
+                [
+                    "test.py",
+                    "test.log",
+                    "--edition",
+                    "enterprise",
+                    "--package-kind",
+                    "crypt_v1",
+                    "package.tgz",
+                ],
+            ),
+            mock.patch.object(under_test, "configure_logging"),
+            mock.patch.object(
+                under_test, "download_extract_all_packages", return_value=["crypt.rpm"]
+            ),
+            mock.patch.object(under_test, "run_and_log", return_value=mock.Mock(returncode=0)),
+            mock.patch.object(under_test, "run_apt_test"),
+            mock.patch.object(
+                under_test, "get_test_args", return_value={"package_kind": "crypt_v1"}
+            ),
+            mock.patch.object(under_test, "run_server_package_tests") as check_server,
+            mock.patch.object(under_test, "test_install_is_complete") as check_install,
+            mock.patch.object(under_test, "test_uninstall"),
+            mock.patch.object(under_test, "test_uninstall_is_complete"),
+        ):
+            self.assertEqual(0, under_test.main())
+            check_server.assert_not_called()
+            check_install.assert_called_once()
 
     def test_server_required_files_include_mongod_service(self):
         test_args = {

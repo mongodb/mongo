@@ -8,6 +8,7 @@ invocation merely to launch the quality-check runner.
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from collections.abc import Callable, Sequence
@@ -208,8 +209,15 @@ def run_quality_checks(
 
     stdout = get_terminal_stream("MONGO_WRAPPER_STDOUT_FD") or sys.stdout
     stderr = get_terminal_stream("MONGO_WRAPPER_STDERR_FD") or sys.stderr
+    # subprocess redirects stdout/stderr and closes the wrapper's extra descriptors.
+    # Do not let the child reuse their stale numbers for unrelated streams.
+    env = dict(os.environ)
+    env.pop("MONGO_WRAPPER_STDOUT_FD", None)
+    env.pop("MONGO_WRAPPER_STDERR_FD", None)
     try:
-        completed = runner(command, cwd=REPO_ROOT, stdout=stdout, stderr=stderr, check=False)
+        completed = runner(
+            command, cwd=REPO_ROOT, stdout=stdout, stderr=stderr, env=env, check=False
+        )
         exit_code = int(completed.returncode)
     except KeyboardInterrupt:
         return QualityChecksResponse(handled=True, exit_code=130)

@@ -68,6 +68,8 @@ class PackageTestCommandsTest(unittest.TestCase):
                 "enterprise",
                 "--platform",
                 "ubuntu2404",
+                "--package-kind",
+                "server",
                 "--skip-system-library-check",
                 "package.tgz",
             ],
@@ -82,6 +84,22 @@ class PackageTestCommandsTest(unittest.TestCase):
         )
 
         self.assertNotIn("--skip-system-library-check", args)
+
+    def test_crypt_package_test_args_select_crypt_v1(self):
+        self.assertEqual(
+            [
+                "--edition",
+                "enterprise",
+                "--platform",
+                "rhel88",
+                "--package-kind",
+                "crypt_v1",
+                "crypt.tgz",
+            ],
+            under_test.build_package_test_internal_args(
+                "enterprise", "rhel88", ["crypt.tgz"], package_kind="crypt_v1"
+            ),
+        )
 
 
 if __name__ == "__main__":
