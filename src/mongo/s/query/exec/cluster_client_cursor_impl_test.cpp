@@ -6,6 +6,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/feature_flag_test_gen.h"
@@ -556,6 +557,25 @@ TEST_F(ClusterClientCursorImplTest, IsEOF) {
     ASSERT_OK(result.getStatus());
     ASSERT_BSONOBJ_EQ(*result.getValue().getResult(), BSON("a" << 3));
     ASSERT_TRUE(cursor.isEOF());
+}
+
+TEST_F(ClusterClientCursorImplTest, ChangeStreamMetricsAreRegisteredAtStartup) {
+    // Read the tree without calling a metric factory. This also runs on Windows, where OTel
+    // is disabled, and verifies the router's namespace-scope registrations used complete options.
+    BSONObjBuilder builder;
+    globalMetricTreeSet()[ClusterRole::None].appendTo(builder);
+    auto root = builder.obj();
+    auto metrics = root.getObjectField("metrics").getObjectField("changeStreams");
+    auto cursor = metrics.getObjectField("cursor");
+    ASSERT(cursor["totalOpened"].isNumber());
+    auto open = cursor.getObjectField("open");
+    ASSERT(open["total"].isNumber());
+    ASSERT(open["pinned"].isNumber());
+    ASSERT(cursor.getObjectField("lifespan")["totalCount"].isNumber());
+
+    auto options = metrics.getObjectField("option").getObjectField("cursor");
+    ASSERT(options.getObjectField("batchSize")["totalCount"].isNumber());
+    ASSERT(options.getObjectField("maxTimeMS")["totalCount"].isNumber());
 }
 
 TEST_F(ClusterClientCursorImplTest, CheckChangeStreamServerStatusCursorMetrics) {

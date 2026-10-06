@@ -19,30 +19,29 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 namespace mongo::change_stream {
 
-inline otel::metrics::CounterOptions kCursorsTotalOpenedOpts = [] {
+// Construct options in each factory so static metric registration does not depend on
+// dynamically initialized inline options being initialized first by the Windows cross toolchain.
+
+// Constructs the counter for the OTEL metric
+// "serverStatus.metrics.changeStreams.cursor.totalOpened".
+inline otel::metrics::Counter<int64_t>& createCurorsTotalOpened() {
     otel::metrics::CounterOptions opts{};
     opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
         .dottedPath = "changeStreams.cursor.totalOpened",
         .role = ::mongo::ClusterRole{::mongo::ClusterRole::None},
     };
-    return opts;
-}();
-
-// Constructs the counter for the OTEL metric
-// "serverStatus.metrics.changeStreams.cursor.totalOpened".
-inline otel::metrics::Counter<int64_t>& createCurorsTotalOpened() {
     return otel::metrics::MetricsService::instance().createInt64Counter(
         otel::metrics::MetricNames::kChangeStreamCursorsTotalOpened,
         "Total number of change stream cursors opened (on router or shard).",
         otel::metrics::MetricUnit::kCursors,
-        kCursorsTotalOpenedOpts);
+        opts);
 }
 
 // Constructs the histogram for the OTEL metric
 // "serverStatus.metrics.changeStreams.cursor.lifespan". The change stream lifespan histogram is
 // updated after a change stream cursor is closed. A histogram provides accurate and thread-safe
 // average for every bucket. This is achieved by locks, so there might be some overhead.
-inline otel::metrics::HistogramOptions kLifespanOpts = [] {
+inline otel::metrics::Histogram<int64_t>& createCursorsLifespan() {
     otel::metrics::HistogramOptions opts{};
     opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
         .dottedPath = "changeStreams.cursor.lifespan",
@@ -63,53 +62,41 @@ inline otel::metrics::HistogramOptions kLifespanOpts = [] {
         24 * 60 * 60 * 1e6,     // lifetime <= 1 day will probably capture some daily patterns
         7 * 24 * 60 * 60 * 1e6  // lifetime <= 1 week will probably capture some weekly patterns
     });
-    return opts;
-}();
-
-inline otel::metrics::Histogram<int64_t>& createCursorsLifespan() {
     return otel::metrics::MetricsService::instance().createInt64Histogram(
         otel::metrics::MetricNames::kChangeStreamCursorsLifespan,
         "Lifespan of closed change stream cursors in microseconds.",
         otel::metrics::MetricUnit::kMicroseconds,
-        kLifespanOpts);
+        opts);
 }
 
-inline otel::metrics::UpDownCounterOptions kCursorsOpenTotalOpts = [] {
+// Constructs the counter for currently open change stream cursors (idle or pinned).
+inline otel::metrics::UpDownCounter<int64_t>& createCursorsOpenTotal() {
     otel::metrics::UpDownCounterOptions opts{};
     opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
         .dottedPath = "changeStreams.cursor.open.total",
         .role = ::mongo::ClusterRole{::mongo::ClusterRole::None},
     };
-    return opts;
-}();
-
-// Constructs the counter for currently open change stream cursors (idle or pinned).
-inline otel::metrics::UpDownCounter<int64_t>& createCursorsOpenTotal() {
     return otel::metrics::MetricsService::instance().createInt64UpDownCounter(
         otel::metrics::MetricNames::kChangeStreamCursorsOpenTotal,
         "Current number of open change stream cursors.",
         otel::metrics::MetricUnit::kCursors,
-        kCursorsOpenTotalOpts);
+        opts);
 }
 
 
-inline otel::metrics::UpDownCounterOptions kCursorsOpenPinnedOpts = [] {
+// Constructs the counter for the number of currently pinned (active) change stream cursors. This
+// counter corresponds to the OTEL metric "serverStatus.metrics.changeStreams.cursor.open.pinned".
+inline otel::metrics::UpDownCounter<int64_t>& createCursorsOpenPinned() {
     otel::metrics::UpDownCounterOptions opts{};
     opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
         .dottedPath = "changeStreams.cursor.open.pinned",
         .role = ::mongo::ClusterRole{::mongo::ClusterRole::None},
     };
-    return opts;
-}();
-
-// Constructs the counter for the number of currently pinned (active) change stream cursors. This
-// counter corresponds to the OTEL metric "serverStatus.metrics.changeStreams.cursor.open.pinned".
-inline otel::metrics::UpDownCounter<int64_t>& createCursorsOpenPinned() {
     return otel::metrics::MetricsService::instance().createInt64UpDownCounter(
         otel::metrics::MetricNames::kChangeStreamCursorsOpenPinned,
         "Current number of open change stream cursors.",
         otel::metrics::MetricUnit::kCursors,
-        kCursorsOpenPinnedOpts);
+        opts);
 }
 
 inline otel::metrics::Counter<int64_t>& createUpdateLookupCounter(otel::metrics::MetricName name,
