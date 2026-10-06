@@ -404,14 +404,14 @@ public:
                 // array.
                 invariant(seq->objs.front().isOwned());
                 _updateOpObj = seq->objs.front();
-            } else if (_commandObj.hasField("updates")) {
+            } else if (auto updates = _commandObj["updates"]; updates.type() == BSONType::array) {
                 // When updates are not sent as a DocumentSequence, extract the first update object
                 // from the command body.
                 // TODO (SERVER-134509): Make update commands mirror all elements in the updates
                 // array.
-                auto updatesArray = _commandObj["updates"].Array();
-                if (!updatesArray.empty()) {
-                    _updateOpObj = updatesArray[0].Obj();
+                BSONObjIterator it(updates.Obj());
+                if (it.more()) {
+                    _updateOpObj = it.next().Obj();
                 }
             }
         }
