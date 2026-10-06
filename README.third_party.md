@@ -45,7 +45,7 @@ a notice will be included in
 | [MurmurHash3]                                        | Public-Domain [1]                 | a6bd3ce7be8ad147ea820a7cf6229a975c0c96bb |                      | ✗                               |
 | [PCRE2 - Perl-Compatible Regular Expressions]        | BSD-3-Clause WITH PCRE2-exception | 10.40                                    |                      | ✗                               |
 | [pypi/ocspbuilder]                                   | MIT                               | 0.10.2                                   |                      |                                 |
-| [pypi/ocspresponder]                                 | Apache-2.0, OTHER                 | 0.5.0                                    |                      |                                 |
+| [pypi/ocspresponder]                                 | Apache-2.0                        | 0.5.0                                    |                      |                                 |
 | [S2 Geometry Library]                                | Apache-2.0                        | a25c502bda9d7e0274b9e2b7825fbddf13cc0306 | ✗                    | ✗                               |
 | [SafeInt]                                            | MIT                               | 3.0.26                                   |                      | ✗                               |
 | [snappy]                                             | BSD-3-Clause                      | 1.1.10                                   | ✗                    | ✗                               |
