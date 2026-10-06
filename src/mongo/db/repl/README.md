@@ -2362,7 +2362,7 @@ and behavior, see the [Flow Control README](../admission/README_flow_control.md)
 
 # Feature Compatibility Version
 
-See the [FCV and Feature Flag README](FCV_AND_FEATURE_FLAG_README.md).
+See the [FCV and Feature Flag documentation](../README.md#fcv-and-feature-flags).
 
 # System Collections
 

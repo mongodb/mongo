@@ -944,7 +944,7 @@ properties:
 
               Setting this property should be avoided if possible, and requires careful handling to
               avoid compatibility issues with old FCVs and binaries.
-              See the FCV and Feature Flag README (FCV_AND_FEATURE_FLAG_README.md) for more detail.
+              See src/mongo/db/README.md for more detail.
           incremental_rollout_phase:
             type: string
             description: >
@@ -972,7 +972,7 @@ properties:
               Specifies whether the feature flag is checked against an Operation FCV
               (`VersionContext`), a short-lived server FCV snapshot (`FCVSnapshot`), or both.
               This determines the signature of the C++ method used for feature flag checks.
-              See the FCV and Feature Flag README (FCV_AND_FEATURE_FLAG_README.md) for more detail.
+              See src/mongo/db/README.md for more detail.
             enum:
               - operation_fcv_or_fcv_snapshot
               - operation_fcv_only

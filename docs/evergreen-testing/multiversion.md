@@ -272,8 +272,8 @@ In addition to disabling multiversion tests based on FCV, there is no need to ru
 likely fail on older versions that have not implemented this feature. For multiversion tasks, we
 pass the `--runNoFeatureFlagTests` flag to avoid these failures on `all feature flag` variants.
 
-For more info on FCV, take a look at
-[FCV_AND_FEATURE_FLAG_README.md](https://github.com/mongodb/mongo/blob/master/src/mongo/db/repl/FCV_AND_FEATURE_FLAG_README.md).
+For more info on FCV, take a look at the
+[FCV and Feature Flag documentation](https://github.com/mongodb/mongo/blob/master/src/mongo/db/README.md#fcv-and-feature-flags).
 
 Another common case could be that the changes on master branch are breaking multiversion tests, but
 with those changes backported to the older branches the multiversion tests should work. In order to

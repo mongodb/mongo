@@ -233,6 +233,29 @@ filters:
   - "feature_compatibility*":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
+  - "README_fcv_overview.md":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
+  - "README_setfcv_command.md":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
+  - "README_fcv_generic_references.md":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
+  - "README_fcv_constants_generation.md":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
+  - "README_feature_flags.md":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
+      - 10gen/query-execution
+      - 10gen/rollout-flag-managers
+  - "README_multiversion_testing.md":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
+  - "README_fcv_feature_flag_rules.md":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
   - "traffic*":
     approvers:
       - 10gen/query-optimization
