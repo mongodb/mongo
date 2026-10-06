@@ -113,6 +113,7 @@ mongo_cc_library(
         "//src/mongo/db/shard_role/ddl:coll_mod_command_idl",
         "//src/mongo/db/shard_role/ddl:index_commands_idl",
         "//src/mongo/db/shard_role/lock_manager:exception_util",
+        "//src/mongo/db/stats:server_initiated_transaction",
         "//src/mongo/db/stats:top",
         "//src/mongo/db/stats:transaction_stats",
         "//src/mongo/db/update:update_driver",

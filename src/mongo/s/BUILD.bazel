@@ -88,6 +88,7 @@ mongo_cc_library(
         "//src/mongo/db/shard_role/lock_manager",
         "//src/mongo/db/shard_role/shard_catalog:collection_uuid_mismatch_info",
         "//src/mongo/db/sharding_environment:stale_config_retry_attempt",
+        "//src/mongo/db/stats:server_initiated_transaction",
         "//src/mongo/db/stats:transaction_stats",
         "//src/mongo/db/timeseries:timeseries_conversion_util",
         "//src/mongo/db/timeseries:timeseries_metadata",

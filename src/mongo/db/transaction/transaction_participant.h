@@ -391,6 +391,13 @@ public:
             return o().txnState.isInRetryableWriteMode();
         }
 
+        bool isServerInitiatedTransaction() const {
+            // The metrics observer's stats are the single source of truth for this classification.
+            return o()
+                .transactionMetricsObserver.getSingleTransactionStats()
+                .isServerInitiatedTransaction();
+        }
+
         std::string transactionStateDescriptor() const {
             return o().txnState.toString();
         }

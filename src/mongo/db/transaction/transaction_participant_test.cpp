@@ -55,6 +55,7 @@
 #include "mongo/db/shard_role/shard_catalog/database.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/stats/server_initiated_transaction.h"
 #include "mongo/db/storage/durable_history_pin.h"
 #include "mongo/db/storage/execution_context.h"
 #include "mongo/db/storage/record_data.h"
@@ -2940,6 +2941,35 @@ TEST_F(TransactionsMetricsTest, ForwardedClassificationOverridesClientSessionFal
               beforeStartedExternal + 1U);
     ASSERT_EQ(ServerTransactionsMetrics::get(opCtx())->getTotalStartedInternal(),
               beforeStartedInternal);
+}
+
+TEST_F(TransactionsMetricsTest, PublishesClassificationOnEveryStatement) {
+    for (bool isServerInitiated : {true, false}) {
+        opCtx()->setTxnNumber(isServerInitiated ? 20 : 21);
+        auto sessionCheckout = isServerInitiated ? checkOutSession() : checkOutSessionAsExternal();
+        ASSERT_EQ(participantIsInServerInitiatedTransaction(opCtx()), isServerInitiated);
+        auto txnParticipant = TransactionParticipant::get(opCtx());
+        txnParticipant.unstashTransactionResources(opCtx(), "insert");
+        txnParticipant.stashTransactionResources(opCtx());
+        sessionCheckout->checkIn(opCtx(), OperationContextSession::CheckInReason::kDone);
+
+        // Continue on a fresh opCtx without the classification argument, whose client also has no
+        // transport session. The published value must come from the stored classification.
+        runFunctionFromDifferentOpCtx([&](OperationContext* newOpCtx) {
+            newOpCtx->setLogicalSessionId(*opCtx()->getLogicalSessionId());
+            newOpCtx->setTxnNumber(*opCtx()->getTxnNumber());
+            newOpCtx->setInMultiDocumentTransaction();
+            auto newOpCtxSession = MongoDSessionCatalog::get(newOpCtx)->checkOutSession(newOpCtx);
+
+            ASSERT_FALSE(participantIsInServerInitiatedTransaction(newOpCtx));
+            TransactionParticipant::get(newOpCtx).beginOrContinue(
+                newOpCtx,
+                {*newOpCtx->getTxnNumber()},
+                false /* autocommit */,
+                TransactionParticipant::TransactionActions::kContinue);
+            ASSERT_EQ(participantIsInServerInitiatedTransaction(newOpCtx), isServerInitiated);
+        });
+    }
 }
 
 TEST_F(TransactionsMetricsTest, IncrementPreparedTransaction) {

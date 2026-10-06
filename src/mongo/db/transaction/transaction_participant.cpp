@@ -59,6 +59,7 @@
 #include "mongo/db/shard_role/shard_catalog/uncommitted_catalog_updates.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/stats/server_initiated_transaction.h"
 #include "mongo/db/storage/exceptions.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
@@ -1163,6 +1164,14 @@ void TransactionParticipant::Participant::beginOrContinue(
     const boost::optional<TransactionRuntimeContext>& transactionRuntimeContext,
     const boost::optional<bool> isServerInitiatedTransaction) {
     opCtx->setActiveTransactionParticipant();
+
+    // Save this participant's classification of the transaction so we can forward it in case this
+    // shard goes on to act as a sub-router.
+    ScopeGuard saveClassification([&] {
+        if (transactionIsOpen()) {
+            participantIsInServerInitiatedTransaction(opCtx) = this->isServerInitiatedTransaction();
+        }
+    });
 
     if (_isInternalSessionForRetryableWrite()) {
         auto parentTxnParticipant =

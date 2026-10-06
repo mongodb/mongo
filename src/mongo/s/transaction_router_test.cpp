@@ -19,6 +19,7 @@
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/sharding_environment/sharding_mongos_test_fixture.h"
+#include "mongo/db/stats/server_initiated_transaction.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
@@ -186,6 +187,15 @@ protected:
 
     void disableRouterRetriesFailPoint() {
         _staleVersionAndSnapshotRetriesBlock.reset();
+    }
+
+    /**
+     * Stands in for the TransactionParticipant that would have published its classification of the
+     * transaction on this operation context, which is where a sub-router's TransactionRouter takes
+     * its own classification from.
+     */
+    void setParticipantClassification(bool isServerInitiated) {
+        participantIsInServerInitiatedTransaction(operationContext()) = isServerInitiated;
     }
 
     /**
@@ -773,6 +783,37 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 
     ASSERT_TRUE(txnRouter.getParticipant(shard1)->isSubRouter);
     ASSERT_FALSE(txnRouter.getParticipant(shard2)->isSubRouter);
+}
+
+TEST_F(TransactionRouterTestWithDefaultSession, SubRouterForwardsParticipantClassification) {
+    // TODO SERVER-135549: Remove this guard once
+    // featureFlagServerInitiatedTransactionClassification is enabled by default.
+    unittest::ServerParameterGuard ff("featureFlagServerInitiatedTransactionClassification", true);
+    for (bool isServerInitiated : {true, false}) {
+        TxnNumber txnNum{isServerInitiated ? 3 : 4};
+        operationContext()->setTxnNumber(txnNum);
+        repl::ReadConcernArgs readConcernArgs;
+        ASSERT_OK(readConcernArgs.initialize(
+            BSON("find" << "test" << repl::ReadConcernArgs::kReadConcernFieldName
+                        << BSON(repl::ReadConcernArgs::kAtClusterTimeFieldName
+                                << kInMemoryLogicalTime.asTimestamp()
+                                << repl::ReadConcernArgs::kLevelFieldName << "snapshot"))));
+        repl::ReadConcernArgs::get(operationContext()) = readConcernArgs;
+
+        // Mock the classification the shard's TransactionParticipant would have published.
+        setParticipantClassification(isServerInitiated);
+
+        auto txnRouter = TransactionRouter::get(operationContext());
+        txnRouter.beginOrContinueTxn(
+            operationContext(), txnNum, TransactionRouter::TransactionActions::kStartOrContinue);
+
+        // The field is only attached when true, so external shows up as its absence.
+        auto newCmd =
+            txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, BSON("insert" << "test"));
+        ASSERT_EQ(newCmd[GenericArguments::kIsServerInitiatedTransactionFieldName].trueValue(),
+                  isServerInitiated)
+            << newCmd;
+    }
 }
 
 TEST_F(TransactionRouterTestWithDefaultSession,

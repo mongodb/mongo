@@ -23,6 +23,7 @@
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
+#include "mongo/db/stats/server_initiated_transaction.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/db/transaction/transaction_runtime_context_gen.h"
 #include "mongo/db/transaction_validation.h"
@@ -2077,9 +2078,10 @@ void TransactionRouter::Router::_resetRouterState(
         // A client with no network session is server-internal (e.g. the transaction API runs on a
         // sessionless client), so classify this as a server-initiated transaction. A genuine
         // end-user connection has a network session. This is only authoritative on the top-level
-        // router: a sub-router runs on the internal connection from its parent router, so it always
-        // computes 'external' regardless of the original client and its value must not be relied
-        // on.
+        // router. A sub-router runs on a real network connection from its parent router, so it
+        // always computes 'external' regardless of the original initiator. That case is handled by
+        // _resetRouterStateForStartOrContinueTransaction, which overwrites this with the
+        // classification from the sub-router's transaction participant.
         o(lk).isServerInitiatedTransaction = !opCtx->getClient()->session();
         p().isRecoveringCommit = false;
         o(lk).participants.clear();
@@ -2153,9 +2155,18 @@ void TransactionRouter::Router::_resetRouterStateForStartOrContinueTransaction(
                              "sub-router");
     }
     _resetRouterStateForStartTransaction(opCtx, txnNumberAndRetryCounter);
+
+    // If we are acting as a sub-router, we should use the classification forwarded to us as a
+    // participant.
+    auto participantClassification = participantIsInServerInitiatedTransaction(opCtx);
+
     {
         std::lock_guard<Client> lk(*opCtx->getClient());
         o(lk).subRouter = true;
+        // Fall back to the !session() guess from _resetRouterState if the participant didn't
+        // publish a classification.
+        o(lk).isServerInitiatedTransaction =
+            participantClassification.value_or(o().isServerInitiatedTransaction);
     }
     setAtClusterTimeForStartOrContinue(opCtx);
 }
