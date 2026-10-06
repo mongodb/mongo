@@ -29,6 +29,7 @@ namespace mongo::repl {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangBeforePipelinedApplierPublish);
+MONGO_FAIL_POINT_DEFINE(hangBeforePipelinedApplierDrain);
 
 /**
  * Configures 'opCtx' for oplog application: no constraint enforcement, prepare conflicts ignored.
@@ -234,7 +235,8 @@ void PipelinedOplogApplier::_dispatchOps(OperationContext* opCtx, std::vector<Op
 }
 
 bool PipelinedOplogApplier::_drainWorkers() {
-    LOGV2(13469900, "Draining pipelined oplog applier workers");
+    hangBeforePipelinedApplierDrain.pauseWhileSet();
+    LOGV2_DEBUG(13469900, 1, "Draining pipelined oplog applier workers");
     _workerPool.waitForIdle();
     // Publication may include deferred multikey writes after the batch is popped from the FIFO.
     // Wait for all publication side effects to finish before allowing inline application to

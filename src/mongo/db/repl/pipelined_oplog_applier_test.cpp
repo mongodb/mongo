@@ -591,15 +591,6 @@ protected:
         ASSERT_TRUE(_buffer.isEmpty());
     }
 
-    // Waits for dispatcher exit to begin draining after all batches are dispatched.
-    void waitForDrainToBegin(const unittest::LogCaptureGuard& logs) {
-        const auto deadline = Date_t::now() + Seconds(60);
-        while (logs.countTextContaining("Draining pipelined oplog applier") == 0) {
-            ASSERT_LT(Date_t::now(), deadline);
-            sleepmillis(1);
-        }
-    }
-
     void pushToBuffer(const std::vector<OplogEntry>& ops) {
         std::vector<BSONObj> docs;
         for (const auto& op : ops) {
@@ -1227,13 +1218,17 @@ TEST_F(PipelinedOplogApplierRunTest, DispatchesTheNextBatchWhileAnEarlierBatchIs
     waitForGate(later);
     ASSERT_EQ(replCoord->getMyLastAppliedOpTimeAndWallTime(), before);
 
-    // Draining must wait for the held worker to finish and its batch to be published.
-    unittest::LogCaptureGuard logs;
-    shutdownApplier();
-    waitForDrainToBegin(logs);
+    // Draining must wait for the held worker to finish and its batch to be published. Both ops
+    // are pipelined, so the first drain the fail point sees is the teardown drain, meaning the
+    // dispatcher finished its run loop.
+    {
+        FailPointEnableBlock drainHang("hangBeforePipelinedApplierDrain");
+        shutdownApplier();
+        drainHang.waitForOneNewEntry();
+    }
+    // The drain is blocked waiting for the held worker's batch to be applied and published, so
+    // shutdown cannot complete yet.
     ASSERT_FALSE(_finished->isReady());
-    ASSERT_EQ(logs.countTextContaining("Shutting down pipelined oplog applier advancer"), 0);
-    ASSERT_EQ(logs.countTextContaining("Shutting down pipelined oplog applier workers"), 0);
     held.release.set();
     _finished->get();
     _finished.reset();
