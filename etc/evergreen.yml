@@ -2847,3 +2847,16 @@ buildvariants:
   - name: compile_dist_test_TG
     distros:
     - windows-vsCurrent-large
+
+# Driver variant for the Windows GSSAPI/SSPI end-to-end test. A Windows driver (not Linux) is used
+# so the binaries it fetches and ships to the created DC host are the native Windows build. The
+# DC must be a separate host because promotion reboots it, which a task host cannot do.
+- <<: *windows_compile_variant_dependency
+  name: gssapi-windows-e2e-driver
+  display_name: "~ GSSAPI Windows SSPI E2E"
+  run_on:
+  - windows-vsCurrent-small
+  expansions:
+    <<: *windows_required_expansions
+  tasks:
+  - name: gssapi_windows_sspi_e2e
