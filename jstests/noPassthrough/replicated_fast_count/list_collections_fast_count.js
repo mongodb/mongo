@@ -16,17 +16,30 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 /**
  * Triggers a flush of the replicated fast count manager so size/count metadata is persisted and
- * visible to listCollections rawData.
+ * visible to listCollections rawData, and waits until every collection in 'collNames' reports it.
  *
  * The fast count deltas are produced by an async oplog tailer thread, not synchronously by the
- * writes themselves. The first fsync flushes whatever the tailer has already scanned into the
- * buffer; because the tailer may not yet have caught up to the writes that just returned, a second
- * fsync is issued so that anything scanned in the interim is also flushed. Two fsyncs are enough to
- * guarantee the tailer-committed writes are persisted for this quiesced single-node test.
+ * writes themselves. An fsync only *requests* an asynchronous flush and does not wait for it, and
+ * the flusher skips the request entirely when the oplog tailer has not yet buffered the writes. So
+ * a fixed number of fsyncs cannot guarantee the metadata is persisted. Poll instead, issuing an
+ * fsync each iteration to request a flush, until the requested collections' fastCount fields appear.
  */
-function flushFastCount(db) {
-    assert.commandWorked(db.adminCommand({fsync: 1}));
-    assert.commandWorked(db.adminCommand({fsync: 1}));
+function flushFastCount(db, collNames) {
+    assert.soon(
+        () => {
+            assert.commandWorked(db.adminCommand({fsync: 1}));
+            const entries = assert.commandWorked(db.runCommand({listCollections: 1, rawData: true}))
+                .cursor.firstBatch;
+            return collNames.every((name) =>
+                entries.some((entry) => entry.name === name && entry.info?.fastCount),
+            );
+        },
+        "fastCount metadata was not persisted after flushing",
+        undefined /*timeout*/,
+        100 /*interval*/,
+        undefined /*opts*/,
+        {collNames},
+    );
 }
 
 describe("listCollections fastCount fields", function () {
@@ -69,7 +82,7 @@ describe("listCollections fastCount fields", function () {
 
         // Flush so the fast count manager persists size/count metadata and advances the timestamp
         // store. Both are required for fastCount fields to appear in listCollections.
-        flushFastCount(this.db);
+        flushFastCount(this.db, ["collA", "collB", "collC"]);
     });
 
     after(function () {
@@ -122,7 +135,7 @@ describe("listCollections fastCount fields", function () {
         // Flush so the fast count manager persists metadata for the timeseries collection. The
         // 'info.fastCount' field is only emitted once the replicated fast count store has persisted
         // content, which normally happens via a background flush.
-        flushFastCount(this.db);
+        flushFastCount(this.db, [tsCollName]);
 
         const res = assert.commandWorked(this.db.runCommand({listCollections: 1, rawData: true}));
         const entries = res.cursor.firstBatch;
