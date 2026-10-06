@@ -146,14 +146,15 @@ bazel_evergreen_shutils::compute_local_arg() {
         local_arg+=" --local_resources=cpu=16"
     fi
 
-    # For run-mode, force the local config when remote execution is disabled or when
-    # the host cannot use either native RBE or the IBM cross-RBE toolchains.
+    # Run locally when remote execution is disabled or unsupported, while retaining
+    # the EngFlow asset downloader, remote cache, and credentials configured by CI.
+    # --config=local disables those too, exposing repository fetches to upstream outages.
     if [[ "$mode" == "run" ]]; then
         if [[ "${evergreen_remote_exec:-}" != "on" ]]; then
-            local_arg+=" --config=local"
+            local_arg+=" --config=no-remote-exec"
         elif ! bazel_evergreen_shutils::bazel_rbe_supported &&
             ! bazel_evergreen_shutils::is_s390x_or_ppc64le; then
-            local_arg+=" --config=local"
+            local_arg+=" --config=no-remote-exec"
         fi
     fi
 

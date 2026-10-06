@@ -518,7 +518,7 @@ test_compute_local_arg_keeps_cross_rbe_for_ibm_run_mode() {
     assert_not_contains "$s390x_args" "--config=local" "s390x run mode should retain cross-RBE configuration"
 }
 
-test_compute_local_arg_uses_local_for_non_rbe_run_mode() {
+test_compute_local_arg_keeps_engflow_cache_for_non_rbe_run_mode() {
     local remote_unsupported_args
     local remote_disabled_args
 
@@ -529,7 +529,8 @@ test_compute_local_arg_uses_local_for_non_rbe_run_mode() {
         bazel_evergreen_shutils::is_s390x() { return 1; }
         bazel_evergreen_shutils::compute_local_arg run
     })"
-    assert_contains "$remote_unsupported_args" "--config=local" "unsupported run hosts should use local configuration"
+    assert_contains "$remote_unsupported_args" "--config=no-remote-exec" "unsupported run hosts should retain the EngFlow asset downloader and cache"
+    assert_not_contains "$remote_unsupported_args" "--config=local" "unsupported run hosts should not disable EngFlow access"
 
     remote_disabled_args="$({
         evergreen_remote_exec="off"
@@ -538,7 +539,8 @@ test_compute_local_arg_uses_local_for_non_rbe_run_mode() {
         bazel_evergreen_shutils::is_s390x() { return 1; }
         bazel_evergreen_shutils::compute_local_arg run
     })"
-    assert_contains "$remote_disabled_args" "--config=local" "run mode should use local configuration when remote execution is disabled"
+    assert_contains "$remote_disabled_args" "--config=no-remote-exec" "disabling remote execution should retain the EngFlow asset downloader and cache"
+    assert_not_contains "$remote_disabled_args" "--config=local" "disabling remote execution should not disable EngFlow access"
 }
 
 test_maybe_release_flag_classifies_patch_test_and_release_tasks() {
@@ -725,7 +727,7 @@ test_provenance_build_invocation_file_selection
 test_timeout_prefix_uses_the_expected_fallback_for_each_execution_mode
 test_retry_bazel_cmd_does_not_retry_test_timeouts
 test_compute_local_arg_keeps_cross_rbe_for_ibm_run_mode
-test_compute_local_arg_uses_local_for_non_rbe_run_mode
+test_compute_local_arg_keeps_engflow_cache_for_non_rbe_run_mode
 test_maybe_release_flag_classifies_patch_test_and_release_tasks
 test_local_release_command_disables_remote_fallback_timeout
 test_retry_bazel_cmd_primes_output_base_before_running_bazel
