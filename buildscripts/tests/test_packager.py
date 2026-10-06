@@ -108,6 +108,13 @@ class TestPackager(TestCase):
         self.assertEqual("9", distro.repo_os_version("rhel93"))
         self.assertEqual("10", distro.repo_os_version("rhel10"))
 
+    def test_enterprise_rhel10_includes_ibm_architectures(self) -> None:
+        """Test Enterprise RHEL 10 build OS choices include IBM architectures."""
+        distro = EnterpriseDistro("redhat")
+
+        self.assertIn("rhel10", distro.build_os("ppc64le"))
+        self.assertIn("rhel10", distro.build_os("s390x"))
+
     def test_redhat_release_dist_accepts_major_only_legacy_name(self) -> None:
         """Test an RHEL 9 and earlier name with no minor version."""
         self.assertEqual("el9", Distro("redhat").release_dist("rhel9"))

@@ -175,18 +175,18 @@ class EnterpriseDistro(packager.Distro):
     def build_os(self, arch):
         """Return the build os label in the binary package to download.
 
-        The labels "rhel57", "rhel62", "rhel67", "rhel70", "rhel79", "rhel80", "rhel90" are for redhat,
-        the others are delegated to the super class.
+        The labels "rhel57", "rhel62", "rhel67", "rhel70", "rhel79", "rhel80",
+        "rhel90", "rhel10" are for redhat, the others are delegated to the super class.
         """
         if arch == "ppc64le":
             if self.dname == "ubuntu":
                 return ["ubuntu1604", "ubuntu1804"]
             if self.dname == "redhat":
-                return ["rhel71", "rhel81", "rhel9"]
+                return ["rhel71", "rhel81", "rhel9", "rhel10"]
             return []
         if arch == "s390x":
             if self.dname == "redhat":
-                return ["rhel67", "rhel72", "rhel83", "rhel9"]
+                return ["rhel67", "rhel72", "rhel83", "rhel9", "rhel10"]
             if self.dname == "suse":
                 return ["suse11", "suse12", "suse15"]
             if self.dname == "ubuntu":
