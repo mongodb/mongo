@@ -117,68 +117,56 @@ Execution Engine: classic
 [ "_id_", "a_1", "a_1_b_1" ]
 ```
 ### Summarized explain
-Execution Engine: classic
+Execution Engine: sbe
 ```json
 {
 	"queryShapeHash" : "7369A25E4B52DA5797E4FFD461F50CE164B53CC62F7CD4D3BFEA04A3342FA081",
-	"stages" : [
+	"rejectedPlans" : [ ],
+	"winningPlan" : [
 		{
-			"$cursor" : {
-				"rejectedPlans" : [ ],
-				"winningPlan" : [
-					{
-						"stage" : "PROJECTION_SIMPLE",
-						"transformBy" : {
-							"_id" : 0,
-							"a" : 1
-						}
-					},
-					{
-						"nss" : "test.unwind_group_to_distinct_scan_multiplanning_md",
-						"stage" : "FETCH"
-					},
-					{
-						"direction" : "forward",
-						"indexBounds" : {
-							"a" : [
-								"[MinKey, MaxKey]"
-							],
-							"b" : [
-								"[MinKey, MaxKey]"
-							]
-						},
-						"indexName" : "a_1_b_1",
-						"isMultiKey" : true,
-						"isPartial" : false,
-						"isSparse" : false,
-						"isUnique" : false,
-						"keyPattern" : {
-							"a" : 1,
-							"b" : 1
-						},
-						"multiKeyPaths" : {
-							"a" : [
-								"a"
-							],
-							"b" : [ ]
-						},
-						"nss" : "test.unwind_group_to_distinct_scan_multiplanning_md",
-						"stage" : "IXSCAN"
-					}
+			"stage" : "GROUP"
+		},
+		{
+			"stage" : "UNWIND"
+		},
+		{
+			"stage" : "PROJECTION_SIMPLE",
+			"transformBy" : {
+				"_id" : false,
+				"a" : true
+			}
+		},
+		{
+			"nss" : "test.unwind_group_to_distinct_scan_multiplanning_md",
+			"stage" : "FETCH"
+		},
+		{
+			"direction" : "forward",
+			"indexBounds" : {
+				"a" : [
+					"[MinKey, MaxKey]"
+				],
+				"b" : [
+					"[MinKey, MaxKey]"
 				]
-			}
-		},
-		{
-			"$unwind" : {
-				"path" : "$a",
-				"preserveNullAndEmptyArrays" : true
-			}
-		},
-		{
-			"$group" : {
-				"$willBeMerged" : false,
-				"_id" : "$a"
-			}
+			},
+			"indexName" : "a_1_b_1",
+			"isMultiKey" : true,
+			"isPartial" : false,
+			"isSparse" : false,
+			"isUnique" : false,
+			"keyPattern" : {
+				"a" : 1,
+				"b" : 1
+			},
+			"multiKeyPaths" : {
+				"a" : [
+					"a"
+				],
+				"b" : [ ]
+			},
+			"nss" : "test.unwind_group_to_distinct_scan_multiplanning_md",
+			"stage" : "IXSCAN"
 		}
 	]
 }
@@ -218,63 +206,51 @@ Execution Engine: classic
 [ "_id_", "a_1", "a_1_b_1" ]
 ```
 ### Summarized explain
-Execution Engine: classic
+Execution Engine: sbe
 ```json
 {
 	"queryShapeHash" : "7369A25E4B52DA5797E4FFD461F50CE164B53CC62F7CD4D3BFEA04A3342FA081",
-	"stages" : [
+	"rejectedPlans" : [ ],
+	"winningPlan" : [
 		{
-			"$cursor" : {
-				"rejectedPlans" : [ ],
-				"winningPlan" : [
-					{
-						"stage" : "PROJECTION_SIMPLE",
-						"transformBy" : {
-							"_id" : 0,
-							"a" : 1
-						}
-					},
-					{
-						"nss" : "test.unwind_group_to_distinct_scan_multiplanning_md",
-						"stage" : "FETCH"
-					},
-					{
-						"direction" : "forward",
-						"indexBounds" : {
-							"a" : [
-								"[MinKey, MaxKey]"
-							]
-						},
-						"indexName" : "a_1",
-						"isMultiKey" : true,
-						"isPartial" : false,
-						"isSparse" : false,
-						"isUnique" : false,
-						"keyPattern" : {
-							"a" : 1
-						},
-						"multiKeyPaths" : {
-							"a" : [
-								"a"
-							]
-						},
-						"nss" : "test.unwind_group_to_distinct_scan_multiplanning_md",
-						"stage" : "IXSCAN"
-					}
+			"stage" : "GROUP"
+		},
+		{
+			"stage" : "UNWIND"
+		},
+		{
+			"stage" : "PROJECTION_SIMPLE",
+			"transformBy" : {
+				"_id" : false,
+				"a" : true
+			}
+		},
+		{
+			"nss" : "test.unwind_group_to_distinct_scan_multiplanning_md",
+			"stage" : "FETCH"
+		},
+		{
+			"direction" : "forward",
+			"indexBounds" : {
+				"a" : [
+					"[MinKey, MaxKey]"
 				]
-			}
-		},
-		{
-			"$unwind" : {
-				"path" : "$a",
-				"preserveNullAndEmptyArrays" : true
-			}
-		},
-		{
-			"$group" : {
-				"$willBeMerged" : false,
-				"_id" : "$a"
-			}
+			},
+			"indexName" : "a_1",
+			"isMultiKey" : true,
+			"isPartial" : false,
+			"isSparse" : false,
+			"isUnique" : false,
+			"keyPattern" : {
+				"a" : 1
+			},
+			"multiKeyPaths" : {
+				"a" : [
+					"a"
+				]
+			},
+			"nss" : "test.unwind_group_to_distinct_scan_multiplanning_md",
+			"stage" : "IXSCAN"
 		}
 	]
 }

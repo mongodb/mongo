@@ -2,7 +2,6 @@
  * Tests the behavior of the internalQueryPlanTotalEvaluationCollFraction parameter.
  */
 import {getPlanRanker} from "jstests/libs/query/cbr_utils.js";
-import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/query/sbe_util.js";
 import {describe, it, beforeEach, after} from "jstests/libs/mochalite.js";
 
 const dbName = jsTestName();
@@ -11,7 +10,6 @@ const collName = jsTestName();
 const conn = MongoRunner.runMongod({});
 const db = conn.getDB(dbName);
 const coll = db.getCollection(collName);
-const sbeFeatureFlagFullEnabled = checkSbeFullFeatureFlagEnabled(db);
 
 function resetKnobsForTest() {
     assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryDisablePlanCache: true}));
@@ -124,7 +122,7 @@ describe("MultiPlanner exit condition metrics get updated correctly", function (
 
     if (planRanker === "costBased") {
         throw new Error(`This test does not support planRanker=costBased`);
-    } else if (planRanker === "mixed" && !sbeFeatureFlagFullEnabled) {
+    } else if (planRanker === "mixed") {
         describe("Mixed plan ranker", function () {
             describe("fallback to CBR", function () {
                 it("does not update multi-planner metrics when plan cache is disabled", function () {
@@ -243,7 +241,7 @@ describe("MultiPlanner exit condition metrics get updated correctly", function (
             });
         });
     } else {
-        // planRanker == "multiPlanning" or SBE is enabled
+        // planRanker == "multiPlanning"
         describe("multiPlanner (no CBR)", function () {
             it("records hitWorksLimit for low collFraction", function () {
                 // With a low total collection fraction, multiplanning should stop due to works limit.

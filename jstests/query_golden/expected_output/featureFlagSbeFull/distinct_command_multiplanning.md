@@ -14,6 +14,7 @@
 						"$eq" : 5
 					}
 				},
+				"nss" : "test.distinct_command_multiplanning_md",
 				"stage" : "FETCH"
 			},
 			{
@@ -34,6 +35,7 @@
 				"multiKeyPaths" : {
 					"x" : [ ]
 				},
+				"nss" : "test.distinct_command_multiplanning_md",
 				"stage" : "IXSCAN"
 			}
 		],
@@ -44,6 +46,7 @@
 						"$eq" : 5
 					}
 				},
+				"nss" : "test.distinct_command_multiplanning_md",
 				"stage" : "FETCH"
 			},
 			{
@@ -64,6 +67,7 @@
 				"multiKeyPaths" : {
 					"x" : [ ]
 				},
+				"nss" : "test.distinct_command_multiplanning_md",
 				"stage" : "IXSCAN"
 			}
 		]
@@ -119,6 +123,7 @@
 	"rejectedPlans" : [
 		[
 			{
+				"nss" : "test.distinct_command_multiplanning_md",
 				"stage" : "FETCH"
 			},
 			{
@@ -141,6 +146,7 @@
 						"x"
 					]
 				},
+				"nss" : "test.distinct_command_multiplanning_md",
 				"stage" : "IXSCAN"
 			}
 		]
@@ -192,6 +198,7 @@
 						"$eq" : 5
 					}
 				},
+				"nss" : "test.distinct_command_multiplanning_md",
 				"stage" : "FETCH"
 			},
 			{
@@ -214,6 +221,7 @@
 						"x"
 					]
 				},
+				"nss" : "test.distinct_command_multiplanning_md",
 				"stage" : "IXSCAN"
 			}
 		],
@@ -224,6 +232,7 @@
 						"$eq" : 5
 					}
 				},
+				"nss" : "test.distinct_command_multiplanning_md",
 				"stage" : "FETCH"
 			},
 			{
@@ -246,6 +255,7 @@
 						"x"
 					]
 				},
+				"nss" : "test.distinct_command_multiplanning_md",
 				"stage" : "IXSCAN"
 			}
 		]

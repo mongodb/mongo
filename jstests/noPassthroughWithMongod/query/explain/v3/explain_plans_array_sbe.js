@@ -17,11 +17,6 @@ import {
     stagesByNodeId,
     stageNames,
 } from "jstests/libs/query/explain_v3_helpers.js";
-import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/query/sbe_util.js";
-
-// With featureFlagSbeFull the SBE runtime planner ranks the candidates instead of the classic
-// multi-planner's capped trial, which changes the trial-phase output asserted below.
-const sbeFull = checkSbeFullFeatureFlagEnabled(db);
 
 const collName = jsTestName();
 const coll = db[collName];
@@ -108,13 +103,10 @@ describe("V3 queryPlanner.plans array on the SBE engine", function () {
         const plans = getV3Plans(explain);
         assert.gte(plans.length, 2, {plans});
 
-        // With featureFlagSbeFull the SBE runtime planner runs the trial in one uncapped phase,
-        // so each plan carries only 'multiPlanFinalizeStats'. Otherwise the default mixed
-        // ranker's capped trial produces results and decides without a resumed phase, so each
-        // plan carries only 'multiPlanEstimateStats'.
-        const [phaseGroup, absentGroup] = sbeFull
-            ? ["multiPlanFinalizeStats", "multiPlanEstimateStats"]
-            : ["multiPlanEstimateStats", "multiPlanFinalizeStats"];
+        // The default mixed ranker's capped trial produces results and decides without a resumed
+        // phase, so each plan carries only 'multiPlanEstimateStats'.
+        const phaseGroup = "multiPlanEstimateStats";
+        const absentGroup = "multiPlanFinalizeStats";
         for (const plan of plans) {
             assertWellFormedPlan(plan);
             assert(plan.hasOwnProperty(phaseGroup), "expected " + phaseGroup, {plan});
@@ -187,12 +179,6 @@ describe("V3 queryPlanner.plans array on the SBE engine", function () {
                     "only the winner may carry the executed tree",
                     context,
                 );
-            }
-
-            // With featureFlagSbeFull the ranked entries come from QuerySolutions with no node
-            // ids assigned, so the trees cannot be correlated by id.
-            if (sbeFull) {
-                continue;
             }
 
             // Node ids are assigned post-order, so extending the plan and rewriting it leave the
