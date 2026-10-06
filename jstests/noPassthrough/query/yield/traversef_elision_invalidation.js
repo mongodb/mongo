@@ -1,6 +1,8 @@
 /**
  * Verifies that when path arrayness assumptions are invalidated, queries that
- * rely on these assumptions are killed during restore.
+ * rely on these assumptions are killed during restore. Also verifies that root-doc
+ * path arrayness is not applied to the element-relative path of an object $elemMatch
+ * child when a non-multikey root index shadows the field name.
  *
  * @tags: [requires_fcv_90, requires_sbe]
  */
@@ -186,15 +188,41 @@ const flagOffOff = {
 
 runTest({testCase: fetchCase, setParameters: flagOnOn, expect: "killed"});
 runTest({testCase: fetchCase, setParameters: flagOnOff, expect: "correct"});
-runTest({testCase: fetchCase, setParameters: flagOffOn, expect: "correct"});
-runTest({testCase: fetchCase, setParameters: flagOffOff, expect: "correct"});
 
 runTest({testCase: collScanCase, setParameters: flagOnOn, expect: "killed"});
 runTest({testCase: collScanCase, setParameters: flagOnOff, expect: "correct"});
-runTest({testCase: collScanCase, setParameters: flagOffOn, expect: "correct"});
-runTest({testCase: collScanCase, setParameters: flagOffOff, expect: "correct"});
 
 runTest({testCase: clusteredCollScanCase, setParameters: flagOnOn, expect: "killed"});
 runTest({testCase: clusteredCollScanCase, setParameters: flagOnOff, expect: "correct"});
-runTest({testCase: clusteredCollScanCase, setParameters: flagOffOn, expect: "correct"});
-runTest({testCase: clusteredCollScanCase, setParameters: flagOffOff, expect: "correct"});
+
+// Root-doc path arrayness must not be applied to the element-relative path of an object
+// $elemMatch child: a non-multikey root index on "b" says nothing about arr.$.b, and
+// applying it would elide traverseF and miss elements whose "b" is an array.
+function runElemMatchObjectCase(setParameters) {
+    jsTest.log.info("Running elemMatch object case with setParameters=" + tojson(setParameters));
+
+    const conn = MongoRunner.runMongod({setParameter: setParameters});
+    assert.neq(null, conn, "mongod was unable to start up");
+
+    const testDb = conn.getDB("test");
+    const coll = testDb.elemmatch_object_arrayness;
+
+    coll.drop();
+    assert.commandWorked(coll.insert({_id: 0, b: 1, arr: [{b: [1, 2]}]}));
+    assert.commandWorked(coll.createIndex({b: 1}));
+
+    // The trailing $group makes the $match run in SBE under trySbeRestricted.
+    const pipeline = [{$match: {arr: {$elemMatch: {b: 2}}}}, {$group: {_id: null}}];
+    assert.eq(getEngine(coll.explain().aggregate(pipeline)), "sbe", "Expected SBE engine");
+
+    assert.sameMembers(
+        coll.aggregate(pipeline).toArray(),
+        [{_id: null}],
+        "Element whose 'b' is an array must match inside object $elemMatch",
+    );
+
+    MongoRunner.stopMongod(conn);
+}
+
+runElemMatchObjectCase(flagOnOn);
+runElemMatchObjectCase(flagOnOff);

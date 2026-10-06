@@ -1,0 +1,8 @@
+# Golden test output of GoldenSbeFilterBuilderElemMatchShadowFixture/TestElemMatchObjectShadowedPathRegex
+ShadowedPath_Regex
+
+    let [
+        l4.0 = getField(s1, "arr") 
+    ] 
+    in ((isArray(l4.0) && traverseF(l4.0, lambda(l5.0) { (typeMatch(l5.0, 24) && traverseF(getField(l5.0, "b"), lambda(l6.0) { (((l6.0 == /^x/) ?: false) || (regexMatch(PcreRegex(/^x/), l6.0) ?: false)) }, false)) }, false)) ?: false) 
+

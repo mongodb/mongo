@@ -5,6 +5,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/exec/docval_to_sbeval.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
@@ -16,7 +17,9 @@
 #include "mongo/db/matcher/expression_type.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/compiler/metadata/path_arrayness.h"
+#include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/query/stage_builder/sbe/tests/sbe_builder_test_fixture.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
@@ -46,6 +49,24 @@ public:
                  std::string_view test,
                  PlanStageSlots slots = {}) {
         auto sbExpr = generateFilter(*_state, expr, rootSlot, slots, isFilterOverIxscan);
+
+        sbe::value::TagValueOwned expectedValue =
+            sbe::value::TagValueOwned::fromRaw(sbe::value::makeValue(Value(expected)));
+        GoldenSbeExprBuilderTestFixture::runTest(
+            std::move(sbExpr), expectedValue.tag(), expectedValue.value(), test);
+    }
+
+    void runTestWithPathArrayness(const MatchExpression* expr,
+                                  boost::optional<SbSlot> rootSlot,
+                                  bool expected,
+                                  std::string_view test,
+                                  PlanStageSlots slots = {}) {
+        auto sbExpr = generateFilter(*_state,
+                                     expr,
+                                     rootSlot,
+                                     slots,
+                                     /*isFilterOverIxscan*/ false,
+                                     /*canUsePathArrayness*/ true);
 
         sbe::value::TagValueOwned expectedValue =
             sbe::value::TagValueOwned::fromRaw(sbe::value::makeValue(Value(expected)));
@@ -391,24 +412,60 @@ public:
         pathArrayness->addPath(FieldPath("a.b"), MultikeyComponents{}, true /* isFullRebuild */);
         _expCtx->setPathArraynessForNss(_expCtx->getNamespaceString(), std::move(pathArrayness));
     }
+};
 
-    void runTestWithPathArrayness(const MatchExpression* expr,
-                                  boost::optional<SbSlot> rootSlot,
-                                  bool expected,
-                                  std::string_view test,
-                                  PlanStageSlots slots = {}) {
-        auto sbExpr = generateFilter(*_state,
-                                     expr,
-                                     rootSlot,
-                                     slots,
-                                     /*isFilterOverIxscan*/ false,
-                                     /*canUsePathArrayness*/ true);
+class GoldenSbeFilterBuilderElemMatchShadowFixture : public GoldenSbeFilterBuilderTestFixture {
+public:
+    void setUp() override {
+        GoldenSbeFilterBuilderTestFixture::setUp();
 
-        sbe::value::TagValueOwned expectedValue =
-            sbe::value::TagValueOwned::fromRaw(sbe::value::makeValue(Value(expected)));
-        GoldenSbeExprBuilderTestFixture::runTest(
-            std::move(sbExpr), expectedValue.tag(), expectedValue.value(), test);
+        // Mark the root paths "b", "e", "g" and "c.d" as known non-array, as non-multikey
+        // root indexes would. Element-relative paths with the same names inside $elemMatch
+        // describe fields of the array elements, not of the root document, and must not
+        // inherit this metadata.
+        auto pathArrayness = std::make_shared<PathArrayness>();
+        pathArrayness->addPath(FieldPath("b"), MultikeyComponents{}, true /* isFullRebuild */);
+        pathArrayness->addPath(FieldPath("e"), MultikeyComponents{}, true /* isFullRebuild */);
+        pathArrayness->addPath(FieldPath("g"), MultikeyComponents{}, true /* isFullRebuild */);
+        pathArrayness->addPath(FieldPath("c.d"), MultikeyComponents{}, true /* isFullRebuild */);
+        _expCtx->setPathArraynessForNss(_expCtx->getNamespaceString(), std::move(pathArrayness));
     }
+
+    // Parses 'filter' and runs it against 'doc' with canUsePathArrayness=true.
+    void runParsedFilter(std::string_view filter,
+                         const BSONObj& doc,
+                         bool expected,
+                         std::string_view test) {
+        auto slot = registerDocSlot("root"sv, doc);
+        runParsedFilterOnSlot(filter, slot, expected, test);
+    }
+
+    // Parses 'filter' and runs it against the already-registered document in 'slot'.
+    void runParsedFilterOnSlot(std::string_view filter,
+                               SbSlot slot,
+                               bool expected,
+                               std::string_view test) {
+        // The parsed expression tree references the backing BSON of 'filter' (e.g. comparison
+        // RHS elements), so the BSONObj must outlive generateFilter.
+        _docs.push_back(fromjson(filter));
+        auto expr = unittest::assertGet(MatchExpressionParser::parse(_docs.back(), _expCtx));
+        runTestWithPathArrayness(expr.get(), slot, expected, test);
+    }
+
+protected:
+    // The fixture owns every registered document so the slots stay valid for the whole test.
+    SbSlot registerDocSlot(std::string_view name, const BSONObj& doc) {
+        _docs.push_back(doc.copy());
+        const BSONObj& owned = _docs.back();
+        auto slotId = _env->registerSlot(name,
+                                         sbe::value::TypeTags::bsonObject,
+                                         sbe::value::bitcastFrom<const char*>(owned.objdata()),
+                                         false,
+                                         &_slotIdGenerator);
+        return SbSlot{slotId, TypeSignature::kObjectType};
+    }
+
+    std::vector<BSONObj> _docs;
 };
 
 TEST_F(GoldenSbeFilterBuilderArraynessTestFixture, TestPathArraynessTraverseFElision) {
@@ -510,6 +567,118 @@ TEST_F(GoldenSbeFilterBuilderArraynessTestFixture, TestNothingCheckWithPathArray
             runTestWithPathArrayness(
                 &eqExpr, rootSlot, true /* expected */, "NothingCheck_EqNull_MissingField"sv);
         }
+    }
+}
+
+// Object-form $elemMatch predicates on the shadowed element-relative path "b". The
+// element's "b" is the array [1, 2] and the root "b" is the scalar 9, so matching the
+// array itself or the root value instead of the array's elements flips each expected
+// result. $size evaluates the array value at the path without traverseF and doubles as a
+// control for that semantics.
+TEST_F(GoldenSbeFilterBuilderElemMatchShadowFixture, TestElemMatchObjectShadowedPathEq) {
+    unittest::ServerParameterGuard featureFlag{"featureFlagPathArrayness", true};
+
+    runParsedFilter("{arr: {$elemMatch: {b: 2}}}",
+                    fromjson("{b: 9, arr: [{b: [1, 2]}]}"),
+                    true,
+                    "ShadowedPath_Eq"sv);
+}
+
+TEST_F(GoldenSbeFilterBuilderElemMatchShadowFixture, TestElemMatchObjectShadowedPathIn) {
+    unittest::ServerParameterGuard featureFlag{"featureFlagPathArrayness", true};
+
+    runParsedFilter("{arr: {$elemMatch: {b: {$in: [2, 7]}}}}",
+                    fromjson("{b: 9, arr: [{b: [1, 2]}]}"),
+                    true,
+                    "ShadowedPath_In"sv);
+}
+
+TEST_F(GoldenSbeFilterBuilderElemMatchShadowFixture, TestElemMatchObjectShadowedPathNotEq) {
+    unittest::ServerParameterGuard featureFlag{"featureFlagPathArrayness", true};
+
+    runParsedFilter("{arr: {$elemMatch: {b: {$not: {$eq: 2}}}}}",
+                    fromjson("{b: 9, arr: [{b: [1, 2]}]}"),
+                    false,
+                    "ShadowedPath_NotEq"sv);
+}
+
+TEST_F(GoldenSbeFilterBuilderElemMatchShadowFixture, TestElemMatchObjectShadowedPathRegex) {
+    unittest::ServerParameterGuard featureFlag{"featureFlagPathArrayness", true};
+
+    runParsedFilter("{arr: {$elemMatch: {b: {$regex: '^x'}}}}",
+                    fromjson("{b: 9, arr: [{b: ['x', 'y']}]}"),
+                    true,
+                    "ShadowedPath_Regex"sv);
+}
+
+TEST_F(GoldenSbeFilterBuilderElemMatchShadowFixture, TestElemMatchObjectShadowedPathSize) {
+    unittest::ServerParameterGuard featureFlag{"featureFlagPathArrayness", true};
+
+    runParsedFilter("{arr: {$elemMatch: {b: {$size: 2}}}}",
+                    fromjson("{b: 9, arr: [{b: [1, 2]}]}"),
+                    true,
+                    "ShadowedPath_Size"sv);
+}
+
+TEST_F(GoldenSbeFilterBuilderElemMatchShadowFixture, TestNestedElemMatchShadowedPath) {
+    unittest::ServerParameterGuard featureFlag{"featureFlagPathArrayness", true};
+
+    // {arr: {$elemMatch: {f: {$elemMatch: {g: 2}}}}}: "g" is element-relative at match
+    // frame depth 3 and must not inherit the root metadata for "g".
+    runParsedFilter("{arr: {$elemMatch: {f: {$elemMatch: {g: 2}}}}}",
+                    fromjson("{g: 1, arr: [{f: [{g: [1, 2]}]}]}"),
+                    true,
+                    "NestedElemMatch_ShadowedG"sv);
+}
+
+TEST_F(GoldenSbeFilterBuilderElemMatchShadowFixture, TestElemMatchShadowedDottedPath) {
+    unittest::ServerParameterGuard featureFlag{"featureFlagPathArrayness", true};
+
+    // {arr: {$elemMatch: {"c.d": 2}}}: the dotted element-relative path must not inherit
+    // the root metadata for "c.d".
+    runParsedFilter("{arr: {$elemMatch: {'c.d': 2}}}",
+                    fromjson("{c: {d: 1}, arr: [{c: {d: [1, 2]}}]}"),
+                    true,
+                    "DottedElemMatch_ShadowedCD"sv);
+}
+
+TEST_F(GoldenSbeFilterBuilderElemMatchShadowFixture, TestRootFramePathStillElides) {
+    unittest::ServerParameterGuard featureFlag{"featureFlagPathArrayness", true};
+
+    // Root-frame predicates on known non-array paths must keep eliding traverseF.
+    auto slot = registerDocSlot("shadowRoot"sv, fromjson("{b: 1, c: {d: 1}, arr: [{b: [1, 2]}]}"));
+    runParsedFilterOnSlot("{b: 1}", slot, true, "RootFrame_Eq_StillElided"sv);
+    runParsedFilterOnSlot("{'c.d': 1}", slot, true, "RootFrame_DottedEq_StillElided"sv);
+}
+
+TEST_F(GoldenSbeFilterBuilderElemMatchShadowFixture, TestElemMatchNestedElemMatchForms) {
+    unittest::ServerParameterGuard featureFlag{"featureFlagPathArrayness", true};
+
+    // {arr: {$elemMatch: {e: {$elemMatch: {$gt: 1}}}}}: the value-form $elemMatch's own path
+    // "e" is element-relative inside the object-form $elemMatch and must not inherit the root
+    // metadata for "e". Hand-built because the parser produces pathless children for value-form
+    // $elemMatch; the planner assigns their paths before stage building in production.
+    {
+        auto slot =
+            registerDocSlot("valueInObjectRoot"sv, fromjson("{b: 1, e: 1, arr: [{e: [1, 2]}]}"));
+        ElemMatchObjectMatchExpression elemMatch(
+            "arr"sv,
+            std::make_unique<ElemMatchValueMatchExpression>(
+                "e"sv, std::make_unique<GTMatchExpression>("e"sv, Value(1))));
+        runTestWithPathArrayness(&elemMatch, slot, true, "ValueInObject_ShadowedE"sv);
+    }
+
+    // {arr: {$elemMatch: {$elemMatch: {b: 2}}}}: the inner object-form $elemMatch's child "b"
+    // is element-relative at match frame depth 3 and must not inherit the root metadata for
+    // "b". Hand-built for the same reason as above.
+    {
+        auto slot =
+            registerDocSlot("objectInValueRoot"sv, fromjson("{b: 1, arr: [[{b: [1, 2]}]]}"));
+        ElemMatchValueMatchExpression elemMatch(
+            "arr"sv,
+            std::make_unique<ElemMatchObjectMatchExpression>(
+                "arr"sv, std::make_unique<EqualityMatchExpression>("b"sv, Value(2))));
+        runTestWithPathArrayness(&elemMatch, slot, true, "ObjectInValue_ShadowedB"sv);
     }
 }
 
