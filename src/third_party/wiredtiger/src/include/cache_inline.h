@@ -365,29 +365,33 @@ __wt_eviction_updates_needed(WT_SESSION_IMPL *session, double *pct_fullp)
 
 /*
  * __wt_btree_dominating_cache --
- *     Return if a single btree is occupying at least half of any of our target's cache usage.
+ *     Return if a single btree is occupying at least half of any of our target's cache usage. Only
+ *     the dimensions selected by the given eviction flags are considered.
  */
 static WT_INLINE bool
-__wt_btree_dominating_cache(WT_SESSION_IMPL *session, WT_BTREE *btree)
+__wt_btree_dominating_cache(WT_SESSION_IMPL *session, WT_BTREE *btree, uint32_t flags)
 {
     WT_CACHE *cache;
-    uint64_t bytes_dirty;
-    uint64_t bytes_max;
+    uint64_t bytes_dirty, bytes_max;
 
     cache = S2C(session)->cache;
     bytes_max = S2C(session)->cache_size + 1;
 
-    if (__wt_cache_bytes_plus_overhead(cache, __wt_atomic_load64(&btree->bytes_inmem)) >
-      (uint64_t)(0.5 * cache->eviction_target * bytes_max) / 100)
+    if (LF_ISSET(WT_CACHE_EVICT_CLEAN) &&
+      __wt_cache_bytes_plus_overhead(cache, __wt_atomic_load64(&btree->bytes_inmem)) >
+        (uint64_t)(0.5 * cache->eviction_target * bytes_max) / 100)
         return (true);
 
-    bytes_dirty =
-      __wt_atomic_load64(&btree->bytes_dirty_intl) + __wt_atomic_load64(&btree->bytes_dirty_leaf);
-    if (__wt_cache_bytes_plus_overhead(cache, bytes_dirty) >
-      (uint64_t)(0.5 * cache->eviction_dirty_target * bytes_max) / 100)
-        return (true);
-    if (__wt_cache_bytes_plus_overhead(cache, __wt_atomic_load64(&btree->bytes_updates)) >
-      (uint64_t)(0.5 * cache->eviction_updates_target * bytes_max) / 100)
+    if (LF_ISSET(WT_CACHE_EVICT_DIRTY)) {
+        bytes_dirty = __wt_atomic_load64(&btree->bytes_dirty_intl) +
+          __wt_atomic_load64(&btree->bytes_dirty_leaf);
+        if (__wt_cache_bytes_plus_overhead(cache, bytes_dirty) >
+          (uint64_t)(0.5 * cache->eviction_dirty_target * bytes_max) / 100)
+            return (true);
+    }
+    if (LF_ISSET(WT_CACHE_EVICT_UPDATES) &&
+      __wt_cache_bytes_plus_overhead(cache, __wt_atomic_load64(&btree->bytes_updates)) >
+        (uint64_t)(0.5 * cache->eviction_updates_target * bytes_max) / 100)
         return (true);
 
     return (false);

@@ -393,7 +393,7 @@ __evict_delete_ref(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
      * have already been freed.
      */
     if (!LF_ISSET(WT_EVICT_CALL_NO_SPLIT | WT_EVICT_CALL_CLOSING)) {
-        parent = ref->home;
+        parent = __wt_atomic_load_pointer(&ref->home);
         WT_INTL_INDEX_GET(session, parent, pindex);
         ndeleted = __wt_atomic_addv32(&pindex->deleted_entries, 1);
 

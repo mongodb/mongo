@@ -439,13 +439,14 @@ __verify_tree(
     WT_BTREE *btree;
     WT_CELL_UNPACK_ADDR *unpack, _unpack;
     WT_DECL_RET;
-    WT_PAGE *page;
+    WT_PAGE *home, *page;
     WT_REF *child_ref;
     uint32_t entry;
 
     btree = S2BT(session);
     bm = btree->bm;
     unpack = &_unpack;
+    home = __wt_atomic_load_pointer(&ref->home);
     page = ref->page;
 
     /*
@@ -567,11 +568,11 @@ __verify_tree(
          * been completed, the parent page's write generation number must be higher than that of its
          * children.
          */
-        if (!__wt_ref_is_root(ref) && page->dsk->write_gen >= ref->home->dsk->write_gen)
+        if (!__wt_ref_is_root(ref) && page->dsk->write_gen >= home->dsk->write_gen)
             WT_RET_MSG(session, EINVAL,
               "child write generation number %" PRIu64
               " is greater/equal to the parent page write generation number %" PRIu64,
-              page->dsk->write_gen, ref->home->dsk->write_gen);
+              page->dsk->write_gen, home->dsk->write_gen);
 
         switch (page->type) {
         case WT_PAGE_COL_FIX:
@@ -657,7 +658,8 @@ celltype_err:
             }
 
             /* Unpack the address block and check timestamps */
-            __wt_cell_unpack_addr(session, child_ref->home->dsk, child_ref->addr, unpack);
+            __wt_cell_unpack_addr(
+              session, __wt_atomic_load_pointer(&child_ref->home)->dsk, child_ref->addr, unpack);
             WT_RET(__verify_addr_ts(session, child_ref, unpack, vs));
 
             /* Verify the subtree. */
@@ -704,7 +706,8 @@ celltype_err:
                 WT_RET(__verify_row_int_key_order(session, page, child_ref, entry, vs));
 
             /* Unpack the address block and check timestamps */
-            __wt_cell_unpack_addr(session, child_ref->home->dsk, child_ref->addr, unpack);
+            __wt_cell_unpack_addr(
+              session, __wt_atomic_load_pointer(&child_ref->home)->dsk, child_ref->addr, unpack);
             WT_RET(__verify_addr_ts(session, child_ref, unpack, vs));
 
             /* Verify the subtree. */

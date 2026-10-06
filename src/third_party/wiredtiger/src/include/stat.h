@@ -489,6 +489,8 @@ struct __wt_connection_stats {
     int64_t cache_eviction_server_slept;
     int64_t cache_eviction_slow;
     int64_t cache_eviction_walk_leaf_notfound;
+    int64_t eviction_server_walk_dominating_cache;
+    int64_t eviction_server_walk_dominating_cache_unproductive;
     int64_t cache_eviction_state;
     int64_t cache_eviction_walk_sleeps;
     int64_t cache_eviction_pages_queued_updates;

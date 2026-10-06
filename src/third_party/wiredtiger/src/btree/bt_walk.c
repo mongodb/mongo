@@ -30,7 +30,7 @@ __ref_index_slot(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE_INDEX **pindexp,
          * Copy the parent page's index value: the page can split at any time, but the index's value
          * is always valid, even if it's not up-to-date.
          */
-        WT_INTL_INDEX_GET(session, ref->home, pindex);
+        WT_INTL_INDEX_GET(session, __wt_atomic_load_pointer(&ref->home), pindex);
         entries = pindex->entries;
 
         /*
@@ -93,7 +93,7 @@ __ref_ascend(WT_SESSION_IMPL *session, WT_REF **refp, WT_PAGE_INDEX **pindexp, u
          * Find our parent slot on the next higher internal page, the slot from which we move to a
          * next/prev slot, checking that we haven't reached the root.
          */
-        parent_ref = ref->home->pg_intl_parent_ref;
+        parent_ref = __wt_atomic_load_pointer(&ref->home)->pg_intl_parent_ref;
         if (__wt_ref_is_root(parent_ref))
             break;
         __ref_index_slot(session, parent_ref, pindexp, slotp);
@@ -136,7 +136,7 @@ __ref_ascend(WT_SESSION_IMPL *session, WT_REF **refp, WT_PAGE_INDEX **pindexp, u
          * our search doesn't point to the same page as that initial
          * WT_REF, there's a race and we start over again.
          */
-        if (ref->home == parent_ref->page)
+        if (__wt_atomic_load_pointer(&ref->home) == parent_ref->page)
             break;
     }
 
@@ -225,7 +225,7 @@ __split_prev_race(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE_INDEX **pindexp
      * until the page-index is updated, but I'm not willing to debug that
      * one if I'm wrong.)
      */
-    if (pindex->index[pindex->entries - 1]->home != ref->page)
+    if (__wt_atomic_load_pointer(&pindex->index[pindex->entries - 1]->home) != ref->page)
         return (true);
 
     *pindexp = pindex;

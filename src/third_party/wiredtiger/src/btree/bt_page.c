@@ -843,7 +843,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
     hint = 0;
     WT_CELL_FOREACH_ADDR (session, page->dsk, unpack) {
         ref = *refp;
-        ref->home = page;
+        __wt_atomic_store_pointer(&ref->home, page);
         ref->pindex_hint = hint++;
 
         switch (unpack.type) {

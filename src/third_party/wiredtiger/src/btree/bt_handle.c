@@ -730,7 +730,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, bool creation)
 
         pindex = WT_INTL_INDEX_GET_SAFE(root);
         ref = pindex->index[0];
-        ref->home = root;
+        __wt_atomic_store_pointer(&ref->home, root);
         ref->page = NULL;
         ref->addr = NULL;
         F_SET(ref, WT_REF_FLAG_LEAF);
@@ -743,7 +743,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, bool creation)
 
         pindex = WT_INTL_INDEX_GET_SAFE(root);
         ref = pindex->index[0];
-        ref->home = root;
+        __wt_atomic_store_pointer(&ref->home, root);
         ref->page = NULL;
         ref->addr = NULL;
         F_SET(ref, WT_REF_FLAG_LEAF);

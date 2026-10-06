@@ -21,6 +21,7 @@
 #define WT_EVICT_MAX_TREES WT_THOUSAND /* Maximum walk points */
 #define WT_EVICT_WALK_BASE 300         /* Pages tracked across file visits */
 #define WT_EVICT_WALK_INCR 100         /* Pages added each walk */
+#define WT_EVICT_WALK_PERIOD_MAX 100   /* Ceiling on walks skipped for one tree */
 
 /*
  * WT_EVICT_ENTRY --

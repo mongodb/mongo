@@ -1490,6 +1490,7 @@ __evict_walk(WT_SESSION_IMPL *session, WT_EVICT_QUEUE *queue)
     WT_DATA_HANDLE *dhandle;
     WT_DECL_RET;
     WT_TRACK_OP_DECL;
+    uint32_t dominating_flags, evict_walk_flags, evict_walk_period;
     u_int loop_count, max_entries, retries, slot, start_slot;
     u_int total_candidates;
     bool dhandle_locked, incr;
@@ -1591,7 +1592,7 @@ retry:
          * its pages.
          */
         if (btree->evict_priority != 0 && !__wt_cache_aggressive(session) &&
-          !__wt_btree_dominating_cache(session, btree)) {
+          !__wt_btree_dominating_cache(session, btree, WT_CACHE_EVICT_ALL)) {
             WT_STAT_CONN_INCR(session, cache_eviction_server_skip_trees_stick_in_cache);
             continue;
         }
@@ -1609,11 +1610,40 @@ retry:
         }
 
         /*
-         * If we are filling the queue, skip files that haven't been useful in the past.
+         * Reset walk effectiveness tracking when the eviction dimensions change. Other flags track
+         * pressure levels and the urgent queue, which turn over frequently and would leave no
+         * effectiveness history if included here.
          */
-        if (btree->evict_walk_period != 0 && btree->evict_walk_skips++ < btree->evict_walk_period) {
-            WT_STAT_CONN_INCR(session, cache_eviction_server_skip_trees_not_useful_before);
-            continue;
+        evict_walk_flags = cache->flags & WT_CACHE_EVICT_ALL;
+        if (btree->last_evict_walk_flags != evict_walk_flags) {
+            btree->evict_walk_period = 0;
+            btree->last_evict_walk_flags = evict_walk_flags;
+        }
+
+        /*
+         * Dirty content in a syncing tree cannot translate into eviction candidates, so do not
+         * consider it when deciding whether the tree dominates cache usage.
+         */
+        dominating_flags = evict_walk_flags;
+        if (WT_BTREE_SYNCING(btree))
+            FLD_CLR(dominating_flags, WT_CACHE_EVICT_DIRTY);
+
+        /*
+         * The walk period records that previous walks found few candidates, not what the tree holds
+         * now. Walk a tree that dominates a dimension eviction is currently targeting despite the
+         * skip period. A saturated period means many consecutive walks came up short, so it is not
+         * overridden.
+         */
+        evict_walk_period = btree->evict_walk_period;
+        btree->evict_walk_dominating = false;
+        if (evict_walk_period != 0 && btree->evict_walk_skips++ < evict_walk_period) {
+            if (evict_walk_period >= WT_EVICT_WALK_PERIOD_MAX ||
+              !__wt_btree_dominating_cache(session, btree, dominating_flags)) {
+                WT_STAT_CONN_INCR(session, cache_eviction_server_skip_trees_not_useful_before);
+                continue;
+            }
+            btree->evict_walk_dominating = true;
+            WT_STAT_CONN_INCR(session, eviction_server_walk_dominating_cache);
         }
         btree->evict_walk_skips = 0;
 
@@ -2059,7 +2089,7 @@ rand_next:
     pages_seen_clean = pages_seen_dirty = pages_seen_updates = 0;
     for (evict = start, pages_already_queued = pages_queued = pages_seen = refs_walked = 0;
          evict < end && (ret == 0 || ret == WT_NOTFOUND);
-         last_parent = ref == NULL ? NULL : ref->home,
+         last_parent = ref == NULL ? NULL : __wt_atomic_load_pointer(&ref->home),
         ret = __wt_tree_walk_count(session, &ref, &refs_walked, walk_flags)) {
         /*
          * Check whether we're finding a good ratio of candidates vs pages seen. Some workloads
@@ -2284,10 +2314,18 @@ fast:
       session->dhandle->name, pages_seen, pages_queued);
 
     /*
+     * A walk that only happened because the tree dominates the cache and queued nothing is the cost
+     * of that override, so track it separately.
+     */
+    if (btree->evict_walk_dominating && pages_queued == 0)
+        WT_STAT_CONN_INCR(session, eviction_server_walk_dominating_cache_unproductive);
+
+    /*
      * If we couldn't find the number of pages we were looking for, skip the tree next time.
      */
     if (pages_queued < target_pages / 2 && !urgent_queued)
-        btree->evict_walk_period = WT_MIN(WT_MAX(1, 2 * btree->evict_walk_period), 100);
+        btree->evict_walk_period =
+          WT_MIN(WT_MAX(1, 2 * btree->evict_walk_period), WT_EVICT_WALK_PERIOD_MAX);
     else if (pages_queued == target_pages) {
         btree->evict_walk_period = 0;
         /*

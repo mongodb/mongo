@@ -886,7 +886,7 @@ __wt_page_parent_modify_set(WT_SESSION_IMPL *session, WT_REF *ref, bool page_onl
      * marking the original parent and all of the newly-created children as dirty. In other words,
      * if we have the wrong parent page, everything was marked dirty already.
      */
-    parent = ref->home;
+    parent = __wt_atomic_load_pointer(&ref->home);
     WT_RET(__wt_page_modify_init(session, parent));
     if (page_only)
         __wt_page_only_modify_set(session, parent);
@@ -917,6 +917,7 @@ static WT_INLINE void
 __wt_ref_key(WT_PAGE *page, WT_REF *ref, void *keyp, size_t *sizep)
 {
     uintptr_t v;
+    void *ikey;
 
 /*
  * An internal page key is in one of two places: if we instantiated the
@@ -945,14 +946,49 @@ __wt_ref_key(WT_PAGE *page, WT_REF *ref, void *keyp, size_t *sizep)
 #define WT_IK_DECODE_KEY_LEN(v) ((v) >> 32)
 #define WT_IK_ENCODE_KEY_OFFSET(v) ((uintptr_t)(v) << 1)
 #define WT_IK_DECODE_KEY_OFFSET(v) (((v)&0xFFFFFFFF) >> 1)
-    v = (uintptr_t)ref->ref_ikey;
+    /*
+     * Read the key once: both forms are valid at any instant, but the flag test and the value used
+     * have to agree. A split can instantiate the key underneath us, so a caller handed an
+     * instantiated key has to see its contents. Acquire pairs with the release store that publishes
+     * an instantiated key.
+     *
+     * This says nothing about which page the key belongs to. An encoded key is an offset into the
+     * disk image of the page it was encoded from, so the caller owes us a page it is valid against.
+     */
+    WT_ACQUIRE_READ(ikey, ref->ref_ikey);
+    v = (uintptr_t)ikey;
     if (v & WT_IK_FLAG) {
         *(void **)keyp = WT_PAGE_REF_OFFSET(page, WT_IK_DECODE_KEY_OFFSET(v));
         *sizep = WT_IK_DECODE_KEY_LEN(v);
     } else {
-        *(void **)keyp = WT_IKEY_DATA(ref->ref_ikey);
-        *sizep = ((WT_IKEY *)ref->ref_ikey)->size;
+        *(void **)keyp = WT_IKEY_DATA(ikey);
+        *sizep = ((WT_IKEY *)ikey)->size;
     }
+}
+
+/*
+ * __wt_ref_key_home --
+ *     Return a reference to a row-store internal page key, relative to the reference's own home
+ *     page.
+ */
+static WT_INLINE void
+__wt_ref_key_home(WT_REF *ref, void *keyp, size_t *sizep)
+{
+    WT_PAGE *home;
+
+    /*
+     * A split instantiates a moved reference's key before pointing the reference at a newly created
+     * page, which has no disk image. Acquire the home page so the key cannot be read from an
+     * earlier state than it: a new home page paired with a still-encoded key decodes the offset
+     * against a NULL image and yields the offset itself as the key. The acquire belongs on this
+     * read, not on the key, because it has to keep the read that follows from moving ahead of it.
+     * Pairs with the release store that publishes a new home page.
+     *
+     * Callers holding the page a reference was encoded against decode against it directly; a stale
+     * encoded key is still correct there, so they need no ordering.
+     */
+    WT_ACQUIRE_READ(home, ref->home);
+    __wt_ref_key(home, ref, keyp, sizep);
 }
 
 /*
@@ -980,12 +1016,16 @@ static WT_INLINE WT_IKEY *
 __wt_ref_key_instantiated(WT_REF *ref)
 {
     uintptr_t v;
+    void *ikey;
 
     /*
-     * See the comment in __wt_ref_key for an explanation of the magic.
+     * See the comment in __wt_ref_key for an explanation of the magic. Read once so the flag test
+     * and the returned value can't disagree, and acquire so a caller that sees the key can safely
+     * dereference it. Pairs with the release store that publishes an instantiated key.
      */
-    v = (uintptr_t)ref->ref_ikey;
-    return (v & WT_IK_FLAG ? NULL : (WT_IKEY *)ref->ref_ikey);
+    WT_ACQUIRE_READ(ikey, ref->ref_ikey);
+    v = (uintptr_t)ikey;
+    return (v & WT_IK_FLAG ? NULL : (WT_IKEY *)ikey);
 }
 
 /*
@@ -1967,7 +2007,7 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
      * matter the size of the key.)
      */
     if (__wt_btree_syncing_by_other_session(session) &&
-      F_ISSET_ATOMIC_16(ref->home, WT_PAGE_INTL_OVERFLOW_KEYS)) {
+      F_ISSET_ATOMIC_16(__wt_atomic_load_pointer(&ref->home), WT_PAGE_INTL_OVERFLOW_KEYS)) {
         WT_STAT_CONN_DATA_INCR(session, cache_eviction_blocked_overflow_keys);
         return (false);
     }
@@ -2218,7 +2258,7 @@ __wt_split_descent_race(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE_INDEX *sa
      * this code, don't re-order that acquisition with this check.
      */
     WT_COMPILER_BARRIER();
-    WT_INTL_INDEX_GET(session, ref->home, pindex);
+    WT_INTL_INDEX_GET(session, __wt_atomic_load_pointer(&ref->home), pindex);
     return (pindex != saved_pindex);
 }
 

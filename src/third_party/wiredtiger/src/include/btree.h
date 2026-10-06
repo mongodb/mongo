@@ -261,10 +261,12 @@ struct __wt_btree {
     uint32_t evict_walk_progress;              /* Eviction walk progress */
     uint32_t evict_walk_target;                /* Eviction walk target */
     u_int evict_walk_period;                   /* Skip this many LRU walks */
+    uint32_t last_evict_walk_flags;            /* Cache dimensions considered on last walk */
     u_int evict_walk_saved;                    /* Saved walk skips for checkpoints */
     u_int evict_walk_skips;                    /* Number of walks skipped */
     wt_shared int32_t evict_disabled;          /* Eviction disabled count */
     bool evict_disabled_open;                  /* Eviction disabled on open */
+    bool evict_walk_dominating;                /* Current walk overrode the walk period */
     wt_shared volatile uint32_t evict_busy;    /* Count of threads in eviction */
     wt_shared volatile uint32_t prefetch_busy; /* Count of threads in prefetch */
     WT_EVICT_WALK_TYPE evict_start_type;
