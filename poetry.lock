@@ -287,7 +287,7 @@ files = [
     {file = "cffi-1.16.0-cp39-cp39-win_amd64.whl", hash = "sha256:3686dffb02459559c74dd3d81748269ffb0eb027c39a6fc99502de37d501faa8"},
     {file = "cffi-1.16.0.tar.gz", hash = "sha256:bcb3ef43e58665bbda2fb198698fcae6776483e0c4a631aa5647806c25e02cc0"},
 ]
-markers = {main = "platform_python_implementation == \"CPython\" and sys_platform == \"win32\""}
+markers = {main = "platform_python_implementation == \"CPython\" and sys_platform == \"win32\"", export = "sys_platform == \"linux\" or sys_platform == \"darwin\" or extra == \"oldcrypt\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or (platform_machine == \"s390x\" or platform_machine == \"ppc64le\") and platform_python_implementation != \"PyPy\"", jira-client = "sys_platform == \"linux\" or extra == \"oldcrypt\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or (platform_machine == \"s390x\" or platform_machine == \"ppc64le\") and platform_python_implementation != \"PyPy\"", platform = "platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or extra == \"oldcrypt\" or (platform_machine == \"s390x\" or platform_machine == \"ppc64le\") and platform_python_implementation != \"PyPy\""}
 
 [package.dependencies]
 pycparser = "*"
@@ -585,7 +585,7 @@ files = [
     {file = "cryptography-36.0.2-pp38-pypy38_pp73-win_amd64.whl", hash = "sha256:e167b6b710c7f7bc54e67ef593f8731e1f45aa35f8a8a7b72d6e42ec76afd4b3"},
     {file = "cryptography-36.0.2.tar.gz", hash = "sha256:70f8f4f7bb2ac9f340655cbac89d68c527af5bb4387522a8413e841e3e6628c9"},
 ]
-markers = {export = "sys_platform == \"linux\" or extra != \"oldcrypt\"", jira-client = "sys_platform == \"linux\" or extra != \"oldcrypt\"", platform = "extra != \"oldcrypt\""}
+markers = {export = "(platform_machine != \"s390x\" and platform_machine != \"ppc64le\") and extra != \"oldcrypt\" or (platform_machine != \"s390x\" and platform_machine != \"ppc64le\") and sys_platform == \"linux\"", external-auth = "platform_machine != \"s390x\" and platform_machine != \"ppc64le\"", jira-client = "(platform_machine != \"s390x\" and platform_machine != \"ppc64le\") and extra != \"oldcrypt\" or (platform_machine != \"s390x\" and platform_machine != \"ppc64le\") and sys_platform == \"linux\"", platform = "(platform_machine != \"s390x\" and platform_machine != \"ppc64le\") and extra != \"oldcrypt\"", testing = "platform_machine != \"s390x\" and platform_machine != \"ppc64le\""}
 
 [package.dependencies]
 cffi = ">=1.12"
@@ -597,6 +597,64 @@ pep8test = ["black", "flake8", "flake8-import-order", "pep8-naming"]
 sdist = ["setuptools-rust (>=0.11.4)"]
 ssh = ["bcrypt (>=3.1.5)"]
 test = ["hypothesis (>=1.11.4,!=3.79.2)", "iso8601", "pretend", "pytest (>=6.2.0)", "pytest-cov", "pytest-subtests", "pytest-xdist", "pytz"]
+
+[[package]]
+name = "cryptography"
+version = "44.0.2"
+description = "cryptography is a package which provides cryptographic recipes and primitives to Python developers."
+optional = false
+python-versions = ">=3.7, !=3.9.0, !=3.9.1"
+groups = ["export", "external-auth", "jira-client", "platform", "testing"]
+files = [
+    {file = "cryptography-44.0.2-cp37-abi3-manylinux_2_28_ppc64le.whl", hash = "sha256:9c51031e043c7cd62e2ab26c5c8dd9fa6c61bd2a725608b13603e3b5c99f4034"},
+]
+markers = {export = "platform_machine == \"ppc64le\" and extra != \"oldcrypt\" or platform_machine == \"ppc64le\" and sys_platform == \"linux\"", external-auth = "platform_machine == \"ppc64le\"", jira-client = "platform_machine == \"ppc64le\" and extra != \"oldcrypt\" or platform_machine == \"ppc64le\" and sys_platform == \"linux\"", platform = "platform_machine == \"ppc64le\" and extra != \"oldcrypt\"", testing = "platform_machine == \"ppc64le\""}
+
+[package.dependencies]
+cffi = {version = ">=1.12", markers = "platform_python_implementation != \"PyPy\""}
+
+[package.extras]
+docs = ["sphinx (>=5.3.0)", "sphinx-rtd-theme (>=3.0.0)"]
+docstest = ["pyenchant (>=3)", "readme-renderer (>=30.0)", "sphinxcontrib-spelling (>=7.3.1)"]
+nox = ["nox (>=2024.4.15)", "nox[uv] (>=2024.3.2)"]
+pep8test = ["check-sdist", "click (>=8.0.1)", "mypy (>=1.4)", "ruff (>=0.3.6)"]
+sdist = ["build (>=1.0.0)"]
+ssh = ["bcrypt (>=3.1.5)"]
+test = ["certifi (>=2024)", "cryptography-vectors (==44.0.2)", "pretend (>=0.7)", "pytest (>=7.4.0)", "pytest-benchmark (>=4.0)", "pytest-cov (>=2.10.1)", "pytest-xdist (>=3.5.0)"]
+test-randomorder = ["pytest-randomly"]
+
+[package.source]
+type = "url"
+url = "https://mdb-build-public.s3.amazonaws.com/cryptography_wheels/cryptography-44.0.2-cp37-abi3-manylinux_2_28_ppc64le.whl"
+
+[[package]]
+name = "cryptography"
+version = "44.0.2"
+description = "cryptography is a package which provides cryptographic recipes and primitives to Python developers."
+optional = false
+python-versions = ">=3.7, !=3.9.0, !=3.9.1"
+groups = ["export", "external-auth", "jira-client", "platform", "testing"]
+files = [
+    {file = "cryptography-44.0.2-cp37-abi3-manylinux_2_28_s390x.whl", hash = "sha256:e033ed86e96fa4225a515497112bb951acceabf72fee66b19cee971bd11f196e"},
+]
+markers = {export = "platform_machine == \"s390x\" and extra != \"oldcrypt\" or platform_machine == \"s390x\" and sys_platform == \"linux\"", external-auth = "platform_machine == \"s390x\"", jira-client = "platform_machine == \"s390x\" and extra != \"oldcrypt\" or platform_machine == \"s390x\" and sys_platform == \"linux\"", platform = "platform_machine == \"s390x\" and extra != \"oldcrypt\"", testing = "platform_machine == \"s390x\""}
+
+[package.dependencies]
+cffi = {version = ">=1.12", markers = "platform_python_implementation != \"PyPy\""}
+
+[package.extras]
+docs = ["sphinx (>=5.3.0)", "sphinx-rtd-theme (>=3.0.0)"]
+docstest = ["pyenchant (>=3)", "readme-renderer (>=30.0)", "sphinxcontrib-spelling (>=7.3.1)"]
+nox = ["nox (>=2024.4.15)", "nox[uv] (>=2024.3.2)"]
+pep8test = ["check-sdist", "click (>=8.0.1)", "mypy (>=1.4)", "ruff (>=0.3.6)"]
+sdist = ["build (>=1.0.0)"]
+ssh = ["bcrypt (>=3.1.5)"]
+test = ["certifi (>=2024)", "cryptography-vectors (==44.0.2)", "pretend (>=0.7)", "pytest (>=7.4.0)", "pytest-benchmark (>=4.0)", "pytest-cov (>=2.10.1)", "pytest-xdist (>=3.5.0)"]
+test-randomorder = ["pytest-randomly"]
+
+[package.source]
+type = "url"
+url = "https://mdb-build-public.s3.amazonaws.com/cryptography_wheels/cryptography-44.0.2-cp37-abi3-manylinux_2_28_s390x.whl"
 
 [[package]]
 name = "curatorbin"
@@ -2598,7 +2656,7 @@ files = [
     {file = "pycparser-2.21-py2.py3-none-any.whl", hash = "sha256:8ee45429555515e1f6b185e78100aea234072576aa43ab53aefcae078162fca9"},
     {file = "pycparser-2.21.tar.gz", hash = "sha256:e644fdec12f7872f86c58ff790da456218b10f863970249516d60a5eaca77206"},
 ]
-markers = {main = "platform_python_implementation == \"CPython\" and sys_platform == \"win32\""}
+markers = {main = "platform_python_implementation == \"CPython\" and sys_platform == \"win32\"", export = "sys_platform == \"linux\" or sys_platform == \"darwin\" or extra == \"oldcrypt\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or (platform_machine == \"s390x\" or platform_machine == \"ppc64le\") and platform_python_implementation != \"PyPy\"", jira-client = "sys_platform == \"linux\" or extra == \"oldcrypt\" or platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or (platform_machine == \"s390x\" or platform_machine == \"ppc64le\") and platform_python_implementation != \"PyPy\"", platform = "platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or extra == \"oldcrypt\" or (platform_machine == \"s390x\" or platform_machine == \"ppc64le\") and platform_python_implementation != \"PyPy\""}
 
 [[package]]
 name = "pydantic"
@@ -2699,6 +2757,7 @@ description = "Use the full Github API v3"
 optional = false
 python-versions = ">=3.7"
 groups = ["testing"]
+markers = "platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"s390x\" or platform_machine == \"ppc64le\""
 files = [
     {file = "PyGithub-1.59.1-py3-none-any.whl", hash = "sha256:3d87a822e6c868142f0c2c4bf16cce4696b5a7a4d142a7bd160e1bdf75bc54a9"},
     {file = "PyGithub-1.59.1.tar.gz", hash = "sha256:c44e3a121c15bf9d3a5cc98d94c9a047a5132a9b01d22264627f58ade9ddc217"},
@@ -2946,6 +3005,7 @@ description = "Python wrapper module around the OpenSSL library"
 optional = false
 python-versions = ">=3.6"
 groups = ["external-auth"]
+markers = "platform_machine != \"s390x\" and platform_machine != \"ppc64le\""
 files = [
     {file = "pyOpenSSL-22.0.0-py2.py3-none-any.whl", hash = "sha256:ea252b38c87425b64116f808355e8da644ef9b07e429398bfece610f893ee2e0"},
     {file = "pyOpenSSL-22.0.0.tar.gz", hash = "sha256:660b1b1425aac4a1bea1d94168a85d99f0b3144c869dd4390d27629d0087f1bf"},
@@ -2957,6 +3017,27 @@ cryptography = ">=35.0"
 [package.extras]
 docs = ["sphinx", "sphinx-rtd-theme"]
 test = ["flaky", "pretend", "pytest (>=3.0.1)"]
+
+[[package]]
+name = "pyopenssl"
+version = "25.0.0"
+description = "Python wrapper module around the OpenSSL library"
+optional = false
+python-versions = ">=3.7"
+groups = ["external-auth"]
+markers = "platform_machine == \"s390x\" or platform_machine == \"ppc64le\""
+files = [
+    {file = "pyOpenSSL-25.0.0-py3-none-any.whl", hash = "sha256:424c247065e46e76a37411b9ab1782541c23bb658bf003772c3405fbaa128e90"},
+    {file = "pyopenssl-25.0.0.tar.gz", hash = "sha256:cd2cef799efa3936bb08e8ccb9433a575722b9dd986023f1cabc4ae64e9dac16"},
+]
+
+[package.dependencies]
+cryptography = ">=41.0.5,<45"
+typing-extensions = {version = ">=4.9", markers = "python_version < \"3.13\" and python_version >= \"3.8\""}
+
+[package.extras]
+docs = ["sphinx (!=5.2.0,!=5.2.0.post0,!=7.2.5)", "sphinx_rtd_theme"]
+test = ["pretend", "pytest (>=3.0.1)", "pytest-rerunfailures"]
 
 [[package]]
 name = "pyparsing"
@@ -4694,4 +4775,4 @@ oldcrypt = []
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<4.0"
-content-hash = "01231ad8f85d015442cf8419a92c28a3d1ffb3aa48af436386ba18d7489275e7"
+content-hash = "fb309c49ae93580dc597eb592955d79f75859c6c5c0e7277fb3b6004cd7c88a9"

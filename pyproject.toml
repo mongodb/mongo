@@ -89,7 +89,8 @@ structlog = "^24.4.0"
 passlib = "1.7.4"
 pyOpenSSL = [
     { version = "19.0.0", markers = "extra == 'oldcrypt'" },     # Needed for oauthlib to use RSAAlgorithm # Version locked - see SERVER-36618
-    { version = "22.0.0", markers = "extra != 'oldcrypt'" },
+    { version = "22.0.0", markers = "extra != 'oldcrypt' and platform_machine != 's390x' and platform_machine != 'ppc64le'" },
+    { version = "25.0.0", markers = "extra != 'oldcrypt' and (platform_machine == 's390x' or platform_machine == 'ppc64le')" },
 ]
 pyparsing = "2.4.0"
 service_identity = "18.1.0"
@@ -126,9 +127,13 @@ license-expression = "^30.4.4"
 [tool.poetry.group.platform.dependencies]
 pypiwin32 = { version = ">=223", markers = "sys_platform == 'win32'" }
 pywin32 = { version = ">=225", markers = "sys_platform == 'win32'" }
+# PyPI does not publish wheels for these architectures; use internal wheels to
+# avoid source builds that require Rust on CI hosts.
 cryptography = [
     { version = "2.3", markers = "extra == 'oldcrypt'" },     # Needed for oauthlib to use RSAAlgorithm # Version locked - see SERVER-36618
-    { version = "36.0.2", markers = "extra != 'oldcrypt'" },
+    { version = "36.0.2", markers = "extra != 'oldcrypt' and platform_machine != 's390x' and platform_machine != 'ppc64le'" },
+    { url = "https://mdb-build-public.s3.amazonaws.com/cryptography_wheels/cryptography-44.0.2-cp37-abi3-manylinux_2_28_s390x.whl", markers = "extra != 'oldcrypt' and platform_machine == 's390x'" },
+    { url = "https://mdb-build-public.s3.amazonaws.com/cryptography_wheels/cryptography-44.0.2-cp37-abi3-manylinux_2_28_ppc64le.whl", markers = "extra != 'oldcrypt' and platform_machine == 'ppc64le'" },
 ]
 mongo-ninja-python = [
     { version = "1.11.1.7", markers = "platform_machine != 's390x' and platform_machine != 'ppc64le'" },

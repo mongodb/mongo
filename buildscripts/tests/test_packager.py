@@ -117,3 +117,10 @@ class TestPackager(TestCase):
 
         self.assertIn("rhel10", distro.build_os("x86_64"))
         self.assertIn("rhel10", distro.build_os("aarch64"))
+
+    def test_enterprise_rhel10_includes_ibm_architectures(self) -> None:
+        """Test Enterprise RHEL 10 build OS choices include IBM architectures."""
+        distro = EnterpriseDistro("redhat")
+
+        self.assertIn("rhel10", distro.build_os("ppc64le"))
+        self.assertIn("rhel10", distro.build_os("s390x"))

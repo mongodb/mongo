@@ -28,15 +28,23 @@ fi
 # Loop 5 times to retry the poetry install
 # We have seen weird network errors that can sometimes mess up the pip install
 # By retrying we would like to only see errors that happen consistently
-if uname -a | grep -q 's390x\|ppc64le'; then
-  # s390x and ppc64le both require these old versions for some reason
-  # They are pinned deps as well
-  if uname -a | grep -q 'rhel9'; then
-    EXTRA_IBM_ARGS="cryptography==36.0.2 pyOpenSSL==22.0.0"
-  else
-    EXTRA_IBM_ARGS="cryptography==2.3 pyOpenSSL==19.0.0"
-  fi
-fi
+# Keep the Poetry bootstrap on the custom wheels because PyPI only provides a
+# cryptography source distribution for IBM architectures, which requires Rust.
+EXTRA_IBM_ARGS=()
+case "$(uname -m)" in
+s390x)
+  EXTRA_IBM_ARGS=(
+    "cryptography @ https://mdb-build-public.s3.amazonaws.com/cryptography_wheels/cryptography-44.0.2-cp37-abi3-manylinux_2_28_s390x.whl#sha256=e033ed86e96fa4225a515497112bb951acceabf72fee66b19cee971bd11f196e"
+    "pyOpenSSL==25.0.0"
+  )
+  ;;
+ppc64le)
+  EXTRA_IBM_ARGS=(
+    "cryptography @ https://mdb-build-public.s3.amazonaws.com/cryptography_wheels/cryptography-44.0.2-cp37-abi3-manylinux_2_28_ppc64le.whl#sha256=9c51031e043c7cd62e2ab26c5c8dd9fa6c61bd2a725608b13603e3b5c99f4034"
+    "pyOpenSSL==25.0.0"
+  )
+  ;;
+esac
 poetry_dir="${workdir}/poetry_dir"
 mkdir -p $poetry_dir
 export POETRY_CONFIG_DIR="$poetry_dir/config"
@@ -44,7 +52,7 @@ export POETRY_DATA_DIR="$poetry_dir/data"
 export POETRY_CACHE_DIR="$poetry_dir/cache"
 export PIP_CACHE_DIR="$poetry_dir/pip_cache"
 for i in {1..5}; do
-  $POETRY_VENV_PYTHON -m pip install "poetry==2.0.0" ${EXTRA_IBM_ARGS} && RET=0 && break || RET=$? && sleep 1
+  $POETRY_VENV_PYTHON -m pip install "poetry==2.0.0" "${EXTRA_IBM_ARGS[@]}" && RET=0 && break || RET=$? && sleep 1
   echo "Python failed to install poetry, retrying..."
 done
 
@@ -133,21 +141,6 @@ done
 if [ $RET -ne 0 ]; then
   echo "Poetry install error for full venv"
   exit $RET
-fi
-
-# poetry will install cryptography in an isolated build environment
-# to conform to pep517, however this doesn't work for the old cryptography
-# version on these platforms, and ends up not building required shared libraries.
-# Here we go behing poetry's back and install with pip
-if uname -a | grep -q 's390x\|ppc64le'; then
-  for i in {1..5}; do
-    python -m pip uninstall -y cryptography==36.0.2
-    python -m pip install cryptography==36.0.2
-  done
-  if [ $RET -ne 0 ]; then
-    echo "cryptography install error for full venv"
-    exit $RET
-  fi
 fi
 
 cd ..
