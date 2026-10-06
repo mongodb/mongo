@@ -1027,9 +1027,6 @@ private:
     std::pair<SbStage, PlanStageSlots> buildShardFilter(const QuerySolutionNode* root,
                                                         const PlanStageReqs& reqs);
 
-    std::pair<SbStage, PlanStageSlots> buildSearch(const QuerySolutionNode* root,
-                                                   const PlanStageReqs& reqs);
-
     /**
      * Constructs an optimized SBE plan for 'root' in the case that the fields of the shard key
      * pattern are provided by the child index scan. In this case, the SBE plan for the child
@@ -1176,8 +1173,6 @@ private:
      * set.
      */
     const CollectionPtr& getCollection(const NamespaceString& nss) const;
-
-    std::pair<std::vector<std::string>, sbe::value::SlotVector> buildSearchMetadataSlots();
 
     sbe::value::SlotIdGenerator _slotIdGenerator;
     sbe::value::FrameIdGenerator _frameIdGenerator;

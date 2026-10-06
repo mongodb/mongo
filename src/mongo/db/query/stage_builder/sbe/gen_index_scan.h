@@ -69,16 +69,6 @@ generateSingleIntervalIndexScanAndSlots(StageBuilderState& state,
                                         PlanNodeId planNodeId,
                                         bool isPointInterval);
 
-std::pair<SbStage, PlanStageSlots> generateSingleIntervalIndexScan(StageBuilderState& state,
-                                                                   const CollectionPtr& collection,
-                                                                   const std::string& indexName,
-                                                                   const BSONObj& keyPattern,
-                                                                   bool forward,
-                                                                   SbExpr lowKeyExpr,
-                                                                   SbExpr highKeyExpr,
-                                                                   const PlanStageReqs& reqs,
-                                                                   PlanNodeId planNodeId);
-
 /**
  * Constructs low/high key values from the given index 'bounds' if they can be represented either as
  * a single interval between the low and high keys, or multiple single intervals. If index bounds
