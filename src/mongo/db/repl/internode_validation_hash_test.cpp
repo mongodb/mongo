@@ -589,28 +589,11 @@ TEST_F(ProviderDrivenValidationTest, PerCollectionEnabledByProviderWithoutFeatur
     EXPECT_TRUE(isContinuousInternodeValidationPerCollectionEnabled(_opCtx.get()));
 }
 
-// The override is the mitigation lever, so it has to win against a provider that mandates
-// validation, which is the only way validation is on in production.
-TEST_F(ProviderDrivenValidationTest, OverrideDisablesValidationMandatedByProvider) {
+// The override only skips verification, so hashes are still emitted and accumulated even when the
+// provider mandates validation.
+TEST_F(ProviderDrivenValidationTest, OverrideKeepsHashEmissionMandatedByProvider) {
     unittest::ServerParameterGuard disableValidation("disableContinuousInternodeValidation", true);
 
-    EXPECT_FALSE(isContinuousInternodeValidationPerDocumentEnabled(_opCtx.get()));
-    EXPECT_FALSE(isContinuousInternodeValidationPerCollectionEnabled(_opCtx.get()));
-}
-
-// The override is settable at runtime, and takes effect on the next operation to consult it in
-// either direction.
-TEST_F(ProviderDrivenValidationTest, OverrideTakesEffectAtRuntime) {
-    // Restores whatever the override held on the way out, including the store() calls below.
-    unittest::ServerParameterGuard restoreOverride("disableContinuousInternodeValidation", false);
-
-    ASSERT_TRUE(isContinuousInternodeValidationPerDocumentEnabled(_opCtx.get()));
-
-    disableContinuousInternodeValidation.store(true);
-    EXPECT_FALSE(isContinuousInternodeValidationPerDocumentEnabled(_opCtx.get()));
-    EXPECT_FALSE(isContinuousInternodeValidationPerCollectionEnabled(_opCtx.get()));
-
-    disableContinuousInternodeValidation.store(false);
     EXPECT_TRUE(isContinuousInternodeValidationPerDocumentEnabled(_opCtx.get()));
     EXPECT_TRUE(isContinuousInternodeValidationPerCollectionEnabled(_opCtx.get()));
 }
@@ -641,6 +624,22 @@ TEST_F(VerifyValidationHashTest, OverrideSkipsVerificationOfMismatchedHash) {
 
     assertDocumentIs(rid, doc);
     EXPECT_EQ(logs.countBSONContainingSubset(BSON("id" << kMismatchLogId)), 0);
+}
+
+// The runtime override takes effect the next time verification eligibility is evaluated.
+TEST_F(VerifyValidationHashTest, OverrideTakesEffectAtRuntime) {
+    // Restores whatever the override held on the way out, including the store() calls below.
+    unittest::ServerParameterGuard restoreOverride("disableContinuousInternodeValidation", false);
+
+    ASSERT_TRUE(shouldVerify(_opCtx.get(), _nss, OplogApplication::Mode::kSecondary, int64_t{123}));
+
+    disableContinuousInternodeValidation.store(true);
+    EXPECT_FALSE(
+        shouldVerify(_opCtx.get(), _nss, OplogApplication::Mode::kSecondary, int64_t{123}));
+    EXPECT_TRUE(isContinuousInternodeValidationPerDocumentEnabled(_opCtx.get()));
+
+    disableContinuousInternodeValidation.store(false);
+    EXPECT_TRUE(shouldVerify(_opCtx.get(), _nss, OplogApplication::Mode::kSecondary, int64_t{123}));
 }
 
 // Validation hashes travel on the oplog and are checked as it is applied, so they are meaningless

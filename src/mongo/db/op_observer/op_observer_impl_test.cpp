@@ -1940,6 +1940,20 @@ TEST_F(OpObserverTest, CheckHashExistsOnInsertWithFlagAndRecordId) {
     EXPECT_FALSE(sizeMetadata->getSz().has_value());
 }
 
+// The override only skips verification on the applier, so the hash is still emitted.
+TEST_F(OpObserverTest, CheckHashExistsOnInsertWithValidationOverride) {
+    unittest::ServerParameterGuard continuousInternodeScope{
+        "featureFlagContinuousInternodeValidationPerDocument", true};
+    unittest::ServerParameterGuard disableValidation{"disableContinuousInternodeValidation", true};
+    auto opCtxWrapper = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxWrapper.get();
+    const BSONObj doc = BSON("_id" << 0 << "data" << "x");
+    const auto sizeMetadata = insertAndGetSizeMetadata(opCtx, nss, doc, {RecordId(1)});
+    ASSERT(sizeMetadata);
+    ASSERT(sizeMetadata->getH());
+    EXPECT_EQ(*sizeMetadata->getH(), repl::computeDocValidationHash(doc));
+}
+
 TEST_F(OpObserverTest, CheckHashMatchesItsOwnDocumentOnMultiDocumentInsert) {
     unittest::ServerParameterGuard continuousInternodeScope{
         "featureFlagContinuousInternodeValidationPerDocument", true};

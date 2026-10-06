@@ -4,7 +4,6 @@
 #include "mongo/db/repl/internode_validation_hash_utils.h"
 
 #include "mongo/db/feature_flag.h"
-#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -53,28 +52,11 @@ bool providerUsesContinuousInternodeValidation(OperationContext* opCtx) {
         .getPersistenceProvider()
         .shouldUseContinuousInternodeValidation();
 }
-
-/**
- * Validation hashes are carried on oplog entries and verified as those entries are applied, so
- * they are only meaningful on a replica set member.
- */
-bool isReplSet(OperationContext* opCtx) {
-    return ReplicationCoordinator::get(opCtx)->getSettings().isReplSet();
-}
-
-/**
- * Emergency override, checked ahead of both the persistence provider and the feature flags. It is
- * settable at runtime: a validation hash is only ever verified against the entry that carries it,
- * so entries written while validation was disabled are skipped by the applier rather than reported
- * as mismatches, and toggling this has no effect beyond the operations it spans.
- */
-bool isDisabledByOverride() {
-    return disableContinuousInternodeValidation.load();
-}
 }  // namespace
 
 bool isContinuousInternodeValidationPerDocumentEnabled(OperationContext* opCtx) {
-    if (MONGO_unlikely(isDisabledByOverride() || !isReplSet(opCtx))) {
+    // Validation hashes are carried on oplog entries, so they are only meaningful on a replica set.
+    if (MONGO_unlikely(!ReplicationCoordinator::get(opCtx)->getSettings().isReplSet())) {
         return false;
     }
 
@@ -84,7 +66,7 @@ bool isContinuousInternodeValidationPerDocumentEnabled(OperationContext* opCtx) 
 }
 
 bool isContinuousInternodeValidationPerCollectionEnabled(OperationContext* opCtx) {
-    if (MONGO_unlikely(isDisabledByOverride() || !isReplSet(opCtx))) {
+    if (MONGO_unlikely(!ReplicationCoordinator::get(opCtx)->getSettings().isReplSet())) {
         return false;
     }
 

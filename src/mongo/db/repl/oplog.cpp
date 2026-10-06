@@ -1778,6 +1778,10 @@ bool isValidationHashVerifiableFor(OperationContext* opCtx,
     if (mode != OplogApplication::Mode::kSecondary) {
         return false;
     }
+    // Emergency override that only skips hash verification.
+    if (MONGO_unlikely(disableContinuousInternodeValidation.load())) {
+        return false;
+    }
     if (!collection->areRecordIdsReplicated() &&
         !(collection->isClustered() &&
           clustered_util::isClusteredOnId(collection->getClusteredInfo()))) {

@@ -781,12 +781,10 @@ server_parameters:
 
     disableContinuousInternodeValidation:
         description: >-
-            Emergency override that turns continuous internode validation off even when the
-            persistence provider mandates it, disabling both the per-document hashes written to the
-            oplog and their verification during oplog application. Intended as a mitigation lever:
-            once validation has been skipped for any window of writes, the divergence it would have
-            caught cannot be recovered by setting this back to false, and any accumulated
-            per-collection hash must be recomputed from scratch.
+            Emergency override that skips verification of per-document hashes during oplog
+            application, even when the persistence provider mandates it. Hashes are still written
+            to the oplog and folded into the per-collection hash. A divergence introduced while verification is skipped is not caught by setting this
+            back to false.
         set_at: [startup, runtime]
         cpp_vartype: Atomic<bool>
         cpp_varname: disableContinuousInternodeValidation
