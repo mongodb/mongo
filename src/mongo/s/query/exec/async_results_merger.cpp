@@ -659,7 +659,17 @@ BSONObj AsyncResultsMerger::_getHighWaterMark(WithLock lk) {
             str::stream() << "Expected _highWaterMark to be either empty or of object type, got "
                           << _highWaterMark,
             _highWaterMark.isEmpty() || _highWaterMark.firstElement().type() == BSONType::object);
-    return _highWaterMark.isEmpty() ? BSONObj() : _highWaterMark.firstElement().Obj().getOwned();
+    if (_highWaterMark.isEmpty()) {
+        return BSONObj();
+    }
+
+    // Return the <high watermark> part of the sort key without deep-copying it. The sub-object view
+    // returned by 'Obj()' is unowned, so share the (immutable, ref-counted) buffer of
+    // '_highWaterMark' with it instead of calling 'getOwned()', which would malloc and memcpy on
+    // every call. This is called once per returned event on mongos.
+    BSONObj result = _highWaterMark.firstElement().Obj();
+    result.shareOwnershipWith(_highWaterMark);
+    return result;
 }
 
 void AsyncResultsMerger::_advanceClientHighWaterMark(WithLock) {
@@ -698,8 +708,17 @@ BSONObj AsyncResultsMerger::getHighWaterMarkForClient() {
             "Expected the client high water mark to be set when the internal high water mark is",
             _highWaterMark.isEmpty() || !_clientHighWaterMark.isEmpty());
 
-    return _clientHighWaterMark.isEmpty() ? BSONObj()
-                                          : _clientHighWaterMark.firstElement().Obj().getOwned();
+    if (_clientHighWaterMark.isEmpty()) {
+        return BSONObj();
+    }
+
+    // Return the <high watermark> part of the sort key without deep-copying it, sharing the
+    // (immutable, ref-counted) buffer of '_clientHighWaterMark' with the unowned sub-object view
+    // returned by 'Obj()' instead of calling 'getOwned()'. This is called once per returned event
+    // on mongos.
+    BSONObj result = _clientHighWaterMark.firstElement().Obj();
+    result.shareOwnershipWith(_clientHighWaterMark);
+    return result;
 }
 
 void AsyncResultsMerger::setHighWaterMark(const BSONObj& highWaterMark) {

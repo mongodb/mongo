@@ -1144,6 +1144,57 @@ TEST_F(AsyncResultsMergerTest, SetHighWaterMark) {
     ASSERT_BSONOBJ_EQ(highWaterMark, arm->getHighWaterMark());
 }
 
+// The high water mark getters must return a sub-object view that shares the merger's own
+// (immutable, ref-counted) BSON buffer rather than deep-copying it. Repeated calls therefore expose
+// the exact same 'objdata()' pointer. The previous 'getOwned()' implementation allocated a fresh
+// buffer on every call, so it returned a different address each time and would fail this test.
+TEST_F(AsyncResultsMergerTest, HighWaterMarkGettersReuseExistingBuffer) {
+    auto arm = buildARM(buildARMParamsForChangeStream(), false /* recognizeControlEvents */);
+
+    auto highWaterMark = makePostBatchResumeToken(Timestamp(42, 5));
+    arm->setHighWaterMark(highWaterMark);
+
+    const auto internalToken = arm->getHighWaterMark();
+    const auto internalTokenAgain = arm->getHighWaterMark();
+    ASSERT_BSONOBJ_EQ(highWaterMark, internalToken);
+    ASSERT_EQ(internalToken.objdata(), internalTokenAgain.objdata());
+
+    const auto clientToken = arm->getHighWaterMarkForClient();
+    const auto clientTokenAgain = arm->getHighWaterMarkForClient();
+    ASSERT_BSONOBJ_EQ(highWaterMark, clientToken);
+    ASSERT_EQ(clientToken.objdata(), clientTokenAgain.objdata());
+}
+
+// A token handed out by a getter must keep its buffer alive independently of the merger: it must
+// stay readable after the merger's high water mark is advanced (which reassigns and drops the old
+// buffer) and after the merger itself is destroyed. Without 'shareOwnershipWith()' the getter would
+// return an unowned view and these reads would be a use-after-free.
+TEST_F(AsyncResultsMergerTest, HighWaterMarkTokenOutlivesMerger) {
+    auto highWaterMark = makePostBatchResumeToken(Timestamp(42, 5));
+
+    BSONObj tokenAfterAdvance;
+    {
+        auto arm = buildARM(buildARMParamsForChangeStream(), false /* recognizeControlEvents */);
+        arm->setHighWaterMark(highWaterMark);
+        tokenAfterAdvance = arm->getHighWaterMark();
+
+        // Advance the high water mark, freeing the buffer the token was carved out of.
+        arm->setHighWaterMark(makePostBatchResumeToken(Timestamp(43, 1)));
+    }
+    ASSERT_BSONOBJ_EQ(highWaterMark, tokenAfterAdvance);
+
+    BSONObj internalToken;
+    BSONObj clientToken;
+    {
+        auto arm = buildARM(buildARMParamsForChangeStream(), false /* recognizeControlEvents */);
+        arm->setHighWaterMark(highWaterMark);
+        internalToken = arm->getHighWaterMark();
+        clientToken = arm->getHighWaterMarkForClient();
+    }
+    ASSERT_BSONOBJ_EQ(highWaterMark, internalToken);
+    ASSERT_BSONOBJ_EQ(highWaterMark, clientToken);
+}
+
 TEST_F(AsyncResultsMergerTest, GetHighWaterMarkDoesNotRegressBelowSetResumeToken) {
     AsyncResultsMergerParams params = AsyncResultsMergerTest::buildARMParamsForChangeStream();
 
