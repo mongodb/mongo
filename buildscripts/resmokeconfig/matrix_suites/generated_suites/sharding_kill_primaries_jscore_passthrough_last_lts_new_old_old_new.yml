@@ -36,7 +36,7 @@ executor:
           overrideRetryAttempts: 3
           runningWithStepdowns: true
           sessionOptions:
-            maybeUseCausalConsistency: true
+            causalConsistency: true
             readConcern:
               level: majority
             readPreference:

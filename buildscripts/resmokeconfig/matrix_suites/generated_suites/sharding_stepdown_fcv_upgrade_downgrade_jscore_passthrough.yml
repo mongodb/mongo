@@ -37,7 +37,7 @@ executor:
           runningWithConfigStepdowns: true
           runningWithShardStepdowns: true
           sessionOptions:
-            maybeUseCausalConsistency: true
+            causalConsistency: true
             readConcern:
               level: majority
             readPreference:

@@ -104,10 +104,10 @@
                 readPreference:
                   mode: "primary"
                 retryWrites: true
-                # Probabilistically choose to use/not use causal consistency. As of SERVER-53813
-                # causal consistency should not be required to read your own writes on the new primary
-                # after the old one is killed.
-                maybeUseCausalConsistency: true
+                # Always use causal consistency. A non-causal majority read can be admitted by the
+                # old primary before a concurrent stepdown and execute on it after it has demoted,
+                # silently missing majority-committed writes from the new primary.
+                causalConsistency: true
               # Inform the tests that we are running with stepdown hook
               runningWithConfigStepdowns: true
               runningWithShardStepdowns: true

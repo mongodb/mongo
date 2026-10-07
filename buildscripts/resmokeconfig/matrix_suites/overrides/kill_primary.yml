@@ -358,6 +358,21 @@
           # retry logic in auto_retry_on_network_error.js.
           nodb: ""
 
+- name: force_causal_consistency
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              sessionOptions:
+                # The suites which apply this override already have maybeUseCausalConsistency set.
+                # Here we are using the property that the overrides are applied recursively and in
+                # order to avoid copying the entire suite. Also, if we set a property to null,
+                # it will be removed from the final merged configuration.
+                maybeUseCausalConsistency: null
+                causalConsistency: true
+
 - name: all_nodes_can_be_primary
   value:
     executor:
