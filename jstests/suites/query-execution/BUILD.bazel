@@ -42,7 +42,7 @@ resmoke_suite_test(
     data = CONCURRENCY_DATA,
     shard_count = 3,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "common",
         "concurrency",
     ],
@@ -1614,7 +1614,7 @@ resmoke_suite_test(
         "common",
         "incompatible_debug_mode",
         "jstestfuzz",
-        "non_deterministic",
+        "non_required",
         "random_name",
         "require_npm",
     ],
@@ -1914,7 +1914,7 @@ resmoke_suite_test(
     tags = [
         "aggfuzzer",
         "blockprocessing",
-        "ci-release-critical",
+        "ci-all-variants",
         "common",
         "incompatible_development_variant",
         "no_debug_mode",
@@ -1953,7 +1953,7 @@ resmoke_suite_test(
     shard_count = 50,
     tags = [
         "aggfuzzer",
-        "ci-release-critical",
+        "ci-all-variants",
         "common",
         "incompatible_debug_mode",
         "incompatible_development_variant",

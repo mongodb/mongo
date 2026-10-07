@@ -18,7 +18,7 @@ resmoke_suite_test(
     name = "concurrency_replication_primary_driven_index_builds",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/concurrency_replication_primary_driven_index_builds.yml",
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "common",
         "concurrency",
         "primary_driven_index_builds",
@@ -41,7 +41,7 @@ resmoke_suite_test(
     size = "enormous",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/concurrency_sharded_replication_primary_driven_index_builds.yml",
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "common",
         "concurrency",
         "incompatible_debug_mode",
@@ -165,7 +165,7 @@ resmoke_suite_test(
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/no_passthrough_primary_driven_index_builds.yml",
     shard_count = 4,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "incompatible_debug_mode",
         "incompatible_with_bazel_remote_test",  # TODO(SERVER-123233) index_build_maximum_memory_usage.js checks default memory limits, but inconsistently handles cgroup memory limits that are used by remote executors.
         "primary_driven_index_builds",

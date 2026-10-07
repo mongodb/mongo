@@ -38,9 +38,9 @@ class TestBuildTagQuery(unittest.TestCase):
         self.assertNotIn(f"- (attr(tags, '\\b{INCOMPATIBLE}", q)
 
     def test_multiple_positive_tags_are_unioned(self):
-        q = g._build_tag_query(["ci-default", "ci-release-critical"], "//...", local_exec=False)
+        q = g._build_tag_query(["ci-default", "ci-all-variants"], "//...", local_exec=False)
         self.assertIn("ci-default", q)
-        self.assertIn("ci-release-critical", q)
+        self.assertIn("ci-all-variants", q)
         self.assertIn(" + ", q)
 
 

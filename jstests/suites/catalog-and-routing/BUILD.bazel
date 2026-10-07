@@ -22,7 +22,7 @@ resmoke_suite_test(
     data = ["//jstests/concurrency/reshard_collection_util:all_javascript_files"] + CONCURRENCY_DATA,
     shard_count = 8,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "common",
         "concurrency",
         "incompatible_debug_mode",
@@ -53,7 +53,7 @@ resmoke_suite_test(
     ] + CORE_DATA,
     shard_count = 20,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "common",
         "jscore",
         "sharding",
@@ -76,7 +76,7 @@ resmoke_suite_test(
     ] + CORE_DATA,
     shard_count = 11,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "common",
         "jscore",
         "requires_large_host_aubsan",
@@ -106,7 +106,7 @@ resmoke_suite_test(
     ] + CORE_DATA,
     shard_count = 18,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "common",
         "incompatible_debug_mode",
         "large",
@@ -517,7 +517,7 @@ resmoke_suite_test(
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharding_kill_stepdown_terminate_jscore_passthrough.yml",
     shard_count = 9,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "common",
         "jscore",
         "sharding",
@@ -710,7 +710,7 @@ resmoke_suite_test(
     config = "//buildscripts/resmokeconfig:suites/concurrency_sharded_with_config_shard.yml",
     shard_count = 50,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "cluster_scalability_only",
         "common",
         "concurrency",
@@ -738,7 +738,7 @@ resmoke_suite_test(
     config = "//buildscripts/resmokeconfig:suites/concurrency_sharded_with_balancer_and_config_shard.yml",
     shard_count = 33,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "cluster_scalability_only",
         "common",
         "concurrency",

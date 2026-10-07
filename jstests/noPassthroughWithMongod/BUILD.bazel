@@ -22,7 +22,7 @@ resmoke_suite_test(
     ],
     shard_count = 10,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "incompatible_with_bazel_remote_test",  # TODO(SERVER-122766) ipv6_connection_string_validation.js: mongod fails to bind to IPv6 port in remote execution
         "misc_js",
     ],

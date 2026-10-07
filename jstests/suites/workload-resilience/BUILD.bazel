@@ -182,7 +182,7 @@ resmoke_suite_test(
     ] + CORE_DATA,
     shard_count = 40,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "ingress_request_rate_limited",
         "jscore",
         "sharding",
@@ -208,7 +208,7 @@ resmoke_suite_test(
     ] + CORE_DATA,
     shard_count = 40,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "common",
         "ingress_request_rate_limited",
         "jscore",
@@ -227,7 +227,7 @@ resmoke_suite_test(
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharding_jscore_passthrough_rate_limited.yml",
     shard_count = 50,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "ingress_request_rate_limited",
         "jscore",
         "sharding",
@@ -249,7 +249,7 @@ resmoke_suite_test(
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/concurrency_sharded_replication_rate_limited.yml",
     shard_count = 50,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "common",
         "concurrency",
         "incompatible_debug_mode",

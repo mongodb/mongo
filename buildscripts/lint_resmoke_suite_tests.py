@@ -46,11 +46,11 @@ BAZEL_TAG_PREFIX = "bazel:"
 BAZEL_NONE = "none"  # the value after the prefix, i.e. the full tag is 'bazel:none'
 
 # Evergreen tags that mark a task as running in the commit-queue / required variants.
-CRITICAL_EVERGREEN_TAGS = frozenset({"default", "release_critical"})
+CRITICAL_EVERGREEN_TAGS = frozenset({"default", "all_variants"})
 
 TAG_EQUIVALENCES = {
     "default": "ci-default",
-    "release_critical": "ci-release-critical",
+    "all_variants": "ci-all-variants",
     "development_critical": "ci-development-critical",
     "experimental": "ci-experimental",
     "fuzzer_deterministic": "ci-fuzzer-deterministic",
@@ -213,7 +213,7 @@ class TagRule(ABC):
 
 
 class CriticalTasksMustMapToTarget(TagRule):
-    """A task tagged 'default' or 'release_critical' must map to a resmoke_suite_test target
+    """A task tagged 'default' or 'all_variants' must map to a resmoke_suite_test target
     (e.g. 'bazel://jstests/suites/foo:bar').
     """
 
@@ -229,7 +229,7 @@ class CriticalTasksMustMapToTarget(TagRule):
         return [
             Violation(
                 f"{task.ref}: task '{task.name}' is tagged {critical} but maps to 'bazel:none'; "
-                "default/release_critical tasks must map to a real resmoke_suite_test target "
+                "default/all_variants tasks must map to a real resmoke_suite_test target "
                 "(bazel://pkg:target)",
                 has_snippet=True,
             )
@@ -811,7 +811,7 @@ def main() -> int:
                 print()
         if needs_real_target:
             print(
-                f"\n{len(needs_real_target)} default/release_critical task(s) map to 'bazel:none' "
+                f"\n{len(needs_real_target)} default/all_variants task(s) map to 'bazel:none' "
                 "but must map to a real target (not auto-fixable). Create the suite target (snippet "
                 "below) and tag the task with its 'bazel://...' label:\n"
             )

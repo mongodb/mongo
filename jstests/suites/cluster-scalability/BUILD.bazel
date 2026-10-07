@@ -41,7 +41,7 @@ resmoke_suite_test(
     ] + CORE_DATA,
     shard_count = 16,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "jscore",
         "sharding",
     ],
@@ -68,7 +68,7 @@ resmoke_suite_test(
     ] + SHARDING_DATA,
     shard_count = 100,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "common",
         "requires_replicated_fast_count_recovery",
         "sharding",
@@ -97,7 +97,7 @@ resmoke_suite_test(
     ] + SHARDING_DATA,
     shard_count = 75,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "common",
         "csrs",
         "non_live_record",
@@ -140,7 +140,7 @@ resmoke_suite_test(
     ] + CORE_DATA,
     shard_count = 26,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "common",
         "jscore",
         "sharding",
@@ -469,7 +469,7 @@ resmoke_suite_test(
     config = "//buildscripts/resmokeconfig:suites/sharded_collections_jscore_passthrough_with_config_shard.yml",
     shard_count = 23,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "cluster_scalability_only",
         "jscore",
         "sharding",
@@ -491,7 +491,7 @@ resmoke_suite_test(
     config = "//buildscripts/resmokeconfig:suites/sharding_config_shard.yml",
     shard_count = 50,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "cluster_scalability_only",
         "common",
         "sharding",
@@ -534,7 +534,7 @@ resmoke_suite_test(
     config = "//buildscripts/resmokeconfig:suites/sharding_jscore_passthrough_with_config_shard.yml",
     shard_count = 27,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "cluster_scalability_only",
         "common",
         "jscore",
@@ -557,7 +557,7 @@ resmoke_suite_test(
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharding_max_mirroring_opportunistic_secondary_targeting.yml",
     shard_count = 50,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "suggested_excluding_required__for_devprod_mitigation_only",
     ],
     target_compatible_with = select({
@@ -666,7 +666,7 @@ resmoke_suite_test(
     srcs = [":resharding_fuzzer_idempotency_tests"],
     config = "//buildscripts/resmokeconfig:suites/resharding_fuzzer_idempotency.yml",
     tags = [
-        "non_deterministic",
+        "non_required",
         "random_name",
         "require_npm",
         "resharding_fuzzer",

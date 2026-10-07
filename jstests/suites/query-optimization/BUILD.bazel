@@ -24,7 +24,7 @@ resmoke_suite_test(
     shard_count = 3,
     tags = [
         "aggregation",
-        "ci-release-critical",
+        "ci-all-variants",
         "common",
     ],
     deps = [
@@ -43,7 +43,7 @@ resmoke_suite_test(
     shard_count = 3,
     tags = [
         "aggregation",
-        "ci-release-critical",
+        "ci-all-variants",
         "common",
     ],
     target_compatible_with = select({
@@ -373,7 +373,7 @@ resmoke_suite_test(
     shard_count = 20,
     tags = [
         "aggfuzzer",
-        "ci-release-critical",
+        "ci-all-variants",
         "incompatible_development_variant",
         "random_name",
         "require_npm",
@@ -409,7 +409,7 @@ resmoke_suite_test(
     shard_count = 50,
     tags = [
         "aggfuzzer",
-        "ci-release-critical",
+        "ci-all-variants",
         "incompatible_development_variant",
         "optimization",
         "random_name",

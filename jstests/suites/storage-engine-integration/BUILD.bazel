@@ -21,7 +21,7 @@ resmoke_suite_test(
         "//jstests/disk/libs:all_javascript_files",
     ],
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "requires_replicated_fast_count_recovery",
     ],
     target_compatible_with = select({

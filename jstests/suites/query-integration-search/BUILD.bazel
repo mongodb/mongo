@@ -23,7 +23,7 @@ resmoke_suite_test(
     ],
     shard_count = 8,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
     ],
     target_compatible_with = select({
         "//bazel/config:build_enterprise_disabled": ["@platforms//:incompatible"],
@@ -49,7 +49,7 @@ resmoke_suite_test(
     ],
     shard_count = 50,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "incompatible_with_bazel_remote_test",  # Mongotmock fails to establish a connection in remote executors.
     ],
     target_compatible_with = select({
@@ -75,7 +75,7 @@ resmoke_suite_test(
         "//jstests/with_mongot/mongotmock/lib",
     ],
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
     ],
     target_compatible_with = select({
         "//bazel/config:build_enterprise_disabled": ["@platforms//:incompatible"],
@@ -106,7 +106,7 @@ resmoke_suite_test(
     ],
     shard_count = 3,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "search_community_mongotmock",
     ],
     target_compatible_with = select({
@@ -135,7 +135,7 @@ resmoke_suite_test(
         "//x509:generate_main_certificates",
     ],
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "search_community_mongotmock",
     ],
     target_compatible_with = select({
@@ -278,7 +278,7 @@ resmoke_suite_test(
         "//jstests/with_mongot/vector_search_mocked/ssl:all_javascript_files",
     ],
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
     ],
     target_compatible_with = select({
         "//bazel/config:build_enterprise_disabled": ["@platforms//:incompatible"],
@@ -305,7 +305,7 @@ resmoke_suite_test(
     ],
     shard_count = 3,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
     ],
     target_compatible_with = select({
         "//bazel/config:build_enterprise_disabled": ["@platforms//:incompatible"],
@@ -480,7 +480,7 @@ resmoke_suite_test(
         "//src/mongo/db/extension/test_examples:resmoke_data",
     ],
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
     ],
     target_compatible_with = select({
         "//bazel/config:build_enterprise_disabled": ["@platforms//:incompatible"],
@@ -512,7 +512,7 @@ resmoke_suite_test(
         "//src/mongo/db/extension/test_examples:resmoke_data",
     ],
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
     ],
     target_compatible_with = select({
         "//bazel/config:build_enterprise_disabled": ["@platforms//:incompatible"],
@@ -551,7 +551,7 @@ resmoke_suite_test(
     shard_count = 50,
     tags = [
         "aggfuzzer",
-        "ci-release-critical",
+        "ci-all-variants",
         "common",
         "incompatible_debug_mode",
         "incompatible_development_variant",

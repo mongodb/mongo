@@ -34,7 +34,7 @@ resmoke_suite_test(
     ],
     shard_count = 2,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "incompatible_debug_mode",
         "incompatible_with_bazel_remote_test",
         "misc_js",
@@ -62,7 +62,7 @@ resmoke_suite_test(
     data = [
         "//src/mongo/db/modules/enterprise/jstests/hot_backups/libs:all_javascript_files",
     ],
-    tags = ["ci-release-critical"],
+    tags = ["ci-all-variants"],
     deps = [
         "//src/mongo/db:mongod",
         "//src/mongo/shell:mongo",

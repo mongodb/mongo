@@ -105,15 +105,15 @@ rules:
         max_num_of_tags: 1
       # Every task should have required selection tag
       - group_name: "required_selection_tags"
-        tag_regex: (development_critical|development_critical_single_variant|release_critical|default|non_deterministic|experimental|auxiliary|monguard|monguard_lint)
+        tag_regex: (development_critical|development_critical_single_variant|all_variants|default|non_required|experimental|auxiliary|monguard|monguard_lint)
         # Before changing anything in this list, please read
         # https://github.com/10gen/mongo/blob/master/docs/evergreen-testing/yaml_configuration/task_selection_tags.md
         tag_list:
           - development_critical
           - development_critical_single_variant
-          - release_critical
+          - all_variants
           - default
-          - non_deterministic
+          - non_required
           - experimental
           - auxiliary
           - monguard

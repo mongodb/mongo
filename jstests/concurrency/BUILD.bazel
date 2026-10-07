@@ -20,7 +20,7 @@ resmoke_suite_test(
     data = CONCURRENCY_DATA,
     shard_count = 3,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "common",
         "concurrency",
         "random_name",

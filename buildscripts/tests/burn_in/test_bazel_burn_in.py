@@ -277,7 +277,7 @@ class TestGetTargetsWithTag(unittest.TestCase):
         """Test that the bazel query subtracts incompatible_with_bazel_remote_test targets."""
         mock_run.return_value.stdout = "//jstests/suites/foo:bar\n"
 
-        under_test.get_targets_with_tag("ci-release-critical")
+        under_test.get_targets_with_tag("ci-all-variants")
 
         query_arg = mock_run.call_args[0][0]
         query_str = " ".join(query_arg)
@@ -291,7 +291,7 @@ class TestGetTargetsMatchingTagFilter(unittest.TestCase):
 
     TAGS_TO_TARGETS = {
         "ci-development-critical": ["//s:dev"],
-        "ci-release-critical": ["//s:rel", "//s:mitigated"],
+        "ci-all-variants": ["//s:rel", "//s:mitigated"],
         "suggested_excluding_required__for_devprod_mitigation_only": ["//s:mitigated"],
         "requires_all_feature_flags": [],
         "requires_compile_variant": [],
@@ -305,16 +305,14 @@ class TestGetTargetsMatchingTagFilter(unittest.TestCase):
 
     def test_union_of_positive_tags(self):
         self.assertEqual(
-            under_test.get_targets_matching_tag_filter(
-                "ci-development-critical,ci-release-critical"
-            ),
+            under_test.get_targets_matching_tag_filter("ci-development-critical,ci-all-variants"),
             {"//s:dev", "//s:rel", "//s:mitigated"},
         )
 
     def test_negated_tags_are_excluded(self):
         self.assertEqual(
             under_test.get_targets_matching_tag_filter(
-                "ci-development-critical,ci-release-critical,"
+                "ci-development-critical,ci-all-variants,"
                 "-suggested_excluding_required__for_devprod_mitigation_only,"
                 "-requires_all_feature_flags,-requires_compile_variant,"
                 "-incompatible_development_variant"
@@ -323,14 +321,14 @@ class TestGetTargetsMatchingTagFilter(unittest.TestCase):
         )
 
     def test_negations_query_the_tag_without_the_dash(self):
-        under_test.get_targets_matching_tag_filter("ci-release-critical,-requires_compile_variant")
+        under_test.get_targets_matching_tag_filter("ci-all-variants,-requires_compile_variant")
 
         queried = [call.args[0] for call in self.mock_get_targets_with_tag.call_args_list]
-        self.assertEqual(queried, ["ci-release-critical", "requires_compile_variant"])
+        self.assertEqual(queried, ["ci-all-variants", "requires_compile_variant"])
 
     def test_blank_entries_are_ignored(self):
         self.assertEqual(
-            under_test.get_targets_matching_tag_filter(" ci-release-critical , "),
+            under_test.get_targets_matching_tag_filter(" ci-all-variants , "),
             {"//s:rel", "//s:mitigated"},
         )
 

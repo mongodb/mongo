@@ -21,7 +21,7 @@ resmoke_suite_test(
     data = CORE_DATA,
     shard_count = 4,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "timeseries_crud",
     ],
     target_compatible_with = select({
