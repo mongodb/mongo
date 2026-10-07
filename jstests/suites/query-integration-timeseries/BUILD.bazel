@@ -43,7 +43,7 @@ resmoke_suite_test(
     ],
     shard_count = 4,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "timeseries_crud",
     ],
     target_compatible_with = select({
