@@ -42,7 +42,7 @@ BAZEL_NONE = "none"  # the value after the prefix, i.e. the full tag is 'bazel:n
 
 TAG_EQUIVALENCES = {
     "default": "ci-default",
-    "release_critical": "ci-release-critical",
+    "all_variants": "ci-all-variants",
     "development_critical": "ci-development-critical",
     "experimental": "ci-experimental",
 }

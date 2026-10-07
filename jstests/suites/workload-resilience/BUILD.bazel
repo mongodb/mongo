@@ -175,7 +175,7 @@ resmoke_suite_test(
     ] + CORE_DATA,
     shard_count = 40,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "ingress_request_rate_limited",
         "jscore",
         "sharding",
@@ -200,7 +200,7 @@ resmoke_suite_test(
     ] + CORE_DATA,
     shard_count = 40,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "common",
         "ingress_request_rate_limited",
         "jscore",

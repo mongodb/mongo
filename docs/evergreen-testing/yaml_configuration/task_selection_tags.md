@@ -25,7 +25,7 @@ found [here](../../../etc/evergreen_lint.yml).
 - `no_commit_queue` - add this to tasks in development_critical that you do not want in the
   commit-queue
 
-- `release_critical` - these tasks should be green prior to the release. We run these tasks on all
+- `all_variants` - these tasks should be green prior to the release. We run these tasks on all
   release and development (required and suggested) variants. It should be uncommon to add tasks to
   this tag but if your task needs to run on many different OSes and it is extremely broad in
   coverage then you can add it to this tag.
@@ -34,8 +34,9 @@ found [here](../../../etc/evergreen_lint.yml).
   most significant development variants (required patches, tsan, aubsan, etc.). Use this tag if you
   are not sure which tag to use for your new task.
 
-- `non_deterministic` - these tasks depend significantly on randomization and we expect to see some
-  unique failures, e.g. fuzzers etc. We run these tasks on non-required development variants.
+- `non_required` - these tasks are not required to be green, e.g. fuzzers etc. that depend
+  significantly on randomization and where we expect to see some unique failures. We run these tasks
+  on non-required development variants.
 
 - `experimental` - these tasks are not running anywhere regularly. We do not use this tag for
   selecting tasks to run on variants. This tag could be used for tasks that you would like to run on

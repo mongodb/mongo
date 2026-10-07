@@ -22,7 +22,7 @@ resmoke_suite_test(
     shard_count = 20,
     tags = [
         "causally_consistent",
-        "ci-release-critical",
+        "ci-all-variants",
         "durable_history",
         "read_write_concern",
     ],
@@ -42,7 +42,7 @@ resmoke_suite_test(
     data = ["//jstests/sharding/libs:all_subpackage_javascript_files"] + CONCURRENCY_DATA,
     shard_count = 20,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "common",
         "concurrency",
         "repl",
@@ -66,7 +66,7 @@ resmoke_suite_test(
     data = CONCURRENCY_DATA,
     shard_count = 8,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "concurrency",
         "large",
         "non_live_record",
@@ -92,7 +92,7 @@ resmoke_suite_test(
     data = CONCURRENCY_DATA,
     shard_count = 8,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "concurrency",
         "large",
         "non_live_record",
@@ -121,7 +121,7 @@ resmoke_suite_test(
     ] + CONCURRENCY_DATA,
     shard_count = 40,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "common",
         "concurrency",
         "large",
@@ -155,7 +155,7 @@ resmoke_suite_test(
     ],
     shard_count = 40,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "incompatible_with_bazel_remote_test",  # Requires KMIP server infrastructure not available in remote executors.
         "large",
         "replica_sets",
@@ -197,7 +197,7 @@ resmoke_suite_test(
     ] + CORE_DATA,
     shard_count = 20,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "common",
         "large",
         "replica_sets",
@@ -219,7 +219,7 @@ resmoke_suite_test(
     data = CORE_DATA,
     shard_count = 40,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "common",
         "large",
         "replica_sets",
@@ -242,7 +242,7 @@ resmoke_suite_test(
     shard_count = 48,
     tags = [
         "causally_consistent",
-        "ci-release-critical",
+        "ci-all-variants",
         "durable_history",
         "read_write_concern",
     ],
@@ -265,7 +265,7 @@ resmoke_suite_test(
     ] + CORE_DATA,
     shard_count = 40,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "initsync",
         "jscore",
         "large",
@@ -296,7 +296,7 @@ resmoke_suite_test(
     ] + CORE_DATA,
     shard_count = 50,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "jscore",
         "sharding",
     ],
@@ -320,7 +320,7 @@ resmoke_suite_test(
     ] + CORE_DATA,
     shard_count = 20,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "initsync",
         "jscore",
         "large",
@@ -346,7 +346,7 @@ resmoke_suite_test(
     name = "serial_run",
     config = "//buildscripts/resmokeconfig:suites/serial_run.yml",
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "misc_js",
         "non_win_dbg",
     ],
@@ -367,7 +367,7 @@ resmoke_suite_test(
     ] + CONCURRENCY_DATA,
     shard_count = 30,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "common",
         "concurrency",
         "large",

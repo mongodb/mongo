@@ -36,7 +36,7 @@ resmoke_suite_test(
     shard_count = 20,
     tags = [
         "auth",
-        "ci-release-critical",
+        "ci-all-variants",
         "incompatible_with_bazel_remote_test",  # jstests/auth/buildinfo_auth_cmd.js fails related to the remote executor's hostname when determining if localhostAuthBypass should apply.
         "requires_replicated_fast_count_recovery",
     ],
@@ -56,7 +56,7 @@ resmoke_suite_test(
         "//x509:generate_main_certificates",
     ],
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "encrypt",
         "patch_build",
         "ssl",
@@ -82,7 +82,7 @@ resmoke_suite_test(
     ],
     shard_count = 4,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "encrypt",
         "incompatible_with_bazel_remote_test",  # jstests/ssl/ssl_x509_SAN.js requires IPv6, which is disabled on remote executors.
         "patch_build",
@@ -106,7 +106,7 @@ resmoke_suite_test(
     ],
     shard_count = 4,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "encrypt",
         "patch_build",
         "ssl",
@@ -127,7 +127,7 @@ resmoke_suite_test(
     shard_count = 10,
     tags = [
         "auth",
-        "ci-release-critical",
+        "ci-all-variants",
         "common",
         "jscore",
     ],
@@ -152,7 +152,7 @@ resmoke_suite_test(
         "//x509:generate_main_certificates",
     ],
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "encrypt",
         "ocsp",
         "patch_build",
@@ -174,7 +174,7 @@ resmoke_suite_test(
         "//x509:generate_main_certificates",
     ],
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "encrypt",
         "patch_build",
         "ssl",
@@ -195,7 +195,7 @@ resmoke_suite_test(
         "//x509:generate_main_certificates",
     ],
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "encrypt",
         "patch_build",
         "requires_replicated_fast_count_recovery",
@@ -212,7 +212,7 @@ resmoke_suite_test(
     name = "fle",
     config = "//buildscripts/resmokeconfig:suites/fle.yml",
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "encrypt",
         "patch_build",
     ],
@@ -231,7 +231,7 @@ resmoke_suite_test(
     name = "fle2",
     config = "//buildscripts/resmokeconfig:suites/fle2.yml",
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "encrypt",
         "patch_build",
     ],
@@ -249,7 +249,7 @@ resmoke_suite_test(
     name = "fle2_high_cardinality",
     config = "//buildscripts/resmokeconfig:suites/fle2_high_cardinality.yml",
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "encrypt",
     ],
     target_compatible_with = select({
@@ -266,7 +266,7 @@ resmoke_suite_test(
     name = "fle2_query_analysis",
     config = "//buildscripts/resmokeconfig:suites/fle2_query_analysis.yml",
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "encrypt",
         "patch_build",
     ],
@@ -286,7 +286,7 @@ resmoke_suite_test(
     config = "//buildscripts/resmokeconfig:suites/fle2_sharding.yml",
     shard_count = 4,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "encrypt",
         "patch_build",
     ],
@@ -306,7 +306,7 @@ resmoke_suite_test(
     config = "//buildscripts/resmokeconfig:suites/fle2_sharding_high_cardinality.yml",
     shard_count = 4,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "encrypt",
     ],
     target_compatible_with = select({
@@ -326,7 +326,7 @@ resmoke_suite_test(
     shard_count = 50,
     tags = [
         "aggregation",
-        "ci-release-critical",
+        "ci-all-variants",
         "encrypt",
     ],
     target_compatible_with = select({
@@ -347,7 +347,7 @@ resmoke_suite_test(
     shard_count = 50,
     tags = [
         "aggregation",
-        "ci-release-critical",
+        "ci-all-variants",
         "encrypt",
         "gcm",
     ],
@@ -368,7 +368,7 @@ resmoke_suite_test(
     config = "//buildscripts/resmokeconfig:suites/core_ese.yml",
     shard_count = 50,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "encrypt",
         "jscore",
     ],
@@ -388,7 +388,7 @@ resmoke_suite_test(
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/core_min_batch_repeat_queries_multiplan_single_solutions_ese_gcm.yml",
     shard_count = 50,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "encrypt",
         "gcm",
         "jscore",
@@ -409,7 +409,7 @@ resmoke_suite_test(
     name = "sasl",
     config = "//buildscripts/resmokeconfig:suites/sasl.yml",
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "patch_build",
         "sasl",
     ],

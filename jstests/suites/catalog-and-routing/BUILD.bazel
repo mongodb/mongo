@@ -21,7 +21,7 @@ resmoke_suite_test(
     data = ["//jstests/concurrency/reshard_collection_util:all_javascript_files"] + CONCURRENCY_DATA,
     shard_count = 20,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "common",
         "concurrency",
         "large",
@@ -51,7 +51,7 @@ resmoke_suite_test(
     ] + CORE_DATA,
     shard_count = 20,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "common",
         "jscore",
         "resources:cpu:2",
@@ -75,7 +75,7 @@ resmoke_suite_test(
     ] + CORE_DATA,
     shard_count = 20,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "common",
         "jscore",
         "requires_large_host_aubsan",
@@ -104,7 +104,7 @@ resmoke_suite_test(
     ] + CORE_DATA,
     shard_count = 20,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "common",
         "large",
         "replica_sets",
@@ -525,7 +525,7 @@ resmoke_suite_test(
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharding_kill_stepdown_terminate_jscore_passthrough.yml",
     shard_count = 20,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "common",
         "jscore",
         "sharding",

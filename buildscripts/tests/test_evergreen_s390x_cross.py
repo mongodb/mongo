@@ -128,7 +128,7 @@ class S390xCrossSchedulingTest(unittest.TestCase):
             variant = self.variants[variant_name]
             all_selected_tasks = set()
             for entry in variant["tasks"]:
-                if not entry["name"].startswith((".development_critical", ".release_critical")):
+                if not entry["name"].startswith((".development_critical", ".all_variants")):
                     continue
                 selected_tasks = _selected_tasks(entry, self.tasks, self.groups)
                 all_selected_tasks.update(selected_tasks)

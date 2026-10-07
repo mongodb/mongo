@@ -40,7 +40,7 @@ resmoke_suite_test(
     data = CONCURRENCY_DATA,
     shard_count = 5,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "common",
         "concurrency",
         "resources:cpu:2",
@@ -1485,7 +1485,7 @@ resmoke_suite_test(
     tags = [
         "common",
         "jstestfuzz",
-        "non_deterministic",
+        "non_required",
         "random_name",
         "require_npm",
     ],

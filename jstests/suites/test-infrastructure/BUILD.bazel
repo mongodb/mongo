@@ -62,7 +62,7 @@ resmoke_suite_test(
     name = "unittest_shell_hang_analyzer",
     config = "//buildscripts/resmokeconfig:suites/unittest_shell_hang_analyzer.yml",
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "incompatible_with_bazel_remote_test",  # Expects a system python to be available: `python ./buildscripts/resmoke.py hang-analyzer ...` Unable to start program python: No such file or directory
         "requires_compile_variant",
         "requires_execution_on_windows_patch_build",
@@ -79,7 +79,7 @@ resmoke_suite_test(
     config = "//buildscripts/resmokeconfig:suites/slow1.yml",
     shard_count = 4,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "misc_js",
         "non_win_dbg",
         "suggested_excluding_required__for_devprod_mitigation_only",

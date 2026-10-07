@@ -39,7 +39,7 @@ resmoke_suite_test(
     ] + CORE_DATA,
     shard_count = 40,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "jscore",
         "sharding",
     ],
@@ -65,7 +65,7 @@ resmoke_suite_test(
     ] + SHARDING_DATA,
     shard_count = 100,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "common",
         "requires_replicated_fast_count_recovery",
         "resources:cpu:2",
@@ -94,7 +94,7 @@ resmoke_suite_test(
     ] + SHARDING_DATA,
     shard_count = 50,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "common",
         "csrs",
         "non_live_record",
@@ -137,7 +137,7 @@ resmoke_suite_test(
     ] + CORE_DATA,
     shard_count = 50,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "common",
         "jscore",
         "sharding",

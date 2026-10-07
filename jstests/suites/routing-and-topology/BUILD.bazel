@@ -26,7 +26,7 @@ resmoke_suite_test(
     ],
     shard_count = 50,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "common",
         "jscore",
         "resources:cpu:2",
@@ -46,7 +46,7 @@ resmoke_suite_test(
     data = CORE_DATA,
     shard_count = 50,
     tags = [
-        "ci-release-critical",
+        "ci-all-variants",
         "jscore",
         "sharding",
     ],

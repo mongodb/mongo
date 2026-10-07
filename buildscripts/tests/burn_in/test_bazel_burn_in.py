@@ -277,7 +277,7 @@ class TestGetTargetsWithTag(unittest.TestCase):
         """Test that the bazel query subtracts incompatible_with_bazel_remote_test targets."""
         mock_run.return_value.stdout = "//jstests/suites/foo:bar\n"
 
-        under_test.get_targets_with_tag("ci-release-critical")
+        under_test.get_targets_with_tag("ci-all-variants")
 
         query_arg = mock_run.call_args[0][0]
         query_str = " ".join(query_arg)

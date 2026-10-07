@@ -24,7 +24,7 @@ resmoke_suite_test(
     tags = [
         "aggregation",
         "blocked_in_join_opt_variant",
-        "ci-release-critical",
+        "ci-all-variants",
         "common",
     ],
     deps = [
@@ -42,7 +42,7 @@ resmoke_suite_test(
     shard_count = 4,
     tags = [
         "aggregation",
-        "ci-release-critical",
+        "ci-all-variants",
         "common",
     ],
     target_compatible_with = select({
