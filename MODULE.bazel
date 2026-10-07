@@ -289,6 +289,8 @@ single_version_override(
         # (WinError 1314/87). Use \\?\ extended-length paths and fall
         # back to copying, like CPython's venv module does. Upstream-worthy;
         # see the patch header.
+        "//bazel/rules_python:bootstrap_runfiles_manifest.patch",
+        "//bazel/rules_python:stage2_bootstrap_runfiles_manifest.patch",
         "//bazel/rules_python:bootstrap_windows_venv_robustness.patch",
         # Windows: direct PyInfo import roots can contain wheel resources
         # beyond MAX_PATH even when LongPathsEnabled is unset. Force those

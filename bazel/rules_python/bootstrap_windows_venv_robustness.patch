@@ -38,6 +38,12 @@ Applied via `single_version_override(patches=...)` on rules_python in
 
 --- a/python/private/python_bootstrap_template.txt	2026-07-23 10:54:27
 +++ b/python/private/python_bootstrap_template.txt	2026-07-23 14:29:06
+@@ -455,1 +455,1 @@
+-        files = os.listdir(python_home)
++        files = os.listdir(_win_extended_path(python_home))
+@@ -470,1 +470,1 @@
+-      for f_basename in os.listdir(runfiles_venv_bin):
++      for f_basename in os.listdir(_win_extended_path(runfiles_venv_bin)):
 @@ -558,8 +558,31 @@
      with open(python_program, 'rb') as f:
        print_verbose("pyprog head:" + str(f.read(50)))
@@ -56,7 +62,7 @@ Applied via `single_version_override(patches=...)` on rules_python in
 +  the path actually exceeds the limit, to minimize behavior change.
 +  """
 +  p = abspath(p)
-+  if len(p) < 260 or p.startswith("\\\\?\\"):
++  if len(p) < 248 or p.startswith("\\\\?\\"):
 +    return p
 +  if p.startswith("\\\\"):
 +    return "\\\\?\\UNC\\" + p[2:]

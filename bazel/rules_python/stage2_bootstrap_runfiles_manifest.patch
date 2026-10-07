@@ -1,0 +1,104 @@
+Windows: resolve stage-2 Python bootstrap files from manifest-only runfiles.
+
+The stage-1 launcher can resolve its generated stage-2 script from a Bazel
+runfiles manifest, but the stage-2 bootstrap must do the same for its main
+source file. This is needed when the Python executable is used as a Windows
+action tool and the runfiles tree contains only `MANIFEST` plus manifest
+targets.
+
+--- a/python/private/stage2_bootstrap_template.py
++++ b/python/private/stage2_bootstrap_template.py
+@@ -179,6 +179,60 @@ def is_verbose_coverage():
+     return os.environ.get("VERBOSE_COVERAGE") or IS_VERBOSE
+ 
+ 
++def _runfiles_manifest_path(runfiles_root, rel_path):
++    """Returns the manifest target for rel_path, if one is available."""
++    manifest_file = os.environ.get("RUNFILES_MANIFEST_FILE", "")
++    if not os.path.isfile(manifest_file):
++        for candidate in (
++            runfiles_root + "_manifest",
++            os.path.join(runfiles_root, "MANIFEST"),
++        ):
++            if os.path.isfile(candidate):
++                manifest_file = candidate
++                break
++    if not manifest_file:
++        return None
++
++    rel_path = rel_path.replace("\\", "/")
++    try:
++        with open(manifest_file, "r") as manifest:
++            for line in manifest:
++                line = line.rstrip("\n")
++                if not line:
++                    continue
++                if line.startswith(" "):
++                    escaped_link, escaped_target = line[1:].split(" ", 1)
++                    link = (
++                        escaped_link.replace(r"\s", " ")
++                        .replace(r"\n", "\n")
++                        .replace(r"\b", "\\")
++                    )
++                    target = (
++                        escaped_target.replace(r"\s", " ")
++                        .replace(r"\n", "\n")
++                        .replace(r"\b", "\\")
++                    )
++                else:
++                    fields = line.split(" ", 1)
++                    if len(fields) != 2:
++                        continue
++                    link, target = fields
++                if link.replace("\\", "/") == rel_path:
++                    if IS_WINDOWS:
++                        target = target.replace("/", os.sep)
++                    return target or link
++    except (OSError, ValueError):
++        return None
++    return None
++
++
++def _resolve_runfile(runfiles_root, rel_path):
++    path = os.path.join(runfiles_root, rel_path)
++    if os.path.exists(path):
++        return path
++    return _runfiles_manifest_path(runfiles_root, rel_path) or path
++
++
+ def find_runfiles_root(main_rel_path):
+     """Finds the runfiles tree."""
+     # When the calling process used the runfiles manifest to resolve the
+@@ -191,6 +191,8 @@
+         runfiles_manifest_file = os.environ.get("RUNFILES_MANIFEST_FILE", "")
+         if runfiles_manifest_file.endswith(
+             ".runfiles_manifest"
++        ) or runfiles_manifest_file.replace("\\", "/").endswith(
++            ".runfiles/MANIFEST"
+         ) or runfiles_manifest_file.endswith(".runfiles/MANIFEST"):
+             runfiles_dir = runfiles_manifest_file[:-9]
+     # Be defensive: the runfiles dir should contain our main entry point. If
+@@ -195,8 +250,12 @@ def find_runfiles_root(main_rel_path):
+             runfiles_dir = runfiles_manifest_file[:-9]
+     # Be defensive: the runfiles dir should contain our main entry point. If
+     # it doesn't, then it must not be our runfiles directory.
+-    if runfiles_dir and os.path.exists(os.path.join(runfiles_dir, main_rel_path)):
+-        return runfiles_dir
++    if runfiles_dir:
++        if os.path.exists(os.path.join(runfiles_dir, main_rel_path)):
++            return runfiles_dir
++        manifest_path = _runfiles_manifest_path(runfiles_dir, main_rel_path)
++        if manifest_path and os.path.exists(manifest_path):
++            return runfiles_dir
+ 
+     # Clear RUNFILES_DIR & RUNFILES_MANIFEST_FILE since the runfiles dir was
+     # not found. These can be correctly set for a parent Python process, but
+@@ -554,7 +611,7 @@ def main():
+         else:
+             prepend_path_entries = []
+ 
+-        main_filename = os.path.join(runfiles_root, main_rel_path)
++        main_filename = _resolve_runfile(runfiles_root, main_rel_path)
+         main_filename = get_windows_path_with_unc_prefix(main_filename)
+         assert os.path.exists(main_filename), (
+             "Cannot exec() %r: file not found." % main_filename

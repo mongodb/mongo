@@ -1,0 +1,115 @@
+Windows: resolve Python bootstrap files from manifest-only runfiles.
+
+When a Python executable is used as an action tool, Bazel may materialize
+only the runfiles manifest on Windows. Generated files, including the
+rules_python stage-2 bootstrap and the hermetic interpreter, are listed in
+that manifest but are not present below the adjacent `.runfiles` directory.
+The launcher must resolve those files through the manifest before reporting
+them as missing or creating a runtime venv from a non-existent path.
+
+The same lookup is needed for the explicit venv symlinks used on Windows.
+Those entries commonly point at individual files in external repositories,
+such as `patch_ng.py`; constructing a path below the synthetic runfiles root
+would otherwise create a dangling link and leave the dependency unavailable
+to the runtime interpreter.
+
+--- a/python/private/python_bootstrap_template.txt
++++ b/python/private/python_bootstrap_template.txt
+@@ -225,7 +225,7 @@ def find_binary(runfiles_root, bin_name):
+   elif os.sep in os.path.normpath(bin_name):
+     # Case 3: Path is relative to the repo root.
+-    return join(runfiles_root, bin_name)
++    return _resolve_runfile(runfiles_root, bin_name)
+   else:
+     # Case 4: Path has to be looked up in the search path.
+     return search_path(bin_name)
+
+@@ -230,6 +230,50 @@ def find_binary(runfiles_root, bin_name):
+     # Case 4: Path has to be looked up in the search path.
+     return search_path(bin_name)
+ 
++def _runfiles_manifest_path(runfiles_root, rel_path):
++  """Returns the manifest target for rel_path, if one is available."""
++  manifest_file = os.environ.get('RUNFILES_MANIFEST_FILE', '')
++  if not os.path.isfile(manifest_file):
++    for candidate in (runfiles_root + '_manifest', join(runfiles_root, 'MANIFEST')):
++      if os.path.isfile(candidate):
++        manifest_file = candidate
++        break
++  if not manifest_file:
++    return None
++
++  rel_path = rel_path.replace('\\', '/')
++  try:
++    with open(manifest_file, 'r') as manifest:
++      for line in manifest:
++        line = line.rstrip('\n')
++        if not line:
++          continue
++        if line.startswith(' '):
++          escaped_link, escaped_target = line[1:].split(' ', 1)
++          link = (escaped_link.replace(r'\s', ' ')
++                  .replace(r'\n', '\n').replace(r'\b', '\\'))
++          target = (escaped_target.replace(r'\s', ' ')
++                    .replace(r'\n', '\n')
++                    .replace(r'\b', '\\'))
++        else:
++          fields = line.split(' ', 1)
++          if len(fields) != 2:
++            continue
++          link, target = fields
++        if link.replace('\\', '/') == rel_path:
++          if IS_WINDOWS:
++            target = target.replace('/', os.sep)
++          return target or link
++  except (OSError, ValueError):
++    return None
++  return None
++
++def _resolve_runfile(runfiles_root, rel_path):
++  path = join(runfiles_root, rel_path)
++  if os.path.exists(path):
++    return path
++  return _runfiles_manifest_path(runfiles_root, rel_path) or path
++
+ def find_runfiles_root(main_rel_path):
+   """Finds the runfiles tree."""
+   # When the calling process used the runfiles manifest to resolve the
+@@ -241,12 +284,17 @@ def find_runfiles_root(main_rel_path):
+   if not runfiles_dir:
+     runfiles_manifest_file = os.environ.get('RUNFILES_MANIFEST_FILE', '')
+     if (runfiles_manifest_file.endswith('.runfiles_manifest') or
++        runfiles_manifest_file.replace('\\', '/').endswith('.runfiles/MANIFEST') or
+         runfiles_manifest_file.endswith('.runfiles/MANIFEST')):
+       runfiles_dir = runfiles_manifest_file[:-9]
+   # Be defensive: the runfiles dir should contain our main entry point. If
+   # it doesn't, then it must not be our runfiles directory.
+-  if runfiles_dir and os.path.exists(join(runfiles_dir, main_rel_path)):
+-    return runfiles_dir
++  if runfiles_dir:
++    if os.path.exists(join(runfiles_dir, main_rel_path)):
++      return runfiles_dir
++    manifest_path = _runfiles_manifest_path(runfiles_dir, main_rel_path)
++    if manifest_path and os.path.exists(manifest_path):
++      return runfiles_dir
+ 
+   # Clear RUNFILES_DIR & RUNFILES_MANIFEST_FILE since the runfiles dir was
+   # not found. These can be correctly set for a parent Python process, but
+@@ -422,7 +470,7 @@ def _create_venv(runfiles_root, delete_dirs):
+     # Recreate correct relative symlinks
+     for venv_rel_path, link_to_rf_path in RUNTIME_VENV_SYMLINKS.items():
+         venv_abs_path = join(venv, venv_rel_path)
+-        link_to = normpath(join(runfiles_root, link_to_rf_path))
++        link_to = _resolve_runfile(runfiles_root, link_to_rf_path)
+         os.makedirs(dirname(venv_abs_path), exist_ok=True)
+         _symlink_exist_ok(from_=venv_abs_path, to=link_to)
+
+@@ -664,7 +712,7 @@ def main():
+   # See: https://docs.python.org/3.11/using/cmdline.html#envvar-PYTHONSAFEPATH
+   new_env['PYTHONSAFEPATH'] = '1'
+ 
+-  main_filename = join(runfiles_root, main_rel_path)
++  main_filename = _resolve_runfile(runfiles_root, main_rel_path)
+   main_filename = get_windows_path_with_unc_prefix(main_filename)
+   assert os.path.exists(main_filename), \
+          'Cannot exec() %r: file not found.' % main_filename
