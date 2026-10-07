@@ -1,4 +1,5 @@
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "int_flag", "string_flag")
+load("@bazel_skylib//rules:write_file.bzl", "write_file")
 load("@internal_platforms_do_not_use//host:constraints.bzl", "HOST_CONSTRAINTS")
 load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
@@ -131,6 +132,15 @@ bool_flag(
 bool_flag(
     name = "support_extended_shard_count",
     build_setting_default = True,
+)
+
+# Stands in for the jstestfuzz bundle under --//bazel/resmoke:skip_deps_for_cquery, so cquery over
+# fuzzer suites does not fetch (clone, npm install, compile) the jstestfuzz repositories.
+write_file(
+    name = "jstestfuzz_cquery_placeholder_bundle",
+    out = "jstestfuzz_cquery_placeholder_bundle.tar",
+    content = [],
+    visibility = ["//visibility:public"],
 )
 
 config_setting(

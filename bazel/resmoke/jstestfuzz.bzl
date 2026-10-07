@@ -91,7 +91,7 @@ def _jstestfuzz_generate_impl(ctx):
 
     return [DefaultInfo(files = depset(out_dirs))]
 
-jstestfuzz_generate = rule(
+_jstestfuzz_generate = rule(
     implementation = _jstestfuzz_generate_impl,
     attrs = {
         "seed": attr.string(
@@ -165,3 +165,20 @@ jstestfuzz_generate = rule(
     },
     doc = "Generates randomized .js test files with jstestfuzz.",
 )
+
+def jstestfuzz_generate(name, bundle = "@jstestfuzz//:bundle", **kwargs):
+    """Generates randomized .js test files with jstestfuzz.
+
+    The bundle repository is a git clone plus an npm install and grammar compile, which takes
+    minutes to fetch. Cquery only needs this target's configuration, not its inputs, so swap in a
+    placeholder under --//bazel/resmoke:skip_deps_for_cquery to avoid fetching it (see
+    buildscripts/generate_result_tasks.py).
+    """
+    _jstestfuzz_generate(
+        name = name,
+        bundle = select({
+            "//bazel/resmoke:skip_deps_for_cquery_enabled": "//bazel/resmoke:jstestfuzz_cquery_placeholder_bundle",
+            "//conditions:default": bundle,
+        }),
+        **kwargs
+    )
