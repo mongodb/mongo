@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: SSPL-1.0
 #pragma once
 
+#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_size_count.h"
 #include "mongo/util/uuid.h"
 
@@ -29,5 +30,18 @@ enum class ReportingStrategy { kFassert, kLogError };
 void validateCheckpoint(const CheckpointContents& standby,
                         const CheckpointContents& primary,
                         ReportingStrategy reportingStrategy);
+
+/**
+ * Returns true if the provided oplog entry is a replicated metadata checkpoint, and false
+ * otherwise.
+ */
+bool isCheckpointApplyOpsEntry(const repl::OplogEntry& entry);
+
+/**
+ * Parses a replicated metadata checkpoint entry and returns the per-collection replicated metadata
+ * it contains.
+ */
+// TODO(SERVER-136501): Handle chained applyOps entries.
+CheckpointContents parseCheckpoint(const repl::OplogEntry& entry);
 
 }  // namespace mongo::replicated_fast_count

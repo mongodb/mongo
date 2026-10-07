@@ -3,6 +3,12 @@
 
 #include "mongo/db/replicated_fast_count/size_count_checkpoint_validator.h"
 
+#include "mongo/db/repl/apply_ops_command_info.h"
+#include "mongo/db/repl/container_oplog_entry_gen.h"
+#include "mongo/db/repl/container_oplog_entry_serialization.h"
+#include "mongo/db/replicated_fast_count/size_count_store.h"
+#include "mongo/db/storage/ident.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 
@@ -23,6 +29,33 @@ void report(ReportingStrategy strategy, int code, std::string message) {
     }
 }
 
+UUID uuidFromContainerInnerOp(const repl::DurableReplOperation& inner) {
+    repl::ContainerKey key;
+    switch (inner.getOpType()) {
+        case repl::OpTypeEnum::kContainerInsert: {
+            const auto parsed = repl::ContainerInsertOplogEntryO::parse(
+                inner.getObject(), IDLParserContext("FastCountCheckpointInnerInsert"));
+            key = parsed.getKey();
+            break;
+        }
+        case repl::OpTypeEnum::kContainerUpdate: {
+            const auto parsed = repl::ContainerUpdateOplogEntryO::parse(
+                inner.getObject(), IDLParserContext("FastCountCheckpointInnerUpdate"));
+            key = parsed.getKey();
+            break;
+        }
+        case repl::OpTypeEnum::kContainerDelete: {
+            const auto parsed = repl::ContainerDeleteOplogEntryO::parse(
+                inner.getObject(), IDLParserContext("FastCountCheckpointInnerDelete"));
+            key = parsed.getKey();
+            break;
+        }
+        default:
+            MONGO_UNREACHABLE;
+    }
+    const auto keyBytes = key.getBytesKey();
+    return UUID::fromCDR(ConstDataRange(keyBytes.data(), keyBytes.data() + keyBytes.size()));
+}
 }  // namespace
 
 void validateCheckpoint(const CheckpointContents& standby,
@@ -97,6 +130,79 @@ void validateCheckpoint(const CheckpointContents& standby,
                                metadata ? "active" : "dropped"));
         }
     }
+}
+
+bool isCheckpointApplyOpsEntry(const repl::OplogEntry& entry) {
+    if (entry.getOpType() != repl::OpTypeEnum::kCommand ||
+        entry.getCommandType() != repl::CommandTypeEnum::kApplyOps) {
+        return false;
+    }
+    const auto applyOpsInfo = repl::ApplyOpsCommandInfo::parse(entry.getObject());
+    for (const auto& innerOpObj : applyOpsInfo.getOperations()) {
+        const auto innerOp = repl::DurableReplOperation::parse(innerOpObj);
+        const bool isContainerWrite = innerOp.getOpType() == repl::OpTypeEnum::kContainerInsert ||
+            innerOp.getOpType() == repl::OpTypeEnum::kContainerUpdate ||
+            innerOp.getOpType() == repl::OpTypeEnum::kContainerDelete;
+        // A timestamp store write is included in every checkpoint, so we check for the existence of
+        // this ident.
+        if (isContainerWrite && innerOp.getContainer() &&
+            *innerOp.getContainer() == ident::kFastCountMetadataStoreTimestamps) {
+            tassert(13647901,
+                    "No container deletes are applied to the timestamp container",
+                    innerOp.getOpType() != repl::OpTypeEnum::kContainerDelete);
+            return true;
+        }
+    }
+    return false;
+}
+
+CheckpointContents parseCheckpoint(const repl::OplogEntry& entry) {
+    CheckpointContents contents;
+    const auto applyOpsInfo = repl::ApplyOpsCommandInfo::parse(entry.getObject());
+    for (const auto& innerOpObj : applyOpsInfo.getOperations()) {
+        const auto innerOp = repl::DurableReplOperation::parse(innerOpObj);
+        if (!innerOp.getContainer() || *innerOp.getContainer() != ident::kFastCountMetadataStore) {
+            continue;
+        }
+        switch (innerOp.getOpType()) {
+            case repl::OpTypeEnum::kContainerDelete: {
+                // A container delete entry does not include any replicated metadata, so we set the
+                // value to boost::none.
+                contents[uuidFromContainerInnerOp(innerOp)] = boost::none;
+                break;
+            }
+            case repl::OpTypeEnum::kContainerInsert: {
+                const auto parsed = repl::ContainerInsertOplogEntryO::parse(
+                    innerOp.getObject(), IDLParserContext("FastCountCheckpointInnerInsert"));
+                massert(13647900,
+                        "Fast count metadata store container write is missing a value",
+                        parsed.getValue().has_value());
+                const BSONObj valueBson = BSONObj(parsed.getValue()->data().data()).getOwned();
+                const SizeCountStore::Entry storeEntry = SizeCountStore::parseContainerValue(
+                    {valueBson.objdata(), static_cast<size_t>(valueBson.objsize())});
+                contents[uuidFromContainerInnerOp(innerOp)] = CollectionReplicatedMetadata{
+                    .sizeCount =
+                        CollectionSizeCount{.size = storeEntry.size, .count = storeEntry.count},
+                    .hash = storeEntry.hash};
+                break;
+            }
+            case repl::OpTypeEnum::kContainerUpdate: {
+                const auto parsed = repl::ContainerUpdateOplogEntryO::parse(
+                    innerOp.getObject(), IDLParserContext("FastCountCheckpointInnerUpdate"));
+                const BSONObj valueBson = BSONObj(parsed.getValue().data().data()).getOwned();
+                const SizeCountStore::Entry storeEntry = SizeCountStore::parseContainerValue(
+                    {valueBson.objdata(), static_cast<size_t>(valueBson.objsize())});
+                contents[uuidFromContainerInnerOp(innerOp)] = CollectionReplicatedMetadata{
+                    .sizeCount =
+                        CollectionSizeCount{.size = storeEntry.size, .count = storeEntry.count},
+                    .hash = storeEntry.hash};
+                break;
+            }
+            default:
+                MONGO_UNREACHABLE;
+        }
+    }
+    return contents;
 }
 
 }  // namespace mongo::replicated_fast_count

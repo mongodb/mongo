@@ -291,7 +291,12 @@ mongo_cc_library(
         "size_count_checkpoint_validator.cpp",
     ],
     deps = [
+        "size_count_store",
         "//src/mongo:base",
+        "//src/mongo/db/repl:apply_ops_command_info",
+        "//src/mongo/db/repl:oplog_entry",
+        "//src/mongo/db/storage:ident",
+        "//src/mongo/idl:idl_parser",
     ],
 )
 
@@ -300,9 +305,21 @@ mongo_cc_unit_test(
     srcs = [
         "size_count_checkpoint_validator_test.cpp",
     ],
-    tags = ["mongo_unittest_third_group"],
+    tags = [
+        "mongo_unittest_third_group",
+        "server-collection-write-path",
+    ],
     deps = [
+        "replicated_fast_count_test_helpers",
+        "size_count_checkpoint_flusher",
         "size_count_checkpoint_validator",
+        "//src/mongo/db:dbhelpers",
+        "//src/mongo/db/repl:apply_ops_command_info",
+        "//src/mongo/db/repl:oplog_entry",
+        "//src/mongo/db/shard_role",
+        "//src/mongo/db/shard_role/shard_catalog:catalog_helpers",
+        "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
+        "//src/mongo/db/storage:write_unit_of_work",
     ],
 )
 
