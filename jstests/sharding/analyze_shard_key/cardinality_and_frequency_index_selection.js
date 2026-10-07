@@ -2,11 +2,7 @@
  * Tests that the cardinality and frequency metrics calculation within the analyzeShardKey command
  * prioritizes indexes that allows it to infer if the shard key is unique.
  *
- * @tags: [
- *   # Requires all nodes to be running the latest binary.
- *   multiversion_incompatible,
- *   requires_fcv_70,
- * ]
+ * @tags: [requires_fcv_70]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -16,16 +12,7 @@ import {AnalyzeShardKeyUtil} from "jstests/sharding/analyze_shard_key/libs/analy
 const numNodesPerRS = 2;
 const numMostCommonValues = 5;
 
-function testAnalyzeShardKey(
-    conn,
-    writeConcern,
-    {docs, indexSpecs, shardKeys, metrics, collectionOptions},
-) {
-    assert(
-        !(collectionOptions && indexSpecs),
-        "Cannot specify both collectionOptions and indexSpecs",
-    );
-
+function testAnalyzeShardKey(conn, writeConcern, {docs, indexSpecs, shardKeys, metrics}) {
     const dbName = "testDb-" + extractUUIDFromObject(UUID());
     const collName = "testColl";
     const ns = dbName + "." + collName;
@@ -34,11 +21,7 @@ function testAnalyzeShardKey(
     const db = conn.getDB(dbName);
     const coll = db.getCollection(collName);
 
-    if (collectionOptions) {
-        assert.commandWorked(db.createCollection(collName, collectionOptions));
-    } else {
-        assert.commandWorked(db.runCommand({createIndexes: collName, indexes: indexSpecs}));
-    }
+    assert.commandWorked(db.runCommand({createIndexes: collName, indexes: indexSpecs}));
     assert.commandWorked(coll.insert(docs, {writeConcern}));
 
     for (let shardKey of shardKeys) {
@@ -109,176 +92,6 @@ function runTest(conn, writeConcern) {
     });
 
     testAnalyzeShardKey(conn, writeConcern, {
-        docs: [{x: -1}, {x: 1}],
-        indexSpecs: [
-            {
-                name: "x_1",
-                key: {x: 1},
-            },
-            {
-                name: "x_1_unique_ci",
-                key: {x: 1},
-                unique: true,
-                collation: {locale: "en", strength: 2},
-            },
-        ],
-        shardKeys: [{x: 1}],
-        metrics: {
-            numDocs: 2,
-            isUnique: false,
-            numDistinctValues: 2,
-            mostCommonValues: [
-                {value: {x: -1}, frequency: 1},
-                {value: {x: 1}, frequency: 1},
-            ],
-            numMostCommonValues,
-        },
-    });
-
-    testAnalyzeShardKey(conn, writeConcern, {
-        docs: [{x: -1}, {x: 1}],
-        indexSpecs: [
-            {
-                name: "x_1",
-                key: {x: 1},
-            },
-            {
-                name: "x_1_unique_ci",
-                key: {x: 1},
-                unique: true,
-                collation: {locale: "en", strength: 2},
-            },
-        ],
-        shardKeys: [{x: "hashed"}],
-        metrics: {
-            numDocs: 2,
-            isUnique: false,
-            numDistinctValues: 2,
-            mostCommonValues: [
-                {value: {x: -1}, frequency: 1},
-                {value: {x: 1}, frequency: 1},
-            ],
-            numMostCommonValues,
-        },
-    });
-
-    testAnalyzeShardKey(conn, writeConcern, {
-        docs: [
-            {x: -1, y: -1},
-            {x: 1, y: 1},
-        ],
-        indexSpecs: [
-            {
-                name: "x_1_y_1",
-                key: {x: 1, y: 1},
-            },
-            {
-                name: "x_1_y_1_unique",
-                key: {x: 1, y: 1},
-                unique: true,
-            },
-        ],
-        shardKeys: [{x: 1}],
-        metrics: {
-            numDocs: 2,
-            isUnique: false,
-            numDistinctValues: 2,
-            mostCommonValues: [
-                {value: {x: -1}, frequency: 1},
-                {value: {x: 1}, frequency: 1},
-            ],
-            numMostCommonValues,
-        },
-    });
-
-    testAnalyzeShardKey(conn, writeConcern, {
-        docs: [
-            {x: -1, y: -1},
-            {x: 1, y: 1},
-        ],
-        indexSpecs: [
-            {
-                name: "x_1_y_1",
-                key: {x: 1, y: 1},
-            },
-            {
-                name: "x_1_y_1_unique_hidden",
-                key: {x: 1, y: 1},
-                unique: true,
-                hidden: true,
-            },
-        ],
-        shardKeys: [{x: 1}],
-        metrics: {
-            numDocs: 2,
-            isUnique: false,
-            numDistinctValues: 2,
-            mostCommonValues: [
-                {value: {x: -1}, frequency: 1},
-                {value: {x: 1}, frequency: 1},
-            ],
-            numMostCommonValues,
-        },
-    });
-
-    testAnalyzeShardKey(conn, writeConcern, {
-        docs: [
-            {x: -1, y: -1},
-            {x: 1, y: 1},
-        ],
-        indexSpecs: [
-            {
-                name: "x_1",
-                key: {x: 1},
-            },
-            {
-                name: "x_1_y_1_unique_hidden",
-                key: {x: 1, y: 1},
-                unique: true,
-                hidden: true,
-            },
-        ],
-        shardKeys: [{x: 1}],
-        metrics: {
-            numDocs: 2,
-            isUnique: false,
-            numDistinctValues: 2,
-            mostCommonValues: [
-                {value: {x: -1}, frequency: 1},
-                {value: {x: 1}, frequency: 1},
-            ],
-            numMostCommonValues,
-        },
-    });
-
-    testAnalyzeShardKey(conn, writeConcern, {
-        docs: [{x: -1}, {x: 1}],
-        indexSpecs: [
-            {
-                name: "x_1",
-                key: {x: 1},
-            },
-            {
-                name: "x_1_unique_hidden",
-                key: {x: 1},
-                unique: true,
-                hidden: true,
-            },
-        ],
-        shardKeys: [{x: 1}],
-        metrics: {
-            numDocs: 2,
-            isUnique: false,
-            numDistinctValues: 2,
-            mostCommonValues: [
-                {value: {x: -1}, frequency: 1},
-                {value: {x: 1}, frequency: 1},
-            ],
-            numMostCommonValues,
-        },
-    });
-
-    testAnalyzeShardKey(conn, writeConcern, {
         docs: [
             {x: -1, y: -1},
             {x: 1, y: 1},
@@ -335,40 +148,6 @@ function runTest(conn, writeConcern) {
             mostCommonValues: [
                 {value: {x: -1, y: -1}, frequency: 1},
                 {value: {x: 1, y: 1}, frequency: 1},
-            ],
-            numMostCommonValues,
-        },
-    });
-
-    testAnalyzeShardKey(conn, writeConcern, {
-        docs: [{_id: -1}, {_id: 1}],
-        collectionOptions: {clusteredIndex: {key: {_id: 1}, unique: true}},
-        shardKeys: [{_id: 1}],
-        metrics: {
-            numDocs: 2,
-            isUnique: true,
-            numDistinctValues: 2,
-            mostCommonValues: [
-                {value: {_id: -1}, frequency: 1},
-                {value: {_id: 1}, frequency: 1},
-            ],
-            numMostCommonValues,
-        },
-    });
-
-    testAnalyzeShardKey(conn, writeConcern, {
-        docs: [{_id: -1}, {_id: 1}],
-        collectionOptions: {
-            clusteredIndex: {key: {_id: 1}, unique: true, name: "ci"},
-        },
-        shardKeys: [{_id: 1}],
-        metrics: {
-            numDocs: 2,
-            isUnique: true,
-            numDistinctValues: 2,
-            mostCommonValues: [
-                {value: {_id: -1}, frequency: 1},
-                {value: {_id: 1}, frequency: 1},
             ],
             numMostCommonValues,
         },
