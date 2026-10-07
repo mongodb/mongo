@@ -23,6 +23,7 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/db/repl/change_stream_oplog_notification.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
 #include "mongo/db/rss/replicated_storage_service.h"
@@ -493,7 +494,8 @@ private:
         // shard starts at lastLTS FCV and is upgraded by the config server during addShard.
         if (gFeatureFlagReplicatedFastCount.isEnabledOnTargetFCVButDisabledOnOriginalFCV(
                 requestedVersion, originalVersion) &&
-            repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet()) {
+            repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet() &&
+            !isReplicatedFastCountDisabledForTest(opCtx)) {
             setUpReplicatedFastCount(opCtx);
         }
     }

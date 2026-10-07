@@ -48,4 +48,10 @@ namespace mongo {
  */
 [[MONGO_MOD_PUBLIC]] bool isReplicatedFastCountInitialSyncEnabled(OperationContext* opCtx);
 
+/**
+ * Returns true if the test-only 'disableReplicatedFastCount' failpoint is set and the persistence
+ * provider does not itself use replicated fast count.
+ */
+[[MONGO_MOD_PUBLIC]] bool isReplicatedFastCountDisabledForTest(OperationContext* opCtx);
+
 }  // namespace mongo

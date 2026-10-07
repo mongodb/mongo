@@ -104,4 +104,13 @@ bool isReplicatedFastCountInitialSyncEnabled(OperationContext* opCtx) {
                                                                                   fcvSnapshot);
 }
 
+bool isReplicatedFastCountDisabledForTest(OperationContext* opCtx) {
+    if (rss::ReplicatedStorageService::get(opCtx)
+            .getPersistenceProvider()
+            .shouldUseReplicatedFastCount()) {
+        return false;
+    }
+    return MONGO_unlikely(disableReplicatedFastCount.shouldFail());
+}
+
 }  // namespace mongo
