@@ -523,8 +523,8 @@ TEST(GeoParser, parseGeometryCollection) {
 // A polygon ring where two adjacent vertices have distinct GeoJSON coordinates but
 // map to the same S2Point under some sin/cos implementations (e.g. glibc 2.34) must be
 // accepted consistently across platforms.
-TEST(GeoParser, adjacentVertexCollapseFromSinCosRoundingIsRecoveredWhenFeatureFlagEnabled) {
-    unittest::ServerParameterGuard featureFlag{"featureFlagGeoSinCosRoundingRecovery", true};
+TEST(GeoParser, adjacentVertexCollapseFromSinCosRoundingIsRecoveredWhenRecoveryEnabled) {
+    unittest::ServerParameterGuard recoveryParam{"geoRecoveryFromSinCosRoundingErrors", true};
     PolygonWithCRS polygon;
     ASSERT_OK(GeoParser::parseGeoJSONPolygon(
         fromjson("{'type':'Polygon','coordinates':[[[0,0],[6.500000000000086,0],"
@@ -539,8 +539,8 @@ TEST(GeoParser, adjacentVertexCollapseFromSinCosRoundingIsRecoveredWhenFeatureFl
 // Ring: [A, B, B', A]. With recovery disabled, whether this is rejected depends on whether B
 // and B' actually collapse on the current glibc: if they do, the ring is reduced to 2 unique
 // vertices and rejected; if they don't, it's already a valid triangle.
-TEST(GeoParser, adjacentVertexCollapseIsRejectedWhenFeatureFlagDisabled) {
-    unittest::ServerParameterGuard featureFlag{"featureFlagGeoSinCosRoundingRecovery", false};
+TEST(GeoParser, adjacentVertexCollapseIsRejectedWhenRecoveryDisabled) {
+    unittest::ServerParameterGuard recoveryParam{"geoRecoveryFromSinCosRoundingErrors", false};
     PolygonWithCRS polygon;
     bool collapses = collapsesOnCurrentGlibc(0, 6.500000000000086, 6.500000000000087);
     Status status = GeoParser::parseGeoJSONPolygon(
@@ -558,11 +558,11 @@ TEST(GeoParser, adjacentVertexCollapseIsRejectedWhenFeatureFlagDisabled) {
 }
 
 // Ring: [A, B, B, A].  Truly duplicated adjacent vertices. Two B will be reduced to one.
-// The ring must still be rejected, regardless of the feature flag.
-TEST(GeoParser, trulyDuplicateAdjacentVerticesAreRejectedRegardlessOfFeatureFlag) {
+// The ring must still be rejected, regardless of the recovery server parameter.
+TEST(GeoParser, trulyDuplicateAdjacentVerticesAreRejectedRegardlessOfRecovery) {
     for (bool flagEnabled : {true, false}) {
-        unittest::ServerParameterGuard featureFlag{"featureFlagGeoSinCosRoundingRecovery",
-                                                   flagEnabled};
+        unittest::ServerParameterGuard recoveryParam{"geoRecoveryFromSinCosRoundingErrors",
+                                                     flagEnabled};
         PolygonWithCRS polygon;
         Status status = GeoParser::parseGeoJSONPolygon(
             fromjson("{'type':'Polygon','coordinates':[[[0,0],[6.5,0],[6.5,0],[0,0]]]}"),
@@ -573,13 +573,16 @@ TEST(GeoParser, trulyDuplicateAdjacentVerticesAreRejectedRegardlessOfFeatureFlag
         ASSERT_STRING_CONTAINS(status.reason(), "2 unique vertices were provided");
         // No vertex collapsed and no recovery happened.
         ASSERT_STRING_OMITS(status.reason(), "after recovery attempted");
+        // The rejection was not an edge crossing, so the stable edge-crossing recheck must not be
+        // reported.
+        ASSERT_STRING_OMITS(status.reason(), "after edge crossing rechecked");
     }
 }
 
 // Ring [A, B, B', B'', A]: Three distinct, 1-ULP-adjacent longitude values that ALL collapse
 // to the same S2Point on glibc 2.34+.
-TEST(GeoParser, tripleAdjacentVertexCollapseFromSinCosRoundingIsRecoveredWhenFeatureFlagEnabled) {
-    unittest::ServerParameterGuard featureFlag{"featureFlagGeoSinCosRoundingRecovery", true};
+TEST(GeoParser, tripleAdjacentVertexCollapseFromSinCosRoundingIsRecoveredWhenRecoveryEnabled) {
+    unittest::ServerParameterGuard recoveryParam{"geoRecoveryFromSinCosRoundingErrors", true};
     PolygonWithCRS polygon;
     ASSERT_OK(GeoParser::parseGeoJSONPolygon(
         fromjson("{'type':'Polygon','coordinates':[[[0,0],[-31.021928199999991,0],"
@@ -602,8 +605,8 @@ TEST(GeoParser, tripleAdjacentVertexCollapseFromSinCosRoundingIsRecoveredWhenFea
 // vertices (and thus rejected) if BOTH adjacent pairs [B, B'] and [B', B''] collapse on the current
 // glibc, cascading the whole run down to a single point; if only one pair collapses (or
 // neither), the ring still ends up with >= 3 distinct vertices and is valid.
-TEST(GeoParser, tripleAdjacentVertexCollapseIsRejectedWhenFeatureFlagDisabled) {
-    unittest::ServerParameterGuard featureFlag{"featureFlagGeoSinCosRoundingRecovery", false};
+TEST(GeoParser, tripleAdjacentVertexCollapseIsRejectedWhenRecoveryDisabled) {
+    unittest::ServerParameterGuard recoveryParam{"geoRecoveryFromSinCosRoundingErrors", false};
     PolygonWithCRS polygon;
     bool bothCollapse = collapsesOnCurrentGlibc(0, -31.021928199999991, -31.021928199999987) &&
         collapsesOnCurrentGlibc(0, -31.021928199999987, -31.021928199999984);
@@ -626,8 +629,8 @@ TEST(GeoParser, tripleAdjacentVertexCollapseIsRejectedWhenFeatureFlagDisabled) {
 // After resize: [PA, PA, PA, PA, PZ]
 // After recover: [PA, PA+1, PA+1, PA+2, PZ]
 // After eraseDuplicatePoints: [PA, PA+1, PA+2, PZ]
-TEST(GeoParser, duplicateCollapseFromSinCosRoundingIsRecoveredWhenFeatureFlagEnabled) {
-    unittest::ServerParameterGuard featureFlag{"featureFlagGeoSinCosRoundingRecovery", true};
+TEST(GeoParser, duplicateCollapseFromSinCosRoundingIsRecoveredWhenRecoveryEnabled) {
+    unittest::ServerParameterGuard recoveryParam{"geoRecoveryFromSinCosRoundingErrors", true};
     PolygonWithCRS polygon;
     ASSERT_OK(GeoParser::parseGeoJSONPolygon(
         fromjson("{'type':'Polygon','coordinates':[[[-31.021928199999991,0],"
@@ -649,8 +652,8 @@ TEST(GeoParser, duplicateCollapseFromSinCosRoundingIsRecoveredWhenFeatureFlagEna
 // Ring [A, A', A', A'', Z, A]. With recovery disabled, this is only reduced below 3 unique
 // vertices (and thus rejected) if BOTH adjacent pairs (A-A', A'-A'') collapse down to a single
 // point; otherwise the ring still ends up with >= 3 distinct vertices and is valid.
-TEST(GeoParser, duplicateCollapseIsRejectedWhenFeatureFlagDisabled) {
-    unittest::ServerParameterGuard featureFlag{"featureFlagGeoSinCosRoundingRecovery", false};
+TEST(GeoParser, duplicateCollapseIsRejectedWhenRecoveryDisabled) {
+    unittest::ServerParameterGuard recoveryParam{"geoRecoveryFromSinCosRoundingErrors", false};
     PolygonWithCRS polygon;
     bool bothCollapse = collapsesOnCurrentGlibc(0, -31.021928199999991, -31.021928199999987) &&
         collapsesOnCurrentGlibc(0, -31.021928199999987, -31.021928199999984);
@@ -672,37 +675,28 @@ TEST(GeoParser, duplicateCollapseIsRejectedWhenFeatureFlagDisabled) {
 // Ring [A, B, X, Y, B', C, D, B'', A]: recoverCollapsedVerticesByShift() correctly detects
 // and shifts all three as members of the same collapse group regardless of adjacency.
 //
-// However, the recovered ring still fails end-to-end, because it has 2 edges that cross.
-
-// TODO(SERVER-132874): once RobustCrossing's sin/cos-rounding sign-flip bug is fixed, this
-// ring is expected to become valid (ASSERT_OK) rather than fail on "Edges ... cross".
-TEST(GeoParser,
-     tripleNonAdjacentVertexCollapseFromSinCosRoundingIsRecoveredWhenFeatureFlagEnabled) {
-    unittest::ServerParameterGuard featureFlag{"featureFlagGeoSinCosRoundingRecovery", true};
+// Once shifted, B, B', and B'' are all extremely close together (but no longer exactly
+// collapsed), which makes several of the recovered loop's edges nearly collinear/coplanar and
+// previously tripped SERVER-132874's RobustCrossing sin/cos-rounding sign-flip bug. Now that
+// RobustCrossingStable resolves near-degenerate orientation tests as "not crossing" rather than
+// trusting ExpensiveCCW's noise-prone sign, the recovered loop is valid end-to-end.
+TEST(GeoParser, tripleNonAdjacentVertexCollapseFromSinCosRoundingIsRecoveredWhenRecoveryEnabled) {
+    unittest::ServerParameterGuard recoveryParam{"geoRecoveryFromSinCosRoundingErrors", true};
     PolygonWithCRS polygon;
 
-    Status status = GeoParser::parseGeoJSONPolygon(
+    ASSERT_OK(GeoParser::parseGeoJSONPolygon(
         fromjson("{'type':'Polygon','coordinates':[[[0,0],[-31.021928199999991,0],"
                  "[0,1],[1,0],[-31.021928199999987,0],[2,2],[3,3],"
                  "[-31.021928199999984,0],[0,0]]]}"),
         false,
-        &polygon);
-    ASSERT_EQUALS(ErrorCodes::BadValue, status.code());
-    ASSERT_STRING_CONTAINS(status.reason(), "Loop is not valid");
-
-    // `recoverCollapsedVertices` is successful, but the recovered loop still fails
-    // S2Loop::IsValid() with "Edges x and y cross".
-    // Once SERVER-132874 is fixed, this ring is expected to become valid instead.
-    ASSERT_STRING_CONTAINS(status.reason(), "Edges 0 and 3 cross");
-    // Recovery was attempted, but the recovered ring is still invalid.
-    ASSERT_STRING_CONTAINS(status.reason(), "after recovery attempted");
+        &polygon));
 }
 
 // Ring: [A, B, B', B, B', B, A] should fail, since there are multiple B or B', which
 // breaks the pair-wise distinct vertices requirement enforced in S2Loop.isValid().
 TEST(GeoParser,
-     repeatedLiteralCoordinatesAcrossNonAdjacentPositionsAreRejectedWhenFeatureFlagEnabled) {
-    unittest::ServerParameterGuard featureFlag{"featureFlagGeoSinCosRoundingRecovery", true};
+     repeatedLiteralCoordinatesAcrossNonAdjacentPositionsAreRejectedWhenRecoveryEnabled) {
+    unittest::ServerParameterGuard recoveryParam{"geoRecoveryFromSinCosRoundingErrors", true};
     PolygonWithCRS polygon;
     Status status5 = GeoParser::parseGeoJSONPolygon(
         fromjson("{'type':'Polygon','coordinates':[[[0,0],[6.500000000000086,0],"
@@ -721,8 +715,8 @@ TEST(GeoParser,
 
 // Ring: [A, Z, A', A]: A (opening) and A' collapse but are not adjacent, while A' and A
 // (closing) collapse and adjacent.
-TEST(GeoParser, nonAdjacentVertexCollapseFromSinCosRoundingIsRecoveredWhenFeatureFlagEnabled) {
-    unittest::ServerParameterGuard featureFlag{"featureFlagGeoSinCosRoundingRecovery", true};
+TEST(GeoParser, nonAdjacentVertexCollapseFromSinCosRoundingIsRecoveredWhenRecoveryEnabled) {
+    unittest::ServerParameterGuard recoveryParam{"geoRecoveryFromSinCosRoundingErrors", true};
     PolygonWithCRS polygon;
     ASSERT_OK(GeoParser::parseGeoJSONPolygon(
         fromjson("{'type':'Polygon','coordinates':[[[6.500000000000086,0],[0,0],"
@@ -737,8 +731,8 @@ TEST(GeoParser, nonAdjacentVertexCollapseFromSinCosRoundingIsRecoveredWhenFeatur
 // Ring: [A, Z, A', A]. With recovery disabled, this is only rejected if A and A' actually
 // collapse  - in which case A'(idx=2) and A(idx=3) merge into a single
 // point during the initial adjacent-duplicate pass.
-TEST(GeoParser, nonAdjacentVertexCollapseIsRejectedWhenFeatureFlagDisabled) {
-    unittest::ServerParameterGuard featureFlag{"featureFlagGeoSinCosRoundingRecovery", false};
+TEST(GeoParser, nonAdjacentVertexCollapseIsRejectedWhenRecoveryDisabled) {
+    unittest::ServerParameterGuard recoveryParam{"geoRecoveryFromSinCosRoundingErrors", false};
     PolygonWithCRS polygon;
     bool collapses = collapsesOnCurrentGlibc(0, 6.500000000000086, 6.500000000000087);
     Status status = GeoParser::parseGeoJSONPolygon(
@@ -757,8 +751,8 @@ TEST(GeoParser, nonAdjacentVertexCollapseIsRejectedWhenFeatureFlagDisabled) {
 
 // Ring: [A, B, B', A, A] -- a doubled closing vertex (the literal coordinate A repeated at
 // idx0, idx3, and idx4) combined with a non-adjacent collapse.
-TEST(GeoParser, doubledClosingVertexWithAdjacentCollapseIsRecoveredWhenFeatureFlagEnabled) {
-    unittest::ServerParameterGuard featureFlag{"featureFlagGeoSinCosRoundingRecovery", true};
+TEST(GeoParser, doubledClosingVertexWithAdjacentCollapseIsRecoveredWhenRecoveryEnabled) {
+    unittest::ServerParameterGuard recoveryParam{"geoRecoveryFromSinCosRoundingErrors", true};
     PolygonWithCRS polygon;
     ASSERT_OK(GeoParser::parseGeoJSONPolygon(
         fromjson("{'type':'Polygon','coordinates':[[[0,0],[6.500000000000086,0],"
@@ -770,8 +764,8 @@ TEST(GeoParser, doubledClosingVertexWithAdjacentCollapseIsRecoveredWhenFeatureFl
     assertSingleLoopVertexCount(polygon, 3);
 }
 
-TEST(GeoParser, doubledClosingVertexWithAdjacentCollapseIsRejectedWhenFeatureFlagDisabled) {
-    unittest::ServerParameterGuard featureFlag{"featureFlagGeoSinCosRoundingRecovery", false};
+TEST(GeoParser, doubledClosingVertexWithAdjacentCollapseIsRejectedWhenRecoveryDisabled) {
+    unittest::ServerParameterGuard recoveryParam{"geoRecoveryFromSinCosRoundingErrors", false};
     PolygonWithCRS polygon;
     bool collapses = collapsesOnCurrentGlibc(0, 6.500000000000086, 6.500000000000087);
     Status status = GeoParser::parseGeoJSONPolygon(
@@ -789,8 +783,8 @@ TEST(GeoParser, doubledClosingVertexWithAdjacentCollapseIsRejectedWhenFeatureFla
 }
 
 // An interior ring [A, B, B', A] forms a hole in a polygon.
-TEST(GeoParser, interiorRingVertexCollapseFromSinCosRoundingIsRecoveredWhenFeatureFlagEnabled) {
-    unittest::ServerParameterGuard featureFlag{"featureFlagGeoSinCosRoundingRecovery", true};
+TEST(GeoParser, interiorRingVertexCollapseFromSinCosRoundingIsRecoveredWhenRecoveryEnabled) {
+    unittest::ServerParameterGuard recoveryParam{"geoRecoveryFromSinCosRoundingErrors", true};
     PolygonWithCRS polygon;
     ASSERT_OK(GeoParser::parseGeoJSONPolygon(
         fromjson("{'type':'Polygon','coordinates':["
@@ -810,8 +804,8 @@ TEST(GeoParser, interiorRingVertexCollapseFromSinCosRoundingIsRecoveredWhenFeatu
 
 // Same polygon with recovery disabled: rejected only if the hole's two vertices actually collapse
 // on the current glibc, in which case the hole is left with 2 unique vertices.
-TEST(GeoParser, interiorRingVertexCollapseIsRejectedWhenFeatureFlagDisabled) {
-    unittest::ServerParameterGuard featureFlag{"featureFlagGeoSinCosRoundingRecovery", false};
+TEST(GeoParser, interiorRingVertexCollapseIsRejectedWhenRecoveryDisabled) {
+    unittest::ServerParameterGuard recoveryParam{"geoRecoveryFromSinCosRoundingErrors", false};
     PolygonWithCRS polygon;
     bool collapses = collapsesOnCurrentGlibc(0, 6.500000000000086, 6.500000000000087);
     Status status = GeoParser::parseGeoJSONPolygon(
@@ -836,8 +830,8 @@ TEST(GeoParser, interiorRingVertexCollapseIsRejectedWhenFeatureFlagDisabled) {
 }
 
 // MultiPolygon. The first member has a collapsing ring, the second is unaffected.
-TEST(GeoParser, multiPolygonVertexCollapseFromSinCosRoundingIsRecoveredWhenFeatureFlagEnabled) {
-    unittest::ServerParameterGuard featureFlag{"featureFlagGeoSinCosRoundingRecovery", true};
+TEST(GeoParser, multiPolygonVertexCollapseFromSinCosRoundingIsRecoveredWhenRecoveryEnabled) {
+    unittest::ServerParameterGuard recoveryParam{"geoRecoveryFromSinCosRoundingErrors", true};
     mongo::MultiPolygonWithCRS mp;
     ASSERT_OK(GeoParser::parseMultiPolygon(
         fromjson("{'type':'MultiPolygon','coordinates':["
@@ -856,8 +850,8 @@ TEST(GeoParser, multiPolygonVertexCollapseFromSinCosRoundingIsRecoveredWhenFeatu
 }
 
 // Same MultiPolygon with recovery disabled.
-TEST(GeoParser, multiPolygonVertexCollapseIsRejectedWhenFeatureFlagDisabled) {
-    unittest::ServerParameterGuard featureFlag{"featureFlagGeoSinCosRoundingRecovery", false};
+TEST(GeoParser, multiPolygonVertexCollapseIsRejectedWhenRecoveryDisabled) {
+    unittest::ServerParameterGuard recoveryParam{"geoRecoveryFromSinCosRoundingErrors", false};
     mongo::MultiPolygonWithCRS mp;
     bool collapses = collapsesOnCurrentGlibc(0, 6.500000000000086, 6.500000000000087);
     Status status = GeoParser::parseMultiPolygon(
@@ -881,6 +875,164 @@ TEST(GeoParser, multiPolygonVertexCollapseIsRejectedWhenFeatureFlagDisabled) {
     ASSERT_EQUALS(ErrorCodes::BadValue, status.code());
     ASSERT_STRING_CONTAINS(status.reason(), "Loop must have at least 3 different vertices");
     ASSERT_STRING_CONTAINS(status.reason(), "2 unique vertices were provided");
+}
+
+// All known real customer polygons that failed with a spurious "Edges X and Y cross" 2dsphere
+// validation error.
+const std::vector<std::string> kRealCustomerEdgeCrossPolygons = {
+    // all 4 points share the same longitude (true
+    // collinearity on a meridian). Originally "Edges 0 and 8 cross" in a 105-vertex ring.
+    // The two synthetic vertices off the meridian keep the ring from retracing itself, so it has
+    // non-zero area and the only overlapping collinear pair is the one under test.
+    "{'type':'Polygon','coordinates':[[[-74.51725091699996,-52.497973255499936],"
+    "[-74.51725091699996,-52.50424355189978],"
+    "[-74.51726,-52.5043],"
+    "[-74.51725091699996,-52.50343127190277],"
+    "[-74.51725091699996,-52.503209760749144],"
+    "[-74.51724,-52.4979],"
+    "[-74.51725091699996,-52.497973255499936]]]}",
+    // B and D are non-adjacent near-duplicates (C sits between them).
+    // Originally "Edges 2 and 4 cross" in an 11-vertex ring.
+    "{'type':'Polygon','coordinates':[[[4.811588259061592,46.188831865509364],"
+    "[4.811562500735455,46.18879804860283],[4.811570979909139,46.188809180520224],"
+    "[4.811562899999999,46.188798299999966],"
+    "[4.811588259061592,46.188831865509364]]]}",
+    // B and C are adjacent near-duplicates. Originally "Edges 1 and 3 cross" in a
+    // 5-vertex ring.
+    "{'type':'Polygon','coordinates':[[[-102.15814805857003,20.91436701191156,0],"
+    "[-102.15813803160876,20.914376735127263,0],"
+    "[-102.15812768344978,20.91436731371167,0],"
+    "[-102.15812768344978,20.914367313711672,0],"
+    "[-102.15813771041094,20.914357590496575,0],"
+    "[-102.15814805857003,20.91436701191156,0]]]}",
+    // Adjacent near-duplicates, same shape as above; a second, independent real customer
+    // polygon. Originally "Edges 1 and 3 cross" in a 5-vertex ring.
+    "{'type':'Polygon','coordinates':[[[-102.16815403780438,20.912087153486475,0],"
+    "[-102.16815449038826,20.91208694327097,0],"
+    "[-102.16816087560454,20.91209908042594,0],"
+    "[-102.16816087560454,20.912099080425936,0],"
+    "[-102.16816042302064,20.912099290641454,0],"
+    "[-102.16815403780438,20.912087153486475,0]]]}",
+    // A and D are the wraparound pair and are near-duplicates.
+    "{'type':'Polygon','coordinates':[[[-104.65965863813986,21.426797451142136,0],"
+    "[-104.65965863813986,21.426797451142132,0],"
+    "[-104.65964986786682,21.426801469735402,0],"
+    "[-104.65964350558568,21.426789296613403,0],"
+    "[-104.65965227585815,21.426785278020446,0],"
+    "[-104.65965863813986,21.426797451142136,0]]]}",
+    // Adjacent near-duplicates, same shape as above.
+    // Originally "Edges 1 and 3 cross" in a 5-vertex ring.
+    "{'type':'Polygon','coordinates':[[[-104.42701666887262,20.8220052318962,0],"
+    "[-104.42700328627922,20.82201026935565,0],"
+    "[-104.42699792837841,20.821997687140296,0],"
+    "[-104.42699792837841,20.8219976871403,0],"
+    "[-104.42701131097088,20.821992649681242,0],"
+    "[-104.42701666887262,20.8220052318962,0]]]}",
+    // All four named vertices share a longitude, so they are collinear on a meridian;
+    // the ring retraces part of it. Originally "Edges 20 and 23 cross" in a 107-vertex ring.
+    // Synthetic vertices off the meridian, as above.
+    "{'type':'Polygon','coordinates':[[[-111.8498675,40.5709765],[-111.8498675,40.570976],"
+    "[-111.849865,40.57097575],"
+    "[-111.8498675,40.5709745],[-111.8498675,40.570974],"
+    "[-111.84987,40.5709735],"
+    "[-111.8498675,40.5709765]]]}",
+    // C and D are the wraparound pair and are near-duplicates. Originally "Edges 2
+    // and 4 cross" in a 5-vertex bounding-box-like ring.
+    "{'type':'Polygon','coordinates':[[[-74.35097,39.601508],[-74.351093,39.601508],"
+    "[-74.351093,39.60166],[-74.351093,39.601364],[-74.35097,39.601508]]]}",
+    // All four named vertices share a longitude, so they are collinear on a meridian;
+    // the ring retraces part of it. Originally "Edges 154 and 157 cross" in a
+    // 188-vertex ring.
+    // Synthetic vertices off the meridian, as above.
+    "{'type':'Polygon','coordinates':[[[-83.12122,42.591314],[-83.12122,42.5913135],"
+    "[-83.12121,42.591313],"
+    "[-83.12122,42.5913125],[-83.12122,42.591311999999995],"
+    "[-83.12123,42.5913115],"
+    "[-83.12122,42.591314]]]}",
+    // C and D are the wraparound pair and are near-duplicates. Originally "Edges 1
+    // and 12 cross" in a 13-vertex ring.
+    "{'type':'Polygon','coordinates':[[[-119.23221,45.864018],[-119.23221,45.864043],"
+    "[-119.232198,45.86402],[-119.23221,45.86402],[-119.23221,45.864018]]]}",
+};
+
+TEST(GeoParser, edgeCrossFromRealCustomerPolygonsIsRecoveredWhenRecoveryEnabled) {
+    unittest::ServerParameterGuard recoveryParam{"geoRecoveryFromSinCosRoundingErrors", true};
+    for (size_t i = 0; i < kRealCustomerEdgeCrossPolygons.size(); ++i) {
+        PolygonWithCRS polygon;
+        ASSERT_OK(GeoParser::parseGeoJSONPolygon(
+            fromjson(kRealCustomerEdgeCrossPolygons[i]), false, &polygon))
+            << "polygon index " << i;
+    }
+}
+
+// Same polygons as above. With recovery disabled, this reproduces "Edges .. and .. cross"
+// validation failure on glibc 2.34+
+TEST(GeoParser, edgeCrossFromRealCustomerPolygonsIsNotRecoveredWhenRecoveryDisabled) {
+    unittest::ServerParameterGuard recoveryParam{"geoRecoveryFromSinCosRoundingErrors", false};
+    for (size_t i = 0; i < kRealCustomerEdgeCrossPolygons.size(); ++i) {
+        PolygonWithCRS polygon;
+        Status status = GeoParser::parseGeoJSONPolygon(
+            fromjson(kRealCustomerEdgeCrossPolygons[i]), false, &polygon);
+        if (status.isOK()) {
+            // This platform's libm does not make this polygon degenerate.
+            continue;
+        }
+        ASSERT_EQUALS(ErrorCodes::BadValue, status.code()) << "polygon index " << i;
+        ASSERT_STRING_CONTAINS(status.reason(), "Loop is not valid") << "polygon index " << i;
+        ASSERT_STRING_CONTAINS(status.reason(), "cross") << "polygon index " << i;
+    }
+}
+
+// A polygon that genuinely, unambiguously self-intersects.
+// Regardless of glibc, this must be rejected both with and without the recovery server parameter.
+TEST(GeoParser, genuinelyIntersectingEdgesAreRejectedWhenRecoveryEnabled) {
+    unittest::ServerParameterGuard recoveryParam{"geoRecoveryFromSinCosRoundingErrors", true};
+    PolygonWithCRS polygon;
+    Status status = GeoParser::parseGeoJSONPolygon(
+        fromjson("{'type':'Polygon','coordinates':[[[0,0],[1,1],[1,0],[0,1],[0,0]]]}"),
+        false,
+        &polygon);
+    ASSERT_EQUALS(ErrorCodes::BadValue, status.code());
+    ASSERT_STRING_CONTAINS(status.reason(), "Loop is not valid");
+    ASSERT_STRING_CONTAINS(status.reason(), "Edges 0 and 2 cross");
+    ASSERT_STRING_OMITS(status.reason(), "after recovery attempted");
+    ASSERT_STRING_CONTAINS(status.reason(), "after edge crossing rechecked");
+}
+
+// A polygon that genuinely, unambiguously self-intersects.
+TEST(GeoParser, genuinelyIntersectingEdgesAreRejectedWhenRecoveryDisabled) {
+    unittest::ServerParameterGuard recoveryParam{"geoRecoveryFromSinCosRoundingErrors", false};
+    PolygonWithCRS polygon;
+    Status status = GeoParser::parseGeoJSONPolygon(
+        fromjson("{'type':'Polygon','coordinates':[[[0,0],[1,1],[1,0],[0,1],[0,0]]]}"),
+        false,
+        &polygon);
+    ASSERT_EQUALS(ErrorCodes::BadValue, status.code());
+    ASSERT_STRING_CONTAINS(status.reason(), "Loop is not valid");
+    ASSERT_STRING_CONTAINS(status.reason(), "Edges 0 and 2 cross");
+
+    ASSERT_STRING_OMITS(status.reason(), "after recovery attempted");
+    ASSERT_STRING_OMITS(status.reason(), "after edge crossing rechecked");
+}
+
+// Baseline/regression coverage: an ordinary, unambiguously valid (non-self-intersecting) square
+// must continue to parse successfully, regardless of the recovery server parameter.
+TEST(GeoParser, validNonCrossingPolygonParsesSuccessfullyWhenRecoveryEnabled) {
+    unittest::ServerParameterGuard recoveryParam{"geoRecoveryFromSinCosRoundingErrors", true};
+    PolygonWithCRS polygon;
+    ASSERT_OK(GeoParser::parseGeoJSONPolygon(
+        fromjson("{'type':'Polygon','coordinates':[[[0,0],[1,0],[1,1],[0,1],[0,0]]]}"),
+        false,
+        &polygon));
+}
+
+TEST(GeoParser, validNonCrossingPolygonParsesSuccessfullyWhenRecoveryDisabled) {
+    unittest::ServerParameterGuard recoveryParam{"geoRecoveryFromSinCosRoundingErrors", false};
+    PolygonWithCRS polygon;
+    ASSERT_OK(GeoParser::parseGeoJSONPolygon(
+        fromjson("{'type':'Polygon','coordinates':[[[0,0],[1,0],[1,1],[0,1],[0,0]]]}"),
+        false,
+        &polygon));
 }
 
 // A GeometryCollection containing a strict-winding polygon parses successfully, but getNativeCRS()
@@ -981,7 +1133,7 @@ DEATH_TEST_F(GeoParserStrictWindingDeathTest,
     point.intersects(strictGC);
 }
 TEST(GeoParser, shiftRecoveryHandlesAllGlibcDivergentPairs) {
-    unittest::ServerParameterGuard featureFlag{"featureFlagGeoSinCosRoundingRecovery", true};
+    unittest::ServerParameterGuard recoveryParam{"geoRecoveryFromSinCosRoundingErrors", true};
     // Pairs where glibc 2.26 and glibc 2.34+ produce different S2Points for
     // 1-ULP-adjacent coordinates.
     // The following pairs are picked out of 1 million random samples with 1 ULP difference in

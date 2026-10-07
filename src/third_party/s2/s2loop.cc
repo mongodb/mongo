@@ -104,7 +104,9 @@ void S2Loop::Init(vector<S2Point> const& vertices) {
   InitBound();
 }
 
-bool S2Loop::IsValid(string* err) const {
+bool S2Loop::IsValid(string* err, bool useStableEdgeCrossingRecheck,
+                     bool* edgesCrossed) const {
+  if (edgesCrossed != NULL) *edgesCrossed = false;
   // Loops must have at least 3 vertices.
   if (num_vertices() < 3) {
     VLOG(2) << "Degenerate loop";
@@ -147,7 +149,13 @@ bool S2Loop::IsValid(string* err) const {
         // TODO(user): Fix that.
         crosses = crosser.RobustCrossing(&vertex(ai+1)) > 0;
         previous_index = ai + 1;
+        if (crosses && useStableEdgeCrossingRecheck) {
+          // Re-verify this specific edge pair with RobustCrossingStable() before
+          // declaring the loop invalid.
+          crosses = crosser.RobustCrossingStable(&vertex(ai), &vertex(ai+1)) > 0;
+        }
         if (crosses) {
+          if (edgesCrossed != NULL) *edgesCrossed = true;
           VLOG(2) << "Edges " << i << " and " << ai << " cross";
           // additional debugging information, reverse Lat/Lng order.
           string errDetail = s2_env::StringStream()

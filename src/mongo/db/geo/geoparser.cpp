@@ -9,9 +9,10 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/dotted_path/dotted_path_support.h"
 #include "mongo/db/geo/big_polygon.h"
+#include "mongo/db/geo/geo_index_knobs_gen.h"
 #include "mongo/db/geo/shapes.h"
-#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/redaction.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
@@ -275,9 +276,25 @@ static StatusWith<vector<S2Point>> parseRingVertices(const BSONElement& ringElt)
     return points;
 }
 
+struct RecoveredRing {
+    vector<S2Point> points;
+    // False means nothing actually collapsed, and there is no recovery.
+    bool shifted = false;
+};
+
+// Every ring is first validated with kStrict. kStable is used only when retrying a rejected ring
+// with geoRecoveryFromSinCosRoundingErrors enabled. It re-verifies each reported crossing with a
+// magnitude-tolerant test, so it accepts a superset of what kStrict accepts.
+enum class EdgeCrossingCheck { kStrict, kStable };
+
 // Returns the loop if 'points' forms a usable ring, otherwise the reason it does not.
+// 'edgesCrossed' is set to whether the rejection was a non-adjacent edge crossing.
 static StatusWith<std::unique_ptr<S2Loop>> buildLoop(const vector<S2Point>& points,
-                                                     bool skipValidation) {
+                                                     bool skipValidation,
+                                                     EdgeCrossingCheck edgeCrossingCheck,
+                                                     bool* edgesCrossed) {
+    *edgesCrossed = false;
+
     // At least 3 vertices.
     if (points.size() < 3) {
         return BAD_VALUE("Loop must have at least 3 different vertices, "
@@ -293,24 +310,24 @@ static StatusWith<std::unique_ptr<S2Loop>> buildLoop(const vector<S2Point>& poin
     // 3. Loops are not allowed to have any duplicate vertices.
     // 4. Non-adjacent edges are not allowed to intersect.
     string err;
-    if (!skipValidation && !loop->IsValid(&err)) {
+    if (!skipValidation &&
+        !loop->IsValid(&err, edgeCrossingCheck == EdgeCrossingCheck::kStable, edgesCrossed)) {
         return BAD_VALUE("Loop is not valid: " << err);
     }
     return std::move(loop);
 }
 
-// Composes the user-facing error for a rejected ring out of the reason the ring was rejected and
-// the offending coordinates.
-static Status ringRejected(const Status& reason, const BSONElement& ringElt, bool afterRecovery) {
-    return BAD_VALUE(reason.reason() << (afterRecovery ? " after recovery attempted" : "") << ": "
-                                     << boundedSnippet(ringElt));
+// Composes the user-facing error for a rejected ring. A null 'recovery' means no retry ran, so
+// neither recovery axis is reported; otherwise the retry may have shifted vertices and/or
+// re-checked the crossing, and both are surfaced for diagnosis.
+static Status ringRejected(const Status& reason,
+                           const BSONElement& ringElt,
+                           const RecoveredRing* recovery) {
+    return BAD_VALUE(reason.reason()
+                     << (recovery && recovery->shifted ? ", after recovery attempted" : "")
+                     << (recovery ? ", after edge crossing rechecked" : "") << ": "
+                     << boundedSnippet(ringElt));
 }
-
-struct RecoveredRing {
-    vector<S2Point> points;
-    // False means nothing actually collapsed, and there is no recovery.
-    bool shifted = false;
-};
 
 // Shift vertices with distinct GeoJSON coordinates that collapsed to the same S2Point, by
 // adding 1 ULP, 2 ULP, and so on, to the originally collapsed S2Point's x-dimension, so all
@@ -415,10 +432,66 @@ static StatusWith<RecoveredRing> recoverCollapsedVertices(const BSONElement& coo
     return recovered;
 }
 
-// Parses one ring of a polygon into an S2Loop, retrying a rejected ring once. The rejection
-// could be caused by vertices with distinct GeoJSON coordinates collapsing into identical
-// S2Points due to sin/cos rounding issue, which may cause a ring valid on one platform become
-// invalid on another. The recover process aims to get consistent result across different platforms.
+// Retries a ring that kStrict rejected: pulls collapsed vertices apart and re-validates with the
+// magnitude-tolerant crossing check.
+static StatusWith<std::unique_ptr<S2Loop>> retryRejectedRing(const BSONElement& ringElt,
+                                                             bool skipValidation,
+                                                             const Status& originalFailure,
+                                                             bool edgesCrossed) {
+    auto swRecovered = recoverCollapsedVertices(ringElt);
+    if (!swRecovered.isOK()) {
+        LOGV2_DEBUG(12940103,
+                    1,
+                    "Could not separate collapsed polygon vertices",
+                    "reason"_attr = swRecovered.getStatus());
+        return ringRejected(originalFailure, ringElt, nullptr);
+    }
+    const RecoveredRing& recovery = swRecovered.getValue();
+
+    // Nothing moved and the rejection was not a crossing, so relaxing only the crossing check
+    // cannot help: the same vertices would fail identically.
+    if (!recovery.shifted && !edgesCrossed) {
+        return ringRejected(originalFailure, ringElt, nullptr);
+    }
+
+    bool retriedEdgesCrossed = false;
+    auto swRetried = buildLoop(
+        recovery.points, skipValidation, EdgeCrossingCheck::kStable, &retriedEdgesCrossed);
+    if (!swRetried.isOK()) {
+        if (!recovery.shifted) {
+            // Same vertices as the first pass, so the original rejection stands.
+            return ringRejected(originalFailure, ringElt, &recovery);
+        }
+        // The ring still fails after its collapsed vertices were pulled apart. If the failure
+        // is a crossing, it survived the tolerant recheck, so it is not due to sin/cos rounding
+        // noise.
+        LOGV2_DEBUG(12940102,
+                    1,
+                    "Polygon ring is still not valid after recovering from collapsed vertices",
+                    "originalReason"_attr = originalFailure,
+                    "reason"_attr = swRetried.getStatus(),
+                    "verticesShifted"_attr = recovery.shifted,
+                    "retriedEdgesCrossed"_attr = retriedEdgesCrossed);
+        return ringRejected(swRetried.getStatus(), ringElt, &recovery);
+    }
+
+    // 'recovery.shifted' and 'edgesCrossed' (the original rejection) together attribute the
+    // rescue: edgesCrossed=true with shifted=false means the stable recheck alone suppressed the
+    // crossing; edgesCrossed=false with shifted=true means the shift fixed a non-crossing
+    // rejection.
+    LOGV2_DEBUG(12940101,
+                1,
+                "Accepted polygon ring after recovering from sin/cos rounding differences",
+                "verticesShifted"_attr = recovery.shifted,
+                "edgesCrossed"_attr = edgesCrossed,
+                "recoveredVertexCount"_attr = swRetried.getValue()->num_vertices(),
+                "ring"_attr = redact(boundedSnippet(ringElt)));
+    return swRetried;
+}
+
+// Parses one ring of a polygon into an S2Loop, retrying a rejected ring once. Distinct GeoJSON
+// coordinates can map to the same S2Point under some sin/cos implementations, so a ring valid on
+// one platform can be rejected on another; the retry aims for a consistent result across platforms.
 static StatusWith<std::unique_ptr<S2Loop>> parseRingAsLoop(const BSONElement& ringElt,
                                                            bool skipValidation) {
     auto swPoints = parseRingVertices(ringElt);
@@ -426,46 +499,17 @@ static StatusWith<std::unique_ptr<S2Loop>> parseRingAsLoop(const BSONElement& ri
         return swPoints.getStatus();
     }
 
-    auto swLoop = buildLoop(swPoints.getValue(), skipValidation);
+    bool edgesCrossed = false;
+    auto swLoop =
+        buildLoop(swPoints.getValue(), skipValidation, EdgeCrossingCheck::kStrict, &edgesCrossed);
     if (swLoop.isOK()) {
         return swLoop;
     }
 
-    // The ring was rejected. Distinct GeoJSON coordinates can map to the same S2Point under some
-    // sin/cos implementations (e.g. glibc 2.26 vs 2.34+), which surfaces either as too few
-    // vertices after deduplication or as a duplicate-/intersecting-vertex rejection. Retry once
-    // with those vertices pulled apart.
-    if (!feature_flags::gFeatureFlagGeoSinCosRoundingRecovery.isEnabled()) {
-        return ringRejected(swLoop.getStatus(), ringElt, /*afterRecovery*/ false);
+    if (!gGeoRecoveryFromSinCosRoundingErrors.load()) {
+        return ringRejected(swLoop.getStatus(), ringElt, nullptr);
     }
-
-    auto swRecovered = recoverCollapsedVertices(ringElt);
-    if (!swRecovered.isOK()) {
-        LOGV2_DEBUG(12940103,
-                    1,
-                    "Could not separate collapsed polygon vertices",
-                    "reason"_attr = swRecovered.getStatus());
-        return ringRejected(swLoop.getStatus(), ringElt, /*afterRecovery*/ false);
-    }
-    if (!swRecovered.getValue().shifted) {
-        // No vertex collapsed, so the original rejection stands on its own merits.
-        return ringRejected(swLoop.getStatus(), ringElt, /*afterRecovery*/ false);
-    }
-
-    auto swRecoveredLoop = buildLoop(swRecovered.getValue().points, skipValidation);
-    if (!swRecoveredLoop.isOK()) {
-        LOGV2_DEBUG(12940102,
-                    1,
-                    "Polygon ring is still not valid after recovering from collapsed vertices",
-                    "reason"_attr = swRecoveredLoop.getStatus());
-        return ringRejected(swRecoveredLoop.getStatus(), ringElt, /*afterRecovery*/ true);
-    }
-
-    LOGV2_DEBUG(12940101,
-                1,
-                "Recovered collapsed vertices from sin/cos rounding errors",
-                "recoveredVertexCount"_attr = swRecoveredLoop.getValue()->num_vertices());
-    return swRecoveredLoop;
+    return retryRejectedRing(ringElt, skipValidation, swLoop.getStatus(), edgesCrossed);
 }
 
 // Takes ownership of 'loops', checks the polygon-level and GeoJSON nesting rules, and

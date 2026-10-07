@@ -80,7 +80,19 @@ class S2Loop : public S2Region {
   // is checked at loop creation time, so IsValid()
   // should always return true.
   // If err is not NULL, output errors into it.
-  bool IsValid(string* err = NULL) const;
+  //
+  // MongoDB addition: if useStableEdgeCrossingRecheck is true, an edge
+  // pair that is reported as crossing is re-verified using S2EdgeUtil::RobustCrossingStable
+  // before the loop is declared invalid, to avoid spurious failures caused by
+  // 1-ULP sin/cos differences across platform math libraries.
+  // See RobustCrossingStable()'s declaration for what that tolerance gives up.
+  //
+  // MongoDB addition: 'edgesCrossed', when non-null, is set to true iff validation failed
+  // because two non-adjacent edges cross. Lets callers distinguish that rejection from others
+  // (too few vertices, duplicates, non-unit-length) without re-parsing 'err'.
+  bool IsValid(string* err = NULL,
+               bool useStableEdgeCrossingRecheck = false,
+               bool* edgesCrossed = NULL) const;
 
 
   // These two versions are deprecated and ignore max_adjacent.

@@ -41,10 +41,35 @@ class S2EdgeUtil {
     // implement point-in-polygon containment tests.
     inline bool EdgeOrVertexCrossing(S2Point const* d);
 
+    // MongoDB addition (SERVER-132874): tests the fixed edge AB against edge CD like
+    // RobustCrossing(d) above, except that each orientation test uses TriageOrExpensiveCCW
+    // (see below) rather than S2::RobustCCW, and a degenerate result
+    // (|det| < kDegenerateDetError) is reported as "not crossing" instead of trusting
+    // ExpensiveCCW's noise-sensitive sign.
+    //
+    // One difference from RobustCrossing() matters to callers:
+    //
+    // A degenerate result is treated as "not crossing", so S2Loop::IsValid() can accept a
+    // loop that queries still see as self-crossing. That query result difference due to sin/cos
+    // across different platforms is a known issue as SERVER-74983.
+    inline int RobustCrossingStable(S2Point const* c, S2Point const* d) const;
+
    private:
     // This function handles the "slow path" of RobustCrossing(), which does
     // not need to be inlined.
     int RobustCrossingInternal(S2Point const* d);
+
+    // Narrows TriageCCW's inconclusive band: below kDegenerateDetError, ExpensiveCCW's sign
+    // is too sensitive to 1-ULP sin/cos differences across platforms to trust, so it is
+    // reported as degenerate (0) instead of resolved. Note this is weaker than
+    // S2::RobustCCW's contract, which returns 0 only when two of the points are equal.
+    static int TriageOrExpensiveCCW(S2Point const& a, S2Point const& b,
+                                     S2Point const& c, S2Point const& a_cross_b);
+
+    // See TriageOrExpensiveCCW() above for rationale. Deliberately much smaller than
+    // S2::kMaxDetError (~8e-16): real customer failures examined for this ticket had
+    // triggering determinants no larger than ~1e-17.
+    static const double kDegenerateDetError;
 
     // The fields below are all constant.
     S2Point const* const a_;
@@ -315,6 +340,32 @@ inline int S2EdgeUtil::EdgeCrosser::RobustCrossing(S2Point const* d) {
   c_ = d;
   acb_ = -bda;
   return result;
+}
+
+inline int S2EdgeUtil::EdgeCrosser::RobustCrossingStable(S2Point const* c,
+                                                          S2Point const* d) const {
+  // Mirrors RobustCrossing()/RobustCrossingInternal() above, but uses TriageOrExpensiveCCW
+  // in place of S2::RobustCCW for every orientation test, and treats a genuinely degenerate
+  // result as "not crossing" rather than resolving it via ExpensiveCCW's noise-prone
+  // differencing.
+  int acb = -TriageOrExpensiveCCW(*a_, *b_, *c, a_cross_b_);
+  int bda = TriageOrExpensiveCCW(*a_, *b_, *d, a_cross_b_);
+  if (acb == 0 || bda == 0) {
+    return 0;  // degenerate cases -- mirror RobustCrossing()'s "two vertices are identical".
+  }
+  if (bda == -acb) {
+    return -1;  // Most common case -- triangles have opposite orientations.
+  }
+  // Slow path: ACB and BDA have the appropriate orientations, so now check the
+  // triangles CBD and DAC.
+  S2Point c_cross_d = c->CrossProd(*d);
+  int cbd = -TriageOrExpensiveCCW(*c, *d, *b_, c_cross_d);
+  int dac = TriageOrExpensiveCCW(*c, *d, *a_, c_cross_d);
+  if (cbd == 0 || dac == 0) {
+    return -1;  // degenerate cases -- treat as not crossing.
+  }
+  if (cbd != acb) return -1;
+  return (dac == acb) ? 1 : -1;
 }
 
 inline bool S2EdgeUtil::EdgeCrosser::EdgeOrVertexCrossing(S2Point const* d) {
