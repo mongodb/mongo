@@ -29,6 +29,7 @@ selector:
     - bazel-bin/**/sbe_builder_bm*
     - bazel-bin/**/ndv_hashing_bm*
     - bazel-bin/**/multi_bson_stream_cursor_bm*
+    - bazel-bin/**/top_k_sort_optimization_bm*
 
 executor:
   config: {}

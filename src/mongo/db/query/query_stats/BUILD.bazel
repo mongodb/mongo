@@ -225,3 +225,19 @@ mongo_cc_benchmark(
         "//src/mongo/db/query/query_shape:delete_cmd_shape",
     ],
 )
+
+mongo_cc_benchmark(
+    name = "top_k_sort_optimization_bm",
+    srcs = [
+        "top_k_sort_optimization_bm.cpp",
+    ],
+    tags = ["query_bm"],
+    deps = [
+        ":query_stats",
+        "//src/mongo/db/pipeline",
+        "//src/mongo/db/query:command_shapes",
+        "//src/mongo/db/query:query_fcv_environment_for_test",
+        "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/db/shard_role/lock_manager",
+    ],
+)
