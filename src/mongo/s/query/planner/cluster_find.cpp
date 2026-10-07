@@ -802,11 +802,15 @@ void ClusterFind::runQuery(OperationContext* opCtx,
                     "ExpCtxDiagnostics",
                     diagnostic_printers::ExpressionContextPrinter{query->getExpCtx()});
 
-                CurOp::get(opCtx)->debug().planCacheShapeHash =
-                    canonical_query_encoder::computeHash(
-                        /* Mongos doesn't know beforehand which execution engine will be used, so we
-                           use the classic encoding method by default. */
-                        canonical_query_encoder::encodeClassic(*query));
+                // Mongos doesn't know beforehand which execution engine will be used, so we use
+                // the classic encoding method by default.
+                auto planCacheShapeHash = canonical_query_encoder::computeHash(
+                    canonical_query_encoder::encodeClassic(*query));
+                auto* curOp = CurOp::get(opCtx);
+                {
+                    auto debugInfoLock = curOp->lockCrossThreadDebugInfo();
+                    curOp->debug().planCacheShapeHash = planCacheShapeHash;
+                }
 
                 // If this is a viewless timeseries namespace, run the equivalent aggregation (which
                 // writes its own cursor response into 'result') and short-circuit the normal find

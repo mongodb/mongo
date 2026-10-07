@@ -49,6 +49,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -85,7 +86,9 @@ struct PlanSummaryStats;
  *
  * The OpDebug member of a CurOp, accessed via the debug() accessor should *only* be accessed
  * from the thread executing an operation, and as a result its fields may be accessed without
- * any synchronization.
+ * any synchronization, except for 'storageStats', 'planCacheShapeHash' and 'planCacheKey',
+ * which reportDebugInfo() may read from other threads and whose mutators must hold the lock
+ * returned by lockCrossThreadDebugInfo().
  */
 class [[MONGO_MOD_PUBLIC]] CurOp {
     CurOp(const CurOp&) = delete;
@@ -545,8 +548,18 @@ public:
      *
      * If called from a thread other than the one executing the operation associated with this
      * CurOp, it is necessary to lock the associated Client object before executing this method.
+     * The OpDebug members 'storageStats', 'planCacheShapeHash' and 'planCacheKey' are guarded by
+     * the lock returned by lockCrossThreadDebugInfo() rather than the Client lock.
      */
     void reportDebugInfo(BSONObjBuilder* builder);
+
+    // Returns a lock guarding the OpDebug members 'storageStats', 'planCacheShapeHash' and
+    // 'planCacheKey' against concurrent reportDebugInfo() reads from other threads. Mutators
+    // must hold it; readers on the operation's own thread need not. Do not acquire the Client
+    // lock while holding it, as reportDebugInfo() callers hold the Client lock first.
+    std::unique_lock<std::mutex> lockCrossThreadDebugInfo() {
+        return std::unique_lock<std::mutex>(_crossThreadDebugInfoMutex);
+    }
 
     /**
      * Sets the message for FailPoints used.
@@ -887,6 +900,8 @@ private:
     BSONObj _opDescription;
     BSONObj _originatingCommand;  // Used by getMore to display original command.
     OpDebug _debug;
+    // Guards the OpDebug members readable by reportDebugInfo() from another thread.
+    std::mutex _crossThreadDebugInfoMutex;
     std::string _failPointMessage;  // Used to store FailPoint information.
     std::string _message;
     boost::optional<ProgressMeter> _progressMeter;

@@ -242,17 +242,23 @@ StatusWith<ClientCursorPin> CursorManager::pinCursor(
 
     // Pass along the original 'planCacheShapeHash', 'planCacheKey', 'queryShapeHash' for slow query
     // logging.
-    CurOp::get(opCtx)->debug().planCacheShapeHash = cursor->_planCacheShapeHash;
-    CurOp::get(opCtx)->debug().planCacheKey = cursor->_planCacheKey;
-    CurOp::get(opCtx)->debug().setQueryShapeHash(opCtx, cursor->_queryShapeHash);
-    CurOp::get(opCtx)->debug().setQuerySettings(opCtx, cursor->_querySettings);
+    CurOp* curOp = CurOp::get(opCtx);
+    {
+        // setQueryShapeHash() below acquires the Client lock, which is the reverse order of
+        // reportDebugInfo() (Client lock, then this lock), so release this lock before it.
+        auto debugInfoLock = curOp->lockCrossThreadDebugInfo();
+        curOp->debug().planCacheShapeHash = cursor->_planCacheShapeHash;
+        curOp->debug().planCacheKey = cursor->_planCacheKey;
+    }
+    curOp->debug().setQueryShapeHash(opCtx, cursor->_queryShapeHash);
+    curOp->debug().setQuerySettings(opCtx, cursor->_querySettings);
 
     // Pass along queryStats context so it is retrievable after query execution for storing metrics.
-    CurOp::get(opCtx)->debug().getQueryStatsInfo().keyHash = cursor->_queryStatsKeyHash;
+    curOp->debug().getQueryStatsInfo().keyHash = cursor->_queryStatsKeyHash;
     // Pass along 'isChangeStreamQuery' for serverStatus metrics.
-    CurOp::get(opCtx)->debug().isChangeStreamQuery = cursor->_isChangeStreamQuery;
+    curOp->debug().isChangeStreamQuery = cursor->_isChangeStreamQuery;
     // Pass along 'usesOptimizedUpdateLookup' so it detects IFR flag change at runtime.
-    CurOp::get(opCtx)->debug().usesOptimizedUpdateLookup = cursor->_usesOptimizedUpdateLookup;
+    curOp->debug().usesOptimizedUpdateLookup = cursor->_usesOptimizedUpdateLookup;
 
     if (cursor->getSessionId()) {
         auto vivifyCursorStatus =

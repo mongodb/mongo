@@ -212,7 +212,9 @@ void TransactionMetricsObserver::onTransactionOperation(
             } else {
                 *_singleTransactionStats.getOpDebug()->storageStats += *storageStats;
             }
-            CurOp::get(opCtx)->debug().storageStats = std::move(storageStats);
+            auto* curOp = CurOp::get(opCtx);
+            auto debugInfoLock = curOp->lockCrossThreadDebugInfo();
+            curOp->debug().storageStats = std::move(storageStats);
         }
     }
 

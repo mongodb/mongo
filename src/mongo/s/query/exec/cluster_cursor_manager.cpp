@@ -305,10 +305,16 @@ StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCur
     }
     cursorGuard->reattachToOperationContext(opCtx);
 
-    CurOp::get(opCtx)->debug().planCacheShapeHash = cursorGuard->getPlanCacheShapeHash();
-    CurOp::get(opCtx)->debug().getQueryStatsInfo().keyHash = cursorGuard->getQueryStatsKeyHash();
-    CurOp::get(opCtx)->debug().setQueryShapeHash(opCtx, cursorGuard->getQueryShapeHash());
-    CurOp::get(opCtx)->debug().setQuerySettings(opCtx, cursorGuard->getQuerySettings());
+    auto* curOp = CurOp::get(opCtx);
+    {
+        // setQueryShapeHash() below acquires the Client lock, which is the reverse order of
+        // reportDebugInfo() (Client lock, then this lock), so release this lock before it.
+        auto debugInfoLock = curOp->lockCrossThreadDebugInfo();
+        curOp->debug().planCacheShapeHash = cursorGuard->getPlanCacheShapeHash();
+    }
+    curOp->debug().getQueryStatsInfo().keyHash = cursorGuard->getQueryStatsKeyHash();
+    curOp->debug().setQueryShapeHash(opCtx, cursorGuard->getQueryShapeHash());
+    curOp->debug().setQuerySettings(opCtx, cursorGuard->getQuerySettings());
 
     OperationMemoryUsageTracker::attachToOpCtxIfAvailable(opCtx,
                                                           cursorGuard->releaseMemoryUsageTracker());

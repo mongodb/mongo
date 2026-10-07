@@ -121,7 +121,9 @@ void inspectPlannerResult(
 }  // namespace
 
 void setOpDebugPlanCacheInfo(OperationContext* opCtx, const PlanCacheInfo& cacheInfo) {
-    OpDebug& opDebug = CurOp::get(opCtx)->debug();
+    CurOp* curOp = CurOp::get(opCtx);
+    auto debugInfoLock = curOp->lockCrossThreadDebugInfo();
+    OpDebug& opDebug = curOp->debug();
     if (!opDebug.planCacheShapeHash && cacheInfo.planCacheShapeHash) {
         opDebug.planCacheShapeHash = *cacheInfo.planCacheShapeHash;
     }

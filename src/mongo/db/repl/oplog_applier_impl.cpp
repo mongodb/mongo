@@ -161,10 +161,14 @@ Status finishAndLogApply(OperationContext* opCtx,
             attrs.add("duration", Milliseconds(opDuration));
 
             // Obtain storage specific statistics and log them if they exist.
-            CurOp::get(opCtx)->debug().storageStats =
-                shard_role_details::getRecoveryUnit(opCtx)
-                    ->computeOperationStatisticsSinceLastCall();
-            CurOp::get(opCtx)->debug().reportStorageStats(&attrs);
+            auto storageStats = shard_role_details::getRecoveryUnit(opCtx)
+                                    ->computeOperationStatisticsSinceLastCall();
+            auto* curOp = CurOp::get(opCtx);
+            {
+                auto debugInfoLock = curOp->lockCrossThreadDebugInfo();
+                curOp->debug().storageStats = std::move(storageStats);
+            }
+            curOp->debug().reportStorageStats(&attrs);
 
             LOGV2(51801, "Applied op", attrs);
         }

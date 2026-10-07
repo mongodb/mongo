@@ -28,11 +28,13 @@
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/hex.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/tick_source_mock.h"
 
 #include <algorithm>
 #include <initializer_list>
 #include <mutex>
+#include <thread>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -2306,6 +2308,51 @@ TEST(CurOpTest, ReportDebugInfoIncludesCurOpState) {
     ASSERT_EQ(bsonObj["numYields"].numberInt(), 3);
     // storage.data.bytesRead
     ASSERT_EQ(bsonObj["storage"]["data"]["bytesRead"].numberLong(), 4096);
+}
+
+// Mutating the cross-thread-readable OpDebug members while another thread calls
+// reportDebugInfo() must be synchronized via lockCrossThreadDebugInfo().
+TEST(CurOpTest, ReportDebugInfoIsSynchronizedWithCrossThreadDebugInfoMutations) {
+    QueryTestServiceContext serviceContext;
+
+    auto opCtx = serviceContext.makeOperationContext();
+    auto curop = CurOp::get(*opCtx);
+    curop->ensureStarted();
+
+    AtomicWord<bool> stop{false};
+    std::thread writer([&] {
+        while (!stop.load()) {
+            auto debugInfoLock = curop->lockCrossThreadDebugInfo();
+            curop->debug().planCacheShapeHash = 12345u;
+            curop->debug().planCacheKey = 67890u;
+            if (curop->debug().storageStats) {
+                *curop->debug().storageStats += MockStorageStats(4096);
+            } else {
+                curop->debug().storageStats = std::make_unique<MockStorageStats>(4096);
+            }
+        }
+    });
+
+    ON_BLOCK_EXIT([&] {
+        stop.store(true);
+        writer.join();
+    });
+
+    for (int i = 0; i < 1000; ++i) {
+        BSONObjBuilder builder;
+        // The Client lock is required to call reportDebugInfo() from another thread.
+        std::lock_guard<Client> lk(*opCtx->getClient());
+        curop->reportDebugInfo(&builder);
+        auto bsonObj = builder.done();
+        // Whatever values reportDebugInfo() observed, it must see them consistently.
+        if (bsonObj.hasField("planCacheShapeHash")) {
+            ASSERT_EQ(bsonObj.getStringField("planCacheShapeHash"), zeroPaddedHex(12345u));
+            ASSERT_EQ(bsonObj.getStringField("planCacheKey"), zeroPaddedHex(67890u));
+        }
+        if (bsonObj.hasField("storage")) {
+            ASSERT_EQ(bsonObj["storage"]["data"]["bytesRead"].numberLong(), 4096);
+        }
+    }
 }
 
 }  // namespace
