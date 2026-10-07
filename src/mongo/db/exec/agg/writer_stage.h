@@ -111,6 +111,16 @@ protected:
 
                 auto doc = nextInput.releaseDocument();
                 auto [obj, objSize] = makeBatchObject(std::move(doc));
+                if (_quotaInBytes > 0) {
+                    _usedQuota += objSize;
+                    uassert(13624400,
+                            fmt::format("Quota exceeded for {} operation: {} bytes used, "
+                                        "effective quota is {} bytes",
+                                        getCommonStats().stageTypeStr,
+                                        _usedQuota,
+                                        _quotaInBytes),
+                            _usedQuota <= _quotaInBytes);
+                }
 
                 bufferedBytes += objSize;
                 if (!batch.empty() &&
@@ -202,6 +212,15 @@ protected:
      */
     virtual void waitWhileFailPointEnabled() {}
 
+    /**
+     * Sets the effective quota for the write operation. After this is set, each
+     * doGetNext() call will check if the quota has been exceeded and uassert if so.
+     * If the value is less than or equal to zero, the quota is considered to be unset
+     * and will not be checked.
+     */
+    void setEffectiveQuota(int64_t quotaInBytes) {
+        _quotaInBytes = quotaInBytes;
+    }
     // An interface that is used to estimate the size of each write operation.
     const std::unique_ptr<MongoProcessInterface::WriteSizeEstimator> _writeSizeEstimator;
 
@@ -210,6 +229,8 @@ protected:
 
     bool _initialized{false};
     bool _done{false};
+    int64_t _quotaInBytes{0};
+    int64_t _usedQuota{0};
 };
 
 }  // namespace mongo::exec::agg
