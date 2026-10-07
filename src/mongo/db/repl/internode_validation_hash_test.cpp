@@ -656,6 +656,60 @@ TEST_F(VerifyValidationHashTest, DisabledWhenNotAReplicaSet) {
     EXPECT_FALSE(isContinuousInternodeValidationPerCollectionEnabled(_opCtx.get()));
 }
 
+bool isCollectionHashEligibleFor(OperationContext* opCtx, const NamespaceString& nss) {
+    auto coll = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kRead),
+        MODE_IS);
+    return isCollectionHashEligible(coll.getCollectionPtr());
+}
+
+TEST_F(VerifyValidationHashTest, EligibleWithReplicatedRecordIds) {
+    EXPECT_TRUE(isCollectionHashEligibleFor(_opCtx.get(), _nss));
+}
+
+// A collection clustered on _id derives its record ids from its documents.
+TEST_F(VerifyValidationHashTest, EligibleWhenClusteredOnId) {
+    EXPECT_TRUE(isCollectionHashEligibleFor(_opCtx.get(), _clusteredNss));
+    EXPECT_TRUE(isCollectionHashEligibleFor(_opCtx.get(), _timeseriesNss));
+}
+
+TEST_F(VerifyValidationHashTest, IneligibleWithoutReplicatedRecordIds) {
+    EXPECT_FALSE(isCollectionHashEligibleFor(_opCtx.get(), _plainNss));
+}
+
+// The oplog is tracked by the replicated fast count under this flag, but its record ids are not
+// replicated.
+TEST_F(VerifyValidationHashTest, IneligibleForTheOplog) {
+    unittest::ServerParameterGuard trackOplog("featureFlagSizeBasedOplogTruncationForDisagg", true);
+    ASSERT_TRUE(isReplicatedFastCountEligible(NamespaceString::kRsOplogNamespace));
+    EXPECT_FALSE(isCollectionHashEligibleFor(_opCtx.get(), NamespaceString::kRsOplogNamespace));
+}
+
+TEST_F(VerifyValidationHashTest, IneligibleForPreImages) {
+    CollectionOptions options;
+    options.clusteredIndex = clustered_util::makeCanonicalClusteredInfoForLegacyFormat();
+    createCollection(_opCtx.get(), NamespaceString::kChangeStreamPreImagesNamespace, options);
+    EXPECT_FALSE(isCollectionHashEligibleFor(_opCtx.get(),
+                                             NamespaceString::kChangeStreamPreImagesNamespace));
+}
+
+TEST_F(VerifyValidationHashTest, IneligibleForUnreplicatedCollections) {
+    const auto localNss = NamespaceString::createNamespaceString_forTest("local.clustered");
+    CollectionOptions options;
+    options.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex();
+    createCollection(_opCtx.get(), localNss, options);
+    EXPECT_FALSE(isCollectionHashEligibleFor(_opCtx.get(), localNss));
+}
+
+TEST_F(VerifyValidationHashTest, IneligibleForImplicitlyReplicatedCollections) {
+    CollectionOptions options;
+    options.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex();
+    createCollection(_opCtx.get(), NamespaceString::kConfigImagesNamespace, options);
+    EXPECT_FALSE(
+        isCollectionHashEligibleFor(_opCtx.get(), NamespaceString::kConfigImagesNamespace));
+}
+
 template <typename Base>
 class FatalOnMismatchTest : public Base {
 protected:

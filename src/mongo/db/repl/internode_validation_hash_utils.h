@@ -6,6 +6,7 @@
 #include "mongo/base/data_range.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/util/modules.h"
 
 #include <cstdint>
@@ -47,5 +48,11 @@ bool isContinuousInternodeValidationPerDocumentEnabled(OperationContext* opCtx);
  * enabled too.
  */
 bool isContinuousInternodeValidationPerCollectionEnabled(OperationContext* opCtx);
+
+/**
+ * Returns true if 'coll' has reproducible record IDs and belongs to a namespace whose writes are
+ * eligible to carry per-document validation hashes for its collection hash.
+ */
+[[MONGO_MOD_PUBLIC]] bool isCollectionHashEligible(const CollectionPtr& coll);
 }  // namespace repl
 }  // namespace mongo

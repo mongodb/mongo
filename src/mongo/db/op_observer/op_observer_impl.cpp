@@ -47,7 +47,6 @@
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/backwards_compatible_collection_options_util.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
-#include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/collection_operation_source.h"
@@ -146,17 +145,11 @@ repl::OplogEntrySizeMetadata makeOperationSizeMetadata(boost::optional<int32_t> 
 // skips verifying them: they are renamed onto the source namespace keeping their UUID, and the
 // fast count store is keyed by UUID, so suppressing their hashes would leave every resharded
 // collection permanently without one.
-bool shouldRecordValidationHash(OperationContext* opCtx,
-                                const CollectionPtr& coll,
-                                bool hasReplicatedRecordId) {
+bool shouldRecordValidationHash(OperationContext* opCtx, const CollectionPtr& coll) {
     if (!repl::isContinuousInternodeValidationPerDocumentEnabled(opCtx)) {
         return false;
     }
-    if (!hasReplicatedRecordId &&
-        !(coll->isClustered() && clustered_util::isClusteredOnId(coll->getClusteredInfo()))) {
-        return false;
-    }
-    return isReplicatedFastCountEligible(coll->ns());
+    return repl::isCollectionHashEligible(coll);
 }
 
 // Attaches size metadata to the given oplog entry if there is a size delta or a validation hash to
@@ -786,8 +779,7 @@ std::vector<repl::OpTime> _logInsertOps(OperationContext* opCtx,
     // Compute the per-document validation hashes before reserving any oplog slot below. A slot
     // reserved by an uncommitted write holds back the oplog visibility point, so work done between
     // the reservation and wuow.commit() delays oplog visibility for all concurrent writers.
-    const bool useValidationHash =
-        shouldRecordValidationHash(opCtx, collectionPtr, !recordIds.empty());
+    const bool useValidationHash = shouldRecordValidationHash(opCtx, collectionPtr);
     std::vector<int64_t> docHashes;
     if (useValidationHash) {
         docHashes.reserve(count);
@@ -951,7 +943,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
     auto shardingWriteRouter = std::make_unique<ShardingWriteRouter>(opCtx, nss);
     const bool useReplicatedSizeCount = isReplicatedFastCountEnabled(opCtx);
     if (inBatchedWrite) {
-        const bool useValidationHash = shouldRecordValidationHash(opCtx, coll, !recordIds.empty());
+        const bool useValidationHash = shouldRecordValidationHash(opCtx, coll);
         size_t i = 0;
         for (auto iter = first; iter != last; iter++) {
             const auto docKey = getDocumentKey(coll, iter->doc).getShardKeyAndId();
@@ -997,7 +989,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
 
         const bool inRetryableInternalTransaction =
             isInternalSessionForRetryableWrite(*opCtx->getLogicalSessionId());
-        const bool useValidationHash = shouldRecordValidationHash(opCtx, coll, !recordIds.empty());
+        const bool useValidationHash = shouldRecordValidationHash(opCtx, coll);
 
         size_t i = 0;
         for (auto iter = first; iter != last; iter++) {
@@ -1118,8 +1110,7 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
 
     auto shardingWriteRouter = std::make_unique<ShardingWriteRouter>(opCtx, nss);
 
-    const bool useValidationHash =
-        shouldRecordValidationHash(opCtx, args.coll, !args.updateArgs->replicatedRecordId.isNull());
+    const bool useValidationHash = shouldRecordValidationHash(opCtx, args.coll);
 
     OpTimeBundle opTime;
     if (inBatchedWrite) {
@@ -1324,8 +1315,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
         return;
     }
 
-    const bool useValidationHash =
-        shouldRecordValidationHash(opCtx, coll, !args.replicatedRecordId.isNull());
+    const bool useValidationHash = shouldRecordValidationHash(opCtx, coll);
 
     OpTimeBundle opTime;
     if (inBatchedWrite) {

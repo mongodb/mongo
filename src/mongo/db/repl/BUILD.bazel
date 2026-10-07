@@ -33,7 +33,9 @@ mongo_cc_library(
         ":repl_server_parameters",
         "//src/mongo:base",
         "//src/mongo/db:server_feature_flags",
+        "//src/mongo/db/replicated_fast_count:replicated_fast_count_enabled",
         "//src/mongo/db/rss:replicated_storage_service",
+        "//src/mongo/db/shard_role/shard_catalog:collection_options",
         "//src/third_party/xxhash",
     ],
 )

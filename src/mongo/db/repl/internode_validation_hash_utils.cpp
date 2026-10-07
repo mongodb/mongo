@@ -5,8 +5,10 @@
 
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/version_context.h"
 
 // The //src/third_party/xxhash target is header-only and defines XXH_INLINE_ALL for its consumers,
@@ -83,6 +85,15 @@ bool isContinuousInternodeValidationPerCollectionEnabled(OperationContext* opCtx
     return isPerDocumentFlagEnabled(vCtx, fcvSnapshot) &&
         gFeatureFlagContinuousInternodeValidationPerCollection
             .isEnabledUseLatestFCVWhenUninitialized(vCtx, fcvSnapshot);
+}
+
+bool isCollectionHashEligible(const CollectionPtr& coll) {
+    // A document's record id has to be reproducible on every node for its hash to be verifiable.
+    if (!coll->areRecordIdsReplicated() &&
+        !(coll->isClustered() && clustered_util::isClusteredOnId(coll->getClusteredInfo()))) {
+        return false;
+    }
+    return isReplicatedFastCountEligible(coll->ns());
 }
 }  // namespace repl
 }  // namespace mongo

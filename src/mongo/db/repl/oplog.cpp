@@ -1782,9 +1782,7 @@ bool isValidationHashVerifiableFor(OperationContext* opCtx,
     if (MONGO_unlikely(disableContinuousInternodeValidation.load())) {
         return false;
     }
-    if (!collection->areRecordIdsReplicated() &&
-        !(collection->isClustered() &&
-          clustered_util::isClusteredOnId(collection->getClusteredInfo()))) {
+    if (!isCollectionHashEligible(collection)) {
         return false;
     }
     if (!isContinuousInternodeValidationPerDocumentEnabled(opCtx)) {
@@ -1792,8 +1790,7 @@ bool isValidationHashVerifiableFor(OperationContext* opCtx,
     }
     // Resharding's collections may carry a hash, but are materialized at-least-once and commit
     // transiently invalid documents that self-heal, so they are not verified.
-    const auto& nss = collection->ns();
-    return isReplicatedFastCountEligible(nss) && !isReshardingInternalCollection(nss);
+    return !isReshardingInternalCollection(collection->ns());
 }
 }  // namespace
 
