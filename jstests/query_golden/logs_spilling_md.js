@@ -311,7 +311,9 @@ try {
     );
     // Pin the LU hash join strategy on so the output doesn't depend on the variant's IFR defaults.
     saveParameterToRestore("featureFlagSbeEqLookupUnwindHashJoin");
+    saveParameterToRestore("featureFlagSbeEqLookupUnwindLocalCollscan");
     setServerParameter("featureFlagSbeEqLookupUnwindHashJoin", true);
+    setServerParameter("featureFlagSbeEqLookupUnwindLocalCollscan", true);
     section("HashLookupUnwind");
     setServerParameter(
         "internalQuerySlotBasedExecutionHashJoinApproxMemoryUseInBytesBeforeSpill",

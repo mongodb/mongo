@@ -30,13 +30,7 @@
 #   - 'rollout':  actively being rolled out; on by default, kill-switchable.
 #   - 'release': rollout complete; retained here as a historical record.
 
-rollout:
-  featureFlagGetExecutorDeferredEngineChoice: {}
-  featureFlagSbeEqLookupUnwindLocalCollscan: {}
-  featureFlagSbeEqLookupUnwindLocalComplexDataAccessPlans: {}
-  featureFlagSbeEqLookupUnwindLocalIxscanFetch: {}
-  featureFlagSbeNonLeadingMatch: {}
-  featureFlagSbeTransformStages: {}
+rollout: {}
 
 release:
   featureFlagCMKRotation: {}
@@ -46,9 +40,12 @@ release:
   featureFlagCostBasedRanker: {}
   featureFlagExtensionsInsideHybridSearch: {}
   featureFlagExtractFieldPathsSbeStage: {}
+  featureFlagGetExecutorDeferredEngineChoice: {}
   featureFlagImprovedDepsAnalysis: {}
   featureFlagMultiPlanLimiter: {}
   featureFlagSbeAccumulators: {}
+  featureFlagSbeNonLeadingMatch: {}
+  featureFlagSbeTransformStages: {}
   featureFlagSbeUpgradeBinaryTrees: {}
   featureFlagSearchExtension: {}
   featureFlagSearchOptimizedIdLookup: {}

@@ -160,6 +160,12 @@ protected:
     NamespaceString nss;
     unittest::ServerParameterGuard _hashJoinParamGuard{"featureFlagSbeEqLookupUnwindHashJoin",
                                                        true};
+    unittest::ServerParameterGuard _localCollscanParamGuard{
+        "featureFlagSbeEqLookupUnwindLocalCollscan", true};
+    unittest::ServerParameterGuard _localIxscanFetchParamGuard{
+        "featureFlagSbeEqLookupUnwindLocalIxscanFetch", true};
+    unittest::ServerParameterGuard _localComplexParamGuard{
+        "featureFlagSbeEqLookupUnwindLocalComplexDataAccessPlans", true};
 };
 
 // Test selection of IXSCAN + FETCH + LU plans.

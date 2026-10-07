@@ -335,7 +335,7 @@ feature_flags:
         cpp_varname: gFeatureFlagSbeNonLeadingMatch
         fcv_gated: false
         default: true
-        incremental_rollout_phase: rollout
+        incremental_rollout_phase: release
 
     featureFlag2dsphereIndexVersion4:
         description: "Feature flag to enable v4 of 2dsphereIndexVersion."
@@ -383,30 +383,30 @@ feature_flags:
     featureFlagSbeEqLookupUnwindLocalCollscan:
         description: "Enables executing $lookup-$unwind in SBE with a collection scan local-side access plan."
         cpp_varname: gFeatureFlagSbeEqLookupUnwindLocalCollscan
-        default: true
+        default: false
         fcv_gated: false
-        incremental_rollout_phase: rollout
+        incremental_rollout_phase: in_development
 
     featureFlagSbeEqLookupUnwindLocalIxscanFetch:
         description: "Enables executing $lookup-$unwind in SBE with an index scan + fetch local-side access plan."
         cpp_varname: gFeatureFlagSbeEqLookupUnwindLocalIxscanFetch
-        default: true
+        default: false
         fcv_gated: false
-        incremental_rollout_phase: rollout
+        incremental_rollout_phase: in_development
 
     featureFlagSbeEqLookupUnwindLocalComplexDataAccessPlans:
         description: "Enables executing $lookup-$unwind in SBE with complex local-side access plans (sort, OR, and sorted merge variants)."
         cpp_varname: gFeatureFlagSbeEqLookupUnwindLocalComplexDataAccessPlans
-        default: true
+        default: false
         fcv_gated: false
-        incremental_rollout_phase: rollout
+        incremental_rollout_phase: in_development
 
     featureFlagGetExecutorDeferredEngineChoice:
         description: "Feature flag to enable engine selection based on query plan, rather than query text."
         cpp_varname: gFeatureFlagGetExecutorDeferredEngineChoice
         fcv_gated: false
         default: true
-        incremental_rollout_phase: rollout
+        incremental_rollout_phase: release
 
     featureFlagImprovedDepsAnalysis:
         description: "Feature flag to enable pipeline rewrites that require a dependency graph"
@@ -427,7 +427,7 @@ feature_flags:
         cpp_varname: gFeatureFlagSbeTransformStages
         fcv_gated: false
         default: true
-        incremental_rollout_phase: rollout
+        incremental_rollout_phase: release
 
     featureFlagSbeUnwind:
         description: "Feature flag to enable pushing down $unwind stages to SBE."

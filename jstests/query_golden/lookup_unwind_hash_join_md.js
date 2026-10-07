@@ -87,6 +87,7 @@ assert.commandWorked(db.foreignDotted.insertMany(dottedForeignDocs));
 // Pin the strategy flags so the plans depend only on the engine mode, not the build's flags.
 const strategyFlags = {
     featureFlagSbeEqLookupUnwindHashJoin: true,
+    featureFlagSbeEqLookupUnwindLocalCollscan: true,
     featureFlagSbeEqLookupUnwindNestedLoopJoin: false,
     featureFlagSbeEqLookupUnwindIndexedLoopJoin: false,
     featureFlagSbeEqLookupUnwindDynamicIndexedLoopJoin: false,
