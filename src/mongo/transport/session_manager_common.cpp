@@ -533,6 +533,9 @@ void SessionManagerCommon::markReplicationSession(Client* client) {
             getReplicationId(session.get()) = i;
             peerEstablishedTimeGauge().set(
                 _svcCtx->getFastClockSource()->now().toMillisSinceEpoch(), {i});
+            if (auto* tl = session->getTransportLayer()) {
+                tl->registerReplicationSession(session);
+            }
             return;
         }
     }

@@ -8,6 +8,7 @@
 #include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_manager.h"
+#include "mongo/util/net/connection_purpose.h"
 #include "mongo/util/periodic_runner.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
@@ -35,40 +36,69 @@ MONGO_FAIL_POINT_DEFINE(failCollectReplicationSessionStats);
 class SessionMetrics::Impl {
 public:
     Impl()
-        : _receiveQueueBytes(MetricsService::instance().createInt64Histogram(
+        : _sendQueueBytes(MetricsService::instance().createInt64Histogram<int64_t>(
+              MetricNames::kReplicationPrimarySendQueueBytes,
+              "Number of bytes currently in the send network queue for replication connections "
+              "sending oplog entries",
+              MetricUnit::kBytes,
+              replicationIdAttribute())),
+          _sendQueueSizes(MetricsService::instance().createInt64Histogram<int64_t>(
+              MetricNames::kReplicationPrimarySendQueueSize,
+              "Size of the send network queue across replication connections sending oplog entries",
+              MetricUnit::kBytes,
+              replicationIdAttribute())),
+          _receiveQueueBytes(MetricsService::instance().createInt64Histogram(
               MetricNames::kReplicationSecondaryReceiveQueueBytes,
-              "Number of bytes currently in the network queue across replication connections",
+              "Number of bytes currently in the receive network queue across for replication "
+              "connections receiving oplog entries ",
               MetricUnit::kBytes)),
           _receiveQueueSizes(MetricsService::instance().createInt64Histogram(
               MetricNames::kReplicationSecondaryReceiveQueueSize,
-              "Size of network queue across replication connections",
+              "Size of the receive network queue across replication connections receiving oplog "
+              "entrie",
               MetricUnit::kBytes)),
-          _congestionWindowSizes(MetricsService::instance().createInt64Histogram(
+          _ingressCongestionWindowSizes(MetricsService::instance().createInt64Histogram<int64_t>(
+              MetricNames::kReplicationPrimaryTcpCongestionWindowSize,
+              "TCP Congestion Window sizes for replication connections sending oplog entries",
+              MetricUnit::kBytes,
+              replicationIdAttribute())),
+          _egressCongestionWindowSizes(MetricsService::instance().createInt64Histogram(
               MetricNames::kReplicationSecondaryTcpCongestionWindowSize,
-              "TCP Congestion Window size across replication connections",
+              "TCP Congestion Window size for replication connections receiving oplog entries",
               MetricUnit::kBytes)),
           _collectionFailures(MetricsService::instance().createInt64Counter(
-              MetricNames::kReplicationSecondaryCollectErrors,
+              MetricNames::kReplicationCollectErrors,
               "Number of times collecting replication session info fails",
               MetricUnit::kCount)) {}
 
 
     void update(const std::vector<transport::SessionStats>& windows) {
         for (const auto& info : windows) {
-            _receiveQueueBytes.record(info.receiveBufferBytes);
-            _congestionWindowSizes.record(info.congestionWindowSizeBytes);
-            _receiveQueueSizes.record(info.receiveBufferSizeBytes);
+            if (info.isIngress) {
+                invariant(info.peerId.has_value());
+                _sendQueueBytes.record(info.sendBufferBytes, {info.peerId.value()});
+                _sendQueueSizes.record(info.sendBufferSizeBytes, {info.peerId.value()});
+                _ingressCongestionWindowSizes.record(info.congestionWindowSizeBytes,
+                                                     {info.peerId.value()});
+            } else {
+                _receiveQueueBytes.record(info.receiveBufferBytes);
+                _receiveQueueSizes.record(info.receiveBufferSizeBytes);
+                _egressCongestionWindowSizes.record(info.congestionWindowSizeBytes);
+            }
         }
     }
 
-    void recordCollectError() {
-        _collectionFailures.add(1);
+    void recordCollectErrors(int64_t numErrors) {
+        _collectionFailures.add(numErrors);
     }
 
 private:
+    otel::metrics::Histogram<int64_t, int64_t>& _sendQueueBytes;
+    otel::metrics::Histogram<int64_t, int64_t>& _sendQueueSizes;
     otel::metrics::Histogram<int64_t>& _receiveQueueBytes;
     otel::metrics::Histogram<int64_t>& _receiveQueueSizes;
-    otel::metrics::Histogram<int64_t>& _congestionWindowSizes;
+    otel::metrics::Histogram<int64_t, int64_t>& _ingressCongestionWindowSizes;
+    otel::metrics::Histogram<int64_t>& _egressCongestionWindowSizes;
     Counter<int64_t>& _collectionFailures;
 };
 
@@ -79,13 +109,16 @@ void SessionMetrics::update(const std::vector<transport::SessionStats>& info) {
     _impl->update(info);
 }
 
-void SessionMetrics::recordCollectError() {
-    _impl->recordCollectError();
+void SessionMetrics::recordCollectErrors(int64_t numErrors) {
+    _impl->recordCollectErrors(numErrors);
 }
 
-std::optional<std::vector<transport::SessionStats>> collectReplicationSessionStats() {
+transport::SessionStatsResult collectReplicationSessionStats() {
     if (MONGO_unlikely(failCollectReplicationSessionStats.shouldFail())) {
-        return {};
+        int64_t errorCount = 0;
+        failCollectReplicationSessionStats.execute(
+            [&](const BSONObj& data) { errorCount = data["errorCount"].numberInt(); });
+        return {.errorCount = errorCount};
     }
     return getGlobalServiceContext()
         ->getTransportLayerManager()
@@ -94,12 +127,9 @@ std::optional<std::vector<transport::SessionStats>> collectReplicationSessionSta
 }
 
 void runReplicationSessionCollectionCycle(SessionMetrics& metrics) {
-    auto windows = collectReplicationSessionStats();
-    if (windows.has_value()) {
-        metrics.update(windows.value());
-    } else {
-        metrics.recordCollectError();
-    }
+    auto [stats, errorCount] = collectReplicationSessionStats();
+    metrics.update(stats);
+    metrics.recordCollectErrors(errorCount);
 }
 
 
@@ -107,7 +137,7 @@ void installReplicationSessionOtelMetrics(ServiceContext* svcCtx) {
     auto& state = getReplicationSessionOtelMetricsState(svcCtx);
     state.metrics = std::make_unique<SessionMetrics>();
     state.job = svcCtx->getPeriodicRunner()->makeJob(PeriodicRunner::PeriodicJob{
-        "CongestionWindowOtelMetrics",
+        "ReplicationSessionOtelMetrics",
         [&state](Client*) { runReplicationSessionCollectionCycle(*state.metrics); },
         Seconds(1),
         false /*isKillableByStepdown*/});

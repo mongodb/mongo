@@ -1737,8 +1737,9 @@ void AsioTransportLayer::_acceptConnection(GenericAcceptor& acceptor) {
     acceptor.async_accept(*_ingressReactor, std::move(acceptCb));
 }
 
-std::optional<std::vector<SessionStats>> AsioTransportLayer::collectReplicationSessionStats() {
+SessionStatsResult AsioTransportLayer::collectReplicationSessionStats() {
     std::scoped_lock lock(_replicationSessionLock);
+    int64_t errorCount = 0;
     std::vector<SessionStats> stats;
     std::erase_if(_replicationSessions,
                   [](const std::weak_ptr<AsioSession>& wp) { return wp.expired(); });
@@ -1747,16 +1748,31 @@ std::optional<std::vector<SessionStats>> AsioTransportLayer::collectReplicationS
     for (const auto& wp : _replicationSessions) {
         if (const auto sp = wp.lock()) {
             try {
+                SessionStats stat = {.isIngress = sp->isIngress(),
+                                     .peerId = getReplicationId(sp.get())};
                 auto& socket = sp->getSocket();
+
                 TcpInfoOption tcpi;
-                asio::socket_base::receive_buffer_size rcvSize;
-                asio::socket_base::bytes_readable rcvBytes;
                 socket.get_option(tcpi);
-                socket.io_control(rcvBytes);
+                stat.congestionWindowSizeBytes = tcpi->tcpi_snd_cwnd;
+
+                asio::socket_base::receive_buffer_size rcvSize;
                 socket.get_option(rcvSize);
-                stats.push_back({.congestionWindowSizeBytes = tcpi->tcpi_snd_cwnd,
-                                 .receiveBufferSizeBytes = rcvSize.value(),
-                                 .receiveBufferBytes = static_cast<int64_t>(rcvBytes.get())});
+                stat.receiveBufferSizeBytes = rcvSize.value();
+
+                asio::socket_base::send_buffer_size sendSize;
+                socket.get_option(sendSize);
+                stat.sendBufferSizeBytes = sendSize.value();
+
+                asio::socket_base::bytes_readable rcvBytes;
+                socket.io_control(rcvBytes);
+                stat.receiveBufferBytes = static_cast<int64_t>(rcvBytes.get());
+
+                SendQueueBytes sendBytes;
+                socket.io_control(sendBytes);
+                stat.sendBufferBytes = sendBytes.get();
+
+                stats.push_back(stat);
             } catch (const asio::system_error& e) {
                 static logv2::SeveritySuppressor suppressor{
                     Seconds(10), logv2::LogSeverity::Warning(), logv2::LogSeverity::Debug(2)};
@@ -1764,14 +1780,12 @@ std::optional<std::vector<SessionStats>> AsioTransportLayer::collectReplicationS
                             suppressor().toInt(),
                             "Error getting replication socket information",
                             "error"_attr = e.what());
-                return {};
+                errorCount++;
             }
         }
     }
-    return stats;
-#else
-    return {};
 #endif
+    return {.stats = stats, .errorCount = errorCount};
 }
 
 void AsioTransportLayer::registerReplicationSession(std::shared_ptr<Session> session) {

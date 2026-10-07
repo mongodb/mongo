@@ -12,7 +12,7 @@ SessionMetrics::SessionMetrics() : _impl(std::make_unique<Impl>()) {}
 SessionMetrics::~SessionMetrics() = default;
 
 void SessionMetrics::update(const std::vector<transport::SessionStats>&) {}
-void SessionMetrics::recordCollectError() {}
+void SessionMetrics::recordCollectErrors(int64_t) {}
 
 void installReplicationSessionOtelMetrics(ServiceContext*) {}
 }  // namespace mongo

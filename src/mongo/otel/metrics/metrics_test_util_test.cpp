@@ -12,7 +12,7 @@
 
 namespace mongo::otel::metrics {
 using namespace std::literals::string_view_literals;
-
+using testing::Not;
 namespace {
 class OtelMetricsCapturerTest : public testing::Test {
 public:
@@ -148,6 +148,29 @@ TEST_F(OtelMetricsCapturerTest, CanReadMetricsIsTrue) {
     EXPECT_TRUE(OtelMetricsCapturer::canReadMetrics());
 }
 
+TEST_F(OtelMetricsCapturerTest, HasSumMatchesHistogram) {
+    OtelMetricsCapturer metricsCapturer(*metricsService);
+    auto& histogram = metricsService->createInt64Histogram(
+        MetricNames::kTest1, "description", MetricUnit::kSeconds);
+    histogram.record(10);
+    histogram.record(30);
+
+    const auto data = metricsCapturer.readInt64Histogram(MetricNames::kTest1);
+    EXPECT_THAT(data, HasSum(40));
+    EXPECT_THAT(data, Not(HasSum(45)));
+}
+
+TEST_F(OtelMetricsCapturerTest, HasCountMatchesHistogram) {
+    OtelMetricsCapturer metricsCapturer(*metricsService);
+    auto& histogram = metricsService->createInt64Histogram(
+        MetricNames::kTest1, "description", MetricUnit::kSeconds);
+    histogram.record(10);
+    histogram.record(30);
+
+    const auto data = metricsCapturer.readInt64Histogram(MetricNames::kTest1);
+    EXPECT_THAT(data, HasCount(2));
+    EXPECT_THAT(data, Not(HasCount(1)));
+}
 #else
 
 TEST_F(OtelMetricsCapturerTest, CanReadMetricsIsFalse) {
@@ -227,6 +250,7 @@ DEATH_TEST_F(OtelMetricsCapturerDeathTest,
 }
 
 #endif  // MONGO_CONFIG_OTEL
+
 
 // The below tests verify the independence of OtelMetricCapturer instances by sharing the same
 // MetricsService among multiple capturers.

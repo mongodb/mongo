@@ -22,7 +22,7 @@ public:
     ~SessionMetrics();
 
     void update(const std::vector<transport::SessionStats>& info);
-    void recordCollectError();
+    void recordCollectErrors(int64_t numErrors);
 
 private:
     class Impl;

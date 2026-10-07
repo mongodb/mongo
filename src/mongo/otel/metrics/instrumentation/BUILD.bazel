@@ -173,6 +173,7 @@ mongo_cc_library(
             "//src/mongo/otel/metrics:otel_metrics_service",
             "//src/mongo/util:fail_point",
             "//src/mongo/util:periodic_runner",
+            "//src/mongo/util/net:connection_purpose",
         ],
         "//conditions:default": [],
     }),

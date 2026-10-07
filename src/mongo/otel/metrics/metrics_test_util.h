@@ -4,6 +4,7 @@
 #pragma once
 
 #include "mongo/otel/metrics/metrics_service.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/modules.h"
 
 #ifdef MONGO_CONFIG_OTEL
@@ -110,6 +111,25 @@ HistogramData<T>::HistogramData(opentelemetry::sdk::metrics::HistogramPointData 
     max = getValue(data.max_);
 };
 #endif  // MONGO_CONFIG_OTEL
+
+/** Pretty printing histogram data for gtest failure messages */
+template <typename T>
+void PrintTo(const HistogramData<T>& h, std::ostream* os) {
+    *os << "{sum: " << h.sum << ", count: " << h.count << ", min: " << h.min << ", max: " << h.max
+        << "}";
+}
+/** Matches a histogram reading against a sum value */
+MATCHER_P(HasSum,
+          sumMatcher,
+          "has sum that " + testing::DescribeMatcher<int64_t>(sumMatcher, negation)) {
+    return testing::ExplainMatchResult(sumMatcher, arg.sum, result_listener);
+}
+/** Matches a histogram reading against a count value */
+MATCHER_P(HasCount,
+          countMatcher,
+          "has count that " + testing::DescribeMatcher<int64_t>(countMatcher, negation)) {
+    return testing::ExplainMatchResult(countMatcher, arg.count, result_listener);
+}
 
 /**
  * Sets up a MetricProvider with an in-memory exporter so tests can create and inspect metrics. This

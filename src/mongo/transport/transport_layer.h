@@ -46,11 +46,20 @@ enum ConnectSSLMode { kGlobalSSLMode, kEnableSSL, kDisableSSL };
 enum class TransportProtocol { MongoRPC, GRPC };
 
 struct SessionStats {
+    bool isIngress{false};
+    boost::optional<int64_t> peerId{};
     int64_t congestionWindowSizeBytes{0};
-    // size of the receive network buffer, in bytes.
+    // size of the receive/send network buffers, in bytes.
     int64_t receiveBufferSizeBytes{0};
-    // number of bytes currently in the receive network buffer.
+    int64_t sendBufferSizeBytes{0};
+    // number of bytes currently in the receive/send network buffers.
     int64_t receiveBufferBytes{0};
+    int64_t sendBufferBytes{0};
+};
+
+struct SessionStatsResult {
+    std::vector<SessionStats> stats;
+    int64_t errorCount{0};
 };
 
 inline std::string_view connectSSLModeToString(ConnectSSLMode mode) {
@@ -182,7 +191,7 @@ public:
     /**
      * Returns the collected stats of current replication sessions.
      */
-    virtual std::optional<std::vector<SessionStats>> collectReplicationSessionStats() = 0;
+    virtual SessionStatsResult collectReplicationSessionStats() = 0;
     /**
      * Should be called whenever a new replication session gets created. This ensures
      * that replication metrics are accurate.

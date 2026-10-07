@@ -118,7 +118,7 @@ public:
         return _options.enableEgress;
     }
 
-    std::optional<std::vector<SessionStats>> collectReplicationSessionStats() override {
+    SessionStatsResult collectReplicationSessionStats() override {
         return {};
     }
     void registerReplicationSession(std::shared_ptr<Session>) override {}

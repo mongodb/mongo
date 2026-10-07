@@ -21,7 +21,7 @@ const kCommonPrefix = "mongodb.network.repl.secondary";
 const kCongestionWindow = `${kCommonPrefix}.tcp_congestion_window_size`;
 const kReceiveQueueBytes = `${kCommonPrefix}.receive_queue`;
 const kReceiveQueueSize = `${kCommonPrefix}.receive_queue_size`;
-const kCollectErrors = `${kCommonPrefix}.collect_errors`;
+const kCollectErrors = "mongodb.network.repl.collect_errors";
 const kHistogramMetrics = [kCongestionWindow, kReceiveQueueSize, kReceiveQueueBytes];
 
 describe("replication session TCP metrics", function () {

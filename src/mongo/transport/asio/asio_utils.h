@@ -33,6 +33,43 @@ namespace mongo::transport {
 #define POLLRDHUP 0
 #endif
 
+#ifdef __linux__
+#include <linux/sockios.h>
+
+/**
+ * Wrapper class to allow SIOCOUTQ IO control command to be accessed through
+ * socket.io_control.
+ * @par Example
+ * @code
+ * asio::ip::tcp::socket socket(my_context);
+ * ...
+ * SendQueueBytes command;
+ * socket.io_control(command);
+ * int64_t sendBytes = command.get();
+ * @endcode
+ */
+class SendQueueBytes {
+public:
+    int name() const {
+        return SIOCOUTQ;
+    }
+
+    asio::detail::ioctl_arg_type* data() {
+        return &_value;
+    }
+
+    const asio::detail::ioctl_arg_type* data() const {
+        return &_value;
+    }
+
+    int64_t get() const {
+        return static_cast<int64_t>(_value);
+    }
+
+private:
+    asio::detail::ioctl_arg_type _value = 0;
+};
+#endif
 /**
  * Generic wrapper for making an ASIO socket get_option or set_option call
  * having a payload of type `T`, which is usually just `int` so it's the default.

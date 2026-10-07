@@ -232,7 +232,7 @@ public:
 
     ExecutorPtr tlsHandshakePool() const;
 
-    std::optional<std::vector<SessionStats>> collectReplicationSessionStats() override;
+    SessionStatsResult collectReplicationSessionStats() override;
     void registerReplicationSession(std::shared_ptr<Session>) override;
 #ifdef __linux__
     BatonHandle makeBaton(OperationContext* opCtx) const override;

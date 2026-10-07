@@ -99,6 +99,12 @@ public:
 class MetricNames {
 public:
     // Networking & Observability Team Metrics
+    static constexpr MetricName kReplicationPrimaryTcpCongestionWindowSize =
+        MetricNameMaker::make("mongodb.network.repl.source.tcp_congestion_window_size");
+    static constexpr MetricName kReplicationPrimarySendQueueSize =
+        MetricNameMaker::make("mongodb.network.repl.source.send_queue_size");
+    static constexpr MetricName kReplicationPrimarySendQueueBytes =
+        MetricNameMaker::make("mongodb.network.repl.source.send_queue");
     static constexpr MetricName kReplicationPrimaryPeerEstablishedTime =
         MetricNameMaker::make("mongodb.network.repl.source.connection_established_time");
     static constexpr MetricName kReplicationPrimaryLogicalBytesOut =
@@ -109,8 +115,8 @@ public:
         MetricNameMaker::make("mongodb.network.repl.secondary.receive_queue");
     static constexpr MetricName kReplicationSecondaryReceiveQueueSize =
         MetricNameMaker::make("mongodb.network.repl.secondary.receive_queue_size");
-    static constexpr MetricName kReplicationSecondaryCollectErrors =
-        MetricNameMaker::make("mongodb.network.repl.secondary.collect_errors");
+    static constexpr MetricName kReplicationCollectErrors =
+        MetricNameMaker::make("mongodb.network.repl.collect_errors");
     static constexpr MetricName kReplicationSecondaryTcpCongestionWindowSize =
         MetricNameMaker::make("mongodb.network.repl.secondary.tcp_congestion_window_size");
     static constexpr MetricName kReplicationSecondaryLogicalBytesIn =

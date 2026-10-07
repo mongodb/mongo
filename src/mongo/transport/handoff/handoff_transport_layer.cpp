@@ -187,7 +187,7 @@ bool HandoffTransportLayer::isEgress() const {
     return false;
 }
 
-std::optional<std::vector<SessionStats>> HandoffTransportLayer::collectReplicationSessionStats() {
+SessionStatsResult HandoffTransportLayer::collectReplicationSessionStats() {
     return {};
 }
 
