@@ -46,7 +46,7 @@ public:
      */
     virtual bool requiresFiltering(OperationContext* opCtx,
                                    MetricsCategoryEnum category,
-                                   bool forcedFiltered) const = 0;
+                                   bool forceFiltered) const = 0;
 
     /**
      * Returns a reference to the allowlist paths for the given MetricsCategoryEnum filtering.
