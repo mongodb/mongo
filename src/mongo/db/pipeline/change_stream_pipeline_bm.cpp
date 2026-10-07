@@ -7,11 +7,13 @@
 #include "mongo/db/client.h"
 #include "mongo/db/exec/agg/exec_pipeline.h"
 #include "mongo/db/exec/agg/pipeline_builder.h"
-#include "mongo/db/exec/agg/queue_stage.h"
+#include "mongo/db/exec/matcher/matcher.h"
+#include "mongo/db/matcher/expression_reordering.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/document_source_cursor.h"
+#include "mongo/db/pipeline/document_source_cursor_test_util.h"
 #include "mongo/db/pipeline/document_source_match.h"
-#include "mongo/db/pipeline/document_source_queue.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
@@ -30,6 +32,7 @@
 #include <string_view>
 
 #include <benchmark/benchmark.h>
+#include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <fmt/format.h>
 
@@ -317,6 +320,12 @@ public:
     }
 
     void TearDown(benchmark::State& state) final {
+        // Tear down the pipelines (and the mock PlanExecutor they own) while the OperationContext
+        // and ExpressionContext are still alive.
+        _execPipeline.reset();
+        _logicalPipeline.reset();
+        _oplogMatchStage.reset();
+
         _opCtx.reset();
         _threadClient.reset();
         _scopedGlobalServiceContext.reset();
@@ -353,64 +362,81 @@ protected:
         // Build pipeline from change stream document sources.
         pipeline_factory::MakePipelineOptions opts{.alreadyOptimized = false,
                                                    .attachCursorSource = false};
-        auto pipeline = pipeline_factory::makePipeline(pipelineElement, getExpCtx(), opts);
+        _logicalPipeline = pipeline_factory::makePipeline(pipelineElement, getExpCtx(), opts);
 
+        // The head of the pipeline is the DocumentSourceChangeStreamOplogMatch stage. In a real
+        // change stream this stage is popped off and its query becomes the filter of the
+        // PlanExecutor behind a $cursor stage (see PipelineD::buildInnerQueryExecutorGeneric).
+        // Mirror that here: keep the stage alive so its compiled MatchExpression can be reused, and
+        // let 'runBenchmarkWithProducer' attach a $cursor stage backed by a mock PlanExecutor.
+        auto poppedHead = _logicalPipeline->popFront();
+        _oplogMatchStage = boost::dynamic_pointer_cast<DocumentSourceMatch>(poppedHead);
+        invariant(_oplogMatchStage);
 
-        // Pop the head of the pipeline, which is the DocumentSourceChangeStreamOplogMatch stage.
-        // This stage cannot be converted to an exec::agg::State. In real world change streams,
-        // this stage is later replaced with a CursorStage. The CursorStage in real world change
-        // streams contains an aggregation pipeline which performs a collscan on the oplog with a
-        // large match expression.
-        // In benchmarks, this whole machinery is replaced with a QueueStage as the pipeline's input
-        // stage. The QueueStage produces the input oplog entries using the generators above. After
-        // the QueueStage, a match stage is added to simulate the filtering done by the oplog match
-        // stage in real world change streams.
-        auto* originalMatchStage = dynamic_cast<DocumentSourceMatch*>(pipeline->peekFront());
-        invariant(originalMatchStage);
-        BSONObj oplogFilter = originalMatchStage->getQuery().getOwned();
-        pipeline->popFront();
-
-        // Create a new match stage that will run the oplog filter instead. This is our way of
-        // simulating the oplog match filtering from a non-cursor input.
-        auto matchSource = DocumentSourceMatch::create(oplogFilter, getExpCtx());
-        pipeline->addInitialSource(matchSource);
-
-        // Add a queue stage as the pipeline's input stage. This stage will produce oplog entries on
-        // the fly for the following stages.
-        auto queueSource = DocumentSourceQueue::create(getExpCtx());
-        pipeline->addInitialSource(queueSource.get());
-
-        _execPipeline = exec::agg::buildPipeline(pipeline->freeze());
-        _queueStage =
-            dynamic_cast<exec::agg::QueueStage*>(_execPipeline->getStages().front().get());
-        invariant(_queueStage);
+        // Enable dynamic match reordering on the oplog match expression. A real change stream oplog
+        // COLLSCAN gets this in QueryPlannerAccess::makeCollectionScan; the benchmark bypasses the
+        // planner, so enable it here to keep predicate evaluation realistic.
+        allowReordering(getOpCtx(), _oplogMatchStage->getMatchExpression());
     }
 
     template <typename Producer>
     void runBenchmarkWithProducer(benchmark::State& state, Producer&& producer) {
+        // Build a mock PlanExecutor that produces oplog entries on the fly and applies the real
+        // oplog match predicate to each entry. The predicate is applied through the executor
+        // matcher (exec::matcher::matchesBSON), the same path a classic COLLSCAN's Filter stage
+        // uses, rather than the aggregation MatchProcessor, so matching includes the same work a
+        // real oplog scan performs. Filtered entries are counted here so the benchmark can still
+        // report how many events were dropped by the oplog match.
+        long long filteredEvents = 0;
+        const MatchExpression* oplogFilter = _oplogMatchStage->getMatchExpression();
+        test::MockDocumentProvider provider =
+            [oplogFilter,
+             producer = std::forward<Producer>(producer),
+             &filteredEvents]() mutable -> boost::optional<BSONObj> {
+            while (true) {
+                BSONObj candidate = producer();
+                if (exec::matcher::matchesBSON(oplogFilter, candidate)) {
+                    return candidate;
+                }
+                ++filteredEvents;
+            }
+        };
+
+        auto exec = std::make_unique<test::MockPlanExecutorForOplogScan>(
+            getOpCtx(), std::move(provider), Timestamp());
+        std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> execWithDeleter(
+            std::move(exec).release(), PlanExecutor::Deleter{getOpCtx()});
+
+        auto cursor =
+            DocumentSourceCursor::create(std::move(execWithDeleter),
+                                         getExpCtx(),
+                                         DocumentSourceCursor::CursorType::kRegular,
+                                         DocumentSourceCursor::ResumeTrackingType::kOplog);
+        cursor->bindCatalogInfo(MultipleCollectionAccessor{},
+                                make_intrusive<ShardRoleTransactionResourcesStasherForPipeline>());
+        cursor->setCatalogResourceHandle_forTest(
+            make_intrusive<test::MockDSCursorCatalogResourceHandle>(std::make_shared<bool>(false)));
+        _logicalPipeline->addInitialSource(std::move(cursor));
+
+        _execPipeline = exec::agg::buildPipeline(_logicalPipeline->freeze());
+
         long long totalSize = 0;
         long long totalEvents = 0;
-        long long filteredEvents = 0;
-        this->_queueStage->emplace_back(Document(producer()));
-
         for (auto _ : state) {
             auto next = this->_execPipeline->getNextResult();
-            // Compute accurate size of the produced events and produce the next oplog entry.
+            // Compute accurate size of the produced events.
             state.PauseTiming();
             if (!next.isEOF() && !next.isPaused()) {
                 totalSize += next.getDocument().toBsonWithMetaData().objsize();
                 totalEvents++;
-            } else {
-                filteredEvents++;
             }
-            this->_queueStage->emplace_back(Document(producer()));
             state.ResumeTiming();
         }
 
         // Total number of change events that were not filtered out.
         state.counters["eventsEmitted"] = totalEvents;
 
-        // Total number of events filtered out.
+        // Total number of events filtered out by the oplog match inside the mock executor.
         state.counters["eventsFiltered"] = filteredEvents;
 
         // Average size of the events that were not filtered out.
@@ -424,8 +450,9 @@ protected:
         state.counters["pipelineStages"] = _execPipeline->getStages().size();
     }
 
+    boost::intrusive_ptr<DocumentSourceMatch> _oplogMatchStage;
+    std::unique_ptr<Pipeline> _logicalPipeline;
     std::unique_ptr<exec::agg::Pipeline> _execPipeline;
-    exec::agg::QueueStage* _queueStage = nullptr;
 
 private:
     std::unique_ptr<ScopedGlobalServiceContextForTest> _scopedGlobalServiceContext;

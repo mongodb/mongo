@@ -3321,6 +3321,7 @@ mongo_cc_unit_test(
         "//src/mongo/db:collection_index_usage_tracker",
         "//src/mongo/db/index:index_access_method",
         "//src/mongo/db/pipeline:aggregation_context_fixture",
+        "//src/mongo/db/pipeline:document_source_cursor_test_util",
         "//src/mongo/db/shard_role:service_context_non_d",
         "//src/mongo/db/storage/wiredtiger:storage_wiredtiger",
         "//src/mongo/util:clock_source_mock",

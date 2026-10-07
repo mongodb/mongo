@@ -1832,6 +1832,7 @@ mongo_cc_benchmark(
     tags = ["query_bm"],
     deps = [
         "change_stream_pipeline",
+        ":document_source_cursor_test_util",
         ":document_source_mock",
         ":expression_context_for_test",
         ":pipeline",
@@ -1921,5 +1922,14 @@ mongo_cc_library(
         ":document_source_mock",
         ":expression_context_for_test",
         ":pipeline",
+    ],
+)
+
+mongo_cc_library(
+    name = "document_source_cursor_test_util",
+    hdrs = ["document_source_cursor_test_util.h"],
+    deps = [
+        ":pipeline",
+        "//src/mongo/db:query_exec",
     ],
 )
