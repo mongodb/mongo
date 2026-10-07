@@ -286,6 +286,27 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "size_count_checkpoint_validator",
+    srcs = [
+        "size_count_checkpoint_validator.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "size_count_checkpoint_validator_test",
+    srcs = [
+        "size_count_checkpoint_validator_test.cpp",
+    ],
+    tags = ["mongo_unittest_third_group"],
+    deps = [
+        "size_count_checkpoint_validator",
+    ],
+)
+
+mongo_cc_library(
     name = "replicated_fast_count_op_observer",
     srcs = [
         "replicated_fast_count_op_observer.cpp",
