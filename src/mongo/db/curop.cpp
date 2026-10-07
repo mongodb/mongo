@@ -24,6 +24,7 @@
 #include "mongo/db/operation_context_options_gen.h"
 #include "mongo/db/profile_filter.h"
 #include "mongo/db/profile_settings.h"
+#include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id_gen.h"
@@ -1281,6 +1282,10 @@ void CurOp::reportState(BSONObjBuilder* builder,
 
     if (auto&& queryShapeHash = _debug.getQueryShapeHash()) {
         builder->append("queryShapeHash", queryShapeHash->toHexString());
+    }
+
+    if (const auto settings = _debug.getQuerySettings().toBSON(); !settings.isEmpty()) {
+        builder->append("querySettings", settings);
     }
 }
 

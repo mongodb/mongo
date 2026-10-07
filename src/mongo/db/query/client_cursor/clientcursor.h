@@ -20,6 +20,7 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/query_lifespan.h"
 #include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/query/query_stats/supplemental_metrics_stats.h"
 #include "mongo/db/query/tailable_mode_gen.h"
@@ -543,6 +544,8 @@ private:
 
     // The hash of query_shape::QueryShapeHash.
     boost::optional<query_shape::QueryShapeHash> _queryShapeHash;
+
+    const query_settings::QuerySettings _querySettings;
 
     // If boost::none, query stats should not be collected for this cursor.
     boost::optional<std::size_t> _queryStatsKeyHash;

@@ -86,6 +86,7 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
       _lastUseDate(_createdDate),
       _planCacheShapeHash(CurOp::get(opCtx)->debug().planCacheShapeHash),
       _queryShapeHash(CurOp::get(opCtx)->debug().getQueryShapeHash()),
+      _querySettings(CurOp::get(opCtx)->debug().getQuerySettings()),
       _shouldOmitDiagnosticInformation(CurOp::get(opCtx)->getShouldOmitDiagnosticInformation()),
       _queryStatsKeyHash(CurOp::get(opCtx)->debug().getQueryStatsInfo().keyHash),
       _queryStatsKey(std::move(CurOp::get(opCtx)->debug().getQueryStatsInfo().key)),
@@ -120,6 +121,7 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
       _lastUseDate(_createdDate),
       _planCacheShapeHash(CurOp::get(opCtx)->debug().planCacheShapeHash),
       _queryShapeHash(CurOp::get(opCtx)->debug().getQueryShapeHash()),
+      _querySettings(CurOp::get(opCtx)->debug().getQuerySettings()),
       _shouldOmitDiagnosticInformation(CurOp::get(opCtx)->getShouldOmitDiagnosticInformation()),
       _queryStatsKeyHash(CurOp::get(opCtx)->debug().getQueryStatsInfo().keyHash),
       _queryStatsKey(std::move(CurOp::get(opCtx)->debug().getQueryStatsInfo().key)),
@@ -389,6 +391,10 @@ boost::optional<uint32_t> ClusterClientCursorImpl::getPlanCacheShapeHash() const
 
 boost::optional<query_shape::QueryShapeHash> ClusterClientCursorImpl::getQueryShapeHash() const {
     return _queryShapeHash;
+}
+
+const query_settings::QuerySettings& ClusterClientCursorImpl::getQuerySettings() const {
+    return _querySettings;
 }
 
 boost::optional<std::size_t> ClusterClientCursorImpl::getQueryStatsKeyHash() const {

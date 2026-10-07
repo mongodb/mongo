@@ -16,6 +16,7 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_ranking/plan_selection_strategy.h"
 #include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/query/query_shape/query_shape_hash.h"
 #include "mongo/db/query/query_stats/data_bearing_node_metrics.h"
 #include "mongo/db/query/query_stats/key.h"
@@ -374,6 +375,18 @@ public:
      */
     [[MONGO_MOD_PRIVATE]] void setQueryShapeHash(
         OperationContext* opCtx, const boost::optional<query_shape::QueryShapeHash>& hash);
+
+    /**
+     * Returns the installed settings without acquiring the client lock. The caller must hold the
+     * client lock or be the operation's executing thread.
+     */
+    [[MONGO_MOD_PRIVATE]] const query_settings::QuerySettings& getQuerySettings() const;
+
+    /**
+     * Installs a copy of the settings under the client lock for threadsafe curOp reporting.
+     */
+    [[MONGO_MOD_PRIVATE]] void setQuerySettings(OperationContext* opCtx,
+                                                query_settings::QuerySettings settings);
 
     // -------------------
 
@@ -985,5 +998,9 @@ private:
 
     // Flag indicates if query_shape::QueryShapeHash has already been computed.
     bool _didComputeQueryShapeHash{false};
+
+    // Access is synchronized with $currentOp by the client lock.
+    // TODO SERVER-136425 Remove this once QueryLifespan::get() is threadsafe.
+    query_settings::QuerySettings _querySettings;
 };
 }  // namespace mongo

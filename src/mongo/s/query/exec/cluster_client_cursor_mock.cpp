@@ -100,6 +100,11 @@ boost::optional<query_shape::QueryShapeHash> ClusterClientCursorMock::getQuerySh
     return boost::none;
 }
 
+const query_settings::QuerySettings& ClusterClientCursorMock::getQuerySettings() const {
+    static const query_settings::QuerySettings kEmpty;
+    return kEmpty;
+}
+
 boost::optional<std::size_t> ClusterClientCursorMock::getQueryStatsKeyHash() const {
     return boost::none;
 }

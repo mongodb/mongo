@@ -1551,6 +1551,15 @@ void OpDebug::setQueryShapeHash(OperationContext* opCtx,
     _didComputeQueryShapeHash = true;
 }
 
+const query_settings::QuerySettings& OpDebug::getQuerySettings() const {
+    return _querySettings;
+}
+
+void OpDebug::setQuerySettings(OperationContext* opCtx, query_settings::QuerySettings settings) {
+    std::lock_guard<Client> lk(*opCtx->getClient());
+    _querySettings = std::move(settings);
+}
+
 BSONArray OpDebug::getResolvedViewsInfo() const {
     BSONArrayBuilder resolvedViewsArr;
     appendResolvedViewsInfoImpl(resolvedViewsArr, this->resolvedViews);

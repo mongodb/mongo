@@ -10,6 +10,7 @@
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/query/query_stats/data_bearing_node_metrics.h"
 #include "mongo/db/query/query_stats/key.h"
@@ -132,6 +133,8 @@ public:
 
     boost::optional<query_shape::QueryShapeHash> getQueryShapeHash() const final;
 
+    const query_settings::QuerySettings& getQuerySettings() const final;
+
     boost::optional<std::size_t> getQueryStatsKeyHash() const final;
 
     bool shouldOmitDiagnosticInformation() const final;
@@ -224,6 +227,9 @@ private:
 
     // The hash of the query_shape::QueryShape.
     boost::optional<query_shape::QueryShapeHash> _queryShapeHash;
+
+    // Retains the originating settings for $currentOp on subsequent getMore requests.
+    const query_settings::QuerySettings _querySettings;
 
     // Whether ClusterClientCursor::next() was interrupted due to MaxTimeMSExpired.
     bool _maxTimeMSExpired = false;

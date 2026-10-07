@@ -245,6 +245,7 @@ StatusWith<ClientCursorPin> CursorManager::pinCursor(
     CurOp::get(opCtx)->debug().planCacheShapeHash = cursor->_planCacheShapeHash;
     CurOp::get(opCtx)->debug().planCacheKey = cursor->_planCacheKey;
     CurOp::get(opCtx)->debug().setQueryShapeHash(opCtx, cursor->_queryShapeHash);
+    CurOp::get(opCtx)->debug().setQuerySettings(opCtx, cursor->_querySettings);
 
     // Pass along queryStats context so it is retrievable after query execution for storing metrics.
     CurOp::get(opCtx)->debug().getQueryStatsInfo().keyHash = cursor->_queryStatsKeyHash;

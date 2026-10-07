@@ -529,8 +529,12 @@ void QuerySettingsService::initializeSettingsForQuery(
         // TODO SERVER-XXXXXX: avoid re-inspecting the result here by having
         // 'lookupQuerySettingsWithRejectionCheck' return the resolved state ('Empty' vs installed
         // settings) directly.
-        state = isDefault(settings) ? QuerySettingsOperationState{Empty{}}
-                                    : QuerySettingsOperationState{std::move(settings)};
+        if (isDefault(settings)) {
+            state = Empty{};
+            return;
+        }
+        CurOp::get(opCtx)->debug().setQuerySettings(opCtx, settings);
+        state = std::move(settings);
     }
 }
 
