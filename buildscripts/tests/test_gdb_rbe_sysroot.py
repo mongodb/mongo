@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import pathlib
 import struct
+import sys
 import tempfile
 import unittest
 from unittest import mock
@@ -10,6 +11,12 @@ from unittest import mock
 from buildscripts import gdb_rbe_sysroot
 
 ET_DYN = 3
+
+# gdb_rbe_sysroot.py only runs on Linux spawn hosts, and these tests write filenames and shell
+# script stubs that are invalid on Windows.
+linux_only = unittest.skipUnless(
+    sys.platform.startswith("linux"), "gdb_rbe_sysroot.py is Linux-only"
+)
 
 # Captured from `eu-unstrip -n --core` on a core produced inside the amazon_linux_2023 RBE container.
 UNSTRIP_OUTPUT = """\
@@ -108,6 +115,7 @@ def _write_elf(
     return path
 
 
+@linux_only
 class ElfParsingTest(unittest.TestCase):
     def setUp(self) -> None:
         self._tmp = tempfile.TemporaryDirectory()
@@ -183,6 +191,7 @@ class ElfParsingTest(unittest.TestCase):
         self.assertEqual(gdb_rbe_sysroot.core_build_ids("dump.core", str(eu_unstrip)), {"abcd"})
 
 
+@linux_only
 class CoreUsesRbeSysrootTest(unittest.TestCase):
     def setUp(self) -> None:
         self._tmp = tempfile.TemporaryDirectory()
@@ -249,6 +258,7 @@ class CoreUsesRbeSysrootTest(unittest.TestCase):
         self.assertFalse(self._uses_sysroot(libs, {"a0", "b1"}))
 
 
+@linux_only
 class BuildGdbCommandTest(unittest.TestCase):
     def setUp(self) -> None:
         self._tmp = tempfile.TemporaryDirectory()
