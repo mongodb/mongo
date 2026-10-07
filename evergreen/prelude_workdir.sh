@@ -5,8 +5,14 @@ if [ "Windows_NT" = "$OS" ]; then
     calculated_workdir=$(cygpath -w "$calculated_workdir")
     pwd_cygpath=$(cygpath -w "$pwd_cygpath")
 else
-    calculated_workdir=$(cd -P "$evergreen_dir/../.." && pwd -P)
-    pwd_cygpath=$(pwd -P)
+    # Spawn hosts source prelude.sh from $HOME through a ~/src symlink to the checkout, which only
+    # matches logically, so fall back to canonical paths only when the logical ones differ.
+    calculated_workdir=$(cd "$evergreen_dir/../.." && echo "$PWD")
+    pwd_cygpath="$PWD"
+    if [ "$pwd_cygpath" != "$calculated_workdir" ]; then
+        calculated_workdir=$(cd -P "$evergreen_dir/../.." && pwd -P)
+        pwd_cygpath=$(pwd -P)
+    fi
 fi
 if [ -z "$workdir" ]; then
     workdir="$calculated_workdir"
@@ -22,7 +28,7 @@ elif [ "Windows_NT" != "$OS" ]; then
         workdir_for_comparison=""
     fi
 
-    if [ "$workdir_for_comparison" != "$calculated_workdir" ]; then
+    if [ "$workdir_for_comparison" != "$(cd -P "$calculated_workdir" && pwd -P)" ]; then
         # if you move the checkout directory (ex: simple project config project),
         # then this assertion will fail in the future. You need to update
         # calculated_workdir, and all the relative directories in this file.
