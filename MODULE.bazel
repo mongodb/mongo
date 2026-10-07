@@ -152,6 +152,7 @@ single_version_override(
         "//bazel/rules_pycross:wheel_library_windows_dll_path.patch",
         "//bazel/rules_pycross:installer_repo_extract.patch",
         "//bazel/rules_pycross:installer_tools_build.patch",
+        "//bazel/rules_pycross:wheel_installer_patch_ng_runfiles.patch",
         "//bazel/rules_pycross:wheel_build_cargo_home.patch",
         "//bazel/rules_pycross:wheel_build_no_werror.patch",
         "//bazel/rules_pycross:crossenv_glibc_teller.patch",
@@ -160,6 +161,7 @@ single_version_override(
         "//bazel/rules_pycross:wheel_build_cross_exec_platform.patch",
         "//bazel/rules_pycross:wheel_library_cross_exec_platform.patch",
         "//bazel/rules_pycross:target_environment_cross_exec_platform.patch",
+        "//bazel/rules_pycross:wheel_library_tool_runfiles.patch",
     ],
     version = "0.8.3",
 )
