@@ -1654,14 +1654,17 @@ void IndexBuildsCoordinator::applyAbortIndexBuild(OperationContext* opCtx,
                 opCtx,
                 indexBuildInfo.spec.getStringField(IndexDescriptor::kIndexNameFieldName),
                 IndexCatalog::InclusionPolicy::kAll);
-
-            LOGV2(6455400,
-                  "Dropping unfinished index during oplog recovery as standalone",
-                  "spec"_attr = indexBuildInfo.spec);
-
-            invariant(writableEntry && writableEntry->isFrozen());
-            invariant(indexCatalog->dropUnfinishedIndex(
-                opCtx, collWriter.getWritableCollection(opCtx), writableEntry));
+            if (writableEntry) {
+                LOGV2(6455400,
+                      "Dropping unfinished index during oplog recovery as standalone",
+                      "spec"_attr = indexBuildInfo.spec);
+                invariant(writableEntry->isFrozen());
+                invariant(indexCatalog->dropUnfinishedIndex(
+                    opCtx, collWriter.getWritableCollection(opCtx), writableEntry));
+            } else {
+                LOGV2_WARNING(
+                    13647600, "Unfinished index not found", "spec"_attr = indexBuildInfo.spec);
+            }
         }
 
         wuow.commit();

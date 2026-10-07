@@ -10,12 +10,19 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/client.h"
 #include "mongo/db/index_builds/commit_quorum_options.h"
+#include "mongo/db/index_builds/index_build_oplog_entry.h"
 #include "mongo/db/index_builds/primary_driven/util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/repl_set_member_in_standalone_mode.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/repl/timestamp_block.h"
+#include "mongo/db/shard_role/lock_manager/d_concurrency.h"
+#include "mongo/db/shard_role/shard_catalog/catalog_control.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
+#include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
+#include "mongo/db/shard_role/shard_catalog/database_holder.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/otel/metrics/metric_names.h"
@@ -805,6 +812,98 @@ TEST_F(IndexBuildsCoordinatorMongodTest, OtelMetricsPrimaryDrivenBuildAfterAbort
     EXPECT_EQ(metricsAfter.started, metricsBeforeBuild.started + 1);
     EXPECT_EQ(metricsAfter.failed, metricsBeforeBuild.failed + 1);
     EXPECT_EQ(metricsAfter.toBeResumed, metricsBeforeBuild.toBeResumed);
+}
+
+
+class IndexBuildsCoordinatorMongodStandaloneRecoveryTest : public IndexBuildsCoordinatorMongodTest {
+public:
+    /**
+     * Writes the given indexes to the durable catalog as one unfinished two-phase build, then
+     * reloads the catalog the way startup does for a replica set member in standalone mode, so
+     * they come back frozen and no index builds are restarted.
+     */
+    void createFrozenIndexes(const UUID& buildUUID, const std::vector<IndexBuildInfo>& indexes) {
+        auto opCtx = operationContext();
+        {
+            auto coll = getCollectionExclusive(opCtx, _testFooNss);
+            WriteUnitOfWork wuow(opCtx);
+            CollectionWriter writer{opCtx, &coll};
+            auto writableColl = writer.getWritableCollection(opCtx);
+            for (const auto& index : indexes) {
+                IndexDescriptor desc{IndexNames::BTREE, index.spec};
+                ASSERT_OK(
+                    writableColl->prepareForIndexBuild(opCtx, &desc, index.indexIdent, buildUUID));
+            }
+            wuow.commit();
+        }
+
+        setReplSetMemberInStandaloneMode(opCtx->getServiceContext(), true);
+        Lock::GlobalLock globalLk(opCtx, MODE_X);
+        catalog::closeCatalog(opCtx);
+        auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+        storageEngine->loadMDBCatalog(opCtx, StorageEngine::LastShutdownState::kClean);
+        catalog::initializeCollectionCatalog(opCtx, storageEngine, catalog::InitMode::kStartup);
+        for (auto&& dbName : catalog::listDatabases()) {
+            DatabaseHolder::get(opCtx)->openDb(opCtx, dbName);
+        }
+    }
+
+    IndexBuildOplogEntry makeAbortOplogEntry(const UUID& buildUUID,
+                                             std::vector<IndexBuildInfo> indexes) {
+        return {.collUUID = _testFooUUID,
+                .commandType = repl::OplogEntry::CommandType::kAbortIndexBuild,
+                .commandName = "abortIndexBuild",
+                .buildUUID = buildUUID,
+                .indexes = std::move(indexes),
+                .cause = Status{ErrorCodes::IndexBuildAborted, "test abort"}};
+    }
+
+    void applyAbort(const IndexBuildOplogEntry& oplogEntry) {
+        TimestampBlock tsBlock(operationContext(), Timestamp(10, 1));
+        _indexBuildsCoord->applyAbortIndexBuild(operationContext(), oplogEntry);
+    }
+
+    std::vector<std::string> nonIdIndexNames() {
+        auto coll = getCollectionExclusive(operationContext(), _testFooNss);
+        std::vector<std::string> names;
+        auto it = coll.getCollectionPtr()->getIndexCatalog()->getIndexIterator(
+            IndexCatalog::InclusionPolicy::kAll);
+        while (it->more()) {
+            auto name = it->next()->descriptor()->indexName();
+            if (name != "_id_") {
+                names.push_back(name);
+            }
+        }
+        return names;
+    }
+
+    unittest::ServerParameterGuard _recoverAsStandalone{"recoverFromOplogAsStandalone", true};
+};
+
+TEST_F(IndexBuildsCoordinatorMongodStandaloneRecoveryTest,
+       ApplyAbortDropsFrozenIndexesWhenSomeIndexesAreMissing) {
+    const auto buildUUID = UUID::gen();
+    auto indexes = makeSpecs({"a", "b", "c"}, {1, 2, 3});
+    createFrozenIndexes(buildUUID, {indexes[0], indexes[2]});
+    ASSERT_EQ(2U, nonIdIndexNames().size());
+
+    applyAbort(makeAbortOplogEntry(buildUUID, indexes));
+
+    ASSERT_EQ(std::vector<std::string>{}, nonIdIndexNames());
+}
+
+TEST_F(IndexBuildsCoordinatorMongodStandaloneRecoveryTest,
+       ApplyAbortIsNoOpWhenAllIndexesAreAlreadyDropped) {
+    const auto buildUUID = UUID::gen();
+    auto indexes = makeSpecs({"a", "b"}, {1, 2});
+    createFrozenIndexes(buildUUID, indexes);
+    ASSERT_EQ(2U, nonIdIndexNames().size());
+
+    applyAbort(makeAbortOplogEntry(buildUUID, indexes));
+    ASSERT_EQ(std::vector<std::string>{}, nonIdIndexNames());
+
+    applyAbort(makeAbortOplogEntry(buildUUID, indexes));
+    ASSERT_EQ(std::vector<std::string>{}, nonIdIndexNames());
 }
 
 }  // namespace
