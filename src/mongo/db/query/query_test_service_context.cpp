@@ -7,6 +7,7 @@
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collation/collator_factory_mock.h"
 #include "mongo/db/topology/sharding_state.h"
+#include "mongo/unittest/test_locker_observer.h"
 
 #include <memory>
 
@@ -15,8 +16,9 @@ namespace mongo {
 QueryTestServiceContext::QueryTestServiceContext(
     std::unique_ptr<TickSourceMock<Nanoseconds>> tickSource)
     : _tickSource(tickSource.get()),
-      _serviceContext(ServiceContext::make(nullptr, nullptr, std::move(tickSource))),
-      _client(_serviceContext->getService()->makeClient("query_test")) {
+      _serviceContext(ServiceContext::make(nullptr, nullptr, std::move(tickSource))) {
+    unittest::installTestLockerObserver(getServiceContext());
+    _client = getServiceContext()->getService()->makeClient("query_test");
     ShardingState::create(getServiceContext());
     CollatorFactoryInterface::set(getServiceContext(), std::make_unique<CollatorFactoryMock>());
 }

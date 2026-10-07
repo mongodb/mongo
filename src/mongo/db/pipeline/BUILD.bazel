@@ -698,6 +698,21 @@ mongo_cc_library(
 )
 
 mongo_cc_unit_test(
+    name = "aggregation_context_fixture_test",
+    srcs = [
+        "aggregation_context_fixture_test.cpp",
+    ],
+    tags = ["mongo_unittest_seventh_group"],
+    deps = [
+        ":aggregation_context_fixture",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/shard_role",
+        "//src/mongo/db/shard_role/lock_manager",
+        "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_unit_test(
     name = "lite_parsed_test",
     srcs = [
         "lite_parsed_document_source_test.cpp",

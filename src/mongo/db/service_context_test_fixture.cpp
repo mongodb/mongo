@@ -9,6 +9,7 @@
 #include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/transport/transport_layer_manager_impl.h"
+#include "mongo/unittest/test_locker_observer.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/tick_source_mock.h"
 
@@ -34,6 +35,11 @@ ScopedGlobalServiceContextForTest::ScopedGlobalServiceContextForTest(bool should
 
 ScopedGlobalServiceContextForTest::ScopedGlobalServiceContextForTest(
     ServiceContext::UniqueServiceContext serviceContext, bool shouldSetupTL) {
+    // Install the Locker observer before anything can create a Client (in particular before any
+    // background threads are started by derived fixtures), so test ServiceContexts match
+    // production.
+    unittest::installTestLockerObserver(serviceContext.get());
+
     if (shouldSetupTL) {
         auto tl = transport::TransportLayerManagerImpl::makeDefaultEgressTransportLayer();
         uassertStatusOK(tl->setup());

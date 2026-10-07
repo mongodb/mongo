@@ -175,15 +175,7 @@ TEST(QueryMemoryLoadSheddingValidation, HighMarkMustStayAboveLowMark) {
 
 // Drives queryMemoryCheckLoadShedding() end-to-end against an operation with a memory tracker,
 // using the test-only pressure-override failpoint to place RSS below or above the low mark.
-// The shed decision reads the operation's Locker (wasGlobalLockTakenForWrite); real operations
-// always have one, so install a Locker on the fixture's opCtx to match.
-class QueryMemoryLoadSheddingCheckTest : public AggregationContextFixture {
-public:
-    QueryMemoryLoadSheddingCheckTest() {
-        auto* opCtx = getExpCtx()->getOperationContext();
-        opCtx->setLockState_DO_NOT_USE(std::make_unique<Locker>(opCtx->getServiceContext()));
-    }
-};
+class QueryMemoryLoadSheddingCheckTest : public AggregationContextFixture {};
 
 void setPressureOverride(int usagePercent) {
     globalFailPointRegistry()
