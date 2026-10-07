@@ -144,6 +144,129 @@ bool consume(const pcre::Regex& re, std::string_view* in, std::string* out) {
     return true;
 }
 
+// Log IDs used by StackTrace::sink and StackTrace::log.
+constexpr int errorCollectingStackTraceId = 31430;
+constexpr int stacktraceLogId = 31380;
+
+// Asserts exactly one log line with log id `id` was captured, and returns its index.
+size_t singleLogIndex(const unittest::LogCaptureGuard& logs, int id) {
+    auto indices = logs.indicesOfBSONContainingSubset(BSON("id" << id));
+    ASSERT_EQ(indices.size(), 1u);
+    return indices[0];
+}
+
+// Returns the number of non-overlapping occurrences of `needle` in `haystack`.
+size_t countOccurrences(std::string_view haystack, std::string_view needle) {
+    size_t count = 0;
+    for (auto pos = haystack.find(needle); pos != std::string_view::npos;
+         pos = haystack.find(needle, pos + needle.size())) {
+        ++count;
+    }
+    return count;
+}
+
+TEST(StackTrace, Log) {
+    std::string testData = "foobarbaz";
+    StackTrace trace(BSON("data" << testData));
+
+    unittest::LogCaptureGuard logs;
+    trace.log();
+
+    // The stacktrace (and no error) go into the logs.
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << errorCollectingStackTraceId)), 0)
+        << "log() logged the error for a trace without an error";
+    singleLogIndex(logs, stacktraceLogId);
+}
+
+TEST(StackTrace, LogWithError) {
+    std::string testData = "foobarbaz";
+    std::string errorString = "errorbazbarfoo";
+    StackTrace trace(BSON("data" << testData), errorString);
+
+    unittest::LogCaptureGuard logs;
+    trace.log();
+
+    // The error and stacktrace are both logged, with the error going first.
+    auto errorIndex = singleLogIndex(logs, errorCollectingStackTraceId);
+    auto stacktraceIndex = singleLogIndex(logs, stacktraceLogId);
+    ASSERT_LT(errorIndex, stacktraceIndex)
+        << "log() logged the stacktrace and error in the wrong order";
+}
+
+TEST(StackTrace, Sink) {
+    std::string testData = "foobarbaz";
+    StackTrace trace(BSON("data" << testData));
+
+    std::string s;
+    StringStackTraceSink sink(s);
+
+    unittest::LogCaptureGuard logs;
+    trace.sink(&sink);
+
+    // The stacktrace goes to the sink.
+    ASSERT_EQ(countOccurrences(s, testData), 1u)
+        << "sink() did not write the stacktrace to the sink exactly once";
+    // The stacktrace does not go to the log.
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << stacktraceLogId)), 0)
+        << "sink() logged the stacktrace to logv2";
+}
+
+TEST(StackTrace, SinkWithError) {
+    std::string testData = "foobarbaz";
+    std::string errorString = "errorbazbarfoo";
+    StackTrace trace(BSON("data" << testData), errorString);
+
+    std::string s;
+    StringStackTraceSink sink(s);
+
+    unittest::LogCaptureGuard logs;
+    trace.sink(&sink);
+
+    // The stacktrace and error go to the sink.
+    ASSERT_EQ(countOccurrences(s, errorString), 1u)
+        << "sink() did not write the error to the sink exactly once";
+    ASSERT_EQ(countOccurrences(s, testData), 1u)
+        << "sink() did not write the stacktrace to the sink exactly once";
+
+    // The error is written before the stacktrace.
+    ASSERT_LT(s.find(errorString), s.find(testData))
+        << "sink() wrote the stacktrace and error in the wrong order";
+
+    // The messages do not go to the logs.
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << stacktraceLogId)), 0)
+        << "sink() logged the stacktrace to logv2";
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << errorCollectingStackTraceId)), 0)
+        << "sink() logged the error to logv2";
+}
+
+TEST(StackTrace, NullSink) {
+    std::string testData = "foobarbaz";
+    StackTrace trace(BSON("data" << testData));
+
+    unittest::LogCaptureGuard logs;
+    trace.sink(nullptr);
+
+    // Null sink, no error, stacktrace goes to the log.
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << errorCollectingStackTraceId)), 0)
+        << "sink(nullptr) logged the error for a trace without an error";
+    singleLogIndex(logs, stacktraceLogId);
+}
+
+TEST(StackTrace, NullSinkWithError) {
+    std::string testData = "foobarbaz";
+    std::string errorString = "errorbazbarfoo";
+    StackTrace trace(BSON("data" << testData), errorString);
+
+    unittest::LogCaptureGuard logs;
+    trace.sink(nullptr);
+
+    // Null sink, the error and stacktrace are both logged, error first.
+    auto errorIndex = singleLogIndex(logs, errorCollectingStackTraceId);
+    auto stacktraceIndex = singleLogIndex(logs, stacktraceLogId);
+    ASSERT_LT(errorIndex, stacktraceIndex)
+        << "sink(nullptr) logged the stacktrace and error in the wrong order";
+}
+
 // Break down a printStackTrace output for a contrived call tree and sanity-check it.
 TEST(StackTrace, PosixFormat) {
     if (kIsWindows) {

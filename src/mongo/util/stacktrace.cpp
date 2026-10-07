@@ -167,16 +167,16 @@ void logBacktraceObject(const BSONObj& bt, StackTraceSink* sink, bool withHumanR
 }  // namespace stacktrace_details
 
 void StackTrace::log(bool withHumanReadable) const {
-    if (hasError()) {
-        LOGV2_ERROR(31430, "Error collecting stack trace", "error"_attr = _error);
-    }
-
     sink(nullptr, withHumanReadable);
 }
 
 void StackTrace::sink(StackTraceSink* sink, bool withHumanReadable) const {
     if (hasError()) {
-        *sink << fmt::format("Error collecting stack trace: {}", _error);
+        if (sink) {
+            *sink << fmt::format("Error collecting stack trace: {}", _error);
+        } else {
+            LOGV2_ERROR(31430, "Error collecting stack trace", "error"_attr = _error);
+        }
     }
 
     stacktrace_details::logBacktraceObject(_stacktrace, sink, withHumanReadable);
