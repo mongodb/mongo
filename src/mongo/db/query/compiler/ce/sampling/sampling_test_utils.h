@@ -327,7 +327,8 @@ BSONObj buildPersistentSampleDoc(const UUID& collUuid,
                                  boost::optional<int> numChunks = boost::none,
                                  int schemaVersion = kPersistentSampleSchemaVersion,
                                  BSONObj overrides = BSONObj(),
-                                 int pageNo = 0);
+                                 int pageNo = 0,
+                                 size_t numDocsDiscarded = 0);
 
 /**
  * Build a BSON document of size `sizeBytes`, or at minimum the size of the BSON overhead of the

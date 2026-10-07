@@ -263,6 +263,7 @@ TEST(ParsePersistentSample, RejectsMissingSchemaVersion) {
     b.append(PersistentSampleDoc::kSamplingMethodFieldName,
              idlSerialize(SamplingTechniqueEnum::kRandom));
     b.appendDate(PersistentSampleDoc::kCreatedAtFieldName, Date_t::now());
+    b.append(PersistentSampleDoc::kNumDocsDiscardedFieldName, static_cast<long long>(0));
     BSONArrayBuilder arr(b.subarrayStart(PersistentSampleDoc::kDocsFieldName));
     for (const auto& d : kStubSampleDocs) {
         arr.append(d);
@@ -415,6 +416,7 @@ TEST(ParsePersistentSample, RejectsMissingDocsField) {
              static_cast<long long>(kStubSampleDocs.size()));
     b.append(PersistentSampleDoc::kSamplingMethodFieldName,
              idlSerialize(SamplingTechniqueEnum::kRandom));
+    b.append(PersistentSampleDoc::kNumDocsDiscardedFieldName, static_cast<long long>(0));
     auto result = parsePersistentSample(b.obj());
     ASSERT_NOT_OK(result.getStatus());
 }
@@ -446,6 +448,18 @@ TEST(ParsePersistentSample, RejectsNonObjectEntryInDocsArray) {
     ASSERT_NOT_OK(result.getStatus());
 }
 
+TEST(ParsePersistentSample, RejectsNegativeNumDocsDiscarded) {
+    auto result = parsePersistentSample(
+        buildPersistentSampleDoc(UUID::gen(),
+                                 SamplingTechniqueEnum::kRandom,
+                                 /*sampleSize=*/kStubSampleDocs.size(),
+                                 /*docs=*/kStubSampleDocs,
+                                 /*numChunks=*/boost::none,
+                                 /*schemaVersion=*/kPersistentSampleSchemaVersion,
+                                 BSON(PersistentSampleDoc::kNumDocsDiscardedFieldName << -1)));
+    ASSERT_NOT_OK(result.getStatus());
+}
+
 // ── reassemblePersistentSample ────────────────────────────────────────────────────────────────
 
 // Builds a single page document for `pageNo` of a logical sample. All pages of a sample share the
@@ -455,7 +469,8 @@ BSONObj buildPage(const UUID& uuid,
                   size_t sampleSize,
                   const std::vector<BSONObj>& docs,
                   int pageNo,
-                  boost::optional<int> numChunks = boost::none) {
+                  boost::optional<int> numChunks = boost::none,
+                  size_t numDocsDiscarded = 0) {
     return buildPersistentSampleDoc(uuid,
                                     method,
                                     sampleSize,
@@ -463,7 +478,8 @@ BSONObj buildPage(const UUID& uuid,
                                     numChunks,
                                     /*schemaVersion=*/kPersistentSampleSchemaVersion,
                                     /*overrides=*/BSONObj{},
-                                    pageNo);
+                                    pageNo,
+                                    numDocsDiscarded);
 }
 
 TEST(ReassemblePersistentSample, EmptyPagesReturnsNoSuchKey) {
@@ -609,6 +625,31 @@ TEST(ReassemblePersistentSample, PreservesChunkNumChunks) {
     ASSERT_EQUALS(sample.getDocs().size(), 2u);
 }
 
+TEST(ReassemblePersistentSample, PagesWithMismatchedDiscardCountRejected) {
+    const UUID uuid = UUID::gen();
+    // page 0 declares numDocsDiscarded 1, page 1 declares numDocsDiscarded 2.
+    auto result = reassemblePersistentSample({
+        buildPage(uuid,
+                  SamplingTechniqueEnum::kRandom,
+                  /*sampleSize=*/4,
+                  /*docs=*/{BSON("a" << 0)},
+                  /*pageNo=*/0,
+                  /*numChunks=*/boost::none,
+                  /*numDocsDiscarded=*/1),
+        buildPage(uuid,
+                  SamplingTechniqueEnum::kRandom,
+                  /*sampleSize=*/4,
+                  /*docs=*/{BSON("a" << 0)},
+                  /*pageNo=*/1,
+                  /*numChunks=*/boost::none,
+                  /*numDocsDiscarded=*/2),
+    });
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_STRING_CONTAINS(result.getStatus().reason(),
+                           "persistent sample pages disagree on their identity fields");
+    ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::UnsupportedFormat);
+}
+
 // ── makePersistentSamplePageDocs
 // ───────────────────────────────────────────────────────────────
 
@@ -667,6 +708,10 @@ TEST(MakePersistentSamplePageDocs, ScatteredDiscardsDoNotAddPages) {
     ASSERT_EQ(pages.size(), 1u);
     ASSERT_EQ(collectPagedDocIds(pages).size(), 27u);
     assertOversizedDocsAbsent(pages, {1, 14, 27});
+
+    auto swParsed = parsePersistentSample(pages[0]);
+    ASSERT_OK(swParsed.getStatus());
+    ASSERT_EQ(swParsed.getValue().getNumDocsDiscarded(), 3);
 }
 
 TEST(MakePersistentSamplePageDocs, DiscardsAtExactlyThresholdSucceed) {
@@ -760,6 +805,7 @@ TEST(MakePersistentSamplePageDocs, DiscardsAcrossMultiplePagesRoundTrip) {
     auto swReassembled = reassemblePersistentSample(pages);
     ASSERT_OK(swReassembled.getStatus());
     ASSERT_EQ(swReassembled.getValue().getDocs().size(), static_cast<size_t>(kNumDocs) - 2);
+    ASSERT_EQ(swReassembled.getValue().getNumDocsDiscarded(), 2);
 
     assertOversizedDocsAbsent(pages, {11, 29});
 }
@@ -772,12 +818,64 @@ TEST(MakePersistentSamplePageDocs, LargeDocJustUnderMaxFitsOnOwnPage) {
     ASSERT_LT(pages[0].objsize(), BSONObjMaxUserSize);
 }
 
+TEST(MakePersistentSamplePageDocs, NumDocsDiscardedFitsOnAPageFilledToTheLastByte) {
+    // Begin the sample with one large document, then add some tiny ones until the first page has
+    // only a few bytes to spare -- less than numDocsDiscarded needs. Leftovers will spill into a
+    // second page.
+    std::vector<BSONObj> sample{makeSizedDoc(0, BSONObjMaxUserSize - 2048)};
+    for (int i = 1; i <= 200; ++i) {
+        sample.push_back(BSON("_id" << i));
+    }
+
+    const auto pages = makeRandomSamplePageDocs(sample, sample.size());
+    ASSERT_EQ(pages.size(), 2u);
+
+    // We only care about the first page because it's filled as much as possible. We want to be
+    // sure that, with numDocsDiscarded appended, the page doesn't exceed the limit but comes close.
+    ASSERT_GT(pages[0].objsize(), BSONObjMaxUserSize - 64);
+    ASSERT_LTE(pages[0].objsize(), BSONObjMaxUserSize);
+
+    auto swParsed = parsePersistentSample(pages[0]);
+    ASSERT_OK(swParsed.getStatus());
+    ASSERT_EQ(swParsed.getValue().getNumDocsDiscarded(), 0);
+}
+
+TEST(MakePersistentSamplePageDocs, NumDocsDiscardedReservationDefersADocToANewPage) {
+    // Begin the sample with one large document and then enough tiny filler documents so that
+    // exactly one page is filled as much as possible (including the space reserved for the
+    // `numDocsDiscarded` field).
+    std::vector<BSONObj> sample{makeSizedDoc(0, BSONObjMaxUserSize - 2048)};
+    for (int i = 1; i <= 99; ++i) {
+        sample.push_back(BSON("_id" << i));
+    }
+
+    // Because space is reserved for the `numDocsDiscarded` field, this document won't fit on the
+    // first page.
+    const BSONObj deferredDoc = BSON("_id" << 100);
+    sample.push_back(deferredDoc);
+
+    const auto pages = makeRandomSamplePageDocs(sample, sample.size());
+    ASSERT_EQ(pages.size(), 2u);
+
+    // Make sure the first page is filled as much as possible, so that `deferredDoc` must be on the
+    // second page.
+    ASSERT_GT(pages[0].objsize(), BSONObjMaxUserSize - 64);
+    ASSERT_LTE(pages[0].objsize(), BSONObjMaxUserSize);
+
+    auto swParsed = parsePersistentSample(pages[1]);
+    ASSERT_OK(swParsed.getStatus());
+    ASSERT_EQ(swParsed.getValue().getDocs().size(), 1u);
+    ASSERT_EQ(swParsed.getValue().getDocs()[0]["_id"].numberInt(), 100);
+    ASSERT_EQ(swParsed.getValue().getNumDocsDiscarded(), 0);
+}
+
 TEST(MakePersistentSamplePageDocs, EmptySampleProducesSingleEmptyPage) {
     const auto pages = makeRandomSamplePageDocs({}, /*sampleSize=*/10);
     ASSERT_EQ(pages.size(), 1u);
     auto swParsed = parsePersistentSample(pages[0]);
     ASSERT_OK(swParsed.getStatus());
     ASSERT_EQ(swParsed.getValue().getDocs().size(), 0u);
+    ASSERT_EQ(swParsed.getValue().getNumDocsDiscarded(), 0);
 }
 
 TEST(MakePersistentSamplePageDocs, PagesAreNumberedSequentiallyFromZero) {
@@ -870,6 +968,25 @@ TEST(MakePersistentSamplePageDocs, ProducesParseableChunkSampleDoc) {
     ASSERT_EQ(parsed.getDocs().size(), 2u);
     ASSERT_EQ(parsed.getDocs()[0]["a"].numberInt(), 1);
     ASSERT_EQ(parsed.getDocs()[1]["a"].numberInt(), 2);
+}
+
+TEST(MakePersistentSamplePageDocs, EveryPageReportsSampleWideDiscardCount) {
+    constexpr int kNumDocs = 40;
+    std::vector<BSONObj> sample;
+    sample.reserve(kNumDocs);
+    for (int i = 0; i < kNumDocs; ++i) {
+        // ids 11 and 29 (2 of 40 == 5%) will be discarded.
+        sample.push_back(
+            makeSizedDoc(i, (i == 11 || i == 29) ? BSONObjMaxUserSize : 1 * 1024 * 1024));
+    }
+
+    const auto pages = makeRandomSamplePageDocs(sample, kNumDocs);
+    ASSERT_EQ(pages.size(), 3u);
+    for (size_t pageNo = 0; pageNo < pages.size(); ++pageNo) {
+        auto swParsed = parsePersistentSample(pages[pageNo]);
+        ASSERT_OK(swParsed.getStatus());
+        ASSERT_EQ(swParsed.getValue().getNumDocsDiscarded(), 2);
+    }
 }
 
 }  // namespace

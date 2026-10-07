@@ -307,6 +307,7 @@ describe("persistent sample serverStatus metrics", function () {
             actualSampleSize: kNumDocs - 1,
             expectedFields: ["pad"],
             expectedNumPages: 1,
+            expectedNumDocsDiscarded: 1,
         });
 
         assert.eq(

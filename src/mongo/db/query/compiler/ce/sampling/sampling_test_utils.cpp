@@ -599,7 +599,8 @@ BSONObj buildPersistentSampleDoc(const UUID& collUuid,
                                  boost::optional<int> numChunks,
                                  int schemaVersion,
                                  BSONObj overrides,
-                                 int pageNo) {
+                                 int pageNo,
+                                 size_t numDocsDiscarded) {
     BSONObjBuilder builder;
     // _id is required by the IDL schema. For intentionally-malformed docs (e.g. kChunk without
     // numChunks, or sampleSize=0, used in parse-rejection tests) we can't build a valid key, so
@@ -622,6 +623,8 @@ BSONObj buildPersistentSampleDoc(const UUID& collUuid,
     builder.appendDate(PersistentSampleDoc::kCreatedAtFieldName, Date_t::now());
     builder.append(PersistentSampleDoc::kSampleSizeFieldName, static_cast<long long>(sampleSize));
     builder.append(PersistentSampleDoc::kSamplingMethodFieldName, idlSerialize(method));
+    builder.append(PersistentSampleDoc::kNumDocsDiscardedFieldName,
+                   static_cast<long long>(numDocsDiscarded));
     if (numChunks) {
         builder.append(PersistentSampleDoc::kNumChunksFieldName, numChunks.value());
     }

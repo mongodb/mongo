@@ -63,6 +63,13 @@ constexpr char kIdSeparator = '_';
 static_assert(kIdSeparator > '9');
 
 /**
+ * Number of bytes taken up by the `numDocsDiscarded` field in the PersistentSampleDoc type.
+ */
+constexpr int kNumDocsDiscardedFieldBytes = 1 /* type indicator */ +
+    (sizeof("numDocsDiscarded")) /* field name (including null-terminator) */
+    + 8 /* long type */;
+
+/**
  * Number of digits the page number is zero-padded to for a sample of the given size.
  */
 size_t pageNoWidth(size_t sampleSize) {
@@ -173,14 +180,19 @@ std::vector<BSONObj> makePersistentSamplePageDocs(const UUID& collectionUuid,
                                                   boost::optional<int> numChunks,
                                                   const std::vector<BSONObj>& sample,
                                                   Date_t createdAt) {
-    std::vector<BSONObj> pages;
+    // The `numDocsDiscarded` field needs to be the same across all pages and we can't determine it
+    // until after we've looped through the entire sample. So we store all the builders in a vector
+    // so that we can keep them open until we're ready to append `numDocsDiscarded` to the page.
+    // Then we can close them.
+    std::vector<BSONObjBuilder> builders;
     size_t docIdx = 0;
     int pageNo = 0;
     size_t numDiscarded = 0;
 
     const double maxDiscardFraction = internalQueryMaxPersistentSampleDiscardFraction.load();
     do {
-        BSONObjBuilder builder;
+        builders.emplace_back();
+        auto& builder = builders.back();
         appendSamplePageMetadata(
             builder, collectionUuid, method, sampleSize, numChunks, pageNo, createdAt);
         BSONArrayBuilder docsArr(builder.subarrayStart(PersistentSampleDoc::kDocsFieldName));
@@ -193,8 +205,8 @@ std::vector<BSONObj> makePersistentSamplePageDocs(const UUID& collectionUuid,
             const BSONObj& doc = sample[docIdx];
 
             // Calculate the maximum number of bytes this document would add to a page.
-            const int docSizeWithOverheadBytes =
-                doc.objsize() + kArrayElementMaxOverheadBytes + kBytesToClosePage;
+            const int docSizeWithOverheadBytes = doc.objsize() + kArrayElementMaxOverheadBytes +
+                kBytesToClosePage + kNumDocsDiscardedFieldBytes;
 
             // Calculate the maximum size the page could be after adding this document.
             const int projectedPageSize = builder.len() + docSizeWithOverheadBytes;
@@ -237,9 +249,18 @@ std::vector<BSONObj> makePersistentSamplePageDocs(const UUID& collectionUuid,
         // Every doc left for this page turned out to be too large to persist, so the page would be
         // empty. Don't persist an empty page unless it is the only page of an empty sample.
         if (docsOnPage == 0 && pageNo > 0) {
+            builders.pop_back();
             break;
         }
 
+        ++pageNo;
+    } while (docIdx < sample.size());
+
+    std::vector<BSONObj> pages;
+    pages.reserve(builders.size());
+    for (auto& builder : builders) {
+        builder.append(PersistentSampleDoc::kNumDocsDiscardedFieldName,
+                       static_cast<long long>(numDiscarded));
         BSONObj page = builder.obj();
         tassert(13044800,
                 str::stream() << "Assembled sample page of " << page.objsize()
@@ -247,9 +268,7 @@ std::vector<BSONObj> makePersistentSamplePageDocs(const UUID& collectionUuid,
                               << " bytes",
                 page.objsize() <= BSONObjMaxUserSize);
         pages.push_back(std::move(page));
-        ++pageNo;
-    } while (docIdx < sample.size());
-
+    }
     return pages;
 }
 
@@ -372,7 +391,8 @@ StatusWith<PersistentSampleDoc> reassemblePersistentSample(std::vector<BSONObj> 
             page.getCollectionUuid() != reassembled.getCollectionUuid() ||
             page.getSamplingMethod() != reassembled.getSamplingMethod() ||
             page.getSampleSize() != reassembled.getSampleSize() ||
-            page.getNumChunks() != reassembled.getNumChunks()) {
+            page.getNumChunks() != reassembled.getNumChunks() ||
+            page.getNumDocsDiscarded() != reassembled.getNumDocsDiscarded()) {
             return Status(ErrorCodes::UnsupportedFormat,
                           "persistent sample pages disagree on their identity fields");
         }

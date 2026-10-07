@@ -150,6 +150,7 @@ describe("analyze sample paging", function () {
             expectedFields: ["pad"],
             // Discarding mid-sample must not split the sample over multiple pages when all of the other docs can fit on a single page.
             expectedNumPages: 1,
+            expectedNumDocsDiscarded: 1,
         });
 
         // The discarded doc is the only one that is absent.
