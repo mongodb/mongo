@@ -702,6 +702,7 @@ networking:
     - src/mongo/executor/test_network*
     - src/mongo/executor/mock_network*
     - src/mongo/executor/mock_async_rpc*
+    - src/mongo/executor/mock_async_client_factory*
     - src/mongo/executor/pooled_async_client_factory.h
     - src/mongo/executor/egress_*
 

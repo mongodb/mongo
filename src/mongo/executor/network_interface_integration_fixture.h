@@ -11,6 +11,7 @@
 #include "mongo/executor/executor_integration_test_fixture.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface.h"
+#include "mongo/executor/network_interface_test_common.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
@@ -35,23 +36,6 @@ namespace mongo {
 class PseudoRandom;
 
 namespace executor {
-
-/**
- * A mock class mimicking TaskExecutor::CallbackState, does nothing.
- */
-class MockCallbackState final : public TaskExecutor::CallbackState {
-public:
-    MockCallbackState() = default;
-    void cancel() override {}
-    void waitForCompletion() override {}
-    bool isCanceled() const override {
-        return false;
-    }
-};
-
-inline TaskExecutor::CallbackHandle makeCallbackHandle() {
-    return TaskExecutor::CallbackHandle(std::make_shared<MockCallbackState>());
-}
 
 using StartCommandCB = std::function<void(const RemoteCommandResponse&)>;
 
