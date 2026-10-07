@@ -651,13 +651,6 @@ py_binary(
     ],
 )
 
-py_binary(
-    name = "gdb_rbe_sysroot",
-    srcs = ["gdb_rbe_sysroot.py"],
-    main = "gdb_rbe_sysroot.py",
-    visibility = ["//buildscripts/tests:__pkg__"],
-)
-
 # Markdown link linter
 py_binary(
     name = "markdown_link_linter",
