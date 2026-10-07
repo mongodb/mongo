@@ -1,0 +1,21 @@
+# Golden test output of GoldenSbeFilterBuilderElemMatchShadowFixture/TestElemMatchNestedElemMatchForms
+ValueInObject_ShadowedE
+
+    let [
+        l5.0 = getField(s1, "arr") 
+    ] 
+    in ((isArray(l5.0) && traverseF(l5.0, lambda(l6.0) { (typeMatch(l6.0, 24) && 
+        let [
+            l7.0 = getField(l6.0, "e") 
+        ] 
+        in ((isArray(l7.0) && traverseF(l7.0, lambda(l8.0) { ((move(l8.0) > 1) ?: false) }, false)) ?: false) 
+   ) }, false)) ?: false) 
+
+# Golden test output of GoldenSbeFilterBuilderElemMatchShadowFixture/TestElemMatchNestedElemMatchForms
+ObjectInValue_ShadowedB
+
+    let [
+        l13.0 = getField(s2, "arr") 
+    ] 
+    in ((isArray(l13.0) && traverseF(l13.0, lambda(l14.0) { ((isArray(l14.0) && traverseF(l14.0, lambda(l15.0) { (typeMatch(l15.0, 24) && traverseF(getField(l15.0, "b"), lambda(l16.0) { ((move(l16.0) == 2) ?: false) }, false)) }, false)) ?: false) }, false)) ?: false) 
+

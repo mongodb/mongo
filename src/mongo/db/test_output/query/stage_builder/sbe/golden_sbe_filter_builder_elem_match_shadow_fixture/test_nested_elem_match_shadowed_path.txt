@@ -1,0 +1,13 @@
+# Golden test output of GoldenSbeFilterBuilderElemMatchShadowFixture/TestNestedElemMatchShadowedPath
+NestedElemMatch_ShadowedG
+
+    let [
+        l6.0 = getField(s1, "arr") 
+    ] 
+    in ((isArray(l6.0) && traverseF(l6.0, lambda(l7.0) { (typeMatch(l7.0, 24) && 
+        let [
+            l8.0 = getField(l7.0, "f") 
+        ] 
+        in ((isArray(l8.0) && traverseF(l8.0, lambda(l9.0) { (typeMatch(l9.0, 24) && traverseF(getField(l9.0, "g"), lambda(l10.0) { ((move(l10.0) == 2) ?: false) }, false)) }, false)) ?: false) 
+   ) }, false)) ?: false) 
+
