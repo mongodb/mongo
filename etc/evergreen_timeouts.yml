@@ -232,6 +232,8 @@ overrides:
       exec_timeout: 600 # 10 hours
     - task: query_fuzzer_plan_cache
       exec_timeout: 600 # 10 hours
+    - task: concurrency_sharded_replication_rate_limited
+      exec_timeout: 180 # 3 hours
     - task: read_concern_linearizable_passthrough
       exec_timeout: 270 # 4.5 hours
     - task: sharding
