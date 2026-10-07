@@ -379,8 +379,6 @@ class LintRunner:
             "src/mongo/crypto/fle_options.cpp",
             # TODO(SERVER-101368): Remove the exemptions below once resolved.
             "src/mongo/db/modules/enterprise/src/streams/commands/update_connection.cpp",
-            # TODO(SERVER-101370): Remove the exemptions below once resolved.
-            "src/mongo/db/modules/enterprise/src/streams/third_party/mongocxx/dist/mongocxx/test_util/client_helpers.cpp",
             # TODO(SERVER-101371): Remove the exemptions below once resolved.
             "src/mongo/db/modules/enterprise/src/streams/util/tests/concurrent_memory_aggregator_test.cpp",
             # TODO(SERVER-101375): Remove the exemptions below once resolved.
