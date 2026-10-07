@@ -82,3 +82,31 @@ class test_isolation01(wttest.WiredTigerTestCase):
             self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.reset_snapshot(),
                 "/not supported in read-committed or read-uncommitted transactions/")
+
+    def test_truncate_isolation_level(self):
+        uri = self.uri + '_truncate'
+        self.session.create(uri, 'key_format=i,value_format=S')
+
+        cursor = self.session.open_cursor(uri, None)
+        for i in range(1, 101):
+            cursor[i] = self.value
+        cursor.close()
+
+        start = self.session.open_cursor(uri, None)
+        start.set_key(30)
+        stop = self.session.open_cursor(uri, None)
+        stop.set_key(60)
+
+        # Truncate is a write, so it follows the same rule as a cursor update.
+        self.session.begin_transaction('isolation=' + self.isolation)
+        if self.isolation != 'snapshot':
+            self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.truncate(None, start, stop, None),
+                "/not supported in read-committed or read-uncommitted transactions/")
+            self.session.rollback_transaction()
+        else:
+            self.assertEqual(self.session.truncate(None, start, stop, None), 0)
+            self.session.commit_transaction()
+
+        start.close()
+        stop.close()

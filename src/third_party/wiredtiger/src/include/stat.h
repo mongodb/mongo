@@ -1585,11 +1585,11 @@ struct __wt_dsrc_stats {
     int64_t btree_maxleafvalue;
     int64_t btree_maximum_depth;
     int64_t btree_entries;
-    int64_t btree_obsolete_inline_bytes;
-    int64_t btree_obsolete_inline_bytes_mixed;
+    int64_t btree_obsolete_ondisk_kv_bytes;
+    int64_t btree_obsolete_ondisk_kv_bytes_mixed;
     int64_t btree_overflow;
-    int64_t btree_obsolete_inline_analyzed;
-    int64_t btree_obsolete_inline_pages;
+    int64_t btree_obsolete_ondisk_kv_analyzed;
+    int64_t btree_obsolete_ondisk_kv_pages;
     int64_t btree_row_empty_values;
     int64_t btree_row_internal;
     int64_t btree_row_leaf_avg_entries;

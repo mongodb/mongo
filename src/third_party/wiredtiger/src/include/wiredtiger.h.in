@@ -9391,30 +9391,30 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
  */
 #define	WT_STAT_DSRC_BTREE_ENTRIES			2071
 /*!
- * btree: obsolete inline value bytes, only reported if tree_walk or all
- * statistics are enabled
+ * btree: obsolete on-disk key/value bytes, only reported if tree_walk or
+ * all statistics are enabled
  */
-#define	WT_STAT_DSRC_BTREE_OBSOLETE_INLINE_BYTES	2072
+#define	WT_STAT_DSRC_BTREE_OBSOLETE_ONDISK_KV_BYTES	2072
 /*!
- * btree: obsolete inline value bytes on mixed pages, only reported if
- * tree_walk or all statistics are enabled
+ * btree: obsolete on-disk key/value bytes on mixed pages, only reported
+ * if tree_walk or all statistics are enabled
  */
-#define	WT_STAT_DSRC_BTREE_OBSOLETE_INLINE_BYTES_MIXED	2073
+#define	WT_STAT_DSRC_BTREE_OBSOLETE_ONDISK_KV_BYTES_MIXED	2073
 /*!
  * btree: overflow pages, only reported if tree_walk or all statistics
  * are enabled
  */
 #define	WT_STAT_DSRC_BTREE_OVERFLOW			2074
 /*!
- * btree: pages analyzed for obsolete inline values, only reported if
+ * btree: pages analyzed for obsolete on-disk key/value pairs, only
+ * reported if tree_walk or all statistics are enabled
+ */
+#define	WT_STAT_DSRC_BTREE_OBSOLETE_ONDISK_KV_ANALYZED	2075
+/*!
+ * btree: pages with obsolete on-disk key/value pairs, only reported if
  * tree_walk or all statistics are enabled
  */
-#define	WT_STAT_DSRC_BTREE_OBSOLETE_INLINE_ANALYZED	2075
-/*!
- * btree: pages with obsolete inline values, only reported if tree_walk
- * or all statistics are enabled
- */
-#define	WT_STAT_DSRC_BTREE_OBSOLETE_INLINE_PAGES	2076
+#define	WT_STAT_DSRC_BTREE_OBSOLETE_ONDISK_KV_PAGES	2076
 /*!
  * btree: row-store empty values, only reported if tree_walk or all
  * statistics are enabled

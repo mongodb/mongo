@@ -29,6 +29,7 @@
 import argparse
 import json
 import logging
+import multiprocessing
 import os
 import shutil
 import subprocess
@@ -45,6 +46,15 @@ def delete_runtime_coverage_files(build_dir_base: str) -> None:
                 file_path = os.path.join(root, filename)
                 os.remove(file_path)
                 logging.debug(f"Deleted: {file_path}")
+
+
+def copy_coverage_files(build_dir: Path, copy_dest_dir: Path) -> None:
+    copy_dest_dir.mkdir()
+    files = [*build_dir.rglob("*.gcda"), *build_dir.rglob("*.gcno")]
+    for src in files:
+        dst = copy_dest_dir / src.relative_to(build_dir)
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(src, dst)
 
 
 # Run a series of tests with code coverage, copying the results and cleaning up
@@ -72,7 +82,7 @@ def run_coverage_task(index, task):
         subprocess.run(split_command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env)
         copy_dest_dir = f"{build_dir}_{index}_copy"
         logging.debug(f"Copying directory {build_dir} to {copy_dest_dir}")
-        shutil.copytree(src=build_dir, dst=copy_dest_dir)
+        copy_coverage_files(Path(build_dir), Path(copy_dest_dir))
 
         task_info = {"task": task}
         task_info_as_json_object = json.dumps(task_info, indent=2)
@@ -89,43 +99,55 @@ def run_coverage_task(index, task):
     return 0
 
 
+# Run gcovr on one build directory. This function is called in parallel for each directory.
+def gcovr_one_copy(build_copy_name, dir_name, gcovr_dir):
+    build_copy_path = os.path.join(dir_name, build_copy_name)
+    task_info_path = os.path.join(build_copy_path, "task_info.json")
+    coverage_output_dir = os.path.join(gcovr_dir, build_copy_name)
+    logging.debug(
+        f"build_copy_name = {build_copy_name}, build_copy_path = {build_copy_path}, "
+        f"task_info_path = {task_info_path}, coverage_output_dir = {coverage_output_dir}")
+    os.mkdir(coverage_output_dir)
+    shutil.copy(src=task_info_path, dst=coverage_output_dir)
+    coverage_dirs = sorted({os.path.dirname(src)
+                            for pattern in ("*.gcda", "*.gcno")
+                            for src in Path(build_copy_path).rglob(pattern)})
+    scan_targets = " ".join(coverage_dirs) if coverage_dirs else build_copy_name
+    gcovr_command = (f"gcovr {scan_targets} "
+                     "--include-internal-functions "
+                     "--gcov-ignore-parse-errors=negative_hits.warn_once_per_file "
+                     "--gcov-ignore-parse-errors=suspicious_hits.warn_once_per_file "
+                     "-f src "
+                     "--html-self-contained --html-details "
+                     f"{coverage_output_dir}/2_coverage_report.html --json-summary-pretty "
+                     f"--json-summary {coverage_output_dir}/1_coverage_report_summary.json "
+                     f"--json {coverage_output_dir}/full_coverage_report.json")
+    split_command = gcovr_command.split()
+    env = os.environ.copy()
+    logging.debug(f'env: {env}')
+    logging.debug(f'gcovr_command: {gcovr_command}')
+    try:
+        completed_process = subprocess.run(split_command, env=env, check=True)
+        output = completed_process.stdout
+        print(f'Command returned {output}')
+    except subprocess.CalledProcessError as exception:
+        print(f'Command {exception.cmd} failed with error {exception.returncode} "{exception.output}"')
+    logging.debug(f'Completed a run of gcovr on {build_copy_name}')
+
 # Run gcovr on each copy of a build directory that contains run-time coverage data
-def run_gcovr(build_dir_base: str, gcovr_dir: str):
+def run_gcovr(build_dir_base: str, gcovr_dir: str, gcovr_processes: int):
     print(f"Starting run_gcovr({build_dir_base}, {gcovr_dir})")
     dir_name = os.path.dirname(build_dir_base)
     filenames_in_dir = os.listdir(dir_name)
     filenames_in_dir.sort()
-    for file_name in filenames_in_dir:
-        if file_name.startswith('build_') and file_name.endswith("copy"):
-            build_copy_name = file_name
-            build_copy_path = os.path.join(dir_name, build_copy_name)
-            task_info_path = os.path.join(build_copy_path, "task_info.json")
-            coverage_output_dir = os.path.join(gcovr_dir, build_copy_name)
-            logging.debug(
-                f"build_copy_name = {build_copy_name}, build_copy_path = {build_copy_path}, "
-                f"task_info_path = {task_info_path}, coverage_output_dir = {coverage_output_dir}")
-            os.mkdir(coverage_output_dir)
-            shutil.copy(src=task_info_path, dst=coverage_output_dir)
-            gcovr_command = (f"gcovr {build_copy_name} "
-                             "--include-internal-functions "
-                             "--gcov-ignore-parse-errors=negative_hits.warn_once_per_file "
-                             "--gcov-ignore-parse-errors=suspicious_hits.warn_once_per_file "
-                             "-f src -j 16 "
-                             "--html-self-contained --html-details "
-                             f"{coverage_output_dir}/2_coverage_report.html --json-summary-pretty "
-                             f"--json-summary {coverage_output_dir}/1_coverage_report_summary.json "
-                             f"--json {coverage_output_dir}/full_coverage_report.json")
-            split_command = gcovr_command.split()
-            env = os.environ.copy()
-            logging.debug(f'env: {env}')
-            logging.debug(f'gcovr_command: {gcovr_command}')
-            try:
-                completed_process = subprocess.run(split_command, env=env, check=True)
-                output = completed_process.stdout
-                print(f'Command returned {output}')
-            except subprocess.CalledProcessError as exception:
-                print(f'Command {exception.cmd} failed with error {exception.returncode} "{exception.output}"')
-            logging.debug(f'Completed a run of gcovr on {build_copy_name}')
+
+    args = [(file_name, dir_name, gcovr_dir)
+            for file_name in filenames_in_dir
+            if file_name.startswith('build_') and file_name.endswith("copy")]
+
+    with multiprocessing.Pool(processes=gcovr_processes) as pool:
+        pool.starmap(gcovr_one_copy, args)
+
     print(f"Ending run_gcovr({build_dir_base}, {gcovr_dir})")
 
 
@@ -135,6 +157,8 @@ def main():
     parser.add_argument('-b', '--build_dir_base', required=True, help='Base name for the build directories')
     parser.add_argument('-j', '--parallel', default=1, type=int, help='How many tests to run in parallel')
     parser.add_argument('-g', '--gcovr_dir', help='Directory to store gcovr output in')
+    parser.add_argument('-p', '--gcovr_processes', default=len(os.sched_getaffinity(0)), type=int,
+                        help='How many gcovr processes to run in parallel during analysis')
     parser.add_argument('-s', '--setup', action="store_true",
                         help='Perform setup actions from the config in each build directory')
     parser.add_argument('-v', '--verbose', action="store_true", help='Be verbose')
@@ -146,6 +170,7 @@ def main():
     build_dir_base = args.build_dir_base
     gcovr_dir = args.gcovr_dir
     parallel_tests = args.parallel
+    gcovr_processes = args.gcovr_processes
     setup = args.setup
     check_errors = args.check_errors
 
@@ -159,10 +184,14 @@ def main():
     logging.debug(f'  Number of parallel tests:        {parallel_tests}')
     logging.debug(f'  Perform setup actions:           {setup}')
     logging.debug(f'  Gcovr output directory:          {gcovr_dir}')
+    logging.debug(f'  Gcovr analysis processes:        {gcovr_processes}')
     logging.debug(f'  Check errors:                    {check_errors}')
 
     if parallel_tests < 1:
         sys.exit("Number of parallel tests must be >= 1")
+
+    if gcovr_processes < 1:
+        sys.exit("Number of gcovr processes must be >= 1")
 
     # Load test config json file
     with open(config_path) as json_file:
@@ -205,7 +234,8 @@ def main():
 
     # Run gcovr if required
     if gcovr_dir:
-        run_gcovr(build_dir_base=build_dir_base, gcovr_dir=gcovr_dir)
+        run_gcovr(build_dir_base=build_dir_base, gcovr_dir=gcovr_dir,
+                  gcovr_processes=args.gcovr_processes)
 
 
 if __name__ == '__main__':

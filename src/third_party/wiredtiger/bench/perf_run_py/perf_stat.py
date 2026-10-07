@@ -194,6 +194,7 @@ class PerfStatDBSize(PerfStat):
         total_size = 0
 
         for ele in os.scandir(home_path):
-            total_size += os.path.getsize(ele)
+            if not ele.name.startswith("WiredTigerStat"):
+                total_size += os.path.getsize(ele)
 
         return [total_size]
