@@ -14,10 +14,12 @@
 #include "mongo/db/exec/sbe/values/scalar_mono_cell_block.h"
 #include "mongo/db/exec/sbe/values/ts_block.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
+#include <limits>
 #include <string_view>
 
 namespace mongo::sbe {
@@ -26,6 +28,220 @@ using namespace std::literals::string_view_literals;
 using TypeTags = value::TypeTags;
 using Value = value::Value;
 using ColumnOpType = value::ColumnOpType;
+
+TEST(Int64RecordIdBlockTest, Extract) {
+    const std::vector<int64_t> ids{
+        std::numeric_limits<int64_t>::min(), -1, 0, 1, std::numeric_limits<int64_t>::max()};
+    value::Int64RecordIdBlock block(ids);
+    ASSERT_EQ(block.count(), ids.size());
+    ASSERT_EQ(block.getVector(), ids);
+    ASSERT_EQ(block.tryDense(), boost::optional<bool>(true));
+
+    const auto sizeBeforeExtract = block.getApproximateSize();
+    auto extracted = block.extract();
+    ASSERT_EQ(extracted.count(), ids.size());
+    ASSERT_EQ(extracted.tag(), TypeTags::RecordId);
+    ASSERT_TRUE(extracted.isDense());
+    for (size_t i = 0; i < ids.size(); ++i) {
+        ASSERT_EQ(extracted.tags()[i], TypeTags::RecordId);
+        ASSERT_EQ(value::getRecordIdView(extracted.vals()[i])->getLong(), ids[i]);
+    }
+    // The RecordIds are materialized into a single contiguous backing vector owned by the block,
+    // so adjacent deblocked values must be adjacent in memory.
+    for (size_t i = 1; i < ids.size(); ++i) {
+        ASSERT_EQ(value::getRecordIdView(extracted.vals()[i]),
+                  value::getRecordIdView(extracted.vals()[i - 1]) + 1);
+    }
+    // Extraction allocates the backing RecordId storage (in addition to the tag/value arrays).
+    ASSERT_GE(block.getApproximateSize(),
+              sizeBeforeExtract + static_cast<int>(sizeof(RecordId) * ids.size()));
+
+    // Repeated extraction preserves the cached RecordIds.
+    auto again = block.extract();
+    ASSERT_EQ(again.tags(), extracted.tags());
+    ASSERT_EQ(again.vals(), extracted.vals());
+    ASSERT_EQ(block.at(2).tag, TypeTags::RecordId);
+    ASSERT_EQ(value::getRecordIdView(block.at(2).value)->getLong(), 0);
+}
+
+TEST(Int64RecordIdBlockTest, EmptyAndClear) {
+    value::Int64RecordIdBlock block;
+    auto empty = block.extract();
+    ASSERT_EQ(block.count(), 0);
+    ASSERT_EQ(empty.count(), 0);
+    ASSERT_EQ(empty.tags(), nullptr);
+    ASSERT_EQ(empty.vals(), nullptr);
+    ASSERT_EQ(empty.tag(), TypeTags::RecordId);
+    ASSERT_TRUE(empty.isDense());
+    ASSERT_EQ(block.tryDense(), boost::optional<bool>(true));
+
+    value::Int64RecordIdBlock populated(std::vector<int64_t>{42, -7});
+    auto extracted = populated.extract();
+    ASSERT_EQ(extracted.count(), 2);
+    ASSERT_EQ(value::getRecordIdView(extracted.vals()[0])->getLong(), 42);
+    ASSERT_EQ(value::getRecordIdView(extracted.vals()[1])->getLong(), -7);
+
+    populated.clear();
+    ASSERT_EQ(populated.count(), 0);
+    ASSERT_TRUE(populated.getVector().empty());
+    ASSERT_EQ(populated.extract().count(), 0);
+
+    value::Int64RecordIdBlock repopulated(std::vector<int64_t>{99});
+    ASSERT_EQ(value::getRecordIdView(repopulated.extract().vals()[0])->getLong(), 99);
+}
+
+TEST(Int64RecordIdBlockTest, CopyDefersMaterialization) {
+    std::unique_ptr<value::Int64RecordIdBlock> copyBeforeExtract;
+    std::unique_ptr<value::Int64RecordIdBlock> copyAfterExtract;
+    {
+        value::Int64RecordIdBlock block(std::vector<int64_t>{7, 8});
+        copyBeforeExtract = std::make_unique<value::Int64RecordIdBlock>(block);
+        const auto sizeBeforeExtract = copyBeforeExtract->getApproximateSize();
+        const auto original = block.extract();
+        copyAfterExtract = std::make_unique<value::Int64RecordIdBlock>(block);
+        // Copying an extracted block retains only the compact integers, just like copying a block
+        // that has never been extracted.
+        ASSERT_EQ(copyAfterExtract->getApproximateSize(), sizeBeforeExtract);
+        ASSERT_EQ(copyAfterExtract->getVector(), block.getVector());
+        const auto copied = copyAfterExtract->extract();
+        ASSERT_GE(copyAfterExtract->getApproximateSize() - sizeBeforeExtract,
+                  static_cast<int>(2 * (sizeof(RecordId) + sizeof(TypeTags) + sizeof(Value))));
+        ASSERT_NE(copied.tags(), original.tags());
+        ASSERT_NE(copied.vals(), original.vals());
+        ASSERT_NE(copied.vals()[0], original.vals()[0]);
+        ASSERT_NE(copied.vals()[1], original.vals()[1]);
+        block.clear();
+    }
+    for (auto* copy : {copyBeforeExtract.get(), copyAfterExtract.get()}) {
+        const auto extracted = copy->extract();
+        ASSERT_EQ(extracted.count(), 2);
+        ASSERT_TRUE(extracted.isDense());
+        ASSERT_EQ(extracted.tag(), TypeTags::RecordId);
+        ASSERT_EQ(value::getRecordIdView(extracted.vals()[0])->getLong(), 7);
+        ASSERT_EQ(value::getRecordIdView(extracted.vals()[1])->getLong(), 8);
+    }
+}
+
+TEST(Int64RecordIdBlockTest, CloneDefersMaterialization) {
+    // Cloning copies only the compact integers and materializes its own RecordIds on extraction.
+    // The clone neither aliases the original's deblocked values nor depends on its lifetime.
+    std::unique_ptr<value::ValueBlock> cloneBeforeExtract;
+    std::unique_ptr<value::ValueBlock> cloneAfterExtract;
+    {
+        value::Int64RecordIdBlock block(std::vector<int64_t>{7, 8});
+        cloneBeforeExtract = block.clone();
+        const auto original = block.extract();
+        cloneAfterExtract = block.clone();
+        ASSERT_EQ(cloneAfterExtract->getApproximateSize(),
+                  cloneBeforeExtract->getApproximateSize());
+        const auto cloned = cloneAfterExtract->extract();
+        ASSERT_GE(cloneAfterExtract->getApproximateSize() -
+                      cloneBeforeExtract->getApproximateSize(),
+                  static_cast<int>(2 * (sizeof(RecordId) + sizeof(TypeTags) + sizeof(Value))));
+        ASSERT_NE(cloned.tags(), original.tags());
+        ASSERT_NE(cloned.vals(), original.vals());
+        ASSERT_NE(cloned.vals()[0], original.vals()[0]);
+        ASSERT_NE(cloned.vals()[1], original.vals()[1]);
+        block.clear();
+    }
+    for (auto* clone : {cloneBeforeExtract.get(), cloneAfterExtract.get()}) {
+        ASSERT_NE(clone->as<value::Int64RecordIdBlock>(), nullptr);
+        auto extracted = clone->extract();
+        ASSERT_EQ(extracted.count(), 2);
+        ASSERT_TRUE(extracted.isDense());
+        ASSERT_EQ(extracted.tag(), TypeTags::RecordId);
+        ASSERT_EQ(value::getRecordIdView(extracted.vals()[0])->getLong(), 7);
+        ASSERT_EQ(value::getRecordIdView(extracted.vals()[1])->getLong(), 8);
+    }
+}
+
+TEST(Int64RecordIdBlockTest, MovePreservesDeblockedValues) {
+    std::unique_ptr<value::Int64RecordIdBlock> moved;
+    {
+        value::Int64RecordIdBlock block(std::vector<int64_t>{5, 6, 7});
+        const auto original = block.extract();
+        const std::vector<Value> recordIdsBeforeMove(original.vals(),
+                                                     original.vals() + original.count());
+        const auto sizeBeforeMove = block.getApproximateSize();
+        const auto* intsBeforeMove = block.getVector().data();
+
+        moved = std::make_unique<value::Int64RecordIdBlock>(std::move(block));
+        ASSERT_EQ(moved->getApproximateSize(), sizeBeforeMove);
+        ASSERT_EQ(moved->getVector().data(), intsBeforeMove);
+        const auto extracted = moved->extract();
+        ASSERT_EQ(extracted.tags(), original.tags());
+        ASSERT_EQ(extracted.vals(), original.vals());
+        for (size_t i = 0; i < extracted.count(); ++i) {
+            ASSERT_EQ(extracted.vals()[i], recordIdsBeforeMove[i]);
+        }
+    }
+    // The transferred storage remains valid after destroying the moved-from block.
+    auto extracted = moved->extract();
+    ASSERT_EQ(extracted.count(), 3);
+    ASSERT_TRUE(extracted.isDense());
+    ASSERT_EQ(extracted.tag(), TypeTags::RecordId);
+    for (size_t i = 0; i < extracted.count(); ++i) {
+        ASSERT_EQ(value::getRecordIdView(extracted.vals()[i])->getLong(),
+                  static_cast<int64_t>(5 + i));
+    }
+}
+
+TEST(Int64RecordIdBlockTest, MoveBeforeExtract) {
+    value::Int64RecordIdBlock block(std::vector<int64_t>{5, 6, 7});
+    const auto sizeBeforeMove = block.getApproximateSize();
+    const auto* intsBeforeMove = block.getVector().data();
+    value::Int64RecordIdBlock moved(std::move(block));
+    ASSERT_EQ(moved.getApproximateSize(), sizeBeforeMove);
+    ASSERT_EQ(moved.getVector().data(), intsBeforeMove);
+
+    const auto extracted = moved.extract();
+    ASSERT_EQ(extracted.count(), 3);
+    ASSERT_TRUE(extracted.isDense());
+    ASSERT_EQ(extracted.tag(), TypeTags::RecordId);
+    for (size_t i = 0; i < extracted.count(); ++i) {
+        ASSERT_EQ(value::getRecordIdView(extracted.vals()[i])->getLong(),
+                  static_cast<int64_t>(5 + i));
+    }
+}
+
+TEST(Int64RecordIdBlockTest, DefaultOperations) {
+    value::Int64RecordIdBlock block(std::vector<int64_t>{7, 8, 7});
+    ASSERT_EQ(block.tryMin().tag, TypeTags::Nothing);
+    ASSERT_EQ(block.tryMax().tag, TypeTags::Nothing);
+    ASSERT_EQ(block.argMin(), boost::none);
+    ASSERT_EQ(block.argMax(), boost::none);
+    ASSERT_EQ(block.tryDense(), boost::optional<bool>(true));
+    ASSERT_EQ(block.fillEmpty(TypeTags::Null, 0), nullptr);
+
+    auto existsBlock = block.exists();
+    auto exists = existsBlock->extract();
+    ASSERT_EQ(exists.count(), 3);
+    for (size_t i = 0; i < exists.count(); ++i) {
+        ASSERT_EQ(exists.tags()[i], TypeTags::Boolean);
+        ASSERT_TRUE(value::bitcastTo<bool>(exists.vals()[i]));
+    }
+
+    auto tokenized = block.tokenize();
+    ASSERT_EQ(tokenized.idxs, (std::vector<size_t>{0, 1, 0}));
+    auto tokens = tokenized.tokens->extract();
+    ASSERT_EQ(tokens.count(), 2);
+    ASSERT_EQ(tokens.tags()[0], TypeTags::RecordId);
+    ASSERT_EQ(tokens.tags()[1], TypeTags::RecordId);
+    ASSERT_EQ(value::getRecordIdView(tokens.vals()[0])->getLong(), 7);
+    ASSERT_EQ(value::getRecordIdView(tokens.vals()[1])->getLong(), 8);
+
+    // The default map implementation must copy deep values into the output block.
+    const auto identity = value::makeColumnOp<ColumnOpType::kNoFlags>(
+        [](TypeTags tag, Value val) { return value::copyValue(tag, val); });
+    auto mappedBlock = block.map(identity);
+    block.clear();
+    auto mapped = mappedBlock->extract();
+    ASSERT_EQ(mapped.count(), 3);
+    for (size_t i = 0; i < mapped.count(); ++i) {
+        ASSERT_EQ(mapped.tags()[i], TypeTags::RecordId);
+        ASSERT_EQ(value::getRecordIdView(mapped.vals()[i])->getLong(), i == 1 ? 8 : 7);
+    }
+}
 
 // Tests that copyValue() behaves correctly when given a TypeTags::valueBlock. Uses MonoBlock as
 // the concrete block type.

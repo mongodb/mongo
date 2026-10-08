@@ -53,6 +53,46 @@ void DeblockedTagValStorage::release() {
     }
 }
 
+DeblockedTagVals Int64RecordIdBlock::deblock(boost::optional<DeblockedTagValStorage>& storage) {
+    if (!storage) {
+        DeblockedTagValStorage deblocked;
+        // The RecordId objects are owned by the _ridStorage vector.
+        deblocked.owned = false;
+        // We can safely initialize the tags to RecordId since the values are marked as unowned.
+        deblocked.tags.resize(_vals.size(), TypeTags::RecordId);
+        deblocked.tag = TypeTags::RecordId;
+        deblocked.isDense = true;
+        deblocked.vals.resize(_vals.size(), 0);
+        // Do a single allocation for all of the RecordIds, materializing and pointing to each in
+        // the same pass.
+        _ridStorage.resize(_vals.size());
+        for (size_t i = 0; i < _vals.size(); ++i) {
+            _ridStorage[i] = RecordId(_vals[i]);
+            deblocked.vals[i] = value::bitcastFrom<RecordId*>(&_ridStorage[i]);
+        }
+        storage.emplace(std::move(deblocked));
+    }
+
+    return {_vals.size(),
+            _vals.empty() ? nullptr : storage->tags.data(),
+            _vals.empty() ? nullptr : storage->vals.data(),
+            TypeTags::RecordId,
+            true};
+}
+
+int Int64RecordIdBlock::getApproximateSize() const {
+    // The RecordIds live in _ridStorage, so account for its backing buffer directly rather than
+    // per deblocked value. This keeps the reported size independent of whether the block has been
+    // deblocked.
+    int result = sizeof(*this) + sizeof(int64_t) * _vals.capacity() +
+        sizeof(RecordId) * _ridStorage.capacity();
+    if (_deblockedStorage) {
+        result += sizeof(TypeTags) * _deblockedStorage->tags.capacity() +
+            sizeof(Value) * _deblockedStorage->vals.capacity();
+    }
+    return result;
+}
+
 std::unique_ptr<ValueBlock> ValueBlock::map(const ColumnOp& op) {
     return defaultMapImpl(op);
 }

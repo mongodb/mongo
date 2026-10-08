@@ -349,6 +349,64 @@ inline constexpr bool validHomogeneousType(TypeTags tag) {
 }
 
 /**
+ * A dense block of integer RecordIds. Only the integers are stored until extraction, which
+ * lazily materializes the RecordIds into a backing vector owned by this block. The deblocked
+ * values are unowned views into that backing vector, so they are only valid while the block
+ * that produced them remains alive.
+ */
+class Int64RecordIdBlock final : public ValueBlock {
+public:
+    Int64RecordIdBlock() = default;
+
+    explicit Int64RecordIdBlock(std::vector<int64_t> vals) : _vals(std::move(vals)) {}
+
+    // Copy the compact backing storage _vals but not the materialized RecordIds or the
+    // DeblockedTagValStorage. A subsequent call to deblock() can rematerialize if necessary.
+    Int64RecordIdBlock(const Int64RecordIdBlock& other) : ValueBlock(other), _vals(other._vals) {
+        _deblockedStorage.reset();
+    }
+
+    // Move the compact backing storage and the materialized RecordIds. If the source has a
+    // deblocked view, it will still point into the moved _ridStorage vector;
+    Int64RecordIdBlock(Int64RecordIdBlock&& other) = default;
+
+    void clear() noexcept {
+        _deblockedStorage.reset();
+        _vals.clear();
+        _ridStorage.clear();
+    }
+
+    const std::vector<int64_t>& getVector() const {
+        return _vals;
+    }
+
+    size_t count() override {
+        return _vals.size();
+    }
+
+    std::unique_ptr<ValueBlock> clone() const override {
+        return std::make_unique<Int64RecordIdBlock>(*this);
+    }
+
+    boost::optional<bool> tryDense() const override {
+        return true;
+    }
+
+    int getApproximateSize() const override;
+
+protected:
+    // Consumers of this block type should use getVector() and operate over the raw ints if
+    // possible.
+    DeblockedTagVals deblock(boost::optional<DeblockedTagValStorage>& storage) override;
+
+private:
+    std::vector<int64_t> _vals;
+
+    // A deblocked Int64RecordIdBlock will contain unowned pointers into this vector.
+    std::vector<RecordId> _ridStorage;
+};
+
+/**
  * A block that is a run of repeated values.
  */
 class MonoBlock final : public ValueBlock {
