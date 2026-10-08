@@ -51,6 +51,8 @@ last-patch:
       ticket: SERVER-127051
     - test_file: jstests/core/timeseries/query/timeseries_empty_metafield.js
       ticket: SERVER-121084
+    - test_file: jstests/core/timeseries/write/timeseries_empty_metafield_write.js
+      ticket: SERVER-134555
     - test_file: jstests/core/txns/multi_statement_transaction_command_args.js
       ticket: SERVER-127661
     - test_file: jstests/fle2/create_encrypted_collection.js
@@ -162,6 +164,8 @@ last-continuous:
       ticket: SERVER-95352
     - test_file: jstests/core/timeseries/write/timeseries_bypass_document_validation_raw_buckets.js
       ticket: SERVER-121714
+    - test_file: jstests/core/timeseries/write/timeseries_empty_metafield_write.js
+      ticket: SERVER-134555
     - test_file: jstests/core/txns/multi_statement_transaction_command_args.js
       ticket: SERVER-127661
     - test_file: jstests/fle2/create_encrypted_collection.js
@@ -617,6 +621,8 @@ last-lts:
       ticket: SERVER-121714
     - test_file: jstests/core/timeseries/write/timeseries_closed_update_delete.js
       ticket: SERVER-95726
+    - test_file: jstests/core/timeseries/write/timeseries_empty_metafield_write.js
+      ticket: SERVER-134555
     - test_file: jstests/core/timeseries/write/timeseries_insert_mixed_schema_bucket.js
       ticket: SERVER-93099
     - test_file: jstests/core/timeseries/write/timeseries_insert_mixed_schema_docs.js
