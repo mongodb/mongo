@@ -2144,6 +2144,7 @@ mongo_cc_unit_test(
         "mongo_unittest_fifth_group",
     ],
     deps = [
+        ":intent_registry",
         ":isself",
         ":optime_observer",
         ":repl_coordinator_impl",

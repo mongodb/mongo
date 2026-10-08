@@ -12,6 +12,7 @@
 #include "mongo/db/repl/bson_extract_optime.h"
 #include "mongo/db/repl/data_replicator_external_state_impl.h"
 #include "mongo/db/repl/hello/hello_response.h"
+#include "mongo/db/repl/intent_guard.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
@@ -1948,11 +1949,21 @@ TEST_F(ReplCoordTest, ConcurrentStepDownShouldNotSignalTheSameFinishEventMoreTha
 
     auto replExec = getReplExec();
 
-    // Prevent _stepDownFinish() from running and becoming secondary by blocking in this
-    // exclusive task.
-    const auto opCtx = makeOperationContext();
+    // Prevent _stepDownFinish() from completing and becoming secondary. With intent registration,
+    // hold a write intent, which the stepdown must wait to drain. The client must be unkillable
+    // during stepdown so the stepdown cannot interrupt this operation and release the intent
+    // early. Without intent registration, hold the RSTL in mode X, which the stepdown must acquire.
+    // TODO SERVER-106669: Remove the RSTL path when featureFlagIntentRegistration is removed.
+    auto client = getServiceContext()->getService()->makeClient("stepDownBlocker");
+    client->setOperationUnkillable_ForTest();
+    const auto opCtx = client->makeOperationContext();
+    boost::optional<rss::consensus::WriteIntentGuard> writeIntent;
     boost::optional<ReplicationStateTransitionLockGuard> transitionGuard;
-    transitionGuard.emplace(opCtx.get(), MODE_X);
+    if (gFeatureFlagIntentRegistration.isEnabled()) {
+        writeIntent.emplace(opCtx.get());
+    } else {
+        transitionGuard.emplace(opCtx.get(), MODE_X);
+    }
 
     TopologyCoordinator::UpdateTermResult termUpdated2;
     auto updateTermEvh2 = getReplCoord()->updateTerm_forTest(2, &termUpdated2);
@@ -1978,6 +1989,7 @@ TEST_F(ReplCoordTest, ConcurrentStepDownShouldNotSignalTheSameFinishEventMoreTha
                   ReplicationMetrics::get(svcCtx).getNumStepDownsCausedByHigherTerm_forTesting());
 
     // Unblock the tasks for updateTerm and _stepDownFinish.
+    writeIntent.reset();
     transitionGuard.reset();
 
     // Wait stepdown to finish and term 3 to be installed.
