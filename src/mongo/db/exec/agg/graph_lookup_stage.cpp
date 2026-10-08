@@ -73,7 +73,7 @@ GraphLookUpStage::GraphLookUpStage(
           pExpCtx->getAllowDiskUse(),
           loadMemoryLimit(StageMemoryLimit::DocumentSourceGraphLookupMaxMemoryBytes))),
       _expressionEvaluationMemoryTracker(
-          OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForStage(*pExpCtx)),
+          OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(*pExpCtx)),
       _queue(pExpCtx.get(), &_memoryUsageTracker),
       _visitedDocuments(pExpCtx.get(), &_memoryUsageTracker, "VisitedDocumentsMap"),
       _visitedFromValues(pExpCtx.get(), &_memoryUsageTracker, "VisitedFromValuesSet"),

@@ -32,8 +32,7 @@ RedactStage::RedactStage(std::string_view stageName,
                          const std::shared_ptr<RedactProcessor>& redactProcessor)
     : Stage(stageName, expCtx),
       _redactProcessor{redactProcessor},
-      _memoryTracker(
-          OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForStage(*expCtx)) {
+      _memoryTracker(OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(*expCtx)) {
     if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() &&
         feature_flags::gFeatureFlagExpressionMemoryTracking.isEnabled()) {
         _expressionEvalCtx.tracker = &_memoryTracker;

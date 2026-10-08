@@ -164,7 +164,7 @@ ProjectionStageDefault::ProjectionStageDefault(boost::intrusive_ptr<ExpressionCo
     if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() &&
         feature_flags::gFeatureFlagExpressionMemoryTracking.isEnabled()) {
         _memoryTracker =
-            OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForStage(*expCtx);
+            OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(*expCtx);
         _expressionEvalCtx.tracker = &_memoryTracker;
     }
     _expressionEvalCtx.stageName = _commonStats.stageTypeStr;

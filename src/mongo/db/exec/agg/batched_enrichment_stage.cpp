@@ -20,8 +20,7 @@ BatchedEnrichmentStage::BatchedEnrichmentStage(
     : Stage(stageName, pExpCtx),
       _limits(limits),
       _batchStatsRecorder(std::move(batchStatsRecorder)),
-      _memTracker(
-          OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForStage(*pExpCtx)) {
+      _memTracker(OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(*pExpCtx)) {
     tassert(12916800, "maxInputEvents must be at least 1", _limits.maxInputEvents >= 1);
     tassert(12916801, "maxInputBytes must be at least 1", _limits.maxInputBytes >= 1);
     tassert(12916802, "maxOutputBytes must be at least 1", _limits.maxOutputBytes >= 1);

@@ -254,12 +254,11 @@ void HashAggStageTest::performHashAggWithSpillChecking(
     }
 };
 
-// The SBE HashAggStage uses a "chunked" operation memory tracker, which only pushes memory-usage
-// updates to CurOp when usage crosses a chunk boundary. With a chunk size larger than anything this
-// small aggregation consumes, the tracker never crosses a boundary, so nothing is reported to CurOp
-// while the stage still holds its memory, even though the stage-local tracker reflects the exact
-// usage. A non-chunked tracker would instead report on every add().
-TEST_F(HashAggStageTest, ChunkedMemoryTrackerDefersCurOpReportingBelowChunkBoundary) {
+// The SBE HashAggStage's operation memory tracker only pushes memory-usage updates to CurOp when
+// usage crosses a chunk boundary. With a chunk size larger than anything this small aggregation
+// consumes, the tracker never crosses a boundary, so nothing is reported to CurOp while the stage
+// still holds its memory, even though the stage-local tracker reflects the exact usage.
+TEST_F(HashAggStageTest, MemoryTrackerDefersCurOpReportingBelowChunkBoundary) {
     unittest::ServerParameterGuard featureFlag("featureFlagQueryMemoryTracking", true);
     unittest::ServerParameterGuard chunkSize("internalQueryMaxWriteToCurOpMemoryUsageBytes",
                                              100 * 1024 * 1024);
@@ -276,10 +275,10 @@ TEST_F(HashAggStageTest, ChunkedMemoryTrackerDefersCurOpReportingBelowChunkBound
     ASSERT_EQ(curOpPeak, 0);
 }
 
-// With a chunk size of 1 byte the chunked tracker reports on essentially every add(), so CurOp ends
-// up mirroring the stage-local tracker's usage. This confirms that the SBE HashAggStage's tracker
-// actually consults the chunk-size knob (which only the chunked tracker does).
-TEST_F(HashAggStageTest, ChunkedMemoryTrackerReportsToCurOpWhenChunkBoundaryCrossed) {
+// With a chunk size of 1 byte the tracker reports on essentially every add(), so CurOp ends up
+// mirroring the stage-local tracker's usage. This confirms that the SBE HashAggStage's tracker
+// actually consults the chunk-size knob.
+TEST_F(HashAggStageTest, MemoryTrackerReportsToCurOpWhenChunkBoundaryCrossed) {
     unittest::ServerParameterGuard featureFlag("featureFlagQueryMemoryTracking", true);
     unittest::ServerParameterGuard chunkSize("internalQueryMaxWriteToCurOpMemoryUsageBytes", 1);
 

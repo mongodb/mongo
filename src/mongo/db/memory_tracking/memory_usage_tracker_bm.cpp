@@ -31,12 +31,14 @@ namespace {
 // Deltas are laundered through 'DoNotOptimize' so the compiler cannot fold add()'s inline zero
 // check against a compile-time constant; in production the delta is a runtime value.
 
-// Exposes the protected setWriteToCurOp() so a benchmark can install a reporting callback the way
-// OperationMemoryUsageTracker does for the root of the chain.
+// Exposes the protected setWriteToCurOp() and the root-only CurOp chunk size so a benchmark can
+// install a reporting callback and latch a chunk size the way OperationMemoryUsageTracker does for
+// the root of the chain.
 class RootTracker : public SimpleMemoryUsageTracker {
 public:
     using SimpleMemoryUsageTracker::setWriteToCurOp;
-    using SimpleMemoryUsageTracker::SimpleMemoryUsageTracker;
+    RootTracker(MemoryUsageLimit limit, int64_t curOpWriteChunkSize)
+        : SimpleMemoryUsageTracker(nullptr, limit, curOpWriteChunkSize) {}
 };
 
 constexpr int64_t kNoLimit = std::numeric_limits<int64_t>::max();
@@ -55,14 +57,13 @@ constexpr int64_t kBaseUsage = 64 * 1024;
  * enabled). Levels are heap-allocated so the parent pointers stay valid.
  */
 struct TrackerChain {
-    explicit TrackerChain(int64_t chunkSize) {
-        root = std::make_unique<RootTracker>(MemoryUsageLimit{kNoLimit}, chunkSize);
+    explicit TrackerChain(int64_t curOpWriteChunkSize) {
+        root = std::make_unique<RootTracker>(MemoryUsageLimit{kNoLimit}, curOpWriteChunkSize);
         // Stands in for the real CurOp write, which is more expensive than this counter. The
         // benchmarks that report on every update measure the call and the surrounding branch, not
         // the cost of touching CurOp's atomics.
         root->setWriteToCurOp([counter = reportCount.get()](int64_t, int64_t) { ++(*counter); });
-        stage = std::make_unique<SimpleMemoryUsageTracker>(
-            root.get(), MemoryUsageLimit{kNoLimit}, 0 /*chunkSize*/);
+        stage = std::make_unique<SimpleMemoryUsageTracker>(root.get(), MemoryUsageLimit{kNoLimit});
         child = std::make_unique<SimpleMemoryUsageTracker>(stage.get(), MemoryUsageLimit{kNoLimit});
     }
 
@@ -77,7 +78,7 @@ struct TrackerChain {
  * inline early return, which never calls into addInternal().
  */
 void BM_AddZeroDelta(benchmark::State& state) {
-    SimpleMemoryUsageTracker tracker{MemoryUsageLimit{kNoLimit}, kDefaultChunkSize};
+    RootTracker tracker{MemoryUsageLimit{kNoLimit}, kDefaultChunkSize};
     tracker.add(kBaseUsage);
     for (auto _ : state) {
         int64_t delta = 0;
@@ -192,7 +193,7 @@ BENCHMARK(BM_GroupAccumulatePattern)->Arg(0)->Arg(10)->Arg(250);
  * this instead of add(); when the size is unchanged it degenerates to a zero delta.
  */
 void BM_SetUnchangedTotal(benchmark::State& state) {
-    SimpleMemoryUsageTracker tracker{MemoryUsageLimit{kNoLimit}, kDefaultChunkSize};
+    RootTracker tracker{MemoryUsageLimit{kNoLimit}, kDefaultChunkSize};
     tracker.add(kBaseUsage);
     for (auto _ : state) {
         int64_t total = kBaseUsage;

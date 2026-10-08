@@ -34,7 +34,7 @@ MatchStage::MatchStage(std::string_view stageName,
     : Stage(stageName, pExpCtx),
       _matchProcessor(matchProcessor),
       _memoryTracker(
-          OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForStage(*pExpCtx)) {
+          OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(*pExpCtx)) {
     // The user facing error should have been generated earlier.
     massert(17309, "Should never call getNext on a $match stage with $text clause", !isTextQuery);
     if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() &&

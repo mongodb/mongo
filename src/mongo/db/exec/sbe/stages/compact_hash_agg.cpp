@@ -83,10 +83,7 @@ void CompactHashAggStage::prepare(CompileCtx& ctx) {
 
     _compiled = true;
 
-    // Use a chunked tracker so that memory-usage stats are only pushed to CurOp when usage crosses
-    // a chunk boundary, rather than on every add(). Reporting on every add() is a per-document
-    // cost on the grouping hot path that does not scale with the amount of tracked memory.
-    _memoryTracker = OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForSBE(
+    _memoryTracker = OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForSBE(
         _opCtx, loadMemoryLimit(StageMemoryLimit::QuerySBEAggApproxMemoryUseInBytesBeforeSpill));
 }
 

@@ -41,7 +41,7 @@ SimpleMemoryUsageTracker& ExpressionContext::getExpressionFallbackTracker() {
             // still counts toward the operation's total memory usage. Per-stage attribution is lost
             // (all such usage is lumped together), but whole-query accounting stays accurate.
             _expressionFallbackTracker =
-                OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForStage(*this);
+                OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(*this);
         } else {
             // Memory tracking is disabled, there is no OperationContext, or this context is
             // excluded from operation-wide memory tracking: fall back to a standalone tracker

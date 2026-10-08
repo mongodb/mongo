@@ -63,7 +63,7 @@ void UniqueStage::prepare(CompileCtx& ctx) {
         _inKeyAccessors.emplace_back(_children[0]->getAccessor(ctx, keySlot));
     }
 
-    _memoryTracker = OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForSBE(
+    _memoryTracker = OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForSBE(
         _opCtx, loadMemoryLimit(StageMemoryLimit::SBEUniqueStageMaxMemoryBytes));
 }
 
@@ -203,7 +203,7 @@ std::unique_ptr<PlanStage> UniqueRoaringStage::clone() const {
 void UniqueRoaringStage::prepare(CompileCtx& ctx) {
     _children[0]->prepare(ctx);
     _inKeyAccessor = _children[0]->getAccessor(ctx, _keySlot);
-    _memoryTracker = OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForSBE(
+    _memoryTracker = OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForSBE(
         _opCtx, loadMemoryLimit(StageMemoryLimit::SBEUniqueStageMaxMemoryBytes));
 }
 

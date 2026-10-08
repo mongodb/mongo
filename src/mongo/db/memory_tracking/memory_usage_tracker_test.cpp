@@ -556,16 +556,18 @@ DEATH_TEST_F(DeduplicatorReporterTestDeathTest,
 
 /**
  * Test-only subclass that exposes setWriteToCurOp() so tests can observe what gets reported to
- * CurOp.
+ * CurOp, and the root-only constructor so tests can latch a CurOp chunk size the way
+ * OperationMemoryUsageTracker does.
  */
 class TestableMemoryUsageTracker : public SimpleMemoryUsageTracker {
 public:
     using SimpleMemoryUsageTracker::setWriteToCurOp;
-    using SimpleMemoryUsageTracker::SimpleMemoryUsageTracker;
+    explicit TestableMemoryUsageTracker(MemoryUsageLimit limit) : SimpleMemoryUsageTracker(limit) {}
+    TestableMemoryUsageTracker(MemoryUsageLimit limit, int64_t curOpWriteChunkSize)
+        : SimpleMemoryUsageTracker(nullptr, limit, curOpWriteChunkSize) {}
 };
 
-TEST(SimpleMemoryUsageTrackerTest, ChunkingOnNonRootTrackerDoesNotGateCurOpReporting) {
-    constexpr int64_t kChunkSize = 100;
+TEST(SimpleMemoryUsageTrackerTest, NonRootTrackerUpdatesReportExactlyViaRoot) {
     constexpr int64_t kBig = 10 * 1024 * 1024;
 
     int curOpWriteCount = 0;
@@ -581,10 +583,9 @@ TEST(SimpleMemoryUsageTrackerTest, ChunkingOnNonRootTrackerDoesNotGateCurOpRepor
         lastReportedPeak = peak;
     });
 
-    // A chunkSize set here is inert: this tracker has no '_writeToCurOp' of its own, so chunking
-    // only ever gates a write that never happens on this object. '_base' still gets every diff
-    // exactly, so the root reports on every one of this tracker's updates regardless.
-    SimpleMemoryUsageTracker stageTracker{&opTracker, MemoryUsageLimit{kBig}, kChunkSize};
+    // A stage tracker has no '_writeToCurOp' of its own, so nothing gates on it; '_base' gets
+    // every diff exactly, so the root reports on every one of this tracker's updates.
+    SimpleMemoryUsageTracker stageTracker{&opTracker, MemoryUsageLimit{kBig}};
 
     stageTracker.add(50);
     ASSERT_EQ(opTracker.inUseTrackedMemoryBytes(), 50);
@@ -599,27 +600,25 @@ TEST(SimpleMemoryUsageTrackerTest, ChunkingOnNonRootTrackerDoesNotGateCurOpRepor
     ASSERT_EQ(lastReportedInUse, 80);
 }
 
-TEST(SimpleMemoryUsageTrackerTest, ChunkingOnIntermediateTrackerStillPropagatesExactlyToRoot) {
-    constexpr int64_t kChunkSize = 100;
+TEST(SimpleMemoryUsageTrackerTest, MultiLevelChainPropagatesExactlyToRoot) {
     constexpr int64_t kBig = 10 * 1024 * 1024;
 
     int curOpWriteCount = 0;
     int64_t lastReportedInUse = -1;
 
-    // Chain: leaf (no chunking) -> mid (chunking, but inert since it has no '_writeToCurOp') ->
-    // root (reports to CurOp, unchunked). Verifies that a chunkSize set two hops away from the
-    // root does not disturb exact propagation of every diff up the chain.
+    // Chain: leaf -> mid -> root (reports to CurOp). Verifies that every diff propagates exactly
+    // up the whole chain regardless of depth.
     TestableMemoryUsageTracker rootTracker{MemoryUsageLimit{kBig}};
     rootTracker.setWriteToCurOp([&](int64_t inUse, int64_t peak) {
         ++curOpWriteCount;
         lastReportedInUse = inUse;
     });
-    SimpleMemoryUsageTracker midTracker{&rootTracker, MemoryUsageLimit{kBig}, kChunkSize};
+    SimpleMemoryUsageTracker midTracker{&rootTracker, MemoryUsageLimit{kBig}};
     SimpleMemoryUsageTracker leafTracker{&midTracker, MemoryUsageLimit{kBig}};
 
     leafTracker.add(50);
     // Exact propagation all the way to the root, and the root -- being unchunked -- reports on
-    // every update regardless of mid's (inert) chunking.
+    // every update.
     ASSERT_EQ(rootTracker.inUseTrackedMemoryBytes(), 50);
     ASSERT_EQ(midTracker.inUseTrackedMemoryBytes(), 50);
     ASSERT_EQ(curOpWriteCount, 1);

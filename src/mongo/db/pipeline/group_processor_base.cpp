@@ -15,7 +15,7 @@ namespace mongo {
 GroupProcessorBase::GroupProcessorBase(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                        MemoryUsageLimit maxMemoryUsageBytes)
     : _expCtx(expCtx),
-      _memoryTracker{OperationMemoryUsageTracker::createChunkedMemoryUsageTrackerForStage(
+      _memoryTracker{OperationMemoryUsageTracker::createMemoryUsageTrackerForStage(
           *expCtx, expCtx->getAllowDiskUse() && !expCtx->getInRouter(), maxMemoryUsageBytes)},
       _groups(expCtx->getValueComparator().makeUnorderedValueMap<Accumulators>()) {}
 

@@ -23,7 +23,10 @@ const OperationContext::Decoration<std::shared_ptr<OperationMemoryUsageTracker>>
 }  // namespace
 
 OperationMemoryUsageTracker::OperationMemoryUsageTracker(OperationContext* opCtx)
-    : SimpleMemoryUsageTracker(MemoryUsageLimit{query_knobs::kMaxMemoryUsageBytesPerOperation},
+    // Root of every tracker base chain: the only tracker that writes to CurOp, so this is where
+    // the CurOp chunk size is latched from the knob.
+    : SimpleMemoryUsageTracker(nullptr,
+                               MemoryUsageLimit{query_knobs::kMaxMemoryUsageBytesPerOperation},
                                internalQueryMaxWriteToCurOpMemoryUsageBytes.loadRelaxed()),
       _opCtx(opCtx) {}
 
@@ -61,7 +64,6 @@ SimpleMemoryUsageTracker OperationMemoryUsageTracker::createSimpleMemoryUsageTra
     const ExpressionContext& expCtx, MemoryUsageLimit maxMemoryUsageBytes) {
     return createSimpleMemoryUsageTrackerImpl(expCtx.getOperationContext(),
                                               maxMemoryUsageBytes,
-                                              0 /* chunkSize */,
                                               expCtx.getExcludeOperationMemoryTracking());
 }
 
@@ -71,40 +73,24 @@ SimpleMemoryUsageTracker OperationMemoryUsageTracker::createSimpleMemoryUsageTra
 }
 
 DeduplicatorReporter OperationMemoryUsageTracker::createDeduplicatorReporter(
-    std::function<void(int64_t, int64_t)> callback, int64_t chunkSize) {
+    std::function<void(int64_t, int64_t)> callback, int64_t serverStatusChunkSize) {
     if (!feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
-        return DeduplicatorReporter{nullptr, chunkSize};
+        return DeduplicatorReporter{nullptr, serverStatusChunkSize};
     }
-    return DeduplicatorReporter{std::move(callback), chunkSize};
-}
-
-SimpleMemoryUsageTracker OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForStage(
-    const ExpressionContext& expCtx, MemoryUsageLimit maxMemoryUsageBytes) {
-    return createSimpleMemoryUsageTrackerImpl(
-        expCtx.getOperationContext(),
-        maxMemoryUsageBytes,
-        internalQueryMaxWriteToCurOpMemoryUsageBytes.loadRelaxed(),
-        expCtx.getExcludeOperationMemoryTracking());
-}
-
-SimpleMemoryUsageTracker OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForSBE(
-    OperationContext* opCtx, MemoryUsageLimit maxMemoryUsageBytes) {
-    return createSimpleMemoryUsageTrackerImpl(
-        opCtx, maxMemoryUsageBytes, internalQueryMaxWriteToCurOpMemoryUsageBytes.loadRelaxed());
+    return DeduplicatorReporter{std::move(callback), serverStatusChunkSize};
 }
 
 SimpleMemoryUsageTracker OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerImpl(
     OperationContext* opCtx,
     MemoryUsageLimit maxMemoryUsageBytes,
-    int64_t chunkSize,
     bool excludeOperationMemoryTracking) {
     if (!feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() ||
         excludeOperationMemoryTracking) {
-        return SimpleMemoryUsageTracker{maxMemoryUsageBytes, chunkSize};
+        return SimpleMemoryUsageTracker{maxMemoryUsageBytes};
     }
 
     OperationMemoryUsageTracker* opTracker = getOperationMemoryUsageTracker(opCtx);
-    return SimpleMemoryUsageTracker{opTracker, maxMemoryUsageBytes, chunkSize};
+    return SimpleMemoryUsageTracker{opTracker, maxMemoryUsageBytes};
 }
 
 MemoryUsageTracker OperationMemoryUsageTracker::createMemoryUsageTrackerForStage(
@@ -112,19 +98,8 @@ MemoryUsageTracker OperationMemoryUsageTracker::createMemoryUsageTrackerForStage
     return createMemoryUsageTrackerImpl(expCtx, allowDiskUse, maxMemoryUsageBytes);
 }
 
-MemoryUsageTracker OperationMemoryUsageTracker::createChunkedMemoryUsageTrackerForStage(
-    const ExpressionContext& expCtx, bool allowDiskUse, MemoryUsageLimit maxMemoryUsageBytes) {
-    return createMemoryUsageTrackerImpl(expCtx,
-                                        allowDiskUse,
-                                        maxMemoryUsageBytes,
-                                        internalQueryMaxWriteToCurOpMemoryUsageBytes.loadRelaxed());
-}
-
 MemoryUsageTracker OperationMemoryUsageTracker::createMemoryUsageTrackerImpl(
-    const ExpressionContext& expCtx,
-    bool allowDiskUse,
-    MemoryUsageLimit maxMemoryUsageBytes,
-    int64_t chunkSize) {
+    const ExpressionContext& expCtx, bool allowDiskUse, MemoryUsageLimit maxMemoryUsageBytes) {
     if (!feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() ||
         expCtx.getExcludeOperationMemoryTracking()) {
         return MemoryUsageTracker{allowDiskUse, maxMemoryUsageBytes};
@@ -132,7 +107,7 @@ MemoryUsageTracker OperationMemoryUsageTracker::createMemoryUsageTrackerImpl(
 
     OperationContext* opCtx = expCtx.getOperationContext();
     OperationMemoryUsageTracker* opTracker = getOperationMemoryUsageTracker(opCtx);
-    return MemoryUsageTracker{opTracker, allowDiskUse, maxMemoryUsageBytes, chunkSize};
+    return MemoryUsageTracker{opTracker, allowDiskUse, maxMemoryUsageBytes};
 }
 
 std::shared_ptr<OperationMemoryUsageTracker>

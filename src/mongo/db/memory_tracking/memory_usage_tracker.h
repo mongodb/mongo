@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <functional>
+#include <limits>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -31,15 +32,11 @@ public:
     SimpleMemoryUsageTracker(SimpleMemoryUsageTracker&&) = default;
     SimpleMemoryUsageTracker& operator=(SimpleMemoryUsageTracker&&) = default;
 
-    // 'chunkSize' of 0 or 1 both mean "no chunking" (see '_chunkSize'); either is clamped to 1.
     SimpleMemoryUsageTracker(SimpleMemoryUsageTracker* base,
-                             MemoryUsageLimit maxAllowedMemoryUsageBytes,
-                             int64_t chunkSize = 0);
+                             MemoryUsageLimit maxAllowedMemoryUsageBytes);
 
-    explicit SimpleMemoryUsageTracker(MemoryUsageLimit maxAllowedMemoryUsageBytes,
-                                      int64_t chunkSize = 0);
-
-    SimpleMemoryUsageTracker();
+    explicit SimpleMemoryUsageTracker(MemoryUsageLimit maxAllowedMemoryUsageBytes =
+                                          MemoryUsageLimit{std::numeric_limits<int64_t>::max()});
 
     /**
      * Accumulates 'diff' into this tracker and up the base chain.
@@ -160,6 +157,15 @@ public:
 
 protected:
     /**
+     * Latches the chunk size gating CurOp writes ('0' means "no chunking" and is clamped to 1).
+     * Only meaningful on a tracker that owns a '_writeToCurOp' callback; the public constructors'
+     * default of 1 (report every change) is inert otherwise.
+     */
+    SimpleMemoryUsageTracker(SimpleMemoryUsageTracker* base,
+                             MemoryUsageLimit maxAllowedMemoryUsageBytes,
+                             int64_t curOpWriteChunkSize);
+
+    /**
      * Provide an extra function that is called whenever add() is invoked. Let it be set via this
      * method instead in the constructor to allow subclasses to capture "this."
      */
@@ -179,7 +185,7 @@ protected:
         reportToCurOp();
         _lastReportedLowerBound = _inUseTrackedMemoryBytes == 0
             ? -1
-            : (_inUseTrackedMemoryBytes / _chunkSize) * _chunkSize;
+            : (_inUseTrackedMemoryBytes / _curOpWriteChunkSize) * _curOpWriteChunkSize;
     }
 
     /**
@@ -200,9 +206,9 @@ protected:
 private:
     /**
      * Accumulates 'diff' into this tracker and propagates the exact diff up the base chain.
-     * Chunking gates the CurOp write. With '_chunkSize == 1' every update reports; with it larger,
-     * only a chunk boundary crossing reports. Once a report has happened, a later return to zero
-     * always reports, so CurOp is not left holding a stale value.
+     * Chunking gates the CurOp write. With '_curOpWriteChunkSize == 1' every update reports; with
+     * it larger, only a chunk boundary crossing reports. Once a report has happened, a later
+     * return to zero always reports, so CurOp is not left holding a stale value.
      */
     MONGO_COMPILER_NOINLINE void addInternal(int64_t diff);
 
@@ -224,13 +230,13 @@ private:
 
     // This tracker's '_writeToCurOp' is only invoked when usage surpasses this size. Writing to
     // CurOp involves lock contention, so in performance-sensitive situations, we should set a
-    // non-1 size. Constructors clamp the requested chunkSize to at least 1: 1 means "report every
-    // change," equivalent to what callers pass as 0 to mean "no chunking." Only meaningful on a
-    // tracker that has '_writeToCurOp' set -- it never affects what is propagated to '_base'.
+    // non-1 size. Constructors clamp the requested chunk size to at least 1: 1 means "report every
+    // change." Only meaningful on a tracker that has '_writeToCurOp' set -- it never affects what
+    // is propagated to '_base'.
     //
     // Kept adjacent to the counters above rather than after '_writeToCurOp' so that every field
     // touched by the addInternal() hot path lies within the first bytes of the object.
-    int64_t _chunkSize;
+    int64_t _curOpWriteChunkSize;
 
     // Last lower-bound chunk reported to CurOp. -1 indicates that no chunk has been reported yet.
     int64_t _lastReportedLowerBound = -1;
@@ -271,8 +277,7 @@ public:
 
     MemoryUsageTracker(SimpleMemoryUsageTracker* baseParent,
                        bool allowDiskUse = false,
-                       MemoryUsageLimit maxMemoryUsageBytes = MemoryUsageLimit{0},
-                       int64_t chunkSize = 0);
+                       MemoryUsageLimit maxMemoryUsageBytes = MemoryUsageLimit{0});
 
     MemoryUsageTracker(bool allowDiskUse = false,
                        MemoryUsageLimit maxMemoryUsageBytes = MemoryUsageLimit{0});
@@ -363,7 +368,8 @@ public:
     DeduplicatorReporter(DeduplicatorReporter&&) noexcept = default;
     DeduplicatorReporter& operator=(DeduplicatorReporter&&) noexcept = default;
 
-    DeduplicatorReporter(std::function<void(int64_t, int64_t)> callback, int64_t chunkSize);
+    DeduplicatorReporter(std::function<void(int64_t, int64_t)> callback,
+                         int64_t serverStatusChunkSize);
 
     void add(int64_t bytesDiff, int64_t recordsDiff = 1);
 
@@ -372,12 +378,12 @@ private:
     int64_t _inUseTrackedMemoryBytes = 0;
     int64_t _inUseRecordIdCount = 0;
 
-    // If set, memory usage updates will only be written to serverStatus if the usage surpasses this
-    // size. Writing to serverStatus involves lock contention, so in performance-sensitive
-    // situations, we should set a non-one size. If 1, no chunking is performed.
-    int64_t _chunkSize;
+    // Memory usage updates will only be written to serverStatus if the usage surpasses this size.
+    // Writing to serverStatus involves lock contention, so in performance-sensitive situations, we
+    // should set a non-one size. If 1, no chunking is performed.
+    int64_t _serverStatusChunkSize;
     // Last lower-bound chunk reported to serverStatus. Same as _inUseTrackedMemoryBytes and
-    // _inUseRecordIdCount if _chunkSize is 1 (no chunking).
+    // _inUseRecordIdCount if _serverStatusChunkSize is 1 (no chunking).
     int64_t _lastReportedLowerBound = 0;
     int64_t _lastReportedRecordIdCount = 0;
 

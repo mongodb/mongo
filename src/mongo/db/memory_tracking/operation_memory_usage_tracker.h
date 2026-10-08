@@ -63,37 +63,13 @@ public:
             std::numeric_limits<int64_t>::max()});
 
     static DeduplicatorReporter createDeduplicatorReporter(
-        std::function<void(int64_t, int64_t)> callback, int64_t chunkSize);
-
-    /**
-     * Rate-limited memory tracker. Chunking refers to the fact that memory usage reporting will be
-     * done in discrete chunks (0, chunkSize, 2*chunkSize, etc.) rather than exact values.
-     */
-    static SimpleMemoryUsageTracker createChunkedSimpleMemoryUsageTrackerForStage(
-        const ExpressionContext& expCtx,
-        MemoryUsageLimit maxMemoryUsageBytes = MemoryUsageLimit{
-            std::numeric_limits<int64_t>::max()});
-
-    static SimpleMemoryUsageTracker createChunkedSimpleMemoryUsageTrackerForSBE(
-        OperationContext* opCtx,
-        MemoryUsageLimit maxMemoryUsageBytes = MemoryUsageLimit{
-            std::numeric_limits<int64_t>::max()});
+        std::function<void(int64_t, int64_t)> callback, int64_t serverStatusChunkSize);
 
     /**
      * When constructing a stage containing a MemoryUsageTracker, use this method to ensure that we
      * aggregate operation-wide memory stats.
      */
     static MemoryUsageTracker createMemoryUsageTrackerForStage(
-        const ExpressionContext& expCtx,
-        bool allowDiskUse = false,
-        MemoryUsageLimit maxMemoryUsageBytes = MemoryUsageLimit{
-            std::numeric_limits<int64_t>::max()});
-
-    /**
-     * Rate-limited memory tracker. Chunking refers to the fact that memory usage reporting will be
-     * done in discrete chunks (0, chunkSize, 2*chunkSize, etc.) rather than exact values.
-     */
-    static MemoryUsageTracker createChunkedMemoryUsageTrackerForStage(
         const ExpressionContext& expCtx,
         bool allowDiskUse = false,
         MemoryUsageLimit maxMemoryUsageBytes = MemoryUsageLimit{
@@ -165,12 +141,10 @@ private:
     static SimpleMemoryUsageTracker createSimpleMemoryUsageTrackerImpl(
         OperationContext* opCtx,
         MemoryUsageLimit maxMemoryUsageBytes,
-        int64_t chunkSize = 0,
         bool excludeOperationMemoryTracking = false);
     static MemoryUsageTracker createMemoryUsageTrackerImpl(const ExpressionContext& expCtx,
                                                            bool allowDiskUse,
-                                                           MemoryUsageLimit maxMemoryUsageBytes,
-                                                           int64_t chunkSize = 0);
+                                                           MemoryUsageLimit maxMemoryUsageBytes);
 
     OperationContext* _opCtx;
 };

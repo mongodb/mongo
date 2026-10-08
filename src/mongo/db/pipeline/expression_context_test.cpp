@@ -685,7 +685,7 @@ TEST_F(ExpressionContextTest, StageMemoryTrackerUnaffectedByExpressionFallbackEx
                       .build();
 
     auto stageTracker =
-        OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForStage(*expCtx);
+        OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(*expCtx);
     stageTracker.add(100);  // Exceeds the per-query limit via the operation-tracker base chain.
     ASSERT_FALSE(stageTracker.withinMemoryLimit(opCtx.get()));
     stageTracker.add(-100);

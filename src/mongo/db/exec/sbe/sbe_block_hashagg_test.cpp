@@ -509,12 +509,11 @@ private:
     std::unique_ptr<Lock::GlobalLock> _globalLock;
 };
 
-// The SBE BlockHashAggStage uses a "chunked" operation memory tracker, which only pushes
-// memory-usage updates to CurOp when usage crosses a chunk boundary. With a chunk size larger than
-// anything this small aggregation consumes, the tracker never crosses a boundary, so nothing is
-// reported to CurOp while the stage still holds its memory, even though the stage-local tracker
-// reflects the exact usage. A non-chunked tracker would instead report on every add().
-TEST_F(BlockHashAggStageTest, ChunkedMemoryTrackerDefersCurOpReportingBelowChunkBoundary) {
+// The SBE BlockHashAggStage's operation memory tracker only pushes memory-usage updates to CurOp
+// when usage crosses a chunk boundary. With a chunk size larger than anything this small
+// aggregation consumes, the tracker never crosses a boundary, so nothing is reported to CurOp while
+// the stage still holds its memory, even though the stage-local tracker reflects the exact usage.
+TEST_F(BlockHashAggStageTest, MemoryTrackerDefersCurOpReportingBelowChunkBoundary) {
     unittest::ServerParameterGuard featureFlag("featureFlagQueryMemoryTracking", true);
     unittest::ServerParameterGuard chunkSize("internalQueryMaxWriteToCurOpMemoryUsageBytes",
                                              100 * 1024 * 1024);
@@ -531,10 +530,10 @@ TEST_F(BlockHashAggStageTest, ChunkedMemoryTrackerDefersCurOpReportingBelowChunk
     ASSERT_EQ(curOpPeak, 0);
 }
 
-// With a chunk size of 1 byte the chunked tracker reports on essentially every add(), so CurOp ends
-// up mirroring the stage-local tracker's usage. This confirms that the SBE BlockHashAggStage's
-// tracker actually consults the chunk-size knob (which only the chunked tracker does).
-TEST_F(BlockHashAggStageTest, ChunkedMemoryTrackerReportsToCurOpWhenChunkBoundaryCrossed) {
+// With a chunk size of 1 byte the tracker reports on essentially every add(), so CurOp ends up
+// mirroring the stage-local tracker's usage. This confirms that the SBE BlockHashAggStage's tracker
+// actually consults the chunk-size knob.
+TEST_F(BlockHashAggStageTest, MemoryTrackerReportsToCurOpWhenChunkBoundaryCrossed) {
     unittest::ServerParameterGuard featureFlag("featureFlagQueryMemoryTracking", true);
     unittest::ServerParameterGuard chunkSize("internalQueryMaxWriteToCurOpMemoryUsageBytes", 1);
 

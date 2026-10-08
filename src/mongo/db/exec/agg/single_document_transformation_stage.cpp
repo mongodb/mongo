@@ -50,7 +50,7 @@ SingleDocumentTransformationStage::SingleDocumentTransformationStage(
       _ownedStageName(stageName),
       _transformationProcessor(transformationProcessor),
       _memoryTracker(
-          OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForStage(*pExpCtx)) {
+          OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(*pExpCtx)) {
     _commonStats.stageTypeStr = _ownedStageName;
     if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled() &&
         feature_flags::gFeatureFlagExpressionMemoryTracking.isEnabled()) {

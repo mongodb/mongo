@@ -62,7 +62,7 @@ BucketAutoStage::BucketAutoStage(
           pExpCtx->getAllowDiskUse() && !pExpCtx->getInRouter(),
           loadMemoryLimit(StageMemoryLimit::DocumentSourceBucketAutoMaxMemoryBytes))},
       _expressionEvaluationMemoryTracker(
-          OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForStage(*pExpCtx)) {
+          OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(*pExpCtx)) {
     for (auto&& accumulationStatement : *_accumulatedFields) {
         _accumulatedFieldMemoryTrackers.push_back(&_memoryTracker[accumulationStatement.fieldName]);
     }

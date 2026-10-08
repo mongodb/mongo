@@ -202,10 +202,7 @@ TEST_F(OperationMemoryUsageTrackerTest, StageTrackersAreStandaloneWhenOperationT
     };
 
     assertStandalone(OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(*expCtx));
-    assertStandalone(
-        OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForStage(*expCtx));
     assertStandalone(OperationMemoryUsageTracker::createMemoryUsageTrackerForStage(*expCtx));
-    assertStandalone(OperationMemoryUsageTracker::createChunkedMemoryUsageTrackerForStage(*expCtx));
 }
 
 /**
