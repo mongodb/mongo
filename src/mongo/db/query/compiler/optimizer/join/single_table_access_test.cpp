@@ -103,4 +103,51 @@ TEST_F(SingleTableAccessTestFixture, EstimatesPopulated) {
     ASSERT_GT(res.nodeCBRCosts[1].toDouble(), 0.0);
 }
 
+// A filter that matches nothing gives every index scan a zero estimate. Outside of join
+// optimization that abandons cost-based ranking in favor of the multi-planner, but
+// join optimization has no multi-planner to fall back to, so it must still get one costed plan.
+TEST_F(SingleTableAccessTestFixture, ZeroScanEstimateStillYieldsSingleCostedPlan) {
+    auto opCtx = operationContext();
+    auto nss = NamespaceString::createNamespaceString_forTest("test", "coll");
+
+    std::vector<BSONObj> docs;
+    for (int i = 0; i < 10; ++i) {
+        docs.push_back(BSON("_id" << i << "a" << 1 << "b" << i));
+    }
+    ce::createCollAndInsertDocuments(opCtx, nss, docs);
+
+    {
+        auto mca = multipleCollectionAccessor(opCtx, {nss});
+        auto uuid = mca.lookupCollection(nss)->uuid();
+
+        createIndex(uuid, fromjson("{a: 1}"), "a_1");
+        createIndex(uuid, fromjson("{b: 1}"), "b_1");
+    }
+
+    // Get new MultiCollectionAccessor after all DDLs are done.
+    auto mca = multipleCollectionAccessor(opCtx, {nss});
+
+    SamplingEstimatorMap estimators;
+    estimators[nss] = samplingEstimator(mca, nss, 1.0);
+
+    // No document has a = 2 or b = 100, so both candidate index scans are estimated at zero.
+    MutableJoinGraph mgraph;
+    auto node =
+        mgraph.addNode(nss, makeCanonicalQuery(nss, fromjson("{a: 2, b: 100}")), boost::none);
+    ASSERT(node);
+
+    JoinGraph graph(std::move(mgraph));
+    OpDebug::JoinOptimizationMetrics::PlanEnumerationMetrics metrics;  // Unused for testing.
+    auto swRes = singleTableAccessPlans(opCtx, mca, graph, estimators, metrics);
+    ASSERT_OK(swRes);
+
+    auto& res = swRes.getValue();
+    ASSERT_EQ(1, res.cbrCqQsns.size());
+    auto soln = res.cbrCqQsns.at(graph.accessPathAt(*node)).get();
+    ASSERT(soln);
+    ASSERT_EQ(soln->getFirstNodeByType(STAGE_IXSCAN).second, 1);
+    ASSERT_EQ(1, res.nodeCBRCosts.size());
+    ASSERT_GT(res.nodeCBRCosts[0].toDouble(), 0.0);
+}
+
 }  // namespace mongo::join_ordering

@@ -43,6 +43,26 @@ const QuerySolution* pickBestPlan(CanonicalQuery* cq,
                                   NamespaceString nss);
 
 /**
+ * Run cost-based ranking for the query 'cq' and return all solutions it produced: a single
+ * winner when CBR ranked the plans, or every candidate when it declined to rank (e.g. because
+ * of a zero cardinality estimate on a scan node).
+ *
+ * If 'originalPlanHashes' is set, it is filled with the hashes of the candidate plans in the
+ * order the planner produced them, before CBR saw them. Callers use it to assert that CBR
+ * preserved the candidate order when it declined to rank.
+ */
+std::vector<std::unique_ptr<QuerySolution>> cbrRankPlans(
+    CanonicalQuery* cq,
+    size_t numDocs,
+    OperationContext& opCtx,
+    int sampleSize,
+    NamespaceString nss,
+    SamplingCEMethodEnum samplingStyle = SamplingCEMethodEnum::kRandom,
+    boost::optional<int> numChunks = boost::none,
+    boost::optional<PlanningTimeProfile&> times = boost::none,
+    boost::optional<std::vector<size_t>&> originalPlanHashes = boost::none);
+
+/**
  * Use the cost-based ranker (CBR) to find an optimal plan for the query 'cq'.
  * It is expected that the tests using this function ensure that CBR always
  * finds an optimal plan. In this case the method returns a pointer to that

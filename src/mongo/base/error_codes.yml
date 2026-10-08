@@ -1368,5 +1368,14 @@ error_codes:
   # should not be retried again.
   - {code: 528, name: KMIPRetryableError}
 
+  # The cost-based ranker estimated that an index scan in a candidate plan produces zero rows
+  # ("CE" is cardinality estimation). Used internally to abandon cost-based ranking and let the
+  # multi-planner choose the plan instead; it is never returned to the client.
+  - {
+      code: 529,
+      name: ZeroCEEstimate,
+      categories: [PlannerEstimationError, InternalOnly],
+    }
+
   # ^^^^
   # Add new codes, sequentially numbered, above.

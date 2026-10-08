@@ -265,8 +265,8 @@ describe("planRanker attribution", function () {
             const entry = profile({op: "query", "command.comment": marker}, () => {
                 coll.find({
                     $or: [
-                        {a: 1, b: {$lt: 500}},
-                        {a: 2, b: {$gt: 800}},
+                        {a: 1, b: {$gte: 0}},
+                        {a: 2, b: {$gte: 0}},
                     ],
                 })
                     .comment(marker)

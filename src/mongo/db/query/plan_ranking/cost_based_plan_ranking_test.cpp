@@ -71,9 +71,12 @@ TEST_F(CostBasedPlanRankingTest, MaxResultsOfOneDoesNotTripFullBatchAssertion) {
     insertNDocuments(5001);  // {_id:i, a:i, b:i, c:i}
     auto colls = getCollsAccessor();
 
-    // No document has c == -1, so no candidate plan advances during the trial.
+    // The 'c' predicate matches the last 1000 documents, so it is estimated as non-zero (a zero
+    // estimate would make CBR fall back to multi-planning), but the candidate index scans start
+    // at the low end of 'a'/'b' and so advance no result within the works budget of the
+    // estimation trial.
     auto [cq, plannerData] =
-        createCQAndPlannerData(colls, BSON("a" << GT << 0 << "b" << GT << 0 << "c" << -1));
+        createCQAndPlannerData(colls, BSON("a" << GT << 0 << "b" << GT << 0 << "c" << GT << 4000));
     plannerData.plannerParams = makePlannerParams(indices, 5001);
 
     plan_ranking::CostBasedPlanRankingStrategy strategy;
@@ -104,6 +107,26 @@ TEST_F(CostBasedPlanRankingTest, MaxResultsOfOneEarlyExitsWhenBatchFilled) {
     ASSERT_EQ(status.getValue().solutions.size(), 1);
     // The multi-planner picked the winner, so the strategy must be recorded on the result.
     ASSERT_EQ(status.getValue().planSelectionStrategy, PlanSelectionStrategy::kMultiPlanner);
+}
+
+TEST_F(CostBasedPlanRankingTest, SoleCandidateWithZeroIxscanEstimateIsReportedAsSinglePlan) {
+    unittest::ServerParameterGuard maxResults("internalQueryPlanEvaluationMaxResults", 1);
+    unittest::ServerParameterGuard sequentialSampling("internalQuerySamplingBySequentialScan",
+                                                      true);
+
+    createIndexOnEmptyCollection(operationContext(), BSON("a" << 1), "a_1");
+    insertNDocuments(5001);
+    auto colls = getCollsAccessor();
+
+    auto [cq, plannerData] =
+        createCQAndPlannerData(colls, fromjson("{a: {$gt: 0, $mod: [5001, 5000]}}"));
+    plannerData.plannerParams = makePlannerParams(indices, 5001);
+
+    plan_ranking::CostBasedPlanRankingStrategy strategy;
+    auto status = planAndRank(strategy, plannerData);
+    ASSERT_OK(status.getStatus());
+    ASSERT_EQ(status.getValue().solutions.size(), 1);
+    ASSERT_EQ(status.getValue().planSelectionStrategy, PlanSelectionStrategy::kSinglePlan);
 }
 
 // Exercises a bug where the sampling estimator would only sample fields referenced directly by the

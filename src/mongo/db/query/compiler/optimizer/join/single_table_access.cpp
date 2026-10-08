@@ -147,7 +147,8 @@ StatusWith<SingleTablePlanResult> accessPlanForFilterWithDerivedPredicates(
                                                               nullptr /*exactCardinality*/,
                                                               std::move(swSolns.getValue()),
                                                               *node.accessPath,
-                                                              QueryCBRCEModeEnum::kSamplingCE);
+                                                              QueryCBRCEModeEnum::kSamplingCE,
+                                                              false /* failOnZeroIxscanCE */);
     // Return bad status if CBR is unable to produce a plan
     if (!swCbrResult.isOK()) {
         return swCbrResult.getStatus();

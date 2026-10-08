@@ -105,6 +105,10 @@ public:
      * select a winner.
      * If query.getExplain().has_value(), collect and return planExplainerData as part of the
      * PlanRankingResult.
+     *
+     * By default a zero index scan estimate abandons ranking and returns every candidate for the
+     * multi-planner to rank. Callers without a multi-planner fallback that need a single costed
+     * plan (e.g. join optimization) pass 'failOnZeroIxscanCE' = false.
      */
     static StatusWith<PlanRankingResult> planWithCostBasedRanking(
         const QueryPlannerParams& params,
@@ -112,7 +116,8 @@ public:
         const ce::ExactCardinalityEstimator* exactCardinality,
         std::vector<std::unique_ptr<QuerySolution>> allSoln,
         const CanonicalQuery& query,
-        QueryCBRCEModeEnum ceMode);
+        QueryCBRCEModeEnum ceMode,
+        bool failOnZeroIxscanCE = true);
 
     /**
      * Generates and returns a query solution, given data retrieved from the plan cache.

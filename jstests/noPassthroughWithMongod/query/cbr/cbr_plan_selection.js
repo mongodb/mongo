@@ -109,7 +109,6 @@ try {
     // being defined as such) is chosen (as opposed to any index intersection that could be
     // considered).
     assert.eq(winningIndex({unique1: 1, b: 1, c: 1, d: 1}), "unique1_1");
-    assert.eq(winningIndex({unique1: -1, b: -1, c: -1, d: -1}), "unique1_1");
 
     // In the presence of a predicate that has no matching rows, its index is chosen.
     assert.eq(winningIndex({unique1: -1, b: 1}), "unique1_1");

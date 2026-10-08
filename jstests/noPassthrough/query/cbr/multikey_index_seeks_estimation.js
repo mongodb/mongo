@@ -92,7 +92,9 @@ describe("samplingCE with dotted paths sharing an array-valued prefix", function
         assertEstimateMatchesActual({
             index: {d: 1, "d.a": 1, "e": 1},
             doc: {d: [{a: 0}, 5], e: 0},
-            query: {d: {$in: [{a: 0}, 5]}, "d.a": {$lt: 1}, e: {$in: [1, 2]}},
+            // 'e' must include the doc's value: a zero scan estimate (ZeroCEEstimate) would make
+            // CBR hand the plan to the multi-planner uncosted.
+            query: {d: {$in: [{a: 0}, 5]}, "d.a": {$lt: 1}, e: {$in: [0, 2]}},
             expectedIndexName: "d_1_d.a_1_e_1",
             // estimateNDV([{d, d.a}], ...) produces 2 keys: ('d': {a: 0}, 'd.a': 0) and ('d': 5,
             // 'd.a': null). The trailing predicate on 'e' adds a multiplication factor of 2, one
@@ -109,7 +111,9 @@ describe("samplingCE with dotted paths sharing an array-valued prefix", function
         assertEstimateMatchesActual({
             index: {"d.a": 1, "d.b": 1, "e": 1},
             doc: {d: [{a: 0}, {b: 1}], e: 0},
-            query: {"d.a": {$in: [0, 1]}, "d.b": {$in: [0, 1]}, e: {$in: [1, 2]}},
+            // 'e' must include the doc's value: a zero scan estimate (ZeroCEEstimate) would make
+            // CBR hand the plan to the multi-planner uncosted.
+            query: {"d.a": {$in: [0, 1]}, "d.b": {$in: [0, 1]}, e: {$in: [0, 2]}},
             expectedIndexName: "d.a_1_d.b_1_e_1",
             // estimateNDV([{d.a, d.b}], ...) produces 2 keys: (d.a: 0, d.b: null) and (d.a: null,
             // d.b: 1). The trailing predicate on 'e' adds a multiplication factor of 2, one for

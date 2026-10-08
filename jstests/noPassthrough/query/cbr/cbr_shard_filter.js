@@ -1,6 +1,10 @@
 /*
  * Test that CBR correctly costs plans that include a shard filter stage.
- * @tags: [requires_fcv_90]
+ * @tags: [
+ *   requires_fcv_90,
+ *   # Starts a two-shard cluster.
+ *   resource_intensive,
+ * ]
  */
 
 import {
@@ -45,11 +49,12 @@ const collName = jsTestName();
 const coll = db[collName];
 coll.drop();
 
-assert.commandWorked(
-    st.s.adminCommand({shardCollection: coll.getFullName(), key: {_id: "hashed"}}),
-);
-
-assert.commandWorked(coll.insert({a: 1, b: 2}));
+// Split at {_id: 10} and move the upper chunk so each shard owns half the documents. An empty
+// shard would report a zero (Metadata-sourced) cardinality estimate, which makes CBR abandon
+// costing the plan and fall back to multiplanning (SERVER-133362), invalidating the assertions
+// below.
+st.shardColl(coll, {_id: 1} /* key */, {_id: 10} /* split */, {_id: 10} /* move */);
+assert.commandWorked(coll.insert(Array.from({length: 20}, (_, i) => ({_id: i, a: 1, b: 2}))));
 assert.commandWorked(coll.createIndexes([{a: 1}, {b: 1}]));
 
 const explain = coll.find({a: 1, b: 1}).explain();
