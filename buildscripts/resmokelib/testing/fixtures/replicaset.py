@@ -759,7 +759,8 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         )
         admin.command("appendOplogNote", data={"await_stable_recovery_timestamp": 1})
 
-        # TODO(SERVER-119066): Remove when no longer necessary
+        # TODO(SERVER-132991): Remove once the old binary in DSC multiversion suites reports
+        # lastStableRecoveryTimestamp.
         mongod_options = self.nodes[0].get_mongod_options()
         disagg_enabled = mongod_options.get("set_parameters", {}).get(
             "disaggregatedStorageEnabled", False
