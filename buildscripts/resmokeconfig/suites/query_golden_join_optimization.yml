@@ -6,6 +6,8 @@ selector:
   exclude_files:
     # Exclude plan stability tests- they run in their own suite
     - jstests/query_golden/join_opt/plan_stability*
+    # Should be re-enabled in SERVER-131449.
+    - jstests/query_golden/join_opt/projections_md.js
 executor:
   config:
     shell_options:

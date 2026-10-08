@@ -1202,11 +1202,20 @@ private:
         ParsedPathView fullPath;
         /// The scope being built.
         ScopeId scope;
-        /// The matching scope of the previous stage.
-        ScopeId parentScope;
         /// The number of levels descended on the full path.
         size_t depth = 0;
     };
+
+    /**
+     * Returns the matching field from the previous stage.
+     */
+    FieldMatch lookupPriorField(const DeclarationCursor& cursor) const {
+        auto stage = _scopes[cursor.scope].stage;
+        if (stage == StageId{0}) {
+            return FieldMatch::baseDocument();
+        }
+        return lookupField(_stages[StageId{stage.value - 1}].scope, cursor.pathToCursor());
+    }
 
     /**
      * Declare a field for the given (possibly dotted) path in the cursor's scope.
@@ -1218,9 +1227,7 @@ private:
      * 'prefixPolicy' dictates whether the modification preserves arrays on the base field. When
      * kEnsureObjects, writing to 'a.b' modifies 'a' to a plain object: if 'a' can be an array,
      * 'a.c' from a prior stage may be discarded, so sibling subfields cannot be inherited.
-     * The cursor's parent scope recovers the prior value of a dotted modification's prefix when
-     * the current scope is a fresh root produced by a ReplaceRoot (e.g. an inclusion projection):
-     * an array-preserving modification such as '{$project: {"a.b": "$x"}}' traverses 'a'
+     * An array-preserving modification such as '{$project: {"a.b": "$x"}}' traverses 'a'
      * element-wise, so 'a' keeps its prior arrayness even though the new root is otherwise empty.
      */
     FieldId declareField(DeclarationCursor cursor,
@@ -1228,7 +1235,6 @@ private:
                          FieldMetadata metadata = {}) {
         const ParsedPathView path = cursor.remainingPath();
         const ScopeId scope = cursor.scope;
-        const ScopeId parentScope = cursor.parentScope;
         // Declaring 'a' should create field 'a' and exit.
         if (path.size() == 1) {
             auto field = _fields.append(Field{scope, ScopeId::none(), metadata});
@@ -1244,20 +1250,16 @@ private:
         // preserve any fields it may already contain.
         auto [existingBaseField, existingBaseFieldType] = lookupField(scope, basePath);
 
-        // Under an array-preserving operation, when declaring a new base field (the prefix is
-        // missing here) and we have a parent scope and we are in an exhaustive scope, we look up
-        // the parent scope's base field. This is because a kPreserveArrays modification does
-        // array-traversal of the previous value, so the new base keeps the prior arrayness, and
-        // nested declarations recover the prior arrayness of each deeper prefix component the
-        // same way. The prior base field must not contribute its subfields though: an exhaustive
-        // stage rebuilds its output from the paths it declares, so prior subfields do not pass
-        // through implicitly.
+        // Under an array-preserving operation, when declaring the base field for the first time in
+        // an exhaustive scope (the kMissing check), we preserve the metadata of the parent scope's
+        // base field. This is the case of {$project: {'a.b': 1}} where we keep 'a's arrayness but
+        // not its fields.
         FieldId priorBaseField;
         bool redeclaresBaseInExhaustiveScope = false;
         if (prefixPolicy == ModifiedPrefixPolicy::kPreserveArrays &&
-            existingBaseFieldType == FieldMatchType::kMissing && parentScope &&
+            existingBaseFieldType == FieldMatchType::kMissing &&
             _scopes[scope].exhaustiveScope == scope) {
-            auto parentMatch = lookupField(parentScope, basePath);
+            auto parentMatch = lookupPriorField(cursor);
             if (parentMatch.type != FieldMatchType::kShadowed) {
                 priorBaseField = parentMatch.fieldId;
                 redeclaresBaseInExhaustiveScope = true;
@@ -1279,9 +1281,6 @@ private:
 
         // Scope for declaring 'b' field of 'a'.
         FieldId newBaseField;
-        // The parent scope to use when recursing so that nested prefixes can recover values from
-        // previous stage.
-        ScopeId parentEmbeddedScope = ScopeId::none();
         if (canReuseBaseField) {
             // We already have such base field in the current scope. We can mutate the scope in this
             // case.
@@ -1292,9 +1291,6 @@ private:
             auto embeddedScope = _scopes.getNextId();
             newBaseField = _fields.append(Field{scope, embeddedScope});
             declareScope(_scopes[scope].stage, embeddedScope /*exhaustiveScope*/, ScopeId::none());
-            // Nested declarations recover prior arrayness through the prior base field's scope.
-            parentEmbeddedScope =
-                priorBaseField ? _fields[priorBaseField].embeddedScope : ScopeId::none();
             // The output's array shape still derives from the prior value that is traversed.
             _fields[newBaseField].dependencies.insert(priorBaseField);
             _scopes[scope].fields[basePath.front()] = newBaseField;
@@ -1306,8 +1302,7 @@ private:
             auto embeddedScope = _scopes.getNextId();
             newBaseField = _fields.append(Field{scope, embeddedScope});
 
-            ScopeId exhaustiveEmbeddedScope;
-            std::tie(exhaustiveEmbeddedScope, parentEmbeddedScope) = resolveNewBaseFieldScopes(
+            auto [exhaustiveEmbeddedScope, parentEmbeddedScope] = resolveNewBaseFieldScopes(
                 prefixPolicy, existingBaseField, embeddedScope, cursor.pathToCursor());
 
             if (parentEmbeddedScope) {
@@ -1327,7 +1322,6 @@ private:
             DeclarationCursor{
                 cursor.fullPath,
                 _fields[newBaseField].embeddedScope,
-                parentEmbeddedScope,
                 cursor.depth + 1,
             },
             prefixPolicy,
@@ -1414,47 +1408,15 @@ private:
     /**
      * Includes the field from the parent scope into the given scope.
      * This has the semantics of an inclusion projection.
-     *
-     * If given, 'defaultFieldId' tells us the assumed origin of the field in case there is no
-     * parent scope:
-     *  - A real FieldId if some prefix of the field is defined (e.g. if "a" is defined but we don't
-     *    know if "a.b" is).
-     *  - FieldId::none() if the field originates from the base collection.
-     *  - parentScope.missingField if the field was made missing by an exhaustive stage.
      */
-    void includeField(DeclarationCursor cursor, FieldId defaultFieldId = FieldId::none()) {
+    void includeField(DeclarationCursor cursor) {
         const ParsedPathView path = cursor.remainingPath();
         const ScopeId scope = cursor.scope;
-        const ScopeId parentScope = cursor.parentScope;
-        // Gets the field which defines the last component in the given path in the parent scope, or
-        // 'defaultFieldId' if there is no parent scope.
-        auto resolvePathInParent = [this, parentScope, defaultFieldId](ParsedPathView path) {
-            if (!parentScope) {
-                return defaultFieldId;
-            }
-
-            auto [fieldId, type] = lookupField(parentScope, path);
-            switch (type) {
-                case FieldMatchType::kShadowed:
-                    return FieldId::none();
-                case FieldMatchType::kExact:
-                case FieldMatchType::kMissing:
-                case FieldMatchType::kBaseDocument:
-                    return fieldId;
-            }
-            MONGO_UNREACHABLE_TASSERT(12266804);
-        };
+        auto [priorBaseField, priorBaseFieldType] = lookupPriorField(cursor);
 
         // Including 'a' should reference field 'a' and exit.
         if (path.size() == 1) {
-            // Note that all four possible cases are covered by resolvePathInParent():
-            // 1) Included field is defined in parentScope.
-            // 2) Included field is not defined in parentScope, but not all fields are known
-            //    (return FieldId::none()).
-            // 3) Included field is not defined in parentScope and all fields are known (return the
-            //    "missing" field id of the last exhaustive stage).
-            // 4) There is no parentScope to resolve paths in (return the given 'defaultFieldId').
-            _scopes[scope].fields[path.front()] = resolvePathInParent(path);
+            _scopes[scope].fields[path.front()] = priorBaseField;
             return;
         }
 
@@ -1465,31 +1427,25 @@ private:
         auto basePath = path.subspan(0, 1);
         auto subPath = path.subspan(1);
 
-        FieldId parentBaseField = resolvePathInParent(basePath);
-        ScopeId parentEmbeddedScope =
-            parentBaseField ? _fields[parentBaseField].embeddedScope : ScopeId::none();
-        ScopeId parentDeclaringScope =
-            parentBaseField ? _fields[parentBaseField].declaringScope : ScopeId::none();
-
-        bool shadowedByParent = parentDeclaringScope && !parentEmbeddedScope &&
-            parentBaseField != _scopes[parentDeclaringScope].missingField;
+        bool shadowedByParent =
+            priorBaseFieldType == FieldMatchType::kExact && !_fields[priorBaseField].embeddedScope;
 
         // Parent is a leaf (scalar / missing / unknown) that shadows the subpath. If we know
         // the parent's constant, walk it to tighten the included field's metadata and constant.
         if (shadowedByParent) {
             boost::optional<Value> constant;
-            if (auto parent = getConstantForField(parentBaseField)) {
+            if (auto parent = getConstantForField(priorBaseField)) {
                 constant = walkConstant(*std::move(parent), subPath);
             }
             FieldMetadata metadata{};
             if (constant && constant->missing()) {
                 updateMetadataForMissingValue(metadata);
             }
-            declareField(DeclarationCursor{cursor.fullPath, scope, parentScope, cursor.depth},
+            declareField(DeclarationCursor{cursor.fullPath, scope, cursor.depth},
                          ModifiedPrefixPolicy::kPreserveArrays,
                          metadata);
             const FieldId leafFieldId = lastDeclaredField();
-            _fields[leafFieldId].dependencies.insert(parentBaseField);
+            _fields[leafFieldId].dependencies.insert(priorBaseField);
             if (constant) {
                 setConstant(leafFieldId, *std::move(constant));
             }
@@ -1507,31 +1463,22 @@ private:
                 tassert(
                     11936307, "Already exists", _fields[existingBaseField].declaringScope == scope);
                 // 'a' is already defined in the current scope.
-                includeField(
-                    DeclarationCursor{
-                        cursor.fullPath,
-
-                        _fields[existingBaseField].embeddedScope,
-                        parentEmbeddedScope,
-                        cursor.depth + 1,
-                    },
-                    parentBaseField /*defaultFieldId*/);
+                includeField(DeclarationCursor{
+                    cursor.fullPath, _fields[existingBaseField].embeddedScope, cursor.depth + 1});
                 break;
             case FieldMatchType::kShadowed:
             case FieldMatchType::kMissing:
             case FieldMatchType::kBaseDocument:
                 // 'a' is not included in the current scope, so we need to declare it then include
                 // 'b'.
-                FieldId newBaseField = declareField(
-                    DeclarationCursor{cursor.pathToCursor(), scope, ScopeId::none(), cursor.depth},
-                    ModifiedPrefixPolicy::kPreserveArrays);
-                _fields[newBaseField].dependencies.insert(parentBaseField);
+                FieldId newBaseField =
+                    declareField(DeclarationCursor{cursor.pathToCursor(), scope, cursor.depth},
+                                 ModifiedPrefixPolicy::kPreserveArrays);
+                _fields[newBaseField].dependencies.insert(priorBaseField);
                 ScopeId newEmbeddedScope = _scopes.getNextId();
                 declareScope(_scopes[scope].stage, newEmbeddedScope, ScopeId::none());
                 _fields[newBaseField].embeddedScope = newEmbeddedScope;
-                includeField(
-                    {cursor.fullPath, newEmbeddedScope, parentEmbeddedScope, cursor.depth + 1},
-                    parentBaseField);
+                includeField({cursor.fullPath, newEmbeddedScope, cursor.depth + 1});
                 break;
         }
     }
@@ -1814,7 +1761,7 @@ private:
                 [&](const PreservePath& p) {
                     tassert(11996202, "Expected operation before PreservePath", hasDeclaredScope);
                     auto parsedPath = internPath(p.getPath());
-                    includeField(DeclarationCursor{parsedPath, scopeId, parentScope});
+                    includeField(DeclarationCursor{parsedPath, scopeId});
                 },
                 [&](const ModifyPath& p) {
                     maybeDeclareInheritedScope();
@@ -1831,9 +1778,8 @@ private:
                             constant = c->getValue();
                         }
                     }
-                    declareField(DeclarationCursor{parsedPath, scopeId, parentScope},
-                                 p.getPrefixPolicy(),
-                                 metadata);
+                    declareField(
+                        DeclarationCursor{parsedPath, scopeId}, p.getPrefixPolicy(), metadata);
                     const FieldId leafFieldId = lastDeclaredField();
                     if (expr) {
                         processExpressionDependencies(
@@ -1958,9 +1904,7 @@ private:
                     const ModifiedPrefixPolicy prefixPolicy = p.getNewPathMaxArrayTraversals() > 0
                         ? ModifiedPrefixPolicy::kPreserveArrays
                         : ModifiedPrefixPolicy::kEnsureObjects;
-                    declareField(DeclarationCursor{parsedNewPath, scopeId, parentScope},
-                                 prefixPolicy,
-                                 metadata);
+                    declareField(DeclarationCursor{parsedNewPath, scopeId}, prefixPolicy, metadata);
                     const FieldId leafFieldId = lastDeclaredField();
                     dassert(lookupField(scopeId, parsedNewPath).fieldId == leafFieldId);
                     _fields[leafFieldId].dependencies.insert(renameSource);

@@ -1739,6 +1739,30 @@ TEST_F(PipelineDependencyGraphTest, ShadowedRenameChecksShadowingFieldArrayness)
     });
 }
 
+TEST_F(PipelineDependencyGraphTest, InclusionRedefinedBaseFieldAfterUnrelated) {
+    setPipeline("[{$set: {unrelated: 1}}, {$project: {'a.b': '$foo'}}]");
+    runTest([&] {
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a"));
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a.b"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, InclusionRedefinedBaseFieldAfterPriorBaseInclusion) {
+    setPipeline("[{$project: {a: 1}}, {$project: {'a.b': '$foo'}}]");
+    runTest([&] {
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a"));
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a.b"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, InclusionRedefinedBaseFieldAfterPriorInclusion) {
+    setPipeline("[{$project: {'a.b': 1}}, {$project: {'a.b': '$foo'}}]");
+    runTest([&] {
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a"));
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a.b"));
+    });
+}
+
 TEST_F(PipelineDependencyGraphTest, ReplaceRootAttributesAllFields) {
     setPipeline(
         "[{$set: { a: 1 }},"
