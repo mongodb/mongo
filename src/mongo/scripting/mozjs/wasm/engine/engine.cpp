@@ -1089,10 +1089,13 @@ err_code_t MozJSScriptEngine::invokePredicate(uint64_t handle,
     // These are cheap JS property sets using the already-deserialized smrecv — no extra
     // BSON serialization needed.
     if (smrecv.isObject()) {
-        JS_SetProperty(_cx, _global, "obj", smrecv);
         JS::RootedValue trueVal(_cx);
         trueVal.setBoolean(true);
-        JS_SetProperty(_cx, _global, "fullObject", trueVal);
+        // Fails if user code made these non-configurable (e.g. froze globalThis).
+        if (!chk.ok(JS_DefineProperty(_cx, _global, "obj", smrecv, JSPROP_ENUMERATE)) ||
+            !chk.ok(JS_DefineProperty(_cx, _global, "fullObject", trueVal, JSPROP_ENUMERATE))) {
+            return err ? err->code : SM_E_JSAPI_FAIL;
+        }
     }
 
     JS::RootedValueVector args(_cx);
@@ -1189,14 +1192,16 @@ err_code_t MozJSScriptEngine::setGlobal(const char* name,
         JS::RootedValue val(_cx);
         ValueReader(_cx, &val).fromBSONElement(elem, value, false /* readOnlyArgs */);
 
-        if (!chk.ok(JS_SetProperty(_cx, jsObj, elem.fieldName(), val), SM_E_INTERNAL)) {
+        if (!chk.ok(JS_DefineProperty(_cx, jsObj, elem.fieldName(), val, JSPROP_ENUMERATE),
+                    SM_E_INTERNAL)) {
             return err ? err->code : SM_E_INTERNAL;
         }
     }
 
     JS::RootedValue objVal(_cx, JS::ObjectValue(*jsObj));
     std::string nameStr(name, name_len);
-    if (!chk.ok(JS_SetProperty(_cx, _global, nameStr.c_str(), objVal), SM_E_INTERNAL)) {
+    if (!chk.ok(JS_DefineProperty(_cx, _global, nameStr.c_str(), objVal, JSPROP_ENUMERATE),
+                SM_E_INTERNAL)) {
         return err ? err->code : SM_E_INTERNAL;
     }
 
@@ -1293,7 +1298,8 @@ err_code_t MozJSScriptEngine::setGlobalValue(const char* name,
     ValueReader(_cx, &val).fromBSONElement(elem, singleElementDoc, false);
 
     std::string nameStr(name, name_len);
-    if (!chk.ok(JS_SetProperty(_cx, _global, nameStr.c_str(), val), SM_E_INTERNAL)) {
+    if (!chk.ok(JS_DefineProperty(_cx, _global, nameStr.c_str(), val, JSPROP_ENUMERATE),
+                SM_E_INTERNAL)) {
         return err ? err->code : SM_E_INTERNAL;
     }
 

@@ -2140,6 +2140,29 @@ TEST_F(WasmMozJSBridgeTest, SetGlobalValueObject) {
     ASSERT_EQ(ret["__value"].numberInt(), 3);
 }
 
+TEST_F(WasmMozJSBridgeTest, SetGlobalValueDoesNotInvokeScriptSetter) {
+    auto install = createFunction(
+        "function() {"
+        "  globalThis._setterRan = false;"
+        "  Object.defineProperty(globalThis, 'val', {"
+        "    set(v) { globalThis._setterRan = true; },"
+        "    get() { return 1; },"
+        "    configurable: true});"
+        "}");
+    invokeFunction(install, BSONObj());
+
+    setGlobalValue("val", BSON("val" << 5));
+
+    auto checkSetter = createFunction("function() { return globalThis._setterRan; }");
+    auto ret = invokeFunction(checkSetter, BSONObj());
+    ASSERT_FALSE(ret["__value"].boolean());
+
+    // The write must define an own data property shadowing the accessor.
+    auto readValue = createFunction("function() { return globalThis.val; }");
+    auto ret2 = invokeFunction(readValue, BSONObj());
+    ASSERT_EQ(ret2["__value"].numberInt(), 5);
+}
+
 // ---------------------------------------------------------------------------
 // `emit` in-WASM boundary
 // ---------------------------------------------------------------------------
@@ -2235,6 +2258,131 @@ TEST_F(WasmMozJSBridgeTest, InvokePredicateRuntimeError) {
     ASSERT_THROWS_WITH_CHECK(invokePredicate(handle, BSON("x" << 1)),
                              AssertionException,
                              getContainsCheck(ErrorCodes::JSInterpreterFailure, "e-runtime"));
+}
+
+TEST_F(WasmMozJSBridgeTest, InvokePredicateUserSetterWithConfigurableTrueNotCalled) {
+    auto install = createFunction(
+        "function() {"
+        "  Object.defineProperty(globalThis, 'obj', {"
+        "    set: function(v) { globalThis.__setterCalled = true; },"
+        "    get: function() { return { stale: true }; },"
+        "    configurable: true"
+        "  });"
+        "  Object.defineProperty(globalThis, 'fullObject', {"
+        "    set: function(v) { globalThis.__setterCalled = true; },"
+        "    get: function() { return 'stale'; },"
+        "    configurable: true"
+        "  });"
+        "  return true;"
+        "}");
+    ASSERT_TRUE(invokePredicate(install, BSON("x" << 0)));
+
+    auto handle = createFunction(
+        "function() {"
+        "  return obj.x === 42 && fullObject === true &&"
+        "      globalThis.__setterCalled === undefined;"
+        "}");
+    ASSERT_TRUE(invokePredicate(handle, BSON("x" << 42)));
+}
+
+TEST_F(WasmMozJSBridgeTest, InvokePredicateUserSetterWithConfigurableFalseErrors) {
+    auto install = createFunction(
+        "function() {"
+        "  Object.defineProperty(globalThis, 'obj', {"
+        "    set: function(v) { globalThis.__setterCalled = true; },"
+        "    configurable: false"
+        "  });"
+        "  return true;"
+        "}");
+    ASSERT_TRUE(invokePredicate(install, BSON("x" << 0)));
+
+    auto handle = createFunction("function() { return true; }");
+    ASSERT_THROWS_WITH_CHECK(
+        invokePredicate(handle, BSON("x" << 1)),
+        AssertionException,
+        getContainsCheck(ErrorCodes::JSInterpreterFailure, "e-pending-exception"));
+
+    auto check = createFunction("function() { return globalThis.__setterCalled === undefined; }");
+    ASSERT_TRUE(invokeFunction(check, BSONObj())["__value"].boolean());
+    ASSERT_TRUE(_bridge->isHealthy());
+}
+
+TEST_F(WasmMozJSBridgeTest, InvokePredicateFrozenGlobalErrorsCleanly) {
+    auto freeze = createFunction("function() { Object.freeze(globalThis); return true; }");
+    ASSERT_TRUE(invokePredicate(freeze, BSON("x" << 1)));
+
+    auto handle = createFunction("function() { return obj.x > 0; }");
+    for (int i = 0; i < 3; ++i) {
+        ASSERT_THROWS_WITH_CHECK(
+            invokePredicate(handle, BSON("x" << i)),
+            AssertionException,
+            getContainsCheck(ErrorCodes::JSInterpreterFailure, "e-pending-exception"));
+    }
+    ASSERT_TRUE(_bridge->isHealthy());
+}
+
+TEST_F(WasmMozJSBridgeTest, SetGlobalUserSetterWithConfigurableTrueNotCalled) {
+    auto install = createFunction(
+        "function() {"
+        "  Object.defineProperty(globalThis, 'cfg', {"
+        "    set: function(v) { globalThis.__setterCalled = true; },"
+        "    get: function() { return 'stale'; },"
+        "    configurable: true"
+        "  });"
+        "  return true;"
+        "}");
+    invokeFunction(install, BSONObj());
+
+    setGlobal("cfg", BSON("a" << 1));
+
+    auto check = createFunction(
+        "function() { return globalThis.cfg.a === 1 && globalThis.__setterCalled === undefined; }");
+    ASSERT_TRUE(invokeFunction(check, BSONObj())["__value"].boolean());
+}
+
+TEST_F(WasmMozJSBridgeTest, SetGlobalUserSetterWithConfigurableFalseErrors) {
+    auto install = createFunction(
+        "function() {"
+        "  Object.defineProperty(globalThis, 'cfg', {"
+        "    set: function(v) { globalThis.__setterCalled = true; },"
+        "    configurable: false"
+        "  });"
+        "  return true;"
+        "}");
+    invokeFunction(install, BSONObj());
+
+    auto doubleCheck = [&](auto&& ex) {
+        ASSERT_EQUALS(ex.code(), 11542300);
+        ASSERT_STRING_CONTAINS(ex.reason(), "e-pending-exception");
+    };
+    ASSERT_THROWS_WITH_CHECK(setGlobal("cfg", BSON("a" << 1)), AssertionException, doubleCheck);
+
+    auto check = createFunction("function() { return globalThis.__setterCalled === undefined; }");
+    ASSERT_TRUE(invokeFunction(check, BSONObj())["__value"].boolean());
+    ASSERT_TRUE(_bridge->isHealthy());
+}
+
+TEST_F(WasmMozJSBridgeTest, SetGlobalValueUserSetterWithConfigurableFalseErrors) {
+    auto install = createFunction(
+        "function() {"
+        "  Object.defineProperty(globalThis, 'sgv', {"
+        "    set: function(v) { globalThis.__setterCalled = true; },"
+        "    configurable: false"
+        "  });"
+        "  return true;"
+        "}");
+    invokeFunction(install, BSONObj());
+
+    auto doubleCheck = [&](auto&& ex) {
+        ASSERT_EQUALS(ex.code(), 11542317);
+        ASSERT_STRING_CONTAINS(ex.reason(), "e-pending-exception");
+    };
+    ASSERT_THROWS_WITH_CHECK(
+        setGlobalValue("sgv", BSON("val" << 1)), AssertionException, doubleCheck);
+
+    auto check = createFunction("function() { return globalThis.__setterCalled === undefined; }");
+    ASSERT_TRUE(invokeFunction(check, BSONObj())["__value"].boolean());
+    ASSERT_TRUE(_bridge->isHealthy());
 }
 
 // ---------------------------------------------------------------------------
