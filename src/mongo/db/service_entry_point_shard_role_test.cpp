@@ -55,21 +55,6 @@ using ::testing::Invoke;
 MONGO_REGISTER_COMMAND(TestCmdProcessInternalCommand).testOnly().forShard();
 MONGO_REGISTER_COMMAND(TestCmdProcessInternalSucceedCommand).testOnly().forShard();
 
-class TestCmdShardIngressSubject final : public TestCmdBase {
-public:
-    static constexpr auto kCommandName = "testShardIngressSubject";
-    TestCmdShardIngressSubject() : TestCmdBase(kCommandName) {}
-
-    bool isSubjectToIngressAdmissionControl() const override {
-        return true;
-    }
-
-    bool runWithBuilderOnly(BSONObjBuilder&) override {
-        return true;
-    }
-};
-MONGO_REGISTER_COMMAND(TestCmdShardIngressSubject).testOnly().forShard();
-
 // Mocks the shard's response to a StaleConfig error found while recovering sharding metadata on
 // the write path, so tests can simulate e.g. the recovery being interrupted by a concurrent
 // shutdown or stepdown.
@@ -540,179 +525,19 @@ TEST_F(ServiceEntryPointShardServerTest, WriteThrottlerFinalizesAdmissionWhenDis
 
 TEST_F(ServiceEntryPointShardServerTest,
        PendingIngressDeferredTokenIsConsumedWhenRateLimitingDisabled) {
-    unittest::ServerParameterGuard rateLimiterEnabled{"ingressRequestRateLimiterEnabled", false};
-
-    RateLimiter limiterForDeferredToken(
-        /*refreshRatePerSec=*/1.0,
-        /*burstCapacitySecs=*/1.0,
-        /*maxQueueDepth=*/1,
-        "PendingIngressDeferredTokenIsConsumedWhenRateLimitingDisabled");
-
-    auto opCtx = makeOperationContext();
-    ASSERT_OK(limiterForDeferredToken.acquireToken(opCtx.get()));
-    auto queuedTokenResult = limiterForDeferredToken.acquireToken();
-    ASSERT_TRUE(queuedTokenResult);
-    ASSERT_FALSE(queuedTokenResult->isReady());
-
-    IngressRequestRateLimiter::setDeferredAdmissionToken_forTest(opCtx->getClient(),
-                                                                 std::move(*queuedTokenResult));
-
-    auto msg = constructMessage(BSON(TestCmdSucceeds::kCommandName << 1), opCtx.get());
-    ASSERT_OK(handleRequest(msg, opCtx.get()));
-
-    ASSERT_EQ(limiterForDeferredToken.stats().addedToQueue(), 1);
-    ASSERT_EQ(limiterForDeferredToken.stats().removedFromQueue(), 1);
-    ASSERT_EQ(limiterForDeferredToken.stats().exemptedAdmissions(), 1);
-    ASSERT_EQ(limiterForDeferredToken.queued(), 0);
+    testPendingIngressDeferredTokenIsConsumedWhenRateLimitingDisabled();
 }
 
 TEST_F(ServiceEntryPointShardServerTest, QueuedAdmissionInterrupted) {
-    unittest::ServerParameterGuard rateLimiterEnabled{"ingressRequestRateLimiterEnabled", true};
-
-    auto opCtx = makeOperationContext();
-    auto* client = opCtx->getClient();
-
-    RateLimiter limiterForDeferredToken(
-        /*refreshRatePerSec=*/1.0,
-        /*burstCapacitySecs=*/1.0,
-        /*maxQueueDepth=*/2,
-        "QueuedAdmissionInterrupted");
-
-    ASSERT_OK(limiterForDeferredToken.acquireToken(opCtx.get()));
-    auto queuedTokenResult = limiterForDeferredToken.acquireToken();
-    ASSERT_TRUE(queuedTokenResult);
-    ASSERT_FALSE(queuedTokenResult->isReady());
-    IngressRequestRateLimiter::setDeferredAdmissionToken_forTest(client,
-                                                                 std::move(*queuedTokenResult));
-
-    // handleRequest blocks in waitForAdmission while the queued token's napTime elapses. A
-    // background thread waits until the opCtx is blocking there, then kills it to trigger
-    // Interrupted.
-    auto msg = constructMessage(BSON(TestCmdShardIngressSubject::kCommandName << 1), opCtx.get());
-    stdx::thread interrupter([&] {
-        auto& admCtx = IngressRequestAdmissionContext::get(opCtx.get());
-        ASSERT(admCtx.waitUntilQueued_forTest(Seconds(30)));
-        opCtx->markKilled(ErrorCodes::Interrupted);
-    });
-    auto swDbResponse = handleRequest(msg, opCtx.get());
-    interrupter.join();
-    ASSERT_OK(swDbResponse);
-
-    const auto response = dbResponseToBSON(swDbResponse.getValue());
-    const auto status = getStatusFromCommandResult(response);
-    ASSERT_EQ(status.code(), ErrorCodes::Interrupted);
-    ASSERT_EQ(limiterForDeferredToken.stats().interruptedInQueue(), 1);
+    testQueuedAdmissionInterrupted();
 }
 
 TEST_F(ServiceEntryPointShardServerTest, QueuedAdmissionRespectsMaxTimeMS) {
-    gFeatureFlagIngressRateLimiting.setForServerParameter(true);
-    unittest::ServerParameterGuard requestLimiterEnabled{"ingressRequestRateLimiterEnabled", true};
-
-    auto* clockSource =
-        static_cast<ClockSourceMock*>(getGlobalServiceContext()->getFastClockSource());
-    auto* tickSource =
-        static_cast<TickSourceMock<Milliseconds>*>(getGlobalServiceContext()->getTickSource());
-
-    auto opCtx = makeOperationContext();
-    auto* client = opCtx->getClient();
-
-    // ServiceEntryPointShardRole has a contract guard ensuring presence of an AuthorizationSession.
-    AuthorizationSession::get(client);
-
-    // Create the limiter with the mock tick source so clock advancement controls token
-    // availability.
-    RateLimiter limiterForDeferredToken(
-        /*refreshRatePerSec=*/1.0,
-        /*burstCapacitySecs=*/1.0,
-        /*maxQueueDepth=*/2,
-        "QueuedAdmissionRespectsMaxTimeMS",
-        tickSource);
-
-    ASSERT_OK(limiterForDeferredToken.acquireToken(opCtx.get()));
-    auto queuedTokenResult = limiterForDeferredToken.acquireToken();
-    ASSERT_TRUE(queuedTokenResult);
-    ASSERT_FALSE(queuedTokenResult->isReady());
-    IngressRequestRateLimiter::setDeferredAdmissionToken_forTest(client,
-                                                                 std::move(*queuedTokenResult));
-
-    // handleRequest parses maxTimeMS from the message and sets the opCtx deadline. A background
-    // thread waits until the opCtx is blocking in waitForAdmission, then advances the mock clock
-    // past the 5ms deadline (well under the ~1000ms napTime) to trigger MaxTimeMSExpired.
-    auto& admCtx = IngressRequestAdmissionContext::get(opCtx.get());
-    stdx::thread clockAdvancer([&] {
-        ASSERT(admCtx.waitUntilQueued_forTest(Seconds(30)));
-        clockSource->advance(Milliseconds(6));
-        tickSource->advance(Milliseconds(6));
-    });
-
-    auto msg = constructMessage(BSON(TestCmdShardIngressSubject::kCommandName
-                                     << 1 << GenericArguments::kMaxTimeMSFieldName << 5),
-                                opCtx.get());
-    auto swDbResponse = handleRequest(msg, opCtx.get());
-    clockAdvancer.join();
-    ASSERT_OK(swDbResponse);
-
-    const auto response = dbResponseToBSON(swDbResponse.getValue());
-    const auto status = getStatusFromCommandResult(response);
-    ASSERT_EQ(status.code(), ErrorCodes::MaxTimeMSExpired);
-    ASSERT_EQ(limiterForDeferredToken.stats().interruptedInQueue(), 1);
+    testQueuedAdmissionRespectsMaxTimeMS();
 }
 
 TEST_F(ServiceEntryPointShardServerTest, QueuedAdmissionWithLargeMaxTimeMSSucceeds) {
-    gFeatureFlagIngressRateLimiting.setForServerParameter(true);
-    unittest::ServerParameterGuard requestLimiterEnabled{"ingressRequestRateLimiterEnabled", true};
-
-    auto* clockSource =
-        static_cast<ClockSourceMock*>(getGlobalServiceContext()->getFastClockSource());
-    auto* tickSource =
-        static_cast<TickSourceMock<Milliseconds>*>(getGlobalServiceContext()->getTickSource());
-
-    auto opCtx = makeOperationContext();
-    auto* client = opCtx->getClient();
-
-    CurOp::get(opCtx.get())->setTickSource_forTest(tickSource);
-
-    // ServiceEntryPointShardRole has a contract guard ensuring presence of an AuthorizationSession.
-    AuthorizationSession::get(client);
-
-    RateLimiter limiterForDeferredToken(
-        /*refreshRatePerSec=*/1.0,
-        /*burstCapacitySecs=*/1.0,
-        /*maxQueueDepth=*/2,
-        "QueuedAdmissionWithLargeMaxTimeMSSucceeds",
-        tickSource);
-
-    ASSERT_OK(limiterForDeferredToken.acquireToken(opCtx.get()));
-    auto queuedTokenResult = limiterForDeferredToken.acquireToken();
-    ASSERT_TRUE(queuedTokenResult);
-    ASSERT_FALSE(queuedTokenResult->isReady());
-    IngressRequestRateLimiter::setDeferredAdmissionToken_forTest(client,
-                                                                 std::move(*queuedTokenResult));
-
-    // handleRequest will block in waitForAdmission while the queued token's napTime (~1000ms at
-    // 1 token/sec) elapses. A background thread waits until the opCtx is blocking, then advances
-    // the mock clock past the napTime to release the token and let the command succeed.
-    auto& admCtx = IngressRequestAdmissionContext::get(opCtx.get());
-    stdx::thread clockAdvancer([&] {
-        ASSERT(admCtx.waitUntilQueued_forTest(Seconds(30)));
-        // Advance the tick source first so that when the queued thread wakes up (due to the
-        // clockSource advancing) it will always observe the correct tick count.
-        tickSource->advance(Milliseconds(1001));
-        clockSource->advance(Milliseconds(1001));
-    });
-
-    auto msg = constructMessage(BSON(TestCmdShardIngressSubject::kCommandName
-                                     << 1 << GenericArguments::kMaxTimeMSFieldName << (60 * 1000)),
-                                opCtx.get());
-    auto swDbResponse = handleRequest(msg, opCtx.get());
-    clockAdvancer.join();
-
-    ASSERT_OK(swDbResponse);
-    ASSERT_EQ(getStatusFromCommandResult(dbResponseToBSON(swDbResponse.getValue())), Status::OK());
-    ASSERT_EQ(limiterForDeferredToken.stats().successfulAdmissions(), 2);
-
-    // Time spent in the queue should not be represented in the "working" time.
-    ASSERT_LESS_THAN(CurOp::get(opCtx.get())->debug().workingTimeMillis, Milliseconds(1000));
+    testQueuedAdmissionWithLargeMaxTimeMSSucceeds();
 }
 
 TEST_F(ServiceEntryPointShardServerTest, TelemetryContextDeserializedFromSection) {

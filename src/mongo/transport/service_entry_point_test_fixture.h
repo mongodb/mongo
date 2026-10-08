@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "mongo/db/admission/ingress_request_admission_context.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
@@ -16,8 +17,11 @@
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/util/clock_source_mock.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/tick_source_mock.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/timer.h"
 
 #include <string_view>
 
@@ -62,6 +66,13 @@ public:
         return getClient()->getService()->getServiceEntryPoint();
     }
 
+    /**
+     * Wait until the thread associated with the given opCtx is queued for admission in the
+     * IngressRequestRateLimiter. The provided `expectedAdmissionTime` must be the expected point in
+     * time at which the thread is to finish queueing and be admitted into the system.
+     */
+    void waitUntilQueuedAtAdmission(OperationContext* opCtx, Date_t expectedAdmissionTime);
+
     void testCommandSucceeds();
     void testCommandFailsRunInvocationWithResponse();
     void testCommandFailsRunInvocationWithException(std::string log);
@@ -88,6 +99,10 @@ public:
     void testSpanNotCreatedWhenTelemetryContextNotSetInRequest();
     void testIngressSpanHasServerKind();
     void testIngressSpanHasConsumerKindForMoreToCome();
+    void testPendingIngressDeferredTokenIsConsumedWhenRateLimitingDisabled();
+    void testQueuedAdmissionInterrupted();
+    void testQueuedAdmissionRespectsMaxTimeMS();
+    void testQueuedAdmissionWithLargeMaxTimeMSSucceeds();
 
 protected:
     ReadWriteConcernDefaultsLookupMock _lookupMock;

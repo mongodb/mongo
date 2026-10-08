@@ -43,6 +43,8 @@ public:
      * Resets the current time to the given value.
      */
     void reset(Date_t newNow = kInitialNow);
+
+    bool hasAlarmAt(Date_t when) const;
 };
 
 /**

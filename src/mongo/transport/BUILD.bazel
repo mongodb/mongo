@@ -368,6 +368,9 @@ mongo_cc_library(
     deps = [
         "//src/mongo/db:read_write_concern_defaults_mock",
         "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/admission:ingress_request_admission_context",
+        "//src/mongo/db/admission:ingress_request_rate_limiter",
+        "//src/mongo/db/admission:rate_limiter",
         "//src/mongo/db/repl:replmocks",
         "//src/mongo/db/repl/hello:hello_command",
         "//src/mongo/otel",

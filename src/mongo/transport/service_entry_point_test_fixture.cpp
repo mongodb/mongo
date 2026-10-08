@@ -7,6 +7,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"
+#include "mongo/db/admission/ingress_request_rate_limiter.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/operation_context.h"
@@ -16,6 +17,7 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/storage_engine_mock.h"
 #include "mongo/executor/remote_command_request.h"
+#include "mongo/logv2/log.h"
 #include "mongo/otel/telemetry_context_holder.h"
 #include "mongo/otel/traces/sampler/sampler.h"
 #include "mongo/otel/traces/telemetry_context_serialization.h"
@@ -26,10 +28,17 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/telemetry_context_section_gen.h"
 #include "mongo/transport/service_entry_point.h"
+#include "mongo/unittest/thread_assertion_monitor.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/duration.h"
+
+#include <algorithm>
 
 #ifdef MONGO_CONFIG_OTEL
 #include "mongo/otel/traces/span/span_telemetry_context_impl.h"
 #endif
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {
 
@@ -141,6 +150,28 @@ DbResponse ServiceEntryPointTestFixture::runCommandTestWithResponse(BSONObj cmdB
 void ServiceEntryPointTestFixture::assertResponseForClusterAndOperationTime(BSONObj response) {
     ASSERT(response.hasField("$clusterTime")) << ", response: " << response;
     ASSERT(response.hasField("operationTime")) << ", response: " << response;
+}
+
+void ServiceEntryPointTestFixture::waitUntilQueuedAtAdmission(OperationContext* opCtx,
+                                                              Date_t expectedAdmissionTime) {
+    ASSERT(IngressRequestAdmissionContext::get(opCtx).waitUntilQueued_forTest(Seconds(30)))
+        << "Timed out waiting for request associated with the provided opCtx to be queued in "
+           "the IRRL";
+
+    auto* clockSource =
+        static_cast<ClockSourceMock*>(getGlobalServiceContext()->getFastClockSource());
+    // Wait until the opCtx has started sleeping for its nap duration.
+    auto expectedAlarm = opCtx->hasDeadline()
+        ? std::min(opCtx->getDeadline(), expectedAdmissionTime)
+        : expectedAdmissionTime;
+
+    Timer t;
+    while (!clockSource->hasAlarmAt(expectedAlarm)) {
+        ASSERT_LT(t.elapsed(), Seconds(30))
+            << "Timed out waiting for thread associated with the provided opCtx to sleep for "
+               "the IRRL's prescribed nap-time";
+        sleepFor(Milliseconds(1));
+    }
 }
 
 void ServiceEntryPointTestFixture::testCommandSucceeds() {
@@ -628,6 +659,212 @@ void ServiceEntryPointTestFixture::testIngressSpanHasConsumerKindForMoreToCome()
 
     EXPECT_THAT(capturer.getSpans(TestCmdSucceeds::kCommandName),
                 Contains(otel::traces::HasKind(otel::traces::SpanKind::kConsumer)));
+}
+
+namespace {
+unittest::MinimumLoggedSeverityGuard enableRateLimiterLogging() {
+    return unittest::MinimumLoggedSeverityGuard{logv2::LogComponent::kDefault,
+                                                logv2::LogSeverity::Debug(4)};
+}
+}  // namespace
+
+void ServiceEntryPointTestFixture::
+    testPendingIngressDeferredTokenIsConsumedWhenRateLimitingDisabled() {
+    auto guard = enableRateLimiterLogging();
+    unittest::ServerParameterGuard requestLimiterEnabled{"ingressRequestRateLimiterEnabled", false};
+
+    admission::RateLimiter limiterForDeferredToken(
+        /*refreshRatePerSec=*/1.0,
+        /*burstCapacitySecs=*/1.0,
+        /*maxQueueDepth=*/1,
+        "PendingIngressDeferredTokenIsConsumedWhenRateLimitingDisabled");
+
+    auto opCtx = makeOperationContext();
+    ASSERT_OK(limiterForDeferredToken.acquireToken(opCtx.get()));
+    auto queuedTokenResult = limiterForDeferredToken.acquireToken();
+    ASSERT_TRUE(queuedTokenResult);
+    ASSERT_FALSE(queuedTokenResult->isReady());
+    admission::IngressRequestRateLimiter::setDeferredAdmissionToken_forTest(
+        opCtx->getClient(), std::move(*queuedTokenResult));
+
+    auto msg = constructMessage(BSON(TestCmdSucceeds::kCommandName << 1), opCtx.get());
+    ASSERT_OK(handleRequest(msg, opCtx.get()));
+
+    ASSERT_EQ(limiterForDeferredToken.stats().addedToQueue(), 1);
+    ASSERT_EQ(limiterForDeferredToken.stats().removedFromQueue(), 1);
+    ASSERT_EQ(limiterForDeferredToken.stats().exemptedAdmissions(), 1);
+    ASSERT_EQ(limiterForDeferredToken.queued(), 0);
+}
+
+void ServiceEntryPointTestFixture::testQueuedAdmissionInterrupted() {
+    auto guard = enableRateLimiterLogging();
+
+    unittest::threadAssertionMonitoredTest([&](auto& monitor) {
+        ThreadClient client("QueuedAdmissionInterrupted", getService());
+        unittest::ServerParameterGuard requestLimiterEnabled{"ingressRequestRateLimiterEnabled",
+                                                             true};
+
+        admission::RateLimiter limiterForDeferredToken(
+            /*refreshRatePerSec=*/1.0,
+            /*burstCapacitySecs=*/1.0,
+            /*maxQueueDepth=*/2,
+            "QueuedAdmissionInterrupted",
+            getGlobalServiceContext()->getTickSource());
+
+        auto opCtx = makeOperationContext();
+        ASSERT_OK(limiterForDeferredToken.acquireToken(opCtx.get()));
+        auto queuedTokenResult = limiterForDeferredToken.acquireToken();
+        ASSERT_TRUE(queuedTokenResult);
+        ASSERT_FALSE(queuedTokenResult->isReady());
+
+        auto napDuration = queuedTokenResult->getNapDuration_forTest();
+        ASSERT_EQ(napDuration, Seconds(1));
+        admission::IngressRequestRateLimiter::setDeferredAdmissionToken_forTest(
+            opCtx->getClient(), std::move(*queuedTokenResult));
+
+        // handleRequest blocks in waitForAdmission while the queued token's napTime elapses. A
+        // background thread waits until the opCtx is blocking there, then kills it to trigger
+        // Interrupted.
+        auto expectedAdmissionTime =
+            getGlobalServiceContext()->getFastClockSource()->now() + napDuration;
+        auto interrupter = monitor.spawn([&] {
+            waitUntilQueuedAtAdmission(opCtx.get(), expectedAdmissionTime);
+            opCtx->markKilled(ErrorCodes::Interrupted);
+        });
+
+        auto msg = constructMessage(BSON("ping" << 1), opCtx.get());
+        auto swDbResponse = handleRequest(msg, opCtx.get());
+        interrupter.join();
+        ASSERT_OK(swDbResponse);
+        auto response = dbResponseToBSON(swDbResponse.getValue());
+        auto status = getStatusFromCommandResult(response);
+        ASSERT_EQ(status, ErrorCodes::Interrupted);
+        ASSERT_EQ(limiterForDeferredToken.stats().interruptedInQueue(), 1);
+    });
+}
+
+void ServiceEntryPointTestFixture::testQueuedAdmissionRespectsMaxTimeMS() {
+    auto guard = enableRateLimiterLogging();
+
+    unittest::threadAssertionMonitoredTest([&](auto& monitor) {
+        ThreadClient client("QueuedAdmissionRespectsMaxTimeMS", getService());
+
+        unittest::ServerParameterGuard requestLimiterEnabled{"ingressRequestRateLimiterEnabled",
+                                                             true};
+
+        auto* clockSource =
+            static_cast<ClockSourceMock*>(getGlobalServiceContext()->getFastClockSource());
+        auto* tickSource =
+            static_cast<TickSourceMock<Milliseconds>*>(getGlobalServiceContext()->getTickSource());
+
+        // Create the limiter with the mock tick source so clock advancement controls token
+        // availability.
+        admission::RateLimiter limiterForDeferredToken(
+            /*refreshRatePerSec=*/1.0,
+            /*burstCapacitySecs=*/1.0,
+            /*maxQueueDepth=*/2,
+            "QueuedAdmissionRespectsMaxTimeMS",
+            tickSource);
+
+        auto opCtx = makeOperationContext();
+        ASSERT_OK(limiterForDeferredToken.acquireToken(opCtx.get()));
+        auto queuedTokenResult = limiterForDeferredToken.acquireToken();
+        ASSERT_TRUE(queuedTokenResult);
+        ASSERT_FALSE(queuedTokenResult->isReady());
+
+        auto napDuration = queuedTokenResult->getNapDuration_forTest();
+        ASSERT_EQ(napDuration, Seconds(1));
+        admission::IngressRequestRateLimiter::setDeferredAdmissionToken_forTest(
+            opCtx->getClient(), std::move(*queuedTokenResult));
+
+        // The clockAdvancer thread waits until the opCtx is blocking in waitForAdmission, then
+        // advances the mock clock past the maxTimeMS deadline (well under the ~1000ms napTime) to
+        // trigger MaxTimeMSExpired.
+        auto maxTimeMS = Milliseconds(105);
+        auto expectedAdmissionTime = clockSource->now() + napDuration;
+        auto clockAdvancer = monitor.spawn([&] {
+            waitUntilQueuedAtAdmission(opCtx.get(), expectedAdmissionTime);
+
+            auto newTime = maxTimeMS + Milliseconds(1);
+            clockSource->advance(newTime);
+            tickSource->advance(newTime);
+        });
+
+        auto msg = constructMessage(
+            BSON("ping" << 1 << GenericArguments::kMaxTimeMSFieldName << maxTimeMS.count()),
+            opCtx.get());
+        auto swDbResponse = handleRequest(msg, opCtx.get());
+        clockAdvancer.join();
+        ASSERT_OK(swDbResponse);
+
+        const auto response = dbResponseToBSON(swDbResponse.getValue());
+        const auto status = getStatusFromCommandResult(response);
+        ASSERT_EQ(status.code(), ErrorCodes::MaxTimeMSExpired);
+        ASSERT_EQ(limiterForDeferredToken.stats().interruptedInQueue(), 1);
+    });
+}
+
+void ServiceEntryPointTestFixture::testQueuedAdmissionWithLargeMaxTimeMSSucceeds() {
+    auto guard = enableRateLimiterLogging();
+
+    unittest::threadAssertionMonitoredTest([&](auto& monitor) {
+        ThreadClient client("QueuedAdmissionWithLargeMaxTimeMSSucceeds", getService());
+        unittest::ServerParameterGuard requestLimiterEnabled{"ingressRequestRateLimiterEnabled",
+                                                             true};
+
+        auto* clockSource =
+            static_cast<ClockSourceMock*>(getGlobalServiceContext()->getFastClockSource());
+        auto* tickSource =
+            static_cast<TickSourceMock<Milliseconds>*>(getGlobalServiceContext()->getTickSource());
+
+        auto opCtx = makeOperationContext();
+
+        // Needed to ensure workingTimeMillis is calculated using the test's mock tick source rather
+        // than the system one.
+        CurOp::get(opCtx.get())->setTickSource_forTest(tickSource);
+
+        admission::RateLimiter limiterForDeferredToken(
+            /*refreshRatePerSec=*/1.0,
+            /*burstCapacitySecs=*/1.0,
+            /*maxQueueDepth=*/2,
+            "QueuedAdmissionWithLargeMaxTimeMSSucceeds",
+            tickSource);
+
+        ASSERT_OK(limiterForDeferredToken.acquireToken(opCtx.get()));
+        auto queuedTokenResult = limiterForDeferredToken.acquireToken();
+        ASSERT_TRUE(queuedTokenResult);
+        ASSERT_FALSE(queuedTokenResult->isReady());
+        auto napDuration = queuedTokenResult->getNapDuration_forTest();
+        ASSERT_EQ(napDuration, Seconds(1));
+        admission::IngressRequestRateLimiter::setDeferredAdmissionToken_forTest(
+            client.get(), std::move(*queuedTokenResult));
+
+        // handleRequest will block in waitForAdmission while the queued token's napTime (~1000ms at
+        // 1 token/sec) elapses. A background thread waits until the opCtx is blocking, then
+        // advances the mock clock past the napTime to release the token and let the command
+        // succeed.
+        auto expectedAdmissionTime = clockSource->now() + napDuration;
+        auto clockAdvancer = monitor.spawn([&] {
+            waitUntilQueuedAtAdmission(opCtx.get(), expectedAdmissionTime);
+            // Advance the tick source first so that when the queued thread wakes up (due to the
+            // clockSource advancing) it will always observe the correct tick count.
+            tickSource->advance(Milliseconds(1001));
+            clockSource->advance(Milliseconds(1001));
+        });
+
+        auto msg = constructMessage(
+            BSON("ping" << 1 << GenericArguments::kMaxTimeMSFieldName << (60 * 1000)), opCtx.get());
+        auto swDbResponse = handleRequest(msg, opCtx.get());
+        clockAdvancer.join();
+
+        ASSERT_OK(swDbResponse);
+        ASSERT_EQ(getStatusFromCommandResult(dbResponseToBSON(swDbResponse.getValue())),
+                  Status::OK());
+        ASSERT_EQ(limiterForDeferredToken.stats().successfulAdmissions(), 2);
+
+        // Time spent in the queue should not be represented in the "working" time.
+        ASSERT_LT(CurOp::get(opCtx.get())->debug().workingTimeMillis, Milliseconds(1000));
+    });
 }
 
 }  // namespace mongo

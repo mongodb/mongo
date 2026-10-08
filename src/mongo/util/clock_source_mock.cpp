@@ -3,15 +3,19 @@
 
 #include "mongo/util/clock_source_mock.h"
 
+#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/static_immortal.h"
 
+#include <algorithm>
 #include <mutex>
 #include <new>
 #include <queue>
 #include <utility>
 #include <vector>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {
 namespace {
@@ -47,6 +51,11 @@ public:
         _processAlarms(lk);
     }
 
+    bool hasAlarmAt(Date_t when) const {
+        std::unique_lock lk(_mutex);
+        return _alarms.hasAlarmAt(when);
+    }
+
 private:
     struct Alarm {
         Date_t when;
@@ -68,6 +77,10 @@ private:
             auto action = std::move(c.front().action);
             pop();
             return action;
+        }
+
+        bool hasAlarmAt(Date_t when) const {
+            return std::any_of(c.begin(), c.end(), [&](const Alarm& a) { return a.when == when; });
         }
     };
 
@@ -110,6 +123,10 @@ void ClockSourceMock::reset(Date_t newNow) {
 
 void ClockSourceMock::setAlarm(Date_t when, unique_function<void()> action) {
     getGlobalClockSourceMock()->setAlarm(when, std::move(action));
+}
+
+bool ClockSourceMock::hasAlarmAt(Date_t when) const {
+    return getGlobalClockSourceMock()->hasAlarmAt(when);
 }
 
 }  // namespace mongo

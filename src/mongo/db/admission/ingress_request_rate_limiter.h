@@ -93,7 +93,8 @@ public:
     /** Clears any pending deferred admission token stored on the client. */
     static void clearDeferredAdmissionToken(Client* client);
     /** Test-only helper to seed a pending DeferredToken on a client. */
-    static void setDeferredAdmissionToken_forTest(Client* client, RateLimiter::DeferredToken token);
+    [[MONGO_MOD_PUBLIC]] static void setDeferredAdmissionToken_forTest(
+        Client* client, RateLimiter::DeferredToken token);
     /** Test-only helper to check if a client has a deferred admission token. */
     static bool hasDeferredAdmissionToken_forTest(Client* client);
 
