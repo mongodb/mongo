@@ -4,7 +4,7 @@
  * @tags: [
  *  requires_sharding,
  *  assumes_balancer_off,
- *  does_not_support_add_remove_shards,
+ *  assumes_stable_shard_list,
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
