@@ -376,6 +376,7 @@ mongo_cc_unit_test(
         "//src/mongo/db:service_context_d_test_fixture",
         "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/db/collection_crud",
+        "//src/mongo/db/commands/server_status:server_status_metric",
         "//src/mongo/db/repl:replmocks",
         "//src/mongo/db/repl:storage_interface_impl",
         "//src/mongo/db/shard_role",

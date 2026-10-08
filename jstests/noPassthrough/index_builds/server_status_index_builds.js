@@ -38,60 +38,141 @@ describe("index build throughput metrics", function () {
         );
     });
 
-    it("keys and bytes processed", () => {
-        const before = this.db.serverStatus().metrics.indexBuilds;
+    const phases = ["collectionScan", "bulkLoad", "drainWrites"];
+    const perPhaseMetrics = ["keysProcessed", "bytesProcessed", "phaseDurationMicros"];
 
-        const fp = configureFailPoint(this.db, "hangIndexBuildDuringBulkLoadPhase", {
-            iteration: 0,
-            indexNames: ["a_1"],
-        });
+    // Gets the difference in metric values between two indexBuilds serverStatus sections, returned as an object with entries of the form {metric: {phase: delta}} for each metric.
+    const perPhaseDelta = (current, original) =>
+        Object.fromEntries(
+            perPhaseMetrics.map((metric) => [
+                metric,
+                Object.fromEntries(
+                    phases.map((phase) => [
+                        phase,
+                        current[phase][metric] - original[phase][metric],
+                    ]),
+                ),
+            ]),
+        );
 
-        const checkIndexBuildMetrics = (current, original, phasesCompleted) => {
-            assert.eq(current.keysProcessed, original.keysProcessed + keyCount * phasesCompleted);
-            assert.gte(
-                current.bytesProcessed,
-                original.bytesProcessed + keyCount * minBytesPerKey * phasesCompleted,
-            );
-        };
-
+    // Builds an ascending index on field 'a', pausing the index build at  `failPointName`, and running `duringFn` during the pause.
+    const buildIndexPausedAt = (failPointName, failPointData, duringFn) => {
+        const fp = configureFailPoint(this.db, failPointName, failPointData);
         const awaitCreateIndex = IndexBuildTest.startIndexBuild(
             this.conn,
             this.coll.getFullName(),
             {a: 1},
         );
+        try {
+            fp.wait();
+            duringFn();
+        } finally {
+            fp.off();
+            awaitCreateIndex();
+        }
+    };
 
-        fp.wait();
-        const during = this.db.serverStatus().metrics.indexBuilds;
-        checkIndexBuildMetrics(during, before, 1);
+    it("per-phase keys and bytes processed", () => {
+        const before = this.db.serverStatus().metrics.indexBuilds;
 
-        fp.off();
-        awaitCreateIndex();
+        buildIndexPausedAt(
+            "hangIndexBuildDuringBulkLoadPhase",
+            {iteration: 0, indexNames: ["a_1"]},
+            () => {
+                const during = this.db.serverStatus().metrics.indexBuilds;
+                const delta = perPhaseDelta(during, before);
+                assert.eq(delta.keysProcessed, {
+                    collectionScan: keyCount,
+                    bulkLoad: 0,
+                    drainWrites: 0,
+                });
+                assert.gte(delta.bytesProcessed.collectionScan, keyCount * minBytesPerKey, {delta});
+                assert.eq(delta.bytesProcessed.bulkLoad, 0, {delta});
+                assert.eq(delta.bytesProcessed.drainWrites, 0, {delta});
+            },
+        );
+
         const after = this.db.serverStatus().metrics.indexBuilds;
-        checkIndexBuildMetrics(after, before, 2);
+        const delta = perPhaseDelta(after, before);
+        // Assert that we scanned and loaded the expected number of keys/bytes, and that we did not drain any side writes.
+        assert.eq(delta.keysProcessed, {
+            collectionScan: keyCount,
+            bulkLoad: keyCount,
+            drainWrites: 0,
+        });
+        assert.gte(delta.bytesProcessed.bulkLoad, keyCount * minBytesPerKey, {delta});
+        assert.eq(delta.bytesProcessed.drainWrites, 0, {delta});
     });
 
-    it("phase durations", () => {
+    it("per-phase durations", () => {
         const before = this.db.serverStatus().metrics.indexBuilds;
 
-        const fp = configureFailPoint(this.db, "hangIndexBuildDuringBulkLoadPhase", {
-            iteration: 0,
-            indexNames: ["a_1"],
-        });
-
-        const awaitCreateIndex = IndexBuildTest.startIndexBuild(
-            this.conn,
-            this.coll.getFullName(),
-            {a: 1},
+        let during;
+        buildIndexPausedAt(
+            "hangIndexBuildDuringBulkLoadPhase",
+            {iteration: 0, indexNames: ["a_1"]},
+            () => {
+                during = this.db.serverStatus().metrics.indexBuilds;
+                assert.gt(perPhaseDelta(during, before).phaseDurationMicros.collectionScan, 0);
+            },
         );
 
-        fp.wait();
-        const during = this.db.serverStatus().metrics.indexBuilds;
-        assert.gt(during.phaseDurationMicros, before.phaseDurationMicros);
-
-        fp.off();
-        awaitCreateIndex();
         const after = this.db.serverStatus().metrics.indexBuilds;
-        assert.gt(after.phaseDurationMicros, during.phaseDurationMicros);
+        assert.gt(perPhaseDelta(after, during).phaseDurationMicros.bulkLoad, 0);
+    });
+
+    it("per-phase drain writes", () => {
+        const sideWriteCount = 10;
+        const before = this.db.serverStatus().metrics.indexBuilds;
+
+        // Write to the collection we are building an index on, which should result in side writes being recorded for the drain phase.
+        buildIndexPausedAt("hangAfterIndexBuildDumpsInsertsFromBulk", {}, () => {
+            assert.commandWorked(
+                this.coll.insertMany(Array.from({length: sideWriteCount}, (_, i) => ({a: i}))),
+            );
+        });
+
+        const after = this.db.serverStatus().metrics.indexBuilds;
+        const delta = perPhaseDelta(after, before);
+        assert.eq(delta.keysProcessed, {
+            collectionScan: keyCount,
+            bulkLoad: keyCount,
+            drainWrites: sideWriteCount,
+        });
+        assert.gte(delta.bytesProcessed.drainWrites, sideWriteCount * minBytesPerKey, {delta});
+        assert.gt(delta.phaseDurationMicros.drainWrites, 0, {delta});
+    });
+
+    it("phase totals equal the sum of the per-phase metrics", () => {
+        const before = this.db.serverStatus().metrics.indexBuilds;
+
+        // Side writes during the pause make all three phases record work.
+        buildIndexPausedAt("hangAfterIndexBuildDumpsInsertsFromBulk", {}, () => {
+            assert.commandWorked(
+                this.coll.insertMany(Array.from({length: 10}, (_, i) => ({a: i}))),
+            );
+        });
+
+        const after = this.db.serverStatus().metrics.indexBuilds;
+        const delta = perPhaseDelta(after, before);
+        for (const metric of perPhaseMetrics) {
+            const perPhaseSum = phases.reduce((sum, phase) => sum + delta[metric][phase], 0);
+            assert.eq(after[metric] - before[metric], perPhaseSum, `${metric} total`, {delta});
+        }
+    });
+
+    it("docs and bytes scanned", () => {
+        const minBytesPerDoc = 4; // Each document holds at least the 4-byte field value.
+        const before = this.db.serverStatus().metrics.indexBuilds;
+
+        assert.commandWorked(this.coll.createIndex({a: 1}));
+
+        const after = this.db.serverStatus().metrics.indexBuilds;
+        assert.eq(after.docsScanned - before.docsScanned, keyCount, {before, after});
+        assert.gte(after.bytesScanned - before.bytesScanned, keyCount * minBytesPerDoc, {
+            before,
+            after,
+        });
     });
 
     afterEach(() => {

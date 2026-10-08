@@ -9,6 +9,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/namespace_string.h"
@@ -63,6 +64,14 @@ HistogramSnapshot readHistogramOrZero(otel::metrics::OtelMetricsCapturer& captur
         }
         throw;
     }
+}
+
+// Returns metrics.indexBuilds.drainWrites.<metric> from serverStatus.
+int64_t readDrainWritesServerStatusMetric(std::string_view metric) {
+    BSONObjBuilder bob;
+    globalMetricTreeSet()[ClusterRole::None].appendTo(bob);
+    const BSONObj root = bob.obj();
+    return root["metrics"]["indexBuilds"]["drainWrites"][metric].numberLong();
 }
 
 key_string::Value makeKeyString(int64_t value, RecordId rid) {
@@ -904,6 +913,9 @@ TEST_F(IndexBuilderInterceptorTest, SingleInsertIsDrainedIntoIndexPrimaryDriven)
     int64_t drainPhaseMicrosBefore = 0;
     HistogramSnapshot drainDurationBefore{0, 0};
     HistogramSnapshot drainBytesBefore{0, 0};
+    const int64_t ssKeysProcessedBefore = readDrainWritesServerStatusMetric("keysProcessed");
+    const int64_t ssBytesProcessedBefore = readDrainWritesServerStatusMetric("bytesProcessed");
+    const int64_t ssPhaseMicrosBefore = readDrainWritesServerStatusMetric("phaseDurationMicros");
     if (capturer.canReadMetrics()) {
         drainedBefore =
             capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDrained);
@@ -970,6 +982,11 @@ TEST_F(IndexBuilderInterceptorTest, SingleInsertIsDrainedIntoIndexPrimaryDriven)
     // Check that the side write table is empty since the side write was removed.
     auto sideWrites = getSideWritesTableContents(indexBuildInfo);
     EXPECT_EQ(0, sideWrites.size());
+
+    EXPECT_EQ(readDrainWritesServerStatusMetric("keysProcessed"), ssKeysProcessedBefore + 1);
+    EXPECT_EQ(readDrainWritesServerStatusMetric("bytesProcessed"),
+              ssBytesProcessedBefore + keyString.getSize());
+    EXPECT_GT(readDrainWritesServerStatusMetric("phaseDurationMicros"), ssPhaseMicrosBefore);
 
     if (capturer.canReadMetrics()) {
         EXPECT_EQ(

@@ -8,6 +8,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/collection_crud/container_write.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/index/btree_access_method.h"
@@ -186,10 +187,65 @@ auto& indexBuildPhasesDurationCounter =
                                                    .role = ClusterRole::None},
             .reportingPolicy = otel::metrics::ReportingPolicy::kUnconditionally});
 
+struct IndexBuildPhaseCounters {
+    Counter64& keysProcessed;
+    Counter64& bytesProcessed;
+    Counter64& phaseDurationMicros;
+};
+
+/*
+ * Create counters for the duration, number of bytes processed, and number of keys processed for a
+ * given index build phase.
+ */
+IndexBuildPhaseCounters makePhaseSSCounters(std::string_view phaseField) {
+    return {
+        *MetricBuilder<Counter64>{fmt::format("indexBuilds.{}.keysProcessed", phaseField)},
+        *MetricBuilder<Counter64>{fmt::format("indexBuilds.{}.bytesProcessed", phaseField)},
+        *MetricBuilder<Counter64>{fmt::format("indexBuilds.{}.phaseDurationMicros", phaseField)},
+    };
+}
+
+IndexBuildPhaseCounters collectionScanServerStatusCounters = makePhaseSSCounters("collectionScan");
+IndexBuildPhaseCounters bulkLoadServerStatusCounters = makePhaseSSCounters("bulkLoad");
+IndexBuildPhaseCounters drainWritesServerStatusCounters = makePhaseSSCounters("drainWrites");
+
+IndexBuildPhaseCounters& ssCountersForPhase(IndexBuildPhaseEnum phase) {
+    switch (phase) {
+        case IndexBuildPhaseEnum::kCollectionScan:
+            return collectionScanServerStatusCounters;
+        case IndexBuildPhaseEnum::kBulkLoad:
+            return bulkLoadServerStatusCounters;
+        case IndexBuildPhaseEnum::kDrainWrites:
+            return drainWritesServerStatusCounters;
+        case IndexBuildPhaseEnum::kInitialized:
+            break;
+    }
+    MONGO_UNREACHABLE;
+}
+
+/*
+ * Updates the duration, number of keys processed, and number of bytes processed for a given index
+ * build phase. Updates both serverStatus and OTel metrics.
+ */
+void updatePhaseStats(IndexBuildPhaseEnum phase,
+                      int64_t keysProcessed,
+                      int64_t bytesProcessed,
+                      int64_t durationMicros) {
+    auto attr = std::tuple{idl::serialize(phase)};
+    keysProcessedCounter.add(keysProcessed, attr);
+    bytesProcessedCounter.add(bytesProcessed, attr);
+    indexBuildPhasesDurationCounter.add(durationMicros, attr);
+
+    auto& serverStatusCounters = ssCountersForPhase(phase);
+    serverStatusCounters.keysProcessed.increment(keysProcessed);
+    serverStatusCounters.bytesProcessed.increment(bytesProcessed);
+    serverStatusCounters.phaseDurationMicros.increment(durationMicros);
+}
+
 constexpr int32_t kMetricUpdateIntervalKeyCount = 1000;
 constexpr int32_t kMetricUpdateIntervalBytes = 1024 * 1024;  // 1 MiB
 
-inline void updateProcessedMetrics(std::string_view phase,
+inline void updateProcessedMetrics(IndexBuildPhaseEnum phase,
                                    const Timer& timer,
                                    int64_t* const keysCounted,
                                    int64_t* const bytesCounted,
@@ -197,11 +253,11 @@ inline void updateProcessedMetrics(std::string_view phase,
                                    bool force = false) {
     if (force || *keysCounted >= kMetricUpdateIntervalKeyCount ||
         *bytesCounted >= kMetricUpdateIntervalBytes) {
-        keysProcessedCounter.add(*keysCounted, {phase});
-        bytesProcessedCounter.add(*bytesCounted, {phase});
         auto timeElapsed = timer.elapsed();
-        indexBuildPhasesDurationCounter.add(
-            durationCount<Microseconds>(timeElapsed - *durationLastUpdated), {phase});
+        updatePhaseStats(phase,
+                         *keysCounted,
+                         *bytesCounted,
+                         durationCount<Microseconds>(timeElapsed - *durationLastUpdated));
         *durationLastUpdated = timeElapsed;
         *keysCounted = 0;
         *bytesCounted = 0;
@@ -244,10 +300,8 @@ auto& insertFailedDueToDuplicateKeyError =
 void recordIndexBuildSideWritesProcessedStats(int64_t keysProcessed,
                                               int64_t bytesProcessed,
                                               Microseconds durationMicros) {
-    auto attr = std::tuple{idl::serialize(IndexBuildPhaseEnum::kDrainWrites)};
-    keysProcessedCounter.add(keysProcessed, attr);
-    bytesProcessedCounter.add(bytesProcessed, attr);
-    indexBuildPhasesDurationCounter.add(durationMicros.count(), attr);
+    updatePhaseStats(
+        IndexBuildPhaseEnum::kDrainWrites, keysProcessed, bytesProcessed, durationMicros.count());
 }
 
 SortedDataIndexAccessMethod::SortedDataIndexAccessMethod(const IndexCatalogEntry* btreeState,
@@ -1378,9 +1432,11 @@ Status BulkBuilderImpl::insert(OperationContext* opCtx,
         _sorter->add(keyString, mongo::NullValue());
     }
     batchGuard.finish();
-    auto phase = idl::serialize(IndexBuildPhaseEnum::kCollectionScan);
-    updateProcessedMetrics(
-        phase, _timer, &_keysInsertedCounted, &_bytesInsertedCounted, &_durationLastUpdated);
+    updateProcessedMetrics(IndexBuildPhaseEnum::kCollectionScan,
+                           _timer,
+                           &_keysInsertedCounted,
+                           &_bytesInsertedCounted,
+                           &_durationLastUpdated);
 
     return Status::OK();
 }
@@ -1392,7 +1448,7 @@ void BulkBuilderImpl::done(bool forceSpill) {
         _sorter->spill();
     }
     _sortedIterator = _sorter->done();
-    updateProcessedMetrics(idl::serialize(IndexBuildPhaseEnum::kCollectionScan),
+    updateProcessedMetrics(IndexBuildPhaseEnum::kCollectionScan,
                            _timer,
                            &_keysInsertedCounted,
                            &_bytesInsertedCounted,
@@ -1418,7 +1474,7 @@ Status BulkBuilderImpl::commit(OperationContext* opCtx,
         ErrorCodes::BadValue, "onNKeysLoadedFnInterval must be >= 1", onNKeysLoadedFnInterval >= 1);
     tassert(12723201, "BulkBuilder::done must be called before commit", _sortedIterator);
     Timer timer;
-    auto phase = idl::serialize(IndexBuildPhaseEnum::kBulkLoad);
+    const auto phase = IndexBuildPhaseEnum::kBulkLoad;
 
     _ns = entry->getNSSFromCatalog(opCtx);
     auto it = std::move(_sortedIterator);

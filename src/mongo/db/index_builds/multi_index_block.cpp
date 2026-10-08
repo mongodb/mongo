@@ -102,12 +102,18 @@ namespace {
 auto& docsScannedCounter = otel::metrics::MetricsService::instance().createInt64Counter(
     otel::metrics::MetricNames::kIndexBuildDocsScanned,
     "Total number of documents scanned during collection scan",
-    otel::metrics::MetricUnit::kOperations);
+    otel::metrics::MetricUnit::kOperations,
+    otel::metrics::CounterOptions{
+        .serverStatusOptions = otel::metrics::ServerStatusOptions{
+            .dottedPath = "indexBuilds.docsScanned", .role = ClusterRole::None}});
 
 auto& bytesScannedCounter = otel::metrics::MetricsService::instance().createInt64Counter(
     otel::metrics::MetricNames::kIndexBuildBytesScanned,
     "Total number of document bytes scanned during collection scan",
-    otel::metrics::MetricUnit::kBytes);
+    otel::metrics::MetricUnit::kBytes,
+    otel::metrics::CounterOptions{
+        .serverStatusOptions = otel::metrics::ServerStatusOptions{
+            .dottedPath = "indexBuilds.bytesScanned", .role = ClusterRole::None}});
 
 constexpr int32_t kMetricUpdateIntervalDocCount = 1000;
 

@@ -5,6 +5,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/collection_crud/container_write.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/preallocated_container_pool.h"
@@ -1929,6 +1930,22 @@ private:
     boost::optional<unittest::ServerParameterGuard> _containerWritesEnabled;
 };
 
+// Returns the serverStatus value at metrics.indexBuilds.<metric>.
+int64_t readIndexBuildsServerStatusMetric(std::string_view metric) {
+    BSONObjBuilder bob;
+    globalMetricTreeSet()[ClusterRole::None].appendTo(bob);
+    const BSONObj root = bob.obj();
+    return root["metrics"]["indexBuilds"][metric].numberLong();
+}
+
+// Returns the serverStatus value at metrics.indexBuilds.<phase>.<metric>.
+int64_t readPerPhaseServerStatusMetric(std::string_view metric, std::string_view phase) {
+    BSONObjBuilder bob;
+    globalMetricTreeSet()[ClusterRole::None].appendTo(bob);
+    const BSONObj root = bob.obj();
+    return root["metrics"]["indexBuilds"][phase][metric].numberLong();
+}
+
 std::string protocolTestName(IndexBuildProtocol protocol) {
     switch (protocol) {
         case IndexBuildProtocol::kSinglePhase:
@@ -1957,6 +1974,20 @@ TEST_P(MultiIndexBlockMetricsTest, BasicMetrics) {
     int64_t bytesInsertedBefore = 0;
     int64_t scanMicrosBefore = 0;
     int64_t bulkLoadMicrosBefore = 0;
+    const int64_t ssDocsScannedBefore = readIndexBuildsServerStatusMetric("docsScanned");
+    const int64_t ssBytesScannedBefore = readIndexBuildsServerStatusMetric("bytesScanned");
+    const int64_t ssScanKeysBefore =
+        readPerPhaseServerStatusMetric("keysProcessed", "collectionScan");
+    const int64_t ssScanBytesBefore =
+        readPerPhaseServerStatusMetric("bytesProcessed", "collectionScan");
+    const int64_t ssScanMicrosBefore =
+        readPerPhaseServerStatusMetric("phaseDurationMicros", "collectionScan");
+    const int64_t ssBulkLoadKeysBefore =
+        readPerPhaseServerStatusMetric("keysProcessed", "bulkLoad");
+    const int64_t ssBulkLoadBytesBefore =
+        readPerPhaseServerStatusMetric("bytesProcessed", "bulkLoad");
+    const int64_t ssBulkLoadMicrosBefore =
+        readPerPhaseServerStatusMetric("phaseDurationMicros", "bulkLoad");
     if (capturer.canReadMetrics()) {
         scannedBefore =
             capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildDocsScanned);
@@ -2023,6 +2054,21 @@ TEST_P(MultiIndexBlockMetricsTest, BasicMetrics) {
     ASSERT_OK(indexer->drainBackgroundWrites(operationContext(),
                                              RecoveryUnit::ReadSource::kNoTimestamp,
                                              IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+
+    EXPECT_EQ(readIndexBuildsServerStatusMetric("docsScanned"),
+              ssDocsScannedBefore + numDocsInColl);
+    EXPECT_GT(readIndexBuildsServerStatusMetric("bytesScanned"), ssBytesScannedBefore);
+    EXPECT_EQ(readPerPhaseServerStatusMetric("keysProcessed", "collectionScan"),
+              ssScanKeysBefore + (numDocsInColl * numIndexSpecs));
+    EXPECT_GT(readPerPhaseServerStatusMetric("bytesProcessed", "collectionScan"),
+              ssScanBytesBefore);
+    EXPECT_GT(readPerPhaseServerStatusMetric("phaseDurationMicros", "collectionScan"),
+              ssScanMicrosBefore);
+    EXPECT_EQ(readPerPhaseServerStatusMetric("keysProcessed", "bulkLoad"),
+              ssBulkLoadKeysBefore + (numDocsInColl * numIndexSpecs));
+    EXPECT_GT(readPerPhaseServerStatusMetric("bytesProcessed", "bulkLoad"), ssBulkLoadBytesBefore);
+    EXPECT_GT(readPerPhaseServerStatusMetric("phaseDurationMicros", "bulkLoad"),
+              ssBulkLoadMicrosBefore);
 
     if (capturer.canReadMetrics()) {
         EXPECT_EQ(capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildDocsScanned),

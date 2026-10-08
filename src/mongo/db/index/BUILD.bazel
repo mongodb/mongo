@@ -93,6 +93,7 @@ mongo_cc_library(
         "//src/mongo/db:service_context",
         "//src/mongo/db:shard_role_api",
         "//src/mongo/db/collection_crud:container_write",
+        "//src/mongo/db/commands/server_status:server_status_metric",
         "//src/mongo/db/exec:projection_executor",
         "//src/mongo/db/exec:working_set",
         "//src/mongo/db/fts:base_fts",
