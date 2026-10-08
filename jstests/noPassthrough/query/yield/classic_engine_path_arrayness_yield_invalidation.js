@@ -44,7 +44,7 @@ function setupColl(name) {
     return coll;
 }
 
-const kKilledMsg = "non-array path became multikey during yield";
+const kKilledMsg = "non-array path became multikey while the query was suspended";
 
 function runPhases({coll, runQuery, isWriteCmd}) {
     const before = getInvalidationCount(db);

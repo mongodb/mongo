@@ -74,6 +74,9 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
       _remoteExplains(std::move(remoteExplains)) {
     tassert(11321400, "nss must not be empty", !_nss.isEmpty());
     tassert(11321401, "plan.root must not be null", _root);
+    // Restores rely on the yield policy to check that the plan is still valid, so it is required
+    // even for plans that never yield (those use an INTERRUPT_ONLY policy).
+    tassert(13650700, "yieldPolicy must not be null", _yieldPolicy);
     auto& env = _rootData.env;
     if (auto slot = _rootData.staticData->resultSlot) {
         _result = _root->getAccessor(env.ctx, *slot);
@@ -97,14 +100,11 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
         _lastGetNext = _stash.back().first;
     }
 
-    // Callers are allowed to disable yielding for this plan by passing a null yield policy.
-    if (_yieldPolicy) {
-        // Clear any formerly registered plans and register '_root' to yield. This is needed because
-        // multiple candidate plans may have been registered during runtime planning, before the
-        // PlanExecutor was created. All but one candidate plan ('_root') have since been discarded.
-        _yieldPolicy->clearRegisteredPlans();
-        _yieldPolicy->registerPlan(_root.get());
-    }
+    // Clear any formerly registered plans and register '_root' to yield. This is needed because
+    // multiple candidate plans may have been registered during runtime planning, before the
+    // PlanExecutor was created. All but one candidate plan ('_root') have since been discarded.
+    _yieldPolicy->clearRegisteredPlans();
+    _yieldPolicy->registerPlan(_root.get());
     const bool isMultiPlan = classicRuntimePlannerStage != nullptr;
     const bool isCachedCandidate = plan.fromPlanCache;
     if (!_cq || !_cq->getExpCtx()->getExplain()) {
@@ -156,6 +156,10 @@ void PlanExecutorSBE::saveState() {
 
 void PlanExecutorSBE::restoreState(const RestoreContext& context) {
     _root->restoreState();
+    // Restores that do not go through a yield (e.g. at the start of a getMore, or between
+    // $cursor batches) bypass PlanYieldPolicySBE::restoreState(), so check here, after the plan's
+    // cursors are repositioned, as the yield path does.
+    _yieldPolicy->checkConstraintsValid();
 }
 
 void PlanExecutorSBE::detachFromOperationContext() {
@@ -326,7 +330,7 @@ PlanExecutor::ExecState PlanExecutorSBE::getNextImpl(ObjectType* out, RecordId* 
             // The !notifier check is necessary because shouldWaitForInserts can return 'true' when
             // shouldListenForInserts returned 'false' (above) in the case of a deadline becoming
             // "unexpired" due to the system clock going backwards.
-            if (!_yieldPolicy || !notifier ||
+            if (!notifier ||
                 !insert_listener::shouldWaitForInserts(_opCtx, _cq.get(), _yieldPolicy.get())) {
                 return PlanExecutor::ExecState::IS_EOF;
             }

@@ -58,7 +58,9 @@ function runAndExpectPathArraynessKill(dbName, pipelineArg, port) {
                     err,
                 });
                 assert(
-                    err.message.includes("non-array path became multikey during yield"),
+                    err.message.includes(
+                        "non-array path became multikey while the query was suspended",
+                    ),
                     "expected path arrayness kill, not another QueryPlanKilled reason",
                     {err},
                 );

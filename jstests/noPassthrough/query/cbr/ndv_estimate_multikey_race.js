@@ -46,7 +46,8 @@ assert.commandWorked(coll.createIndexes([{a: 1, b: 1, c: 1}]));
 const fpBeforeSampling = configureFailPoint(adminDB, "hangBeforeCBRSamplingGenerateSample");
 
 const awaitQuery = startParallelShell(() => {
-    const killedMsg = 'query plan killed :: non-array path became multikey during yield: path=a"';
+    const killedMsg =
+        'query plan killed :: non-array path became multikey while the query was suspended: path=a"';
     const testColl = db.getSiblingDB(jsTestName())[jsTestName()];
     const err = assert.throws(() => testColl.find({a: {$lt: 50}, c: {$lt: 50}}).explain());
     assert.eq(err.code, ErrorCodes.QueryPlanKilled, err.message);
