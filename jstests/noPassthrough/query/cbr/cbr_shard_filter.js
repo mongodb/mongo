@@ -14,8 +14,10 @@ import {
     getWinningPlanFromExplain,
 } from "jstests/libs/query/analyze_plan.js";
 import {assertPlanCosted, assertPlanNotCosted} from "jstests/libs/query/cbr_utils.js";
+import {hasCostBasedGroup} from "jstests/libs/query/explain_v3_helpers.js";
 import {isDeferredGetExecutorEnabled} from "jstests/libs/query/sbe_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {setParameterOnAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 const st = new ShardingTest({
     shards: 2,
@@ -31,20 +33,6 @@ const st = new ShardingTest({
 
 const db = st.getDB("test");
 
-// TODO SERVER-130179: The deferred engine choice path passes an empty EstimateMap to the plan
-// executor, so costEstimate is absent from explain output even with internalQueryPlanRanker set to
-// costBased. Skip when that feature flag is on until the C++ path is fixed.
-if (
-    db.adminCommand({getParameter: 1, featureFlagGetExecutorDeferredEngineChoice: 1})
-        .featureFlagGetExecutorDeferredEngineChoice?.value
-) {
-    jsTest.log.info(
-        "Skipping: featureFlagGetExecutorDeferredEngineChoice bypasses CBR cost estimation in explain",
-    );
-    st.stop();
-    quit();
-}
-
 const collName = jsTestName();
 const coll = db[collName];
 coll.drop();
@@ -57,23 +45,44 @@ st.shardColl(coll, {_id: 1} /* key */, {_id: 10} /* split */, {_id: 10} /* move 
 assert.commandWorked(coll.insert(Array.from({length: 20}, (_, i) => ({_id: i, a: 1, b: 2}))));
 assert.commandWorked(coll.createIndexes([{a: 1}, {b: 1}]));
 
-const explain = coll.find({a: 1, b: 1}).explain();
+const deferredEngineOn = isDeferredGetExecutorEnabled(db);
 
-if (getEngine(explain) === "classic") {
-    // CBR must cost all plans even when a SHARDING_FILTER stage is present; it
-    // should not fall back to multiplanning.
-    getAllPlans(explain).forEach(assertPlanCosted);
-} else {
-    const winningPlan = getWinningPlanFromExplain(explain, true /* SBE plan */);
-    // TODO SERVER-129522. Winning plan's explain should also populate cost info in SBE.
-    assertPlanNotCosted(winningPlan);
-    const rejected = getRejectedPlans(explain);
-    assert.gt(rejected.length, 0, `Expected at least one rejected plan: ${tojson(explain)}`);
-    // TODO SERVER-117707. Remove this conditional once CBR fully supports SBE.
-    if (isDeferredGetExecutorEnabled(db)) {
-        rejected.forEach(assertPlanCosted);
+for (const frameworkControl of ["forceClassicEngine", "trySbeEngine"]) {
+    setParameterOnAllNonConfigNodes(st.s, "internalQueryFrameworkControl", frameworkControl);
+    const explain = coll.find({a: 1, b: 1}).explain();
+
+    if (getEngine(explain) === "classic") {
+        // CBR must cost all plans even when a SHARDING_FILTER stage is present; it
+        // should not fall back to multiplanning.
+        getAllPlans(explain).forEach(assertPlanCosted);
     } else {
-        rejected.forEach(assertPlanNotCosted);
+        const winningPlan = getWinningPlanFromExplain(explain);
+        const rejected = getRejectedPlans(explain);
+        assert.gt(rejected.length, 0, `Expected at least one rejected plan: ${tojson(explain)}`);
+        // TODO SERVER-117707. Remove this conditional once CBR fully supports SBE.
+        if (deferredEngineOn) {
+            assertPlanCosted(winningPlan);
+            rejected.forEach(assertPlanCosted);
+        } else {
+            assertPlanNotCosted(winningPlan);
+            rejected.forEach(assertPlanNotCosted);
+        }
+    }
+
+    // Without deferred engine choice, SBE V3 explain does not carry the cost estimates.
+    // TODO SERVER-136210 Remove this check once V3 supports deferred engine off.
+    if (deferredEngineOn) {
+        const explain = assert.commandWorked(
+            db.runCommand({
+                explain: {find: collName, filter: {a: 1, b: 1}},
+                verbosity: "plannerStats",
+            }),
+        );
+        const plans = explain.queryPlanner.winningPlan.shards.flatMap((shard) => shard.plans);
+        assert.gt(plans.length, 1, `Expected at least one rejected plan: ${tojson(explain)}`);
+        plans.forEach((plan) =>
+            assert(hasCostBasedGroup(plan), `Expected V3 plan to be costed: ${tojson(plan)}`),
+        );
     }
 }
 

@@ -196,7 +196,6 @@ private:
                                            isFromSbePlanCache,
                                            _rankingResult.cachedPlanHash,
                                            false /*usedJoinOpt*/,
-                                           {} /*estimates*/,
                                            {} /*rejectedJoinPlans*/,
                                            std::move(remoteCursors),
                                            std::move(remoteExplains),

@@ -79,7 +79,6 @@ public:
                     std::unique_ptr<MultiPlanStage> classicRuntimePlannerStage,
                     const MultipleCollectionAccessor& mca,
                     bool usedJoinOpt = false,
-                    cost_based_ranker::EstimateMap estimates = {},
                     std::vector<JoinOptPlan> rejectedJoinPlans = {},
                     boost::optional<PlanExplainerData> maybeExplainData = boost::none,
                     boost::optional<PlanSelectionStrategy> planSelectionStrategy = boost::none);

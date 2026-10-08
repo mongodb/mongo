@@ -258,17 +258,8 @@ describe("V3 for aggregation pipelines", function () {
         ],
         cursor: {},
     };
-    let savedFrameworkControl;
 
     before(function () {
-        savedFrameworkControl = assert.commandWorked(
-            db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1}),
-        ).internalQueryFrameworkControl;
-        // TODO SERVER-130179 remove once SBE-eligible plans via deferred engine are supported in V3.
-        assert.commandWorked(
-            db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}),
-        );
-
         const coll = db[collName];
         coll.drop();
         assert.commandWorked(
@@ -279,15 +270,6 @@ describe("V3 for aggregation pipelines", function () {
             ]),
         );
         assert.commandWorked(coll.createIndex({a: 1}));
-    });
-
-    after(function () {
-        assert.commandWorked(
-            db.adminCommand({
-                setParameter: 1,
-                internalQueryFrameworkControl: savedFrameworkControl,
-            }),
-        );
     });
 
     for (const verbosity of ["plannerChoice", "plannerStats", "execStats"]) {
@@ -302,7 +284,9 @@ describe("V3 for aggregation pipelines", function () {
                 explain,
             });
 
-            const leaf = getAggPlanStage(explain, "IXSCAN") || getAggPlanStage(explain, "COLLSCAN");
+            const leaf =
+                getAggPlanStage(explain, "IXSCAN", true /* useQueryPlannerSection */) ||
+                getAggPlanStage(explain, "COLLSCAN", true /* useQueryPlannerSection */);
             assert(leaf, "expected the query layer's access stage to be reachable", {explain});
         });
     }

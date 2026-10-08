@@ -63,7 +63,7 @@ const original = assert.commandWorked(
 
 try {
     // Increase explain threshold step-by-step.
-    for (let size = 410; ; size++) {
+    for (let size = 501; ; size++) {
         if (!checkSbeRestrictedOrFullyEnabled(db)) {
             // Test is SBE-only.
             break;

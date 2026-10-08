@@ -155,7 +155,6 @@ public:
         std::unique_ptr<PlanStage> classicRuntimePlannerStage,
         RemoteExplainVector* remoteExplains,
         bool usedJoinOpt = false,
-        cost_based_ranker::EstimateMap estimates = {},
         std::vector<JoinOptPlan> rejectedPlans = {},
         boost::optional<PlanExplainerData> maybeExplainData = boost::none,
         boost::optional<PlanSelectionStrategy> planSelectionStrategy = boost::none);

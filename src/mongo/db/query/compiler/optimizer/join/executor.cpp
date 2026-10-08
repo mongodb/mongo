@@ -618,7 +618,6 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> checkPlanCacheForPlan(
     if (model.getSuffix() && model.getSuffix()->peekFront()) {
         plannerOptions |= QueryPlannerParams::RETURN_OWNED_DATA;
     }
-    cost_based_ranker::EstimateMap emptyEstimates;
     auto exec = plan_executor_factory::make(opCtx,
                                             nullptr /* cq */,
                                             std::move(winnerSoln),
@@ -630,7 +629,6 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> checkPlanCacheForPlan(
                                             true /* isFromPlanCache */,
                                             false /* cachedPlanHash */,
                                             true /*usedJoinOpt*/,
-                                            std::move(emptyEstimates),
                                             {} /* rejectedPlans */,
                                             nullptr /* remoteCursors */,
                                             nullptr /* remoteExplains */,
@@ -1012,13 +1010,16 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
                 makeJoinPlanCacheKey(model.getGraph(), model.getResolvedPaths(), graphOnlyMca);
         }
         explainData.joinPlanCacheKeyHash = canonical_query_encoder::computeHash(*cacheKey);
+        // The join-reordering estimates cover the winning and the rejected plans, and are only
+        // serialized by explain. The rejected plans were lowered above, so the map can be moved.
+        explainData.estimates = std::move(reordered.estimates);
         maybeExplainData = std::move(explainData);
     }
 
     // TODO SERVER-111913: Once we are no-longer cloning QSN for single-table plans, the
-    // estimate map from join-reordering 'reordered.estimates' can be combined with the estimate
-    // map from CBR 'ctx.singleTableAccess.estimate' before creating the executor below. We
-    // actually have several canonical queries, so we don't try to pass one in.
+    // estimate map from CBR 'ctx.singleTableAccess.estimate' can be combined into the explain
+    // data's estimates alongside the join-reordering estimates. We actually have several
+    // canonical queries, so we don't try to pass one in.
     auto exec = plan_executor_factory::make(opCtx,
                                             nullptr /* cq */,
                                             std::move(reordered.soln),
@@ -1030,7 +1031,6 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
                                             false /* isFromPlanCache */,
                                             false /* cachedPlanHash */,
                                             true /*usedJoinOpt*/,
-                                            std::move(reordered.estimates),
                                             std::move(rejectedPlans),
                                             nullptr /* remoteCursors */,
                                             nullptr /* remoteExplains */,

@@ -804,6 +804,47 @@ boost::optional<BSONArray> PlanExplainerSBEBase::buildRemotePlanInfo() const {
     return arrBuilder.arr();
 }
 
+namespace {
+/**
+ * Returns the cost-based ranker's estimates for the SBE explainer.
+ */
+cost_based_ranker::EstimateMap getCostEstimates(
+    boost::optional<PlanExplainerData>& maybeExplainData,
+    const QuerySolution* solution,
+    bool hasClassicRuntimePlannerStage) {
+    if (!maybeExplainData.has_value() || maybeExplainData->estimates.empty()) {
+        return {};
+    }
+
+    // If there's no runtime planner stages, then 'maybeExplainData->estimates' contains just the
+    // estimates for the winning plan.
+    if (!hasClassicRuntimePlannerStage) {
+        return std::move(maybeExplainData->estimates);
+    }
+    if (!solution) {
+        return {};
+    }
+
+    // If we have a classic runtime planner stage, we need to extract the estimates for the winner
+    // plan out of 'maybeExplainData->estimates'.
+    cost_based_ranker::EstimateMap winnerEstimates;
+    const auto& allEstimates = maybeExplainData->estimates;
+    std::vector<const QuerySolutionNode*> toVisit{solution->root()};
+    while (!toVisit.empty()) {
+        const auto* node = toVisit.back();
+        toVisit.pop_back();
+        if (auto it = allEstimates.find(node); it != allEstimates.end()) {
+            winnerEstimates.emplace(node,
+                                    std::make_unique<cost_based_ranker::QSNEstimate>(*it->second));
+        }
+        for (const auto& child : node->children) {
+            toVisit.push_back(child.get());
+        }
+    }
+    return winnerEstimates;
+}
+}  // namespace
+
 PlanExplainerClassicRuntimePlannerForSBE::PlanExplainerClassicRuntimePlannerForSBE(
     const sbe::PlanStage* root,
     const stage_builder::PlanStageData* data,
@@ -815,7 +856,6 @@ PlanExplainerClassicRuntimePlannerForSBE::PlanExplainerClassicRuntimePlannerForS
     std::unique_ptr<PlanStage> classicRuntimePlannerStage,
     RemoteExplainVector* remoteExplains,
     bool usedJoinOpt,
-    cost_based_ranker::EstimateMap estimates,
     std::vector<JoinOptPlan> rejectedPlans,
     boost::optional<PlanExplainerData> maybeExplainData,
     boost::optional<PlanSelectionStrategy> planSelectionStrategy)
@@ -828,7 +868,8 @@ PlanExplainerClassicRuntimePlannerForSBE::PlanExplainerClassicRuntimePlannerForS
                            std::move(debugInfo),
                            remoteExplains,
                            usedJoinOpt,
-                           std::move(estimates),
+                           getCostEstimates(
+                               maybeExplainData, solution, classicRuntimePlannerStage != nullptr),
                            std::move(rejectedPlans),
                            planSelectionStrategy,
                            maybeExplainData ? maybeExplainData->preExtensionWinningPlanHash

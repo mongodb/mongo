@@ -50,7 +50,6 @@ std::unique_ptr<PlanExplainer> make(
     std::unique_ptr<PlanStage> classicRuntimePlannerStage,
     RemoteExplainVector* remoteExplains,
     bool usedJoinOpt,
-    cost_based_ranker::EstimateMap estimates,
     std::vector<JoinOptPlan> rejectedPlans,
     boost::optional<PlanExplainerData> maybeExplainData,
     boost::optional<PlanSelectionStrategy> planSelectionStrategy) {
@@ -69,7 +68,6 @@ std::unique_ptr<PlanExplainer> make(
         std::move(classicRuntimePlannerStage),
         remoteExplains,
         usedJoinOpt,
-        std::move(estimates),
         std::move(rejectedPlans),
         std::move(maybeExplainData),
         planSelectionStrategy);

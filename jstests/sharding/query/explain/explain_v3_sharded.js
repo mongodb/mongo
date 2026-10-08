@@ -108,7 +108,7 @@ function describeUnderEachRankerMode(testCallback) {
 
             before(function () {
                 classicEngineForced = checkSbeCompletelyDisabled(st.shard0.getDB(dbName));
-                // TODO SERVER-130179: The SBE explainer does not record the ranker choice reason
+                // TODO SERVER-136210: The SBE explainer does not record the ranker choice reason
                 // when deferred engine choice is off, so only the chosen ranker can be checked.
                 const shardDB = st.shard0.getDB(dbName);
                 if (checkSbeFullyEnabled(shardDB) && !isDeferredGetExecutorEnabled(shardDB)) {
