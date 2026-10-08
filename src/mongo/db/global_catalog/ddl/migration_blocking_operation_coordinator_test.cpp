@@ -287,6 +287,44 @@ DEATH_TEST_F(MigrationBlockingOperationCoordinatorTestDeathTest,
     Instance::getOrCreate(_opCtx, _service, stateDocument.toBSON());
 }
 
+// Intentionally corrupts the persisted state document into a state that cannot arise through
+// ordinary operation of the coordinator: phase kBlockingMigrations with the "operations" array
+// removed entirely. Such a document still parses cleanly, so it survives recovery on failover.
+// This is a regression test verifying that we do not write to uninitialized memory when a
+// subsequent operation begins.
+TEST_F(MigrationBlockingOperationCoordinatorTest, BlockingMigrationsPhaseWithMissingOperations) {
+    _operations = {UUID::gen()};
+    beginOperations();
+    ASSERT_EQ(MigrationBlockingOperationCoordinatorPhaseEnum::kBlockingMigrations,
+              getStateDocumentOnDisk().getPhase());
+
+    // Drop the operations array from the on-disk document, leaving the phase untouched.
+    {
+        DBDirectClient client(_opCtx);
+        client.update(NamespaceString::kShardingDDLCoordinatorsNamespace,
+                      BSON("_id" << getCoordinatorId().toBSON()),
+                      BSON("$unset" << BSON("operations" << 1)));
+    }
+    ASSERT_FALSE(getStateDocumentOnDisk().getOperations());
+
+    stepDown();
+    ASSERT_NOT_OK(_instance->getCompletionFuture().getNoThrow());
+    stepUp(_opCtx);
+
+    // The lost operations are ignored; tracking restarts from the newly begun operation, which
+    // can then end normally and unblock migrations.
+    _instance = getExistingInstance();
+    _operations = {UUID::gen()};
+    ASSERT_DOES_NOT_THROW(beginOperations());
+    assertOperationCountOnDisk(1);
+    ASSERT_FALSE(_externalState->migrationsAreAllowed());
+
+    ASSERT_DOES_NOT_THROW(endOperations());
+    ASSERT_OK(_instance->getCompletionFuture().getNoThrow());
+    ASSERT_FALSE(stateDocumentExistsOnDisk());
+    ASSERT_TRUE(_externalState->migrationsAreAllowed());
+}
+
 TEST_F(MigrationBlockingOperationCoordinatorTest, BeginOperationThrowsWhileCoordinatorCleaningUp) {
     auto fp = globalFailPointRegistry().find(kHangBeforeRemovingCoordinatorDocument);
     invariant(fp);

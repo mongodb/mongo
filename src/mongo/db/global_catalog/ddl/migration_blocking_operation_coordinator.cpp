@@ -36,6 +36,13 @@ MigrationBlockingOperationCoordinator::UUIDSet populateOperations(
     return operationsSet;
 }
 
+void addOperation(MigrationBlockingOperationCoordinatorDocument& doc, const UUID& operationUUID) {
+    if (!doc.getOperations()) {
+        doc.setOperations(std::vector<UUID>{});
+    }
+    doc.getOperations()->push_back(operationUUID);
+}
+
 void ensureFulfilledPromise(WithLock lk, SharedPromise<void>& sp) {
     if (!sp.getFuture().isReady()) {
         sp.emplaceValue();
@@ -179,10 +186,9 @@ void MigrationBlockingOperationCoordinator::beginOperation(OperationContext* opC
     auto isFirst = _isFirstOperation(lock);
 
     if (isFirst) {
-        newDoc.setOperations(std::vector<UUID>{});
         newDoc.setPhase(Phase::kBlockingMigrations);
     }
-    newDoc.getOperations()->push_back(operationUUID);
+    addOperation(newDoc, operationUUID);
 
     hangBeforeUpdatingDiskState.pauseWhileSet();
     _insertOrUpdateStateDocument(lock, opCtx, std::move(newDoc));
