@@ -14,9 +14,6 @@
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/field_path.h"
-// TODO SERVER-136009: Remove this include. Nothing in this file uses it anymore, but removing it
-// triggers some false positive warnings in unit tests.
-#include "mongo/db/pipeline/window_function/window_function_statement.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/query/compiler/dependency_analysis/expression_dependencies.h"
