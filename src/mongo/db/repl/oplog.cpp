@@ -2775,7 +2775,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                         // skip this if oplog entries are being grouped because the timestamp will
                         // be allocated at commit time.
                         auto oplogInfo = LocalOplogInfo::get(opCtx);
-                        auto oplogSlots = oplogInfo->getNextOpTimes(opCtx, /*batchSize=*/1);
+                        auto oplogSlots = oplogInfo->getNextOpTimes(opCtx, /*count=*/1);
                         insertStmt.oplogSlot = oplogSlots.front();
                     }
 

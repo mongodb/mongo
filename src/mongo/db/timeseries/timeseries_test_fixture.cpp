@@ -64,7 +64,7 @@ void TimeseriesTestFixture::validateCollectionsHelper(
             _opCtx,
             nss,
             collection_validation::ValidationOptions{
-                /*mode=*/collection_validation::ValidateMode::kForegroundFull,
+                /*validateMode=*/collection_validation::ValidateMode::kForegroundFull,
                 /*repairMode=*/collection_validation::RepairMode::kNone,
                 /*logDiagnostics=*/false},
             validateResults));
@@ -516,7 +516,7 @@ TimeseriesTestFixture::_generateBucketsWithMeasurements(
                                                        measurements,
                                                        /*startIndex=*/0,
                                                        /*numDocsToStage=*/measurements.size(),
-                                                       /*docsToRetry=*/{},
+                                                       /*indices=*/{},
                                                        errorsAndIndices);
         ASSERT(errorsAndIndices.empty());
         // We should only be creating one batch and it should be able to fit in one bucket.

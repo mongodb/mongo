@@ -56,7 +56,7 @@ int IndexEntryComparison::compare(const IndexKeyEntry& lhs, const IndexKeyEntry&
         const BSONElement l = lhsIt.next();
         const BSONElement r = rhsIt.next();
 
-        if (int cmp = l.woCompare(r, /*compareFieldNames=*/false)) {
+        if (int cmp = l.woCompare(r, /*rules=*/false)) {
             if (cmp == std::numeric_limits<int>::min()) {
                 // can't be negated
                 cmp = -1;

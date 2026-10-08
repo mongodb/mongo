@@ -390,7 +390,7 @@ void downgradeFromViewlessTimeseries(OperationContext* opCtx,
                 viewOptions.pipeline =
                     timeseries::generateViewPipeline(*mainColl->getTimeseriesOptions(), asArray);
                 uassertStatusOK(
-                    db->userCreateNS(opCtx, mainNs, viewOptions, /*createIdIndex=*/false));
+                    db->userCreateNS(opCtx, mainNs, viewOptions, /*createDefaultIndexes=*/false));
             }
 
             // Add validator to the buckets collection.

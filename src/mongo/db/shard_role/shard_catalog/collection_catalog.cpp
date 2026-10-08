@@ -698,7 +698,7 @@ public:
                         // Override existing Collection on this namespace
                         catalog._registerCollection(opCtx,
                                                     std::move(collection),
-                                                    /*ts=*/commitTime);
+                                                    /*commitTime=*/commitTime);
                     });
                     break;
                 }

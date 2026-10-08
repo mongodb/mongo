@@ -319,7 +319,7 @@ SbeSingleDocumentLookupExecutor::PreparedExecutor::make(OperationContext* opCtx,
                                                   *cq,
                                                   collections,
                                                   yieldPolicy.get(),
-                                                  /*preparingFromCache=*/false);
+                                                  /*preparingFromSbeCache=*/false);
 
     // Compute the binder. Return boost::none (without constructing anything) on an unsupported plan
     // shape so the caller can fall back cleanly.

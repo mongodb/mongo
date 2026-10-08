@@ -22,10 +22,10 @@ namespace transport {
 
 class [[MONGO_MOD_UNFORTUNATELY_OPEN]] MockSessionBase : public Session {
 public:
-    MockSessionBase() : Session(/*ingress=*/true) {}  // Not always true but good enough for now.
+    MockSessionBase() : Session(/*isIngress=*/true) {}  // Not always true but good enough for now.
 
     explicit MockSessionBase(HostAndPort remote, SockAddr remoteAddr, SockAddr localAddr)
-        : Session(/*ingress=*/true),
+        : Session(/*isIngress=*/true),
           _remote(std::move(remote)),
           _remoteAddr(std::move(remoteAddr)),
           _localAddr(std::move(localAddr)),

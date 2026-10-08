@@ -528,7 +528,7 @@ Status _createViewNoRetry(OperationContext* opCtx,
                                        "fail point enabled."};
     }
 
-    Status status = db->userCreateNS(opCtx, nss, collectionOptions, /*createIdIndex=*/false);
+    Status status = db->userCreateNS(opCtx, nss, collectionOptions, /*createDefaultIndexes=*/false);
     if (!status.isOK()) {
         return status;
     }
@@ -1067,7 +1067,7 @@ Status _createCollection(
                 : db->userCreateNS(opCtx,
                                    nss,
                                    collectionOptions,
-                                   /*createIdIndex=*/false,
+                                   /*createDefaultIndexes=*/false,
                                    /*idIndex=*/BSONObj(),
                                    /*fromMigrate=*/false,
                                    catalogIdentifier,

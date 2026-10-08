@@ -815,7 +815,7 @@ StatusWith<bool> offlineValidateCollection(OperationContext* opCtx,
     }
 
     BSONObjBuilder results;
-    validateResults.appendToResultObj(&results, /*debug=*/false);
+    validateResults.appendToResultObj(&results, /*debugging=*/false);
     LOGV2_OPTIONS(9437301,
                   {logv2::LogTruncation::Disabled},
                   "Offline validation result",

@@ -198,7 +198,7 @@ PlanStage::StageState UpsertStage::_performInsert(const BSONObj& newDocument, Wo
                 }
                 if (!BatchedWriteContext::get(opCtx()).writesAreBatched()) {
                     auto oplogInfo = LocalOplogInfo::get(opCtx());
-                    auto oplogSlots = oplogInfo->getNextOpTimes(opCtx(), /*batchSize=*/1);
+                    auto oplogSlots = oplogInfo->getNextOpTimes(opCtx(), /*count=*/1);
                     insertStmt.oplogSlot = oplogSlots.front();
                 }
             }

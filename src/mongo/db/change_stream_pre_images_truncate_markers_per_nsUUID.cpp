@@ -256,7 +256,7 @@ void PreImagesTruncateMarkersPerNsUUID::updateMarkers(int64_t numBytes,
     // TODO: SERVER-110862 Remove this parameter from CollectionTruncateMarkers. It should only be
     // in OplogTruncateMarkers.
     updateCurrentMarker(
-        numBytes, recordId, wallTime, numRecords, /*gOplogSamplingAsyncEnabled=*/false);
+        numBytes, recordId, wallTime, numRecords, /*oplogSamplingAsyncEnabled=*/false);
 }
 
 bool PreImagesTruncateMarkersPerNsUUID::_hasExcessMarkers(OperationContext* opCtx) const {

@@ -181,7 +181,7 @@ public:
                 LiteParsedPipeline resolvedViewLitePipeline(
                     resolvedView.getValue().getResolvedNamespace(),
                     resolvedView.getValue().getBsonPipeline(),
-                    /*makeSubpipelineOwned=*/false,
+                    /*isRunningAgainstView_ForHybridSearch=*/false,
                     resolvedViewLpOpts);
 
                 const auto& resolvedViewInvolvedNamespaces =
@@ -858,7 +858,7 @@ void AggCatalogState::maybeProactivelyResolveInvolvedNamespaces(AggExState& aggE
         operationCollationSpec = mainViewResolved.getDefaultCollation();
         LiteParsedPipeline mainViewLpp(mainViewResolved.getResolvedNamespace(),
                                        mainViewResolved.getBsonPipeline(),
-                                       /*makeSubpipelineOwned=*/false,
+                                       /*isRunningAgainstView_ForHybridSearch=*/false,
                                        LiteParserOptions{.ifrContext = ifrContext});
         const auto& namespacesSet = mainViewLpp.getInvolvedNamespaces();
         std::deque<NamespaceString> namespaces(namespacesSet.begin(), namespacesSet.end());

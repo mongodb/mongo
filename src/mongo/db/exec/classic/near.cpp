@@ -43,7 +43,7 @@ NearStage::NearStage(ExpressionContext* expCtx,
                     sorter::kLatestChecksumVersion,
                     static_cast<int64_t>(internalQuerySpillingMinAvailableDiskSpaceBytes.load()))
               : nullptr,
-          /*settings=*/{}),
+          /*checkInput=*/true),
       _stageType(type),
       _nextInterval(nullptr),
       _memoryTracker(OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(

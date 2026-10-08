@@ -169,7 +169,7 @@ void cappedDeleteUntilBelowConfiguredMaximum(OperationContext* opCtx,
                                                      collection,
                                                      doc,
                                                      record->id,
-                                                     /*logIfError=*/false,
+                                                     /*noWarn=*/false,
                                                      &keysDeleted);
 
         // We're about to delete the record our cursor is positioned on, so advance the cursor.

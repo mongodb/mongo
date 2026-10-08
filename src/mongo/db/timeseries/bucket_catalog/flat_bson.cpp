@@ -375,11 +375,11 @@ typename std::string FlatBSON<Derived, Element, Value>::updateStatusString(
 template <class Derived, class Element, class Value>
 typename FlatBSON<Derived, Element, Value>::UpdateStatus FlatBSON<Derived, Element, Value>::update(
     const BSONObj& doc,
-    boost::optional<std::string_view> omitField,
+    boost::optional<std::string_view> metaField,
     const StringDataComparator* stringComparator) {
     auto obj = _store.root();
-    return _updateObj(obj, doc, {}, stringComparator, [&omitField](std::string_view fieldName) {
-        return omitField && fieldName == omitField;
+    return _updateObj(obj, doc, {}, stringComparator, [&metaField](std::string_view fieldName) {
+        return metaField && fieldName == metaField;
     });
 }
 

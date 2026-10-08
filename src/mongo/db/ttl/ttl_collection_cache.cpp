@@ -81,7 +81,7 @@ void TTLCollectionCache::_deregisterTTLInfo(UUID uuid, const Info& info) {
 }
 
 void TTLCollectionCache::deregisterTTLIndexByName(UUID uuid, const IndexName& indexName) {
-    _deregisterTTLInfo(std::move(uuid), TTLCollectionCache::Info{indexName, /*unusedSpec=*/{}});
+    _deregisterTTLInfo(std::move(uuid), TTLCollectionCache::Info{indexName, /*type=*/{}});
 }
 
 void TTLCollectionCache::deregisterTTLClusteredIndex(UUID uuid) {

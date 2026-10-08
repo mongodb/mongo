@@ -884,7 +884,7 @@ void WiredTigerKVEngine::cleanShutdown(bool memLeakAllowed) {
 
     _connection->shuttingDown(WiredTigerConnection::ShutdownReason::kCleanShutdown);
 
-    syncSizeInfo(/*syncToDisk=*/true);
+    syncSizeInfo(/*sync=*/true);
 
     // The size storer has to be destructed after the session cache has shut down. This sets the
     // shutdown flag internally in the session cache. As operations get interrupted during
