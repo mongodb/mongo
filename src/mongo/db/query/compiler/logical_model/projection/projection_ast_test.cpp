@@ -91,6 +91,11 @@ public:
                                                matchExprBson.get_value_or(BSONObj()),
                                                policies);
     }
+
+    BSONObj serializeToQueryShape(const projection_ast::Projection& projection) {
+        return projection_ast::serialize(
+            *projection.root(), SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
+    }
 };
 
 void assertCanClone(Projection proj, size_t expectedNumGrandChildren) {
@@ -899,6 +904,13 @@ TEST_F(ProjectionASTTest, TestASTRedaction) {
         R"({"HASH<f>":{"$elemMatch":{"HASH<foo>":{"$eq":"?string"}}},"HASH<_id>":true})",
         output);
 
+    // DBRef $elemMatch field projection.
+    proj = fromjson("{$db: {$elemMatch: {foo: 'bar'}}}");
+    output = projection_ast::serialize(*parseWithFindFeaturesEnabled(proj).root(), options);
+    ASSERT_BSONOBJ_EQ_AUTO(  //
+        R"({"HASH<$db>":{"$elemMatch":{"$eq":"?object"}},"HASH<_id>":true})",
+        output);
+
     // Positional projection
     proj = fromjson("{'x.$': 1}");
     output = projection_ast::serialize(
@@ -927,5 +939,91 @@ TEST_F(ProjectionASTTest, TestASTRedaction) {
     ASSERT_BSONOBJ_EQ_AUTO(  //
         R"({"HASH<foo>":{"$meta":"indexKey"}})",
         output);
+}
+
+TEST_F(ProjectionASTTest, SerializeToQueryShapeElemMatchDBRefDb) {
+    // "{$db: {$elemMatch: {foo: 1}}}" => parseDBRef collapses to Equality($db, <object>).
+    // Query-stats serializer wraps the equality's RHS in $elemMatch so the shape is a
+    // valid, re-parseable projection.
+    auto proj = parseWithFindFeaturesEnabled(fromjson("{$db: {$elemMatch: {foo: 1}}}"));
+    auto shape = serializeToQueryShape(proj);
+    ASSERT_BSONOBJ_EQ_AUTO(  //
+        R"({"$db":{"$elemMatch":{"$eq":{"?":"?"}}},"_id":true})",
+        shape);
+    // The shape must be re-parsable.
+    ASSERT_DOES_NOT_THROW(parseWithFindFeaturesEnabled(shape));
+}
+
+TEST_F(ProjectionASTTest, SerializeToQueryShapeElemMatchDBRefId) {
+    auto proj = parseWithFindFeaturesEnabled(fromjson("{$id: {$elemMatch: {x: 42}}}"));
+    auto shape = serializeToQueryShape(proj);
+    ASSERT_BSONOBJ_EQ_AUTO(  //
+        R"({"$id":{"$elemMatch":{"$eq":{"?":"?"}}},"_id":true})",
+        shape);
+    // The shape must be re-parsable.
+    ASSERT_DOES_NOT_THROW(parseWithFindFeaturesEnabled(shape));
+}
+
+TEST_F(ProjectionASTTest, SerializeToQueryShapeElemMatchNonDBRefIsUnaffected) {
+    // Non-DBRef outer path doesn't go through parseDBRef, and should result in a different shape.
+    auto proj = parseWithFindFeaturesEnabled(fromjson("{f: {$elemMatch: {foo: 1}}}"));
+    auto shape = serializeToQueryShape(proj);
+    ASSERT_BSONOBJ_EQ_AUTO(  //
+        R"({"f":{"$elemMatch":{"foo":{"$eq":1}}},"_id":true})",
+        shape);
+    ASSERT_DOES_NOT_THROW(parseWithFindFeaturesEnabled(shape));
+}
+
+TEST_F(ProjectionASTTest, SerializeToQueryShapeElemMatchWithDBRefInnerPredicate) {
+    // DBRef field inside the $elemMatch predicate (not as the outer projection
+    // field).
+    auto proj = parseWithFindFeaturesEnabled(fromjson("{f: {$elemMatch: {$db: 'x'}}}"));
+    auto shape = serializeToQueryShape(proj);
+    ASSERT_BSONOBJ_EQ_AUTO(  //
+        R"({"f":{"$elemMatch":{"$_internalPath":{"$db":{"$eq":"?"}}}},"_id":true})",
+        shape);
+    ASSERT_DOES_NOT_THROW(parseWithFindFeaturesEnabled(shape));
+}
+
+TEST_F(ProjectionASTTest, SerializeToQueryShapeDBRefInclusionIsUnaffected) {
+    // Inclusion on a DBRef field.
+    auto proj = parseWithFindFeaturesEnabled(fromjson("{$db: 1}"));
+    auto shape = serializeToQueryShape(proj);
+    ASSERT_BSONOBJ_EQ_AUTO(  //
+        R"({"$db":true,"_id":true})",
+        shape);
+    ASSERT_DOES_NOT_THROW(parseWithFindFeaturesEnabled(shape));
+}
+
+TEST_F(ProjectionASTTest, SerializeToQueryShapeDottedDBRefInclusionIsUnaffected) {
+    auto proj = parseWithFindFeaturesEnabled(fromjson("{'a.$db': 1}"));
+    auto shape = serializeToQueryShape(proj);
+    ASSERT_BSONOBJ_EQ_AUTO(  //
+        R"({"a":{"$db":true},"_id":true})",
+        shape);
+    ASSERT_DOES_NOT_THROW(parseWithFindFeaturesEnabled(shape));
+}
+
+TEST_F(ProjectionASTTest, SerializeToQueryShapeDBRefSliceIsUnaffected) {
+    // $slice on a DBRef field goes through ProjectionSliceASTNode, not a match
+    // expression.
+    auto proj = parseWithFindFeaturesEnabled(fromjson("{$db: {$slice: 1}}"));
+    auto shape = serializeToQueryShape(proj);
+    ASSERT_BSONOBJ_EQ_AUTO(  //
+        R"({"$db":{"$slice":1}})",
+        shape);
+    ASSERT_DOES_NOT_THROW(parseWithFindFeaturesEnabled(shape));
+}
+
+TEST_F(ProjectionASTTest, SerializeToQueryShapeElemMatchDBRefScalarInner) {
+    // Regardless of the inner predicate (object, scalar, or operator), parseDBRef
+    // collapses the whole RHS to an equality literal, so the representative shape is
+    // the same "{$path: {$elemMatch: {$eq: {"?":"?"}}}}" form.
+    auto proj = parseWithFindFeaturesEnabled(fromjson("{$db: {$elemMatch: {$gt: 5}}}"));
+    auto shape = serializeToQueryShape(proj);
+    ASSERT_BSONOBJ_EQ_AUTO(  //
+        R"({"$db":{"$elemMatch":{"$eq":{"?":"?"}}},"_id":true})",
+        shape);
+    ASSERT_DOES_NOT_THROW(parseWithFindFeaturesEnabled(shape));
 }
 }  // namespace

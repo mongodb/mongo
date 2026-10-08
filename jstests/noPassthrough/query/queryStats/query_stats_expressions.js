@@ -1,7 +1,6 @@
 /**
  * Test that queryStats works properly for a find command that uses agg expressions and produces the
  * proper query shape without issues during re-parsing.
- * @tags: [requires_fcv_71]
  */
 import {getQueryStats, resetQueryStatsStore} from "jstests/libs/query/query_stats_utils.js";
 
@@ -176,6 +175,55 @@ function makeAggCmd(pipeline, collName = coll.getName()) {
 
     const queryStats = getQueryStats(conn);
     assert.eq(queryStats.length, 2, `Expected 2 entries but got ${tojson(queryStats)}`);
+}
+
+// Filter on a DBRef field must re-parse correctly.
+{
+    resetQueryStatsStore(conn, "1MB");
+    coll.find({$db: "mydb"}).sort({_id: 1}).itcount();
+    let queryStats = getQueryStats(conn);
+    assert.eq(queryStats.length, 1, `Expected 1 entry but got ${tojson(queryStats)}`);
+}
+
+// Projection on a DBRef field with $elemMatch must re-parse correctly.
+{
+    resetQueryStatsStore(conn, "1MB");
+    coll.find({}, {$db: {$elemMatch: {foo: 1}}})
+        .sort({_id: 1})
+        .itcount();
+    coll.find({}, {$id: {$elemMatch: {x: 42}}})
+        .sort({_id: 1})
+        .itcount();
+    coll.find({}, {"$ref": {$elemMatch: {x: 42}}})
+        .sort({_id: 1})
+        .itcount();
+    let queryStats = getQueryStats(conn);
+    assert.eq(queryStats.length, 3, `Expected 3 entries but got ${tojson(queryStats)}`);
+}
+
+// Non-$elemMatch projections on DBRef paths.
+{
+    resetQueryStatsStore(conn, "1MB");
+    coll.find({}, {$db: 1}).sort({_id: 1}).itcount();
+    coll.find({}, {"a.$db": 1}).sort({_id: 1}).itcount();
+    coll.find({}, {$db: {$slice: 1}})
+        .sort({_id: 1})
+        .itcount();
+    coll.find({}, {$db: {$literal: "x"}})
+        .sort({_id: 1})
+        .itcount();
+    let queryStats = getQueryStats(conn);
+    assert.eq(queryStats.length, 4, `Expected 4 entries but got ${tojson(queryStats)}`);
+}
+
+// Non-DBRef outer path with a DBRef field inside the $elemMatch predicate.
+{
+    resetQueryStatsStore(conn, "1MB");
+    coll.find({}, {arr: {$elemMatch: {$db: "somedb"}}})
+        .sort({_id: 1})
+        .itcount();
+    let queryStats = getQueryStats(conn);
+    assert.eq(queryStats.length, 1, `Expected 1 entry but got ${tojson(queryStats)}`);
 }
 
 MongoRunner.stopMongod(conn);
