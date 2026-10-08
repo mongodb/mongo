@@ -191,9 +191,6 @@ Fixture& getFixture(size_t numEntries, ShapeKind shapeKind) {
  * Args: {limit, storeSize}
  */
 void runTopKBenchmark(benchmark::State& state, ShapeKind shapeKind) {
-    // TODO SERVER-135111 remove this once the optimization is enabled by default.
-    internalQueryStatsTopKSortOptimizationEnabled.store(true);
-
     const long long limit = state.range(0);
     const size_t storeSize = static_cast<size_t>(state.range(1));
     auto& fixture = getFixture(storeSize, shapeKind);

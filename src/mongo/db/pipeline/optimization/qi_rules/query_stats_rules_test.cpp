@@ -32,9 +32,7 @@ class QueryStatsTopKOptimizationRulesTest : public AggregationContextFixture {
 public:
     QueryStatsTopKOptimizationRulesTest()
         : AggregationContextFixture(
-              NamespaceString::makeCollectionlessAggregateNSS(DatabaseName::kAdmin)),
-          // TODO SERVER-135111: remove once the optimization is enabled by default.
-          _enableTopKSortOptimization("internalQueryStatsTopKSortOptimizationEnabled", true) {}
+              NamespaceString::makeCollectionlessAggregateNSS(DatabaseName::kAdmin)) {}
 
 protected:
     struct ExpectedTopKSpec {
@@ -84,10 +82,6 @@ protected:
         auto pipeline = parseAndOptimize(stagesJson);
         ASSERT_FALSE(getTopKSortOptimizationSpec(*pipeline).has_value());
     }
-
-private:
-    // Restores the knob to its pre-suite value on fixture teardown.
-    unittest::ServerParameterGuard _enableTopKSortOptimization;
 };
 
 TEST_F(QueryStatsTopKOptimizationRulesTest, AppliesOnMinimalPipelineWithoutProjection) {

@@ -239,8 +239,6 @@ describe("$queryStats top-K sort (standalone)", function () {
                 setParameter: {
                     internalQueryStatsSampleRate: 1,
                     internalQueryStatsCacheSize: "1MB",
-                    // TODO SERVER-135111: remove once the optimization is enabled by default.
-                    internalQueryStatsTopKSortOptimizationEnabled: true,
                 },
             });
             return {conn, adminDB: conn.getDB("admin"), testDB: conn.getDB("test")};
@@ -262,9 +260,6 @@ describe("$queryStats top-K sort (on mongos)", function () {
                         setParameter: {
                             internalQueryStatsSampleRate: 1,
                             internalQueryStatsCacheSize: "1MB",
-                            // TODO SERVER-135111: remove once the optimization is enabled by
-                            // default.
-                            internalQueryStatsTopKSortOptimizationEnabled: true,
                         },
                     },
                 },
@@ -288,9 +283,6 @@ describe("$queryStats top-K sort (on a shard server)", function () {
                         setParameter: {
                             internalQueryStatsSampleRate: 1,
                             internalQueryStatsCacheSize: "1MB",
-                            // TODO SERVER-135111: remove once the optimization is enabled by
-                            // default.
-                            internalQueryStatsTopKSortOptimizationEnabled: true,
                         },
                     },
                 },
