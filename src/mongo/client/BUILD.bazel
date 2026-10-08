@@ -295,6 +295,7 @@ mongo_cc_library(
         "//src/mongo/executor:network_interface",
         "//src/mongo/executor:network_interface_factory",
         "//src/mongo/executor:network_interface_thread_pool",
+        "//src/mongo/executor:rpc_local_timing",
         "//src/mongo/executor:thread_pool_task_executor",
         "//src/mongo/transport:message_compressor",
         "//src/mongo/transport:transport_layer_manager",
@@ -621,6 +622,9 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_third_group"],
     deps = [
         ":clientdriver_network",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/otel/metrics:metrics_test_util",
+        "//src/mongo/transport:transport_layer_common",
         "//src/mongo/util:version_impl",
     ],
 )
@@ -687,6 +691,7 @@ mongo_cc_integration_test(
     ],
     deps = [
         ":clientdriver_network",
+        "//src/mongo/otel/metrics:metrics_test_util",
         "//src/mongo/transport:transport_layer_egress_init",
         "//src/mongo/util:version_impl",
     ],

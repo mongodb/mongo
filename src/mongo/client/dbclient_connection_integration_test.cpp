@@ -13,6 +13,8 @@
 #include "mongo/client/dbclient_base.h"
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/db/database_name.h"
+#include "mongo/otel/metrics/metric_names.h"
+#include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/integration_test.h"
@@ -23,13 +25,13 @@
 
 #include <memory>
 #include <string_view>
+#include <tuple>
 
 namespace mongo {
 namespace {
-using namespace std::literals::string_view_literals;
 
 const auto sleepCmd = fromjson(R"({sleep: 1, locks: 'none', secs: 100})");
-constexpr std::string_view kAppName = "DBClientConnectionTest"sv;
+constexpr std::string_view kAppName = "DBClientConnectionTest";
 
 class DBClientConnectionFixture : public unittest::Test {
 public:
@@ -92,6 +94,37 @@ TEST_F(DBClientConnectionFixture, shutdownWorksIfRunCommandInProgress) {
     BSONObj reply;
     ASSERT_THROWS(conn->runCommand(DatabaseName::kAdmin, sleepCmd, reply),
                   ExceptionFor<ErrorCategory::NetworkError>);  // Currently HostUnreachable.
+}
+
+TEST_F(DBClientConnectionFixture, RecordsSyncRpcLocalLatency) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        GTEST_SKIP() << "Requires OTel metrics";
+    }
+
+    auto conn = makeConn();
+    auto countFor = [&](std::string_view kind, std::string_view mode) {
+        try {
+            return static_cast<int64_t>(
+                capturer
+                    .readInt64Histogram(otel::metrics::MetricNames::kNetworkRpcLocalLatency,
+                                        std::tuple{kind, mode})
+                    .count);
+        } catch (const DBException&) {
+            return int64_t{0};
+        }
+    };
+
+    BSONObj reply;
+    ASSERT(conn->runCommand(DatabaseName::kAdmin, BSON("ping" << 1), reply));
+    conn->runFireAndForgetCommand(
+        rpc::upconvertRequest(DatabaseName::kAdmin, BSON("ping" << 1), 0));
+
+    EXPECT_EQ(countFor("initial", "sync"), 1);
+    EXPECT_EQ(countFor("fire_and_forget", "sync"), 1);
+    EXPECT_EQ(countFor("initial", "async"), 0);
+    EXPECT_EQ(countFor("exhaust_continuation", "async"), 0);
+    EXPECT_EQ(countFor("fire_and_forget", "async"), 0);
 }
 
 }  // namespace

@@ -18,6 +18,7 @@
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/client/authenticate.h"
 #include "mongo/client/replica_set_monitor.h"
+#include "mongo/client/rpc_local_timing.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/client/sasl_client_session.h"
 #include "mongo/config.h"  // IWYU pragma: keep
@@ -30,6 +31,7 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/remote_command_response.h"
+#include "mongo/executor/rpc_local_timing.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/client_metadata.h"
@@ -46,6 +48,7 @@
 #include "mongo/util/net/ssl_peer_info.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
+#include "mongo/util/system_tick_source.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/version.h"
 
@@ -73,6 +76,28 @@ auto& dbClientSessionReconnectAttempts =
 // ensureConnection() with autoReconnect = false so does not try to reconnect.
 auto& dbClientSessionWithoutAutoReconnectFailures =
     *MetricBuilder<Counter64>("network.dbClientSessionWithoutAutoReconnectFailures");
+
+/**
+ * Helper class to track the time spent waiting for a response in the RPC local timing via its
+ * lifetime.
+ */
+class RpcLocalTimingResponseWait {
+public:
+    explicit RpcLocalTimingResponseWait(RpcLocalTiming* timing) : _timing(timing) {
+        if (_timing) {
+            _timing->beginResponseWait();
+        }
+    }
+
+    ~RpcLocalTimingResponseWait() {
+        if (_timing) {
+            _timing->endResponseWait();
+        }
+    }
+
+private:
+    RpcLocalTiming* _timing;
+};
 }  // namespace
 
 using std::string;
@@ -234,6 +259,11 @@ boost::optional<Milliseconds> clampTimeout(double timeoutInSec) {
 void DBClientSession::connect(const HostAndPort& serverAddress,
                               std::string_view applicationName,
                               const boost::optional<TransientSSLParams>& transientSSLParams) {
+    // This suppression prevents "connect" from counting as a timed RPC in metrics, even if it is
+    // called by an external caller.
+    const bool wasTimingSuppressed = std::exchange(_rpcLocalTimingSuppressed, true);
+    ScopeGuard restoreTimingSuppression(
+        [this, wasTimingSuppressed] { _rpcLocalTimingSuppressed = wasTimingSuppressed; });
 
     // Internal connections must always carry an applicationName so that server-side policies
     // (e.g. ingress rate limiting) can correctly identify and exempt them.
@@ -472,10 +502,23 @@ DBClientSession::DBClientSession(bool autoReconnect,
       _connectionPurpose(connectionPurpose),
       _socketTimeout(clampTimeout(soTimeout)),
       _autoReconnect(autoReconnect),
+      _rpcLocalTimingTickSource(globalSystemTickSource()),
       _hook(hook),
       _uri(std::move(uri)) {}
 
+std::pair<rpc::UniqueReply, DBClientBase*> DBClientSession::runCommandWithTarget(
+    OpMsgRequest request) {
+    RpcLocalTimingScope timing(*this, executor::RpcLocalTimingKind::kInitial);
+    return DBClientBase::runCommandWithTarget(std::move(request));
+}
+
+DBClientBase* DBClientSession::runFireAndForgetCommand(OpMsgRequest request) {
+    RpcLocalTimingScope timing(*this, executor::RpcLocalTimingKind::kFireAndForget);
+    return DBClientBase::runFireAndForgetCommand(std::move(request));
+}
+
 void DBClientSession::say(Message& toSend, bool isRetry, string* actualServer) {
+    RpcLocalTimingScope timing(*this, executor::RpcLocalTimingKind::kFireAndForget);
     ensureConnection();
     ScopeGuard killSessionOnError([this] { _markFailed(kKillSession); });
 
@@ -496,8 +539,13 @@ void DBClientSession::say(Message& toSend, bool isRetry, string* actualServer) {
 }
 
 Message DBClientSession::recv(int lastRequestId) {
+    RpcLocalTimingScope timing(*this, executor::RpcLocalTimingKind::kExhaustContinuation);
     ScopeGuard killSessionOnError([this] { _markFailed(kKillSession); });
-    auto m = uassertStatusOK(_session->sourceMessage());
+    auto m = [&] {
+        RpcLocalTimingResponseWait wait(_rpcLocalTimingSuppressed ? nullptr
+                                                                  : _activeRpcLocalTiming);
+        return uassertStatusOK(_session->sourceMessage());
+    }();
 
     uassert(40570,
             "Response ID did not match the sent message ID.",
@@ -514,6 +562,7 @@ Message DBClientSession::recv(int lastRequestId) {
 }
 
 Message DBClientSession::_call(Message& toSend, string* actualServer) {
+    RpcLocalTimingScope timing(*this, executor::RpcLocalTimingKind::kInitial);
     ensureConnection();
     ScopeGuard killSessionOnError([this] { _markFailed(kKillSession); });
 
@@ -543,7 +592,11 @@ Message DBClientSession::_call(Message& toSend, string* actualServer) {
                                                  << getServerAddress());
     }
 
-    swm = _session->sourceMessage();
+    swm = [&] {
+        RpcLocalTimingResponseWait wait(_rpcLocalTimingSuppressed ? nullptr
+                                                                  : _activeRpcLocalTiming);
+        return _session->sourceMessage();
+    }();
     Message response;
     if (swm.isOK()) {
         response = std::move(swm.getValue());
@@ -591,6 +644,11 @@ void DBClientSession::ensureConnection() {
         throwSocketError(SocketErrorKind::FAILED_STATE, toString());
     }
     dbClientSessionReconnectAttempts.increment();
+    // This suppression prevents "connect" from counting as a timed RPC in metrics, even if it is
+    // called by an external caller.
+    const bool wasTimingSuppressed = std::exchange(_rpcLocalTimingSuppressed, true);
+    ScopeGuard restoreTimingSuppression(
+        [this, wasTimingSuppressed] { _rpcLocalTimingSuppressed = wasTimingSuppressed; });
     _reconnectSession();
 }
 

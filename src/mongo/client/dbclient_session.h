@@ -13,10 +13,12 @@
 #include "mongo/client/index_spec.h"
 #include "mongo/client/mongo_uri.h"
 #include "mongo/client/read_preference.h"
+#include "mongo/client/rpc_local_timing.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/remote_command_response.h"
+#include "mongo/executor/rpc_local_timing.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/rpc/message.h"
@@ -34,6 +36,7 @@
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/net/ssl_types.h"
 #include "mongo/util/str.h"
+#include "mongo/util/tick_source.h"
 #include "mongo/util/time_support.h"
 
 #include <cstdint>
@@ -87,6 +90,10 @@ public:
                     const HandshakeValidationHook& hook,
                     const ClientAPIVersionParameters* apiParameters,
                     ConnectionPurpose connectionPurpose = ConnectionPurpose::kDefault);
+
+    using DBClientBase::runCommandWithTarget;
+    std::pair<rpc::UniqueReply, DBClientBase*> runCommandWithTarget(OpMsgRequest request) override;
+    DBClientBase* runFireAndForgetCommand(OpMsgRequest request) override;
 
     ~DBClientSession() override {}
 
@@ -184,6 +191,10 @@ public:
 
     uint64_t getSockCreationMicroSec() const override;
 
+    void setTickSource_forTest(TickSource* tickSource) {
+        _rpcLocalTimingTickSource = tickSource;
+    }
+
     MessageCompressorManager& getCompressorManager() {
         return _compressorManager;
     }
@@ -271,6 +282,48 @@ protected:
     boost::optional<TransientSSLParams> _transientSSLParams;
 
 private:
+    /**
+     * A single call to run a command on DBClientSession may result in additional calls to run
+     * commands (e.g., if a new connection is needed). This class helps to ensure the RPC timing is
+     * correctly recorded, i.e., that nested calls are included in the outermost timing scope rather
+     * than spawning new timing scopes.
+     */
+    class RpcLocalTimingScope {
+    public:
+        RpcLocalTimingScope(DBClientSession& client, executor::RpcLocalTimingKind kind)
+            : _client(client), _kind(kind) {
+            if (_client._activeRpcLocalTiming || _client._rpcLocalTimingSuppressed) {
+                return;
+            }
+            _timing.emplace(_client._rpcLocalTimingTickSource);
+            _client._activeRpcLocalTiming = &*_timing;
+        }
+
+        /** Records the timing only if this is the outermost scope. */
+        ~RpcLocalTimingScope() {
+            if (_timing) {
+                _client._activeRpcLocalTiming = nullptr;
+                executor::recordRpcLocalLatency(
+                    *_timing, _kind, executor::RpcLocalTimingMode::kSync);
+            }
+        }
+
+        RpcLocalTimingScope(const RpcLocalTimingScope&) = delete;
+        RpcLocalTimingScope& operator=(const RpcLocalTimingScope&) = delete;
+
+    private:
+        DBClientSession& _client;
+        executor::RpcLocalTimingKind _kind;
+        boost::optional<RpcLocalTiming> _timing;
+    };
+
+    TickSource* _rpcLocalTimingTickSource;
+    // Entry points set this value, which nested calls then reuse. RpcLocalTimingScope manages this
+    // value and the logic around it.
+    RpcLocalTiming* _activeRpcLocalTiming = nullptr;
+    // Connection setup is included in an enclosing command but is not timed as a separate RPC.
+    bool _rpcLocalTimingSuppressed = false;
+
     Message _call(Message& toSend, std::string* actualServer) override;
     virtual StatusWith<std::shared_ptr<transport::Session>> _makeSession(
         const HostAndPort& host,

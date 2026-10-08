@@ -113,7 +113,7 @@ void DBClientConnection::_auth(const BSONObj& params) {
         authCache[dbName] = params.getOwned();
     }
 
-    DBClientBase::_auth(params);
+    DBClientSession::_auth(params);
 }
 
 void DBClientConnection::authenticateInternalUser(auth::StepDownBehavior stepDownBehavior) {
@@ -122,7 +122,7 @@ void DBClientConnection::authenticateInternalUser(auth::StepDownBehavior stepDow
         _internalAuthStepDownBehavior = stepDownBehavior;
     }
 
-    return DBClientBase::authenticateInternalUser(stepDownBehavior);
+    return DBClientSession::authenticateInternalUser(stepDownBehavior);
 }
 
 void DBClientConnection::logout(const DatabaseName& dbName, BSONObj& info) {
@@ -133,7 +133,7 @@ void DBClientConnection::logout(const DatabaseName& dbName, BSONObj& info) {
 
 std::pair<rpc::UniqueReply, DBClientBase*> DBClientConnection::runCommandWithTarget(
     OpMsgRequest request) {
-    auto out = DBClientBase::runCommandWithTarget(std::move(request));
+    auto out = DBClientSession::runCommandWithTarget(std::move(request));
     if (!_parentReplSetName.empty()) {
         const auto replyBody = out.first->getCommandReply();
         if (!isOk(replyBody)) {
@@ -146,7 +146,7 @@ std::pair<rpc::UniqueReply, DBClientBase*> DBClientConnection::runCommandWithTar
 
 std::pair<rpc::UniqueReply, std::shared_ptr<DBClientBase>> DBClientConnection::runCommandWithTarget(
     OpMsgRequest request, std::shared_ptr<DBClientBase> me) {
-    auto out = DBClientBase::runCommandWithTarget(std::move(request), std::move(me));
+    auto out = DBClientSession::runCommandWithTarget(std::move(request), std::move(me));
     if (!_parentReplSetName.empty()) {
         const auto replyBody = out.first->getCommandReply();
         if (!isOk(replyBody)) {
@@ -160,7 +160,7 @@ std::pair<rpc::UniqueReply, std::shared_ptr<DBClientBase>> DBClientConnection::r
 rpc::UniqueReply DBClientConnection::parseCommandReplyMessage(const std::string& host,
                                                               const Message& replyMsg) {
     try {
-        return DBClientBase::parseCommandReplyMessage(host, replyMsg);
+        return DBClientSession::parseCommandReplyMessage(host, replyMsg);
     } catch (const DBException& ex) {
         if (ErrorCodes::isConnectionFatalMessageParseError(ex.code())) {
             _markFailed(kKillSession);

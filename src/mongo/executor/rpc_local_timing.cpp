@@ -14,12 +14,13 @@ namespace mongo {
 namespace executor {
 
 namespace {
+// TODO SERVER-135608: Record asynchronous latencies in this histogram.
 auto& rpcLocalLatencyHistogram =
     otel::metrics::MetricsService::instance()
         .createInt64Histogram<std::string_view, std::string_view>(
             otel::metrics::MetricNames::kNetworkRpcLocalLatency,
-            "Elapsed local-path latency for one outbound RPC segment, excluding the wait for the "
-            "full response message.",
+            "Elapsed latency for one outbound RPC segment, excluding the wait for the full "
+            "response message. This can include reconnections.",
             otel::metrics::MetricUnit::kMicroseconds,
             otel::metrics::AttributeDefinition<std::string_view>{
                 .name = "kind",
