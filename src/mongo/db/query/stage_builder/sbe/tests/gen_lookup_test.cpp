@@ -13,6 +13,7 @@
 #include "mongo/db/exec/sbe/util/debug_print.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/exec/trial_run_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
@@ -243,7 +244,7 @@ protected:
     std::vector<EqLookupNode::LookupStrategy> strategies = {
         EqLookupNode::LookupStrategy::kNestedLoopJoin, EqLookupNode::LookupStrategy::kHashJoin};
 
-private:
+protected:
     const NamespaceString _foreignNss =
         NamespaceString::createNamespaceString_forTest("testdb.sbe_stage_builder_foreign");
 };
@@ -2691,6 +2692,59 @@ TEST_F(BinaryJoinStageBuilderTest, JoinFilterOnMaterializedDocument) {
         fromjson("{_id: 1, l1key: 1, x: {y: {_id: 11, f1key: 1, l2key: 11}}, w: {z: {_id: 21, "
                  "f2key: 11}}}"),
     });
+}
+
+// The lookup paths record their trial run opt-outs on the blueprint nodes before lowering them,
+// so that a later deferred lowering would apply them the same way. Here the lowered plan runs
+// under a trial run tracker: the foreign side's reads are not counted, so a read cap just above
+// the outer side's reads lets the plan finish, while a cap below them stops it immediately.
+TEST_F(LookupStageBuilderTest, TrialRunDoesNotCountForeignReads) {
+    const std::vector<BSONObj> ldocs = {
+        fromjson("{_id: 0, lkey: 1}"),
+        fromjson("{_id: 1, lkey: 12}"),
+    };
+    const std::vector<BSONObj> fdocs = {
+        fromjson("{_id: 0, fkey: 1}"),
+        fromjson("{_id: 1, fkey: 12}"),
+        fromjson("{_id: 2, fkey: 13}"),
+        fromjson("{_id: 3, fkey: 14}"),
+    };
+    insertDocuments(ldocs, fdocs);
+
+    CollectionOrViewAcquisitionMap secondaryAcquisitions;
+    CollectionOrViewAcquisitionRequests acquisitionRequests;
+    acquisitionRequests.emplace_back(CollectionOrViewAcquisitionRequest::fromOpCtx(
+        operationContext(), _nss, AcquisitionPrerequisites::kRead));
+    acquisitionRequests.emplace_back(CollectionOrViewAcquisitionRequest::fromOpCtx(
+        operationContext(), _foreignNss, AcquisitionPrerequisites::kRead));
+    secondaryAcquisitions = makeAcquisitionMap(
+        acquireCollectionsOrViewsMaybeLockFree(operationContext(), acquisitionRequests));
+    auto localColl = secondaryAcquisitions.extract(_nss).mapped();
+    MultipleCollectionAccessor colls(
+        localColl, secondaryAcquisitions, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+
+    for (auto strategy : strategies) {
+        auto runWithReadCap = [&](size_t maxReads) {
+            auto tree = buildLookupSbeTree(strategy, colls, "lkey", "fkey", "result");
+            // buildLookupSbeTree() opens the plan, and a hash join reads its whole foreign side
+            // in open(). Reopen the plan with the tracker attached so that every read is tracked.
+            tree.stage->close();
+            TrialRunTracker tracker(boost::none, maxReads);
+            tree.stage->attachToTrialRunTracker(&tracker);
+            tree.stage->open(false);
+            PlanState state = PlanState::ADVANCED;
+            while (state == PlanState::ADVANCED) {
+                state = tree.stage->getNext();
+            }
+            tree.stage->close();
+        };
+
+        // The plan reads the two local documents; the foreign side does not participate, so a cap
+        // of three reads is enough to finish.
+        runWithReadCap(3);
+        // The tracker is live: a cap below the outer side's reads stops the run.
+        ASSERT_THROWS_CODE(runWithReadCap(1), DBException, ErrorCodes::QueryTrialRunCompleted);
+    }
 }
 
 }  // namespace

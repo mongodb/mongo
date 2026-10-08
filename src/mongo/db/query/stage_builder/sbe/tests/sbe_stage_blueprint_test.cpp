@@ -5,14 +5,18 @@
 
 #include "mongo/db/exec/sbe/stages/co_scan.h"
 #include "mongo/db/exec/sbe/util/debug_print.h"
+#include "mongo/db/exec/trial_run_tracker.h"
 #include "mongo/db/query/stage_builder/sbe/sbe_stage_lowering.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr_helpers.h"
 #include "mongo/db/query/stage_builder/sbe/tests/sbe_builder_test_fixture.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
+#include <memory>
 #include <string>
 #include <variant>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo::stage_builder {
 namespace {
@@ -66,6 +70,63 @@ TEST_F(SbBlueprintLoweringTest, SbBuilderLowersEachStageImmediately) {
     ASSERT_STRING_CONTAINS(str, "[5] unique");
     ASSERT_STRING_CONTAINS(str, "[5] unwind");
     ASSERT_STRING_CONTAINS(str, "[5] limit 1");
+}
+
+TEST(SbBlueprintTest, TrialRunTrackingGuardMarksNodesAddedInScope) {
+    SbBlueprint blueprint;
+    blueprint.add(SbBlueprintCoScan{});
+    {
+        NoTrialRunTrackingGuard guard{blueprint};
+        blueprint.add(SbBlueprintCoScan{});
+    }
+    blueprint.add(SbBlueprintCoScan{});
+    ASSERT_FALSE(blueprint.isTrialRunTrackingDisabled(SbBlueprintNodeIdx{0}));
+    ASSERT_TRUE(blueprint.isTrialRunTrackingDisabled(SbBlueprintNodeIdx{1}));
+    ASSERT_FALSE(blueprint.isTrialRunTrackingDisabled(SbBlueprintNodeIdx{2}));
+}
+
+TEST_F(SbBlueprintLoweringTest, PassthroughWrapsLoweredStage) {
+    SbBlueprint blueprint;
+    auto idx = blueprint.add(SbBlueprintPassthrough{sbe::makeS<sbe::CoScanStage>(7)});
+    ASSERT_EQ(print(lowerSbeBlueprint(blueprint, idx, *_state)), "[7] coscan ");
+
+    SbBuilder b{*_state, 6};
+    auto limited =
+        b.makeLimit(b.makePassthrough(sbe::makeS<sbe::CoScanStage>(7)), b.makeInt64Constant(1));
+    ASSERT_EQ(print(limited), "[6] limit 1ll \n[7] coscan ");
+}
+
+TEST_F(SbBlueprintLoweringTest, DisableTrialRunTrackingAppliesToLoweredStage) {
+    // Builds limit(nodeId 2) -> limit 1(nodeId 1) -> coscan(nodeId 1). With node 1 as the runtime
+    // planning root, attaching a trial run tracker reports TrackResults for the inner limit
+    // unless its trial run tracking has been disabled.
+    auto build = [&](bool disableInner) {
+        SbBlueprint blueprint;
+        SbBuilder b{*_state, 1};
+        auto coScan = blueprint.add(SbBlueprintCoScan{.nodeId = 1});
+        boost::optional<NoTrialRunTrackingGuard> guard;
+        if (disableInner) {
+            guard.emplace(blueprint);
+        }
+        auto inner = blueprint.add(SbBlueprintLimitSkip{
+            .child = coScan, .nodeId = 1, .limitExpr = b.makeInt64Constant(1)});
+        guard.reset();
+        auto root = blueprint.add(
+            SbBlueprintLimitSkip{.child = inner, .nodeId = 2, .limitExpr = b.makeInt64Constant(2)});
+        return lowerSbeBlueprint(blueprint, root, *_state);
+    };
+
+    auto tracker = std::make_unique<TrialRunTracker>(boost::none, boost::none);
+
+    auto enabled = build(false /* disableInner */);
+    ASSERT_EQ(enabled->attachToTrialRunTracker(tracker.get(), PlanNodeId{1}),
+              sbe::PlanStage::TrialRunTrackingType::TrackResults);
+    enabled->detachFromTrialRunTracker();
+
+    auto disabled = build(true /* disableInner */);
+    ASSERT_EQ(disabled->attachToTrialRunTracker(tracker.get(), PlanNodeId{1}),
+              sbe::PlanStage::TrialRunTrackingType::NoTracking);
+    disabled->detachFromTrialRunTracker();
 }
 
 class SbBlueprintLoweringDeathTest : public SbBlueprintLoweringTest {};

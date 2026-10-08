@@ -11,15 +11,16 @@
  * configuration. Each SBE stage type has a corresponding "SbBlueprint*" struct, and
  * SbBlueprintNode is the variant over all of them.
  *
- * The nodes of a blueprint tree are stored in an SbBlueprintNodeVector, and children are
- * referenced by index (SbBlueprintNodeIdx) into that vector rather than by pointer.
+ * The nodes of a blueprint tree are stored in an SbBlueprint, and children are referenced by
+ * index (SbBlueprintNodeIdx) into its node vector rather than by pointer.
  *
  * Output slots in a blueprint are pre-allocated by the caller via StageBuilderState::slotId().
  * Slots are stored as plain slot IDs since lowering does not need their type signatures.
  *
- * SbBuilder methods build the blueprint for the stage they create and immediately lower it
- * (sbe_stage_lowering.h/.cpp) to a unique_ptr<sbe::PlanStage>. This mirrors how SbExpr::lower()
- * works for expressions.
+ * SbBuilder methods append the blueprint for the stage they create to the SbBlueprint owned by
+ * StageBuilderState and immediately lower it (sbe_stage_lowering.h/.cpp). This mirrors how
+ * SbExpr::lower() works for expressions. The blueprint also records which nodes opt out of trial
+ * run tracking (see NoTrialRunTrackingGuard), and lowering applies the opt-out to the stage.
  */
 
 #include "mongo/bson/bsonobj.h"
@@ -36,6 +37,7 @@
 #include "mongo/db/query/stage_builder/sbe/sbexpr.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr_helpers.h"
 #include "mongo/db/storage/key_string/key_string.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
 
 #include <algorithm>
@@ -53,7 +55,7 @@
 namespace mongo::stage_builder {
 
 /**
- * Index of a node within an SbBlueprintNodeVector.
+ * Index of a node within an SbBlueprint.
  */
 struct SbBlueprintNodeIdx {
     uint32_t value{0};
@@ -70,7 +72,8 @@ using SbSortDirectionVector = absl::InlinedVector<sbe::value::SortDirection, 4>;
 
 /**
  * Wraps an already-lowered sbe::PlanStage so that it can be used as the child of a blueprint.
- * Lowering returns the wrapped stage unchanged.
+ * Lowering returns the wrapped stage unchanged. This is used for stages that have no blueprint
+ * (e.g. MultiRangeClusteredScanStage).
  */
 struct SbBlueprintPassthrough {
     SbStage stage;
@@ -359,6 +362,16 @@ struct SbBlueprintBlockHashAgg {
 };
 
 /**
+ * AggProjectStage: a projection whose expressions are accumulator expressions, evaluated in
+ * aggregate context. Each element of 'aggs' is (outSlot, expressions).
+ */
+struct SbBlueprintAggProject {
+    SbBlueprintNodeIdx child;
+    PlanNodeId nodeId{kEmptyPlanNodeId};
+    std::vector<std::pair<sbe::value::SlotId, SbBlockAggExpr>> aggs;
+};
+
+/**
  * BlockToRowStage. Converts block-vectorized rows back to scalar rows. 'outputSlots' is parallel
  * to 'blockSlots'.
  */
@@ -492,6 +505,7 @@ using SbBlueprintNode = std::variant<SbBlueprintLowered,
                                      SbBlueprintMergeJoin,
                                      SbBlueprintHashAgg,
                                      SbBlueprintBlockHashAgg,
+                                     SbBlueprintAggProject,
                                      SbBlueprintBlockToRow,
                                      SbBlueprintTsBucketToCellBlock,
                                      SbBlueprintAndHash,
@@ -521,7 +535,9 @@ inline SbBlueprintNodeIdx addBlueprintNode(SbBlueprintNodeVector& nodes, SbBluep
 class SbBlueprint {
 public:
     SbBlueprintNodeIdx add(SbBlueprintNode node) {
-        return addBlueprintNode(_nodes, std::move(node));
+        auto idx = addBlueprintNode(_nodes, std::move(node));
+        _trialRunTrackingDisabled.push_back(_noTrialRunTrackingOnAdd);
+        return idx;
     }
 
     size_t size() const {
@@ -564,11 +580,48 @@ public:
         _loweredPrefix = _nodes.size();
     }
 
+    bool isTrialRunTrackingDisabled(SbBlueprintNodeIdx idx) const {
+        tassert(12703003, "Invalid blueprint node index", idx.value < _nodes.size());
+        return _trialRunTrackingDisabled[idx.value];
+    }
+
 private:
+    friend class NoTrialRunTrackingGuard;
+
     SbBlueprintNodeVector _nodes;
+
+    // Parallel to '_nodes'.
+    std::vector<bool> _trialRunTrackingDisabled;
+
+    // While set (by a NoTrialRunTrackingGuard), add() marks nodes as not participating in trial
+    // run tracking.
+    bool _noTrialRunTrackingOnAdd{false};
 
     // Every node before this index has been lowered.
     size_t _loweredPrefix{0};
+};
+
+
+/**
+ * While an instance is alive, every node added to 'blueprint' is marked as not participating in
+ * trial run tracking; lowering applies the mark to the stage. Guards do not nest.
+ */
+class NoTrialRunTrackingGuard {
+public:
+    explicit NoTrialRunTrackingGuard(SbBlueprint& blueprint) : _blueprint(blueprint) {
+        tassert(12703004,
+                "Trial run tracking guards do not nest",
+                !_blueprint._noTrialRunTrackingOnAdd);
+        _blueprint._noTrialRunTrackingOnAdd = true;
+    }
+    NoTrialRunTrackingGuard(const NoTrialRunTrackingGuard&) = delete;
+    NoTrialRunTrackingGuard& operator=(const NoTrialRunTrackingGuard&) = delete;
+    ~NoTrialRunTrackingGuard() {
+        _blueprint._noTrialRunTrackingOnAdd = false;
+    }
+
+private:
+    SbBlueprint& _blueprint;
 };
 
 }  // namespace mongo::stage_builder

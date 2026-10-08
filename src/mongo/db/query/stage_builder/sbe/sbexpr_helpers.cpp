@@ -436,6 +436,11 @@ SbExpr SbExprBuilder::makeBooleanOpTree(abt::Operations logicOp, SbExpr lhs, SbE
     return makeBooleanOpTree(logicOp, std::move(leaves));
 }
 
+SbStage SbBuilder::makePassthrough(std::unique_ptr<sbe::PlanStage> stage) {
+    auto idx = _state.blueprint().add(SbBlueprintPassthrough{std::move(stage)});
+    return lowerSbeBlueprint(_state.blueprint(), idx, _state);
+}
+
 SbBuilder::MakeScanResult SbBuilder::makeScan(UUID collectionUuid,
                                               DatabaseName dbName,
                                               bool forward,
@@ -485,7 +490,7 @@ SbBuilder::MakeScanResult SbBuilder::makeScan(UUID collectionUuid,
         scanFieldSlots.emplace_back(SbSlot{_state.slotId()});
     }
 
-    auto scanStage =
+    auto scanStage = makePassthrough(
         sbe::makeS<sbe::MultiRangeClusteredScanStage>(collectionUuid,
                                                       std::move(dbName),
                                                       lower(resultSlot),
@@ -501,7 +506,7 @@ SbBuilder::MakeScanResult SbBuilder::makeScan(UUID collectionUuid,
                                                       _state.yieldPolicy,
                                                       _nodeId,
                                                       std::move(scanOpenCallback),
-                                                      true /* participateInTrialRunTracking */);
+                                                      true /* participateInTrialRunTracking */));
 
     return {std::move(scanStage), resultSlot, recordIdSlot, std::move(scanFieldSlots)};
 }
@@ -869,20 +874,20 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeBlockHashAgg(
 std::tuple<SbStage, SbSlotVector> SbBuilder::makeAggProject(const VariableTypes& varTypes,
                                                             SbStage stage,
                                                             SbBlockAggExprVector sbBlockAggExprs) {
-    sbe::AggExprVector aggExprsVec;
+    std::vector<std::pair<sbe::value::SlotId, SbBlockAggExpr>> aggs;
     SbSlotVector aggOutSlots;
 
     for (auto& [sbBlockAggExpr, optSbSlot] : sbBlockAggExprs) {
         auto sbSlot = optSbSlot ? *optSbSlot : SbSlot{_state.slotId()};
         aggOutSlots.emplace_back(sbSlot);
-
-        auto exprPair = sbe::AggExprPair{sbBlockAggExpr.init.lower(_state, &varTypes),
-                                         sbBlockAggExpr.agg.lower(_state, &varTypes)};
-
-        aggExprsVec.emplace_back(std::pair(sbSlot.getId(), std::move(exprPair)));
+        aggs.emplace_back(sbSlot.getId(), std::move(sbBlockAggExpr));
     }
 
-    stage = sbe::makeS<sbe::AggProjectStage>(std::move(stage), std::move(aggExprsVec), _nodeId);
+    stage = lowerBlueprint(_state,
+                           SbBlueprintAggProject{.child = addStage(_state, std::move(stage)),
+                                                 .nodeId = _nodeId,
+                                                 .aggs = std::move(aggs)},
+                           &varTypes);
 
     return {std::move(stage), std::move(aggOutSlots)};
 }

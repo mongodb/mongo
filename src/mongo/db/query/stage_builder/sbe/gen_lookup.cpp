@@ -22,6 +22,7 @@
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 #include "mongo/db/query/stage_builder/sbe/gen_index_scan.h"
 #include "mongo/db/query/stage_builder/sbe/gen_projection.h"
+#include "mongo/db/query/stage_builder/sbe/sbe_stage_blueprint.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr_helpers.h"
 #include "mongo/util/assert_util.h"
@@ -29,6 +30,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <tuple>
 #include <utility>
 
 #include <boost/none.hpp>
@@ -472,6 +474,8 @@ std::pair<SbSlot /* keyValuesSetSlot */, SbStage> buildKeySetForForeign(
     const PlanStageSlots& inputSlots,
     const FieldPath& fp,
     const PlanNodeId nodeId) {
+    // The foreign key set's reads must not influence trial runs of the outer side.
+    NoTrialRunTrackingGuard noTrialRunTracking{state.blueprint()};
     SbBuilder b(state, nodeId);
 
     auto inputSlot = inputSlots.getResultObj();
@@ -761,6 +765,39 @@ std::pair<SbSlotVector /*inner projects*/, SbStage> buildLoopJoinInnerProjects(
     return {innerProj, std::move(aggStage)};
 }  // buildLoopJoinInnerProjects
 
+/**
+ * Builds the inner side of a loop join $lookup: the foreign records of 'foreignStage' that match
+ * the local keys in 'localKeySlot'.
+ *
+ * Returns the slot holding the matched foreign records, the inner slots to be used in projections
+ * and the inner stage.
+ */
+std::tuple<SbSlot /* matched docs */, SbSlotVector /* inner projects */, SbStage>
+buildLoopJoinInnerSide(StageBuilderState& state,
+                       SbSlot localKeySlot,
+                       SbStage foreignStage,
+                       SbSlot foreignRecordSlot,
+                       const FieldPath& foreignFieldName,
+                       SbSlot topLevelFieldSlot,
+                       const PlanNodeId nodeId,
+                       bool hasUnwindSrc,
+                       boost::optional<sbe::value::SlotId> indexSlotId) {
+    // The inner side's reads must not influence trial runs of the outer side.
+    NoTrialRunTrackingGuard noTrialRunTracking{state.blueprint()};
+
+    auto [matchedRecordsSlot, matchesStage] = buildForeignMatches(localKeySlot,
+                                                                  std::move(foreignStage),
+                                                                  foreignRecordSlot,
+                                                                  foreignFieldName,
+                                                                  topLevelFieldSlot,
+                                                                  nodeId,
+                                                                  state,
+                                                                  hasUnwindSrc);
+    auto [innerProj, innerStage] = buildLoopJoinInnerProjects(
+        state, std::move(matchesStage), nodeId, matchedRecordsSlot, indexSlotId);
+    return {matchedRecordsSlot, std::move(innerProj), std::move(innerStage)};
+}  // buildLoopJoinInnerSide
+
 std::pair<SbSlot /* matched docs */, SbStage> buildNljLookupStage(
     StageBuilderState& state,
     SbStage localStage,
@@ -790,21 +827,16 @@ std::pair<SbSlot /* matched docs */, SbStage> buildNljLookupStage(
     // Build the inner branch that will get the foreign key values, compare them to the local key
     // values and accumulate all matching foreign records into an array that is placed into
     // 'matchedRecordsSlot'.
-    auto [matchedRecordsSlot, innerStage] = buildForeignMatches(localKeySlot,
-                                                                std::move(foreignStage),
-                                                                foreignRecordSlot,
-                                                                foreignFieldName,
-                                                                foreignFieldNameSlot,
-                                                                nodeId,
-                                                                state,
-                                                                unwindSpec.has_value());
-
-    auto [innerProj, innerRootStage] = buildLoopJoinInnerProjects(
-        state, std::move(innerStage), nodeId, matchedRecordsSlot, indexSlot);
-
-    // 'innerRootStage' should not participate in trial run tracking as the number of reads that
-    // it performs should not influence planning decisions made for 'outerRootStage'.
-    innerRootStage->disableTrialRunTracking();
+    auto [matchedRecordsSlot, innerProj, innerRootStage] =
+        buildLoopJoinInnerSide(state,
+                               localKeySlot,
+                               std::move(foreignStage),
+                               foreignRecordSlot,
+                               foreignFieldName,
+                               foreignFieldNameSlot,
+                               nodeId,
+                               unwindSpec.has_value(),
+                               indexSlot);
 
     SbSlot localRecordSlot = slots.getResultObj();
     // Connect the two branches with a nested loop join. For each outer record with a corresponding
@@ -1094,21 +1126,16 @@ std::pair<SbSlot, SbStage> buildIndexJoinLookupStage(
     // those in 'localKeysSetSlot'. This is necessary because some values are encoded with the same
     // value in BTree index, such as undefined, null and empty array. In hashed indexes, hash
     // collisions are possible.
-    auto [foreignGroupSlot, foreignStage] = buildForeignMatches(localKeysSetSlot,
-                                                                std::move(scanNljStage),
-                                                                foreignRecordSlot,
-                                                                foreignFieldName,
-                                                                foreignFieldTopLevelSlot,
-                                                                nodeId,
-                                                                state,
-                                                                unwindSpec.has_value());
-
-    auto [innerProj, foreignGroupStage] = buildLoopJoinInnerProjects(
-        state, std::move(foreignStage), nodeId, foreignGroupSlot, indexSlot);
-
-    // 'foreignGroupStage' should not participate in trial run tracking as the number of reads
-    // that it performs should not influence planning decisions for 'localKeysSetStage'.
-    foreignGroupStage->disableTrialRunTracking();
+    auto [foreignGroupSlot, innerProj, foreignGroupStage] =
+        buildLoopJoinInnerSide(state,
+                               localKeysSetSlot,
+                               std::move(scanNljStage),
+                               foreignRecordSlot,
+                               foreignFieldName,
+                               foreignFieldTopLevelSlot,
+                               nodeId,
+                               unwindSpec.has_value(),
+                               indexSlot);
 
     SbSlot localRecordSlot = slots.getResultObj();
     // The top level loop join stage that joins each local field with the matched foreign
@@ -1312,20 +1339,16 @@ std::pair<SbSlot, SbStage> buildDynamicIndexedLoopJoinLookupStage(
         SbExpr::makeSV(nestedLoopFallbackRecordSlot, nestedLoopFallbackFieldNameSlot));
 
     SbSlot resultSlot = branchSlots[0];
-    auto [finalForeignSlot, foreignMatchStage] = buildForeignMatches(localKeysSetSlot,
-                                                                     std::move(branchStage),
-                                                                     resultSlot,
-                                                                     foreignFieldName,
-                                                                     branchSlots[1],
-                                                                     nodeId,
-                                                                     state,
-                                                                     unwindSpec.has_value());
-    auto [innerProj, finalForeignStage] = buildLoopJoinInnerProjects(
-        state, std::move(foreignMatchStage), nodeId, finalForeignSlot, indexSlot);
-
-    //  'finalForeignStage' should not participate in trial run tracking as the number of
-    //  reads that it performs should not influence planning decisions for 'outerRootStage'.
-    finalForeignStage->disableTrialRunTracking();
+    auto [finalForeignSlot, innerProj, finalForeignStage] =
+        buildLoopJoinInnerSide(state,
+                               localKeysSetSlot,
+                               std::move(branchStage),
+                               resultSlot,
+                               foreignFieldName,
+                               branchSlots[1],
+                               nodeId,
+                               unwindSpec.has_value(),
+                               indexSlot);
 
     SbSlot localRecordSlot = slots.getResultObj();
     // Connect the local (left) and foreign (right) sides with a nested loop join. For each left
@@ -1378,10 +1401,6 @@ std::pair<SbSlot /*matched docs*/, SbStage> buildHashJoinLookupStage(
 
     auto [foreignKeySlot, foreignKeyStage] = buildKeySetForForeign(
         state, std::move(foreignStage), foreignSlots, foreignFieldName, nodeId);
-
-    // 'foreignKeyStage' should not participate in trial run tracking as the number of
-    // reads that it performs should not influence planning decisions for 'outerRootStage'.
-    foreignKeyStage->disableTrialRunTracking();
 
     auto foreignRecordSlot = foreignSlots.getResultObj();
 

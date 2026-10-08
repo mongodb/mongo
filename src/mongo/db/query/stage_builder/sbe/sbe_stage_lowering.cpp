@@ -3,6 +3,7 @@
 
 #include "mongo/db/query/stage_builder/sbe/sbe_stage_lowering.h"
 
+#include "mongo/db/exec/sbe/stages/agg_project.h"
 #include "mongo/db/exec/sbe/stages/and_hash.h"
 #include "mongo/db/exec/sbe/stages/block_hashagg.h"
 #include "mongo/db/exec/sbe/stages/block_to_row.h"
@@ -56,9 +57,14 @@ struct Lowerer {
     // ----------------------------------------------------------------
     std::unique_ptr<sbe::PlanStage> lower(SbBlueprintNodeIdx idx) {
         auto node = _blueprint.takeForLowering(idx);
-        return std::visit(
+        auto stage = std::visit(
             [&](auto&& n) -> std::unique_ptr<sbe::PlanStage> { return (*this)(std::move(n)); },
             std::move(node));
+
+        if (_blueprint.isTrialRunTrackingDisabled(idx)) {
+            stage->disableTrialRunTracking();
+        }
+        return stage;
     }
 
     // ----------------------------------------------------------------
@@ -347,6 +353,20 @@ struct Lowerer {
                                                   node.nodeId,
                                                   true /* participateInTrialRunTracking */,
                                                   node.forceIncreasedSpilling);
+    }
+
+    std::unique_ptr<sbe::PlanStage> operator()(SbBlueprintAggProject node) {
+        auto child = lower(node.child);
+
+        sbe::AggExprVector aggExprsVec;
+        aggExprsVec.reserve(node.aggs.size());
+        for (auto& [outSlot, sbExpr] : node.aggs) {
+            auto exprPair = sbe::AggExprPair{le(sbExpr.init), le(sbExpr.agg)};
+            aggExprsVec.emplace_back(outSlot, std::move(exprPair));
+        }
+
+        return sbe::makeS<sbe::AggProjectStage>(
+            std::move(child), std::move(aggExprsVec), node.nodeId);
     }
 
     std::unique_ptr<sbe::PlanStage> operator()(SbBlueprintBlockToRow node) {
