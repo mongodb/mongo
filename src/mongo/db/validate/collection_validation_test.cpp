@@ -1614,7 +1614,11 @@ TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationCorruptData) {
     }
     foregroundValidate(_nss,
                        _opCtx,
-                       {.valid = true, .numRecords = 1, .numErrors = 0, .numWarnings = 2},
+                       {.valid = false,
+                        .numRecords = 1,
+                        .numInvalidDocuments = 1,
+                        .numErrors = 1,
+                        .numWarnings = 1},
                        {_validateMode});
 }
 

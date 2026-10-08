@@ -436,11 +436,11 @@ auto ValidateAdaptor::validateRecord(OperationContext* opCtx,
     bool validDocument{true};
     {
         boost::optional<std::string> bsonValidationDescription;
-        const Status bsonValidationStatus = validateBSON(record.data.data(),
-                                                         record.data.size(),
-                                                         _validateState->getBSONValidateMode(),
-                                                         validationVersion,
-                                                         &bsonValidationDescription);
+        Status bsonValidationStatus = validateBSON(record.data.data(),
+                                                   record.data.size(),
+                                                   _validateState->getBSONValidateMode(),
+                                                   validationVersion,
+                                                   &bsonValidationDescription);
 
         if (!bsonValidationStatus.isOK()) {
             switch (bsonValidationStatus.code()) {
@@ -452,7 +452,23 @@ auto ValidateAdaptor::validateRecord(OperationContext* opCtx,
                                           "reason"_attr = bsonValidationStatus);
                     compliantDocument = false;
                     results.addWarning(_describeBSONNonConformantResult(bsonValidationDescription));
-                    break;
+                    // Non Conformant BSON may trigger on the first non-compliant field, this can
+                    // mask corruption past that point in the document. In the event that
+                    // non-conformance triggers a warning, run a check for structural integrity of
+                    // the BSON document, if that fails, additionally log as an error.
+                    // TODO: SERVER-136504 Remove second structural check when full/extended
+                    // validation no longer early exit.
+                    bsonValidationStatus = validateBSON(record.data.data(),
+                                                        record.data.size(),
+                                                        BSONValidateModeEnum::kDefault,
+                                                        validationVersion,
+                                                        &bsonValidationDescription);
+                    if (bsonValidationStatus.isOK()) {
+                        // Structurally sound, only log as warning.
+                        break;
+                    }
+                    // Log error and skip subsequent checks.
+                    [[fallthrough]];
                 default:
                     // The failing check is named in the returned error message via the
                     // description passed back out-of-band, so the message stays bounded rather

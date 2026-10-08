@@ -11,7 +11,9 @@ import {
     insertInvalidRegex,
     insertInvalidUTF8,
     insertNonSequentialArrayIndexes,
+    rewriteTable,
     startMongodOnExistingPath,
+    wtHeaderLines,
 } from "jstests/disk/libs/wt_file_helper.js";
 
 const baseName = "validate_bson_inconsistency";
@@ -392,4 +394,56 @@ resetDbpath(dbpath);
     assert.eq(res.warnings.length, 4, tojson(res.warnings));
 
     MongoRunner.stopMongod(mongod, null, {skipValidation: true});
+})();
+
+(function validateInvalidBSONAfterNonConformantElement() {
+    jsTest.log.info("Validate documents with an unknown BSON type after a non-conformant element");
+
+    const toHex = (str) =>
+        str
+            .split("")
+            .map((c) => c.charCodeAt(0).toString(16).padStart(2, "0"))
+            .join("");
+    // {validString: "p"} -> {validString: "\x80"}: invalid UTF-8, so only non-conformant.
+    const stringElem = "02" + toHex("validString") + "00" + "02000000" + "70";
+    // {zzzz: NumberInt(1)} -> type byte 0x7e, which does not exist, so the document is invalid.
+    const intElem = "10" + toHex("zzzz") + "00";
+    const corrupt = function (lines) {
+        for (let i = wtHeaderLines; i < lines.length; i += 2) {
+            assert(lines[i].includes(stringElem) && lines[i].includes(intElem), lines[i]);
+            lines[i] = lines[i]
+                .replace(stringElem, stringElem.slice(0, -2) + "80")
+                .replace(intElem, "7e" + intElem.slice(2));
+        }
+    };
+
+    for (const indexSpec of [null, {partialFilterExpression: {zzzz: {$gt: 0}}}]) {
+        let mongod = startMongodOnExistingPath(dbpath);
+        let db = mongod.getDB(baseName);
+        const collName = collNamePrefix + count++;
+        db.createCollection(collName);
+        let testColl = db[collName];
+        if (indexSpec) {
+            assert.commandWorked(testColl.createIndex({zzzz: 1}, indexSpec));
+        }
+
+        const numDocs = 10;
+        for (let i = 0; i < numDocs; ++i) {
+            assert.commandWorked(testColl.insert({validString: "p", zzzz: NumberInt(1)}));
+        }
+        rewriteTable(getUriForColl(testColl), mongod, corrupt);
+
+        mongod = startMongodOnExistingPath(dbpath);
+        db = mongod.getDB(baseName);
+        testColl = db[collName];
+
+        for (const options of [{}, {checkBSONConformance: true}]) {
+            const res = assert.commandWorked(testColl.validate(options));
+            assert(!res.valid, tojson(res));
+            assert.eq(res.nInvalidDocuments, numDocs, tojson(res));
+        }
+        assert.commandWorked(db.adminCommand({ping: 1}));
+
+        MongoRunner.stopMongod(mongod, null, {skipValidation: true});
+    }
 })();

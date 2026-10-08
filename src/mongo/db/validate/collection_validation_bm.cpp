@@ -61,6 +61,8 @@ struct DataSpec {
     int arrayLength{0};   // range(4): if > 0, field "a1" is an array of this length (making an
                           // index on it multikey). Only "a1" is arrayed so this axis varies index
                           // key count without also growing document size.
+    bool deprecatedType{false};  // range(5): if nonzero, every document carries a deprecated-type
+                                 // (Symbol) field, which BSON validation reports as non-conformant.
 };
 
 // Creates 'numIndexes' secondary indexes on the (empty) collection, keyed on fields a1..aK. Must be
@@ -111,6 +113,9 @@ size_t insertRecords(OperationContext* opCtx, const DataSpec& spec) {
             if (spec.payloadBytes > 0) {
                 builder.append("p", payload);
             }
+            if (spec.deprecatedType) {
+                builder.appendSymbol("d", "x");
+            }
             auto obj = builder.obj();
             totalBytes += obj.objsize();
             batch.push_back(std::move(obj));
@@ -134,6 +139,7 @@ void BM_Validate(benchmark::State& state, collection_validation::ValidateMode mo
         .payloadBytes = static_cast<int>(state.range(2)),
         .numIndexes = static_cast<int>(state.range(3)),
         .arrayLength = static_cast<int>(state.range(4)),
+        .deprecatedType = state.range(5) != 0,
     };
 
     ValidateBenchmarkFixture fixture;
@@ -165,28 +171,35 @@ void BM_Validate(benchmark::State& state, collection_validation::ValidateMode mo
 // Baseline shape: 4 small fields, no payload, no secondary indexes. Sweeps record count.
 void RecordCountArgs(benchmark::internal::Benchmark* b) {
     for (int n : {1'000, 10'000, 100'000}) {
-        b->Args({n, 4, 0, 0, 0});
+        b->Args({n, 4, 0, 0, 0, 0});
     }
 }
 
 // Fixed record count; sweeps document size via a string payload field.
 void DocSizeArgs(benchmark::internal::Benchmark* b) {
     for (int payload : {0, 256, 4'096, 16'384}) {
-        b->Args({50'000, 4, payload, 0, 0});
+        b->Args({50'000, 4, payload, 0, 0, 0});
     }
 }
 
 // Fixed record count; sweeps the number of (small) fields per document, stressing BSON traversal.
 void FieldCountArgs(benchmark::internal::Benchmark* b) {
     for (int fields : {1, 8, 32, 128}) {
-        b->Args({50'000, fields, 0, 0, 0});
+        b->Args({50'000, fields, 0, 0, 0, 0});
     }
 }
 
 // Fixed record count; sweeps the number of secondary indexes (keyed on a1..aK; needs >= K fields).
 void IndexCountArgs(benchmark::internal::Benchmark* b) {
     for (int indexes : {0, 1, 2, 4}) {
-        b->Args({50'000, 4, 0, indexes, 0});
+        b->Args({50'000, 4, 0, indexes, 0, 0});
+    }
+}
+
+// Fixed record count; with and without a deprecated BSON type field in every document.
+void DeprecatedTypeArgs(benchmark::internal::Benchmark* b) {
+    for (const bool deprecatedType : {false, true}) {
+        b->Args({50'000, 4, 0, 0, 0, deprecatedType});
     }
 }
 
@@ -235,8 +248,23 @@ BENCHMARK_CAPTURE(BM_Validate,
         {1, 1},            // numFields fixed
         {0, 0},            // payloadBytes fixed
         {1, 1},            // numIndexes fixed
-        {0, 1024}          // arrayLen sweeps: 0, 1, 4, 16, 64, 256, 1024
+        {0, 1024},         // arrayLen sweeps: 0, 1, 4, 16, 64, 256, 1024
+        {0, 0}             // deprecatedType off
     });
+
+// Deprecated-type axis (non-conformant documents take an extra structural validation pass).
+BENCHMARK_CAPTURE(BM_Validate,
+                  Foreground_DeprecatedType,
+                  collection_validation::ValidateMode::kForeground)
+    ->Apply(DeprecatedTypeArgs);
+BENCHMARK_CAPTURE(BM_Validate,
+                  ForegroundFull_DeprecatedType,
+                  collection_validation::ValidateMode::kForegroundFull)
+    ->Apply(DeprecatedTypeArgs);
+BENCHMARK_CAPTURE(BM_Validate,
+                  ForegroundFullCheckBSON_DeprecatedType,
+                  collection_validation::ValidateMode::kForegroundFullCheckBSON)
+    ->Apply(DeprecatedTypeArgs);
 // ── Timeseries variant ────────────────────────────────────────────────────────
 
 const NamespaceString kTsNss =

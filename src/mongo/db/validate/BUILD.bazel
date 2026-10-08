@@ -126,6 +126,7 @@ mongo_cc_unit_test(
         "key_string_index_consistency_test.cpp",
         "record_store_slicer_test.cpp",
         "size_limited_bsonobj_heap_test.cpp",
+        "validate_adaptor_test.cpp",
         "validate_results_test.cpp",
     ],
     tags = [
