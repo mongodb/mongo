@@ -11,10 +11,11 @@ import tempfile
 import threading
 import time
 import unittest
-from contextlib import redirect_stderr
+from contextlib import chdir, redirect_stderr
 from pathlib import Path
 from unittest import mock
 
+from buildscripts.bazel_rules_mongo.utils import evergreen_git
 from buildscripts.quality_checks import adapters, cli, selection, telemetry
 from buildscripts.quality_checks.adapters import CheckContext, RunOutcome
 from buildscripts.quality_checks.engine import (
@@ -840,6 +841,85 @@ class TelemetryTest(unittest.TestCase):
 
 
 class CliTest(unittest.TestCase):
+    def test_codeowners_uses_evergreen_diff_base_without_remote_refs(self):
+        cases = (
+            ("base PR", {"is_patch": True, "github_pr_number": "123"}, "master"),
+            ("stacked PR", {"is_patch": True, "github_pr_number": "124"}, "evg-pr-test-base"),
+            ("CLI patch", {"is_patch": True}, None),
+            ("waterfall", {"is_patch": False}, None),
+        )
+        for name, expansions, branch in cases:
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / "repo"
+                root.mkdir()
+                selection._run_git(root, "init", "-b", "master")
+                selection._run_git(root, "config", "commit.gpgsign", "false")
+                selection._run_git(
+                    root, "remote", "add", "origin", "https://github.com/10gen/mongo.git"
+                )
+
+                def commit_file(path: str) -> str:
+                    (root / path).write_text("contents", encoding="utf-8")
+                    selection._run_git(root, "add", path)
+                    selection._run_git(
+                        root,
+                        "-c",
+                        "user.name=Test",
+                        "-c",
+                        "user.email=test@example.com",
+                        "commit",
+                        "-m",
+                        path,
+                    )
+                    return selection._run_git(root, "rev-parse", "HEAD").strip()
+
+                commit_file("base.txt")
+                selection._run_git(root, "checkout", "-b", "evg-pr-test-base")
+                stack_base = commit_file("bottom.txt")
+                selection._run_git(root, "checkout", "-b", "pr")
+                commit_file("top.txt")
+                expansions = {**expansions, "branch_name": branch, "revision": stack_base}
+                expansions_path = Path(temp) / "expansions.yml"
+                expansions_path.write_text(json.dumps(expansions), encoding="utf-8")
+                evergreen_git.get_diff_revision.cache_clear()
+                evergreen_git.get_expansions.cache_clear()
+                self.addCleanup(evergreen_git.get_diff_revision.cache_clear)
+                self.addCleanup(evergreen_git.get_expansions.cache_clear)
+                with (
+                    chdir(root),
+                    mock.patch.object(cli, "REPO_ROOT", root),
+                    mock.patch.object(cli, "QualityChecksEngine") as engine_type,
+                    mock.patch.object(cli, "TelemetryClient"),
+                ):
+                    engine_type.return_value.run.return_value = EngineResult(0, (), {})
+                    stderr = io.StringIO()
+                    code = cli.main(
+                        [
+                            "--invocation-name",
+                            "codeowners",
+                            "--check",
+                            "--expansions-file",
+                            "../expansions.yml",
+                        ],
+                        stdout=io.StringIO(),
+                        stderr=stderr,
+                    )
+                self.assertEqual(code, 0, stderr.getvalue())
+                context = engine_type.call_args.kwargs["context"]
+                expected = {"bottom.txt", "top.txt"} if name == "base PR" else {"top.txt"}
+                self.assertEqual({candidate.path for candidate in context.candidates}, expected)
+                self.assertEqual(context.expansions_file, "../expansions.yml")
+                self.assertFalse(context.all_files)
+
+    @mock.patch.object(evergreen_git, "get_diff_revision")
+    @mock.patch.object(cli, "discover_changed_files", return_value=DiscoveryResult((), "HEAD"))
+    def test_explicit_discovery_scope_does_not_resolve_evergreen_diff_base(self, discover, diff):
+        for scope in (["--origin-branch", "custom-base"], ["--all"], ["--files", "gone.txt"]):
+            with self.subTest(scope=scope):
+                args = cli._parser().parse_args(["--expansions-file", "expansions.yml", *scope])
+                cli._discover(args)
+        diff.assert_not_called()
+
     def _alias_mode(self, alias: str) -> tuple[bool, frozenset[str]]:
         candidate = CandidateFile("file.py", ChangeStatus.MODIFIED)
         discovery = DiscoveryResult((candidate,), "origin/master")

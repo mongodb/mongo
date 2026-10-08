@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import io
 import os
 import sys
 import time
@@ -237,8 +238,16 @@ def _discover(args: argparse.Namespace, *, force_all: bool = False) -> Discovery
     if requested_files:
         origin = "HEAD" if args.origin_branch == "auto" else args.origin_branch
         return DiscoveryResult(explicit_files(REPO_ROOT, requested_files), origin)
+    origin_branch = args.origin_branch
+    if args.expansions_file and origin_branch == "auto" and not (args.all or force_all):
+        from buildscripts.bazel_rules_mongo.utils.evergreen_git import get_diff_revision
+
+        # Evergreen checkouts may have only a local PR base branch, without
+        # origin/master. Use the same CI diff base as the CODEOWNERS generator.
+        with contextlib.chdir(REPO_ROOT), contextlib.redirect_stdout(io.StringIO()):
+            origin_branch = get_diff_revision(args.expansions_file)
     return discover_changed_files(
-        REPO_ROOT, origin_branch=args.origin_branch, force_all=args.all or force_all
+        REPO_ROOT, origin_branch=origin_branch, force_all=args.all or force_all
     )
 
 
