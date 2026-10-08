@@ -10,10 +10,10 @@ filters:
       - 10gen/query-integration-staff-leads
   - "matcher_geo*":
     approvers:
-      - 10gen/query-integration-features
+      - 10gen/query-execution
   - "matcher_text*":
     approvers:
-      - 10gen/query-integration-search
+      - 10gen/query-execution
   # The JS engine is owned by QI.
   - "matcher_where*":
     approvers:

@@ -1,8 +1,11 @@
 version: 1.0.0
 filters:
+  # Window function code spans parsing/optimization (QO) and runtime execution (QE).
   - "*":
     approvers:
-      - 10gen/query-integration-features
+      - 10gen/query-execution
+      - 10gen/query-optimization
   - "OWNERS.yml":
     approvers:
-      - 10gen/query-integration-staff-leads
+      - 10gen/query-execution-staff-leads
+      - 10gen/query-optimization-staff-leads

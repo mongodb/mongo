@@ -6,6 +6,3 @@ filters:
   - "OWNERS.yml":
     approvers:
       - 10gen/query-optimization-staff-leads
-  - "*geo*":
-    approvers:
-      - 10gen/query-integration-features

@@ -26,10 +26,10 @@
   - DB Integration & Observability
 10gen/query-integration-staff-leads:
   - DB Integration & Observability
-10gen/query-integration-timeseries:
-  - DB Integration & Observability
 10gen/query-optimization:
   - Query Optimization
+10gen/query-timeseries:
+  - Query Execution
 10gen/query-optimization-cost-based-ranker:
   - Query Optimization
 10gen/server-catalog-and-routing:

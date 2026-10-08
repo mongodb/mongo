@@ -14,10 +14,10 @@ filters:
       - 10gen/server-collection-write-path
   - "timeseries_index_ttl_partial.js":
     approvers:
-      - 10gen/query-integration-timeseries
+      - 10gen/query-timeseries
   - "timeseries_index_use.js":
     approvers:
-      - 10gen/query-integration-timeseries
+      - 10gen/query-timeseries
   - "timeseries_split_vector.js":
     approvers:
       - 10gen/server-cluster-scalability

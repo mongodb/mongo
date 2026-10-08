@@ -26,28 +26,34 @@ filters:
       - 10gen/query-execution-classic
   - "accumulator_covariance.cpp":
     approvers:
-      - 10gen/query-integration-features
+      - 10gen/query-execution
+      - 10gen/query-optimization
   - "accumulator_exp_moving_avg.cpp":
     approvers:
-      - 10gen/query-integration-features
+      - 10gen/query-execution
+      - 10gen/query-optimization
   - "accumulator_for_window_functions.h":
     approvers:
-      - 10gen/query-integration-features
+      - 10gen/query-execution
+      - 10gen/query-optimization
   - "accumulator_integral.cpp":
     approvers:
-      - 10gen/query-integration-features
+      - 10gen/query-execution
+      - 10gen/query-optimization
   - "accumulator_js_*":
     approvers:
       - 10gen/query-integration-features
   - "accumulator_locf.cpp":
     approvers:
-      - 10gen/query-integration-features
+      - 10gen/query-execution
+      - 10gen/query-optimization
   - "accumulator_percentile*":
     approvers:
-      - 10gen/query-integration-features
+      - 10gen/query-execution
+      - 10gen/query-optimization
   - "accumulator_test.cpp":
     approvers:
-      - 10gen/query-integration-features
+      - 10gen/query-optimization
       - 10gen/query-execution-classic
   - "accumulator_internal_construct_ndv_sketch*":
     approvers:
@@ -57,7 +63,7 @@ filters:
       - 10gen/query-optimization
   - "aggregation_hint_translation.h":
     approvers:
-      - 10gen/query-integration-timeseries
+      - 10gen/query-timeseries
   - "aggregation_request*":
     approvers:
       - 10gen/query-optimization
@@ -93,13 +99,15 @@ filters:
       - 10gen/query-integration-observability
   - "document_source_densify*":
     approvers:
-      - 10gen/query-integration-features
+      - 10gen/query-execution
+      - 10gen/query-optimization
   - "document_source_fill*":
     approvers:
-      - 10gen/query-integration-features
+      - 10gen/query-execution
+      - 10gen/query-optimization
   - "document_source*geo*":
     approvers:
-      - 10gen/query-integration-features
+      - 10gen/query-execution
   - "document_source_hybrid_scoring*":
     approvers:
       - 10gen/query-integration-search
@@ -108,10 +116,10 @@ filters:
       - 10gen/query-execution-write-exec
   - "document_source_internal_unpack_bucket*":
     approvers:
-      - 10gen/query-integration-timeseries
+      - 10gen/query-timeseries
   - "document_source_internal_convert_bucket_index_stats*":
     approvers:
-      - 10gen/query-integration-timeseries
+      - 10gen/query-timeseries
   - "document_source_parsing_validators*":
     approvers:
       - 10gen/query-optimization
@@ -129,7 +137,8 @@ filters:
       - 10gen/query-integration-search
   - "document_source_set_window_fields*":
     approvers:
-      - 10gen/query-integration-features
+      - 10gen/query-execution
+      - 10gen/query-optimization
   - "document_source_merge_spec*":
     approvers:
       - 10gen/query-optimization
@@ -156,7 +165,8 @@ filters:
       - 10gen/query-execution-classic
   - "expression_from_accumulator_quantile.h":
     approvers:
-      - 10gen/query-integration-features
+      - 10gen/query-execution
+      - 10gen/query-optimization
   - "expression_function*":
     approvers:
       - 10gen/query-integration-features
@@ -225,7 +235,8 @@ filters:
       - 10gen/query-integration
   - "partition_key_comparator*":
     approvers:
-      - 10gen/query-integration-features
+      - 10gen/query-execution
+      - 10gen/query-optimization
   - "pipeline_d*":
     approvers:
       - 10gen/query-optimization
@@ -281,13 +292,15 @@ filters:
     approvers:
       - 10gen/query-execution-classic
   # Percentile calculations fall under the umbrella of "analytical extensions" which are owned by
-  # QI.
+  # QO.
   - "percentile_algo*":
     approvers:
-      - 10gen/query-integration-features
+      - 10gen/query-execution
+      - 10gen/query-optimization
   - "pipeline_metadata_tree*":
     approvers:
-      - 10gen/query-integration-features
+      - 10gen/query-execution
+      - 10gen/query-optimization
   - "plan_explainer*":
     approvers:
       - 10gen/query-optimization
@@ -311,7 +324,7 @@ filters:
       - 10gen/query-execution-classic
   - "timeseries_index_conversion_options.h":
     approvers:
-      - 10gen/query-integration-timeseries
+      - 10gen/query-timeseries
   - "value.idl":
     approvers:
       - 10gen/query-execution-classic

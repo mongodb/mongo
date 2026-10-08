@@ -11,10 +11,10 @@ filters:
       - 10gen/server-collection-write-path
   - "timeseries_agg*":
     approvers:
-      - 10gen/query-integration-timeseries
+      - 10gen/query-timeseries
   - "timeseries_deletes_and_inserts.js":
     approvers:
-      - 10gen/query-integration-timeseries
+      - 10gen/query-timeseries
   - "crud/crud_clustered_collection.js":
     approvers:
       - 10gen/server-collection-write-path

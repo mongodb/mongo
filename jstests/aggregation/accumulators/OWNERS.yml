@@ -16,12 +16,15 @@ filters:
       - 10gen/query-integration-features
   - "percentiles*":
     approvers:
-      - 10gen/query-integration-features
+      - 10gen/query-execution
+      - 10gen/query-optimization
   - "median*":
     approvers:
-      - 10gen/query-integration-features
+      - 10gen/query-execution
+      - 10gen/query-optimization
   - "percentiles_syntax.js":
     approvers:
+      - 10gen/query-execution
       - 10gen/query-optimization
   - "internal_construct_ndv_sketch.js":
     approvers:

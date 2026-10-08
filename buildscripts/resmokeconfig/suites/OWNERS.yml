@@ -188,7 +188,7 @@ filters:
       - 10gen/query-execution-query-settings
   - "timeseries_crud_jscore_passthrough.yml":
     approvers:
-      - 10gen/query-integration-timeseries
+      - 10gen/query-timeseries
   - "sharding_auth.yml":
     approvers:
       - 10gen/server-security

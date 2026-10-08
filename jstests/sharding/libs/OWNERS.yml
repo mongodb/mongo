@@ -2,7 +2,7 @@ version: 1.0.0
 filters:
   - "timeseries_update_multi_util.js":
     approvers:
-      - 10gen/query-integration-timeseries
+      - 10gen/query-timeseries
   - "chunk_bounds_util.js":
     approvers:
       - 10gen/server-cluster-scalability

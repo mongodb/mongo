@@ -18,10 +18,12 @@ filters:
       - 10gen/query-integration-features
   - "median*":
     approvers:
-      - 10gen/query-integration-features
+      - 10gen/query-execution
+      - 10gen/query-optimization
   - "percentile*":
     approvers:
-      - 10gen/query-integration-features
+      - 10gen/query-execution
+      - 10gen/query-optimization
   - "sigmoid.js":
     approvers:
-      - 10gen/query-integration-features
+      - 10gen/query-optimization

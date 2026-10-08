@@ -17,7 +17,7 @@ filters:
       - 10gen/query-optimization-cost-based-ranker
   - "external_sort_text_agg.js":
     approvers:
-      - 10gen/query-integration-search
+      - 10gen/query-execution
   - "prepare_constraint_validation_level_failpoint.js":
     approvers:
       - 10gen/query-execution
