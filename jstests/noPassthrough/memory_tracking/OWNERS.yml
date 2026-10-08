@@ -3,3 +3,6 @@ filters:
   - "*":
     approvers:
       - 10gen/query-integration-observability
+  - "query_memory_queued_operation_shedding.js":
+    approvers:
+      - 10gen/query-execution

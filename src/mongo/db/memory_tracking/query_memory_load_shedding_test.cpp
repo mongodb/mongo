@@ -3,22 +3,33 @@
 
 #include "mongo/db/memory_tracking/query_memory_load_shedding.h"
 
+#include "mongo/db/admission/execution_control/execution_control_parameters_gen.h"
+#include "mongo/db/admission/execution_control/ticketing_system.h"
+#include "mongo/db/admission/ticketing/ticketholder.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/memory_tracking/query_memory_load_shedding_gen.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/query/query_lifespan.h"
+#include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/lock_manager/locker.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/otel/metrics/metric_names.h"
 #include "mongo/otel/metrics/metrics_test_util.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/clock_source_mock.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 
 #include <cmath>
 #include <memory>
+#include <string>
+#include <string_view>
+#include <vector>
 
 #include <boost/optional.hpp>
 
@@ -317,7 +328,7 @@ TEST_F(QueryMemoryLoadSheddingCheckTest, ShedIncrementsOtelOperationsShedCounter
 }
 
 // An operation that has taken a write-intent (IX/X) global lock is never shed, even when forced:
-// wasGlobalLockTakenForWrite() latches, so we never abort after a partial, non-idempotent write.
+// the Locker's write-lock flag latches, so we never abort after a partial, non-idempotent write.
 // This is what protects a $merge/$out write inside an eligible aggregate.
 TEST_F(QueryMemoryLoadSheddingCheckTest, WriteIntentLockedOperationIsNeverShed) {
     auto restore = scopedRestoreMarks();
@@ -430,6 +441,350 @@ TEST_F(QueryMemoryLoadSheddingEligibility, PersistsAcrossBoundLifespanButNotSepa
     // Bound to the originating query's lifespan, as a getMore does: eligibility carries over.
     QueryLifespan::AlternativeQueryRegion region(laterOpCtx.get(), handle);
     ASSERT_TRUE(isOperationQueryMemorySheddingEligible(laterOpCtx.get()));
+}
+
+// ---------------------------------------------------------------------------------------------
+// Queued-operation sweep: operations blocked waiting for an execution ticket cannot reach a query
+// checkpoint, so the RSS monitor evaluates them. These tests install a one-ticket TicketingSystem,
+// park a second operation in the ticket queue on its own thread, and drive the sweep directly.
+// ---------------------------------------------------------------------------------------------
+
+class QueryMemoryLoadSheddingQueuedSweepTest : public ClockSourceMockServiceContextTest {
+public:
+    using TicketHolder = mongo::TicketHolder;
+    using TicketingSystem = admission::execution_control::TicketingSystem;
+
+    void setUp() override {
+        ClockSourceMockServiceContextTest::setUp();
+        auto* svcCtx = getServiceContext();
+        auto makeHolder = [&](int n) {
+            return std::make_unique<TicketHolder>(svcCtx,
+                                                  n,
+                                                  false /*trackPeakUsed*/,
+                                                  TicketHolder::kDefaultMaxQueueDepth,
+                                                  nullptr /*delinquentCallback*/,
+                                                  nullptr /*acquisitionCallback*/,
+                                                  nullptr /*waitedAcquisitionCallback*/,
+                                                  nullptr /*releaseCallback*/,
+                                                  nullptr /*startQueueingCallback*/,
+                                                  TicketHolder::ResizePolicy::kGradual,
+                                                  semaphoreType());
+        };
+        TicketingSystem::use(
+            svcCtx,
+            std::make_unique<TicketingSystem>(
+                svcCtx,
+                TicketingSystem::RWTicketHolder{makeHolder(1), makeHolder(1)},
+                TicketingSystem::RWTicketHolder{makeHolder(1), makeHolder(1)},
+                admission::execution_control::ExecutionControlConcurrencyAdjustmentAlgorithmEnum::
+                    kFixedConcurrentTransactions));
+    }
+
+    // The semaphore backing every ticket pool. The default matches the normal-priority pools.
+    virtual TicketHolder::SemaphoreType semaphoreType() const {
+        return TicketHolder::SemaphoreType::kCompeting;
+    }
+
+    void tearDown() override {
+        TicketingSystem::use(getServiceContext(), nullptr);
+        ClockSourceMockServiceContextTest::tearDown();
+    }
+
+    struct ClientAndOp {
+        ServiceContext::UniqueClient client;
+        ServiceContext::UniqueOperationContext opCtx;
+    };
+
+    ClientAndOp makeClientAndOp(std::string_view name) {
+        ClientAndOp c;
+        c.client = getService()->makeClient(std::string{name});
+        c.opCtx = c.client->makeOperationContext();
+        return c;
+    }
+
+    // Makes 'opCtx' look like a memory-tracked, shed-eligible read holding 'bytes' of tracked
+    // memory, published to CurOp the way a real stage tracker does.
+    static void makeEligibleHolding(OperationContext* opCtx, int64_t bytes) {
+        markOperationQueryMemorySheddingEligible(opCtx);
+        auto owned = std::make_unique<OperationMemoryUsageTracker>(opCtx);
+        owned->add(bytes);
+        OperationMemoryUsageTracker::attachToOpCtxIfAvailable(opCtx, std::move(owned));
+        CurOp::get(opCtx)->setMemoryTrackingStats(bytes, bytes);
+    }
+
+    static void waitUntilQueued(
+        OperationContext* opCtx,
+        Locker::ClientState queuedState = Locker::ClientState::kQueuedReader) {
+        const auto* locker = shard_role_details::getLocker(opCtx);
+        const Date_t deadline = Date_t::now() + Seconds(30);
+        while (locker->getClientState() != queuedState) {
+            ASSERT_LT(Date_t::now(), deadline) << "operation never queued for a ticket";
+            sleepmillis(1);
+        }
+    }
+
+    PseudoRandom& prng() {
+        return getClient()->getPrng();
+    }
+
+    // Advances the mock fast clock the sweep reads, past the per-evaluation throttle.
+    void advanceClock() {
+        static_cast<ClockSourceMock*>(getServiceContext()->getFastClockSource())
+            ->advance(Milliseconds(2));
+    }
+
+    // End to end: a shed-eligible read blocked on the (single, taken) read ticket is killed by the
+    // sweep with QueryMemoryLimitExceeded, wakes from its ticket wait with that error, and the
+    // bookkeeping (operationsShed) records it. The running ticket holder is untouched.
+    void runKillsEligibleOperationBlockedOnTicket() {
+        auto restore = scopedRestoreMarks();
+        gQueryMemoryLoadSheddingLowMarkPercent.store(50);
+        gQueryMemoryLoadSheddingHighMarkPercent.store(60);
+        ON_BLOCK_EXIT([] {
+            globalFailPointRegistry().find("queryMemoryPressureOverride")->setMode(FailPoint::off);
+        });
+        // Above the high mark: p == 1, so the sweep is deterministic once the clock is primed.
+        setPressureOverride(90);
+
+        auto holder = makeClientAndOp("ticket holder");
+        makeEligibleHolding(holder.opCtx.get(), 1 << 20);
+        Lock::GlobalRead holderLock(holder.opCtx.get());  // takes the only read ticket
+
+        auto waiter = makeClientAndOp("ticket waiter");
+        OperationContext* waiterOpCtx = waiter.opCtx.get();
+        makeEligibleHolding(waiterOpCtx, 1 << 20);
+
+        Status waiterResult = Status::OK();
+        stdx::thread waiterThread([&] {
+            try {
+                Lock::GlobalRead lk(waiterOpCtx);  // blocks: no ticket available
+            } catch (const DBException& ex) {
+                waiterResult = ex.toStatus();
+            }
+        });
+        // If an assertion fails before the shed, wake the still-queued waiter so the join can't
+        // hang.
+        ScopeGuard join([&] {
+            waiterOpCtx->markKilled(ErrorCodes::Interrupted);
+            waiterThread.join();
+        });
+        waitUntilQueued(waiterOpCtx);
+
+        const long long shedBefore = [&] {
+            BSONObjBuilder b;
+            appendQueryMemoryLoadSheddingStats(getServiceContext(), b);
+            return b.obj()["loadShedding"]["operationsShed"].numberLong();
+        }();
+
+        // First pass only primes the sweep clock for the newly observed queued op.
+        auto candidates = sweepQueuedOperationsForMemoryPressure(getServiceContext(), prng());
+        ASSERT_EQ(candidates, 1);
+        ASSERT_EQ(waiterOpCtx->getKillStatus(), ErrorCodes::OK);
+
+        // Second pass, at least the throttle interval later, sheds it (p == 1 above the high mark).
+        advanceClock();
+        candidates = sweepQueuedOperationsForMemoryPressure(getServiceContext(), prng());
+        ASSERT_EQ(candidates, 1);
+        ASSERT_EQ(waiterOpCtx->getKillStatus(), ErrorCodes::QueryMemoryLimitExceeded);
+        // The running ticket holder was never a candidate.
+        ASSERT_EQ(holder.opCtx->getKillStatus(), ErrorCodes::OK);
+
+        // The kill wakes the waiter out of its ticket wait without it ever being admitted.
+        join.dismiss();
+        waiterThread.join();
+        ASSERT_EQ(waiterResult, ErrorCodes::QueryMemoryLimitExceeded);
+
+        BSONObjBuilder b;
+        appendQueryMemoryLoadSheddingStats(getServiceContext(), b);
+        // Hold the builder's obj so 'after' does not view a buffer owned by a temporary.
+        BSONObj statsObj = b.obj();
+        const BSONObj after = statsObj["loadShedding"].Obj();
+        // The queued sweep's shed is counted in operationsShed like any other shed.
+        ASSERT_EQ(after["operationsShed"].numberLong(), shedBefore + 1);
+    }
+};
+
+// The normal-priority pools use the competing semaphore, which also wakes waiters periodically.
+TEST_F(QueryMemoryLoadSheddingQueuedSweepTest, KillsEligibleOperationBlockedOnTicket) {
+    runKillsEligibleOperationBlockedOnTicket();
+}
+
+// Execution control deprioritizes long-running queries into low-priority pools backed by the
+// ordered semaphore, which never wakes a waiter periodically: the sweep's kill must wake it.
+class QueryMemoryLoadSheddingQueuedSweepOrderedTest
+    : public QueryMemoryLoadSheddingQueuedSweepTest {
+    TicketHolder::SemaphoreType semaphoreType() const override {
+        return TicketHolder::SemaphoreType::kPrioritizeFewestAdmissions;
+    }
+};
+
+TEST_F(QueryMemoryLoadSheddingQueuedSweepOrderedTest, KillsEligibleOperationBlockedOnTicket) {
+    runKillsEligibleOperationBlockedOnTicket();
+}
+
+// The sweep is a no-op when the feature is off or RSS is below the low mark -- even with an
+// eligible operation parked in the queue across many passes -- and sheds that same operation once
+// RSS rises above the low mark, so the earlier no-ops are due to the low-mark gate.
+TEST_F(QueryMemoryLoadSheddingQueuedSweepTest, ShedsQueuedOperationOnlyAboveLowMark) {
+    auto restore = scopedRestoreMarks();
+    ON_BLOCK_EXIT([] {
+        globalFailPointRegistry().find("queryMemoryPressureOverride")->setMode(FailPoint::off);
+    });
+
+    auto holder = makeClientAndOp("ticket holder");
+    Lock::GlobalRead holderLock(holder.opCtx.get());
+    auto waiter = makeClientAndOp("ticket waiter");
+    OperationContext* waiterOpCtx = waiter.opCtx.get();
+    makeEligibleHolding(waiterOpCtx, 1 << 20);
+    Status waiterResult = Status::OK();
+    stdx::thread waiterThread([&] {
+        try {
+            Lock::GlobalRead lk(waiterOpCtx);
+        } catch (const DBException& ex) {
+            waiterResult = ex.toStatus();
+        }
+    });
+    ScopeGuard cleanup([&] {
+        waiterOpCtx->markKilled(ErrorCodes::Interrupted);
+        waiterThread.join();
+    });
+    waitUntilQueued(waiterOpCtx);
+
+    // Feature disabled.
+    gQueryMemoryLoadSheddingLowMarkPercent.store(-1);
+    setPressureOverride(99);
+    auto candidates = sweepQueuedOperationsForMemoryPressure(getServiceContext(), prng());
+    ASSERT_EQ(candidates, 0);
+
+    // Enabled but below the low mark: never a candidate. Two passes would prime and then charge the
+    // op's clock if the low-mark gate were missing.
+    gQueryMemoryLoadSheddingLowMarkPercent.store(50);
+    gQueryMemoryLoadSheddingHighMarkPercent.store(60);
+    setPressureOverride(40);
+    for (int pass = 0; pass < 2; ++pass) {
+        advanceClock();
+        candidates = sweepQueuedOperationsForMemoryPressure(getServiceContext(), prng());
+        ASSERT_EQ(candidates, 0) << "pass " << pass;
+    }
+    ASSERT_EQ(waiterOpCtx->getKillStatus(), ErrorCodes::OK);
+
+    // Above the high mark (p == 1), the same op is shed: the first pass primes its clock and the
+    // second sheds it.
+    setPressureOverride(90);
+    candidates = sweepQueuedOperationsForMemoryPressure(getServiceContext(), prng());
+    ASSERT_EQ(candidates, 1);
+    advanceClock();
+    candidates = sweepQueuedOperationsForMemoryPressure(getServiceContext(), prng());
+    ASSERT_EQ(candidates, 1);
+    ASSERT_EQ(waiterOpCtx->getKillStatus(), ErrorCodes::QueryMemoryLimitExceeded);
+    cleanup.dismiss();
+    waiterThread.join();
+    ASSERT_EQ(waiterResult, ErrorCodes::QueryMemoryLimitExceeded);
+}
+
+// Candidacy requires all of: queued for a read ticket, shed-eligible, no write-intent lock, tracked
+// memory > 0. Each missing condition alone excludes the operation.
+TEST_F(QueryMemoryLoadSheddingQueuedSweepTest, SkipsIneligibleQueuedOperations) {
+    auto restore = scopedRestoreMarks();
+    gQueryMemoryLoadSheddingLowMarkPercent.store(50);
+    gQueryMemoryLoadSheddingHighMarkPercent.store(60);
+    ON_BLOCK_EXIT([] {
+        globalFailPointRegistry().find("queryMemoryPressureOverride")->setMode(FailPoint::off);
+    });
+    setPressureOverride(99);
+
+    auto holder = makeClientAndOp("ticket holder");
+    makeEligibleHolding(holder.opCtx.get(), 1 << 20);  // eligible but RUNNING: never a candidate
+    Lock::GlobalRead holderLock(holder.opCtx.get());
+
+    // Not eligible (never opted in) but holding tracked memory.
+    auto notEligible = makeClientAndOp("not eligible");
+    {
+        auto owned = std::make_unique<OperationMemoryUsageTracker>(notEligible.opCtx.get());
+        owned->add(1 << 20);
+        OperationMemoryUsageTracker::attachToOpCtxIfAvailable(notEligible.opCtx.get(),
+                                                              std::move(owned));
+        CurOp::get(notEligible.opCtx.get())->setMemoryTrackingStats(1 << 20, 1 << 20);
+    }
+
+    // Eligible, but no tracked memory published.
+    auto noMemory = makeClientAndOp("no memory");
+    markOperationQueryMemorySheddingEligible(noMemory.opCtx.get());
+
+    // Eligible with memory, but has taken a write-intent global lock (exempt).
+    auto writer = makeClientAndOp("writer");
+    makeEligibleHolding(writer.opCtx.get(), 1 << 20);
+    shard_role_details::getLocker(writer.opCtx.get())->setGlobalLockTakenInMode(MODE_IX);
+
+    std::vector<OperationContext*> waiters{
+        notEligible.opCtx.get(), noMemory.opCtx.get(), writer.opCtx.get()};
+    std::vector<stdx::thread> threads;
+    for (auto* opCtx : waiters) {
+        threads.emplace_back([opCtx] {
+            try {
+                Lock::GlobalRead lk(opCtx);
+            } catch (const DBException&) {
+            }
+        });
+    }
+    ScopeGuard cleanup([&] {
+        for (auto* opCtx : waiters) {
+            opCtx->markKilled(ErrorCodes::Interrupted);
+        }
+        for (auto& t : threads) {
+            t.join();
+        }
+    });
+    for (auto* opCtx : waiters) {
+        waitUntilQueued(opCtx);
+    }
+
+    for (int pass = 0; pass < 2; ++pass) {
+        advanceClock();
+        auto candidates = sweepQueuedOperationsForMemoryPressure(getServiceContext(), prng());
+        ASSERT_EQ(candidates, 0) << "pass " << pass;
+    }
+    for (auto* opCtx : waiters) {
+        ASSERT_EQ(opCtx->getKillStatus(), ErrorCodes::OK);
+    }
+    ASSERT_EQ(holder.opCtx->getKillStatus(), ErrorCodes::OK);
+}
+
+// An eligible operation queued for a write ticket is never a candidate: once granted, it could
+// begin writing before a kill is observed.
+TEST_F(QueryMemoryLoadSheddingQueuedSweepTest, SkipsQueuedWriters) {
+    auto restore = scopedRestoreMarks();
+    gQueryMemoryLoadSheddingLowMarkPercent.store(50);
+    gQueryMemoryLoadSheddingHighMarkPercent.store(60);
+    ON_BLOCK_EXIT([] {
+        globalFailPointRegistry().find("queryMemoryPressureOverride")->setMode(FailPoint::off);
+    });
+    setPressureOverride(99);
+
+    auto holder = makeClientAndOp("write ticket holder");
+    // Takes the only write ticket.
+    Lock::GlobalLock holderLock(holder.opCtx.get(), MODE_IX);
+
+    auto writer = makeClientAndOp("queued writer");
+    makeEligibleHolding(writer.opCtx.get(), 1 << 20);
+    stdx::thread thread([opCtx = writer.opCtx.get()] {
+        try {
+            Lock::GlobalLock lk(opCtx, MODE_IX);
+        } catch (const DBException&) {
+        }
+    });
+    ScopeGuard cleanup([&] {
+        writer.opCtx->markKilled(ErrorCodes::Interrupted);
+        thread.join();
+    });
+    waitUntilQueued(writer.opCtx.get(), Locker::ClientState::kQueuedWriter);
+
+    for (int pass = 0; pass < 2; ++pass) {
+        advanceClock();
+        ASSERT_EQ(sweepQueuedOperationsForMemoryPressure(getServiceContext(), prng()), 0)
+            << "pass " << pass;
+    }
+    ASSERT_EQ(writer.opCtx->getKillStatus(), ErrorCodes::OK);
 }
 
 }  // namespace

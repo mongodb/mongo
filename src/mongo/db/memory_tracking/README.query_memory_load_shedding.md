@@ -40,8 +40,9 @@ available from `hostInfo` (`system.memLimitMB`) — so a dashboard can compute R
 without a duplicate metric.
 
 Each shed also emits a log line (id `13033300`) that identifies the shed operation — namespace,
-redacted command, plan summary, and opId — alongside the pressure fields, rate-limited to one full
-line per second (the first at `Warning`, the rest at debug severity).
+redacted command, plan summary, and opId — alongside the pressure fields and whether the operation
+was waiting for an execution ticket, rate-limited to one full line per second (the first at
+`Warning`, the rest at debug severity).
 
 ## Why probabilistic?
 
@@ -208,6 +209,20 @@ The two header-inline funnels (ExpressionContext, SBE `CanInterrupt`) call out-o
 their widely-included headers don't pull in the load-shed library; the shim lives in each funnel's
 own library, which depends on `query_memory_load_shedding`.
 
+### Operations waiting for an execution ticket
+
+An operation blocked waiting for an execution ticket (or a lock) also cannot reach a checkpoint. On
+an overloaded system, execution control deprioritizes long-running queries and assigned them to a
+small ticket pool, so queueing of high-memory operations can be expected. The RSS monitor thread
+therefore also evaluates queued operations for shedding after its RSS sampling.
+
+Only operations queued as readers are swept. A queued reader is normally killed in its ticket wait,
+so it fails without acquiring any lock. A later IX acquisition for a write also fails if the kill is
+already pending, since lock grants check for interrupt. There remains a narrow, accepted race: the
+sweep decides on another thread, so the operation can be granted its ticket and take its IX lock
+between the sweep's check and the kill, and then be killed after a partial write. SERVER-136543
+tracks moving this check onto the queued operation's own thread, which closes the race.
+
 ### Hot-path cost
 
 These funnels are extremely hot, so the off cost and the enabled-but-healthy cost are both
@@ -237,8 +252,9 @@ The random roll reuses the client's warm PRNG via `Client::getPrng().trueWithPro
   i.e. it is a memory-tracking read. Point queries, writes without tracked memory, and internal
   bookkeeping have no tracker and are never shed.
 - The operation is marked **eligible** (see the next section).
-- The operation has not taken a write-intent global lock (`wasGlobalLockTakenForWrite()`); see
-  "Writes are exempt via the write-intent lock latch".
+- The operation has not taken a write-intent global lock
+  (`wasGlobalLockTakenInModeConflictingWithWrites()`); see "Writes are exempt via the write-intent
+  lock latch".
 - `pressure > 0` and `size > 0` and the probabilistic roll fires.
 
 ### Eligibility is opt-in
@@ -278,10 +294,11 @@ The flag is a per-opCtx decoration (like the exemption latch), defaulting false.
 An operation that has begun a write must not be aborted mid-way, or shedding would surface a
 `RetriableError` after a partial, non-idempotent write that a naive client retry could re-apply. We
 detect this from the `Locker`: `queryMemoryCheckLoadShedding` skips any op for which
-`wasGlobalLockTakenForWrite()` is true — i.e. it has ever taken the global lock in `IX`/`X` (write
-intent). This is a **sticky, one-way signal**: the Locker's `_globalLockMode` bits are never
+`wasGlobalLockTakenInModeConflictingWithWrites()` is true — i.e. it has ever taken the global lock
+in `IX`/`X` (write intent). The flag also latches on a global `S` lock, which only fsyncLock takes,
+so it excludes no shed-eligible read. This is a **sticky, one-way signal**: the flag is never
 cleared, so once an op takes a write-intent lock it stays exempt for the rest of its life, and
-surviving yields.
+surviving yields. It is atomic, so the queued-operation sweep can read it from the monitor thread.
 
 - Update/delete/findAndModify (including a whole `multi:true` statement) take a collection/global
   `IX` before writing, so they are exempt for the duration.

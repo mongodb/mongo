@@ -8,8 +8,10 @@
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/memory_tracking/query_memory_load_shedding_gen.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_lifespan.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/locker.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/topology/cluster_role.h"
@@ -58,12 +60,31 @@ const auto getProcessState = ServiceContext::declareDecoration<QueryMemoryLoadSh
 // and idle periods.
 struct LoadSheddingOpState {
     // Opt-in eligibility (see is/markOperationQueryMemorySheddingEligible). Defaults false.
-    bool eligible = false;
-    // Wall-clock time of the previous shed evaluation, used to compute dt. The default-constructed
-    // Date_t{} (epoch) is the "no dt baseline yet" sentinel: set below the low mark and before the
-    // first evaluation after crossing above it, so the first post-crossing check only primes the
-    // clock instead of computing a bogus dt.
-    Date_t lastEvalTime;
+    // Atomic because the queued-operation sweep reads it from the monitor thread. Relaxed access is
+    // sufficient because the flag is one-way, so a stale read only delays shedding candidacy.
+    // Writes are protected separately by the write-intent lock check in isShedCandidate(), not by
+    // this flag.
+    bool isEligible() const {
+        return _eligible.loadRelaxed();
+    }
+    void markEligible() {
+        _eligible.storeRelaxed(true);
+    }
+
+    // Wall-clock time of the previous shed evaluation, used to compute dt. Initialized by the
+    // first shedding check. Atomic due to r/w access on both the op's interrupt checks and the
+    // queued-operation sweep. Relaxed access is sufficient -- timing inaccuracies just skew the
+    // shed probability.
+    Date_t lastEvalTime() const {
+        return Date_t::fromMillisSinceEpoch(_lastEvalTimeMillis.loadRelaxed());
+    }
+    void setLastEvalTime(Date_t t) {
+        _lastEvalTimeMillis.storeRelaxed(t.toMillisSinceEpoch());
+    }
+
+private:
+    AtomicWord<bool> _eligible{false};
+    AtomicWord<long long> _lastEvalTimeMillis{0};
 };
 const auto getOpState = QueryLifespan::declareOpCtxDecoration<LoadSheddingOpState>();
 
@@ -77,10 +98,10 @@ const ConstructorActionRegistererType<ServiceContext> onServiceContextCreate{
 // path. Skipped time accrues into the next dt, preserving the time-based probability.
 constexpr Milliseconds kMinShedEvalInterval{1};
 
-// Caps the dt charged in one shedding evaluation, so a long gap between evaluations can't push the
-// per-check probability toward 1 in a single step. Otherwise, if the whole system stalls (e.g. a
-// lock convoy or slow storage), every eligible op resumes with a huge dt at once and is shed
-// near-certainly. Under-shedding is safe: the op is re-evaluated at its next checkpoint.
+// Caps the dt charged in one shedding evaluation. This avoids a thundering herd of sheds if the
+// whole system stalls. Instead we temporarily under-shed after a stall. Setting
+// 'queryMemoryRssMonitorIntervalMillis' above this cap is not recommended because it will
+// consistently under-shed queued operations.
 constexpr Milliseconds kMaxShedEvalDt{1000};
 
 // Holds the periodic monitor job for the lifetime of the ServiceContext.
@@ -162,18 +183,19 @@ bool rollForShed(const PressureSnapshot& pressure,
     }
 
     // No dt baseline yet (see LoadSheddingOpState::lastEvalTime): don't shed, just start the clock.
-    if (opState.lastEvalTime == Date_t{}) {
-        opState.lastEvalTime = now;
+    const Date_t lastEvalTime = opState.lastEvalTime();
+    if (lastEvalTime == Date_t{}) {
+        opState.setLastEvalTime(now);
         return false;
     }
 
     // Throttle: don't update the clock, so the time accrues into the next dt.
-    Milliseconds dt = now - opState.lastEvalTime;
+    Milliseconds dt = now - lastEvalTime;
     if (dt < kMinShedEvalInterval) {
         return false;
     }
     dt = std::min(dt, kMaxShedEvalDt);
-    opState.lastEvalTime = now;
+    opState.setLastEvalTime(now);
 
     const double p = query_memory_load_shedding_detail::shedProbability(
         pressure.rssBytes,
@@ -195,7 +217,7 @@ bool isShedCandidate(OperationContext* opCtx,
                      const LoadSheddingOpState& opState,
                      int64_t opTrackedBytes) {
     // Operations opt in to load shedding via markOperationQueryMemorySheddingEligible.
-    if (!opState.eligible) {
+    if (!opState.isEligible()) {
         return false;
     }
     // An operation with no tracked memory has zero shed probability and is never a shedding target
@@ -206,15 +228,18 @@ bool isShedCandidate(OperationContext* opCtx,
     }
     // Never shed an operation that has taken a write-intent (IX/X) global lock: it has begun (or is
     // in) a write, and shedding would surface a RetriableError after a partial, non-idempotent
-    // write. This is a sticky, one-way signal on the Locker that survives yields.
-    return !shard_role_details::getLocker(opCtx)->wasGlobalLockTakenForWrite();
+    // write. This is a sticky, one-way signal on the Locker that survives yields, and is atomic so
+    // the queued-operation sweep can read it from another thread. It also latches on a global S
+    // lock, which only fsyncLock takes, so it excludes no shed-eligible read.
+    return !shard_role_details::getLocker(opCtx)->wasGlobalLockTakenInModeConflictingWithWrites();
 }
 
 // Bookkeeping and logging for a shed.
 void recordShed(QueryMemoryLoadSheddingState& processState,
                 OperationContext* opCtx,
                 const PressureSnapshot& pressure,
-                int64_t opTrackedBytes) {
+                int64_t opTrackedBytes,
+                bool waitingForTicket) {
     const long long total = processState.operationsShed->fetchAndAdd(1) + 1;
     operationsShedCounter().add(1);
     // Rate-limit to one full line per second to avoid flooding the log under sustained pressure;
@@ -229,6 +254,7 @@ void recordShed(QueryMemoryLoadSheddingState& processState,
                 "ns"_attr = toStringForLogging(curOp->getNSS()),
                 "command"_attr = redact(curOp->opDescription()),
                 "planSummary"_attr = curOp->getPlanSummary(),
+                "waitingForTicket"_attr = waitingForTicket,
                 "currentUsageBytes"_attr = pressure.rssBytes,
                 "opTrackedBytes"_attr = opTrackedBytes,
                 "operationsShed"_attr = total);
@@ -309,16 +335,16 @@ double shedProbability(int64_t rssBytes,
 }
 
 Date_t lastEvalTimeForTest(OperationContext* opCtx) {
-    return getOpState(opCtx).lastEvalTime;
+    return getOpState(opCtx).lastEvalTime();
 }
 }  // namespace query_memory_load_shedding_detail
 
 bool isOperationQueryMemorySheddingEligible(OperationContext* opCtx) {
-    return getOpState(opCtx).eligible;
+    return getOpState(opCtx).isEligible();
 }
 
 void markOperationQueryMemorySheddingEligible(OperationContext* opCtx) {
-    getOpState(opCtx).eligible = true;
+    getOpState(opCtx).markEligible();
 }
 
 Status queryMemoryCheckLoadShedding(OperationContext* opCtx) {
@@ -341,7 +367,7 @@ Status queryMemoryCheckLoadShedding(OperationContext* opCtx) {
     // (Date_t{}) to record that we don't have a dt baseline yet. We'll only shed after the second
     // check that passes this conditional.
     if (!pressure.aboveLowMark()) {
-        opState.lastEvalTime = Date_t{};
+        opState.setLastEvalTime(Date_t{});
         return Status::OK();
     }
 
@@ -360,11 +386,84 @@ Status queryMemoryCheckLoadShedding(OperationContext* opCtx) {
     // Make the shed sticky via markKilled (like the deadline/killOp paths) so it is one-shot and
     // every later interrupt check agrees, not a transient status a caller could swallow.
     opCtx->markKilled(ErrorCodes::QueryMemoryLimitExceeded);
-    recordShed(processState, opCtx, pressure, opTrackedBytes);
+    recordShed(processState, opCtx, pressure, opTrackedBytes, /*waitingForTicket*/ false);
     return {
         ErrorCodes::QueryMemoryLimitExceeded,
         "Operation load-shed because the server is under memory pressure. Retry when the server "
         "is less loaded."};
+}
+
+namespace {
+
+// True when 'opCtx' is blocked waiting for a read ticket (or a shared lock) and so cannot reach any
+// query-execution checkpoint on its own. Queued writers are excluded. We accept a minor race: the
+// op can be granted its ticket, take a write lock and begin writing between this check and
+// killOperation(), and then be killed with a retryable error after a partial write.
+// TODO SERVER-136543: shed queued operations on their own thread while they wait for a ticket, and
+// remove this sweep.
+bool isQueuedReader(OperationContext* opCtx) {
+    const Locker* locker = shard_role_details::getLocker(opCtx);
+    if (!locker) {
+        return false;
+    }
+    return locker->getClientState() == Locker::ClientState::kQueuedReader;
+}
+
+}  // namespace
+
+// Runs on the monitor thread, so it can't use queryMemoryCheckLoadShedding(), which must run on the
+// op's own thread. It reads the op's tracked bytes from CurOp's atomic copy instead of the tracker,
+// rolls on the caller's PRNG instead of the op's Client PRNG, and sheds via killOperation() under
+// the ClientLock so the op's blocked ticket/lock wait is interrupted.
+size_t sweepQueuedOperationsForMemoryPressure(ServiceContext* serviceContext, PseudoRandom& prng) {
+    size_t candidates = 0;
+    if (!loadSheddingSupportedOnThisProcess() || !loadSheddingEnabled()) {
+        return candidates;
+    }
+    auto& processState = getProcessState(serviceContext);
+    const PressureSnapshot pressure = samplePressure(processState);
+    if (!pressure.aboveLowMark()) {
+        return candidates;
+    }
+    // Skip the client walk when no reader is queued. This is the same state isQueuedReader()
+    // selects, read from Locker's lock-free global counts.
+    if (Locker::getGlobalClientStateCounts().queuedReader <= 0) {
+        return candidates;
+    }
+
+    const Date_t now = serviceContext->getFastClockSource()->now();
+    for (ServiceContext::LockedClientsCursor cursor(serviceContext);
+         Client* client = cursor.next();) {
+        ClientLock lk(client);
+        OperationContext* opCtx = client->getOperationContext();
+        if (!opCtx || opCtx->isKillPending() || opCtx->isKillOpsExempt()) {
+            continue;
+        }
+        // Evaluate only operations that are not executing.
+        if (!isQueuedReader(opCtx)) {
+            continue;
+        }
+        // Eligibility state lives on the QueryLifespan; never create one from another thread.
+        if (!QueryLifespan::getIfExists(opCtx)) {
+            continue;
+        }
+        LoadSheddingOpState& opState = getOpState(opCtx);
+        // Tracked bytes as last published to CurOp (atomic; updated by the op's own thread each
+        // time its trackers cross a reporting chunk boundary).
+        const int64_t opTrackedBytes = CurOp::get(opCtx)->getInUseTrackedMemoryBytes();
+        if (!isShedCandidate(opCtx, opState, opTrackedBytes)) {
+            continue;
+        }
+        ++candidates;
+        // The op is eligible, so give it a chance at probabilistic shedding.
+        if (!rollForShed(pressure, opState, opTrackedBytes, now, prng)) {
+            continue;
+        }
+        // The random roll was positive, so shed the query.
+        serviceContext->killOperation(lk, opCtx, ErrorCodes::QueryMemoryLimitExceeded);
+        recordShed(processState, opCtx, pressure, opTrackedBytes, /*waitingForTicket*/ true);
+    }
+    return candidates;
 }
 
 void appendQueryMemoryLoadSheddingStats(ServiceContext* serviceContext, BSONObjBuilder& b) {
@@ -443,6 +542,7 @@ void startQueryMemoryRssMonitor(ServiceContext* serviceContext, bool ignoreWhenN
                 return;
             }
             publishRssSample(client->getServiceContext());
+            sweepQueuedOperationsForMemoryPressure(client->getServiceContext(), client->getPrng());
         },
         Milliseconds(gQueryMemoryRssMonitorIntervalMillis.load()),
         false /*isKillableByStepdown*/);

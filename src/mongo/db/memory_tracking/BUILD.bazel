@@ -118,6 +118,9 @@ mongo_cc_unit_test(
     deps = [
         ":memory_tracking",
         ":query_memory_load_shedding",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/admission/execution_control:ticketing_system",
+        "//src/mongo/db/admission/ticketing:ticketholder",
         "//src/mongo/db/pipeline:aggregation_context_fixture",
         "//src/mongo/db/query:query_lifespan",
         "//src/mongo/db/shard_role/lock_manager",
