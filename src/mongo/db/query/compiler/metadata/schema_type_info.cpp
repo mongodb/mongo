@@ -28,6 +28,10 @@ Type SchemaTypeInfo::getPathType(const FieldRef& path) const {
     return pipeline::type_system::getPathType(_rootType, path);
 }
 
+bool SchemaTypeInfo::hasSameRootTypeAs(const SchemaTypeInfo& other) const {
+    return _rootType == other._rootType;
+}
+
 void CollectionSchemaChecker::uassertIfInvalidatedAndSyncSchema(const SchemaTypeInfo& current,
                                                                 const NamespaceString& nss) {
     const auto& currentRootType = current.getRootType();

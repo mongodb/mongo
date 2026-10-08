@@ -46,6 +46,13 @@ public:
     }
 
     /**
+     * Returns whether this schema's inferred root type is identical to 'other''s. Exposed so that
+     * callers outside the query module can detect validator-driven schema changes without
+     * depending on the query-private 'Type' representation.
+     */
+    [[MONGO_MOD_PUBLIC]] bool hasSameRootTypeAs(const SchemaTypeInfo& other) const;
+
+    /**
      * Returns whether any component of 'path' could be an array, according to '_rootType'.
      * A path whose traversal is not modelled by '_rootType' is conservatively treated as an array.
      */

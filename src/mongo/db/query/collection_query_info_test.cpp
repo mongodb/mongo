@@ -158,11 +158,14 @@ TEST_F(CollectionQueryInfoTest, SchemaTypeInfoChangesOnValidationLevelTransition
                                                 ValidationLevelEnum::strict,
                                                 boost::none));
         auto& collectionQueryInfo = CollectionQueryInfo::get(writableColl);
-        const auto initialEpoch = collectionQueryInfo.getSchemaTypeInfo()->epoch();
         collectionQueryInfo.rebuildSchemaTypeInfo(operationContext(), writableColl);
-        ASSERT_EQ(collectionQueryInfo.getSchemaTypeInfo()->epoch(), initialEpoch + 1);
+        const auto rebuilt = collectionQueryInfo.getSchemaTypeInfo();
+        // Dropping below 'constraint' validation level yields an unconstrained schema.
+        ASSERT_EQ(rebuilt->getRootType(), pipeline::type_system::Type::anyObject());
+        // Rebuilding again with the same inferred root type is idempotent and does not republish
+        // a new snapshot.
         collectionQueryInfo.rebuildSchemaTypeInfo(operationContext(), writableColl);
-        ASSERT_EQ(collectionQueryInfo.getSchemaTypeInfo()->epoch(), initialEpoch + 2);
+        ASSERT_EQ(collectionQueryInfo.getSchemaTypeInfo().get(), rebuilt.get());
         wuow.commit();
     }
     const auto newSchemaTypeInfo = readSchemaTypeInfo();

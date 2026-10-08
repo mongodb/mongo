@@ -18,8 +18,9 @@ namespace mongo {
  * version. A new copy of the collection is created each time the collection
  * changes (copy-on-write policy). The collection version is incremented only after changes that
  * require invalidating the plan cache (for example, creating an index or deleting the collection).
- * If the catalog change does not require invalidation of plan cache entries (for example, changing
- * the document validator), then the collection version remains unchanged.
+ * Some catalog changes, such as changing the document validator, do not change the collection
+ * version. Callers must still explicitly clear cached plans when they may depend on derived
+ * metadata affected by that change.
  */
 class PlanCacheInvalidator {
 public:

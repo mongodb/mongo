@@ -1026,13 +1026,24 @@ Status _collModInternal(OperationContext* opCtx,
                                                    cmrNew.prepareConstraintValidationLevel),
                 "Failed to set validation options");
             auto& collectionQueryInfo = CollectionQueryInfo::get(writableColl);
-            if (feature_flags::gFeatureFlagQueryTypeInference.checkEnabled()) {
+            const bool typeInferenceEnabled =
+                feature_flags::gFeatureFlagQueryTypeInference.checkEnabled();
+            // Snapshot the inferred schema type info before updating it, so we can detect whether
+            // this validator change actually altered the inferred types.
+            const auto prevSchemaTypeInfo = collectionQueryInfo.getSchemaTypeInfo();
+            if (typeInferenceEnabled) {
                 collectionQueryInfo.rebuildSchemaTypeInfo(opCtx, writableColl);
-                // TODO: think whether to invalidate the cache only if there was change of the
-                // schema type info
-                collectionQueryInfo.clearQueryCache(opCtx, CollectionPtr(writableColl));
             } else {
                 collectionQueryInfo.invalidateSchemaTypeInfo();
+            }
+            const bool schemaTypeInfoChanged =
+                !prevSchemaTypeInfo->hasSameRootTypeAs(*collectionQueryInfo.getSchemaTypeInfo());
+            // Clear the plan cache only when the inferred schema type info actually changed. This
+            // skips redundant invalidations: repeated collMods with the feature flag off (type
+            // already "any object"), and changes that don't affect the inferred type (e.g.
+            // 'validationAction'-only).
+            if (schemaTypeInfoChanged) {
+                collectionQueryInfo.clearQueryCache(opCtx, CollectionPtr(writableColl));
             }
         }
 

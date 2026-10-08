@@ -6,19 +6,21 @@
  */
 
 import {getPlanCacheNumEntries, getPlanCacheSize} from "jstests/libs/query/plan_cache_utils.js";
+import {runWithParamsAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
-const conn = MongoRunner.runMongod();
+const conn = MongoRunner.runMongod({setParameter: {featureFlagQueryTypeInference: true}});
 assert.neq(conn, null, "mongod failed to start");
-const db = conn.getDB("sbe_plan_cache_invalidation");
+const db = conn.getDB("plan_cache_invalidation");
 
 /**
  * Helper class that creates a collection, indexes on it, and makes a few queries to add entries
  * to the plan cache.
  */
 class TestCollection {
-    constructor(name = "coll") {
+    constructor(name = "coll", collectionOptions = {}) {
         this.coll = db[name];
         this.coll.drop();
+        assert.commandWorked(db.createCollection(name, collectionOptions));
 
         this.indexNames = ["index1", "index2", "index3"];
         assert.commandWorked(this.coll.createIndex({a: 1}, {name: this.indexNames[0]}));
@@ -97,17 +99,26 @@ class TestCollection {
     test.assertAllCollectionCacheEntriesRemoved();
 })();
 
-(function cacheEntriesNotRemovedIfCollModCalled() {
+(function cacheEntriesRemovedIfValidatorChangesWithTypeInferenceDisabled() {
     const collectionName = "coll";
-    const test = new TestCollection(collectionName);
+    const test = new TestCollection(collectionName, {
+        validator: {a: {$not: {$type: "array"}}},
+        validationLevel: "constraint",
+    });
     const initialPlanCacheSize = getPlanCacheSize(db);
 
-    assert.commandWorked(
-        db.runCommand({collMod: collectionName, validator: {text: {$type: "string"}}}),
-    );
+    runWithParamsAllNonConfigNodes(db, {featureFlagQueryTypeInference: false}, () => {
+        assert.commandWorked(
+            db.runCommand({
+                collMod: collectionName,
+                validator: {a: {$type: "number"}},
+                validationLevel: "strict",
+            }),
+        );
 
-    assert.eq(getPlanCacheSize(db), initialPlanCacheSize);
-    test.assertCollectionCacheEntriesNotRemoved();
+        assert.lt(getPlanCacheSize(db), initialPlanCacheSize);
+        test.assertAllCollectionCacheEntriesRemoved();
+    });
 })();
 
 (function cacheEntriesRemovedIfIndexChanged() {
