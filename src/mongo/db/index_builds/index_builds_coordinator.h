@@ -913,9 +913,11 @@ protected:
 
     /**
      * Function to be run in the asynchronous task launched onStepUp to check if there are any index
-     * builds that can be aborted because it has skipped records.
+     * builds that can be aborted because it has skipped records. 'stepUpTerm' is the term this node
+     * is stepping up in; the task gives up if it observes a different term, since that means the
+     * step-up it was launched for has been abandoned.
      */
-    void _onStepUpAsyncTaskFn(OperationContext* opCtx);
+    void _onStepUpAsyncTaskFn(OperationContext* opCtx, long long stepUpTerm);
 
     /**
      * Runs the index build.

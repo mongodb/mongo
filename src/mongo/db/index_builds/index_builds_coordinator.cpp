@@ -125,6 +125,7 @@ MONGO_FAIL_POINT_DEFINE(failIndexBuildWithError);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildOnSetupBeforeTakingLocks);
 MONGO_FAIL_POINT_DEFINE(hangAbortIndexBuildByBuildUUIDAfterLocks);
 MONGO_FAIL_POINT_DEFINE(hangOnStepUpAsyncTaskBeforeCheckingCommitQuorum);
+MONGO_FAIL_POINT_DEFINE(hangOnStepUpAsyncTaskBeforeWaitingForWritable);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildAfterReceivingCommitIndexBuildOplogEntry);
 MONGO_FAIL_POINT_DEFINE(failToCreatePendingInterceptorsOnStepUp);
 
@@ -2247,18 +2248,26 @@ void IndexBuildsCoordinator::onStepUp(OperationContext* opCtx) {
     // interceptor exists is invisible to the resumed build.
     _attachInterceptorsForResumableBuildsOnStepUp(opCtx);
 
-    _stepUpThread = stdx::thread([this] {
+    // The term has already been bumped for this election by the time we are called.
+    const auto stepUpTerm = repl::ReplicationCoordinator::get(opCtx)->getTerm();
+    _stepUpThread = stdx::thread([this, stepUpTerm] {
         Client::initThread("IndexBuildsCoordinator-StepUp",
                            getGlobalServiceContext()->getService());
         auto threadCtx = Client::getCurrent()->makeOperationContext();
-        _onStepUpAsyncTaskFn(threadCtx.get());
+        _onStepUpAsyncTaskFn(threadCtx.get(), stepUpTerm);
     });
 }
 
-void IndexBuildsCoordinator::_onStepUpAsyncTaskFn(OperationContext* opCtx) {
-    const auto signalCommitQuorumAndRetrySkippedRecords = [this,
-                                                           opCtx](const std::shared_ptr<
-                                                                  ReplIndexBuildState>& replState) {
+void IndexBuildsCoordinator::_onStepUpAsyncTaskFn(OperationContext* opCtx, long long stepUpTerm) {
+    const auto uassertStepUpNotAbandoned = [&] {
+        uassert(ErrorCodes::InterruptedDueToReplStateChange,
+                "Index build step up task interrupted because the step-up was abandoned",
+                repl::ReplicationCoordinator::get(opCtx)->getTerm() == stepUpTerm);
+    };
+
+    const auto signalCommitQuorumAndRetrySkippedRecords = [&,
+                                                           this](const std::shared_ptr<
+                                                                 ReplIndexBuildState>& replState) {
         try {
             if (replState->protocol != IndexBuildProtocol::kTwoPhase) {
                 return;
@@ -2276,12 +2285,13 @@ void IndexBuildsCoordinator::_onStepUpAsyncTaskFn(OperationContext* opCtx) {
                     try {
                         return AutoGetCollection{opCtx, dbAndUUID, MODE_IX};
                     } catch (const ExceptionFor<ErrorCodes::NotWritablePrimary>&) {
+                        uassertStepUpNotAbandoned();
                         logAndBackoff(
                             10262302,
                             MONGO_LOGV2_DEFAULT_COMPONENT,
                             logv2::LogSeverity::Debug(1),
                             retryAttempts,
-                            "Retrying _completeAbortForShutdown until we can declare our intent");
+                            "Retrying index build step up task until we can declare our intent");
                     }
                 }
             }();
@@ -2365,6 +2375,8 @@ void IndexBuildsCoordinator::_onStepUpAsyncTaskFn(OperationContext* opCtx) {
         [&] { index_builds::getPendingInterceptors(opCtx->getServiceContext()).clear(); });
 
     try {
+        hangOnStepUpAsyncTaskBeforeWaitingForWritable.pauseWhileSet();
+
         // If we step up quickly after stepping down, there may be old builds still tearing down
         // from us having previously been primary.
         stdx::unordered_set<UUID, UUID::Hash> pdibCollections;
@@ -2387,6 +2399,7 @@ void IndexBuildsCoordinator::_onStepUpAsyncTaskFn(OperationContext* opCtx) {
             for (int retryAttempts = 0;
                  !replCoord->canAcceptWritesForDatabase(opCtx, DatabaseName::kAdmin);
                  ++retryAttempts) {
+                uassertStepUpNotAbandoned();
                 logAndBackoff(12741703,
                               MONGO_LOGV2_DEFAULT_COMPONENT,
                               logv2::LogSeverity::Debug(1),
