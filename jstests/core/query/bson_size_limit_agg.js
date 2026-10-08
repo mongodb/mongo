@@ -222,16 +222,34 @@ function testTrialRun() {
     // Run a query that adds a 200 KB field to the document.
     const pipeline = [{$match: {a: 1, b: 1}}, {$addFields: {extra: "x".repeat(200 * 1024)}}];
 
+    const activeEntriesBefore = coll.getPlanCache().list([{$match: {isActive: true}}]).length;
+
     // Activate cache entry.
     coll.aggregate(pipeline).toArray();
     coll.aggregate(pipeline).toArray();
     coll.aggregate(pipeline).toArray();
+    const activeEntriesAfter = coll.getPlanCache().list([{$match: {isActive: true}}]);
+    // 'gte' because an implicitly sharded collection might cache in the different shard nodes.
+    assert.gte(
+        activeEntriesAfter.length,
+        activeEntriesBefore + 1,
+        "expected a new active plan cache entry",
+        {activeEntriesAfter},
+    );
 
-    // Replace with a near-limit document.
+    // Replace with a near-limit document, and check that the cache entry remains active.
     const bsonUserLimit = 16 * 1024 * 1024;
     const paddingSize = bsonUserLimit - 4000;
     assert.commandWorked(
         coll.replaceOne({_id: 1}, {_id: 1, a: 1, b: 1, padding: "y".repeat(paddingSize)}),
+    );
+
+    const activeEntriesAfterReplace = coll.getPlanCache().list([{$match: {isActive: true}}]);
+    assert.gte(
+        activeEntriesAfterReplace.length,
+        activeEntriesBefore + 1,
+        "expected an existing plan cache entry to remain active",
+        {activeEntriesAfterReplace},
     );
 
     // Hit the active cache entry and execute the trial run. Under SBE, this will
