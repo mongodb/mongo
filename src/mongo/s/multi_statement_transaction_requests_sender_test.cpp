@@ -25,6 +25,7 @@
 #include "mongo/s/transaction_router.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <string_view>
@@ -200,6 +201,166 @@ TEST_F(RouterMultiStatementTransactionRequestsSenderTest, TxnDetailsAreAppendedI
         // The TransactionRouter will throw when parsing this response if
         // "processParticipantResponse" does not exist
         return BSON("ok" << true << "readOnly" << true);
+    });
+
+    future.default_timed_get();
+}
+
+// A metadata-validation failure on one response must not abandon sibling responses: next() drains
+// the remaining responses (enrolling their announced participants) and only then rethrows the
+// original failure.
+TEST_F(RouterMultiStatementTransactionRequestsSenderTest, NextDrainsSiblingsAfterMetadataFailure) {
+    operationContext()->setLogicalSessionId(makeLogicalSessionIdForTest());
+    operationContext()->setTxnNumber(TxnNumber(0));
+    operationContext()->setInMultiDocumentTransaction();
+    RouterOperationContextSession rocs(operationContext());
+    auto txnRouter = TransactionRouter::get(operationContext());
+    txnRouter.beginOrContinueTxn(
+        operationContext(), TxnNumber(0), TransactionRouter::TransactionActions::kStart);
+    txnRouter.setDefaultAtClusterTime(operationContext());
+
+    const ShardId kTestRemoteShardId3 = ShardId("FakeShard3");
+    const ShardId kTestRemoteShardId4 = ShardId("FakeShard4");
+
+    // setUp() registered only shard1; the sender targets shard2 as well. addRemoteShards()
+    // re-mocks the config.shards find to return exactly the shards passed, so both shards must be
+    // registered in one call — a second call would evict shard1 and its request would never
+    // resolve a host.
+    std::vector<std::tuple<ShardId, HostAndPort>> shardInfos;
+    shardInfos.emplace_back(std::make_tuple(kTestRemoteShardId1, kTestRemoteHostAndPort1));
+    shardInfos.emplace_back(std::make_tuple(kTestRemoteShardId2, kTestRemoteHostAndPort2));
+    addRemoteShards(shardInfos);
+
+    std::vector<AsyncRequestsSender::Request> requests{
+        {kTestRemoteShardId1, BSON("find" << "bar")}, {kTestRemoteShardId2, BSON("find" << "bar")}};
+
+    // Construction attaches txn fields, enrolling both targeted shards.
+    auto msars =
+        MultiStatementTransactionRequestsSender(operationContext(),
+                                                executor(),
+                                                kTestNss.dbName(),
+                                                requests,
+                                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                                Shard::RetryPolicy::kNoRetry);
+
+    // Record shard3's term (5) as if an earlier response announced it.
+    txnRouter.processParticipantResponse(
+        operationContext(),
+        kTestRemoteShardId1,
+        TransactionRouter::Router::parseParticipantResponseMetadata(
+            BSON("ok" << 1 << "readOnly" << true << "additionalParticipants"
+                      << BSON_ARRAY(BSON("shardId" << kTestRemoteShardId3 << "readOnly" << true
+                                                   << "term" << 5LL)))));
+    auto recordedParticipant = txnRouter.getParticipant(kTestRemoteShardId3);
+    ASSERT(recordedParticipant);
+    ASSERT_EQ(*recordedParticipant->term, 5);
+
+    auto future = launchAsync([&]() {
+        ASSERT_THROWS_CODE(msars.next(), AssertionException, ErrorCodes::NoSuchTransaction);
+    });
+
+    // The first response announces shard3 with a changed term (6): validation fails. The second
+    // (sibling) response announces shard4 and must still be drained and enrolled before the
+    // original error surfaces.
+    {
+        // Deliver the second response only after next() has consumed the first, so the
+        // arrival order is deterministic.
+        FailPointEnableBlock fp("hangBeforePollResponse", BSON("remotesLeft" << 1));
+        onCommand([&](const auto& request) {
+            ASSERT_EQ(request.target, kTestRemoteHostAndPort1);
+            return BSON("ok" << 1 << "readOnly" << true << "additionalParticipants"
+                             << BSON_ARRAY(BSON("shardId" << kTestRemoteShardId3 << "readOnly"
+                                                          << true << "term" << 6LL)));
+        });
+        fp->waitForTimesEntered(fp.initialTimesEntered() + 1);
+    }
+    onCommand([&](const auto& request) {
+        ASSERT_EQ(request.target, kTestRemoteHostAndPort2);
+        return BSON("ok" << 1 << "readOnly" << true << "additionalParticipants"
+                         << BSON_ARRAY(BSON("shardId" << kTestRemoteShardId4 << "readOnly" << true
+                                                      << "term" << 7LL)));
+    });
+
+    future.default_timed_get();
+
+    // The sibling's announced participant was enrolled during the drain, and shard3's recorded term
+    // was not overwritten by the mismatching observation.
+    ASSERT(txnRouter.getParticipant(kTestRemoteShardId4));
+    recordedParticipant = txnRouter.getParticipant(kTestRemoteShardId3);
+    ASSERT(recordedParticipant);
+    ASSERT_EQ(*recordedParticipant->term, 5);
+}
+
+// A metadata-validation failure stops retries before draining: a sibling's retryable network
+// error must not schedule a retry and stall the drain on a response that never comes.
+TEST_F(RouterMultiStatementTransactionRequestsSenderTest,
+       MetadataFailureStopsRetryingBeforeDraining) {
+    operationContext()->setLogicalSessionId(makeLogicalSessionIdForTest());
+    operationContext()->setTxnNumber(TxnNumber(0));
+    operationContext()->setInMultiDocumentTransaction();
+    RouterOperationContextSession rocs(operationContext());
+    auto txnRouter = TransactionRouter::get(operationContext());
+    txnRouter.beginOrContinueTxn(
+        operationContext(), TxnNumber(0), TransactionRouter::TransactionActions::kStart);
+    txnRouter.setDefaultAtClusterTime(operationContext());
+
+    const ShardId kTestRemoteShardId3 = ShardId("FakeShard3");
+
+    // Register both shards in one call; a second addRemoteShards() would evict the first.
+    std::vector<std::tuple<ShardId, HostAndPort>> shardInfos;
+    shardInfos.emplace_back(std::make_tuple(kTestRemoteShardId1, kTestRemoteHostAndPort1));
+    shardInfos.emplace_back(std::make_tuple(kTestRemoteShardId2, kTestRemoteHostAndPort2));
+    addRemoteShards(shardInfos);
+
+    std::vector<AsyncRequestsSender::Request> requests{
+        {kTestRemoteShardId1, BSON("find" << "bar")}, {kTestRemoteShardId2, BSON("find" << "bar")}};
+
+    // Pre-enroll both shards so the sender's requests continue the transaction instead of
+    // starting it: startTransaction requests have their retry policy demoted to
+    // kStrictlyNotIdempotent, which would mask the retry-stopping behavior under test.
+    txnRouter.attachTxnFieldsIfNeeded(
+        operationContext(), kTestRemoteShardId1, BSON("find" << "bar"));
+    txnRouter.attachTxnFieldsIfNeeded(
+        operationContext(), kTestRemoteShardId2, BSON("find" << "bar"));
+
+    // Idempotent retry policy: the sibling's retryable failure below would be retried unless the
+    // metadata failure stopped retrying first.
+    auto msars =
+        MultiStatementTransactionRequestsSender(operationContext(),
+                                                executor(),
+                                                kTestNss.dbName(),
+                                                requests,
+                                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                                Shard::RetryPolicy::kIdempotent);
+
+    // Record shard3's term (5) as if an earlier response announced it.
+    txnRouter.processParticipantResponse(
+        operationContext(),
+        kTestRemoteShardId1,
+        TransactionRouter::Router::parseParticipantResponseMetadata(
+            BSON("ok" << 1 << "readOnly" << true << "additionalParticipants"
+                      << BSON_ARRAY(BSON("shardId" << kTestRemoteShardId3 << "readOnly" << true
+                                                   << "term" << 5LL)))));
+
+    auto future = launchAsync([&]() {
+        ASSERT_THROWS_CODE(msars.next(), AssertionException, ErrorCodes::NoSuchTransaction);
+    });
+
+    {
+        // Hold the drain's next() until the metadata failure has stopped retrying; otherwise the
+        // sibling's failure can be processed, and its retry scheduled, before stopRetrying() runs.
+        FailPointEnableBlock fp("hangBeforePollResponse", BSON("remotesLeft" << 1));
+        onCommand([&](const auto& request) {
+            ASSERT_EQ(request.target, kTestRemoteHostAndPort1);
+            return BSON("ok" << 1 << "readOnly" << true << "additionalParticipants"
+                             << BSON_ARRAY(BSON("shardId" << kTestRemoteShardId3 << "readOnly"
+                                                          << true << "term" << 6LL)));
+        });
+        fp->waitForTimesEntered(fp.initialTimesEntered() + 1);
+    }
+    onCommand([&](const auto& request) -> StatusWith<BSONObj> {
+        ASSERT_EQ(request.target, kTestRemoteHostAndPort2);
+        return Status(ErrorCodes::HostUnreachable, "host unreachable");
     });
 
     future.default_timed_get();

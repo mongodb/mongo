@@ -736,6 +736,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/global_catalog/ddl:merge_chunks_request_test.cpp",
         "//src/mongo/db/global_catalog/ddl:remove_shard_from_zone_request_test.cpp",
         "//src/mongo/db/global_catalog/ddl:sessions_collection_sharded_test.cpp",
+        "//src/mongo/db/router_role:cluster_commands_helpers_test.cpp",
         "//src/mongo/db/router_role:collection_routing_info_targeter_test.cpp",
         "//src/mongo/db/router_role:mock_ns_targeter.cpp",
         "//src/mongo/db/router_role:router_role_test.cpp",

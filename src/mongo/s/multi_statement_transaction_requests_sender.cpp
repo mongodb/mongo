@@ -130,7 +130,27 @@ bool MultiStatementTransactionRequestsSender::done() const {
 
 AsyncRequestsSender::Response MultiStatementTransactionRequestsSender::next(bool forMergeCursors) {
     auto response = nextResponse();
-    validateResponse(response, forMergeCursors);
+    try {
+        validateResponse(response, forMergeCursors);
+    } catch (const DBException& ex) {
+        // A metadata failure (e.g. a term mismatch) must not abandon sibling responses whose
+        // participants are not yet enrolled: stop retrying (the failure follows a failover, so
+        // retries would only delay the error), drain the rest, then surface the first failure.
+        // Validation throws only when the operation has a transaction router, so outside a
+        // transaction nothing drains. The drain is bounded by opCtx interruption, after which
+        // AsyncRequestsSender::next() returns every remaining response without waiting.
+        _ars->stopRetrying();
+        auto firstStatus = ex.toStatus();
+        while (!done()) {
+            auto rest = nextResponse();
+            try {
+                validateResponse(rest, forMergeCursors);
+            } catch (const DBException&) {
+                // The first failure wins.
+            }
+        }
+        uassertStatusOK(firstStatus);
+    }
     return response;
 }
 
