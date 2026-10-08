@@ -255,7 +255,7 @@ typename FlatBSONStore<Element, Value>::Iterator FlatBSONStore<Element, Value>::
 
         // Found entry that is used for an Array, we can claim this field.
         if (first->isArrayFieldName()) {
-            first->claimArrayFieldNameForObject(fieldName.toString());
+            claimArrayFieldName(first, fieldName.toString());
             return first;
         }
     }
@@ -289,6 +289,34 @@ template <class Element, class Value>
 typename FlatBSONStore<Element, Value>::Iterator FlatBSONStore<Element, Value>::Obj::search(
     FlatBSONStore<Element, Value>::Iterator first, StringData fieldName) {
     return search(first, end(), fieldName);
+}
+
+template <class Element, class Value>
+bool FlatBSONStore<Element, Value>::Obj::claimArrayFieldName(
+    FlatBSONStore<Element, Value>::Iterator pos, std::string fieldName) {
+    // The fast lookup map keys entries by field name, so it must be kept in sync with the
+    // rename. When the map exists there is at most one array entry: the map cannot hold
+    // duplicate names, so it is only built when a single reserved-name entry exists, and
+    // inserting a second one is rejected.
+    if (_pos->_fieldNameToIndex) {
+        auto& map = *_pos->_fieldNameToIndex;
+        // The offset of the entry does not change with the rename, only its key does. Emplace
+        // the new key first: if the name is already present we cannot claim, as the rename
+        // would create a duplicate key.
+        auto [_, inserted] = map.try_emplace(
+            make_tracked_string(_trackingContext, fieldName.data(), fieldName.size()),
+            pos._pos->_offsetParent);
+        if (!inserted) {
+            return false;
+        }
+
+        auto it = map.find(kArrayFieldName);
+        invariant(it != map.end() && it->second == pos._pos->_offsetParent);
+        map.erase(it);
+    }
+
+    pos->claimArrayFieldNameForObject(std::move(fieldName));
+    return true;
 }
 
 template <class Element, class Value>
@@ -338,7 +366,15 @@ FlatBSONStore<Element, Value>::Obj::insert(FlatBSONStore<Element, Value>::Iterat
         for (; next != end; ++next) {
             ++next._pos->_offsetParent;
             if (parent->_fieldNameToIndex) {
-                ++parent->_fieldNameToIndex->at(next._pos->_element.fieldName());
+                // Every child's current field name must be a key in the map. Use find() instead
+                // of at() so a violated invariant trips a diagnosable assertion here rather than
+                // escaping as std::out_of_range, which is not a DBException and would terminate
+                // the process without context.
+                auto mapIt = parent->_fieldNameToIndex->find(next._pos->_element.fieldName());
+                tassert(13650500,
+                        "FlatBSON lookup map is out of sync with the entries of its object",
+                        mapIt != parent->_fieldNameToIndex->end());
+                ++mapIt->second;
             }
         }
 
@@ -497,9 +533,14 @@ FlatBSON<Derived, Element, Value>::_updateObj(typename FlatBSONStore<Element, Va
         if (it == end) {
             // Field missing, we need to insert it at the end so we preserve the input field order.
             std::tie(it, end) = obj.insert(it, fieldName.toString());
-        } else if (it->isArrayFieldName()) {
-            // Entry is only used for Arrays, we can claim the field name.
-            it->claimArrayFieldNameForObject(fieldName.toString());
+        } else if (it->isArrayFieldName() && obj.claimArrayFieldName(it, fieldName.toString())) {
+            // Entry is only used for arrays, we claimed the field name for it. The claim is
+            // refused when the fast lookup map already contains this name, meaning an entry
+            // with this name exists elsewhere in the child list. This is reachable with
+            // documents that repeat a field name, or when an earlier update placed the field
+            // after this placeholder. Renaming anyway would create a duplicate key in the map,
+            // so we fall through to the mismatch handling below, which locates the existing
+            // entry through the map instead.
         } else if (it->fieldName() != fieldName) {
             // Traversing the FlatBSONStore structure in lock-step with the input document resulted
             // in a miss. This means one of two things. (1) The input document does not contain all
