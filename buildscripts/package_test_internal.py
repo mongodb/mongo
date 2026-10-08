@@ -584,15 +584,37 @@ def test_uninstall_is_complete(test_args: TestArgs):
             raise RuntimeError("Failed to uninstall cleanly, found: {}".format(path))
 
 
+def parse_package_test_arguments(package_args: List[str]) -> Tuple[List[str], str]:
+    """Parse package URLs and the optional expected package kind after the log path."""
+
+    package_kind = "server"
+    if "--package-kind" in package_args:
+        kind_index = package_args.index("--package-kind")
+        if kind_index + 1 >= len(package_args):
+            raise ValueError("Missing value for --package-kind (expected one of: server, crypt_v1)")
+        package_kind = package_args[kind_index + 1]
+        if package_kind not in ("server", "crypt_v1"):
+            raise ValueError("Unsupported package kind: {}".format(package_kind))
+        package_args = package_args[:kind_index] + package_args[kind_index + 2 :]
+    return package_args, package_kind
+
+
 def main() -> int:
     global test_args
 
     if len(sys.argv) < 3:
-        print("Usage: {} <log-path> <package-url> [package-url ...]".format(sys.argv[0]))
+        print(
+            "Usage: {} <log-path> [--package-kind <server|crypt_v1>] "
+            "<package-url> [package-url ...]".format(sys.argv[0])
+        )
         return 1
 
     configure_logging(sys.argv[1])
-    package_urls = sys.argv[2:]
+    try:
+        package_urls, expected_package_kind = parse_package_test_arguments(sys.argv[2:])
+    except ValueError as exc:
+        logging.error(str(exc))
+        return 1
 
     if len(package_urls) == 0:
         logging.error("No packages to test... Failing test")
@@ -621,6 +643,13 @@ def main() -> int:
     test_args = get_test_args(package_manager, package_files)
     logging.info("Test Args:\n%s", json.dumps(test_args, sort_keys=True, indent=4))
     logging.info("Detected package kind: %s", test_args["package_kind"])
+    if test_args["package_kind"] != expected_package_kind:
+        logging.error(
+            "Expected %s packages, but detected %s packages",
+            expected_package_kind,
+            test_args["package_kind"],
+        )
+        return 1
 
     if test_args["package_kind"] == "server":
         setup(test_args)

@@ -603,6 +603,7 @@ class Test:
     base_packages: list[str] = dataclasses.field(default_factory=list)
     python_command: str = dataclasses.field(default="", repr=False)
     packages_urls: list[str] = dataclasses.field(default_factory=list)
+    package_kind: str = "server"
     packages_paths: list[Path] = dataclasses.field(default_factory=list)
     attempts: int = dataclasses.field(default=0)
 
@@ -745,6 +746,7 @@ def run_test(test: Test, client: DockerClient) -> Result:
 
     commands.append(
         f"python3 /mnt/package_test/package_test_internal.py {log_docker_path} "
+        f"--package-kind {test.package_kind} "
         f"{' '.join(docker_packages_urls)}"
     )
     logging.debug(
@@ -1017,6 +1019,12 @@ release_test_parser.add_argument(
 )
 branch_test_parser = subparsers.add_parser("branch")
 branch_test_parser.add_argument(
+    "--package-kind",
+    choices=["server", "crypt_v1"],
+    default="server",
+    help="Expected package kind; fail if the archive contains a different kind.",
+)
+branch_test_parser.add_argument(
     "-t",
     "--test",
     type=str,
@@ -1228,6 +1236,7 @@ if args.command == "branch":
                     edition=args.edition,
                     version=args.server_version,
                     packages_urls=urls,
+                    package_kind=args.package_kind,
                 )
             )
 
