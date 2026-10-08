@@ -132,18 +132,9 @@ protected:
                               BSON("level" << "local"
                                            << "afterClusterTime" << kDefaultFetchTimestamp));
 
-            // Ensure listIndexes always returns a 'collation' field.
-            std::vector<BSONObj> indexDocsWithCollation;
-            for (auto&& indexDoc : indexDocs) {
-                if (!indexDoc.hasField("collation")) {
-                    indexDocsWithCollation.emplace_back(
-                        indexDoc.addFields(BSON("collation" << BSON("locale" << "simple"))));
-                }
-            }
-
-            return BSON("ok" << 1 << "cursor"
-                             << BSON("id" << 0LL << "ns" << nss.ns_forTest() << "firstBatch"
-                                          << indexDocsWithCollation));
+            return BSON(
+                "ok" << 1 << "cursor"
+                     << BSON("id" << 0LL << "ns" << nss.ns_forTest() << "firstBatch" << indexDocs));
         });
     }
 
@@ -339,17 +330,15 @@ TEST_F(RecipientServiceExternalStateTest, CreateLocalReshardingCollectionBasic) 
                                                    kReshardingTimestamp);
 
     const std::vector<BSONObj> indexes = {
-        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName
-                 << "collation" << BSON("locale" << "simple")),
+        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName),
         BSON("v" << 2 << "key"
                  << BSON("a" << 1 << "b"
                              << "hashed")
                  << "name"
-                 << "indexOne" << "collation" << BSON("locale" << "simple"))};
+                 << "indexOne")};
     // When creating collection, only _id index should be created.
     const std::vector<BSONObj> expectedIndexes = {
-        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName
-                 << "collation" << BSON("locale" << "simple"))};
+        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName)};
     auto future = launchAsync([&] {
         expectRefreshReturnForOriginalColl(
             kOrigNss, kShardKey, kOrigUUID, kOrigEpoch, kOrigTimestamp);
@@ -405,17 +394,15 @@ TEST_F(RecipientServiceExternalStateTest,
                                                    kReshardingTimestamp);
 
     const std::vector<BSONObj> indexes = {
-        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName
-                 << "collation" << BSON("locale" << "simple")),
+        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName),
         BSON("v" << 2 << "key"
                  << BSON("a" << 1 << "b"
                              << "hashed")
                  << "name"
-                 << "indexOne" << "collation" << BSON("locale" << "simple"))};
+                 << "indexOne")};
     // When creating collection, only _id index should be created.
     const std::vector<BSONObj> expectedIndexes = {
-        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName
-                 << "collation" << BSON("locale" << "simple"))};
+        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName)};
 
     auto future = launchAsync([&] {
         expectRefreshReturnForOriginalColl(
@@ -484,7 +471,9 @@ TEST_F(RecipientServiceExternalStateTest,
                              << "hashed")
                  << "name"
                  << "indexOne")};
-
+    // When creating collection, only _id index should be created.
+    const std::vector<BSONObj> expectedIndexes = {
+        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName)};
     // Create the collection and indexes to simulate retrying after a failover. Only include the id
     // index, because it is needed to create the collection.
     CollectionOptionsAndIndexes optionsAndIndexes = {
@@ -516,11 +505,6 @@ TEST_F(RecipientServiceExternalStateTest,
     verifyTempReshardingCollectionAndMetadata();
 
     future.default_timed_get();
-
-    // When creating collection, only _id index should be created.
-    const std::vector<BSONObj> expectedIndexes = {
-        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName
-                 << "collation" << BSON("locale" << "simple"))};
 
     verifyCollectionAndIndexes(kReshardingNss, kReshardingUUID, expectedIndexes);
 }

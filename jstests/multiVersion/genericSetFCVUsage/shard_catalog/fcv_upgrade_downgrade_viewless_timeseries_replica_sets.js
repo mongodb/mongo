@@ -33,13 +33,6 @@ assert.commandWorked(coll.insertOne({t: ISODate(), m: 123}));
 
 const expectedViewlessMetadata = coll.getMetadata();
 const expectedIndexes = coll.getIndexes();
-if (!FeatureFlagUtil.isEnabled(db, "ListIndexesAlwaysIncludesSimpleCollation")) {
-    expectedIndexes.map((index) => {
-        if (!index.collation) {
-            index.collation = {locale: "simple"};
-        }
-    });
-}
 
 // Check that the collection can be converted to viewful timeseries and back to viewless.
 function assertValidTimeseriesCollection(nodeColl, {expectViewlessFormat, expectedFixedBucketing}) {
@@ -74,16 +67,7 @@ function assertValidTimeseriesCollection(nodeColl, {expectViewlessFormat, expect
         assert.docEq(expectedMetadata, nodeColl.getMetadata());
         assert.eq(expectedViewlessMetadata.info.uuid, getTimeseriesBucketsColl(nodeColl).getUUID());
     }
-
-    let actualIndexes = nodeColl.getIndexes();
-    if (!FeatureFlagUtil.isEnabled(db, "ListIndexesAlwaysIncludesSimpleCollation")) {
-        actualIndexes.map((index) => {
-            if (!index.collation) {
-                index.collation = {locale: "simple"};
-            }
-        });
-    }
-    assert.docEq(expectedIndexes, actualIndexes);
+    assert.docEq(expectedIndexes, nodeColl.getIndexes());
 
     // The data is still accessible
     assert.eq(2, nodeColl.countDocuments({}));

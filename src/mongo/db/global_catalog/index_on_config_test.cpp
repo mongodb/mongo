@@ -36,12 +36,11 @@ TEST_F(ConfigIndexTest, CompatibleIndexAlreadyExists) {
                   ->initializeConfigDatabaseIfNeeded(operationContext()));
 
     auto expectedShardsIndexes = std::vector<BSONObj>{
-        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName
-                 << "collation" << BSON("locale" << "simple")),
+        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName),
         BSON("v" << 2 << "unique" << true << "key" << BSON("host" << 1) << "name"
-                 << "host_1" << "collation" << BSON("locale" << "simple")),
+                 << "host_1"),
         BSON("v" << 2 << "unique" << true << "key" << BSON("uuid" << 1) << "name"
-                 << "uuid_1" << "collation" << BSON("locale" << "simple"))};
+                 << "uuid_1")};
 
 
     auto foundShardsIndexes =
