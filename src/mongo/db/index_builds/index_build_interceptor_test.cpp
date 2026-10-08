@@ -441,8 +441,6 @@ TEST_F(IndexBuilderInterceptorTest, MultikeySideWriteRecordsMultikeyPaths) {
     EXPECT_EQ(multikey_paths::toString(parsedPaths), multikey_paths::toString(multikeyPaths));
 }
 
-// A document can be multikey while generating no keys at all (SERVER-39705) -- a sparse
-// {"a.b": 1} index over {a: [{c: 1}]}, for instance.
 TEST_F(IndexBuilderInterceptorTest, MultikeySideWriteWithoutKeysWritesNoRecord) {
     auto indexBuildInfo = buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}}"));
     auto interceptor = createIndexBuildInterceptor(indexBuildInfo);
@@ -466,8 +464,7 @@ TEST_F(IndexBuilderInterceptorTest, MultikeySideWriteWithoutKeysWritesNoRecord) 
     }
 
     EXPECT_EQ(getSideWritesTableContents(indexBuildInfo).size(), 0);
-    // The state is still tracked in memory for the node that received the write.
-    EXPECT_TRUE(interceptor->getMultikeyPaths());
+    EXPECT_FALSE(interceptor->getMultikeyPaths());
 }
 
 TEST_F(IndexBuilderInterceptorTest, MultikeySideWriteRecordsMultikeyPathsOnMetadataKeyRecord) {

@@ -1838,6 +1838,9 @@ bool SortedDataIndexAccessMethod::shouldMarkIndexAsMultikey(
     size_t numberOfKeys,
     const KeyStringSet& multikeyMetadataKeys,
     const MultikeyPaths& multikeyPaths) const {
+    if (numberOfKeys == 0) {
+        return false;
+    }
     return numberOfKeys > 1 || isMultikeyFromPaths(multikeyPaths);
 }
 

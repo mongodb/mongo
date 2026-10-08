@@ -88,12 +88,13 @@ runTest({
     expectMultikey: false,
 });
 
-// '2dsphere' indexes are automatically sparse. If we insert a document where 'x' is multikey, even
-// though 'b' is omitted, the index is still considered multikey. See SERVER-39705.
+// '2dsphere' indexes are automatically sparse. A document omitting 'b' generates no keys at all, so
+// even though 'x' holds an array nothing of that document is reachable through the index and it is
+// left non-multikey.
 runTest({
     indexSpec: {x: 1, b: "2dsphere"},
     extraDocs: [{x: [1, 2]}],
-    expectMultikey: true,
+    expectMultikey: false,
 });
 
 // Test that a partial index is not multikey when a multikey document is not indexed.
