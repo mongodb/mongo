@@ -324,15 +324,24 @@ public:
      * Returns statistics that detail the winning plan selected by the multi-planner, or, if no
      * multi-planning has been performed, for the single plan selected by the QueryPlanner.
      *
-     * The 'verbosity' level parameter determines the amount of information to be returned.
-     *
-     * TODO SERVER-134444: deduplicate with getPlanEntries.
+     * Returns an empty stats object for explainers with no candidate plans to enumerate.
      */
-    [[MONGO_MOD_NEEDS_REPLACEMENT]] virtual PlanStatsDetails getWinningPlanStats(
-        ExplainOptions::Verbosity verbosity) const = 0;
+    PlanStatsDetails getWinningPlanStats(const ExplainPolicy& policy) const {
+        auto entries =
+            getPlanEntries(policy, PlanStatsFormat::kLegacy, PlanSelectionStrategy::kSinglePlan);
+        if (entries.empty()) {
+            return {};
+        }
+        auto& winner = entries.front();
+        return {std::move(winner.planStatsTree), std::move(winner.summary)};
+    }
 
-    virtual PlanStatsDetails getWinningPlanStatsQueryPlanner(bool /*printBytecode*/) const {
-        return getWinningPlanStats(ExplainOptions::Verbosity::kQueryPlanner);
+    /**
+     * Convenience overload for callers that have a verbosity rather than a policy.
+     */
+    [[MONGO_MOD_NEEDS_REPLACEMENT]] PlanStatsDetails getWinningPlanStats(
+        ExplainOptions::Verbosity verbosity) const {
+        return getWinningPlanStats(explainPolicyFor(verbosity));
     }
 
     /**
@@ -343,13 +352,24 @@ public:
     /**
      * Returns statistics that detail candidate plans rejected by the multi-planner. If no
      * multi-planning has been performed, an empty vector is returned.
-     *
-     * The 'verbosity' level parameter determines the amount of information to be returned.
-     *
-     * TODO SERVER-134444: remove together with getWinningPlanStats().
      */
-    virtual std::vector<PlanStatsDetails> getRejectedPlansStats(
-        ExplainOptions::Verbosity verbosity) const = 0;
+    std::vector<PlanStatsDetails> getRejectedPlansStats(const ExplainPolicy& policy) const {
+        auto entries =
+            getPlanEntries(policy, PlanStatsFormat::kLegacy, PlanSelectionStrategy::kSinglePlan);
+        std::vector<PlanStatsDetails> res;
+        if (entries.empty()) {
+            return res;
+        }
+        res.reserve(entries.size() - 1);
+        for (size_t i = 1; i < entries.size(); ++i) {
+            res.push_back({std::move(entries[i].planStatsTree), std::move(entries[i].summary)});
+        }
+        return res;
+    }
+
+    std::vector<PlanStatsDetails> getRejectedPlansStats(ExplainOptions::Verbosity verbosity) const {
+        return getRejectedPlansStats(explainPolicyFor(verbosity));
+    }
 
     /**
      * Returns a uniform per-plan view of the candidate plans: one ExplainPlanEntry per plan, the

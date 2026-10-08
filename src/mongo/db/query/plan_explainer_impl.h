@@ -60,10 +60,7 @@ public:
     boost::optional<PlanSelectionStrategy> getPlanSelectionStrategy() const final {
         return _planSelectionStrategy;
     }
-    PlanStatsDetails getWinningPlanStats(ExplainOptions::Verbosity verbosity) const final;
     PlanStatsDetails getWinningPlanTrialStats() const final;
-    std::vector<PlanStatsDetails> getRejectedPlansStats(
-        ExplainOptions::Verbosity verbosity) const final;
     std::vector<ExplainPlanEntry> getPlanEntries(
         const ExplainPolicy& policy,
         PlanStatsFormat format,

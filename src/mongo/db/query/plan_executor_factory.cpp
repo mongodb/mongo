@@ -142,7 +142,6 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
                                     .solution = std::move(solution),
                                     .root = std::move(rootStage),
                                     .data = sbe::plan_ranker::CandidatePlanData{std::move(data)},
-                                    .exitedEarly = false,
                                     .status = Status::OK(),
                                     .fromPlanCache = planIsFromCache},
                                 plannerOptions & QueryPlannerParams::RETURN_OWNED_DATA,

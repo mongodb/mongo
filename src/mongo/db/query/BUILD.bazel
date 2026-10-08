@@ -374,6 +374,7 @@ mongo_cc_library(
         "yield_policy_callbacks_impl.cpp",
     ],
     deps = [
+        ":explain_policy",
         ":plan_yield_policy",
         "//src/mongo/db/memory_tracking",
     ],

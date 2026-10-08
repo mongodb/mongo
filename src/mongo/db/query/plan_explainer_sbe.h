@@ -78,8 +78,15 @@ public:
     }
     void getSecondarySummaryStats(const NamespaceString& secondaryColl,
                                   PlanSummaryStats* statsOut) const override;
-    PlanStatsDetails getWinningPlanStats(ExplainOptions::Verbosity verbosity) const final;
-    PlanStatsDetails getWinningPlanStatsQueryPlanner(bool printBytecode) const final;
+
+    /**
+     * Describes the single SBE plan this explainer holds, in the legacy node shape. The V3 shape
+     * is assembled by PlanExplainerClassicRuntimePlannerForSBE.
+     */
+    std::vector<ExplainPlanEntry> getPlanEntries(
+        const ExplainPolicy& policy,
+        PlanStatsFormat format,
+        PlanSelectionStrategy decidingPlanRanker) const override;
 
     static BSONObj buildExecPlanDebugInfo(const sbe::PlanStage* root,
                                           const stage_builder::PlanStageData* data,
@@ -154,16 +161,9 @@ public:
         boost::optional<PlanSelectionStrategy> planSelectionStrategy = boost::none);
 
     PlanStatsDetails getWinningPlanTrialStats() const final;
-    std::vector<PlanStatsDetails> getRejectedPlansStats(
-        ExplainOptions::Verbosity verbosity) const final;
 
     /**
-     * The V3 per-plan view for a query run through SBE, drawn from one of two sources.
-     *
-     * Normally it is delegated to the embedded classic explainer, whose entries are the trial trees
-     * the classic runtime planner ranked. Otherwise the plan is described by its QuerySolution
-     * alone (e.g. if there is a single solution or via the subplanner).
-     *
+     * The per-plan view for a query run through SBE.
      */
     std::vector<ExplainPlanEntry> getPlanEntries(
         const ExplainPolicy& policy,
@@ -180,6 +180,12 @@ public:
     }
 
 private:
+    /**
+     * The legacy-shaped per-plan view: the SBE winner as PlanExplainerSBEBase describes it,
+     * followed by the rejected candidates.
+     */
+    std::vector<ExplainPlanEntry> _getPlanEntriesLegacy(const ExplainPolicy& policy) const;
+
     /**
      * Serializes 'solution' into a V3 plan entry using the QuerySolution-derived node shape. Used
      * for the plans that never ran a multi-planning trial, so the entry carries no trial

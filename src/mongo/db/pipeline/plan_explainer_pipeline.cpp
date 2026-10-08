@@ -50,8 +50,15 @@ void PlanExplainerPipeline::getSummaryStats(PlanSummaryStats* statsOut) const {
     statsOut->nReturned = _nReturned;
 }
 
-PlanExplainer::PlanStatsDetails PlanExplainerPipeline::getWinningPlanStats(
-    ExplainOptions::Verbosity verbosity) const {
+PlanExplainer::PlanStatsDetails PlanExplainerPipeline::getWinningPlanTrialStats() const {
+    // We are not supposed to call this method on a pipeline explainer.
+    MONGO_UNREACHABLE;
+}
+
+std::vector<ExplainPlanEntry> PlanExplainerPipeline::getPlanEntries(
+    const ExplainPolicy& policy,
+    PlanStatsFormat format,
+    PlanSelectionStrategy decidingPlanRanker) const {
     // TODO SERVER-49808: Report execution stats for the pipeline.
     if (_pipeline->empty()) {
         return {};
@@ -60,20 +67,16 @@ PlanExplainer::PlanStatsDetails PlanExplainerPipeline::getWinningPlanStats(
     if (auto docSourceCursor =
             dynamic_cast<DocumentSourceCursor*>(_pipeline->getSources().cbegin()->get())) {
         if (auto explainer = docSourceCursor->getPlanExplainer()) {
-            return explainer->getWinningPlanStats(verbosity);
+            auto entries = explainer->getPlanEntries(policy, format, decidingPlanRanker);
+            // Report only the cursor's winning plan. The cursor stage may itself have been
+            // multi-planned, but this explainer declares it has no rejected plans
+            // (areThereRejectedPlansToExplain() is always false here).
+            if (entries.size() > 1) {
+                entries.resize(1);
+            }
+            return entries;
         }
     };
-    return {};
-}
-
-PlanExplainer::PlanStatsDetails PlanExplainerPipeline::getWinningPlanTrialStats() const {
-    // We are not supposed to call this method on a pipeline explainer.
-    MONGO_UNREACHABLE;
-}
-
-std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerPipeline::getRejectedPlansStats(
-    ExplainOptions::Verbosity verbosity) const {
-    // Multi-planning is not supported for aggregation pipelines.
     return {};
 }
 }  // namespace mongo

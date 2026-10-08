@@ -119,7 +119,6 @@ sbe::plan_ranker::CandidatePlan collectExecutionStatsForCachedPlan(
         .solution = std::move(solution),
         .root = std::move(root),
         .data = sbe::plan_ranker::CandidatePlanData{std::move(data)},
-        .exitedEarly = false,
         .status = Status::OK(),
         .fromPlanCache = true};
     ON_BLOCK_EXIT([rootPtr = candidate.root.get()] { rootPtr->detachFromTrialRunTracker(); });
@@ -279,7 +278,7 @@ std::unique_ptr<PlannerInterface> attemptToUsePlan(
                       incrementReplannedPlanIsCachedPlanCounterCb);
     }
 
-    if (candidate.exitedEarly) {
+    if (candidate.stopCondition == MultiPlannerStopCondition::kExhaustedBudget) {
         // The trial period took more than 'maxReadsBeforeReplan' physical reads. This plan may not
         // be efficient any longer, so we replan from scratch.
         auto numReads =

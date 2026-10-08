@@ -86,15 +86,13 @@ public:
     }
 
     void getSummaryStats(PlanSummaryStats* statsOut) const override {}
-    PlanStatsDetails getWinningPlanStats(ExplainOptions::Verbosity verbosity) const override {
-        return PlanStatsDetails(BSONObj(), boost::none);
-    }
     PlanStatsDetails getWinningPlanTrialStats() const override {
         return PlanStatsDetails(BSONObj(), boost::none);
     }
-    std::vector<PlanStatsDetails> getRejectedPlansStats(
-        ExplainOptions::Verbosity verbosity) const override {
-        return {};
+    std::vector<ExplainPlanEntry> getPlanEntries(const ExplainPolicy&,
+                                                 PlanStatsFormat,
+                                                 PlanSelectionStrategy) const override {
+        return std::vector<ExplainPlanEntry>{ExplainPlanEntry{}};
     }
 };
 

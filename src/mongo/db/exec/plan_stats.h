@@ -790,7 +790,11 @@ struct MultiPlanStats : public SpecificStats {
     /* others and only an all-candidates failure is fatal - so it is ranked out but still shown */ \
     /* among the rejected plans, with the partial counters it accumulated before failing and no */ \
     /* score, since a failed candidate is never scored. */                                        \
-    X(kFailed, "failed")
+    X(kFailed, "failed")                                                                          \
+    /* The candidate stopped because the results it had stashed reached the trial's memory cap.  */\
+    /* SBE-only: the SBE trial buffers whole documents and caps their total size, which the      */ \
+    /* classic trial has no counterpart for. */                                               \
+    X(kStashSizeLimit, "stashSizeLimit")
 // clang-format on
 
 QUERY_UTIL_NAMED_ENUM_DEFINE(MultiPlannerStopCondition, MULTI_PLANNER_STOP_CONDITION_TABLE)

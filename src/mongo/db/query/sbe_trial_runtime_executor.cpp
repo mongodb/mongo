@@ -40,6 +40,7 @@ bool TrialRuntimeExecutor::fetchNextDocument(plan_ranker::CandidatePlan* candida
                                                         true /* must return owned BSON */);
         if (state == PlanState::IS_EOF) {
             candidate->root->close();
+            candidate->stopCondition = MultiPlannerStopCondition::kEof;
             return false;
         }
 
@@ -47,17 +48,24 @@ bool TrialRuntimeExecutor::fetchNextDocument(plan_ranker::CandidatePlan* candida
         invariant(obj.isOwned());
         _stashSizeBytes += obj.objsize();
         candidate->results.push_back({std::move(obj), {recordIdSlot != nullptr, recordId}});
+
+        // Distinguish between reaching a full batch and hitting the stash size limit.
         if (candidate->results.size() >= maxNumResults ||
-            candidate->data.tracker->metricReached<TrialRunTracker::kNumResults>() ||
-            _stashSizeBytes >= _stashSizeMaxBytes) {
+            candidate->data.tracker->metricReached<TrialRunTracker::kNumResults>()) {
+            candidate->stopCondition = MultiPlannerStopCondition::kFullBatch;
+            return false;
+        }
+        if (_stashSizeBytes >= _stashSizeMaxBytes) {
+            candidate->stopCondition = MultiPlannerStopCondition::kStashSizeLimit;
             return false;
         }
     } catch (const ExceptionFor<ErrorCodes::QueryTrialRunCompleted>&) {
-        candidate->exitedEarly = true;
+        candidate->stopCondition = MultiPlannerStopCondition::kExhaustedBudget;
         return false;
     } catch (const ExceptionFor<ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed>& ex) {
         candidate->root->close();
         candidate->status = ex.toStatus();
+        candidate->stopCondition = MultiPlannerStopCondition::kFailed;
         return false;
     }
     return true;

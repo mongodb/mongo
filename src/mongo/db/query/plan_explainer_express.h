@@ -204,14 +204,7 @@ public:
 
     void getSummaryStats(PlanSummaryStats* statsOut) const override;
 
-    PlanStatsDetails getWinningPlanStats(ExplainOptions::Verbosity verbosity) const override;
-
     PlanStatsDetails getWinningPlanTrialStats() const override {
-        return {};
-    }
-
-    std::vector<PlanStatsDetails> getRejectedPlansStats(
-        ExplainOptions::Verbosity verbosity) const override {
         return {};
     }
 
@@ -226,8 +219,8 @@ public:
 
 private:
     /**
-     * The per-plan formatting core shared by getWinningPlanStats() and getPlanEntries(), so the two
-     * shapes cannot drift. 'format' selects between them; see PlanStatsFormat.
+     * The per-plan formatting core behind getPlanEntries() in both formats. 'format' selects
+     * between them; see PlanStatsFormat.
      */
     PlanStatsDetails _formatPlanStats(const ExplainPolicy& policy, PlanStatsFormat format) const;
 

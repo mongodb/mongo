@@ -82,11 +82,6 @@ PlanExplainer::PlanStatsDetails PlanExplainerExpress::_formatPlanStats(
     return {bob.obj(), stats};
 }
 
-PlanExplainer::PlanStatsDetails PlanExplainerExpress::getWinningPlanStats(
-    ExplainOptions::Verbosity verbosity) const {
-    return _formatPlanStats(explainPolicyFor(verbosity), PlanStatsFormat::kLegacy);
-}
-
 std::vector<ExplainPlanEntry> PlanExplainerExpress::getPlanEntries(const ExplainPolicy& policy,
                                                                    PlanStatsFormat format,
                                                                    PlanSelectionStrategy) const {
@@ -96,7 +91,9 @@ std::vector<ExplainPlanEntry> PlanExplainerExpress::getPlanEntries(const Explain
     entry.planStatsTree = std::move(planStatsTree);
     entry.hasTrialStats = false;
     entry.isCached = false;
-    if (policy.hasExecStats() || policy.hasAllPlansStats()) {
+    // The V3 output only consumes a summary when the policy asks for execution statistics. The
+    // legacy shape carries it unconditionally.
+    if (format == PlanStatsFormat::kLegacy || policy.hasExecStats() || policy.hasAllPlansStats()) {
         entry.summary = std::move(summary);
     }
 

@@ -1397,20 +1397,6 @@ PlanExplainer::PlanStatsDetails PlanExplainerImpl::_formatPlanStats(
     return {bob.obj(), std::move(summary)};
 }
 
-PlanExplainer::PlanStatsDetails PlanExplainerImpl::getWinningPlanStats(
-    ExplainOptions::Verbosity verbosity) const {
-    // Thin wrapper over the shared per-plan enumerator; kLegacy is exactly the legacy semantics,
-    // pinned by the LegacyAccessorsMatchPlanEntriesAcrossVerbosities equivalence test and the
-    // legacy explain suites.
-    // TODO SERVER-134444: route the SBE and Express legacy-shaped output through getPlanEntries()
-    // as well, then remove the legacy per-plan virtuals from the PlanExplainer interface.
-    auto entries = getPlanEntries(
-        explainPolicyFor(verbosity), PlanStatsFormat::kLegacy, PlanSelectionStrategy::kSinglePlan);
-    tassert(13052905, "getPlanEntries() must return at least the winning plan", !entries.empty());
-    auto& winner = entries.front();
-    return {std::move(winner.planStatsTree), std::move(winner.summary)};
-}
-
 PlanExplainer::PlanStatsDetails PlanExplainerImpl::getWinningPlanTrialStats() const {
     if (_explainData.multiPlannerWinningPlanTrialStats) {
         boost::optional<size_t> solutionHash;
@@ -1430,20 +1416,6 @@ PlanExplainer::PlanStatsDetails PlanExplainerImpl::getWinningPlanTrialStats() co
     return getWinningPlanStats(ExplainOptions::Verbosity::kExecAllPlans);
 }
 
-std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerImpl::getRejectedPlansStats(
-    ExplainOptions::Verbosity verbosity) const {
-    // Thin wrapper over the shared per-plan enumerator: the entries after the winner, in
-    // enumeration order (kLegacy). See the consolidation note on getWinningPlanStats().
-    auto entries = getPlanEntries(
-        explainPolicyFor(verbosity), PlanStatsFormat::kLegacy, PlanSelectionStrategy::kSinglePlan);
-    std::vector<PlanStatsDetails> res;
-    res.reserve(entries.size() - 1);
-    for (size_t i = 1; i < entries.size(); ++i) {
-        res.push_back({std::move(entries[i].planStatsTree), std::move(entries[i].summary)});
-    }
-    return res;
-}
-
 std::vector<ExplainPlanEntry> PlanExplainerImpl::getPlanEntries(
     const ExplainPolicy& policy,
     PlanStatsFormat format,
@@ -1458,7 +1430,8 @@ std::vector<ExplainPlanEntry> PlanExplainerImpl::_getPlanEntriesLegacy(
     const ExplainPolicy& policy) const {
     std::vector<ExplainPlanEntry> entries;
 
-    // The winning (or sole) plan first, formatted by the same per-plan core as getWinningPlanStats.
+    // The winning (or sole) plan first; this entry is what the base class's getWinningPlanStats()
+    // returns.
     const auto winningPlanIdx = getWinningPlanIdx(_root);
     auto winnerStats = _root->getStats();
     boost::optional<double> winnerScore;

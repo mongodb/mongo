@@ -915,57 +915,113 @@ TEST_F(PlanExplainerTest, GetPlanEntriesV3PhaseGroupsAreDisjoint) {
     });
 }
 
-TEST_F(PlanExplainerTest, LegacyAccessorsMatchPlanEntriesAcrossVerbosities) {
-    // The legacy winning/rejected accessors and the kLegacy
-    // per-plan enumerator produce BSON-identical output for every legacy verbosity across
-    // single-plan, multi-planned, and CBR-rejected scenarios. First verified against the
-    // pre-consolidation accessor implementations, it now pins the consolidation (the accessors
-    // are thin wrappers over getPlanEntries) to byte-identity.
-    auto assertAccessorsMatchEntries = [&](PlanExecutor* exec) {
+// Asserts that there are no "statistics" subobjects in the given tree.
+void assertNoStatistics(const BSONObj& node) {
+    ASSERT_FALSE(node.hasField("statistics")) << node;
+    if (auto inputStage = node["inputStage"]; !inputStage.eoo()) {
+        assertNoStatistics(inputStage.Obj());
+    }
+    if (auto inputStages = node["inputStages"]; !inputStages.eoo()) {
+        for (auto&& child : inputStages.Array()) {
+            assertNoStatistics(child.Obj());
+        }
+    }
+}
+
+TEST_F(PlanExplainerTest, GetPlanEntriesLegacyVerbosities) {
+
+    auto assertLegacyEntryContract = [&](PlanExecutor* exec, bool expectRejectedPlans) {
         auto& explainer = exec->getPlanExplainer();
         for (auto verbosity : {ExplainOptions::Verbosity::kQueryPlanner,
                                ExplainOptions::Verbosity::kExecStats,
                                ExplainOptions::Verbosity::kExecAllPlans,
                                ExplainOptions::Verbosity::kInternal}) {
-            auto entries = explainer.getPlanEntries(explainPolicyFor(verbosity),
-                                                    PlanStatsFormat::kLegacy,
-                                                    PlanSelectionStrategy::kSinglePlan);
-            ASSERT_GTE(entries.size(), 1u);
+            const auto policy = explainPolicyFor(verbosity);
+            const auto verbosityName = ExplainOptions::verbosityString(verbosity);
+            auto entries = explainer.getPlanEntries(
+                policy, PlanStatsFormat::kLegacy, PlanSelectionStrategy::kSinglePlan);
 
-            auto&& [winningPlan, winningSummary] = explainer.getWinningPlanStats(verbosity);
-            ASSERT_BSONOBJ_EQ(entries[0].planStatsTree, winningPlan);
-            ASSERT_EQ(entries[0].summary.has_value(), winningSummary.has_value());
+            // There is always at least the winning (or sole) plan, and it comes first.
+            ASSERT_GTE(entries.size(), 1u) << verbosityName;
+            ASSERT_EQ(entries.size() > 1, expectRejectedPlans) << verbosityName;
 
-            auto rejected = explainer.getRejectedPlansStats(verbosity);
-            ASSERT_EQ(rejected.size(), entries.size() - 1);
-            for (size_t i = 0; i < rejected.size(); ++i) {
-                ASSERT_BSONOBJ_EQ(entries[i + 1].planStatsTree, rejected[i].first);
-                ASSERT_EQ(entries[i + 1].summary.has_value(), rejected[i].second.has_value());
-                if (rejected[i].second) {
-                    ASSERT_EQ(entries[i + 1].summary->score.has_value(),
-                              rejected[i].second->score.has_value());
+            for (size_t i = 0; i < entries.size(); ++i) {
+                const auto& entry = entries[i];
+                ASSERT_FALSE(entry.planStatsTree.isEmpty()) << verbosityName;
+
+                // The 'statistics' grouping is a kV3 behavior and must not appear here.
+                assertNoStatistics(entry.planStatsTree);
+
+                // A summary is collected exactly when the policy asks for execution statistics.
+                ASSERT_EQ(entry.summary.has_value(), policy.hasExecStats())
+                    << verbosityName << " entry " << i;
+                // A trial-period score is never reported below allPlansExecution.
+                if (entry.summary && !policy.hasAllPlansStats()) {
+                    ASSERT_FALSE(entry.summary->score.has_value())
+                        << verbosityName << " entry " << i;
+                }
+            }
+
+            // Legacy orders the plans after the winner by enumeration order.
+            for (auto ranker :
+                 {PlanSelectionStrategy::kMultiPlanner, PlanSelectionStrategy::kCostBasedRanker}) {
+                auto reordered = explainer.getPlanEntries(policy, PlanStatsFormat::kLegacy, ranker);
+                ASSERT_EQ(reordered.size(), entries.size()) << verbosityName;
+                for (size_t i = 0; i < entries.size(); ++i) {
+                    ASSERT_BSONOBJ_EQ(reordered[i].planStatsTree, entries[i].planStatsTree);
                 }
             }
         }
     };
 
     {
-        // Single-plan scenario.
+        // Single-plan scenario: the sole plan, no rejected candidates.
         auto exec = buildFindExecAndIter(fromjson("{c: {$eq: 1}}"));
-        assertAccessorsMatchEntries(exec.get());
+        assertLegacyEntryContract(exec.get(), false /* expectRejectedPlans */);
     }
     {
-        // Multi-planned scenario.
+        // Multi-planned scenario: candidates that ran a trial inside a MultiPlanStage.
         auto exec = buildFindExecAndIter(fromjson("{a: {$gte: 0}, b: {$gte: 0}}"));
-        assertAccessorsMatchEntries(exec.get());
+        assertLegacyEntryContract(exec.get(), true /* expectRejectedPlans */);
     }
     {
-        // CBR scenario with rejected plans that never ran a trial.
+        // CBR scenario: rejected plans that never ran a trial, so their stats trees are built for
+        // display only.
         unittest::ServerParameterGuard planRankerController("internalQueryPlanRanker", "costBased");
         unittest::ServerParameterGuard samplingController("internalQueryCBRCEMode", "samplingCE");
         expCtx->setExplain(ExplainOptions::Verbosity::kQueryPlanner);
         auto exec = buildFindExecAndIter(fromjson("{a: {$gte: 0}, b: {$gte: 0}}"));
-        assertAccessorsMatchEntries(exec.get());
+        assertLegacyEntryContract(exec.get(), true /* expectRejectedPlans */);
+    }
+}
+
+TEST_F(PlanExplainerTest, SBEGetPlanEntriesLegacyMultiPlanner) {
+    // The SBE legacy per-plan view is assembled from two different sources: the winner is
+    // described by the SBE tree the explainer holds, while the rejected candidates are the classic
+    // trial trees enumerated by the embedded classic runtime-planner explainer. The classic
+    // explainer reports its own winner too, which must be dropped so the winner is not duplicated
+    // and the rejected plans are not shifted by one.
+    unittest::ServerParameterGuard sbeFullController("featureFlagSbeFull", true);
+    expCtx->setExplain(ExplainOptions::Verbosity::kQueryPlanner);
+    auto exec = buildFindExecAndIter(fromjson("{a: {$gte: 0}, b: {$gte: 0}}"));
+    auto& explainer = exec->getPlanExplainer();
+    ASSERT(explainer.areThereRejectedPlansToExplain());
+
+    auto entries =
+        explainer.getPlanEntries(explainPolicyFor(ExplainOptions::Verbosity::kQueryPlanner),
+                                 PlanStatsFormat::kLegacy,
+                                 PlanSelectionStrategy::kSinglePlan);
+    ASSERT_GTE(entries.size(), 2u);
+
+    // Only the winner is described by the SBE tree, so only it carries the stringified SBE plan.
+    ASSERT(entries[0].planStatsTree.hasField("slotBasedPlan")) << entries[0].planStatsTree;
+    ASSERT_STRING_CONTAINS(entries[0].planStatsTree.toString(), "IXSCAN");
+
+    // The rejected entries are the classic trial trees, and none of them repeats the winner.
+    for (size_t i = 1; i < entries.size(); ++i) {
+        ASSERT_FALSE(entries[i].planStatsTree.hasField("slotBasedPlan"))
+            << entries[i].planStatsTree;
+        ASSERT_BSONOBJ_NE(entries[i].planStatsTree, entries[0].planStatsTree);
     }
 }
 

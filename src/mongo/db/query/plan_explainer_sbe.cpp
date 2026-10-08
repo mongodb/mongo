@@ -221,9 +221,8 @@ PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
     const boost::optional<std::string>& planSummary,
     const boost::optional<BSONObj>& queryParams,
     const boost::optional<BSONArray>& remotePlanInfo,
-    ExplainOptions::Verbosity verbosity,
+    const ExplainPolicy& explainPolicy,
     bool isCached,
-    bool printBytecode,
     bool usedJoinOpt = false,
     const cost_based_ranker::EstimateMap& _estimates = {},
     boost::optional<size_t> preExtensionSolutionHash = boost::none) {
@@ -236,7 +235,6 @@ PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
         return (long long)preExtensionSolutionHash.value_or(solution->hash());
     };
 
-    const ExplainPolicy explainPolicy = explainPolicyFor(verbosity);
     if (explainPolicy.hasExecStats()) {
         auto summary = sbe::collectExecutionStatsSummary(stats);
         if (solution != nullptr && explainPolicy.hasAllPlansStats()) {
@@ -281,7 +279,7 @@ PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
             buildSbeDebugInfoWithinBudget(sbePlanStageRoot,
                                           sbePlanStageData,
                                           explainThresholdBytes - plan.len() /* lengthCap */,
-                                          printBytecode)) {
+                                          explainPolicy.hasByteCode())) {
         plan.append("slotBasedPlan", *execPlanDebugInfo);
     } else {
         plan.append("warning", "slotBasedPlan exceeded BSON size limit for explain");
@@ -761,46 +759,38 @@ void PlanExplainerSBEBase::getSecondarySummaryStats(const NamespaceString& secon
     }
 }
 
-PlanExplainer::PlanStatsDetails PlanExplainerSBEBase::getWinningPlanStats(
-    ExplainOptions::Verbosity verbosity) const {
+std::vector<ExplainPlanEntry> PlanExplainerSBEBase::getPlanEntries(const ExplainPolicy& policy,
+                                                                   PlanStatsFormat format,
+                                                                   PlanSelectionStrategy) const {
+    // The V3 per-plan view is assembled by the runtime-planner subclass. This class only
+    // knows how to describe the plan it is holding in the legacy format.
+    tassert(13314404,
+            "the SBE base explainer produces only legacy-format plan entries",
+            format == PlanStatsFormat::kLegacy);
     tassert(9378606, "encountered unexpected nullptr for root PlanStage", _root);
     auto stats = _root->getStats(true /* includeDebugInfo  */);
     tassert(9378611, "encountered unexpected nullptr for PlanStageStats", stats);
 
-    return buildPlanStatsDetails(_solution,
-                                 *stats,
-                                 _root,
-                                 _rootData,
-                                 boost::none /* planSummary */,
-                                 boost::none /* queryParams */,
-                                 buildRemotePlanInfo(),
-                                 verbosity,
-                                 matchesCachedPlan(),
-                                 false /*printBytecode*/,
-                                 _usedJoinOpt,
-                                 _estimates,
-                                 _preExtensionWinningPlanHash);
-}
-
-PlanExplainer::PlanStatsDetails PlanExplainerSBEBase::getWinningPlanStatsQueryPlanner(
-    bool printBytecode) const {
-    tassert(10629901, "encountered unexpected nullptr for root PlanStage", _root);
-    auto stats = _root->getStats(true /* includeDebugInfo  */);
-    tassert(10629902, "encountered unexpected nullptr for PlanStageStats", stats);
-
-    return buildPlanStatsDetails(_solution,
-                                 *stats,
-                                 _root,
-                                 _rootData,
-                                 boost::none /* planSummary */,
-                                 boost::none /* queryParams */,
-                                 buildRemotePlanInfo(),
-                                 ExplainOptions::Verbosity::kQueryPlanner,
-                                 matchesCachedPlan(),
-                                 printBytecode,
-                                 _usedJoinOpt,
-                                 _estimates,
-                                 _preExtensionWinningPlanHash);
+    auto [planStatsTree, summary] = buildPlanStatsDetails(_solution,
+                                                          *stats,
+                                                          _root,
+                                                          _rootData,
+                                                          boost::none /* planSummary */,
+                                                          boost::none /* queryParams */,
+                                                          buildRemotePlanInfo(),
+                                                          policy,
+                                                          matchesCachedPlan(),
+                                                          _usedJoinOpt,
+                                                          _estimates,
+                                                          _preExtensionWinningPlanHash);
+    ExplainPlanEntry entry;
+    entry.planStatsTree = std::move(planStatsTree);
+    entry.summary = std::move(summary);
+    entry.isCached = matchesCachedPlan();
+    if (_solution) {
+        entry.solutionHash = _solution->hash();
+    }
+    return std::vector<ExplainPlanEntry>{std::move(entry)};
 }
 
 boost::optional<BSONArray> PlanExplainerSBEBase::buildRemotePlanInfo() const {
@@ -884,31 +874,47 @@ PlanExplainer::PlanStatsDetails PlanExplainerClassicRuntimePlannerForSBE::getWin
         : PlanExplainer::PlanStatsDetails{};
 }
 
-std::vector<PlanExplainer::PlanStatsDetails>
-PlanExplainerClassicRuntimePlannerForSBE::getRejectedPlansStats(
-    ExplainOptions::Verbosity verbosity) const {
+std::vector<ExplainPlanEntry> PlanExplainerClassicRuntimePlannerForSBE::_getPlanEntriesLegacy(
+    const ExplainPolicy& policy) const {
+    // The winner is described by the SBE tree this explainer holds.
+    auto entries = PlanExplainerSBEBase::getPlanEntries(
+        policy, PlanStatsFormat::kLegacy, PlanSelectionStrategy::kSinglePlan);
+
     if (_usedJoinOpt) {
-        std::vector<PlanExplainer::PlanStatsDetails> out;
+        // Join optimization keeps its rejected candidates as fully built SBE plans of its own.
         for (auto&& soln : _rejectedPlansForJoinOpt) {
             auto stats = soln.stage->getStats(true /* includeDebugInfo  */);
-            out.push_back(buildPlanStatsDetails(soln.soln.get(),
-                                                *stats,
-                                                soln.stage.get(),
-                                                &soln.data,
-                                                boost::none /* planSummary */,
-                                                boost::none /* queryParams */,
-                                                boost::none /* remotePlanInfo */,
-                                                verbosity,
-                                                false /* matchesCachedPlan */,
-                                                false /* printBytecode */,
-                                                true /* usedJoinOpt */,
-                                                _estimates));
+            auto [planStatsTree, summary] = buildPlanStatsDetails(soln.soln.get(),
+                                                                  *stats,
+                                                                  soln.stage.get(),
+                                                                  &soln.data,
+                                                                  boost::none /* planSummary */,
+                                                                  boost::none /* queryParams */,
+                                                                  boost::none /* remotePlanInfo */,
+                                                                  policy,
+                                                                  false /* matchesCachedPlan */,
+                                                                  true /* usedJoinOpt */,
+                                                                  _estimates);
+            ExplainPlanEntry entry;
+            entry.planStatsTree = std::move(planStatsTree);
+            entry.summary = std::move(summary);
+            entry.solutionHash = soln.soln->hash();
+            entries.push_back(std::move(entry));
         }
-        return out;
+        return entries;
     }
-    return _classicRuntimePlannerExplainer
-        ? _classicRuntimePlannerExplainer->getRejectedPlansStats(verbosity)
-        : std::vector<PlanExplainer::PlanStatsDetails>{};
+
+    // Otherwise the rejected candidates are the classic trial trees the runtime planner ranked, so
+    // the embedded classic explainer enumerates them.
+    if (_classicRuntimePlannerExplainer) {
+        auto classicEntries = _classicRuntimePlannerExplainer->getPlanEntries(
+            policy, PlanStatsFormat::kLegacy, PlanSelectionStrategy::kSinglePlan);
+        // Emit only the rejected plans (starting at index 1), the winner is emitted above already.
+        for (size_t i = 1; i < classicEntries.size(); ++i) {
+            entries.push_back(std::move(classicEntries[i]));
+        }
+    }
+    return entries;
 }
 
 ExplainPlanEntry PlanExplainerClassicRuntimePlannerForSBE::makeQsnPlanEntry(
@@ -959,9 +965,9 @@ std::vector<ExplainPlanEntry> PlanExplainerClassicRuntimePlannerForSBE::getPlanE
     const ExplainPolicy& policy,
     PlanStatsFormat format,
     PlanSelectionStrategy decidingPlanRanker) const {
-    tassert(13314403,
-            "SBE explainers produce only V3-format plan entries",
-            format == PlanStatsFormat::kV3);
+    if (format == PlanStatsFormat::kLegacy) {
+        return _getPlanEntriesLegacy(policy);
+    }
 
     // With no runtime planner stage there are no trial trees to read, so the plan is described by
     // its QuerySolution alone: one entry, carrying the cost-based ranker's estimates but no trial

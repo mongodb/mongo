@@ -353,14 +353,19 @@ Status MultiPlanStage::runTrials(PlanYieldPolicy* yieldPolicy,
         for (size_t i = 0; i < childrenSize; ++i) {
             auto& candidate = _candidates[i];
             numDocsFound += candidate.results.size();
-            // Every candidate of this phase now has a stop condition. A candidate that did exit
-            // early keeps the reason recorded by workAllPlans(). In the capped trial flow this
-            // may set a no-early-exit condition for a candidate that a later trial phase resumes
-            // and exits early - that phase overwrites it with the real reason. The capped phase's
-            // own value is saved below ('estimatePhaseStopCondition'). A candidate that failed in
-            // a recoverable fashion already recorded kFailed at the moment it failed - so the
-            // status check preserves that reason rather than overwriting it.
-            if (!candidate.exitedEarly && candidate.status.isOK()) {
+            // Every candidate of this phase now has a stop condition. A candidate that ended its
+            // own trial - by reaching EOF or filling the batch - keeps the reason workAllPlans()
+            // recorded. Other candidates that did not end their trial early will get the "no early
+            // exit" reason. In the capped trial flow this may set a no-early-exit condition for a
+            // candidate that a later trial phase resumes and exits early - that phase overwrites it
+            // with the real reason. The capped phase's own value is saved below
+            // ('estimatePhaseStopCondition'). A candidate that failed in a recoverable fashion
+            // already recorded kFailed at the moment it failed - so the status check preserves that
+            // reason rather than overwriting it.
+            const bool endedItsOwnTrial =
+                candidate.stopCondition == MultiPlannerStopCondition::kEof ||
+                candidate.stopCondition == MultiPlannerStopCondition::kFullBatch;
+            if (!endedItsOwnTrial && candidate.status.isOK()) {
                 candidate.stopCondition = noEarlyExitCondition;
             }
         }
@@ -570,7 +575,6 @@ bool MultiPlanStage::workAllPlans(size_t numResults, PlanYieldPolicy* yieldPolic
             // Once a plan returns enough results, stop working.
             const bool isEof = candidate.root->isEOF();
             if (candidate.results.size() >= numResults || isEof) {
-                candidate.exitedEarly = true;
                 // Reaching EOF on the same work() call that produced a result is an EOF exit, even
                 // when the result also completed the batch: the plan is out of results either way.
                 candidate.stopCondition =
@@ -585,7 +589,6 @@ bool MultiPlanStage::workAllPlans(size_t numResults, PlanYieldPolicy* yieldPolic
             // First plan to hit EOF wins automatically.  Stop evaluating other plans.
             // Assumes that the ranking will pick this plan.
             doneWorking = true;
-            candidate.exitedEarly = true;
             candidate.stopCondition = MultiPlannerStopCondition::kEof;
 
             if (!_shouldNotCollectMetrics) {

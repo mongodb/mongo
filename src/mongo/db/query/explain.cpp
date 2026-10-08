@@ -230,8 +230,11 @@ void generatePlannerInfo(PlanExecutor* exec,
     appendQueryPlannerCommonInfo(exec, plannerContext, extraInfo, serializationContext, plannerBob);
 
     auto&& explainer = exec->getPlanExplainer();
-    auto&& [winningStats, _] = explainer.getWinningPlanStatsQueryPlanner(
-        explainPolicyFor(verbosity).hasByteCode() /*printBytecode*/);
+    auto plannerPolicy = explainPolicyFor(ExplainOptions::Verbosity::kQueryPlanner);
+    if (explainPolicyFor(verbosity).hasByteCode()) {
+        plannerPolicy = plannerPolicy.with(ExplainSettings::kBytecode);
+    }
+    auto&& [winningStats, _] = explainer.getWinningPlanStats(plannerPolicy);
     plannerBob.append("winningPlan", winningStats);
 
     BSONArrayBuilder bab{plannerBob.subarrayStart("rejectedPlans")};
