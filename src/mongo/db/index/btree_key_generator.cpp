@@ -38,19 +38,22 @@ const BSONElement nullElt = nullObj.firstElement();
 const BSONObj undefinedObj = BSON("" << BSONUndefined);
 const BSONElement undefinedElt = undefinedObj.firstElement();
 
+void assertNonArrayElement(const BSONElement& elt, std::string_view path) {
+    uassert(7246301,
+            str::stream() << "field " << path << " cannot be indexed as an array (multikey)",
+            elt.type() != BSONType::array);
+}
+
 /**
- * Returns the non-array element at the specified path. This function returns an empty BSON element
- * if the path doesn't exist.
+ * Returns the element at the specified path, or the first array encountered while traversing it.
+ * Returns an empty BSON element if the path doesn't exist.
  *
  * The 'path' can be specified using a dotted notation in order to traverse through embedded
- * objects. If 'exist' is specified it should be set to true if the element is present. This output
- * can help the caller to know whether the 'path' is missing or has a 'null' value.
- *
- * This function must only be used when there is no an array element along the 'path'. Otherwise,
- * an exception will be thrown if encounters any array.
+ * objects. The returned boolean indicates whether an element or array was found, distinguishing
+ * missing paths from null values.
  */
-std::pair<BSONElement, bool> extractNonArrayElementAtPath(const BSONObj& obj,
-                                                          std::string_view path) {
+std::pair<BSONElement, bool> extractElementAtPathOrArray(const BSONObj& obj,
+                                                         std::string_view path) {
     static const auto kEmptyElt = BSONElement{};
 
     auto&& [elt, tail] = [&]() -> std::pair<BSONElement, std::string_view> {
@@ -59,16 +62,12 @@ std::pair<BSONElement, bool> extractNonArrayElementAtPath(const BSONObj& obj,
         }
         return {obj.getField(path), ""sv};
     }();
-    uassert(7246301,
-            str::stream() << "field " << path << " cannot be indexed as an array (multikey)",
-            elt.type() != BSONType::array);
-
     if (elt.eoo()) {
         return {kEmptyElt, false};
-    } else if (tail.empty()) {
+    } else if (elt.type() == BSONType::array || tail.empty()) {
         return {elt, true};
     } else if (elt.type() == BSONType::object) {
-        return extractNonArrayElementAtPath(elt.embeddedObject(), tail);
+        return extractElementAtPathOrArray(elt.embeddedObject(), tail);
     }
     // We found a scalar element, but there is more path to traverse, e.g. {a: 1} with a path of
     // "a.b".
@@ -230,8 +229,7 @@ void BtreeKeyGenerator::getKeys(SharedBufferFragmentBuilder& pooledBufferBuilder
             multikeyPaths->resize(1);
         }
     } else if (skipMultikey && !_pathsContainPositionalComponent) {
-        // This index doesn't contain array values. We therefore always set 'multikeyPaths' as
-        // [[ ], [], ...].
+        // Documents contributing keys to this index cannot require multikey paths.
         if (multikeyPaths) {
             invariant(multikeyPaths->empty());
             multikeyPaths->resize(_fieldNames.size());
@@ -308,7 +306,18 @@ void BtreeKeyGenerator::_getKeysWithoutArray(SharedBufferFragmentBuilder& pooled
     size_t numNotFound{0};
 
     for (auto&& fieldName : _fieldNames) {
-        auto [elem, _] = extractNonArrayElementAtPath(obj, fieldName);
+        auto [elem, _] = extractElementAtPathOrArray(obj, fieldName);
+        if (_isSetSparseByUser && elem.type() == BSONType::array) {
+            // Arrays are legal in documents omitted from a non-multikey sparse index.
+            SharedBufferFragmentBuilder arrayKeyPool{
+                key_string::HeapBuilder::kHeapAllocatorDefaultBytes};
+            KeyStringSet arrayKeys;
+            getKeys(arrayKeyPool, obj, false, &arrayKeys, nullptr, collator, id);
+            if (arrayKeys.empty()) {
+                return;
+            }
+        }
+        assertNonArrayElement(elem, fieldName);
         if (elem.eoo()) {
             ++numNotFound;
         }
@@ -337,7 +346,8 @@ boost::dynamic_bitset<size_t> BtreeKeyGenerator::extractElements(
     boost::dynamic_bitset<size_t> existFields(_fieldNames.size());
     size_t idx = 0;
     for (auto&& fieldName : _fieldNames) {
-        auto [elem, exist] = extractNonArrayElementAtPath(obj, fieldName);
+        auto [elem, exist] = extractElementAtPathOrArray(obj, fieldName);
+        assertNonArrayElement(elem, fieldName);
         elems->push_back(elem);
         existFields[idx++] = exist;
     }

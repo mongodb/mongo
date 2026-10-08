@@ -4,6 +4,7 @@
 
 #include "mongo/db/index/btree_key_generator.h"
 
+#include "mongo/base/error_codes.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
@@ -653,6 +654,115 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromSparseEmptyArraySecond) {
     genKeysFrom = fromjson("{a:[{c:1}]}");
     ASSERT(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths, sparse));
 }
+
+TEST(BtreeKeyGeneratorTest, NonMultikeySparseIndexWithArrayGeneratesNoKeys) {
+    BtreeKeyGenerator keyGen{{"a.b"},
+                             {BSONElement{}},
+                             true,
+                             key_string::Version::kLatestVersion,
+                             Ordering::make(BSONObj())};
+    for (auto&& doc :
+         {fromjson("{a: [{c: 1}, {c: 2}]}"), fromjson("{a: []}"), fromjson("{a: [1, {c: 1}]}")}) {
+        SharedBufferFragmentBuilder allocator{BufBuilder::kDefaultInitSizeBytes};
+        KeyStringSet keys;
+        MultikeyPaths multikeyPaths;
+        keyGen.getKeys(allocator, doc, true, &keys, &multikeyPaths);
+        EXPECT_TRUE(keys.empty());
+        EXPECT_EQ(multikeyPaths, MultikeyPaths({MultikeyComponents{}}));
+    }
+
+    SharedBufferFragmentBuilder allocator{BufBuilder::kDefaultInitSizeBytes};
+    KeyStringSet keys;
+    keyGen.getKeys(allocator, fromjson("{a: [{c: 1}]}"), true, &keys, nullptr);
+    EXPECT_TRUE(keys.empty());
+}
+
+TEST(BtreeKeyGeneratorTest, NonMultikeyCompoundSparseIndexWithArrayGeneratesNoKeys) {
+    BtreeKeyGenerator keyGen{{"z", "a.b"},
+                             {BSONElement{}, BSONElement{}},
+                             true,
+                             key_string::Version::kLatestVersion,
+                             Ordering::make(BSONObj())};
+    SharedBufferFragmentBuilder allocator{BufBuilder::kDefaultInitSizeBytes};
+    KeyStringSet keys;
+    MultikeyPaths multikeyPaths;
+    keyGen.getKeys(allocator, fromjson("{a: [{c: 1}, {c: 2}]}"), true, &keys, &multikeyPaths);
+    EXPECT_TRUE(keys.empty());
+    EXPECT_EQ(multikeyPaths, MultikeyPaths({MultikeyComponents{}, MultikeyComponents{}}));
+}
+
+TEST(BtreeKeyGeneratorTest, ExtractElementsRejectsArraysEvenWhenSparseIndexGeneratesNoKeys) {
+    BtreeKeyGenerator keyGen{{"a.b"},
+                             {BSONElement{}},
+                             true,
+                             key_string::Version::kLatestVersion,
+                             Ordering::make(BSONObj())};
+    for (auto&& doc : {fromjson("{a: [{c: 1}]}"), fromjson("{a: {b: []}}")}) {
+        std::vector<BSONElement> elems;
+        EXPECT_THAT([&] { keyGen.extractElements(doc, &elems); },
+                    testing::Throws<DBException>(unittest::match::CodeIs(7246301)));
+        EXPECT_TRUE(elems.empty());
+    }
+}
+
+struct NonMultikeyIndexTestCase {
+    std::string name;
+    BSONObj keyPattern;
+    BSONObj doc;
+    bool sparse;
+    int errorCode;
+};
+
+class NonMultikeyIndexKeyGenerationTest
+    : public unittest::Test,
+      public testing::WithParamInterface<NonMultikeyIndexTestCase> {};
+
+TEST_P(NonMultikeyIndexKeyGenerationTest, RejectInvalidArrayDocuments) {
+    const auto& testCase = GetParam();
+    std::vector<const char*> fieldNames;
+    for (auto&& field : testCase.keyPattern) {
+        fieldNames.push_back(field.fieldName());
+    }
+    BtreeKeyGenerator keyGen{fieldNames,
+                             std::vector<BSONElement>(fieldNames.size()),
+                             testCase.sparse,
+                             key_string::Version::kLatestVersion,
+                             Ordering::make(testCase.keyPattern)};
+    SharedBufferFragmentBuilder allocator{BufBuilder::kDefaultInitSizeBytes};
+    KeyStringSet keys;
+    MultikeyPaths multikeyPaths;
+    EXPECT_THAT([&] { keyGen.getKeys(allocator, testCase.doc, true, &keys, &multikeyPaths); },
+                testing::Throws<DBException>(unittest::match::CodeIs(testCase.errorCode)));
+    EXPECT_TRUE(keys.empty());
+    EXPECT_EQ(multikeyPaths, MultikeyPaths(fieldNames.size()));
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    BtreeKeyGenerator,
+    NonMultikeyIndexKeyGenerationTest,
+    testing::Values(NonMultikeyIndexTestCase{"NonSparseMissingLeaf",
+                                             fromjson("{'a.b': 1}"),
+                                             fromjson("{a: [{c: 1}]}"),
+                                             false,
+                                             7246301},
+                    NonMultikeyIndexTestCase{"SparseArrayWithIndexedValue",
+                                             fromjson("{'a.b': 1}"),
+                                             fromjson("{a: [{b: 1}]}"),
+                                             true,
+                                             7246301},
+                    NonMultikeyIndexTestCase{
+                        "SparseEmptyArray", fromjson("{a: 1}"), fromjson("{a: []}"), true, 7246301},
+                    NonMultikeyIndexTestCase{"CompoundSparseWithOtherFieldPresent",
+                                             fromjson("{'a.b': 1, z: 1}"),
+                                             fromjson("{a: [{c: 1}], z: 1}"),
+                                             true,
+                                             7246301},
+                    NonMultikeyIndexTestCase{"ParallelArrays",
+                                             fromjson("{'a.b': 1, z: 1}"),
+                                             fromjson("{a: [{b: 1}], z: [1]}"),
+                                             true,
+                                             ErrorCodes::CannotIndexParallelArrays}),
+    [](const testing::TestParamInfo<NonMultikeyIndexTestCase>& info) { return info.param.name; });
 
 TEST(BtreeKeyGeneratorTest, SparseNonObjectMissingNestedField) {
     const bool sparse = true;

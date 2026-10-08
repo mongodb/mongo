@@ -60,6 +60,10 @@ public:
      * this parameter must be set to 'false'. In this case a generic algorithm will be used, which
      * can handle both multikey and non-multikey indexes.
      *
+     * For a sparse index, a document generating no keys may traverse arrays without violating
+     * the non-multikey assumption. With 'skipMultikey' set, such a document produces empty
+     * 'multikeyPaths' entries.
+     *
      * If the 'collator' argument is set to null, this key generator orders strings according to the
      * simple binary compare. If non-null, represents the collator used to generate index keys for
      * indexed strings.
@@ -157,7 +161,8 @@ private:
 
     /**
      * An optimized version of the key generation algorithm to be used when it is known that 'obj'
-     * doesn't contain an array value in any of the fields in the key pattern.
+     * cannot generate multikey index entries. For a sparse index, an array encountered along an
+     * indexed path is allowed only if array-aware key generation produces no keys.
      */
     void _getKeysWithoutArray(SharedBufferFragmentBuilder& pooledBufferBuilder,
                               const BSONObj& obj,
