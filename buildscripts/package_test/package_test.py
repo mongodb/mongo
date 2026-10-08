@@ -34,22 +34,21 @@ from buildscripts.package_test.package_test_commands import (
 )
 from buildscripts.package_test.package_test_internal import write_compressed_text_file
 from buildscripts.package_test.package_test_provenance import (
-    ARCHIVE_DIST_TEST_PROVENANCE_BUILD_COMMAND_PATH,
     RELEASE_BINARY_NAMES,
     combine_execution_log_validation_summaries,
+    create_release_binary_provenance_from_archive_dist_test,
     extract_file_from_tar_by_basename,
     fetch_release_binary_provenance_from_tasks,
     fetch_release_execution_log_from_tasks,
     fetch_task_artifact_to_file,
     find_build_task,
     find_task_artifact_url_with_retry,
-    hash_release_binaries_in_archive,
     is_release_branch_project,
     is_server_release_project,
     release_binary_name_from_path,
     validate_compact_execution_log_file,
     validate_release_binary_provenance_against_archive,
-    validate_release_build_command,
+    validate_release_binary_provenance_distro,
 )
 from buildscripts.resmokelib.utils import evergreen_conn
 from buildscripts.simple_report import Report, Result
@@ -134,7 +133,12 @@ def get_release_binary_provenance_for_validation(
     if binary_provenance_file:
         binary_provenance_path = Path(binary_provenance_file)
         logging.info("Reading release binary provenance from: %s", binary_provenance_path)
-        return binary_provenance_path.read_text()
+        provenance_text = binary_provenance_path.read_text()
+        if evg_build_id:
+            tasks = evergreen_conn.get_evergreen_api().tasks_by_build(evg_build_id)
+            build_task = find_build_task(tasks, binary_provenance_task_name)
+            validate_release_binary_provenance_distro(json.loads(provenance_text), build_task)
+        return provenance_text
 
     if not evg_build_id:
         raise RuntimeError(
@@ -166,35 +170,6 @@ def get_release_binary_provenance_for_validation(
     )
     return create_release_binary_provenance_from_archive_dist_test(
         tasks, evg_build_id, download_dir
-    )
-
-
-def create_release_binary_provenance_from_archive_dist_test(
-    tasks: list[Any], evg_build_id: str, download_dir: Path
-) -> str:
-    """Create release binary provenance from archive_dist_test's existing artifacts."""
-
-    task_name = "archive_dist_test"
-    archive_task = find_build_task(tasks, task_name)
-    artifacts_path = fetch_task_artifact_to_file(
-        archive_task, "Artifacts", download_dir / "archive_dist_test_artifacts.tgz"
-    )
-    build_command_path = extract_file_from_tar_by_basename(
-        artifacts_path, ARCHIVE_DIST_TEST_PROVENANCE_BUILD_COMMAND_PATH, download_dir
-    )
-    binary_archive_path = fetch_task_artifact_to_file(
-        archive_task, "Binaries", download_dir / "archive_dist_test_binaries"
-    )
-
-    build_command = build_command_path.read_text()
-    validate_release_build_command(build_command)
-    return json.dumps(
-        {
-            "build_id": evg_build_id,
-            "task_name": task_name,
-            "build_command": build_command,
-            "binaries": hash_release_binaries_in_archive(binary_archive_path),
-        }
     )
 
 

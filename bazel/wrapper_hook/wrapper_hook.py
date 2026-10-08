@@ -160,6 +160,9 @@ def _prepare_bazel_configuration(
     if any(arg.startswith("--test_sharding_strategy") for arg in configured_args):
         configured_args.append("--//bazel/resmoke:support_extended_shard_count=False")
 
+    from bazel.wrapper_hook.release_distro import check_evergreen_release_distro
+
+    check_evergreen_release_distro(configured_args)
     engflow_auth(configured_args)
     write_workstation_bazelrc(configured_args)
     write_wrapper_hook_bazelrc(configured_args)
@@ -216,6 +219,16 @@ def _run_quality_check_generators() -> None:
 
 
 def main():
+    from bazel.wrapper_hook.release_distro import ReleaseDistroError, check_evergreen_release_distro
+
+    try:
+        check_evergreen_release_distro(sys.argv[2:])
+    except ReleaseDistroError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        if not _write_wrapper_status(handled=True, exit_code=1):
+            sys.exit(1)
+        return
+
     quality_checks_args = tuple(sys.argv[2:])
     quality_invocation = _quality_checks_invocation(quality_checks_args)
     if quality_invocation is not None:
@@ -314,7 +327,13 @@ def main():
     enterprise = True
     atlas = True
     if check_bazel_command_type(sys.argv[1:]) not in ["clean", "shutdown", "version", None]:
-        args, enterprise, atlas, _added_options = _prepare_bazel_configuration(sys.argv)
+        try:
+            args, enterprise, atlas, _added_options = _prepare_bazel_configuration(sys.argv)
+        except ReleaseDistroError as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            if not _write_wrapper_status(handled=True, exit_code=1):
+                sys.exit(1)
+            return
         # Disable git age check for now, to avoid issues wth merge commits
         # git_age_check()
 

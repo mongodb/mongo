@@ -388,7 +388,7 @@ ignore = [
 "buildscripts/evergreen_activate_gen_tasks.py" = ["UP006", "UP035"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["buildscripts", "buildscripts/idl", "evergreen", "tools"]
+known-first-party = ["bazel", "buildscripts", "buildscripts/idl", "evergreen", "tools"]
 
 [tool.pyright]
 include = [

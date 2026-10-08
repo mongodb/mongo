@@ -4,6 +4,7 @@ import tempfile
 import unittest
 
 import yaml
+
 from bazel.merge_tidy_configs import (
     deep_merge_dicts,
     filter_and_sort_config_paths,

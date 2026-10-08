@@ -162,6 +162,13 @@ actions use the execution-architecture compiler and follow the remote compile ro
 disabled for PPC64LE and s390x until target profiles and an IBM-compatible post-link pipeline are
 available.
 
+Evergreen invocations of `public-release`, `public-release-local`, or `public-release-rbe` require
+the executing task's `distro_id` to start with `release-`, including patch and cross builds. The
+compile wrapper checks RC aliases before starting Bazel. Release binary provenance records the
+distro captured with the primary build invocation; package tests compare it with the build task's
+Evergreen metadata. Existing provenance artifacts without a recorded distro must be rebuilt before
+they can pass this validation.
+
 Waterfall release/provenance tasks use `public-release-local`. On a native IBM host the wrapper
 resets the foreign execution platform/toolchain and cross repository selectors, clears remote
 execution, and marks all actions `no-cache` while retaining the gRPC cache endpoint required by

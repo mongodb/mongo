@@ -20,6 +20,21 @@ py_test(
 )
 
 py_test(
+    name = "bazel_compile_test",
+    srcs = ["bazel_compile_test.py"],
+    data = [
+        "bazel_compile.sh",
+        "bazel_evergreen_shutils.sh",
+        "//etc:evergreen_yml_components/tasks/compile_tasks.yml",
+        "//etc:evergreen_yml_components/variants/ibm/test_release.yml",
+    ],
+    deps = [
+        "//bazel/wrapper_hook:release_distro",
+        dependency("pyyaml"),
+    ],
+)
+
+py_test(
     name = "record_mongodb_server_version_test",
     srcs = ["record_mongodb_server_version_test.py"],
     data = ["record_mongodb_server_version.sh"],

@@ -545,6 +545,7 @@ test_compute_local_arg_keeps_engflow_cache_for_non_rbe_run_mode() {
 
 test_maybe_release_flag_classifies_patch_test_and_release_tasks() {
     local output
+    local project="mongodb-mongo-master-nightly"
 
     output="$({
         MONGO_VERSION_OVERRIDE=""
@@ -565,6 +566,23 @@ test_maybe_release_flag_classifies_patch_test_and_release_tasks() {
         bazel_evergreen_shutils::maybe_release_flag "--config=evg"
     })"
     assert_not_contains "$output" "public-release" "test tasks should not select a release config"
+
+    output="$({
+        MONGO_VERSION_OVERRIDE=""
+        is_patch="false"
+        release_rbe="true"
+        push_bucket="downloads.example.invalid"
+        compiling_for_test="true"
+        bazel_evergreen_shutils::maybe_release_flag "--config=evg"
+    })"
+    assert_not_contains "$output" "public-release" "test tasks should not select the automatic release RBE config"
+
+    output="$({
+        MONGO_VERSION_OVERRIDE="9.0.0"
+        compiling_for_test="true"
+        bazel_evergreen_shutils::maybe_release_flag "--config=evg"
+    })"
+    assert_contains "$output" "--config=public-release" "explicit release versions should remain enforced"
 
     output="$({
         MONGO_VERSION_OVERRIDE=""

@@ -33,6 +33,7 @@ py_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
+        "//bazel/wrapper_hook:release_distro",
         "//buildscripts:bazel_spawn_pb2",
         dependency(
             "requests",
