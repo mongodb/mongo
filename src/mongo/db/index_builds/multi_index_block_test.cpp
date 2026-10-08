@@ -835,8 +835,7 @@ TEST_F(MultiIndexBlockTest, CommitUsesCommitTimestampForTemporaryTableDrops) {
                                                    {indexBuildInfo},
                                                    MultiIndexBlock::kNoopOnInitFn,
                                                    MultiIndexBlock::InitMode::SteadyState,
-                                                   boost::none,
-                                                   /*generateTableWrites=*/true));
+                                                   boost::none));
     EXPECT_EQ(1U, specs.size());
 
     auto sideWritesIdent = *indexBuildInfo.sideWritesIdent;
@@ -2264,8 +2263,7 @@ TEST_F(MultiIndexBlockTest, AbortWithNoCommitTimestampDropsImmediately) {
                                                    {indexBuildInfo},
                                                    MultiIndexBlock::kNoopOnInitFn,
                                                    MultiIndexBlock::InitMode::SteadyState,
-                                                   boost::none,
-                                                   /*generateTableWrites=*/true));
+                                                   boost::none));
     EXPECT_EQ(1U, specs.size());
 
     auto sideWritesIdent = *indexBuildInfo.sideWritesIdent;
