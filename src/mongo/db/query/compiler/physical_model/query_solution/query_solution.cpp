@@ -727,7 +727,7 @@ std::unique_ptr<QuerySolutionNode> MergeSortNode::clone() const {
 
 void FetchNode::appendToString(str::stream* ss, int indent) const {
     addIndent(ss, indent);
-    *ss << "FETCH\n";
+    *ss << nodeStageTypeToString(this) << '\n';
     addIndent(ss, indent + 1);
     *ss << "ns = " << toStringForLogging(nss) << '\n';
     if (nullptr != filter) {
@@ -745,6 +745,16 @@ void FetchNode::appendToString(str::stream* ss, int indent) const {
 
 std::unique_ptr<QuerySolutionNode> FetchNode::clone() const {
     auto copy = std::make_unique<FetchNode>(this->nss);
+    cloneBaseData(copy.get());
+    return copy;
+}
+
+//
+// BatchedFetchNode
+//
+
+std::unique_ptr<QuerySolutionNode> BatchedFetchNode::clone() const {
+    auto copy = std::make_unique<BatchedFetchNode>(this->nss);
     cloneBaseData(copy.get());
     return copy;
 }
@@ -1298,6 +1308,7 @@ std::unique_ptr<QuerySolutionNode> IndexScanNode::clone() const {
 
     // nss and index fields are initialized in the constructor
     copy->direction = this->direction;
+    copy->allowBatching = this->allowBatching;
     copy->addKeyMetadata = this->addKeyMetadata;
     copy->shouldDedup = this->shouldDedup;
     copy->bounds = this->bounds;

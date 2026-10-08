@@ -80,6 +80,7 @@ bool isNodeUnsupportedByCBR(StageType type) {
     switch (type) {
         case STAGE_COLLSCAN_MULTI_RANGE:  // This is an execution-only stage.
         case STAGE_DISTINCT_SCAN:         // TODO SERVER-99075: Implement distinct scan
+        case STAGE_BATCHED_FETCH:         // TODO SERVER-136666: Implement batched fetch
         case STAGE_TEXT_OR:
         case STAGE_TEXT_MATCH:
         case STAGE_GEO_NEAR_2D:
@@ -194,6 +195,7 @@ bool isNodeUnexpectedByCBR(StageType type) {
         case STAGE_VIRTUAL_SCAN:
         case STAGE_IXSCAN:
         case STAGE_FETCH:
+        case STAGE_BATCHED_FETCH:
         case STAGE_AND_HASH:
         case STAGE_AND_SORTED:
         case STAGE_OR:

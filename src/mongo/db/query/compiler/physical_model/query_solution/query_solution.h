@@ -814,9 +814,32 @@ struct FetchNode : public QuerySolutionNode {
         return children[0]->providedSorts();
     }
 
-    std::unique_ptr<QuerySolutionNode> clone() const final;
+    std::unique_ptr<QuerySolutionNode> clone() const override;
 
     NamespaceString nss;
+};
+
+/**
+ * A fetch that may return records in a different order from its child, allowing batched execution.
+ * This is not currently generated for any query plans.
+ * TODO SERVER-136309: Build batched index scan + fetch SBE plans for this node.
+ * TODO SERVER-136310: Build batched index scan + fetch Classic plans for this node.
+ */
+struct BatchedFetchNode : public FetchNode {
+    using FetchNode::FetchNode;
+
+    StageType getType() const override {
+        return STAGE_BATCHED_FETCH;
+    }
+
+    bool sortedByDiskLoc() const override {
+        return false;
+    }
+    const ProvidedSortSet& providedSorts() const override {
+        return kEmptySet;
+    }
+
+    std::unique_ptr<QuerySolutionNode> clone() const final;
 };
 
 struct [[MONGO_MOD_NEEDS_REPLACEMENT]] IndexScanNode : public QuerySolutionNodeWithSortSet {
@@ -863,6 +886,13 @@ struct [[MONGO_MOD_NEEDS_REPLACEMENT]] IndexScanNode : public QuerySolutionNodeW
     IndexEntry index;
 
     int direction;
+
+    // Planning metadata only; execution stages do not consume this yet. Future execution stages
+    // will read multiple index keys and eventually the underlying WiredTiger index scan will
+    // support returning many entries at once.
+    // TODO SERVER-136309: Consume this flag to create batched index scan + fetch SBE plans.
+    // TODO SERVER-136310: Consume this flag to create batched index scan + fetch Classic plans.
+    bool allowBatching = false;
 
     // If there's a 'returnKey' projection we add key metadata.
     bool addKeyMetadata;

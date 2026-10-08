@@ -417,6 +417,17 @@ TEST(CardinalityEstimator, IntersectionOfUnionsFallback) {
     }
 }
 
+TEST(CardinalityEstimator, BatchedFetchFallsBack) {
+    const auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
+    auto scan = makeIndexScan(testNss, makePointIntervalBounds(5.0, "a"), {"a"});
+    QuerySolution plan;
+    plan.setRoot(std::make_unique<BatchedFetchNode>(std::move(scan), testNss));
+
+    const auto collInfo = buildCollectionInfo({}, makeCollStats(1000.0));
+    const auto ceRes = getPlanCE(plan, collInfo, QueryCBRCEModeEnum::kHeuristicCE);
+    ASSERT_EQ(ceRes.getStatus(), ErrorCodes::UnsupportedCbrNode);
+}
+
 TEST(CardinalityEstimator, TopLevelUnionIsCosted) {
     auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
     std::vector<std::string> indexFields = {"a"};

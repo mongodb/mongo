@@ -543,6 +543,7 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
                 return mockStage;
             }
             case STAGE_BATCHED_DELETE:
+            case STAGE_BATCHED_FETCH:
             case STAGE_CACHED_PLAN:
             case STAGE_COLLSCAN_MULTI_RANGE:
             case STAGE_COUNT:

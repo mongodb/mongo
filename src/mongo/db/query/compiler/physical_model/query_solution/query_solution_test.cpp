@@ -114,6 +114,154 @@ void assertNamespaceVectorsAreEqual(const std::vector<NamespaceStringOrUUID>& se
     ASSERT_EQ(secondaryNssMultiset, expectedNssMultiset);
 }
 
+TEST(QuerySolutionTest, IndexScanBatchingDefaultsToDisabled) {
+    const auto nss = NamespaceString::createNamespaceString_forTest("db.main");
+    IndexScanNode scan{nss, buildSimpleIndexEntry(BSON("a" << 1))};
+    ASSERT_FALSE(scan.allowBatching);
+}
+
+TEST(QuerySolutionTest, IndexScanClonePreservesAllFields) {
+    const auto nss = NamespaceString::createNamespaceString_forTest("db.main");
+    CollatorInterfaceMock queryCollator(CollatorInterfaceMock::MockType::kReverseString);
+
+    IndexScanNode scan{nss, buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1))};
+    scan.index.multikey = true;
+    scan.index.multikeyPaths = MultikeyPaths{{0U}, {}};
+    scan.direction = -1;
+    scan.allowBatching = true;
+    scan.addKeyMetadata = true;
+    scan.shouldDedup = true;
+    scan.bounds.isSimpleRange = true;
+    scan.bounds.startKey = BSON("a" << 1 << "b" << 1);
+    scan.bounds.endKey = BSON("a" << 2 << "b" << 2);
+    scan.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
+    scan.queryCollator = &queryCollator;
+    scan.multikeyFields.insert("a");
+    scan.sortSet = ProvidedSortSet(BSON("b" << 1), {"a"});
+    OrderedIntervalList oilA{};
+    oilA.name = "a";
+    oilA.intervals.push_back(IndexBoundsBuilder::makePointInterval(BSON("" << 1)));
+    scan.iets.push_back(
+        interval_evaluation_tree::IET::make<interval_evaluation_tree::ConstNode>(oilA));
+    scan.filter = std::make_unique<EqualityMatchExpression>("a"sv, Value(1));
+
+    auto clone = scan.clone();
+    const auto& cloned = static_cast<const IndexScanNode&>(*clone);
+
+    ASSERT_TRUE(cloned.nss == scan.nss);
+    ASSERT_TRUE(cloned.index.identifier == scan.index.identifier);
+    ASSERT_TRUE(cloned.index.keyPattern.woCompare(scan.index.keyPattern) == 0);
+    ASSERT_EQ(cloned.index.multikey, scan.index.multikey);
+    ASSERT_EQ(cloned.index.multikeyPaths, scan.index.multikeyPaths);
+    ASSERT_EQ(cloned.direction, scan.direction);
+    ASSERT_EQ(cloned.allowBatching, scan.allowBatching);
+    ASSERT_EQ(cloned.addKeyMetadata, scan.addKeyMetadata);
+    ASSERT_EQ(cloned.shouldDedup, scan.shouldDedup);
+    ASSERT_TRUE(cloned.bounds == scan.bounds);
+    ASSERT_EQ(cloned.queryCollator, scan.queryCollator);
+    ASSERT_EQ(cloned.multikeyFields, scan.multikeyFields);
+    ASSERT_TRUE(cloned.iets == scan.iets);
+    ASSERT_EQ(cloned.sortSet, scan.sortSet);
+    ASSERT_TRUE(cloned.filter->equivalent(scan.filter.get()));
+}
+
+TEST(QuerySolutionTest, FetchClonePreservesAllFields) {
+    const auto nss = NamespaceString::createNamespaceString_forTest("db.main");
+    auto child = std::make_unique<IndexScanNode>(nss, buildSimpleIndexEntry(BSON("a" << 1)));
+    FetchNode fetch{std::move(child), nss};
+    fetch.filter = std::make_unique<EqualityMatchExpression>("a"sv, Value(1));
+
+    auto clone = fetch.clone();
+    const auto& cloned = static_cast<const FetchNode&>(*clone);
+
+    ASSERT_TRUE(cloned.nss == fetch.nss);
+    ASSERT_EQ(cloned.getType(), STAGE_FETCH);
+    ASSERT_EQ(cloned.children.size(), 1u);
+    ASSERT_EQ(cloned.children.size(), fetch.children.size());
+    ASSERT_EQ(cloned.children[0]->getType(), fetch.children[0]->getType());
+    ASSERT_TRUE(cloned.filter->equivalent(fetch.filter.get()));
+}
+
+TEST(QuerySolutionTest, BatchedFetchClonePreservesAllFields) {
+    const auto nss = NamespaceString::createNamespaceString_forTest("db.main");
+    auto child = std::make_unique<IndexScanNode>(nss, buildSimpleIndexEntry(BSON("a" << 1)));
+    BatchedFetchNode fetch{std::move(child), nss};
+    fetch.filter = std::make_unique<EqualityMatchExpression>("a"sv, Value(1));
+
+    auto clone = fetch.clone();
+    ASSERT_EQ(clone->getType(), STAGE_BATCHED_FETCH);
+    const auto& cloned = static_cast<const BatchedFetchNode&>(*clone);
+
+    ASSERT_TRUE(cloned.nss == fetch.nss);
+    ASSERT_EQ(cloned.children.size(), 1u);
+    ASSERT_EQ(cloned.children[0]->getType(), fetch.children[0]->getType());
+    ASSERT_NE(cloned.children[0].get(), fetch.children[0].get());
+    ASSERT_TRUE(cloned.filter->equivalent(fetch.filter.get()));
+    ASSERT_NE(cloned.filter.get(), fetch.filter.get());
+    verifyClone(fetch);
+}
+
+TEST(QuerySolutionTest, BatchedFetchProvidesFetchedFields) {
+    const auto nss = NamespaceString::createNamespaceString_forTest("db.main");
+    auto child = std::make_unique<IndexScanNode>(nss, buildSimpleIndexEntry(BSON("a" << 1)));
+    BatchedFetchNode fetch{std::move(child), nss};
+    fetch.computeProperties();
+
+    ASSERT_TRUE(fetch.fetched());
+    ASSERT_EQ(fetch.getFieldAvailability("a"), FieldAvailability::kFullyProvided);
+    ASSERT_EQ(fetch.getFieldAvailability("b"), FieldAvailability::kFullyProvided);
+}
+
+TEST(QuerySolutionTest, BatchedFetchHasDistinctStageName) {
+    const auto nss = NamespaceString::createNamespaceString_forTest("db.main");
+    auto child = std::make_unique<IndexScanNode>(nss, buildSimpleIndexEntry(BSON("a" << 1)));
+    FetchNode orderedFetch{child->clone(), nss};
+    BatchedFetchNode batchedFetch{std::move(child), nss};
+
+    ASSERT_EQ(nodeStageTypeToString(&orderedFetch), "FETCH"sv);
+    ASSERT_EQ(nodeStageTypeToString(&batchedFetch), "BATCHED_FETCH"sv);
+    ASSERT_EQ(nodeStageTypeToString(&batchedFetch, true), "BATCHED_FETCH"sv);
+    ASSERT_EQ(orderedFetch.toString().find("FETCH\n"), 0u);
+    ASSERT_EQ(batchedFetch.toString().find("BATCHED_FETCH\n"), 0u);
+    ASSERT_NE(absl::Hash<QuerySolutionNode>{}(orderedFetch),
+              absl::Hash<QuerySolutionNode>{}(batchedFetch));
+}
+
+TEST(QuerySolutionTest, OnlyOrderedFetchPreservesProvidedSorts) {
+    const auto nss = NamespaceString::createNamespaceString_forTest("db.main");
+    auto scan =
+        std::make_unique<IndexScanNode>(nss, buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1)));
+    scan->bounds.isSimpleRange = true;
+    scan->bounds.startKey = BSON("a" << 1 << "b" << 1);
+    scan->bounds.endKey = BSON("a" << 1 << "b" << 2);
+    BatchedFetchNode batchedFetch{scan->clone(), nss};
+    FetchNode fetch{std::move(scan), nss};
+    fetch.computeProperties();
+    batchedFetch.computeProperties();
+
+    ASSERT_EQ(fetch.providedSorts(), ProvidedSortSet(BSON("b" << 1), {"a"}));
+    ASSERT_EQ(batchedFetch.children[0]->providedSorts(), fetch.providedSorts());
+    ASSERT_EQ(batchedFetch.providedSorts(), kEmptySet);
+    ASSERT_EQ(batchedFetch.clone()->providedSorts(), kEmptySet);
+}
+
+TEST(QuerySolutionTest, OnlyOrderedFetchPreservesDiskLocOrder) {
+    const auto nss = NamespaceString::createNamespaceString_forTest("db.main");
+    auto scan = std::make_unique<IndexScanNode>(nss, buildSimpleIndexEntry(BSON("a" << 1)));
+    scan->bounds.isSimpleRange = true;
+    scan->bounds.startKey = BSON("a" << 1);
+    scan->bounds.endKey = BSON("a" << 1);
+    BatchedFetchNode batchedFetch{scan->clone(), nss};
+    FetchNode fetch{std::move(scan), nss};
+    fetch.computeProperties();
+    batchedFetch.computeProperties();
+
+    ASSERT_TRUE(fetch.sortedByDiskLoc());
+    ASSERT_TRUE(batchedFetch.children[0]->sortedByDiskLoc());
+    ASSERT_FALSE(batchedFetch.sortedByDiskLoc());
+    ASSERT_FALSE(batchedFetch.clone()->sortedByDiskLoc());
+}
+
 // Index: {a: 1, b: 1, c: 1, d: 1, e: 1}
 // Min: {a: 1, b: 1, c: 1, d: 1, e: 1}
 // Max: {a: 1, b: 1, c: 1, d: 1, e: 1}

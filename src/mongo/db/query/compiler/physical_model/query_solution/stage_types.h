@@ -53,6 +53,7 @@ enum [[MONGO_MOD_NEEDS_REPLACEMENT]] StageType {
     STAGE_EOF,
 
     STAGE_FETCH,
+    STAGE_BATCHED_FETCH,
 
     // The two $geoNear impls imply a fetch+sort and must be stages.
     STAGE_GEO_NEAR_2D,

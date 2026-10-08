@@ -42,6 +42,8 @@ std::string_view nodeStageTypeToString(const QuerySolutionNode* node, bool brief
             return "EQ_LOOKUP_UNWIND"sv;
         case STAGE_FETCH:
             return "FETCH"sv;
+        case STAGE_BATCHED_FETCH:
+            return "BATCHED_FETCH"sv;
         case STAGE_GEO_NEAR_2D:
             return "GEO_NEAR_2D"sv;
         case STAGE_GEO_NEAR_2DSPHERE:

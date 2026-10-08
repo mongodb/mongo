@@ -286,6 +286,12 @@ public:
         add(makeFetch(makeIxScan(), true /* withFilter */),
             {QsnNodeCounter::kFetchWithFilter, QsnNodeCounter::kIxscanNoFilter});
 
+        // Batched fetches are not tracked yet, but their children are still counted.
+        add(std::make_unique<BatchedFetchNode>(makeIxScan(), _nss),
+            {QsnNodeCounter::kIxscanNoFilter});
+        add(addFilter(std::make_unique<BatchedFetchNode>(makeIxScan(), _nss)),
+            {QsnNodeCounter::kIxscanNoFilter});
+
         // Index intersection nodes.
         add(makeAndHash(), {QsnNodeCounter::kAndHashNoFilter, QsnNodeCounter::kIxscanNoFilter});
         add(addFilter(makeAndHash()),
