@@ -679,7 +679,7 @@ rightEmbeddingField: "none"
 usedJoinOptimization: true
 
 ```
-HASH_JOIN_EMBEDDING [x.y $= a]
+HASH_JOIN_EMBEDDING [x.y $= a,j3.obj.obj.obj.foo $= rename.some.field]
 leftEmbeddingField: "none"
 rightEmbeddingField: "j2"
   |  |
@@ -689,14 +689,24 @@ rightEmbeddingField: "j2"
   |  COLLSCAN [test.projections_md_a]
   |  direction: "forward"
   |
-  HASH_JOIN_EMBEDDING [m.n = z]
-  leftEmbeddingField: "j1"
+  HASH_JOIN_EMBEDDING [j1.m.n = z]
+  leftEmbeddingField: "none"
   rightEmbeddingField: "none"
   |  |
   |  PROJECTION_DEFAULT
   |  transformBy: { "_id" : true, "x" : { "y" : "$a" }, "z" : "$obj.subobj.field" }
   |  |
   |  COLLSCAN [test.projections_md_a]
+  |  direction: "forward"
+  |
+  HASH_JOIN_EMBEDDING [m.o = obj.obj.b]
+  leftEmbeddingField: "j1"
+  rightEmbeddingField: "j3"
+  |  |
+  |  PROJECTION_DEFAULT
+  |  transformBy: { "_id" : true, "obj" : { "obj" : { "obj" : { "foo" : "$obj.foo" }, "b" : "$b" } } }
+  |  |
+  |  COLLSCAN [test.projections_md_b]
   |  direction: "forward"
   |
   PROJECTION_DEFAULT

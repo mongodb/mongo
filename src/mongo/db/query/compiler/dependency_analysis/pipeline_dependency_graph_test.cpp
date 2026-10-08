@@ -1713,6 +1713,179 @@ TEST_F(PipelineDependencyGraphTest, DottedNewPathBaseFieldMetadataUsesFullCollec
     });
 }
 
+TEST_F(PipelineDependencyGraphTest, InclusionDottedPathAfterPriorStageIsNotArray) {
+    pathArrayness->addPath("a.b.c", {}, true);
+    setPipeline(
+        "[{$match: {m: 1}}, "
+        " {$project: {'a.b.c': 1}}]");
+    runTest([&] {
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b.c"));
+        // To be done: a.b.d is definitely missing.
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a.b.d"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, RepeatedInclusionIsNotArray) {
+    pathArrayness->addPath("a.b.c", {}, true);
+    setPipeline(
+        "[{$project: {'a.b.c': 1}}, "
+        " {$project: {'a.b.c': 1}}]");
+    runTest([&] {
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b.c"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, InclusionNestedSiblingIsNotArray) {
+    pathArrayness->addPath("a.b.d", {}, true);
+    setPipeline("[{$project: {'a.b.c': 1, 'a.b.d': 1}}]");
+    runTest([&] {
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b"));
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a.b.c"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b.d"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, InclusionSameStageSiblingIsNotArray) {
+    pathArrayness->addPath("a.c.d", {}, true);
+    setPipeline("[{$project: {'a.b.x': 1, 'a.c.d': 1}}]");
+    runTest([&] {
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a.b"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.c.d"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, DeepestSubpathRedefinedMaybeArray) {
+    pathArrayness->addPath("a.b.c.d", {}, true);
+    setPipeline(
+        "[{$set: { 'a.b.c': '$m' }}, "
+        " {$set: { 'a.b.c.d.e': 1 }}]");
+    runTest([&] {
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b"));
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a.b.c"));
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a.b.c.d"));
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a.b.c.d.e"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, DeepestSubpathRedefinedNotArray) {
+    pathArrayness->addPath("a.b.c.d", {}, true);
+    setPipeline(
+        "[{$project: { 'a.b.c': 1 }}, "
+        " {$set: { 'a.b.c.e': 1 }}]");
+    runTest([&] {
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b.c"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b.c.d"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b.c.e"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, DeepestSubpathRedefinedSiblingNotArray) {
+    pathArrayness->addPath("a.b.c.d", {}, true);
+    pathArrayness->addPath("a.b.c.x", {}, true);
+    setPipeline(
+        "[{$project: { 'a.b.c': 1 }}, "
+        " {$set: { 'a.b.c.d.e': 1 }}]");
+    runTest([&] {
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b.c"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b.c.d"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b.c.d.e"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b.c.x"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, ModifiedDottedPathAfterPriorStageIsNotArray) {
+    pathArrayness->addPath(FieldPath("a.b"), {}, true);
+    setPipeline(R"([{$match: {m: 1}}, {$project: {"a.b.c": "$x"}}])");
+
+    runTest([&] {
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b"));
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a.b.c"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, ModifiedSiblingAfterPriorStageIsNotArray) {
+    pathArrayness->addPath(FieldPath("a.b"), {}, true);
+    pathArrayness->addPath(FieldPath("a.b.d"), {}, true);
+    setPipeline(R"([{$match: {m: 1}}, {$project: {"a.b.c": "$x", "a.b.d.e": "$y"}}])");
+
+    runTest([&] {
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b")) << graph->toDebugString();
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b.d"));
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a.b.c"));
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a.b.d.e"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, LaterStageSiblingIsNotArray) {
+    pathArrayness->addPath("a.b.c", {}, true);
+    pathArrayness->addPath("a.x", {}, true);
+    setPipeline(
+        "[{$set: {'a.b.c': 1}}, "
+        " {$set: {'a.x.y': 1}}]");
+    runTest([&] {
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.x"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, InclusionDottedSiblingDroppedByPriorInclusionIsMissing) {
+    pathArrayness->addPath("a.b.c", {}, true);
+    setPipeline(
+        "[{$project: {'a.b.c': 1}}, "
+        " {$project: {'a.x.y': 1}}]");
+    runTest([&] {
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a"));
+        // To be done: a.x is non-array, since the project definitely removes all paths except a.b.
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a.x"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest,
+       InclusionWithComputedDottedSiblingDroppedByPriorInclusionIsMissing) {
+    pathArrayness->addPath("a.b.c", {}, true);
+    setPipeline(
+        "[{$project: {'a.b.c': 1}}, "
+        " {$project: {'a.x.y': {$rand: {}}}}]");
+    runTest([&] {
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a"));
+        // To be done: a.x is non-array, since the project definitely removes all paths except a.b.
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a.x"));
+    });
+}
+
+
+TEST_F(PipelineDependencyGraphTest, RedefinedSubpathIgnoresSameNamedCollectionField) {
+    pathArrayness->addPath("d.e", {}, true);
+    pathArrayness->addPath("a.b", {}, true);
+    pathArrayness->addPath("m", {}, true);
+    setPipeline(
+        "[{$set: { 'a.b.c': '$m' }}, "
+        " {$set: { 'a.b.c.d.e': 1 }}]");
+    runTest([&] {
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b.c"));
+        // 'a.b.c.d' is 'm.d', whose arrayness is unknown, and not the top-level 'd'.
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a.b.c.d")) << graph->toDebugString();
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, BaseDocumentFieldAliasAfterDottedInclusion) {
+    pathArrayness->addPath("a.b.c", {}, true);
+    setPipeline(
+        "[{$project: {'a.b.c': 1}}, "
+        " {$set: {n: '$a.b.c'}}]");
+    runTest([&] {
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "a.b.c"), FieldPath("n"));
+        ASSERT_FALSE(graph->getBaseDocumentFieldAlias(nullptr, "zzz"));
+    });
+}
+
 TEST_F(PipelineDependencyGraphTest, CanPathBeArrayChecksShadowingFieldArrayness) {
     pathArrayness->addPath("x.y", {}, true);
     // c can be array (a is not indexed). c.y is shadowed by c: even though c's alias
@@ -3748,6 +3921,35 @@ TEST_F(PipelineDependencyGraphTest, GetBaseDocumentFieldAliasExclusionThenRename
     });
 }
 
+TEST_F(PipelineDependencyGraphTest, GetBaseDocumentFieldAliasSubPipelineProjectionRename) {
+    setOptimizedPipeline(R"([
+        {$lookup: {
+            from: "coll_b",
+            as: "docs",
+            pipeline: [{$match: {x: 1}}, {$project: {"obj.obj.b": "$b"}}]
+        }},
+        {$unwind: "$docs"}
+    ])");
+
+    auto secondary = std::make_shared<PathArrayness>();
+    secondary->addPath(FieldPath("obj"), {}, true);
+    secondary->addPath(FieldPath("obj.obj"), {}, true);
+    auto subExpCtx = stages[0]->getSubpipelineExpCtx();
+    pipeline->getContext()->setPathArraynessForNss(subExpCtx->getNamespaceString(), secondary);
+    graph->recompute_forTest();
+
+    runTest([&] {
+        auto* subGraph = graph->getSubpipelineGraph(stages[0].get());
+        ASSERT_NOT_EQUALS(subGraph, nullptr);
+        auto subGraphEntry = stages[0]->getSubPipeline()->front();
+        ASSERT_FALSE(subGraph->canPathBeArray(subGraphEntry.get(), "obj"));
+        ASSERT_FALSE(subGraph->canPathBeArray(subGraphEntry.get(), "obj.obj"));
+        ASSERT_FALSE(subGraph->canPathBeArray(nullptr, "obj"));
+        ASSERT_FALSE(subGraph->canPathBeArray(nullptr, "obj.obj"));
+        ASSERT_EQ(subGraph->getBaseDocumentFieldAlias(nullptr, "b"), FieldPath("obj.obj.b"));
+    });
+}
+
 TEST_F(PipelineDependencyGraphTest, GetTypeAfterUnionWith) {
     setPipeline(R"([
         {$match: {x: {$not: {$type: 'array'}}}},
@@ -3948,7 +4150,6 @@ TEST_F(PipelineDependencyGraphTest, GetTypeDoesNotSkipMatchesOnOtherBaseDocument
                   (Stages{stages[0].get(), stages[1].get()}));
     });
 }
-
 
 }  // namespace
 }  // namespace mongo::pipeline::dependency_graph

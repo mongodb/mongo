@@ -20,7 +20,9 @@ assert.commandWorked(
         {_id: 3, a: 3, obj: {subobj: {field: "foo"}}},
     ]),
 );
-assert.commandWorked(a.createIndex({a: 1, "obj.subobj.field": 1}));
+assert.commandWorked(
+    a.createIndex({a: 1, "obj.subobj.field": 1, "rename.some": 1, "x": 1, "z": 1}),
+);
 
 const b = db[jsTestName() + "_b"];
 b.drop();
@@ -30,7 +32,7 @@ assert.commandWorked(
         {_id: 2, b: -1, obj: {foo: "bar"}},
     ]),
 );
-assert.commandWorked(b.createIndex({b: 1, "obj.foo": 1}));
+assert.commandWorked(b.createIndex({b: 1, "obj.foo": 1, "obj.obj.obj": 1, "m": 1}));
 
 function runJoinTest(test, baseColl, pipeline, assertResultsEqual = true) {
     section(test);
@@ -177,7 +179,6 @@ joinTestWrapper(db, () => {
         {$match: {$expr: {$eq: ["$j1.b", "$a"]}}},
     ]);
 
-    // TODO SERVER-131449: Ensure the last $lookup is eligible after fix to deps graph.
     runJoinTest("4-Nodes, Rename all join preds, subpipeline edges", a, [
         {$project: {"x.y": "$a", "z": "$obj.subobj.field"}},
         {

@@ -15,15 +15,28 @@ public:
     struct TestCase {
         const std::string& name;
         const std::string& pipeline;
+        const std::vector<std::string> nonArrayPaths;
     };
 
     PipelineDependencyGraphGoldenTest()
         : _cfg{"src/mongo/db/test_output/query/compiler/dependency_analysis"} {}
 
     void runVariation(TestCase testCase) {
-        auto [name, pipelineStr] = testCase;
+        auto [name, pipelineStr, nonArrayPaths] = testCase;
         auto pipeline = parsePipeline(pipelineStr);
-        DependencyGraph graph(pipeline->getSources());
+
+        auto pathArrayness = std::make_shared<PathArrayness>();
+        for (const auto& path : nonArrayPaths) {
+            pathArrayness->addPath(path, {}, true);
+        }
+        pipeline->getContext()->setPathArraynessForNss(pipeline->getContext()->getNamespaceString(),
+                                                       pathArrayness);
+        auto canPathBeArray = [this, &pipeline](std::string_view path) -> bool {
+            return pipeline->getContext()->canPathBeArrayForNss(
+                FieldRef(path), pipeline->getContext()->getNamespaceString());
+        };
+
+        DependencyGraph graph(pipeline->getSources(), canPathBeArray);
 
         // Run the golden test portion.
         {
@@ -510,6 +523,13 @@ TEST_F(PipelineDependencyGraphGoldenTest, ConstantOverwritten) {
         .pipeline = "[{$set: {a: 1}},"
                     " {$set: {a: 2}}]",
     });
+}
+
+TEST_F(PipelineDependencyGraphGoldenTest, InclusionDottedAfterPriorStage) {
+    runVariation({.name = "InclusionDottedPathAfterPriorStageIsNotArray",
+                  .pipeline = "[{$match: {x: 1}},"
+                              " {$project: {'a.b.c': 1, 'a.b.d.e': 1}}]",
+                  .nonArrayPaths = {"a.b.c"}});
 }
 
 }  // namespace

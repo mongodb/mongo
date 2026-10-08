@@ -1250,21 +1250,17 @@ private:
         // preserve any fields it may already contain.
         auto [existingBaseField, existingBaseFieldType] = lookupField(scope, basePath);
 
+        auto [priorBaseField, priorBaseFieldType] = lookupPriorField(cursor);
+
         // Under an array-preserving operation, when declaring the base field for the first time in
         // an exhaustive scope (the kMissing check), we preserve the metadata of the parent scope's
         // base field. This is the case of {$project: {'a.b': 1}} where we keep 'a's arrayness but
         // not its fields.
-        FieldId priorBaseField;
-        bool redeclaresBaseInExhaustiveScope = false;
-        if (prefixPolicy == ModifiedPrefixPolicy::kPreserveArrays &&
+        bool redeclaresBaseInExhaustiveScope =
+            prefixPolicy == ModifiedPrefixPolicy::kPreserveArrays &&
             existingBaseFieldType == FieldMatchType::kMissing &&
-            _scopes[scope].exhaustiveScope == scope) {
-            auto parentMatch = lookupPriorField(cursor);
-            if (parentMatch.type != FieldMatchType::kShadowed) {
-                priorBaseField = parentMatch.fieldId;
-                redeclaresBaseInExhaustiveScope = true;
-            }
-        }
+            _scopes[scope].exhaustiveScope == scope && priorBaseField &&
+            priorBaseFieldType != FieldMatchType::kShadowed;
 
         bool canReuseBaseField = [&] {
             switch (existingBaseFieldType) {
@@ -1294,7 +1290,8 @@ private:
             // The output's array shape still derives from the prior value that is traversed.
             _fields[newBaseField].dependencies.insert(priorBaseField);
             _scopes[scope].fields[basePath.front()] = newBaseField;
-            populateBaseFieldMetadata(newBaseField, priorBaseField, cursor.pathToCursor());
+            populateBaseFieldMetadata(
+                newBaseField, {priorBaseField, priorBaseFieldType}, cursor.pathToCursor());
         } else {
             // No such field, we need to declare it and an embedded scope;
             // OR existing base field from previous scope, we need to re-declare the base here with
@@ -1311,12 +1308,14 @@ private:
             }
             declareScope(_scopes[scope].stage, exhaustiveEmbeddedScope, parentEmbeddedScope);
             _scopes[scope].fields[basePath.front()] = newBaseField;
-            populateBaseFieldMetadata(newBaseField, existingBaseField, cursor.pathToCursor());
+            populateBaseFieldMetadata(
+                newBaseField, {priorBaseField, priorBaseFieldType}, cursor.pathToCursor());
             if (prefixPolicy == ModifiedPrefixPolicy::kEnsureObjects) {
                 // The modification modifies 'a' to a plain object, so 'a' is no longer an array.
                 _fields[newBaseField].metadata.canFieldBeArray = false;
             }
         }
+
         // Finally, declare the subPath in the embeddedScope we found or created.
         auto embeddedField = declareField(
             DeclarationCursor{
@@ -1478,6 +1477,8 @@ private:
                 ScopeId newEmbeddedScope = _scopes.getNextId();
                 declareScope(_scopes[scope].stage, newEmbeddedScope, ScopeId::none());
                 _fields[newBaseField].embeddedScope = newEmbeddedScope;
+                populateBaseFieldMetadata(
+                    newBaseField, {priorBaseField, priorBaseFieldType}, cursor.pathToCursor());
                 includeField({cursor.fullPath, newEmbeddedScope, cursor.depth + 1});
                 break;
         }
@@ -1616,16 +1617,26 @@ private:
      * Populate metadata when a base field is redefined.
      */
     void populateBaseFieldMetadata(FieldId newBaseField,
-                                   FieldId existingBaseField,
+                                   FieldMatch priorBaseFieldMatch,
                                    ParsedPathView pathToBaseField) {
-        if (existingBaseField) {
-            _fields[newBaseField].metadata.canFieldBeArray =
-                _fields[existingBaseField].metadata.canFieldBeArray;
-        } else {
-            // The included base field is a collection field. Query the PathArrayness API to
-            // determine if the field can be an array, using the full collection path.
-            _fields[newBaseField].metadata.canFieldBeArray =
-                canCollectionFieldBeArray(pathToBaseField);
+        tassert(13144901,
+                "Base field should have an embeddedScope",
+                _fields[newBaseField].embeddedScope);
+        switch (priorBaseFieldMatch.type) {
+            case FieldMatchType::kExact:
+            case FieldMatchType::kMissing:
+                _fields[newBaseField].metadata.canFieldBeArray =
+                    _fields[priorBaseFieldMatch.fieldId].metadata.canFieldBeArray;
+                break;
+            case FieldMatchType::kShadowed:
+                // The path did not exist prior to this definition.
+                break;
+            case FieldMatchType::kBaseDocument:
+                // The included base field is a collection field. Query the PathArrayness API to
+                // determine if the field can be an array, using the full collection path.
+                _fields[newBaseField].metadata.canFieldBeArray =
+                    canCollectionFieldBeArray(pathToBaseField);
+                break;
         }
     }
 
