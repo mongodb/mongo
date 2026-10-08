@@ -8,6 +8,9 @@ import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js
 let normalCluster = connect(TestData.normalCluster).getMongo();
 let bulkWriteCluster = connect(TestData.bulkWriteCluster).getMongo();
 
+// Node-local setup must reach both clusters without going through command mirroring.
+TestData.fixtureClusterConnectionStrings = [TestData.bulkWriteCluster, TestData.normalCluster];
+
 let normalClusterRunCommand = TestData.preOverrideRunCommand;
 
 jsTestLog("Normal Cluster: " + normalCluster);

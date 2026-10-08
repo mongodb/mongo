@@ -1180,7 +1180,7 @@ Status CollectionImpl::setValidationOptions(
             // validator may have been well formed on the version that wrote it. Keeping it
             // rejects writes to the collection (fail closed) rather than allowing them
             // unvalidated (SERVER-134863).
-            if (opCtx->writesAreReplicated()) {
+            if (opCtx->isEnforcingConstraints()) {
                 return _validator.getStatus();
             }
             LOGV2_WARNING(13486300,
