@@ -67,10 +67,10 @@ public:
         auto runner = makePeriodicRunner(getServiceContext());
         getServiceContext()->setPeriodicRunner(std::move(runner));
 
-        StorageEngineOptions options{/*directoryPerDB=*/false,
-                                     /*directoryForIndexes=*/false,
-                                     /*forRepair=*/false,
-                                     /*lockFileCreatedByUncleanShutdown=*/false};
+        StorageEngineOptions options{.directoryPerDB = false,
+                                     .directoryForIndexes = false,
+                                     .forRepair = false,
+                                     .lockFileCreatedByUncleanShutdown = false};
         _storageEngine =
             std::make_unique<StorageEngineImpl>(opCtx.get(),
                                                 std::make_unique<TimestampMockKVEngine>(),
@@ -226,10 +226,10 @@ public:
         auto runner = makePeriodicRunner(getServiceContext());
         getServiceContext()->setPeriodicRunner(std::move(runner));
 
-        StorageEngineOptions options{/*directoryPerDB=*/false,
-                                     /*directoryForIndexes=*/false,
-                                     /*forRepair=*/false,
-                                     /*lockFileCreatedByUncleanShutdown=*/false};
+        StorageEngineOptions options{.directoryPerDB = false,
+                                     .directoryForIndexes = false,
+                                     .forRepair = false,
+                                     .lockFileCreatedByUncleanShutdown = false};
         _storageEngine = std::make_unique<StorageEngineImpl>(
             opCtx.get(), std::make_unique<MockKVEngine>(), std::unique_ptr<KVEngine>(), options);
         _mockKVEngine = static_cast<MockKVEngine*>(_storageEngine->getEngine());

@@ -507,7 +507,7 @@ TEST(JoinPlanCacheStatsTest, SerializesComplexPlanTree) {
 TEST(JoinPlanCacheStatsTest, SerializesCollectionTags) {
     const auto uuid = UUID::gen();
     std::vector<CollectionTag> tags{
-        CollectionTag{uuid, CollectionVersionTag{/*collectionVersion*/ 3, /*sampleVersion*/ 5}}};
+        CollectionTag{uuid, CollectionVersionTag{.collectionVersion = 3, .sampleVersion = 5}}};
     auto entry = std::make_unique<JoinPlanCacheEntry>(
         nullptr, join_ordering::NodeId{0}, std::move(tags), std::vector<NodeFingerprint>{});
 

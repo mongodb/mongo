@@ -34,7 +34,7 @@ public:
     ~PrimaryOnlyServiceOpObserver() override;
 
     NamespaceFilters getNamespaceFilters() const final {
-        return {/*update=*/NamespaceFilter::kNone, /*delete=*/NamespaceFilter::kConfig};
+        return {.updateFilter = NamespaceFilter::kNone, .deleteFilter = NamespaceFilter::kConfig};
     }
 
     void onDelete(OperationContext* opCtx,
