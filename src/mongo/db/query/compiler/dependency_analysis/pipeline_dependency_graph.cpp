@@ -1186,7 +1186,30 @@ private:
     }
 
     /**
-     * Declare a field for the given (possibly dotted) path in the scope.
+     * Encapsulates information needed to define or include a path in a given scope.
+     */
+    struct DeclarationCursor {
+        /// Path that remains to be processed at the current depth.
+        ParsedPathView remainingPath() const {
+            return fullPath.subspan(depth);
+        }
+        /// Path from the root to the current depth.
+        ParsedPathView pathToCursor() const {
+            return fullPath.subspan(0, depth + 1);
+        }
+
+        /// The full path that is being declared or included from the root.
+        ParsedPathView fullPath;
+        /// The scope being built.
+        ScopeId scope;
+        /// The matching scope of the previous stage.
+        ScopeId parentScope;
+        /// The number of levels descended on the full path.
+        size_t depth = 0;
+    };
+
+    /**
+     * Declare a field for the given (possibly dotted) path in the cursor's scope.
      * For a path like 'a.b' declares 'a' with embedded scope holding 'b'.
      * If 'a' already exists, any fields are preserved.
      * The 'metadata' is assigned to the declared field 'a.b'. The declared field's dependencies
@@ -1195,18 +1218,17 @@ private:
      * 'prefixPolicy' dictates whether the modification preserves arrays on the base field. When
      * kEnsureObjects, writing to 'a.b' modifies 'a' to a plain object: if 'a' can be an array,
      * 'a.c' from a prior stage may be discarded, so sibling subfields cannot be inherited.
-     * 'parentScope' (when provided) is the scope of the previous stage. It is used to recover the
-     * prior value of a dotted modification's prefix when the current scope is a fresh root produced
-     * by a ReplaceRoot (e.g. an inclusion projection): an array-preserving modification such as
-     * '{$project: {"a.b": "$x"}}' traverses 'a' element-wise, so 'a' keeps its prior arrayness even
-     * though the new root is otherwise empty.
+     * The cursor's parent scope recovers the prior value of a dotted modification's prefix when
+     * the current scope is a fresh root produced by a ReplaceRoot (e.g. an inclusion projection):
+     * an array-preserving modification such as '{$project: {"a.b": "$x"}}' traverses 'a'
+     * element-wise, so 'a' keeps its prior arrayness even though the new root is otherwise empty.
      */
-    FieldId declareField(ScopeId scope,
-                         ParsedPathView path,
+    FieldId declareField(DeclarationCursor cursor,
                          ModifiedPrefixPolicy prefixPolicy,
-                         FieldMetadata metadata = {},
-                         ParsedPathView collectionPathPrefix = {},
-                         ScopeId parentScope = ScopeId::none()) {
+                         FieldMetadata metadata = {}) {
+        const ParsedPathView path = cursor.remainingPath();
+        const ScopeId scope = cursor.scope;
+        const ScopeId parentScope = cursor.parentScope;
         // Declaring 'a' should create field 'a' and exit.
         if (path.size() == 1) {
             auto field = _fields.append(Field{scope, ScopeId::none(), metadata});
@@ -1217,7 +1239,6 @@ private:
         // Declaring a.b should use the scope for 'a' or declare a new embedded scope, in which to
         // create the subpath 'b'.
         auto basePath = path.subspan(0, 1);
-        auto subPath = path.subspan(1);
 
         // Check if we already have 'a' in the current scope that we are building. If we do, we will
         // preserve any fields it may already contain.
@@ -1277,8 +1298,7 @@ private:
             // The output's array shape still derives from the prior value that is traversed.
             _fields[newBaseField].dependencies.insert(priorBaseField);
             _scopes[scope].fields[basePath.front()] = newBaseField;
-            populateBaseFieldMetadata(
-                newBaseField, priorBaseField, collectionPathPrefix, basePath.front());
+            populateBaseFieldMetadata(newBaseField, priorBaseField, cursor.pathToCursor());
         } else {
             // No such field, we need to declare it and an embedded scope;
             // OR existing base field from previous scope, we need to re-declare the base here with
@@ -1288,7 +1308,7 @@ private:
 
             ScopeId exhaustiveEmbeddedScope;
             std::tie(exhaustiveEmbeddedScope, parentEmbeddedScope) = resolveNewBaseFieldScopes(
-                prefixPolicy, existingBaseField, embeddedScope, collectionPathPrefix, path.front());
+                prefixPolicy, existingBaseField, embeddedScope, cursor.pathToCursor());
 
             if (parentEmbeddedScope) {
                 // The new field depends on the previous field, since it inherits paths.
@@ -1296,22 +1316,22 @@ private:
             }
             declareScope(_scopes[scope].stage, exhaustiveEmbeddedScope, parentEmbeddedScope);
             _scopes[scope].fields[basePath.front()] = newBaseField;
-            populateBaseFieldMetadata(
-                newBaseField, existingBaseField, collectionPathPrefix, basePath.front());
+            populateBaseFieldMetadata(newBaseField, existingBaseField, cursor.pathToCursor());
             if (prefixPolicy == ModifiedPrefixPolicy::kEnsureObjects) {
                 // The modification modifies 'a' to a plain object, so 'a' is no longer an array.
                 _fields[newBaseField].metadata.canFieldBeArray = false;
             }
         }
         // Finally, declare the subPath in the embeddedScope we found or created.
-        ParsedPath nestedPrefix(collectionPathPrefix.begin(), collectionPathPrefix.end());
-        nestedPrefix.push_back(basePath.front());
-        auto embeddedField = declareField(_fields[newBaseField].embeddedScope,
-                                          subPath,
-                                          prefixPolicy,
-                                          metadata,
-                                          nestedPrefix,
-                                          parentEmbeddedScope);
+        auto embeddedField = declareField(
+            DeclarationCursor{
+                cursor.fullPath,
+                _fields[newBaseField].embeddedScope,
+                parentEmbeddedScope,
+                cursor.depth + 1,
+            },
+            prefixPolicy,
+            metadata);
         _fields[newBaseField].dependencies.insert(embeddedField);
         return newBaseField;
     }
@@ -1333,8 +1353,7 @@ private:
     std::pair<ScopeId, ScopeId> resolveNewBaseFieldScopes(ModifiedPrefixPolicy prefixPolicy,
                                                           FieldId existingBaseField,
                                                           ScopeId embeddedScope,
-                                                          ParsedPathView collectionPathPrefix,
-                                                          StringPool::Id fieldNameId) const {
+                                                          ParsedPathView pathToBaseField) const {
         // The prior embedded scope (sibling subfields) is only safe to inherit when the base
         // field's existing contents are guaranteed to survive the modification:
         //   - kPreserveArrays
@@ -1349,8 +1368,7 @@ private:
                         prefixCanBeArray = _fields[existingBaseField].metadata.canFieldBeArray;
                     } else {
                         // The base field is a collection field. Check the PathArrayness API.
-                        prefixCanBeArray =
-                            canCollectionFieldBeArray(collectionPathPrefix, fieldNameId);
+                        prefixCanBeArray = canCollectionFieldBeArray(pathToBaseField);
                     }
                     return !prefixCanBeArray;
                 case ModifiedPrefixPolicy::kNotSupported:
@@ -1404,10 +1422,10 @@ private:
      *  - FieldId::none() if the field originates from the base collection.
      *  - parentScope.missingField if the field was made missing by an exhaustive stage.
      */
-    void includeField(ScopeId scope,
-                      ScopeId parentScope,
-                      ParsedPathView path,
-                      FieldId defaultFieldId = FieldId::none()) {
+    void includeField(DeclarationCursor cursor, FieldId defaultFieldId = FieldId::none()) {
+        const ParsedPathView path = cursor.remainingPath();
+        const ScopeId scope = cursor.scope;
+        const ScopeId parentScope = cursor.parentScope;
         // Gets the field which defines the last component in the given path in the parent scope, or
         // 'defaultFieldId' if there is no parent scope.
         auto resolvePathInParent = [this, parentScope, defaultFieldId](ParsedPathView path) {
@@ -1467,12 +1485,9 @@ private:
             if (constant && constant->missing()) {
                 updateMetadataForMissingValue(metadata);
             }
-            declareField(scope,
-                         path,
+            declareField(DeclarationCursor{cursor.fullPath, scope, parentScope, cursor.depth},
                          ModifiedPrefixPolicy::kPreserveArrays,
-                         metadata,
-                         {} /*collectionPathPrefix*/,
-                         parentScope);
+                         metadata);
             const FieldId leafFieldId = lastDeclaredField();
             _fields[leafFieldId].dependencies.insert(parentBaseField);
             if (constant) {
@@ -1492,23 +1507,31 @@ private:
                 tassert(
                     11936307, "Already exists", _fields[existingBaseField].declaringScope == scope);
                 // 'a' is already defined in the current scope.
-                includeField(_fields[existingBaseField].embeddedScope,
-                             parentEmbeddedScope,
-                             subPath,
-                             parentBaseField /*defaultFieldId*/);
+                includeField(
+                    DeclarationCursor{
+                        cursor.fullPath,
+
+                        _fields[existingBaseField].embeddedScope,
+                        parentEmbeddedScope,
+                        cursor.depth + 1,
+                    },
+                    parentBaseField /*defaultFieldId*/);
                 break;
             case FieldMatchType::kShadowed:
             case FieldMatchType::kMissing:
             case FieldMatchType::kBaseDocument:
                 // 'a' is not included in the current scope, so we need to declare it then include
                 // 'b'.
-                FieldId newBaseField =
-                    declareField(scope, basePath, ModifiedPrefixPolicy::kPreserveArrays);
+                FieldId newBaseField = declareField(
+                    DeclarationCursor{cursor.pathToCursor(), scope, ScopeId::none(), cursor.depth},
+                    ModifiedPrefixPolicy::kPreserveArrays);
                 _fields[newBaseField].dependencies.insert(parentBaseField);
                 ScopeId newEmbeddedScope = _scopes.getNextId();
                 declareScope(_scopes[scope].stage, newEmbeddedScope, ScopeId::none());
                 _fields[newBaseField].embeddedScope = newEmbeddedScope;
-                includeField(newEmbeddedScope, parentEmbeddedScope, subPath, parentBaseField);
+                includeField(
+                    {cursor.fullPath, newEmbeddedScope, parentEmbeddedScope, cursor.depth + 1},
+                    parentBaseField);
                 break;
         }
     }
@@ -1624,14 +1647,10 @@ private:
 
     /**
      * Returns whether a field that comes directly from the collection (not redefined by any stage)
-     * can be an array. Appends 'fieldNameId' to 'collectionPathPrefix' and queries the
-     * PathArrayness API on the resulting dotted path.
+     * can be an array, by querying the PathArrayness API on its full dotted path.
      */
-    bool canCollectionFieldBeArray(ParsedPathView collectionPathPrefix,
-                                   StringPool::Id fieldNameId) const {
-        ParsedPath path(collectionPathPrefix.begin(), collectionPathPrefix.end());
-        path.push_back(fieldNameId);
-        return _canPathBeArray(buildDottedPath(path));
+    bool canCollectionFieldBeArray(ParsedPathView path) const {
+        return _canPathBeArray(buildDottedPath(ParsedPath(path.begin(), path.end())));
     }
 
     /**
@@ -1651,8 +1670,7 @@ private:
      */
     void populateBaseFieldMetadata(FieldId newBaseField,
                                    FieldId existingBaseField,
-                                   ParsedPathView collectionPathPrefix,
-                                   StringPool::Id fieldNameId) {
+                                   ParsedPathView pathToBaseField) {
         if (existingBaseField) {
             _fields[newBaseField].metadata.canFieldBeArray =
                 _fields[existingBaseField].metadata.canFieldBeArray;
@@ -1660,7 +1678,7 @@ private:
             // The included base field is a collection field. Query the PathArrayness API to
             // determine if the field can be an array, using the full collection path.
             _fields[newBaseField].metadata.canFieldBeArray =
-                canCollectionFieldBeArray(collectionPathPrefix, fieldNameId);
+                canCollectionFieldBeArray(pathToBaseField);
         }
     }
 
@@ -1796,7 +1814,7 @@ private:
                 [&](const PreservePath& p) {
                     tassert(11996202, "Expected operation before PreservePath", hasDeclaredScope);
                     auto parsedPath = internPath(p.getPath());
-                    includeField(scopeId, parentScope, parsedPath);
+                    includeField(DeclarationCursor{parsedPath, scopeId, parentScope});
                 },
                 [&](const ModifyPath& p) {
                     maybeDeclareInheritedScope();
@@ -1813,12 +1831,9 @@ private:
                             constant = c->getValue();
                         }
                     }
-                    declareField(scopeId,
-                                 parsedPath,
+                    declareField(DeclarationCursor{parsedPath, scopeId, parentScope},
                                  p.getPrefixPolicy(),
-                                 metadata,
-                                 {} /*collectionPathPrefix*/,
-                                 parentScope);
+                                 metadata);
                     const FieldId leafFieldId = lastDeclaredField();
                     if (expr) {
                         processExpressionDependencies(
@@ -1943,12 +1958,9 @@ private:
                     const ModifiedPrefixPolicy prefixPolicy = p.getNewPathMaxArrayTraversals() > 0
                         ? ModifiedPrefixPolicy::kPreserveArrays
                         : ModifiedPrefixPolicy::kEnsureObjects;
-                    declareField(scopeId,
-                                 parsedNewPath,
+                    declareField(DeclarationCursor{parsedNewPath, scopeId, parentScope},
                                  prefixPolicy,
-                                 metadata,
-                                 {} /*collectionPathPrefix*/,
-                                 parentScope);
+                                 metadata);
                     const FieldId leafFieldId = lastDeclaredField();
                     dassert(lookupField(scopeId, parsedNewPath).fieldId == leafFieldId);
                     _fields[leafFieldId].dependencies.insert(renameSource);
