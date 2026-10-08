@@ -111,48 +111,32 @@ void recordIndexBuildOutcome(IndexBuildOutcome outcome) {
 // The histogram buckets for `kIndexBuildCompletedDurationMillis`. Index builds range from
 // milliseconds for a no-op completion to days for a large collection.
 const std::vector<double> kIndexBuildDurationBucketsMillis = {
-    10,           // 10ms
-    1'000,        // 1s
-    10'000,       // 10s
     60'000,       // 1min
-    300'000,      // 5min
-    1'800'000,    // 30min
-    7'200'000,    // 2h
+    3'600'000,    // 1h
     28'800'000,   // 8h
     86'400'000,   // 1d
-    172'800'000,  // 2d
     259'200'000,  // 3d
-    432'000'000,  // 5d
 };
 
-// The histogram buckets for `kIndexBuildCompletedKeysWritten`, log scaled in steps of 10x.
+// The histogram buckets for `kIndexBuildCompletedKeysWritten`.
 const std::vector<double> kIndexBuildKeysWrittenBuckets = {
-    0,               // wrote no keys
-    10,              // 10
-    100,             // 100
-    1'000,           // 1k
-    10'000,          // 10k
-    100'000,         // 100k
-    1'000'000,       // 1M
-    10'000'000,      // 10M
-    100'000'000,     // 100M
-    1'000'000'000,   // 1B
-    10'000'000'000,  // 10B
+    1'000'000,        // 1M
+    50'000'000,       // 50M
+    500'000'000,      // 500M
+    1'000'000'000,    // 1B
+    5'000'000'000,    // 5B
+    10'000'000'000,   // 10B
+    100'000'000'000,  // 100B
 };
 
-// The histogram buckets for `kIndexBuildCompletedBytesWritten`. Log scaled in steps of 8x, from a
-// single small key up to multi-terabyte builds.
+// The histogram buckets for `kIndexBuildCompletedBytesWritten`, from small builds up to
+// multi-terabyte builds.
 const std::vector<double> kIndexBuildBytesWrittenBuckets = {
-    0,                  // wrote no bytes
-    1'024,              // 1 KiB
-    8'192,              // 8 KiB
-    65'536,             // 64 KiB
-    524'288,            // 512 KiB
-    4'194'304,          // 4 MiB
-    33'554'432,         // 32 MiB
-    268'435'456,        // 256 MiB
-    2'147'483'648,      // 2 GiB
+    16'777'216,         // 16 MiB
+    1'073'741'824,      // 1 GiB
+    8'589'934'592,      // 8 GiB
     17'179'869'184,     // 16 GiB
+    68'719'476'736,     // 64 GiB
     137'438'953'472,    // 128 GiB
     1'099'511'627'776,  // 1 TiB
 };

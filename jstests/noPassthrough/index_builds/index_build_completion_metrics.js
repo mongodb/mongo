@@ -32,10 +32,9 @@ const kBytesWrittenMetric = "mongodb.index_builds.completed.data_written";
 const kCompletionMetrics = [kDurationMetric, kKeysWrittenMetric, kBytesWrittenMetric];
 
 // The bucket boundaries of the keys and bytes written histograms.
-const kKeysWrittenBounds = [0, 10, 100, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e10];
+const kKeysWrittenBounds = [1e6, 5e7, 5e8, 1e9, 5e9, 1e10, 1e11];
 const kBytesWrittenBounds = [
-    0, 1024, 8192, 65536, 524288, 4194304, 33554432, 268435456, 2147483648, 17179869184,
-    137438953472, 1099511627776,
+    16777216, 1073741824, 8589934592, 17179869184, 68719476736, 137438953472, 1099511627776,
 ];
 
 // The size of the key string generated from a sample document {x: 1}. Every key generated from documents in this test should have this size.

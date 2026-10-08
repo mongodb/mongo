@@ -34,18 +34,11 @@ namespace mongo {
 namespace {
 
 const std::vector<double> kHistogramBucketBoundaries = {
-    10,           // 10ms
-    1'000,        // 1s
-    10'000,       // 10s
     60'000,       // 1min
-    300'000,      // 5min
-    1'800'000,    // 30min
-    7'200'000,    // 2h
+    3'600'000,    // 1h
     28'800'000,   // 8h
     86'400'000,   // 1d
-    172'800'000,  // 2d
     259'200'000,  // 3d
-    432'000'000,  // 5d
 };
 const size_t kNumHistogramBuckets = kHistogramBucketBoundaries.size() + 1;
 
@@ -193,10 +186,12 @@ std::vector<DurationTestCase> makeDurationTestCases() {
     std::vector<DurationTestCase> testCases;
     for (auto startPhase : kAllPhases) {
         for (auto outcome : kAllOutcomes) {
-            testCases.push_back({startPhase, outcome, Milliseconds(0), 0});    // (0, 10ms]
-            testCases.push_back({startPhase, outcome, Milliseconds(500), 1});  // (10ms, 1000ms]
-            testCases.push_back(
-                {startPhase, outcome, Milliseconds(5'000), 2});  // (1000ms, 10000ms]
+            testCases.push_back({startPhase, outcome, Seconds(30), 0});  // (0, 1min]
+            testCases.push_back({startPhase, outcome, Minutes(30), 1});  // (1min, 1h]
+            testCases.push_back({startPhase, outcome, Hours(2), 2});     // (1h, 8h]
+            testCases.push_back({startPhase, outcome, Hours(12), 3});    // (8h, 1d]
+            testCases.push_back({startPhase, outcome, Days(2), 4});      // (1d, 3d]
+            testCases.push_back({startPhase, outcome, Days(5), 5});      // (3d, inf)
         }
     }
     return testCases;
