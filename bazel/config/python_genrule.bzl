@@ -1,5 +1,5 @@
 load("//bazel:utils.bzl", "write_target")
-load("//bazel/config:py_action_env.bzl", "py_action_env_windows_dll_path")
+load("//bazel/config:py_action_env.bzl", "py_action_env_pythonpath", "py_action_env_windows_dll_path")
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 load("@rules_python//python:defs.bzl", "py_binary")
 
@@ -11,7 +11,7 @@ def python_genrule_impl(ctx):
 
     # Add runfiles package dir to PYTHONPATH so scripts can import python_libs (e.g. gen_helper).
     runfiles_package_dir = ctx.executable.python_binary.path + ".runfiles/" + ctx.workspace_name + "/" + ctx.label.package
-    env = {"PYTHONPATH": runfiles_package_dir}
+    env = py_action_env_pythonpath(ctx, ctx.attr.python_binary, runfiles_package_dir)
     env.update(py_action_env_windows_dll_path(ctx))
     windows_cross_host_path = ctx.attr._windows_cross_host_path[BuildSettingInfo].value
     if windows_cross_host_path:

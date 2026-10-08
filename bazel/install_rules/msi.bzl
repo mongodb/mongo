@@ -1,4 +1,5 @@
-load("//bazel/config:py_action_env.bzl", "py_action_env_windows_dll_path")
+load("@rules_python//python:py_info.bzl", "PyInfo")
+load("//bazel/config:py_action_env.bzl", "py_action_env_windows_dll_path", "py_exec_import_paths", "py_runtime_pythonpath")
 
 # Build an msi using the wix toolset.
 # Building the msi involves running candle.exe -> light.exe -> msitrim.py
@@ -79,6 +80,7 @@ def mongo_msi_impl(ctx):
 
     python = ctx.toolchains["@rules_python//python:toolchain_type"].py3_runtime
     ctx.actions.run(
+        mnemonic = "WixCandle",
         outputs = candle_out,
         inputs = depset(transitive = [depset(candle_in), ctx.attr._candle_wrapper_script.files, python.files, ctx.attr._candle.files]),
         executable = python.interpreter.path,
@@ -108,6 +110,7 @@ def mongo_msi_impl(ctx):
     light_arguments.append(light_msi.path)
 
     ctx.actions.run(
+        mnemonic = "WixLight",
         outputs = light_out,
         inputs = light_in,
         executable = ctx.executable._light,
@@ -115,15 +118,20 @@ def mongo_msi_impl(ctx):
     )
 
     output_msi = ctx.actions.declare_file(output_filename + ".msi")
+    trim_script = ctx.file._msi_trim_script
+    trim_env = py_action_env_windows_dll_path(ctx)
+    trim_env["PYTHONPATH"] = py_runtime_pythonpath(python, py_exec_import_paths(ctx, [ctx.attr._msi_trim_deps]))
 
     ctx.actions.run(
+        mnemonic = "MsiTrim",
         outputs = [output_msi],
-        inputs = depset(transitive = [depset(light_out), ctx.attr._msi_trim_script[DefaultInfo].default_runfiles.files, python.files]),
-        executable = ctx.executable._msi_trim_script,
-        arguments = [light_msi.path, output_msi.path],
-        # msi_trim_script is a py_binary; the Windows launcher.exe needs
-        # python313.dll on PATH to LoadLibrary at start.
-        env = py_action_env_windows_dll_path(ctx),
+        inputs = depset(transitive = [depset(light_out + [trim_script]), ctx.attr._msi_trim_deps[DefaultInfo].default_runfiles.files, python.files]),
+        # A py_binary's launcher can embed Linux Python from its execution
+        # toolchain during a cross build. Use this rule's Windows runtime and
+        # the dependency imports directly because msilib requires Windows.
+        executable = python.interpreter.path,
+        arguments = [trim_script.path, light_msi.path, output_msi.path],
+        env = trim_env,
     )
 
     return [DefaultInfo(
@@ -146,7 +154,7 @@ mongo_msi = rule(
             default = "@wix_toolset//:candle",
             allow_single_file = True,
             executable = True,
-            cfg = "host",
+            cfg = "exec",
         ),
         "_candle_wrapper_script": attr.label(
             doc = "The python msi trimming script to use.",
@@ -157,12 +165,16 @@ mongo_msi = rule(
             default = "@wix_toolset//:light",
             allow_single_file = True,
             executable = True,
-            cfg = "host",
+            cfg = "exec",
         ),
         "_msi_trim_script": attr.label(
             doc = "The python msi trimming script to use.",
-            default = "//buildscripts:msitrim",
-            executable = True,
+            default = "//buildscripts:msitrim.py",
+            allow_single_file = True,
+        ),
+        "_msi_trim_deps": attr.label(
+            default = "//buildscripts:msitrim_deps",
+            providers = [PyInfo],
             cfg = "exec",
         ),
         "_merge_modules": attr.label(
@@ -170,5 +182,8 @@ mongo_msi = rule(
         ),
     },
     doc = "Create a msi using wix toolset",
+    # Cross builds use a Linux host platform for compiler tools, but WiX and
+    # msilib must run on Windows. Resolve all packaging tools for that platform.
+    exec_compatible_with = ["@platforms//os:windows"],
     toolchains = ["@rules_python//python:toolchain_type"],
 )

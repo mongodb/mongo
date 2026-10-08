@@ -71,8 +71,16 @@ load(
     "use_wiredtiger",
     "visibility_support",
 )
+load(":py_action_env_test.bzl", "runtime_pythonpath_test", "template_renderer_python_path_analysis_test")
 
 package(default_visibility = ["//visibility:public"])
+
+runtime_pythonpath_test(name = "runtime_pythonpath_test")
+
+template_renderer_python_path_analysis_test(
+    name = "template_renderer_python_path_analysis_test",
+    target_under_test = "//src/mongo/base:error_codes_source",
+)
 
 # --------------------------------------
 # WASI / WebAssembly builds

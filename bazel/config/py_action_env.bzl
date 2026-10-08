@@ -33,8 +33,20 @@ Usage:
 
 load("@rules_python//python:py_info.bzl", "PyInfo")
 
+def py_runtime_pythonpath(python, paths):
+    """Format import paths for the selected interpreter's execution OS.
+
+    host_path_separator describes the Bazel client, which can be Windows
+    while the selected Python runtime executes on a Linux remote worker.
+    """
+    separator = ";" if python.interpreter.extension == "exe" else ":"
+    return separator.join([path.replace("\\", "/") for path in paths])
+
 def py_action_env_windows_dll_path(ctx):
-    """Returns `{"PATH": <python_dir>}` on Windows, else `{}`.
+    """Returns the Windows Python DLL and standard-library environment.
+
+    On Windows, returns `PATH` and `PYTHONHOME` set to the Python distribution
+    directory; on other platforms returns `{}`.
 
     The rule using this helper must declare
     `toolchains = ["@rules_python//python:toolchain_type"]`.
@@ -56,7 +68,15 @@ def py_action_env_windows_dll_path(ctx):
     # `external/py_windows_x86_64/dist`. Bazel sets the action's CWD to
     # the execroot on Windows, so the launcher's DLL search finds
     # `python313.dll` in this directory.
-    return {"PATH": interpreter.dirname}
+    #
+    # PYTHONHOME is also needed because rules_python can launch the interpreter
+    # through a manifest-only runfiles alias. Without it, CPython derives its
+    # stdlib location from that alias and cannot find encodings before the
+    # action's PYTHONPATH is processed.
+    return {
+        "PATH": interpreter.dirname,
+        "PYTHONHOME": interpreter.dirname,
+    }
 
 def py_exec_import_paths(ctx, py_deps):
     """Exec-tree PYTHONPATH entries for exec-configured python deps.
@@ -110,3 +130,17 @@ def py_exec_import_paths(ctx, py_deps):
             if candidate not in python_path:
                 python_path.append(candidate)
     return python_path
+
+def py_action_env_pythonpath(ctx, python_binary, runfiles_package_dir):
+    """Returns a PYTHONPATH containing a Python binary and its dependencies.
+
+    Custom actions that invoke a py_binary directly do not get the import path
+    setup performed by the standard rules_python launcher. Include the binary's
+    runfiles package directory and its exec-configured dependency imports so
+    those actions work when Windows runfiles are manifest-only.
+    """
+    python_path = [runfiles_package_dir] + py_exec_import_paths(ctx, [python_binary])
+    python = ctx.toolchains["@rules_python//python:toolchain_type"].py3_runtime
+    return {
+        "PYTHONPATH": py_runtime_pythonpath(python, python_path),
+    }
