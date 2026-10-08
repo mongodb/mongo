@@ -136,7 +136,7 @@ protected:
         const NamespaceString& collName,
         int32_t numChunks,
         std::vector<ShardId> desiredShards,
-        bool setOnCurrentShardSice = true) {
+        bool setOnCurrentShardSince = true) {
         const auto collUUID = UUID::gen();
         const auto collEpoch = OID::gen();
         const auto collCreationTime = Date_t::now();
@@ -154,7 +154,7 @@ protected:
             const auto shardId = desiredShards[i % desiredShards.size()];
             chunkVersion.incMinor();
             ChunkType chunk(collUUID, ChunkRange(minKey, maxKey), chunkVersion, shardId);
-            if (setOnCurrentShardSice) {
+            if (setOnCurrentShardSince) {
                 Timestamp onShardSince(collCreationTime + Milliseconds(i));
                 chunk.setHistory({ChunkHistory(onShardSince, shardId)});
                 chunk.setOnCurrentShardSince(onShardSince);
@@ -445,7 +445,7 @@ TEST_F(ConfigInitializationTest, InitializePlacementHistory) {
                                           corruptedCollName,
                                           8,
                                           expectedCorruptedCollPlacement,
-                                          false /* setOnCurrentShardSince*/);
+                                          /*setOnCurrentShardSince=*/false);
 
     // Ensure that the vector clock is able to return an up-to-date config time to both the
     // ShardingCatalogManager and this test.
