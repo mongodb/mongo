@@ -43,6 +43,8 @@ std::string parseLineFromFile(const char* fname) {
     if (f != nullptr) {
         if (fgets(fstr, 1023, f) != nullptr)
             fstr[strlen(fstr) < 1 ? 0 : strlen(fstr) - 1] = '\0';
+        else
+            fstr[0] = '\0';
         fclose(f);
     }
 
@@ -69,7 +71,8 @@ unsigned long long getMemorySizeLimitInBytes() {
         unsigned long long groupMemBytes = 0;
         std::string groupLimit = parseLineFromFile(file);
 
-        if (!groupLimit.empty() ) {
+        // The "max" value in cgroups v2 means no limit.
+        if (!groupLimit.empty() && groupLimit != "max") {
             return std::min(systemMemBytes, (unsigned long long)atoll(groupLimit.c_str()));
         }
     }
