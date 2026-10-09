@@ -101,6 +101,12 @@
                 - "ReshardCollectionInterruptedDueToFCVChange"
                 - "Interrupted"
                 - "MovePrimaryInProgress"
+                # A movePrimary (or dropDatabase) issued by one writer can race with an index
+                # build started by a sibling writer on the same database, failing with
+                # BackgroundOperationInProgressFor{Namespace,Database}. The conflict is transient:
+                # retry once the build finishes.
+                - "BackgroundOperationInProgressForNamespace"
+                - "BackgroundOperationInProgressForDatabase"
               migrationRetryMatchFCVErrors: true
               migrationRetryWriteErrors: true
               threadOverrides:
