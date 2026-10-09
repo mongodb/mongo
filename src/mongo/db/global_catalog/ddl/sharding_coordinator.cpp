@@ -443,11 +443,14 @@ SemiFuture<void> ShardingCoordinator::run(std::shared_ptr<executor::ScopedTaskEx
             if (cleanup()) {
                 try {
                     if (!completionStatus.isOK()) {
-                        LOGV2_ERROR(
-                            7524000,
-                            "Failed sharding coordinator",
-                            logv2::DynamicAttributes{getCoordinatorLogAttrs(),
-                                                     "reason"_attr = redact(completionStatus)});
+                        const auto redactedReason = redact(completionStatus);
+                        const auto attrs = logv2::DynamicAttributes{getCoordinatorLogAttrs(),
+                                                                    "reason"_attr = redactedReason};
+                        if (_shouldLogCompletionErrorAsWarning(completionStatus)) {
+                            LOGV2_WARNING(13580300, "Failed sharding coordinator", attrs);
+                        } else {
+                            LOGV2_ERROR(7524000, "Failed sharding coordinator", attrs);
+                        }
                     }
 
                     hangBeforeRemovingCoordinatorDocument.pauseWhileSet();

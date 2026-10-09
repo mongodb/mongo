@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/global_catalog/ddl/chunk_operation_sharding_coordinator.h"
@@ -42,6 +43,12 @@ public:
 
 protected:
     bool isInCriticalSection(Phase phase) const override;
+
+    // Failing to acquire the migration critical-section lock before the deadline is an expected,
+    // retryable outcome under contention. Preserve the legacy moveRange warning severity.
+    bool _shouldLogCompletionErrorAsWarning(const Status& status) const override {
+        return status.code() == ErrorCodes::LockTimeout;
+    }
 
     ChunkOperationsStatistics::ChunkOperationType chunkOperationMetricType() const override {
         return ChunkOperationsStatistics::ChunkOperationType::kMoveRange;

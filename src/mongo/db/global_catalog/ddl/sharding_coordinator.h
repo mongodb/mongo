@@ -185,6 +185,10 @@ protected:
         return getBasicCoordinatorAttrs();
     }
 
+    virtual bool _shouldLogCompletionErrorAsWarning(const Status&) const {
+        return false;
+    }
+
     /*
      * Specify if the coordinator must indefinitely be retried in case of exceptions. It is always
      * expected for a coordinator to make progress after performing intermediate operations that
