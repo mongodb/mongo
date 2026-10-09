@@ -101,10 +101,10 @@ if (!canRunCBR) {
         );
         assert.neq(null, shardFilterStage, "expected a SHARDING_FILTER stage", {explain});
 
-        // TODO SERVER-92589: remove this exception for SBE. CBR still ranks the plans, so the
-        // limit propagation test still runs, but the winning plan's explain output carries no
-        // cost or cardinality estimates for it to be asserted on. This is required so that this
-        // test passes under the trySbeEngine variant.
+        // Under SBE, CBR still ranks the plans, so the limit propagation test still runs, but the
+        // winning plan's explain output carries no cost or cardinality estimates for it to be
+        // asserted on.
+        // TODO SERVER-130179: Remove this early return once SBE explain reports these estimates.
         if (getEngine(explain) !== "classic") {
             return;
         }

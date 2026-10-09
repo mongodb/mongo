@@ -20,13 +20,6 @@
  * ]
  */
 import {getAllPlans} from "jstests/libs/query/analyze_plan.js";
-import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
-
-// Enabling SBE affects plan enumeration under CBR.
-if (checkSbeFullyEnabled(db)) {
-    jsTestLog(`Skipping ${jsTestName()} as SBE executor is not supported yet`);
-    quit();
-}
 
 const coll = db[jsTestName()];
 coll.drop();

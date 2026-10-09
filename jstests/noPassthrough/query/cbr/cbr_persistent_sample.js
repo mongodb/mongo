@@ -14,7 +14,6 @@
 
 import {getWinningPlanFromExplain, isCollscan} from "jstests/libs/query/analyze_plan.js";
 import {getPlanRankerConfig, setPlanRankerConfig} from "jstests/libs/query/cbr_utils.js";
-import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import * as PersistentSamplesUtils from "jstests/libs/query/persistent_samples_utils.js";
 
 const conn = MongoRunner.runMongod({
@@ -25,13 +24,6 @@ const conn = MongoRunner.runMongod({
     },
 });
 const db = conn.getDB("test");
-
-// TODO SERVER-92589: Remove this exemption
-if (checkSbeFullyEnabled(db)) {
-    jsTest.log.info(`Skipping ${jsTestName()} as SBE executor is not supported yet`);
-    MongoRunner.stopMongod(conn);
-    quit();
-}
 
 const collName = jsTestName();
 const coll = db[collName];

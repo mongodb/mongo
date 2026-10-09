@@ -8,7 +8,6 @@
  */
 
 import {getAllPlans} from "jstests/libs/query/analyze_plan.js";
-import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 let docs = [];
@@ -56,12 +55,6 @@ for (const config of samplingConfigs) {
     rst.initiate();
 
     const db = rst.getPrimary().getDB("test");
-    // TODO SERVER-92589: Remove this exemption once CBR supports SBE.
-    if (checkSbeRestrictedOrFullyEnabled(db)) {
-        jsTest.log.info(`Skipping test because CBR does not support SBE`);
-        rst.stopSet();
-        quit();
-    }
 
     // Create a collection and insert some data.
     const coll = db[jsTestName()];

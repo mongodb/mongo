@@ -15,7 +15,6 @@ import {
     isCollscan,
 } from "jstests/libs/query/analyze_plan.js";
 import * as PersistentSamplesUtils from "jstests/libs/query/persistent_samples_utils.js";
-import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 const conn = MongoRunner.runMongod({
     setParameter: {
@@ -34,13 +33,6 @@ const conn = MongoRunner.runMongod({
 });
 assert.neq(conn, null, "mongod failed to start");
 const db = conn.getDB(jsTestName());
-
-// TODO SERVER-92589: Remove this exemption.
-if (checkSbeFullyEnabled(db)) {
-    jsTest.log.info(`Skipping ${jsTestName()} as the SBE executor is not supported by CBR yet`);
-    MongoRunner.stopMongod(conn);
-    quit();
-}
 
 const ordersName = "orders";
 const productsName = "products";

@@ -26,9 +26,10 @@ const conn = MongoRunner.runMongod({
 });
 const db = conn.getDB("test");
 
-// TODO SERVER-130973: Remove this skip once CBR supports SBE.
+// SBE explain does not report CBR estimates for the winning plan, which this test asserts on.
+// TODO SERVER-130179: Remove this early exit once SBE explain reports these estimates.
 if (checkSbeFullyEnabled(db)) {
-    jsTestLog("Skipping test: CBR does not support SBE");
+    jsTestLog(`Skipping ${jsTestName()}: SBE explain lacks CBR estimates for the winning plan`);
     MongoRunner.stopMongod(conn);
     quit();
 }

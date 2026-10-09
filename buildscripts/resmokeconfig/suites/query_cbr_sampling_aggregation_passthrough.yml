@@ -9,9 +9,6 @@ selector:
     - jstests/aggregation/extras/*.js
     - jstests/aggregation/data/*.js
 
-    # TODO SERVER-92589: Fails in all feature flags variant because SBE explain not supported
-    - jstests/aggregation/optimization/use_query_sort.js
-
   exclude_with_any_tags:
     # Profiler entries will have different shape in CBR
     - requires_profiling

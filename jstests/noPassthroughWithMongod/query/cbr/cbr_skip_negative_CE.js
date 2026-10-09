@@ -11,14 +11,6 @@
  * ]
  */
 
-import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
-
-// TODO SERVER-117707: Remove this check once CBR is enabled for SBE
-if (checkSbeFullyEnabled(db)) {
-    jsTestLog(`Skipping ${jsTestName()} as SBE executor is not supported yet`);
-    quit();
-}
-
 const collName = jsTestName();
 const coll = db[collName];
 coll.drop();

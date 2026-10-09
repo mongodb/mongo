@@ -15,19 +15,12 @@ import {
     getWinningPlanFromExplain,
     isCollscan,
 } from "jstests/libs/query/analyze_plan.js";
-import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 //TODO SERVER-130034 Re-design test relying on the old CE strategy.
 jsTest.log.info(
     `Skipping ${jsTestName()}: The test is disabled since it uses outdated automatic strategy that is no longer supported.`,
 );
 quit();
-
-// TODO SERVER-92589: Remove this exemption
-if (checkSbeFullyEnabled(db)) {
-    jsTestLog(`Skipping ${jsTestName()} as SBE executor is not supported yet`);
-    quit();
-}
 
 const collName = jsTestName();
 const collName1 = collName + "_ceModes";

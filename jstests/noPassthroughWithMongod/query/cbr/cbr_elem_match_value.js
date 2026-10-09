@@ -9,9 +9,10 @@ import {getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 import {planEstimatedWithHistogram} from "jstests/libs/query/cbr_utils.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
-// TODO SERVER-92589: Remove this exemption
+// SBE explain does not report CBR estimates for the winning plan, which this test asserts on.
+// TODO SERVER-130179: Remove this early exit once SBE explain reports these estimates.
 if (checkSbeFullyEnabled(db)) {
-    jsTestLog(`Skipping ${jsTestName()} as SBE executor is not supported yet`);
+    jsTestLog(`Skipping ${jsTestName()}: SBE explain lacks CBR estimates for the winning plan`);
     quit();
 }
 

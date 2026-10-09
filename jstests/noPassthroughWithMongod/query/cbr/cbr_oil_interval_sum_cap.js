@@ -34,13 +34,6 @@
  * ]
  */
 
-import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
-
-if (checkSbeFullyEnabled(db)) {
-    jsTestLog(`Skipping ${jsTestName()} as SBE executor is not supported yet`);
-    quit();
-}
-
 const collName = jsTestName();
 const coll = db[collName];
 coll.drop();

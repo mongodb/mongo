@@ -11,7 +11,6 @@
 import {after, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import * as PersistentSamplesUtils from "jstests/libs/query/persistent_samples_utils.js";
-import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const kDbName = jsTestName();
@@ -191,13 +190,6 @@ describe("analyze sample on replica sets", function () {
             );
         });
     });
-
-    // TODO SERVER-92589: Remove once CBR supports SBE.
-    if (checkSbeRestrictedOrFullyEnabled(primaryDB)) {
-        jsTest.log.info(`Skipping remaining tests: ${jsTestName()}: CBR does not support SBE`);
-        rst.stopSet();
-        quit();
-    }
 
     describe("CE on secondary uses persisted sample", function () {
         it("uses on-the-fly sampling when no persisted sample exists", function () {
