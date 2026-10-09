@@ -147,11 +147,11 @@ describe("planRanker in slow query log and profiler", function () {
         );
     });
 
-    it("reports 'none' for the express path, which selects no plan", function () {
+    it("reports 'express' for the express path, which bypasses plan selection", function () {
         setPlanRankerConfig(db, {featureFlagCostBasedRanker: false});
 
-        // The express path builds no PlanExecutor plan selection, so nothing populates the strategy
-        // and diagnostics report "none" rather than claiming a single candidate plan existed.
+        // The express path runs no plan selection, so it reports its own strategy rather than
+        // claiming a single candidate plan existed.
         const id = coll.findOne()._id;
         const marker = "planRankerMarkerExpress";
         try {
@@ -170,13 +170,16 @@ describe("planRanker in slow query log and profiler", function () {
         assert(logLine, "did not find slow query log line for express query");
         const profileEntry = getLatestProfilerEntry(db, {op: "query", "command.comment": marker});
 
-        // "none" is the log/profiler rendering of an absent strategy.
         assert.eq(
             JSON.parse(logLine).attr.planRanker,
-            "none",
-            "express query should report planRanker: none",
+            "express",
+            "express query should report planRanker: express",
         );
-        assert.eq(profileEntry.planRanker, "none", "express query should report planRanker: none");
+        assert.eq(
+            profileEntry.planRanker,
+            "express",
+            "express query should report planRanker: express",
+        );
     });
 
     it("reports 'singlePlan' when only one candidate plan exists (no ranking needed)", function () {

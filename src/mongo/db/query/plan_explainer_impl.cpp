@@ -1617,7 +1617,8 @@ void orderV3PlanCandidates(PlanSelectionStrategy decidingPlanRanker,
         }
         case PlanSelectionStrategy::kSinglePlan:
         case PlanSelectionStrategy::kCachedPlan:
-            // No ranking decision (single plan, cached plan): enumeration order.
+        case PlanSelectionStrategy::kExpress:
+            // No ranking decision (single plan, cached plan, express path): enumeration order.
             return;
         case PlanSelectionStrategy::kJoinOptimization:
         case PlanSelectionStrategy::kJoinCachedPlan:

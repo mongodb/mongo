@@ -816,7 +816,7 @@ describe("V3 queryPlanner.plans array with classic engine", function () {
                 db.runCommand({explain: {find: collName, filter: {_id: 1}}, verbosity}),
             );
             assert.eq(explain.explainVersion, "3", "expected V3 version reporting", {explain});
-            assertChosenRanker(explain, ChosenRanker.kSinglePlan, PlanRankerReason.kSinglePlan);
+            assertChosenRanker(explain, ChosenRanker.kExpress, PlanRankerReason.kSinglePlan);
             assert(!explain.queryPlanner.hasOwnProperty("winningPlan"), "unexpected winningPlan", {
                 explain,
                 verbosity,

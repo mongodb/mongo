@@ -24,6 +24,7 @@ std::string PlanExplainerExpress::getPlanSummary() const {
 
 void PlanExplainerExpress::getSummaryStats(PlanSummaryStats* statsOut) const {
     statsOut->nReturned = _planStats->numResults();
+    statsOut->planSelectionStrategy = PlanSelectionStrategy::kExpress;
     _iteratorStats->populateSummaryStats(statsOut);
     if (_commonStats) {
         statsOut->executionTime = _commonStats->executionTime;

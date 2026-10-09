@@ -19,8 +19,9 @@ namespace mongo {
  * member.
  */
 enum class PlanRankerReason {
-    // A single candidate solution (or a cached plan): no ranking ran. The only valid reason for
-    // chosenRanker "none"; derived at explain emission rather than recorded by a strategy.
+    // A single candidate solution (or a cached plan or express path): no ranking ran. The only
+    // reason emitted for the no-ranking strategies (chosenRanker singlePlan, cachedPlan or
+    // express); derived at explain emission rather than recorded by a strategy.
     kSinglePlan,
     // featureFlagCostBasedRanker is off, so planning was rewritten to the multi-planner.
     kCBRFeatureFlagDisabled,

@@ -839,6 +839,9 @@ TEST(CurOpTest, PlanSelectionStrategyAppendedToProfilerOutput) {
 
     curop->debug().planSelectionStrategy = PlanSelectionStrategy::kCachedPlan;
     ASSERT_EQ(appendAndGetPlanRanker().value_or(""), "cachedPlan");
+
+    curop->debug().planSelectionStrategy = PlanSelectionStrategy::kExpress;
+    ASSERT_EQ(appendAndGetPlanRanker().value_or(""), "express");
 }
 
 TEST(CurOpTest, PlanSelectionStrategyInSlowQueryLogReport) {
@@ -887,6 +890,9 @@ TEST(CurOpTest, PlanSelectionStrategyInSlowQueryLogReport) {
 
     curop->debug().planSelectionStrategy = PlanSelectionStrategy::kCachedPlan;
     ASSERT_EQ(getPlanRankerAttr().value_or(""), "cachedPlan");
+
+    curop->debug().planSelectionStrategy = PlanSelectionStrategy::kExpress;
+    ASSERT_EQ(getPlanRankerAttr().value_or(""), "express");
 }
 
 TEST(CurOpTest, PlanSelectionStrategyInProfileFilterAppendStaged) {
@@ -929,6 +935,9 @@ TEST(CurOpTest, PlanSelectionStrategyInProfileFilterAppendStaged) {
 
     curop->debug().planSelectionStrategy = PlanSelectionStrategy::kCachedPlan;
     ASSERT_EQ(stagedAndGetPlanRanker().value_or(""), "cachedPlan");
+
+    curop->debug().planSelectionStrategy = PlanSelectionStrategy::kExpress;
+    ASSERT_EQ(stagedAndGetPlanRanker().value_or(""), "express");
 }
 
 TEST(CurOpTest, UsedJoinOptimizationExposedInAllOutputs) {

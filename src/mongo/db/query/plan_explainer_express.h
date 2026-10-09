@@ -204,6 +204,10 @@ public:
 
     void getSummaryStats(PlanSummaryStats* statsOut) const override;
 
+    boost::optional<PlanSelectionStrategy> getPlanSelectionStrategy() const override {
+        return PlanSelectionStrategy::kExpress;
+    }
+
     PlanStatsDetails getWinningPlanTrialStats() const override {
         return {};
     }

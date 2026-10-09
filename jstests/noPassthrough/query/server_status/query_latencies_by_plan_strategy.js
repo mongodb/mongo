@@ -1,7 +1,7 @@
 /**
  * Verifies the query latency histograms per plan selection strategy. Published under serverStatus
  * "metrics.queryLatencies.<strategy>" for strategy in {multiPlanner, costBased, singlePlan,
- * cachedPlan, joinOptimization, joinCachedPlan}. Each is a subobject holding three
+ * cachedPlan, joinOptimization, joinCachedPlan, express}. Each is a subobject holding three
  * metrics:
  *   - "histogram":  an array of {lowerBound, count} buckets (a HistogramServerStatusMetric)
  *   - "latency":    the summed latency of every observation, in microseconds
@@ -24,7 +24,12 @@
  * ]
  */
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
-import {getEngine} from "jstests/libs/query/analyze_plan.js";
+import {
+    assertChosenRanker,
+    ChosenRanker,
+    getEngine,
+    PlanRankerReason,
+} from "jstests/libs/query/analyze_plan.js";
 import {joinOptUsed} from "jstests/libs/query/join_utils.js";
 import {checkSbeCompletelyDisabled} from "jstests/libs/query/sbe_util.js";
 
@@ -35,6 +40,7 @@ const kStrategies = [
     "cachedPlan",
     "joinOptimization",
     "joinCachedPlan",
+    "express",
 ];
 
 // Bucket count per histogram: HistogramServerStatusMetric::pow(31, 64, 2) yields 31 boundaries,
@@ -173,7 +179,7 @@ function makeSuite(getDb) {
 function itSinglePlan(suite, frameworkControl) {
     it("records singlePlan for find and aggregate", function () {
         const coll = suite.db().small_coll;
-        assertEngine(coll.find({a: 42}).explain(), frameworkControl);
+        assertEngine(assert.commandWorked(coll.find({a: 42}).explain()), frameworkControl);
 
         suite.assertStrategyIncremented("singlePlan", () => {
             assert.eq(1, coll.find({a: 42}).itcount());
@@ -197,7 +203,7 @@ function itMultiPlanner(suite, frameworkControl) {
         assert.commandWorked(db.runCommand({planCacheClear: coll.getName()}));
 
         const query = {a: 5, b: {$gte: 0}};
-        assertEngine(coll.find(query).explain(), frameworkControl);
+        assertEngine(assert.commandWorked(coll.find(query).explain()), frameworkControl);
         suite.assertStrategyIncremented("multiPlanner", () => {
             assert.gte(coll.find(query).itcount(), 1);
         });
@@ -219,7 +225,7 @@ function itCostBased(suite, frameworkControl) {
 
         // No document has c == -1, so no candidate plan advances during the trial.
         const query = {a: {$gt: 0}, b: {$gt: 0}, c: -1};
-        assertEngine(coll.find(query).explain(), frameworkControl);
+        assertEngine(assert.commandWorked(coll.find(query).explain()), frameworkControl);
         suite.assertStrategyIncremented("costBased", () => {
             coll.find(query).itcount();
         });
@@ -237,7 +243,7 @@ function itCachedPlan(suite, frameworkControl) {
         assert.commandWorked(db.runCommand({planCacheClear: coll.getName()}));
 
         const query = {a: 5, b: {$gte: 0}};
-        assertEngine(coll.find(query).explain(), frameworkControl);
+        assertEngine(assert.commandWorked(coll.find(query).explain()), frameworkControl);
         // Run enough times to activate the plan cache entry (inactive -> active).
         for (let i = 0; i < 5; i++) {
             coll.find(query).itcount();
@@ -249,14 +255,49 @@ function itCachedPlan(suite, frameworkControl) {
     });
 }
 
+// An _id equality lookup bypasses query planning on the express path.
+function itExpress(suite) {
+    it("records express for an _id lookup", function () {
+        const coll = suite.db().small_coll;
+        const id = coll.findOne({a: 42})._id;
+        const explain = assert.commandWorked(coll.find({_id: id}).explain());
+        assert(
+            explain.queryPlanner.winningPlan.stage.startsWith("EXPRESS_"),
+            "expected an express plan for the _id lookup",
+            {explain},
+        );
+
+        // A V3-verbosity explain of the same query must also succeed.
+        for (const verbosity of ["plannerStats", "plannerChoice", "execStats"]) {
+            const v3Explain = assert.commandWorked(coll.find({_id: id}).explain(verbosity));
+            assertChosenRanker(v3Explain, ChosenRanker.kExpress, PlanRankerReason.kSinglePlan);
+        }
+
+        const before = suite.getQueryLatencies();
+        assert.eq(1, coll.find({_id: id}).itcount());
+        const after = suite.getQueryLatencies();
+        assert.eq(
+            suite.queriesFor(after, "express"),
+            suite.queriesFor(before, "express") + 1,
+            "expected express.totalCount to increase by 1",
+            {before, after},
+        );
+        assert.eq(
+            suite.totalQueries(after),
+            suite.totalQueries(before) + 1,
+            "the express lookup must be recorded under express only",
+            {before, after},
+        );
+    });
+}
+
 // ---------------------------------------------------------------------------
 // Ranker-independent cases (single-plan collscans).
 // ---------------------------------------------------------------------------
 
-// The published shape is fixed: the same field names and the same 32 bucket lowerBounds appear
+// The published histogram shape is fixed: the same field names and the same 32 bucket lowerBounds appear
 // before and after observations are recorded, which is what FTDC depends on.
 function itDenseHistogramShape(suite) {
-    // The field names plus the bucket lowerBound sequence: everything FTDC needs to stay constant.
     function shapeOf(entry) {
         return {
             fields: Object.keys(entry).sort(),
@@ -575,6 +616,7 @@ function defineLifecycleSuite() {
         });
 
         itDenseHistogramShape(suite);
+        itExpress(suite);
         itLatencyCounter(suite);
         itAggregatePipeline(suite);
         itGetMoreOneQuery(suite);
@@ -657,7 +699,7 @@ function defineJoinOptimizationSuite() {
         }
 
         it("records joinOptimization for a freshly enumerated aggregate", function () {
-            const explain = base.explain().aggregate(joinPipeline());
+            const explain = assert.commandWorked(base.explain().aggregate(joinPipeline()));
             assert(joinOptUsed(explain), "Expected join optimization to be used", {explain});
 
             // This is the first execution of the shape: the join plan cache is empty, so

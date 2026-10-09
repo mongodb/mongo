@@ -199,12 +199,14 @@ export function getWinningPlanFromExplain(explain, isSBEPlan = false) {
  *                    case where CBR was engaged but could not cost the plans and fell back to MP.
  *   kSinglePlan    - no ranking was needed because there was a single candidate plan.
  *   kCachedPlan    - no ranking was needed because the plan came from the plan cache.
+ *   kExpress       - no ranking was needed because the plan was produced by the express path.
  */
 export const ChosenRanker = {
     kMultiPlanning: "multiPlanning",
     kCostBased: "costBased",
     kSinglePlan: "singlePlan",
     kCachedPlan: "cachedPlan",
+    kExpress: "express",
 };
 
 /**

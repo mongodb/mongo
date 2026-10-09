@@ -159,6 +159,7 @@ TEST_F(QueryLatencyAccumulatorTest, RoutesEachStrategyToItsOwnHistogram) {
         {PlanSelectionStrategy::kCachedPlan, "cachedPlan"sv, 750},
         {PlanSelectionStrategy::kJoinOptimization, "joinOptimization"sv, 1250},
         {PlanSelectionStrategy::kJoinCachedPlan, "joinCachedPlan"sv, 1750},
+        {PlanSelectionStrategy::kExpress, "express"sv, 125},
     };
 
     for (const auto& [strategy, name, micros] : cases) {

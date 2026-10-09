@@ -409,18 +409,19 @@ void appendPlanRankerChoice(const PlanSelectionStrategy decidingPlanRanker,
 
     planRankerBob.append("chosenRanker", getPlanSelectionStrategyName(decidingPlanRanker));
     if (decidingPlanRanker == PlanSelectionStrategy::kSinglePlan ||
-        decidingPlanRanker == PlanSelectionStrategy::kCachedPlan) {
-        // No ranking took place (single candidate solution, count scan, cached plan). singlePlan
-        // is the only valid reason for those strategies, so it is derived here as a constant
-        // function of the recorded strategy - collapsing the plumbing for the several no-ranking
-        // paths to zero - rather than reconstructed from which statistics happen to be present.
+        decidingPlanRanker == PlanSelectionStrategy::kCachedPlan ||
+        decidingPlanRanker == PlanSelectionStrategy::kExpress) {
+        // No ranking took place (single candidate solution, count scan, cached plan, express
+        // execution). singlePlan is the only valid reason for those strategies, so it is derived
+        // here as a constant function of the recorded strategy - collapsing the plumbing for the
+        // several no-ranking paths to zero - rather than reconstructed from which statistics happen
+        // to be present.
         // TODO SERVER-132012 SERVER-132079: make the caller pass kSinglePlan at the point of
         // decision.
         planRankerBob.append("reason", getPlanRankerReasonName(PlanRankerReason::kSinglePlan));
     } else {
         // A strategy decided, so it must have recorded why (it populated the same explain data
-        // this value comes from). Express plans are single plans that no strategy ranks, so they
-        // always take the branch above.
+        // this value comes from).
         // TODO SERVER-134550 Remove the condition on SBE explainer and the extra bool parameter.
         tassert(13237700,
                 "a ranking strategy decided the winning plan but recorded no reason",

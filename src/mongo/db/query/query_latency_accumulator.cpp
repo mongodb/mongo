@@ -74,6 +74,7 @@ QueryLatencyMetrics& singlePlanMetrics = makeQueryLatencyMetrics("singlePlan");
 QueryLatencyMetrics& cachedPlanMetrics = makeQueryLatencyMetrics("cachedPlan");
 QueryLatencyMetrics& joinOptimizationMetrics = makeQueryLatencyMetrics("joinOptimization");
 QueryLatencyMetrics& joinCachedPlanMetrics = makeQueryLatencyMetrics("joinCachedPlan");
+QueryLatencyMetrics& expressMetrics = makeQueryLatencyMetrics("express");
 
 // No default case: a new PlanSelectionStrategy fails to compile until it names its metrics.
 QueryLatencyMetrics& queryLatencyMetricsFor(PlanSelectionStrategy strategy) {
@@ -90,6 +91,8 @@ QueryLatencyMetrics& queryLatencyMetricsFor(PlanSelectionStrategy strategy) {
             return joinOptimizationMetrics;
         case PlanSelectionStrategy::kJoinCachedPlan:
             return joinCachedPlanMetrics;
+        case PlanSelectionStrategy::kExpress:
+            return expressMetrics;
     }
     MONGO_UNREACHABLE_TASSERT(12765301);
 }
