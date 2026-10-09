@@ -44,12 +44,12 @@ const QuerySolution* pickBestPlan(CanonicalQuery* cq,
 
 /**
  * Run cost-based ranking for the query 'cq' and return all solutions it produced: a single
- * winner when CBR ranked the plans, or every candidate when it declined to rank (e.g. because
- * of a zero cardinality estimate on a scan node).
+ * winner when CBR could estimate every plan, or otherwise the best estimable plan (if any)
+ * followed by the plans it could not estimate.
  *
  * If 'originalPlanHashes' is set, it is filled with the hashes of the candidate plans in the
  * order the planner produced them, before CBR saw them. Callers use it to assert that CBR
- * preserved the candidate order when it declined to rank.
+ * preserved the order of the plans it could not estimate.
  */
 std::vector<std::unique_ptr<QuerySolution>> cbrRankPlans(
     CanonicalQuery* cq,

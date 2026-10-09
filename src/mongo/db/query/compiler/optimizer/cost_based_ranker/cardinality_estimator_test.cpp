@@ -675,8 +675,7 @@ TEST(CardinalityEstimator, CompareCardinalityEstimatesForIndexScanAndFetch) {
 
     // Create indexed plan with a fetch filter.
     std::vector<std::string> indexFields = {"a"};
-    // 'b' is 0 in every sampled document where 'a' is 50, so this filter matches some documents;
-    // a filter matching nothing would abort estimation with ZeroCEEstimate.
+    // 'b' is 0 in every sampled document where 'a' is 50, so this filter matches some documents.
     BSONObj fetchCond = fromjson("{$or: [{b: 0}, {c: 'xyz'}]}");
     auto fetchExpr = parse(fetchCond);
     auto indexedPlan = makeIndexScanFetchPlan(testNss,
@@ -1270,20 +1269,21 @@ protected:
         assertEstimable(std::move(bounds));
     }
 
-    // Asserts that the plan estimates to zero, which aborts estimation with ZeroCEEstimate.
+    // Asserts that the plan estimates to zero. Which after clamping, results in the estimate being
+    // set to the minimum estimate of one row.
     void assertZeroCE(IndexBounds bounds) {
         auto plan = makeEqualityPrefixPlan(std::move(bounds));
         const auto ceRes = getPlanCE(*plan, _collInfo, QueryCBRCEModeEnum::kHeuristicCE);
-        ASSERT_EQ(ErrorCodes::ZeroCEEstimate, ceRes.getStatus().code());
+        ASSERT_OK(ceRes);
+        ASSERT_LTE(ceRes.getValue().toDouble(), 1.0) << ceRes.getValue().toString();
     }
 
 private:
-    // Estimation must not fail; a zero estimate is allowed and reported as ZeroCEEstimate.
+    // Estimation must not fail.
     void assertEstimable(IndexBounds bounds) {
         auto plan = makeEqualityPrefixPlan(std::move(bounds));
         const auto ceRes = getPlanCE(*plan, _collInfo, QueryCBRCEModeEnum::kHeuristicCE);
-        ASSERT(ceRes.isOK() || ceRes.getStatus().code() == ErrorCodes::ZeroCEEstimate)
-            << ceRes.getStatus();
+        ASSERT_OK(ceRes);
     }
 
     const CollectionInfo _collInfo =
@@ -1417,11 +1417,13 @@ TYPED_TEST(EqualityPrefixTypedTest, EqPrefix_Empty) {
 }
 
 // OIL list: [fullyOpen, empty]
+// The empty OIL on 'b' is a residual condition, so the scan still reads every key and only its
+// output may be estimated to zero.
 TYPED_TEST(EqualityPrefixTypedTest, FullyOpen_Empty) {
     IndexBounds bounds;
     bounds.fields.push_back(makeFullyOpenOil("a"));
     bounds.fields.push_back(makeEmptyOil("b"));
-    this->assertZeroCE(std::move(bounds));
+    this->assertNotSkipScan(std::move(bounds));
 }
 
 // OIL list: [empty, range]
@@ -1914,9 +1916,7 @@ TEST(CardinalityEstimator, ShardFilterIsPassThrough) {
     ASSERT_EQ(getPlanHeuristicCE(*shardFilterPlan, collCard), collScanCE);
 }
 
-// An approximate-source (histogram) zero estimate for a node aborts plan estimation with a
-// ZeroCEEstimate error: the zero means "not observed", so ranking cannot trust it.
-TEST(CardinalityEstimator, ZeroCEEstimateFromApproximateSourceFailsEstimation) {
+TEST(CardinalityEstimator, ZeroCEEstimateFromHistogramIsClamped) {
     auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
     // The histogram fixture's bucket frequencies total 1000, so collCard must match.
     auto collInfo = buildCollectionInfo({}, makeCollStatsWithHistograms({"a"}, 1000.0));
@@ -1929,8 +1929,9 @@ TEST(CardinalityEstimator, ZeroCEEstimateFromApproximateSourceFailsEstimation) {
     auto zeroPlan = makeIndexScanFetchPlan(
         testNss, makePointIntervalBounds(100.0, indexFields[0]), indexFields);
     auto ceRes = estimator.estimatePlan(*zeroPlan);
-    ASSERT_NOT_OK(ceRes);
-    ASSERT_EQ(ceRes.getStatus().code(), ErrorCodes::ZeroCEEstimate);
+    ASSERT_OK(ceRes);
+    ASSERT_EQ(ceRes.getValue(),
+              CardinalityEstimate(CardinalityType{1.0}, EstimationSource::Histogram));
 }
 
 TEST(CardinalityEstimator, NonZeroEstimatePlanDoesNotFail) {
@@ -1949,9 +1950,7 @@ TEST(CardinalityEstimator, NonZeroEstimatePlanDoesNotFail) {
     ASSERT_TRUE(approxGt(ceRes.getValue(), zeroCE));
 }
 
-// Callers that opt out of the zero-scan abort (join optimization) get a costed plan instead: the
-// approximate zero is clamped to the minimum estimate like any other zero.
-TEST(CardinalityEstimator, ZeroCEEstimateIsClampedWhenNotFailingOnZeroScanCE) {
+TEST(CardinalityEstimator, ZeroCEEstimateIsClampedIfConsideredEstimableByFlag) {
     auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
 
     size_t collCard = 1000;
@@ -1967,7 +1966,7 @@ TEST(CardinalityEstimator, ZeroCEEstimateIsClampedWhenNotFailingOnZeroScanCE) {
                                    &samplingEstimator,
                                    estimates,
                                    QueryCBRCEModeEnum::kSamplingCE,
-                                   false /* failOnZeroIxscanCE */};
+                                   false /* considerZeroCESampledIXScanNonEstimable */};
 
     // The sampled documents have 'a' in [0, 99], so a point query on 100 estimates to zero.
     std::vector<std::string> indexFields = {"a"};
@@ -1978,6 +1977,84 @@ TEST(CardinalityEstimator, ZeroCEEstimateIsClampedWhenNotFailingOnZeroScanCE) {
     // Clamped to the minimum estimate of one row.
     ASSERT_EQ(ceRes.getValue(),
               CardinalityEstimate(CardinalityType{1.0}, EstimationSource::Sampling));
+}
+
+// Only an index scan estimated to scan zero keys aborts plan estimation: one that scans keys but
+// whose residual filter matches none of them is estimable.
+TEST(CardinalityEstimator, ZeroOutputIndexScanWithNonZeroInputIsEstimable) {
+    auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
+    size_t collCard = 1000;
+    ce::SamplingEstimatorTest samplingEstimatorTest;
+    samplingEstimatorTest.setUp();
+    // Sample the full collection so that the estimates are exact.
+    auto samplingEstimator = samplingEstimatorTest.createSamplingEstimatorForTesting(
+        collCard, collCard, ce::NoProjection{});
+    EstimateMap estimates;
+    auto collInfo = buildCollectionInfo({}, makeCollStatsWithHistograms({}, collCard));
+    CardinalityEstimator estimator{
+        collInfo, &samplingEstimator, estimates, QueryCBRCEModeEnum::kSamplingCE};
+
+    // 'a' is 50 in 10 of the documents, none of which has 'b' equal to 999.
+    std::vector<std::string> indexFields = {"a", "b"};
+    BSONObj indexCond = fromjson("{b: 999}");
+    auto plan = makeIndexScanFetchPlan(testNss,
+                                       makePointIntervalBounds(50.0, indexFields[0]),
+                                       indexFields,
+                                       parse(indexCond) /* indexFilter */);
+    ASSERT_OK(estimator.estimatePlan(*plan));
+    const auto& scanEst = estimates.at(plan->root()->children[0].get());
+    ASSERT_EQ(*scanEst->inCE, CardinalityEstimate(CardinalityType{10}, EstimationSource::Sampling));
+}
+
+// An index scan that sampling estimates to scan zero keys aborts plan estimation with
+// ZeroCEEstimate.
+TEST(CardinalityEstimator, ZeroInputSampledIndexScanFailsEstimation) {
+    auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
+    size_t collCard = 1000;
+    ce::SamplingEstimatorTest samplingEstimatorTest;
+    samplingEstimatorTest.setUp();
+    auto samplingEstimator = samplingEstimatorTest.createSamplingEstimatorForTesting(
+        collCard, collCard, ce::NoProjection{});
+    EstimateMap estimates;
+    auto collInfo = buildCollectionInfo({}, makeCollStatsWithHistograms({}, collCard));
+    CardinalityEstimator estimator{
+        collInfo, &samplingEstimator, estimates, QueryCBRCEModeEnum::kSamplingCE};
+
+    // No document has 'a' equal to 5000.
+    std::vector<std::string> indexFields = {"a"};
+    auto plan = makeIndexScanFetchPlan(
+        testNss, makePointIntervalBounds(5000.0, indexFields[0]), indexFields);
+    ASSERT_EQ(estimator.estimatePlan(*plan).getStatus().code(), ErrorCodes::ZeroCEEstimate);
+}
+
+// A zero estimate on a node other than an index scan does not abort plan estimation.
+TEST(CardinalityEstimator, ZeroEstimateOnNonIndexScanNodeIsEstimable) {
+    auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
+    size_t collCard = 1000;
+    ce::SamplingEstimatorTest samplingEstimatorTest;
+    samplingEstimatorTest.setUp();
+    auto samplingEstimator = samplingEstimatorTest.createSamplingEstimatorForTesting(
+        collCard, collCard, ce::NoProjection{});
+    EstimateMap estimates;
+    auto collInfo = buildCollectionInfo({}, makeCollStatsWithHistograms({}, collCard));
+    CardinalityEstimator estimator{
+        collInfo, &samplingEstimator, estimates, QueryCBRCEModeEnum::kSamplingCE};
+
+    // The index scan reads the 10 keys where 'a' is 50, and the fetch filter matches none of the
+    // documents.
+    std::vector<std::string> indexFields = {"a"};
+    BSONObj fetchCond = fromjson("{b: 999}");
+    auto fetchPlan = makeIndexScanFetchPlan(testNss,
+                                            makePointIntervalBounds(50.0, indexFields[0]),
+                                            indexFields,
+                                            nullptr /* indexFilter */,
+                                            parse(fetchCond) /* fetchFilter */);
+    ASSERT_OK(estimator.estimatePlan(*fetchPlan));
+
+    // A collection scan whose filter matches nothing.
+    BSONObj collScanCond = fromjson("{a: 5000}");
+    auto collScanPlan = makeCollScanPlan(parse(collScanCond));
+    ASSERT_OK(estimator.estimatePlan(*collScanPlan));
 }
 
 }  // unnamed namespace

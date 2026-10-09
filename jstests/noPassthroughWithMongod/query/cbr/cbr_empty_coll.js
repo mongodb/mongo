@@ -32,10 +32,9 @@ function testNonExistentColl() {
     assert(!nonExistentCollPlan.hasOwnProperty("cardinalityEstimate"));
 }
 
-// A zero IXSCAN estimate aborts CBR (ZeroCEEstimate); the multi-planner ranks the plans uncosted.
-function assertNoPlanCosted(explainRoot) {
+function assertAllPlansHaveZeroCE(explainRoot) {
     [getWinningPlanFromExplain(explainRoot), ...getRejectedPlans(explainRoot)].forEach((plan) => {
-        assert(!plan.hasOwnProperty("cardinalityEstimate"), plan);
+        assert.eq(plan.cardinalityEstimate, 0, plan);
     });
 }
 
@@ -57,12 +56,12 @@ function testEmptyColl() {
     assert.commandWorked(coll.createIndex({a: 1}));
     const emptyCollIndexPlan = getWinningPlanFromExplain(coll.find({a: 1}).explain());
     assert(isIxscan(db, emptyCollIndexPlan), emptyCollIndexPlan);
-    assert(!emptyCollIndexPlan.hasOwnProperty("cardinalityEstimate"), emptyCollIndexPlan);
+    assert.eq(emptyCollIndexPlan.cardinalityEstimate, 0, emptyCollIndexPlan);
 
     // Index intersection
     assert.commandWorked(coll.createIndex({b: 1}));
     const emptyCollIntersectionExp = coll.find({a: 1, b: 1}).explain();
-    assertNoPlanCosted(emptyCollIntersectionExp);
+    assertAllPlansHaveZeroCE(emptyCollIntersectionExp);
 
     // Index union
     const emptyCollUnionExp = coll
@@ -73,13 +72,13 @@ function testEmptyColl() {
             ],
         })
         .explain();
-    assertNoPlanCosted(emptyCollUnionExp);
+    assertAllPlansHaveZeroCE(emptyCollUnionExp);
 
     // Test limit and skip with empty collection
     const emptyCollLimitPlan = getWinningPlanFromExplain(coll.find({a: 1}).limit(5).explain());
-    assert(!emptyCollLimitPlan.hasOwnProperty("cardinalityEstimate"), emptyCollLimitPlan);
+    assert.eq(emptyCollLimitPlan.cardinalityEstimate, 0, emptyCollLimitPlan);
     const emptyCollSkipPlan = getWinningPlanFromExplain(coll.find({a: 1}).skip(5).explain());
-    assert(!emptyCollSkipPlan.hasOwnProperty("cardinalityEstimate"), emptyCollSkipPlan);
+    assert.eq(emptyCollSkipPlan.cardinalityEstimate, 0, emptyCollSkipPlan);
 
     // Cleanup indexes created in this testcase
     assert.commandWorked(coll.dropIndex({a: 1}));

@@ -1942,14 +1942,14 @@ StatusWith<PlanRankingResult> QueryPlanner::planWithCostBasedRanking(
     std::vector<std::unique_ptr<QuerySolution>> allSoln,
     const CanonicalQuery& query,
     QueryCBRCEModeEnum ceMode,
-    bool failOnZeroIxscanCE) {
+    bool considerZeroCESampledIXScanNonEstimable) {
     using namespace cost_based_ranker;
     auto cbrMode = ceMode;
     EstimateMap estimates;
     const auto& collInfo = params.mainCollectionInfo;
     tassert(9969001, "CBR received incomplete catalog statistics", collInfo.collStats != nullptr);
     CardinalityEstimator cardEstimator(
-        collInfo, samplingEstimator, estimates, cbrMode, failOnZeroIxscanCE);
+        collInfo, samplingEstimator, estimates, cbrMode, considerZeroCESampledIXScanNonEstimable);
     CostEstimator costEstimator(estimates);
 
     // TODO SERVER-136418. Consider using bitsets instead of vectors here.
@@ -1967,9 +1967,6 @@ StatusWith<PlanRankingResult> QueryPlanner::planWithCostBasedRanking(
 
     CostEstimate bestCost = maxCost;
     boost::optional<size_t> bestIdx;
-    // Set when a plan aborted with a zero cardinality estimate, in which case all plans are handed
-    // to the multi-planner.
-    bool zeroCEEstimate = false;
     for (size_t solnIdx = 0; solnIdx < allSoln.size(); ++solnIdx) {
         const auto& soln = *allSoln[solnIdx];
         const auto& ceRes = cbrMode == QueryCBRCEModeEnum::kExactCE
@@ -1982,15 +1979,12 @@ StatusWith<PlanRankingResult> QueryPlanner::planWithCostBasedRanking(
                 // Fallback to multi-planning when the reason for the inestimable plan was an
                 // unsupported node.
                 acceptedIdx.push_back(solnIdx);
-            } else if (ceRes.getStatus().code() == ErrorCodes::ZeroCEEstimate) {
-                // An index scan was estimated to produce zero rows. CBR does not reliably pick
-                // the better plan when costs rest on a zero estimate (whatever its source), so
-                // abandon CBR for this query and let the multi-planner rank *all* candidate plans.
-                zeroCEEstimate = true;
-                // The estimates gathered so far are deliberately kept: explain still reports them,
-                // which is what makes this case triageable - a zero estimate is visible alongside
-                // the fact that the multi-planner ended up choosing the winner.
-                break;
+            } else if (considerZeroCESampledIXScanNonEstimable &&
+                       ceRes.getStatus().code() == ErrorCodes::ZeroCEEstimate) {
+                // An index scan that sampling estimated to scan zero keys means "no
+                // matching data observed" rather than a true zero, so this plan's cost cannot be
+                // compared with the others.
+                acceptedIdx.push_back(solnIdx);
             } else {
                 // All other CE modes are considered "strict", that is, when a CE method couldn't
                 // be applied, this is considered a user error.
@@ -2018,27 +2012,20 @@ StatusWith<PlanRankingResult> QueryPlanner::planWithCostBasedRanking(
         }
     }
 
-    std::vector<std::unique_ptr<QuerySolution>> acceptedSoln;
-    std::vector<std::unique_ptr<QuerySolution>> rejectedSoln;
-    if (zeroCEEstimate) {
-        // Abandon plan ranking and hand every candidate to the multi-planner in the original order.
-        acceptedSoln = std::move(allSoln);
-    } else {
-        if (bestIdx.has_value()) {
-            // Put the plan with lowest cost (among the estimated plans) first.
-            acceptedIdx.insert(acceptedIdx.begin(), bestIdx.value());
-        }
-        auto extractSolutions = [&](const std::vector<size_t>& indexes) {
-            std::vector<std::unique_ptr<QuerySolution>> solutions;
-            solutions.reserve(indexes.size());
-            for (size_t idx : indexes) {
-                solutions.push_back(std::move(allSoln[idx]));
-            }
-            return solutions;
-        };
-        acceptedSoln = extractSolutions(acceptedIdx);
-        rejectedSoln = extractSolutions(rejectedIdx);
+    if (bestIdx.has_value()) {
+        // Put the plan with lowest cost (among the estimated plans) first.
+        acceptedIdx.insert(acceptedIdx.begin(), bestIdx.value());
     }
+    auto extractSolutions = [&](const std::vector<size_t>& indexes) {
+        std::vector<std::unique_ptr<QuerySolution>> solutions;
+        solutions.reserve(indexes.size());
+        for (size_t idx : indexes) {
+            solutions.push_back(std::move(allSoln[idx]));
+        }
+        return solutions;
+    };
+    auto acceptedSoln = extractSolutions(acceptedIdx);
+    auto rejectedSoln = extractSolutions(rejectedIdx);
 
     tassert(9751901,
             "Some plan has fallen into the gray zone between accepted and rejected QSNs.",

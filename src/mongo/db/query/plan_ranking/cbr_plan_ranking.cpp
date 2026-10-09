@@ -192,9 +192,9 @@ StatusWith<PlanRankingResult> CBRPlanRankingStrategy::rankPlans(
                 }
             }
         } else if (result.solutions.size() > 1) {
-            // CBR could not estimate all plans (a node rejected with UnsupportedCbrNode) and
-            // returned multiple solutions to be ranked by the multi-planner, so MP - not CBR -
-            // decides the winner.
+            // CBR could not estimate all plans (a node rejected with UnsupportedCbrNode or
+            // ZeroCEEstimate) and returned multiple solutions to be ranked by the multi-planner,
+            // so MP - not CBR - decides the winner.
             // All three callers of this strategy - the strict costBased knob, and the two mixed
             // strategies (NoMultiplanningResults, EstimateRankingEffort) calling via
             // getBestCBRPlan - report the same reason for this outcome, so this inner site

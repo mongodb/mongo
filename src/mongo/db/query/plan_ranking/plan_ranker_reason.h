@@ -32,7 +32,8 @@ enum class PlanRankerReason {
     // TODO SERVER-133066 remove when the limitation is removed
     kHistogramCEInternalColl,
     // CBR was engaged but could not estimate the cardinality or cost of a node in some candidate
-    // plan (any node the estimators reject with ErrorCodes::UnsupportedCbrNode - see
+    // plan (any node the estimators reject with ErrorCodes::UnsupportedCbrNode, or an index scan
+    // that sampling estimated to scan zero keys, rejected with ErrorCodes::ZeroCEEstimate - see
     // cardinality_estimator.cpp), so ranking fell back to multi-planning.
     kCBRInestimableNode,
     // The multi-planning trial exited early because one plan reached EOF or filled a batch

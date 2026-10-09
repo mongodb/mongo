@@ -104,7 +104,7 @@ TEST_F(SingleTableAccessTestFixture, EstimatesPopulated) {
 }
 
 // A filter that matches nothing gives every index scan a zero estimate. Outside of join
-// optimization that abandons cost-based ranking in favor of the multi-planner, but
+// optimization that makes those plans non-estimable and hands them to the multi-planner, but
 // join optimization has no multi-planner to fall back to, so it must still get one costed plan.
 TEST_F(SingleTableAccessTestFixture, ZeroScanEstimateStillYieldsSingleCostedPlan) {
     auto opCtx = operationContext();

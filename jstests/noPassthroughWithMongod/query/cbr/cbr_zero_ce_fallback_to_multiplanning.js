@@ -1,7 +1,8 @@
 /**
- * Test that CBR falls back to multiplanning when a plan contains an index scan whose cardinality
- * estimate is zero. CBR does not reliably pick the better plan when costs rest on a zero estimate,
- * so the candidate plans are handed to the multi-planner instead.
+ * Test that CBR falls back to multiplanning for a plan containing an index scan that sampling
+ * estimates to scan zero keys. A zero estimate from sampling typically means "no matching data
+ * observed in the sample" rather than "truly zero", so the plan's cost cannot be trusted and the
+ * plan is handed to the multi-planner instead.
  *
  * @tags: [
  *   requires_fcv_90,
@@ -12,10 +13,14 @@ import {
     assertChosenRanker,
     ChosenRanker,
     getPlanStage,
+    getRejectedPlans,
     getWinningPlanFromExplain,
-    PlanRankerReason,
 } from "jstests/libs/query/analyze_plan.js";
-import {getPlanRankerConfig, setPlanRankerConfig} from "jstests/libs/query/cbr_utils.js";
+import {
+    getPlanRankerConfig,
+    isPlanCosted,
+    setPlanRankerConfig,
+} from "jstests/libs/query/cbr_utils.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
 
@@ -27,76 +32,64 @@ if (checkSbeFullyEnabled(db)) {
 
 const coll = db[jsTestName()];
 
-// The query below matches nothing, so its two candidate index scans tie on multi-planner score
-// and the tie is broken by candidate order: the planner enumerates the {a: 1} index first.
-const zeroCEFilter = {a: {$gt: 5000}, b: {$gt: 5000}};
+function scannedIndex(plan) {
+    const ixscan = getPlanStage(plan, "IXSCAN");
+    assert.neq(null, ixscan, "expected an IXSCAN in the plan", {plan});
+    return ixscan.keyPattern;
+}
 
 function winningIndex(explain) {
-    const ixscan = getPlanStage(getWinningPlanFromExplain(explain), "IXSCAN");
-    assert.neq(null, ixscan, "expected an IXSCAN in the winning plan", {explain});
-    return ixscan.keyPattern;
+    return scannedIndex(getWinningPlanFromExplain(explain));
+}
+
+function allPlans(explain) {
+    return [getWinningPlanFromExplain(explain), ...getRejectedPlans(explain)];
 }
 
 describe("CBR with a zero cardinality estimate", function () {
     let prevPlanRankerConfig;
-    let prevPlanEvaluationWorks;
 
     before(function () {
         coll.drop();
-        // 1,000 docs with a = b = 0..999. Two indexes so that the queries below have multiple
-        // candidate plans and plan ranking is engaged. 'g' is present on the second half of the
-        // collection only: it is common enough to be observed by the sample, yet absent from the
-        // prefix of the {a: 1} index that the multi-planner's trial phase scans.
+        // 1,000 docs with a = b = c = 0..999, and indexes so that the queries below have multiple
+        // candidate plans and plan ranking is engaged.
         assert.commandWorked(
-            coll.insertMany(
-                Array.from({length: 1000}, (_, i) => (i < 500 ? {a: i, b: i} : {a: i, b: i, g: 1})),
-            ),
+            coll.insertMany(Array.from({length: 1000}, (_, i) => ({a: i, b: i, c: i}))),
         );
         assert.commandWorked(coll.createIndex({a: 1}));
         assert.commandWorked(coll.createIndex({b: 1}));
+        assert.commandWorked(coll.createIndex({c: 1}));
 
         prevPlanRankerConfig = getPlanRankerConfig(db);
-        // "mixed" so that the multi-planner runs first and only hands over to CBR when its trial
-        // phase produces no results - the path this test is about.
+        // Strict cost-based ranking, so that CBR ranks every query before any multi-planning trial:
+        // the multi-planner only runs on the plans CBR hands to it. An uncosted plan is therefore
+        // one CBR could not estimate.
         setPlanRankerConfig(db, {
-            internalQueryPlanRanker: "mixed",
+            internalQueryPlanRanker: "costBased",
             internalQueryCBRCEMode: "samplingCE",
-            internalQueryMixedPlanRankingStrategy: "NoMultiplanningResults",
         });
-        // Keep the multi-planner's trial phase short so it gives up before reaching the documents
-        // carrying 'g' in the control query below.
-        prevPlanEvaluationWorks = assert.commandWorked(
-            db.adminCommand({setParameter: 1, internalQueryPlanEvaluationWorks: 10}),
-        ).was;
     });
 
     after(function () {
         setPlanRankerConfig(db, prevPlanRankerConfig);
-        assert.commandWorked(
-            db.adminCommand({
-                setParameter: 1,
-                internalQueryPlanEvaluationWorks: prevPlanEvaluationWorks,
-            }),
-        );
         coll.drop();
     });
 
     it("hands every candidate to the multi-planner in its original order", function () {
         coll.getPlanCache().clear();
 
-        // No document (and hence no sampled document) matches, so every candidate plan has a zero
-        // cardinality estimate. CBR must not trust the zero estimates and must hand all plans to
-        // the multi-planner.
-        const zeroCEExplain = coll.find(zeroCEFilter).explain();
-        assertChosenRanker(
-            zeroCEExplain,
-            ChosenRanker.kMultiPlanning,
-            PlanRankerReason.kCBRInestimableNode,
-        );
+        // No document (and hence no sampled document) matches, so both candidate index scans are
+        // estimated to scan zero keys. CBR must not trust the zero estimates: it estimates neither
+        // plan and hands both to the multi-planner, which picks the winner.
+        const zeroCEExplain = coll.find({a: {$gt: 5000}, b: {$gt: 5000}}).explain();
+        assertChosenRanker(zeroCEExplain, ChosenRanker.kMultiPlanning);
+        for (const plan of allPlans(zeroCEExplain)) {
+            assert(!isPlanCosted(plan), "expected CBR not to cost a zero-CE plan", {plan});
+        }
 
-        // Abandoning CBR must hand the candidates to the multi-planner in the planner's original
-        // order, so the outcome is exactly what multi-planning alone would have produced: the tie
-        // is broken in favour of the first enumerated index, {a: 1}.
+        // The plans are handed to the multi-planner in the planner's original order. They tie on
+        // score, as neither returns a document, so the tie is broken in favour of the first
+        // enumerated index, {a: 1}.
         assert.eq(
             {a: 1},
             winningIndex(zeroCEExplain),
@@ -107,18 +100,40 @@ describe("CBR with a zero cardinality estimate", function () {
         );
     });
 
-    it("ranks with CBR when the sample observes matching documents", function () {
+    it("still ranks the plans whose index scans do not estimate zero keys", function () {
         coll.getPlanCache().clear();
 
-        // The multi-planner also hands over here - the trial phase scans the first half of the
-        // {a: 1} index, none of which has 'g', and exhausts its works budget without a result -
-        // but this time the sample does observe matching documents, so the estimates are non-zero
-        // and CBR ranks the plans itself.
-        const nonZeroCEExplain = coll.find({a: {$gte: 0}, b: {$gte: 0}, g: 1}).explain();
-        assertChosenRanker(
-            nonZeroCEExplain,
-            ChosenRanker.kCostBased,
-            PlanRankerReason.kNoMultiplanningResults,
+        // Only the plan scanning {a: 1} is estimated to scan zero keys: 'a > 5000' matches nothing,
+        // while the 'b' and 'c' predicates match most of the collection. CBR still costs the plans
+        // scanning {b: 1} and {c: 1}, and hands only the cheaper of them to the multi-planner along
+        // with the zero-CE plan.
+        const partialZeroCEExplain = coll
+            .find({a: {$gt: 5000}, b: {$gt: 5}, c: {$gt: 5}})
+            .explain();
+        assertChosenRanker(partialZeroCEExplain, ChosenRanker.kMultiPlanning);
+
+        // The zero-CE plan wins the multi-planner's trial, as it reaches EOF at once, and is not
+        // costed.
+        const winningPlan = getWinningPlanFromExplain(partialZeroCEExplain);
+        assert.eq({a: 1}, scannedIndex(winningPlan), "unexpected winning plan", {
+            partialZeroCEExplain,
+        });
+        assert(!isPlanCosted(winningPlan), "expected CBR not to cost the zero-CE plan", {
+            winningPlan,
+        });
+
+        // Both estimable plans are rejected with the cost CBR gave them: one by the multi-planner,
+        // the other by CBR itself.
+        const rejectedPlans = getRejectedPlans(partialZeroCEExplain);
+        assert.sameMembers(
+            [{b: 1}, {c: 1}],
+            rejectedPlans.map((plan) => scannedIndex(plan)),
+            "unexpected rejected plans",
+            undefined /* compareFn */,
+            {partialZeroCEExplain},
         );
+        for (const plan of rejectedPlans) {
+            assert(isPlanCosted(plan), "expected CBR to cost an estimable plan", {plan});
+        }
     });
 });

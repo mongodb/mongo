@@ -142,13 +142,14 @@ StatusWith<SingleTablePlanResult> accessPlanForFilterWithDerivedPredicates(
     if (!swSolns.isOK()) {
         return swSolns.getStatus();
     }
-    auto swCbrResult = QueryPlanner::planWithCostBasedRanking(querySolutionParams,
-                                                              samplingEstimator,
-                                                              nullptr /*exactCardinality*/,
-                                                              std::move(swSolns.getValue()),
-                                                              *node.accessPath,
-                                                              QueryCBRCEModeEnum::kSamplingCE,
-                                                              false /* failOnZeroIxscanCE */);
+    auto swCbrResult =
+        QueryPlanner::planWithCostBasedRanking(querySolutionParams,
+                                               samplingEstimator,
+                                               nullptr /*exactCardinality*/,
+                                               std::move(swSolns.getValue()),
+                                               *node.accessPath,
+                                               QueryCBRCEModeEnum::kSamplingCE,
+                                               false /* considerZeroCESampledIXScanNonEstimable */);
     // Return bad status if CBR is unable to produce a plan
     if (!swCbrResult.isOK()) {
         return swCbrResult.getStatus();

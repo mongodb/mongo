@@ -41,7 +41,7 @@ CardinalityEstimator::CardinalityEstimator(const CollectionInfo& collInfo,
                                            const ce::SamplingEstimator* samplingEstimator,
                                            EstimateMap& qsnEstimates,
                                            QueryCBRCEModeEnum rankerMode,
-                                           bool failOnZeroIxscanCE)
+                                           bool considerZeroCESampledIXScanNonEstimable)
     : _collCard{CardinalityEstimate{CardinalityType{collInfo.collStats->getCardinality()},
                                     EstimationSource::Metadata}},
       _inputCard{_collCard},
@@ -49,7 +49,7 @@ CardinalityEstimator::CardinalityEstimator(const CollectionInfo& collInfo,
       _samplingEstimator(samplingEstimator),
       _qsnEstimates{qsnEstimates},
       _ceMode(rankerMode),
-      _failOnZeroIxscanCE(failOnZeroIxscanCE) {
+      _considerZeroCESampledIXScanNonEstimable(considerZeroCESampledIXScanNonEstimable) {
     if (_ceMode == QueryCBRCEModeEnum::kSamplingCE) {
         tassert(9746501,
                 "samplingEstimator cannot be null when CBRCEMode is samplingCE",
@@ -214,21 +214,6 @@ CEResult CardinalityEstimator::estimate(const QuerySolutionNode* node) {
     if (!ceRes.isOK()) {
         return ceRes;
     }
-
-    // A zero scan estimate fails the whole plan because CBR does not always pick the better plan
-    // in this case.
-    if (_failOnZeroIxscanCE && nodeType == STAGE_IXSCAN && ceRes.getValue() == zeroCE) {
-        LOGV2_DEBUG(13336200,
-                    2,
-                    "Aborting CBR plan estimation: a scan node's cardinality estimate is zero. "
-                    "The plan will be ranked by the multi-planner instead",
-                    "stage"_attr = nodeStageTypeToString(node),
-                    "ceSource"_attr = toStringData(ceRes.getValue().source()));
-        return Status(ErrorCodes::ZeroCEEstimate,
-                      str::stream() << "Node " << nodeStageTypeToString(node)
-                                    << " has a zero cardinality estimate");
-    }
-
     if (isConjunctionBreaker) {
         popSelectivities();
         _inputCard = ceRes.getValue();
@@ -733,6 +718,19 @@ CEResult CardinalityEstimator::estimate(const IndexScanNode* node) {
             } else {
                 est.inCE = ridsEstFunct(node->bounds, nullptr);
             }
+        }
+
+        if (_considerZeroCESampledIXScanNonEstimable && est.inCE.has_value() &&
+            est.inCE.value() == zeroCE) {
+            LOGV2_DEBUG(13336200,
+                        2,
+                        "Aborting CBR plan estimation: an index scan's input cardinality estimate "
+                        "is zero. The plan will be ranked by the multi-planner instead",
+                        "stage"_attr = nodeStageTypeToString(node),
+                        "ceSource"_attr = toStringData(est.inCE->source()));
+            return Status(ErrorCodes::ZeroCEEstimate,
+                          str::stream() << "Node " << nodeStageTypeToString(node)
+                                        << " has a zero input cardinality estimate");
         }
 
         auto seekCE = estimateIndexSeeks(node->bounds, node->index.multikey);
