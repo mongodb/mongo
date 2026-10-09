@@ -190,7 +190,9 @@ AggregateCommandRequest makeAggregateRequestForCardinalityAndFrequency(const Nam
                                                                        int numMostCommonValues,
                                                                        int64_t numDocsTotal,
                                                                        int64_t numDocsToSample) {
-    uassertStatusOK(validateIndexKey(hintIndexKey));
+    // Validate only the shard key prefix. Additional fields are not needed for calculating metrics.
+    uassertStatusOK(
+        validateIndexKey(hintIndexKey.filterFieldsUndotted(shardKey, true /* inFilter */)));
 
     std::vector<BSONObj> pipeline;
 
@@ -418,6 +420,8 @@ struct IndexSpec {
  * - It must not be partial since such an index omits documents do not match the specified
  *   filter.
  * - It must not be multi-key since a shard key field cannot be an array.
+ * - It must not have descending fields within the shard key prefix since they are unsupported by
+ * shardCollection.
  */
 boost::optional<IndexSpec> findCompatiblePrefixedIndex(OperationContext* opCtx,
                                                        const CollectionPtr& collection,
@@ -456,6 +460,14 @@ boost::optional<IndexSpec> findCompatiblePrefixedIndex(OperationContext* opCtx,
         }
 
         if (!shardKey.isFieldNamePrefixOf(indexKey)) {
+            continue;
+        }
+        // Skip indexes whose shard key prefix has a numeric field other than 1.
+        const auto indexKeyPrefix = indexKey.filterFieldsUndotted(shardKey, true /* inFilter */);
+        if (std::any_of(
+                indexKeyPrefix.begin(), indexKeyPrefix.end(), [](const BSONElement& element) {
+                    return element.isNumber() && element.safeNumberInt() != 1;
+                })) {
             continue;
         }
         if (!compatibleIndexSpec.has_value() ||

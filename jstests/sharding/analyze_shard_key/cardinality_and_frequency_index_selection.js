@@ -2,7 +2,11 @@
  * Tests that the cardinality and frequency metrics calculation within the analyzeShardKey command
  * prioritizes indexes that allows it to infer if the shard key is unique.
  *
- * @tags: [requires_fcv_70]
+ * @tags: [
+ *   # Requires all nodes to be running the latest binary.
+ *   multiversion_incompatible,
+ *   requires_fcv_70,
+ * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -36,6 +40,41 @@ function testAnalyzeShardKey(conn, writeConcern, {docs, indexSpecs, shardKeys, m
         );
         AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res.keyCharacteristics, metrics);
     }
+}
+
+function testAnalyzeShardKeyFails(
+    conn,
+    writeConcern,
+    {docs, indexSpecs, shardKey, expectedErrorCode, expectedErrorMsg},
+) {
+    const dbName = "testDb-" + extractUUIDFromObject(UUID());
+    const collName = "testColl";
+    const ns = dbName + "." + collName;
+    jsTest.log(
+        `Testing ${tojson({dbName, collName, docs, indexSpecs, shardKey, expectedErrorCode})}`,
+    );
+
+    const db = conn.getDB(dbName);
+    const coll = db.getCollection(collName);
+
+    assert.commandWorked(db.runCommand({createIndexes: collName, indexes: indexSpecs}));
+    assert.commandWorked(coll.insert(docs, {writeConcern}));
+
+    const res = assert.commandFailedWithCode(
+        conn.adminCommand({
+            analyzeShardKey: ns,
+            key: shardKey,
+            // Skip calculating the read and write distribution metrics since they are not needed by
+            // this test.
+            readWriteDistribution: false,
+        }),
+        expectedErrorCode,
+    );
+    if (expectedErrorMsg) {
+        assert.eq(res.errmsg, expectedErrorMsg, "Unexpected error message", {res});
+    }
+
+    assert(coll.drop());
 }
 
 function runTest(conn, writeConcern) {
@@ -151,6 +190,43 @@ function runTest(conn, writeConcern) {
             ],
             numMostCommonValues,
         },
+    });
+
+    testAnalyzeShardKey(conn, writeConcern, {
+        docs: [
+            {x: -1, y: -1},
+            {x: 1, y: 1},
+        ],
+        indexSpecs: [{name: "x_1_y_-1", key: {x: 1, y: -1}}],
+        shardKeys: [{x: 1}, {x: "hashed"}],
+        metrics: {
+            numDocs: 2,
+            isUnique: false,
+            numDistinctValues: 2,
+            mostCommonValues: [
+                {value: {x: -1}, frequency: 1},
+                {value: {x: 1}, frequency: 1},
+            ],
+            numMostCommonValues,
+        },
+    });
+
+    testAnalyzeShardKeyFails(conn, writeConcern, {
+        docs: [{x: -1}, {x: 1}],
+        indexSpecs: [{name: "x_-1", key: {x: -1}}],
+        shardKey: {x: 1},
+        expectedErrorCode: ErrorCodes.IllegalOperation,
+        expectedErrorMsg:
+            "Cannot analyze the characteristics of a shard key that does not have a supporting index",
+    });
+
+    testAnalyzeShardKeyFails(conn, writeConcern, {
+        docs: [{x: -1}, {x: 1}],
+        indexSpecs: [{name: "x_-1", key: {x: -1}, unique: true}],
+        shardKey: {x: 1},
+        expectedErrorCode: ErrorCodes.IllegalOperation,
+        expectedErrorMsg:
+            "Cannot analyze the characteristics of a shard key that does not have a supporting index",
     });
 }
 
