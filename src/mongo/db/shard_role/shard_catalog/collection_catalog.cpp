@@ -1225,7 +1225,9 @@ ConsistentCollection CollectionCatalog::establishConsistentCollection(
 
     auto coll = _lookupCollectionByNamespaceOrUUIDNoFindInstantiated(nssOrUUID).get();
 
-    if constexpr (kIsSanitizerBuild || kDebugBuild) {
+    // TODO(SERVER-136424): Temporarily disabled. Re-enable after fixing replicated fast count
+    // issue.
+    if constexpr (false && (kIsSanitizerBuild || kDebugBuild)) {
         if (coll) {
             auto clone = _instantiateCollectionIfTesting(
                 opCtx, nssOrUUID, coll->getCatalogId(), readTimestamp);

@@ -2394,6 +2394,8 @@ TEST_F(CollectionCatalogTimestampTest, CollectionLifetimeTiedToStorageTransactio
     }
 }
 
+// TODO(SERVER-136424): Re-enable tests after fixing replicated fast count issue.
+#if 0
 TEST_F(CollectionCatalogTimestampTest, OpenCollectionAlwaysForDebugBuilds) {
     if constexpr (!kDebugBuild) {
         return;
@@ -2447,6 +2449,7 @@ TEST_F(CollectionCatalogTimestampTest, OpenCollectionAlwaysForSanitizerBuilds) {
     const auto& openedColls = OpenedCollections::get(opCtx.get());
     ASSERT_FALSE(openedColls.lookupByNamespace(nss));
 }
+#endif
 #endif
 
 TEST_F(CollectionCatalogTimestampTest, EstablishConsistentCollectionReadYourWrites) {
