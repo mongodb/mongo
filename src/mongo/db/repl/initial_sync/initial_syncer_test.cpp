@@ -1094,6 +1094,8 @@ TEST_F(InitialSyncerTest, InitialSyncerTransitionsToCompleteWhenFinishCallbackTh
 
     ASSERT_OK(initialSyncer->shutdown());
 
+    executor::NetworkInterfaceMock::InNetworkGuard(getNet())->runReadyNetworkOperations();
+
     hangBeforeFinish->waitForTimesEntered(timesEnteredFailPoint + 1);
     hangBeforeFinish->setMode(FailPoint::off);
     initialSyncer->join();
