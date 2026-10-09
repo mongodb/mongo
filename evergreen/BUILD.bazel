@@ -112,6 +112,18 @@ sh_test(
     data = ["//evergreen/functions:venv_adjust.sh"],
 )
 
+sh_test(
+    name = "external_auth_gcp_test",
+    srcs = ["external_auth_gcp_test.sh"],
+    data = [
+        "external_auth_gcp_requirements.txt",
+        "external_auth_gcp_setup.sh",
+        "external_auth_gcp_teardown.sh",
+        "external_auth_gcp_venv.sh",
+    ],
+    target_compatible_with = ["@platforms//os:linux"],
+)
+
 sh_binary(
     name = "check_idl_compat",
     srcs = ["check_idl_compat.sh"],
@@ -190,11 +202,19 @@ sh_binary(
 sh_binary(
     name = "external_auth_gcp_setup",
     srcs = ["external_auth_gcp_setup.sh"],
+    data = [
+        "external_auth_gcp_requirements.txt",
+        "external_auth_gcp_venv.sh",
+    ],
 )
 
 sh_binary(
     name = "external_auth_gcp_teardown",
     srcs = ["external_auth_gcp_teardown.sh"],
+    data = [
+        "external_auth_gcp_requirements.txt",
+        "external_auth_gcp_venv.sh",
+    ],
 )
 
 sh_binary(

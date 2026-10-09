@@ -38,10 +38,10 @@ echo ${oidc_gcp_service_account_key} | sed "s/[[:space:]]//g" | base64 --decode 
 chmod 600 ${GOOGLE_APPLICATION_CREDENTIALS}
 ls -al ${GOOGLE_APPLICATION_CREDENTIALS}
 
-# Install google-cloud-compute so that the script can run.
-$python -m pip install google-cloud-compute
+. "$DIR/external_auth_gcp_venv.sh"
+setup_gcp_venv
 
 # This script creates a Google Compute Engine VM instance that we will later use to obtain our managed identity token.
 # It also outputs the external IP and name of the new VM into a local file so that the test knows where to SSH into
 # and the teardown script knows which VM instance to delete.
-$python src/mongo/db/modules/enterprise/jstests/external_auth_oidc_gcp/lib/gce_vm_manager.py create --config_file $HOME/gce_vm_config.json --service_account_key_file ${GOOGLE_APPLICATION_CREDENTIALS} --output_file $HOME/gce_vm_info.json
+"$gcp_python" -I src/mongo/db/modules/enterprise/jstests/external_auth_oidc_gcp/lib/gce_vm_manager.py create --config_file $HOME/gce_vm_config.json --service_account_key_file ${GOOGLE_APPLICATION_CREDENTIALS} --output_file $HOME/gce_vm_info.json

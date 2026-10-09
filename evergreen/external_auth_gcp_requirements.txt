@@ -1,0 +1,21 @@
+# GCP VM helper dependencies, installed only in its isolated environment.
+certifi==2026.7.22
+cffi==2.1.1
+charset-normalizer==3.5.2
+cryptography==50.0.2
+google-api-core==2.41.0
+google-auth==2.61.0
+google-cloud-compute==1.55.0
+googleapis-common-protos==1.75.5
+grpcio==1.84.0
+grpcio-status==1.84.0
+idna==3.20
+opentelemetry-api==1.45.1
+proto-plus==1.29.0
+protobuf==7.36.2
+pyasn1==0.6.4
+pyasn1_modules==0.4.2
+pycparser==3.1
+requests==2.34.2
+typing_extensions==4.16.0
+urllib3==2.8.0
