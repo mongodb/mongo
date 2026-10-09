@@ -14,6 +14,14 @@
         shell_options:
           eval: >-
             await import("jstests/libs/override_methods/pin_fcv_to_last_continuous.js");
+- name: pin_fcv_to_last_continuous_and_retry_resharding
+  value:
+    executor:
+      config:
+        shell_options:
+          eval: >-
+            await import("jstests/libs/override_methods/pin_fcv_to_last_continuous.js");
+            await import("jstests/libs/override_methods/implicitly_retry_resharding.js");
 - name: exclude_fcv_incompatible_tests
   value:
     selector:

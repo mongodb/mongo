@@ -113,6 +113,7 @@
         shell_options:
           eval: >-
             await import('jstests/libs/override_methods/implicitly_retry_transactions_on_write_conflicts.js');
+            await import('jstests/libs/override_methods/implicitly_retry_resharding.js');
 - name: all_no_passthrough_index_builds_tests_selector
   value:
     selector:

@@ -13,6 +13,7 @@ executor:
   config:
     shell_options:
       authenticationDatabase: local
+      eval: await import("jstests/libs/override_methods/implicitly_retry_resharding.js");
       global_vars:
         TestData:
           auth: true

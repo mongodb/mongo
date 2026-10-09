@@ -135,6 +135,7 @@ executor:
       - src/mongo/db/modules/enterprise/jstests/live_imports_multiversion/*.js
   config:
     shell_options:
+      eval: await import("jstests/libs/override_methods/implicitly_retry_resharding.js");
       nodb: ""
       global_vars:
         TestData:

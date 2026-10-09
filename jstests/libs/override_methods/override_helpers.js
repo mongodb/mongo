@@ -1,4 +1,5 @@
 import {getCommandName} from "jstests/libs/cmd_object_utils.js";
+import {Thread} from "jstests/libs/parallelTester.js";
 
 // Store the original 'runCommand' function before applying any overrides.
 const preOverrideRunCommand = Mongo.prototype.runCommand;
@@ -68,7 +69,7 @@ export const OverrideHelpers = (function () {
     function prependOverrideInParallelShell(overrideFile) {
         const startParallelShellOriginal = startParallelShell;
 
-        startParallelShell = function (jsCode, port, noConnect) {
+        startParallelShell = function (jsCode, port, noConnect, ...optionArgs) {
             let newCode;
             if (typeof jsCode === "function") {
                 // Load the override file and immediately invoke the supplied function.
@@ -81,7 +82,29 @@ export const OverrideHelpers = (function () {
                 newCode = `await import("${overrideFile}"); ${jsCode};`;
             }
 
-            return startParallelShellOriginal(newCode, port, noConnect);
+            return startParallelShellOriginal(newCode, port, noConnect, ...optionArgs);
+        };
+    }
+
+    // Threads run in a fresh JS scope, so overrides must be loaded again inside of them.
+    function prependOverrideInThread(overrideFile) {
+        const initOriginal = Thread.prototype.init;
+
+        Thread.prototype.init = function (startWrapper, testData, startFn, ...args) {
+            const startFnWithOverride = function (overrideFile, startFn, ...args) {
+                // eslint-disable-next-line no-restricted-syntax -- sync loader needed in thread scope
+                load(overrideFile);
+                return startFn.apply(this, args);
+            };
+            return initOriginal.call(
+                this,
+                startWrapper,
+                testData,
+                startFnWithOverride,
+                overrideFile,
+                startFn,
+                ...args,
+            );
         };
     }
 
@@ -130,6 +153,7 @@ export const OverrideHelpers = (function () {
         isAggregationWithQuerySettings: makeIsAggregationWithFirstStage("$querySettings"),
         isMapReduceWithInlineOutput: isMapReduceWithInlineOutput,
         prependOverrideInParallelShell: prependOverrideInParallelShell,
+        prependOverrideInThread: prependOverrideInThread,
         overrideRunCommand: overrideRunCommand,
         withPreOverrideRunCommand: withPreOverrideRunCommand,
     };

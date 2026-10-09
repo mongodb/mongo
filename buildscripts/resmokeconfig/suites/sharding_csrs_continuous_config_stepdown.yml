@@ -351,4 +351,5 @@ executor:
       eval: >-
         await import("jstests/libs/override_methods/sharding_csrs_continuous_config_stepdown.js");
         await import("jstests/libs/override_methods/query/require_change_stream_test_fixture.js");
+        await import("jstests/libs/override_methods/implicitly_retry_resharding.js");
       nodb: ""
