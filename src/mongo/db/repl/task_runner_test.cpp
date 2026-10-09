@@ -209,14 +209,18 @@ TEST_F(TaskRunnerTest, Cancel) {
     stdx::condition_variable condition;
     Status status = getDetectableErrorStatus();
     bool taskRunning = false;
+    bool activeChecked = false;
 
-    // Running this task causes the task runner to wait for another task that
-    // is never scheduled.
+    // The task blocks until the test has checked isActive(). Otherwise the task could complete and
+    // make the task runner inactive before the check.
     auto task = [&](OperationContext* theTxn, const Status& theStatus) {
-        std::lock_guard<std::mutex> lk(mutex);
+        std::unique_lock<std::mutex> lk(mutex);
         status = theStatus;
         taskRunning = true;
         condition.notify_all();
+        while (!activeChecked) {
+            condition.wait(lk);
+        }
         return TaskRunner::NextAction::kDisposeOperationContext;
     };
 
@@ -225,13 +229,18 @@ TEST_F(TaskRunnerTest, Cancel) {
     getTaskRunner().cancel();
 
     getTaskRunner().schedule(task);
-    ASSERT_TRUE(getTaskRunner().isActive());
+    // Capture the result before unblocking the task so a failed assertion below cannot leave the
+    // task blocked in its condition wait.
+    bool isActiveResult = getTaskRunner().isActive();
     {
         std::unique_lock<std::mutex> lk(mutex);
+        activeChecked = true;
+        condition.notify_all();
         while (!taskRunning) {
             condition.wait(lk);
         }
     }
+    ASSERT_TRUE(isActiveResult);
 
     // It is fine to call cancel() multiple times.
     getTaskRunner().cancel();
@@ -286,25 +295,34 @@ TEST_F(TaskRunnerTest, DestroyShouldWaitForTasksToComplete) {
     stdx::condition_variable condition;
     Status status = getDetectableErrorStatus();
     bool taskRunning = false;
+    bool activeChecked = false;
 
-    // Running this task causes the task runner to wait for another task that
-    // is never scheduled.
+    // The task blocks until the test has checked isActive(). Otherwise the task could complete and
+    // make the task runner inactive before the check.
     auto task = [&](OperationContext* theTxn, const Status& theStatus) {
-        std::lock_guard<std::mutex> lk(mutex);
+        std::unique_lock<std::mutex> lk(mutex);
         status = theStatus;
         taskRunning = true;
         condition.notify_all();
+        while (!activeChecked) {
+            condition.wait(lk);
+        }
         return TaskRunner::NextAction::kDisposeOperationContext;
     };
 
     getTaskRunner().schedule(task);
-    ASSERT_TRUE(getTaskRunner().isActive());
+    // Capture the result before unblocking the task so a failed assertion below cannot leave the
+    // task blocked in its condition wait.
+    bool isActiveResult = getTaskRunner().isActive();
     {
         std::unique_lock<std::mutex> lk(mutex);
+        activeChecked = true;
+        condition.notify_all();
         while (!taskRunning) {
             condition.wait(lk);
         }
     }
+    ASSERT_TRUE(isActiveResult);
 
     destroyTaskRunner();
 
