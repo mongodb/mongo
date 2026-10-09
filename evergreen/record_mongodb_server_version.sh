@@ -11,4 +11,10 @@ if [ -n "${build_patch_id}" ]; then
     exit 0
 fi
 
+# An ARM64 cross builder cannot execute its s390x output. The native
+# record_s390x_server_version task publishes this metadata instead.
+if [[ -n "${mongo_s390x_cross_config:-}" && "$(uname -m)" == "aarch64" ]]; then
+    exit 0
+fi
+
 "$1" --version >"$2"

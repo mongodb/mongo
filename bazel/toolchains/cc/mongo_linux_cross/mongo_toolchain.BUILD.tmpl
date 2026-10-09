@@ -1,0 +1,385 @@
+# This file exists to describe "mongo_toolchain", the http_archive defined in WORKSPACE.bazel
+
+load("@//bazel/toolchains/cc/mongo_linux:mongo_linux_cc_toolchain_config.bzl", "mongo_linux_cc_toolchain_config")
+load(":mongo_toolchain_flags.bzl",
+    "CLANG_INCLUDE_DIRS",
+    "COMMON_BINDIRS",
+    "COMMON_BUILTIN_INCLUDE_DIRECTORIES",
+    "COMMON_INCLUDE_DIRECTORIES",
+    "COMMON_LINK_FLAGS",
+    "GCC_INCLUDE_DIRS",
+)
+load("@s390x_cross_sysroot//:sysroot_info.bzl", "SYSROOT_PATH")
+
+load(
+    "@//bazel/toolchains/cc:mongo_custom_features.bzl",
+    "FEATURES_ATTR_NAMES",
+    "get_common_features_attrs",
+)
+load(
+    "@//bazel/toolchains/cc:mongo_errors.bzl",
+    "REQUIRED_SETTINGS_SANITIZER_ERROR_MESSAGE",
+    "SYSTEM_ALLOCATOR_SANITIZER_ERROR_MESSAGE",
+    "THREAD_SANITIZER_ERROR_MESSAGE",
+)
+load("@//bazel/toolchains/cc:mongo_defines.bzl", "MONGO_GLOBAL_DEFINES")
+COMPRESS_DEBUG_ENABLED = select({
+    "@//bazel/config:compress_debug_compile_enabled": True,
+    "@//conditions:default": False,
+})
+
+COVERAGE_ENABLED = select({
+    "@//bazel/config:gcov_enabled": True,
+    "@//conditions:default": False,
+})
+
+DEBUG_LEVEL = select({
+    "@//bazel/config:gcc_or_clang_dbg_level_0": 0,
+    "@//bazel/config:gcc_or_clang_dbg_level_1": 1,
+    "@//bazel/config:gcc_or_clang_dbg_level_2": 2,
+    "@//bazel/config:gcc_or_clang_dbg_level_3": 3,
+})
+
+INTERNAL_THIN_LTO_ENABLED = select({
+    "@//bazel/config:thin_lto_enabled": True,
+    "@//conditions:default": False,
+})
+
+LINKSTATIC_ENABLED = select({
+    "@//bazel/config:linkstatic_enabled": True,
+    "@//conditions:default": False,
+})
+
+WARNINGS_AS_ERRORS_ENABLED = select({
+    "@//bazel/config:warnings_as_errors_enabled": True,
+    "@//conditions:default": False,
+})
+
+package(default_visibility = ["//visibility:public"])
+
+# Export headers used for clang-tidy checks.
+cc_library(
+    name = "llvm_headers",
+    hdrs = glob([
+        "stow/llvm-{version}/include/**/*.h",
+        "stow/llvm-{version}/include/**/*.inc",
+        "stow/llvm-{version}/include/**/*.def",
+    ]),
+    visibility = ["//visibility:public"],
+)
+
+# A note on toolchains: this is complicated! Bazel requires multiple layers of indirection.
+#
+# In this case, we have:
+# cc_gcc_toolchain_config (of type cc_toolchain_config)
+# referenced by: cc_mongo_toolchain (of type cc_toolchain)
+# referenced by: mongo_toolchain (of type toolchain)
+# referenced by: toolchain_suite (of type cc_toolchain_suite)
+
+CHOSEN_LINKER = select(
+    {
+        "@//bazel/config:linker_lld_valid_settings": "lld",
+        "@//bazel/config:linker_mold_valid_settings": "mold",
+    },
+)
+
+SHARED_ARCHIVE_ENABLED = select({
+    "@//bazel/config:shared_archive_enabled": True,
+    "@//conditions:default": False,
+})
+
+DWARF_VERSION = select({
+    "@//bazel/config:dwarf_version_4_linux": 4,
+    "@//bazel/config:dwarf_version_5_linux": 5,
+    "@//conditions:default": None,
+})
+
+FISSION_ENABLED = select({
+    "@//bazel/config:fission_enabled": True,
+    "@//conditions:default": False,
+})
+
+DISABLE_DEBUG_SYMBOLS = select({
+    "@//bazel/config:debug_symbols_disabled": True,
+    "@//conditions:default": False,
+})
+
+PGO_PROFILE_GENERATE_ENABLED = select({
+    "@//bazel/config:pgo_profile_generate_enabled": True,
+    "@//conditions:default": False,
+})
+
+PGO_PROFILE_USE_ENABLED = select({
+    "@//bazel/config:pgo_profile_use_clang_enabled_linkstatic_enabled": "@pgo_data//:clang_pgo_files",
+    "@//bazel/config:pgo_profile_use_gcc_enabled_linkstatic_enabled": "@pgo_data//:gcc_pgo_files",
+    "@//conditions:default": None,
+})
+
+PROPELLER_PROFILE_GENERATE_ENABLED = select({
+    "@//bazel/config:propeller_profile_generate_enabled": True,
+    "@//conditions:default": False,
+})
+
+DTLTO_ENABLED = select({
+    "@//bazel/config:dtlto_linux_clang_enabled_fission_disabled_linkstatic_enabled": True,
+    "@//conditions:default": False,
+})
+
+ANY_SANITIZER_ENABLED = select({
+    "@//bazel/config:no_enabled_sanitizer": False,
+    "@//bazel/config:any_sanitizer_required_setting": True,
+}, no_match_error = REQUIRED_SETTINGS_SANITIZER_ERROR_MESSAGE)
+
+ASAN_ENABLED = select({
+    "@//bazel/config:asan_disabled": False,
+    "@//bazel/config:sanitize_address_required_settings": True,
+}, no_match_error = SYSTEM_ALLOCATOR_SANITIZER_ERROR_MESSAGE)
+
+ASAN_DENYLIST = "@//etc:asan_denylist_h"
+
+FSAN_ENABLED = select({
+    "@//bazel/config:sanitize_fuzzer_required_settings": True,
+    "@//bazel/config:fsan_disabled": False,
+}, no_match_error = SYSTEM_ALLOCATOR_SANITIZER_ERROR_MESSAGE + "fuzzer")
+
+MSAN_ENABLED = select({
+    "@//bazel/config:msan_disabled": False,
+    "@//bazel/config:sanitize_memory_required_settings": True
+}, no_match_error = SYSTEM_ALLOCATOR_SANITIZER_ERROR_MESSAGE)
+
+MSAN_DENYLIST = "@//etc:msan_denylist_h"
+
+# Combines following two conditions -
+# 1.
+# TODO: SERVER-48622
+#
+# See https://github.com/google/sanitizers/issues/943 for why we disallow
+# combining TSAN with libunwind. We could, alternatively, have added logic to
+# automate the decision about whether to enable libunwind based on whether TSAN
+# is enabled, but that logic is already complex, and it feels better to make it
+# explicit that using TSAN means you won't get the benefits of libunwind.
+#
+# 2.
+# We add suppressions based on the library file in etc/tsan.suppressions so the
+# link-model needs to be dynamic.
+TSAN_ENABLED = select({
+    "@//bazel/config:sanitize_thread_required_settings": True,
+    "@//bazel/config:tsan_disabled": False,
+}, no_match_error = THREAD_SANITIZER_ERROR_MESSAGE)
+
+TSAN_DENYLIST = "@//etc:tsan_denylist_h"
+
+UBSAN_ENABLED = select({
+    "@//bazel/config:ubsan_enabled": True,
+    "@//conditions:default": False,
+})
+
+UBSAN_DENYLIST = "@//etc:ubsan_denylist_h"
+
+IS_AARCH64 = select({
+    "@//bazel/config:linux_aarch64": True,
+    "@//conditions:default": False,
+})
+
+IS_PPC64LE = select({
+    "@//bazel/config:linux_ppc64le": True,
+    "@//conditions:default": False,
+})
+
+IS_S390X = select({
+    "@//bazel/config:linux_s390x": True,
+    "@//conditions:default": False,
+})
+
+IS_X86_64 = select({
+    "@//bazel/config:linux_x86_64": True,
+    "@//conditions:default": False,
+})
+
+IS_DEBUG_BUILD = select({
+    "@//bazel/config:dbg_enabled": True,
+    "@//conditions:default": False,
+})
+
+MOLD_BIN_DIR = "./external/{toolchain_repo_name}/mold-2.37.1-aarch64-linux/bin/"
+
+# v8.3 selects its linker via flags in the BUILD template rather than via
+# linker features in mongo_linux_cc_toolchain_config (as newer branches do).
+LINK_FLAGS = ["-L" + flag for flag in COMMON_LINK_FLAGS] + select({
+    # Keep linking with v8.3's LLVM 19.1.7 while the newer archive supplies
+    # cross GCC and the s390x target runtimes.
+    "@//bazel/config:linker_lld_valid_settings": [
+        "-fuse-ld=lld",
+        "-Bexternal/mongo_toolchain_v5/stow/llvm-v5/bin/",
+    ],
+    "@//bazel/config:linker_mold_valid_settings": ["-fuse-ld=mold", "-B" + MOLD_BIN_DIR],
+})
+
+BUILTIN_SYSROOT = SYSROOT_PATH
+
+EFFECTIVE_BUILTIN_INCLUDE_DIRS = COMMON_BUILTIN_INCLUDE_DIRECTORIES + GCC_INCLUDE_DIRS + COMMON_INCLUDE_DIRECTORIES
+
+# Helper target for the toolchain (see below):
+filegroup(
+    name = "all_files",
+    srcs = glob(["**/*"]) + select({
+        "@//bazel/config:pgo_profile_use_clang_enabled_linkstatic_enabled": ["@pgo_data//:clang_pgo_files"],
+        "@//bazel/config:pgo_profile_use_gcc_enabled_linkstatic_enabled": ["@pgo_data//:gcc_pgo_files"],
+        "@//conditions:default": [],
+    }) + select ({
+        "@//bazel/config:asan_disabled": [],
+        "@//bazel/config:sanitize_address_required_settings": ["@//etc:asan_denylist_h"],
+    }) + select ({
+        "@//bazel/config:msan_disabled": [],
+        "@//bazel/config:sanitize_memory_required_settings": ["@//etc:msan_denylist_h"],
+    }) + select ({
+        "@//bazel/config:sanitize_thread_required_settings": ["@//etc:tsan_denylist_h"],
+        "@//bazel/config:tsan_disabled": [],
+    }) + select ({
+        "@//bazel/config:ubsan_enabled": ["@//etc:ubsan_denylist_h"],
+        "@//conditions:default": [],
+    }) + ["@s390x_cross_sysroot//:sysroot_files"] + select({
+        "@//bazel/config:linker_lld_valid_settings": ["@mongo_toolchain_v5//:lld_files"],
+        "@//conditions:default": [],
+    })
+)
+
+feature_attrs = get_common_features_attrs()
+
+mongo_linux_cc_toolchain_config(
+    name = "cc_gcc_toolchain_config",
+    bin_dirs = COMMON_BINDIRS,
+    compiler = "gcc",
+    dbg = IS_DEBUG_BUILD,
+    linker = CHOSEN_LINKER,
+    distro = "{distro}",
+    cpu = "{bazel_toolchain_cpu}",
+    builtin_sysroot = BUILTIN_SYSROOT,
+    cxx_builtin_include_directories = EFFECTIVE_BUILTIN_INCLUDE_DIRS,
+    extra_ldflags = LINK_FLAGS,
+    includes = GCC_INCLUDE_DIRS + COMMON_INCLUDE_DIRECTORIES + COMMON_BUILTIN_INCLUDE_DIRECTORIES,
+    tool_paths = {
+        # Note: You might assume that the specification of `compiler_name` (above) would be sufficient to make Bazel
+        # use the correct binary. This is incorrect; Bazel appears to unconditionally use the `gcc` tool_path. As a result,
+        # we have to conditionally set the value pointed to by `gcc`.
+        "gcc": "stow/gcc-v5/bin/s390x-mongodb-linux-gcc",
+        "g++": "stow/gcc-v5/bin/s390x-mongodb-linux-g++",
+        "cpp": "stow/gcc-v5/bin/s390x-mongodb-linux-cpp",
+        "ar": "stow/gcc-v5/bin/s390x-mongodb-linux-ar",
+        "nm": "stow/gcc-v5/bin/s390x-mongodb-linux-nm",
+        "ld": "stow/gcc-v5/bin/s390x-mongodb-linux-ld",
+        "as": "stow/gcc-v5/bin/s390x-mongodb-linux-as",
+        "dwp": "{version}/bin/dwp",
+        "objcopy": "stow/gcc-v5/bin/s390x-mongodb-linux-objcopy",
+        "objdump": "stow/gcc-v5/bin/s390x-mongodb-linux-objdump",
+        "strip": "stow/gcc-v5/bin/s390x-mongodb-linux-strip",
+        "gcov": "stow/gcc-v5/bin/s390x-mongodb-linux-gcov",
+        "llvm-cov": "/bin/false",  # /bin/false = we're not using llvm-cov
+    },
+    toolchain_identifier = "gcc_toolchain",
+    verbose = True,
+    linkstatic = LINKSTATIC_ENABLED,
+    shared_archive = SHARED_ARCHIVE_ENABLED,
+    dwarf_version = DWARF_VERSION,
+    fission = FISSION_ENABLED,
+    debug_level = DEBUG_LEVEL,
+    disable_debug_symbols = DISABLE_DEBUG_SYMBOLS,
+    optimization_level = feature_attrs[FEATURES_ATTR_NAMES.OPT_LEVEL],
+    pgo_profile_generate = PGO_PROFILE_GENERATE_ENABLED,
+    pgo_profile_use = PGO_PROFILE_USE_ENABLED,
+    distributed_thin_lto = DTLTO_ENABLED,
+    any_sanitizer_enabled = ANY_SANITIZER_ENABLED,
+    asan_enabled = ASAN_ENABLED,
+    asan_denylist = ASAN_DENYLIST,
+    fsan_enabled = FSAN_ENABLED,
+    msan_enabled = MSAN_ENABLED,
+    msan_denylist = MSAN_DENYLIST,
+    tsan_enabled = TSAN_ENABLED,
+    tsan_denylist = TSAN_DENYLIST,
+    ubsan_enabled = UBSAN_ENABLED,
+    ubsan_denylist = UBSAN_DENYLIST,
+    is_aarch64 = IS_AARCH64,
+    is_ppc64le = IS_PPC64LE,
+    is_s390x = IS_S390X,
+    is_x86_64 = IS_X86_64,
+    internal_thin_lto_enabled = False,
+    coverage_enabled = COVERAGE_ENABLED,
+    compress_debug_enabled = COMPRESS_DEBUG_ENABLED,
+    warnings_as_errors_enabled = WARNINGS_AS_ERRORS_ENABLED,
+    global_defines = MONGO_GLOBAL_DEFINES,
+)
+
+cc_toolchain(
+    name = "cc_mongo_toolchain",
+    all_files = ":all_files",
+    ar_files = ":all_files",
+    compiler_files = ":all_files",
+    dwp_files = ":all_files",
+    linker_files = ":all_files",
+    objcopy_files = ":all_files",
+    strip_files = ":all_files",
+    toolchain_config = ":cc_gcc_toolchain_config",
+)
+
+toolchain(
+    name = "mongo_toolchain",
+    exec_compatible_with = [
+        "@platforms//os:linux",
+        "@platforms//cpu:arm64",
+        "@//bazel/platforms:use_mongo_toolchain",
+        "@//bazel/platforms:{distro}",
+    ],
+    target_compatible_with = [
+        "@platforms//os:linux",
+        "@platforms//cpu:{bazel_toolchain_cpu}",
+        "@//bazel/platforms:use_mongo_s390x_cross_toolchain",
+        "@//bazel/platforms:{distro}",
+    ],
+    target_settings = [
+        "@//bazel/config:mongo_toolchain_{version}",
+        "@//bazel/config:compiler_type_gcc",
+    ],
+    toolchain = ":cc_mongo_toolchain",
+    toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",
+)
+
+
+# This file group makes it possible to set the clang-tidy configuration setting:
+#   --@bazel_clang_tidy//:clang_tidy_executable=@mongo_toolchain//:clang_tidy
+filegroup(
+    name = "clang_tidy",
+    srcs = [
+        "{version}/bin/clang-tidy",
+    ],
+)
+
+filegroup(
+    name = "llvm_symbolizer",
+    srcs = [
+        "stow/llvm-{version}/bin/llvm-symbolizer",
+    ],
+)
+
+# Since the symbolizer may pull in pretty much anything as a dynamic library, include everything in the toolchain.
+# Some extensions (ex. libLLVM.so.19.1) don't end in .so, so we just have to grab everything.
+filegroup(
+    name = "llvm_symbolizer_libs",
+    srcs = glob([
+        "stow/**/*",
+        "{version}/**/*",
+    ]),
+)
+
+filegroup(
+    name = "clang_format",
+    srcs = [
+        "{version}/bin/clang-format",
+    ],
+)
+
+filegroup(
+    name = "libclang",
+    srcs = [
+        "{version}/lib/libclang.so",
+    ],
+)

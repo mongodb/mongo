@@ -35,7 +35,7 @@ py_runtime_pair(
 toolchain(
     name = "python_toolchain",
     exec_compatible_with = [{constraints}],
-    target_compatible_with = [{constraints}],
+    # Build-time Python runs on the execution platform, which can differ from the target.
     toolchain = ":py_runtime_pair",
     toolchain_type = "@rules_python//python:toolchain_type",
 )

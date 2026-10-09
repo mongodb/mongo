@@ -128,6 +128,9 @@ def install_modules(bazel, args):
         cmd = [
             bazel,
             "build",
+            # Wrapper dependencies execute on this machine even when .bazelrc
+            # selects a cross-compilation target platform for the server build.
+            "--platforms=@internal_platforms_do_not_use//host",
         ] + ["@poetry//:library_" + dep.replace("-", "_") for dep in deps_needed]
 
         if skip_cplusplus_toolchain(args):

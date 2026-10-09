@@ -1,6 +1,16 @@
 load("@poetry//:dependencies.bzl", "dependency")
 load("//bazel:mongo_script_rules.bzl", "mongo_toolchain_py_cxx_test")
-load("@rules_python//python:defs.bzl", "py_library")
+load("@rules_python//python:defs.bzl", "py_library", "py_test")
+
+py_test(
+    name = "test_evergreen_s390x_cross",
+    srcs = ["test_evergreen_s390x_cross.py"],
+    data = ["//etc:evergreen_s390x_cross_test_data"],
+    deps = [dependency(
+        "pyyaml",
+        group = "core",
+    )],
+)
 
 mongo_toolchain_py_cxx_test(
     name = "test_clang_tidy",

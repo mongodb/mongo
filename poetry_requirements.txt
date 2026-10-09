@@ -6,7 +6,13 @@ cffi~=1.17.1
 charset-normalizer~=3.4.2
 cleo~=2.1.0
 crashtest~=0.4.1
-cryptography~=44.0.2
+# PyPI does not publish cryptography wheels for s390x or ppc64le. Keep the
+# bootstrap install on a wheel for those architectures so installing Poetry
+# does not invoke cryptography's Rust-backed sdist build before Poetry can
+# apply the platform-specific sources in poetry.lock.
+cryptography==44.0.2 ; platform_machine != "s390x" and platform_machine != "ppc64le"
+cryptography @ https://mdb-build-public.s3.amazonaws.com/cryptography_wheels/cryptography-44.0.2-cp37-abi3-manylinux_2_28_s390x.whl#sha256=e033ed86e96fa4225a515497112bb951acceabf72fee66b19cee971bd11f196e ; platform_machine == "s390x"
+cryptography @ https://mdb-build-public.s3.amazonaws.com/cryptography_wheels/cryptography-44.0.2-cp37-abi3-manylinux_2_28_ppc64le.whl#sha256=9c51031e043c7cd62e2ab26c5c8dd9fa6c61bd2a725608b13603e3b5c99f4034 ; platform_machine == "ppc64le"
 distlib~=0.3.9
 dulwich~=0.22.8
 fastjsonschema~=2.21.1

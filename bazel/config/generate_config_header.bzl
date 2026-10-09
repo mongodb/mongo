@@ -3,9 +3,32 @@ load("@bazel_tools//tools/build_defs/cc:action_names.bzl", "ACTION_NAMES")
 load("//bazel/config:configs.bzl", "sdkroot_provider")
 load("//bazel:utils.bzl", "write_target")
 
+def _strip_sysroot_flags(flags):
+    """Remove --sysroot and sysroot-debug-prefix-map flags.
+
+    When building locally with an RBE sysroot, the toolchain adds --sysroot
+    and -fdebug-prefix-map flags that are not present in RBE builds. Strip
+    them so the embedded build-info strings are identical either way.
+    """
+    result = []
+    skip_next = False
+    for flag in flags:
+        if skip_next:
+            skip_next = False
+            continue
+        if flag == "--sysroot":
+            # --sysroot <value> is two separate entries
+            skip_next = True
+            continue
+        if flag.startswith("--sysroot=") or flag.startswith("--sysroot "):
+            continue
+        if flag.startswith("-fdebug-prefix-map=") and flag.endswith("=/"):
+            continue
+        result.append(flag)
+    return result
+
 def generate_config_header_impl(ctx):
     cc_toolchain = find_cpp_toolchain(ctx)
-    compiler_bin = cc_toolchain.compiler_executable
     input = ctx.attr.template.files.to_list()[0].path
     checks = ctx.attr.checks.files.to_list()[0].path
 
@@ -13,6 +36,10 @@ def generate_config_header_impl(ctx):
     feature_configuration = cc_common.configure_features(
         ctx = ctx,
         cc_toolchain = cc_toolchain,
+    )
+    compiler_bin = cc_common.get_tool_for_action(
+        feature_configuration = feature_configuration,
+        action_name = ACTION_NAMES.cpp_compile,
     )
     compile_variables = cc_common.create_compile_variables(
         feature_configuration = feature_configuration,
@@ -41,6 +68,11 @@ def generate_config_header_impl(ctx):
         action_name = ACTION_NAMES.cpp_link_executable,
         variables = compile_variables,
     )
+
+    # Strip sysroot-related flags so that the embedded build info is
+    # identical regardless of whether a local RBE sysroot is used.
+    build_info_compiler_flags = _strip_sysroot_flags(compiler_flags)
+    build_info_link_flags = _strip_sysroot_flags(link_flags)
     env_flags = cc_common.get_environment_variables(
         feature_configuration = feature_configuration,
         action_name = ACTION_NAMES.cpp_compile,
@@ -55,9 +87,11 @@ def generate_config_header_impl(ctx):
                 key: ctx.expand_make_variables("generate_config_header_expand", val, ctx.var),
             }
 
+    expanded_extra_definitions["TARGET_ARCH"] = cc_toolchain.cpu
+
     expanded_extra_definitions |= {
-        "compile_variables": " ".join(compiler_flags + ctx.attr.cpp_opts),
-        "linkflags": " ".join(link_flags + ctx.attr.cpp_linkflags),
+        "compile_variables": " ".join(build_info_compiler_flags + ctx.attr.cpp_opts),
+        "linkflags": " ".join(build_info_link_flags + ctx.attr.cpp_linkflags),
         "cpp_defines": " ".join(ctx.attr.cpp_defines),
     }
 

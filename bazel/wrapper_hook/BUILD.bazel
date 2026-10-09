@@ -42,6 +42,18 @@ py_library(
 )
 
 py_test(
+    name = "install_modules_test",
+    srcs = ["install_modules_test.py"],
+    deps = [":wrapper_hook"],
+)
+
+py_test(
+    name = "wrapper_hook_test",
+    srcs = ["wrapper_hook_test.py"],
+    deps = [":wrapper_hook"],
+)
+
+py_test(
     name = "lint_test",
     srcs = [
         "lint_test.py",
