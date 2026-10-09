@@ -7,18 +7,106 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/docval_to_sbeval.h"
+#include "mongo/db/exec/sbe/expression_test_base.h"
+#include "mongo/db/exec/sbe/sbe_unittest_assert.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_trigonometric.h"
 #include "mongo/db/query/stage_builder/sbe/tests/sbe_builder_test_fixture.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
+#include <limits>
+#include <memory>
 #include <string_view>
 #include <utility>
 #include <vector>
 
 namespace mongo::stage_builder {
 using namespace std::literals::string_view_literals;
+
+class SubstrBytesGenExpressionTest : public sbe::EExpressionTestFixture {
+public:
+    void setUp() override {
+        sbe::EExpressionTestFixture::setUp();
+        auto rootSlot = SbSlot{bindAccessor(&_rootAccessor), TypeSignature::kObjectType};
+        auto expression =
+            Expression::parseExpression(_expCtx.get(),
+                                        fromjson("{$substrBytes: ['$s', '$start', '$length']}"),
+                                        _expCtx->variablesParseState);
+        PlanStageSlots slots;
+        _sbeExpression =
+            generateExpression(_state, expression.get(), rootSlot, slots).lower(_state);
+        _compiled = compileExpression(*_sbeExpression);
+    }
+
+protected:
+    sbe::value::ViewOfValueAccessor _rootAccessor;
+    std::unique_ptr<sbe::EExpression> _sbeExpression;
+    std::unique_ptr<sbe::vm::CodeFragment> _compiled;
+};
+
+struct SubstrBytesCoercionTestCase {
+    BSONObj root;
+    std::string_view expected;
+};
+
+class SubstrBytesNumericCoercionTest
+    : public SubstrBytesGenExpressionTest,
+      public testing::WithParamInterface<SubstrBytesCoercionTestCase> {};
+
+TEST_P(SubstrBytesNumericCoercionTest, CoercesNumericArguments) {
+    const auto& test = GetParam();
+    _rootAccessor.reset(sbe::value::TypeTags::bsonObject,
+                        sbe::value::bitcastFrom<const char*>(test.root.objdata()));
+    auto expected = sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewString(test.expected));
+    auto actual = sbe::value::TagValueOwned::fromRaw(runCompiledExpression(_compiled.get()));
+    ASSERT_SBE_VALUE_EQ(actual.tag(), actual.value(), expected.tag(), expected.value());
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    NumericCoercion,
+    SubstrBytesNumericCoercionTest,
+    testing::ValuesIn(std::vector<SubstrBytesCoercionTestCase>{
+        {BSON("s" << "abc" << "start" << 1.5 << "length" << 1.5), "b"},
+        {BSON("s" << "abc" << "start" << -0.5 << "length" << 2), "ab"},
+        {BSON("s" << "abc" << "start" << 1 << "length" << -0.5), ""},
+        {BSON("s" << "abc" << "start" << Decimal128("1.5") << "length" << Decimal128("1.5")), "c"},
+        {BSON("s" << "abc" << "start" << Decimal128("2.5") << "length" << 2), "c"},
+        {BSON("s" << "abc" << "start" << Decimal128("-0.5") << "length" << 2), "ab"},
+        {BSON("s" << "abc" << "start" << std::numeric_limits<int64_t>::max() << "length" << 2), ""},
+        {BSON("s" << "abc" << "start" << 1 << "length" << std::numeric_limits<int64_t>::min()),
+         "bc"},
+    }));
+
+struct SubstrBytesValidationTestCase {
+    BSONObj root;
+    int expectedError;
+};
+
+class SubstrBytesNumericValidationTest
+    : public SubstrBytesGenExpressionTest,
+      public testing::WithParamInterface<SubstrBytesValidationTestCase> {};
+
+TEST_P(SubstrBytesNumericValidationTest, RejectsInvalidNumericArguments) {
+    const auto& test = GetParam();
+    _rootAccessor.reset(sbe::value::TypeTags::bsonObject,
+                        sbe::value::bitcastFrom<const char*>(test.root.objdata()));
+    ASSERT_THROWS_CODE(runCompiledExpression(_compiled.get()), DBException, test.expectedError);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    InvalidNumericArguments,
+    SubstrBytesNumericValidationTest,
+    testing::ValuesIn(std::vector<SubstrBytesValidationTestCase>{
+        {BSON("s" << "abc" << "start" << 1 << "length" << std::numeric_limits<double>::quiet_NaN()),
+         13626501},
+        {BSON("s" << "abc" << "start" << std::numeric_limits<double>::quiet_NaN() << "length" << 2),
+         13626500},
+        {BSON("s" << "abc" << "start" << 1 << "length" << Decimal128("9223372036854775807.5")),
+         13626501},
+        {BSON("s" << "abc" << "start" << Decimal128("9223372036854775807.5") << "length" << 2),
+         13626500},
+    }));
 
 class GoldenGenExpressionTest : public GoldenSbeExprBuilderTestFixture {
 public:

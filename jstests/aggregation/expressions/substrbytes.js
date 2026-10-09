@@ -6,7 +6,7 @@ import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 let t = db.jstests_aggregation_substr;
 t.drop();
 
-t.save({});
+assert.commandWorked(t.insert({}));
 
 function assertSubstring(expected, str, offset, len) {
     assert.eq(
@@ -16,7 +16,12 @@ function assertSubstring(expected, str, offset, len) {
 }
 
 function assertArgsException(args) {
-    assert.commandFailed(t.runCommand("aggregate", {pipeline: [{$substrBytes: args}]}));
+    assert.commandFailed(
+        t.runCommand("aggregate", {
+            pipeline: [{$project: {a: {$substrBytes: args}}}],
+            cursor: {},
+        }),
+    );
 }
 
 function assertException(str, offset, len) {
@@ -107,21 +112,23 @@ assertSubstring("\uD834\uDF06", "\uD834\uDF06", 0, 4);
 
 // Operands from document.
 t.drop();
-t.save({
-    w: "ó",
-    x: "a",
-    y: "abc",
-    z: "abcde",
-    a: 0,
-    b: 1,
-    c: 2,
-    d: 3,
-    e: 4,
-    f: 5,
-    g: -2,
-    /* Max unsigned int plus one */
-    k: NumberLong(4294967297),
-});
+assert.commandWorked(
+    t.insert({
+        w: "ó",
+        x: "a",
+        y: "abc",
+        z: "abcde",
+        a: 0,
+        b: 1,
+        c: 2,
+        d: 3,
+        e: 4,
+        f: 5,
+        g: -2,
+        /* Max unsigned int plus one */
+        k: NumberLong(4294967297),
+    }),
+);
 assertSubstring("a", "$x", "$a", "$b");
 assertSubstring("abcde", "$z", "$a", "$k");
 assertSubstring("", "$x", "$k", "$f");
@@ -131,9 +138,11 @@ assertSubstring("b", "$z", "$b", "$b");
 assertSubstring("bcd", "$z", "$b", "$d");
 assertSubstring("cde", "$z", "$c", "$f");
 assertSubstring("c", "$y", "$c", "$f");
+
+assertException("$y", "$w", 2);
 assertException("$w", "$b", "$d");
-assertException("$w", "$a", "$c");
-assertException("$w", "$a", "$g");
+assertSubstring("ó", "$w", "$a", "$c");
+assertSubstring("ó", "$w", "$a", "$g");
 assertException("$w", "$g", "$a");
 
 // String coercion fails.
@@ -171,3 +180,5 @@ assert.eq(
         })
         .toArray()[0].a,
 );
+
+assert(t.drop());

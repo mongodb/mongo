@@ -2833,6 +2833,30 @@ public:
         SbVar byteCountVar{frameId, 0};
         SbVar startIndexVar{frameId, 1};
         SbVar stringExprVar{frameId, 2};
+        SbVar convertedStart{frameId, 3};
+
+        // Match Value::coerceToLong(): doubles truncate, but decimals round with ties to even.
+        // Keep integers unchanged so int64 values never pass through floating-point arithmetic.
+        auto coerceToLong = [&](SbVar input, ErrorCodes::Error conversionError) {
+            auto rounded = _b.buildMultiBranchConditionalFromCaseValuePairs(
+                SbExpr::makeExprPairVector(
+                    SbExprPair{_b.makeFunction(
+                                   sbe::EFn::kTypeMatch,
+                                   input,
+                                   _b.makeInt32Constant(getBSONTypeMask(BSONType::numberDouble))),
+                               _b.makeFunction(sbe::EFn::kTrunc, input)},
+                    SbExprPair{_b.makeFunction(
+                                   sbe::EFn::kTypeMatch,
+                                   input,
+                                   _b.makeInt32Constant(getBSONTypeMask(BSONType::numberDecimal))),
+                               _b.makeFunction(sbe::EFn::kRound, input)}),
+                input);
+            SbExpr convertedExpr = _b.makeFillEmpty(
+                _b.makeNumericConvert(std::move(rounded), sbe::value::TypeTags::NumberInt64),
+                _b.makeFail(conversionError,
+                            "$substrBytes: cannot coerce out of range value to long"));
+            return convertedExpr;
+        };
 
         SbExpr::Vector functionArgs;
 
@@ -2848,37 +2872,31 @@ public:
             _b.makeFunction(sbe::EFn::kCoerceToString, stringExprVar));
         functionArgs.push_back(std::move(validStringExpr));
 
-        SbExpr validStartIndexExpr = _b.makeIf(
-            _b.makeBinaryOp(
-                abt::Operations::Or,
-                _b.generateNullMissingOrUndefined(startIndexVar),
-                _b.makeBinaryOp(
-                    abt::Operations::Or,
-                    _b.generateNonNumericCheck(startIndexVar),
-                    _b.makeBinaryOp(abt::Operations::Lt, startIndexVar, _b.makeInt32Constant(0)))),
-            _b.makeFail(ErrorCodes::Error{5155603},
-                        "Starting index must be non-negative numeric type"),
-            _b.makeFunction(
-                sbe::EFn::kConvert,
-                startIndexVar,
-                _b.makeInt32Constant(static_cast<int32_t>(sbe::value::TypeTags::NumberInt64))));
-        functionArgs.push_back(std::move(validStartIndexExpr));
+        functionArgs.push_back(convertedStart);
 
+        // SBE evaluates function arguments right to left, so check the start before the length.
         SbExpr validLengthExpr = _b.makeIf(
-            _b.makeBinaryOp(abt::Operations::Or,
-                            _b.generateNullMissingOrUndefined(byteCountVar),
-                            _b.generateNonNumericCheck(byteCountVar)),
-            _b.makeFail(ErrorCodes::Error{5155602}, "Length must be a numeric type"),
-            _b.makeFunction(
-                sbe::EFn::kConvert,
-                byteCountVar,
-                _b.makeInt32Constant(static_cast<int32_t>(sbe::value::TypeTags::NumberInt64))));
+            _b.makeBinaryOp(abt::Operations::Lt, convertedStart, _b.makeInt64Constant(0)),
+            _b.makeFail(ErrorCodes::Error{5155603}, "Starting index must be non-negative"),
+            coerceToLong(byteCountVar, ErrorCodes::Error{13626501}));
         functionArgs.push_back(std::move(validLengthExpr));
 
-        pushExpr(_b.makeLet(
-            frameId,
-            SbExpr::makeSeq(std::move(byteCount), std::move(startIndex), std::move(stringExpr)),
-            _b.makeFunction(sbe::EFn::kSubstrBytes, std::move(functionArgs))));
+        SbExpr convertedStartExpr = _b.buildMultiBranchConditionalFromCaseValuePairs(
+            SbExpr::makeExprPairVector(
+                SbExprPair{_b.makeFillEmptyTrue(_b.generateNonNumericCheck(startIndexVar)),
+                           _b.makeFail(ErrorCodes::Error{13626502},
+                                       "$substrBytes: starting index must be a numeric type")},
+                SbExprPair{_b.makeFillEmptyTrue(_b.generateNonNumericCheck(byteCountVar)),
+                           _b.makeFail(ErrorCodes::Error{5155602},
+                                       "$substrBytes: length must be a numeric type")}),
+            coerceToLong(startIndexVar, ErrorCodes::Error{13626500}));
+
+        pushExpr(_b.makeLet(frameId,
+                            SbExpr::makeSeq(std::move(byteCount),
+                                            std::move(startIndex),
+                                            std::move(stringExpr),
+                                            std::move(convertedStartExpr)),
+                            _b.makeFunction(sbe::EFn::kSubstrBytes, std::move(functionArgs))));
     }
     void visit(const ExpressionSubstrCP* expr) final {
         tassert(11051813,
