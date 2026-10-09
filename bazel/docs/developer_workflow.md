@@ -90,21 +90,6 @@ command.
         ],
     }
 
-## Using Bazel's clang-format in VS Code
-
-Configure the clang-format extension to use the repository's wrapper:
-
-```json
-"clang-format.executable": "${workspaceRoot}/buildscripts/clang_format_vscode.sh"
-```
-
-Use `${workspaceRoot}` because the `xaver.clang-format` extension expands this placeholder.
-
-The wrapper queries Bazel for the pinned v5 toolchain repository, fetching it if necessary, then
-runs clang-format with the editor's arguments and input. Bazel must be on the editor's PATH. The
-first invocation can take longer while Bazel downloads the toolchain. Each invocation resolves the
-current repository so a branch change or toolchain update uses the current pin.
-
 ## Running clang-tidy via Bazel
 
 Note: This feature is still in development; see https://jira.mongodb.org/browse/SERVER-80396 for

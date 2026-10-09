@@ -372,7 +372,7 @@ The `devcontainer.json` includes extensive VS Code settings:
 ```json
 "clangd.checkUpdates": true,
 "clangd.path": "${workspaceFolder}/buildscripts/clangd_vscode.sh",
-"clang-format.executable": "${workspaceRoot}/buildscripts/clang_format_vscode.sh",
+"clang-format.executable": "${workspaceRoot}/bazel-out/.../clang-format",
 ```
 
 **Why clangd?**

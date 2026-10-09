@@ -7,7 +7,6 @@ load("//bazel/uv:defs.bzl", "dependency")
 exports_files([
     "candle_wrapper.py",
     "cheetah_source_generator.py",
-    "clang_format_vscode.sh",
     "clang_tidy_config_gen.py",
     "jstoh.py",
     "msitrim.py",
