@@ -24,3 +24,6 @@ filters:
   - "delinquent*":
     approvers:
       - 10gen/server-workload-resilience
+  - "geo_validator_concurrent_inserts.js":
+    approvers:
+      - 10gen/query-execution
