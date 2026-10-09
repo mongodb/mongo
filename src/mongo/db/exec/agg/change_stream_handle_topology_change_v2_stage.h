@@ -5,6 +5,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/exec/agg/change_stream_handle_topology_change_v2_metrics.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/change_stream.h"
@@ -223,7 +224,15 @@ public:
     };
 
     ChangeStreamHandleTopologyChangeV2Stage(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                            std::shared_ptr<Parameters> params);
+                                            std::shared_ptr<Parameters> params,
+                                            ChangeStreamTopologyChangeV2MetricsRecorder metrics =
+                                                getChangeStreamTopologyChangeV2MetricsRecorder());
+
+    /**
+     * Decrements the degraded gauge if it is still counted, in case 'doDispose()' was never
+     * called for this stage. Delegates to the same idempotent logic as 'doDispose()'.
+     */
+    ~ChangeStreamHandleTopologyChangeV2Stage() override;
 
     /**
      * Returns a string representation of the state name.
@@ -303,6 +312,14 @@ public:
     [[MONGO_MOD_PRIVATE]] void setState_forTest(State state, bool validateStateTransition);
 
     /**
+     * Records an entry into 'state' via '_metrics', bypassing '_setState()''s transition
+     * validation so tests can exercise every state's counter directly.
+     */
+    [[MONGO_MOD_PRIVATE]] void recordStateEntry_forTest(State state) const {
+        _recordStateEntry(state);
+    }
+
+    /**
      * Runs a single iteration of the internal state machine for testing.
      */
     [[MONGO_MOD_PRIVATE]] boost::optional<DocumentSource::GetNextResult>
@@ -321,6 +338,19 @@ private:
     GetNextResult doGetNext() final;
 
     /**
+     * Releases resources held by this stage. If the stage is torn down while in degraded mode, no
+     * state-machine transition fires anymore, so the currently-degraded gauge is decremented here
+     * to avoid leaking the count.
+     */
+    void doDispose() final;
+
+    /**
+     * Decrements the currently-degraded gauge if it is still counted. Idempotent via
+     * '_degradedCounted', so it is safe to call from both 'doDispose()' and the destructor.
+     */
+    void _decrementDegradedIfCounted();
+
+    /**
      * Runs a single iteration of the internal state machine.
      */
     boost::optional<DocumentSource::GetNextResult> _runGetNextStateMachine();
@@ -329,6 +359,13 @@ private:
      * Sets the state to 'newState'.
      */
     void _setState(State newState);
+
+    /**
+     * Counts an entry into 'newState' via '_metrics'. Must only be called for transitions that
+     * passed the validation in '_setState()': in particular 'kUninitialized' is unreachable
+     * (transitions back to it are forbidden) and has no counter.
+     */
+    void _recordStateEntry(State newState) const;
 
     /**
      * Asserts that the current state is equal to 'expectedState' and the change stream's read mode
@@ -385,6 +422,14 @@ private:
 
     // The current state that the state machine for 'doGetNext()' and its callees is in.
     State _state = State::kUninitialized;
+
+    // Metrics recorder for this stage's state machine, injected at construction.
+    ChangeStreamTopologyChangeV2MetricsRecorder _metrics;
+
+    // Whether this stage is currently counted in the 'changeStreams.shardTargeting.degraded'
+    // gauge. Tracked separately from '_state' so that the gauge adjustment is idempotent across
+    // the exit transition in '_setState()' and the decrement in 'doDispose()'.
+    bool _degradedCounted = false;
 
     // If an exception was caught during processing, the exception status will be recorded here, and
     // the same exception will be re-thrown for any further invocation of 'doGetNext()'.

@@ -450,4 +450,52 @@ inline otel::metrics::Counter<int64_t>& cursorBytesRead() {
     return counter;
 }
 
+// Public so the catalog_and_routing module's shard-targeter metrics can reuse the same
+// serverStatus registration shape.
+[[MONGO_MOD_PUBLIC]] inline otel::metrics::Counter<int64_t>& createShardTargetingCounter(
+    otel::metrics::MetricName name, std::string dottedPath, std::string description) {
+    otel::metrics::CounterOptions opts{};
+    opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
+        .dottedPath = std::move(dottedPath),
+        .role = ::mongo::ClusterRole{::mongo::ClusterRole::None},
+    };
+    return otel::metrics::MetricsService::instance().createInt64Counter(
+        name, std::move(description), otel::metrics::MetricUnit::kEvents, opts);
+}
+
+inline otel::metrics::UpDownCounter<int64_t>& createShardTargetingDegradedGauge() {
+    otel::metrics::UpDownCounterOptions opts{};
+    opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
+        .dottedPath = "changeStreams.shardTargeting.degraded",
+        .role = ::mongo::ClusterRole{::mongo::ClusterRole::None},
+    };
+    return otel::metrics::MetricsService::instance().createInt64UpDownCounter(
+        otel::metrics::MetricNames::kChangeStreamShardTargetingDegraded,
+        "Current number of v2 change streams whose topology-handler stage is in degraded mode.",
+        otel::metrics::MetricUnit::kCount,
+        opts);
+}
+
+// Public so the catalog_and_routing module's shard-targeter metrics can reuse the same
+// serverStatus registration shape.
+[[MONGO_MOD_PUBLIC]] inline otel::metrics::Histogram<int64_t>& createPlacementHistoryLatency(
+    otel::metrics::MetricName name, std::string dottedPath) {
+    otel::metrics::HistogramOptions opts{};
+    opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
+        .dottedPath = std::move(dottedPath),
+        .role = ::mongo::ClusterRole{::mongo::ClusterRole::None},
+    };
+
+    // Millisecond-scale buckets: a placement-history lookup is a config-server round trip, so
+    // latencies land in the tens-to-thousands-of-milliseconds range.
+    opts.explicitBucketBoundaries =
+        std::vector<double>({1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000});
+    opts.serializationFormat = otel::metrics::HistogramSerializationFormat::kBucketCounts;
+    return otel::metrics::MetricsService::instance().createInt64Histogram(
+        name,
+        "Latency of v2 change stream shard-targeting placement history lookups in milliseconds.",
+        otel::metrics::MetricUnit::kMilliseconds,
+        opts);
+}
+
 }  // namespace mongo::change_stream

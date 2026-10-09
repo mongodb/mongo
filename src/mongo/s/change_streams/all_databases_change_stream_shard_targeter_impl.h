@@ -9,6 +9,7 @@
 #include "mongo/db/pipeline/change_stream_shard_targeter.h"
 #include "mongo/db/pipeline/historical_placement_fetcher.h"
 #include "mongo/s/change_streams/all_databases_change_stream_state_event_handler.h"
+#include "mongo/s/change_streams/change_stream_shard_targeter_metrics.h"
 #include "mongo/s/change_streams/change_stream_shard_targeter_state_event_handler.h"
 #include "mongo/util/modules.h"
 
@@ -24,7 +25,9 @@ class AllDatabasesChangeStreamShardTargeterImpl
 public:
     explicit AllDatabasesChangeStreamShardTargeterImpl(
         std::unique_ptr<HistoricalPlacementFetcher> fetcher)
-        : _fetcher(std::move(fetcher)) {
+        : _fetcher(std::move(fetcher)),
+          _scopeMetrics(getAllDatabasesShardTargeterMetricsRecorder()),
+          _controlEventMetrics(getShardTargeterControlEventMetricsRecorder()) {
         setEventHandler(std::make_unique<AllDatabasesShardTargeterStateEventHandler>());
     }
 
@@ -57,6 +60,13 @@ private:
      * The current shard targeter state event handler used by the shard targeter.
      */
     std::unique_ptr<ChangeStreamShardTargeterStateEventHandler> _eventHandler;
+
+    /**
+     * Metrics recorders for this targeter's scope (all-databases has no db-present/db-absent
+     * split) and for control events.
+     */
+    AllDatabasesShardTargeterMetricsRecorder _scopeMetrics;
+    ShardTargeterControlEventMetricsRecorder _controlEventMetrics;
 };
 
 }  // namespace mongo

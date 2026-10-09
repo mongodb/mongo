@@ -7,6 +7,7 @@
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 
@@ -34,6 +35,9 @@ HistoricalPlacement HistoricalPlacementFetcherImpl::fetch(
     request.setTargetWholeCluster(targetWholeCluster);
     request.setCheckIfPointInTimeIsInFuture(checkIfPointInTimeIsInFuture);
 
+    // Time the config-server round trip plus response parsing.
+    Timer timer;
+
     auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
     auto remoteResponse = uassertStatusOK(
         configShard->runCommand(opCtx,
@@ -44,9 +48,12 @@ HistoricalPlacement HistoricalPlacementFetcherImpl::fetch(
                                 Shard::RetryPolicy::kIdempotentOrCursorInvalidated));
     uassertStatusOK(remoteResponse.commandStatus);
 
-    return ConfigsvrGetHistoricalPlacementResponse::parse(
-               remoteResponse.response, IDLParserContext("HistoricalPlacementFetcherImpl"))
-        .getHistoricalPlacement();
+    auto placement =
+        ConfigsvrGetHistoricalPlacementResponse::parse(
+            remoteResponse.response, IDLParserContext("HistoricalPlacementFetcherImpl"))
+            .getHistoricalPlacement();
+    _metrics.recordLookup(placement.getStatus(), duration_cast<Milliseconds>(timer.elapsed()));
+    return placement;
 }
 
 }  // namespace mongo

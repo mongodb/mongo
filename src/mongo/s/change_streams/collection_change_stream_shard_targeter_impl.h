@@ -19,7 +19,9 @@ class CollectionChangeStreamShardTargeterImpl : public ChangeStreamShardTargeter
 public:
     explicit CollectionChangeStreamShardTargeterImpl(
         std::unique_ptr<HistoricalPlacementFetcher> fetcher)
-        : ChangeStreamShardTargeterBase(std::move(fetcher)) {}
+        : ChangeStreamShardTargeterBase(std::move(fetcher),
+                                        getCollectionShardTargeterScopeMetricsRecorder(),
+                                        getShardTargeterControlEventMetricsRecorder()) {}
 
     std::unique_ptr<ChangeStreamShardTargeterStateEventHandler> createDbAbsentHandler()
         const override;

@@ -40,6 +40,24 @@ export function readUpdateLookupDelta(delta) {
     return result;
 }
 
+// Reads the v2 shard-targeting metrics deltas out of a serverStatus metrics diff, treating any
+// missing leaf as 0: topologyState per-state entry counters, the currently-degraded gauge,
+// targeterScope handler installations (per (scope, db-presence) for collection/database, a single
+// counter for allDatabases), controlEvents per-type counters, and placementHistoryLookup outcome
+// counters ('latencyCount' is the latency histogram's recorded observation count).
+export function readShardTargetingDelta(delta) {
+    const st = (delta.changeStreams && delta.changeStreams.shardTargeting) || {};
+    const phl = st.placementHistoryLookup || {};
+    return {
+        topologyState: st.topologyState || {},
+        degraded: st.degraded || 0,
+        targeterScope: st.targeterScope || {},
+        controlEvents: st.controlEvents || {},
+        placementHistoryLookup: phl,
+        placementHistoryLookupLatencyCount: (phl.latencyMillis || {}).totalCount || 0,
+    };
+}
+
 /**
  * combine() numeric value of server status metrics between 'a' and 'b'.
  */
