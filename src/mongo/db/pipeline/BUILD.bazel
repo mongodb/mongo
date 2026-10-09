@@ -342,6 +342,7 @@ mongo_cc_library(
         ":accumulator_percentile_gen",
         ":map_reduce_options_gen",
         "//src/mongo/db/pipeline/window_function:window_bounds.cpp",
+        "//src/mongo/db/pipeline/window_function:window_function_avg.cpp",
         "//src/mongo/db/pipeline/window_function:window_function_count.cpp",
         "//src/mongo/db/pipeline/window_function:window_function_covariance.cpp",
         "//src/mongo/db/pipeline/window_function:window_function_expression.cpp",

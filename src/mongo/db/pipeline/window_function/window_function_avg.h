@@ -82,6 +82,9 @@ public:
         _memUsageTracker.add(sizeof(long long));
     }
 
+    Value serializeState() const final;
+    void restoreState(const Value& state) final;
+
 private:
     long long _count;
 };

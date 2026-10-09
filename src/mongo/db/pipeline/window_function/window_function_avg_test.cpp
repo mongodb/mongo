@@ -4,6 +4,7 @@
 #include "mongo/db/pipeline/window_function/window_function_avg.h"
 
 #include "mongo/db/exec/document_value/document_value_test_util.h"
+#include "mongo/db/pipeline/window_function/window_function_state_serialization_test_util.h"
 #include "mongo/unittest/unittest.h"
 
 #include <limits>
@@ -140,6 +141,44 @@ TEST_F(WindowFunctionAvgTest, HandleInfs) {
     avg.remove(nan);
     avg.remove(negInf2);  // 1
     ASSERT_VALUE_EQ(avg.getValue(), Value{1});
+}
+
+TEST_F(WindowFunctionAvgTest, SerializedStateLayoutIsStable) {
+    // This layout is persisted in checkpoints. Changing it requires a
+    // version bump and a restore path for the old layout.
+    avg.add(Value{10});
+    auto state = avg.serializeState().getDocument();
+    ASSERT_EQUALS(state.computeSize(), 3);
+    ASSERT_VALUE_EQ(state["v"], Value{1});
+    ASSERT_EQUALS(state["sum"].getType(), BSONType::object);
+    ASSERT_VALUE_EQ(state["count"], Value{1LL});
+}
+
+TEST_F(WindowFunctionAvgTest, RestoreRejectsUnknownStateVersion) {
+    avg.add(Value{10});
+    MutableDocument state(avg.serializeState().getDocument());
+    state["v"] = Value{2};
+    WindowFunctionAvg restored(nullptr);
+    ASSERT_THROWS_CODE(
+        restored.restoreState(state.freezeToValue()), DBException, ErrorCodes::UnsupportedFormat);
+}
+
+TEST_F(WindowFunctionAvgTest, SerializeRoundTripThenAddRemove) {
+    avg.add(Value{10});
+    avg.add(Value{20});
+    avg.add(Value{"not a number"sv});
+
+    WindowFunctionAvg restored(nullptr);
+    assertSerializeRoundTrip(avg,
+                             restored,
+                             {
+                                 {true, Value{30}},
+                                 {false, Value{10}},
+                                 {false, Value{20}},
+                                 {false, Value{30}},
+                                 {true, Value{"not a number"sv}},
+                             });
+    ASSERT_VALUE_EQ(restored.getValue(), Value{BSONNULL});
 }
 
 }  // namespace

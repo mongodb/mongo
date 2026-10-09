@@ -41,6 +41,18 @@ public:
      */
     virtual Value getValue(boost::optional<Value> current = boost::none) const = 0;
     virtual void reset() = 0;
+
+    /**
+     * serializeState() captures the full internal state as a Value. restoreState() loads such a
+     * Value into an instance of the same type so that subsequent add()/remove()/getValue() calls
+     * behave identically to the original.
+     */
+    virtual Value serializeState() const {
+        tasserted(13571600, "This window function does not support serializeState()");
+    }
+    virtual void restoreState(const Value& state) {
+        tasserted(13571601, "This window function does not support restoreState()");
+    }
     size_t getApproximateSize() {
         tassert(5414200,
                 "_memUsageTracker is not set for function",

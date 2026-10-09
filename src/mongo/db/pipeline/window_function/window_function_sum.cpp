@@ -3,9 +3,13 @@
 
 #include "mongo/db/pipeline/window_function/window_function_sum.h"
 
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/accumulator.h"
+#include "mongo/db/pipeline/window_function/window_function_state_serialization.h"
+#include "mongo/util/assert_util.h"
 
 #include <cstdint>
+#include <string_view>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -50,5 +54,41 @@ Value RemovableSum::getValue(boost::optional<Value> current) const {
         return Value::createIntOrLong(val.getLong());
     }
     return val;
+}
+
+namespace {
+
+constexpr std::string_view kSumField = "sum";
+constexpr std::string_view kPosInfCountField = "posInfCount";
+constexpr std::string_view kNegInfCountField = "negInfCount";
+constexpr std::string_view kNanCountField = "nanCount";
+constexpr std::string_view kDoubleCountField = "doubleCount";
+constexpr std::string_view kDecimalCountField = "decimalCount";
+constexpr int kStateVersion = 1;
+
+}  // namespace
+
+Value RemovableSum::serializeState() const {
+    // The inner sum is stored in AccumulatorSum's mergeable form so it can be loaded back with a
+    // merging process() call, which preserves the running total type.
+    return Value(Document{{window_function_state::kVersionField, kStateVersion},
+                          {kSumField, _sumAcc->getValue(true /* toBeMerged */)},
+                          {kPosInfCountField, _posInfiniteValueCount},
+                          {kNegInfCountField, _negInfiniteValueCount},
+                          {kNanCountField, _nanCount},
+                          {kDoubleCountField, _doubleCount},
+                          {kDecimalCountField, _decimalCount}});
+}
+
+void RemovableSum::restoreState(const Value& state) {
+    auto doc =
+        window_function_state::validateVersionedStateDoc(state, kStateVersion, "RemovableSum");
+    _sumAcc->reset();
+    _sumAcc->process(doc[kSumField], true /* merging */);
+    _posInfiniteValueCount = window_function_state::getIntField(doc, kPosInfCountField);
+    _negInfiniteValueCount = window_function_state::getIntField(doc, kNegInfCountField);
+    _nanCount = window_function_state::getIntField(doc, kNanCountField);
+    _doubleCount = window_function_state::getLongField(doc, kDoubleCountField);
+    _decimalCount = window_function_state::getLongField(doc, kDecimalCountField);
 }
 }  // namespace mongo

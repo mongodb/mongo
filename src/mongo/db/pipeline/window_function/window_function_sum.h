@@ -50,6 +50,9 @@ public:
 
     Value getValue(boost::optional<Value> current = boost::none) const override;
 
+    Value serializeState() const override;
+    void restoreState(const Value& state) override;
+
     void reset() override {
         _sumAcc->reset();
         _posInfiniteValueCount = 0;
