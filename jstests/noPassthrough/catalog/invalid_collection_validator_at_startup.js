@@ -5,52 +5,94 @@
  * We restart mongod during the test and expect it to have the same data after restarting.
  * @tags: [requires_persistence]
  */
+import {withFailPoint} from "jstests/libs/fail_point_util.js";
+import {after, before, describe, it} from "jstests/libs/mochalite.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const testName = "invalid_collection_validator_at_startup";
 const dbpath = MongoRunner.dataPath + testName;
 const collName = "collectionWithMalformedValidator";
 
-// Create a collection with an invalid regex using a fail point.
-(function createCollectionWithMalformedValidator() {
-    const conn = MongoRunner.runMongod({dbpath: dbpath});
-    assert.neq(null, conn, "mongod was unable to start up");
+// Invalid because '*' is a quantifier that does not follow a repeatable item.
+const malformedValidator = {email: {$regex: "^*"}};
+const kValidatorParseErrorCode = 51091;
+const document = {email: "x@example.com"};
 
-    const testDB = conn.getDB("test");
-    assert.commandWorked(testDB[collName].insert({a: "hello world"}));
+describe("startup with a malformed collection validator on a standalone", function () {
+    before(function () {
+        this.conn = MongoRunner.runMongod({dbpath});
+        assert.neq(null, this.conn, "mongod was unable to start up");
 
-    assert.commandWorked(
-        conn.adminCommand({
-            configureFailPoint: "allowSettingMalformedCollectionValidators",
-            mode: "alwaysOn",
-        }),
-    );
+        const testDB = this.conn.getDB(jsTestName());
+        assert.commandWorked(testDB[collName].insert({a: "hello world"}));
 
-    // Invalid because '*' indicates that repetitions should be allowed but it's preceded by a
-    // special character.
-    const invalidRegex = "^*";
+        // Use collMod to give the collection a malformed validator.
+        withFailPoint(this.conn, "allowSettingMalformedCollectionValidators", () => {
+            assert.commandWorked(
+                testDB.runCommand({collMod: collName, validator: malformedValidator}),
+            );
+        });
+    });
 
-    // Use collMod to give the collection a malformed validator.
-    assert.commandWorked(
-        testDB.runCommand({collMod: collName, validator: {email: {$regex: invalidRegex}}}),
-    );
+    after(function () {
+        if (this.conn) {
+            MongoRunner.stopMongod(this.conn);
+        }
+    });
 
-    MongoRunner.stopMongod(conn);
-})();
+    it("retains the persisted validator and rejects writes after restart", function () {
+        MongoRunner.stopMongod(this.conn);
+        this.conn = MongoRunner.runMongod({dbpath, noCleanData: true});
+        assert.neq(null, this.conn, "mongod was unable to start up");
 
-(function startUpWithMalformedValidator() {
-    const conn = MongoRunner.runMongod({dbpath: dbpath, noCleanData: true});
-    assert.neq(null, conn, "mongod was unable to start up");
-    const testDB = conn.getDB("test");
+        const testDB = this.conn.getDB(jsTestName());
+        const cmdRes = assert.commandWorked(testDB.adminCommand({getLog: "startupWarnings"}));
+        assert(/has malformed validator/.test(cmdRes.log));
 
-    // Check that we logged a startup warning.
-    const cmdRes = assert.commandWorked(testDB.adminCommand({getLog: "startupWarnings"}));
-    assert(/has malformed validator/.test(cmdRes.log));
+        assert.docEq(testDB[collName].getMetadata().options.validator, malformedValidator);
+        assert.commandFailedWithCode(testDB[collName].insert(document), kValidatorParseErrorCode);
 
-    // Be sure that inserting to the collection with the malformed validator fails.
-    assert.commandFailedWithCode(testDB[collName].insert({email: "hello world"}), 51091);
+        assert.commandWorked(testDB.someOtherCollection.insert({a: 1}));
+    });
+});
 
-    // Inserting to another collection should succeed.
-    assert.commandWorked(testDB.someOtherCollection.insert({a: 1}));
-    assert.eq(testDB.someOtherCollection.find().itcount(), 1);
+describe("startup with a malformed collection validator in a replica set", function () {
+    before(function () {
+        this.rst = new ReplSetTest({nodes: 1});
+        this.rst.startSet();
+        this.rst.initiate();
 
-    MongoRunner.stopMongod(conn);
-})();
+        const primary = this.rst.getPrimary();
+        const testDB = primary.getDB(jsTestName());
+
+        // Retain the parse error in memory, as a secondary applying the oplog would.
+        withFailPoint(
+            primary,
+            "allowSettingMalformedCollectionValidators",
+            () => {
+                assert.commandWorked(
+                    testDB.createCollection(collName, {validator: malformedValidator}),
+                );
+            },
+            {data: {parseValidator: true}},
+        );
+    });
+
+    after(function () {
+        this.rst.stopSet();
+    });
+
+    it("retains the persisted validator and rejects writes after restart", function () {
+        // The failpoint is off, so startup must parse the validator stored on disk.
+        this.rst.restart(this.rst.getPrimary());
+
+        const testDB = this.rst.getPrimary().getDB(jsTestName());
+        const cmdRes = assert.commandWorked(testDB.adminCommand({getLog: "startupWarnings"}));
+        assert(/has malformed validator/.test(cmdRes.log));
+
+        assert.docEq(testDB[collName].getMetadata().options.validator, malformedValidator);
+        assert.commandFailedWithCode(testDB[collName].insert(document), kValidatorParseErrorCode);
+
+        assert.commandWorked(testDB.someOtherCollection.insert({a: 1}));
+    });
+});
