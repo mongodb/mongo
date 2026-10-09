@@ -13,23 +13,21 @@
 namespace mongo {
 namespace {
 
-constexpr Milliseconds kBasePollInterval{500};
-
 Date_t nextDeadline(Date_t until, Date_t now, Milliseconds pollInterval) {
     return std::min(until, now + pollInterval);
 }
 
-Milliseconds jitteredPollInterval() {
+Milliseconds jitteredPollInterval(Milliseconds basePollInterval) {
     // Timed waits can be problematic if we have a large number of waiters, since each time we
     // check for interrupt we risk waking up all waiting threads at the same time. We introduce
     // some jitter here to try to reduce the impact of a thundering herd of waiters woken at
     // the same time.
     constexpr double kJitterFactor = 0.2;
     static thread_local XorShift128 urbg(SecureRandom().nextInt64());
-    const auto base = kBasePollInterval.count();
+    const auto base = basePollInterval.count();
     int32_t offset =
         std::uniform_int_distribution<int32_t>(-kJitterFactor * base, kJitterFactor * base)(urbg);
-    return kBasePollInterval + Milliseconds{offset};
+    return basePollInterval + Milliseconds{offset};
 }
 
 }  // namespace
@@ -63,7 +61,8 @@ bool UnorderedTicketSemaphore::acquire(OperationContext* opCtx,
             return true;
         }
 
-        Date_t deadline = nextDeadline(until, Date_t::now(), jitteredPollInterval());
+        Date_t deadline =
+            nextDeadline(until, Date_t::now(), jitteredPollInterval(_basePollInterval));
 
         if (!hasStartedWaiting) {
             // Read maxWaiters before we increment _waiters so callers can rely on
@@ -80,13 +79,22 @@ bool UnorderedTicketSemaphore::acquire(OperationContext* opCtx,
             }
         }
 
-        _permits.waitUntil(0, deadline);
+        // Take the current permit count. If it is positive, loop to retry acquisition immediately.
+        // Otherwise, wait for the observed non-positive value to change. If it remains unchanged
+        // through the final deadline, the ticket acquisition fails.
+        const auto observedPermits = _permits.load();
+        if (observedPermits > 0) {
+            continue;
+        }
+
+        const auto waitResult = _permits.waitUntil(observedPermits, deadline);
 
         if (interruptible) {
             opCtx->checkForInterrupt();
         }
 
-        if (deadline == until) {
+        // We enter here only if no newly available permit woke this waiter early.
+        if (!waitResult && deadline == until) {
             if (!interruptible) {
                 // Uninterruptible wait - just return timeout
                 return false;

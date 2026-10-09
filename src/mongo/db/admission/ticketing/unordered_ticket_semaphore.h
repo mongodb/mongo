@@ -25,8 +25,10 @@ namespace mongo {
  */
 class UnorderedTicketSemaphore : public TicketSemaphore {
 public:
-    UnorderedTicketSemaphore(int numPermits, int maxWaiters)
-        : _permits(numPermits), _maxWaiters(maxWaiters) {}
+    UnorderedTicketSemaphore(int numPermits,
+                             int maxWaiters,
+                             Milliseconds basePollInterval = Milliseconds{500})
+        : _permits(numPermits), _maxWaiters(maxWaiters), _basePollInterval(basePollInterval) {}
 
     bool tryAcquire() override;
 
@@ -49,6 +51,7 @@ private:
     BasicWaitableAtomic<int> _permits;
     Atomic<int> _waiters{0};
     Atomic<int> _maxWaiters;
+    const Milliseconds _basePollInterval;
 };
 
 }  // namespace mongo
