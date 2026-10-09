@@ -23,7 +23,7 @@ using std::vector;
 // regular basis. The particular distribution of data shouldn't matter much.
 vector<double> generateNormal(size_t n, bool presorted) {
     std::mt19937 generator(2023u);
-    boost::random::normal_distribution<double> dist(0.0 /* mean */, 1.0 /* sigma */);
+    boost::random::normal_distribution<double> dist(/*mean=*/0.0, /*sigma=*/1.0);
 
     vector<double> inputs;
     inputs.reserve(n);
@@ -70,7 +70,7 @@ void PercentileAlgoBenchmarkFixture::discrete_normalData(benchmark::State& state
 void PercentileAlgoBenchmarkFixture::tdigest_normalData_batched(benchmark::State& state,
                                                                 TDigest::ScalingFunction k_limit,
                                                                 double delta) {
-    const vector<double> inputs = generateNormal(nLarge, false /* presorted */);
+    const vector<double> inputs = generateNormal(nLarge, /*presorted=*/false);
 
     for (auto keepRunning : state) {
         auto d = std::make_unique<TDigest>(k_limit, delta);

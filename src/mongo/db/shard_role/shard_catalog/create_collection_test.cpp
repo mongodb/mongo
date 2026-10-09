@@ -135,7 +135,7 @@ void CreateCollectionTest::validateValidator(const std::string& validatorStr,
 
         WriteUnitOfWork wuow(opCtx.get());
         const auto status =
-            db->userCreateNS(opCtx.get(), newNss, options, false /*createDefaultIndexes*/);
+            db->userCreateNS(opCtx.get(), newNss, options, /*createDefaultIndexes=*/false);
         ASSERT_EQ(expectedError, status.code()) << status;
     });
 }
@@ -209,7 +209,7 @@ TEST_F(CreateCollectionTest, CreateCollectionForApplyOpsWithSpecificUuidNoExisti
                                           newNss.dbName(),
                                           uuid,
                                           BSON("create" << newNss.coll()),
-                                          /*allowRenameOutOfTheWay*/ false));
+                                          /*allowRenameOutOfTheWay=*/false));
 
     ASSERT_TRUE(collectionExists(opCtx.get(), newNss));
 }
@@ -232,7 +232,7 @@ TEST_F(CreateCollectionTest, CreateCollectionForApplyOpsWithSpecificUuidNestedIn
                                           newNss.dbName(),
                                           boost::none,
                                           BSON("create" << newNss.coll() << "uuid" << uuid),
-                                          /*allowRenameOutOfTheWay*/ false));
+                                          /*allowRenameOutOfTheWay=*/false));
 
     ASSERT_TRUE(collectionExists(opCtx.get(), newNss));
     ASSERT_EQUALS(uuid, getCollectionUuid(opCtx.get(), newNss));
@@ -262,7 +262,7 @@ TEST_F(CreateCollectionTest,
                                           newNss.dbName(),
                                           uuid,
                                           BSON("create" << newNss.coll()),
-                                          /*allowRenameOutOfTheWay*/ true));
+                                          /*allowRenameOutOfTheWay=*/true));
 
     ASSERT_FALSE(collectionExists(opCtx.get(), curNss));
     ASSERT_TRUE(collectionExists(opCtx.get(), newNss));
@@ -291,7 +291,7 @@ TEST_F(CreateCollectionTest,
                                           newNss.dbName(),
                                           uuid,
                                           BSON("create" << newNss.coll()),
-                                          /*allowRenameOutOfTheWay*/ true));
+                                          /*allowRenameOutOfTheWay=*/true));
 
     ASSERT_TRUE(collectionExists(opCtx.get(), newNss));
     ASSERT_EQUALS(uuid, getCollectionUuid(opCtx.get(), newNss));
@@ -347,7 +347,7 @@ TEST_F(CreateCollectionTest, CreateCollectionForApplyOpsRespectsTimeseriesBucket
                                           bucketsColl.dbName(),
                                           uuid2,
                                           cmd.toBSON(),
-                                          /*allowRenameOutOfTheWay*/ true));
+                                          /*allowRenameOutOfTheWay=*/true));
     ASSERT_TRUE(collectionExists(opCtx.get(), bucketsColl));
     ASSERT_EQUALS(uuid2, getCollectionUuid(opCtx.get(), bucketsColl));
 
@@ -375,7 +375,7 @@ TEST_F(CreateCollectionTest, CreateCollectionForApplyOpsRespectsTimeseriesBucket
                                           bucketsColl.dbName(),
                                           uuid1,
                                           cmd.toBSON(),
-                                          /*allowRenameOutOfTheWay*/ false));
+                                          /*allowRenameOutOfTheWay=*/false));
     // This should rename the old collection back to its original name.
     ASSERT_FALSE(collectionExists(opCtx.get(), *renamedCollectionNss));
     ASSERT_TRUE(collectionExists(opCtx.get(), bucketsColl));
@@ -443,7 +443,7 @@ TEST_F(CreateCollectionTest, CreateCollectionForApplyOpsDoesNotCreateIdIndexOnCl
                           << BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
                                       << "clustered_index"
                                       << "unique" << true)),
-            /*allowRenameOutOfTheWay*/ false));
+            /*allowRenameOutOfTheWay=*/false));
     }
 
     auto coll = acquireCollForRead(opCtx.get(), nss);
@@ -763,7 +763,7 @@ TEST_F(CreateCollectionTest,
             newNss.dbName(),
             uuid,
             fromjson("{create: 'view', viewOn: 'coll', pipeline: []}"),
-            /*allowRenameOutOfTheWay*/ false,
+            /*allowRenameOutOfTheWay=*/false,
             /*idIndex=*/boost::none,
             CreateCollCatalogIdentifier{.ident = "collection-1", .idIndexIdent = "index-1"s}),
         DBException,
@@ -999,7 +999,7 @@ TEST_F(CreateCollectionTest, CreateCollectionForApplyOpsTimeseries) {
                                           newNss.dbName(),
                                           uuid,
                                           cmd.toBSON(),
-                                          /*allowRenameOutOfTheWay*/ false));
+                                          /*allowRenameOutOfTheWay=*/false));
 
     ASSERT_TRUE(collectionExists(opCtx.get(), newNss));
 }
@@ -1024,7 +1024,7 @@ TEST_F(CreateCollectionTest, CreateCollectionForApplyOpsTimeseriesDollarPrefix) 
                                           newNss.dbName(),
                                           uuid,
                                           cmd.toBSON(),
-                                          /*allowRenameOutOfTheWay*/ false));
+                                          /*allowRenameOutOfTheWay=*/false));
 
     ASSERT_TRUE(collectionExists(opCtx.get(), newNss));
 }

@@ -59,23 +59,23 @@ public:
 
         auto env = std::make_unique<RuntimeEnvironment>();
 
-        std::unique_ptr<PlanStage> stage = std::make_unique<MultiRangeClusteredScanStage>(
-            colls.getMainCollection()->uuid(),
-            _nss.dbName(),
-            resultSlot,
-            recordIdSlot,
-            boost::none /* snapshotIdSlot */,
-            boost::none /* indexIdentSlot */,
-            boost::none /* indexKeySlot */,
-            boost::none /* indexKeyPatternSlot */,
-            std::vector<std::string>{},
-            value::SlotVector{},
-            std::move(rangeList),
-            forward,
-            nullptr /* yieldPolicy */,
-            kEmptyPlanNodeId,
-            nullptr /* scanOpenCallback */,
-            false /* participateInTrialRunTracking */);
+        std::unique_ptr<PlanStage> stage =
+            std::make_unique<MultiRangeClusteredScanStage>(colls.getMainCollection()->uuid(),
+                                                           _nss.dbName(),
+                                                           resultSlot,
+                                                           recordIdSlot,
+                                                           /*snapshotIdSlot=*/boost::none,
+                                                           /*indexIdentSlot=*/boost::none,
+                                                           /*indexKeySlot=*/boost::none,
+                                                           /*indexKeyPatternSlot=*/boost::none,
+                                                           std::vector<std::string>{},
+                                                           value::SlotVector{},
+                                                           std::move(rangeList),
+                                                           forward,
+                                                           /*yieldPolicy=*/nullptr,
+                                                           kEmptyPlanNodeId,
+                                                           /*scanOpenCallback=*/nullptr,
+                                                           /*participateInTrialRunTracking=*/false);
 
         auto ctx = makeCompileCtx(std::move(env));
         attachCollectionAcquisition(colls);
@@ -121,7 +121,7 @@ TEST_F(MultiRangeClusteredScanStageTest, ReOpenNoStartBoundForward) {
     ASSERT_EQ(first, expected);
 
     // Now reOpen and drain again — must produce the same documents.
-    p.stage->open(true /* reOpen */);
+    p.stage->open(/*reOpen=*/true);
     auto second = drain(p.stage.get(), p.recordIdAccessor);
     ASSERT_EQ(second, expected);
 }
@@ -148,7 +148,7 @@ TEST_F(MultiRangeClusteredScanStageTest, ReOpenNoStartBoundBackward) {
         expected.push_back(record_id_helpers::keyForElem(BSON("_id" << i).firstElement()));
     ASSERT_EQ(first, expected);
 
-    p.stage->open(true /* reOpen */);
+    p.stage->open(/*reOpen=*/true);
     auto second = drain(p.stage.get(), p.recordIdAccessor);
     ASSERT_EQ(second, expected);
 }
@@ -173,7 +173,7 @@ TEST_F(MultiRangeClusteredScanStageTest, ReOpenWithStartBoundForward) {
         expected.push_back(record_id_helpers::keyForElem(BSON("_id" << i).firstElement()));
     ASSERT_EQ(first, expected);
 
-    p.stage->open(true /* reOpen */);
+    p.stage->open(/*reOpen=*/true);
     auto second = drain(p.stage.get(), p.recordIdAccessor);
     ASSERT_EQ(second, expected);
 }

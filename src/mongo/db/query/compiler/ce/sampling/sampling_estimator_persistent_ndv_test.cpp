@@ -178,7 +178,7 @@ protected:
     void withEstimator(F&& fn) {
         auto coll = acquireTestCollection();
         auto colls = MultipleCollectionAccessor(
-            coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+            coll, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
         SamplingEstimatorForTesting estimator(operationContext(),
                                               colls,
@@ -186,9 +186,9 @@ protected:
                                               PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                               kSampleSize,
                                               SamplingCEMethodEnum::kRandom,
-                                              boost::none /* numChunks */,
+                                              /*numChunks=*/boost::none,
                                               makeCardinalityEstimate(kCollCard),
-                                              nullptr /* customerQueryExpCtx */);
+                                              /*customerQueryExpCtx=*/nullptr);
         estimator.generateSample(ce::NoProjection{});
         fn(estimator);
     }
@@ -477,7 +477,7 @@ TEST_F(PersistentNDVTest, CompositeFallsBackWhenSeveralFieldsFolded) {
 
 TEST_F(PersistentNDVTest, CompositeWrongSketchCountFallsBack) {
     // Two fields require exactly three sketches; a two-sketch document is malformed.
-    persistCompositeNDV({"a", "b"}, kCompositeBase, 2 /* sketchCountOverride */);
+    persistCompositeNDV({"a", "b"}, kCompositeBase, /*sketchCountOverride=*/2);
     withEstimator([&](SamplingEstimatorForTesting& estimator) {
         ASSERT_NE(
             estimator

@@ -159,45 +159,45 @@ std::unique_ptr<sbe::PlanStage> makeScanStage(const CollectionPtr& collection,
                                                 collection->ns().dbName(),
                                                 recordSlot,
                                                 recordIdSlot,
-                                                boost::none /* snapshotIdSlot */,
-                                                boost::none /* indexIdentSlot */,
-                                                boost::none /* indexKeySlot */,
-                                                boost::none /* keyPatternSlot */,
+                                                /*snapshotIdSlot=*/boost::none,
+                                                /*indexIdentSlot=*/boost::none,
+                                                /*indexKeySlot=*/boost::none,
+                                                /*keyPatternSlot=*/boost::none,
                                                 scanFieldNames,
                                                 scanFieldSlots,
                                                 sbeYieldPolicy,
-                                                0 /* nodeId */);
+                                                /*nodeId=*/0);
     } else if (minRecordIdSlot) {
         return sbe::makeS<sbe::ScanStage>(collection->uuid(),
                                           collection->ns().dbName(),
                                           recordSlot,
                                           recordIdSlot,
-                                          boost::none /* snapshotIdSlot */,
-                                          boost::none /* indexIdentSlot */,
-                                          boost::none /* indexKeySlot */,
-                                          boost::none /* keyPatternSlot */,
+                                          /*snapshotIdSlot=*/boost::none,
+                                          /*indexIdentSlot=*/boost::none,
+                                          /*indexKeySlot=*/boost::none,
+                                          /*keyPatternSlot=*/boost::none,
                                           scanFieldNames,
                                           scanFieldSlots,
                                           minRecordIdSlot,
-                                          boost::none /* maxRecordIdSlot */,
-                                          true /* forward */,
+                                          /*maxRecordIdSlot=*/boost::none,
+                                          /*forward=*/true,
                                           sbeYieldPolicy,
-                                          0 /* nodeId */,
+                                          /*nodeId=*/0,
                                           std::move(scanOpenCallback));
     }
     return sbe::makeS<sbe::GenericScanStage>(collection->uuid(),
                                              collection->ns().dbName(),
                                              recordSlot,
                                              recordIdSlot,
-                                             boost::none /* snapshotIdSlot */,
-                                             boost::none /* indexIdentSlot */,
-                                             boost::none /* indexKeySlot */,
-                                             boost::none /* keyPatternSlot */,
+                                             /*snapshotIdSlot=*/boost::none,
+                                             /*indexIdentSlot=*/boost::none,
+                                             /*indexKeySlot=*/boost::none,
+                                             /*keyPatternSlot=*/boost::none,
                                              scanFieldNames,
                                              scanFieldSlots,
-                                             true /* forward */,
+                                             /*forward=*/true,
                                              sbeYieldPolicy,
-                                             0 /* nodeId */,
+                                             /*nodeId=*/0,
                                              std::move(scanOpenCallback));
 }
 
@@ -280,7 +280,7 @@ std::unique_ptr<sbe::PlanStage> makeProjectStage(std::unique_ptr<sbe::PlanStage>
     auto func = sbe::makeE<sbe::EFunction>(
         sbe::EFn::kMakeBsonObj,
         sbe::makeEs(std::move(specExpr), sbe::makeE<sbe::EVariable>(inputSlot)));
-    return sbe::makeProjectStage(std::move(stage), 0 /* nodeId */, outputSlot, std::move(func));
+    return sbe::makeProjectStage(std::move(stage), /*nodeId=*/0, outputSlot, std::move(func));
 }
 }  // namespace
 
@@ -373,8 +373,8 @@ SamplingEstimatorImpl::generateRandomSamplingPlan(PlanYieldPolicySBE* sbeYieldPo
         std::move(stage),
         sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
                                    sbe::value::bitcastFrom<int64_t>(_sampleSize)),
-        nullptr /* skip */,
-        0 /* nodeId */);
+        /*skip=*/nullptr,
+        /*nodeId=*/0);
 
     // Inject projection if topLevelSampleFieldNames is non-empty.
     if (!_topLevelSampleFieldNames.empty()) {
@@ -413,8 +413,8 @@ SamplingEstimatorImpl::generateChunkSamplingPlan(PlanYieldPolicySBE* sbeYieldPol
         std::move(outerStage),
         sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
                                    sbe::value::bitcastFrom<int64_t>(*_numChunks)),
-        nullptr /* skip */,
-        0 /* nodeId */);
+        /*skip=*/nullptr,
+        /*nodeId=*/0);
 
     // The inner stage seeks into the starting point picked by the outer stage and scans 'chunkSize'
     // documents sequentially.
@@ -425,8 +425,8 @@ SamplingEstimatorImpl::generateChunkSamplingPlan(PlanYieldPolicySBE* sbeYieldPol
         std::move(innerStage),
         sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
                                    sbe::value::bitcastFrom<int64_t>(chunkSize)),
-        nullptr /* skip */,
-        0 /* nodeId */);
+        /*skip=*/nullptr,
+        /*nodeId=*/0);
 
 
     sbe::value::SlotVector outerProjectsSlots;
@@ -435,8 +435,8 @@ SamplingEstimatorImpl::generateChunkSamplingPlan(PlanYieldPolicySBE* sbeYieldPol
                                                 std::move(innerStage),
                                                 outerProjectsSlots,
                                                 outerCorrelatedSlots,
-                                                nullptr /* predicate */,
-                                                0 /* _nodeId */);
+                                                /*predicate=*/nullptr,
+                                                /*_nodeId=*/0);
 
     // Inject projection if topLevelSampleFieldNames is non-empty.
     if (!_topLevelSampleFieldNames.empty()) {
@@ -477,14 +477,14 @@ void SamplingEstimatorImpl::executeSamplingQueryAndSample(
     // Create a PlanExecutor for the execution of the sampling plan.
     auto exec = mongo::plan_executor_factory::make(_opCtx,
                                                    std::move(cq),
-                                                   nullptr /*solution*/,
+                                                   /*solution=*/nullptr,
                                                    std::move(plan),
                                                    _collections,
                                                    QueryPlannerParams::DEFAULT,
                                                    _nss,
                                                    std::move(sbeYieldPolicy),
-                                                   false /* isFromPlanCache */,
-                                                   false /* cachedPlanHash */);
+                                                   /*isFromPlanCache=*/false,
+                                                   /*cachedPlanHash=*/false);
 
     // This function call could be a re-sample request, so the previous sample should be cleared.
     _sample.clear();
@@ -645,8 +645,8 @@ void SamplingEstimatorImpl::generateSampleForTesting(SamplingTechniqueEnum techn
                 std::move(stage),
                 sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
                                            sbe::value::bitcastFrom<int64_t>(_sampleSize)),
-                nullptr /* skip */,
-                0 /* nodeId */);
+                /*skip=*/nullptr,
+                /*nodeId=*/0);
             break;
         }
         case SamplingTechniqueEnum::kStrides: {
@@ -679,13 +679,13 @@ void SamplingEstimatorImpl::generateSampleForTesting(SamplingTechniqueEnum techn
                 sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
                                            sbe::value::bitcastFrom<int64_t>(0)));
             stage = sbe::makeS<sbe::FilterStage<false>>(
-                std::move(stage), std::move(hashModFilter), 0 /* nodeId */);
+                std::move(stage), std::move(hashModFilter), /*nodeId=*/0);
             stage = sbe::makeS<sbe::LimitSkipStage>(
                 std::move(stage),
                 sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
                                            sbe::value::bitcastFrom<int64_t>(_sampleSize)),
-                nullptr /* skip */,
-                0 /* nodeId */);
+                /*skip=*/nullptr,
+                /*nodeId=*/0);
             break;
         }
         default:
@@ -1194,7 +1194,7 @@ boost::optional<size_t> SamplingEstimatorImpl::selectPersistedNDVSketchIndex(
     size_t foldedCount = 0;
     size_t sketchIndex = 0;
     for (size_t i = 0; i < sortedFields.size(); ++i) {
-        if (!sortedFields[i].second /* isExprEq */) {
+        if (/*isExprEq=*/!sortedFields[i].second) {
             ++foldedCount;
             sketchIndex = i + 1;
         }

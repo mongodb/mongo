@@ -274,7 +274,7 @@ struct OplogEntryProducerInsertsSmall : OplogEntryProducerInserts<IdGeneratorTyp
                                    const UUID& uuid,
                                    IdGeneratorType idGenerator)
         : OplogEntryProducerInserts<IdGeneratorType>(
-              nss, uuid, std::move(idGenerator), 0 /* numFields */, 0 /* payloadSize */) {}
+              nss, uuid, std::move(idGenerator), /*numFields=*/0, /*payloadSize=*/0) {}
 };
 
 // Produces medium "insert" oplog entries.
@@ -284,7 +284,7 @@ struct OplogEntryProducerInsertsMedium : OplogEntryProducerInserts<IdGeneratorTy
                                     const UUID& uuid,
                                     IdGeneratorType idGenerator)
         : OplogEntryProducerInserts<IdGeneratorType>(
-              nss, uuid, std::move(idGenerator), 16 /* numFields */, 256 /* payloadSize */) {}
+              nss, uuid, std::move(idGenerator), /*numFields=*/16, /*payloadSize=*/256) {}
 };
 
 // Produces large "insert" oplog entries.
@@ -294,7 +294,7 @@ struct OplogEntryProducerInsertsLarge : OplogEntryProducerInserts<IdGeneratorTyp
                                    const UUID& uuid,
                                    IdGeneratorType idGenerator)
         : OplogEntryProducerInserts<IdGeneratorType>(
-              nss, uuid, std::move(idGenerator), 40 /* numFields */, 8192 /* payloadSize */) {}
+              nss, uuid, std::move(idGenerator), /*numFields=*/40, /*payloadSize=*/8192) {}
 };
 
 
@@ -309,7 +309,7 @@ public:
         serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLatest);
 
         _scopedGlobalServiceContext =
-            std::make_unique<ScopedGlobalServiceContextForTest>(false /* shouldSetupTL */);
+            std::make_unique<ScopedGlobalServiceContextForTest>(/*shouldSetupTL=*/false);
         _threadClient =
             std::make_unique<ThreadClient>(_scopedGlobalServiceContext->getService(), nullptr);
         _opCtx = (*_threadClient)->makeOperationContext();

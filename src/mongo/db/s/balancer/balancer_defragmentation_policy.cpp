@@ -98,9 +98,9 @@ std::vector<ChunkType> getCollectionChunks(OperationContext* opCtx, const Collec
     return uassertStatusOK(
         catalogClient->getChunks(opCtx,
                                  /*filter=*/BSON(ChunkType::collectionUUID() << coll.getUuid()),
-                                 BSON(ChunkType::min() << 1) /*sort*/,
-                                 boost::none /*limit*/,
-                                 nullptr /*opTime*/,
+                                 /*sort=*/BSON(ChunkType::min() << 1),
+                                 /*limit=*/boost::none,
+                                 /*opTime=*/nullptr,
                                  coll.getEpoch(),
                                  coll.getTimestamp(),
                                  repl::ReadConcernArgs::kLocal,
@@ -259,7 +259,7 @@ public:
                                  shardVersion,
                                  _shardKey,
                                  /*estimatedValue=*/true,
-                                 _smallChunkSizeThresholdBytes /* maxSize */));
+                                 /*maxSize=*/_smallChunkSizeThresholdBytes));
                 pendingActions.rangesWithoutDataSize.pop_back();
             } else if (!pendingActions.rangesToMerge.empty()) {
                 const auto& rangeToMerge = pendingActions.rangesToMerge.back();

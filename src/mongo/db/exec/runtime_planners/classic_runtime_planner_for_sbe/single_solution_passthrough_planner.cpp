@@ -36,7 +36,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> SingleSolutionPassthroughPl
                                   std::move(_sbePlanAndData),
                                   _isFromPlanCache,
                                   cachedPlanHash(),
-                                  nullptr /*classicRuntimePlannerStage*/);
+                                  /*classicRuntimePlannerStage=*/nullptr);
 }
 
 std::unique_ptr<QuerySolution> SingleSolutionPassthroughPlanner::extendSolutionWithPipelineIfNeeded(

@@ -409,7 +409,7 @@ void TextOrStage::doForceSpill() {
                                                          _memoryTracker.inUseTrackedMemoryBytes(),
                                                          recordsToSpill,
                                                          _sorterStats->bytesSpilled());
-    textOrCounters.incrementPerSpilling(1 /*spills*/,
+    textOrCounters.incrementPerSpilling(/*spills=*/1,
                                         _memoryTracker.inUseTrackedMemoryBytes(),
                                         recordsToSpill,
                                         spilledDataStorageIncrease);

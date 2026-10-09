@@ -129,9 +129,9 @@ void installShardedCollectionMetadata(OperationContext* opCtx,
                                            false,
                                            epoch,
                                            timestamp,
-                                           boost::none /* timeseriesFields */,
+                                           /*timeseriesFields=*/boost::none,
                                            boost::none /* resharding Fields */,
-                                           true /* allowMigrations */,
+                                           /*allowMigrations=*/true,
                                            chunks);
 
     const auto version = rt.getVersion();

@@ -212,7 +212,7 @@ namespace plan_cache_key_factory {
 std::tuple<sbe::PlanCacheKeyCollectionState, std::vector<sbe::PlanCacheKeyCollectionState>>
 getCollectionState(OperationContext* opCtx, const MultipleCollectionAccessor& collections) {
     auto mainCollectionState = plan_cache_detail::computeCollectionState(
-        opCtx, collections.getMainCollectionAcquisition(), false /* isSecondaryColl */);
+        opCtx, collections.getMainCollectionAcquisition(), /*isSecondaryColl=*/false);
     std::vector<sbe::PlanCacheKeyCollectionState> secondaryCollectionStates;
     secondaryCollectionStates.reserve(collections.getSecondaryCollectionAcquisitions().size());
     // We always use the collection order saved in MultipleCollectionAccessor to populate the plan
@@ -220,7 +220,7 @@ getCollectionState(OperationContext* opCtx, const MultipleCollectionAccessor& co
     for (auto& [_, collectionOrView] : collections.getSecondaryCollectionAcquisitions()) {
         if (collectionOrView.collectionExists()) {
             secondaryCollectionStates.emplace_back(plan_cache_detail::computeCollectionState(
-                opCtx, collectionOrView.getCollection(), true /* isSecondaryColl */));
+                opCtx, collectionOrView.getCollection(), /*isSecondaryColl=*/true));
         }
     }
     secondaryCollectionStates.shrink_to_fit();

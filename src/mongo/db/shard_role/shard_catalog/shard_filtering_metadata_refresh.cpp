@@ -373,7 +373,7 @@ void FilteringMetadataCache::forceCollectionMetadataRefresh_DEPRECATED(Operation
 
     auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
 
-    if (isCollectionPlacementUpToDate(scopedCsr->getCurrentMetadataIfKnown() /* optMetadata */)) {
+    if (isCollectionPlacementUpToDate(/*optMetadata=*/scopedCsr->getCurrentMetadataIfKnown())) {
         return;
     }
 
@@ -540,7 +540,7 @@ void FilteringMetadataCache::_recoverMigrationCoordinations(OperationContext* op
                 // The decision is already known.
                 coordinator.setShardKeyPattern(
                     rangedeletionutil::getShardKeyPatternFromRangeDeletionTask(opCtx, doc.getId()));
-                coordinator.completeMigration(opCtx, true /* clearShardCatalogCache */);
+                coordinator.completeMigration(opCtx, /*clearShardCatalogCache=*/true);
                 return true;
             }
 
@@ -643,7 +643,7 @@ void FilteringMetadataCache::_recoverMigrationCoordinations(OperationContext* op
             }
 
             coordinator.setShardKeyPattern(KeyPattern(currentMetadata.getKeyPattern()));
-            coordinator.completeMigration(opCtx, true /* clearShardCatalogCache */);
+            coordinator.completeMigration(opCtx, /*clearShardCatalogCache=*/true);
             setCollectionMetadata();
             return true;
         });
@@ -671,7 +671,7 @@ Status FilteringMetadataCache::_refreshDbMetadata(OperationContext* opCtx,
     }();
 
     // Force a refresh of the cached database metadata from the config server.
-    catalogCache->onStaleDatabaseVersion(dbName, boost::none /* wantedVersion */);
+    catalogCache->onStaleDatabaseVersion(dbName, /*wantedVersion=*/boost::none);
     const auto swDbMetadata = catalogCache->getDatabase(opCtx, dbName);
 
     Lock::DBLock dbLock(

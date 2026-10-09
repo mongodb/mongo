@@ -53,7 +53,7 @@ void InitialSyncClonerTestFixture::setUp() {
     ClonerTestFixture::setUp();
 
     _sharedData = std::make_unique<InitialSyncSharedData>(kInitialRollbackId,
-                                                          true /* cleanShutdownCheckEnabled */,
+                                                          /*cleanShutdownCheckEnabled=*/true,
                                                           kBaseCleanShutdownId,
                                                           kBeginApplyingTimestamp,
                                                           Days(1),

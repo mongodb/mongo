@@ -396,7 +396,7 @@ void WiredTigerRecoveryUnit::doAbandonSnapshot() {
     if (_isActive()) {
         // Can't be in a WriteUnitOfWork, so safe to rollback if the AbandonSnapshotMode is
         // kAbort. If kCommit, however, then any active cursors will remain positioned and valid.
-        _txnClose(_abandonSnapshotMode == AbandonSnapshotMode::kCommit /* commit */);
+        _txnClose(/*commit=*/_abandonSnapshotMode == AbandonSnapshotMode::kCommit);
     }
     _setState(State::kInactive);
 }
@@ -807,7 +807,7 @@ void WiredTigerRecoveryUnit::_txnOpen() {
                                             _optionsUsedToOpenSnapshot.roundUpPreparedTimestamps,
                                             RoundUpReadTimestamp::kNoRoundError,
                                             _untimestampedWriteAssertionLevel,
-                                            boost::none /* claimPreparedId */,
+                                            /*claimPreparedId=*/boost::none,
                                             operationTimeoutArg(_operationTimeout));
             auto status = txnOpen.setReadSnapshot(_readAtTimestamp);
 
@@ -838,7 +838,7 @@ Timestamp WiredTigerRecoveryUnit::_beginTransactionAtAllDurableTimestamp() {
                                     _optionsUsedToOpenSnapshot.roundUpPreparedTimestamps,
                                     RoundUpReadTimestamp::kRound,
                                     _untimestampedWriteAssertionLevel,
-                                    boost::none /* claimPreparedId */,
+                                    /*claimPreparedId=*/boost::none,
                                     operationTimeoutArg(_operationTimeout));
     Timestamp txnTimestamp = _connection->getKVEngine()->getAllDurableTimestamp();
     auto status = txnOpen.setReadSnapshot(txnTimestamp);
@@ -868,7 +868,7 @@ void WiredTigerRecoveryUnit::_beginTransactionAtLastAppliedTimestamp() {
                                         _optionsUsedToOpenSnapshot.roundUpPreparedTimestamps,
                                         RoundUpReadTimestamp::kNoRoundError,
                                         _untimestampedWriteAssertionLevel,
-                                        boost::none /* claimPreparedId */,
+                                        /*claimPreparedId=*/boost::none,
                                         operationTimeoutArg(_operationTimeout));
         LOGV2_DEBUG(4847500, 2, "no read timestamp available for kLastApplied");
         txnOpen.done();
@@ -880,7 +880,7 @@ void WiredTigerRecoveryUnit::_beginTransactionAtLastAppliedTimestamp() {
                                     _optionsUsedToOpenSnapshot.roundUpPreparedTimestamps,
                                     RoundUpReadTimestamp::kRound,
                                     _untimestampedWriteAssertionLevel,
-                                    boost::none /* claimPreparedId */,
+                                    /*claimPreparedId=*/boost::none,
                                     operationTimeoutArg(_operationTimeout));
     auto status = txnOpen.setReadSnapshot(_readAtTimestamp);
     fassert(4847501, status);
@@ -937,7 +937,7 @@ Timestamp WiredTigerRecoveryUnit::_beginTransactionAtNoOverlapTimestamp() {
                                         _optionsUsedToOpenSnapshot.roundUpPreparedTimestamps,
                                         RoundUpReadTimestamp::kNoRoundError,
                                         _untimestampedWriteAssertionLevel,
-                                        boost::none /* claimPreparedId */,
+                                        /*claimPreparedId=*/boost::none,
                                         operationTimeoutArg(_operationTimeout));
         LOGV2_DEBUG(4452900, 1, "no read timestamp available for kNoOverlap");
         txnOpen.done();
@@ -949,7 +949,7 @@ Timestamp WiredTigerRecoveryUnit::_beginTransactionAtNoOverlapTimestamp() {
                                     _optionsUsedToOpenSnapshot.roundUpPreparedTimestamps,
                                     RoundUpReadTimestamp::kRound,
                                     _untimestampedWriteAssertionLevel,
-                                    boost::none /* claimPreparedId */,
+                                    /*claimPreparedId=*/boost::none,
                                     operationTimeoutArg(_operationTimeout));
     auto status = txnOpen.setReadSnapshot(readTimestamp);
     fassert(51066, status);

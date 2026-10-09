@@ -312,8 +312,8 @@ public:
             client.update(donorDoc.getSourceNss(),
                           BSON("_id" << 0),
                           BSON("$inc" << BSON("x" << 1)),
-                          false /*upsert*/,
-                          false /*multi*/);
+                          /*upsert=*/false,
+                          /*multi=*/false);
         }
         for (int i = 0; i <= numDeletes; i++) {
             client.remove(donorDoc.getSourceNss(), BSON("_id" << i), false);
@@ -349,7 +349,7 @@ public:
         auto status = donor.createAndStartChangeStreamsMonitor(cloneTimestamp).getNoThrow(opCtx);
         if (donorDoc.getPerformVerification()) {
             ASSERT_OK(status);
-            checkChangeStreamsMonitor(opCtx, donorDoc, boost::none /* documentsDelta */);
+            checkChangeStreamsMonitor(opCtx, donorDoc, /*documentsDelta=*/boost::none);
             // Perform some writes against the source collection so we can verify the delta later
             // in the test.
             writeToSourceCollection(opCtx, donorDoc, _numInserts, _numUpdates, _numDeletes);
@@ -1248,7 +1248,7 @@ TEST_F(ReshardingDonorServiceTest, RestoreMetricsOnKBlockingWrites) {
             doc.getSourceNss(),
             critSecReason,
             ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-            true /* clearShardCatalogCache */);
+            /*clearShardCatalogCache=*/true);
 
     auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
     notifyReshardingCommitting(opCtx.get(), *donor, doc);
@@ -1291,7 +1291,7 @@ TEST_F(ReshardingDonorServiceTest, AbortWhileChangeStreamsMonitorInProgress) {
 
     createSourceCollection(opCtx.get(), doc);
     auto makeChangeStreamsMonitorCtx = [&]() {
-        ChangeStreamsMonitorContext changeStreamsMonitorCtx(cloneTimestamp, 0 /* documentsDelta */);
+        ChangeStreamsMonitorContext changeStreamsMonitorCtx(cloneTimestamp, /*documentsDelta=*/0);
         return changeStreamsMonitorCtx;
     };
     doc.setChangeStreamsMonitor(makeChangeStreamsMonitorCtx());
@@ -1307,7 +1307,7 @@ TEST_F(ReshardingDonorServiceTest, AbortWhileChangeStreamsMonitorInProgress) {
             BSON("command" << "resharding_donor"
                            << "collection" << doc.getSourceNss().toString_forTest()),
             ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-            true /* clearShardCatalogCache */);
+            /*clearShardCatalogCache=*/true);
 
     auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
     ASSERT_OK(donor->awaitChangeStreamsMonitorStarted().getNoThrow());

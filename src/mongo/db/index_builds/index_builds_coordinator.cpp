@@ -3224,7 +3224,7 @@ IndexBuildsCoordinator::PostSetupAction IndexBuildsCoordinator::_setUpIndexBuild
                 replState->collectionUUID,
                 replState->buildUUID,
                 replState->getIndexes(),
-                false /* fromMigrate */,
+                /*fromMigrate=*/false,
                 collection->isTimeseriesCollection());
         };
     } else {

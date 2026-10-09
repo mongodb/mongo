@@ -1053,9 +1053,9 @@ public:
         return uassertStatusOK(
             catalogClient()->getChunks(operationContext(),
                                        BSON(ChunkType::collectionUUID() << _collUUID),
-                                       BSON(ChunkType::min() << 1) /* sort */,
-                                       boost::none /* limit */,
-                                       nullptr /* opTime */,
+                                       /*sort=*/BSON(ChunkType::min() << 1),
+                                       /*limit=*/boost::none,
+                                       /*opTime=*/nullptr,
                                        _collEpoch,
                                        _collTimestamp,
                                        repl::ReadConcernArgs::kLocal));
@@ -1152,7 +1152,7 @@ TEST_F(CommitMoveRangeTest, MoveRangeOneWholeChunk) {
     ChunkType migratedChunk = chunks.at(0);
 
     runMoveRangeAndVerify(
-        origChunk, migratedChunk, false /* expectLeftSplit */, false /* expectRightSplit */);
+        origChunk, migratedChunk, /*expectLeftSplit=*/false, /*expectRightSplit=*/false);
 }
 
 /* Test that moveRange(min:10) correctly split+move.
@@ -1170,7 +1170,7 @@ TEST_F(CommitMoveRangeTest, MoveRangeSplitChunkLeftSide) {
     migratedChunk.setRange({BSON("x" << 10), migratedChunk.getMax()});
 
     runMoveRangeAndVerify(
-        origChunk, migratedChunk, true /* expectLeftSplit */, false /* expectRightSplit */);
+        origChunk, migratedChunk, /*expectLeftSplit=*/true, /*expectRightSplit=*/false);
 }
 
 /* Test that moveRange(min:minKey, max: 10) correctly split+move.
@@ -1189,7 +1189,7 @@ TEST_F(CommitMoveRangeTest, MoveRangeSplitChunkRightSide) {
     migratedChunk.setRange({migratedChunk.getMin(), BSON("x" << 10)});
 
     runMoveRangeAndVerify(
-        origChunk, migratedChunk, false /* expectLeftSplit */, true /* expectRightSplit */);
+        origChunk, migratedChunk, /*expectLeftSplit=*/false, /*expectRightSplit=*/true);
 }
 
 /* Test that moveRange(min:1, max: 10) correctly split+move.
@@ -1208,7 +1208,7 @@ TEST_F(CommitMoveRangeTest, MoveRangeSplitChunkLeftRightSide) {
     migratedChunk.setRange({BSON("x" << 1), BSON("x" << 10)});
 
     runMoveRangeAndVerify(
-        origChunk, migratedChunk, true /* expectLeftSplit */, true /* expectRightSplit */);
+        origChunk, migratedChunk, /*expectLeftSplit=*/true, /*expectRightSplit=*/true);
 }
 
 /* Test a random moveRange happening on a collection with several chunks */

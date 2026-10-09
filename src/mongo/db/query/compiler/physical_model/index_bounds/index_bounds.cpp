@@ -233,7 +233,7 @@ bool OrderedIntervalList::boundsOverlapObjectTypeBracket() const {
         BSONObjBuilder objBracketBounds;
         objBracketBounds.appendMinForType("", stdx::to_underlying(BSONType::object));
         objBracketBounds.appendMaxForType("", stdx::to_underlying(BSONType::object));
-        return Interval(objBracketBounds.obj(), false /*startIncluded*/, false /*endIncluded*/);
+        return Interval(objBracketBounds.obj(), /*startIncluded=*/false, /*endIncluded=*/false);
     }();
 
     // Determine whether any of the ordered intervals overlap with the object type bracket. Because

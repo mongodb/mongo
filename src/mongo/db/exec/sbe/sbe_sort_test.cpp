@@ -32,17 +32,17 @@ TEST_F(SortStageTest, SortNumbersTest) {
 
     auto makeStageFn = [](value::SlotVector scanSlots, std::unique_ptr<PlanStage> scanStage) {
         // Create a SortStage that sorts by slot0 in ascending order.
-        auto sortStage =
-            makeS<SortStage>(std::move(scanStage),
-                             makeSV(scanSlots[0]),
-                             std::vector<value::SortDirection>{value::SortDirection::Ascending},
-                             makeSV(scanSlots[1]),
-                             makeE<EConstant>(value::TypeTags::NumberInt64,
-                                              value::bitcastFrom<int64_t>(4)) /*limit*/,
-                             204857600,
-                             false /* allowDiskUse */,
-                             nullptr /* yieldPolicy */,
-                             kEmptyPlanNodeId);
+        auto sortStage = makeS<SortStage>(
+            std::move(scanStage),
+            makeSV(scanSlots[0]),
+            std::vector<value::SortDirection>{value::SortDirection::Ascending},
+            makeSV(scanSlots[1]),
+            /*limit=*/
+            makeE<EConstant>(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(4)),
+            204857600,
+            /*allowDiskUse=*/false,
+            /*yieldPolicy=*/nullptr,
+            kEmptyPlanNodeId);
 
         return std::make_pair(scanSlots, std::move(sortStage));
     };
@@ -96,10 +96,10 @@ TEST_F(SortStageTest, SortStringsWithSpillingTest) {
                              makeSV(scanSlots[0]),
                              std::vector<value::SortDirection>{value::SortDirection::Ascending},
                              makeSV(scanSlots[1]),
-                             nullptr /*limit*/,
-                             10 * 1024 * 1024 /* memoryLimit */,
-                             true /* allowDiskUse */,
-                             nullptr /* yieldPolicy */,
+                             /*limit=*/nullptr,
+                             /*memoryLimit=*/10 * 1024 * 1024,
+                             /*allowDiskUse=*/true,
+                             /*yieldPolicy=*/nullptr,
                              kEmptyPlanNodeId);
 
         return std::make_pair(scanSlots, std::move(sortStage));
@@ -134,10 +134,10 @@ TEST_F(SortStageTest, SortStringsWithForceSpillingTest) {
                              makeSV(scanSlots[0]),
                              std::vector<value::SortDirection>{value::SortDirection::Ascending},
                              makeSV(scanSlots[1]),
-                             nullptr /*limit*/,
-                             100 * 1024 * 1024 /* memoryLimit */,
-                             true /* allowDiskUse */,
-                             nullptr /* yieldPolicy */,
+                             /*limit=*/nullptr,
+                             /*memoryLimit=*/100 * 1024 * 1024,
+                             /*allowDiskUse=*/true,
+                             /*yieldPolicy=*/nullptr,
                              kEmptyPlanNodeId);
 
         return std::make_pair(scanSlots, std::move(sortStage));

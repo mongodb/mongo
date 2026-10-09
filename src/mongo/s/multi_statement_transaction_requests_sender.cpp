@@ -81,7 +81,7 @@ void processReplyMetadataForAsyncGetMore(
     OperationContext* opCtx,
     const ShardId& shardId,
     const TransactionRouter::ParsedParticipantResponseMetadata& parsedResponse) {
-    processReplyMetadata(opCtx, shardId, parsedResponse, true /* forAsyncGetMore */);
+    processReplyMetadata(opCtx, shardId, parsedResponse, /*forAsyncGetMore=*/true);
 }
 
 }  // namespace transaction_request_sender_details

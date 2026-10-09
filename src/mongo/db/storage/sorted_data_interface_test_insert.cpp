@@ -666,7 +666,7 @@ TEST_F(SortedDataInterfaceTest, InsertReservedRecordIdLong) {
     ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(),
                                         recoveryUnit(),
                                         makeKeyString(sorted.get(), key1, reservedLoc),
-                                        /*dupsAllowed*/ true));
+                                        /*dupsAllowed=*/true));
     txn.commit();
     ASSERT_EQUALS(1, sorted->numEntries(opCtx(), recoveryUnit()));
 }

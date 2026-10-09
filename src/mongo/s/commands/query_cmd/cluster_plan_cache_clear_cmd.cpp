@@ -122,8 +122,8 @@ public:
                                 Shard::RetryPolicy::kIdempotent,
                                 query,
                                 CollationSpec::kSimpleSpec,
-                                boost::none /*letParameters*/,
-                                boost::none /*runtimeConstants*/);
+                                /*letParameters=*/boost::none,
+                                /*runtimeConstants=*/boost::none);
 
                             // Sort shard responses by shard id.
                             std::sort(shardResponses.begin(),

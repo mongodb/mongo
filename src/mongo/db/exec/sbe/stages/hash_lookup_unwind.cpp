@@ -28,7 +28,7 @@ HashLookupUnwindStage::HashLookupUnwindStage(std::unique_ptr<PlanStage> outer,
                                              PlanNodeId planNodeId,
                                              bool participateInTrialRunTracking)
     : PlanStage("hash_lookup_unwind"sv,
-                nullptr /* yieldPolicy */,
+                /*yieldPolicy=*/nullptr,
                 planNodeId,
                 participateInTrialRunTracking),
       _outerKeySlot(outerKeySlot),
@@ -132,7 +132,7 @@ void HashLookupUnwindStage::open(bool reOpen) {
     auto optTimer(getOptTimer(_opCtx));
 
     if (reOpen) {
-        reset(false /* fromClose */);
+        reset(/*fromClose=*/false);
     }
     _commonStats.opens++;
     _hashTable.open();
@@ -213,7 +213,7 @@ void HashLookupUnwindStage::close() {
     auto optTimer(getOptTimer(_opCtx));
     trackClose();
     outerChild()->close();
-    reset(true /* fromClose */);
+    reset(/*fromClose=*/true);
 }
 
 std::unique_ptr<PlanStageStats> HashLookupUnwindStage::getStats(bool includeDebugInfo) const {

@@ -365,7 +365,7 @@ public:
                 txnParticipant.beginOrContinue(
                     opCtx,
                     txnNumberAndRetryCounter,
-                    false /* autocommit */,
+                    /*autocommit=*/false,
                     TransactionParticipant::TransactionActions::kContinue);
 
                 if (txnParticipant.transactionIsCommitted())
@@ -393,7 +393,7 @@ public:
                 txnParticipant.beginOrContinue(
                     opCtx,
                     txnNumberAndRetryCounter,
-                    false /* autocommit */,
+                    /*autocommit=*/false,
                     TransactionParticipant::TransactionActions::kContinue);
 
                 invariant(!txnParticipant.transactionIsOpen(),

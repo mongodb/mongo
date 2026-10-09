@@ -91,14 +91,14 @@ RoutingTableHistory makeRoutingTable(const std::vector<ChunkType>& chunks) {
     return RoutingTableHistory::makeNew(kNamespace,
                                         collUUID(),
                                         kShardKeyPattern,
-                                        false /* unsplittable */,
-                                        nullptr /* defaultCollator */,
-                                        false /* unique */,
+                                        /*unsplittable=*/false,
+                                        /*defaultCollator=*/nullptr,
+                                        /*unique=*/false,
                                         kCollEpoch,
                                         kCollTimestamp,
-                                        boost::none /* timeseriesFields */,
-                                        boost::none /* reshardingFields */,
-                                        true /* allowMigrations */,
+                                        /*timeseriesFields=*/boost::none,
+                                        /*reshardingFields=*/boost::none,
+                                        /*allowMigrations=*/true,
                                         chunks);
 }
 
@@ -212,7 +212,7 @@ void checkChunksOnShardForTag(const DistributionStatus& dist,
             ASSERT(expectedChunkIt != expectedChunks.end())
                 << "forEachChunkOnShardInZone loop found more chunks than expected";
             ChunkInfo expectedChunkInfo{*expectedChunkIt++};
-            ASSERT_EQ(Chunk(expectedChunkInfo, boost::none /* atClusterTime */).toString(),
+            ASSERT_EQ(Chunk(expectedChunkInfo, /*atClusterTime=*/boost::none).toString(),
                       chunk.toString());
             return true;  // continue
         });

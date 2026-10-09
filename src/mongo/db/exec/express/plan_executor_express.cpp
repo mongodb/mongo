@@ -840,12 +840,12 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForDelet
                                              std::move(chosenShardFilter),
                                              express::IdentityProjection());
             return {new PlanExecutorExpress(opCtx,
-                                            nullptr /* cq */,
+                                            /*cq=*/nullptr,
                                             precision,
                                             collection,
                                             std::move(plan),
                                             recoveryPolicy,
-                                            false /* returnOwnedBson */),
+                                            /*returnOwnedBson=*/false),
                     PlanExecutor::Deleter(opCtx)};
         },
         std::move(iterator),
@@ -998,10 +998,10 @@ boost::optional<IndexForExpressEquality> getIndexForExpressEquality(
         if (const auto* bestCoveringEntry =
                 findBestCoveringIndexEntry(indexes, *dependencies, cq, data, collationRelevant)) {
             return IndexForExpressEquality(std::move(*bestCoveringEntry),
-                                           true /*coversProjection*/);
+                                           /*coversProjection=*/true);
         }
     }
-    return IndexForExpressEquality(std::move(*bestEntry), false /*coversProjection*/);
+    return IndexForExpressEquality(std::move(*bestEntry), /*coversProjection=*/false);
 }
 
 }  // namespace mongo

@@ -27,7 +27,7 @@ SubPlanner::SubPlanner(PlannerDataForSBE plannerData)
         opCtx(), cq()->nss(), static_cast<PlanStage*>(_subplanStage.get()), yieldPolicy());
     uassertStatusOK(_subplanStage->pickBestPlan(plannerParams(),
                                                 trialPeriodYieldPolicy.get(),
-                                                false /* shouldConstructClassicExecutableTree */));
+                                                /*shouldConstructClassicExecutableTree=*/false));
 
     // Only now is it known which of the branches were ranked, and by what.
     setPlanSelectionStrategy(_subplanStage->planSelectionStrategy());
@@ -42,9 +42,9 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> SubPlanner::makeExecutor(
     return prepareSbePlanExecutor(std::move(canonicalQuery),
                                   std::move(_solution),
                                   std::move(sbePlanAndData),
-                                  false /*isFromPlanCache*/,
+                                  /*isFromPlanCache=*/false,
                                   cachedPlanHash(),
-                                  nullptr /*classicRuntimePlannerStage*/);
+                                  /*classicRuntimePlannerStage=*/nullptr);
 }
 SubplanStage::PlanSelectionCallbacks SubPlanner::makeCallbacks() {
     // This callback is invoked on a per $or branch basis. The callback is constructed in the

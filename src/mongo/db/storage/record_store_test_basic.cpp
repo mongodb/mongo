@@ -314,7 +314,7 @@ TEST(RecordStoreTest, UpdateInPlace1) {
                                       s1Rec,
                                       damageSource,
                                       dv,
-                                      nullptr /*cursor*/);
+                                      /*cursor=*/nullptr);
             ASSERT_OK(newRecStatus.getStatus());
             ASSERT_EQUALS(s2, newRecStatus.getValue().data());
             txn.commit();

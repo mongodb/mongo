@@ -682,7 +682,7 @@ SbExpr generateUnwindProjection(StageBuilderState& state,
                               std::move(paths),
                               std::move(nodes),
                               std::move(docExpr),
-                              nullptr /* slots */,
+                              /*slots=*/nullptr,
                               traversalDepth,
                               shouldProduceBson);
 }
@@ -716,7 +716,7 @@ SbExpr generateUnwindProjection(StageBuilderState& state,
                                   std::move(paths),
                                   std::move(nodes),
                                   std::move(docExpr),
-                                  nullptr /* slots */,
+                                  /*slots=*/nullptr,
                                   traversalDepth,
                                   shouldProduceBson);
     }

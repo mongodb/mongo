@@ -21,15 +21,15 @@ TEST_F(DbCheckTest, DbCheckHasherErrorsOnCollectionCheckTimeout) {
 
     auto params = createSecondaryIndexCheckParams(
         DbCheckValidationModeEnum::dataConsistencyAndMissingIndexKeysCheck,
-        "" /* secondaryIndex */);
+        /*secondaryIndex=*/"");
     ASSERT_EQ(ErrorCodes::DbCheckSecondaryBatchTimeout,
               runHashForCollectionCheck(opCtx,
                                         docMinKey,
                                         docMaxKey,
                                         params,
-                                        std::numeric_limits<int64_t>::max() /*maxCount*/,
-                                        std::numeric_limits<int64_t>::max() /*maxBytes*/,
-                                        Date_t::now() - Milliseconds(1) /*deadlineOnSecondary*/)
+                                        /*maxCount=*/std::numeric_limits<int64_t>::max(),
+                                        /*maxBytes=*/std::numeric_limits<int64_t>::max(),
+                                        /*deadlineOnSecondary=*/Date_t::now() - Milliseconds(1))
                   .code());
 }
 
@@ -42,16 +42,16 @@ TEST_F(DbCheckTest, DbCheckHasherErrorsOnExtraIndexKeysCheckTimeout) {
 
     auto params = createSecondaryIndexCheckParams(
         DbCheckValidationModeEnum::dataConsistencyAndMissingIndexKeysCheck,
-        "a_1" /* secondaryIndex */);
+        /*secondaryIndex=*/"a_1");
     ASSERT_EQ(ErrorCodes::DbCheckSecondaryBatchTimeout,
               runHashForExtraIndexKeysCheck(opCtx,
                                             docMinKey,
                                             docMaxKey,
                                             docMaxKey,
                                             params,
-                                            std::numeric_limits<int64_t>::max() /*maxCount*/,
-                                            std::numeric_limits<int64_t>::max() /*maxBytes*/,
-                                            Date_t::now() - Milliseconds(1) /*deadlineOnSecondary*/)
+                                            /*maxCount=*/std::numeric_limits<int64_t>::max(),
+                                            /*maxBytes=*/std::numeric_limits<int64_t>::max(),
+                                            /*deadlineOnSecondary=*/Date_t::now() - Milliseconds(1))
                   .code());
 }
 
@@ -64,7 +64,7 @@ TEST_F(DbCheckTest, DbCheckHasherNoMissingKeys) {
 
     auto params = createSecondaryIndexCheckParams(
         DbCheckValidationModeEnum::dataConsistencyAndMissingIndexKeysCheck,
-        "" /* secondaryIndex */);
+        /*secondaryIndex=*/"");
     ASSERT_OK(runHashForCollectionCheck(opCtx, docMinKey, docMaxKey, params));
 
     // Shut down the health log writer so that the writes get flushed to the health log collection.
@@ -88,7 +88,7 @@ TEST_F(DbCheckTest, DbCheckHasherMissingKeys) {
 
     auto params = createSecondaryIndexCheckParams(
         DbCheckValidationModeEnum::dataConsistencyAndMissingIndexKeysCheck,
-        "" /* secondaryIndex */);
+        /*secondaryIndex=*/"");
     ASSERT_OK(runHashForCollectionCheck(opCtx, docMinKey, docMaxKey, params));
 
     // Shut down the health log writer so that the writes get flushed to the health log collection.
@@ -106,13 +106,12 @@ TEST_F(DbCheckTest, DbCheckDocumentWithDuplicateFieldNames) {
 
     createIndex(opCtx, BSON("a" << 1));
     const auto numWarningDocs = 10;
-    insertDocs(
-        opCtx, 0 /* startIdNum */, numWarningDocs, fieldNames, true /* duplicateFieldNames */);
+    insertDocs(opCtx, /*startIdNum=*/0, numWarningDocs, fieldNames, /*duplicateFieldNames=*/true);
 
     auto params = createSecondaryIndexCheckParams(
         DbCheckValidationModeEnum::dataConsistencyAndMissingIndexKeysCheck,
-        "" /* secondaryIndex */,
-        false /* skipLookupForExtraKeys */,
+        /*secondaryIndex=*/"",
+        /*skipLookupForExtraKeys=*/false,
         BSONValidateModeEnum::kFull);
     ASSERT_OK(runHashForCollectionCheck(opCtx, docMinKey, docMaxKey, params));
 
@@ -132,12 +131,12 @@ TEST_F(DbCheckTest, DbCheckDocumentWithInvalidUuid) {
 
     createIndex(opCtx, BSON("a" << 1));
     const auto numWarningDocs = 1;
-    insertInvalidUuid(opCtx, 0 /* startIdNum */, fieldNames);
+    insertInvalidUuid(opCtx, /*startIdNum=*/0, fieldNames);
 
     auto params = createSecondaryIndexCheckParams(
         DbCheckValidationModeEnum::dataConsistencyAndMissingIndexKeysCheck,
-        "" /* secondaryIndex */,
-        false /* skipLookupForExtraKeys */,
+        /*secondaryIndex=*/"",
+        /*skipLookupForExtraKeys=*/false,
         BSONValidateModeEnum::kFull);
     ASSERT_OK(runHashForCollectionCheck(opCtx, docMinKey, docMaxKey, params));
 
@@ -180,8 +179,8 @@ TEST_F(DbCheckClusteredCollectionTest, DbCheckIdRecordIdMismatch) {
 
     auto params = createSecondaryIndexCheckParams(
         DbCheckValidationModeEnum::dataConsistencyAndMissingIndexKeysCheck,
-        "" /* secondaryIndex */,
-        false /* skipLookupForExtraKeys */,
+        /*secondaryIndex=*/"",
+        /*skipLookupForExtraKeys=*/false,
         BSONValidateModeEnum::kExtended);
     ASSERT_OK(runHashForCollectionCheck(opCtx, docMinKey, docMaxKey, params));
     // Shut down the health log writer so that the writes get flushed to the health log collection.
@@ -201,8 +200,8 @@ TEST(DbCheckHelperTest, IsIndexOrderAndUniquenessPreservedCorrectOrder) {
     KeyStringEntry entry1(keyString1.release(), recordId1);
     KeyStringEntry entry2(keyString2.release(), recordId2);
 
-    ASSERT_TRUE(isIndexOrderAndUniquenessPreserved(entry1, entry2, false /*isUnique*/));
-    ASSERT_TRUE(isIndexOrderAndUniquenessPreserved(entry1, entry2, true /*isUnique*/));
+    ASSERT_TRUE(isIndexOrderAndUniquenessPreserved(entry1, entry2, /*isUnique=*/false));
+    ASSERT_TRUE(isIndexOrderAndUniquenessPreserved(entry1, entry2, /*isUnique=*/true));
 }
 
 TEST(DbCheckHelperTest, IsIndexOrderAndUniquenessPreservedKeyOrderViolation) {
@@ -216,8 +215,8 @@ TEST(DbCheckHelperTest, IsIndexOrderAndUniquenessPreservedKeyOrderViolation) {
     KeyStringEntry entry2(keyString2.release(), recordId2);
 
     // The check should fail when the key order is violated regardless of index type and recordId.
-    ASSERT_FALSE(isIndexOrderAndUniquenessPreserved(entry1, entry2, false /*isUnique*/));
-    ASSERT_FALSE(isIndexOrderAndUniquenessPreserved(entry1, entry2, true /*isUnique*/));
+    ASSERT_FALSE(isIndexOrderAndUniquenessPreserved(entry1, entry2, /*isUnique=*/false));
+    ASSERT_FALSE(isIndexOrderAndUniquenessPreserved(entry1, entry2, /*isUnique=*/true));
 }
 
 TEST(DbCheckHelperTest, IsIndexOrderAndUniquenessPreservedSameKeyDifferentRecordId) {
@@ -232,8 +231,8 @@ TEST(DbCheckHelperTest, IsIndexOrderAndUniquenessPreservedSameKeyDifferentRecord
 
     // The check should only fail when it is on unique index because unique index should not have
     // the same key string.
-    ASSERT_TRUE(isIndexOrderAndUniquenessPreserved(entry1, entry2, false /*isUnique*/));
-    ASSERT_FALSE(isIndexOrderAndUniquenessPreserved(entry1, entry2, true /*isUnique*/));
+    ASSERT_TRUE(isIndexOrderAndUniquenessPreserved(entry1, entry2, /*isUnique=*/false));
+    ASSERT_FALSE(isIndexOrderAndUniquenessPreserved(entry1, entry2, /*isUnique=*/true));
 }
 
 TEST(DbCheckHelperTest, IsIndexOrderAndUniquenessPreservedSameKeySameRecordId) {
@@ -248,8 +247,8 @@ TEST(DbCheckHelperTest, IsIndexOrderAndUniquenessPreservedSameKeySameRecordId) {
 
     // The check should fail for both unique and non-unique indexes because (key string + recordId)
     // should always be unique.
-    ASSERT_FALSE(isIndexOrderAndUniquenessPreserved(entry1, entry2, false /*isUnique*/));
-    ASSERT_FALSE(isIndexOrderAndUniquenessPreserved(entry1, entry2, true /*isUnique*/));
+    ASSERT_FALSE(isIndexOrderAndUniquenessPreserved(entry1, entry2, /*isUnique=*/false));
+    ASSERT_FALSE(isIndexOrderAndUniquenessPreserved(entry1, entry2, /*isUnique=*/true));
 }
 
 }  // namespace mongo

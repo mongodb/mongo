@@ -170,7 +170,7 @@ void UnionWithStage::prepareSubPipeline(const std::vector<BSONObj>& serializedPi
         pExpCtx->getMongoProcessInterface()->finalizeAndMaybePreparePipelineForExecution(
             pipelineCtx,
             std::move(_sharedState->_pipeline),
-            true /* attachCursorAfterOptimizing */,
+            /*attachCursorAfterOptimizing=*/true,
             pipeline_optimization::optimizeAndValidatePipeline);
     logPipeline(104244, "$unionWith POST pipeline prep: ", *_sharedState->_pipeline);
 

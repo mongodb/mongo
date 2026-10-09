@@ -76,12 +76,12 @@ private:
                           IndexConfig::kLatestIndexVersion,
                           /*mk=*/false,
                           /*mkp=*/{},
-                          {} /*multikeyPathSet*/,
+                          /*multikeyPathSet=*/{},
                           /*sp=*/false,
                           /*unq=*/false,
                           IndexEntry::Identifier{indexName},
                           /*io=*/BSONObj(),
-                          nullptr /*wildcardProjection*/,
+                          /*wildcardProjection=*/nullptr,
                           std::move(iceStorage));
     }
 };

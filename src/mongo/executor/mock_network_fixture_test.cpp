@@ -115,7 +115,7 @@ TEST_F(MockNetworkTest, MockFixtureBasicTest) {
     ASSERT_OK(scheduleCommand(request));
 
     mock().runUntilExpectationsSatisfied();
-    evaluateResponses(1 /* numExpected */);
+    evaluateResponses(/*numExpected=*/1);
 }
 
 TEST_F(MockNetworkTest, MockFixtureBasicTestWithMatcherFn) {
@@ -127,7 +127,7 @@ TEST_F(MockNetworkTest, MockFixtureBasicTestWithMatcherFn) {
     ASSERT_OK(scheduleCommand(request));
 
     mock().runUntilExpectationsSatisfied();
-    evaluateResponses(1 /* numExpected */);
+    evaluateResponses(/*numExpected=*/1);
 }
 
 TEST_F(MockNetworkTest, MockFixtureBasicTestSameCommandMultipleTimes) {
@@ -141,7 +141,7 @@ TEST_F(MockNetworkTest, MockFixtureBasicTestSameCommandMultipleTimes) {
     ASSERT_OK(scheduleCommand(request));
 
     mock().runUntilExpectationsSatisfied();
-    evaluateResponses(3 /* numExpected */);
+    evaluateResponses(/*numExpected=*/3);
 }
 
 TEST_F(MockNetworkTest, MockFixtureSeveralExpectationsUnordered) {
@@ -161,7 +161,7 @@ TEST_F(MockNetworkTest, MockFixtureSeveralExpectationsUnordered) {
     ASSERT_OK(scheduleCommand(requestOne));
 
     mock().runUntilExpectationsSatisfied();
-    evaluateResponses(5 /* numExpected */);
+    evaluateResponses(/*numExpected=*/5);
 }
 
 TEST_F(MockNetworkTest, MockFixtureSimilarExpectationsSpecialization) {
@@ -180,7 +180,7 @@ TEST_F(MockNetworkTest, MockFixtureSimilarExpectationsSpecialization) {
     ASSERT_OK(scheduleCommand(bsonRequest));
 
     mock().runUntilExpectationsSatisfied();
-    evaluateResponses(2 /* numExpected */);
+    evaluateResponses(/*numExpected=*/2);
 }
 
 TEST_F(MockNetworkTest, MockFixtureSimilarExpectationsOverride) {
@@ -219,7 +219,7 @@ TEST_F(MockNetworkTest, MockFixtureSimilarExpectationsOverride) {
     ASSERT_OK(scheduleCommand(bsonRequest));
 
     mock().runUntilExpectationsSatisfied();
-    evaluateResponses(3 /* numExpected */);
+    evaluateResponses(/*numExpected=*/3);
 }
 
 TEST_F(MockNetworkTest, MockFixtureRunUntilReadyRequest) {
@@ -242,7 +242,7 @@ TEST_F(MockNetworkTest, MockFixtureRunUntilReadyRequest) {
 
     // We will have run our expected request as it was ready.
     mock().verifyExpectations();
-    evaluateResponses(1 /* numExpected */);
+    evaluateResponses(/*numExpected=*/1);
 }
 
 TEST_F(MockNetworkTest, MockFixtureRunUntilNotAllExpectationsSatisfied) {
@@ -273,7 +273,7 @@ TEST_F(MockNetworkTest, MockFixtureRunUntilNotAllExpectationsSatisfied) {
     ASSERT_OK(scheduleCommand(requestTwo));
 
     mock().runUntilExpectationsSatisfied();
-    evaluateResponses(2 /* numExpected */);
+    evaluateResponses(/*numExpected=*/2);
 }
 
 TEST_F(MockNetworkTest, MockFixtureNotEnoughTimesMatched) {
@@ -291,7 +291,7 @@ TEST_F(MockNetworkTest, MockFixtureNotEnoughTimesMatched) {
     ASSERT_OK(scheduleCommand(request));
 
     mock().runUntilExpectationsSatisfied();
-    evaluateResponses(2 /* numExpected */);
+    evaluateResponses(/*numExpected=*/2);
 }
 
 TEST_F(MockNetworkTest, MockFixtureSequenceTestCorrectOrder) {
@@ -311,7 +311,7 @@ TEST_F(MockNetworkTest, MockFixtureSequenceTestCorrectOrder) {
     ASSERT_OK(scheduleCommand(requestTwo));
 
     mock().runUntilExpectationsSatisfied();
-    evaluateResponses(2 /* numExpected */);
+    evaluateResponses(/*numExpected=*/2);
 }
 
 TEST_F(MockNetworkTest, MockFixtureSequenceTestOppositeOrder) {
@@ -344,7 +344,7 @@ TEST_F(MockNetworkTest, MockFixtureSequenceTestOppositeOrder) {
     ASSERT_OK(scheduleCommand(requestTwo));
 
     mock().runUntilExpectationsSatisfied();
-    evaluateResponses(3 /* numExpected */);
+    evaluateResponses(/*numExpected=*/3);
 }
 
 TEST_F(MockNetworkTest, MockFixtureSequenceTestCorrectPartialOrder) {
@@ -368,7 +368,7 @@ TEST_F(MockNetworkTest, MockFixtureSequenceTestCorrectPartialOrder) {
     ASSERT_OK(scheduleCommand(requestTwo));
 
     mock().runUntilExpectationsSatisfied();
-    evaluateResponses(3 /* numExpected */);
+    evaluateResponses(/*numExpected=*/3);
 }
 
 TEST_F(MockNetworkTest, MockFixtureSequenceTestTwoSequencesNoOverlap) {
@@ -399,7 +399,7 @@ TEST_F(MockNetworkTest, MockFixtureSequenceTestTwoSequencesNoOverlap) {
     ASSERT_OK(scheduleCommand(requestFour));
 
     mock().runUntilExpectationsSatisfied();
-    evaluateResponses(4 /* numExpected */);
+    evaluateResponses(/*numExpected=*/4);
 }
 
 TEST_F(MockNetworkTest, MockFixtureSequenceTestTwoSequencesPartialOrder) {
@@ -430,7 +430,7 @@ TEST_F(MockNetworkTest, MockFixtureSequenceTestTwoSequencesPartialOrder) {
     ASSERT_OK(scheduleCommand(requestFour));
 
     mock().runUntilExpectationsSatisfied();
-    evaluateResponses(4 /* numExpected */);
+    evaluateResponses(/*numExpected=*/4);
 }
 
 TEST_F(MockNetworkTest, MockFixtureSequenceTestLongerChain) {
@@ -456,7 +456,7 @@ TEST_F(MockNetworkTest, MockFixtureSequenceTestLongerChain) {
     ASSERT_OK(scheduleCommand(requestFour));
 
     mock().runUntilExpectationsSatisfied();
-    evaluateResponses(4 /* numExpected */);
+    evaluateResponses(/*numExpected=*/4);
 }
 
 }  // namespace

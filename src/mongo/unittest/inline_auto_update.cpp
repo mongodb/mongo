@@ -146,7 +146,7 @@ void outputDiff(std::ostream& os,
 
             // Print remaining expected side.
             const auto& expLine = expFormatted.at(expectedIndex);
-            outputLine(true /*isExpected*/, startLineNumber + expectedIndex, expLine);
+            outputLine(/*isExpected=*/true, startLineNumber + expectedIndex, expLine);
             expectedIndex++;
             continue;
         }
@@ -154,7 +154,7 @@ void outputDiff(std::ostream& os,
         const auto& actualLine = actualFormatted.at(actualIndex);
         if (expectedIndex >= expSize) {
             // Exhausted expected side. Print remaining actual side.
-            outputLine(false /*isExpected*/, startLineNumber + actualIndex, actualLine);
+            outputLine(/*isExpected=*/false, startLineNumber + actualIndex, actualLine);
             actualIndex++;
             continue;
         }
@@ -170,7 +170,7 @@ void outputDiff(std::ostream& os,
         if (const auto fwdIndex = diffLookAhead(actualIndex, actualFormatted, expLine)) {
             // Looked ahead successfully into the actual side. Move actual side forward.
             for (size_t i = actualIndex; i < *fwdIndex; i++) {
-                outputLine(false /*isExpected*/, startLineNumber + i, actualFormatted.at(i));
+                outputLine(/*isExpected=*/false, startLineNumber + i, actualFormatted.at(i));
             }
             actualIndex = *fwdIndex;
             continue;
@@ -178,15 +178,15 @@ void outputDiff(std::ostream& os,
         if (const auto fwdIndex = diffLookAhead(expectedIndex, expFormatted, actualLine)) {
             // Looked ahead successfully into the expected side. Move expected side forward.
             for (size_t i = expectedIndex; i < *fwdIndex; i++) {
-                outputLine(true /*isExpected*/, startLineNumber + i, expFormatted.at(i));
+                outputLine(/*isExpected=*/true, startLineNumber + i, expFormatted.at(i));
             }
             expectedIndex = *fwdIndex;
             continue;
         }
 
         // Move both sides forward.
-        outputLine(false /*isExpected*/, startLineNumber + actualIndex, actualLine);
-        outputLine(true /*isExpected*/, startLineNumber + expectedIndex, expLine);
+        outputLine(/*isExpected=*/false, startLineNumber + actualIndex, actualLine);
+        outputLine(/*isExpected=*/true, startLineNumber + expectedIndex, expLine);
         actualIndex++;
         expectedIndex++;
     }

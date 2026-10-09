@@ -77,10 +77,10 @@ public:
                                             std::move(wtConfig),
                                             WiredTigerExtensions::get(serviceContext()),
                                             provider,
-                                            false /* repair */,
-                                            true /* isReplSet */,
-                                            false /* shouldRecoverFromOplogAsStandalone */,
-                                            false /* inStandaloneMode */);
+                                            /*repair=*/false,
+                                            /*isReplSet=*/true,
+                                            /*shouldRecoverFromOplogAsStandalone=*/false,
+                                            /*inStandaloneMode=*/false);
 
         _engine->notifyStorageStartupRecoveryComplete();
     }

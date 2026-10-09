@@ -78,7 +78,7 @@ int64_t runCoveredCount(OperationContext* opCtx, const NamespaceString& nss) {
 
     DBDirectClient client(opCtx);
     auto cursor = uassertStatusOK(DBClientCursor::fromAggregationRequest(
-        &client, aggRequest, true /* secondaryOk */, false /* useExhaust */));
+        &client, aggRequest, /*secondaryOk=*/true, /*useExhaust=*/false));
 
     // '$count' emits at most one document, and none when the collection is empty.
     if (!cursor->more()) {

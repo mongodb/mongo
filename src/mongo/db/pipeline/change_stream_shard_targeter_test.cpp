@@ -26,7 +26,7 @@ const ChangeStreamShardTargeterMock::ReaderContextCallback kEmptyCallback =
 
 DocumentSourceChangeStreamSpec buildChangeStreamSpec(Timestamp ts) {
     DocumentSourceChangeStreamSpec spec;
-    spec.setResumeAfter(ResumeToken::makeHighWaterMarkToken(ts, 1 /* version */));
+    spec.setResumeAfter(ResumeToken::makeHighWaterMarkToken(ts, /*version=*/1));
     return spec;
 }
 
@@ -34,7 +34,7 @@ class ChangeStreamShardTargeterTest : public ServiceContextTest {
 public:
     ChangeStreamShardTargeterTest()
         : ServiceContextTest(
-              std::make_unique<ScopedGlobalServiceContextForTest>(false /* shouldSetupTL */)) {
+              std::make_unique<ScopedGlobalServiceContextForTest>(/*shouldSetupTL=*/false)) {
         _opCtx = makeOperationContext();
         _expCtx = make_intrusive<ExpressionContextForTest>(_opCtx.get());
     }

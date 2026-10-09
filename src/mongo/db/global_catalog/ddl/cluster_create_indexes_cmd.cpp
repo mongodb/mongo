@@ -156,10 +156,10 @@ public:
                                 applyReadWriteConcern(opCtx, this, cmdToBeSent)),
                             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                             Shard::RetryPolicy::kIdempotent,
-                            BSONObj() /*query*/,
-                            BSONObj() /*collation*/,
-                            boost::none /*letParameters*/,
-                            boost::none /*runtimeConstants*/);
+                            /*query=*/BSONObj(),
+                            /*collation=*/BSONObj(),
+                            /*letParameters=*/boost::none,
+                            /*runtimeConstants=*/boost::none);
 
                         std::string errmsg;
                         bool allShardsSucceeded =

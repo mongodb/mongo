@@ -2767,7 +2767,7 @@ TEST_F(StorageInterfaceImplTest, UpdateDocumentsUpdatesDocumentWhenCollectionIsN
                                                   repl::StorageInterface::ScanDirection::kForward,
                                                   {},
                                                   BoundInclusion::kIncludeStartKeyOnly,
-                                                  -1 /* limit */));
+                                                  /*limit=*/-1));
     ASSERT_EQ(2, docs.size());
     ASSERT_BSONOBJ_EQ(BSON("_id" << 0 << "x" << 1), docs[0]);
     ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "x" << 1), docs[1]);
@@ -2789,7 +2789,7 @@ TEST_F(StorageInterfaceImplTest, UpdateDocumentsWithArrayFilter) {
     update.timestamp = Timestamp();
     std::vector<BSONObj> arrayFilters{BSON("src" << "b")};
 
-    ASSERT_OK(storage.updateDocuments(opCtx, nss, {} /* query */, update, arrayFilters));
+    ASSERT_OK(storage.updateDocuments(opCtx, nss, /*query=*/{}, update, arrayFilters));
     auto docs =
         unittest::assertGet(storage.findDocuments(opCtx,
                                                   nss,
@@ -2797,7 +2797,7 @@ TEST_F(StorageInterfaceImplTest, UpdateDocumentsWithArrayFilter) {
                                                   repl::StorageInterface::ScanDirection::kForward,
                                                   {},
                                                   BoundInclusion::kIncludeStartKeyOnly,
-                                                  -1 /* limit */));
+                                                  /*limit=*/-1));
     ASSERT_EQ(2, docs.size());
     BSONObj expectedDoc0 = BSON("_id" << 0 << "participants" << BSON_ARRAY("a" << "d"));
     BSONObj expectedDoc1 = BSON("_id" << 1 << "participants" << BSON_ARRAY("c" << "d"));

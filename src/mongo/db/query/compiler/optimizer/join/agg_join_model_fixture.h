@@ -19,8 +19,8 @@ public:
 
     static std::string toString(const BSONObj& bson) {
         return bson.jsonString(
-            /*format*/ ExtendedCanonicalV2_0_0,
-            /*pretty*/ true);
+            /*format=*/ExtendedCanonicalV2_0_0,
+            /*pretty=*/true);
     }
 
     static std::string toString(const std::unique_ptr<Pipeline>& pipeline);

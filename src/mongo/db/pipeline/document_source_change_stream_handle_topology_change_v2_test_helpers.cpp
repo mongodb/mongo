@@ -212,13 +212,13 @@ void DeadlineWaiterMock::setStatus(Status status) {
 // -----------------------------------
 
 BSONObj buildHighWaterMarkToken(Timestamp ts) {
-    return ResumeToken::makeHighWaterMarkToken(ts, 1 /* version */).toDocument().toBson();
+    return ResumeToken::makeHighWaterMarkToken(ts, /*version=*/1).toDocument().toBson();
 }
 
 DocumentSourceChangeStreamSpec buildChangeStreamSpec(Timestamp ts, ChangeStreamReadMode mode) {
     DocumentSourceChangeStreamSpec spec;
     spec.setIgnoreRemovedShards(mode == ChangeStreamReadMode::kIgnoreRemovedShards);
-    spec.setResumeAfter(ResumeToken::makeHighWaterMarkToken(ts, 1 /* version */));
+    spec.setResumeAfter(ResumeToken::makeHighWaterMarkToken(ts, /*version=*/1));
     return spec;
 }
 

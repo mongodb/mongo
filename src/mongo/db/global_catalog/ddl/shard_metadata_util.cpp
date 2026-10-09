@@ -73,7 +73,7 @@ Status setPersistedRefreshFlags(OperationContext* opCtx, const NamespaceString& 
         BSON(ShardCollectionType::kNssFieldName
              << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())),
         BSON("$set" << BSON(ShardCollectionType::kRefreshingFieldName << true)),
-        false /*upsert*/);
+        /*upsert=*/false);
 }
 
 }  // namespace
@@ -111,7 +111,7 @@ Status unsetPersistedRefreshFlags(OperationContext* opCtx,
         BSON(ShardCollectionType::kNssFieldName
              << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())),
         BSON("$set" << updateBuilder.obj()),
-        false /*upsert*/);
+        /*upsert=*/false);
 }
 
 StatusWith<RefreshState> getPersistedRefreshFlags(OperationContext* opCtx,
@@ -393,7 +393,7 @@ Status updateShardChunks(OperationContext* opCtx,
                     invariant(chunk.getVersion().epoch() == currEpoch);
                     auto query = BSON(ChunkType::minShardID
                                       << BSON("$gte" << chunk.getMin() << "$lt" << chunk.getMax()));
-                    deletes.emplace_back(std::move(query), true /* multi */);
+                    deletes.emplace_back(std::move(query), /*multi=*/true);
                 }
                 write_ops::DeleteCommandRequest deleteReq{chunksNss, std::move(deletes)};
                 deleteReq.getWriteCommandRequestBase().setOrdered(true);

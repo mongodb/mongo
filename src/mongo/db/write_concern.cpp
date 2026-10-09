@@ -326,7 +326,7 @@ void waitForNoOplogHolesIfNeeded(OperationContext* opCtx) {
         // It is safe for secondaries in multi-node single voter replica sets to truncate writes if
         // there are oplog holes. They can catch up again.
         repl::StorageInterface::get(opCtx)->waitForAllEarlierOplogWritesToBeVisible(
-            opCtx, /*primaryOnly*/ true);
+            opCtx, /*primaryOnly=*/true);
     }
 }
 

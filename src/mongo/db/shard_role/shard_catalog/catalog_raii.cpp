@@ -183,7 +183,7 @@ AutoGetDb AutoGetDb::createForAutoGetCollection(OperationContext* opCtx,
     return AutoGetDb(opCtx,
                      nsOrUUID.dbName(),
                      isSharedLockMode(modeColl) ? MODE_IS : MODE_IX,
-                     boost::none /* tenantLockMode */,
+                     /*tenantLockMode=*/boost::none,
                      deadline,
                      std::move(dbLockOptions));
 }
@@ -427,7 +427,7 @@ CollectionWriter::CollectionWriter(OperationContext* opCtx, CollectionAcquisitio
     : _acquisition(acquisition), _managed(true), _sharedImpl(std::make_shared<SharedImpl>(this)) {
 
     _storedCollection = CollectionPtr(CollectionCatalog::get(opCtx)->establishConsistentCollection(
-        opCtx, _acquisition->nss(), boost::none /*readTimestamp*/));
+        opCtx, _acquisition->nss(), /*readTimestamp=*/boost::none));
     _storedCollection.makeYieldable(opCtx, LockedCollectionYieldRestore(opCtx, _storedCollection));
 
     _sharedImpl->_writableCollectionInitializer = [this, opCtx]() mutable {
@@ -458,7 +458,7 @@ CollectionWriter::CollectionWriter(OperationContext* opCtx, const NamespaceStrin
     : _managed(true), _sharedImpl(std::make_shared<SharedImpl>(this)) {
 
     _storedCollection = CollectionPtr(CollectionCatalog::get(opCtx)->establishConsistentCollection(
-        opCtx, nss, boost::none /*readTimestamp*/));
+        opCtx, nss, /*readTimestamp=*/boost::none));
     _storedCollection.makeYieldable(opCtx, LockedCollectionYieldRestore(opCtx, _storedCollection));
 
     _sharedImpl->_writableCollectionInitializer = [opCtx, nss]() {

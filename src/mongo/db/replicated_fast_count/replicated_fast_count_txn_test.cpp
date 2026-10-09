@@ -113,7 +113,7 @@ protected:
         auto txnParticipant = TransactionParticipant::get(opCtx);
         txnParticipant.beginOrContinue(opCtx,
                                        {txnNumber},
-                                       false /* autocommit */,
+                                       /*autocommit=*/false,
                                        TransactionParticipant::TransactionActions::kStart);
 
         txnParticipant.unstashTransactionResources(opCtx, "ReplicatedFastCountTxns");
@@ -149,7 +149,7 @@ protected:
 
         txnParticipant.beginOrContinue(opCtx,
                                        {txnNumber},
-                                       false /* autocommit */,
+                                       /*autocommit=*/false,
                                        TransactionParticipant::TransactionActions::kContinue);
 
         txnParticipant.unstashTransactionResources(opCtx, "commitTransaction");
@@ -169,7 +169,7 @@ protected:
         auto txnParticipant = TransactionParticipant::get(opCtx);
         txnParticipant.beginOrContinue(opCtx,
                                        {txnNumber},
-                                       false /* autocommit */,
+                                       /*autocommit=*/false,
                                        TransactionParticipant::TransactionActions::kContinue);
 
         txnParticipant.unstashTransactionResources(opCtx, "abortTransaction");
@@ -548,7 +548,7 @@ protected:
 
         txnParticipant.beginOrContinue(opCtx,
                                        {txnNumber},
-                                       false /* autocommit */,
+                                       /*autocommit=*/false,
                                        TransactionParticipant::TransactionActions::kContinue);
         txnParticipant.unstashTransactionResources(opCtx, "prepareTransaction");
         auto prepareTs = txnParticipant.prepareTransaction(opCtx, {}).first;
@@ -573,7 +573,7 @@ protected:
 
         txnParticipant.beginOrContinue(opCtx,
                                        {txnNumber},
-                                       false /* autocommit */,
+                                       /*autocommit=*/false,
                                        TransactionParticipant::TransactionActions::kContinue);
         txnParticipant.unstashTransactionResources(opCtx, "commitTransaction");
         const auto commitTs = Timestamp(prepareTs.getSecs(), prepareTs.getInc() + 1);
@@ -636,7 +636,7 @@ protected:
 
         txnParticipant.beginOrContinue(opCtx,
                                        {txnNumber},
-                                       false /* autocommit */,
+                                       /*autocommit=*/false,
                                        TransactionParticipant::TransactionActions::kContinue);
         txnParticipant.unstashTransactionResources(opCtx, "prepareTransaction");
         txnParticipant.prepareTransaction(opCtx, {});

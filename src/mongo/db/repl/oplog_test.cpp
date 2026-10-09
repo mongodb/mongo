@@ -417,7 +417,7 @@ public:
                                               _nss.dbName(),
                                               boost::none,
                                               BSON("create" << _nss.coll() << "uuid" << uuid),
-                                              /*allowRenameOutOfTheWay*/ false));
+                                              /*allowRenameOutOfTheWay=*/false));
 
         auto replCoord = ReplicationCoordinator::get(opCtx.get());
         ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_SECONDARY));

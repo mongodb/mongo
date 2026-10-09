@@ -118,7 +118,7 @@ public:
         const auto shardDrainingStatus = [&] {
             try {
                 auto swShardId = Grid::get(opCtx)->shardRegistry()->resolveShardId(
-                    opCtx, shardIdOrUrl, true /* allowNonShardIdIdentifiers */);
+                    opCtx, shardIdOrUrl, /*allowNonShardIdIdentifiers=*/true);
                 if (swShardId == ErrorCodes::ShardNotFound) {
                     return RemoveShardProgress(ShardDrainingStateEnum::kCompleted);
                 }

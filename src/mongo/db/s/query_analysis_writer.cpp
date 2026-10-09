@@ -413,7 +413,7 @@ QueryAnalysisWriter* QueryAnalysisWriter::get(ServiceContext* serviceContext) {
 }
 
 bool QueryAnalysisWriter::shouldRegisterReplicaSetAwareService() const {
-    return supportsPersistingSampledQueries(true /* isReplEnabled */);
+    return supportsPersistingSampledQueries(/*isReplEnabled=*/true);
 }
 
 void QueryAnalysisWriter::onStartup(OperationContext* opCtx) {
@@ -445,7 +445,7 @@ void QueryAnalysisWriter::onStartup(OperationContext* opCtx) {
             }
         },
         Seconds(gQueryAnalysisWriterIntervalSecs.load()),
-        true /*isKillableByStepdown*/);
+        /*isKillableByStepdown=*/true);
     _periodicQueryWriter =
         std::make_shared<PeriodicJobAnchor>(periodicRunner->makeJob(std::move(queryWriterJob)));
     _periodicQueryWriter->start();
@@ -467,7 +467,7 @@ void QueryAnalysisWriter::onStartup(OperationContext* opCtx) {
             }
         },
         Seconds(gQueryAnalysisWriterIntervalSecs.load()),
-        true /*isKillableByStepdown*/);
+        /*isKillableByStepdown=*/true);
     _periodicDiffWriter =
         std::make_shared<PeriodicJobAnchor>(periodicRunner->makeJob(std::move(diffWriterJob)));
     _periodicDiffWriter->start();

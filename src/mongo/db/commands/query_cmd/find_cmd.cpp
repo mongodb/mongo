@@ -849,7 +849,7 @@ public:
                 timeseries::requiresViewlessTimeseriesTranslation(opCtx, *collectionOrView)) {
                 // Relinquish locks. The aggregation command will re-acquire them.
                 collectionOrView.reset();
-                return runFindAsAgg(opCtx, *cq, boost::none /* verbosity */, replyBuilder);
+                return runFindAsAgg(opCtx, *cq, /*verbosity=*/boost::none, replyBuilder);
             }
             // For the purposes of OpDebug's reporting, we only need 'collectionType' to distinguish
             // between view/timeseries/collection. For view/timeseries, 'collectionType' will be set

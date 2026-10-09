@@ -147,7 +147,7 @@ std::vector<ValidateResults> foregroundValidate(
                       validateResults))
             << "Validation Mode: " << static_cast<int>(mode);
         BSONObjBuilder validateResultsBuilder;
-        validateResults.appendToResultObj(&validateResultsBuilder, true /* debugging */);
+        validateResults.appendToResultObj(&validateResultsBuilder, /*debugging=*/true);
         auto validateResultsObj = validateResultsBuilder.obj();
 
         // The total number of errors is: those in the top-level results plus the sum of
@@ -270,7 +270,7 @@ int setUpInvalidData(OperationContext* opCtx) {
  */
 BSONObj resultToBSON(const ValidateResults& vr) {
     BSONObjBuilder builder;
-    vr.appendToResultObj(&builder, true /* debugging */);
+    vr.appendToResultObj(&builder, /*debugging=*/true);
     return builder.obj();
 }
 
@@ -288,8 +288,7 @@ NamespaceString createClusteredCollectionWithIndexName(OperationContext* opCtx,
     indexSpec.setName(std::string{indexName});
 
     CollectionOptions options;
-    options.clusteredIndex =
-        ClusteredCollectionInfo(std::move(indexSpec), false /* legacyFormat */);
+    options.clusteredIndex = ClusteredCollectionInfo(std::move(indexSpec), /*legacyFormat=*/false);
     ASSERT_OK(storageInterface->createCollection(opCtx, nss, options));
     return nss;
 }
@@ -850,7 +849,7 @@ key_string::Value makeKeyStringWithoutRecordId(const key_string::View& keyString
     auto buffer = bufBuilder.release();
 
     BufReader bufReader(buffer.get(), builderSize);
-    return key_string::Value::deserialize(bufReader, version, boost::none /* ridFormat */);
+    return key_string::Value::deserialize(bufReader, version, /*ridFormat=*/boost::none);
 }
 
 // Verify calling validate() on a collection with old (pre-4.2) keys in a WT unique index.
@@ -1468,7 +1467,7 @@ protected:
     void setUp() override {
         CatalogTestFixture::setUp();
         _options.uuid = UUID::gen();
-        _options.timeseries = TimeseriesOptions(/*timeField*/ "date");
+        _options.timeseries = TimeseriesOptions(/*timeField=*/"date");
         _options.timeseries->setBucketRoundingSeconds(60);
         _options.timeseries->setBucketMaxSpanSeconds(60 * 60 * 24);
         _options.timeseries->setMetaField("ticker"sv);

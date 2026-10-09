@@ -101,7 +101,7 @@ PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
                                        cachedPlanHash,
                                        std::move(replanReason),
                                        std::move(maybeExplainData),
-                                       _cq && _cq->getExplain().has_value() /* isExplain */,
+                                       /*isExplain=*/_cq && _cq->getExplain().has_value(),
                                        planSelectionStrategy)),
       _mustReturnOwnedBson(returnOwnedBson),
       _mustSetRecordIdMetadata(_cq && _cq->metadataDeps()[DocumentMetadataFields::kRecordId]),
@@ -248,7 +248,7 @@ void PlanExecutorImpl::restoreState(const RestoreContext& context) {
 
         // Handles retries by calling restoreStateWithoutRetrying() in a loop.
         uassertStatusOK(_yieldPolicy->yieldOrInterrupt(
-            getOpCtx(), nullptr /* whileYieldingFn */, context.type()));
+            getOpCtx(), /*whileYieldingFn=*/nullptr, context.type()));
     }
 }
 

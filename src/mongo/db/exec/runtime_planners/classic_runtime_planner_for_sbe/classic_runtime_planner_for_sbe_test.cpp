@@ -174,7 +174,7 @@ protected:
                                       false,
                                       IndexEntry::Identifier{indexName},
                                       BSONObj(),
-                                      nullptr /* wildcardProjection */,
+                                      /*wildcardProjection=*/nullptr,
                                       std::move(iceStorage)));
     }
 
@@ -246,12 +246,12 @@ protected:
 
         auto addVirtualScanSolution = [&](std::vector<BSONArray> docs) {
             auto virtScan = std::make_unique<VirtualScanNode>(
-                std::move(docs), VirtualScanNode::ScanType::kCollScan, false /*hasRecordId*/);
+                std::move(docs), VirtualScanNode::ScanType::kCollScan, /*hasRecordId=*/false);
             virtScan->filter = cq->getPrimaryMatchExpression()->clone();
             auto solution = std::make_unique<QuerySolution>();
             solution->cacheData = std::make_unique<SolutionCacheData>();
             solution->cacheData->virtualScanData = std::make_unique<VirtualScanCacheData>(
-                virtScan->docs, false /* hasRecordId */, BSONObj() /* indexKeyPattern */);
+                virtScan->docs, /*hasRecordId=*/false, /*indexKeyPattern=*/BSONObj());
             solution->setRoot(std::move(virtScan));
             solution->cacheData->solnType = SolutionCacheData::VIRTSCAN_SOLN;
             solutions.push_back(std::move(solution));
@@ -412,7 +412,7 @@ TEST_F(ClassicRuntimePlannerForSbeTest, SingleSolutionPassthroughPlannerCreatesC
 
             auto root = std::make_unique<VirtualScanNode>(kDocs,
                                                           VirtualScanNode::ScanType::kIxscan,
-                                                          kHasRecordId /*hasRecordId*/,
+                                                          /*hasRecordId=*/kHasRecordId,
                                                           kIndexKeyPattern);
             auto solution = std::make_unique<QuerySolution>();
 
@@ -453,7 +453,7 @@ TEST_F(ClassicRuntimePlannerForSbeTest, MultiPlannerPicksMoreEfficientPlan) {
 
         auto [cq, plannerData] = createPlannerData();
         auto [solutions, expectedSums] =
-            createVirtualScanQuerySolutionsForDefaultFilter(200 /*resultDocCount*/, plannerData.cq);
+            createVirtualScanQuerySolutionsForDefaultFilter(/*resultDocCount=*/200, plannerData.cq);
         {
             MultiPlanner planner{std::move(plannerData),
                                  std::move(solutions),
@@ -489,9 +489,9 @@ TEST_F(ClassicRuntimePlannerForSbeTest, MultiPlannerUsesEofOptimization) {
         {
             // When the query has 200 result documents, no plan will reach EOF during multi-planner,
             // so we should use SBE.
-            auto [cq, plannerData] = createPlannerData(kFindFilter, BSONObj{} /*addFieldsSpec*/);
+            auto [cq, plannerData] = createPlannerData(kFindFilter, /*addFieldsSpec=*/BSONObj{});
             auto [solutions, expectedSums] = createVirtualScanQuerySolutionsForDefaultFilter(
-                200 /*resultDocCount*/, plannerData.cq);
+                /*resultDocCount=*/200, plannerData.cq);
             MultiPlanner planner{std::move(plannerData),
                                  std::move(solutions),
                                  true /*shouldWriteToCache*/,
@@ -505,9 +505,9 @@ TEST_F(ClassicRuntimePlannerForSbeTest, MultiPlannerUsesEofOptimization) {
         {
             // When the query has only 50 result documents, winning plan will reach EOF during
             // multi-planner, so we should use the Classic Engine.
-            auto [cq, plannerData] = createPlannerData(kFindFilter, BSONObj{} /*addFieldsSpec*/);
+            auto [cq, plannerData] = createPlannerData(kFindFilter, /*addFieldsSpec=*/BSONObj{});
             auto [solutions, expectedSums] = createVirtualScanQuerySolutionsForDefaultFilter(
-                50 /*resultDocCount*/, plannerData.cq);
+                /*resultDocCount=*/50, plannerData.cq);
             MultiPlanner planner{std::move(plannerData),
                                  std::move(solutions),
                                  true /*shouldWriteToCache*/,
@@ -523,7 +523,7 @@ TEST_F(ClassicRuntimePlannerForSbeTest, MultiPlannerUsesEofOptimization) {
 TEST_F(ClassicRuntimePlannerForSbeTest, SubPlannerPicksMoreEfficientPlanForEachBranch) {
     setUpSubPlannerTest();
     testSbeFullOnAndOffFn([&](bool sbeFullEnabled) {
-        auto exec = getExecutorWithSubPlanning(2 /*expectedPerBranchMultiplans*/);
+        auto exec = getExecutorWithSubPlanning(/*expectedPerBranchMultiplans=*/2);
         PlanSummaryStats stats;
         exec->getPlanExplainer().getSummaryStats(&stats);
 
@@ -543,7 +543,7 @@ TEST_F(ClassicRuntimePlannerForSbeTest,
     unittest::ServerParameterGuard sbeFullController("featureFlagSbeFull", true);
     setUpSubPlannerTest();
 
-    getExecutorWithSubPlanning(2 /*expectedPerBranchMultiplans*/);
+    getExecutorWithSubPlanning(/*expectedPerBranchMultiplans=*/2);
 
     // With featureFlagSbeFull enabled, the subplanner now writes to the classic cache (two
     // per-branch entries), not the SBE plan cache.
@@ -555,7 +555,7 @@ TEST_F(ClassicRuntimePlannerForSbeTest, SubPlannerCachesEachBranchWhenSbePlanCac
     unittest::ServerParameterGuard sbeFullController("featureFlagSbeFull", false);
     setUpSubPlannerTest();
 
-    getExecutorWithSubPlanning(2 /*expectedPerBranchMultiplans*/);
+    getExecutorWithSubPlanning(/*expectedPerBranchMultiplans=*/2);
 
     // When "featureFlagSbeFull" is *not* enabled, the subplanner should write two entries to the
     // classic cache -- one for each branch. It should not write to the SBE plan cache.
@@ -564,7 +564,7 @@ TEST_F(ClassicRuntimePlannerForSbeTest, SubPlannerCachesEachBranchWhenSbePlanCac
 
     // If we subplan a second time, we should still see multi-planning since the cache entries are
     // inactive.
-    getExecutorWithSubPlanning(2 /*expectedPerBranchMultiplans*/);
+    getExecutorWithSubPlanning(/*expectedPerBranchMultiplans=*/2);
 
     // The third time, the active cache entries will get used and we should not see any
     // multi-planning for either $or branch.
@@ -591,7 +591,7 @@ TEST_F(ClassicRuntimePlannerForSbeTest, ClassicCachedPlannerReplansOnFailureMemo
 
     auto [cqForCacheWrite, plannerDataForCacheWrite] = createPlannerData();
     auto [solutions, expectedSums] = createVirtualScanQuerySolutionsForDefaultFilter(
-        200 /*resultDocCount*/, plannerDataForCacheWrite.cq);
+        /*resultDocCount=*/200, plannerDataForCacheWrite.cq);
     {
         MultiPlanner planner{std::move(plannerDataForCacheWrite),
                              std::move(solutions),
@@ -656,7 +656,7 @@ TEST_F(ClassicRuntimePlannerForSbeTest, ClassicCachedPlannerReplansOnHittingMaxN
 
     auto [cq, plannerData] = createPlannerData();
     auto [solutions, expectedSums] =
-        createVirtualScanQuerySolutionsForDefaultFilter(200 /*resultDocCount*/, plannerData.cq);
+        createVirtualScanQuerySolutionsForDefaultFilter(/*resultDocCount=*/200, plannerData.cq);
     {
         MultiPlanner planner{std::move(plannerData),
                              std::move(solutions),

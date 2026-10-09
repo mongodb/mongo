@@ -50,12 +50,12 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> PlannerBase::prepareSbePlan
                                        extractSbeYieldPolicy(),
                                        isFromPlanCache,
                                        cachedPlanHash,
-                                       false /*usedJoinOpt*/,
-                                       {} /* rejectedJoinPlans */,
+                                       /*usedJoinOpt=*/false,
+                                       /*rejectedJoinPlans=*/{},
                                        std::move(remoteCursors),
                                        std::move(remoteExplains),
                                        std::move(classicRuntimePlannerStage),
-                                       boost::none /* maybeExplainData */,
+                                       /*maybeExplainData=*/boost::none,
                                        planSelectionStrategy());
 }
 

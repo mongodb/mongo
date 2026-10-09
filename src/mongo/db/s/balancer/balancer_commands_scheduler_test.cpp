@@ -162,7 +162,7 @@ TEST_F(BalancerCommandsSchedulerTest, SuccessfulMoveRangeCommand) {
     moveRangeRequestBase.setMax({});
 
     auto futureResponse = _scheduler.requestMoveRange(
-        operationContext(), shardsvrRequest, WriteConcernOptions(), false /* issuedByRemoteUser */);
+        operationContext(), shardsvrRequest, WriteConcernOptions(), /*issuedByRemoteUser=*/false);
     ASSERT_OK(futureResponse.getNoThrow());
     remoteResponsesFuture.default_timed_get();
     _scheduler.stop();
@@ -218,7 +218,7 @@ TEST_F(BalancerCommandsSchedulerTest, SuccessfulRequestChunkDataSizeCommand) {
                                    ShardVersionFactory::make(chunk.getVersion()),
                                    KeyPattern(BSON("x" << 1)),
                                    /*estimatedValue=*/false,
-                                   (kDefaultMaxChunkSizeBytes / 100) * 25 /* maxSize */);
+                                   /*maxSize=*/(kDefaultMaxChunkSizeBytes / 100) * 25);
     auto swReceivedDataSize = futureResponse.getNoThrow();
     ASSERT_OK(swReceivedDataSize.getStatus());
     auto receivedDataSize = swReceivedDataSize.getValue();
@@ -283,7 +283,7 @@ TEST_F(BalancerCommandsSchedulerTest, CommandFailsWhenNetworkReturnsError) {
     _scheduler.start(operationContext());
     auto req = makeMoveRangeRequest(0, kShardId1, kShardId0);
     auto futureResponse = _scheduler.requestMoveRange(
-        operationContext(), req, WriteConcernOptions(), false /* issuedByRemoteUser */);
+        operationContext(), req, WriteConcernOptions(), /*issuedByRemoteUser=*/false);
     ASSERT_EQUALS(futureResponse.getNoThrow(), timeoutError);
     remoteResponsesFuture.default_timed_get();
     _scheduler.stop();
@@ -292,7 +292,7 @@ TEST_F(BalancerCommandsSchedulerTest, CommandFailsWhenNetworkReturnsError) {
 TEST_F(BalancerCommandsSchedulerTest, CommandFailsWhenSchedulerIsStopped) {
     auto req = makeMoveRangeRequest(0, kShardId1, kShardId0);
     auto futureResponse = _scheduler.requestMoveRange(
-        operationContext(), req, WriteConcernOptions(), false /* issuedByRemoteUser */);
+        operationContext(), req, WriteConcernOptions(), /*issuedByRemoteUser=*/false);
     ASSERT_EQUALS(futureResponse.getNoThrow(),
                   Status(ErrorCodes::BalancerInterrupted,
                          "Request rejected - balancer scheduler is stopped"));
@@ -307,7 +307,7 @@ TEST_F(BalancerCommandsSchedulerTest, CommandCanceledIfUnsubmittedBeforeBalancer
         auto req = makeMoveRangeRequest(0, kShardId1, kShardId0);
 
         futureResponse = _scheduler.requestMoveRange(
-            operationContext(), req, WriteConcernOptions(), false /* issuedByRemoteUser */);
+            operationContext(), req, WriteConcernOptions(), /*issuedByRemoteUser=*/false);
         _scheduler.stop();
         remoteResponsesFuture.default_timed_get();
     }

@@ -196,24 +196,24 @@ void summaryStringRecursive(const QuerySolutionNode* node,
                             bool includeNss = false) {
     if (auto joinNode = dynamic_cast<const BinaryJoinEmbeddingNode*>(node)) {
         // Join node!
-        sb << nodeStageTypeToString(node, true /* brief */);
+        sb << nodeStageTypeToString(node, /*brief=*/true);
         sb << "( ";
         sb << (joinNode->leftEmbeddingField ? joinNode->leftEmbeddingField->fullPath()
                                             : std::string{"_"})
            << " = ( ";
-        summaryStringRecursive(joinNode->children[0].get(), sb, true /* includeNss */);
+        summaryStringRecursive(joinNode->children[0].get(), sb, /*includeNss=*/true);
         sb << " ), "
            << (joinNode->rightEmbeddingField ? joinNode->rightEmbeddingField->fullPath()
                                              : std::string{"_"})
            << " = ( ";
-        summaryStringRecursive(joinNode->children[1].get(), sb, true /* includeNss */);
+        summaryStringRecursive(joinNode->children[1].get(), sb, /*includeNss=*/true);
         sb << " ) )";
         return;
     }
 
     if (node->children.empty()) {
         // Leaf node!
-        sb << nodeStageTypeToString(node, true /* brief */);
+        sb << nodeStageTypeToString(node, /*brief=*/true);
         if (includeNss) {
             if (auto nss = getNamespace(node); nss) {
                 sb << " ["
@@ -1761,7 +1761,7 @@ void DistinctNode::computeProperties() {
     // Note that we don't need to save the returned multikey fields for a DISTINCT_SCAN. They are
     // only needed for explodeForSort(), which works on IXSCAN but not DISTINCT_SCAN.
     sortSet = computeSortsAndMultikeyPathsForScan(
-                  index, direction, bounds, queryCollator, nullptr /* iets */)
+                  index, direction, bounds, queryCollator, /*iets=*/nullptr)
                   .first;
 }
 

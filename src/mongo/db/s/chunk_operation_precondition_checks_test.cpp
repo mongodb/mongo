@@ -67,13 +67,13 @@ protected:
         auto rt = RoutingTableHistory::makeNew(kNss,
                                                uuid,
                                                kShardKeyPattern,
-                                               false /* unsplittable */,
-                                               nullptr /* defaultCollator */,
-                                               false /* unique */,
+                                               /*unsplittable=*/false,
+                                               /*defaultCollator=*/nullptr,
+                                               /*unique=*/false,
                                                epoch,
                                                timestamp,
-                                               boost::none /* timeseriesFields */,
-                                               boost::none /* reshardingFields */,
+                                               /*timeseriesFields=*/boost::none,
+                                               /*reshardingFields=*/boost::none,
                                                allowMigrations,
                                                std::move(chunkTypes));
 

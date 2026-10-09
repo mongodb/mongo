@@ -58,7 +58,7 @@ public:
 
             const auto requestShardId = request().getCommandParameter();
             const auto shardId = uassertStatusOK(Grid::get(opCtx)->shardRegistry()->resolveShardId(
-                opCtx, requestShardId, true /* allowNonShardIdIdentifiers */));
+                opCtx, requestShardId, /*allowNonShardIdIdentifiers=*/true));
 
             const auto shardingCatalogManager = ShardingCatalogManager::get(opCtx);
             const auto isShardDraining =

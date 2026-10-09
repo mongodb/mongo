@@ -236,7 +236,7 @@ TEST_F(QueryPlannerDistinctTest, FlipDistinctScanDirection) {
 TEST_F(QueryPlannerDistinctTest, MultikeyIndexEligibleOnlyForUnwoundDistinct) {
     params.mainCollectionInfo.options |= QueryPlannerParams::STRICT_DISTINCT_ONLY;
     unittest::ServerParameterGuard shardFiltering("featureFlagShardFilteringDistinctScan", true);
-    addIndex(fromjson("{x: 1}"), true /*multikey*/);
+    addIndex(fromjson("{x: 1}"), /*multikey=*/true);
 
     runDistinctQuery("x");
     assertNumSolutions(1);
@@ -247,7 +247,7 @@ TEST_F(QueryPlannerDistinctTest, MultikeyIndexEligibleOnlyForUnwoundDistinct) {
                      BSONObj(),
                      BSONObj(),
                      /*flipDistinctScanDirection=*/false,
-                     true /*unwindsArrays*/);
+                     /*unwindsArrays=*/true);
     assertNumSolutions(1);
     assertCandidateExists(
         "{proj: {spec: {_id: 0, x: 1}, node: {distinct: {key: 'x', indexPattern: {x: 1}}}}}");
@@ -257,14 +257,14 @@ TEST_F(QueryPlannerDistinctTest, MultikeyIndexEligibleOnlyForUnwoundDistinct) {
 TEST_F(QueryPlannerDistinctTest, UnwoundDistinctReversesDescendingIndexScan) {
     params.mainCollectionInfo.options |= QueryPlannerParams::STRICT_DISTINCT_ONLY;
     unittest::ServerParameterGuard shardFiltering("featureFlagShardFilteringDistinctScan", true);
-    addIndex(fromjson("{x: -1}"), true /*multikey*/);
+    addIndex(fromjson("{x: -1}"), /*multikey=*/true);
 
     runDistinctQuery("x",
                      BSONObj(),
                      BSONObj(),
                      BSONObj(),
                      /*flipDistinctScanDirection=*/false,
-                     true /*unwindsArrays*/);
+                     /*unwindsArrays=*/true);
     assertNumSolutions(1);
     assertCandidateExists(
         "{proj: {spec: {_id: 0, x: 1}, node: {distinct: {key: 'x', indexPattern: {x: -1}, "
@@ -278,10 +278,10 @@ TEST_F(QueryPlannerDistinctTest, UnwoundDistinctReversesDescendingIndexScan) {
 TEST_F(QueryPlannerDistinctTest, UnwoundDistinctWithFilterCannotUseMultikeyIndex) {
     params.mainCollectionInfo.options |= QueryPlannerParams::STRICT_DISTINCT_ONLY;
     unittest::ServerParameterGuard shardFiltering("featureFlagShardFilteringDistinctScan", true);
-    addIndex(fromjson("{x: 1}"), true /*multikey*/);
+    addIndex(fromjson("{x: 1}"), /*multikey=*/true);
 
     runDistinctQuery(
-        "x", fromjson("{x: {$gt: 3}}"), BSONObj(), BSONObj(), false, true /*unwindsArrays*/);
+        "x", fromjson("{x: {$gt: 3}}"), BSONObj(), BSONObj(), false, /*unwindsArrays=*/true);
     assertNumSolutions(1);
     assertCandidateExists("{fetch: {node: {ixscan: {pattern: {x: 1}}}}}");
 }
@@ -299,7 +299,7 @@ TEST_F(QueryPlannerDistinctTest, UnwoundDistinctWithNonMultikeyIndex) {
                      BSONObj(),
                      BSONObj(),
                      /*flipDistinctScanDirection=*/false,
-                     true /*unwindsArrays*/);
+                     /*unwindsArrays=*/true);
     assertNumSolutions(1);
     assertCandidateExists(
         "{proj: {spec: {_id: 0, x: 1}, node: {distinct: {key: 'x', indexPattern: {x: 1}}}}}");

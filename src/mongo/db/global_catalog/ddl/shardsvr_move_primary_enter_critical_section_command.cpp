@@ -89,7 +89,7 @@ public:
                         NamespaceString(dbName),
                         csReason,
                         ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-                        true /* clearShardCatalogCache */);
+                        /*clearShardCatalogCache=*/true);
                 ShardingRecoveryService::get(newOpCtx.get())
                     ->promoteRecoverableCriticalSectionToBlockAlsoReads(
                         newOpCtx.get(),
@@ -105,8 +105,8 @@ public:
             dbClient.update(NamespaceString::kServerConfigurationNamespace,
                             BSON("_id" << Request::kCommandName),
                             BSON("$inc" << BSON("count" << 1)),
-                            true /* upsert */,
-                            false /* multi */);
+                            /*upsert=*/true,
+                            /*multi=*/false);
         }
 
     private:

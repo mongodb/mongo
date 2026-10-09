@@ -83,8 +83,8 @@ TEST_F(ClusterFindTest, SnapshotReadConcernWithAfterClusterTime) {
 }
 
 TEST_F(ClusterFindTest, IncludeQueryStatsMetrics) {
-    testIncludeQueryStatsMetrics(kFindCmdTargeted, true /* isTargeted */);
-    testIncludeQueryStatsMetrics(kFindCmdScatterGather, false /* isTargeted */);
+    testIncludeQueryStatsMetrics(kFindCmdTargeted, /*isTargeted=*/true);
+    testIncludeQueryStatsMetrics(kFindCmdScatterGather, /*isTargeted=*/false);
 }
 
 }  // namespace

@@ -186,7 +186,7 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(PlannerDat
     auto mp = classic_runtime_planner::MultiPlanner(std::move(plannerData),
                                                     std::move(solutions),
                                                     PlanExplainerData{},
-                                                    false /* addingCBRChosenPlanToPlanCache */,
+                                                    /*addingCBRChosenPlanToPlanCache=*/false,
                                                     PlanSelectionStrategy::kMultiPlanner);
 
     auto trialConfig = mp.getTrialPhaseConfig();

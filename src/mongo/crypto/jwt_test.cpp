@@ -213,7 +213,7 @@ TEST_F(JWKManagerTest, JWKSFetcherQuiesce) {
     // Advance clock further, but imagine that the JWKS endpoint goes down, Fetcher should
     // attempt a JIT and fail for all of the new keys.
     getClock()->advance(Seconds{3});
-    jwksFetcher()->setShouldFail(true /* shouldFail */);
+    jwksFetcher()->setShouldFail(/*shouldFail=*/true);
     ASSERT_OK(jwkManager()->getValidator("custom-key-1"sv));
     ASSERT_NOT_OK(jwkManager()->getValidator("custom-key-2"sv));
     ASSERT_NOT_OK(jwkManager()->getValidator("ec-prime256v1"sv));
@@ -224,7 +224,7 @@ TEST_F(JWKManagerTest, JWKSFetcherQuiesce) {
     // but the fetcher should refuse to perform another JIT since the quiesce period is now
     // in effect from the last, failed, JIT refresh.
     getClock()->advance(Seconds{3});
-    jwksFetcher()->setShouldFail(false /* shouldFail */);
+    jwksFetcher()->setShouldFail(/*shouldFail=*/false);
     ASSERT_OK(jwkManager()->getValidator("custom-key-1"sv));
     ASSERT_NOT_OK(jwkManager()->getValidator("custom-key-2"sv));
     ASSERT_NOT_OK(jwkManager()->getValidator("ec-prime256v1"sv));

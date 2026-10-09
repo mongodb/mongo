@@ -619,7 +619,7 @@ void ReplicationRecoveryImpl::_recoverFromStableTimestamp(OperationContext* opCt
         if (_duringInitialSync) {
             auto* replCoord = ReplicationCoordinator::get(opCtx);
             replCoord->getServiceContext()->getStorageEngine()->setStableTimestamp(
-                topOfOplog.getTimestamp(), false /*force*/);
+                topOfOplog.getTimestamp(), /*force=*/false);
             replCoord->setOldestTimestamp(topOfOplog.getTimestamp());
         }
     }
@@ -650,7 +650,7 @@ void ReplicationRecoveryImpl::_recoverFromUnstableCheckpoint(OperationContext* o
         // We advance both appliedThrough and the oldest timestamp together during oplog application
         // for restore after each batch, so the oldest timestamp cannot be behind appliedThrough.
         opCtx->getServiceContext()->getStorageEngine()->setOldestTimestamp(
-            appliedThrough.getTimestamp(), false /*force*/);
+            appliedThrough.getTimestamp(), /*force=*/false);
 
         if (startupRecoveryForRestore) {
             // This branch only runs when there is no stable checkpoint to recover from, so there is
@@ -687,7 +687,7 @@ void ReplicationRecoveryImpl::_recoverFromUnstableCheckpoint(OperationContext* o
     // playing oplog entries from.
     opCtx->getServiceContext()->getStorageEngine()->waitUntilUnjournaledWritesDurable(
         opCtx,
-        /*stableCheckpoint*/ true);
+        /*stableCheckpoint=*/true);
 
     // Now that we have set the initial data timestamp and taken an unstable checkpoint with the
     // appliedThrough being the topOfOplog, it is safe to clear the appliedThrough. This minValid
@@ -813,7 +813,7 @@ Timestamp ReplicationRecoveryImpl::_applyOplogOperations(OperationContext* opCtx
             invariant(!applyThroughOpTime.isNull());
             _consistencyMarkers->setAppliedThrough(opCtx, applyThroughOpTime);
             replCoord->getServiceContext()->getStorageEngine()->setStableTimestamp(
-                applyThroughOpTime.getTimestamp(), false /*force*/);
+                applyThroughOpTime.getTimestamp(), /*force=*/false);
             replCoord->setOldestTimestamp(applyThroughOpTime.getTimestamp());
         }
     }
@@ -941,7 +941,7 @@ void ReplicationRecoveryImpl::_truncateOplogTo(OperationContext* opCtx,
             opCtx,
             *shard_role_details::getRecoveryUnit(opCtx),
             truncateAfterRecordId,
-            false /*inclusive*/);
+            /*inclusive=*/false);
     wunit.commit();
     if (result.recordsRemoved > 0) {
         if (auto truncateMarkers = LocalOplogInfo::get(opCtx)->getTruncateMarkers()) {

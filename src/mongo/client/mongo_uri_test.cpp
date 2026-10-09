@@ -1324,7 +1324,7 @@ TEST(MongoURI, MakeAuthObjAuthSourceDefaults) {
                                   << " (test: " << tc.description << ")";
 
         auto authObj =
-            rs.getValue().makeAuthObjFromOptions(/*maxWireVersion*/ 0, tc.saslMechsForAuth);
+            rs.getValue().makeAuthObjFromOptions(/*maxWireVersion=*/0, tc.saslMechsForAuth);
         ASSERT_TRUE(authObj.has_value())
             << "No auth object created for URI: " << tc.uri << " (test: " << tc.description << ")";
 

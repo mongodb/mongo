@@ -1043,7 +1043,7 @@ TEST_F(DocumentSourceExtensionOptimizableTest, TransformAstNodeWithDefaultGetPro
         std::string(sdk::shared_test_stages::kTransformName), std::move(handle), _nss);
     ASSERT_FALSE(lp.isInitialSource());
     ASSERT_FALSE(lp.requiresAuthzChecks());
-    ASSERT_EQUALS(lp.requiredPrivileges(/*isMongos*/ false, /*bypassDocumentValidation*/ false),
+    ASSERT_EQUALS(lp.requiredPrivileges(/*isMongos=*/false, /*bypassDocumentValidation=*/false),
                   PrivilegeVector{});
 }
 
@@ -1058,7 +1058,7 @@ TEST_F(DocumentSourceExtensionOptimizableTest,
         stageBson.firstElement(), std::move(handle), _nss, LiteParserOptions{});
     ASSERT_FALSE(lp.isInitialSource());
     ASSERT_FALSE(lp.requiresAuthzChecks());
-    ASSERT_EQUALS(lp.requiredPrivileges(/*isMongos*/ false, /*bypassDocumentValidation*/ false),
+    ASSERT_EQUALS(lp.requiredPrivileges(/*isMongos=*/false, /*bypassDocumentValidation=*/false),
                   PrivilegeVector{});
 }
 
@@ -1279,7 +1279,7 @@ TEST_F(DocumentSourceExtensionOptimizableTest, ExpandToMatchParseNodeInheritsPro
         stageBson.firstElement(), std::move(handle), _nss, LiteParserOptions{});
     ASSERT_FALSE(lp.isInitialSource());
     ASSERT_FALSE(lp.requiresAuthzChecks());
-    ASSERT_EQUALS(lp.requiredPrivileges(/*isMongos*/ false, /*bypassDocumentValidation*/ false),
+    ASSERT_EQUALS(lp.requiredPrivileges(/*isMongos=*/false, /*bypassDocumentValidation=*/false),
                   PrivilegeVector{});
 }
 
@@ -1294,7 +1294,7 @@ TEST_F(DocumentSourceExtensionOptimizableTest,
         stageBson.firstElement(), std::move(handle), _nss, LiteParserOptions{});
     ASSERT_TRUE(lp.isInitialSource());
 
-    auto privileges = lp.requiredPrivileges(/*isMongos*/ false, /*bypassDocumentValidation*/ false);
+    auto privileges = lp.requiredPrivileges(/*isMongos=*/false, /*bypassDocumentValidation=*/false);
     ASSERT_EQ(privileges.size(), 1);
 
     const auto& privilege = privileges.front();
@@ -1316,7 +1316,7 @@ TEST_F(DocumentSourceExtensionOptimizableTest, EmptyRequiredPrivilegesAstNodeSuc
     host::DocumentSourceExtensionOptimizable::LiteParsedExpanded lp(
         std::string(EmptyRequiredPrivilegesAggStageAstNode::kName), std::move(handle), _nss);
 
-    ASSERT_EQUALS(lp.requiredPrivileges(/*isMongos*/ false, /*bypassDocumentValidation*/ false),
+    ASSERT_EQUALS(lp.requiredPrivileges(/*isMongos=*/false, /*bypassDocumentValidation=*/false),
                   PrivilegeVector{});
     ASSERT_FALSE(lp.requiresAuthzChecks());
 }
@@ -1330,7 +1330,7 @@ TEST_F(DocumentSourceExtensionOptimizableTest,
     host::DocumentSourceExtensionOptimizable::LiteParsedExpanded lp(
         std::string(SingleActionRequiredPrivilegesAggStageAstNode::kName), std::move(handle), _nss);
 
-    auto privileges = lp.requiredPrivileges(/*isMongos*/ false, /*bypassDocumentValidation*/ false);
+    auto privileges = lp.requiredPrivileges(/*isMongos=*/false, /*bypassDocumentValidation=*/false);
     ASSERT_EQ(privileges.size(), 1);
 
     const auto& privilege = privileges.front();
@@ -1355,7 +1355,7 @@ TEST_F(DocumentSourceExtensionOptimizableTest,
         std::move(handle),
         _nss);
 
-    auto privileges = lp.requiredPrivileges(/*isMongos*/ false, /*bypassDocumentValidation*/ false);
+    auto privileges = lp.requiredPrivileges(/*isMongos=*/false, /*bypassDocumentValidation=*/false);
     ASSERT_EQ(privileges.size(), 1);
 
     const auto& privilege = privileges.front();
@@ -1379,7 +1379,7 @@ TEST_F(DocumentSourceExtensionOptimizableTest,
     host::DocumentSourceExtensionOptimizable::LiteParsedExpanded lp(
         std::string(MultipleRequiredPrivilegesAggStageAstNode::kName), std::move(handle), _nss);
 
-    auto privileges = lp.requiredPrivileges(/*isMongos*/ false, /*bypassDocumentValidation*/ false);
+    auto privileges = lp.requiredPrivileges(/*isMongos=*/false, /*bypassDocumentValidation=*/false);
     ASSERT_EQ(privileges.size(), 1);
 
     const auto& privilege = privileges.front();
@@ -1412,7 +1412,7 @@ TEST_F(DocumentSourceExtensionOptimizableTest,
     host::DocumentSourceExtensionOptimizable::LiteParsedExpandable lp(
         stageBson.firstElement(), std::move(handle), _nss, LiteParserOptions{});
 
-    auto privileges = lp.requiredPrivileges(/*isMongos*/ false, /*bypassDocumentValidation*/ false);
+    auto privileges = lp.requiredPrivileges(/*isMongos=*/false, /*bypassDocumentValidation=*/false);
 
     ASSERT_EQ(privileges.size(), 1);
 
@@ -1443,7 +1443,7 @@ DEATH_TEST_F(DocumentSourceExtensionOptimizableTestDeathTest,
         _nss);
 
     [[maybe_unused]] auto privileges =
-        lp.requiredPrivileges(/*isMongos*/ false, /*bypassDocumentValidation*/ false);
+        lp.requiredPrivileges(/*isMongos=*/false, /*bypassDocumentValidation=*/false);
 }
 
 TEST_F(DocumentSourceExtensionOptimizableTest,
@@ -1943,9 +1943,9 @@ TEST_F(DocumentSourceExtensionOptimizableTest, LiteParsedExpandableClonePreserve
 
     // Verify requiredPrivileges() is preserved.
     auto originalPrivileges =
-        original.requiredPrivileges(/*isMongos*/ false, /*bypassDocumentValidation*/ false);
+        original.requiredPrivileges(/*isMongos=*/false, /*bypassDocumentValidation=*/false);
     auto clonedPrivileges =
-        cloned->requiredPrivileges(/*isMongos*/ false, /*bypassDocumentValidation*/ false);
+        cloned->requiredPrivileges(/*isMongos=*/false, /*bypassDocumentValidation=*/false);
     ASSERT_EQ(originalPrivileges.size(), clonedPrivileges.size());
     ASSERT_EQ(clonedPrivileges.size(), 1);
 }
@@ -2043,9 +2043,9 @@ TEST_F(DocumentSourceExtensionOptimizableTest, LiteParsedExpandedClonePreservesR
 
     // Verify requiredPrivileges() is preserved.
     auto originalPrivileges =
-        original.requiredPrivileges(/*isMongos*/ false, /*bypassDocumentValidation*/ false);
+        original.requiredPrivileges(/*isMongos=*/false, /*bypassDocumentValidation=*/false);
     auto clonedPrivileges =
-        cloned->requiredPrivileges(/*isMongos*/ false, /*bypassDocumentValidation*/ false);
+        cloned->requiredPrivileges(/*isMongos=*/false, /*bypassDocumentValidation=*/false);
     ASSERT_EQ(originalPrivileges.size(), clonedPrivileges.size());
     ASSERT_EQ(clonedPrivileges.size(), 1);
 
@@ -2071,9 +2071,9 @@ TEST_F(DocumentSourceExtensionOptimizableTest, LiteParsedExpandedCloneWithMultip
     auto cloned = original.clone();
 
     auto originalPrivileges =
-        original.requiredPrivileges(/*isMongos*/ false, /*bypassDocumentValidation*/ false);
+        original.requiredPrivileges(/*isMongos=*/false, /*bypassDocumentValidation=*/false);
     auto clonedPrivileges =
-        cloned->requiredPrivileges(/*isMongos*/ false, /*bypassDocumentValidation*/ false);
+        cloned->requiredPrivileges(/*isMongos=*/false, /*bypassDocumentValidation=*/false);
 
     ASSERT_EQ(originalPrivileges.size(), clonedPrivileges.size());
     ASSERT_EQ(clonedPrivileges.size(), 1);
@@ -2100,7 +2100,7 @@ TEST_F(DocumentSourceExtensionOptimizableTest, LiteParsedExpandedCloneWithNoPriv
     ASSERT_FALSE(cloned->requiresAuthzChecks());
 
     auto clonedPrivileges =
-        cloned->requiredPrivileges(/*isMongos*/ false, /*bypassDocumentValidation*/ false);
+        cloned->requiredPrivileges(/*isMongos=*/false, /*bypassDocumentValidation=*/false);
     ASSERT_EQ(clonedPrivileges, PrivilegeVector{});
 }
 

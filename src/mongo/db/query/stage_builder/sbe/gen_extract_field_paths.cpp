@@ -114,7 +114,7 @@ boost::optional<PlanStageReqs> makeExtractFieldPathsPlanStageReqs(
                 extractFieldPathsReqs.set(slotName);
             }
         });
-        ExpressionWalker walker(&visitor, nullptr /*inVisitor*/, nullptr /*postVisitor*/);
+        ExpressionWalker walker(&visitor, /*inVisitor=*/nullptr, /*postVisitor=*/nullptr);
         expression_walker::walk<const Expression>(expression, &walker);
     }
     if (!ok) {

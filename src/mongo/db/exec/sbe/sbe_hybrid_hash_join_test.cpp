@@ -379,7 +379,7 @@ TEST_F(HybridHashJoinTestFixture, SpillTriggersOnMemoryLimit) {
 }
 
 TEST_F(HybridHashJoinTestFixture, SpillThrowsWhenDiskUseNotAllowed) {
-    auto hhj = makeHHJ(nullptr /* collator */, false /* allowDiskUse */);
+    auto hhj = makeHHJ(/*collator=*/nullptr, /*allowDiskUse=*/false);
 
     // Inserting enough rows to exceed the tiny memory limit must throw
     // QueryExceededMemoryLimitNoDiskUseAllowed instead of partitioning and spilling, because disk

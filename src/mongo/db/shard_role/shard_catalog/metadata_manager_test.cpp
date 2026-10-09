@@ -75,8 +75,8 @@ protected:
             false,
             epoch,
             Timestamp(1, 1),
-            boost::none /* timeseriesFields */,
-            boost::none /* reshardingFields */,
+            /*timeseriesFields=*/boost::none,
+            /*reshardingFields=*/boost::none,
 
             true,
             {ChunkType{uuid, range, ChunkVersion({epoch, Timestamp(1, 1)}, {1, 0}), kOtherShard}});
@@ -127,12 +127,11 @@ protected:
                                  chunkVersion,
                                  kOtherShard);
 
-        auto rt =
-            cm->getRoutingTableHistory_forTest().makeUpdated(boost::none /* timeseriesFields */,
-                                                             boost::none /* reshardingFields */,
-                                                             true,
-                                                             false, /* unsplittable */
-                                                             splitChunks);
+        auto rt = cm->getRoutingTableHistory_forTest().makeUpdated(/*timeseriesFields=*/boost::none,
+                                                                   /*reshardingFields=*/boost::none,
+                                                                   true,
+                                                                   false, /* unsplittable */
+                                                                   splitChunks);
 
         return CollectionMetadata(
             CurrentChunkManager(makeStandaloneRoutingTableHistory(std::move(rt))), kThisShard);
@@ -154,8 +153,8 @@ protected:
         chunkVersion.incMajor();
 
         auto rt = cm->getRoutingTableHistory_forTest().makeUpdated(
-            boost::none /* timeseriesFields */,
-            boost::none /* reshardingFields */,
+            /*timeseriesFields=*/boost::none,
+            /*reshardingFields=*/boost::none,
             true,
             false, /* unsplittable */
             {ChunkType(metadata.getUUID(), ChunkRange(minKey, maxKey), chunkVersion, kOtherShard)});
@@ -234,7 +233,7 @@ TEST_F(MetadataManagerTest, GetActiveMetadataDoesNotAlwaysPreserveRange) {
     ASSERT_EQ(_manager->numberOfMetadataSnapshots(), 0);
 
     auto metadataWithoutTimestampPreserveRange =
-        _manager->getActiveMetadata(boost::none, true /* preserveRange */);
+        _manager->getActiveMetadata(boost::none, /*preserveRange=*/true);
 
     _manager->setCollectionMetadata(
         cloneMetadataPlusChunk(metadataWithoutTimestampPreserveRange->get(), cr3));

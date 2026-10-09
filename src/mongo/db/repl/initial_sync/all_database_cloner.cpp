@@ -150,8 +150,8 @@ BaseCloner::AfterStageBehavior AllDatabaseCloner::listDatabasesStage() {
 
     databasesArray = getClient()->getDatabaseInfos(
         BSONObj(),
-        true /* nameOnly */,
-        false /*authorizedDatabases*/,
+        /*nameOnly=*/true,
+        /*authorizedDatabases=*/false,
         /*useListDatabasesForAllTenants=*/multiTenancyAndRequireTenantIdEnabled);
 
     size_t idxToInsertNextAdmin = 0;

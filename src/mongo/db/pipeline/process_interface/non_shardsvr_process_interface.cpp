@@ -111,7 +111,7 @@ std::vector<DatabaseName> NonShardServerProcessInterface::getAllDatabases(
     OperationContext* opCtx, boost::optional<TenantId> tenantId) {
     DBDirectClient dbClient(opCtx);
     auto databasesResponse = dbClient.getDatabaseInfos(
-        BSONObj() /* filter */, true /* nameOnly */, false /* authorizedDatabases */);
+        /*filter=*/BSONObj(), /*nameOnly=*/true, /*authorizedDatabases=*/false);
 
     std::vector<DatabaseName> databases;
     databases.reserve(databasesResponse.size());
@@ -294,8 +294,7 @@ void NonShardServerProcessInterface::createIndexesOnEmptyCollection(
 
             WriteUnitOfWork wuow(opCtx);
             IndexBuildsCoordinator::get(opCtx)->createIndexesOnEmptyCollection(
-                opCtx, collectionWriter, filteredIndexes, false  // fromMigrate
-            );
+                opCtx, collectionWriter, filteredIndexes, /*fromMigrate=*/false);
             wuow.commit();
         });
 }

@@ -528,7 +528,7 @@ public:
         client.createCollection(NamespaceString::kConfigsvrCollectionsNamespace);
 
         LogicalSessionCache::set(getServiceContext(), std::make_unique<LogicalSessionCacheNoop>());
-        TransactionCoordinatorService::get(opCtx)->initializeIfNeeded(opCtx, /*term*/ 1);
+        TransactionCoordinatorService::get(opCtx)->initializeIfNeeded(opCtx, /*term=*/1);
 
         _controller = std::make_shared<CoordinatorStateTransitionController>();
         WaitForMajorityService::get(getServiceContext()).startup(getServiceContext());

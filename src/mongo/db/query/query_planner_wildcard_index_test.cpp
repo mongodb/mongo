@@ -77,9 +77,9 @@ protected:
         auto descriptor = IndexDescriptor(IndexNames::WILDCARD, spec.toBSON());
         auto mockIndexCatalogEntry = std::make_shared<IndexCatalogEntryMock>(nullptr,
                                                                              nullptr,
-                                                                             "" /* ident */,
+                                                                             /*ident=*/"",
                                                                              std::move(descriptor),
-                                                                             false /* isFrozen */,
+                                                                             /*isFrozen=*/false,
                                                                              partialFilterExpr,
                                                                              collator);
 

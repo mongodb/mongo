@@ -301,7 +301,7 @@ TEST_F(HistogramTest, MaxDiffIntArrays) {
 
         value::TagValueOwned val = value::TagValueOwned::fromRaw(makeInt64Value(2));
         const EstimationResult estimatedCard =
-            estimateCardinalityEq(*estimator, val.tag(), val.value(), true /*includeScalar*/);
+            estimateCardinalityEq(*estimator, val.tag(), val.value(), /*includeScalar=*/true);
         const EstimationResult estimatedCardAreaDiff =
             estimateCardinalityEq(*estimatorAreaDiff, val.tag(), val.value(), true);
 
@@ -317,23 +317,23 @@ TEST_F(HistogramTest, MaxDiffIntArrays) {
         value::TagValueOwned val = value::TagValueOwned::fromRaw(makeInt64Value(3));
         const EstimationResult estimatedCard =
             estimateCardinalityRange(*estimator,
-                                     false /*lowInclusive*/,
+                                     /*lowInclusive=*/false,
                                      value::TypeTags::MinKey,
                                      0,
-                                     false /*highInclusive*/,
+                                     /*highInclusive=*/false,
                                      val.tag(),
                                      val.value(),
-                                     true /* includeScalar */,
+                                     /*includeScalar=*/true,
                                      ArrayRangeEstimationAlgo::kConjunctArrayCE);
         const EstimationResult estimatedCardAreaDiff =
             estimateCardinalityRange(*estimatorAreaDiff,
-                                     false /*lowInclusive*/,
+                                     /*lowInclusive=*/false,
                                      value::TypeTags::MinKey,
                                      0,
-                                     false /*highInclusive*/,
+                                     /*highInclusive=*/false,
                                      val.tag(),
                                      val.value(),
-                                     true /* includeScalar */,
+                                     /*includeScalar=*/true,
                                      ArrayRangeEstimationAlgo::kConjunctArrayCE);
 
         ASSERT_EQ(6, actualCard);
@@ -350,23 +350,23 @@ TEST_F(HistogramTest, MaxDiffIntArrays) {
 
         const EstimationResult estimatedCard =
             estimateCardinalityRange(*estimator,
-                                     false /*lowInclusive*/,
+                                     /*lowInclusive=*/false,
                                      low.tag(),
                                      low.value(),
-                                     false /*highInclusive*/,
+                                     /*highInclusive=*/false,
                                      high.tag(),
                                      high.value(),
-                                     false /* includeScalar */,
+                                     /*includeScalar=*/false,
                                      ArrayRangeEstimationAlgo::kExactArrayCE);
         const EstimationResult estimatedCardAreaDiff =
             estimateCardinalityRange(*estimatorAreaDiff,
-                                     false /*lowInclusive*/,
+                                     /*lowInclusive=*/false,
                                      low.tag(),
                                      low.value(),
-                                     false /*highInclusive*/,
+                                     /*highInclusive=*/false,
                                      high.tag(),
                                      high.value(),
-                                     false /* includeScalar */,
+                                     /*includeScalar=*/false,
                                      ArrayRangeEstimationAlgo::kExactArrayCE);
 
         ASSERT_EQ(2, actualCard);

@@ -171,7 +171,7 @@ public:
                      ExplainOptions::Verbosity verbosity,
                      rpc::ReplyBuilderInterface* result) override {
             Impl::checkCanExplainHere(opCtx);
-            setReadWriteConcern(opCtx, request(), true /* setRC */, false /* setWC */);
+            setReadWriteConcern(opCtx, request(), /*setRC=*/true, /*setWC=*/false);
 
             auto curOp = CurOp::get(opCtx);
             curOp->debug().getQueryStatsInfo().disableForSubqueryExecution = true;
@@ -208,7 +208,7 @@ public:
                     std::move(cmdRequest),
                     verbosity,
                     MatchExpressionParser::kAllowAllSpecialFeatures,
-                    false /* mustRegisterRequestToQueryStats */);
+                    /*mustRegisterRequestToQueryStats=*/false);
 
                 // Create an RAII object that prints useful information about the
                 // ExpressionContext in the case of a tassert or crash.
@@ -322,7 +322,7 @@ public:
                     std::move(findRequest),
                     verbosity,
                     MatchExpressionParser::kAllowAllSpecialFeatures,
-                    false /* mustRegisterRequestToQueryStats */);
+                    /*mustRegisterRequestToQueryStats=*/false);
 
                 ClusterExplain::buildEOFExplainResult(
                     opCtx, query.get(), unparsedRequest().body, &bodyBuilder);
@@ -333,7 +333,7 @@ public:
             Impl::checkCanRunHere(opCtx);
             CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
             markOperationQueryMemorySheddingEligible(opCtx);
-            setReadWriteConcern(opCtx, request(), true /* setRC */, false /* setWC */);
+            setReadWriteConcern(opCtx, request(), /*setRC=*/true, /*setWC=*/false);
 
             auto cmdRequest = query_request_helper::makeFromFindCommand(request());
             doFLERewriteIfNeeded(opCtx, *cmdRequest);

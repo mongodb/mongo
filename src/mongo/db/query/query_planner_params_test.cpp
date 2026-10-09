@@ -78,7 +78,7 @@ protected:
         auto catalog = CollectionCatalog::get(_opCtx.get());
         catalog->onCreateCollection(_opCtx.get(), collection);
         auto collectionPtr = CollectionPtr(catalog->establishConsistentCollection(
-            _opCtx.get(), nss, boost::none /* readTimestamp */));
+            _opCtx.get(), nss, /*readTimestamp=*/boost::none));
 
         // Retrieve query settings decoration.
         auto& querySettings = *QuerySettingsDecoration::get(collectionPtr->getSharedDecorations());

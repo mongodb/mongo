@@ -52,7 +52,7 @@ std::unique_ptr<MatchExpression> buildEndOfTransactionFilter(
     }
 
     auto nsRegex = DocumentSourceChangeStream::getNsRegexForChangeStream(expCtx);
-    return std::make_unique<RegexMatchExpression>("o2.endOfTransaction"sv, nsRegex, "" /*options*/);
+    return std::make_unique<RegexMatchExpression>("o2.endOfTransaction"sv, nsRegex, /*options=*/"");
 }
 }  // namespace change_stream_filter
 
@@ -429,7 +429,7 @@ void ChangeStreamUnwindTransactionStage::TransactionOpIterator::_collectAllOpTim
 
 void ChangeStreamUnwindTransactionStage::TransactionOpIterator::_addAffectedNamespaces(
     const Document& doc) {
-    const auto dbCmdNs = NamespaceStringUtil::deserialize(boost::none /* tenantId */,
+    const auto dbCmdNs = NamespaceStringUtil::deserialize(/*tenantId=*/boost::none,
                                                           doc["ns"sv].getStringData(),
                                                           SerializationContext::stateDefault());
     if (doc[FieldAccessors::kOpType].getStringData() != "c"sv) {

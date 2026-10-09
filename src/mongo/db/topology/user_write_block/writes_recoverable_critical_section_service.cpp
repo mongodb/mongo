@@ -376,7 +376,7 @@ void UserWritesRecoverableCriticalSectionService::
 
         // Promote the critical section to block also user writes by updating the critical section
         // document. The OpObserver will promote the in-memory CS when reacting to the update event.
-        setBlockUserWritesDocumentField(opCtx, nss, true /* blockUserWrites */);
+        setBlockUserWritesDocumentField(opCtx, nss, /*blockUserWrites=*/true);
     }
 
     LOGV2_DEBUG(6351904,
@@ -436,7 +436,7 @@ void UserWritesRecoverableCriticalSectionService::
 
         // Demote the critical section to block also user writes by updating the critical section
         // document. The OpObserver will demote the in-memory CS when reacting to the update event.
-        setBlockUserWritesDocumentField(opCtx, nss, false /* blockUserWrites */);
+        setBlockUserWritesDocumentField(opCtx, nss, /*blockUserWrites=*/false);
     }
 
     LOGV2_DEBUG(6351908,

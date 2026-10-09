@@ -126,7 +126,7 @@ void updateSbePlanCache(OperationContext* opCtx,
         opCtx->getServiceContext()->getPreciseClockSource()->now(),
         &callbacks,
         isSensitive ? PlanSecurityLevel::kSensitive : PlanSecurityLevel::kNotSensitive,
-        boost::none /* worksGrowthCoefficient */));
+        /*worksGrowthCoefficient=*/boost::none));
     planCacheCounters.incrementSbeCachedPlansEvictedCounter(evictedCount);
 }
 
@@ -170,7 +170,7 @@ void updateClassicPlanCacheFromClassicCandidates(
                   opCtx->getServiceContext()->getPreciseClockSource()->now(),
                   &callbacks,
                   isSensitive ? PlanSecurityLevel::kSensitive : PlanSecurityLevel::kNotSensitive,
-                  boost::none /* worksGrowthCoefficient */));
+                  /*worksGrowthCoefficient=*/boost::none));
     planCacheCounters.incrementClassicCachedPlansEvictedCounter(evictedCount);
 }
 

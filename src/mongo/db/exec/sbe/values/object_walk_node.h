@@ -123,11 +123,11 @@ struct ScalarProjectionPositionInfoRecorder final
         // If we have traversed an array, then this recorder owns the array and it will be saved
         // with saveOwnedArray(). Otherwise the recorder just holds an unowned view into the input
         // so we return an unowned view here.
-        outputValue = TagValueMaybeOwned::fromRaw(false /* owned */, tag, val);
+        outputValue = TagValueMaybeOwned::fromRaw(/*owned=*/false, tag, val);
     }
     void saveOwnedArray(std::unique_ptr<Array> arr) {
         outputValue = TagValueMaybeOwned::fromRaw(
-            true /* owned */, TypeTags::Array, value::bitcastFrom<Array*>(arr.release()));
+            /*owned=*/true, TypeTags::Array, value::bitcastFrom<Array*>(arr.release()));
     }
 };
 
@@ -323,7 +323,7 @@ void walkObject(ObjectWalkNode<ProjectionRecorder>* node,
         if (auto child = node->findChild(obj->field(i)); child != nullptr) {
             auto eltTagVal = obj->getAt(i);
             walkField<ProjectionRecorder>(
-                child, eltTagVal.tag, eltTagVal.value, nullptr /*bsonPtr*/, cb, traverseArrays);
+                child, eltTagVal.tag, eltTagVal.value, /*bsonPtr=*/nullptr, cb, traverseArrays);
             numChildrenWalked++;
         }
         i++;

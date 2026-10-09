@@ -601,7 +601,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_finishR
                                 _critSecReason,
                                 ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
                                 *customAction,
-                                false /*throwIfReasonDiffers*/);
+                                /*throwIfReasonDiffers=*/false);
                     }
                 })
                 .then([this, executor, factory] {
@@ -965,10 +965,10 @@ void ReshardingRecipientService::RecipientStateMachine::
                         _metadata.getSourceNss(),
                         ShardKeyPattern{_metadata.getReshardingKey()},
                         CollationSpec::kSimpleSpec,
-                        false /* unique */,
-                        true /* enforceUniquenessCheck */,
+                        /*unique=*/false,
+                        /*enforceUniquenessCheck=*/true,
                         behaviors,
-                        collectionOptions.timeseries /* tsOpts */);
+                        /*tsOpts=*/collectionOptions.timeseries);
                 });
         }
 
@@ -1286,10 +1286,10 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                     _metadata.getSourceNss(),
                     ShardKeyPattern{_metadata.getReshardingKey()},
                     CollationSpec::kSimpleSpec,
-                    false /* unique */,
-                    true /* enforceUniquenessCheck */,
+                    /*unique=*/false,
+                    /*enforceUniquenessCheck=*/true,
                     behaviors,
-                    collectionOptions.timeseries /* tsOpts */);
+                    /*tsOpts=*/collectionOptions.timeseries);
             }
 
             // Get all indexSpecs need to build.
@@ -1676,7 +1676,7 @@ void ReshardingRecipientService::RecipientStateMachine::_verifyIndexesBuilt(
         _metadata.getSourceUUID(),
         *_cloneTimestamp,
         "loading indexes to validate indexes on temporary resharding collection"sv,
-        /*expandSimpleCollation*/ false);
+        /*expandSimpleCollation=*/false);
 
     const auto& tempCollIdxSpecs = listIndexesEmptyListIfMissing(opCtx,
                                                                  _metadata.getTempReshardingNss(),
@@ -2098,7 +2098,7 @@ void ReshardingRecipientService::RecipientStateMachine::_removeRecipientDocument
                       coll,
                       BSON(ReshardingRecipientDocument::kReshardingUUIDFieldName
                            << _metadata.getReshardingUUID()),
-                      true /* justOne */);
+                      /*justOne=*/true);
 
         wuow.commit();
     });

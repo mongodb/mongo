@@ -28,7 +28,7 @@ BranchStage::BranchStage(std::unique_ptr<PlanStage> inputThen,
                          value::SlotVector outputVals,
                          PlanNodeId planNodeId,
                          bool participateInTrialRunTracking)
-    : PlanStage("branch"sv, nullptr /* yieldPolicy */, planNodeId, participateInTrialRunTracking),
+    : PlanStage("branch"sv, /*yieldPolicy=*/nullptr, planNodeId, participateInTrialRunTracking),
       _filter(std::move(filter)),
       _inputThenVals(std::move(inputThenVals)),
       _inputElseVals(std::move(inputElseVals)),
@@ -225,7 +225,7 @@ void BranchStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
     ret.emplace_back(DebugPrinter::Block("`]"));
 
     if (debugPrintInfo.printBytecode) {
-        PlanStage::debugPrintBytecode(ret, _filterCode, "FILTER" /*title*/);
+        PlanStage::debugPrintBytecode(ret, _filterCode, /*title=*/"FILTER");
     }
 
     DebugPrinter::addBlocks(ret, _children[1]->debugPrint(debugPrintInfo));

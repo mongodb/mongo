@@ -229,7 +229,7 @@ BSONObj buildOptimizedExpression(size_t depth) {
 TEST(ExpressionLetOptimizeTest, DoesNotCauseExponentialTraversals) {
     auto expCtx = ExpressionContextForTest{};
     auto expression = Expression::parseExpression(
-        &expCtx, buildRecursiveLet(50, false /*optimized*/), expCtx.variablesParseState);
+        &expCtx, buildRecursiveLet(50, /*optimized=*/false), expCtx.variablesParseState);
     expression = expression->optimize();
     ASSERT_BSONOBJ_EQ(buildOptimizedExpression(50), expression->serialize().getDocument().toBson());
 }

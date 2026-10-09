@@ -70,7 +70,7 @@ public:
     void doInitialSync() {
         auto opCtx = cc().makeOperationContext();
         _initializer.onConsistentDataAvailable(
-            opCtx.get(), false /* isMajority */, false /* isRollback */);
+            opCtx.get(), /*isMajority=*/false, /*isRollback=*/false);
     }
 
     /**
@@ -80,7 +80,7 @@ public:
     void doStartupRecovery() {
         auto opCtx = cc().makeOperationContext();
         _initializer.onConsistentDataAvailable(
-            opCtx.get(), true /* isMajority */, false /* isRollback */);
+            opCtx.get(), /*isMajority=*/true, /*isRollback=*/false);
     }
 
 protected:

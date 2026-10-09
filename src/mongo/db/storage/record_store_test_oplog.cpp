@@ -190,7 +190,7 @@ TEST(RecordStoreTest, SeekOplog) {
         rs->capped()->truncateAfter(opCtx.get(),
                                     *shard_role_details::getRecoveryUnit(opCtx.get()),
                                     RecordId(2, 2),
-                                    false /* inclusive */);
+                                    /*inclusive=*/false);
         txn.commit();
     }
 
@@ -429,7 +429,7 @@ TEST(RecordStoreTest, OplogOrder) {
         rs->capped()->truncateAfter(opCtx.get(),
                                     *shard_role_details::getRecoveryUnit(opCtx.get()),
                                     id1,
-                                    false /* inclusive */);
+                                    /*inclusive=*/false);
         txn.commit();
     }
 

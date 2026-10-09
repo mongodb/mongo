@@ -119,10 +119,10 @@ DistributionStatus::DistributionStatus(NamespaceString nss,
     for (size_t zoneRangeIdx = 0; zoneRangeIdx < _normalizedZones.size(); zoneRangeIdx++) {
         const auto& zoneRange = _normalizedZones[zoneRangeIdx];
         chunkMngr.forEachOverlappingChunk(
-            zoneRange.min, zoneRange.max, false /* isMaxInclusive */, [&](const auto& chunkInfo) {
+            zoneRange.min, zoneRange.max, /*isMaxInclusive=*/false, [&](const auto& chunkInfo) {
                 auto [zoneIt, created] =
                     _shardZoneInfoMap[chunkInfo.getShardId().toString()].try_emplace(
-                        zoneRange.zone, 1 /* numChunks */, zoneRangeIdx, chunkInfo.getMin());
+                        zoneRange.zone, /*numChunks=*/1, zoneRangeIdx, chunkInfo.getMin());
 
                 if (!created) {
                     ++(zoneIt->second.numChunks);
@@ -492,7 +492,7 @@ MigrateInfosWithReason BalancerPolicy::balance(
                             distribution.nss(),
                             distribution.getChunkManager().getUUID(),
                             chunk.getMin(),
-                            boost::none /* max */,
+                            /*max=*/boost::none,
                             chunk.getLastmod(),
                             // Do not force jumbo chunks to be migrated off draining shards. Jumbo
                             // chunks need to be moved manually, similar to how they are handled
@@ -622,7 +622,7 @@ MigrateInfosWithReason BalancerPolicy::balance(
                                                 distribution.nss(),
                                                 distribution.getChunkManager().getUUID(),
                                                 chunk.getMin(),
-                                                boost::none /* max */,
+                                                /*max=*/boost::none,
                                                 chunk.getLastmod(),
                                                 forceJumbo ? ForceJumbo::kForceBalancer
                                                            : ForceJumbo::kDoNotForce,
@@ -795,7 +795,7 @@ bool BalancerPolicy::_singleZoneBalanceBasedOnDataSize(
                                      distribution.nss(),
                                      distribution.getChunkManager().getUUID(),
                                      chunk.getMin(),
-                                     boost::none /* max */,
+                                     /*max=*/boost::none,
                                      chunk.getLastmod(),
                                      forceJumbo,
                                      collDataSizeInfo.maxChunkSizeBytes);
@@ -983,7 +983,7 @@ NamespaceStringToShardDataSizeMap getStatsForBalancing(
 
     const auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     auto responsesFromShards = sharding_util::sendCommandToShards(
-        opCtx, DatabaseName::kAdmin, reqObj, shardIds, executor, false /* throwOnError */);
+        opCtx, DatabaseName::kAdmin, reqObj, shardIds, executor, /*throwOnError=*/false);
 
     NamespaceStringToShardDataSizeMap namespaceToShardDataSize;
     for (auto&& response : responsesFromShards) {

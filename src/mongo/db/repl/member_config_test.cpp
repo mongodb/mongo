@@ -456,7 +456,7 @@ TEST(MemberConfig, CanOmitNewlyAddedFieldInBSONViaToBSONWithoutNewlyAdded) {
     ASSERT_EQ(true, newlyAdded);
 
     // Also verify that 'toBSONWithoutNewlyAdded' omits the 'newlyAdded' field.
-    obj = mc.toBSON(true /* omitNewlyAddedField */);
+    obj = mc.toBSON(/*omitNewlyAddedField=*/true);
     ASSERT_EQ(ErrorCodes::NoSuchKey, bsonExtractBooleanField(obj, "newlyAdded", &newlyAdded));
 
     MemberConfig mc2(obj, &tagConfig);

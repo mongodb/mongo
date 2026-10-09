@@ -1771,7 +1771,7 @@ public:
             wunit.commit();
         }
         insert(nss1, BSON("a" << 1));
-        auto dbInfos = _client.getDatabaseInfos(BSONObj(), true /*nameOnly*/);
+        auto dbInfos = _client.getDatabaseInfos(BSONObj(), /*nameOnly=*/true);
         checkNewDBInResults(dbInfos, 1);
 
 
@@ -1785,7 +1785,7 @@ public:
             wunit.commit();
         }
         insert(nss2, BSON("b" << 2));
-        dbInfos = _client.getDatabaseInfos(BSONObj(), true /*nameOnly*/);
+        dbInfos = _client.getDatabaseInfos(BSONObj(), /*nameOnly=*/true);
         checkNewDBInResults(dbInfos, 2);
 
 
@@ -1799,7 +1799,7 @@ public:
             wunit.commit();
         }
         insert(nss3, BSON("c" << 3));
-        dbInfos = _client.getDatabaseInfos(BSONObj(), true /*nameOnly*/);
+        dbInfos = _client.getDatabaseInfos(BSONObj(), /*nameOnly=*/true);
         checkNewDBInResults(dbInfos, 3);
     }
 

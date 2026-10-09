@@ -200,7 +200,7 @@ public:
                 "Capped collection size must be greater than zero",
                 size > 0);
 
-        convertToCapped(opCtx, nss, size, false /*fromMigrate*/);
+        convertToCapped(opCtx, nss, size, /*fromMigrate=*/false);
         return true;
     }
 };

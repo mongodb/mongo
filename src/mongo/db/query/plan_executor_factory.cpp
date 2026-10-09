@@ -46,7 +46,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
                 yieldPolicy,
                 cachedPlanHash,
                 std::move(replanReason),
-                boost::none /* maybeExplainData */,
+                /*maybeExplainData=*/boost::none,
                 planSelectionStrategy);
 }
 
@@ -71,9 +71,9 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
                 plannerOptions,
                 std::move(nss),
                 yieldPolicy,
-                boost::none /* cachedPlanHash */,
-                boost::none /* replanReason */,
-                boost::none /* maybeExplainData */);
+                /*cachedPlanHash=*/boost::none,
+                /*replanReason=*/boost::none,
+                /*maybeExplainData=*/boost::none);
 }
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
@@ -145,7 +145,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
                                     .fromPlanCache = planIsFromCache},
                                 plannerOptions & QueryPlannerParams::RETURN_OWNED_DATA,
                                 std::move(nss),
-                                false /*isOpen*/,
+                                /*isOpen=*/false,
                                 std::move(yieldPolicy),
                                 cachedPlanHash,
                                 std::move(remoteCursors),
@@ -183,16 +183,16 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
                                 std::move(candidate),
                                 plannerOptions & QueryPlannerParams::RETURN_OWNED_DATA,
                                 std::move(nss),
-                                true, /*isOpen*/
+                                /*isOpen=*/true,
                                 std::move(yieldPolicy),
                                 cachedPlanHash,
                                 std::move(remoteCursors),
                                 std::move(remoteExplains),
-                                nullptr /*classicRuntimePlannerStage*/,
+                                /*classicRuntimePlannerStage=*/nullptr,
                                 collections,
-                                false /*usedJoinOpt*/,
-                                {} /*rejectedJoinPlans*/,
-                                boost::none /*maybeExplainData*/,
+                                /*usedJoinOpt=*/false,
+                                /*rejectedJoinPlans=*/{},
+                                /*maybeExplainData=*/boost::none,
                                 planSelectionStrategy),
             PlanExecutor::Deleter{opCtx}};
 }

@@ -712,7 +712,7 @@ BSONObj _openGoldenData(const BSONObj& input, void*) {
     auto config = configArg.Obj();
     goldenTestConfig = unittest::GoldenTestConfig::parseFromBson(config);
 
-    goldenTestContext.emplace(&goldenTestConfig, std::string{testPath}, true /*validateOnClose*/);
+    goldenTestContext.emplace(&goldenTestConfig, std::string{testPath}, /*validateOnClose=*/true);
 
     return {};
 }
@@ -749,11 +749,11 @@ BSONObj _closeGoldenData(const BSONObj& input, void*) {
 void closeMochaStyleTestContext(Scope& scope) {
     scope.exec(
         "if (typeof globalThis.__mochalite_closer === 'function') { await __mochalite_closer(); }",
-        "" /* name */,
-        true /* printResult */,
-        true /* reportError*/,
-        true /* assertOnError*/,
-        0 /*timeoutMs*/);
+        /*name=*/"",
+        /*printResult=*/true,
+        /*reportError=*/true,
+        /*assertOnError=*/true,
+        /*timeoutMs=*/0);
 }
 
 /**

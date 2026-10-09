@@ -140,7 +140,7 @@ void checkOutSessionAndVerifyTxnState(OperationContext* opCtx) {
     TransactionParticipant::get(opCtx).beginOrContinue(
         opCtx,
         {*opCtx->getTxnNumber()},
-        boost::none /* autocommit */,
+        /*autocommit=*/boost::none,
         TransactionParticipant::TransactionActions::kNone);
 }
 
@@ -670,7 +670,7 @@ Status MigrationDestinationManager::restoreRecoveredMigrationState(
           "sessionId"_attr = *_sessionId);
 
     _migrateThreadHandle = stdx::thread([this, cancellationToken = _cancellationSource.token()]() {
-        _migrateThread(cancellationToken, true /* skipToCritSecTaken */);
+        _migrateThread(cancellationToken, /*skipToCritSecTaken=*/true);
     });
 
     return Status::OK();
@@ -1288,7 +1288,7 @@ void _cloneCollectionIndexesAndOptions(
             // We do not have a collection by this name. Create it with the donor's options.
             OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
                 unsafeCreateCollection(
-                    opCtx, nss, true /* forceCSRAsUnknownAfterCollectionCreation */);
+                    opCtx, nss, /*forceCSRAsUnknownAfterCollectionCreation=*/true);
             WriteUnitOfWork wuow(opCtx);
             // The write fence will invalid and reload the acquisition on destruction, leaving the
             // acquisition pointing to the latest collection instance
@@ -1299,9 +1299,9 @@ void _cloneCollectionIndexesAndOptions(
             uassertStatusOK(db->userCreateNS(opCtx,
                                              nss,
                                              collectionOptions,
-                                             true /* createDefaultIndexes */,
+                                             /*createDefaultIndexes=*/true,
                                              collectionOptionsAndIndexes.idIndexSpec,
-                                             true /* fromMigrate */));
+                                             /*fromMigrate=*/true));
             wuow.commit();
         }
     }
@@ -1312,7 +1312,7 @@ void _cloneCollectionIndexesAndOptions(
         WriteUnitOfWork wunit(opCtx);
         CollectionWriter collWriter(opCtx, &collection);
         IndexBuildsCoordinator::get(opCtx)->createIndexesOnEmptyCollection(
-            opCtx, collWriter, indexSpecs, true /* fromMigrate */);
+            opCtx, collWriter, indexSpecs, /*fromMigrate=*/true);
         wunit.commit();
     }
 }
@@ -1373,7 +1373,7 @@ void MigrationDestinationManager::_migrateThread(CancellationToken cancellationT
             auto txnParticipant = TransactionParticipant::get(opCtx);
             txnParticipant.beginOrContinue(opCtx,
                                            {*opCtx->getTxnNumber()},
-                                           boost::none /* autocommit */,
+                                           /*autocommit=*/boost::none,
                                            TransactionParticipant::TransactionActions::kNone);
             _migrateDriver(opCtx, skipToCritSecTaken || recovering);
         } catch (...) {
@@ -1435,7 +1435,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
             checkConfigShardIsNotDraining(outerOpCtx);
         }
 
-        timing.emplace(outerOpCtx, "to", _nss, _min, _max, 8 /* steps */, _toShard, _fromShard);
+        timing.emplace(outerOpCtx, "to", _nss, _min, _max, /*steps=*/8, _toShard, _fromShard);
 
         LOGV2(22000,
               "Starting receiving end of chunk migration",
@@ -2106,9 +2106,9 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx, const
                 deleteObjects(opCtx,
                               collection,
                               id,
-                              true /* justOne */,
-                              false /* god */,
-                              true /* fromMigrate */);
+                              /*justOne=*/true,
+                              /*god=*/false,
+                              /*fromMigrate=*/true);
             });
 
             changeInOrphans--;
@@ -2365,7 +2365,7 @@ boost::optional<BSONObj> MigrationDestinationManager::checkForExistingDocumentsI
 
     // Find a shard key prefixed index to use for the scan.
     const auto shardKeyIdx = findShardKeyPrefixedIndex(
-        opCtx, collection.getCollectionPtr(), shardKeyPattern, false /* requireSingleKey */);
+        opCtx, collection.getCollectionPtr(), shardKeyPattern, /*requireSingleKey=*/false);
 
     uassert(ErrorCodes::IndexNotFound,
             str::stream() << "Could not find shard key index for pattern " << shardKeyPattern

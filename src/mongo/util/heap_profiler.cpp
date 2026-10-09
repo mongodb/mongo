@@ -454,7 +454,7 @@ private:
 
         // If new stack, store in stackHashTable.
         if (!stackInfo) {
-            StackInfo newStackInfo(stackHashTable.size() /*stackNum*/);
+            StackInfo newStackInfo(/*stackNum=*/stackHashTable.size());
             stackInfo = stackHashTable.insert(stackHash, tempStack, newStackInfo);
             if (!stackInfo) {
                 disable("too many stacks; disabling heap profiling");

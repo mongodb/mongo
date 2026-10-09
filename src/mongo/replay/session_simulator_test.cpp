@@ -46,7 +46,7 @@ public:
                          std::chrono::steady_clock::time_point startTime,
                          std::string_view uri)
         : SessionSimulator(std::move(source),
-                           0 /* sessionID */,
+                           /*sessionID=*/0,
                            startTime,
                            std::string(uri),
                            std::make_unique<ReplayCommandExecutor>(),

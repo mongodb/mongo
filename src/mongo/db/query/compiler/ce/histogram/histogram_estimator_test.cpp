@@ -149,7 +149,7 @@ TEST(HistogramPredicateEstimationTest, EstimateViaTypeCountsBooleanOnlyFalse) {
 
     std::vector<stats::SBEValue> data;
     for (size_t i = 0; i < size; i++) {
-        data.push_back(stats::makeBooleanValue(0 /*false*/));
+        data.push_back(stats::makeBooleanValue(/*false=*/0));
     }
 
     auto ceHist = stats::createCEHistogram(data, numberOfBuckets);
@@ -182,7 +182,7 @@ TEST(HistogramPredicateEstimationTest, EstimateViaTypeCountsBooleanOnlyTrue) {
 
     std::vector<stats::SBEValue> data;
     for (size_t i = 0; i < size; i++) {
-        data.push_back(stats::makeBooleanValue(1 /*true*/));
+        data.push_back(stats::makeBooleanValue(/*true=*/1));
     }
 
     auto ceHist = stats::createCEHistogram(data, numberOfBuckets);
@@ -219,11 +219,11 @@ TEST(HistogramPredicateEstimationTest, EstimateViaTypeCountsBooleanMix) {
 
     std::vector<stats::SBEValue> data;
     for (size_t i = 0; i < falseValues; i++) {
-        data.push_back(stats::makeBooleanValue(0 /*false*/));
+        data.push_back(stats::makeBooleanValue(/*false=*/0));
     }
 
     for (size_t i = 0; i < trueValues; i++) {
-        data.push_back(stats::makeBooleanValue(1 /*true*/));
+        data.push_back(stats::makeBooleanValue(/*true=*/1));
     }
 
     auto ceHist = stats::createCEHistogram(data, numberOfBuckets);
@@ -256,11 +256,11 @@ TEST(HistogramPredicateEstimationTest, EstimateViaTypeCountsBooleanMixDifferentB
 
     std::vector<stats::SBEValue> data;
     for (size_t i = 0; i < falseValues; i++) {
-        data.push_back(stats::makeBooleanValue(0 /*false*/));
+        data.push_back(stats::makeBooleanValue(/*false=*/0));
     }
 
     for (size_t i = 0; i < trueValues; i++) {
-        data.push_back(stats::makeBooleanValue(1 /*true*/));
+        data.push_back(stats::makeBooleanValue(/*true=*/1));
     }
 
     auto ceHist = stats::createCEHistogram(data, numberOfBuckets);
@@ -296,11 +296,11 @@ TEST(HistogramPredicateEstimationTest, EstimateViaTypeCountsBooleanMixNotInclusi
                                  EstimationSource::Histogram};
     std::vector<stats::SBEValue> data;
     for (size_t i = 0; i < falseValues; i++) {
-        data.push_back(stats::makeBooleanValue(0 /*false*/));
+        data.push_back(stats::makeBooleanValue(/*false=*/0));
     }
 
     for (size_t i = 0; i < trueValues; i++) {
-        data.push_back(stats::makeBooleanValue(1 /*true*/));
+        data.push_back(stats::makeBooleanValue(/*true=*/1));
     }
 
     auto ceHist = stats::createCEHistogram(data, numberOfBuckets);
@@ -351,11 +351,11 @@ TEST(HistogramPredicateEstimationTest, EstimateViaTypeCountsBooleanMixNotInclusi
 
     std::vector<stats::SBEValue> data;
     for (size_t i = 0; i < falseValues; i++) {
-        data.push_back(stats::makeBooleanValue(0 /*false*/));
+        data.push_back(stats::makeBooleanValue(/*false=*/0));
     }
 
     for (size_t i = 0; i < trueValues; i++) {
-        data.push_back(stats::makeBooleanValue(1 /*true*/));
+        data.push_back(stats::makeBooleanValue(/*true=*/1));
     }
 
     auto ceHist = stats::createCEHistogram(data, numberOfBuckets);
@@ -529,12 +529,12 @@ TEST(HistogramPredicateEstimationTest, EstimateViaTypeCountsMixTypes) {
 
     // add True boolean values.
     for (size_t i = 0; i < trueValues; i++) {
-        data.push_back(stats::makeBooleanValue(1 /*true*/));
+        data.push_back(stats::makeBooleanValue(/*true=*/1));
     }
 
     // add True boolean values.
     for (size_t i = 0; i < falseValues; i++) {
-        data.push_back(stats::makeBooleanValue(0 /*false*/));
+        data.push_back(stats::makeBooleanValue(/*false=*/0));
     }
 
     // add NaN values.
@@ -612,106 +612,103 @@ TEST(HistogramPredicateEstimationTest, IntHistogramIntervalEstimation) {
         CEHistogram::make(hist, TypeCounts{{NumberInt64, intCnt.toDouble()}}, intCnt.toDouble());
 
     {  // {a: 20}
-        Interval interval(BSON("" << 20 << "" << 20), true /*startIncluded*/, true
-                          /*endIncluded*/);
+        Interval interval(BSON("" << 20 << "" << 20), /*startIncluded=*/true, /*endIncluded=*/true);
         auto estimatedCard =
-            estimateCardinalityEq(*ceHist, NumberInt64, 20, true /*includeScalar*/).card;
+            estimateCardinalityEq(*ceHist, NumberInt64, 20, /*includeScalar=*/true).card;
         ASSERT_EQ(3.0, estimatedCard);
         ASSERT_EQ(CardinalityEstimate(CardinalityType(estimatedCard), EstimationSource::Code),
                   estimateIntervalCardinality(*ceHist,
                                               interval,
-                                              true /* includeScalar */,
+                                              /*includeScalar=*/true,
                                               ArrayRangeEstimationAlgo::kConjunctArrayCE));
     }
 
     {  // {a: {$gte: 20, $lte: 30}}
         Interval interval(BSON("" << 20 << "" << 30), true, true);
         auto estimatedCard = estimateCardinalityRange(*ceHist,
-                                                      true /*lowInclusive*/,
+                                                      /*lowInclusive=*/true,
                                                       NumberInt64,
                                                       20,
-                                                      true /*highInclusive*/,
+                                                      /*highInclusive=*/true,
                                                       NumberInt64,
                                                       30,
-                                                      true /*includeScalar*/,
+                                                      /*includeScalar=*/true,
                                                       ArrayRangeEstimationAlgo::kConjunctArrayCE)
                                  .card;
         ASSERT_EQ(14.0, estimatedCard);
         ASSERT_EQ(CardinalityEstimate(CardinalityType(estimatedCard), EstimationSource::Code),
                   estimateIntervalCardinality(*ceHist,
                                               interval,
-                                              true /*includeScalar*/,
+                                              /*includeScalar=*/true,
                                               ArrayRangeEstimationAlgo::kConjunctArrayCE));
     }
 
     {  //  {a: {$gte: 20, $lte: 25}}, bucket interpolation.
-        Interval interval(BSON("" << 20 << "" << 25), true /*startIncluded*/, true
-                          /*endIncluded*/);
+        Interval interval(BSON("" << 20 << "" << 25), /*startIncluded=*/true, /*endIncluded=*/true);
         auto estimatedCard = estimateCardinalityRange(*ceHist,
-                                                      true /*lowInclusive*/,
+                                                      /*lowInclusive=*/true,
                                                       NumberInt64,
                                                       20,
-                                                      true /*highInclusive*/,
+                                                      /*highInclusive=*/true,
                                                       NumberInt64,
                                                       25,
-                                                      true /*includeScalar*/,
+                                                      /*includeScalar=*/true,
                                                       ArrayRangeEstimationAlgo::kConjunctArrayCE)
                                  .card;
         ASSERT_EQ(8.0, estimatedCard);
         ASSERT_EQ(CardinalityEstimate(CardinalityType(estimatedCard), EstimationSource::Code),
                   estimateIntervalCardinality(*ceHist,
                                               interval,
-                                              true /*includeScalar*/,
+                                              /*includeScalar=*/true,
                                               ArrayRangeEstimationAlgo::kConjunctArrayCE));
     }
 
     {  // {a: {$gte: 30, $lte: 40}}
-        Interval interval(BSON("" << 30 << "" << 40), true /*startIncluded*/, true
-                          /*endIncluded*/);
+        Interval interval(BSON("" << 30 << "" << 40), /*startIncluded=*/true, /*endIncluded=*/true);
         ASSERT_EQ(3.0,
                   HistogramEstimator::estimateCardinality(*ceHist,
                                                           intCnt,
                                                           interval,
-                                                          true /*includeScalar*/,
+                                                          /*includeScalar=*/true,
                                                           ArrayRangeEstimationAlgo::kExactArrayCE)
                       .toDouble());
     }
 
     {  // {a: {$gte: 30}}
         Interval interval(BSON("" << 30 << "" << std::numeric_limits<double>::infinity()),
-                          true /*startIncluded*/,
-                          true /*endIncluded*/);
+                          /*startIncluded=*/true,
+                          /*endIncluded=*/true);
         ASSERT_EQ(CardinalityEstimate(CardinalityType(14.0), EstimationSource::Code),
                   HistogramEstimator::estimateCardinality(*ceHist,
                                                           intCnt,
                                                           interval,
-                                                          true /*includeScalar*/,
+                                                          /*includeScalar=*/true,
                                                           ArrayRangeEstimationAlgo::kExactArrayCE));
     }
 
     {  // Interval [30, "") is supposed to have the same estimate as [30, Infinity].
         Interval interval(BSON("" << 30 << ""
                                   << ""),
-                          true /*startIncluded*/,
-                          false /*endIncluded*/);
+                          /*startIncluded=*/true,
+                          /*endIncluded=*/false);
         ASSERT_EQ(CardinalityEstimate(CardinalityType(14.0), EstimationSource::Code),
                   HistogramEstimator::estimateCardinality(*ceHist,
                                                           intCnt,
                                                           interval,
-                                                          true /*includeScalar*/,
+                                                          /*includeScalar=*/true,
                                                           ArrayRangeEstimationAlgo::kExactArrayCE));
     }
 
     {  // {a: {$gte: -Infinity}}
         Interval interval(BSON("" << -std::numeric_limits<double>::infinity() << ""
                                   << std::numeric_limits<double>::infinity()),
-                          true /*startIncluded*/,
-                          true /*endIncluded*/);
+                          /*startIncluded=*/true,
+                          /*endIncluded=*/true);
         ASSERT_EQ(54.5,
                   HistogramEstimator::estimateCardinality(*ceHist,
                                                           intCnt,
                                                           interval,
-                                                          true /*includeScalar*/,
+                                                          /*includeScalar=*/true,
                                                           ArrayRangeEstimationAlgo::kExactArrayCE)
                       .toDouble());
     }
@@ -745,13 +742,13 @@ TEST(HistogramPredicateEstimationTest, StrHistogramIntervalEstimation) {
                           true,
                           true);
         auto estimatedCard =
-            estimateCardinalityEq(*ceHist, strLow.tag(), strLow.value(), true /*includeScalar*/)
+            estimateCardinalityEq(*ceHist, strLow.tag(), strLow.value(), /*includeScalar=*/true)
                 .card;
         ASSERT_EQ(5.0, estimatedCard);
         ASSERT_EQ(CardinalityEstimate(CardinalityType(estimatedCard), EstimationSource::Code),
                   (estimateIntervalCardinality(*ceHist,
                                                interval,
-                                               true /*includeScalar*/,
+                                               /*includeScalar=*/true,
                                                ArrayRangeEstimationAlgo::kConjunctArrayCE)));
     }
 
@@ -764,20 +761,20 @@ TEST(HistogramPredicateEstimationTest, StrHistogramIntervalEstimation) {
                           true,
                           true);
         auto estimatedCard = estimateCardinalityRange(*ceHist,
-                                                      true /*lowInclusive*/,
+                                                      /*lowInclusive=*/true,
                                                       strLow.tag(),
                                                       strLow.value(),
-                                                      true /*highInclusive*/,
+                                                      /*highInclusive=*/true,
                                                       strHigh.tag(),
                                                       strHigh.value(),
-                                                      true /*includeScalar*/,
+                                                      /*includeScalar=*/true,
                                                       ArrayRangeEstimationAlgo::kConjunctArrayCE)
                                  .card;
         ASSERT_EQ(10.0, estimatedCard);
         ASSERT_EQ(CardinalityEstimate(CardinalityType(estimatedCard), EstimationSource::Code),
                   estimateIntervalCardinality(*ceHist,
                                               interval,
-                                              true /*includeScalar*/,
+                                              /*includeScalar=*/true,
                                               ArrayRangeEstimationAlgo::kConjunctArrayCE));
     }
 
@@ -790,20 +787,20 @@ TEST(HistogramPredicateEstimationTest, StrHistogramIntervalEstimation) {
                           true,
                           true);
         auto estimatedCard = estimateCardinalityRange(*ceHist,
-                                                      true /*lowInclusive*/,
+                                                      /*lowInclusive=*/true,
                                                       strLow.tag(),
                                                       strLow.value(),
-                                                      true /*highInclusive*/,
+                                                      /*highInclusive=*/true,
                                                       strHigh.tag(),
                                                       strHigh.value(),
-                                                      true /*includeScalar*/,
+                                                      /*includeScalar=*/true,
                                                       ArrayRangeEstimationAlgo::kConjunctArrayCE)
                                  .card;
         ASSERT_APPROX_EQUAL(6.244, estimatedCard, 0.001);
         ASSERT_EQ(CardinalityEstimate(CardinalityType(estimatedCard), EstimationSource::Code),
                   estimateIntervalCardinality(*ceHist,
                                               interval,
-                                              true /*includeScalar*/,
+                                              /*includeScalar=*/true,
                                               ArrayRangeEstimationAlgo::kConjunctArrayCE));
     }
 
@@ -817,7 +814,7 @@ TEST(HistogramPredicateEstimationTest, StrHistogramIntervalEstimation) {
                   HistogramEstimator::estimateCardinality(*ceHist,
                                                           strCnt,
                                                           interval,
-                                                          true /*includeScalar*/,
+                                                          /*includeScalar=*/true,
                                                           ArrayRangeEstimationAlgo::kExactArrayCE)
                       .toDouble());
     }
@@ -831,7 +828,7 @@ TEST(HistogramPredicateEstimationTest, StrHistogramIntervalEstimation) {
                   HistogramEstimator::estimateCardinality(*ceHist,
                                                           strCnt,
                                                           interval,
-                                                          true /*includeScalar*/,
+                                                          /*includeScalar=*/true,
                                                           ArrayRangeEstimationAlgo::kExactArrayCE)
                       .toDouble());
     }
@@ -861,13 +858,13 @@ TEST(HistogramPredicateEstimationTest, IntStrHistogramIntervalEstimation) {
     {  // {a: 993}
         Interval interval(BSON("" << 993 << "" << 993), true, true);
         auto estimatedCard =
-            estimateCardinalityEq(*ceHist, NumberInt64, 993, true /*includeScalar*/).card;
+            estimateCardinalityEq(*ceHist, NumberInt64, 993, /*includeScalar=*/true).card;
         ASSERT_APPROX_EQUAL(7.0, estimatedCard,
                             0.1);  // Actual: 9
         ASSERT_EQ(CardinalityEstimate(CardinalityType(estimatedCard), EstimationSource::Code),
                   estimateIntervalCardinality(*ceHist,
                                               interval,
-                                              true /*includeScalar*/,
+                                              /*includeScalar=*/true,
                                               ArrayRangeEstimationAlgo::kConjunctArrayCE));
     }
 
@@ -877,31 +874,31 @@ TEST(HistogramPredicateEstimationTest, IntStrHistogramIntervalEstimation) {
         Interval interval(BSON("" << "04e"
                                   << ""
                                   << "04e"),
-                          true /*startIncluded*/,
-                          true /*endIncluded*/);
+                          /*startIncluded=*/true,
+                          /*endIncluded=*/true);
         auto estimatedCard =
-            estimateCardinalityEq(*ceHist, str.tag(), str.value(), true /*includeScalar*/).card;
+            estimateCardinalityEq(*ceHist, str.tag(), str.value(), /*includeScalar=*/true).card;
         ASSERT_APPROX_EQUAL(2.2, estimatedCard, 0.1);  // Actual: 3.
         ASSERT_EQ(CardinalityEstimate(CardinalityType(estimatedCard), EstimationSource::Code),
                   estimateIntervalCardinality(*ceHist,
                                               interval,
-                                              true /*includeScalar*/,
+                                              /*includeScalar=*/true,
                                               ArrayRangeEstimationAlgo::kConjunctArrayCE));
     }
 
     {  // {a: 100000000}
         value::TypeTags tagLow = NumberInt64;
         value::Value valLow = 100000000;
-        Interval interval(BSON("" << 100000000 << "" << 100000000), true /*startIncluded*/, true
-                          /*endIncluded*/);
+        Interval interval(
+            BSON("" << 100000000 << "" << 100000000), /*startIncluded=*/true, /*endIncluded=*/true);
         auto estimatedCard =
-            estimateCardinalityEq(*ceHist, tagLow, valLow, true /*includeScalar*/).card;
+            estimateCardinalityEq(*ceHist, tagLow, valLow, /*includeScalar=*/true).card;
         ASSERT_APPROX_EQUAL(0.0, estimatedCard,
                             0.1);  // Actual: 0
         ASSERT_EQ(CardinalityEstimate(CardinalityType(estimatedCard), EstimationSource::Code),
                   estimateIntervalCardinality(*ceHist,
                                               interval,
-                                              true /*includeScalar*/,
+                                              /*includeScalar=*/true,
                                               ArrayRangeEstimationAlgo::kConjunctArrayCE));
     }
 
@@ -916,20 +913,20 @@ TEST(HistogramPredicateEstimationTest, IntStrHistogramIntervalEstimation) {
                           true,
                           false);
         auto estimatedCard = estimateCardinalityRange(*ceHist,
-                                                      false /* lowInclusive */,
+                                                      /*lowInclusive=*/false,
                                                       strLow.tag(),
                                                       strLow.value(),
-                                                      false /* highInclusive */,
+                                                      /*highInclusive=*/false,
                                                       strHigh.tag(),
                                                       strHigh.value(),
-                                                      true /* includeScalar */,
+                                                      /*includeScalar=*/true,
                                                       ArrayRangeEstimationAlgo::kConjunctArrayCE)
                                  .card;
         ASSERT_APPROX_EQUAL(13.3, estimatedCard, 0.1);  // Actual: 0.
         ASSERT_EQ(CardinalityEstimate(CardinalityType(estimatedCard), EstimationSource::Code),
                   estimateIntervalCardinality(*ceHist,
                                               interval,
-                                              true /*includeScalar*/,
+                                              /*includeScalar=*/true,
                                               ArrayRangeEstimationAlgo::kConjunctArrayCE));
     }
 }
@@ -975,40 +972,40 @@ TEST(HistogramPredicateEstimationTest, IntArrayOnlyIntervalEstimate) {
                                           maxHist,
                                           // There are 100 non-empty int-only arrays.
                                           TypeCounts{{value::TypeTags::NumberInt64, 100}},
-                                          totalCnt.toDouble() /* sampleSize */);
+                                          /*sampleSize=*/totalCnt.toDouble());
 
     {  // {$match: {a: {$elemMatch: {$gt: 500, $lt: 600}}}}
         value::TypeTags tagLow = NumberInt64;
         value::Value valLow = 500;
         value::TypeTags tagHigh = NumberInt64;
         value::Value valHigh = 600;
-        Interval interval(BSON("" << 500 << "" << 600), false, false /*endIncluded*/);
+        Interval interval(BSON("" << 500 << "" << 600), false, /*endIncluded=*/false);
         auto estimatedCard = estimateCardinalityRange(*ceHist,
-                                                      false /*lowInclusive*/,
+                                                      /*lowInclusive=*/false,
                                                       tagLow,
                                                       valLow,
-                                                      false /*highInclusive*/,
+                                                      /*highInclusive=*/false,
                                                       tagHigh,
                                                       valHigh,
-                                                      false /*includeScalar*/,
+                                                      /*includeScalar=*/false,
                                                       ArrayRangeEstimationAlgo::kExactArrayCE)
                                  .card;
         ASSERT_APPROX_EQUAL(27.0, estimatedCard, 0.1);  // actual 21.
         ASSERT_EQ(CardinalityEstimate(CardinalityType(estimatedCard), EstimationSource::Code),
                   estimateIntervalCardinality(*ceHist,
                                               interval,
-                                              false /*includeScalar*/,
+                                              /*includeScalar=*/false,
                                               ArrayRangeEstimationAlgo::kExactArrayCE));
     }
 
     {  // {$match: {a: {$elemMatch: {$gt: 10, $lt: 110}}}
         Interval interval(
-            BSON("" << 10 << "" << 110), false /*startIncluded*/, false /*endIncluded*/);
+            BSON("" << 10 << "" << 110), /*startIncluded=*/false, /*endIncluded=*/false);
         ASSERT_EQ(CardinalityEstimate(CardinalityType(24.1065), EstimationSource::Code),
                   HistogramEstimator::estimateCardinality(*ceHist,
                                                           totalCnt,
                                                           interval,
-                                                          false /*includeScalar*/,
+                                                          /*includeScalar=*/false,
                                                           ArrayRangeEstimationAlgo::kExactArrayCE));
     }
 }
@@ -1037,60 +1034,61 @@ TEST(HistogramPredicateEstimationTest, NonHistogrammableTypesEstimation) {
 
     {  // check estimation for Boolean
         Interval interval(
-            BSON("" << true << "" << true), true /*startIncluded*/, true /*endIncluded*/);
+            BSON("" << true << "" << true), /*startIncluded=*/true, /*endIncluded=*/true);
         ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
         ASSERT_EQ(
             CardinalityEstimate(CardinalityType(5), EstimationSource::Code), /*estimatedCard */
             estimateIntervalCardinality(*ceHist,
                                         interval,
-                                        true /*includeScalar*/,
+                                        /*includeScalar=*/true,
                                         ArrayRangeEstimationAlgo::kConjunctArrayCE));
     }
 
     {  // check estimation for Null
-        Interval interval(BSON("" << BSONNULL << "" << BSONNULL), true /*startIncluded*/, true
-                          /*endIncluded*/);
+        Interval interval(
+            BSON("" << BSONNULL << "" << BSONNULL), /*startIncluded=*/true, /*endIncluded=*/true);
         ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
-        ASSERT_EQ(CardinalityEstimate(CardinalityType(5), EstimationSource::Code), /*estimatedCard*/
-                  estimateIntervalCardinality(*ceHist,
-                                              interval,
-                                              true /*includeScalar*/,
-                                              ArrayRangeEstimationAlgo::kConjunctArrayCE));
+        ASSERT_EQ(
+            CardinalityEstimate(CardinalityType(5), EstimationSource::Code), /*estimatedCard=*/
+            estimateIntervalCardinality(*ceHist,
+                                        interval,
+                                        /*includeScalar=*/true,
+                                        ArrayRangeEstimationAlgo::kConjunctArrayCE));
     }
 
     {  // check estimation for Timestamp
         Interval interval(
-            BSON("" << startTs << "" << endTs), true /*startIncluded*/, true /*endIncluded*/);
+            BSON("" << startTs << "" << endTs), /*startIncluded=*/true, /*endIncluded=*/true);
         ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
         ASSERT_EQ(
-            CardinalityEstimate(CardinalityType(25), EstimationSource::Code), /*estimatedCard*/
+            CardinalityEstimate(CardinalityType(25), EstimationSource::Code), /*estimatedCard=*/
             estimateIntervalCardinality(*ceHist,
                                         interval,
-                                        true /*includeScalar*/,
+                                        /*includeScalar=*/true,
                                         ArrayRangeEstimationAlgo::kConjunctArrayCE));
     }
 
     {  // check estimation for [Null, true]
         Interval interval(
-            BSON("" << BSONNULL << "" << true), true /*startIncluded*/, true /*endIncluded*/);
+            BSON("" << BSONNULL << "" << true), /*startIncluded=*/true, /*endIncluded=*/true);
         ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
         ASSERT_EQ(
             CardinalityEstimate(CardinalityType(75), EstimationSource::Code), /*estimatedCard ,*/
             estimateIntervalCardinality(*ceHist,
                                         interval,
-                                        true /*includeScalar*/,
+                                        /*includeScalar=*/true,
                                         ArrayRangeEstimationAlgo::kConjunctArrayCE));
     }
 
     {  // check estimation for [false, timestamp]
         Interval interval(
-            BSON("" << false << "" << endTs), true /*startIncluded*/, true /*endIncluded*/);
+            BSON("" << false << "" << endTs), /*startIncluded=*/true, /*endIncluded=*/true);
         ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
         ASSERT_EQ(
             CardinalityEstimate(CardinalityType(50), EstimationSource::Code), /*estimatedCard ,*/
             estimateIntervalCardinality(*ceHist,
                                         interval,
-                                        true /*includeScalar*/,
+                                        /*includeScalar=*/true,
                                         ArrayRangeEstimationAlgo::kConjunctArrayCE));
     }
 }
@@ -1120,12 +1118,12 @@ DEATH_TEST(HistogramPredicateEstimationTestDeathTest,
                                           20);
     {  // check estimation for Object (expected to fail)
         Interval interval(BSON("" << BSON("" << "") << "" << BSON("" << "")),
-                          true /*startIncluded*/,
-                          true /*endIncluded*/);
+                          /*startIncluded=*/true,
+                          /*endIncluded=*/true);
         ASSERT_FALSE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
         ASSERT_THROWS_CODE(estimateIntervalCardinality(*ceHist,
                                                        interval,
-                                                       true /*includeScalar*/,
+                                                       /*includeScalar=*/true,
                                                        ArrayRangeEstimationAlgo::kConjunctArrayCE),
                            DBException,
                            8870500);
@@ -1159,42 +1157,42 @@ TEST(HistogramPredicateEstimationTest, MixedTypeIntervalEstimation) {
 
     {  // [MinKey, MaxKey]
         Interval interval(
-            BSON("" << MINKEY << "" << MAXKEY), true /*startIncluded*/, true /*endIncluded*/);
+            BSON("" << MINKEY << "" << MAXKEY), /*startIncluded=*/true, /*endIncluded=*/true);
         ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
         ASSERT_EQ(CardinalityEstimate(CardinalityType(100), EstimationSource::Code),
                   estimateIntervalCardinality(*ceHist,
                                               interval,
-                                              true /*includeScalar*/,
+                                              /*includeScalar=*/true,
                                               ArrayRangeEstimationAlgo::kConjunctArrayCE));
     }
     {  // [MinKey, endTs]
         Interval interval(
-            BSON("" << MINKEY << "" << endTs), true /*startIncluded*/, true /*endIncluded*/);
+            BSON("" << MINKEY << "" << endTs), /*startIncluded=*/true, /*endIncluded=*/true);
         ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
         ASSERT_EQ(CardinalityEstimate(CardinalityType(98), EstimationSource::Code),
                   estimateIntervalCardinality(*ceHist,
                                               interval,
-                                              true /*includeScalar*/,
+                                              /*includeScalar=*/true,
                                               ArrayRangeEstimationAlgo::kConjunctArrayCE));
     }
     {  // [0.0, MaxKey]
         Interval interval(
-            BSON("" << 0.0 << "" << MAXKEY), true /*startIncluded*/, true /*endIncluded*/);
+            BSON("" << 0.0 << "" << MAXKEY), /*startIncluded=*/true, /*endIncluded=*/true);
         ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
         ASSERT_EQ(CardinalityEstimate(CardinalityType(94), EstimationSource::Code),
                   estimateIntervalCardinality(*ceHist,
                                               interval,
-                                              true /*includeScalar*/,
+                                              /*includeScalar=*/true,
                                               ArrayRangeEstimationAlgo::kConjunctArrayCE));
     }
     {  // [0.0, endTs]
         Interval interval(
-            BSON("" << 0.0 << "" << endTs), true /*startIncluded*/, true /*endIncluded*/);
+            BSON("" << 0.0 << "" << endTs), /*startIncluded=*/true, /*endIncluded=*/true);
         ASSERT_TRUE(HistogramEstimator::canEstimateInterval(*ceHist, interval));
         ASSERT_EQ(CardinalityEstimate(CardinalityType(92), EstimationSource::Code),
                   estimateIntervalCardinality(*ceHist,
                                               interval,
-                                              true /*includeScalar*/,
+                                              /*includeScalar=*/true,
                                               ArrayRangeEstimationAlgo::kConjunctArrayCE));
     }
 }

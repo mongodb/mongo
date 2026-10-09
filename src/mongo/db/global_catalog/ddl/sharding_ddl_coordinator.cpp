@@ -258,7 +258,7 @@ void ShardingDDLCoordinatorMixin::_checkDBVersion(ShardingCoordinator& self,
         }
 
         ScopedSetShardRole scopedSetShardRole(
-            opCtx, originalNss, boost::none /* shardVersion */, _databaseVersion);
+            opCtx, originalNss, /*shardVersion=*/boost::none, _databaseVersion);
 
         self._getExternalState()->assertIsPrimaryShardForDb(opCtx, originalNss.dbName());
     };

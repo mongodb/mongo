@@ -321,7 +321,7 @@ public:
             ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(),
                                                 recoveryUnit(),
                                                 makeKeyString(sorted.get(), key, loc),
-                                                false /* dupsAllowed*/));
+                                                /*dupsAllowed=*/false));
             txn.commit();
         }
 
@@ -357,51 +357,51 @@ public:
 };
 
 TEST_F(SortedDataInterfaceTestBoundaryTest, UniqueForwardWithNonInclusiveBoundaries) {
-    testBoundaries(IndexType::kUnique, /*forward*/ true, /*inclusive*/ false);
+    testBoundaries(IndexType::kUnique, /*forward=*/true, /*inclusive=*/false);
 }
 
 TEST_F(SortedDataInterfaceTestBoundaryTest, NonUniqueForwardWithNonInclusiveBoundaries) {
-    testBoundaries(IndexType::kNonUnique, /*forward*/ true, /*inclusive*/ false);
+    testBoundaries(IndexType::kNonUnique, /*forward=*/true, /*inclusive=*/false);
 }
 
 TEST_F(SortedDataInterfaceTestBoundaryTest, IdForwardWithNonInclusiveBoundaries) {
-    testBoundaries(IndexType::kId, /*forward*/ true, /*inclusive*/ false);
+    testBoundaries(IndexType::kId, /*forward=*/true, /*inclusive=*/false);
 }
 
 TEST_F(SortedDataInterfaceTestBoundaryTest, UniqueForwardWithInclusiveBoundaries) {
-    testBoundaries(IndexType::kUnique, /*forward*/ true, /*inclusive*/ true);
+    testBoundaries(IndexType::kUnique, /*forward=*/true, /*inclusive=*/true);
 }
 
 TEST_F(SortedDataInterfaceTestBoundaryTest, NonUniqueForwardWithInclusiveBoundaries) {
-    testBoundaries(IndexType::kNonUnique, /*forward*/ true, /*inclusive*/ true);
+    testBoundaries(IndexType::kNonUnique, /*forward=*/true, /*inclusive=*/true);
 }
 
 TEST_F(SortedDataInterfaceTestBoundaryTest, IdForwardWithInclusiveBoundaries) {
-    testBoundaries(IndexType::kId, /*forward*/ true, /*inclusive*/ true);
+    testBoundaries(IndexType::kId, /*forward=*/true, /*inclusive=*/true);
 }
 
 TEST_F(SortedDataInterfaceTestBoundaryTest, UniqueBackwardWithNonInclusiveBoundaries) {
-    testBoundaries(IndexType::kUnique, /*forward*/ false, /*inclusive*/ false);
+    testBoundaries(IndexType::kUnique, /*forward=*/false, /*inclusive=*/false);
 }
 
 TEST_F(SortedDataInterfaceTestBoundaryTest, NonUniqueBackwardWithNonInclusiveBoundaries) {
-    testBoundaries(IndexType::kNonUnique, /*forward*/ false, /*inclusive*/ false);
+    testBoundaries(IndexType::kNonUnique, /*forward=*/false, /*inclusive=*/false);
 }
 
 TEST_F(SortedDataInterfaceTestBoundaryTest, IdBackwardWithNonInclusiveBoundaries) {
-    testBoundaries(IndexType::kId, /*forward*/ false, /*inclusive*/ false);
+    testBoundaries(IndexType::kId, /*forward=*/false, /*inclusive=*/false);
 }
 
 TEST_F(SortedDataInterfaceTestBoundaryTest, UniqueBackwardWithInclusiveBoundaries) {
-    testBoundaries(IndexType::kUnique, /*forward*/ false, /*inclusive*/ true);
+    testBoundaries(IndexType::kUnique, /*forward=*/false, /*inclusive=*/true);
 }
 
 TEST_F(SortedDataInterfaceTestBoundaryTest, NonUniqueBackwardWithInclusiveBoundaries) {
-    testBoundaries(IndexType::kNonUnique, /*forward*/ false, /*inclusive*/ true);
+    testBoundaries(IndexType::kNonUnique, /*forward=*/false, /*inclusive=*/true);
 }
 
 TEST_F(SortedDataInterfaceTestBoundaryTest, IdBackwardWithInclusiveBoundaries) {
-    testBoundaries(IndexType::kId, /*forward*/ false, /*inclusive*/ true);
+    testBoundaries(IndexType::kId, /*forward=*/false, /*inclusive=*/true);
 }
 
 }  // namespace

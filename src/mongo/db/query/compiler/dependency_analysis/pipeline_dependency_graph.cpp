@@ -1163,8 +1163,8 @@ private:
             if (isDead) {
                 out.push_back(DeadField{_stages[stageId].documentSource,
                                         FieldPath{pathBuf,
-                                                  /*precomputeHashes*/ false,
-                                                  /*validateFieldNames*/ false}});
+                                                  /*precomputeHashes=*/false,
+                                                  /*validateFieldNames=*/false}});
             }
             if (hasOwnEmbeddedScope) {
                 walkPotentiallyDeadFields(field.embeddedScope, alive, pathBuf, out);
@@ -1286,7 +1286,7 @@ private:
             // is exhaustive on itself, since only the paths this stage declares survive.
             auto embeddedScope = _scopes.getNextId();
             newBaseField = _fields.append(Field{scope, embeddedScope});
-            declareScope(_scopes[scope].stage, embeddedScope /*exhaustiveScope*/, ScopeId::none());
+            declareScope(_scopes[scope].stage, /*exhaustiveScope=*/embeddedScope, ScopeId::none());
             // The output's array shape still derives from the prior value that is traversed.
             _fields[newBaseField].dependencies.insert(priorBaseField);
             _scopes[scope].fields[basePath.front()] = newBaseField;
@@ -1755,7 +1755,7 @@ private:
                     // fields. If 'isEmpty' is true (e.g. inclusion projection), any
                     // field not explicitly added is truly missing. Otherwise (e.g. $replaceRoot
                     // with expression), unknown fields may still exist.
-                    declareScope(stage, scopeId /*exhaustiveScope*/, ScopeId::none());
+                    declareScope(stage, /*exhaustiveScope=*/scopeId, ScopeId::none());
                     auto& missingField = _fields[_scopes[scopeId].missingField];
                     if (op.isEmpty()) {
                         updateMetadataForMissingValue(missingField.metadata);
@@ -2408,7 +2408,7 @@ BSONObj DependencyGraph::toBSON() const {
 
 std::string DependencyGraph::toDebugString() const {
     auto bson = toBSON();
-    return tojson(bson, ExtendedRelaxedV2_0_0, true /*pretty*/);
+    return tojson(bson, ExtendedRelaxedV2_0_0, /*pretty=*/true);
 }
 
 std::vector<DeadField> DependencyGraph::getDeadFields() const {

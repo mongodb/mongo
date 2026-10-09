@@ -165,7 +165,7 @@ BENCHMARK_DEFINE_F(UpdateTreeExecutorBenchmark, AddToSetNumbers)(benchmark::Stat
     BSONObj addToSetSpec =
         BSON("a" << BSON("$each" << generateNumberArray(
                              _random, inputSize - updateSize, inputSize + updateSize, 2)));
-    benchmarkAddToSet(inputDoc, addToSetSpec, nullptr /*collator*/, state);
+    benchmarkAddToSet(inputDoc, addToSetSpec, /*collator=*/nullptr, state);
 }
 
 BSONArray generateObjectWithStringArray(std::mt19937& random,
@@ -192,7 +192,7 @@ BENCHMARK_DEFINE_F(UpdateTreeExecutorBenchmark,
     BSONObj addToSetSpec =
         BSON("a" << BSON("$each" << generateObjectWithStringArray(
                              _random, inputSize - updateSize, inputSize + updateSize, 2)));
-    benchmarkAddToSet(inputDoc, addToSetSpec, nullptr /*collator*/, state);
+    benchmarkAddToSet(inputDoc, addToSetSpec, /*collator=*/nullptr, state);
 }
 
 BENCHMARK_DEFINE_F(UpdateTreeExecutorBenchmark,

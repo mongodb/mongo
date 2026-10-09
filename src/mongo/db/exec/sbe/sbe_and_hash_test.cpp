@@ -69,7 +69,7 @@ TEST_F(AndHashStageTest, AndHashCollationTest) {
                                     makeSV(innerCondSlot),
                                     makeSV(),
                                     boost::optional<value::SlotId>{useCollator, collatorSlot},
-                                    nullptr /* yieldPolicy */,
+                                    /*yieldPolicy=*/nullptr,
                                     kEmptyPlanNodeId);
 
             return std::make_pair(makeSV(innerCondSlot, outerCondSlot), std::move(andHashStage));
@@ -153,7 +153,7 @@ TEST_F(AndHashStageTest, TestHashValueIsCopied) {
                                             makeSV(innerKeySlot),
                                             makeSV(),
                                             boost::none,
-                                            nullptr /* yieldPolicy */,
+                                            /*yieldPolicy=*/nullptr,
                                             kEmptyPlanNodeId);
 
     auto resultAccessors = prepareTree(ctx.get(), andHashStage.get(), makeSV(outerProjectSlot));
@@ -209,7 +209,7 @@ TEST_F(AndHashStageTest, AndHashMemoryLimitExceeded) {
                                             makeSV(innerKeySlot),
                                             makeSV(),
                                             boost::none,
-                                            nullptr /* yieldPolicy */,
+                                            /*yieldPolicy=*/nullptr,
                                             kEmptyPlanNodeId);
 
     // prepareTree() calls open() internally; with a 1-byte limit the first row inserted into
@@ -241,7 +241,7 @@ TEST_F(AndHashStageTest, AndHashMemoryTracking) {
                                             makeSV(innerKeySlot),
                                             makeSV(),
                                             boost::none,
-                                            nullptr /* yieldPolicy */,
+                                            /*yieldPolicy=*/nullptr,
                                             kEmptyPlanNodeId);
 
     auto resultAccessors =

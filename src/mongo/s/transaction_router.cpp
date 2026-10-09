@@ -847,12 +847,12 @@ void TransactionRouter::Router::processParticipantResponse(
                 auto readOnlyValue = determineReadOnlyValue(participantToAdd,
                                                             currentReadOnly,
                                                             participantElem.getReadOnly(),
-                                                            true /* isAdditionalParticipant */);
+                                                            /*isAdditionalParticipant=*/true);
 
                 // We only care about the isSubRouter value for participants in the top level
                 // transaction router, so we default the value to false for any additional
                 // participants.
-                _updateParticipant(opCtx, participantToAdd, readOnlyValue, false /* isSubRouter */);
+                _updateParticipant(opCtx, participantToAdd, readOnlyValue, /*isSubRouter=*/false);
             }
         }
     };
@@ -864,14 +864,14 @@ void TransactionRouter::Router::processParticipantResponse(
     if (!commandStatus.isOK() && commandStatus != ErrorCodes::WouldChangeOwningShard) {
         // We should still add any participants added to the transaction to ensure they will be
         // aborted
-        processAdditionalParticipants(false /* okResponse */);
+        processAdditionalParticipants(/*okResponse=*/false);
     } else {
         readOnlyValue = determineReadOnlyValue(shardId,
                                                participant->readOnly,
                                                parsedMetadata.txnResponseMetadata.getReadOnly(),
-                                               false /* isAdditionalParticipant */);
+                                               /*isAdditionalParticipant=*/false);
         // Create any participants added by the shard 'shardId'
-        processAdditionalParticipants(true /* okResponse */);
+        processAdditionalParticipants(/*okResponse=*/true);
     }
 
     // Set isSubRouter for this participant
@@ -982,8 +982,8 @@ BSONObj TransactionRouter::Router::attachTxnFieldsIfNeeded(OperationContext* opC
                     "request"_attr = redact(cmdObj));
         return txnPart->attachTxnFieldsIfNeeded(opCtx,
                                                 cmdObj,
-                                                false /* isFirstStatementInThisParticipant */,
-                                                false /* addingParticipantViaSubRouter */,
+                                                /*isFirstStatementInThisParticipant=*/false,
+                                                /*addingParticipantViaSubRouter=*/false,
                                                 p().createdDatabases);
     }
 
@@ -1003,7 +1003,7 @@ BSONObj TransactionRouter::Router::attachTxnFieldsIfNeeded(OperationContext* opC
 
     return txnPart.attachTxnFieldsIfNeeded(opCtx,
                                            cmdObj,
-                                           true /* isFirstStatementInThisParticipant */,
+                                           /*isFirstStatementInThisParticipant=*/true,
                                            o().subRouter,
                                            p().createdDatabases);
 }

@@ -42,7 +42,7 @@ void CertificateExpirationMonitor::start(ServiceContext* service) {
         "CertificateExpirationMonitor",
         [this](Client* client) { return run(client); },
         oneDay,
-        true /*isKillableByStepdown*/);
+        /*isKillableByStepdown=*/true);
 
     _job = std::make_unique<PeriodicJobAnchor>(periodicRunner->makeJob(std::move(job)));
     _job->start();

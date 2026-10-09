@@ -496,8 +496,7 @@ void QueryPlannerParams::fillOutSecondaryCollectionsPlannerParams(
         return;
     }
 
-    fillOutSecondaryCollectionsInfo(
-        opCtx, canonicalQuery, collections, true /* includeSizeStats */);
+    fillOutSecondaryCollectionsInfo(opCtx, canonicalQuery, collections, /*includeSizeStats=*/true);
 }
 
 void QueryPlannerParams::fillOutMainCollectionPlannerParams(
@@ -580,7 +579,7 @@ void QueryPlannerParams::fillOutMainCollectionPlannerParams(
     applyQuerySettingsOrIndexFiltersForMainCollection(canonicalQuery, collections);
 
     fillOutPlannerCollectionInfo(
-        opCtx, mainColl, &mainCollectionInfo.stats, false /* includeSizeStats */);
+        opCtx, mainColl, &mainCollectionInfo.stats, /*includeSizeStats=*/false);
 }
 
 void QueryPlannerParams::setTargetSbeStageBuilder(const CanonicalQuery& canonicalQuery,

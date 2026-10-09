@@ -509,7 +509,7 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
                              child,
                              fullPathToNode,
                              queryContext,
-                             true /* nodeisNotChild */)) {
+                             /*nodeisNotChild=*/true)) {
                 return false;
             }
         }

@@ -51,7 +51,7 @@ public:
      * Constructor of a DatabaseVersion based on epochs and timestamps
      */
     DatabaseVersion(mongo::UUID uuid, mongo::Timestamp timestamp)
-        : DatabaseVersionBase(timestamp, 1 /* lastMod */) {
+        : DatabaseVersionBase(timestamp, /*lastMod=*/1) {
         setUuid(uuid);
     }
 

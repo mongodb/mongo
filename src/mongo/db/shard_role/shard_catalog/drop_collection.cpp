@@ -250,7 +250,7 @@ Status _dropCollectionForApplyOps(OperationContext* opCtx,
     {
         CollectionPtr coll =
             CollectionPtr(CollectionCatalog::get(opCtx)->establishConsistentCollection(
-                opCtx, collectionName, boost::none /*readTimestamp*/));
+                opCtx, collectionName, /*readTimestamp=*/boost::none));
 
         Status status = _checkReplState(opCtx, coll, collectionName);
         if (!status.isOK()) {
@@ -546,7 +546,7 @@ void checkForIdIndexes(OperationContext* opCtx, const DatabaseName& dbName) {
             continue;
 
         CollectionPtr coll = CollectionPtr(
-            catalog->establishConsistentCollection(opCtx, nss, boost::none /* readTimestamp */));
+            catalog->establishConsistentCollection(opCtx, nss, /*readTimestamp=*/boost::none));
         if (!coll)
             continue;
 

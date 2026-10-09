@@ -851,7 +851,7 @@ void MirrorMaestroImpl::_mirror(const std::vector<HostAndPort>& hostsForGeneralM
         };
 
         auto newRequest = executor::RemoteCommandRequest(
-            host, invocation.getDBForReadMirroring(), payload, nullptr /* opCtx */);
+            host, invocation.getDBForReadMirroring(), payload, /*opCtx=*/nullptr);
 
         newRequest.fireAndForget = true;
         if (MONGO_unlikely(mirrorMaestroExpectsResponse.shouldFail()))
@@ -890,7 +890,7 @@ void MirrorMaestroImpl::_mirror(const std::vector<HostAndPort>& hostsForGeneralM
         for (auto i = 0; i < mirrorCount; i++) {
             auto& host =
                 hostsForGeneralMirroring[(startIndex + i) % hostsForGeneralMirroring.size()];
-            executeMirrors(host, generalMirroringPayload, true /* generalMirror */);
+            executeMirrors(host, generalMirroringPayload, /*generalMirror=*/true);
         }
     }
 
@@ -898,7 +898,7 @@ void MirrorMaestroImpl::_mirror(const std::vector<HostAndPort>& hostsForGeneralM
     auto targetedMirroringPayload = payload(params.getTargetedMirroring().getMaxTimeMS());
     for (size_t i = 0; i < hostsForTargetedMirroring.size(); i++) {
         auto& host = hostsForTargetedMirroring[i];
-        executeMirrors(host, targetedMirroringPayload, false /* generalMirror */);
+        executeMirrors(host, targetedMirroringPayload, /*generalMirror=*/false);
     }
 } catch (const DBException& e) {
     LOGV2_DEBUG(31456, 2, "Mirroring failed", "reason"_attr = e);

@@ -146,8 +146,7 @@ TEST_F(TimeseriesWriteOpsTest, PerformTimeseriesDeletesNoCollection) {
     auto nss = NamespaceString::createNamespaceString_forTest(
         "db_timeseries_write_ops_test", "system.buckets.perform_timeseries_deletes_no_collection");
     write_ops::DeleteCommandRequest request(nss);
-    request.setDeletes(
-        {write_ops::DeleteOpEntry(BSON("_id" << 0), false /* multi */, boost::none)});
+    request.setDeletes({write_ops::DeleteOpEntry(BSON("_id" << 0), /*multi=*/false, boost::none)});
     auto source = OperationSource::kTimeseriesDelete;
     auto writeResult =
         write_ops_exec::performDeletes(_opCtx, request, /*preConditions=*/boost::none, source);
@@ -214,9 +213,9 @@ public:
                                                false,
                                                epoch,
                                                timestamp,
-                                               boost::none /* timeseriesFields */,
+                                               /*timeseriesFields=*/boost::none,
                                                boost::none /* resharding Fields */,
-                                               true /* allowMigrations */,
+                                               /*allowMigrations=*/true,
                                                chunks);
 
         const auto version = rt.getVersion();

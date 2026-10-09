@@ -67,7 +67,7 @@ CollectionMetadata readCollectionMetadataFromDisk(OperationContext* opCtx,
         DBDirectClient client{opCtx};
         auto cursor = uassertStatusOKWithContext(
             DBClientCursor::fromAggregationRequest(
-                &client, aggRequest, false /* secondaryOk */, true /* useExhaust */),
+                &client, aggRequest, /*secondaryOk=*/false, /*useExhaust=*/true),
             "Failed to establish a cursor while reading the collection metadata from the shard "
             "catalog");
         while (cursor->more()) {

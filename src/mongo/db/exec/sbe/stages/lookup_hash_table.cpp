@@ -235,7 +235,7 @@ void LookupHashTable::spillBufferedValueToDisk(SpillingStore* rs,
     auto spilledDataStorageIncrease = _hashLookupStats.spillingBuffStats.updateSpillingStats(
         1, spillToDiskBytes, 1, _recordStoreBuf->storageSize(_opCtx));
     lookupPushdownCounters.incrementPerSpilling(
-        1 /* spills */, spillToDiskBytes, 1, spilledDataStorageIncrease);
+        /*spills=*/1, spillToDiskBytes, 1, spilledDataStorageIncrease);
     _recordStoreBuf->updateSpillStorageStatsForOperation(_opCtx);
 }
 
@@ -321,7 +321,7 @@ void LookupHashTable::spillIndicesToRecordStore(SpillingStore* rs,
         update ? 0 : 1,
         _recordStoreHt->storageSize(_opCtx));
     lookupPushdownCounters.incrementPerSpilling(
-        1 /* spills */, spillToDiskBytes, update ? 0 : 1, spilledDataStorageIncrease);
+        /*spills=*/1, spillToDiskBytes, update ? 0 : 1, spilledDataStorageIncrease);
     _recordStoreHt->updateSpillStorageStatsForOperation(_opCtx);
 }
 

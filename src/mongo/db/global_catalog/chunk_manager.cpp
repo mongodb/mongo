@@ -211,7 +211,7 @@ ChunkMap::ChunkMapIterator ChunkMap::find(const BSONObj& shardKey) const {
 
     const auto& chunkVector = *(it->second);
     auto chunkIt = _findIntersectingChunkIterator(
-        shardKeyString, chunkVector.begin(), chunkVector.end(), true /*isMaxInclusive*/);
+        shardKeyString, chunkVector.begin(), chunkVector.end(), /*isMaxInclusive=*/true);
     if (chunkIt == chunkVector.end()) {
         return end();
     }
@@ -536,7 +536,7 @@ ChunkMap ChunkMap::_makeUpdated(ChunkVector&& updateChunks, bool forceAllowGaps)
         // We have both update and old chunk to peak from
         // If they overlaps we discard the old chunk otherwise we process the one with smaller key
         if (updateChunk.overlapsWith(oldChunk)) {
-            processOldChunk(*(oldChunkIt++), true /* discard */);
+            processOldChunk(*(oldChunkIt++), /*discard=*/true);
             return;
         } else {
             // Ranges do not overlap so we yield the chunk with smaller max key

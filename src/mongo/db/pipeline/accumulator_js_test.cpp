@@ -315,12 +315,12 @@ TEST_F(MapReduceFixture, AccumulatorJs) {
     // Process a string input. Should uassert that the input must be an array when 'merging'
     // argument is false.
     ASSERT_THROWS_CODE(
-        acc.processInternal(Value("xxx_"sv), false /* merging */), AssertionException, 4544712);
+        acc.processInternal(Value("xxx_"sv), /*merging=*/false), AssertionException, 4544712);
 
     // Process an array input, which must be const. Should succeed. This will be queued in
     // 'AccumulateorJs::_pendingCalls' until getValue() is called.
     const Value valYyyZzz{BSON_ARRAY("Yyy_" << "Zzz_")};
-    acc.processInternal(valYyyZzz, false /* merging */);
+    acc.processInternal(valYyyZzz, /*merging=*/false);
 
     // Call reduceMemoryConcuptionIfAble() while 'AccumulateorJs::_pendingCalls' is non-empty. This
     // exercises the main body of the method.
@@ -329,7 +329,7 @@ TEST_F(MapReduceFixture, AccumulatorJs) {
     // Get the current accumulated value with 'toBeMerged' arg false, which means it will produce a
     // finalized (merged) value. Returning a string literal from the "finalize" function oddly
     // includes the surrounding double quotes in the value.
-    Value resultVal = acc.getValue(false /* toBeMerged */);
+    Value resultVal = acc.getValue(/*toBeMerged=*/false);
     ASSERT_EQ("\"YYY_ZZZ_\"", resultVal.toString());
 
     // Get the current accumulated value with 'toBeMerged' arg true, which means the value has not

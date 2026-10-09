@@ -104,7 +104,7 @@ TEST_F(APIVersionMetricsTest, RemovesStaleMetrics) {
     assertShouldExistInMap(map,
                            appName,
                            APIVersionMetrics::kVersionMetricsVersionOnePosition,
-                           false /* shouldExist */);
+                           /*shouldExist=*/false);
 
     // Advance the clock by more than a half day.
     auto timeToAdvance = Milliseconds(1005 * 60 * 60 * 12);

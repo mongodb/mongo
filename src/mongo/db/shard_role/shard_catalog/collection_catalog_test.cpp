@@ -2463,7 +2463,7 @@ TEST_F(CollectionCatalogTimestampTest, EstablishConsistentCollectionReadYourWrit
 
     auto coll =
         CollectionCatalog::get(opCtx.get())
-            ->establishConsistentCollection(opCtx.get(), nss, boost::none /* readTimestamp */);
+            ->establishConsistentCollection(opCtx.get(), nss, /*readTimestamp=*/boost::none);
     ASSERT(coll);
     ASSERT_EQ(expectedUUID, coll->uuid());
 
@@ -2481,7 +2481,7 @@ TEST_F(CollectionCatalogTimestampTest, EstablishConsistentCollectionReadYourWrit
 
     auto coll =
         CollectionCatalog::get(opCtx.get())
-            ->establishConsistentCollection(opCtx.get(), nss, boost::none /* readTimestamp */);
+            ->establishConsistentCollection(opCtx.get(), nss, /*readTimestamp=*/boost::none);
     ASSERT(coll);
     ASSERT_EQ(expectedUUID, coll->uuid());
 
@@ -2514,7 +2514,7 @@ TEST_F(CollectionCatalogTimestampTest,
             // Establish the collection and assert we get the one we just created in the child
             // WriteUnitOfWork (not the one which is being concurrently committed)
             auto coll = CollectionCatalog::get(opCtx)->establishConsistentCollection(
-                opCtx, nss, boost::none /* readTimestamp */);
+                opCtx, nss, /*readTimestamp=*/boost::none);
             ASSERT(coll);
             ASSERT_EQ(expectedUUID, coll->uuid());
 
@@ -2554,11 +2554,10 @@ TEST_F(CollectionCatalogTimestampTest, DropCollectionAndCreateViewOnSameNSS) {
                                 opCtx.get(),
                                 nss,
                                 viewOnNs,
-                                BSONArray() /* pipeline */,
-                                [](auto&&...) {
-                                    return stdx::unordered_set<NamespaceString>{};
-                                } /* validatePipeline */,
-                                BSONObj() /* collation */));
+                                /*pipeline=*/BSONArray(),
+                                /*validatePipeline=*/
+                                [](auto&&...) { return stdx::unordered_set<NamespaceString>{}; },
+                                /*collation=*/BSONObj()));
 
         // Signal that we're ready to commit and wait until we are signaled to actually commit
         updatedCatalogInWuowAndReadyToCommit.emplaceValue();
@@ -2654,16 +2653,16 @@ public:
                 ASSERT(catalog->lookupCollectionByNamespace(newOpCtx.get(), mainNs));
                 ASSERT(!catalog->lookupView(newOpCtx.get(), mainNs));
                 ASSERT(catalog->establishConsistentCollection(
-                    newOpCtx.get(), mainNs, boost::none /* readTimestamp */));
+                    newOpCtx.get(), mainNs, /*readTimestamp=*/boost::none));
                 ASSERT(!catalog->establishConsistentCollection(
-                    newOpCtx.get(), bucketsNs, boost::none /* readTimestamp */));
+                    newOpCtx.get(), bucketsNs, /*readTimestamp=*/boost::none));
             } else {
                 ASSERT(!catalog->lookupCollectionByNamespace(newOpCtx.get(), mainNs));
                 ASSERT(catalog->lookupView(newOpCtx.get(), mainNs));
                 ASSERT(!catalog->establishConsistentCollection(
-                    newOpCtx.get(), mainNs, boost::none /* readTimestamp */));
+                    newOpCtx.get(), mainNs, /*readTimestamp=*/boost::none));
                 ASSERT(catalog->establishConsistentCollection(
-                    newOpCtx.get(), bucketsNs, boost::none /* readTimestamp */));
+                    newOpCtx.get(), bucketsNs, /*readTimestamp=*/boost::none));
             }
         };
 
@@ -2681,28 +2680,28 @@ public:
 
             // Before durable commit: no changes visible.
             ddl.hangAfterPreCommit();
-            assertCatalogState(!isUpgrade /* expectViewless */);
+            assertCatalogState(/*expectViewless=*/!isUpgrade);
 
             // After durable commit, before catalog update: no changes visible, neither in the
             // collection nor the view (this is special behavior for timeseries upgrade/downgrade:
             // normally the collection would become visible after durable commit).
             ddl.hangAfterCommit();
-            assertCatalogState(!isUpgrade /* expectViewless */);
+            assertCatalogState(/*expectViewless=*/!isUpgrade);
         }
 
         // After in-memory state updated: all changes visible.
-        assertCatalogState(isUpgrade /* expectViewless */);
+        assertCatalogState(/*expectViewless=*/isUpgrade);
     }
 };
 
 TEST_F(CollectionCatalogTimeseriesUpgradeDowngradeTest,
        ConcurrentTimeseriesDowngradeAndOpenCollection) {
-    testConcurrentTimeseriesUpgradeDowngradeAndOpenCollection(false /* isUpgrade */);
+    testConcurrentTimeseriesUpgradeDowngradeAndOpenCollection(/*isUpgrade=*/false);
 }
 
 TEST_F(CollectionCatalogTimeseriesUpgradeDowngradeTest,
        ConcurrentTimeseriesUpgradeAndOpenCollection) {
-    testConcurrentTimeseriesUpgradeDowngradeAndOpenCollection(true /* isUpgrade */);
+    testConcurrentTimeseriesUpgradeDowngradeAndOpenCollection(/*isUpgrade=*/true);
 }
 
 // Tests that lookupView hides a timeseries view for PIT reads at a timestamp before the

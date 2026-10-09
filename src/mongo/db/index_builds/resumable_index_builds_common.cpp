@@ -22,7 +22,7 @@ boost::optional<ResumeIndexInfo> readAndParseResumeIndexInfo(StorageEngine* engi
         return boost::none;
     }
     auto rs = engine->getEngine()->getRecordStore(
-        opCtx, NamespaceString::kEmpty, ident, RecordStore::Options{}, boost::none /* uuid */);
+        opCtx, NamespaceString::kEmpty, ident, RecordStore::Options{}, /*uuid=*/boost::none);
 
     auto cursor = rs->getCursor(opCtx, ru);
     auto record = cursor->next();

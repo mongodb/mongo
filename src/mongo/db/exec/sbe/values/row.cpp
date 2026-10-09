@@ -670,7 +670,7 @@ RowType RowBase<RowType>::deserializeFromKeyString(const key_string::Value& keyS
     auto keepReading = true;
     do {
         keepReading = key_string::readValue(
-            &reader, &typeBitsReader, false /* inverted */, typeBits.version, &valBuilder);
+            &reader, &typeBitsReader, /*inverted=*/false, typeBits.version, &valBuilder);
     } while (keepReading);
 
     size_t sizeOfRow = numPrefixValsToRead ? *numPrefixValsToRead : valBuilder.numValues();

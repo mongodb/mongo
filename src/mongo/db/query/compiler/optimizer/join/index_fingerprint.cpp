@@ -183,7 +183,7 @@ void addUsedIndexNames(const CachedJoinPlan& plan, std::vector<StringSet>& out) 
 StringSet relevantFieldsForQuery(const CanonicalQuery& cq) {
     StringSet fields;
 
-    addFilterFields(cq.getPrimaryMatchExpression(), "" /* prefix */, fields);
+    addFilterFields(cq.getPrimaryMatchExpression(), /*prefix=*/"", fields);
 
     if (const auto* proj = cq.getProj()) {
         // For an exclusion projection these are the paths the projection excludes rather than the

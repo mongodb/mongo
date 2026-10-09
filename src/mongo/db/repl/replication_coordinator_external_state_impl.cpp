@@ -275,7 +275,7 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
             replCoord,
             _storageInterface,
             _replicationProcess->getConsistencyMarkers(),
-            OplogWriter::Options(false /* skipWritesToOplogColl */));
+            OplogWriter::Options(/*skipWritesToOplogColl=*/false));
     }
 
     _oplogApplier = std::make_unique<OplogApplierImpl>(
@@ -305,7 +305,7 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
     // stopProducer() will have set _stopProducerRequested and we catch it here.
     if (nodeIsAlreadyPrimary || _stopProducerRequested) {
         _stopProducerRequested = false;
-        _bgSync->stop(false /* resetLastFetchedOptime */);
+        _bgSync->stop(/*resetLastFetchedOptime=*/false);
         // The oplog writer automatically drains the oplog applier once it has drained. This pattern
         // is used in stopProcuer() also.
         if (_oplogWriteBuffer) {
@@ -570,8 +570,8 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
         _storageInterface->waitForAllEarlierOplogWritesToBeVisible(opCtx);
 
         // Take an unstable checkpoint to ensure that the FCV document is persisted to disk.
-        _service->getStorageEngine()->waitUntilUnjournaledWritesDurable(
-            opCtx, false /* stableCheckpoint */);
+        _service->getStorageEngine()->waitUntilUnjournaledWritesDurable(opCtx,
+                                                                        /*stableCheckpoint=*/false);
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
@@ -1207,7 +1207,7 @@ std::unique_ptr<JournalListener::Token> ReplicationCoordinatorExternalStateImpl:
     if (auto truncatePoint = repl::ReplicationProcess::get(opCtx)
                                  ->getConsistencyMarkers()
                                  ->refreshOplogTruncateAfterPointIfPrimary(opCtx)) {
-        return std::make_unique<ReplDurabilityToken>(*truncatePoint, true /*isPrimary*/);
+        return std::make_unique<ReplDurabilityToken>(*truncatePoint, /*isPrimary=*/true);
     }
 
     // All other repl states use the 'lastWritten'.
@@ -1232,7 +1232,7 @@ std::unique_ptr<JournalListener::Token> ReplicationCoordinatorExternalStateImpl:
               "tokenOptime"_attr = opTime);
         hangAfterJournalFlusherGetToken.pauseWhileSet(opCtx);
     }
-    return std::make_unique<ReplDurabilityToken>(opTime, false /*isPrimary*/);
+    return std::make_unique<ReplDurabilityToken>(opTime, /*isPrimary=*/false);
 }
 
 void ReplicationCoordinatorExternalStateImpl::onDurable(const JournalListener::Token& t) {

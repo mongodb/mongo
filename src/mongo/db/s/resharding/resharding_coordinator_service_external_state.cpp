@@ -188,7 +188,7 @@ ReshardingCoordinatorExternalStateImpl::calculateParticipantShardsAndChunks(
         // a specific placement. 'SplitPointsBasedSplitPolicy' is not zone or shard distribution
         // aware, so it would silently ignore those constraints.
         if (!parsedZones && !coordinatorDoc.getShardDistribution() && shardKey.hasHashedPrefix()) {
-            auto initialSplitter = SplitPointsBasedSplitPolicy(boost::none /* availableShardIds */);
+            auto initialSplitter = SplitPointsBasedSplitPolicy(/*availableShardIds=*/boost::none);
             splitResult = initialSplitter.createFirstChunks(opCtx, shardKey, splitParams);
         } else if (const auto& shardDistribution = coordinatorDoc.getShardDistribution()) {
             uassert(ErrorCodes::InvalidOptions,
@@ -217,14 +217,13 @@ ReshardingCoordinatorExternalStateImpl::calculateParticipantShardsAndChunks(
                 splitResult = initialSplitter.createFirstChunks(opCtx, shardKey, splitParams);
             }
         } else {
-            auto initialSplitter =
-                SamplingBasedSplitPolicy::make(opCtx,
-                                               coordinatorDoc.getSourceNss(),
-                                               shardKey,
-                                               numInitialChunks,
-                                               std::move(parsedZones),
-                                               boost::none /* availableShardIds */,
-                                               numSamplesPerChunk);
+            auto initialSplitter = SamplingBasedSplitPolicy::make(opCtx,
+                                                                  coordinatorDoc.getSourceNss(),
+                                                                  shardKey,
+                                                                  numInitialChunks,
+                                                                  std::move(parsedZones),
+                                                                  /*availableShardIds=*/boost::none,
+                                                                  numSamplesPerChunk);
             splitResult = initialSplitter.createFirstChunks(opCtx, shardKey, splitParams);
         }
 
@@ -343,7 +342,7 @@ std::map<ShardId, int64_t> ReshardingCoordinatorExternalStateImpl::getDocumentsT
         std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrReshardingDonorGetCloneCount>>(
             executor, token, cmd);
     auto responses = resharding::sendCommandToShards(
-        opCtx, opts, shardVersions, readPref, false /* throwOnError */);
+        opCtx, opts, shardVersions, readPref, /*throwOnError=*/false);
 
     std::map<ShardId, int64_t> docsToCopy;
     std::map<ShardId, Status> errors;
@@ -531,8 +530,7 @@ std::map<ShardId, int64_t> ReshardingCoordinatorExternalStateImpl::getDocumentsD
     opts->cmd.setDbName(DatabaseName::kAdmin);
     // Fetch from all donors without throwing on the first failure so that every per-shard error
     // can be logged before the fetch is retried.
-    auto responses =
-        resharding::sendCommandToShards(opCtx, opts, shardIds, false /* throwOnError */);
+    auto responses = resharding::sendCommandToShards(opCtx, opts, shardIds, /*throwOnError=*/false);
 
     std::map<ShardId, int64_t> docsDelta;
     std::map<ShardId, Status> errors;
@@ -581,8 +579,7 @@ std::map<ShardId, int64_t> ReshardingCoordinatorExternalStateImpl::getDocumentsD
         async_rpc::AsyncRPCOptions<ShardsvrReshardingRecipientFetchFinalCollectionStats>>(
         executor, token, cmd);
     opts->cmd.setDbName(DatabaseName::kAdmin);
-    auto responses =
-        resharding::sendCommandToShards(opCtx, opts, shardIds, false /* throwOnError */);
+    auto responses = resharding::sendCommandToShards(opCtx, opts, shardIds, /*throwOnError=*/false);
 
     std::map<ShardId, int64_t> docsDelta;
     std::map<ShardId, Status> errors;
@@ -752,7 +749,7 @@ void ReshardingCoordinatorExternalStateImpl::resumeMigrations(
     // Re-enable chunk operations on the source namespace, regardless of the collection's UUID.
     sharding_ddl_util::resumeMigrations(opCtx,
                                         nss,
-                                        boost::none /* expectedCollectionUUID */,
+                                        /*expectedCollectionUUID=*/boost::none,
                                         osiGenerator,
                                         convert(authoritativeMetadataLevel));
 }

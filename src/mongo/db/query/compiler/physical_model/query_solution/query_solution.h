@@ -1815,7 +1815,7 @@ struct StreamingGroupNode : public GroupNode {
                     std::move(groupByExpression),
                     std::move(accs),
                     /*merging=*/false,
-                    false /* willBeMerged */,
+                    /*willBeMerged=*/false,
                     shouldProduceBson),
           streamingKey(std::move(streamingKey)) {}
 

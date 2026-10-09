@@ -341,7 +341,7 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(
                 }
 
                 auto newSlotId = _providedSlots.registerSlot(
-                    sbe::value::TypeTags::Nothing, 0, false /* owned */, &_slotIdGenerator);
+                    sbe::value::TypeTags::Nothing, 0, /*owned=*/false, &_slotIdGenerator);
                 _inputParamToSlotMap.emplace(paramIdVal, newSlotId);
                 return newSlotId;
             }();

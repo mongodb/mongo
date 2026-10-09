@@ -66,7 +66,7 @@ void testFetchPreOrPostImageFromSnapshot(
                                 postImageDoc,
                                 docKey,
                                 sessionInfo,
-                                {1} /* stmtIds */,
+                                /*stmtIds=*/{1},
                                 imageType);  // needsRetryImage
     if (commitTimestamp) {
         entry.setCommitTransactionTimestamp(*commitTimestamp);
@@ -105,14 +105,14 @@ TEST(FindAndModifyImageLookupTest, FetchPreImageFromSnapshotBasic_RetryableWrite
     auto expectedAtClusterTime0 = Timestamp(100, 1);
     testFetchPreOrPostImageFromSnapshot(RetryImageEnum::kPreImage,
                                         entryOpTime0,
-                                        boost::none /* commitTimestamp */,
+                                        /*commitTimestamp=*/boost::none,
                                         expectedAtClusterTime0);
 
     auto entryOpTime1 = repl::OpTime(Timestamp(100, 0), 5);
     auto expectedAtClusterTime1 = Timestamp(99, kMaxTsInc);
     testFetchPreOrPostImageFromSnapshot(RetryImageEnum::kPreImage,
                                         entryOpTime1,
-                                        boost::none /* commitTimestamp */,
+                                        /*commitTimestamp=*/boost::none,
                                         expectedAtClusterTime1);
 }
 
@@ -150,9 +150,9 @@ TEST(FindAndModifyImageLookupTest, FetchPreImageFromSnapshotRequiresTsULLGte1_Re
     auto expectedAtClusterTime = boost::none;
     testFetchPreOrPostImageFromSnapshot(RetryImageEnum::kPreImage,
                                         entryOpTime1,
-                                        boost::none /* commitTimestamp */,
+                                        /*commitTimestamp=*/boost::none,
                                         expectedAtClusterTime,
-                                        12020800 /* expectedErrorCode */);
+                                        /*expectedErrorCode=*/12020800);
 }
 
 TEST(FindAndModifyImageLookupTest,
@@ -161,7 +161,7 @@ TEST(FindAndModifyImageLookupTest,
     auto expectedAtClusterTime = Timestamp(0, 0);
     testFetchPreOrPostImageFromSnapshot(RetryImageEnum::kPreImage,
                                         entryOpTime,
-                                        boost::none /* commitTimestamp */,
+                                        /*commitTimestamp=*/boost::none,
                                         expectedAtClusterTime);
 }
 
@@ -188,7 +188,7 @@ TEST(FindAndModifyImageLookupTest, FetchPostImageFromSnapshotBasic_RetryableWrit
     auto expectedAtClusterTime = Timestamp(100, 2);
     testFetchPreOrPostImageFromSnapshot(RetryImageEnum::kPostImage,
                                         entryOpTime,
-                                        boost::none /* commitTimestamp */,
+                                        /*commitTimestamp=*/boost::none,
                                         expectedAtClusterTime);
 }
 
@@ -216,7 +216,7 @@ TEST(FindAndModifyImageLookupTest,
     auto expectedAtClusterTime = Timestamp(0, 0);
     testFetchPreOrPostImageFromSnapshot(RetryImageEnum::kPostImage,
                                         entryOpTime,
-                                        boost::none /* commitTimestamp */,
+                                        /*commitTimestamp=*/boost::none,
                                         expectedAtClusterTime);
 }
 

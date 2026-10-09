@@ -49,528 +49,528 @@ const size_t seed_value5_high = 37593;
 std::map<int, std::vector<CollectionFieldConfiguration>> collectionFieldConfigurations = {
     {1,
      {CollectionFieldConfiguration(
-          /*fieldName*/ "a",
+          /*fieldName=*/"a",
           /*fieldPositionInCollection=*/0,
           /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-          /*ndv*/ 1000,
-          /*dataDistribution*/ stats::DistrType::kUniform,
-          /*seed*/ seed_value1_low),
+          /*ndv=*/1000,
+          /*dataDistribution=*/stats::DistrType::kUniform,
+          /*seed=*/seed_value1_low),
       CollectionFieldConfiguration(
-          /*fieldName*/ "b",
+          /*fieldName=*/"b",
           /*fieldPositionInCollection=*/5,
           /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-          /*ndv*/ 1000,
-          /*dataDistribution*/ stats::DistrType::kUniform,
-          /*seed*/ seed_value2_low),
+          /*ndv=*/1000,
+          /*dataDistribution=*/stats::DistrType::kUniform,
+          /*seed=*/seed_value2_low),
       CollectionFieldConfiguration(
-          /*fieldName*/ "c",
+          /*fieldName=*/"c",
           /*fieldPositionInCollection=*/20,
           /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-          /*ndv*/ 1000,
-          /*dataDistribution*/ stats::DistrType::kUniform,
-          /*seed*/ seed_value3_low),
+          /*ndv=*/1000,
+          /*dataDistribution=*/stats::DistrType::kUniform,
+          /*seed=*/seed_value3_low),
       CollectionFieldConfiguration(
-          /*fieldName*/ "e",
+          /*fieldName=*/"e",
           /*fieldPositionInCollection=*/22,
           /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-          /*ndv*/ 1000,
-          /*dataDistribution*/ stats::DistrType::kUniform,
-          /*seed*/ seed_value5_low),
+          /*ndv=*/1000,
+          /*dataDistribution=*/stats::DistrType::kUniform,
+          /*seed=*/seed_value5_low),
       CollectionFieldConfiguration(
-          /*fieldName*/ "d",
+          /*fieldName=*/"d",
           /*fieldPositionInCollection=*/25,
           /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-          /*ndv*/ 1000,
-          /*dataDistribution*/ stats::DistrType::kUniform,
-          /*seed*/ seed_value4_low)}},
+          /*ndv=*/1000,
+          /*dataDistribution=*/stats::DistrType::kUniform,
+          /*seed=*/seed_value4_low)}},
     {2,
      {CollectionFieldConfiguration(
-          /*fieldName*/ "a",
+          /*fieldName=*/"a",
           /*fieldPositionInCollection=*/0,
           /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-          /*ndv*/ 500,
-          /*dataDistribution*/ stats::DistrType::kUniform,
-          /*seed*/ seed_value1_low),
+          /*ndv=*/500,
+          /*dataDistribution=*/stats::DistrType::kUniform,
+          /*seed=*/seed_value1_low),
       CollectionFieldConfiguration(
-          /*fieldName*/ "b",
+          /*fieldName=*/"b",
           /*fieldPositionInCollection=*/5,
           /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-          /*ndv*/ 500,
-          /*dataDistribution*/ stats::DistrType::kUniform,
-          /*seed*/ seed_value2_low),
+          /*ndv=*/500,
+          /*dataDistribution=*/stats::DistrType::kUniform,
+          /*seed=*/seed_value2_low),
       CollectionFieldConfiguration(
-          /*fieldName*/ "c",
+          /*fieldName=*/"c",
           /*fieldPositionInCollection=*/20,
           /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-          /*ndv*/ 500,
-          /*dataDistribution*/ stats::DistrType::kUniform,
-          /*seed*/ seed_value3_low),
+          /*ndv=*/500,
+          /*dataDistribution=*/stats::DistrType::kUniform,
+          /*seed=*/seed_value3_low),
       CollectionFieldConfiguration(
-          /*fieldName*/ "e",
+          /*fieldName=*/"e",
           /*fieldPositionInCollection=*/22,
           /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-          /*ndv*/ 500,
-          /*dataDistribution*/ stats::DistrType::kUniform,
-          /*seed*/ seed_value5_low),
+          /*ndv=*/500,
+          /*dataDistribution=*/stats::DistrType::kUniform,
+          /*seed=*/seed_value5_low),
       CollectionFieldConfiguration(
-          /*fieldName*/ "d",
+          /*fieldName=*/"d",
           /*fieldPositionInCollection=*/25,
           /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-          /*ndv*/ 500,
-          /*dataDistribution*/ stats::DistrType::kUniform,
-          /*seed*/ seed_value4_low)}},
+          /*ndv=*/500,
+          /*dataDistribution=*/stats::DistrType::kUniform,
+          /*seed=*/seed_value4_low)}},
     {3,
      {CollectionFieldConfiguration(
-          /*fieldName*/ "a",
+          /*fieldName=*/"a",
           /*fieldPositionInCollection=*/0,
           /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-          /*ndv*/ 250,
-          /*dataDistribution*/ stats::DistrType::kUniform,
-          /*seed*/ seed_value1_low),
+          /*ndv=*/250,
+          /*dataDistribution=*/stats::DistrType::kUniform,
+          /*seed=*/seed_value1_low),
       CollectionFieldConfiguration(
-          /*fieldName*/ "b",
+          /*fieldName=*/"b",
           /*fieldPositionInCollection=*/5,
           /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-          /*ndv*/ 250,
-          /*dataDistribution*/ stats::DistrType::kUniform,
-          /*seed*/ seed_value2_low),
+          /*ndv=*/250,
+          /*dataDistribution=*/stats::DistrType::kUniform,
+          /*seed=*/seed_value2_low),
       CollectionFieldConfiguration(
-          /*fieldName*/ "c",
+          /*fieldName=*/"c",
           /*fieldPositionInCollection=*/20,
           /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-          /*ndv*/ 250,
-          /*dataDistribution*/ stats::DistrType::kUniform,
-          /*seed*/ seed_value3_low),
+          /*ndv=*/250,
+          /*dataDistribution=*/stats::DistrType::kUniform,
+          /*seed=*/seed_value3_low),
       CollectionFieldConfiguration(
-          /*fieldName*/ "e",
+          /*fieldName=*/"e",
           /*fieldPositionInCollection=*/22,
           /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-          /*ndv*/ 250,
-          /*dataDistribution*/ stats::DistrType::kUniform,
-          /*seed*/ seed_value5_low),
+          /*ndv=*/250,
+          /*dataDistribution=*/stats::DistrType::kUniform,
+          /*seed=*/seed_value5_low),
       CollectionFieldConfiguration(
-          /*fieldName*/ "d",
+          /*fieldName=*/"d",
           /*fieldPositionInCollection=*/25,
           /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-          /*ndv*/ 250,
-          /*dataDistribution*/ stats::DistrType::kUniform,
-          /*seed*/ seed_value4_low)}},
+          /*ndv=*/250,
+          /*dataDistribution=*/stats::DistrType::kUniform,
+          /*seed=*/seed_value4_low)}},
     {4,
      {CollectionFieldConfiguration(
-          /*fieldName*/ "a",
+          /*fieldName=*/"a",
           /*fieldPositionInCollection=*/0,
           /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-          /*ndv*/ 100,
-          /*dataDistribution*/ stats::DistrType::kUniform,
-          /*seed*/ seed_value1_low),
+          /*ndv=*/100,
+          /*dataDistribution=*/stats::DistrType::kUniform,
+          /*seed=*/seed_value1_low),
       CollectionFieldConfiguration(
-          /*fieldName*/ "b",
+          /*fieldName=*/"b",
           /*fieldPositionInCollection=*/5,
           /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-          /*ndv*/ 100,
-          /*dataDistribution*/ stats::DistrType::kUniform,
-          /*seed*/ seed_value2_low),
+          /*ndv=*/100,
+          /*dataDistribution=*/stats::DistrType::kUniform,
+          /*seed=*/seed_value2_low),
       CollectionFieldConfiguration(
-          /*fieldName*/ "c",
+          /*fieldName=*/"c",
           /*fieldPositionInCollection=*/20,
           /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-          /*ndv*/ 100,
-          /*dataDistribution*/ stats::DistrType::kUniform,
-          /*seed*/ seed_value3_low),
+          /*ndv=*/100,
+          /*dataDistribution=*/stats::DistrType::kUniform,
+          /*seed=*/seed_value3_low),
       CollectionFieldConfiguration(
-          /*fieldName*/ "e",
+          /*fieldName=*/"e",
           /*fieldPositionInCollection=*/22,
           /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-          /*ndv*/ 100,
-          /*dataDistribution*/ stats::DistrType::kUniform,
-          /*seed*/ seed_value5_low),
+          /*ndv=*/100,
+          /*dataDistribution=*/stats::DistrType::kUniform,
+          /*seed=*/seed_value5_low),
       CollectionFieldConfiguration(
-          /*fieldName*/ "d",
+          /*fieldName=*/"d",
           /*fieldPositionInCollection=*/25,
           /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-          /*ndv*/ 100,
-          /*dataDistribution*/ stats::DistrType::kUniform,
-          /*seed*/ seed_value4_low)}},
+          /*ndv=*/100,
+          /*dataDistribution=*/stats::DistrType::kUniform,
+          /*seed=*/seed_value4_low)}},
     {5,
      {CollectionFieldConfiguration(
-          /*fieldName*/ "a",
+          /*fieldName=*/"a",
           /*fieldPositionInCollection=*/0,
           /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-          /*ndv*/ 50,
-          /*dataDistribution*/ stats::DistrType::kUniform,
-          /*seed*/ seed_value1_low),
+          /*ndv=*/50,
+          /*dataDistribution=*/stats::DistrType::kUniform,
+          /*seed=*/seed_value1_low),
       CollectionFieldConfiguration(
-          /*fieldName*/ "b",
+          /*fieldName=*/"b",
           /*fieldPositionInCollection=*/5,
           /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-          /*ndv*/ 50,
-          /*dataDistribution*/ stats::DistrType::kUniform,
-          /*seed*/ seed_value2_low),
+          /*ndv=*/50,
+          /*dataDistribution=*/stats::DistrType::kUniform,
+          /*seed=*/seed_value2_low),
       CollectionFieldConfiguration(
-          /*fieldName*/ "c",
+          /*fieldName=*/"c",
           /*fieldPositionInCollection=*/20,
           /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-          /*ndv*/ 50,
-          /*dataDistribution*/ stats::DistrType::kUniform,
-          /*seed*/ seed_value3_low),
+          /*ndv=*/50,
+          /*dataDistribution=*/stats::DistrType::kUniform,
+          /*seed=*/seed_value3_low),
       CollectionFieldConfiguration(
-          /*fieldName*/ "e",
+          /*fieldName=*/"e",
           /*fieldPositionInCollection=*/22,
           /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-          /*ndv*/ 50,
-          /*dataDistribution*/ stats::DistrType::kUniform,
-          /*seed*/ seed_value5_low),
+          /*ndv=*/50,
+          /*dataDistribution=*/stats::DistrType::kUniform,
+          /*seed=*/seed_value5_low),
       CollectionFieldConfiguration(
-          /*fieldName*/ "d",
+          /*fieldName=*/"d",
           /*fieldPositionInCollection=*/25,
           /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-          /*ndv*/ 50,
-          /*dataDistribution*/ stats::DistrType::kUniform,
-          /*seed*/ seed_value4_low)}},
+          /*ndv=*/50,
+          /*dataDistribution=*/stats::DistrType::kUniform,
+          /*seed=*/seed_value4_low)}},
     {6,
      {CollectionFieldConfiguration(
-          /*fieldName*/ "a",
+          /*fieldName=*/"a",
           /*fieldPositionInCollection=*/0,
           /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-          /*ndv*/ 10,
-          /*dataDistribution*/ stats::DistrType::kUniform,
-          /*seed*/ seed_value1_low),
+          /*ndv=*/10,
+          /*dataDistribution=*/stats::DistrType::kUniform,
+          /*seed=*/seed_value1_low),
       CollectionFieldConfiguration(
-          /*fieldName*/ "b",
+          /*fieldName=*/"b",
           /*fieldPositionInCollection=*/5,
           /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-          /*ndv*/ 10,
-          /*dataDistribution*/ stats::DistrType::kUniform,
-          /*seed*/ seed_value2_low),
+          /*ndv=*/10,
+          /*dataDistribution=*/stats::DistrType::kUniform,
+          /*seed=*/seed_value2_low),
       CollectionFieldConfiguration(
-          /*fieldName*/ "c",
+          /*fieldName=*/"c",
           /*fieldPositionInCollection=*/20,
           /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-          /*ndv*/ 10,
-          /*dataDistribution*/ stats::DistrType::kUniform,
-          /*seed*/ seed_value3_low),
+          /*ndv=*/10,
+          /*dataDistribution=*/stats::DistrType::kUniform,
+          /*seed=*/seed_value3_low),
       CollectionFieldConfiguration(
-          /*fieldName*/ "e",
+          /*fieldName=*/"e",
           /*fieldPositionInCollection=*/22,
           /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-          /*ndv*/ 10,
-          /*dataDistribution*/ stats::DistrType::kUniform,
-          /*seed*/ seed_value5_low),
+          /*ndv=*/10,
+          /*dataDistribution=*/stats::DistrType::kUniform,
+          /*seed=*/seed_value5_low),
       CollectionFieldConfiguration(
-          /*fieldName*/ "d",
+          /*fieldName=*/"d",
           /*fieldPositionInCollection=*/25,
           /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-          /*ndv*/ 10,
-          /*dataDistribution*/ stats::DistrType::kUniform,
-          /*seed*/ seed_value4_low)}}
+          /*ndv=*/10,
+          /*dataDistribution=*/stats::DistrType::kUniform,
+          /*seed=*/seed_value4_low)}}
 
 };
 
 int numberOfIterations = 7;
 
 auto pointQueryConfig1A = WorkloadConfiguration(
-    /*numberOfQueries*/ numberOfIterations,  // This defines the number or queries generated not the
+    /*numberOfQueries=*/numberOfIterations,  // This defines the number or queries generated not the
                                              // actual number of queries (that is defined by number
                                              // of iterations)
     QueryConfiguration(
         {DataFieldDefinition(
-            /*fieldName*/ "a",
+            /*fieldName=*/"a",
             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-            /*ndv*/ numberOfIterations,  // as long as this number is larger than numberOfQueries,
+            /*ndv=*/numberOfIterations,  // as long as this number is larger than numberOfQueries,
                                          // all queries will be unique.
             /*dataDistribution*/ stats::DistrType::kUniform,
-            /*seed*/ {seed_value1_low, seed_value1_low})},
-        /*queryTypes*/ {kPoint}));
+            /*seed=*/{seed_value1_low, seed_value1_low})},
+        /*queryTypes=*/{kPoint}));
 
 auto rangeQueryConfig1A = WorkloadConfiguration(
-    /*numberOfQueries*/ numberOfIterations,
+    /*numberOfQueries=*/numberOfIterations,
     QueryConfiguration({DataFieldDefinition(
-                           /*fieldName*/ "a",
+                           /*fieldName=*/"a",
                            /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-                           /*ndv*/ numberOfIterations,
-                           /*dataDistribution*/ stats::DistrType::kUniform,
-                           /*seed*/ {seed_value1_low, seed_value1_high})},
-                       /*queryTypes*/ {kRange}));
+                           /*ndv=*/numberOfIterations,
+                           /*dataDistribution=*/stats::DistrType::kUniform,
+                           /*seed=*/{seed_value1_low, seed_value1_high})},
+                       /*queryTypes=*/{kRange}));
 
 auto pointQueryConfig1A_E = WorkloadConfiguration(
-    /*numberOfQueries*/ numberOfIterations,  // This defines the number or queries generated not the
+    /*numberOfQueries=*/numberOfIterations,  // This defines the number or queries generated not the
                                              // actual number of queries (that is defined by number
                                              // of iterations)
     QueryConfiguration(
         {DataFieldDefinition(
-             /*fieldName*/ "a",
+             /*fieldName=*/"a",
              /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-             /*ndv*/ numberOfIterations,  // as long as this number is larger than numberOfQueries,
+             /*ndv=*/numberOfIterations,  // as long as this number is larger than numberOfQueries,
                                           // all queries will be unique.
              /*dataDistribution*/ stats::DistrType::kUniform,
-             /*seed*/ {seed_value1_low, seed_value1_low}),
+             /*seed=*/{seed_value1_low, seed_value1_low}),
          DataFieldDefinition(
-             /*fieldName*/ "e",
+             /*fieldName=*/"e",
              /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-             /*ndv*/ numberOfIterations,
-             /*dataDistribution*/ stats::DistrType::kUniform,
-             /*seed*/ {seed_value5_low, seed_value5_low})},
-        /*queryTypes*/ {kPoint, kPoint}));
+             /*ndv=*/numberOfIterations,
+             /*dataDistribution=*/stats::DistrType::kUniform,
+             /*seed=*/{seed_value5_low, seed_value5_low})},
+        /*queryTypes=*/{kPoint, kPoint}));
 
 auto pointQueryConfig1D = WorkloadConfiguration(
-    /*numberOfQueries*/ numberOfIterations,  // This defines the number or queries generated not the
+    /*numberOfQueries=*/numberOfIterations,  // This defines the number or queries generated not the
                                              // actual number of queries (that is defined by number
                                              // of iterations)
     QueryConfiguration(
         {DataFieldDefinition(
-            /*fieldName*/ "d",
+            /*fieldName=*/"d",
             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-            /*ndv*/ numberOfIterations,  // as long as this number is larger than numberOfQueries,
+            /*ndv=*/numberOfIterations,  // as long as this number is larger than numberOfQueries,
                                          // all queries will be unique.
             /*dataDistribution*/ stats::DistrType::kUniform,
-            /*seed*/ {seed_value4_low, seed_value4_low})},
-        /*queryTypes*/ {kPoint}));
+            /*seed=*/{seed_value4_low, seed_value4_low})},
+        /*queryTypes=*/{kPoint}));
 
 auto rangeQueryConfig1D = WorkloadConfiguration(
-    /*numberOfQueries*/ numberOfIterations,
+    /*numberOfQueries=*/numberOfIterations,
     QueryConfiguration({DataFieldDefinition(
-                           /*fieldName*/ "d",
+                           /*fieldName=*/"d",
                            /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-                           /*ndv*/ numberOfIterations,
-                           /*dataDistribution*/ stats::DistrType::kUniform,
-                           /*seed*/ {seed_value4_low, seed_value4_high})},
-                       /*queryTypes*/ {kRange}));
+                           /*ndv=*/numberOfIterations,
+                           /*dataDistribution=*/stats::DistrType::kUniform,
+                           /*seed=*/{seed_value4_low, seed_value4_high})},
+                       /*queryTypes=*/{kRange}));
 
 auto pointQueryConfig1D_E = WorkloadConfiguration(
-    /*numberOfQueries*/ numberOfIterations,  // This defines the number or queries generated not the
+    /*numberOfQueries=*/numberOfIterations,  // This defines the number or queries generated not the
                                              // actual number of queries (that is defined by number
                                              // of iterations)
     QueryConfiguration(
         {DataFieldDefinition(
-             /*fieldName*/ "d",
+             /*fieldName=*/"d",
              /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-             /*ndv*/ numberOfIterations,  // as long as this number is larger than numberOfQueries,
+             /*ndv=*/numberOfIterations,  // as long as this number is larger than numberOfQueries,
                                           // all queries will be unique.
              /*dataDistribution*/ stats::DistrType::kUniform,
-             /*seed*/ {seed_value4_low, seed_value4_low}),
+             /*seed=*/{seed_value4_low, seed_value4_low}),
          DataFieldDefinition(
-             /*fieldName*/ "e",
+             /*fieldName=*/"e",
              /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-             /*ndv*/ numberOfIterations,
-             /*dataDistribution*/ stats::DistrType::kUniform,
-             /*seed*/ {seed_value5_low, seed_value5_low})},
-        /*queryTypes*/ {kPoint, kPoint}));
+             /*ndv=*/numberOfIterations,
+             /*dataDistribution=*/stats::DistrType::kUniform,
+             /*seed=*/{seed_value5_low, seed_value5_low})},
+        /*queryTypes=*/{kPoint, kPoint}));
 
 auto pointQueryConfig2 = WorkloadConfiguration(
-    /*numberOfQueries*/ numberOfIterations,
+    /*numberOfQueries=*/numberOfIterations,
     QueryConfiguration({DataFieldDefinition(
-                            /*fieldName*/ "a",
+                            /*fieldName=*/"a",
                             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-                            /*ndv*/ numberOfIterations,
-                            /*dataDistribution*/ stats::DistrType::kUniform,
-                            /*seed*/ {seed_value1_low, seed_value1_low}),
+                            /*ndv=*/numberOfIterations,
+                            /*dataDistribution=*/stats::DistrType::kUniform,
+                            /*seed=*/{seed_value1_low, seed_value1_low}),
                         DataFieldDefinition(
-                            /*fieldName*/ "b",
+                            /*fieldName=*/"b",
                             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-                            /*ndv*/ numberOfIterations,
-                            /*dataDistribution*/ stats::DistrType::kUniform,
-                            /*seed*/ {seed_value2_low, seed_value2_low})},
-                       /*queryTypes*/ {kPoint, kPoint}));
+                            /*ndv=*/numberOfIterations,
+                            /*dataDistribution=*/stats::DistrType::kUniform,
+                            /*seed=*/{seed_value2_low, seed_value2_low})},
+                       /*queryTypes=*/{kPoint, kPoint}));
 
 auto rangeQueryConfig2 = WorkloadConfiguration(
-    /*numberOfQueries*/ numberOfIterations,
+    /*numberOfQueries=*/numberOfIterations,
     QueryConfiguration({DataFieldDefinition(
-                            /*fieldName*/ "a",
+                            /*fieldName=*/"a",
                             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-                            /*ndv*/ numberOfIterations,
-                            /*dataDistribution*/ stats::DistrType::kUniform,
-                            /*seed*/ {seed_value1_low, seed_value1_high}),
+                            /*ndv=*/numberOfIterations,
+                            /*dataDistribution=*/stats::DistrType::kUniform,
+                            /*seed=*/{seed_value1_low, seed_value1_high}),
                         DataFieldDefinition(
-                            /*fieldName*/ "b",
+                            /*fieldName=*/"b",
                             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-                            /*ndv*/ numberOfIterations,
-                            /*dataDistribution*/ stats::DistrType::kUniform,
-                            /*seed*/ {seed_value2_low, seed_value2_high})},
-                       /*queryTypes*/ {kRange, kRange}));
+                            /*ndv=*/numberOfIterations,
+                            /*dataDistribution=*/stats::DistrType::kUniform,
+                            /*seed=*/{seed_value2_low, seed_value2_high})},
+                       /*queryTypes=*/{kRange, kRange}));
 
 auto pointQueryConfig2_E = WorkloadConfiguration(
-    /*numberOfQueries*/ numberOfIterations,
+    /*numberOfQueries=*/numberOfIterations,
     QueryConfiguration({DataFieldDefinition(
-                            /*fieldName*/ "a",
+                            /*fieldName=*/"a",
                             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-                            /*ndv*/ numberOfIterations,
-                            /*dataDistribution*/ stats::DistrType::kUniform,
-                            /*seed*/ {seed_value1_low, seed_value1_low}),
+                            /*ndv=*/numberOfIterations,
+                            /*dataDistribution=*/stats::DistrType::kUniform,
+                            /*seed=*/{seed_value1_low, seed_value1_low}),
                         DataFieldDefinition(
-                            /*fieldName*/ "b",
+                            /*fieldName=*/"b",
                             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-                            /*ndv*/ numberOfIterations,
-                            /*dataDistribution*/ stats::DistrType::kUniform,
-                            /*seed*/ {seed_value2_low, seed_value2_low}),
+                            /*ndv=*/numberOfIterations,
+                            /*dataDistribution=*/stats::DistrType::kUniform,
+                            /*seed=*/{seed_value2_low, seed_value2_low}),
                         DataFieldDefinition(
-                            /*fieldName*/ "e",
+                            /*fieldName=*/"e",
                             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-                            /*ndv*/ numberOfIterations,
-                            /*dataDistribution*/ stats::DistrType::kUniform,
-                            /*seed*/ {seed_value5_low, seed_value5_low})},
-                       /*queryTypes*/ {kPoint, kPoint, kPoint}));
+                            /*ndv=*/numberOfIterations,
+                            /*dataDistribution=*/stats::DistrType::kUniform,
+                            /*seed=*/{seed_value5_low, seed_value5_low})},
+                       /*queryTypes=*/{kPoint, kPoint, kPoint}));
 
 auto pointQueryConfig3 = WorkloadConfiguration(
-    /*numberOfQueries*/ numberOfIterations,
+    /*numberOfQueries=*/numberOfIterations,
     QueryConfiguration({DataFieldDefinition(
-                            /*fieldName*/ "a",
+                            /*fieldName=*/"a",
                             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-                            /*ndv*/ numberOfIterations,
-                            /*dataDistribution*/ stats::DistrType::kUniform,
-                            /*seed*/ {seed_value1_low, seed_value1_low}),
+                            /*ndv=*/numberOfIterations,
+                            /*dataDistribution=*/stats::DistrType::kUniform,
+                            /*seed=*/{seed_value1_low, seed_value1_low}),
                         DataFieldDefinition(
-                            /*fieldName*/ "b",
+                            /*fieldName=*/"b",
                             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-                            /*ndv*/ numberOfIterations,
-                            /*dataDistribution*/ stats::DistrType::kUniform,
-                            /*seed*/ {seed_value2_low, seed_value2_low}),
+                            /*ndv=*/numberOfIterations,
+                            /*dataDistribution=*/stats::DistrType::kUniform,
+                            /*seed=*/{seed_value2_low, seed_value2_low}),
                         DataFieldDefinition(
-                            /*fieldName*/ "c",
+                            /*fieldName=*/"c",
                             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-                            /*ndv*/ numberOfIterations,
-                            /*dataDistribution*/ stats::DistrType::kUniform,
-                            /*seed*/ {seed_value3_low, seed_value3_low})},
-                       /*queryTypes*/ {kPoint, kPoint, kPoint}));
+                            /*ndv=*/numberOfIterations,
+                            /*dataDistribution=*/stats::DistrType::kUniform,
+                            /*seed=*/{seed_value3_low, seed_value3_low})},
+                       /*queryTypes=*/{kPoint, kPoint, kPoint}));
 
 auto rangeQueryConfig3 = WorkloadConfiguration(
-    /*numberOfQueries*/ numberOfIterations,
+    /*numberOfQueries=*/numberOfIterations,
     QueryConfiguration({DataFieldDefinition(
-                            /*fieldName*/ "a",
+                            /*fieldName=*/"a",
                             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-                            /*ndv*/ numberOfIterations,
-                            /*dataDistribution*/ stats::DistrType::kUniform,
-                            /*seed*/ {seed_value1_low, seed_value1_high}),
+                            /*ndv=*/numberOfIterations,
+                            /*dataDistribution=*/stats::DistrType::kUniform,
+                            /*seed=*/{seed_value1_low, seed_value1_high}),
                         DataFieldDefinition(
-                            /*fieldName*/ "b",
+                            /*fieldName=*/"b",
                             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-                            /*ndv*/ numberOfIterations,
-                            /*dataDistribution*/ stats::DistrType::kUniform,
-                            /*seed*/ {seed_value2_low, seed_value2_high}),
+                            /*ndv=*/numberOfIterations,
+                            /*dataDistribution=*/stats::DistrType::kUniform,
+                            /*seed=*/{seed_value2_low, seed_value2_high}),
                         DataFieldDefinition(
-                            /*fieldName*/ "c",
+                            /*fieldName=*/"c",
                             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-                            /*ndv*/ numberOfIterations,
-                            /*dataDistribution*/ stats::DistrType::kUniform,
-                            /*seed*/ {seed_value3_low, seed_value3_high})},
-                       /*queryTypes*/ {kRange, kRange, kRange}));
+                            /*ndv=*/numberOfIterations,
+                            /*dataDistribution=*/stats::DistrType::kUniform,
+                            /*seed=*/{seed_value3_low, seed_value3_high})},
+                       /*queryTypes=*/{kRange, kRange, kRange}));
 
 auto pointQueryConfig3_E = WorkloadConfiguration(
-    /*numberOfQueries*/ numberOfIterations,
+    /*numberOfQueries=*/numberOfIterations,
     QueryConfiguration({DataFieldDefinition(
-                            /*fieldName*/ "a",
+                            /*fieldName=*/"a",
                             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-                            /*ndv*/ numberOfIterations,
-                            /*dataDistribution*/ stats::DistrType::kUniform,
-                            /*seed*/ {seed_value1_low, seed_value1_low}),
+                            /*ndv=*/numberOfIterations,
+                            /*dataDistribution=*/stats::DistrType::kUniform,
+                            /*seed=*/{seed_value1_low, seed_value1_low}),
                         DataFieldDefinition(
-                            /*fieldName*/ "b",
+                            /*fieldName=*/"b",
                             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-                            /*ndv*/ numberOfIterations,
-                            /*dataDistribution*/ stats::DistrType::kUniform,
-                            /*seed*/ {seed_value2_low, seed_value2_low}),
+                            /*ndv=*/numberOfIterations,
+                            /*dataDistribution=*/stats::DistrType::kUniform,
+                            /*seed=*/{seed_value2_low, seed_value2_low}),
                         DataFieldDefinition(
-                            /*fieldName*/ "c",
+                            /*fieldName=*/"c",
                             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-                            /*ndv*/ numberOfIterations,
-                            /*dataDistribution*/ stats::DistrType::kUniform,
-                            /*seed*/ {seed_value3_low, seed_value3_low}),
+                            /*ndv=*/numberOfIterations,
+                            /*dataDistribution=*/stats::DistrType::kUniform,
+                            /*seed=*/{seed_value3_low, seed_value3_low}),
                         DataFieldDefinition(
-                            /*fieldName*/ "e",
+                            /*fieldName=*/"e",
                             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-                            /*ndv*/ numberOfIterations,
-                            /*dataDistribution*/ stats::DistrType::kUniform,
-                            /*seed*/ {seed_value5_low, seed_value5_low})},
-                       /*queryTypes*/ {kPoint, kPoint, kPoint, kPoint}));
+                            /*ndv=*/numberOfIterations,
+                            /*dataDistribution=*/stats::DistrType::kUniform,
+                            /*seed=*/{seed_value5_low, seed_value5_low})},
+                       /*queryTypes=*/{kPoint, kPoint, kPoint, kPoint}));
 
 auto pointQueryConfig4 = WorkloadConfiguration(
-    /*numberOfQueries*/ numberOfIterations,
+    /*numberOfQueries=*/numberOfIterations,
     QueryConfiguration({DataFieldDefinition(
-                            /*fieldName*/ "a",
+                            /*fieldName=*/"a",
                             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-                            /*ndv*/ numberOfIterations,
-                            /*dataDistribution*/ stats::DistrType::kUniform,
-                            /*seed*/ {seed_value1_low, seed_value1_low}),
+                            /*ndv=*/numberOfIterations,
+                            /*dataDistribution=*/stats::DistrType::kUniform,
+                            /*seed=*/{seed_value1_low, seed_value1_low}),
                         DataFieldDefinition(
-                            /*fieldName*/ "b",
+                            /*fieldName=*/"b",
                             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-                            /*ndv*/ numberOfIterations,
-                            /*dataDistribution*/ stats::DistrType::kUniform,
-                            /*seed*/ {seed_value2_low, seed_value2_low}),
+                            /*ndv=*/numberOfIterations,
+                            /*dataDistribution=*/stats::DistrType::kUniform,
+                            /*seed=*/{seed_value2_low, seed_value2_low}),
                         DataFieldDefinition(
-                            /*fieldName*/ "c",
+                            /*fieldName=*/"c",
                             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-                            /*ndv*/ numberOfIterations,
-                            /*dataDistribution*/ stats::DistrType::kUniform,
-                            /*seed*/ {seed_value3_low, seed_value3_low}),
+                            /*ndv=*/numberOfIterations,
+                            /*dataDistribution=*/stats::DistrType::kUniform,
+                            /*seed=*/{seed_value3_low, seed_value3_low}),
                         DataFieldDefinition(
-                            /*fieldName*/ "d",
+                            /*fieldName=*/"d",
                             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-                            /*ndv*/ numberOfIterations,
-                            /*dataDistribution*/ stats::DistrType::kUniform,
-                            /*seed*/ {seed_value4_low, seed_value4_low})},
-                       /*queryTypes*/ {kPoint, kPoint, kPoint, kPoint}));
+                            /*ndv=*/numberOfIterations,
+                            /*dataDistribution=*/stats::DistrType::kUniform,
+                            /*seed=*/{seed_value4_low, seed_value4_low})},
+                       /*queryTypes=*/{kPoint, kPoint, kPoint, kPoint}));
 
 auto rangeQueryConfig4 = WorkloadConfiguration(
-    /*numberOfQueries*/ numberOfIterations,
+    /*numberOfQueries=*/numberOfIterations,
     QueryConfiguration({DataFieldDefinition(
-                            /*fieldName*/ "a",
+                            /*fieldName=*/"a",
                             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-                            /*ndv*/ numberOfIterations,
-                            /*dataDistribution*/ stats::DistrType::kUniform,
-                            /*seed*/ {seed_value1_low, seed_value1_high}),
+                            /*ndv=*/numberOfIterations,
+                            /*dataDistribution=*/stats::DistrType::kUniform,
+                            /*seed=*/{seed_value1_low, seed_value1_high}),
                         DataFieldDefinition(
-                            /*fieldName*/ "b",
+                            /*fieldName=*/"b",
                             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-                            /*ndv*/ numberOfIterations,
-                            /*dataDistribution*/ stats::DistrType::kUniform,
-                            /*seed*/ {seed_value2_low, seed_value2_high}),
+                            /*ndv=*/numberOfIterations,
+                            /*dataDistribution=*/stats::DistrType::kUniform,
+                            /*seed=*/{seed_value2_low, seed_value2_high}),
                         DataFieldDefinition(
-                            /*fieldName*/ "c",
+                            /*fieldName=*/"c",
                             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-                            /*ndv*/ numberOfIterations,
-                            /*dataDistribution*/ stats::DistrType::kUniform,
-                            /*seed*/ {seed_value3_low, seed_value3_high}),
+                            /*ndv=*/numberOfIterations,
+                            /*dataDistribution=*/stats::DistrType::kUniform,
+                            /*seed=*/{seed_value3_low, seed_value3_high}),
                         DataFieldDefinition(
-                            /*fieldName*/ "d",
+                            /*fieldName=*/"d",
                             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-                            /*ndv*/ numberOfIterations,
-                            /*dataDistribution*/ stats::DistrType::kUniform,
-                            /*seed*/ {seed_value4_low, seed_value4_high})},
-                       /*queryTypes*/ {kRange, kRange, kRange, kRange}));
+                            /*ndv=*/numberOfIterations,
+                            /*dataDistribution=*/stats::DistrType::kUniform,
+                            /*seed=*/{seed_value4_low, seed_value4_high})},
+                       /*queryTypes=*/{kRange, kRange, kRange, kRange}));
 
 auto pointQueryConfig4_E = WorkloadConfiguration(
-    /*numberOfQueries*/ numberOfIterations,
+    /*numberOfQueries=*/numberOfIterations,
     QueryConfiguration({DataFieldDefinition(
-                            /*fieldName*/ "a",
+                            /*fieldName=*/"a",
                             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-                            /*ndv*/ numberOfIterations,
-                            /*dataDistribution*/ stats::DistrType::kUniform,
-                            /*seed*/ {seed_value1_low, seed_value1_low}),
+                            /*ndv=*/numberOfIterations,
+                            /*dataDistribution=*/stats::DistrType::kUniform,
+                            /*seed=*/{seed_value1_low, seed_value1_low}),
                         DataFieldDefinition(
-                            /*fieldName*/ "b",
+                            /*fieldName=*/"b",
                             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-                            /*ndv*/ numberOfIterations,
-                            /*dataDistribution*/ stats::DistrType::kUniform,
-                            /*seed*/ {seed_value2_low, seed_value2_low}),
+                            /*ndv=*/numberOfIterations,
+                            /*dataDistribution=*/stats::DistrType::kUniform,
+                            /*seed=*/{seed_value2_low, seed_value2_low}),
                         DataFieldDefinition(
-                            /*fieldName*/ "c",
+                            /*fieldName=*/"c",
                             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-                            /*ndv*/ numberOfIterations,
-                            /*dataDistribution*/ stats::DistrType::kUniform,
-                            /*seed*/ {seed_value3_low, seed_value3_low}),
+                            /*ndv=*/numberOfIterations,
+                            /*dataDistribution=*/stats::DistrType::kUniform,
+                            /*seed=*/{seed_value3_low, seed_value3_low}),
                         DataFieldDefinition(
-                            /*fieldName*/ "d",
+                            /*fieldName=*/"d",
                             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-                            /*ndv*/ numberOfIterations,
-                            /*dataDistribution*/ stats::DistrType::kUniform,
-                            /*seed*/ {seed_value4_low, seed_value4_low}),
+                            /*ndv=*/numberOfIterations,
+                            /*dataDistribution=*/stats::DistrType::kUniform,
+                            /*seed=*/{seed_value4_low, seed_value4_low}),
                         DataFieldDefinition(
-                            /*fieldName*/ "e",
+                            /*fieldName=*/"e",
                             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-                            /*ndv*/ numberOfIterations,
-                            /*dataDistribution*/ stats::DistrType::kUniform,
-                            /*seed*/ {seed_value5_low, seed_value5_low})},
-                       /*queryTypes*/ {kPoint, kPoint, kPoint, kPoint, kPoint}));
+                            /*ndv=*/numberOfIterations,
+                            /*dataDistribution=*/stats::DistrType::kUniform,
+                            /*seed=*/{seed_value5_low, seed_value5_low})},
+                       /*queryTypes=*/{kPoint, kPoint, kPoint, kPoint, kPoint}));
 
 /**
  * This map defines a set of configurations for workload generation.
@@ -707,7 +707,6 @@ void BM_RunAllConfigs(benchmark::State& state) {
             // Translate the fields and positions configurations based on the defined map.
             DataConfiguration dataConfig(
                 /*size=*/dataSizes[dataSize_idx],
-
                 /*allDataFieldConfig=*/
                 collectionFieldConfigurations
                     [dataFieldsConfigurations[dataFieldsConfiguration_idx]]);
@@ -777,7 +776,7 @@ void BM_RunAllConfigs(benchmark::State& state) {
                              errorConfigs_idx++) {
                             // Translate the sample size definition to corresponding sample size.
                             auto sampleSize = translateSampleDefToActualSampleSize(
-                                /*sampleSizeDef*/ static_cast<SampleSizeDef>(
+                                /*sampleSizeDef=*/static_cast<SampleSizeDef>(
                                     errorConfigs[errorConfigs_idx]));
 
                             execStats.cbrSampleSizes[errorConfigs[errorConfigs_idx]] = sampleSize;

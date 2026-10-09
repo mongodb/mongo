@@ -75,7 +75,7 @@ void acquireCriticalSection(OperationContext* opCtx,
         nss,
         critSecReason,
         ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-        false /* clearShardCatalogCache */);
+        /*clearShardCatalogCache=*/false);
     svc->promoteRecoverableCriticalSectionToBlockAlsoReads(
         opCtx, nss, critSecReason, ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
 }
@@ -300,7 +300,7 @@ ExecutorFuture<void> MergeAllChunksCoordinator::_runImpl(
                         Grid::get(opCtx)->shardRegistry()->getConfigShard(),
                         NamespaceString::kConfigShardCatalogChunksNamespace,
                         *coll,
-                        boost::none /*originalVersion*/,
+                        /*originalVersion=*/boost::none,
                         _request.getMaxNumberOfChunksToMerge(),
                         _request.getMaxTimeProcessingChunksMS());
 
@@ -320,7 +320,7 @@ ExecutorFuture<void> MergeAllChunksCoordinator::_runImpl(
 
                 BSONArrayBuilder bab;
                 for (const auto& chunk : newChunks) {
-                    BSONObj chunkBson = chunk.toConfigBSON(true /*omitVersion*/);
+                    BSONObj chunkBson = chunk.toConfigBSON(/*omitVersion=*/true);
                     if (bab.len() + chunkBson.objsize() > kMaxChunkVectorSize) {
                         // If we truncate the list, numMergedChunks is no longer correct. This is
                         // not a huge deal: that number never reaches the user, and internally is

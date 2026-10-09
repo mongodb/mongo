@@ -120,7 +120,7 @@ void PeriodicThreadToAbortExpiredTransactions::_init(ServiceContext* serviceCont
             }
         },
         getPeriod(gTransactionLifetimeLimitSeconds.load()),
-        true /*isKillableByStepdown*/);
+        /*isKillableByStepdown=*/true);
 
     _anchor = std::make_shared<PeriodicJobAnchor>(periodicRunner->makeJob(std::move(job)));
 

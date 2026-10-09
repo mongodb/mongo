@@ -172,7 +172,7 @@ TEST_F(ExpressionContextTest, DontInitializeUnreferencedVariables) {
     auto opCtx = makeOperationContext();
     std::vector<BSONObj> pipeline;
     pipeline.push_back(BSON("$match" << BSON("a" << 1)));
-    AggregateCommandRequest acr({} /*nss*/, pipeline);
+    AggregateCommandRequest acr(/*nss=*/{}, pipeline);
     auto expCtx = ExpressionContextBuilder{}.fromRequest(opCtx.get(), acr).build();
     pipeline_factory::makePipeline(pipeline, expCtx, pipeline_factory::kOptionsMinimal);
     expCtx->initializeReferencedSystemVariables();
@@ -188,7 +188,7 @@ TEST_F(ExpressionContextTest, ErrorsIfClusterTimeUsedInStandalone) {
                                           opCtx->getServiceContext(), repl::ReplSettings()));
     std::vector<BSONObj> pipeline;
     pipeline.push_back(BSON("$project" << BSON("a" << "$$CLUSTER_TIME")));
-    AggregateCommandRequest acr({} /*nss*/, pipeline);
+    AggregateCommandRequest acr(/*nss=*/{}, pipeline);
     auto expCtx = ExpressionContextBuilder{}.fromRequest(opCtx.get(), acr).build();
     ASSERT_THROWS_CODE(
         pipeline_factory::makePipeline(pipeline, expCtx, pipeline_factory::kOptionsMinimal),

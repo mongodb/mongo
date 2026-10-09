@@ -16,7 +16,7 @@ void doFuzz(const char* data, size_t size) try {
     Value val;
     try {
         val = exec::expression::convert_utils::parseJson(std::string_view{data, size},
-                                                         boost::none /*expectedType*/);
+                                                         /*expectedType=*/boost::none);
     } catch (const ExceptionFor<ErrorCodes::ConversionFailure>&) {
         return;
     }

@@ -259,7 +259,7 @@ SbExpr generateTraverseF(SbExpr inputExpr,
     auto makeResultExpr = [&](const SbExpr& innerInputExpr, bool innerCanPathBeArray) -> SbExpr {
         return isLeafField ? makePredicate(innerInputExpr.clone())
                            : generateTraverseF(innerInputExpr.clone(),
-                                               boost::none /* topLevelFieldSlot */,
+                                               /*topLevelFieldSlot=*/boost::none,
                                                fp,
                                                level + 1,
                                                frameIdGenerator,
@@ -273,13 +273,13 @@ SbExpr generateTraverseF(SbExpr inputExpr,
     if (omitTraverseF) {
         auto& opDebug = CurOp::get(state.opCtx)->debug();
         opDebug.pathArraynessSimplified = true;
-        return makeResultExpr(fieldExpr, false /* canPathBeArray */);
+        return makeResultExpr(fieldExpr, /*canPathBeArray=*/false);
     }
 
     auto lambdaFrameId = frameIdGenerator->generate();
     auto lambdaParam = SbExpr{SbVar{lambdaFrameId, 0}};
 
-    auto resultExpr = makeResultExpr(lambdaParam, true /* canPathBeArray */);
+    auto resultExpr = makeResultExpr(lambdaParam, /*canPathBeArray=*/true);
 
     if (isLeafField && mode == LeafTraversalMode::kDoNotTraverseLeaf) {
         return b.makeLet(

@@ -148,8 +148,8 @@ protected:
                                          false,
                                          epoch,
                                          timestamp,
-                                         boost::none /* timeseriesFields */,
-                                         boost::none /* reshardingFields */,
+                                         /*timeseriesFields=*/boost::none,
+                                         /*reshardingFields=*/boost::none,
                                          true,
                                          {std::move(chunk)})));
         auto dbVersion = DatabaseVersion(uuid, timestamp);
@@ -851,18 +851,18 @@ TEST_F(ReshardingDonorRecipientCommonTest,
 
 TEST_F(ReshardingDonorRecipientCommonTest,
        ProcessDonorFieldsWhenShardDoesNotOwnAnyChunks_NotPrimaryShard) {
-    testProcessDonorFields(kOtherShard.getShardId() /* shardThatChunkExistsOn*/,
-                           kOtherShard.getShardId() /* primaryShard */,
-                           boost::none /* performVerification */,
-                           false /* expectDonorStateMachine */);
+    testProcessDonorFields(/*shardThatChunkExistsOn=*/kOtherShard.getShardId(),
+                           /*primaryShard=*/kOtherShard.getShardId(),
+                           /*performVerification=*/boost::none,
+                           /*expectDonorStateMachine=*/false);
 }
 
 TEST_F(ReshardingDonorRecipientCommonTest,
        ProcessDonorFieldsWhenShardDoesNotOwnAnyChunks_PrimaryShard) {
-    testProcessDonorFields(kOtherShard.getShardId() /* shardThatChunkExistsOn*/,
-                           kThisShard.getShardId() /* primaryShard */,
-                           boost::none /* performVerification */,
-                           false /* expectDonorStateMachine */);
+    testProcessDonorFields(/*shardThatChunkExistsOn=*/kOtherShard.getShardId(),
+                           /*primaryShard=*/kThisShard.getShardId(),
+                           /*performVerification=*/boost::none,
+                           /*expectDonorStateMachine=*/false);
 }
 
 TEST_F(ReshardingDonorRecipientCommonTest,
@@ -871,10 +871,10 @@ TEST_F(ReshardingDonorRecipientCommonTest,
         "featureFlagReshardingVerification", true);
     auto performVerification = boost::none;
 
-    testProcessDonorFields(kThisShard.getShardId() /* shardThatChunkExistsOn*/,
-                           kOtherShard.getShardId() /* primaryShard */,
+    testProcessDonorFields(/*shardThatChunkExistsOn=*/kThisShard.getShardId(),
+                           /*primaryShard=*/kOtherShard.getShardId(),
                            performVerification,
-                           true /* expectDonorStateMachine */,
+                           /*expectDonorStateMachine=*/true,
                            DonorFieldsValidator{});
 }
 
@@ -884,20 +884,20 @@ TEST_F(ReshardingDonorRecipientCommonTest,
         "featureFlagReshardingVerification", false);
     auto performVerification = boost::none;
 
-    testProcessDonorFields(kThisShard.getShardId() /* shardThatChunkExistsOn*/,
-                           kOtherShard.getShardId() /* primaryShard */,
+    testProcessDonorFields(/*shardThatChunkExistsOn=*/kThisShard.getShardId(),
+                           /*primaryShard=*/kOtherShard.getShardId(),
                            performVerification,
-                           true /* expectDonorStateMachine */,
+                           /*expectDonorStateMachine=*/true,
                            DonorFieldsValidator{});
 }
 
 TEST_F(ReshardingDonorRecipientCommonTest, ProcessDonorFieldsNotPerformVerification) {
     bool performVerification = false;
 
-    testProcessDonorFields(kThisShard.getShardId() /* shardThatChunkExistsOn*/,
-                           kOtherShard.getShardId() /* primaryShard */,
+    testProcessDonorFields(/*shardThatChunkExistsOn=*/kThisShard.getShardId(),
+                           /*primaryShard=*/kOtherShard.getShardId(),
                            performVerification,
-                           true /* expectDonorStateMachine */,
+                           /*expectDonorStateMachine=*/true,
                            DonorFieldsValidator{.performVerification = performVerification});
 }
 
@@ -907,10 +907,10 @@ TEST_F(ReshardingDonorRecipientCommonTest,
         "featureFlagReshardingVerification", false);
     bool performVerification = true;
 
-    ASSERT_THROWS_CODE(testProcessDonorFields(kThisShard.getShardId() /* shardThatChunkExistsOn*/,
-                                              kOtherShard.getShardId() /* primaryShard */,
+    ASSERT_THROWS_CODE(testProcessDonorFields(/*shardThatChunkExistsOn=*/kThisShard.getShardId(),
+                                              /*primaryShard=*/kOtherShard.getShardId(),
                                               performVerification,
-                                              false /* expectDonorStateMachine */),
+                                              /*expectDonorStateMachine=*/false),
                        DBException,
                        ErrorCodes::InvalidOptions);
 }
@@ -921,10 +921,10 @@ TEST_F(ReshardingDonorRecipientCommonTest,
 
     // Not set featureFlagReshardingStoreOplogFetcherProgress to verify that it defaults to true.
 
-    testProcessRecipientFields(kThisShard.getShardId() /* shardThatChunkExistsOn*/,
-                               kThisShard.getShardId() /* primaryShard */,
-                               boost::none /* performVerification */,
-                               true /* expectRecipientStateMachine */,
+    testProcessRecipientFields(/*shardThatChunkExistsOn=*/kThisShard.getShardId(),
+                               /*primaryShard=*/kThisShard.getShardId(),
+                               /*performVerification=*/boost::none,
+                               /*expectRecipientStateMachine=*/true,
                                RecipientFieldsValidator{.storeOplogFetcherProgress = true});
 }
 
@@ -935,19 +935,19 @@ TEST_F(ReshardingDonorRecipientCommonTest,
     unittest::ServerParameterGuard storeOplogFetcherProgressFeatureFlagController(
         "featureFlagReshardingStoreOplogFetcherProgress", false);
 
-    testProcessRecipientFields(kThisShard.getShardId() /* shardThatChunkExistsOn*/,
-                               kThisShard.getShardId() /* primaryShard */,
-                               boost::none /* performVerification */,
-                               true /* expectRecipientStateMachine */,
+    testProcessRecipientFields(/*shardThatChunkExistsOn=*/kThisShard.getShardId(),
+                               /*primaryShard=*/kThisShard.getShardId(),
+                               /*performVerification=*/boost::none,
+                               /*expectRecipientStateMachine=*/true,
                                RecipientFieldsValidator{.storeOplogFetcherProgress = false});
 }
 
 TEST_F(ReshardingDonorRecipientCommonTest,
        ProcessRecipientFieldsWhenShardDoesNotOwnAnyChunks_NotPrimaryShard) {
-    testProcessRecipientFields(kOtherShard.getShardId() /* shardThatChunkExistsOn*/,
-                               kOtherShard.getShardId() /* primaryShard */,
-                               boost::none /* performVerification */,
-                               false /* expectRecipientStateMachine */);
+    testProcessRecipientFields(/*shardThatChunkExistsOn=*/kOtherShard.getShardId(),
+                               /*primaryShard=*/kOtherShard.getShardId(),
+                               /*performVerification=*/boost::none,
+                               /*expectRecipientStateMachine=*/false);
 }
 
 TEST_F(
@@ -960,10 +960,10 @@ TEST_F(
     unittest::ServerParameterGuard skipCloningFeatureFlagController(
         "featureFlagReshardingSkipCloningIfApplicable", false);
 
-    testProcessRecipientFields(kOtherShard.getShardId() /* shardThatChunkExistsOn*/,
-                               kThisShard.getShardId() /* primaryShard */,
-                               boost::none /* performVerification */,
-                               true /* expectRecipientStateMachine */,
+    testProcessRecipientFields(/*shardThatChunkExistsOn=*/kOtherShard.getShardId(),
+                               /*primaryShard=*/kThisShard.getShardId(),
+                               /*performVerification=*/boost::none,
+                               /*expectRecipientStateMachine=*/true,
                                RecipientFieldsValidator{.skipCloningAndApplying = false});
 }
 
@@ -976,10 +976,10 @@ TEST_F(ReshardingDonorRecipientCommonTest,
     unittest::ServerParameterGuard skipCloningFeatureFlagController(
         "featureFlagReshardingSkipCloningIfApplicable", true);
 
-    testProcessRecipientFields(kOtherShard.getShardId() /* shardThatChunkExistsOn*/,
-                               kThisShard.getShardId() /* primaryShard */,
-                               boost::none /* performVerification */,
-                               true /* expectRecipientStateMachine */,
+    testProcessRecipientFields(/*shardThatChunkExistsOn=*/kOtherShard.getShardId(),
+                               /*primaryShard=*/kThisShard.getShardId(),
+                               /*performVerification=*/boost::none,
+                               /*expectRecipientStateMachine=*/true,
                                RecipientFieldsValidator{.skipCloning = true});
 }
 
@@ -992,10 +992,10 @@ TEST_F(ReshardingDonorRecipientCommonTest,
     unittest::ServerParameterGuard skipCloningFeatureFlagController(
         "featureFlagReshardingSkipCloningIfApplicable", false);
 
-    testProcessRecipientFields(kOtherShard.getShardId() /* shardThatChunkExistsOn*/,
-                               kThisShard.getShardId() /* primaryShard */,
-                               boost::none /* performVerification */,
-                               true /* expectRecipientStateMachine */,
+    testProcessRecipientFields(/*shardThatChunkExistsOn=*/kOtherShard.getShardId(),
+                               /*primaryShard=*/kThisShard.getShardId(),
+                               /*performVerification=*/boost::none,
+                               /*expectRecipientStateMachine=*/true,
                                RecipientFieldsValidator{.skipCloning = false});
 }
 
@@ -1007,10 +1007,10 @@ TEST_F(ReshardingDonorRecipientCommonTest,
         "featureFlagReshardingVerification", true);
     boost::optional<bool> performVerification = boost::none;
 
-    testProcessRecipientFields(kThisShard.getShardId() /* shardThatChunkExistsOn*/,
-                               kOtherShard.getShardId() /* primaryShard */,
+    testProcessRecipientFields(/*shardThatChunkExistsOn=*/kThisShard.getShardId(),
+                               /*primaryShard=*/kOtherShard.getShardId(),
                                performVerification,
-                               true /* expectRecipientStateMachine */,
+                               /*expectRecipientStateMachine=*/true,
                                RecipientFieldsValidator{});
 }
 
@@ -1022,10 +1022,10 @@ TEST_F(ReshardingDonorRecipientCommonTest,
         "featureFlagReshardingVerification", false);
     auto performVerification = boost::none;
 
-    testProcessRecipientFields(kThisShard.getShardId() /* shardThatChunkExistsOn*/,
-                               kOtherShard.getShardId() /* primaryShard */,
+    testProcessRecipientFields(/*shardThatChunkExistsOn=*/kThisShard.getShardId(),
+                               /*primaryShard=*/kOtherShard.getShardId(),
                                performVerification,
-                               true /* expectRecipientStateMachine */,
+                               /*expectRecipientStateMachine=*/true,
                                RecipientFieldsValidator{});
 }
 
@@ -1035,10 +1035,10 @@ TEST_F(ReshardingDonorRecipientCommonTest, ProcessRecipientFieldsNotPerformVerif
     bool performVerification = false;
 
     testProcessRecipientFields(
-        kThisShard.getShardId() /* shardThatChunkExistsOn*/,
-        kOtherShard.getShardId() /* primaryShard */,
+        /*shardThatChunkExistsOn=*/kThisShard.getShardId(),
+        /*primaryShard=*/kOtherShard.getShardId(),
         performVerification,
-        true /* expectRecipientStateMachine */,
+        /*expectRecipientStateMachine=*/true,
         RecipientFieldsValidator{.performVerification = performVerification});
 }
 
@@ -1049,10 +1049,10 @@ TEST_F(ReshardingDonorRecipientCommonTest,
     bool performVerification = true;
 
     ASSERT_THROWS_CODE(
-        testProcessRecipientFields(kThisShard.getShardId() /* shardThatChunkExistsOn*/,
-                                   kOtherShard.getShardId() /* primaryShard */,
+        testProcessRecipientFields(/*shardThatChunkExistsOn=*/kThisShard.getShardId(),
+                                   /*primaryShard=*/kOtherShard.getShardId(),
                                    performVerification,
-                                   false /* expectRecipientStateMachine */),
+                                   /*expectRecipientStateMachine=*/false),
         DBException,
         ErrorCodes::InvalidOptions);
 }
@@ -1184,10 +1184,10 @@ TEST_F(ReshardingDonorRecipientCommonInternalsTest, ClearReshardingFilteringMeta
 TEST_F(ReshardingDonorRecipientCommonTest, ProcessRecipientFieldsForCloningNoRefresh) {
     GTEST_SKIP() << "Test doesn't support FCV 9.1. Remove/review (TODO: SERVER-132935)";
 
-    testProcessRecipientFields(kThisShard.getShardId() /* shardThatChunkExistsOn*/,
-                               kThisShard.getShardId() /* primaryShard */,
-                               boost::none /* performVerification */,
-                               true /* expectRecipientStateMachine */,
+    testProcessRecipientFields(/*shardThatChunkExistsOn=*/kThisShard.getShardId(),
+                               /*primaryShard=*/kThisShard.getShardId(),
+                               /*performVerification=*/boost::none,
+                               /*expectRecipientStateMachine=*/true,
                                RecipientFieldsValidator{});
 }
 

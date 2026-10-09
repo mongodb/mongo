@@ -136,7 +136,7 @@ public:
     const VersionContext kCurrentVersion{kLastLTSVersionContext};
 
     auto makeClient(std::string desc = "client") {
-        return getServiceContext()->getService()->makeClient(desc, nullptr /* session */);
+        return getServiceContext()->getService()->makeClient(desc, /*session=*/nullptr);
     }
 
     [[nodiscard]] ScopedHoldOperation getRunningOperationWithStaleOfcv() {

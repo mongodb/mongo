@@ -90,7 +90,7 @@ public:
                            *autoColl,
                            stmts.cbegin(),
                            stmts.cend(),
-                           /*recordIds*/ {},
+                           /*recordIds=*/{},
                            /*fromMigrate=*/std::vector<bool>(stmts.size(), false),
                            /*defaultFromMigrate=*/false);
         if (commit)
@@ -142,7 +142,7 @@ public:
                                   UUID::gen(),
                                   0U,
                                   /*markFromMigrate=*/false,
-                                  /*isTimeseries*/ false);
+                                  /*isTimeseries=*/false);
         if (commit)
             wuow.commit();
     }

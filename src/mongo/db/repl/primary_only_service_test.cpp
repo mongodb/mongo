@@ -263,7 +263,7 @@ public:
                         NamespaceString::createNamespaceString_forTest("config.test_service"),
                         _id,
                         newStateDoc,
-                        true /*upsert*/);
+                        /*upsert=*/true);
                 }
             } catch (const DBException& e) {
                 _documentWriteException.setError(e.toStatus());

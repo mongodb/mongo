@@ -75,9 +75,9 @@ public:
         : ServiceContextMongoDTest(Options{}.useMockClock(true)),
           _opCtx(makeOperationContext()),
           _expCtx(ExpressionContextBuilder{}.opCtx(_opCtx.get()).ns(kNss).build()) {
-        _setUpCollectionAndIdx(kIndexName /*indexName*/,
-                               BSON("quote" << "text") /*indexKeys*/,
-                               kMovieDocs /*docsToInsert*/);
+        _setUpCollectionAndIdx(/*indexName=*/kIndexName,
+                               /*indexKeys=*/BSON("quote" << "text"),
+                               /*docsToInsert=*/kMovieDocs);
     }
 
     TextOrStage makeTextOr(size_t keyPrefixSize = 1, const MatchExpression* filter = nullptr) {

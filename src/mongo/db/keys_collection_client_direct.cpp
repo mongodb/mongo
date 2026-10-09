@@ -73,7 +73,7 @@ KeysCollectionClientDirect::getAllExternalKeys(OperationContext* opCtx, std::str
         // It is safe to read external keys with local read concern because they are only used to
         // validate incoming signatures, not to sign them. If a cached key is rolled back, it will
         // eventually be reaped from the cache.
-        false /* tryUseMajority */);
+        /*tryUseMajority=*/false);
 }
 
 template <typename KeyDocumentType>

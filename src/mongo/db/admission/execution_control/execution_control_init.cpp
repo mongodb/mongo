@@ -57,7 +57,7 @@ std::unique_ptr<TicketingSystem> createTicketingSystem(
             std::make_unique<TicketHolder>(
                 svcCtx,
                 gConcurrentReadTransactions.load(),
-                true /* trackPeakUsed */,
+                /*trackPeakUsed=*/true,
                 gReadMaxQueueDepth.load(),
                 delinquentCb,
                 makeAcquisitionCb(ExecutionAdmissionContext::QueueType::kNormal),
@@ -67,7 +67,7 @@ std::unique_ptr<TicketingSystem> createTicketingSystem(
             std::make_unique<TicketHolder>(
                 svcCtx,
                 gConcurrentWriteTransactions.load(),
-                true /* trackPeakUsed */,
+                /*trackPeakUsed=*/true,
                 gWriteMaxQueueDepth.load(),
                 delinquentCb,
                 makeAcquisitionCb(ExecutionAdmissionContext::QueueType::kNormal),
@@ -78,7 +78,7 @@ std::unique_ptr<TicketingSystem> createTicketingSystem(
             std::make_unique<TicketHolder>(
                 svcCtx,
                 TicketingSystem::resolveLowPriorityTickets(gConcurrentReadLowPriorityTransactions),
-                false /* trackPeakUsed */,
+                /*trackPeakUsed=*/false,
                 gReadLowPriorityMaxQueueDepth.load(),
                 delinquentCb,
                 makeAcquisitionCb(ExecutionAdmissionContext::QueueType::kLow),
@@ -90,7 +90,7 @@ std::unique_ptr<TicketingSystem> createTicketingSystem(
             std::make_unique<TicketHolder>(
                 svcCtx,
                 TicketingSystem::resolveLowPriorityTickets(gConcurrentWriteLowPriorityTransactions),
-                false /* trackPeakUsed */,
+                /*trackPeakUsed=*/false,
                 gWriteLowPriorityMaxQueueDepth.load(),
                 delinquentCb,
                 makeAcquisitionCb(ExecutionAdmissionContext::QueueType::kLow),

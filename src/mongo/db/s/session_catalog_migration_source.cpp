@@ -884,7 +884,7 @@ SessionCatalogMigrationSource::SessionOplogIterator::SessionOplogIterator(
       }()) {
     _writeHistoryIterator = std::make_unique<TransactionHistoryIterator>(
         _record.getLastWriteOpTime(),
-        true /* permitYield */,
+        /*permitYield=*/true,
         _record.getState() ? TransactionHistoryIterator::IncludeCommitTimestamp::kYes
                            : TransactionHistoryIterator::IncludeCommitTimestamp::kNo);
 }

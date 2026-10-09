@@ -55,7 +55,7 @@ std::vector<CursorId> lookUpCursorIds(OperationContext* opCtx,
     AggregateCommandRequest aggRequest(
         NamespaceString::makeCollectionlessAggregateNSS(DatabaseName::kAdmin), pipeline);
     auto cursor = uassertStatusOK(DBClientCursor::fromAggregationRequest(
-        &client, aggRequest, true /* secondaryOk */, false /* useExhaust*/));
+        &client, aggRequest, /*secondaryOk=*/true, /*useExhaust=*/false));
 
     std::vector<CursorId> cursorIds;
     while (cursor->more()) {
@@ -197,7 +197,7 @@ int64_t ReshardingChangeStreamsMonitor::numBatchesForTest() {
 
 CancelableOperationContext ReshardingChangeStreamsMonitor::_makeOperationContext(
     std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) const {
-    return resharding::makeReshardingOperationContext(*factory, true /* nonDeprioritizable */);
+    return resharding::makeReshardingOperationContext(*factory, /*nonDeprioritizable=*/true);
 }
 
 std::vector<BSONObj> ReshardingChangeStreamsMonitor::_makeAggregatePipeline() const {
@@ -310,7 +310,7 @@ std::unique_ptr<mongo::DBClientCursor> ReshardingChangeStreamsMonitor::_makeDBCl
     if (!_cursorId) {
         auto aggRequest = makeAggregateCommandRequest();
         auto cursor = uassertStatusOK(DBClientCursor::fromAggregationRequest(
-            client, aggRequest, false /* secondaryOk */, useExhaust, keepCursorOpen));
+            client, aggRequest, /*secondaryOk=*/false, useExhaust, keepCursorOpen));
         _cursorId = cursor->getCursorId();
         return cursor;
     }
@@ -318,9 +318,9 @@ std::unique_ptr<mongo::DBClientCursor> ReshardingChangeStreamsMonitor::_makeDBCl
                                             _monitorNss,
                                             *_cursorId,
                                             useExhaust,
-                                            std::vector<BSONObj>{} /* initialBatch */,
-                                            boost::none /* operationTime*/,
-                                            boost::none /* postBatchResumeToken*/,
+                                            /*initialBatch=*/std::vector<BSONObj>{},
+                                            /*operationTime=*/boost::none,
+                                            /*postBatchResumeToken=*/boost::none,
                                             keepCursorOpen);
 }
 

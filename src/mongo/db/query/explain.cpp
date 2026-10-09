@@ -346,7 +346,7 @@ void generateExecutionInfo(PlanExecutor* exec,
     generateSinglePlanExecutionInfo(explainer.getWinningPlanStats(verbosity),
                                     totalTimeMicros,
                                     &execBob,
-                                    false /* isTrialPeriodInfo */);
+                                    /*isTrialPeriodInfo=*/false);
 
     // Also generate exec stats for all plans, if the verbosity level is high enough. These stats
     // reflect what happened during the trial period that ranked the plans.
@@ -361,13 +361,13 @@ void generateExecutionInfo(PlanExecutor* exec,
         if (explainer.areThereRejectedPlansToExplain()) {
             BSONObjBuilder planBob(allPlansBob.subobjStart());
             generateSinglePlanExecutionInfo(
-                *winningPlanTrialStats, boost::none, &planBob, true /* isTrialPeriodInfo */);
+                *winningPlanTrialStats, boost::none, &planBob, /*isTrialPeriodInfo=*/true);
             planBob.doneFast();
 
             for (auto&& stats : explainer.getRejectedPlansStats(verbosity)) {
                 BSONObjBuilder planBob(allPlansBob.subobjStart());
                 generateSinglePlanExecutionInfo(
-                    stats, boost::none, &planBob, true /* isTrialPeriodInfo */);
+                    stats, boost::none, &planBob, /*isTrialPeriodInfo=*/true);
                 planBob.doneFast();
             }
         }
@@ -824,7 +824,7 @@ void Explain::planCacheEntryToBSON(const PlanCacheEntry& entry, BSONObjBuilder* 
         for (auto&& stats : execStats) {
             BSONObjBuilder planBob(creationBuilder.subobjStart());
             generateSinglePlanExecutionInfo(
-                stats, boost::none, &planBob, false /* isTrialPeriodInfo */);
+                stats, boost::none, &planBob, /*isTrialPeriodInfo=*/false);
             planBob.doneFast();
         }
         explain_common::appendIfRoom(creationBuilder.arr(), "creationExecStats", out);

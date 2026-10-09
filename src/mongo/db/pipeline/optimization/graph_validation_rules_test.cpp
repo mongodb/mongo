@@ -30,7 +30,7 @@ protected:
     void markFieldNonArray(const std::string& nonArrayField) {
         auto pathArrayness = std::make_shared<PathArrayness>();
         pathArrayness->addPath(
-            FieldPath(nonArrayField), MultikeyComponents{}, true /* isFullRebuild */);
+            FieldPath(nonArrayField), MultikeyComponents{}, /*isFullRebuild=*/true);
         getExpCtx()->setPathArraynessForNss(getExpCtx()->getNamespaceString(),
                                             std::move(pathArrayness));
     }

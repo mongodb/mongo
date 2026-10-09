@@ -229,7 +229,7 @@ void DDLLockManager::ScopedDatabaseDDLLock::_lock(OperationContext* opCtx,
                         db,
                         reason,
                         mode,
-                        true /*waitForRecovery*/,
+                        /*waitForRecovery=*/true,
                         timeout);
 
         // Check under the DDL dbLock if this is the primary shard for the database
@@ -286,7 +286,7 @@ void DDLLockManager::ScopedCollectionDDLLock::_lock(OperationContext* opCtx,
                         ns.dbName(),
                         reason,
                         isSharedLockMode(mode) ? MODE_IS : MODE_IX,
-                        true /*waitForRecovery*/,
+                        /*waitForRecovery=*/true,
                         timeout);
 
         // Check under the DDL db lock if this is the primary shard for the database
@@ -303,7 +303,7 @@ void DDLLockManager::ScopedCollectionDDLLock::_lock(OperationContext* opCtx,
                           ns.isTimeseriesBucketsCollection() ? ns.getTimeseriesViewNamespace() : ns,
                           reason,
                           mode,
-                          true /*waitForRecovery*/,
+                          /*waitForRecovery=*/true,
                           timeout);
     } catch (...) {
         _dbLock.reset();

@@ -203,7 +203,7 @@ void insertOplogBatch(OperationContext* opCtx,
             BSON("$inc" << BSON(ReshardingOplogFetcherProgress::kNumEntriesFetchedFieldName
                                 << static_cast<long long>(oplogBatch.size())));
         auto updateResult = Helpers::upsert(
-            opCtx, oplogFetcherProgressColl, filter, updateMod, false /* fromMigrate */);
+            opCtx, oplogFetcherProgressColl, filter, updateMod, /*fromMigrate=*/false);
         invariant(updateResult.numDocsModified == 1 || !updateResult.upsertedId.isEmpty());
     }
 
@@ -810,7 +810,7 @@ bool ReshardingOplogFetcher::consume(
                 deleteObjects(opCtx,
                               oplogBufferColl,
                               BSON("_id" << BSON("$gt" << originalStartAt.toBSON())),
-                              false /* justOne */);
+                              /*justOne=*/false);
 
             if (oplogFetcherProgressColl && numDeleted > 0) {
                 auto filter = BSON(ReshardingOplogApplierProgress::kOplogSourceIdFieldName

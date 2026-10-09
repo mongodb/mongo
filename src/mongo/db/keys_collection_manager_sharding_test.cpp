@@ -642,7 +642,7 @@ protected:
 
         _keyManager = std::make_unique<KeysCollectionManager>(
             "dummy",
-            std::make_unique<KeysCollectionClientDirect>(false /*mustUseLocalReads*/),
+            std::make_unique<KeysCollectionClientDirect>(/*mustUseLocalReads=*/false),
             Seconds(1));
     }
 

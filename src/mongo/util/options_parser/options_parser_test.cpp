@@ -4036,7 +4036,7 @@ TEST(OptionCount, Basic) {
     ASSERT_OK(testOpts.addSection(subSection));
 
     int numOptions;
-    ASSERT_OK(testOpts.countOptions(&numOptions, true /*visibleOnly*/, moe::SourceCommandLine));
+    ASSERT_OK(testOpts.countOptions(&numOptions, /*visibleOnly=*/true, moe::SourceCommandLine));
     ASSERT_EQUALS(numOptions, 1);
 }
 

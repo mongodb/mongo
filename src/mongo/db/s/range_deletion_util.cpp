@@ -461,8 +461,8 @@ bool hasAtLeastOneRangeDeletionTaskForCollection(OperationContext* opCtx,
         const auto query = BSON(RangeDeletionTask::kCollectionUuidFieldName << collectionUuid);
         return dbClient.count(NamespaceString::kRangeDeletionNamespace,
                               query,
-                              0 /* options */,
-                              1 /* limit */) > 0;
+                              /*options=*/0,
+                              /*limit=*/1) > 0;
     }
 }
 
@@ -693,7 +693,7 @@ void deleteRangeDeletionTaskOnRecipient(OperationContext* opCtx,
     const auto queryFilter =
         getQueryFilterForRangeDeletionTaskOnRecipient(collectionUuid, range, migrationId);
     write_ops::DeleteCommandRequest deleteOp(NamespaceString::kRangeDeletionNamespace);
-    write_ops::DeleteOpEntry query(queryFilter, false /*multi*/);
+    write_ops::DeleteOpEntry query(queryFilter, /*multi=*/false);
     deleteOp.setDeletes({query});
     deleteOp.setWriteConcern(defaultMajorityWriteConcernDoNotUse());
 

@@ -30,7 +30,7 @@ void MockClientStream::read(SharedBuffer* msg, GRPCReactor::CompletionQueueEntry
     // sent before setting that status, so only return early here if the RPC was cancelled.
     // Otherwise, try to read whatever messages are in the queue.
     if (_rpcCancellationState->isCancelled()) {
-        _reactor->_processCompletionQueueNotification(tag, false /* ok */);
+        _reactor->_processCompletionQueueNotification(tag, /*ok=*/false);
         return;
     }
 
@@ -39,24 +39,24 @@ void MockClientStream::read(SharedBuffer* msg, GRPCReactor::CompletionQueueEntry
 
     if (res.has_value()) {
         *msg = res.get();
-        _reactor->_processCompletionQueueNotification(tag, true /* ok */);
+        _reactor->_processCompletionQueueNotification(tag, /*ok=*/true);
     } else {
-        _reactor->_processCompletionQueueNotification(tag, false /* ok */);
+        _reactor->_processCompletionQueueNotification(tag, /*ok=*/false);
     }
 }
 
 void MockClientStream::write(ConstSharedBuffer msg, GRPCReactor::CompletionQueueEntry* tag) {
     if (_rpcCancellationState->isCancelled() || _rpcReturnStatus.isReady()) {
-        _reactor->_processCompletionQueueNotification(tag, false /* ok */);
+        _reactor->_processCompletionQueueNotification(tag, /*ok=*/false);
         return;
     }
 
     auto res = runWithDeadline<bool>(_rpcCancellationState->getDeadline(),
                                      [&](Interruptible* i) { return _pipe.write(msg, i); });
     if (res) {
-        _reactor->_processCompletionQueueNotification(tag, true /* ok */);
+        _reactor->_processCompletionQueueNotification(tag, /*ok=*/true);
     } else {
-        _reactor->_processCompletionQueueNotification(tag, false /* ok */);
+        _reactor->_processCompletionQueueNotification(tag, /*ok=*/false);
     }
 }
 
@@ -74,32 +74,32 @@ void MockClientStream::finish(::grpc::Status* status, GRPCReactor::CompletionQue
     if (auto cancellationStatus = _rpcCancellationState->getCancellationStatus();
         cancellationStatus.has_value()) {
         *status = *cancellationStatus;
-        _reactor->_processCompletionQueueNotification(tag, true /* ok */);
+        _reactor->_processCompletionQueueNotification(tag, /*ok=*/true);
         return;
     }
 
     *status = _rpcReturnStatus.get();
-    _reactor->_processCompletionQueueNotification(tag, true /* ok */);
+    _reactor->_processCompletionQueueNotification(tag, /*ok=*/true);
 }
 
 void MockClientStream::writesDone(GRPCReactor::CompletionQueueEntry* tag) {
-    _reactor->_processCompletionQueueNotification(tag, true /* ok */);
+    _reactor->_processCompletionQueueNotification(tag, /*ok=*/true);
 }
 
 void MockClientStream::startCall(GRPCReactor::CompletionQueueEntry* tag) {
     if (MONGO_unlikely(grpcHangOnStreamEstablishment.shouldFail())) {
         _rpcCancellationState->onCancel().thenRunOn(_reactor).getAsync(
             [reactor = _reactor, tag](Status s) {
-                reactor->_processCompletionQueueNotification(tag, false /* ok */);
+                reactor->_processCompletionQueueNotification(tag, /*ok=*/false);
             });
 
         return;
     } else if (MONGO_unlikely(grpcFailStreamEstablishment.shouldFail())) {
         _cancel();
-        _reactor->_processCompletionQueueNotification(tag, false /* ok */);
+        _reactor->_processCompletionQueueNotification(tag, /*ok=*/false);
         return;
     }
-    _reactor->_processCompletionQueueNotification(tag, true /* ok */);
+    _reactor->_processCompletionQueueNotification(tag, /*ok=*/true);
 }
 
 boost::optional<SharedBuffer> MockClientStream::syncRead(

@@ -1394,7 +1394,7 @@ void ConnectionPool::SpecificPool::returnConnection(
         connPtr->refresh(_parent->_controller->pendingTimeout(),
                          guardCallback([this](auto& lk, auto conn, auto status) {
                              finishRefresh(
-                                 lk, std::move(conn), std::move(status), false /* onSetup */);
+                                 lk, std::move(conn), std::move(status), /*onSetup=*/false);
                          }));
 
         return;
@@ -1585,7 +1585,7 @@ Future<ConnectionPool::ConnectionHandle> ConnectionPool::SpecificPool::setGetCon
     }
     auto pf = makePromiseFuture<ConnectionHandle>();
     auto request = std::make_shared<Request>(
-        0, std::move(pf.promise), false /*lease*/, token, ConnectionAcquisitionPurpose::kNormal);
+        0, std::move(pf.promise), /*lease=*/false, token, ConnectionAcquisitionPurpose::kNormal);
     auto timeoutTimer = _parent->_factory->makeTimer();
     timeoutTimer->setTimeout(failpointTimeout, [request, timeoutTimer, failpointStatus]() mutable {
         request->promise.setError(failpointStatus);
@@ -1694,7 +1694,7 @@ void ConnectionPool::SpecificPool::spawnConnections(WithLock lk) {
         // Run the setup callback
         handle->setup(_parent->_controller->pendingTimeout(),
                       guardCallback([this](auto& lk, auto conn, auto status) {
-                          finishRefresh(lk, std::move(conn), std::move(status), true /* onSetup */);
+                          finishRefresh(lk, std::move(conn), std::move(status), /*onSetup=*/true);
                       }),
                       _parent->getName());
     }

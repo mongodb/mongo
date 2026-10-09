@@ -1409,7 +1409,7 @@ TEST(Simple8b, FlushResetsLastInPreviousWhenFlushingRleZeroRleAfter) {
     }
     {
         Simple8b<uint64_t> s8b(
-            sharedBuffer.get() + sizeAfterFlush, size - sizeAfterFlush, 0 /* previous */);
+            sharedBuffer.get() + sizeAfterFlush, size - sizeAfterFlush, /*previous=*/0);
         assertValuesEqual(s8b, std::vector<boost::optional<uint64_t>>(120, 0));
     }
 }

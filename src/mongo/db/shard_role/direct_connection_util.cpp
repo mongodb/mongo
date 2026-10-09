@@ -67,7 +67,7 @@ void checkDirectShardDDLAllowed(OperationContext* opCtx, const NamespaceString& 
     // parameter should be active in rare cases, like restoring a sharded cluster as a replica set.
     if (enableDirectShardDDLOperations.load()) {
         const auto severity =
-            ShardingState::get(opCtx)->directConnectionLogSeverity(true /* forDirectDDLs */);
+            ShardingState::get(opCtx)->directConnectionLogSeverity(/*forDirectDDLs=*/true);
         LOGV2_DEBUG(11108701,
                     severity.toInt(),
                     "Skipping checking authorization for direct shard ddl operations because "
@@ -112,7 +112,7 @@ void checkDirectShardOperationAllowed(OperationContext* opCtx, const NamespaceSt
                 // per hour. To abide by this, we only log this message once per hour and
                 // rely on the user assertion log (debug 1) otherwise.
                 const auto severity = ShardingState::get(opCtx)->directConnectionLogSeverity(
-                    false /* forDirectDDLs */);
+                    /*forDirectDDLs=*/false);
                 if (severity == logv2::LogSeverity::Warning()) {
                     LOGV2_DEBUG(8679600,
                                 logv2::LogSeverity::Error().toInt(),
@@ -129,7 +129,7 @@ void checkDirectShardOperationAllowed(OperationContext* opCtx, const NamespaceSt
                 // per hour. To abide by this, we log the lower verbosity messages with a
                 // different log ID to prevent log ingestion from picking them up.
                 const auto severity = ShardingState::get(opCtx)->directConnectionLogSeverity(
-                    false /* forDirectDDLs */);
+                    /*forDirectDDLs=*/false);
                 LOGV2_DEBUG(severity == logv2::LogSeverity::Warning() ? 7553700 : 8993900,
                             severity.toInt(),
                             errorMsg,

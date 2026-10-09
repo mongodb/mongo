@@ -89,7 +89,7 @@ public:
 
             const auto requestShardId = request().getCommandParameter();
             auto swShardId = Grid::get(opCtx)->shardRegistry()->resolveShardId(
-                opCtx, requestShardId, true /* allowNonShardIdIdentifiers */);
+                opCtx, requestShardId, /*allowNonShardIdIdentifiers=*/true);
             if (swShardId == ErrorCodes::ShardNotFound) {
                 return;
             }

@@ -174,7 +174,7 @@ StatusWith<ChunkType> findChunkContainingRange(OperationContext* opCtx,
                                             NamespaceString::kConfigsvrChunksNamespace,
                                             chunkQuery,
                                             BSON(ChunkType::min << -1),
-                                            1 /* limit */);
+                                            /*limit=*/1);
 
     if (!findResponseWith.isOK()) {
         return findResponseWith.getStatus();
@@ -410,9 +410,9 @@ void bumpCollectionMinorVersion(OperationContext* opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         repl::ReadConcernArgs::kLocal,
         NamespaceString::kConfigsvrChunksNamespace,
-        BSON(ChunkType::collectionUUID << coll.getUuid()) /* query */,
-        BSON(ChunkType::lastmod << -1) /* sort */,
-        1 /* limit */));
+        /*query=*/BSON(ChunkType::collectionUUID << coll.getUuid()),
+        /*sort=*/BSON(ChunkType::lastmod << -1),
+        /*limit=*/1));
 
     uassert(ErrorCodes::IncompatibleShardingMetadata,
             str::stream() << "Tried to find max chunk version for collection '"
@@ -438,8 +438,7 @@ void bumpCollectionMinorVersion(OperationContext* opCtx,
         BSON(ChunkType::name << newestChunk.getName()),  // query
         chunkUpdate,                                     // update
         false,                                           // upsert
-        false                                            // multi
-    );
+        /*multi=*/false);
 
     const auto res = ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
         opCtx, NamespaceString::kConfigsvrChunksNamespace, request, txnNumber);
@@ -580,7 +579,7 @@ bool isPlacementChangedInParentCollection(OperationContext* opCtx,
                                             NamespaceString::kConfigsvrChunksNamespace,
                                             query,
                                             BSONObj(),
-                                            1 /* limit */));
+                                            /*limit=*/1));
     if (findResponse.docs.empty()) {
         return true;
     }
@@ -740,8 +739,7 @@ void ShardingCatalogManager::bumpMajorVersionOneChunkPerShard(
                                                  query,        // query
                                                  chunkUpdate,  // update
                                                  false,        // upsert
-                                                 false         // multi
-            );
+                                                 /*multi=*/false);
 
         auto res = ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
             opCtx, NamespaceString::kConfigsvrChunksNamespace, request, txnNumber);
@@ -1032,7 +1030,7 @@ ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
                                            range,
                                            splitPoints,
                                            shardName,
-                                           boost::none /* shardVersionPreSplitForRebuild */);
+                                           /*shardVersionPreSplitForRebuild=*/boost::none);
     if (!swOutcome.isOK()) {
         return swOutcome.getStatus();
     }
@@ -1387,7 +1385,7 @@ ShardingCatalogManager::commitChunksMerge(OperationContext* opCtx,
                                             requestCollectionUUID,
                                             chunkRange,
                                             shardId,
-                                            boost::none /* shardVersionPreMergeForRebuild */);
+                                            /*shardVersionPreMergeForRebuild=*/boost::none);
     if (!swOutcome.isOK()) {
         return swOutcome.getStatus();
     }
@@ -1407,7 +1405,7 @@ StatusWith<std::vector<ChunkType>> ShardingCatalogManager::commitMerge(
                                             nss,
                                             shardVersionPreMerge.epoch(),
                                             shardVersionPreMerge.getTimestamp(),
-                                            boost::none /* requestCollectionUUID */,
+                                            /*requestCollectionUUID=*/boost::none,
                                             chunkRange,
                                             shardId,
                                             shardVersionPreMerge);
@@ -1535,7 +1533,7 @@ ShardingCatalogManager::commitMergeAllChunksOnShard(OperationContext* opCtx,
                                 numMergedChunksPerRange.at(i),
                                 _localConfigShard,
                                 _localCatalogClient.get(),
-                                true /*isAutoMerge*/);
+                                /*isAutoMerge=*/true);
 
             // we can know the prevVersion since newChunks vector is sorted by version
             prevVersion = newChunk.getVersion();
@@ -1661,7 +1659,7 @@ ShardingCatalogManager::commitMergeAllPrecomputedChunksOnShard(OperationContext*
                                 numMergedChunksPerRange.at(i),
                                 _localConfigShard,
                                 _localCatalogClient.get(),
-                                true /*isAutoMerge*/);
+                                /*isAutoMerge=*/true);
 
             // newChunks is sorted by version, so we can know prevVersion from the previous chunk.
             prevVersion = newChunk.getVersion();
@@ -2099,7 +2097,7 @@ ShardingCatalogManager::commitChunkMigration(OperationContext* opCtx,
                                   collectionTimestamp,
                                   fromShard,
                                   toShard,
-                                  boost::none /* donorShardVersionPreMigrationForRebuild */);
+                                  /*donorShardVersionPreMigrationForRebuild=*/boost::none);
     if (!swOutcome.isOK()) {
         return swOutcome.getStatus();
     }
@@ -2323,7 +2321,7 @@ void ShardingCatalogManager::clearJumboFlag(OperationContext* opCtx,
                                                   NamespaceString::kConfigsvrChunksNamespace,
                                                   chunkQuery,
                                                   BSON("$unset" << BSON(ChunkType::jumbo() << "")),
-                                                  false /* upsert */,
+                                                  /*upsert=*/false,
                                                   kNoWaitWriteConcern));
 
     uassert(51263,
@@ -2384,7 +2382,7 @@ void ShardingCatalogManager::ensureChunkVersionIsGreaterThan(OperationContext* o
             repl::ReadConcernArgs::kLocal,
             NamespaceString::kConfigsvrCollectionsNamespace,
             BSON(CollectionType::kEpochFieldName << version.epoch()),
-            {} /* sort */,
+            /*sort=*/{},
             1));
 
         if (findCollResponse.docs.empty()) {
@@ -2413,8 +2411,8 @@ void ShardingCatalogManager::ensureChunkVersionIsGreaterThan(OperationContext* o
                                 repl::ReadConcernArgs::kLocal,
                                 NamespaceString::kConfigsvrChunksNamespace,
                                 requestedChunkQuery,
-                                BSONObj() /* sort */,
-                                1 /* limit */))
+                                /*sort=*/BSONObj(),
+                                /*limit=*/1))
                 .docs;
         if (matchingChunksVector.empty()) {
             // This can happen in a number of cases, such as that the collection has been
@@ -2457,8 +2455,8 @@ void ShardingCatalogManager::ensureChunkVersionIsGreaterThan(OperationContext* o
                                 repl::ReadConcernArgs::kLocal,
                                 NamespaceString::kConfigsvrChunksNamespace,
                                 query,
-                                BSON(ChunkType::lastmod << -1) /* sort */,
-                                1 /* limit */))
+                                /*sort=*/BSON(ChunkType::lastmod << -1),
+                                /*limit=*/1))
                 .docs;
         if (highestChunksVector.empty()) {
             LOGV2(23886,
@@ -2488,7 +2486,7 @@ void ShardingCatalogManager::ensureChunkVersionIsGreaterThan(OperationContext* o
                                                   NamespaceString::kConfigsvrChunksNamespace,
                                                   requestedChunkQuery,
                                                   newChunk.toConfigBSON(),
-                                                  false /* upsert */,
+                                                  /*upsert=*/false,
                                                   kNoWaitWriteConcern));
     if (didUpdate) {
         LOGV2(23887,
@@ -2881,7 +2879,7 @@ void ShardingCatalogManager::setChunkEstimatedSize(OperationContext* opCtx,
                                                   NamespaceString::kConfigsvrChunksNamespace,
                                                   chunkQuery,
                                                   updateBuilder.done(),
-                                                  false /* upsert */,
+                                                  /*upsert=*/false,
                                                   writeConcern));
     if (!didUpdate) {
         uasserted(6049401, "Did not update chunk with estimated size");

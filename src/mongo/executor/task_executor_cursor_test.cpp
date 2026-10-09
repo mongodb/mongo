@@ -86,7 +86,7 @@ public:
                                                 bool preFetchNextBatch = true) {
         // pinConnection is a required argument to construct the options, but will be overriden in
         // the base class to the correct value.
-        TaskExecutorCursorOptions options(/*pinConnection*/ false, batchSize, preFetchNextBatch);
+        TaskExecutorCursorOptions options(/*pinConnection=*/false, batchSize, preFetchNextBatch);
         return Base::makeTec(rcr, std::move(options));
     }
 
@@ -383,7 +383,7 @@ public:
                                  findCmd,
                                  opCtx.get());
 
-        auto tec = makeTec(rcr, /*batchSize*/ 3);
+        auto tec = makeTec(rcr, /*batchSize=*/3);
 
         scheduleSuccessfulCursorResponse("firstBatch", 1, 2, cursorId);
 
@@ -437,7 +437,7 @@ public:
                                  findCmd,
                                  opCtx.get());
 
-        auto tec = makeTec(rcr, /*batchSize*/ 3);
+        auto tec = makeTec(rcr, /*batchSize=*/3);
 
         // Schedule a cursor response with an empty "firstBatch". Use end < start so we don't
         // append any doc to "firstBatch".
@@ -475,7 +475,7 @@ public:
                                  findCmd,
                                  opCtx.get());
 
-        auto tec = makeTec(rcr, /*batchSize*/ 3);
+        auto tec = makeTec(rcr, /*batchSize=*/3);
 
         // Schedule a cursor response with a non-empty "firstBatch".
         ASSERT_BSONOBJ_EQ(findCmd, scheduleSuccessfulCursorResponse("firstBatch", 1, 1, cursorId));
@@ -526,11 +526,11 @@ public:
 
             // Construction of the TaskExecutorCursor enqueues a request in the
             // NetworkInterfaceMock.
-            auto tec = makeTec(rcr, /*batchSize*/ 2, /*preFetchNextBatch*/ false);
+            auto tec = makeTec(rcr, /*batchSize=*/2, /*preFetchNextBatch=*/false);
 
             // Mock the response for the first batch.
             scheduleSuccessfulCursorResponse(
-                "firstBatch", 1, 2, cursorId, /*expectedPrefetch*/ false);
+                "firstBatch", 1, 2, cursorId, /*expectedPrefetch=*/false);
 
             // Exhaust the first batch.
             ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), 1);
@@ -549,7 +549,7 @@ public:
             // response on the NetworkInterfaceMock.
             auto responseSchedulerThread = monitor.spawn([&] {
                 auto recievedGetMoreCmd = scheduleSuccessfulCursorResponse(
-                    "nextBatch", 3, 4, 0, /*expectedPrefetch*/ false);
+                    "nextBatch", 3, 4, 0, /*expectedPrefetch=*/false);
 
                 // Assert that the command processed for the above response matches with the
                 // lambda to augment the getMore command used during construction of the TEC
@@ -702,7 +702,7 @@ TEST_F(NonPinningDefaultTaskExecutorCursorTestFixture, LsidIsPassed) {
                              opCtx.get());
 
     std::unique_ptr<TaskExecutorCursor> tec;
-    tec = makeTec(rcr, /*batchSize*/ 1);
+    tec = makeTec(rcr, /*batchSize=*/1);
 
     // lsid in the first batch
     ASSERT_BSONOBJ_EQ(BSON("find" << "test"

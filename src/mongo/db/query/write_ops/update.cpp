@@ -92,7 +92,7 @@ UpdateResult doUpdate(OperationContext* opCtx,
 
     OpDebug* const nullOpDebug = nullptr;
     auto exec = uassertStatusOK(
-        getExecutorUpdate(nullOpDebug, coll, *canonicalUpdate, boost::none /* verbosity */));
+        getExecutorUpdate(nullOpDebug, coll, *canonicalUpdate, /*verbosity=*/boost::none));
 
     PlanExecutor::ExecState state = PlanExecutor::ADVANCED;
     BSONObj image;

@@ -120,7 +120,7 @@ void prepareSearchQueryParameters(PlanStageData* data, const CanonicalQuery& cq)
         env->resetSlot(env->getSlot("searchLimit"sv),
                        sbe::value::TypeTags::NumberInt64,
                        *sn->limit,
-                       true /* owned */);
+                       /*owned=*/true);
     }
 
     if (sn->sortSpec) {
@@ -128,7 +128,7 @@ void prepareSearchQueryParameters(PlanStageData* data, const CanonicalQuery& cq)
         env->resetSlot(env->getSlot("searchSortSpec"sv),
                        sbe::value::TypeTags::sortSpec,
                        sbe::value::bitcastFrom<sbe::SortSpec*>(sortSpec.release()),
-                       true /* owned */);
+                       /*owned=*/true);
     }
 
     if (auto remoteVars = sn->remoteCursorVars) {
@@ -137,12 +137,12 @@ void prepareSearchQueryParameters(PlanStageData* data, const CanonicalQuery& cq)
         auto varsObj = remoteVars->getField(name);
         if (varsObj.ok()) {
             auto [tag, val] = sbe::bson::convertToOwned(varsObj).releaseToRaw();
-            env->resetSlot(env->getSlot(name), tag, val, true /* owned */);
+            env->resetSlot(env->getSlot(name), tag, val, /*owned=*/true);
             // Both the SBE and the classic portions of the query can reference the same value,
             // and this is the only place to set the value if using SBE so we don't worry about
             // inconsistency.
             cq.getExpCtx()->variables.setReservedValue(
-                Variables::kSearchMetaId, mongo::Value(varsObj), true /* isConstant */);
+                Variables::kSearchMetaId, mongo::Value(varsObj), /*isConstant=*/true);
             if (varsObj.type() == BSONType::object) {
                 auto metaValObj = varsObj.embeddedObject();
                 if (metaValObj.hasField("count")) {
@@ -321,7 +321,7 @@ std::pair<SbStage, PlanStageData> buildSearchMetadataExecutorSBE(OperationContex
                                                            data->resultSlot,
                                                            remoteCursorId,
                                                            yieldPolicy,
-                                                           PlanNodeId{} /* planNodeId */);
+                                                           /*planNodeId=*/PlanNodeId{});
 
     env.ctx.remoteCursors = remoteCursors;
     stage->attachToOperationContext(opCtx);
@@ -1150,7 +1150,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildCountScan(
                               csn->endKeyInclusive,
                               indexAccessMethod->getSortedDataInterface()->getKeyStringVersion(),
                               indexAccessMethod->getSortedDataInterface()->getOrdering(),
-                              true /* forward */);
+                              /*forward=*/true);
         isPointInterval = lowKey == highKey;
     } else {
         isPointInterval = ietsArePointInterval(csn->iets);
@@ -1164,7 +1164,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildCountScan(
                                                 collection,
                                                 indexName,
                                                 indexDescriptor->keyPattern(),
-                                                true /* forward */,
+                                                /*forward=*/true,
                                                 std::move(lowKey),
                                                 std::move(highKey),
                                                 ixScanReqs,
@@ -1328,8 +1328,9 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildFetch(const Query
                            fn->filter.get(),
                            resultSlot,
                            outputs,
-                           /*isFilterOverIxscan*/ false,
-                           /*canUsePathArrayness*/
+                           /*isFilterOverIxscan=*/false,
+
+                           /*canUsePathArrayness=*/
                            _state.expCtx->getQueryKnobConfiguration().getEnablePathArrayness());
         if (!filterExpr.isNull()) {
             stage = b.makeFilter(std::move(stage), std::move(filterExpr));
@@ -3835,7 +3836,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::build(const QuerySolut
         _data->metadataSlots.reset();
     }
 
-    outputs.clearNonRequiredSlots(reqsIn, false /*saveResultObj*/);
+    outputs.clearNonRequiredSlots(reqsIn, /*saveResultObj=*/false);
 
     return {std::move(stage), std::move(outputs)};
 }

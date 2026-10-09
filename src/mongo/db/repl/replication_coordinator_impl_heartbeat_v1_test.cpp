@@ -289,8 +289,8 @@ TEST_F(ReplCoordHBV1Test, RestartingHeartbeatsShouldOnlyCancelScheduledHeartbeat
     receiveHeartbeatFrom(rsConfig,
                          /*sourceId=*/3,
                          HostAndPort("node3", 12345),
-                         1 /* term */,
-                         3 /* currentPrimaryId */);
+                         /*term=*/1,
+                         /*currentPrimaryId=*/3);
 
     enterNetwork();
 
@@ -350,8 +350,8 @@ TEST_F(ReplCoordHBV1Test,
     receiveHeartbeatFrom(rsConfig,
                          /*sourceId=*/3,
                          HostAndPort("node3", 12345),
-                         1 /* term */,
-                         3 /* currentPrimaryId */);
+                         /*term=*/1,
+                         /*currentPrimaryId=*/3);
 
     enterNetwork();
     std::set<std::string> expectedHosts{"node2", "node3"};
@@ -375,8 +375,8 @@ TEST_F(ReplCoordHBV1Test,
     receiveHeartbeatFrom(rsConfig,
                          /*sourceId=*/3,
                          HostAndPort("node3", 12345),
-                         0 /* term */,
-                         3 /* currentPrimaryId */);
+                         /*term=*/0,
+                         /*currentPrimaryId=*/3);
     enterNetwork();
     ASSERT_FALSE(getNet()->hasReadyRequests());
     exitNetwork();
@@ -413,8 +413,8 @@ TEST_F(
     receiveHeartbeatFrom(getReplCoord()->getConfig(),
                          /*sourceId=*/2,
                          HostAndPort("node3", 12345),
-                         0 /* term */,
-                         3 /* currentPrimaryId */);
+                         /*term=*/0,
+                         /*currentPrimaryId=*/3);
 
     {
         enterNetwork();
@@ -753,7 +753,7 @@ TEST_F(ReplCoordHBV1ReconfigTest,
         if (field == "t") {
             continue;
         } else if (field == "config") {
-            finalRes.append("config", makeConfigObj(initConfigVersion + 1, boost::none /* term */));
+            finalRes.append("config", makeConfigObj(initConfigVersion + 1, /*term=*/boost::none));
         } else {
             finalRes.append(origResObj[field]);
         }
@@ -1591,7 +1591,7 @@ TEST_F(ReplCoordHBV1Test, handleHeartbeatResponseForTestEnqueuesValidHandle) {
     stdx::thread heartbeatReponseThread([&] {
         Client::initThread("handleHeartbeatResponseForTest",
                            getGlobalServiceContext()->getService());
-        getReplCoord()->handleHeartbeatResponse_forTest(hbRespObj, 1 /* targetIndex */);
+        getReplCoord()->handleHeartbeatResponse_forTest(hbRespObj, /*targetIndex=*/1);
     });
 
     failpoint->waitForTimesEntered(timesEntered + 1);
@@ -1877,20 +1877,20 @@ void HBStepdownAndReconfigTest::sendHBResponse(int targetIndex,
 
 void HBStepdownAndReconfigTest::sendHBResponseWithNewConfig() {
     // Send a heartbeat response from a secondary, with newer config.
-    sendHBResponse(2 /* targetIndex */,
-                   1 /* term */,
-                   3 /* configVersion */,
-                   1 /* configTerm */,
-                   true /* includeConfig */);
+    sendHBResponse(/*targetIndex=*/2,
+                   /*term=*/1,
+                   /*configVersion=*/3,
+                   /*configTerm=*/1,
+                   /*includeConfig=*/true);
 }
 
 void HBStepdownAndReconfigTest::sendHBResponseWithNewTerm() {
     // Send a heartbeat response from a secondary, with higher term.
-    sendHBResponse(1 /* targetIndex */,
-                   2 /* term */,
-                   2 /* configVersion */,
-                   1 /* configTerm */,
-                   false /* includeConfig */);
+    sendHBResponse(/*targetIndex=*/1,
+                   /*term=*/2,
+                   /*configVersion=*/2,
+                   /*configTerm=*/1,
+                   /*includeConfig=*/false);
 }
 
 Future<void> HBStepdownAndReconfigTest::startReconfigCommand() {

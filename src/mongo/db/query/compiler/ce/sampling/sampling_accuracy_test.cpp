@@ -47,10 +47,10 @@ std::pair<DataConfiguration, WorkloadConfiguration> buildConfigs(
     std::vector<DataFieldDefinition> queryFieldDefinitions;
     for (size_t fieldIdx = 0; fieldIdx < queryFields.size(); fieldIdx++) {
         queryFieldDefinitions.push_back(DataFieldDefinition(
-            /*fieldName*/ queryFields[fieldIdx],
+            /*fieldName=*/queryFields[fieldIdx],
             /*fieldDataType=*/queryFieldDataTypes[fieldIdx],
-            /*ndv*/ queryndvs[fieldIdx],
-            /*dataDistribution*/ stats::DistrType::kUniform,
+            /*ndv=*/queryndvs[fieldIdx],
+            /*dataDistribution=*/stats::DistrType::kUniform,
             /*seed (optional)*/ seed_queries[fieldIdx]));
     }
     WorkloadConfiguration queryConfig(numberOfQueries,

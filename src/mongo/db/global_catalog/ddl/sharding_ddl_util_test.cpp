@@ -218,15 +218,15 @@ TEST_F(ShardingDDLUtilTest, RenamePreconditionsAreMet) {
     sharding_ddl_util::checkRenamePreconditions(opCtx,
                                                 kToNss,
                                                 /*optTargetCollType=*/boost::none,
-                                                false /*isSourceUnsharded*/,
-                                                false /* dropTarget */);
+                                                /*isSourceUnsharded=*/false,
+                                                /*dropTarget=*/false);
 
     // Initialize the sharded TO collection
     const auto toColl = setupShardedCollection(kToNss);
 
     // No exception is thrown if the TO collection exists and dropTarget is `true`
     sharding_ddl_util::checkRenamePreconditions(
-        opCtx, kToNss, toColl, false /*isSourceUnsharded*/, true /* dropTarget */);
+        opCtx, kToNss, toColl, /*isSourceUnsharded=*/false, /*dropTarget=*/true);
 }
 
 TEST_F(ShardingDDLUtilTest, RenamePreconditionsTargetNamespaceIsTooLong) {
@@ -242,14 +242,14 @@ TEST_F(ShardingDDLUtilTest, RenamePreconditionsTargetNamespaceIsTooLong) {
         dbName + "." +
         std::string(NamespaceString::MaxUserNsShardedCollectionLen - dbName.length() - 1, 'x'));
     sharding_ddl_util::checkRenamePreconditions(
-        opCtx, longEnoughNss, boost::none, false /*isSourceUnsharded*/, false /* dropTarget */);
+        opCtx, longEnoughNss, boost::none, /*isSourceUnsharded=*/false, /*dropTarget=*/false);
 
     // Check that an exception is thrown if the namespace of the target collection is too long
     const NamespaceString tooLongNss =
         NamespaceString::createNamespaceString_forTest(longEnoughNss.toString_forTest() + 'x');
     ASSERT_THROWS_CODE(
         sharding_ddl_util::checkRenamePreconditions(
-            opCtx, tooLongNss, boost::none, false /*isSourceUnsharded*/, false /* dropTarget */),
+            opCtx, tooLongNss, boost::none, /*isSourceUnsharded=*/false, /*dropTarget=*/false),
         AssertionException,
         ErrorCodes::InvalidNamespace);
 }
@@ -267,14 +267,14 @@ TEST_F(ShardingDDLUtilTest, RenamePreconditionsTargetNamespaceIsTooLongUnsplitta
         dbName + "." +
         std::string(NamespaceString::MaxUserNsCollectionLen - dbName.length() - 1, 'x'));
     sharding_ddl_util::checkRenamePreconditions(
-        opCtx, longEnoughNss, boost::none, true /*isSourceUnsharded*/, false /* dropTarget */);
+        opCtx, longEnoughNss, boost::none, /*isSourceUnsharded=*/true, /*dropTarget=*/false);
 
     // Check that an exception is thrown if the namespace of the target collection is too long
     const NamespaceString tooLongNss =
         NamespaceString::createNamespaceString_forTest(longEnoughNss.toString_forTest() + 'x');
     ASSERT_THROWS_CODE(
         sharding_ddl_util::checkRenamePreconditions(
-            opCtx, tooLongNss, boost::none, true /*isSourceUnsharded*/, false /* dropTarget */),
+            opCtx, tooLongNss, boost::none, /*isSourceUnsharded=*/true, /*dropTarget=*/false),
         AssertionException,
         ErrorCodes::InvalidNamespace);
 }
@@ -291,7 +291,7 @@ TEST_F(ShardingDDLUtilTest, RenamePreconditionsTargetCollectionExists) {
     // Check that an exception is thrown if the target collection exists and dropTarget is not set
     ASSERT_THROWS_CODE(
         sharding_ddl_util::checkRenamePreconditions(
-            opCtx, kToNss, toColl, false /*isSourceUnsharded*/, false /* dropTarget */),
+            opCtx, kToNss, toColl, /*isSourceUnsharded=*/false, /*dropTarget=*/false),
         AssertionException,
         ErrorCodes::NamespaceExists);
 }
@@ -313,11 +313,10 @@ TEST_F(ShardingDDLUtilTest, RenamePreconditionTargetCollectionHasTags) {
     ASSERT_OK(insertToConfigCollection(operationContext(), TagsType::ConfigNS, tagDoc.toBSON()));
 
     // Check that an exception is thrown if some tag is associated to the target collection
-    ASSERT_THROWS_CODE(
-        sharding_ddl_util::checkRenamePreconditions(
-            opCtx, kToNss, toColl, false /*isSourceUnsharded*/, true /* dropTarget */),
-        AssertionException,
-        ErrorCodes::CommandFailed);
+    ASSERT_THROWS_CODE(sharding_ddl_util::checkRenamePreconditions(
+                           opCtx, kToNss, toColl, /*isSourceUnsharded=*/false, /*dropTarget=*/true),
+                       AssertionException,
+                       ErrorCodes::CommandFailed);
 }
 
 TEST_F(ShardingDDLUtilTest, NamespaceTooLong) {
@@ -334,25 +333,25 @@ TEST_F(ShardingDDLUtilTest, NamespaceTooLong) {
 
     // Always valid.
     ASSERT_DOES_NOT_THROW(
-        sharding_ddl_util::assertNamespaceLengthLimit(validNss, true /*isUnsharded*/));
+        sharding_ddl_util::assertNamespaceLengthLimit(validNss, /*isUnsharded=*/true));
     ASSERT_DOES_NOT_THROW(
-        sharding_ddl_util::assertNamespaceLengthLimit(validNss, false /*isUnsharded*/));
+        sharding_ddl_util::assertNamespaceLengthLimit(validNss, /*isUnsharded=*/false));
 
     // Only valid if the collection is unsharded.
     ASSERT_THROWS_CODE(
-        sharding_ddl_util::assertNamespaceLengthLimit(invalidShardedNss, false /*isUnsharded*/),
+        sharding_ddl_util::assertNamespaceLengthLimit(invalidShardedNss, /*isUnsharded=*/false),
         DBException,
         ErrorCodes::InvalidNamespace);
     ASSERT_DOES_NOT_THROW(
-        sharding_ddl_util::assertNamespaceLengthLimit(invalidShardedNss, true /*isUnsharded*/));
+        sharding_ddl_util::assertNamespaceLengthLimit(invalidShardedNss, /*isUnsharded=*/true));
 
     // Never valid.
     ASSERT_THROWS_CODE(
-        sharding_ddl_util::assertNamespaceLengthLimit(invalidNss, true /*isUnsharded*/),
+        sharding_ddl_util::assertNamespaceLengthLimit(invalidNss, /*isUnsharded=*/true),
         DBException,
         ErrorCodes::InvalidNamespace);
     ASSERT_THROWS_CODE(
-        sharding_ddl_util::assertNamespaceLengthLimit(invalidNss, false /*isUnsharded*/),
+        sharding_ddl_util::assertNamespaceLengthLimit(invalidNss, /*isUnsharded=*/false),
         DBException,
         ErrorCodes::InvalidNamespace);
 }

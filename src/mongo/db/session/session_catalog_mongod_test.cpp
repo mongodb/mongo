@@ -107,7 +107,7 @@ TEST_F(MongoDSessionCatalogTest, StepUpCreatesConfigImageCollectionIfSupported) 
     repl::StorageInterface::set(service, std::make_unique<repl::StorageInterfaceImpl>());
 
     auto testProvider = std::make_unique<TestPersistenceProviderCustomizableSupportImageCollection>(
-        true /* supportsImageCollection */);
+        /*supportsImageCollection=*/true);
     auto& rss = rss::ReplicatedStorageService::get(service);
     rss.setPersistenceProvider(std::move(testProvider));
 
@@ -139,7 +139,7 @@ TEST_F(MongoDSessionCatalogTest, StepUpDoesNotCreateConfigImageCollectionIfNotSu
     repl::StorageInterface::set(service, std::make_unique<repl::StorageInterfaceImpl>());
 
     auto testProvider = std::make_unique<TestPersistenceProviderCustomizableSupportImageCollection>(
-        false /* supportsImageCollection */);
+        /*supportsImageCollection=*/false);
     auto& rss = rss::ReplicatedStorageService::get(service);
     rss.setPersistenceProvider(std::move(testProvider));
 

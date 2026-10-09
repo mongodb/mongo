@@ -608,10 +608,10 @@ TEST_F(ShardRegistryTest, GetShardIdAcceptsShardId) {
     auto* opCtx = operationContext();
     ASSERT_EQ(shardId,
               unittest::assertGet(shardRegistry()->resolveShardId(
-                  opCtx, shardId, false /* allowNonShardIdIdentifiers */)));
+                  opCtx, shardId, /*allowNonShardIdIdentifiers=*/false)));
     ASSERT_EQ(shardId,
               unittest::assertGet(shardRegistry()->resolveShardId(
-                  opCtx, shardId, true /* allowNonShardIdIdentifiers */)));
+                  opCtx, shardId, /*allowNonShardIdIdentifiers=*/true)));
 }
 
 TEST_F(ShardRegistryTest, GetShardIdRejectsUnknownIdentifier) {
@@ -625,7 +625,7 @@ TEST_F(ShardRegistryTest, GetShardIdRejectsUnknownIdentifier) {
     auto future = launchAsync([this, opCtx, unknownShard] {
         ASSERT_EQ(ErrorCodes::ShardNotFound,
                   shardRegistry()
-                      ->resolveShardId(opCtx, unknownShard, false /* allowNonShardIdIdentifiers */)
+                      ->resolveShardId(opCtx, unknownShard, /*allowNonShardIdIdentifiers=*/false)
                       .getStatus());
     });
     expectCSRSLookup();
@@ -634,7 +634,7 @@ TEST_F(ShardRegistryTest, GetShardIdRejectsUnknownIdentifier) {
     future = launchAsync([this, opCtx, unknownShard] {
         ASSERT_EQ(ErrorCodes::ShardNotFound,
                   shardRegistry()
-                      ->resolveShardId(opCtx, unknownShard, true /* allowNonShardIdIdentifiers */)
+                      ->resolveShardId(opCtx, unknownShard, /*allowNonShardIdIdentifiers=*/true)
                       .getStatus());
     });
     expectCSRSLookup();
@@ -654,12 +654,12 @@ TEST_F(ShardRegistryTest, GetShardIdAllowsAlternateIdentifiers) {
     auto* opCtx = operationContext();
     ASSERT_EQ(shardId,
               unittest::assertGet(shardRegistry()->resolveShardId(
-                  opCtx, hostAndPortId, true /* allowNonShardIdIdentifiers */)));
+                  opCtx, hostAndPortId, /*allowNonShardIdIdentifiers=*/true)));
 
     auto future = launchAsync([this, opCtx, hostAndPortId] {
         ASSERT_EQ(ErrorCodes::ShardNotFound,
                   shardRegistry()
-                      ->resolveShardId(opCtx, hostAndPortId, false /* allowNonShardIdIdentifiers */)
+                      ->resolveShardId(opCtx, hostAndPortId, /*allowNonShardIdIdentifiers=*/false)
                       .getStatus());
     });
     expectCSRSLookup();

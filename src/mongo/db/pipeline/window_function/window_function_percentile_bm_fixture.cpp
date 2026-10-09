@@ -23,7 +23,7 @@ namespace mongo {
 using std::vector;
 vector<double> generateNormalData(size_t n) {
     std::mt19937 generator(curTimeMillis64());
-    boost::random::normal_distribution<double> dist(0.0 /* mean */, 1.0 /* sigma */);
+    boost::random::normal_distribution<double> dist(/*mean=*/0.0, /*sigma=*/1.0);
 
     vector<double> inputs;
     inputs.reserve(n);

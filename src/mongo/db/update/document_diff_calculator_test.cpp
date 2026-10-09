@@ -32,7 +32,7 @@ TEST(IndexUpdateIdentifierTest, Empty) {
     auto postObj = fromjson("{a: 1, b: 1}");
     auto oplogDiff = doc_diff::computeOplogDiff_forTest(preObj, postObj);
 
-    doc_diff::IndexUpdateIdentifier updateIdentifier(1 /* numIndexes */);
+    doc_diff::IndexUpdateIdentifier updateIdentifier(/*numIndexes=*/1);
 
     // No indexes affected because we do not have any.
     ASSERT_TRUE(updateIdentifier.determineAffectedIndexes(oplogDiff).none());
@@ -44,7 +44,7 @@ TEST(IndexUpdateIdentifierTest, EmptyDiff) {
     ASSERT_TRUE(oplogDiff.isEmpty());
 
     {
-        doc_diff::IndexUpdateIdentifier updateIdentifier(1 /* numIndexes */);
+        doc_diff::IndexUpdateIdentifier updateIdentifier(/*numIndexes=*/1);
         {
             UpdateIndexData uid;
             uid.addPath(FieldRef("a"));
@@ -56,7 +56,7 @@ TEST(IndexUpdateIdentifierTest, EmptyDiff) {
     }
 
     {
-        doc_diff::IndexUpdateIdentifier updateIdentifier(1 /* numIndexes */);
+        doc_diff::IndexUpdateIdentifier updateIdentifier(/*numIndexes=*/1);
         {
             UpdateIndexData uid;
             uid.addPathComponent("a"sv);
@@ -74,7 +74,7 @@ TEST(IndexUpdateIdentifierTest, DiffForSingleIndex) {
     auto oplogDiff = doc_diff::computeOplogDiff_forTest(preObj, postObj);
 
     {
-        doc_diff::IndexUpdateIdentifier updateIdentifier(1 /* numIndexes */);
+        doc_diff::IndexUpdateIdentifier updateIdentifier(/*numIndexes=*/1);
         {
             UpdateIndexData uid;
             uid.addPath(FieldRef("a"));
@@ -87,7 +87,7 @@ TEST(IndexUpdateIdentifierTest, DiffForSingleIndex) {
     }
 
     {
-        doc_diff::IndexUpdateIdentifier updateIdentifier(1 /* numIndexes */);
+        doc_diff::IndexUpdateIdentifier updateIdentifier(/*numIndexes=*/1);
         {
             UpdateIndexData uid;
             uid.addPathComponent("a"sv);
@@ -106,7 +106,7 @@ TEST(IndexUpdateIdentifierTest, DiffForSingleIndexDottedField) {
     auto oplogDiff = doc_diff::computeOplogDiff_forTest(preObj, postObj);
 
     {
-        doc_diff::IndexUpdateIdentifier updateIdentifier(1 /* numIndexes */);
+        doc_diff::IndexUpdateIdentifier updateIdentifier(/*numIndexes=*/1);
         {
             UpdateIndexData uid;
             uid.addPath(FieldRef("a.b"));
@@ -119,7 +119,7 @@ TEST(IndexUpdateIdentifierTest, DiffForSingleIndexDottedField) {
     }
 
     {
-        doc_diff::IndexUpdateIdentifier updateIdentifier(1 /* numIndexes */);
+        doc_diff::IndexUpdateIdentifier updateIdentifier(/*numIndexes=*/1);
         {
             UpdateIndexData uid;
             uid.addPath(FieldRef("b.a"));
@@ -132,7 +132,7 @@ TEST(IndexUpdateIdentifierTest, DiffForSingleIndexDottedField) {
     }
 
     {
-        doc_diff::IndexUpdateIdentifier updateIdentifier(1 /* numIndexes */);
+        doc_diff::IndexUpdateIdentifier updateIdentifier(/*numIndexes=*/1);
         {
             UpdateIndexData uid;
             uid.addPathComponent("a"sv);
@@ -145,7 +145,7 @@ TEST(IndexUpdateIdentifierTest, DiffForSingleIndexDottedField) {
     }
 
     {
-        doc_diff::IndexUpdateIdentifier updateIdentifier(1 /* numIndexes */);
+        doc_diff::IndexUpdateIdentifier updateIdentifier(/*numIndexes=*/1);
         {
             UpdateIndexData uid;
             uid.addPathComponent("b"sv);
@@ -158,7 +158,7 @@ TEST(IndexUpdateIdentifierTest, DiffForSingleIndexDottedField) {
     }
 
     {
-        doc_diff::IndexUpdateIdentifier updateIdentifier(1 /* numIndexes */);
+        doc_diff::IndexUpdateIdentifier updateIdentifier(/*numIndexes=*/1);
         {
             UpdateIndexData uid;
             uid.addPathComponent("c"sv);
@@ -177,7 +177,7 @@ TEST(IndexUpdateIdentifierTest, DiffForMultipleIndexesAllAffected) {
     auto oplogDiff = doc_diff::computeOplogDiff_forTest(preObj, postObj);
 
     {
-        doc_diff::IndexUpdateIdentifier updateIdentifier(3 /* numIndexes */);
+        doc_diff::IndexUpdateIdentifier updateIdentifier(/*numIndexes=*/3);
         {
             UpdateIndexData uid;
             uid.addPath(FieldRef("a"));
@@ -201,7 +201,7 @@ TEST(IndexUpdateIdentifierTest, DiffForMultipleIndexesAllAffected) {
     }
 
     {
-        doc_diff::IndexUpdateIdentifier updateIdentifier(3 /* numIndexes */);
+        doc_diff::IndexUpdateIdentifier updateIdentifier(/*numIndexes=*/3);
         {
             UpdateIndexData uid;
             uid.addPathComponent("a"sv);
@@ -231,7 +231,7 @@ TEST(IndexUpdateIdentifierTest, DiffForMultipleIndexesSomeAffected) {
     auto oplogDiff = doc_diff::computeOplogDiff_forTest(preObj, postObj);
 
     {
-        doc_diff::IndexUpdateIdentifier updateIdentifier(4 /* numIndexes */);
+        doc_diff::IndexUpdateIdentifier updateIdentifier(/*numIndexes=*/4);
         {
             UpdateIndexData uid;
             uid.addPath(FieldRef("a"));
@@ -265,7 +265,7 @@ TEST(IndexUpdateIdentifierTest, DiffForMultipleIndexesSomeAffected) {
     }
 
     {
-        doc_diff::IndexUpdateIdentifier updateIdentifier(4 /* numIndexes */);
+        doc_diff::IndexUpdateIdentifier updateIdentifier(/*numIndexes=*/4);
         {
             UpdateIndexData uid;
             uid.addPathComponent("a"sv);
@@ -305,7 +305,7 @@ TEST(IndexUpdateIdentifierTest, DiffOnlyForNonIndexedFields) {
     auto oplogDiff = doc_diff::computeOplogDiff_forTest(preObj, postObj);
 
     {
-        doc_diff::IndexUpdateIdentifier updateIdentifier(2 /* numIndexes */);
+        doc_diff::IndexUpdateIdentifier updateIdentifier(/*numIndexes=*/2);
         {
             UpdateIndexData uid;
             uid.addPath(FieldRef("a"));
@@ -323,7 +323,7 @@ TEST(IndexUpdateIdentifierTest, DiffOnlyForNonIndexedFields) {
     }
 
     {
-        doc_diff::IndexUpdateIdentifier updateIdentifier(2 /* numIndexes */);
+        doc_diff::IndexUpdateIdentifier updateIdentifier(/*numIndexes=*/2);
         {
             UpdateIndexData uid;
             uid.addPathComponent("a"sv);
@@ -347,7 +347,7 @@ TEST(IndexUpdateIdentifierTest, DiffForArrayField) {
     auto oplogDiff = doc_diff::computeOplogDiff_forTest(preObj, postObj);
 
     {
-        doc_diff::IndexUpdateIdentifier updateIdentifier(2 /* numIndexes */);
+        doc_diff::IndexUpdateIdentifier updateIdentifier(/*numIndexes=*/2);
         {
             UpdateIndexData uid;
             uid.addPath(FieldRef("a"));
@@ -366,7 +366,7 @@ TEST(IndexUpdateIdentifierTest, DiffForArrayField) {
     }
 
     {
-        doc_diff::IndexUpdateIdentifier updateIdentifier(2 /* numIndexes */);
+        doc_diff::IndexUpdateIdentifier updateIdentifier(/*numIndexes=*/2);
         {
             UpdateIndexData uid;
             uid.addPathComponent("a"sv);
@@ -391,7 +391,7 @@ TEST(IndexUpdateIdentifierTest, DiffForArrayOfObjectsField) {
     auto oplogDiff = doc_diff::computeOplogDiff_forTest(preObj, postObj);
 
     {
-        doc_diff::IndexUpdateIdentifier updateIdentifier(2 /* numIndexes */);
+        doc_diff::IndexUpdateIdentifier updateIdentifier(/*numIndexes=*/2);
         {
             UpdateIndexData uid;
             uid.addPath(FieldRef("a.b"));
@@ -416,7 +416,7 @@ TEST(IndexUpdateIdentifierTest, DiffForDollarPrefixField) {
     auto oplogDiff = doc_diff::computeOplogDiff_forTest(preObj, postObj);
 
     {
-        doc_diff::IndexUpdateIdentifier updateIdentifier(2 /* numIndexes */);
+        doc_diff::IndexUpdateIdentifier updateIdentifier(/*numIndexes=*/2);
         {
             UpdateIndexData uid;
             uid.addPath(FieldRef("a.$b"));
@@ -440,7 +440,7 @@ TEST(IndexUpdateIdentifierTest, DiffForSingleWildcardIndex) {
     auto postObj = fromjson("{a: 2, b: 2, c: 2}");
     auto oplogDiff = doc_diff::computeOplogDiff_forTest(preObj, postObj);
 
-    doc_diff::IndexUpdateIdentifier updateIdentifier(1 /* numIndexes */);
+    doc_diff::IndexUpdateIdentifier updateIdentifier(/*numIndexes=*/1);
     {
         UpdateIndexData uid;
 
@@ -459,7 +459,7 @@ TEST(IndexUpdateIdentifierTest, DiffForMultipleWildcardIndexes) {
     auto postObj = fromjson("{a: 2, b: 2, c: 2}");
     auto oplogDiff = doc_diff::computeOplogDiff_forTest(preObj, postObj);
 
-    doc_diff::IndexUpdateIdentifier updateIdentifier(3 /* numIndexes */);
+    doc_diff::IndexUpdateIdentifier updateIdentifier(/*numIndexes=*/3);
     {
         UpdateIndexData uid;
 
@@ -496,7 +496,7 @@ TEST(IndexUpdateIdentifierTest, DiffForWildcardIndexCombination) {
     auto postObj = fromjson("{a: 2, b: 1, c: 2}");
     auto oplogDiff = doc_diff::computeOplogDiff_forTest(preObj, postObj);
 
-    doc_diff::IndexUpdateIdentifier updateIdentifier(3 /* numIndexes */);
+    doc_diff::IndexUpdateIdentifier updateIdentifier(/*numIndexes=*/3);
     {
         UpdateIndexData uid;
         uid.addPath(FieldRef("a"));
@@ -539,7 +539,7 @@ TEST(IndexUpdateIdentifierTest, BinaryDiffForSingleIndex) {
     auto oplogDiff = diffNode.serialize();
 
     {
-        doc_diff::IndexUpdateIdentifier updateIdentifier(1 /* numIndexes */);
+        doc_diff::IndexUpdateIdentifier updateIdentifier(/*numIndexes=*/1);
         {
             UpdateIndexData uid;
             uid.addPath(FieldRef("a"));
@@ -552,7 +552,7 @@ TEST(IndexUpdateIdentifierTest, BinaryDiffForSingleIndex) {
     }
 
     {
-        doc_diff::IndexUpdateIdentifier updateIdentifier(1 /* numIndexes */);
+        doc_diff::IndexUpdateIdentifier updateIdentifier(/*numIndexes=*/1);
         {
             UpdateIndexData uid;
             uid.addPathComponent("a"sv);
@@ -580,7 +580,7 @@ TEST(IndexUpdateIdentifierTest, BinaryDiffForSingleIndexDottedField) {
     auto oplogDiff = diffRoot.serialize();
 
     {
-        doc_diff::IndexUpdateIdentifier updateIdentifier(1 /* numIndexes */);
+        doc_diff::IndexUpdateIdentifier updateIdentifier(/*numIndexes=*/1);
         {
             UpdateIndexData uid;
             uid.addPath(FieldRef("a.b"));
@@ -593,7 +593,7 @@ TEST(IndexUpdateIdentifierTest, BinaryDiffForSingleIndexDottedField) {
     }
 
     {
-        doc_diff::IndexUpdateIdentifier updateIdentifier(1 /* numIndexes */);
+        doc_diff::IndexUpdateIdentifier updateIdentifier(/*numIndexes=*/1);
         {
             UpdateIndexData uid;
             uid.addPath(FieldRef("b.a"));
@@ -606,7 +606,7 @@ TEST(IndexUpdateIdentifierTest, BinaryDiffForSingleIndexDottedField) {
     }
 
     {
-        doc_diff::IndexUpdateIdentifier updateIdentifier(1 /* numIndexes */);
+        doc_diff::IndexUpdateIdentifier updateIdentifier(/*numIndexes=*/1);
         {
             UpdateIndexData uid;
             uid.addPathComponent("a"sv);
@@ -619,7 +619,7 @@ TEST(IndexUpdateIdentifierTest, BinaryDiffForSingleIndexDottedField) {
     }
 
     {
-        doc_diff::IndexUpdateIdentifier updateIdentifier(1 /* numIndexes */);
+        doc_diff::IndexUpdateIdentifier updateIdentifier(/*numIndexes=*/1);
         {
             UpdateIndexData uid;
             uid.addPathComponent("b"sv);
@@ -632,7 +632,7 @@ TEST(IndexUpdateIdentifierTest, BinaryDiffForSingleIndexDottedField) {
     }
 
     {
-        doc_diff::IndexUpdateIdentifier updateIdentifier(1 /* numIndexes */);
+        doc_diff::IndexUpdateIdentifier updateIdentifier(/*numIndexes=*/1);
         {
             UpdateIndexData uid;
             uid.addPathComponent("c"sv);
@@ -648,7 +648,7 @@ TEST(IndexUpdateIdentifierTest, BinaryDiffForSingleIndexDottedField) {
 DEATH_TEST_REGEX(IndexUpdateIdentifierTestDeathTest,
                  FailsWhenAnIndexIsAddedWIthWrongCounter,
                  R"#(Tripwire assertion.*7639000.*indexCounter should be less than _numIndexes)#") {
-    doc_diff::IndexUpdateIdentifier updateIdentifier(1 /* numIndexes */);
+    doc_diff::IndexUpdateIdentifier updateIdentifier(/*numIndexes=*/1);
     {
         UpdateIndexData uid;
 

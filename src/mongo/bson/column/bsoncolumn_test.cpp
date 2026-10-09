@@ -8009,7 +8009,7 @@ TEST_F(BSONColumnTest, InterleavedArrayAppend) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, elems, false /* testPathDecompression */);
+    verifyDecompression(binData, elems, /*testPathDecompression=*/false);
 }
 
 TEST_F(BSONColumnTest, InterleavedIncompatibleMerge) {
@@ -8312,7 +8312,7 @@ TEST_F(BSONColumnTest, ObjectEmpty) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, elems, false /* testPathDecompression */);
+    verifyDecompression(binData, elems, /*testPathDecompression=*/false);
 }
 
 TEST_F(BSONColumnTest, ObjectEmptyAfterNonEmpty) {
@@ -8333,7 +8333,7 @@ TEST_F(BSONColumnTest, ObjectEmptyAfterNonEmpty) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, elems, false /* testPathDecompression */);
+    verifyDecompression(binData, elems, /*testPathDecompression=*/false);
 }
 
 TEST_F(BSONColumnTest, ObjectEmptyAfterNonEmptyLegacyDecompression) {
@@ -8348,7 +8348,7 @@ TEST_F(BSONColumnTest, ObjectEmptyAfterNonEmptyLegacyDecompression) {
     appendLiteral(expected, elems[1]);
     appendEOO(expected);
 
-    verifyDecompression(expected, elems, false /* testPathDecompression */);
+    verifyDecompression(expected, elems, /*testPathDecompression=*/false);
 }
 
 TEST_F(BSONColumnTest, ObjectWithOnlyEmptyObjsDoesNotStartInterleaving) {
@@ -8367,7 +8367,7 @@ TEST_F(BSONColumnTest, ObjectWithOnlyEmptyObjsDoesNotStartInterleaving) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, elems, false /* testPathDecompression */);
+    verifyDecompression(binData, elems, /*testPathDecompression=*/false);
 }
 
 TEST_F(BSONColumnTest, ObjectWithOnlyEmptyObjsDoesNotStartInterleavingFromDetermine) {
@@ -8393,7 +8393,7 @@ TEST_F(BSONColumnTest, ObjectWithOnlyEmptyObjsDoesNotStartInterleavingFromDeterm
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, elems, false /* testPathDecompression */);
+    verifyDecompression(binData, elems, /*testPathDecompression=*/false);
 }
 
 TEST_F(BSONColumnTest,
@@ -8415,7 +8415,7 @@ TEST_F(BSONColumnTest,
     appendLiteral(expected, elems[1]);
     appendEOO(expected);
 
-    verifyDecompression(expected, elems, false /* testPathDecompression */);
+    verifyDecompression(expected, elems, /*testPathDecompression=*/false);
 }
 
 
@@ -8454,7 +8454,7 @@ TEST_F(BSONColumnTest, ObjectWithOnlyEmptyObjsDoesNotStartInterleavingFromAppend
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, elems, false /* testPathDecompression */);
+    verifyDecompression(binData, elems, /*testPathDecompression=*/false);
 }
 
 TEST_F(BSONColumnTest,
@@ -8487,7 +8487,7 @@ TEST_F(BSONColumnTest,
     appendLiteral(expected, elems[6]);
     appendEOO(expected);
 
-    verifyDecompression(expected, elems, false /* testPathDecompression */);
+    verifyDecompression(expected, elems, /*testPathDecompression=*/false);
 }
 
 TEST_F(BSONColumnTest, InterleavedFullSkipAfterObjectSkip) {
@@ -9733,7 +9733,7 @@ TEST_F(BSONColumnTest, EmptyObjectSkipAndInterleaved) {
 
     auto binData = cb.finalize();
 
-    verifyDecompression(binData, elems, false /* testPathDecompression */);
+    verifyDecompression(binData, elems, /*testPathDecompression=*/false);
     verifyDecompressPathFast(binData, elems, TestPath{{"a"}});
     verifyDecompressPathFast(binData, elems, TestPath{{"b"}});
     verifyDecompressPathFast(binData, elems, TestPath{{}});

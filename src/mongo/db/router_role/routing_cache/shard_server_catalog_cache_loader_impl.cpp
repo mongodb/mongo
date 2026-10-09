@@ -145,7 +145,7 @@ Status persistCollectionAndChangedChunks(OperationContext* opCtx,
         BSON(ShardCollectionType::kNssFieldName
              << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())),
         update.toBSON(),
-        true /*upsert*/);
+        /*upsert=*/true);
     if (!status.isOK()) {
         return status;
     }
@@ -185,7 +185,7 @@ Status persistDbVersion(OperationContext* opCtx, const DatabaseType& dbt) {
              << DatabaseNameUtil::serialize(dbt.getDbName(), SerializationContext::stateDefault())),
         dbt.toBSON(),
         BSONObj(),
-        true /*upsert*/);
+        /*upsert=*/true);
     if (!status.isOK()) {
         return status;
     }

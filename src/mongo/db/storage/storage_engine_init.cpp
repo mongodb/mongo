@@ -196,7 +196,7 @@ StorageEngine::LastShutdownState reinitializeStorageEngine(
     auto service = opCtx->getServiceContext();
     shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
     // Tell storage engine to free memory since the process is not exiting.
-    shutdownGlobalStorageEngineCleanly(service, false /* memLeakAllowed */);
+    shutdownGlobalStorageEngineCleanly(service, /*memLeakAllowed=*/false);
     shard_role_details::setRecoveryUnit(opCtx,
                                         std::make_unique<RecoveryUnitNoop>(),
                                         WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);

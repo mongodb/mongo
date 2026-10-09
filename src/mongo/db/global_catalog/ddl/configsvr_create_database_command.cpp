@@ -97,9 +97,9 @@ public:
                         DatabaseNameUtil::deserialize(boost::none,
                                                       str::toLower(dbNameStr),
                                                       request().getSerializationContext()),
-                        "createDatabase" /* reason */,
+                        /*reason=*/"createDatabase",
                         MODE_X,
-                        true /*waitForRecovery*/);
+                        /*waitForRecovery=*/true);
                 }
 
                 boost::optional<FixedFCVRegion> fixedFcvRegion{opCtx};

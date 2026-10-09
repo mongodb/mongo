@@ -72,8 +72,8 @@ const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("Tes
 
 RoutingTableHistory makeUpdatedRoutingTable(const RoutingTableHistory& rt,
                                             std::vector<ChunkType> chunks) {
-    return rt.makeUpdated(boost::none /* timeseriesFields */,
-                          boost::none /* reshardingFields */,
+    return rt.makeUpdated(/*timeseriesFields=*/boost::none,
+                          /*reshardingFields=*/boost::none,
                           true,
                           false, /* unsplittable */
                           {std::move(chunks)});
@@ -176,8 +176,8 @@ public:
                                             false,
                                             _epoch,
                                             _collTimestamp,
-                                            boost::none /* timeseriesFields */,
-                                            boost::none /* reshardingFields */,
+                                            /*timeseriesFields=*/boost::none,
+                                            /*reshardingFields=*/boost::none,
                                             true,
                                             chunks);
     }
@@ -203,7 +203,7 @@ public:
                                        getShardKeyPattern().globalMax()};
         ChunkVersion version{{collEpoch(), collTimestamp()}, {1, 0}};
         auto chunks =
-            genChunkVector(collUUID(), _initialChunkBoundaryPoints, version, 1 /* numShards */);
+            genChunkVector(collUUID(), _initialChunkBoundaryPoints, version, /*numShards=*/1);
 
         _rt.emplace(makeNewRt(chunks));
 
@@ -286,7 +286,7 @@ TEST_F(RoutingTableHistoryTest, RandomCreateBasic) {
  * also cover the case for which min/max key is missing.
  */
 TEST_F(RoutingTableHistoryTest, RandomCreateWithMissingChunkFail) {
-    auto chunks = genRandomChunkVector(2 /*minNumChunks*/);
+    auto chunks = genRandomChunkVector(/*minNumChunks=*/2);
 
     // Remove one random chunk to simulate a gap in the shardkey
     chunks.erase(chunks.begin() + _random.nextInt64(chunks.size()));
@@ -302,7 +302,7 @@ TEST_F(RoutingTableHistoryTest, RandomCreateWithMissingChunkFail) {
  * The gap is produced by shrinking the range of a random chunk.
  */
 TEST_F(RoutingTableHistoryTest, RandomCreateWithChunkGapFail) {
-    auto chunks = genRandomChunkVector(2 /*minNumChunks*/);
+    auto chunks = genRandomChunkVector(/*minNumChunks=*/2);
 
     auto& shrinkedChunk = chunks.at(_random.nextInt64(chunks.size()));
     auto intermediateKey =
@@ -353,7 +353,7 @@ TEST_F(RoutingTableHistoryTest, RandomUpdateWithChunkGapFail) {
  * Creating a Routing Table with overlapping chunks must fail.
  */
 TEST_F(RoutingTableHistoryTest, RandomCreateWithChunkOverlapFail) {
-    auto chunks = genRandomChunkVector(2 /* minNumChunks */);
+    auto chunks = genRandomChunkVector(/*minNumChunks=*/2);
 
     auto chunkToExtendIt = chunks.begin() + _random.nextInt64(chunks.size());
 
@@ -364,8 +364,8 @@ TEST_F(RoutingTableHistoryTest, RandomCreateWithChunkOverlapFail) {
     if (extendRight) {
         auto newMax = calculateIntermediateShardKey(chunkToExtendIt->getMax(),
                                                     std::next(chunkToExtendIt)->getMax(),
-                                                    0.0 /* minKeyProb */,
-                                                    0.1 /* maxKeyProb */);
+                                                    /*minKeyProb=*/0.0,
+                                                    /*maxKeyProb=*/0.1);
         // extend right bound
         chunkToExtendIt->setRange({chunkToExtendIt->getMin(), newMax});
         auto newVersion = chunkToExtendIt->getVersion();
@@ -377,8 +377,8 @@ TEST_F(RoutingTableHistoryTest, RandomCreateWithChunkOverlapFail) {
         invariant(canExtendLeft);
         auto newMin = calculateIntermediateShardKey(std::prev(chunkToExtendIt)->getMin(),
                                                     chunkToExtendIt->getMin(),
-                                                    0.1 /* minKeyProb */,
-                                                    0.0 /* maxKeyProb */);
+                                                    /*minKeyProb=*/0.1,
+                                                    /*maxKeyProb=*/0.0);
 
         // extend left bound
         chunkToExtendIt->setRange({newMin, chunkToExtendIt->getMax()});
@@ -395,7 +395,7 @@ TEST_F(RoutingTableHistoryTest, RandomCreateWithChunkOverlapFail) {
  * Updating a ChunkMap with overlapping chunks must fail.
  */
 TEST_F(RoutingTableHistoryTest, RandomUpdateWithChunkOverlapFail) {
-    auto chunks = genRandomChunkVector(2 /* minNumChunks */);
+    auto chunks = genRandomChunkVector(/*minNumChunks=*/2);
 
     // Create a new routing table from the randomly generated chunks
     auto rt = makeNewRt(chunks);
@@ -594,16 +594,16 @@ TEST_F(RoutingTableHistoryTest, AllowMigrationFlag) {
                                                false,
                                                collEpoch(),
                                                collTimestamp(),
-                                               boost::none /* timeseriesFields */,
-                                               boost::none /* reshardingFields */,
+                                               /*timeseriesFields=*/boost::none,
+                                               /*reshardingFields=*/boost::none,
                                                allowMigrationsValue,
                                                chunks);
         ASSERT_EQ(allowMigrationsValue, rt.allowMigrations());
 
         // Create an updated routing table with flipped allowMigration flag
         allowMigrationsValue = !allowMigrationsValue;
-        rt = rt.makeUpdated(boost::none /* timeseriesFields */,
-                            boost::none /* reshardingFields */,
+        rt = rt.makeUpdated(/*timeseriesFields=*/boost::none,
+                            /*reshardingFields=*/boost::none,
                             allowMigrationsValue,
                             false, /* unsplittable */
                             {makeUpdatedChunk(rt.getVersion())});
@@ -611,8 +611,8 @@ TEST_F(RoutingTableHistoryTest, AllowMigrationFlag) {
 
         // Change back the allow migration flag to the original value
         allowMigrationsValue = !allowMigrationsValue;
-        rt = rt.makeUpdated(boost::none /* timeseriesFields */,
-                            boost::none /* reshardingFields */,
+        rt = rt.makeUpdated(/*timeseriesFields=*/boost::none,
+                            /*reshardingFields=*/boost::none,
                             allowMigrationsValue,
                             false, /* unsplittable */
                             {makeUpdatedChunk(rt.getVersion())});
@@ -918,8 +918,8 @@ public:
                                                         false,
                                                         collEpoch(),
                                                         collTimestamp(),
-                                                        boost::none /* timeseriesFields */,
-                                                        boost::none /* reshardingFields */,
+                                                        /*timeseriesFields=*/boost::none,
+                                                        /*reshardingFields=*/boost::none,
                                                         true,
                                                         chunks);
     }
@@ -969,7 +969,7 @@ TEST_F(RoutingTableHistoryGapTest, CreateWithGapsSucceeds) {
 // Mirror of RandomCreateWithMissingChunkFail: a chunk vector with a chunk missing is rejected by
 // makeNew but accepted by makeNewAllowingGaps.
 TEST_F(RoutingTableHistoryGapTest, RandomCreateWithMissingChunkSucceedsAllowingGaps) {
-    auto chunks = genRandomChunkVector(2 /* minNumChunks */);
+    auto chunks = genRandomChunkVector(/*minNumChunks=*/2);
     chunks.erase(chunks.begin() + _random.nextInt64(chunks.size()));
 
     ASSERT_THROWS_CODE(makeNewRt(chunks), DBException, ErrorCodes::ChunkMetadataInconsistency);
@@ -981,7 +981,7 @@ TEST_F(RoutingTableHistoryGapTest, RandomCreateWithMissingChunkSucceedsAllowingG
 // Mirror of RandomCreateWithChunkGapFail: shrinking a chunk to open a gap is rejected by makeNew
 // but accepted by makeNewAllowingGaps.
 TEST_F(RoutingTableHistoryGapTest, RandomCreateWithChunkGapSucceedsAllowingGaps) {
-    auto chunks = genRandomChunkVector(2 /* minNumChunks */);
+    auto chunks = genRandomChunkVector(/*minNumChunks=*/2);
 
     auto& shrinkedChunk = chunks.at(_random.nextInt64(chunks.size()));
     auto intermediateKey =

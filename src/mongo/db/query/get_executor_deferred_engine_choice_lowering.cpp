@@ -53,7 +53,7 @@ public:
             tassert(11974305,
                     "Expected no query solution for idhack queries.",
                     _rankingResult.solutions.empty());
-            return makeClassicExecutor(nullptr /* solution */);
+            return makeClassicExecutor(/*solution=*/nullptr);
         } else {
             tassert(11974304,
                     "Expected 1 query solutions for non-idhack queries",
@@ -182,7 +182,7 @@ private:
                                                       remoteCursors.get());
 
         // Count queries are not supported in SBE
-        buildRejectedExecutableTreesForExplain(solution.get(), false /*isCountQuery*/);
+        buildRejectedExecutableTreesForExplain(solution.get(), /*isCountQuery=*/false);
 
         static const bool isFromSbePlanCache = false;
         return plan_executor_factory::make(_opCtx,
@@ -195,8 +195,8 @@ private:
                                            std::move(sbeYieldPolicy),
                                            isFromSbePlanCache,
                                            _rankingResult.cachedPlanHash,
-                                           false /*usedJoinOpt*/,
-                                           {} /*rejectedJoinPlans*/,
+                                           /*usedJoinOpt=*/false,
+                                           /*rejectedJoinPlans=*/{},
                                            std::move(remoteCursors),
                                            std::move(remoteExplains),
                                            extractMps(),
@@ -253,7 +253,7 @@ private:
             buildRejectedExecutableTreesForExplain(
                 solutionPtr, true, countStage->getLimit(), countStage->getSkip());
         } else {
-            buildRejectedExecutableTreesForExplain(solutionPtr, false /*isCountQuery*/);
+            buildRejectedExecutableTreesForExplain(solutionPtr, /*isCountQuery=*/false);
         }
 
         return plan_executor_factory::make(

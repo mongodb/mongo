@@ -34,7 +34,7 @@ TEST(RateLimiterTest, SampleBasedSucceeds) {
     size_t numHandles = 0;
     std::thread([&numHandles] {
         auto rl = RateLimiter();
-        rl.configureSampleBased(10 /* 1% */, 0 /* seed */);
+        rl.configureSampleBased(10 /* 1% */, /*seed=*/0);
         size_t requestCount = 10000;
         for (size_t i = 0; i < requestCount; i++) {
             if (rl.handle()) {
@@ -47,7 +47,7 @@ TEST(RateLimiterTest, SampleBasedSucceeds) {
 
 TEST(RateLimiterTest, SampleBasedFails) {
     auto rl = RateLimiter();
-    rl.configureSampleBased(0 /* 0% */, 0 /* seed */);
+    rl.configureSampleBased(0 /* 0% */, /*seed=*/0);
     ASSERT_FALSE(rl.handle());
 }
 
@@ -60,7 +60,7 @@ TEST(RateLimiterTest, PolicyGetter) {
     }
     {
         auto rl = RateLimiter();
-        rl.configureSampleBased(10 /* 1% */, 0 /* seed */);
+        rl.configureSampleBased(10 /* 1% */, /*seed=*/0);
         ASSERT_EQ(rl.getSamplingRate(), 10);
         ASSERT_TRUE(rl.getPolicyType() == RateLimiter::PolicyType::kSampleBasedPolicy);
     }

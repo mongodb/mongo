@@ -207,7 +207,7 @@ EstimationResult runSingleQuery(QueryType queryType,
             if (useE2EAPI) {
                 BSONObj bsonInterval = sbeValuesToInterval(sbeValLow, "", sbeValLow, "");
 
-                Interval interval(bsonInterval, true /*startIncluded*/, true /*endIncluded*/);
+                Interval interval(bsonInterval, /*startIncluded=*/true, /*endIncluded=*/true);
 
                 auto sizeCardinality =
                     CardinalityEstimate{CardinalityType{(double)size}, EstimationSource::Histogram};
@@ -232,7 +232,7 @@ EstimationResult runSingleQuery(QueryType queryType,
             if (useE2EAPI) {
                 BSONObj bsonInterval = sbeValuesToInterval(sbeValLow, "", sbeValHigh, "");
 
-                Interval interval(bsonInterval, true /*startIncluded*/, true /*endIncluded*/);
+                Interval interval(bsonInterval, /*startIncluded=*/true, /*endIncluded=*/true);
 
                 auto sizeCardinality =
                     CardinalityEstimate{CardinalityType{(double)size}, EstimationSource::Histogram};
@@ -248,10 +248,10 @@ EstimationResult runSingleQuery(QueryType queryType,
 
                 // Estimate result.
                 estimatedCard = estimateCardinalityRange(*ceHist,
-                                                         true /*lowInclusive*/,
+                                                         /*lowInclusive=*/true,
                                                          sbeValLow.getTag(),
                                                          sbeValLow.getValue(),
-                                                         true /*highInclusive*/,
+                                                         /*highInclusive=*/true,
                                                          sbeValHigh.getTag(),
                                                          sbeValHigh.getValue(),
                                                          includeScalar,

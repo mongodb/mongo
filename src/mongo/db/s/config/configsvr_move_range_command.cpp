@@ -74,14 +74,14 @@ public:
                 uassertStatusOKWithContext(Grid::get(opCtx)->shardRegistry()->resolveShardId(
                                                opCtx,
                                                req.getMoveRangeRequestBase().getToShard(),
-                                               true /* allowNonShardIdIdentifiers */),
+                                               /*allowNonShardIdIdentifiers=*/true),
                                            "Could not find destination shard");
 
             // Ensure we forward to the balancer the resolved shard id, not the original identifier.
             req.setToShard(resolvedToShard);
 
             try {
-                Balancer::get(opCtx)->moveRange(opCtx, nss, req, true /* issuedByRemoteUser */);
+                Balancer::get(opCtx)->moveRange(opCtx, nss, req, /*issuedByRemoteUser=*/true);
             } catch (ExceptionFor<ErrorCodes::InterruptedDueToReplStateChange>& ex) {
                 // Rewrite `InterruptedDueToReplStateChange` with `RetriableRemoteCommandFailure` to
                 // ensure it is not forwarded to remote callers. Until we can expose the error

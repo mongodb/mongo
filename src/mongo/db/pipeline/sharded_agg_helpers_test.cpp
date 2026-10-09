@@ -45,7 +45,7 @@ TEST_F(
     for (auto&& shardId : setupShards(3)) {
         ASSERT_EQ(getTargetedShards(expCtx(),
                                     PipelineDataSource::kGeneratesOwnDataOnce,
-                                    boost::none /* cri */,
+                                    /*cri=*/boost::none,
                                     BSONObj(),
                                     BSONObj(),
                                     shardId),
@@ -64,10 +64,10 @@ TEST_F(
 
     ASSERT_EQ(getTargetedShards(expCtx(),
                                 PipelineDataSource::kGeneratesOwnDataOnce,
-                                boost::none /* cri */,
+                                /*cri=*/boost::none,
                                 BSONObj(),
                                 BSONObj(),
-                                boost::none /* mergeShardId */),
+                                /*mergeShardId=*/boost::none),
               std::set<ShardId>{shardId});
 
     future.default_timed_get();
@@ -79,10 +79,10 @@ TEST_F(ShardedAggHelpersFixture,
     setChangeStreamVersionToExpCtx(ChangeStreamReaderVersionEnum::kV1);
     ASSERT_EQ(getTargetedShards(expCtx(),
                                 PipelineDataSource::kChangeStream,
-                                boost::none /* cri */,
+                                /*cri=*/boost::none,
                                 BSONObj(),
                                 BSONObj(),
-                                boost::none /* mergeShardId */),
+                                /*mergeShardId=*/boost::none),
               allShardIds);
 }
 
@@ -92,10 +92,10 @@ TEST_F(ShardedAggHelpersFixture,
     setChangeStreamVersionToExpCtx(ChangeStreamReaderVersionEnum::kV2);
     ASSERT_EQ(getTargetedShards(expCtx(),
                                 PipelineDataSource::kChangeStream,
-                                boost::none /* cri */,
+                                /*cri=*/boost::none,
                                 BSONObj(),
                                 BSONObj(),
-                                boost::none /* mergeShardId */),
+                                /*mergeShardId=*/boost::none),
               std::set<ShardId>{});
 }
 
@@ -107,10 +107,10 @@ TEST_F(
     expCtx()->setNamespaceString(nss);
     ASSERT_EQ(getTargetedShards(expCtx(),
                                 PipelineDataSource::kNormal,
-                                boost::none /* cri */,
+                                /*cri=*/boost::none,
                                 BSONObj(),
                                 BSONObj(),
-                                boost::none /* mergeShardId */),
+                                /*mergeShardId=*/boost::none),
               allShardIds);
 }
 
@@ -126,7 +126,7 @@ TEST_F(
                                 cri,
                                 BSONObj(),
                                 BSONObj(),
-                                boost::none /* mergeShardId */),
+                                /*mergeShardId=*/boost::none),
               std::set<ShardId>{ShardId("0")});
 }
 
@@ -142,7 +142,7 @@ TEST_F(
                                 cri,
                                 BSONObj(),
                                 BSONObj(),
-                                boost::none /* mergeShardId */),
+                                /*mergeShardId=*/boost::none),
               std::set<ShardId>{ShardId("0")});
 }
 
@@ -164,7 +164,7 @@ TEST_F(
                                 cri,
                                 BSONObj(),
                                 BSONObj(),
-                                boost::none /* mergeShardId */),
+                                /*mergeShardId=*/boost::none),
               expectedShardIds);
 }
 

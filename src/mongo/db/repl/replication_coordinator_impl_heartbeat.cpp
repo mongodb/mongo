@@ -819,7 +819,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
         auto status = [this, opCtx = opCtx.get(), newConfig]() {
             // Don't write the no-op for config learned via heartbeats.
             return _externalState->storeLocalConfigDocument(
-                opCtx, newConfig.toBSON(), false /* writeOplog */);
+                opCtx, newConfig.toBSON(), /*writeOplog=*/false);
         }();
 
         // Wait for durability of the new config document.

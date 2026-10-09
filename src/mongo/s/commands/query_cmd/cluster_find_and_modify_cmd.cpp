@@ -135,7 +135,7 @@ void handleWouldChangeOwningShardErrorNonTransaction(OperationContext* opCtx,
     auto& executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
 
     auto txn = txn_api::SyncTransactionWithRetries(
-        opCtx, executor, nullptr /* resourceYielder */, inlineExecutor);
+        opCtx, executor, /*resourceYielder=*/nullptr, inlineExecutor);
 
     // Shared state for the transaction API use below.
     struct SharedBlock {
@@ -575,7 +575,7 @@ void expandLetParams(OperationContext* opCtx,
                               {nss, ResolvedNamespace(nss, std::vector<BSONObj>{})}})
                           .fromRouter(true)
                           .bypassDocumentValidation(true)
-                          .explain(boost::none /* verbosity */)
+                          .explain(/*verbosity=*/boost::none)
                           .runtimeConstants(runtimeConstants)
                           .letParameters(letParams)
                           .build();
@@ -663,10 +663,10 @@ void FindAndModifyCmd::Invocation::explain(OperationContext* opCtx,
 
             if (cri.hasRoutingTable()) {
                 auto expCtx = makeExpressionContextWithDefaultsForTargeter(
-                    opCtx, nss, cri, collation, boost::none /* verbosity */, let, rc);
+                    opCtx, nss, cri, collation, /*verbosity=*/boost::none, let, rc);
                 if (write_without_shard_key::useTwoPhaseProtocol(opCtx,
                                                                  nss,
-                                                                 false /* isUpdateOrDelete */,
+                                                                 /*isUpdateOrDelete=*/false,
                                                                  isUpsert,
                                                                  query,
                                                                  collation,
@@ -700,7 +700,7 @@ void FindAndModifyCmd::Invocation::explain(OperationContext* opCtx,
                         cmdRequest,
                         applyReadWriteConcern(
                             opCtx, false, false, makeExplainCmd(opCtx, cmdRequest, verbosity)),
-                        boost::none /* allowShardKeyUpdatesWithoutFullShardKeyInQuery */,
+                        /*allowShardKeyUpdatesWithoutFullShardKeyInQuery=*/boost::none,
                         isTimeseriesLogicalRequest,
                         &bob,
                         /*eligibleForSampling=*/false);
@@ -870,7 +870,7 @@ void FindAndModifyCmd::Invocation::run(OperationContext* opCtx, rpc::ReplyBuilde
                                                                        nss,
                                                                        cri,
                                                                        collation,
-                                                                       boost::none /* verbosity */,
+                                                                       /*verbosity=*/boost::none,
                                                                        letParams,
                                                                        runtimeConstants);
 
@@ -878,7 +878,7 @@ void FindAndModifyCmd::Invocation::run(OperationContext* opCtx, rpc::ReplyBuilde
 
             if (write_without_shard_key::useTwoPhaseProtocol(opCtx,
                                                              nss,
-                                                             false /* isUpdateOrDelete */,
+                                                             /*isUpdateOrDelete=*/false,
                                                              isUpsert,
                                                              query,
                                                              collation,
@@ -922,7 +922,7 @@ void FindAndModifyCmd::Invocation::run(OperationContext* opCtx, rpc::ReplyBuilde
                             nss,
                             cmdRequest,
                             cmdRequest.toBSON(),
-                            boost::none /* allowShardKeyUpdatesWithoutFullShardKeyInQuery */,
+                            /*allowShardKeyUpdatesWithoutFullShardKeyInQuery=*/boost::none,
                             isTimeseriesLogicalRequest,
                             &result);
             }
@@ -936,7 +936,7 @@ void FindAndModifyCmd::Invocation::run(OperationContext* opCtx, rpc::ReplyBuilde
                         nss,
                         cmdRequest,
                         cmdRequest.toBSON(),
-                        boost::none /* allowShardKeyUpdatesWithoutFullShardKeyInQuery */,
+                        /*allowShardKeyUpdatesWithoutFullShardKeyInQuery=*/boost::none,
                         isTimeseriesLogicalRequest,
                         &result);
         }
@@ -1046,7 +1046,7 @@ void FindAndModifyCmd::_runCommandWithoutShardKey(
         prepareCmdObjForPassthrough(opCtx,
                                     cmdRequest.toBSON(),
                                     nss,
-                                    true /* eligibleForSampling */,
+                                    /*eligibleForSampling=*/true,
                                     allowShardKeyUpdatesWithoutFullShardKeyInQuery);
 
     // TODO SERVER-108928 - Handle this inside of prepareCmdObjForPassthrough.
@@ -1112,12 +1112,12 @@ void FindAndModifyCmd::_runExplainWithoutShardKey(OperationContext* opCtx,
                                                   const BSONObj& originalExplainObj,
                                                   ExplainOptions::Verbosity verbosity,
                                                   BSONObjBuilder* result) {
-    auto cmdObjForPassthrough = prepareCmdObjForPassthrough(
-        opCtx,
-        originalExplainObj,
-        nss,
-        false /* eligibleForSampling */,
-        boost::none /* allowShardKeyUpdatesWithoutFullShardKeyInQuery */);
+    auto cmdObjForPassthrough =
+        prepareCmdObjForPassthrough(opCtx,
+                                    originalExplainObj,
+                                    nss,
+                                    /*eligibleForSampling=*/false,
+                                    /*allowShardKeyUpdatesWithoutFullShardKeyInQuery=*/boost::none);
 
     auto explainObj = translateExplainObjForRawData(opCtx, cmdObjForPassthrough, nss);
 
@@ -1249,7 +1249,7 @@ void FindAndModifyCmd::_handleWouldChangeOwningShardErrorRetryableWriteLegacy(
         if (write_without_shard_key::useTwoPhaseProtocol(
                 opCtx,
                 nss,
-                false /* isUpdateOrDelete */,
+                /*isUpdateOrDelete=*/false,
                 cmdRequest.getUpsert().value_or(false),
                 cmdRequest.getQuery(),
                 cmdRequest.getCollation().value_or(BSONObj{}),
@@ -1268,7 +1268,7 @@ void FindAndModifyCmd::_handleWouldChangeOwningShardErrorRetryableWriteLegacy(
                         nss,
                         cmdRequestNoWC,
                         cmdRequestNoWC.toBSON(),
-                        boost::none /* allowShardKeyUpdatesWithoutFullShardKeyInQuery */,
+                        /*allowShardKeyUpdatesWithoutFullShardKeyInQuery=*/boost::none,
                         isTimeseriesViewRequest,
                         result);
         }

@@ -46,7 +46,7 @@ static size_t countUniqueKeysBtree(
     for (const auto& doc : docs) {
         SharedBufferFragmentBuilder allocator(BufBuilder::kDefaultInitSizeBytes);
         KeyStringSet docKeys;
-        keyGen.getKeys(allocator, doc, false /* skipMultikey */, &docKeys, nullptr);
+        keyGen.getKeys(allocator, doc, /*skipMultikey=*/false, &docKeys, nullptr);
         allKeys.insert(docKeys.begin(), docKeys.end());
     }
 

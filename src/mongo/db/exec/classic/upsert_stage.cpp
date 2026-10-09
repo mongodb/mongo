@@ -279,7 +279,7 @@ void UpsertStage::_assertDocumentToBeInsertedIsValid(const mutablebson::Document
                                          true, /* allowTopLevelDollarPrefixes */
                                          true, /* Should validate for storage */
                                          &containsDotsAndDollarsField,
-                                         false /* fromOplogApplication */);
+                                         /*fromOplogApplication=*/false);
         if (containsDotsAndDollarsField)
             _params.driver->setContainsDotsAndDollarsField(true);
 

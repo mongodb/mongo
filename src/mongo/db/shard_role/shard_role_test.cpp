@@ -214,9 +214,9 @@ void ShardRoleTest::installShardedCollectionMetadata(
                                            false,
                                            epoch,
                                            timestamp,
-                                           boost::none /* timeseriesFields */,
+                                           /*timeseriesFields=*/boost::none,
                                            reshardingFields,
-                                           true /* allowMigrations */,
+                                           /*allowMigrations=*/true,
                                            chunks);
 
     const auto version = rt.getVersion();
@@ -929,7 +929,7 @@ TEST_F(ShardRoleTest, IntentAcquisitionErrorsHavePrecedenceOverShardVersionCheck
             .killConflictingOperations(rss::consensus::IntentRegistry::InterruptionType::Shutdown,
                                        shutdownOpCtx.get(),
                                        nullptr,
-                                       10 /* timeout_sec */);
+                                       /*timeout_sec=*/10);
     auto shutdownGuard = shutdownTransition.get();
 
     ASSERT_THROWS_CODE(acquireCollection(operationContext(),
@@ -1788,7 +1788,7 @@ TEST_F(ShardRoleTest, StepdownWhileYieldedDrainsAndRestoreFailsForWrite) {
             .killConflictingOperations(rss::consensus::IntentRegistry::InterruptionType::StepDown,
                                        stepdownOpCtx.get(),
                                        nullptr,
-                                       10 /* timeout_sec */)
+                                       /*timeout_sec=*/10)
             .get();
 
     // If the yield is resumed during the state transition it should fail due to not being able to

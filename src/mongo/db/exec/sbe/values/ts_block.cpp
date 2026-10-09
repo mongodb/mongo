@@ -314,7 +314,7 @@ TsBucketPathExtractor::ExtractResult TsBucketPathExtractor::extractCellBlocks(
         // fast path, we will call extract() on this TsBlock, and then pull the values out from the
         // nested bson.
         outBlocks.push_back(std::make_unique<TsBlock>(noOfMeasurements,
-                                                      false /*owned*/,
+                                                      /*owned=*/false,
                                                       columnTag,
                                                       columnVal,
                                                       bucketVersion,
@@ -567,7 +567,7 @@ std::unique_ptr<TsBlock> TsBlock::cloneStrongTyped() const {
     TagValueOwned cpyTagVal = _block.getOwnedCopy();
     // The new copy must own the copied underlying buffer.
     auto cpy = std::make_unique<TsBlock>(_count,
-                                         /*owned*/ true,
+                                         /*owned=*/true,
                                          cpyTagVal.tag(),
                                          cpyTagVal.value(),
                                          _bucketVersion,

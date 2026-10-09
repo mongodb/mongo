@@ -65,8 +65,8 @@ public:
                                      expr,
                                      rootSlot,
                                      slots,
-                                     /*isFilterOverIxscan*/ false,
-                                     /*canUsePathArrayness*/ true);
+                                     /*isFilterOverIxscan=*/false,
+                                     /*canUsePathArrayness=*/true);
 
         sbe::value::TagValueOwned expectedValue =
             sbe::value::TagValueOwned::fromRaw(sbe::value::makeValue(Value(expected)));
@@ -90,16 +90,16 @@ TEST_F(GoldenSbeFilterBuilderTestFixture, TestSimpleExpr) {
         AlwaysFalseMatchExpression alwaysFalseExpr{};
         runTest(&alwaysFalseExpr,
                 rootSlot,
-                false /* isFilterOverIxscan */,
-                false /* expected */,
+                /*isFilterOverIxscan=*/false,
+                /*expected=*/false,
                 "AlwaysFalseMatchExpression"sv);
     }
     {
         AlwaysTrueMatchExpression alwaysTrueExpr{};
         runTest(&alwaysTrueExpr,
                 rootSlot,
-                false /* isFilterOverIxscan */,
-                true /* expected */,
+                /*isFilterOverIxscan=*/false,
+                /*expected=*/true,
                 "AlwaysTrueMatchExpression"sv);
     }
     {
@@ -107,8 +107,8 @@ TEST_F(GoldenSbeFilterBuilderTestFixture, TestSimpleExpr) {
         ElemMatchObjectMatchExpression elemMatchObjExpr("arr"sv, std::move(eq));
         runTest(&elemMatchObjExpr,
                 rootSlot,
-                false /* isFilterOverIxscan */,
-                true /* expected */,
+                /*isFilterOverIxscan=*/false,
+                /*expected=*/true,
                 "ElemMatchObjectMatchExpression"sv);
     }
     {
@@ -116,16 +116,16 @@ TEST_F(GoldenSbeFilterBuilderTestFixture, TestSimpleExpr) {
         ElemMatchValueMatchExpression elemMatchValExpr("arr"sv, std::move(gt));
         runTest(&elemMatchValExpr,
                 rootSlot,
-                false /* isFilterOverIxscan */,
-                true /* expected */,
+                /*isFilterOverIxscan=*/false,
+                /*expected=*/true,
                 "ElemMatchValueMatchExpression"sv);
     }
     {
         ExistsMatchExpression existsExpr("not-exist"sv);
         runTest(&existsExpr,
                 rootSlot,
-                false /* isFilterOverIxscan */,
-                false /* expected */,
+                /*isFilterOverIxscan=*/false,
+                /*expected=*/false,
                 "ExistsMatchExpression"sv);
     }
     {
@@ -138,8 +138,8 @@ TEST_F(GoldenSbeFilterBuilderTestFixture, TestSimpleExpr) {
         ExprMatchExpression exprExpr(inExpr, _expCtx.get());
         runTest(&exprExpr,
                 rootSlot,
-                false /* isFilterOverIxscan */,
-                true /* expected */,
+                /*isFilterOverIxscan=*/false,
+                /*expected=*/true,
                 "ExprMatchExpression"sv);
     }
     {
@@ -148,8 +148,8 @@ TEST_F(GoldenSbeFilterBuilderTestFixture, TestSimpleExpr) {
         ASSERT_OK(inExpr.setEqualitiesArray(std::move(arr)));
         runTest(&inExpr,
                 rootSlot,
-                false /* isFilterOverIxscan */,
-                true /* expected */,
+                /*isFilterOverIxscan=*/false,
+                /*expected=*/true,
                 "InMatchExpression"sv);
     }
     {
@@ -159,16 +159,16 @@ TEST_F(GoldenSbeFilterBuilderTestFixture, TestSimpleExpr) {
         ASSERT_OK(inExpr.setEqualitiesArray(std::move(arr)));
         runTest(&inExpr,
                 rootSlot,
-                false /* isFilterOverIxscan */,
-                true /* expected */,
+                /*isFilterOverIxscan=*/false,
+                /*expected=*/true,
                 "InMatchExpressionRegex"sv);
     }
     {
         ModMatchExpression modExpr("field1"sv, 4, 1);
         runTest(&modExpr,
                 rootSlot,
-                false /* isFilterOverIxscan */,
-                true /* expected */,
+                /*isFilterOverIxscan=*/false,
+                /*expected=*/true,
                 "ModMatchExpression"sv);
     }
     {
@@ -176,32 +176,32 @@ TEST_F(GoldenSbeFilterBuilderTestFixture, TestSimpleExpr) {
         norExpr.add(std::make_unique<EqualityMatchExpression>("field1"sv, Value(4)));
         runTest(&norExpr,
                 rootSlot,
-                false /* isFilterOverIxscan */,
-                true /* expected */,
+                /*isFilterOverIxscan=*/false,
+                /*expected=*/true,
                 "NorMatchExpression"sv);
     }
     {
         RegexMatchExpression regexExpr("str"sv, "ABc", "i");
         runTest(&regexExpr,
                 rootSlot,
-                false /* isFilterOverIxscan */,
-                true /* expected */,
+                /*isFilterOverIxscan=*/false,
+                /*expected=*/true,
                 "RegexMatchExpression"sv);
     }
     {
         SizeMatchExpression sizeExpr("str"sv, 4);
         runTest(&sizeExpr,
                 rootSlot,
-                false /* isFilterOverIxscan */,
-                false /* expected */,
+                /*isFilterOverIxscan=*/false,
+                /*expected=*/false,
                 "SizeMatchExpression"sv);
     }
     {
         TypeMatchExpression typeExpr("field1"sv, MatcherTypeSet{BSONType::numberInt});
         runTest(&typeExpr,
                 rootSlot,
-                false /* isFilterOverIxscan */,
-                true /* expected */,
+                /*isFilterOverIxscan=*/false,
+                /*expected=*/true,
                 "TypeMatchExpression"sv);
     }
 }
@@ -219,16 +219,16 @@ TEST_F(GoldenSbeFilterBuilderTestFixture, TestBitsExpr) {
         BitsAllClearMatchExpression bitsAllClearExp("field1"sv, 35);
         runTest(&bitsAllClearExp,
                 rootSlot,
-                false /* isFilterOverIxscan */,
-                false /* expected */,
+                /*isFilterOverIxscan=*/false,
+                /*expected=*/false,
                 "BitsAllClearMatchExpression"sv);
     }
     {
         BitsAllSetMatchExpression bitsAllSetExp("field1"sv, {0, 2});
         runTest(&bitsAllSetExp,
                 rootSlot,
-                false /* isFilterOverIxscan */,
-                true /* expected */,
+                /*isFilterOverIxscan=*/false,
+                /*expected=*/true,
                 "BitsAllSetMatchExpression"sv);
     }
     {
@@ -236,16 +236,16 @@ TEST_F(GoldenSbeFilterBuilderTestFixture, TestBitsExpr) {
         BitsAnyClearMatchExpression bitsAnyClearExp("field1"sv, 137);
         runTest(&bitsAnyClearExp,
                 rootSlot,
-                false /* isFilterOverIxscan */,
-                true /* expected */,
+                /*isFilterOverIxscan=*/false,
+                /*expected=*/true,
                 "BitsAnyClearMatchExpression"sv);
     }
     {
         BitsAnySetMatchExpression bitsAnySetExp("field1"sv, {0, 2});
         runTest(&bitsAnySetExp,
                 rootSlot,
-                false /* isFilterOverIxscan */,
-                true /* expected */,
+                /*isFilterOverIxscan=*/false,
+                /*expected=*/true,
                 "BitsAnySetMatchExpression"sv);
     }
 }
@@ -260,14 +260,14 @@ TEST_F(GoldenSbeFilterBuilderTestFixture, TestCompExpr) {
     auto rootSlot = SbSlot{rootSlotId, TypeSignature::kObjectType};
     {
         auto idxFieldSlotId = _env->registerSlot(
-            "field1"sv, sbe::value::TypeTags::NumberInt32, 5 /* val */, true, &_slotIdGenerator);
+            "field1"sv, sbe::value::TypeTags::NumberInt32, /*val=*/5, true, &_slotIdGenerator);
         PlanStageSlots slots;
         slots.set(std::make_pair(PlanStageSlots::kField, "field1"sv), SbSlot{idxFieldSlotId});
         GTEMatchExpression gteExpr("field1"sv, Value(1));
         runTest(&gteExpr,
                 rootSlot,
-                true /* isFilterOverIxscan */,
-                true /* expected */,
+                /*isFilterOverIxscan=*/true,
+                /*expected=*/true,
                 "GTEMatchExpression_isFilterOverIxscan"sv,
                 slots);
     }
@@ -275,32 +275,32 @@ TEST_F(GoldenSbeFilterBuilderTestFixture, TestCompExpr) {
         GTEMatchExpression gteExpr("field1"sv, Value(MinKeyLabeler{}));
         runTest(&gteExpr,
                 rootSlot,
-                false /* isFilterOverIxscan */,
-                true /* expected */,
+                /*isFilterOverIxscan=*/false,
+                /*expected=*/true,
                 "GTEMatchExpression_MinKey"sv);
     }
     {
         GTEMatchExpression gteExpr("field1"sv, Value(MaxKeyLabeler{}));
         runTest(&gteExpr,
                 rootSlot,
-                false /* isFilterOverIxscan */,
-                false /* expected */,
+                /*isFilterOverIxscan=*/false,
+                /*expected=*/false,
                 "GTEMatchExpression_MaxKey"sv);
     }
     {
         GTMatchExpression gtExpr("field1"sv, Value(MinKeyLabeler{}));
         runTest(&gtExpr,
                 rootSlot,
-                false /* isFilterOverIxscan */,
-                true /* expected */,
+                /*isFilterOverIxscan=*/false,
+                /*expected=*/true,
                 "GTMatchExpression_MinKey"sv);
     }
     {
         GTMatchExpression gtExpr("field1"sv, Value(MaxKeyLabeler{}));
         runTest(&gtExpr,
                 rootSlot,
-                false /* isFilterOverIxscan */,
-                false /* expected */,
+                /*isFilterOverIxscan=*/false,
+                /*expected=*/false,
                 "GTMatchExpression_MaxKey"sv);
     }
     {
@@ -308,8 +308,8 @@ TEST_F(GoldenSbeFilterBuilderTestFixture, TestCompExpr) {
                                              root.firstElement());
         runTest(&eqExpr,
                 rootSlot,
-                false /* isFilterOverIxscan */,
-                true /* expected */,
+                /*isFilterOverIxscan=*/false,
+                /*expected=*/true,
                 "InternalExprEqMatchExpression"sv);
     }
     {
@@ -317,8 +317,8 @@ TEST_F(GoldenSbeFilterBuilderTestFixture, TestCompExpr) {
                                              root.firstElement());
         runTest(&gtExpr,
                 rootSlot,
-                false /* isFilterOverIxscan */,
-                false /* expected */,
+                /*isFilterOverIxscan=*/false,
+                /*expected=*/false,
                 "InternalExprGTMatchExpression"sv);
     }
     {
@@ -326,8 +326,8 @@ TEST_F(GoldenSbeFilterBuilderTestFixture, TestCompExpr) {
                                                root.firstElement());
         runTest(&gteExpr,
                 rootSlot,
-                false /* isFilterOverIxscan */,
-                true /* expected */,
+                /*isFilterOverIxscan=*/false,
+                /*expected=*/true,
                 "InternalExprGTEMatchExpression"sv);
     }
     {
@@ -335,8 +335,8 @@ TEST_F(GoldenSbeFilterBuilderTestFixture, TestCompExpr) {
                                              root.firstElement());
         runTest(&ltExpr,
                 rootSlot,
-                false /* isFilterOverIxscan */,
-                false /* expected */,
+                /*isFilterOverIxscan=*/false,
+                /*expected=*/false,
                 "InternalExprLTMatchExpression"sv);
     }
     {
@@ -344,40 +344,40 @@ TEST_F(GoldenSbeFilterBuilderTestFixture, TestCompExpr) {
                                                root.firstElement());
         runTest(&lteExpr,
                 rootSlot,
-                false /* isFilterOverIxscan */,
-                true /* expected */,
+                /*isFilterOverIxscan=*/false,
+                /*expected=*/true,
                 "InternalExprLTEMatchExpression"sv);
     }
     {
         LTEMatchExpression lteExpr("field1"sv, Value(10));
         runTest(&lteExpr,
                 rootSlot,
-                false /* isFilterOverIxscan */,
-                true /* expected */,
+                /*isFilterOverIxscan=*/false,
+                /*expected=*/true,
                 "LTEMatchExpression"sv);
     }
     {
         LTEMatchExpression lteExpr("field1"sv, Value(MaxKeyLabeler{}));
         runTest(&lteExpr,
                 rootSlot,
-                false /* isFilterOverIxscan */,
-                true /* expected */,
+                /*isFilterOverIxscan=*/false,
+                /*expected=*/true,
                 "LTEMatchExpression_MaxKey"sv);
     }
     {
         LTMatchExpression ltExpr("field1"sv, Value(10));
         runTest(&ltExpr,
                 rootSlot,
-                false /* isFilterOverIxscan */,
-                true /* expected */,
+                /*isFilterOverIxscan=*/false,
+                /*expected=*/true,
                 "LTMatchExpression"sv);
     }
     {
         LTMatchExpression ltExpr("field1"sv, Value(MinKeyLabeler{}));
         runTest(&ltExpr,
                 rootSlot,
-                false /* isFilterOverIxscan */,
-                false /* expected */,
+                /*isFilterOverIxscan=*/false,
+                /*expected=*/false,
                 "LTMatchExpression_MinKey"sv);
     }
 }
@@ -385,8 +385,8 @@ TEST_F(GoldenSbeFilterBuilderTestFixture, TestCompExpr) {
 TEST_F(GoldenSbeFilterBuilderTestFixture, InternalExprEqOnDottedPathOverIxscan) {
     auto abSlotId = _env->registerSlot("aDotB"sv,
                                        sbe::value::TypeTags::NumberInt32,
-                                       0 /* val */,
-                                       true /* owned */,
+                                       /*val=*/0,
+                                       /*owned=*/true,
                                        &_slotIdGenerator);
     PlanStageSlots slots;
     slots.set(std::make_pair(PlanStageSlots::kField, "a.b"sv), SbSlot{abSlotId});
@@ -396,7 +396,7 @@ TEST_F(GoldenSbeFilterBuilderTestFixture, InternalExprEqOnDottedPathOverIxscan) 
 
     runTest(&eqExpr,
             boost::none /* rootSlot, as at the IXSCAN level */,
-            true /* isFilterOverIxscan */,
+            /*isFilterOverIxscan=*/true,
             true /* expected: slot value 0 == 0 */,
             "InternalExprEqOnDottedPathOverIxscan"sv,
             std::move(slots));
@@ -409,7 +409,7 @@ public:
         _gctx->validateOnClose(true);
 
         auto pathArrayness = std::make_shared<PathArrayness>();
-        pathArrayness->addPath(FieldPath("a.b"), MultikeyComponents{}, true /* isFullRebuild */);
+        pathArrayness->addPath(FieldPath("a.b"), MultikeyComponents{}, /*isFullRebuild=*/true);
         _expCtx->setPathArraynessForNss(_expCtx->getNamespaceString(), std::move(pathArrayness));
     }
 };
@@ -482,12 +482,12 @@ TEST_F(GoldenSbeFilterBuilderArraynessTestFixture, TestPathArraynessTraverseFEli
     {
         EqualityMatchExpression eqExpr("a.b"sv, Value(1));
         runTestWithPathArrayness(
-            &eqExpr, rootSlot, true /* expected */, "TraverseFElided_KnownNonArrayPath"sv);
+            &eqExpr, rootSlot, /*expected=*/true, "TraverseFElided_KnownNonArrayPath"sv);
     }
     {
         EqualityMatchExpression eqExpr("c.d"sv, Value(1));
         runTestWithPathArrayness(
-            &eqExpr, rootSlot, true /* expected */, "TraverseFRetained_UnknownPath"sv);
+            &eqExpr, rootSlot, /*expected=*/true, "TraverseFRetained_UnknownPath"sv);
     }
 }
 
@@ -508,20 +508,20 @@ TEST_F(GoldenSbeFilterBuilderArraynessTestFixture, TestNothingCheckWithPathArray
         {
             EqualityMatchExpression eqExpr("a.b"sv, Value(BSONNULL));
             runTestWithPathArrayness(
-                &eqExpr, rootSlot, true /* expected */, "NothingCheck_EqNull_ScalarIntermediate"sv);
+                &eqExpr, rootSlot, /*expected=*/true, "NothingCheck_EqNull_ScalarIntermediate"sv);
         }
         {
             LTEMatchExpression lteExpr("a.b"sv, Value(BSONNULL));
             runTestWithPathArrayness(&lteExpr,
                                      rootSlot,
-                                     true /* expected */,
+                                     /*expected=*/true,
                                      "NothingCheck_LteNull_ScalarIntermediate"sv);
         }
         {
             GTEMatchExpression gteExpr("a.b"sv, Value(BSONNULL));
             runTestWithPathArrayness(&gteExpr,
                                      rootSlot,
-                                     true /* expected */,
+                                     /*expected=*/true,
                                      "NothingCheck_GteNull_ScalarIntermediate"sv);
         }
         {
@@ -529,7 +529,7 @@ TEST_F(GoldenSbeFilterBuilderArraynessTestFixture, TestNothingCheckWithPathArray
             BSONArray arr = BSON_ARRAY(BSONNULL);
             ASSERT_OK(inExpr.setEqualitiesArray(std::move(arr)));
             runTestWithPathArrayness(
-                &inExpr, rootSlot, true /* expected */, "NothingCheck_InNull_ScalarIntermediate"sv);
+                &inExpr, rootSlot, /*expected=*/true, "NothingCheck_InNull_ScalarIntermediate"sv);
         }
     }
 
@@ -547,7 +547,7 @@ TEST_F(GoldenSbeFilterBuilderArraynessTestFixture, TestNothingCheckWithPathArray
             EqualityMatchExpression eqExpr("a.b"sv, Value(BSONNULL));
             runTestWithPathArrayness(&eqExpr,
                                      rootSlot,
-                                     false /* expected */,
+                                     /*expected=*/false,
                                      "NothingCheck_EqNull_ObjectIntermediate"sv);
         }
     }
@@ -565,7 +565,7 @@ TEST_F(GoldenSbeFilterBuilderArraynessTestFixture, TestNothingCheckWithPathArray
         {
             EqualityMatchExpression eqExpr("a.b"sv, Value(BSONNULL));
             runTestWithPathArrayness(
-                &eqExpr, rootSlot, true /* expected */, "NothingCheck_EqNull_MissingField"sv);
+                &eqExpr, rootSlot, /*expected=*/true, "NothingCheck_EqNull_MissingField"sv);
         }
     }
 }

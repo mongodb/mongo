@@ -168,7 +168,7 @@ const QuerySolutionNode* _treeSearch(const QuerySolutionNode* root,
 
 template <class... Rules>
 const QuerySolutionNode* treeSearch(const QuerySolutionNode* root, Rules&&... rules) {
-    return _treeSearch(root, true /* allowEarlyExit */, rules...);
+    return _treeSearch(root, /*allowEarlyExit=*/true, rules...);
 }
 
 /**
@@ -263,7 +263,7 @@ public:
                    [](const StateSpec& state) {
                        return container_size_helper::estimateObjectSizeInBytes(state.edges);
                    },
-                   true /* includeShallowSize */);
+                   /*includeShallowSize=*/true);
     }
 
 private:

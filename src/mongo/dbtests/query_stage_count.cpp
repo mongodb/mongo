@@ -147,8 +147,8 @@ public:
                                  oldDoc),
             newDoc,
             collection_internal::kUpdateAllIndexes,
-            nullptr /* indexesAffected */,
-            nullptr /* opDebug */,
+            /*indexesAffected=*/nullptr,
+            /*opDebug=*/nullptr,
             &args);
         wunit.commit();
     }

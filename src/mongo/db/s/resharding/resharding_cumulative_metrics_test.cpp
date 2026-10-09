@@ -590,8 +590,8 @@ TEST_F(ReshardingCumulativeMetricsTest, ReportContainsRunCount) {
     auto uuidOne = UUID::gen();
     auto uuidTwo = UUID::gen();
 
-    _reshardingCumulativeMetrics->onStarted(false /*isSameKeyResharding*/, uuidOne);
-    _reshardingCumulativeMetrics->onStarted(true /*isSameKeyResharding*/, uuidTwo);
+    _reshardingCumulativeMetrics->onStarted(/*isSameKeyResharding=*/false, uuidOne);
+    _reshardingCumulativeMetrics->onStarted(/*isSameKeyResharding=*/true, uuidTwo);
 
     {
         BSONObjBuilder bob;
@@ -620,8 +620,8 @@ TEST_F(ReshardingCumulativeMetricsTest, ReportContainsSucceededCount) {
     _reshardingCumulativeMetrics->onStarted(false, uuidOne);
     _reshardingCumulativeMetrics->onStarted(true, uuidTwo);
 
-    _reshardingCumulativeMetrics->onSuccess(false /*isSameKeyResharding*/, uuidOne);
-    _reshardingCumulativeMetrics->onSuccess(true /*isSameKeyResharding*/, uuidTwo);
+    _reshardingCumulativeMetrics->onSuccess(/*isSameKeyResharding=*/false, uuidOne);
+    _reshardingCumulativeMetrics->onSuccess(/*isSameKeyResharding=*/true, uuidTwo);
 
     {
         BSONObjBuilder bob;
@@ -650,8 +650,8 @@ TEST_F(ReshardingCumulativeMetricsTest, ReportContainsFailedCount) {
     _reshardingCumulativeMetrics->onStarted(false, uuidOne);
     _reshardingCumulativeMetrics->onStarted(true, uuidTwo);
 
-    _reshardingCumulativeMetrics->onFailure(false /*isSameKeyResharding*/, uuidOne);
-    _reshardingCumulativeMetrics->onFailure(true /*isSameKeyResharding*/, uuidTwo);
+    _reshardingCumulativeMetrics->onFailure(/*isSameKeyResharding=*/false, uuidOne);
+    _reshardingCumulativeMetrics->onFailure(/*isSameKeyResharding=*/true, uuidTwo);
 
     {
         BSONObjBuilder bob;
@@ -680,8 +680,8 @@ TEST_F(ReshardingCumulativeMetricsTest, ReportContainsCanceledCount) {
     _reshardingCumulativeMetrics->onStarted(false, uuidOne);
     _reshardingCumulativeMetrics->onStarted(true, uuidTwo);
 
-    _reshardingCumulativeMetrics->onCanceled(false /*isSameKeyResharding*/, uuidOne);
-    _reshardingCumulativeMetrics->onCanceled(true /*isSameKeyResharding*/, uuidTwo);
+    _reshardingCumulativeMetrics->onCanceled(/*isSameKeyResharding=*/false, uuidOne);
+    _reshardingCumulativeMetrics->onCanceled(/*isSameKeyResharding=*/true, uuidTwo);
 
     {
         BSONObjBuilder bob;
@@ -705,8 +705,8 @@ TEST_F(ReshardingCumulativeMetricsTest, RepeatedCallsToOnStartedDoesNotIncrement
 
     auto uuid = UUID::gen();
 
-    _reshardingCumulativeMetrics->onStarted(true /*isSameKeyResharding*/, uuid);
-    _reshardingCumulativeMetrics->onStarted(true /*isSameKeyResharding*/, uuid);
+    _reshardingCumulativeMetrics->onStarted(/*isSameKeyResharding=*/true, uuid);
+    _reshardingCumulativeMetrics->onStarted(/*isSameKeyResharding=*/true, uuid);
 
     {
         BSONObjBuilder bob;
@@ -731,8 +731,8 @@ TEST_F(ReshardingCumulativeMetricsTest, RepeatedCallsToOnFailedDoesNotIncrementC
 
     _reshardingCumulativeMetrics->onStarted(true, uuid);
 
-    _reshardingCumulativeMetrics->onFailure(true /*isSameKeyResharding*/, uuid);
-    _reshardingCumulativeMetrics->onFailure(true /*isSameKeyResharding*/, uuid);
+    _reshardingCumulativeMetrics->onFailure(/*isSameKeyResharding=*/true, uuid);
+    _reshardingCumulativeMetrics->onFailure(/*isSameKeyResharding=*/true, uuid);
 
     {
         BSONObjBuilder bob;
@@ -757,8 +757,8 @@ TEST_F(ReshardingCumulativeMetricsTest, RepeatedCallsToOnSuccessDoesNotIncrement
 
     _reshardingCumulativeMetrics->onStarted(true, uuid);
 
-    _reshardingCumulativeMetrics->onSuccess(true /*isSameKeyResharding*/, uuid);
-    _reshardingCumulativeMetrics->onSuccess(true /*isSameKeyResharding*/, uuid);
+    _reshardingCumulativeMetrics->onSuccess(/*isSameKeyResharding=*/true, uuid);
+    _reshardingCumulativeMetrics->onSuccess(/*isSameKeyResharding=*/true, uuid);
 
     {
         BSONObjBuilder bob;
@@ -783,8 +783,8 @@ TEST_F(ReshardingCumulativeMetricsTest, RepeatedCallsToOnCanceledDoesNotIncremen
 
     _reshardingCumulativeMetrics->onStarted(true, uuid);
 
-    _reshardingCumulativeMetrics->onCanceled(true /*isSameKeyResharding*/, uuid);
-    _reshardingCumulativeMetrics->onCanceled(true /*isSameKeyResharding*/, uuid);
+    _reshardingCumulativeMetrics->onCanceled(/*isSameKeyResharding=*/true, uuid);
+    _reshardingCumulativeMetrics->onCanceled(/*isSameKeyResharding=*/true, uuid);
 
     {
         BSONObjBuilder bob;

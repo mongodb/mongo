@@ -1109,16 +1109,16 @@ TEST_F(AsyncResultsMergerTest, MultiShardMultipleGets) {
 }
 
 TEST_F(AsyncResultsMergerTest, HighWaterMarkTestChangeStreamV1) {
-    runHighWaterMarkTest(false /* recognizeControlEvents */);
+    runHighWaterMarkTest(/*recognizeControlEvents=*/false);
 }
 
 TEST_F(AsyncResultsMergerTest, HighWaterMarkTestRecognizeControlEvents) {
-    runHighWaterMarkTest(true /* recognizeControlEvents */);
+    runHighWaterMarkTest(/*recognizeControlEvents=*/true);
 }
 
 TEST_F(AsyncResultsMergerTest, SetHighWaterMark) {
     AsyncResultsMergerParams params = AsyncResultsMergerTest::buildARMParamsForChangeStream();
-    auto arm = buildARM(std::move(params), false /* recognizeControlEvents */);
+    auto arm = buildARM(std::move(params), /*recognizeControlEvents=*/false);
 
     // No high water mark set initially.
     ASSERT_BSONOBJ_EQ(BSONObj(), arm->getHighWaterMark());
@@ -1207,7 +1207,7 @@ TEST_F(AsyncResultsMergerTest, GetHighWaterMarkDoesNotRegressBelowSetResumeToken
                          kTestShardHosts[0],
                          CursorResponse(kTestNss, 1, {}, boost::none, lowPromisedMinSortKey)));
     params.setRemotes(std::move(cursors));
-    auto arm = buildARM(std::move(params), false /* recognizeControlEvents */);
+    auto arm = buildARM(std::move(params), /*recognizeControlEvents=*/false);
 
     // Set a full event resume token at the same cluster time as the remote's promised sort key.
     // A full resume token sorts after a high-water-mark token at the same cluster time, so the
@@ -1229,7 +1229,7 @@ TEST_F(AsyncResultsMergerTest, GetHighWaterMarkDoesNotRegressOnAddNewShardCursor
                                        kTestShardHosts[0],
                                        CursorResponse(kTestNss, 1, {}, boost::none, lowKey)));
     params.setRemotes(std::move(cursors));
-    auto arm = buildARM(std::move(params), false /* recognizeControlEvents */);
+    auto arm = buildARM(std::move(params), /*recognizeControlEvents=*/false);
 
     // Set HWM to an event resume token at (42, 5) — strictly above the remote's promised key.
     auto resumeToken = makeResumeToken(Timestamp(42, 5), UUID::gen(), BSON("_id" << 1));
@@ -1258,7 +1258,7 @@ TEST_F(AsyncResultsMergerTest, GetHighWaterMarkForClientIgnoresPromisedSortKeysW
     params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
     params.setSort(change_stream_constants::kSortSpec);
 
-    auto arm = buildARM(std::move(params), false /* recognizeControlEvents */);
+    auto arm = buildARM(std::move(params), /*recognizeControlEvents=*/false);
 
     auto clientToken = makePostBatchResumeToken(Timestamp(42, 5));
     arm->setHighWaterMark(clientToken);
@@ -1298,7 +1298,7 @@ TEST_F(AsyncResultsMergerTest, GetHighWaterMarkForClientAdvancesFromPromisedSort
     params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
     params.setSort(change_stream_constants::kSortSpec);
 
-    auto arm = buildARM(std::move(params), false /* recognizeControlEvents */);
+    auto arm = buildARM(std::move(params), /*recognizeControlEvents=*/false);
 
     auto clientToken = makePostBatchResumeToken(Timestamp(42, 5));
     arm->setHighWaterMark(clientToken);
@@ -1335,7 +1335,7 @@ TEST_F(AsyncResultsMergerTest, ClientHighWaterMarkCatchesUpAfterReEnablingPromis
     params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
     params.setSort(change_stream_constants::kSortSpec);
 
-    auto arm = buildARM(std::move(params), false /* recognizeControlEvents */);
+    auto arm = buildARM(std::move(params), /*recognizeControlEvents=*/false);
 
     auto clientToken = makePostBatchResumeToken(Timestamp(42, 5));
     arm->setHighWaterMark(clientToken);
@@ -1372,7 +1372,7 @@ TEST_F(AsyncResultsMergerTest, PromisedControlEventResumeTokenDoesNotLeakIntoHig
                                        CursorResponse(kTestNss, 1, {}, boost::none, initialPBRT)));
     params.setRemotes(std::move(cursors));
 
-    auto arm = buildARM(std::move(params), true /* recognizeControlEvents */);
+    auto arm = buildARM(std::move(params), /*recognizeControlEvents=*/true);
 
     // An *event* resume token for a control event, also promised by the shard as its PBRT.
     auto controlEventToken = makeResumeToken(Timestamp(42, 5), UUID::gen(), BSON("_id" << 1));
@@ -1423,7 +1423,7 @@ TEST_F(AsyncResultsMergerTest, UndoNextReadyRestoresClientHighWaterMark) {
     params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
     params.setSort(change_stream_constants::kSortSpec);
 
-    auto arm = buildARM(std::move(params), false /* recognizeControlEvents */);
+    auto arm = buildARM(std::move(params), /*recognizeControlEvents=*/false);
     arm->setHighWaterMark(initialPBRT);
     arm->disablePromisedSortKeyHighWaterMarkAdvancement();
     arm->enableUndoNextReadyMode();
@@ -1459,7 +1459,7 @@ TEST_F(AsyncResultsMergerTest, SetHighWaterMarkDoesNotRegressClientHighWaterMark
     params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
     params.setSort(change_stream_constants::kSortSpec);
 
-    auto arm = buildARM(std::move(params), false /* recognizeControlEvents */);
+    auto arm = buildARM(std::move(params), /*recognizeControlEvents=*/false);
     arm->setHighWaterMark(initialPBRT);
     arm->disablePromisedSortKeyHighWaterMarkAdvancement();
 
@@ -1495,7 +1495,7 @@ TEST_F(AsyncResultsMergerTest, HandleControlEventsWithUniqueTimestamps) {
                                        CursorResponse(kTestNss, 1, {}, boost::none, initialPBRT)));
     params.setRemotes(std::move(cursors));
 
-    auto arm = buildARM(std::move(params), true /* recognizeControlEvents */);
+    auto arm = buildARM(std::move(params), /*recognizeControlEvents=*/true);
 
     const std::vector<BSONObj> pbrts = {
         makePostBatchResumeToken(Timestamp(42, 1)),
@@ -1555,7 +1555,7 @@ TEST_F(AsyncResultsMergerTest, HandleControlEventsWithNonUniqueTimestamps) {
                                        CursorResponse(kTestNss, 1, {}, boost::none, initialPBRT)));
     params.setRemotes(std::move(cursors));
 
-    auto arm = buildARM(std::move(params), true /* recognizeControlEvents */);
+    auto arm = buildARM(std::move(params), /*recognizeControlEvents=*/true);
 
     auto readyEvent = unittest::assertGet(arm->nextEvent());
 
@@ -1624,7 +1624,7 @@ DEATH_TEST_REGEX_F(AsyncResultsMergerTestDeathTest,
         makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 1, {})));
     params.setRemotes(std::move(cursors));
 
-    auto arm = buildARM(std::move(params), false /* recognizeControlEvents */);
+    auto arm = buildARM(std::move(params), /*recognizeControlEvents=*/false);
 
     auto readyEvent = unittest::assertGet(arm->nextEvent());
 
@@ -2919,7 +2919,7 @@ TEST_F(AsyncResultsMergerTest, NoMaxTimeMSSetByDefault) {
     params.setRemotes(std::move(cursors));
     params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
     params.setSort(change_stream_constants::kSortSpec);
-    auto arm = buildARM(std::move(params), false /* recognizeControlEvents */);
+    auto arm = buildARM(std::move(params), /*recognizeControlEvents=*/false);
 
     ASSERT_EQ(boost::none, arm->getAwaitDataTimeout_forTest());
     ASSERT_EQ(boost::none, arm->getEffectiveAwaitDataTimeout_forTest());
@@ -2936,7 +2936,7 @@ TEST_F(AsyncResultsMergerTest, MaxTimeMSIsNotCappedAt1000ForSingleRemote) {
     params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
     params.setSort(change_stream_constants::kSortSpec);
 
-    auto arm = buildARM(std::move(params), false /* recognizeControlEvents */);
+    auto arm = buildARM(std::move(params), /*recognizeControlEvents=*/false);
 
     ASSERT_OK(arm->setAwaitDataTimeout(Milliseconds(5000)));
     ASSERT_EQ(Milliseconds(5000), arm->getAwaitDataTimeout_forTest());
@@ -2956,7 +2956,7 @@ TEST_F(AsyncResultsMergerTest, MaxTimeMSIsCappedAt1000ForMultipleRemotes) {
     params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
     params.setSort(change_stream_constants::kSortSpec);
 
-    auto arm = buildARM(std::move(params), false /* recognizeControlEvents */);
+    auto arm = buildARM(std::move(params), /*recognizeControlEvents=*/false);
 
     ASSERT_OK(arm->setAwaitDataTimeout(Milliseconds(5000)));
     ASSERT_EQ(Milliseconds(5000), arm->getAwaitDataTimeout_forTest());
@@ -2974,7 +2974,7 @@ TEST_F(AsyncResultsMergerTest, MaxTimeMSGetsCappedIfRemoteGetsAdded) {
     params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
     params.setSort(change_stream_constants::kSortSpec);
 
-    auto arm = buildARM(std::move(params), false /* recognizeControlEvents */);
+    auto arm = buildARM(std::move(params), /*recognizeControlEvents=*/false);
 
     ASSERT_EQ(boost::none, arm->getAwaitDataTimeout_forTest());
 
@@ -3004,7 +3004,7 @@ TEST_F(AsyncResultsMergerTest, MaxTimeMSGetsUncappedIfRemoteGetsClosed) {
     params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
     params.setSort(change_stream_constants::kSortSpec);
 
-    auto arm = buildARM(std::move(params), false /* recognizeControlEvents */);
+    auto arm = buildARM(std::move(params), /*recognizeControlEvents=*/false);
 
     ASSERT_EQ(boost::none, arm->getAwaitDataTimeout_forTest());
 
@@ -3043,7 +3043,7 @@ DEATH_TEST_REGEX_F(AsyncResultsMergerTestDeathTest,
     params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
     params.setSort(change_stream_constants::kSortSpec);
 
-    auto arm = buildARM(std::move(params), false /* recognizeControlEvents */);
+    auto arm = buildARM(std::move(params), /*recognizeControlEvents=*/false);
 
     auto readyEvent = unittest::assertGet(arm->nextEvent());
     ASSERT_FALSE(arm->ready());
@@ -3073,7 +3073,7 @@ DEATH_TEST_REGEX_F(AsyncResultsMergerTestDeathTest,
     params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
     params.setSort(change_stream_constants::kSortSpec);
 
-    auto arm = buildARM(std::move(params), false /* recognizeControlEvents */);
+    auto arm = buildARM(std::move(params), /*recognizeControlEvents=*/false);
 
     auto readyEvent = unittest::assertGet(arm->nextEvent());
     ASSERT_TRUE(arm->ready());
@@ -3105,7 +3105,7 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorNotReadyIfRemoteHasLowerPostB
     params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
     params.setSort(change_stream_constants::kSortSpec);
 
-    auto arm = buildARM(std::move(params), false /* recognizeControlEvents */);
+    auto arm = buildARM(std::move(params), /*recognizeControlEvents=*/false);
 
     auto readyEvent = unittest::assertGet(arm->nextEvent());
 
@@ -3130,7 +3130,7 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorNewShardOrderedAfterExisting)
     params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
     params.setSort(change_stream_constants::kSortSpec);
 
-    auto arm = buildARM(std::move(params), false /* recognizeControlEvents */);
+    auto arm = buildARM(std::move(params), /*recognizeControlEvents=*/false);
 
     auto readyEvent = unittest::assertGet(arm->nextEvent());
 
@@ -3210,7 +3210,7 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorNewShardOrderedBeforeExisting
     params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
     params.setSort(change_stream_constants::kSortSpec);
 
-    auto arm = buildARM(std::move(params), false /* recognizeControlEvents */);
+    auto arm = buildARM(std::move(params), /*recognizeControlEvents=*/false);
 
     auto readyEvent = unittest::assertGet(arm->nextEvent());
 
@@ -3303,7 +3303,7 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorReturnsHighWaterMarkSortKey) 
     params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
     params.setSort(change_stream_constants::kSortSpec);
 
-    auto arm = buildARM(std::move(params), false /* recognizeControlEvents */);
+    auto arm = buildARM(std::move(params), /*recognizeControlEvents=*/false);
 
     // We have no results to return, so the ARM is not ready.
     auto readyEvent = unittest::assertGet(arm->nextEvent());
@@ -3382,7 +3382,7 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorDoesNotAdvanceHighWaterMarkFo
     params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
     params.setSort(change_stream_constants::kSortSpec);
 
-    auto arm = buildARM(std::move(params), false /* recognizeControlEvents */);
+    auto arm = buildARM(std::move(params), /*recognizeControlEvents=*/false);
 
     // We have no results to return, so the ARM is not ready.
     auto readyEvent = unittest::assertGet(arm->nextEvent());
@@ -4160,7 +4160,7 @@ TEST_F(AsyncResultsMergerTest, IncludeQueryStatsMetricsIncludedInGetMore) {
         auto params = makeARMParamsFromExistingCursors(std::move(cursors), findCmd);
         params.setRequestQueryStatsFromRemotes(requestParams);
 
-        auto arm = buildARM(std::move(params), false /* recognizeControlEvents */);
+        auto arm = buildARM(std::move(params), /*recognizeControlEvents=*/false);
 
         // Schedule the request for the getMore.
         auto readyEvent = unittest::assertGet(arm->nextEvent());
@@ -4209,7 +4209,7 @@ TEST_F(AsyncResultsMergerTest, IncludeMetricsQueryStatsIncludedInGetMoreWithFeat
         im.setQueryStats(requestParams);
         setRequestRemoteMetrics(im, params, operationContext());
 
-        auto arm = buildARM(std::move(params), false /* recognizeControlEvents */);
+        auto arm = buildARM(std::move(params), /*recognizeControlEvents=*/false);
 
         // Schedule the request for the getMore.
         auto readyEvent = unittest::assertGet(arm->nextEvent());
@@ -4253,12 +4253,12 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
         responses.emplace_back(kTestNss,
                                id,
                                std::move(batch),
-                               boost::none /* atClusterTime */,
-                               boost::none /* postBatchResumeToken */,
-                               boost::none /* writeConcernError */,
-                               boost::none /* varsField */,
-                               boost::none /* explainField*/,
-                               boost::none /* cursorType */,
+                               /*atClusterTime=*/boost::none,
+                               /*postBatchResumeToken=*/boost::none,
+                               /*writeConcernError=*/boost::none,
+                               /*varsField=*/boost::none,
+                               /*explainField=*/boost::none,
+                               /*cursorType=*/boost::none,
                                std::move(metrics));
         scheduleNetworkResponses(std::move(responses));
     };
@@ -4273,22 +4273,22 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
         makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, id, {})));
     params.setRemotes(std::move(cursors));
 
-    auto arm = buildARM(std::move(params), false /* recognizeControlEvents */);
+    auto arm = buildARM(std::move(params), /*recognizeControlEvents=*/false);
 
     // Schedule the request for a getMore.
     auto readyEvent = unittest::assertGet(arm->nextEvent());
 
     // Schedule a response.
     {
-        CursorMetrics metrics(2 /* keysExamined */,
-                              5 /* docsExamined */,
-                              13 /* bytesRead */,
-                              17 /* readingTimeMicros */,
-                              7 /* workingTimeMillis */,
-                              false /* hasSortStage */,
-                              true /* usedDisk */,
-                              true /* fromMultiPlanner */,
-                              true /* fromPlanCache */);
+        CursorMetrics metrics(/*keysExamined=*/2,
+                              /*docsExamined=*/5,
+                              /*bytesRead=*/13,
+                              /*readingTimeMicros=*/17,
+                              /*workingTimeMillis=*/7,
+                              /*hasSortStage=*/false,
+                              /*usedDisk=*/true,
+                              /*fromMultiPlanner=*/true,
+                              /*fromPlanCache=*/true);
         metrics.setPlanningTimeMicros(100);
         metrics.setNDocsSampled(15);
         metrics.setCpuNanos(37);
@@ -4379,15 +4379,15 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
 
     // Schedule a second response.
     {
-        CursorMetrics metrics(7 /* keysExamined */,
-                              11 /* docsExamined */,
-                              17 /* bytesRead */,
-                              19 /* readingTimeMicros */,
-                              13 /* workingTimeMillis */,
-                              false /* hasSortStage */,
-                              true /* usedDisk */,
-                              true /* fromMultiPlanner */,
-                              false /* fromPlanCache */);
+        CursorMetrics metrics(/*keysExamined=*/7,
+                              /*docsExamined=*/11,
+                              /*bytesRead=*/17,
+                              /*readingTimeMicros=*/19,
+                              /*workingTimeMillis=*/13,
+                              /*hasSortStage=*/false,
+                              /*usedDisk=*/true,
+                              /*fromMultiPlanner=*/true,
+                              /*fromPlanCache=*/false);
         metrics.setPlanningTimeMicros(150);
         metrics.setNDocsSampled(16);
         metrics.setCpuNanos(121);
@@ -4744,7 +4744,7 @@ TEST_F(AsyncResultsMergerTest, UndoNextReadySortedTailable) {
     params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
     params.setSort(change_stream_constants::kSortSpec);
 
-    auto arm = buildARM(std::move(params), false /* recognizeControlEvents */);
+    auto arm = buildARM(std::move(params), /*recognizeControlEvents=*/false);
     arm->setHighWaterMark(pbrt0);
     arm->enableUndoNextReadyMode();
 
@@ -4817,7 +4817,7 @@ TEST_F(AsyncResultsMergerTest, UndoNextReadySortedWithMoreResultsArriving) {
     params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
     params.setSort(change_stream_constants::kSortSpec);
 
-    auto arm = buildARM(std::move(params), false /* recognizeControlEvents */);
+    auto arm = buildARM(std::move(params), /*recognizeControlEvents=*/false);
     arm->setHighWaterMark(pbrt0);
     arm->enableUndoNextReadyMode();
 
@@ -5114,7 +5114,7 @@ DEATH_TEST_REGEX(NextHighWaterMarkDeterminingStrategyTestDeathTest,
                  ChangeStreamV1InvalidInputDocument,
                  "Tripwire assertion.*10359101") {
     auto nextHighWaterMarkDeterminingStrategy =
-        buildNextHighWaterMarkDeterminingStrategy(false /* recognizeControlEvents */);
+        buildNextHighWaterMarkDeterminingStrategy(/*recognizeControlEvents=*/false);
 
     ASSERT_EQ("changeStreamV1"sv, nextHighWaterMarkDeterminingStrategy->getName());
 
@@ -5177,7 +5177,7 @@ DEATH_TEST_REGEX(NextHighWaterMarkDeterminingStrategyTestDeathTest,
                  RecognizeControlEventsInvalidInputDocument,
                  "Tripwire assertion.*10359101") {
     auto nextHighWaterMarkDeterminingStrategy =
-        buildNextHighWaterMarkDeterminingStrategy(true /* recognizeControlEvents */);
+        buildNextHighWaterMarkDeterminingStrategy(/*recognizeControlEvents=*/true);
 
     ASSERT_EQ("recognizeControlEvents"sv, nextHighWaterMarkDeterminingStrategy->getName());
 
@@ -5192,7 +5192,7 @@ DEATH_TEST_REGEX(NextHighWaterMarkDeterminingStrategyTestDeathTest,
                  RecognizeControlEventsThrowsUponEmptyCurrentHighWaterMark,
                  "Tripwire assertion.*10359109") {
     auto nextHighWaterMarkDeterminingStrategy =
-        buildNextHighWaterMarkDeterminingStrategy(true /* recognizeControlEvents */);
+        buildNextHighWaterMarkDeterminingStrategy(/*recognizeControlEvents=*/true);
 
     BSONObj pbrt = makeResumeToken(Timestamp(23, 1), UUID::gen(), BSON("_id" << 1));
     BSONObj doc = BSON("_id" << pbrt << "$sortKey" << BSON_ARRAY(pbrt)
@@ -5205,7 +5205,7 @@ DEATH_TEST_REGEX(NextHighWaterMarkDeterminingStrategyTestDeathTest,
 TEST(NextHighWaterMarkDeterminingStrategyTest,
      RecognizeControlEventsControlEventWithHigherTimestampThanPrevious) {
     auto nextHighWaterMarkDeterminingStrategy =
-        buildNextHighWaterMarkDeterminingStrategy(true /* recognizeControlEvents */);
+        buildNextHighWaterMarkDeterminingStrategy(/*recognizeControlEvents=*/true);
 
     // Set initial high water mark from document and expect that the same value is returned.
     BSONObj pbrt = makeResumeToken(Timestamp(23, 1), UUID::gen(), BSON("_id" << 1));
@@ -5227,7 +5227,7 @@ TEST(NextHighWaterMarkDeterminingStrategyTest,
 TEST(NextHighWaterMarkDeterminingStrategyTest,
      RecognizeControlEventsControlEventWithSameTimestampAsPrevious) {
     auto nextHighWaterMarkDeterminingStrategy =
-        buildNextHighWaterMarkDeterminingStrategy(true /* recognizeControlEvents */);
+        buildNextHighWaterMarkDeterminingStrategy(/*recognizeControlEvents=*/true);
 
     // Set initial high water mark from document and expect that the same value is returned.
     BSONObj pbrt = makeResumeToken(Timestamp(23, 1), UUID::gen(), BSON("_id" << 1));

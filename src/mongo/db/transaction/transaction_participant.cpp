@@ -321,7 +321,7 @@ ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
     // Restore the current timestamp read source after fetching transaction history, which may
     // change our ReadSource.
     ReadSourceScope readSourceScope(
-        opCtx, RecoveryUnit::ReadSource::kNoTimestamp, boost::none, true /* waitForOplog */);
+        opCtx, RecoveryUnit::ReadSource::kNoTimestamp, boost::none, /*waitForOplog=*/true);
     auto originalReadConcern =
         std::exchange(repl::ReadConcernArgs::get(opCtx), repl::ReadConcernArgs());
     ON_BLOCK_EXIT([&] { repl::ReadConcernArgs::get(opCtx) = std::move(originalReadConcern); });
@@ -2596,7 +2596,7 @@ void TransactionParticipant::Participant::_commitSplitPreparedTxnOnPrimary(
             // original transaction is already holding RSTL in IX mode. We also should not
             // try to acquire RSTL again because that could deadlock with stepdown.
             newTxnParticipant._commitStorageTransaction(splitOpCtx.get(),
-                                                        true /* isSplitPreparedTxn */);
+                                                        /*isSplitPreparedTxn=*/true);
             // transactionOperations may be unavailable if the transaction was recovered from a
             // checkpoint, but that's acceptable because it will only lead to incorrect per
             // transaction metrics.
@@ -2879,7 +2879,7 @@ void TransactionParticipant::Participant::_abortSplitPreparedTxnOnPrimary(
             // original transaction is already holding RSTL in IX mode. We also should not
             // try to acquire RSTL again because that could deadlock with stepdown.
             newTxnParticipant._cleanUpTxnResourceOnOpCtx(
-                splitOpCtx.get(), TerminationCause::kAborted, true /* isSplitPreparedTxn */);
+                splitOpCtx.get(), TerminationCause::kAborted, /*isSplitPreparedTxn=*/true);
             newTxnParticipant._finishAbortingActiveTransaction(splitOpCtx.get(),
                                                                TransactionState::kPrepared);
         }

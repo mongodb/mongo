@@ -27,11 +27,11 @@ void IngressAdmissionController::init() {
                                                    gIngressAdmissionControllerTicketPoolSize.load(),
                                                    false,
                                                    gIngressAdmissionControllerMaxQueueDepth.load(),
-                                                   nullptr /* delinquentCallback */,
-                                                   nullptr /* executionAcquisitionCallback */,
-                                                   nullptr /* executionWaitedAcquisitionCallback */,
-                                                   nullptr /* executionReleaseCallback */,
-                                                   nullptr /* startQueueingCallback */,
+                                                   /*delinquentCallback=*/nullptr,
+                                                   /*executionAcquisitionCallback=*/nullptr,
+                                                   /*executionWaitedAcquisitionCallback=*/nullptr,
+                                                   /*executionReleaseCallback=*/nullptr,
+                                                   /*startQueueingCallback=*/nullptr,
                                                    TicketHolder::ResizePolicy::kImmediate);
 }
 

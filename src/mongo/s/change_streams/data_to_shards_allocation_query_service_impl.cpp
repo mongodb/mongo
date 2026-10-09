@@ -16,8 +16,8 @@ AllocationToShardsStatus DataToShardsAllocationQueryServiceImpl::getAllocationTo
                 ->fetch(opCtx,
                         NamespaceString::kEmpty,
                         clusterTime,
-                        true /* checkIfPointInTimeIsInFuture */,
-                        false /* ignoreRemovedShards */)
+                        /*checkIfPointInTimeIsInFuture=*/true,
+                        /*ignoreRemovedShards=*/false)
                 .getStatus()) {
         case HistoricalPlacementStatus::OK:
             return AllocationToShardsStatus::kOk;

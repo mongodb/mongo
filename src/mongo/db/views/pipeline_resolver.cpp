@@ -151,7 +151,7 @@ buildResolvedPipelineForRegularView(OperationContext* opCtx,
         search_helpers::checkAndSetViewOnExpCtx(expCtx, lpp, *resolvedView, requestedNss);
     }
     auto pipeline =
-        Pipeline::parseFromLiteParsed(lpp, expCtx, nullptr, false, true /* useStubInterface */);
+        Pipeline::parseFromLiteParsed(lpp, expCtx, nullptr, false, /*useStubInterface=*/true);
 
     // The serialized BSON will be soon re-parsed when we restart the agg path with the resolved
     // pipeline. We set the serializeForReparse flag so search stages emit user-form rather than the

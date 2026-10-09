@@ -463,7 +463,7 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
         }
 
         if (auto grid = Grid::get(opCtx)) {
-            grid->shutdown(opCtx, &shutdownTimeElapsedBuilder, true /* isMongos */);
+            grid->shutdown(opCtx, &shutdownTimeElapsedBuilder, /*isMongos=*/true);
         }
 
         // Reject new search cursors before shutting down the search executors, mirroring mongod.

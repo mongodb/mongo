@@ -138,8 +138,8 @@ public:
                 client.update(NamespaceString::kServerConfigurationNamespace,
                               BSON("_id" << "commitMergeAllChunksOnShardStats"),
                               BSON("$inc" << BSON("count" << 1)),
-                              true /* upsert */,
-                              false /* multi */);
+                              /*upsert=*/true,
+                              /*multi=*/false);
             }
 
             const auto& [shardAndCollVers, numMergedChunks] = response;

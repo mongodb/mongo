@@ -769,10 +769,10 @@ TEST(ScalarHistogramEstimatorEdgeCasesTest, MinValueMixedHistogramFromData) {
 
     // [minDate, startInstant], estimated by the half of the date bucket.
     auto expectedCard = estimateCardinalityRange(hist2,
-                                                 true /* lowInclusive */,
+                                                 /*lowInclusive=*/true,
                                                  minDateTag,
                                                  minDateVal,
-                                                 true /* highInclusive */,
+                                                 /*highInclusive=*/true,
                                                  value::TypeTags::Date,
                                                  value::bitcastFrom<int64_t>(startInstant));
     ASSERT_EQ(1.0, expectedCard.card);
@@ -1176,25 +1176,25 @@ TEST(CEHistogramEstimatorTest, UniformIntStrHistogram) {
 
     // Query: [{$match: {a: {$lt: '04e'}}}].
     auto expectedCard = estimateCardinalityRange(*ceHist,
-                                                 false /* lowInclusive */,
+                                                 /*lowInclusive=*/false,
                                                  lowTag,
                                                  lowVal,
-                                                 false /* highInclusive */,
+                                                 /*highInclusive=*/false,
                                                  strVal.tag(),
                                                  strVal.value(),
-                                                 true /* includeScalar */,
+                                                 /*includeScalar=*/true,
                                                  ArrayRangeEstimationAlgo::kConjunctArrayCE);
     ASSERT_APPROX_EQUAL(13.3, expectedCard.card, 0.1);  // Actual: 0.
 
     // Query: [{$match: {a: {$lte: '04e'}}}].
     expectedCard = estimateCardinalityRange(*ceHist,
-                                            false /* lowInclusive */,
+                                            /*lowInclusive=*/false,
                                             lowTag,
                                             lowVal,
-                                            true /* highInclusive */,
+                                            /*highInclusive=*/true,
                                             strVal.tag(),
                                             strVal.value(),
-                                            true /* includeScalar */,
+                                            /*includeScalar=*/true,
                                             ArrayRangeEstimationAlgo::kConjunctArrayCE);
     ASSERT_APPROX_EQUAL(15.5, expectedCard.card, 0.1);  // Actual: 3.
 
@@ -1203,25 +1203,25 @@ TEST(CEHistogramEstimatorTest, UniformIntStrHistogram) {
 
     // Query: [{$match: {a: {$lt: '8B5'}}}].
     expectedCard = estimateCardinalityRange(*ceHist,
-                                            false /* lowInclusive */,
+                                            /*lowInclusive=*/false,
                                             lowTag,
                                             lowVal,
-                                            false /* highInclusive */,
+                                            /*highInclusive=*/false,
                                             strVal.tag(),
                                             strVal.value(),
-                                            true /* includeScalar */,
+                                            /*includeScalar=*/true,
                                             ArrayRangeEstimationAlgo::kConjunctArrayCE);
     ASSERT_APPROX_EQUAL(13.3, expectedCard.card, 0.1);  // Actual: 24.
 
     // Query: [{$match: {a: {$lte: '8B5'}}}].
     expectedCard = estimateCardinalityRange(*ceHist,
-                                            false /* lowInclusive */,
+                                            /*lowInclusive=*/false,
                                             lowTag,
                                             lowVal,
-                                            true /* highInclusive */,
+                                            /*highInclusive=*/true,
                                             strVal.tag(),
                                             strVal.value(),
-                                            true /* includeScalar */,
+                                            /*includeScalar=*/true,
                                             ArrayRangeEstimationAlgo::kConjunctArrayCE);
     ASSERT_APPROX_EQUAL(15.5, expectedCard.card, 0.1);  // Actual: 29.
 }
@@ -1276,7 +1276,7 @@ TEST(CEHistogramEstimatorInterpolationTest, UniformIntStrEstimate) {
 
     // Type bracketing: low value of different type than the bucket bound.
     // Query: [{$match: {a: {$eq: 100000000}}}].
-    expectedCard = estimateCardinalityEq(*ceHist, lowTag, lowVal, true /* includeScalar */);
+    expectedCard = estimateCardinalityEq(*ceHist, lowTag, lowVal, /*includeScalar=*/true);
     ASSERT_APPROX_EQUAL(0.0, expectedCard.card, 0.1);  // Actual: 0.
 
     // No interpolation for inequality to values inside the first string bucket, fallback to half of
@@ -1284,25 +1284,25 @@ TEST(CEHistogramEstimatorInterpolationTest, UniformIntStrEstimate) {
 
     // Query: [{$match: {a: {$lt: '04e'}}}].
     expectedCard = estimateCardinalityRange(*ceHist,
-                                            false /* lowInclusive */,
+                                            /*lowInclusive=*/false,
                                             lowTag,
                                             lowVal,
-                                            false /* highInclusive */,
+                                            /*highInclusive=*/false,
                                             strVal.tag(),
                                             strVal.value(),
-                                            true /* includeScalar */,
+                                            /*includeScalar=*/true,
                                             ArrayRangeEstimationAlgo::kConjunctArrayCE);
     ASSERT_APPROX_EQUAL(13.3, expectedCard.card, 0.1);  // Actual: 0.
 
     // Query: [{$match: {a: {$lte: '04e'}}}].
     expectedCard = estimateCardinalityRange(*ceHist,
-                                            false /* lowInclusive */,
+                                            /*lowInclusive=*/false,
                                             lowTag,
                                             lowVal,
-                                            true /* highInclusive */,
+                                            /*highInclusive=*/true,
                                             strVal.tag(),
                                             strVal.value(),
-                                            true /* includeScalar */,
+                                            /*includeScalar=*/true,
                                             ArrayRangeEstimationAlgo::kConjunctArrayCE);
     ASSERT_APPROX_EQUAL(15.5, expectedCard.card, 0.1);  // Actual: 3.
 
@@ -1311,25 +1311,25 @@ TEST(CEHistogramEstimatorInterpolationTest, UniformIntStrEstimate) {
 
     // Query: [{$match: {a: {$lt: '8B5'}}}].
     expectedCard = estimateCardinalityRange(*ceHist,
-                                            false /* lowInclusive */,
+                                            /*lowInclusive=*/false,
                                             lowTag,
                                             lowVal,
-                                            false /* highInclusive */,
+                                            /*highInclusive=*/false,
                                             strVal.tag(),
                                             strVal.value(),
-                                            true /* includeScalar */,
+                                            /*includeScalar=*/true,
                                             ArrayRangeEstimationAlgo::kConjunctArrayCE);
     ASSERT_APPROX_EQUAL(13.3, expectedCard.card, 0.1);  // Actual: 24.
 
     // Query: [{$match: {a: {$lte: '8B5'}}}].
     expectedCard = estimateCardinalityRange(*ceHist,
-                                            false /* lowInclusive */,
+                                            /*lowInclusive=*/false,
                                             lowTag,
                                             lowVal,
-                                            true /* highInclusive */,
+                                            /*highInclusive=*/true,
                                             strVal.tag(),
                                             strVal.value(),
-                                            true /* includeScalar */,
+                                            /*includeScalar=*/true,
                                             ArrayRangeEstimationAlgo::kConjunctArrayCE);
     ASSERT_APPROX_EQUAL(15.5, expectedCard.card, 0.1);  // Actual: 29.
 }
@@ -1372,7 +1372,7 @@ TEST(CEHistogramEstimatorInterpolationTest, UniformIntArrayOnlyEstimate) {
                                           maxHist,
                                           // There are 100 non-empty int-only arrays.
                                           TypeCounts{{value::TypeTags::NumberInt64, 100}},
-                                          100.0 /* sampleSize */);
+                                          /*sampleSize=*/100.0);
 
     // Query in the middle of the domain: estimate from ArrayUnique histogram.
     value::TypeTags lowTag = value::TypeTags::NumberInt64;
@@ -1382,13 +1382,13 @@ TEST(CEHistogramEstimatorInterpolationTest, UniformIntArrayOnlyEstimate) {
 
     // Test interpolation for query: [{$match: {a: {$elemMatch: {$gt: 500, $lt: 600}}}}].
     auto expectedCard = estimateCardinalityRange(*ceHist,
-                                                 false /* lowInclusive */,
+                                                 /*lowInclusive=*/false,
                                                  lowTag,
                                                  lowVal,
-                                                 false /* highInclusive */,
+                                                 /*highInclusive=*/false,
                                                  highTag,
                                                  highVal,
-                                                 false /* includeScalar */,
+                                                 /*includeScalar=*/false,
                                                  ArrayRangeEstimationAlgo::kExactArrayCE);
     ASSERT_APPROX_EQUAL(27.0, expectedCard.card, 0.1);  // actual 21.
 
@@ -1396,13 +1396,13 @@ TEST(CEHistogramEstimatorInterpolationTest, UniformIntArrayOnlyEstimate) {
     // Note: although there are no scalars, the estimate is different than the
     // above since we use different formulas.
     expectedCard = estimateCardinalityRange(*ceHist,
-                                            false /* lowInclusive */,
+                                            /*lowInclusive=*/false,
                                             lowTag,
                                             lowVal,
-                                            false /* highInclusive */,
+                                            /*highInclusive=*/false,
                                             highTag,
                                             highVal,
-                                            true /* includeScalar */,
+                                            /*includeScalar=*/true,
                                             ArrayRangeEstimationAlgo::kConjunctArrayCE);
     ASSERT_APPROX_EQUAL(92.0, expectedCard.card, 0.1);  // actual 92.
 
@@ -1412,25 +1412,25 @@ TEST(CEHistogramEstimatorInterpolationTest, UniformIntArrayOnlyEstimate) {
 
     // Test interpolation for query: [{$match: {a: {$elemMatch: {$gt: 10, $lt: 110}}}}].
     expectedCard = estimateCardinalityRange(*ceHist,
-                                            false /* lowInclusive */,
+                                            /*lowInclusive=*/false,
                                             lowTag,
                                             lowVal,
-                                            false /* highInclusive */,
+                                            /*highInclusive=*/false,
                                             highTag,
                                             highVal,
-                                            false /* includeScalar */,
+                                            /*includeScalar=*/false,
                                             ArrayRangeEstimationAlgo::kExactArrayCE);
     ASSERT_APPROX_EQUAL(24.1, expectedCard.card, 0.1);  // actual 29.
 
     // Test interpolation for query: [{$match: {a: {$gt: 10, $lt: 110}}}].
     expectedCard = estimateCardinalityRange(*ceHist,
-                                            false /* lowInclusive */,
+                                            /*lowInclusive=*/false,
                                             lowTag,
                                             lowVal,
-                                            false /* highInclusive */,
+                                            /*highInclusive=*/false,
                                             highTag,
                                             highVal,
-                                            true /* includeScalar */,
+                                            /*includeScalar=*/true,
                                             ArrayRangeEstimationAlgo::kConjunctArrayCE);
     ASSERT_APPROX_EQUAL(27.8, expectedCard.card, 0.1);  // actual 31.
 }
@@ -1481,7 +1481,7 @@ TEST(CEHistogramEstimatorInterpolationTest, UniformIntMixedArrayEstimate) {
                                           maxHist,
                                           // There are 94 non-empty int-only arrays.
                                           TypeCounts{{value::TypeTags::NumberInt64, 94}},
-                                          200.0 /* sampleSize */);
+                                          /*sampleSize=*/200.0);
 
     value::TypeTags lowTag = value::TypeTags::NumberInt64;
     value::Value lowVal = 500;
@@ -1490,25 +1490,25 @@ TEST(CEHistogramEstimatorInterpolationTest, UniformIntMixedArrayEstimate) {
 
     // Test interpolation for query: [{$match: {a: {$gt: 500, $lt: 550}}}].
     auto expectedCard = estimateCardinalityRange(*ceHist,
-                                                 false /* lowInclusive */,
+                                                 /*lowInclusive=*/false,
                                                  lowTag,
                                                  lowVal,
-                                                 false /* highInclusive */,
+                                                 /*highInclusive=*/false,
                                                  highTag,
                                                  highVal,
-                                                 true /* includeScalar */,
+                                                 /*includeScalar=*/true,
                                                  ArrayRangeEstimationAlgo::kConjunctArrayCE);
     ASSERT_APPROX_EQUAL(92.9, expectedCard.card, 0.1);  // Actual: 94.
 
     // Test interpolation for query: [{$match: {a: {$elemMatch: {$gt: 500, $lt: 550}}}}].
     expectedCard = estimateCardinalityRange(*ceHist,
-                                            false /* lowInclusive */,
+                                            /*lowInclusive=*/false,
                                             lowTag,
                                             lowVal,
-                                            false /* highInclusive */,
+                                            /*highInclusive=*/false,
                                             highTag,
                                             highVal,
-                                            false /* includeScalar */,
+                                            /*includeScalar=*/false,
                                             ArrayRangeEstimationAlgo::kExactArrayCE);
     ASSERT_APPROX_EQUAL(11.0, expectedCard.card, 0.1);  // Actual: 8.
 }
@@ -1531,25 +1531,25 @@ TEST(CEHistogramEstimatorEdgeCasesTest, TwoExclusiveBucketsMixedHistogram) {
 
     // [{$match: {a: {$elemMatch: {$gt: NaN, $lt: 1}}}}]
     auto expectedCard = estimateCardinalityRange(*ceHist,
-                                                 false /* lowInclusive */,
+                                                 /*lowInclusive=*/false,
                                                  tagLowDbl,
                                                  valLowDbl,
-                                                 false /* highInclusive */,
+                                                 /*highInclusive=*/false,
                                                  value::TypeTags::NumberInt32,
                                                  value::bitcastFrom<int64_t>(1),
-                                                 true /* includeScalar */,
+                                                 /*includeScalar=*/true,
                                                  ArrayRangeEstimationAlgo::kConjunctArrayCE);
     ASSERT_APPROX_EQUAL(0.0, expectedCard.card, kErrorBound);
 
     // [{$match: {a: {$gt: NaN, $lt: 5}}}]
     expectedCard = estimateCardinalityRange(*ceHist,
-                                            false /* lowInclusive */,
+                                            /*lowInclusive=*/false,
                                             tagLowDbl,
                                             valLowDbl,
-                                            false /* highInclusive */,
+                                            /*highInclusive=*/false,
                                             value::TypeTags::NumberInt32,
                                             value::bitcastFrom<int64_t>(5),
-                                            true /* includeScalar */,
+                                            /*includeScalar=*/true,
                                             ArrayRangeEstimationAlgo::kConjunctArrayCE);
     ASSERT_APPROX_EQUAL(3.0, expectedCard.card, kErrorBound);
 
@@ -1558,25 +1558,25 @@ TEST(CEHistogramEstimatorEdgeCasesTest, TwoExclusiveBucketsMixedHistogram) {
 
     // [{$match: {a: {$gte: 0, $lt: ""}}}]
     expectedCard = estimateCardinalityRange(*ceHist,
-                                            true /* lowInclusive */,
+                                            /*lowInclusive=*/true,
                                             value::TypeTags::NumberInt32,
                                             value::bitcastFrom<int64_t>(0),
-                                            false /* highInclusive */,
+                                            /*highInclusive=*/false,
                                             lowStr.tag(),
                                             lowStr.value(),
-                                            true /* includeScalar */,
+                                            /*includeScalar=*/true,
                                             ArrayRangeEstimationAlgo::kConjunctArrayCE);
     ASSERT_APPROX_EQUAL(numInts, expectedCard.card, kErrorBound);
 
     // [{$match: {a: {$gte: "", $lte: "a"}}}]
     expectedCard = estimateCardinalityRange(*ceHist,
-                                            true /* lowInclusive */,
+                                            /*lowInclusive=*/true,
                                             lowStr.tag(),
                                             lowStr.value(),
-                                            true /* highInclusive */,
+                                            /*highInclusive=*/true,
                                             strVal.tag(),
                                             strVal.value(),
-                                            true /* includeScalar */,
+                                            /*includeScalar=*/true,
                                             ArrayRangeEstimationAlgo::kConjunctArrayCE);
 
     ASSERT_APPROX_EQUAL(0.0, expectedCard.card, kErrorBound);
@@ -1584,13 +1584,13 @@ TEST(CEHistogramEstimatorEdgeCasesTest, TwoExclusiveBucketsMixedHistogram) {
     strVal = value::TagValueOwned::fromRaw(value::makeNewString("xyz"sv));
     // [{$match: {a: {$gte: "", $lte: "xyz"}}}]
     expectedCard = estimateCardinalityRange(*ceHist,
-                                            true /* lowInclusive */,
+                                            /*lowInclusive=*/true,
                                             lowStr.tag(),
                                             lowStr.value(),
-                                            true /* highInclusive */,
+                                            /*highInclusive=*/true,
                                             strVal.tag(),
                                             strVal.value(),
-                                            true /* includeScalar */,
+                                            /*includeScalar=*/true,
                                             ArrayRangeEstimationAlgo::kConjunctArrayCE);
 
     ASSERT_APPROX_EQUAL(numStrs, expectedCard.card, kErrorBound);
@@ -1604,7 +1604,7 @@ TEST(CEHistogramEstimatorEdgeCasesTest, TwoBucketsMixedHistogram) {
     const auto ceHist = CEHistogram::make(
         hist,
         TypeCounts{{value::TypeTags::NumberInt64, 20}, {value::TypeTags::StringSmall, 80}},
-        100.0 /* sampleSize */);
+        /*sampleSize=*/100.0);
 
     ASSERT_EQ(100.0, getTotals(hist).card);
 
@@ -1671,37 +1671,37 @@ TEST(CEHistogramEstimatorEdgeCasesTest, TwoBucketsMixedHistogram) {
 
     // [{$match: {a: {$gte: NaN, $lte: 25}}}]
     expectedCard = estimateCardinalityRange(*ceHist,
-                                            true /* lowInclusive */,
+                                            /*lowInclusive=*/true,
                                             tagLowDbl,
                                             valLowDbl,
-                                            true /* highInclusive */,
+                                            /*highInclusive=*/true,
                                             value::TypeTags::NumberInt32,
                                             value::bitcastFrom<int64_t>(25),
-                                            true /* includeScalar */,
+                                            /*includeScalar=*/true,
                                             ArrayRangeEstimationAlgo::kConjunctArrayCE);
     ASSERT_APPROX_EQUAL(8.49, expectedCard.card, kErrorBound);
 
     // [{$match: {a: {$gte: 25, $lte: 1000000}}}]
     expectedCard = estimateCardinalityRange(*ceHist,
-                                            true /* lowInclusive */,
+                                            /*lowInclusive=*/true,
                                             value::TypeTags::NumberInt32,
                                             value::bitcastFrom<int64_t>(25),
-                                            true /* highInclusive */,
+                                            /*highInclusive=*/true,
                                             tagHighInt,
                                             valHighInt,
-                                            true /* includeScalar */,
+                                            /*includeScalar=*/true,
                                             ArrayRangeEstimationAlgo::kConjunctArrayCE);
     ASSERT_APPROX_EQUAL(13.38, expectedCard.card, kErrorBound);
 
     // [{$match: {a: {$gte: NaN, $lte: 1000000}}}]
     expectedCard = estimateCardinalityRange(*ceHist,
-                                            true /* lowInclusive */,
+                                            /*lowInclusive=*/true,
                                             tagLowDbl,
                                             valLowDbl,
-                                            true /* highInclusive */,
+                                            /*highInclusive=*/true,
                                             tagHighInt,
                                             valHighInt,
-                                            true /* includeScalar */,
+                                            /*includeScalar=*/true,
                                             ArrayRangeEstimationAlgo::kConjunctArrayCE);
     ASSERT_APPROX_EQUAL(20.0, expectedCard.card, kErrorBound);
 
@@ -1709,37 +1709,37 @@ TEST(CEHistogramEstimatorEdgeCasesTest, TwoBucketsMixedHistogram) {
 
     // [{$match: {a: {$gte: NaN, $lt: ""}}}]
     expectedCard = estimateCardinalityRange(*ceHist,
-                                            true /* lowInclusive */,
+                                            /*lowInclusive=*/true,
                                             tagLowDbl,
                                             valLowDbl,
-                                            false /* highInclusive */,
+                                            /*highInclusive=*/false,
                                             lowStr.tag(),
                                             lowStr.value(),
-                                            true /* includeScalar */,
+                                            /*includeScalar=*/true,
                                             ArrayRangeEstimationAlgo::kConjunctArrayCE);
     ASSERT_APPROX_EQUAL(20.0, expectedCard.card, kErrorBound);
 
     // [{$match: {a: {$gte: 25, $lt: ""}}}]
     expectedCard = estimateCardinalityRange(*ceHist,
-                                            true /* lowInclusive */,
+                                            /*lowInclusive=*/true,
                                             value::TypeTags::NumberInt32,
                                             value::bitcastFrom<int64_t>(25),
-                                            false /* highInclusive */,
+                                            /*highInclusive=*/false,
                                             lowStr.tag(),
                                             lowStr.value(),
-                                            true /* includeScalar */,
+                                            /*includeScalar=*/true,
                                             ArrayRangeEstimationAlgo::kConjunctArrayCE);
     ASSERT_APPROX_EQUAL(13.39, expectedCard.card, kErrorBound);
 
     // [{$match: {a: {$gte: "", $lte: "a"}}}]
     expectedCard = estimateCardinalityRange(*ceHist,
-                                            true /* lowInclusive */,
+                                            /*lowInclusive=*/true,
                                             lowStr.tag(),
                                             lowStr.value(),
-                                            true /* highInclusive */,
+                                            /*highInclusive=*/true,
                                             strVal.tag(),
                                             strVal.value(),
-                                            true /* includeScalar */,
+                                            /*includeScalar=*/true,
                                             ArrayRangeEstimationAlgo::kConjunctArrayCE);
 
     ASSERT_APPROX_EQUAL(37.49, expectedCard.card, kErrorBound);
@@ -1747,25 +1747,25 @@ TEST(CEHistogramEstimatorEdgeCasesTest, TwoBucketsMixedHistogram) {
     // ["", {}).
     value::TagValueOwned objVal = value::TagValueOwned::fromRaw(value::makeNewObject());
     expectedCard = estimateCardinalityRange(*ceHist,
-                                            true /* lowInclusive */,
+                                            /*lowInclusive=*/true,
                                             lowStr.tag(),
                                             lowStr.value(),
-                                            false /* highInclusive */,
+                                            /*highInclusive=*/false,
                                             objVal.tag(),
                                             objVal.value(),
-                                            true /* includeScalar */,
+                                            /*includeScalar=*/true,
                                             ArrayRangeEstimationAlgo::kConjunctArrayCE);
     ASSERT_APPROX_EQUAL(80.0, expectedCard.card, kErrorBound);
 
     // ["a", {}).
     expectedCard = estimateCardinalityRange(*ceHist,
-                                            true /* lowInclusive */,
+                                            /*lowInclusive=*/true,
                                             strVal.tag(),
                                             strVal.value(),
-                                            false /* highInclusive */,
+                                            /*highInclusive=*/false,
                                             objVal.tag(),
                                             objVal.value(),
-                                            true /* includeScalar */,
+                                            /*includeScalar=*/true,
                                             ArrayRangeEstimationAlgo::kConjunctArrayCE);
 
     ASSERT_APPROX_EQUAL(45.5, expectedCard.card, kErrorBound);
@@ -1834,36 +1834,36 @@ TEST(CEHistogramEstimatorDataTest, Histogram1000ArraysSmall10Buckets) {
     for (const auto q : querySet) {
         // $match query, includeScalar = true.
         auto estCard = estimateCardinalityRange(*ceHist,
-                                                false /* lowInclusive */,
+                                                /*lowInclusive=*/false,
                                                 value::TypeTags::NumberInt32,
                                                 value::bitcastFrom<int32_t>(q.low),
-                                                false /* highInclusive */,
+                                                /*highInclusive=*/false,
                                                 value::TypeTags::NumberInt32,
                                                 value::bitcastFrom<int32_t>(q.high),
-                                                true /* includeScalar */,
+                                                /*includeScalar=*/true,
                                                 ArrayRangeEstimationAlgo::kConjunctArrayCE);
         std::cout << estCard.card << " -> " << q.estMatch << std::endl;
         ASSERT_APPROX_EQUAL(estCard.card, q.estMatch, 0.1);
 
         // $elemMatch query, includeScalar = false.
         estCard = estimateCardinalityRange(*ceHist,
-                                           false /* lowInclusive */,
+                                           /*lowInclusive=*/false,
                                            value::TypeTags::NumberInt32,
                                            value::bitcastFrom<int32_t>(q.low),
-                                           false /* highInclusive */,
+                                           /*highInclusive=*/false,
                                            value::TypeTags::NumberInt32,
                                            value::bitcastFrom<int32_t>(q.high),
-                                           false /* includeScalar */,
+                                           /*includeScalar=*/false,
                                            ArrayRangeEstimationAlgo::kExactArrayCE);
         ASSERT_APPROX_EQUAL(estCard.card, q.estElemMatch, 0.1);
 
         LOGV2(9163800,
               "RMSE for $match query",
-              "RMSE"_attr = computeRMSE(querySet, false /* isElemMatch */));
+              "RMSE"_attr = computeRMSE(querySet, /*isElemMatch=*/false));
 
         LOGV2(9163801,
               "RMSE for $elemMatch query",
-              "RMSE"_attr = computeRMSE(querySet, true /* isElemMatch */));
+              "RMSE"_attr = computeRMSE(querySet, /*isElemMatch=*/true));
     }
 }
 
@@ -1930,35 +1930,35 @@ TEST(CEHistogramEstimatorDataTest, Histogram1000ArraysLarge10Buckets) {
     for (const auto q : querySet) {
         // $match query, includeScalar = true.
         auto estCard = estimateCardinalityRange(*ceHist,
-                                                false /* lowInclusive */,
+                                                /*lowInclusive=*/false,
                                                 value::TypeTags::NumberInt32,
                                                 value::bitcastFrom<int32_t>(q.low),
-                                                false /* highInclusive */,
+                                                /*highInclusive=*/false,
                                                 value::TypeTags::NumberInt32,
                                                 value::bitcastFrom<int32_t>(q.high),
-                                                true /* includeScalar */,
+                                                /*includeScalar=*/true,
                                                 ArrayRangeEstimationAlgo::kConjunctArrayCE);
         ASSERT_APPROX_EQUAL(estCard.card, q.estMatch, 0.1);
 
         // $elemMatch query, includeScalar = false.
         estCard = estimateCardinalityRange(*ceHist,
-                                           false /* lowInclusive */,
+                                           /*lowInclusive=*/false,
                                            value::TypeTags::NumberInt32,
                                            value::bitcastFrom<int32_t>(q.low),
-                                           false /* highInclusive */,
+                                           /*highInclusive=*/false,
                                            value::TypeTags::NumberInt32,
                                            value::bitcastFrom<int32_t>(q.high),
-                                           false /* includeScalar */,
+                                           /*includeScalar=*/false,
                                            ArrayRangeEstimationAlgo::kExactArrayCE);
         ASSERT_APPROX_EQUAL(estCard.card, q.estElemMatch, 0.1);
 
         LOGV2(9163802,
               "RMSE for $match query",
-              "RMSE"_attr = computeRMSE(querySet, false /* isElemMatch */));
+              "RMSE"_attr = computeRMSE(querySet, /*isElemMatch=*/false));
 
         LOGV2(9163803,
               "RMSE for $elemMatch query",
-              "RMSE"_attr = computeRMSE(querySet, true /* isElemMatch */));
+              "RMSE"_attr = computeRMSE(querySet, /*isElemMatch=*/true));
     }
 }
 
@@ -2011,11 +2011,11 @@ TEST(CEHistogramEstimatorCanEstimateTest, EstimateViaTypeCountsBooleanMixInclusi
 
     std::vector<stats::SBEValue> data;
     for (size_t i = 0; i < falseValues; i++) {
-        data.push_back(stats::makeBooleanValue(0 /*false*/));
+        data.push_back(stats::makeBooleanValue(/*false=*/0));
     }
 
     for (size_t i = 0; i < trueValues; i++) {
-        data.push_back(stats::makeBooleanValue(1 /*true*/));
+        data.push_back(stats::makeBooleanValue(/*true=*/1));
     }
 
     auto ceHist = stats::createCEHistogram(data, numberOfBuckets);
@@ -2061,11 +2061,11 @@ TEST(CEHistogramEstimatorCanEstimateTest, EstimateViaTypeCountsBooleanMixNotIncl
 
     std::vector<stats::SBEValue> data;
     for (size_t i = 0; i < falseValues; i++) {
-        data.push_back(stats::makeBooleanValue(0 /*false*/));
+        data.push_back(stats::makeBooleanValue(/*false=*/0));
     }
 
     for (size_t i = 0; i < trueValues; i++) {
-        data.push_back(stats::makeBooleanValue(1 /*true*/));
+        data.push_back(stats::makeBooleanValue(/*true=*/1));
     }
 
     auto ceHist = stats::createCEHistogram(data, numberOfBuckets);
@@ -2114,11 +2114,11 @@ DEATH_TEST(CEHistogramEstimatorCanEstimateTestDeathTest,
 
     std::vector<stats::SBEValue> data;
     for (size_t i = 0; i < falseValues; i++) {
-        data.push_back(stats::makeBooleanValue(0 /*false*/));
+        data.push_back(stats::makeBooleanValue(/*false=*/0));
     }
 
     for (size_t i = 0; i < trueValues; i++) {
-        data.push_back(stats::makeBooleanValue(1 /*true*/));
+        data.push_back(stats::makeBooleanValue(/*true=*/1));
     }
 
     auto ceHist = stats::createCEHistogram(data, numberOfBuckets);
@@ -2150,11 +2150,11 @@ DEATH_TEST(CEHistogramEstimatorCanEstimateTestDeathTest,
 
     std::vector<stats::SBEValue> data;
     for (size_t i = 0; i < falseValues; i++) {
-        data.push_back(stats::makeBooleanValue(0 /*false*/));
+        data.push_back(stats::makeBooleanValue(/*false=*/0));
     }
 
     for (size_t i = 0; i < trueValues; i++) {
-        data.push_back(stats::makeBooleanValue(1 /*true*/));
+        data.push_back(stats::makeBooleanValue(/*true=*/1));
     }
 
     auto ceHist = stats::createCEHistogram(data, numberOfBuckets);
@@ -2186,11 +2186,11 @@ DEATH_TEST(CEHistogramEstimatorCanEstimateTestDeathTest,
 
     std::vector<stats::SBEValue> data;
     for (size_t i = 0; i < falseValues; i++) {
-        data.push_back(stats::makeBooleanValue(0 /*false*/));
+        data.push_back(stats::makeBooleanValue(/*false=*/0));
     }
 
     for (size_t i = 0; i < trueValues; i++) {
-        data.push_back(stats::makeBooleanValue(1 /*true*/));
+        data.push_back(stats::makeBooleanValue(/*true=*/1));
     }
 
     auto ceHist = stats::createCEHistogram(data, numberOfBuckets);
@@ -2222,11 +2222,11 @@ DEATH_TEST(CEHistogramEstimatorCanEstimateTestDeathTest,
 
     std::vector<stats::SBEValue> data;
     for (size_t i = 0; i < falseValues; i++) {
-        data.push_back(stats::makeBooleanValue(0 /*false*/));
+        data.push_back(stats::makeBooleanValue(/*false=*/0));
     }
 
     for (size_t i = 0; i < trueValues; i++) {
-        data.push_back(stats::makeBooleanValue(1 /*true*/));
+        data.push_back(stats::makeBooleanValue(/*true=*/1));
     }
 
     auto ceHist = stats::createCEHistogram(data, numberOfBuckets);
@@ -2258,11 +2258,11 @@ DEATH_TEST(CEHistogramEstimatorCanEstimateTestDeathTest,
 
     std::vector<stats::SBEValue> data;
     for (size_t i = 0; i < falseValues; i++) {
-        data.push_back(stats::makeBooleanValue(0 /*false*/));
+        data.push_back(stats::makeBooleanValue(/*false=*/0));
     }
 
     for (size_t i = 0; i < trueValues; i++) {
-        data.push_back(stats::makeBooleanValue(1 /*true*/));
+        data.push_back(stats::makeBooleanValue(/*true=*/1));
     }
 
     auto ceHist = stats::createCEHistogram(data, numberOfBuckets);
@@ -2294,11 +2294,11 @@ DEATH_TEST(CEHistogramEstimatorCanEstimateTestDeathTest,
 
     std::vector<stats::SBEValue> data;
     for (size_t i = 0; i < falseValues; i++) {
-        data.push_back(stats::makeBooleanValue(0 /*false*/));
+        data.push_back(stats::makeBooleanValue(/*false=*/0));
     }
 
     for (size_t i = 0; i < trueValues; i++) {
-        data.push_back(stats::makeBooleanValue(1 /*true*/));
+        data.push_back(stats::makeBooleanValue(/*true=*/1));
     }
 
     auto ceHist = stats::createCEHistogram(data, numberOfBuckets);
@@ -2462,12 +2462,12 @@ TEST(CEHistogramEstimatorCanEstimateTest, EstimateViaTypeCountsMixTypes) {
 
     // add True boolean values.
     for (size_t i = 0; i < trueValues; i++) {
-        data.push_back(stats::makeBooleanValue(1 /*true*/));
+        data.push_back(stats::makeBooleanValue(/*true=*/1));
     }
 
     // add True boolean values.
     for (size_t i = 0; i < falseValues; i++) {
-        data.push_back(stats::makeBooleanValue(0 /*false*/));
+        data.push_back(stats::makeBooleanValue(/*false=*/0));
     }
 
     // add NaN values.

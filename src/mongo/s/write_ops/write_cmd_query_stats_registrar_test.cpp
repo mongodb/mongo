@@ -908,7 +908,7 @@ TEST_F(WriteCmdQueryStatsRegistrarRegisterRequestFixture,
             configureReadLimiter();
 
             WriteCmdQueryStatsRegistrar::parseAndRegisterRequest(
-                localOpCtx, cmdRef, false /* skipRegistration */);
+                localOpCtx, cmdRef, /*skipRegistration=*/false);
 
             const auto& opDebug = CurOp::get(localOpCtx)->debug();
             ASSERT_FALSE(opDebug.hasQueryStatsInfo(0));
@@ -940,7 +940,7 @@ TEST_F(WriteCmdQueryStatsRegistrarTest, RegisterRequestInsertNotSampledWhenWrite
             configureReadLimiter();
 
             WriteCmdQueryStatsRegistrar::parseAndRegisterRequest(
-                localOpCtx, cmdRef, false /* skipRegistration */);
+                localOpCtx, cmdRef, /*skipRegistration=*/false);
 
             const auto& opDebug = CurOp::get(localOpCtx)->debug();
             ASSERT_FALSE(opDebug.hasQueryStatsInfo(kInsertOpIndex));

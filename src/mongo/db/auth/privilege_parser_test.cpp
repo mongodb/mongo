@@ -67,7 +67,7 @@ TEST(PrivilegeParserTest, IsNotValidTest) {
 Privilege resolvePrivilege(BSONObj obj, std::vector<std::string>* unrecognized = nullptr) {
     IDLParserContext ctx("resolvePrivilege");
     auto pp = ParsedPrivilege::parse(obj, ctx);
-    return Privilege::resolvePrivilegeWithTenant(boost::none /* tenantId */, pp, unrecognized);
+    return Privilege::resolvePrivilegeWithTenant(/*tenantId=*/boost::none, pp, unrecognized);
 }
 
 const std::set<std::string_view> kBoolResourceTypes = {

@@ -117,14 +117,14 @@ protected:
 
         // Constructs a QuerySolution consisting of a GroupNode on top of a VirtualScanNode.
         auto virtScanNode = std::make_unique<VirtualScanNode>(
-            inputDocs, VirtualScanNode::ScanType::kCollScan, false /*hasRecordId*/);
+            inputDocs, VirtualScanNode::ScanType::kCollScan, /*hasRecordId=*/false);
 
         auto groupNode = std::make_unique<GroupNode>(std::move(virtScanNode),
                                                      docSrcGroup->getIdExpression(),
                                                      docSrcGroup->getAccumulationStatements(),
-                                                     false /*doingMerge*/,
-                                                     false /*willBeMerged*/,
-                                                     true /*shouldProduceBson*/);
+                                                     /*doingMerge=*/false,
+                                                     /*willBeMerged=*/false,
+                                                     /*shouldProduceBson=*/true);
 
         // Makes a QuerySolution from the root group node.
         return {makeQuerySolution(std::move(groupNode)), docSrcGroup};
@@ -140,7 +140,7 @@ protected:
 
         // Translates the QuerySolution tree to a sbe::PlanStage tree.
         auto [resultSlots, stage, data, _] = buildPlanStage(
-            std::move(querySolution), false /*hasRecordId*/, nullptr, std::move(collator));
+            std::move(querySolution), /*hasRecordId=*/false, nullptr, std::move(collator));
         ASSERT_EQ(resultSlots.size(), 1);
 
         auto resultAccessors = prepareTree(&data.env.ctx, stage.get(), resultSlots[0]);
@@ -269,7 +269,7 @@ protected:
             // AccumulationExpressions or _id expression that are not supported by SBE will flip the
             // sbeGroupCompatible flag in the expCtx to false.
             auto [querySolution, groupStage] =
-                makeGroupQuerySolution(expCtx, groupSpec, std::vector<BSONArray>{} /*inputDocs*/);
+                makeGroupQuerySolution(expCtx, groupSpec, /*inputDocs=*/std::vector<BSONArray>{});
 
             // We try to figure out the expected sbeGroupCompatible value here. The
             // sbeGroupCompatible flag should be false if any accumulator being tested does not have
@@ -278,7 +278,7 @@ protected:
             try {
                 // Tries to translate the QuerySolution tree to a sbe::PlanStage tree.
                 (void)buildPlanStage(
-                    std::move(querySolution), false /*hasRecordId*/, nullptr, nullptr);
+                    std::move(querySolution), /*hasRecordId=*/false, nullptr, nullptr);
 
             } catch (const DBException& e) {
                 // The accumulator or the _id expression is unsupported in SBE, so we expect that

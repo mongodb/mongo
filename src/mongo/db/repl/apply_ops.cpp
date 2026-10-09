@@ -421,7 +421,7 @@ Status applyOps(OperationContext* opCtx,
         globalWriteLock.reset();
     }
     return _applyOps(
-        opCtx, info, dbName, oplogApplicationMode, result, &numApplied, nullptr /* opsBuilder */);
+        opCtx, info, dbName, oplogApplicationMode, result, &numApplied, /*opsBuilder=*/nullptr);
 }
 
 }  // namespace repl

@@ -129,7 +129,7 @@ void UserCacheInvalidator::start(ServiceContext* serviceCtx, OperationContext* o
         "UserCacheInvalidator",
         [serviceCtx](Client* client) { getUserCacheInvalidator(serviceCtx).run(); },
         loadInterval(),
-        true /*isKillableByStepdown*/);
+        /*isKillableByStepdown=*/true);
 
     std::lock_guard lg(invalidator._jobMutex);
     // UserCacheInvalidator job must not already be present

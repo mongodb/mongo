@@ -216,7 +216,7 @@ std::unique_ptr<QuerySolutionNode> buildQSNFromJoinPlan(
                                                   qsn.get(),
                                                   NodeSet().set(base.node),
                                                   base.cost,
-                                                  {} /* edges */,
+                                                  /*edges=*/{},
                                                   estimates);
                        }
                    },
@@ -340,7 +340,7 @@ ReorderedJoinSolution makeReorderedJoinSoln(
                 5,
                 "Winning join plan",
                 "plan"_attr =
-                    registry.joinPlanNodeToBSON(bestPlanNodeId, ctx.joinGraph, false /* brief */));
+                    registry.joinPlanNodeToBSON(bestPlanNodeId, ctx.joinGraph, /*brief=*/false));
 
     // Populate enumeration-wide metrics.
     metrics.numPlansEnumerated = peCtx.getNumFinalSubsetPlans();

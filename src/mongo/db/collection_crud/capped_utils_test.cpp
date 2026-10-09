@@ -120,7 +120,7 @@ TEST_F(CappedUtilsTest, ConvertToCappedReturnsNamespaceNotFoundIfCollectionIsMis
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
     auto opCtx = makeOpCtx();
     EXPECT_FALSE(collectionExists(opCtx.get(), nss));
-    ASSERT_THROWS_CODE(convertToCapped(opCtx.get(), nss, 1000.0, false /*fromMigrate*/),
+    ASSERT_THROWS_CODE(convertToCapped(opCtx.get(), nss, 1000.0, /*fromMigrate=*/false),
                        DBException,
                        ErrorCodes::NamespaceNotFound);
 }
@@ -133,7 +133,7 @@ TEST_F(CappedUtilsTest, ConvertToCappedUpdatesCollectionOptionsOnSuccess) {
     auto options = getCollectionOptions(opCtx.get(), nss);
     EXPECT_FALSE(options.capped);
 
-    convertToCapped(opCtx.get(), nss, cappedCollectionSize, false /*fromMigrate*/);
+    convertToCapped(opCtx.get(), nss, cappedCollectionSize, /*fromMigrate=*/false);
     options = getCollectionOptions(opCtx.get(), nss);
     EXPECT_TRUE(options.capped);
     EXPECT_NEAR(cappedCollectionSize, options.cappedSize, 0.001)

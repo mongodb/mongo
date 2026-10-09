@@ -730,7 +730,7 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicWritesForUserDelete) {
     CompressionResult compressionResult = compressBucket(uncompressedDoc,
                                                          _timeField,
                                                          _nsNoMeta,
-                                                         /*validateDecompression*/ true);
+                                                         /*validateDecompression=*/true);
     const BSONObj& bucketDoc = compressionResult.compressedBucket.value();
     auto minTime = bucketDoc.getObjectField(kBucketControlFieldName)
                        .getObjectField(kBucketControlMinFieldName)
@@ -790,7 +790,7 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicWritesForUserDelete) {
         CompressionResult compressionResult = compressBucket(uncompressedReplaceDoc,
                                                              _timeField,
                                                              _nsNoMeta,
-                                                             /*validateDecompression*/ true);
+                                                             /*validateDecompression=*/true);
         const BSONObj& replaceDoc = compressionResult.compressedBucket.value();
 
         Snapshotted<BSONObj> doc;
@@ -998,7 +998,7 @@ DEATH_TEST_F(TimeseriesWriteUtilDeathTest,
     CompressionResult compressionResult = compressBucket(uncompressedDoc,
                                                          _timeField,
                                                          _nsNoMeta,
-                                                         /*validateDecompression*/ true);
+                                                         /*validateDecompression=*/true);
     const BSONObj& bucketDoc = compressionResult.compressedBucket.value();
     auto originalMinTime = bucketDoc.getObjectField(kBucketControlFieldName)
                                .getObjectField(kBucketControlMinFieldName)

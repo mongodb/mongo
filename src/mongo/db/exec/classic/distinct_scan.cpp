@@ -157,13 +157,14 @@ PlanStage::StageState DistinctScan::doFetch(WorkingSetMember* member,
 
             return ADVANCED;
         },
+        /*yieldHandler=*/
         [&] {
             // Ensure that the BSONObj underlying the WorkingSetMember is owned because it may be
             // freed when we yield.
             member->makeObjOwnedIfNeeded();
             _idRetrying = id;
             *out = WorkingSet::INVALID_ID;
-        } /* yieldHandler */);
+        });
 }
 
 PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
@@ -196,9 +197,7 @@ PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
                     _seekPoint, _scanDirection == 1, builder));
             return PlanStage::ADVANCED;
         },
-        [&] {
-            *out = WorkingSet::INVALID_ID;
-        } /* yieldHandler */);
+        /*yieldHandler=*/[&] { *out = WorkingSet::INVALID_ID; });
 
     if (ret != PlanStage::ADVANCED) {
         return ret;

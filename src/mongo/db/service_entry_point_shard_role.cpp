@@ -415,8 +415,8 @@ void appendErrorLabelsAndTopologyVersion(OperationContext* opCtx,
                        code,
                        wcCode,
                        isInternalClient,
-                       false /* isMongos */,
-                       OperationShardingState::isShardingAware(opCtx) /* isComingFromRouter */,
+                       /*isMongos=*/false,
+                       /*isComingFromRouter=*/OperationShardingState::isShardingAware(opCtx),
                        lastOpBeforeRun,
                        lastOpAfterRun);
     commandBodyFieldsBob->appendElements(errorLabels);
@@ -1071,7 +1071,7 @@ void CheckoutSessionAndInvokeCommand::_checkOutSession() {
         // transaction resources.
         if (command->shouldAffectReadOptionCounters() && opCtx->inMultiDocumentTransaction()) {
             ServerReadConcernMetrics::get(opCtx)->recordReadConcern(readConcernArgs,
-                                                                    true /* isTransaction */);
+                                                                    /*isTransaction=*/true);
         }
 
         // For replica sets, we do not receive the readConcernArgs of our parent transaction
@@ -1203,7 +1203,7 @@ void RunCommandImpl::_prologue() {
     if (!opCtx->getClient()->isInDirectClient() && command->shouldAffectReadOptionCounters() &&
         !opCtx->inMultiDocumentTransaction()) {
         ServerReadConcernMetrics::get(opCtx)->recordReadConcern(repl::ReadConcernArgs::get(opCtx),
-                                                                false /* isTransaction */);
+                                                                /*isTransaction=*/false);
     }
 
     auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
@@ -1975,7 +1975,7 @@ void ExecCommandDatabase::_initiateCommand() {
                         timeseriesBucketsNss,
                         shardVersion,
                         {},
-                        true /* disableCheckVersioningCorrectness */);
+                        /*disableCheckVersioningCorrectness=*/true);
                 }
             }
         }
@@ -2175,7 +2175,7 @@ void ExecCommandDatabase::_handleFailure(Status status) {
     auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
     if (readConcernArgs.isEmpty()) {
         auto readConcernArgsStatus = _extractReadConcern(
-            opCtx, false /*startTransaction*/, false /* startOrContinueTransaction */);
+            opCtx, /*startTransaction=*/false, /*startOrContinueTransaction=*/false);
         if (readConcernArgsStatus.isOK()) {
             // We must obtain the client lock to set the ReadConcernArgs on the operation context as
             // it may be concurrently read by CurrentOp.

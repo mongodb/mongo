@@ -44,8 +44,8 @@ void writeNoopEntryLocal(OperationContext* opCtx) {
     client.update(NamespaceString::kServerConfigurationNamespace,
                   BSON("_id" << "AddShardStats"),
                   BSON("$inc" << BSON("count" << 1)),
-                  true /* upsert */,
-                  false /* multi */);
+                  /*upsert=*/true,
+                  /*multi=*/false);
 }
 
 void waitForMajority(OperationContext* opCtx) {

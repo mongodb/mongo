@@ -50,7 +50,7 @@ BucketAutoStage::BucketAutoStage(
     boost::intrusive_ptr<GranularityRounder> granularityRounder,
     int nBuckets)
     : exec::agg::Stage(stageName, expCtx),
-      _sorterFileStats(nullptr /*sorterTracker*/),
+      _sorterFileStats(/*sorterTracker=*/nullptr),
       _accumulatedFields(std::move(accumulatedFields)),
       _populated(std::move(populated)),
       _groupByExpression(std::move(groupByExpression)),

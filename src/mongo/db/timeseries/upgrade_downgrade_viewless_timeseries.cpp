@@ -113,7 +113,7 @@ Status canUpgradeToViewlessTimeseries(OperationContext* opCtx,
     auto inconsistencies = checkBucketCollectionInconsistencies(
         opCtx,
         bucketsColl,
-        false /* ensureViewExists */,
+        /*ensureViewExists=*/false,
         locks.mainAcq.isView() ? &locks.mainAcq.getView().getViewDefinition() : nullptr,
         mainColl.get());
     if (!inconsistencies.empty()) {
@@ -292,7 +292,7 @@ void upgradeToViewlessTimeseries(OperationContext* opCtx,
 
             // Drop view and rename the buckets NSS over it.
             uassertStatusOK(db->dropView(opCtx, mainNs));
-            uassertStatusOK(db->renameCollection(opCtx, bucketsNs, mainNs, true /* stayTemp */));
+            uassertStatusOK(db->renameCollection(opCtx, bucketsNs, mainNs, /*stayTemp=*/true));
 
             // Clean up the buckets NSS metadata.
             CollectionWriter collWriter{opCtx, mainNs};
@@ -313,7 +313,7 @@ void upgradeToViewlessTimeseries(OperationContext* opCtx,
 
         // Log a oplog entry giving a single, atomic timestamp to all operations done above.
         opCtx->getServiceContext()->getOpObserver()->onUpgradeDowngradeViewlessTimeseries(
-            opCtx, mainNs, bucketsColl->uuid(), true /* isUpgrade */);
+            opCtx, mainNs, bucketsColl->uuid(), /*isUpgrade=*/true);
 
         wuow.commit();
     });
@@ -379,7 +379,7 @@ void downgradeFromViewlessTimeseries(OperationContext* opCtx,
             repl::UnreplicatedWritesBlock uwb(opCtx);
 
             // Rename the collection to the buckets NSS.
-            uassertStatusOK(db->renameCollection(opCtx, mainNs, bucketsNs, true /* stayTemp */));
+            uassertStatusOK(db->renameCollection(opCtx, mainNs, bucketsNs, /*stayTemp=*/true));
 
             // Only create the view on the primary shard.
             if (!skipViewCreation) {
@@ -413,7 +413,7 @@ void downgradeFromViewlessTimeseries(OperationContext* opCtx,
 
         // Log a oplog entry giving a single, atomic timestamp to all operations done above.
         opCtx->getServiceContext()->getOpObserver()->onUpgradeDowngradeViewlessTimeseries(
-            opCtx, mainNs, mainColl->uuid(), false /* isUpgrade */, skipViewCreation);
+            opCtx, mainNs, mainColl->uuid(), /*isUpgrade=*/false, skipViewCreation);
 
         wuow.commit();
     });
@@ -486,9 +486,9 @@ void forEachTimeseriesCollectionFromDb(OperationContext* opCtx,
 void upgradeAllTimeseriesToViewless(OperationContext* opCtx) {
     for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
         forEachTimeseriesCollectionFromDb(
-            opCtx, dbName, false /* isViewless */, [&](UpgradeDowngradeTimeseriesLocks&& locks) {
+            opCtx, dbName, /*isViewless=*/false, [&](UpgradeDowngradeTimeseriesLocks&& locks) {
                 timeseries::upgradeToViewlessTimeseries(
-                    opCtx, std::move(locks), boost::none /* expectedUUID */);
+                    opCtx, std::move(locks), /*expectedUUID=*/boost::none);
             });
     }
 };
@@ -496,11 +496,11 @@ void upgradeAllTimeseriesToViewless(OperationContext* opCtx) {
 void downgradeAllTimeseriesFromViewless(OperationContext* opCtx) {
     for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
         forEachTimeseriesCollectionFromDb(
-            opCtx, dbName, true /* isViewless */, [&](UpgradeDowngradeTimeseriesLocks&& locks) {
+            opCtx, dbName, /*isViewless=*/true, [&](UpgradeDowngradeTimeseriesLocks&& locks) {
                 timeseries::downgradeFromViewlessTimeseries(opCtx,
                                                             std::move(locks),
-                                                            boost::none /* expectedUUID */,
-                                                            false /* skipViewCreation */);
+                                                            /*expectedUUID=*/boost::none,
+                                                            /*skipViewCreation=*/false);
             });
     }
 }
@@ -538,7 +538,7 @@ std::vector<BucketsCollectionInconsistency> checkBucketCollectionInconsistencies
         if (view) {
             if (view->viewOn() == nss && view->pipeline().size() == 1) {
                 const auto expectedViewPipeline = timeseries::generateViewPipeline(
-                    *bucketsColl->getTimeseriesOptions(), false /* asArray */);
+                    *bucketsColl->getTimeseriesOptions(), /*asArray=*/false);
                 const auto expectedInternalUnpackStage =
                     expectedViewPipeline
                         .getField(DocumentSourceInternalUnpackBucket::kStageNameInternal)

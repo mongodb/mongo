@@ -256,9 +256,9 @@ int CryptDMain(int argc, char** argv) {
     auto tl = transport::TransportLayerManagerImpl::createWithConfig(
         &serverGlobalParams,
         serviceContext,
-        false /* useEgressGRPC */,
-        boost::none /* loadBalancerPort */,
-        boost::none /* priorityPort */,
+        /*useEgressGRPC=*/false,
+        /*loadBalancerPort=*/boost::none,
+        /*priorityPort=*/boost::none,
         std::make_unique<ClientObserverCryptD>());
     serviceContext->setTransportLayerManager(std::move(tl));
 

@@ -35,7 +35,7 @@ vector<double> generateNormal(size_t n) {
     auto seed = time(nullptr);
     LOGV2(7514415, "generateNormal", "seed"_attr = seed);
     std::mt19937 generator(seed);
-    boost::random::normal_distribution<double> dist(0.0 /* mean */, 1.0 /* sigma */);
+    boost::random::normal_distribution<double> dist(/*mean=*/0.0, /*sigma=*/1.0);
 
     vector<double> inputs;
     inputs.reserve(n);

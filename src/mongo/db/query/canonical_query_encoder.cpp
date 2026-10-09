@@ -1213,7 +1213,7 @@ void encodePipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                 bufBuilder,
                 // We do not use explode for sort optimization for a $match stage, since it is not
                 // a part of index selection.
-                false /*hasSort*/);
+                /*hasSort=*/false);
         } else if (!search_helpers::encodeSearchForSbeCache(expCtx, documentSource, bufBuilder)) {
             encodeKeyForPipelineStage(documentSource, serializedArray, bufBuilder);
         }

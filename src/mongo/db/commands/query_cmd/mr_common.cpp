@@ -194,7 +194,7 @@ auto translateOutMerge(boost::intrusive_ptr<ExpressionContext> expCtx,
                                        boost::none,  // pipeline
                                        std::set<FieldPath>{FieldPath("_id"s)},
                                        std::move(targetCollectionPlacementVersion),
-                                       true /*allowMergeOnNullishValues*/);
+                                       /*allowMergeOnNullishValues=*/true);
 }
 
 auto translateOutReduce(boost::intrusive_ptr<ExpressionContext> expCtx,
@@ -231,7 +231,7 @@ auto translateOutReduce(boost::intrusive_ptr<ExpressionContext> expCtx,
                                        pipelineSpec,
                                        std::set<FieldPath>{FieldPath("_id"s)},
                                        std::move(targetCollectionPlacementVersion),
-                                       true /*allowMergeOnNullishValues*/);
+                                       /*allowMergeOnNullishValues=*/true);
 }
 
 void rejectRequestsToCreateShardedCollections(

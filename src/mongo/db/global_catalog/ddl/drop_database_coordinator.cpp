@@ -129,7 +129,7 @@ void cloneAuthoritativeDatabaseMetadata(OperationContext* opCtx, const DatabaseN
             thisShardId == dbMetadata.getPrimary());
 
     shard_catalog_commit::commitCreateDatabaseMetadataLocally(
-        opCtx, dbMetadata, true /* fromClone */);
+        opCtx, dbMetadata, /*fromClone=*/true);
 }
 
 /**
@@ -282,7 +282,7 @@ void DropDatabaseCoordinator::_dropTrackedCollection(
         defaultMajorityWriteConcernDoNotUse(),
         getNewSession(opCtx),
         **executor,
-        false /*logCommitOnConfigPlacementHistory*/);
+        /*logCommitOnConfigPlacementHistory=*/false);
 
     {
         const auto session = getNewSession(opCtx);
@@ -321,10 +321,10 @@ void DropDatabaseCoordinator::_dropTrackedCollection(
             token,
             getNewSession(opCtx),
             fromMigrate,
-            false /* dropSystemCollections */,
-            !isAuthoritative /* forceLegacyRefresh */,
-            boost::none /* collectionUUID */,
-            false /* requireCollectionEmpty */);
+            /*dropSystemCollections=*/false,
+            /*forceLegacyRefresh=*/!isAuthoritative,
+            /*collectionUUID=*/boost::none,
+            /*requireCollectionEmpty=*/false);
     };
     auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
     // Remove primary shard from participants
@@ -335,15 +335,15 @@ void DropDatabaseCoordinator::_dropTrackedCollection(
                                               shard == changeStreamsNotifierShardId;
                                       }),
                        participants.end());
-    locallyDropCollectionOnParticipants(participants, true /*fromMigrate*/);
+    locallyDropCollectionOnParticipants(participants, /*fromMigrate=*/true);
 
     // The sharded collection must be dropped on the primary shard after it has been dropped on all
     // of the other shards to ensure it can only be re-created as unsharded with a higher optime
     // than all of the drops.
-    locallyDropCollectionOnParticipants({changeStreamsNotifierShardId}, false /*fromMigrate*/);
+    locallyDropCollectionOnParticipants({changeStreamsNotifierShardId}, /*fromMigrate=*/false);
 
     if (primaryShardId != changeStreamsNotifierShardId) {
-        locallyDropCollectionOnParticipants({primaryShardId}, true /*fromMigrate*/);
+        locallyDropCollectionOnParticipants({primaryShardId}, /*fromMigrate=*/true);
     }
 
     const auto commitTime = [&]() {
@@ -660,7 +660,7 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                 _critSecReason,
                 defaultMajorityWriteConcern(),
                 *actionPtr,
-                false /* throwIfReasonDiffers */);
+                /*throwIfReasonDiffers=*/false);
         })
         .then([this, token, dbNss, executor = executor, anchor = shared_from_this()] {
             auto opCtxHolder = makeOperationContext();

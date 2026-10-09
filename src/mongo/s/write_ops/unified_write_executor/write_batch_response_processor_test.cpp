@@ -1125,7 +1125,7 @@ TEST_F(WriteBatchResponseProcessorTest, ProcessesNoRetryResponseOk) {
         opCtx,
         routingCtx,
         NoRetryWriteBatchResponse::make(StatusWith<BSONObj>(setTopLevelOK(reply.toBSON())),
-                                        /*wce*/ boost::none,
+                                        /*wce=*/boost::none,
                                         WriteOp(request, 0),
                                         inTransaction));
     ASSERT_TRUE(result.opsToRetry.empty());
@@ -1162,7 +1162,7 @@ TEST_F(WriteBatchResponseProcessorTest, ProcessesNoRetryResponseError) {
         opCtx,
         routingCtx,
         NoRetryWriteBatchResponse::make(StatusWith<BSONObj>(setTopLevelOK(reply.toBSON())),
-                                        /*wce*/ boost::none,
+                                        /*wce=*/boost::none,
                                         WriteOp(request, 0),
                                         inTransaction));
     ASSERT_TRUE(result.opsToRetry.empty());
@@ -1203,7 +1203,7 @@ TEST_F(WriteBatchResponseProcessorTest, NonVerboseMode) {
 
     WriteCommandRef cmdRef(request);
     Stats stats;
-    WriteBatchResponseProcessor processor(cmdRef, stats, true /*isNonVerbose*/);
+    WriteBatchResponseProcessor processor(cmdRef, stats, /*isNonVerbose=*/true);
     auto result = processor.onWriteBatchResponse(
         opCtx,
         routingCtx,
@@ -1239,7 +1239,7 @@ TEST_F(WriteBatchResponseProcessorTest, NonVerboseModeWithErrors) {
 
     WriteCommandRef cmdRef(request);
     Stats stats;
-    WriteBatchResponseProcessor processor(cmdRef, stats, true /*isNonVerbose*/);
+    WriteBatchResponseProcessor processor(cmdRef, stats, /*isNonVerbose=*/true);
 
     auto result = processor.onWriteBatchResponse(
         opCtx,
@@ -1293,7 +1293,7 @@ TEST_F(WriteBatchResponseProcessorTest, NonVerboseModeWithMixedErrorsAndOk) {
 
     WriteCommandRef cmdRef(request);
     Stats stats;
-    WriteBatchResponseProcessor processor(cmdRef, stats, true /*isNonVerbose*/);
+    WriteBatchResponseProcessor processor(cmdRef, stats, /*isNonVerbose=*/true);
 
     processor.onWriteBatchResponse(
         opCtx,
@@ -1831,10 +1831,10 @@ TEST_F(WriteBatchResponseProcessorTest, ProcessFindAndModifyErrorResponse) {
     request.setUpdate(write_ops::UpdateModification(BSON("b" << 1)));
     WriteOp op(request);
 
-    ErrorReply reply(0 /* ok */,
+    ErrorReply reply(/*ok=*/0,
                      ErrorCodes::BadValue,
-                     "Bad Value" /* codeName */,
-                     "Wrong argument" /* errmsg */);
+                     /*codeName=*/"Bad Value",
+                     /*errmsg=*/"Wrong argument");
 
     ShardId shard1 = ShardId("shard1");
     RemoteCommandResponse rcr1(host1, reply.toBSON(), Microseconds{0}, false);
@@ -1865,11 +1865,11 @@ TEST_F(WriteBatchResponseProcessorTest, ProcessFindAndModifyRetryResponse) {
     WriteOp op(request);
 
     ShardId shard1 = ShardId("shard1");
-    ErrorReply errorReply(0 /* ok */,
+    ErrorReply errorReply(/*ok=*/0,
                           ErrorCodes::StaleConfig,
-                          "StaleConfig" /* codeName */,
-                          "Shard stale error, please retry" /* errmsg */);
-    StaleConfigInfo staleInfo(nss1, *shard1Endpoint.shardVersion, boost::none /* wanted */, shard1);
+                          /*codeName=*/"StaleConfig",
+                          /*errmsg=*/"Shard stale error, please retry");
+    StaleConfigInfo staleInfo(nss1, *shard1Endpoint.shardVersion, /*wanted=*/boost::none, shard1);
     BSONObjBuilder builder;
     errorReply.serialize(&builder);
     staleInfo.serialize(&builder);
@@ -2556,7 +2556,7 @@ TEST_F(WriteBatchResponseProcessorTest, TwoPhaseWriteErrorsOnlyModeNoError) {
     auto result = processor.onWriteBatchResponse(
         opCtx,
         routingCtx,
-        NoRetryWriteBatchResponse::make(BSONObj(), /*wce*/ boost::none, op1, inTransaction));
+        NoRetryWriteBatchResponse::make(BSONObj(), /*wce=*/boost::none, op1, inTransaction));
 
     // No errors.
     ASSERT_EQ(processor.getNumErrorsRecorded(), 0);
@@ -2592,7 +2592,7 @@ TEST_F(WriteBatchResponseProcessorTest, TwoPhaseWriteErrorsOnlyModeWithError) {
         opCtx,
         routingCtx,
         NoRetryWriteBatchResponse::make(
-            Status(ErrorCodes::BadValue, ""), /*wce*/ boost::none, op1, inTransaction));
+            Status(ErrorCodes::BadValue, ""), /*wce=*/boost::none, op1, inTransaction));
 
     // An error should have occurred.
     ASSERT_EQ(processor.getNumErrorsRecorded(), 1);
@@ -2628,7 +2628,7 @@ TEST_F(WriteBatchResponseProcessorTest, UpdateQueryStatsMetricsAggregatedFromSha
         SimpleWriteBatchResponse{
             {{shard1Name,
               ShardResponse::make(
-                  rcr, {WriteOp(request, 0), WriteOp(request, 1)}, false /*inTransaction*/)}}});
+                  rcr, {WriteOp(request, 0), WriteOp(request, 1)}, /*inTransaction=*/false)}}});
 
     auto& opDebug = CurOp::get(opCtx)->debug();
     assertQueryStatsAggregated(opDebug, 0, 10, 5);
@@ -2663,8 +2663,8 @@ TEST_F(WriteBatchResponseProcessorTest, UpdateQueryStatsMetricsAggregatedFromMul
 TEST_F(WriteBatchResponseProcessorTest, DeleteQueryStatsMetricsAggregatedFromShardResponse) {
     auto deleteRequest = write_ops::DeleteCommandRequest(
         nss1,
-        {write_ops::DeleteOpEntry(BSON("_id" << 0), false /*multi*/),
-         write_ops::DeleteOpEntry(BSON("_id" << 1), false /*multi*/)});
+        {write_ops::DeleteOpEntry(BSON("_id" << 0), /*multi=*/false),
+         write_ops::DeleteOpEntry(BSON("_id" << 1), /*multi=*/false)});
     auto request = BatchedCommandRequest(deleteRequest);
 
     auto resp = makeBatchResponseWithQueryStatsMetrics(
@@ -2679,7 +2679,7 @@ TEST_F(WriteBatchResponseProcessorTest, DeleteQueryStatsMetricsAggregatedFromSha
         SimpleWriteBatchResponse{
             {{shard1Name,
               ShardResponse::make(
-                  rcr, {WriteOp(request, 0), WriteOp(request, 1)}, false /*inTransaction*/)}}});
+                  rcr, {WriteOp(request, 0), WriteOp(request, 1)}, /*inTransaction=*/false)}}});
 
     auto& opDebug = CurOp::get(opCtx)->debug();
     assertQueryStatsAggregated(opDebug, 0, 10, 5);
@@ -2688,7 +2688,7 @@ TEST_F(WriteBatchResponseProcessorTest, DeleteQueryStatsMetricsAggregatedFromSha
 
 TEST_F(WriteBatchResponseProcessorTest, DeleteQueryStatsMetricsAggregatedFromMultipleShards) {
     auto deleteRequest = write_ops::DeleteCommandRequest(
-        nss1, {write_ops::DeleteOpEntry(BSON("_id" << 0), true /*multi*/)});
+        nss1, {write_ops::DeleteOpEntry(BSON("_id" << 0), /*multi=*/true)});
     auto request = BatchedCommandRequest(deleteRequest);
 
     auto resp1 = makeBatchResponseWithQueryStatsMetrics(1, {makeQueryStatsMetrics(0, 10, 5, 1)});
@@ -2733,7 +2733,7 @@ TEST_F(WriteBatchResponseProcessorTest,
         routingCtx,
         SimpleWriteBatchResponse{
             {{shard1Name,
-              ShardResponse::make(rcr, {WriteOp(request, 0)}, false /*inTransaction*/)}}});
+              ShardResponse::make(rcr, {WriteOp(request, 0)}, /*inTransaction=*/false)}}});
 
     auto reply = processor.generateClientResponseForBatchedCommand(opCtx);
     ASSERT_TRUE(reply.areQueryStatsMetricsSet());
@@ -2761,7 +2761,7 @@ TEST_F(WriteBatchResponseProcessorTest, QueryStatsMetricsNotEchoedBackWhenNotReq
         routingCtx,
         SimpleWriteBatchResponse{
             {{shard1Name,
-              ShardResponse::make(rcr, {WriteOp(request, 0)}, false /*inTransaction*/)}}});
+              ShardResponse::make(rcr, {WriteOp(request, 0)}, /*inTransaction=*/false)}}});
 
     auto reply = processor.generateClientResponseForBatchedCommand(opCtx);
     ASSERT_FALSE(reply.areQueryStatsMetricsSet());
@@ -2791,7 +2791,7 @@ TEST_F(WriteBatchResponseProcessorTest,
         routingCtx,
         SimpleWriteBatchResponse{
             {{shard1Name,
-              ShardResponse::make(rcr, {WriteOp(request, 0)}, false /*inTransaction*/)}}});
+              ShardResponse::make(rcr, {WriteOp(request, 0)}, /*inTransaction=*/false)}}});
 
     auto reply = processor.generateClientResponseForBatchedCommand(opCtx);
     ASSERT_FALSE(reply.areQueryStatsMetricsSet());
@@ -2820,7 +2820,7 @@ TEST_F(WriteBatchResponseProcessorTest, QueryStatsMetricsNotEchoedBackForExterna
         routingCtx,
         SimpleWriteBatchResponse{
             {{shard1Name,
-              ShardResponse::make(rcr, {WriteOp(request, 0)}, false /*inTransaction*/)}}});
+              ShardResponse::make(rcr, {WriteOp(request, 0)}, /*inTransaction=*/false)}}});
 
     auto reply = processor.generateClientResponseForBatchedCommand(opCtx);
     ASSERT_FALSE(reply.areQueryStatsMetricsSet());

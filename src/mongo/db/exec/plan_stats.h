@@ -63,7 +63,7 @@ struct [[MONGO_MOD_NEEDS_REPLACEMENT]] SpecificStats {
 struct CommonStats {
     CommonStats() = delete;
 
-    CommonStats(std::string_view type) : CommonStats(type, nullptr /*originalPlanStage*/) {}
+    CommonStats(std::string_view type) : CommonStats(type, /*originalPlanStage=*/nullptr) {}
 
     CommonStats(std::string_view type, PlanStageKey originalPlanStage)
         : stageTypeStr(type),

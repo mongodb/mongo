@@ -64,7 +64,7 @@ TEST_F(QueryPlannerTest, ExprEqCannotUseMultikeyFieldOfIndex) {
 // compound non-multikey index. The fetch parent needs no filter.
 TEST_F(QueryPlannerTest, ExprEqQueryOnCompoundIndexPushesFilterToIxscan) {
     params.mainCollectionInfo.options = QueryPlannerParams::INCLUDE_COLLSCAN;
-    addIndex(BSON("a" << 1 << "b" << 1), false /* multikey */);
+    addIndex(BSON("a" << 1 << "b" << 1), /*multikey=*/false);
     runQuery(fromjson("{$and: [{a: 123}, {$expr: {$eq: ['$b', 456]}}]}"));
 
     assertNumSolutions(2U);
@@ -347,8 +347,7 @@ TEST_F(QueryPlannerTest, ExistsFalseSparseIndex) {
 TEST_F(QueryPlannerTest, NotEqualsNullSparseIndex) {
     addIndex(BSON("x" << 1),
              false,  // multikey
-             true    // sparse
-    );
+             /*sparse=*/true);
 
     runQuery(fromjson("{x: {$ne: null}}"));
 
@@ -362,8 +361,7 @@ TEST_F(QueryPlannerTest, NotEqualsNullSparseIndex) {
 TEST_F(QueryPlannerTest, NotEqualsNullSparseMultiKeyIndex) {
     addIndex(BSON("x" << 1),
              true,  // multikey
-             true   // sparse
-    );
+             /*sparse=*/true);
 
     runQuery(fromjson("{x: {$ne: null}}"));
 
@@ -375,8 +373,7 @@ TEST_F(QueryPlannerTest, NotEqualsNullInElemMatchValueSparseMultiKeyIndex) {
     MultikeyPaths multikeyPaths{{0U}};
     addIndex(BSON("x" << 1),
              true,  // multikey
-             true   // sparse
-    );
+             /*sparse=*/true);
 
     runQuery(fromjson("{'x': {$elemMatch: {$ne: null}}}"));
 

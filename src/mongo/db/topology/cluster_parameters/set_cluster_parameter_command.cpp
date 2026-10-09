@@ -92,8 +92,8 @@ public:
 
             setClusterParameterImplReplicaSetOrStandalone(opCtx,
                                                           request(),
-                                                          boost::none /* clusterParameterTime */,
-                                                          boost::none /* previousTime */);
+                                                          /*clusterParameterTime=*/boost::none,
+                                                          /*previousTime=*/boost::none);
         }
 
     private:

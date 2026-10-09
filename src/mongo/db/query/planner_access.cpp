@@ -296,7 +296,7 @@ void QueryPlannerAccess::handleRIDRangeMinMax(const CanonicalQuery& query,
         // The min() is inclusive as are bounded collection scans by default.
         recordRange.maybeNarrowMin(
             IndexBoundsBuilder::objFromElement(minObj.firstElement(), queryCollator),
-            true /* inclusive*/);
+            /*inclusive=*/true);
     }
 }
 
@@ -408,7 +408,7 @@ void QueryPlannerAccess::handleRIDRangeMinMax(const CanonicalQuery& query,
                 // point ranges.
                 const BSONObj collated = IndexBoundsBuilder::objFromElement(element, queryCollator);
                 const RecordIdBound bound(record_id_helpers::keyForObj(collated), collated);
-                r.intersectRange(bound, bound, true /* minInclusive */, true /* maxInclusive */);
+                r.intersectRange(bound, bound, /*minInclusive=*/true, /*maxInclusive=*/true);
             } else {
                 // Collation-incompatible element: use a coarse type range so the scan is at
                 // least bounded to the right BSON type.
@@ -419,8 +419,8 @@ void QueryPlannerAccess::handleRIDRangeMinMax(const CanonicalQuery& query,
                 const BSONObj minObj = bMin.obj(), maxObj = bMax.obj();
                 r.intersectRange(RecordIdBound(record_id_helpers::keyForObj(minObj), minObj),
                                  RecordIdBound(record_id_helpers::keyForObj(maxObj), maxObj),
-                                 true /* minInclusive */,
-                                 true /* maxInclusive */);
+                                 /*minInclusive=*/true,
+                                 /*maxInclusive=*/true);
             }
             ranges.push_back(std::move(r));
         }
@@ -454,11 +454,11 @@ void QueryPlannerAccess::handleRIDRangeMinMax(const CanonicalQuery& query,
         RecordIdRange recordRange;
         BSONObjBuilder minb;
         minb.appendMinForType("", stdx::to_underlying(element.type()));
-        recordRange.maybeNarrowMin(minb.obj(), true /* inclusive */);
+        recordRange.maybeNarrowMin(minb.obj(), /*inclusive=*/true);
 
         BSONObjBuilder maxb;
         maxb.appendMaxForType("", stdx::to_underlying(element.type()));
-        recordRange.maybeNarrowMax(maxb.obj(), true /* inclusive */);
+        recordRange.maybeNarrowMax(maxb.obj(), /*inclusive=*/true);
 
         outRangeList = RecordIdRangeList(std::move(recordRange));
     }
@@ -483,8 +483,8 @@ void QueryPlannerAccess::handleRIDRangeMinMax(const CanonicalQuery& query,
     switch (match->matchType()) {
         case MType::EQ:
         case MType::INTERNAL_EXPR_EQ:
-            recordRange.maybeNarrowMin(collated, true /* inclusive */);
-            recordRange.maybeNarrowMax(collated, true /* inclusive */);
+            recordRange.maybeNarrowMin(collated, /*inclusive=*/true);
+            recordRange.maybeNarrowMax(collated, /*inclusive=*/true);
             break;
         case MType::LT:
         case MType::INTERNAL_EXPR_LT:
@@ -492,7 +492,7 @@ void QueryPlannerAccess::handleRIDRangeMinMax(const CanonicalQuery& query,
             break;
         case MType::LTE:
         case MType::INTERNAL_EXPR_LTE:
-            recordRange.maybeNarrowMax(collated, true /* inclusive */);
+            recordRange.maybeNarrowMax(collated, /*inclusive=*/true);
             break;
         case MType::GT:
         case MType::INTERNAL_EXPR_GT:
@@ -500,7 +500,7 @@ void QueryPlannerAccess::handleRIDRangeMinMax(const CanonicalQuery& query,
             break;
         case MType::GTE:
         case MType::INTERNAL_EXPR_GTE:
-            recordRange.maybeNarrowMin(collated, true /* inclusive */);
+            recordRange.maybeNarrowMin(collated, /*inclusive=*/true);
             break;
         default:
             // Unknown match type. Cannot narrow the type-wide bounds, and we are not sure if the
@@ -598,8 +598,8 @@ void QueryPlannerAccess::simplifyFilter(std::unique_ptr<MatchExpression>& expr,
         queryCollator,
         ccCollator,
         clusterKeyFieldName,
-        /*outRangeList*/ unused,
-        /*outRangeListExact*/ nullptr,
+        /*outRangeList=*/unused,
+        /*outRangeListExact=*/nullptr,
         [&](const MatchExpression* node, const RecordIdRangeList& nodeRange) {
             if (QueryPlannerAccess::rangeListContainedIn(rangeList, nodeRange)) {
                 toRemove.insert(node);
@@ -2592,7 +2592,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::pushdownFilterToFullIxsca
     if (index.type == IndexType::INDEX_BTREE && !index.multikey &&
         !params.mainCollectionInfo.stats.isTimeseries &&
         filter->matchType() != MatchExpression::OR) {
-        QueryPlannerIXSelect::rateIndices(filter.get(), "" /* prefix */, {index}, queryContext);
+        QueryPlannerIXSelect::rateIndices(filter.get(), /*prefix=*/"", {index}, queryContext);
         QueryPlannerIXSelect::stripInvalidAssignments(filter.get(), {index});
         LOGV2_DEBUG(10360112,
                     5,

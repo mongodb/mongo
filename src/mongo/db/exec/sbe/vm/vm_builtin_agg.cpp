@@ -287,7 +287,7 @@ value::TagValueMaybeOwned ByteCode::builtinAggSetUnionCapped(ArityType arity) {
     return builtinAggSetUnionCappedImpl(std::move(lhsAccumulatorState),
                                         std::move(rhsAccumulatorState),
                                         value::bitcastTo<int32_t>(sizeCap.value),
-                                        nullptr /*collator*/);
+                                        /*collator=*/nullptr);
 }
 
 value::TagValueMaybeOwned ByteCode::builtinAggCollSetUnionCapped(ArityType arity) {

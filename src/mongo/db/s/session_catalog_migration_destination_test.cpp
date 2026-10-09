@@ -214,7 +214,7 @@ public:
         auto txnParticipant = TransactionParticipant::get(opCtx);
         txnParticipant.beginOrContinue(opCtx,
                                        {txnNumber},
-                                       boost::none /* autocommit */,
+                                       /*autocommit=*/boost::none,
                                        TransactionParticipant::TransactionActions::kNone);
     }
 
@@ -235,7 +235,7 @@ public:
         auto txnParticipant = TransactionParticipant::get(opCtx);
         txnParticipant.beginOrContinue(opCtx,
                                        {txnNumber},
-                                       false /* autocommit */,
+                                       /*autocommit=*/false,
                                        TransactionParticipant::TransactionActions::kStart);
 
         txnParticipant.unstashTransactionResources(opCtx, "insert");
@@ -259,7 +259,7 @@ public:
         auto txnParticipant = TransactionParticipant::get(opCtx);
         txnParticipant.beginOrContinue(opCtx,
                                        {txnNumber},
-                                       false /* autocommit */,
+                                       /*autocommit=*/false,
                                        TransactionParticipant::TransactionActions::kContinue);
 
         txnParticipant.unstashTransactionResources(opCtx, "preparedTransaction");
@@ -303,7 +303,7 @@ public:
 
         txnParticipant.beginOrContinue(opCtx,
                                        {txnNumber},
-                                       false /* autocommit */,
+                                       /*autocommit=*/false,
                                        TransactionParticipant::TransactionActions::kContinue);
 
         txnParticipant.unstashTransactionResources(opCtx, "commitTransaction");
@@ -315,7 +315,7 @@ public:
             FailPointEnableBlock failPointBlock("skipCommitTxnCheckPrepareMajorityCommitted");
 
             txnParticipant.commitPreparedTransaction(
-                opCtx, *commitTimestamp, boost::none /* commitOplogEntryOpTime */);
+                opCtx, *commitTimestamp, /*commitOplogEntryOpTime=*/boost::none);
         } else {
             txnParticipant.commitUnpreparedTransaction(opCtx);
         }
@@ -393,15 +393,15 @@ public:
             initializeOperationSessionInfo(innerOpCtx.get(),
                                            opMsgRequest.getValidatedTenantId(),
                                            osi,
-                                           true /* requiresAuth */,
-                                           true /* attachToOpCtx */,
-                                           true /* isReplSetMemberOrMongos */);
+                                           /*requiresAuth=*/true,
+                                           /*attachToOpCtx=*/true,
+                                           /*isReplSetMemberOrMongos=*/true);
             auto mongoDSessionCatalog = MongoDSessionCatalog::get(innerOpCtx.get());
             auto sessionTxnState = mongoDSessionCatalog->checkOutSession(innerOpCtx.get());
             auto txnParticipant = TransactionParticipant::get(innerOpCtx.get());
             txnParticipant.beginOrContinue(innerOpCtx.get(),
                                            {*sessionInfo.getTxnNumber()},
-                                           boost::none /* autocommit */,
+                                           /*autocommit=*/boost::none,
                                            TransactionParticipant::TransactionActions::kNone);
 
             const auto reply = write_ops_exec::performInserts(innerOpCtx.get(), insertRequest);
@@ -2077,7 +2077,7 @@ TEST_F(SessionCatalogMigrationDestinationTest,
         txnParticipant.refreshFromStorageIfNeeded(opCtx);
         txnParticipant.beginOrContinue(opCtx,
                                        {3},
-                                       boost::none /* autocommit */,
+                                       /*autocommit=*/boost::none,
                                        TransactionParticipant::TransactionActions::kNone);
     }
 

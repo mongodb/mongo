@@ -996,17 +996,17 @@ std::pair<SbStage, PlanStageSlots> generateIndexScanWithDynamicBoundsImpl(
         intervalsRequired != IntervalsRequired::MultiInterval) {
         boost::optional<std::pair<SbSlot, SbSlot>> indexScanBoundsSlots;
         std::tie(stage, outputs, indexScanBoundsSlots) =
-            generateSingleIntervalIndexScanAndSlotsImpl(
-                state,
-                collection,
-                indexName,
-                keyPattern,
-                forward,
-                boost::none,
-                boost::none,
-                reqs,
-                ixn->nodeId(),
-                intervalsRequired == IntervalsRequired::EqualityInterval /* isPointInterval */);
+            generateSingleIntervalIndexScanAndSlotsImpl(state,
+                                                        collection,
+                                                        indexName,
+                                                        keyPattern,
+                                                        forward,
+                                                        boost::none,
+                                                        boost::none,
+                                                        reqs,
+                                                        ixn->nodeId(),
+                                                        /*isPointInterval=*/intervalsRequired ==
+                                                            IntervalsRequired::EqualityInterval);
         tassert(6484702, "lowKey and highKey runtime slots must be present", indexScanBoundsSlots);
         parameterizedScanSlots = {ParameterizedIndexScanSlots::SingleIntervalPlan{
             indexScanBoundsSlots->first.getId(), indexScanBoundsSlots->second.getId()}};

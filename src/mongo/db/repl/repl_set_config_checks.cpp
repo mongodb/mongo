@@ -483,7 +483,7 @@ StatusWith<int> validateConfigForInitiate(ReplicationCoordinatorExternalState* e
     }
 
     status = validatePriorityPortSettings(
-        VersionContext::getDecoration(opCtx), boost::none, newConfig, false /* force */);
+        VersionContext::getDecoration(opCtx), boost::none, newConfig, /*force=*/false);
     if (!status.isOK()) {
         return StatusWith<int>(status);
     }

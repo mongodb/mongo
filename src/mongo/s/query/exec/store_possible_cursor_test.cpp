@@ -95,7 +95,7 @@ TEST_F(StorePossibleCursorTest, ReturnsValidCursorResponse) {
 TEST_F(StorePossibleCursorTest, PreservesPartialResultsReturnedForExhaustedCursorResponse) {
     std::vector<BSONObj> batch = {fromjson("{_id: 1}")};
     auto cursorResponseObj =
-        makeCursorResponseObj(CursorId(0), batch, true /* partialResultsReturned */);
+        makeCursorResponseObj(CursorId(0), batch, /*partialResultsReturned=*/true);
 
     auto outgoingCursorResponse = storePossibleCursor(opCtx(),
                                                       shardId,

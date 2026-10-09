@@ -49,7 +49,7 @@ ShardsvrSetUserWriteBlockMode makeShardsvrSetUserWriteBlockModeCommand(
     bool block, ShardsvrSetUserWriteBlockModePhaseEnum phase) {
     ShardsvrSetUserWriteBlockMode shardsvrSetUserWriteBlockModeCmd;
     shardsvrSetUserWriteBlockModeCmd.setDbName(DatabaseName::kAdmin);
-    SetUserWriteBlockModeRequest setUserWriteBlockModeRequest(block /* global */);
+    SetUserWriteBlockModeRequest setUserWriteBlockModeRequest(/*global=*/block);
     shardsvrSetUserWriteBlockModeCmd.setSetUserWriteBlockModeRequest(
         std::move(setUserWriteBlockModeRequest));
     shardsvrSetUserWriteBlockModeCmd.setPhase(phase);

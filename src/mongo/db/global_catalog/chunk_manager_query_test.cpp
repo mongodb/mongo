@@ -477,8 +477,8 @@ TEST_F(ChunkManagerQueryTest, SnapshotQueryWithMoreShardsThanLatestMetadata) {
                                                         false,
                                                         epoch,
                                                         Timestamp(1, 1),
-                                                        boost::none /* timeseriesFields */,
-                                                        boost::none /* reshardingFields */,
+                                                        /*timeseriesFields=*/boost::none,
+                                                        /*reshardingFields=*/boost::none,
 
                                                         true,
                                                         {chunk0, chunk1});
@@ -492,8 +492,8 @@ TEST_F(ChunkManagerQueryTest, SnapshotQueryWithMoreShardsThanLatestMetadata) {
                        ChunkHistory(Timestamp(1, 0), ShardId("1"))});
 
     PointInTimeChunkManager cm(makeStandaloneRoutingTableHistory(
-                                   oldRoutingTable.makeUpdated(boost::none /* timeseriesFields */,
-                                                               boost::none /* reshardingFields */,
+                                   oldRoutingTable.makeUpdated(/*timeseriesFields=*/boost::none,
+                                                               /*reshardingFields=*/boost::none,
                                                                true,
                                                                false, /* unsplittable */
                                                                {chunk1})),
@@ -514,7 +514,7 @@ TEST_F(ChunkManagerQueryTest, TestKeyBelongsToShard) {
     const auto epoch = OID::gen();
     const Timestamp collTimestamp{1, 1};
     auto chunkVec = chunks_test_util::genRandomChunkVector(
-        uuid, epoch, collTimestamp, 30 /* maxNumChunks */, 1 /* minNumChunks */);
+        uuid, epoch, collTimestamp, /*maxNumChunks=*/30, /*minNumChunks=*/1);
     auto chunks = chunks_test_util::toChunkInfoPtrVector(chunkVec);
 
     Timestamp clusterTime{Date_t::now()};
@@ -542,8 +542,8 @@ TEST_F(ChunkManagerQueryTest, TestKeyBelongsToShard) {
                                            false,
                                            epoch,
                                            collTimestamp,
-                                           boost::none /* timeseriesFields */,
-                                           boost::none /* reshardingFields */,
+                                           /*timeseriesFields=*/boost::none,
+                                           /*reshardingFields=*/boost::none,
                                            true,
                                            chunkVec);
     PointInTimeChunkManager cm(makeStandaloneRoutingTableHistory(std::move(rt)), clusterTime);
@@ -570,7 +570,7 @@ TEST_F(ChunkManagerQueryTest, TestKeyBelongsToShard) {
 
         // Pick a random shard key in the chunk.
         auto shardKey = chunks_test_util::calculateIntermediateShardKey(
-            (*chunkIt)->getMin(), (*chunkIt)->getMax(), 0.2 /* minKeyProb */);
+            (*chunkIt)->getMin(), (*chunkIt)->getMax(), /*minKeyProb=*/0.2);
 
         // Validate shard key is correctly identified as being owned by its shard & the same chunk
         // is found as the one we are curently looking at.

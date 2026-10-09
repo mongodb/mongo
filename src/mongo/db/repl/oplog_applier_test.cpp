@@ -200,12 +200,12 @@ TEST_F(OplogApplierTest, GetNextApplierBatchGroupsUnpreparedCommitTransactionOpW
 
 TEST_F(OplogApplierTest, GetNextApplierBatchGroupsPreparedApplyOpsOrPreparedCommits) {
     std::vector<OplogEntry> srcOps;
-    srcOps.push_back(makeApplyOpsOplogEntry(1, true /* prepare */));
-    srcOps.push_back(makeApplyOpsOplogEntry(2, true /* prepare */));
-    srcOps.push_back(makeCommitTransactionOplogEntry(3, dbName, true /* prepared */));
+    srcOps.push_back(makeApplyOpsOplogEntry(1, /*prepare=*/true));
+    srcOps.push_back(makeApplyOpsOplogEntry(2, /*prepare=*/true));
+    srcOps.push_back(makeCommitTransactionOplogEntry(3, dbName, /*prepared=*/true));
     srcOps.push_back(makeAbortTransactionOplogEntry(4, dbName));
-    srcOps.push_back(makeApplyOpsOplogEntry(5, true /* prepare */));
-    srcOps.push_back(makeApplyOpsOplogEntry(6, true /* prepare */));
+    srcOps.push_back(makeApplyOpsOplogEntry(5, /*prepare=*/true));
+    srcOps.push_back(makeApplyOpsOplogEntry(6, /*prepare=*/true));
     _applier->enqueue(opCtx(), srcOps.cbegin(), srcOps.cend());
 
     // Prepares can be batched together.
@@ -231,9 +231,9 @@ TEST_F(OplogApplierTest, GetNextApplierBatchGroupsCrudOpsWithPreparedApplyOpsOrP
     std::vector<OplogEntry> srcOps;
     auto nss = NamespaceString::createNamespaceString_forTest(dbName, "bar");
     srcOps.push_back(makeInsertOplogEntry(1, nss));
-    srcOps.push_back(makeApplyOpsOplogEntry(2, true /* prepare */));
-    srcOps.push_back(makeApplyOpsOplogEntry(3, true /* prepare */));
-    srcOps.push_back(makeCommitTransactionOplogEntry(4, dbName, true /* prepared */));
+    srcOps.push_back(makeApplyOpsOplogEntry(2, /*prepare=*/true));
+    srcOps.push_back(makeApplyOpsOplogEntry(3, /*prepare=*/true));
+    srcOps.push_back(makeCommitTransactionOplogEntry(4, dbName, /*prepared=*/true));
     srcOps.push_back(makeInsertOplogEntry(5, nss));
     srcOps.push_back(makeAbortTransactionOplogEntry(6, dbName));
     _applier->enqueue(opCtx(), srcOps.cbegin(), srcOps.cend());
@@ -268,9 +268,9 @@ TEST_F(OplogApplierTest, GetNextApplierBatchGroupsDBCheckWithCrudOps) {
     // The DBCheck oplog shouldn't be batched with any preceding oplog, but it can be batched with
     // any subsequent oplog that is batchable.
     srcOps.push_back(makeDBCheckBatchEntry(2, nss));
-    srcOps.push_back(makeApplyOpsOplogEntry(3, false /* prepare */));
+    srcOps.push_back(makeApplyOpsOplogEntry(3, /*prepare=*/false));
     srcOps.push_back(makeInsertOplogEntry(4, nss));
-    srcOps.push_back(makeApplyOpsOplogEntry(5, true /* prepare */));
+    srcOps.push_back(makeApplyOpsOplogEntry(5, /*prepare=*/true));
 
     // The DBCheck oplog shouldn't be batched with the previous DBCheck oplog.
     srcOps.push_back(makeDBCheckBatchEntry(6, nss));
@@ -278,7 +278,7 @@ TEST_F(OplogApplierTest, GetNextApplierBatchGroupsDBCheckWithCrudOps) {
 
     // DBCheck oplog shouldn't be batched with a prepared commit that follows it as prepared commit
     // must start a new batch.
-    srcOps.push_back(makeCommitTransactionOplogEntry(8, dbName, true /* prepared */));
+    srcOps.push_back(makeCommitTransactionOplogEntry(8, dbName, /*prepared=*/true));
 
     // DBCheck oplog shouldn't be batched with a prepared commit that precedes it.
     srcOps.push_back(makeDBCheckBatchEntry(9, nss));
@@ -322,9 +322,9 @@ TEST_F(OplogApplierTest, GetNextApplierBatchGroupsNewPrimary) {
     // The New Primary oplog shouldn't be batched with any preceding oplog, but it can be batched
     // with any subsequent oplog that is batchable.
     srcOps.push_back(makeNewPrimaryBatchEntry(2));
-    srcOps.push_back(makeApplyOpsOplogEntry(3, false /* prepare */));
+    srcOps.push_back(makeApplyOpsOplogEntry(3, /*prepare=*/false));
     srcOps.push_back(makeInsertOplogEntry(4, nss));
-    srcOps.push_back(makeApplyOpsOplogEntry(5, true /* prepare */));
+    srcOps.push_back(makeApplyOpsOplogEntry(5, /*prepare=*/true));
 
     // The New Primary oplog shouldn't be batched with the previous New Primary oplog.
     srcOps.push_back(makeNewPrimaryBatchEntry(6));
@@ -332,7 +332,7 @@ TEST_F(OplogApplierTest, GetNextApplierBatchGroupsNewPrimary) {
 
     // New Primary oplog shouldn't be batched with a prepared commit that follows it as prepared
     // commit must start a new batch.
-    srcOps.push_back(makeCommitTransactionOplogEntry(8, dbName, true /* prepared */));
+    srcOps.push_back(makeCommitTransactionOplogEntry(8, dbName, /*prepared=*/true));
 
     // New Primary oplog shouldn't be batched with a prepared commit that precedes it.
     srcOps.push_back(makeNewPrimaryBatchEntry(9));

@@ -55,7 +55,7 @@ protected:
 };
 
 TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithAbsentCWRWCWithImplicitWCW1) {
-    createDefaults(false /* isImplicitWCMajority */);
+    createDefaults(/*isImplicitWCMajority=*/false);
 
     // By not calling _lookupMock.setLookupCallReturnValue(), tests _defaults.lookup() returning
     // boost::none.
@@ -76,7 +76,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithAbsentCWRWCWithImplicitWC
 }
 
 TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithAbsentCWRWCWithImplicitWCMajority) {
-    createDefaults(true /* isImplicitWCMajority */);
+    createDefaults(/*isImplicitWCMajority=*/true);
 
     // By not calling _lookupMock.setLookupCallReturnValue(), tests _defaults.lookup() returning
     // boost::none.
@@ -100,7 +100,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithAbsentCWRWCWithImplicitWC
 }
 
 TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithCWRWCNeverSetWithImplicitWCW1) {
-    createDefaults(false /* isImplicitWCMajority */);
+    createDefaults(/*isImplicitWCMajority=*/false);
 
     // _defaults.lookup() returning default constructed RWConcern not boost::none.
     _lookupMock.setLookupCallReturnValue({});
@@ -122,7 +122,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithCWRWCNeverSetWithImplicit
 }
 
 TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithCWRWCNeverSetWithImplicitWCMajority) {
-    createDefaults(true /* isImplicitWCMajority */);
+    createDefaults(/*isImplicitWCMajority=*/true);
 
     // _defaults.lookup() returning default constructed RWConcern not boost::none.
     ASSERT(!isCWWCSet());
@@ -146,7 +146,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithCWRWCNeverSetWithImplicit
 }
 
 TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithUnsetCWRWCWithImplicitWCW1) {
-    createDefaults(false /* isImplicitWCMajority */);
+    createDefaults(/*isImplicitWCMajority=*/false);
 
     RWConcernDefault newDefaults;
     newDefaults.setUpdateOpTime(Timestamp(1, 2));
@@ -170,7 +170,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithUnsetCWRWCWithImplicitWCW
 }
 
 TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithUnsetCWRWCWithImplicitWCMajority) {
-    createDefaults(true /* isImplicitWCMajority */);
+    createDefaults(/*isImplicitWCMajority=*/true);
 
     RWConcernDefault newDefaults;
     newDefaults.setUpdateOpTime(Timestamp(1, 2));
@@ -197,7 +197,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithUnsetCWRWCWithImplicitWCM
 }
 
 TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithCWRWCNotSetThenSetWithImplicitWCW1) {
-    createDefaults(false /* isImplicitWCMajority */);
+    createDefaults(/*isImplicitWCMajority=*/false);
 
     // _defaults.lookup() returning default constructed RWConcern not boost::none.
     _lookupMock.setLookupCallReturnValue({});
@@ -243,7 +243,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithCWRWCNotSetThenSetWithImp
 }
 
 TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithCWRWCNotSetThenSetWithImplicitWCMajority) {
-    createDefaults(true /* isImplicitWCMajority */);
+    createDefaults(/*isImplicitWCMajority=*/true);
 
     // _defaults.lookup() returning default constructed RWConcern not boost::none.
     _lookupMock.setLookupCallReturnValue({});
@@ -291,7 +291,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithCWRWCNotSetThenSetWithImp
 }
 
 TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithSetCWRWCWithImplicitWCW1) {
-    createDefaults(false /* isImplicitWCMajority */);
+    createDefaults(/*isImplicitWCMajority=*/false);
 
     RWConcernDefault newDefaults;
     newDefaults.setDefaultReadConcern(
@@ -318,7 +318,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithSetCWRWCWithImplicitWCW1)
 }
 
 TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithSetCWRWCWithImplicitWCMajority) {
-    createDefaults(true /* isImplicitWCMajority */);
+    createDefaults(/*isImplicitWCMajority=*/true);
 
     RWConcernDefault newDefaults;
     newDefaults.setDefaultReadConcern(
@@ -346,7 +346,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithSetCWRWCWithImplicitWCMaj
 }
 
 TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWriteConcernSourceImplicitWithUsedDefaultWC) {
-    createDefaults(true /* isImplicitWCMajority */);
+    createDefaults(/*isImplicitWCMajority=*/true);
 
     RWConcernDefault newDefaults;
     newDefaults.setDefaultWriteConcern(WriteConcernOptions());
@@ -376,7 +376,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWriteConcernSourceImplicitWit
 }
 
 TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithSetAndUnSetCWRCWithImplicitWC1) {
-    createDefaults(false /* isImplicitWCMajority */);
+    createDefaults(/*isImplicitWCMajority=*/false);
 
     // Setting only default read concern.
     RWConcernDefault newDefaults;
@@ -424,7 +424,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithSetAndUnSetCWRCWithImplic
 }
 
 TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithSetAndUnSetCWRCWithImplicitWCMajority) {
-    createDefaults(true /* isImplicitWCMajority */);
+    createDefaults(/*isImplicitWCMajority=*/true);
 
     // Setting only default read concern.
     RWConcernDefault newDefaults;
@@ -478,14 +478,14 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithSetAndUnSetCWRCWithImplic
 
 
 TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultLookupFailure) {
-    createDefaults(true /* isImplicitWCMajority */);
+    createDefaults(/*isImplicitWCMajority=*/true);
     _lookupMock.setLookupCallFailure(Status{ErrorCodes::Error(1234), "foobar"});
     ASSERT_THROWS_CODE_AND_WHAT(getDefault(), AssertionException, 1234, "foobar");
     ASSERT_THROWS_CODE_AND_WHAT(isCWWCSet(), AssertionException, 1234, "foobar");
 }
 
 TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithoutInvalidateDoesNotCallLookup) {
-    createDefaults(false /* isImplicitWCMajority */);
+    createDefaults(/*isImplicitWCMajority=*/false);
 
     RWConcernDefault newDefaults;
     newDefaults.setUpdateOpTime(Timestamp(1, 2));
@@ -535,7 +535,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithoutInvalidateDoesNotCallL
 }
 
 TEST_F(ReadWriteConcernDefaultsTest, TestInvalidate) {
-    createDefaults(false /* isImplicitWCMajority */);
+    createDefaults(/*isImplicitWCMajority=*/false);
 
     RWConcernDefault newDefaults;
     newDefaults.setUpdateOpTime(Timestamp(1, 2));
@@ -584,7 +584,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestInvalidate) {
 }
 
 TEST_F(ReadWriteConcernDefaultsTest, TestRefreshDefaultsWithEmptyCacheAndAbsentDefaults) {
-    createDefaults(false /* isImplicitWCMajority */);
+    createDefaults(/*isImplicitWCMajority=*/false);
     ReadWriteConcernDefaults::get(getService()).refreshIfNecessary(_opCtx);
 
     ASSERT(!isCWWCSet());
@@ -604,7 +604,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestRefreshDefaultsWithEmptyCacheAndAbsentD
 }
 
 TEST_F(ReadWriteConcernDefaultsTest, TestRefreshDefaultsWithEmptyCacheAndSetDefaults) {
-    createDefaults(false /* isImplicitWCMajority */);
+    createDefaults(/*isImplicitWCMajority=*/false);
 
     RWConcernDefault newDefaults;
     newDefaults.setUpdateOpTime(Timestamp(1, 2));
@@ -622,7 +622,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestRefreshDefaultsWithEmptyCacheAndSetDefa
 }
 
 TEST_F(ReadWriteConcernDefaultsTest, TestRefreshDefaultsWithHigherEpoch) {
-    createDefaults(false /* isImplicitWCMajority */);
+    createDefaults(/*isImplicitWCMajority=*/false);
 
     RWConcernDefault newDefaults;
     newDefaults.setUpdateOpTime(Timestamp(1, 2));
@@ -650,7 +650,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestRefreshDefaultsWithHigherEpoch) {
 }
 
 TEST_F(ReadWriteConcernDefaultsTest, TestRefreshDefaultsWithLowerEpoch) {
-    createDefaults(false /* isImplicitWCMajority */);
+    createDefaults(/*isImplicitWCMajority=*/false);
 
     RWConcernDefault newDefaults;
     newDefaults.setUpdateOpTime(Timestamp(10, 20));
@@ -676,7 +676,7 @@ TEST_F(ReadWriteConcernDefaultsTest, TestRefreshDefaultsWithLowerEpoch) {
 }
 
 TEST_F(ReadWriteConcernDefaultsTest, TestRefreshDefaultsWithHigherEpochNoRWCChangeNoMessage) {
-    createDefaults(false /* isImplicitWCMajority */);
+    createDefaults(/*isImplicitWCMajority=*/false);
 
     RWConcernDefault newDefaults;
     newDefaults.setUpdateOpTime(Timestamp(1, 2));

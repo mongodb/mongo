@@ -201,7 +201,7 @@ void FcvOpObserver::_onInsertOrUpdate(OperationContext* opCtx, const BSONObj& do
 
     shard_role_details::getRecoveryUnit(opCtx)->onCommit(
         [fcvDoc](OperationContext* opCtx, boost::optional<Timestamp> ts) {
-            _setVersion(opCtx, fcvDoc, false /*onRollback*/, true /*withinRecoveryUnit*/, ts);
+            _setVersion(opCtx, fcvDoc, /*onRollback=*/false, /*withinRecoveryUnit=*/true, ts);
         });
 }
 
@@ -265,7 +265,7 @@ void FcvOpObserver::onReplicationRollback(OperationContext* opCtx,
                   "newVersion"_attr = multiversion::toString(diskFcv),
                   "oldVersion"_attr = multiversion::toString(memoryFcv));
             _setVersion(
-                opCtx, fcvDoc, true /*onRollback*/, false /*withinRecoveryUnit*/, boost::none);
+                opCtx, fcvDoc, /*onRollback=*/true, /*withinRecoveryUnit=*/false, boost::none);
             // The rollback FCV is already in the stable snapshot.
             FeatureCompatibilityVersion::clearLastFCVUpdateTimestamp();
         }

@@ -274,7 +274,7 @@ std::vector<AsyncRequestsSender::Response> CollModCoordinator::_sendCollModToPar
                                                 opts,
                                                 _shardingInfo->participantsNotOwningChunks,
                                                 getNewSession(opCtx),
-                                                false /* throwOnError */);
+                                                /*throwOnError=*/false);
     for (const auto& response : responses) {
         auto status = AsyncRequestsSender::Response::getEffectiveStatus(response);
         if (!status.isOK() && _isRetriableErrorForDDLCoordinator(status)) {
@@ -372,7 +372,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                         _collInfo->nsForTargeting,
                         shards,
                         CriticalSectionBlockTypeEnum::kReadsAndWrites,
-                        boost::none /* reason */,
+                        /*reason=*/boost::none,
                         _doc.getAuthoritativeMetadataAccessLevel(),
                         session,
                         executor,
@@ -600,7 +600,7 @@ ExecutorFuture<void> CollModCoordinator::_cleanupOnAbort(
                     _collInfo->nsForTargeting,
                     shards,
                     CriticalSectionBlockTypeEnum::kUnblock,
-                    boost::none /* reason */,
+                    /*reason=*/boost::none,
                     _doc.getAuthoritativeMetadataAccessLevel(),
                     session,
                     executor,

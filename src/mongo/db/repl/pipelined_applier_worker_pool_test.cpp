@@ -154,7 +154,7 @@ private:
 };
 
 TEST_F(PipelinedApplierWorkerPoolTest, SingleWorkerConsumesInFifoOrder) {
-    auto pool = makePool(1 /* numWorkers */);
+    auto pool = makePool(/*numWorkers=*/1);
     std::vector<Timestamp> enqueued;
     for (int i = 0; i < 100; ++i) {
         enqueued.push_back(enqueueItem(*pool, 0));
@@ -197,7 +197,7 @@ TEST_F(PipelinedApplierWorkerPoolTest, WorkersConsumeOnInternalKillExemptClients
 }
 
 TEST_F(PipelinedApplierWorkerPoolTest, ShutdownWithIdleWorkers) {
-    auto pool = makePool(4 /* numWorkers */);
+    auto pool = makePool(/*numWorkers=*/4);
     // Workers are idle waiting on their empty queues; shutdown joins all of them without
     // hanging.
     pool->shutdownAndJoin();
@@ -317,7 +317,7 @@ TEST_F(PipelinedApplierWorkerPoolTest, WaitForIdleWaitsForEveryWorkerAndKeepsPoo
 }
 
 TEST_F(PipelinedApplierWorkerPoolTest, EnqueueAfterShutdownThrows) {
-    auto pool = makePool(2 /* numWorkers */);
+    auto pool = makePool(/*numWorkers=*/2);
     enqueueItem(*pool, 0);
     pool->shutdownAndJoin();
 
@@ -326,7 +326,7 @@ TEST_F(PipelinedApplierWorkerPoolTest, EnqueueAfterShutdownThrows) {
 }
 
 TEST_F(PipelinedApplierWorkerPoolTest, ShutdownAndJoinIsIdempotent) {
-    auto pool = makePool(2 /* numWorkers */);
+    auto pool = makePool(/*numWorkers=*/2);
     enqueueItem(*pool, 0);
     pool->shutdownAndJoin();
     pool->shutdownAndJoin();
@@ -353,7 +353,7 @@ TEST_F(PipelinedApplierWorkerPoolTest, ReportsPerWorkerCounters) {
 
 TEST_F(PipelinedApplierWorkerPoolTest, RepeatedPoolLifecycles) {
     for (int cycle = 0; cycle < 5; ++cycle) {
-        auto pool = makePool(4 /* numWorkers */);
+        auto pool = makePool(/*numWorkers=*/4);
         for (size_t w = 0; w < 4; ++w) {
             enqueueItem(*pool, w);
         }

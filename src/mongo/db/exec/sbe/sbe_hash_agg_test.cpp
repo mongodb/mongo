@@ -70,7 +70,7 @@ public:
         stage->saveState();
 
         // Force spill.
-        stage->forceSpill(nullptr /*yieldPolicy*/);
+        stage->forceSpill(/*yieldPolicy=*/nullptr);
 
         // Check stats to make sure it spilled
         auto stats = static_cast<const HashAggStats*>(stage->getSpecificStats());
@@ -138,8 +138,8 @@ public:
                     makeFunction(EFn::kSum, makeVariable(spillSlot)))),
                 true,
                 boost::none,
-                false /* allowDiskUse */,
-                nullptr /* yieldPolicy */,
+                /*allowDiskUse=*/false,
+                /*yieldPolicy=*/nullptr,
                 kEmptyPlanNodeId);
             return std::make_pair(countsSlot, std::move(hashAggStage));
         };
@@ -191,7 +191,7 @@ void HashAggStageTest::performHashAggWithSpillChecking(
             true,
             boost::optional<value::SlotId>{shouldUseCollator, collatorSlot},
             shouldSpill,
-            nullptr /* yieldPolicy */,
+            /*yieldPolicy=*/nullptr,
             kEmptyPlanNodeId);
 
         return std::make_pair(countsSlot, std::move(hashAggStage));
@@ -353,8 +353,8 @@ TEST_F(HashAggStageTest, HashAggMinMaxTest) {
                                  makeStringConstant("Unexpected merge with allowDiskUse=false")))),
             true,
             boost::none,
-            false /* allowDiskUse */,
-            nullptr /* yieldPolicy */,
+            /*allowDiskUse=*/false,
+            /*yieldPolicy=*/nullptr,
             kEmptyPlanNodeId);
 
         auto outSlot = generateSlotId();
@@ -412,8 +412,8 @@ TEST_F(HashAggStageTest, HashAggAddToSetTest) {
                              makeStringConstant("Unexpected merge with allowDiskUse=false")))),
             true,
             boost::none,
-            false /* allowDiskUse */,
-            nullptr /* yieldPolicy */,
+            /*allowDiskUse=*/false,
+            /*yieldPolicy=*/nullptr,
             kEmptyPlanNodeId);
 
         return std::make_pair(hashAggSlot, std::move(hashAggStage));
@@ -511,8 +511,8 @@ TEST_F(HashAggStageTest, HashAggBasicCountNoSpill) {
                                 makeFunction(EFn::kSum, makeVariable(spillSlot)))),
                             true,
                             boost::none,
-                            true /* allowDiskUse */,
-                            nullptr /* yieldPolicy */,
+                            /*allowDiskUse=*/true,
+                            /*yieldPolicy=*/nullptr,
                             kEmptyPlanNodeId);
 
     // Prepare the tree and get the 'SlotAccessor' for the output slot.
@@ -538,7 +538,7 @@ TEST_F(HashAggStageTest, HashAggBasicCountNoSpill) {
     ASSERT_EQ(0, stats->spillingStats.getSpills());
     ASSERT_EQ(0, stats->spillingStats.getSpilledRecords());
 
-    checkMemoryStats(stage.get(), false /*spill*/);
+    checkMemoryStats(stage.get(), /*spill=*/false);
     stage->close();
 }
 
@@ -566,8 +566,8 @@ TEST_F(HashAggStageTest, HashAggBasicCountForceSpill) {
                                 makeFunction(EFn::kSum, makeVariable(spillSlot)))),
                             true,
                             boost::none,
-                            true /* allowDiskUse */,
-                            nullptr /* yieldPolicy */,
+                            /*allowDiskUse=*/true,
+                            /*yieldPolicy=*/nullptr,
                             kEmptyPlanNodeId);
 
     // Prepare the tree and get the 'SlotAccessor' for the output slot.
@@ -615,7 +615,7 @@ TEST_F(HashAggStageTest, HashAggBasicCountForceSpill) {
     ASSERT_EQ(1, stats->spillingStats.getSpills());
     ASSERT_EQ(2, stats->spillingStats.getSpilledRecords());
 
-    checkMemoryStats(stage.get(), true /*spill*/);
+    checkMemoryStats(stage.get(), /*spill=*/true);
     stage->close();
 }
 
@@ -648,8 +648,8 @@ TEST_F(HashAggStageTest, HashAggBasicCountSpill) {
                                 makeFunction(EFn::kSum, makeVariable(spillSlot)))),
                             true,
                             boost::none,
-                            true /* allowDiskUse */,
-                            nullptr /* yieldPolicy */,
+                            /*allowDiskUse=*/true,
+                            /*yieldPolicy=*/nullptr,
                             kEmptyPlanNodeId);
 
     // Prepare the tree and get the 'SlotAccessor' for the output slot.
@@ -681,7 +681,7 @@ TEST_F(HashAggStageTest, HashAggBasicCountSpill) {
     // there are input values minus one.
     ASSERT_EQ(stats->spillingStats.getSpilledRecords(), 8);
 
-    checkMemoryStats(stage.get(), true /*spill*/);
+    checkMemoryStats(stage.get(), /*spill=*/true);
     stage->close();
 }
 
@@ -720,8 +720,8 @@ TEST_F(HashAggStageTest, HashAggBasicCountNoSpillIfNoMemCheck) {
                                 makeFunction(EFn::kSum, makeVariable(spillSlot)))),
                             true,
                             boost::none,
-                            true /* allowDiskUse */,
-                            nullptr /* yieldPolicy */,
+                            /*allowDiskUse=*/true,
+                            /*yieldPolicy=*/nullptr,
                             kEmptyPlanNodeId);
 
     // Prepare the tree and get the 'SlotAccessor' for the output slot.
@@ -747,7 +747,7 @@ TEST_F(HashAggStageTest, HashAggBasicCountNoSpillIfNoMemCheck) {
     ASSERT_EQ(0, stats->spillingStats.getSpills());
     ASSERT_EQ(0, stats->spillingStats.getSpilledRecords());
 
-    checkMemoryStats(stage.get(), false /*spill*/);
+    checkMemoryStats(stage.get(), /*spill=*/false);
     stage->close();
 }
 
@@ -780,8 +780,8 @@ TEST_F(HashAggStageTest, HashAggBasicCountSpillDouble) {
                                 makeFunction(EFn::kSum, makeVariable(spillSlot)))),
                             true,
                             boost::none,
-                            true /* allowDiskUse */,
-                            nullptr /* yieldPolicy */,
+                            /*allowDiskUse=*/true,
+                            /*yieldPolicy=*/nullptr,
                             kEmptyPlanNodeId);
 
     // Prepare the tree and get the 'SlotAccessor' for the output slot.
@@ -813,7 +813,7 @@ TEST_F(HashAggStageTest, HashAggBasicCountSpillDouble) {
     // there are input values minus one.
     ASSERT_EQ(stats->spillingStats.getSpilledRecords(), 8);
 
-    checkMemoryStats(stage.get(), true /*spill*/);
+    checkMemoryStats(stage.get(), /*spill=*/true);
     stage->close();
 }
 
@@ -843,8 +843,8 @@ TEST_F(HashAggStageTest, HashAggBasicCountNoSpillWithNoGroupByDouble) {
                                 makeFunction(EFn::kSum, makeVariable(spillSlot)))),
                             true,
                             boost::none,
-                            true /* allowDiskUse */,
-                            nullptr /* yieldPolicy */,
+                            /*allowDiskUse=*/true,
+                            /*yieldPolicy=*/nullptr,
                             kEmptyPlanNodeId);
 
     // Prepare the tree and get the 'SlotAccessor' for the output slot.
@@ -912,8 +912,8 @@ TEST_F(HashAggStageTest, HashAggMultipleAccSpill) {
                                     makeFunction(EFn::kSum, makeVariable(spillSlot2)))),
                             true,
                             boost::none,
-                            true /* allowDiskUse */,
-                            nullptr /* yieldPolicy */,
+                            /*allowDiskUse=*/true,
+                            /*yieldPolicy=*/nullptr,
                             kEmptyPlanNodeId);
 
     // Prepare the tree and get the 'SlotAccessor' for the output slot.
@@ -948,7 +948,7 @@ TEST_F(HashAggStageTest, HashAggMultipleAccSpill) {
     // there are input values minus one.
     ASSERT_EQ(stats->spillingStats.getSpilledRecords(), 8);
 
-    checkMemoryStats(stage.get(), true /*spill*/);
+    checkMemoryStats(stage.get(), /*spill=*/true);
     stage->close();
 }
 
@@ -989,7 +989,7 @@ TEST_F(HashAggStageTest, HashAggMultipleAccSpillAllToDisk) {
                             true,
                             boost::none,
                             true,  // allowDiskUse=true
-                            nullptr /* yieldPolicy */,
+                            /*yieldPolicy=*/nullptr,
                             kEmptyPlanNodeId);
 
     // Prepare the tree and get the 'SlotAccessor' for the output slot.
@@ -1023,7 +1023,7 @@ TEST_F(HashAggStageTest, HashAggMultipleAccSpillAllToDisk) {
     ASSERT_EQ(stats->spillingStats.getSpills(), 9);
     ASSERT_EQ(stats->spillingStats.getSpilledRecords(), 9);
 
-    checkMemoryStats(stage.get(), true /*spill*/);
+    checkMemoryStats(stage.get(), /*spill=*/true);
     stage->close();
 }
 
@@ -1059,8 +1059,8 @@ TEST_F(HashAggStageTest, HashAggMultipleAccForceSpill) {
                                     makeFunction(EFn::kSum, makeVariable(spillSlot2)))),
                             true,
                             boost::none,
-                            true /* allowDiskUse */,
-                            nullptr /* yieldPolicy */,
+                            /*allowDiskUse=*/true,
+                            /*yieldPolicy=*/nullptr,
                             kEmptyPlanNodeId);
 
     // Prepare the tree and get the 'SlotAccessor' for the output slot.
@@ -1117,7 +1117,7 @@ TEST_F(HashAggStageTest, HashAggMultipleAccForceSpill) {
     ASSERT_EQ(1, stats->spillingStats.getSpills());
     ASSERT_EQ(2, stats->spillingStats.getSpilledRecords());
 
-    checkMemoryStats(stage.get(), true /*spill*/);
+    checkMemoryStats(stage.get(), /*spill=*/true);
     stage->close();
 }
 
@@ -1158,8 +1158,8 @@ TEST_F(HashAggStageTest, HashAggMultipleAccForceSpillAfterSpill) {
                                     makeFunction(EFn::kSum, makeVariable(spillSlot2)))),
                             true,
                             boost::none,
-                            true /* allowDiskUse */,
-                            nullptr /* yieldPolicy */,
+                            /*allowDiskUse=*/true,
+                            /*yieldPolicy=*/nullptr,
                             kEmptyPlanNodeId);
 
     // Prepare the tree and get the 'SlotAccessor' for the output slot.
@@ -1201,7 +1201,7 @@ TEST_F(HashAggStageTest, HashAggMultipleAccForceSpillAfterSpill) {
     // there are input values minus one.
     ASSERT_EQ(stats->spillingStats.getSpilledRecords(), 8);
 
-    checkMemoryStats(stage.get(), true /*spill*/);
+    checkMemoryStats(stage.get(), /*spill=*/true);
     stage->close();
 }
 
@@ -1245,7 +1245,7 @@ TEST_F(HashAggStageTest, HashAggSum10Groups) {
                             true,
                             boost::none,
                             true,  // allowDiskUse=true
-                            nullptr /* yieldPolicy */,
+                            /*yieldPolicy=*/nullptr,
                             kEmptyPlanNodeId);
 
     // Prepare the tree and get the 'SlotAccessor' for the output slot.
@@ -1261,7 +1261,7 @@ TEST_F(HashAggStageTest, HashAggSum10Groups) {
                             value::TypeTags::NumberInt32,
                             value::bitcastFrom<int>(it->second));
     }
-    checkMemoryStats(stage.get(), true /*spill*/);
+    checkMemoryStats(stage.get(), /*spill=*/true);
     stage->close();
 }
 
@@ -1295,7 +1295,7 @@ TEST_F(HashAggStageTest, HashAggBasicCountWithRecordIds) {
                             true,
                             boost::none,
                             true,  // allowDiskUse=true
-                            nullptr /* yieldPolicy */,
+                            /*yieldPolicy=*/nullptr,
                             kEmptyPlanNodeId);
 
     // Prepare the tree and get the 'SlotAccessor' for the output slot.
@@ -1323,7 +1323,7 @@ TEST_F(HashAggStageTest, HashAggBasicCountWithRecordIds) {
     ASSERT_EQ(3, results[10]);
     ASSERT_EQ(4, results[999]);
 
-    checkMemoryStats(stage.get(), false /*spill*/);
+    checkMemoryStats(stage.get(), /*spill=*/false);
     stage->close();
 }
 }  // namespace mongo::sbe

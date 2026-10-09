@@ -46,8 +46,8 @@ void assertHashEqualityMatchesWoCompare(const BSONObj& obj) {
     for (size_t i = 0; i < elements.size(); ++i) {
         for (size_t j = 0; j < elements.size(); ++j) {
             const bool valuesEqual = elements[i].woCompare(elements[j],
-                                                           false /* considerFieldName */,
-                                                           nullptr /* comparator */) == 0;
+                                                           /*considerFieldName=*/false,
+                                                           /*comparator=*/nullptr) == 0;
             ASSERT_EQ(hashes[i] == hashes[j], valuesEqual)
                 << "lhs=" << elements[i] << " rhs=" << elements[j];
         }

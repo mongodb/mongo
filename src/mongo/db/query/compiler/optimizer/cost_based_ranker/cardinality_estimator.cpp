@@ -94,7 +94,7 @@ CEResult CardinalityEstimator::estimateFilter(const MatchExpression* filter) {
     _inputCard = _collCard;
     _conjSels.clear();
 
-    auto ceRes = estimate(filter, true /* isFilterRoot */);
+    auto ceRes = estimate(filter, /*isFilterRoot=*/true);
     if (!ceRes.isOK()) {
         return ceRes;
     }
@@ -972,12 +972,12 @@ CEResult CardinalityEstimator::estimateConjWithHistogram(
                          IndexDescriptor::IndexVersion::kV2,
                          /*mk=*/false,
                          /*mkp=*/{},
-                         {} /* multikeyPathSet */,
+                         /*multikeyPathSet=*/{},
                          /*sp=*/false,
                          /*unq=*/false,
                          CoreIndexInfo::Identifier("idx"),
                          /*io=*/BSONObj::kEmptyObject,
-                         nullptr /* wildcardProjection */);
+                         /*wildcardProjection=*/nullptr);
     OrderedIntervalList oil;
     IndexBoundsBuilder::allValuesForField(fakeIndex.keyPattern.firstElement(), &oil);
     IndexBoundsBuilder::BoundsTightness tightness;

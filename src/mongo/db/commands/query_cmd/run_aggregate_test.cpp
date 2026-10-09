@@ -270,8 +270,8 @@ protected:
                         params.nConsumers,
                         consumerId,
                         cursorId,
-                        params.nTotalDocs / params.nConsumers /* nExpectedDocs */,
-                        params.errorOffset.has_value() /* expectError */);
+                        /*nExpectedDocs=*/params.nTotalDocs / params.nConsumers,
+                        /*expectError=*/params.errorOffset.has_value());
                 });
             ASSERT_OK(swHandle);
             handles.push_back(swHandle.getValue());

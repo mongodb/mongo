@@ -1606,10 +1606,10 @@ TEST_F(ReshardingAggWithStorageTest, RetryableFindAndModifyWithImageLookup) {
                                   repl::OpTypeEnum::kUpdate,
                                   kCrudNs,
                                   kCrudUUID,
-                                  false /* fromMigrate */,
+                                  /*fromMigrate=*/false,
                                   boost::none,  // checkExistenceForDiffInsert
                                   boost::none,  // versionContext
-                                  0 /* version */,
+                                  /*version=*/0,
                                   BSON("$set" << BSON("y" << 1)), /* o1 */
                                   BSON("_id" << 2),               /* o2 */
                                   sessionInfo,

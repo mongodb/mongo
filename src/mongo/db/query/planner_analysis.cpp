@@ -618,7 +618,7 @@ std::unique_ptr<QuerySolutionNode> analyzeDistinct(const CanonicalQuery& query,
     auto projection = projection_ast::parseAndAnalyze(query.getExpCtx(),
                                                       *projectionBSON,
                                                       ProjectionPolicies::findProjectionPolicies(),
-                                                      true /* shouldOptimize */);
+                                                      /*shouldOptimize=*/true);
     // We don't actually have a projection on the query, so we use a projection specification
     // generated for this distinct() to determine if we need a FETCH or if this query can be
     // covered.
@@ -626,7 +626,7 @@ std::unique_ptr<QuerySolutionNode> analyzeDistinct(const CanonicalQuery& query,
                              std::move(solnRoot),
                              hasSortStage,
                              std::move(projection),
-                             true /* mayProvideAdditionalFields */);
+                             /*mayProvideAdditionalFields=*/true);
 }
 
 /**
@@ -1637,7 +1637,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAnalysis::analyzeSort(
 
     // See if solnRoot gives us the sort.  If so, we're done.
     if (analyzeNonBlockingSort(
-            params, sortObj, findCommand.getHint(), true /*reverseScanIfNeeded*/, solnRoot.get())) {
+            params, sortObj, findCommand.getHint(), /*reverseScanIfNeeded=*/true, solnRoot.get())) {
         return solnRoot;
     }
 

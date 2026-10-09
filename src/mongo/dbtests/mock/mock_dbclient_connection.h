@@ -122,7 +122,7 @@ public:
 
     std::unique_ptr<DBClientCursor> find(FindCommandRequest findRequest,
                                          const ReadPreferenceSetting& /*unused*/,
-                                         ExhaustMode /*unused*/) override;
+                                         /*unused=*/ExhaustMode) override;
 
     uint64_t getSockCreationMicroSec() const override;
 

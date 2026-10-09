@@ -53,8 +53,7 @@ TEST_F(WindowFunctionMinMaxScalerUtilTest, ComputeResultAllZerosTest) {
                                 Value(0),  // windowMin
                                 Value(0),  // windowMax
                                 Value(0),  // sMin
-                                Value(0)   // sMax
-    );
+                                /*sMax=*/Value(0));
 }
 
 // Tests that if windowMin and windowMax are equal, sMin is always returned.
@@ -64,8 +63,7 @@ TEST_F(WindowFunctionMinMaxScalerUtilTest, ComputeResultWindowMinAndMaxEqualTest
     assertComputeResultExpected(Value(0),          // expectedResult
                                 Value(windowMin),  // currentValue
                                 Value(windowMin),  // windowMin
-                                Value(windowMin)   // windowMax
-    );
+                                /*windowMax=*/Value(windowMin));
 
     // Test same case, with sMin and sMax scaled.
     int sMin = getRandomBetweenBounds(1, 1000);
@@ -75,8 +73,7 @@ TEST_F(WindowFunctionMinMaxScalerUtilTest, ComputeResultWindowMinAndMaxEqualTest
                                 Value(windowMin),  // windowMin
                                 Value(windowMin),  // windowMax
                                 Value(sMin),       // sMin
-                                Value(sMax)        // sMax
-    );
+                                /*sMax=*/Value(sMax));
 }
 
 // Tests that if current value is windowMin, sMin is always returned
@@ -87,8 +84,7 @@ TEST_F(WindowFunctionMinMaxScalerUtilTest, ComputeResultResultIsWindowMinTest) {
     assertComputeResultExpected(Value(0),          // expectedResult
                                 Value(windowMin),  // currentValue
                                 Value(windowMin),  // windowMin
-                                Value(windowMax)   // windowMax
-    );
+                                /*windowMax=*/Value(windowMax));
 
     // Test same case, with sMin and sMax scaled.
     int sMin = getRandomBetweenBounds(1, 1000);
@@ -98,8 +94,7 @@ TEST_F(WindowFunctionMinMaxScalerUtilTest, ComputeResultResultIsWindowMinTest) {
                                 Value(windowMin),  // windowMin
                                 Value(windowMax),  // windowMax
                                 Value(sMin),       // sMin
-                                Value(sMax)        // sMax
-    );
+                                /*sMax=*/Value(sMax));
 }
 
 // Tests that if the current value is the windowMax, sMax is always returned
@@ -110,8 +105,7 @@ TEST_F(WindowFunctionMinMaxScalerUtilTest, ComputeResultCurrentIsWindowMaxTest) 
     assertComputeResultExpected(Value(1),          // expectedResult
                                 Value(windowMax),  // currentValue
                                 Value(windowMin),  // windowMin
-                                Value(windowMax)   // windowMax
-    );
+                                /*windowMax=*/Value(windowMax));
 
     // Test same case, with sMin and sMax scaled.
     int sMin = getRandomBetweenBounds(1, 1000);
@@ -121,8 +115,7 @@ TEST_F(WindowFunctionMinMaxScalerUtilTest, ComputeResultCurrentIsWindowMaxTest) 
                                 Value(windowMin),  // windowMin
                                 Value(windowMax),  // windowMax
                                 Value(sMin),       // sMin
-                                Value(sMax)        // sMax
-    );
+                                /*sMax=*/Value(sMax));
 }
 
 // Tests that if the current value is between the windowMin and windowMax,
@@ -139,8 +132,7 @@ TEST_F(WindowFunctionMinMaxScalerUtilTest, ComputeResultWindowIntermediateTest) 
         assertComputeResultExpected(Value(expectedValue),  // expectedResult
                                     Value(currentValue),   // currentValue
                                     Value(windowMin),      // windowMin
-                                    Value(windowMax)       // windowMax
-        );
+                                    /*windowMax=*/Value(windowMax));
     }
 
     // Test same case, with sMin and sMax scaled.
@@ -155,8 +147,7 @@ TEST_F(WindowFunctionMinMaxScalerUtilTest, ComputeResultWindowIntermediateTest) 
                                     Value(windowMin),      // windowMin
                                     Value(windowMax),      // windowMax
                                     Value(sMin),           // sMin
-                                    Value(sMax)            // sMax
-        );
+                                    /*sMax=*/Value(sMax));
     }
 }
 
@@ -175,8 +166,7 @@ TEST_F(WindowFunctionMinMaxScalerUtilTest, ComputeResultWindowIntermediateWithDo
         assertComputeResultExpected(Value(expectedValue),  // expectedResult
                                     Value(currentValue),   // currentValue
                                     Value(windowMin),      // windowMin
-                                    Value(windowMax)       // windowMax
-        );
+                                    /*windowMax=*/Value(windowMax));
     }
 
     // Test same case, with sMin and sMax scaled.
@@ -193,8 +183,7 @@ TEST_F(WindowFunctionMinMaxScalerUtilTest, ComputeResultWindowIntermediateWithDo
                                     Value(windowMin),      // windowMin
                                     Value(windowMax),      // windowMax
                                     Value(sMin),           // sMin
-                                    Value(sMax)            // sMax
-        );
+                                    /*sMax=*/Value(sMax));
     }
 }
 

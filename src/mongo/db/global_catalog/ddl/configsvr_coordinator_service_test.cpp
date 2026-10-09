@@ -317,7 +317,7 @@ TEST_F(ConfigsvrCoordinatorBarrierTest, NoBarrierOnFirstRun) {
     auto barrier = std::make_unique<MockCausalityBarrier>();
     EXPECT_CALL(*barrier, perform(::testing::_, ::testing::_)).Times(0);
 
-    runCoordinatorToCompletion(std::move(barrier), 0 /* forcedRetries */);
+    runCoordinatorToCompletion(std::move(barrier), /*forcedRetries=*/0);
 }
 
 TEST_F(ConfigsvrCoordinatorBarrierTest, BarrierOnReExecution) {
@@ -326,7 +326,7 @@ TEST_F(ConfigsvrCoordinatorBarrierTest, BarrierOnReExecution) {
     auto barrier = std::make_unique<MockCausalityBarrier>();
     EXPECT_CALL(*barrier, perform(::testing::_, ::testing::_)).Times(1);
 
-    runCoordinatorToCompletion(std::move(barrier), 1 /* forcedRetries */);
+    runCoordinatorToCompletion(std::move(barrier), /*forcedRetries=*/1);
 }
 
 }  // namespace

@@ -123,7 +123,7 @@ bool isTransientTxnError(bool inTransaction,
                 ErrorReply::parse(*responseData, IDLParserContext("ErrorReply_UnifiedWriteExec")));
         } else {
             return isTransientTransactionError(
-                status.code(), /*hasWriteConcernError*/ false, /*isCommitOrAbort*/ false);
+                status.code(), /*hasWriteConcernError=*/false, /*isCommitOrAbort=*/false);
         }
     }
     return false;
@@ -150,7 +150,7 @@ NoRetryWriteBatchResponse executeOpInInternalTransaction(OperationContext* opCtx
     auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
     txn_api::SyncTransactionWithRetries txn(
-        opCtx, executor, /*resourceYielder*/ nullptr, inlineExecutor);
+        opCtx, executor, /*resourceYielder=*/nullptr, inlineExecutor);
 
     ResponseType response;
     auto swRes = txn.runNoThrow(
@@ -695,7 +695,7 @@ BSONObj WriteBatchExecutor::buildFindAndModifyRequestObj(
     auto cmdObj = request.toBSON();
 
     if (shouldAppendReadWriteConcern) {
-        cmdObj = applyReadWriteConcern(opCtx, /*setRC*/ true, /*setWC*/ true, cmdObj);
+        cmdObj = applyReadWriteConcern(opCtx, /*setRC=*/true, /*setWC=*/true, cmdObj);
     }
 
     BSONObjBuilder builder(cmdObj);
@@ -1024,15 +1024,14 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
     std::vector<AsyncRequestsSender::Request> requestsToSend;
 
     for (auto& [shardId, shardRequest] : batch.requestByShardId) {
-        auto request =
-            buildRequest(opCtx,
-                         shardRequest.ops,
-                         shardRequest.versionByNss,
-                         shardRequest.nssIsViewfulTimeseries,
-                         shardRequest.sampleIds,
-                         errorsOnly,
-                         boost::none /* allowShardKeyUpdatesWithoutFullShardKeyInQuery */,
-                         IsEmbeddedCommand::No);
+        auto request = buildRequest(opCtx,
+                                    shardRequest.ops,
+                                    shardRequest.versionByNss,
+                                    shardRequest.nssIsViewfulTimeseries,
+                                    shardRequest.sampleIds,
+                                    errorsOnly,
+                                    /*allowShardKeyUpdatesWithoutFullShardKeyInQuery=*/boost::none,
+                                    IsEmbeddedCommand::No);
         auto requestObj = buildRequestObj(opCtx,
                                           std::move(request),
                                           ShouldAppendLsidAndTxnNumber::Yes,
@@ -1207,7 +1206,7 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
                                    {}, /* nssIsViewfulTimeseries */
                                    sampleIds,
                                    errorsOnly,
-                                   boost::none /* allowShardKeyUpdatesWithoutFullShardKeyInQuery */,
+                                   /*allowShardKeyUpdatesWithoutFullShardKeyInQuery=*/boost::none,
                                    IsEmbeddedCommand::No);
 
     // Remove the "legacyRuntimeConstants" field if it's present.
@@ -1267,7 +1266,7 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
         }
     }();
 
-    return NoRetryWriteBatchResponse::make(reply, /*wce*/ boost::none, writeOp, inTransaction);
+    return NoRetryWriteBatchResponse::make(reply, /*wce=*/boost::none, writeOp, inTransaction);
 }
 
 DatabaseName WriteBatchExecutor::getExecutionDatabase() const {

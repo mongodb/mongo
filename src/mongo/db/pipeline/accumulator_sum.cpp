@@ -82,7 +82,7 @@ void applyPartialSum(const std::vector<Value>& arr,
 }
 
 DoubleDoubleSummation AccumulatorSum::_constantSumToDoubleDoubleSummation() {
-    auto constantSum = getValue(false /* toBeMerged */);
+    auto constantSum = getValue(/*toBeMerged=*/false);
     DoubleDoubleSummation dds;
     switch (totalType) {
         case BSONType::numberInt:

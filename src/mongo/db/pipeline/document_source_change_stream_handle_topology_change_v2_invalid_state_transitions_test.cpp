@@ -42,7 +42,7 @@ DEATH_TEST_REGEX_F(DSV2StageInvalidStateTransitionsTestDeathTest,
                                dataToShardsAllocationQueryService.get());
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
 
-    docSource->setState_forTest(V2Stage::State::kFinal, false /* validateStateTransition */);
+    docSource->setState_forTest(V2Stage::State::kFinal, /*validateStateTransition=*/false);
     ASSERT_THROWS_CODE(docSource->runGetNextStateMachine_forTest(), AssertionException, 10657532);
 }
 
@@ -57,9 +57,9 @@ DEATH_TEST_REGEX_F(DSV2StageInvalidStateTransitionsTestDeathTest,
 
     // Check state invalid transition from Final to kWaiting to kWaiting.
     auto state = V2Stage::State::kWaiting;
-    docSource->setState_forTest(state, false /* validateStateTransition */);
+    docSource->setState_forTest(state, /*validateStateTransition=*/false);
 
-    ASSERT_THROWS_CODE(docSource->setState_forTest(state, true /* validateStateTransition */),
+    ASSERT_THROWS_CODE(docSource->setState_forTest(state, /*validateStateTransition=*/true),
                        AssertionException,
                        10657503);
 }
@@ -73,12 +73,12 @@ DEATH_TEST_REGEX_F(DSV2StageInvalidStateTransitionsTestDeathTest,
         buildChangeStreamSpec(Timestamp(42, 0), ChangeStreamReadMode::kStrict));
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), nullptr);
 
-    docSource->setState_forTest(V2Stage::State::kFinal, false /* validateStateTransition */);
+    docSource->setState_forTest(V2Stage::State::kFinal, /*validateStateTransition=*/false);
 
     for (auto state : {V2Stage::State::kWaiting,
                        V2Stage::State::kFetchingInitialization,
                        V2Stage::State::kDowngrading}) {
-        ASSERT_THROWS_CODE(docSource->setState_forTest(state, true /* validateStateTransition */),
+        ASSERT_THROWS_CODE(docSource->setState_forTest(state, /*validateStateTransition=*/true),
                            AssertionException,
                            10657504);
     }
@@ -108,10 +108,10 @@ DEATH_TEST_REGEX_F(DSV2StageInvalidStateTransitionsTestDeathTest,
     for (auto state : {V2Stage::State::kWaiting,
                        V2Stage::State::kFetchingInitialization,
                        V2Stage::State::kDowngrading}) {
-        docSource->setState_forTest(state, false /* validateStateTransition */);
+        docSource->setState_forTest(state, /*validateStateTransition=*/false);
 
         ASSERT_THROWS_CODE(docSource->setState_forTest(V2Stage::State::kUninitialized,
-                                                       true /* validateStateTransition */),
+                                                       /*validateStateTransition=*/true),
                            AssertionException,
                            10657505);
     }

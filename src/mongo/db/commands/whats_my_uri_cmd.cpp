@@ -48,7 +48,7 @@ public:
              const DatabaseName&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        result << "you" << opCtx->getClient()->clientAddress(true /*includePort*/);
+        result << "you" << opCtx->getClient()->clientAddress(/*includePort=*/true);
         return true;
     }
 };

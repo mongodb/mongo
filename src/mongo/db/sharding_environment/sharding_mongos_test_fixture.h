@@ -164,7 +164,7 @@ private:
 class ShardingTestFixtureWithMockCatalogCache : public ShardingTestFixture {
 public:
     ShardingTestFixtureWithMockCatalogCache()
-        : ShardingTestFixture(true /*withMockCatalogCache*/) {}
+        : ShardingTestFixture(/*withMockCatalogCache=*/true) {}
 
     CatalogCacheMock* getCatalogCacheMock() {
         return checked_cast<CatalogCacheMock*>(Grid::get(operationContext())->catalogCache());

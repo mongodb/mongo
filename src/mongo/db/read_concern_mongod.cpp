@@ -509,7 +509,7 @@ Status waitForReadConcernImpl(OperationContext* opCtx,
                 // flushAllFiles does not guarantee that the lastStableRecoveryTimestamp will
                 // advance, since with some persistence providers, secondaries do not take their own
                 // checkpoints.
-                storageEngine->flushAllFiles(opCtx, /*callerHoldsReadLock*/ true);
+                storageEngine->flushAllFiles(opCtx, /*callerHoldsReadLock=*/true);
                 needsPoll = true;
             }
         }

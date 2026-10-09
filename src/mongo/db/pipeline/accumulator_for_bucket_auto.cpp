@@ -129,7 +129,7 @@ public:
         _memUsageTracker.set(sizeof(*this));
     }
 
-    void processInternal(const Value& input, bool /*merging*/) final;
+    void processInternal(const Value& input, /*merging=*/bool) final;
 
     Value getValue(bool toBeMerged) final {
         return _output.freezeToValue();
@@ -421,7 +421,7 @@ void AccumulatorFirstLastNForBucketAuto<sense, single>::reset() {
 }
 
 template <FirstLastSense sense, bool single>
-Value AccumulatorFirstLastNForBucketAuto<sense, single>::getValue(bool /*toBeMerged*/) {
+Value AccumulatorFirstLastNForBucketAuto<sense, single>::getValue(/*toBeMerged=*/bool) {
     std::vector<Value> result;
     auto begin = _map.begin();
     auto end = _map.end();
@@ -450,7 +450,7 @@ boost::intrusive_ptr<AccumulatorState> AccumulatorFirstLastNForBucketAuto<sense,
 }
 
 void AccumulatorMergeObjectsForBucketAuto::processInternal(const Value& compoundInput,
-                                                           bool /*merging*/) {
+                                                           /*merging=*/bool) {
     // 'compoundInput' is made of two parts:
     // - 'input' is the value that the user specified in their {$mergeObjects: _}
     //   accumulator-expression.

@@ -490,7 +490,7 @@ void CursorManager::_destroyCursor(OperationContext* opCtx,
 }
 
 Status CursorManager::killCursor(OperationContext* opCtx, CursorId id) {
-    return _killCursor(opCtx, id, /*authChecker*/ {});
+    return _killCursor(opCtx, id, /*authChecker=*/{});
 }
 
 Status CursorManager::killCursorWithAuthCheck(

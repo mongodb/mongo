@@ -345,7 +345,7 @@ void updateUnsplittableCollChunkStmt(const txn_api::TransactionClient& txnClient
         return updateOp;
     }());
 
-    const auto response = txnClient.runCRUDOpSync(request, {-1} /*stmtIds*/);
+    const auto response = txnClient.runCRUDOpSync(request, /*stmtIds=*/{-1});
     uassertStatusOK(response.toStatus());
     // Only one chunk should have been updated (unless the transaction is repeated due to a
     // stepdown).
@@ -429,7 +429,7 @@ void renameCollectionMetadataInTransaction(
                 stmtId++);
             // Log the placement change of FROM.
             sharding_ddl_util::upsertPlacementHistoryDocInTransaction(
-                txnClient, fromNss, fromUUID, commitTime, {} /*shards*/, stmtId++);
+                txnClient, fromNss, fromUUID, commitTime, /*shards=*/{}, stmtId++);
             // Reassign original zones to the renamed collection entry.
             sharding_ddl_util::updateZonesInTransaction(txnClient, fromNss, toNss);
             // A rename request across databases (only allowed when FROM is unsharded or
@@ -698,7 +698,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                             toNss,
                             criticalSectionReason,
                             ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-                            !isAuthoritative /* clearShardCatalogCache */);
+                            /*clearShardCatalogCache=*/!isAuthoritative);
                         criticalSection->promoteRecoverableCriticalSectionToBlockAlsoReads(
                             opCtx,
                             toNss,
@@ -774,7 +774,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                         criticalSectionReason,
                         ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
                         ShardingRecoveryService::NoCustomAction(),
-                        false /* throwIfReasonDiffers */);
+                        /*throwIfReasonDiffers=*/false);
                     _completeOnError = true;
                     throw;
                 }
@@ -823,7 +823,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
             }))
         .then(_buildPhaseHandler(
             Phase::kSetupChangeStreamsPreconditions,
-            supportsPreciseChangeStreamTargeter /*shouldExecute*/,
+            /*shouldExecute=*/supportsPreciseChangeStreamTargeter,
             [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
                 const auto& fromNss = nss();
                 const auto& toNss = _request.getTo();

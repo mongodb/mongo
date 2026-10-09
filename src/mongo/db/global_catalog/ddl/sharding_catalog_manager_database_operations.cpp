@@ -110,9 +110,9 @@ DatabaseType ShardingCatalogManager::createDatabase(
                        shard_role_details::getLocker(opCtx),
                        DatabaseNameUtil::deserialize(
                            boost::none, str::toLower(dbNameStr), serializationContext),
-                       "createDatabase" /* reason */,
+                       /*reason=*/"createDatabase",
                        MODE_X,
-                       true /*waitForRecovery*/);
+                       /*waitForRecovery=*/true);
     }
 
     // Expensive createDatabase code path
@@ -314,7 +314,7 @@ void ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
 
     txn_api::SyncTransactionWithRetries txn(opCtx,
                                             executor,
-                                            nullptr, /*resourceYielder*/
+                                            /*resourceYielder=*/nullptr,
                                             inlineExecutor);
     txn.run(opCtx, transactionChain);
 
@@ -400,7 +400,7 @@ DatabaseType ShardingCatalogManager::commitCreateDatabase(OperationContext* opCt
         auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
 
         txn_api::SyncTransactionWithRetries txn(
-            opCtx, executor, nullptr /*resourceYielder*/, inlineExecutor);
+            opCtx, executor, /*resourceYielder=*/nullptr, inlineExecutor);
         txn.run(opCtx, transactionChain);
 
         return db;

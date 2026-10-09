@@ -68,7 +68,7 @@ std::vector<ChunkType> fetchOwnedChunks(OperationContext* opCtx,
              << coll.getUuid() << "$or"
              << BSON_ARRAY(BSON(ChunkType::shard(shardId.toString()))
                            << BSON("history.shard" << shardId.toString()))),
-        BSON(ChunkType::min() << 1) /* sort */,
+        /*sort=*/BSON(ChunkType::min() << 1),
         limit,
         nullptr,
         coll.getEpoch(),
@@ -237,7 +237,7 @@ void deleteCollectionEntryLocally(OperationContext* opCtx, const NamespaceString
     executeLocalDelete(dbClient,
                        NamespaceString::kConfigShardCatalogCollectionsNamespace,
                        BSON(CollectionType::kNssFieldName << serializeNss(nss)),
-                       false /* multi */);
+                       /*multi=*/false);
 }
 
 void upsertCollectionEntryLocally(OperationContext* opCtx,
@@ -257,7 +257,7 @@ void deleteEntireCollectionChunksMetadataLocally(OperationContext* opCtx, const 
     executeLocalDelete(dbClient,
                        NamespaceString::kConfigShardCatalogChunksNamespace,
                        BSON(ChunkType::collectionUUID() << uuid),
-                       true /* multi */);
+                       /*multi=*/true);
 }
 
 void deleteAllCollectionMetadataLocally(OperationContext* opCtx,
@@ -389,7 +389,7 @@ void updateCollectionMetadata(OperationContext* opCtx,
                               const std::vector<ChunkType>& changedChunks) {
     const auto& uuid = coll.getUuid();
     if (changedChunks.size() > kMaxChangedChunksInDeltaOplogEntry) {
-        invalidateCollectionMetadata(opCtx, nss, uuid, false /* forDroppedCollection */);
+        invalidateCollectionMetadata(opCtx, nss, uuid, /*forDroppedCollection=*/false);
         return;
     }
 
@@ -404,7 +404,7 @@ void updateCollectionMetadata(OperationContext* opCtx,
 
     auto oplogEntry = makeShardCatalogCommandOplogEntry(opCtx, nss, uuid, entry.toBSON());
     if (oplogEntry.toBSON().objsize() > kMaxUpdateCollectionMetadataOplogEntryObjectSizeBytes) {
-        invalidateCollectionMetadata(opCtx, nss, uuid, false /* forDroppedCollection */);
+        invalidateCollectionMetadata(opCtx, nss, uuid, /*forDroppedCollection=*/false);
         return;
     }
 
@@ -476,7 +476,7 @@ void commitCollectionMetadataLocallyImpl(OperationContext* opCtx,
         case CommitCollectionMetadataOptions::NotifyMode::kInvalidateThenReinstallOnPrimary:
             // Emit the oplog 'c' entry and clear the in-memory state.
             invalidateCollectionMetadata(
-                opCtx, nss, coll.getUuid(), !hasCollectionEntry /* forDroppedCollection */);
+                opCtx, nss, coll.getUuid(), /*forDroppedCollection=*/!hasCollectionEntry);
             if (hasCollectionEntry) {
                 // Update this node's CSR with collection metadata and chunks as an optimization,
                 // so the next query doesn't have to recover it from disk.
@@ -493,7 +493,7 @@ void commitCollectionMetadataLocallyImpl(OperationContext* opCtx,
                     buildOwnedCollectionMetadata(opCtx, nss, coll, ownedChunks)
                         .getShardPlacementVersion();
                 invalidateCollectionMetadata(
-                    opCtx, nss, coll.getUuid(), false /* forDroppedCollection */, diskShardVersion);
+                    opCtx, nss, coll.getUuid(), /*forDroppedCollection=*/false, diskShardVersion);
                 if (commitAllowChunkOperations) {
                     {
                         auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
@@ -672,7 +672,7 @@ void commitDropCollectionLocally(OperationContext* opCtx,
     deleteAllCollectionMetadataLocally(opCtx, nss, uuid);
 
     // Write an oplog 'c' entry to invalidate the CSR and clear it on this node and secondaries.
-    invalidateCollectionMetadata(opCtx, nss, uuid, true /* forDroppedCollection */);
+    invalidateCollectionMetadata(opCtx, nss, uuid, /*forDroppedCollection=*/true);
 
     LOGV2_INFO(12295703,
                "Dropped all shard catalog metadata for collection",
@@ -723,14 +723,12 @@ void commitRenameOfCollectionMetadata(OperationContext* opCtx,
         // to clear out the in-memory state if the collection got replaced.
         if (clearFromNss && fromUUID) {
             // Emit the oplog 'c' entry and clear the in-memory state.
-            invalidateCollectionMetadata(
-                opCtx, fromNss, *fromUUID, true /* forDroppedCollection */);
+            invalidateCollectionMetadata(opCtx, fromNss, *fromUUID, /*forDroppedCollection=*/true);
         }
 
         if (clearToNss && targetUUID) {
             // Emit the oplog 'c' entry and clear the in-memory state.
-            invalidateCollectionMetadata(
-                opCtx, toNss, *targetUUID, true /* forDroppedCollection */);
+            invalidateCollectionMetadata(opCtx, toNss, *targetUUID, /*forDroppedCollection=*/true);
         }
     };
 
@@ -748,7 +746,7 @@ void commitRenameOfCollectionMetadata(OperationContext* opCtx,
                         "collection is untracked",
                         "toNss"_attr = toNss,
                         "error"_attr = ex.toStatus());
-            cleanupInMemoryState(false /*clearFromNss*/, true /*clearToNss*/);
+            cleanupInMemoryState(/*clearFromNss=*/false, /*clearToNss=*/true);
             return boost::none;
         }
     };
@@ -776,13 +774,13 @@ void commitRenameOfCollectionMetadata(OperationContext* opCtx,
             return;
         }
         commitCollectionMetadataLocally(
-            opCtx, toNss, isDbPrimaryShard, true /*commitAllowChunkOperations*/);
+            opCtx, toNss, isDbPrimaryShard, /*commitAllowChunkOperations=*/true);
         return;
     }
 
     // The source namespace no longer exists after the rename, so its in-memory state must be
     // invalidated and cleared regardless of what happens to the target namespace.
-    cleanupInMemoryState(true /*clearFromNss*/, false /*clearToNss*/);
+    cleanupInMemoryState(/*clearFromNss=*/true, /*clearToNss=*/false);
 
     // At this point we can assume that the shard catalog metadata is durably persisted on this
     // shard, so all the chunk entries are stored locally for both from/target collections if they
@@ -817,7 +815,7 @@ void commitRenameOfCollectionMetadata(OperationContext* opCtx,
         newEntry,
         ownedChunks,
         isDbPrimaryShard,
-        true /*commitAllowChunkOperations*/,
+        /*commitAllowChunkOperations=*/true,
         {.rewritePersistedChunks = false,
          .notifyMode =
              CommitCollectionMetadataOptions::NotifyMode::kInvalidateThenReinstallOnPrimary});
@@ -869,7 +867,7 @@ void cloneCollectionMetadataLocally(OperationContext* opCtx,
         coll,
         ownedChunks,
         isDbPrimaryShard,
-        false /*commitAllowChunkOperations*/,
+        /*commitAllowChunkOperations=*/false,
         {.notifyMode = CommitCollectionMetadataOptions::NotifyMode::kInvalidateIfStale});
 
     ShardingStatistics::get(opCtx)
@@ -904,9 +902,9 @@ void commitChunklessCollectionMetadataLocally(OperationContext* opCtx, const Nam
     invalidateCollectionMetadata(opCtx,
                                  nss,
                                  coll.getUuid(),
-                                 false /* forDroppedCollection */,
-                                 boost::none /* diskShardVersion */,
-                                 true /* onlyClearIfShardDoesntOwnChunks */);
+                                 /*forDroppedCollection=*/false,
+                                 /*diskShardVersion=*/boost::none,
+                                 /*onlyClearIfShardDoesntOwnChunks=*/true);
 
     LOGV2_INFO(12721505,
                "Committed chunkless collection shard catalog metadata locally",
@@ -983,7 +981,7 @@ void commitChunkOperationsMetadataLocally(OperationContext* opCtx,
         // does not own any chunks, which cannot be the case since this shard is receiving a chunk.
         ShardingStatistics::get(opCtx)
             .chunkOperationsStatistics.registerMoveRangeFirstChunkReceived();
-        commitCollectionMetadataLocally(opCtx, nss, false /* isDbPrimaryShard */);
+        commitCollectionMetadataLocally(opCtx, nss, /*isDbPrimaryShard=*/false);
         return;
     }
 
@@ -1002,7 +1000,7 @@ void commitChunkOperationsMetadataLocally(OperationContext* opCtx,
     deleteOverlappingChunksLocally(opCtx, coll, chunksToInsert);
 
     writeCollectionMetadataLocally(
-        opCtx, nss, coll.asShardCatalogType(), chunksToInsert, true /* rewritePersistedChunks */);
+        opCtx, nss, coll.asShardCatalogType(), chunksToInsert, /*rewritePersistedChunks=*/true);
 
     updateCollectionMetadata(opCtx, nss, coll, chunksToInsert);
 
@@ -1048,7 +1046,7 @@ void commitRenameOfTemporaryCollection(OperationContext* opCtx,
                                                                   sourceNss,
                                                                   sourceUUID,
                                                                   tempReshardingUUID,
-                                                                  false /* isUpgrading */,
+                                                                  /*isUpgrading=*/false,
                                                                   isDbPrimaryShard);
 }
 
@@ -1088,7 +1086,7 @@ void commitDropOfStaleChunksForRename(OperationContext* opCtx,
             NamespaceString::kConfigShardCatalogCollectionsNamespace,
             BSON(CollectionType::kNssFieldName << shard_catalog_commit::serializeNss(nss)
                                                << CollectionType::kUuidFieldName << oldUuid),
-            false /* multi */);
+            /*multi=*/false);
     }
     shard_catalog_commit::commitDropOfStaleChunksForRename(opCtx, oldUuid);
 
@@ -1098,7 +1096,7 @@ void commitDropOfStaleChunksForRename(OperationContext* opCtx,
     bool shardOwnsChunks = shard_catalog_commit::doesShardOwnChunks(opCtx, nss);
     if (!shardOwnsChunks) {
         shard_catalog_commit::invalidateCollectionMetadata(
-            opCtx, nss, oldUuid, true /* forDroppedCollection */);
+            opCtx, nss, oldUuid, /*forDroppedCollection=*/true);
     }
 
     LOGV2_DEBUG(12721507,

@@ -229,7 +229,7 @@ struct LastRefsTransporter {
      * which side is evaluated last.
      */
     static void merge(Result& result, Result& other) {
-        mergeImpl(result, other, false /*resetOther*/, true /*resetBoth*/);
+        mergeImpl(result, other, /*resetOther=*/false, /*resetBoth=*/true);
     }
 
     /**
@@ -252,7 +252,7 @@ struct LastRefsTransporter {
      * preserved.
      */
     static void mergeKeepLastRefs(Result& result, Result& other) {
-        mergeImpl(result, other, true /*resetOther*/, false /*resetBoth*/);
+        mergeImpl(result, other, /*resetOther=*/true, /*resetBoth=*/false);
     }
 
     /**
@@ -262,7 +262,7 @@ struct LastRefsTransporter {
      * branches of a conditional.
      */
     static void unionLastRefs(Result& result, Result& other) {
-        mergeImpl(result, other, false /*resetOther*/, false /*resetBoth*/);
+        mergeImpl(result, other, /*resetOther=*/false, /*resetBoth=*/false);
     }
 
     /**

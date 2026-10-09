@@ -144,8 +144,8 @@ public:
             client.update(NamespaceString::kServerConfigurationNamespace,
                           BSON("_id" << "commitMergeChunksStats"),
                           BSON("$inc" << BSON("count" << 1)),
-                          true /* upsert */,
-                          false /* multi */);
+                          /*upsert=*/true,
+                          /*multi=*/false);
 
             std::vector<BSONObj> changedChunkDocs;
             changedChunkDocs.reserve(changedChunks.size());

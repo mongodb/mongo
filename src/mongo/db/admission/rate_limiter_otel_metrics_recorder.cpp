@@ -201,7 +201,7 @@ PeriodicRunner::JobAnchor RateLimiterOtelMetricsRecorder::installOtelMetrics(
             record(TokensAvailable{sampleAvailableTokens()});
         },
         period,
-        false /* isKillableByStepdown */));
+        /*isKillableByStepdown=*/false));
     anchor.start();
     return anchor;
 }

@@ -67,8 +67,8 @@ public:
             client.update(NamespaceString::kServerConfigurationNamespace,
                           BSON("_id" << "SetUseWriteBlockModeStats"),
                           BSON("$inc" << BSON("count" << 1)),
-                          true /* upsert */,
-                          false /* multi */);
+                          /*upsert=*/true,
+                          /*multi=*/false);
         }
 
     private:

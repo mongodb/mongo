@@ -300,7 +300,7 @@ public:
                                              kSortMaxMemoryUsageBytes),
             PlanShapeCounter::kCollscanSort);
         // A sort with an absorbed limit (top-N sort) is still a "SORT".
-        add(makeSort(makeCollScan(), 5 /* limit */), PlanShapeCounter::kCollscanSort);
+        add(makeSort(makeCollScan(), /*limit=*/5), PlanShapeCounter::kCollscanSort);
 
         // The shapes intentionally don't distinguish nodes with and without filters.
         {
@@ -470,7 +470,7 @@ TEST_F(PlanShapeCountersTest, LookupForeignSideIsExcludedFromShape) {
                                                    FieldPath("b"),
                                                    FieldPath("out"),
                                                    EqLookupNode::LookupStrategy::kNestedLoopJoin,
-                                                   false /* shouldProduceBson */);
+                                                   /*shouldProduceBson=*/false);
     assertShape(*makeExtendedPlan(makeFetch(makeIxScan()), std::move(eqLookup)),
                 PlanShapeCounter::kIxscanFetch,
                 "lookup-extended plan");

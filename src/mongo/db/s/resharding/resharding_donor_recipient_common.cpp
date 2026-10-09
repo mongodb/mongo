@@ -219,7 +219,7 @@ bool isCurrentShardPrimary(OperationContext* opCtx, const NamespaceString& nss) 
         //
         // TODO SERVER-96115 Use the CatalogClient to fetch DB info and avoid this forced refresh
         const auto& catalogCache = Grid::get(opCtx)->catalogCache();
-        catalogCache->onStaleDatabaseVersion(nss.dbName(), boost::none /* wantedVersion */);
+        catalogCache->onStaleDatabaseVersion(nss.dbName(), /*wantedVersion=*/boost::none);
         return uassertStatusOK(catalogCache->getDatabase(opCtx, nss.dbName()));
     }();
     return dbInfo->getPrimary() == ShardingState::get(opCtx)->shardId();
@@ -238,7 +238,7 @@ void processReshardingFieldsForRecipientCollection(OperationContext* opCtx,
                                                                   ReshardingRecipientDocument>(
             opCtx, reshardingFields.getReshardingUUID())) {
         recipientStateMachine->get()->onReshardingFieldsChanges(
-            opCtx, reshardingFields, !metadata.currentShardHasAnyChunks() /* noChunksToCopy */);
+            opCtx, reshardingFields, /*noChunksToCopy=*/!metadata.currentShardHasAnyChunks());
         return;
     }
 
@@ -489,7 +489,7 @@ void clearCollectionMetadata(OperationContext* opCtx,
             auto opCtx = tc->makeOperationContext();
             uassertStatusOK(FilteringMetadataCache::get(opCtx.get())
                                 ->onShardVersionMismatch(
-                                    opCtx.get(), nss, boost::none /* chunkVersionReceived */));
+                                    opCtx.get(), nss, /*chunkVersionReceived=*/boost::none));
         })
             .until([](const Status& status) {
                 if (!status.isOK()) {

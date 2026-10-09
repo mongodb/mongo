@@ -56,7 +56,7 @@ NamedPipeOutput::NamedPipeOutput(const std::string& pipeDir,
     // Just in case that uncleaned-up named pipe is still there. This is a test-only implementation
     // and so, it should be fine to just remove it and ignore the ENOENT error.
     if (!persistPipe) {
-        removeNamedPipe(true /*ignoreNoEntError*/, _pipeAbsolutePath.c_str());
+        removeNamedPipe(/*ignoreNoEntError=*/true, _pipeAbsolutePath.c_str());
         uassert(7005005,
                 fmt::format("Failed to create a named pipe, error: {}",
                             getLastSystemErrorMessageFormatted("mkfifo", _pipeAbsolutePath)),
@@ -68,7 +68,7 @@ NamedPipeOutput::~NamedPipeOutput() {
     close();
     // Makes sure that the named pipe is removed.
     if (!_persistPipe) {
-        removeNamedPipe(false /*ignoreNoEntError*/, _pipeAbsolutePath.c_str());
+        removeNamedPipe(/*ignoreNoEntError=*/false, _pipeAbsolutePath.c_str());
     }
 }
 

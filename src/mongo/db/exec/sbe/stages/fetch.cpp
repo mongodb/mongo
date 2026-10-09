@@ -165,7 +165,7 @@ void FetchStage::open(bool reOpen) {
 
     // Reuse existing cursor if possible.
     if (!reOpen) {
-        _cursor = _coll->getCollectionPtr()->getCursor(_opCtx, true /* forward */);
+        _cursor = _coll->getCollectionPtr()->getCursor(_opCtx, /*forward=*/true);
     }
     _children[0]->open(reOpen);
     _recordIdAccessor.reset(

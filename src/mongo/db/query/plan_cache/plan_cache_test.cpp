@@ -282,8 +282,7 @@ TEST_F(PlanCacheTest, ShouldNotCacheQueryExplain) {
                                                     "{}",
                                                     "{}",
                                                     "{}",  // min, max
-                                                    true   // explain
-                                                    ));
+                                                    /*explain=*/true));
     ASSERT_TRUE(cq->getExplain());
     assertShouldNotCacheQuery(*cq);
 }
@@ -883,7 +882,7 @@ TEST_F(PlanCacheTest, GetMatchingStatsMatchesAndSerializesCorrectly) {
 
     // Verify the output of getMatchingStats().
     auto getStatsResult =
-        planCache.getMatchingStats({} /* cacheKeyFilterFunc */, serializer, matcher);
+        planCache.getMatchingStats(/*cacheKeyFilterFunc=*/{}, serializer, matcher);
     ASSERT_EQ(1U, getStatsResult.size());
     ASSERT_BSONOBJ_EQ(BSON("works" << 5), getStatsResult[0]);
 }
@@ -939,7 +938,7 @@ protected:
     }
 
     void addIndex(BSONObj keyPattern, const std::string& indexName, bool multikey = false) {
-        addIndexEntry(keyPattern, indexName, multikey, {}, false /*sparse*/, nullptr /*collator*/);
+        addIndexEntry(keyPattern, indexName, multikey, {}, /*sparse=*/false, /*collator=*/nullptr);
     }
 
     // Adds an index with path-level multikey info. The multikey flag is derived from it.
@@ -952,15 +951,15 @@ protected:
                         multikeyPaths.cend(),
                         [](const MultikeyComponents& components) { return !components.empty(); });
         addIndexEntry(
-            keyPattern, indexName, multikey, multikeyPaths, false /*sparse*/, nullptr /*collator*/);
+            keyPattern, indexName, multikey, multikeyPaths, /*sparse=*/false, /*collator=*/nullptr);
     }
 
     void addIndex(BSONObj keyPattern, const std::string& indexName, bool multikey, bool sparse) {
-        addIndexEntry(keyPattern, indexName, multikey, {}, sparse, nullptr /*collator*/);
+        addIndexEntry(keyPattern, indexName, multikey, {}, sparse, /*collator=*/nullptr);
     }
 
     void addIndex(BSONObj keyPattern, const std::string& indexName, CollatorInterface* collator) {
-        addIndexEntry(keyPattern, indexName, false /*multikey*/, {}, false /*sparse*/, collator);
+        addIndexEntry(keyPattern, indexName, /*multikey=*/false, {}, /*sparse=*/false, collator);
     }
 
     //
@@ -1156,7 +1155,7 @@ protected:
                                    planCacheKey,
                                    0, /* planCacheCommandKey */
                                    Date_t(),
-                                   false /* isActive  */,
+                                   /*isActive=*/false,
                                    PlanSecurityLevel::kNotSensitive,
                                    PlanCacheDecisionMetrics{NumReads{0}, NumWorks{0}},
                                    plan_cache_util::buildDebugInfo(*scopedCq, std::move(decision)));
@@ -2161,7 +2160,7 @@ protected:
         auto catalog = CollectionCatalog::get(_operationContext.get());
         catalog->onCreateCollection(_operationContext.get(), collection);
         auto consistentColl = catalog->establishConsistentCollection(
-            _operationContext.get(), _nss, boost::none /* readTimestamp */);
+            _operationContext.get(), _nss, /*readTimestamp=*/boost::none);
         _collectionAcq =
             std::make_unique<CollectionAcquisition>(shard_role_mock::acquireCollectionMocked(
                 _operationContext.get(), _nss, consistentColl));

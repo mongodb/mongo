@@ -142,7 +142,7 @@ SessionsCollection::RefreshSessionsResult SessionsCollectionSharded::refreshSess
         BatchedCommandResponse response;
         BatchWriteExecStats stats;
 
-        cluster::write(opCtx, request, nullptr /* nss */, &stats, &response);
+        cluster::write(opCtx, request, /*nss=*/nullptr, &stats, &response);
         return response.toStatus();
     };
 

@@ -61,7 +61,7 @@ bool MatchProcessor::process(const Document& input, const EvaluationContext& ctx
         }(),
         &input);
     trackBufferMemory(ctx);
-    return exec::matcher::matches(_expression.get(), &toMatch, /*details*/ nullptr, ctx);
+    return exec::matcher::matches(_expression.get(), &toMatch, /*details=*/nullptr, ctx);
 }
 
 bool MatchProcessor::dependenciesHaveUniqueFirstFields(const OrderedPathSet& paths) {

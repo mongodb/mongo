@@ -372,7 +372,7 @@ ReadWriteConcernDefaults::Cache::Cache(Service* service,
           [this](OperationContext* opCtx, Type, const ValueHandle& unusedCachedValue) {
               return LookupResult(lookup(opCtx));
           },
-          1 /* cacheSize */),
+          /*cacheSize=*/1),
       _fetchDefaultsFn(std::move(fetchDefaultsFn)) {}
 
 boost::optional<RWConcernDefault> ReadWriteConcernDefaults::Cache::lookup(OperationContext* opCtx) {

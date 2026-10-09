@@ -35,7 +35,7 @@ std::unique_ptr<FetchNode> makeFetch(std::unique_ptr<QuerySolutionNode> child) {
 
 std::unique_ptr<LimitNode> makeLimit(std::unique_ptr<QuerySolutionNode> child) {
     return std::make_unique<LimitNode>(
-        std::move(child), 5 /* limit */, LimitSkipParameterization::Disabled);
+        std::move(child), /*limit=*/5, LimitSkipParameterization::Disabled);
 }
 
 

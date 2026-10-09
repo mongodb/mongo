@@ -434,7 +434,7 @@ boost::optional<std::vector<HostAndPort>> StreamableReplicaSetMonitor::_getHosts
 
 HostAndPort StreamableReplicaSetMonitor::getPrimaryOrUassert() {
     return getHostOrRefresh(kPrimaryOnlyReadPreference,
-                            {} /* targetingMetadata */,
+                            /*targetingMetadata=*/{},
                             CancellationToken::uncancelable())
         .get();
 }

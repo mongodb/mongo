@@ -29,7 +29,7 @@ boost::optional<SharedSemiFuture<void>> runWithSessionCheckedOutIfStatementNotEx
     try {
         txnParticipant.beginOrContinue(opCtx,
                                        {txnNumber},
-                                       boost::none /* autocommit */,
+                                       /*autocommit=*/boost::none,
                                        TransactionParticipant::TransactionActions::kNone);
 
     } catch (const ExceptionFor<ErrorCodes::TransactionTooOld>&) {

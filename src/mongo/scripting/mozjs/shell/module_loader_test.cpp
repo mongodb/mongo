@@ -32,8 +32,8 @@ TEST(ModuleLoaderTest, ImportBaseSpecifierFails) {
     ASSERT_THROWS_WITH_CHECK(
         scope->exec(code,
                     "root_module",
-                    true /* printResult */,
-                    true /* reportError */,
+                    /*printResult=*/true,
+                    /*reportError=*/true,
                     true /* assertOnError , timeout*/),
         DBException,
         [&](const auto& ex) { ASSERT_STRING_CONTAINS(ex.what(), "Cannot find module"); });
@@ -51,8 +51,8 @@ TEST(ModuleLoaderTest, ImportDirectoryFails) {
     ASSERT_THROWS_WITH_CHECK(
         scope->exec(code,
                     "root_module",
-                    true /* printResult */,
-                    true /* reportError */,
+                    /*printResult=*/true,
+                    /*reportError=*/true,
                     true /* assertOnError , timeout*/),
         DBException,
         [&](const auto& ex) { ASSERT_STRING_CONTAINS(ex.what(), "Directory import"); });
@@ -69,8 +69,8 @@ TEST(ModuleLoaderTest, ImportInInteractiveFails) {
     ASSERT_THROWS_WITH_CHECK(
         scope->exec(code,
                     MozJSImplScope::kInteractiveShellName,
-                    true /* printResult */,
-                    true /* reportError */,
+                    /*printResult=*/true,
+                    /*reportError=*/true,
                     true /* assertOnError , timeout*/),
         DBException,
         [&](const auto& ex) {
@@ -87,8 +87,8 @@ TEST(ModuleLoaderTest, TopLevelAwaitWorks) {
     auto code = "async function test() { return 42; } await test();"sv;
     ASSERT_DOES_NOT_THROW(scope->exec(code,
                                       "root_module",
-                                      true /* printResult */,
-                                      true /* reportError */,
+                                      /*printResult=*/true,
+                                      /*reportError=*/true,
                                       true /* assertOnError , timeout*/));
     scope.reset();
     setGlobalScriptEngine(nullptr);
@@ -174,8 +174,8 @@ TEST(ModuleLoaderTest, ImportDisabledInServerEnvironment) {
     ASSERT_THROWS_WITH_CHECK(
         scope->exec(code,
                     "root_module",
-                    true /* printResult */,
-                    true /* reportError */,
+                    /*printResult=*/true,
+                    /*reportError=*/true,
                     true /* assertOnError , timeout*/),
         DBException,
         [&](const auto& ex) {

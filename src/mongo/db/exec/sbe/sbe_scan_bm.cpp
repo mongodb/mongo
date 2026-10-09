@@ -33,7 +33,7 @@ public:
         {
             WriteUnitOfWork wuow{operationContext()};
             ASSERT_OK(collection_internal::insertDocuments(
-                operationContext(), *agc, inserts.begin(), inserts.end(), nullptr /* opDebug */));
+                operationContext(), *agc, inserts.begin(), inserts.end(), /*opDebug=*/nullptr));
             wuow.commit();
         }
     }
@@ -91,17 +91,17 @@ public:
                                                   dbName,
                                                   scanSlot,
                                                   recordIdSlot,
-                                                  boost::none /* snapshotIdSlot */,
-                                                  boost::none /* indexIdentSlot */,
-                                                  boost::none /* indexKeySlot */,
-                                                  boost::none /* indexKeyPatternSlot */,
-                                                  std::vector<std::string>{} /* scanFieldNames */,
+                                                  /*snapshotIdSlot=*/boost::none,
+                                                  /*indexIdentSlot=*/boost::none,
+                                                  /*indexKeySlot=*/boost::none,
+                                                  /*indexKeyPatternSlot=*/boost::none,
+                                                  /*scanFieldNames=*/std::vector<std::string>{},
                                                   scanFieldSlots,
-                                                  true /* forward */,
-                                                  nullptr /* yieldPolicy */,
+                                                  /*forward=*/true,
+                                                  /*yieldPolicy=*/nullptr,
                                                   kEmptyPlanNodeId,
-                                                  nullptr /* scanOpenCallback */,
-                                                  false /* participateInTrialRunTracking */);
+                                                  /*scanOpenCallback=*/nullptr,
+                                                  /*participateInTrialRunTracking=*/false);
 
             return std::make_pair(scanSlot, std::move(scanStage));
         };
@@ -134,19 +134,19 @@ public:
                                            dbName,
                                            scanSlot,
                                            recordIdSlot,
-                                           boost::none /* snapshotIdSlot */,
-                                           boost::none /* indexIdentSlot */,
-                                           boost::none /* indexKeySlot */,
-                                           boost::none /* indexKeyPatternSlot */,
-                                           std::vector<std::string>{} /* scanFieldNames */,
+                                           /*snapshotIdSlot=*/boost::none,
+                                           /*indexIdentSlot=*/boost::none,
+                                           /*indexKeySlot=*/boost::none,
+                                           /*indexKeyPatternSlot=*/boost::none,
+                                           /*scanFieldNames=*/std::vector<std::string>{},
                                            scanFieldSlots,
-                                           boost::none /* minRecordIdSlot */,
-                                           boost::none /* maxRecordIdSlot */,
-                                           true /* forward */,
-                                           nullptr /* yieldPolicy */,
+                                           /*minRecordIdSlot=*/boost::none,
+                                           /*maxRecordIdSlot=*/boost::none,
+                                           /*forward=*/true,
+                                           /*yieldPolicy=*/nullptr,
                                            kEmptyPlanNodeId,
-                                           nullptr /* scanOpenCallback */,
-                                           false /* participateInTrialRunTracking */);
+                                           /*scanOpenCallback=*/nullptr,
+                                           /*participateInTrialRunTracking=*/false);
 
             return std::make_pair(scanSlot, std::move(scanStage));
         };

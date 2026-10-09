@@ -68,7 +68,7 @@ auto getDecimalGenerator(PseudoRandom& random) {
 
 std::vector<double> generateNormal(size_t n) {
     std::mt19937 generator(2023u);
-    boost::random::normal_distribution<double> dist(0.0 /* mean */, 1.0 /* sigma */);
+    boost::random::normal_distribution<double> dist(/*mean=*/0.0, /*sigma=*/1.0);
 
     std::vector<double> inputs;
     inputs.reserve(n);
@@ -101,7 +101,7 @@ void registerExpressionForBenchmark(std::string expression, Parser parser) {
                                        parser,
                                        AllowedWithApiStrict::kNeverInVersion1,
                                        AllowedWithClientType::kAny,
-                                       nullptr /* featureFlag */);
+                                       /*featureFlag=*/nullptr);
     } catch (const DBException& e) {
         ASSERT(e.reason() == "Duplicate expression (" + expression + ") registered.");
     }
@@ -482,8 +482,8 @@ void ExpressionBenchmarkFixture::benchmarkDateDiffEvaluateMinute300Years(benchma
     testDateDiffExpression(-1640989478000LL /* 1918-01-01*/,
                            7826117722000LL /* 2218-01-01*/,
                            "minute",
-                           boost::none /*timezone*/,
-                           boost::none /*startOfWeek*/,
+                           /*timezone=*/boost::none,
+                           /*startOfWeek=*/boost::none,
                            state);
 }
 
@@ -491,8 +491,8 @@ void ExpressionBenchmarkFixture::benchmarkDateDiffEvaluateMinute2Years(benchmark
     testDateDiffExpression(1542448721000LL /* 2018-11-17*/,
                            1605607121000LL /* 2020-11-17*/,
                            "minute",
-                           boost::none /*timezone*/,
-                           boost::none /*startOfWeek*/,
+                           /*timezone=*/boost::none,
+                           /*startOfWeek=*/boost::none,
                            state);
 }
 
@@ -502,7 +502,7 @@ void ExpressionBenchmarkFixture::benchmarkDateDiffEvaluateMinute2YearsWithTimezo
                            1605607121000LL /* 2020-11-17*/,
                            "minute",
                            std::string{"America/New_York"},
-                           boost::none /*startOfWeek*/,
+                           /*startOfWeek=*/boost::none,
                            state);
 }
 
@@ -510,8 +510,8 @@ void ExpressionBenchmarkFixture::benchmarkDateDiffEvaluateWeek(benchmark::State&
     testDateDiffExpression(7826117722000LL /* 2218-01-01*/,
                            4761280721000LL /*2120-11-17*/,
                            "week",
-                           boost::none /*timezone*/,
-                           std::string("Sunday") /*startOfWeek*/,
+                           /*timezone=*/boost::none,
+                           /*startOfWeek=*/std::string("Sunday"),
                            state);
 }
 
@@ -571,7 +571,7 @@ void ExpressionBenchmarkFixture::benchmarkDateTruncEvaluateMinute15NewYork(
                             "minute",
                             15,
                             std::string{"America/New_York"},
-                            boost::none /* startOfWeek */,
+                            /*startOfWeek=*/boost::none,
                             state);
 }
 
@@ -580,7 +580,7 @@ void ExpressionBenchmarkFixture::benchmarkDateTruncEvaluateMinute15UTC(benchmark
                             "minute",
                             15,
                             boost::none,
-                            boost::none /* startOfWeek */,
+                            /*startOfWeek=*/boost::none,
                             state);
 }
 
@@ -590,7 +590,7 @@ void ExpressionBenchmarkFixture::benchmarkDateTruncEvaluateHour1UTCMinus0700(
                             "hour",
                             1,
                             std::string{"-07:00"},
-                            boost::none /* startOfWeek */,
+                            /*startOfWeek=*/boost::none,
                             state);
 }
 
@@ -600,7 +600,7 @@ void ExpressionBenchmarkFixture::benchmarkDateTruncEvaluateWeek2NewYorkValue2100
                             "week",
                             2,
                             std::string{"America/New_York"},
-                            std::string{"monday"} /* startOfWeek */,
+                            /*startOfWeek=*/std::string{"monday"},
                             state);
 }
 
@@ -610,7 +610,7 @@ void ExpressionBenchmarkFixture::benchmarkDateTruncEvaluateWeek2UTCValue2100(
                             "week",
                             2,
                             std::string{"UTC"},
-                            std::string{"monday"} /* startOfWeek */,
+                            /*startOfWeek=*/std::string{"monday"},
                             state);
 }
 
@@ -620,7 +620,7 @@ void ExpressionBenchmarkFixture::benchmarkDateTruncEvaluateMonth6NewYorkValue210
                             "month",
                             6,
                             std::string{"America/New_York"},
-                            boost::none /* startOfWeek */,
+                            /*startOfWeek=*/boost::none,
                             state);
 }
 
@@ -630,7 +630,7 @@ void ExpressionBenchmarkFixture::benchmarkDateTruncEvaluateMonth6NewYorkValue203
                             "month",
                             6,
                             std::string{"America/New_York"},
-                            boost::none /* startOfWeek */,
+                            /*startOfWeek=*/boost::none,
                             state);
 }
 
@@ -640,7 +640,7 @@ void ExpressionBenchmarkFixture::benchmarkDateTruncEvaluateMonth6UTCValue2030(
                             "month",
                             8,
                             boost::none,
-                            boost::none /* startOfWeek */,
+                            /*startOfWeek=*/boost::none,
                             state);
 }
 
@@ -650,7 +650,7 @@ void ExpressionBenchmarkFixture::benchmarkDateTruncEvaluateYear1NewYorkValue2020
                             "year",
                             1,
                             std::string{"America/New_York"},
-                            boost::none /* startOfWeek */,
+                            /*startOfWeek=*/boost::none,
                             state);
 }
 
@@ -660,7 +660,7 @@ void ExpressionBenchmarkFixture::benchmarkDateTruncEvaluateYear1UTCValue2020(
                             "year",
                             1,
                             boost::none,
-                            boost::none /* startOfWeek */,
+                            /*startOfWeek=*/boost::none,
                             state);
 }
 
@@ -670,7 +670,7 @@ void ExpressionBenchmarkFixture::benchmarkDateTruncEvaluateYear1NewYorkValue2100
                             "year",
                             1,
                             std::string{"America/New_York"},
-                            boost::none /* startOfWeek */,
+                            /*startOfWeek=*/boost::none,
                             state);
 }
 

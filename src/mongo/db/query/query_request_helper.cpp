@@ -232,7 +232,7 @@ std::unique_ptr<FindCommandRequest> makeFromFindCommand(const FindCommandRequest
 std::unique_ptr<FindCommandRequest> makeFromFindCommandForTests(
     const BSONObj& cmdObj, boost::optional<NamespaceString> nss) {
     return makeFromFindCommand(cmdObj,
-                               boost::none /*vts*/,
+                               /*vts=*/boost::none,
                                nss ? nss->tenantId() : boost::none,
                                SerializationContext::stateDefault());
 }

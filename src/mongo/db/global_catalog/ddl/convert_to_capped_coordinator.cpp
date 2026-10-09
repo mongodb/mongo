@@ -222,7 +222,7 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
                     nss(),
                     _critSecReason,
                     ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-                    !isAuthoritative /* clearShardCatalogCache */);
+                    /*clearShardCatalogCache=*/!isAuthoritative);
 
                 // Check preconditions again under the critical section because we're guaranteed no
                 // catalog changes can happen at this point.
@@ -272,9 +272,9 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
                         **executor,
                         token,
                         session,
-                        true /* fromMigrate */,
-                        false /* dropSystemCollections */,
-                        !isAuthoritative /* forceLegacyRefresh */,
+                        /*fromMigrate=*/true,
+                        /*dropSystemCollections=*/false,
+                        /*forceLegacyRefresh=*/!isAuthoritative,
                         _doc.getOriginalCollection()->getUuid());
                 }
             }))
@@ -288,7 +288,7 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
         .then(_buildPhaseHandler(
             Phase::kConvertCollectionToCappedOnDataShard,
             [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
-                logConvertToCappedOnChangelog(opCtx, nss(), _doc.getSize(), true /* start */);
+                logConvertToCappedOnChangelog(opCtx, nss(), _doc.getSize(), /*start=*/true);
 
                 if (MONGO_unlikely(convertToCappedFailBeforeCappingTheCollection.shouldFail())) {
                     uasserted(ErrorCodes::InternalError,
@@ -322,7 +322,7 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
                     // If the primary is not a data bearing shard, op entries must not be visible to
                     // change stream readers.
                     convertToCapped(
-                        opCtx, nss(), _doc.getSize(), true /*fromMigrate*/, *_doc.getTargetUUID());
+                        opCtx, nss(), _doc.getSize(), /*fromMigrate=*/true, *_doc.getTargetUUID());
                 }
             }))
         .then(_buildPhaseHandler(
@@ -468,7 +468,7 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
                     _critSecReason,
                     defaultMajorityWriteConcernDoNotUse(),
                     *actionPtr,
-                    true /* throwIfReasonDiffers */);
+                    /*throwIfReasonDiffers=*/true);
             }))
         .onError(
             [this, token, executor = executor, anchor = shared_from_this()](const Status& status) {
@@ -565,7 +565,7 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_cleanupOnAbort(
                     _critSecReason,
                     defaultMajorityWriteConcernDoNotUse(),
                     *actionPtr,
-                    false /* throwIfReasonDiffers */);
+                    /*throwIfReasonDiffers=*/false);
             }
         });
 }

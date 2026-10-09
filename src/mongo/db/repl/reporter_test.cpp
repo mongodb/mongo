@@ -707,7 +707,7 @@ TEST_F(ReporterTest, AllowUsingBackupChannel) {
     ASSERT_FALSE(reporter->isBackupActive());
     ASSERT_OK(reporter->trigger());
     ASSERT_FALSE(reporter->isBackupActive());
-    ASSERT_OK(reporter->trigger(true /*allowOneMore*/));
+    ASSERT_OK(reporter->trigger(/*allowOneMore=*/true));
     ASSERT_TRUE(reporter->isBackupActive());
 
     processNetworkResponse(BSON("ok" << 1), true);
@@ -724,7 +724,7 @@ TEST_F(ReporterTest, AllowUsingBackupChannel) {
 
 TEST_F(ReporterTest, BackupChannelFailureAlsoCauseReporterFailure) {
     ASSERT_FALSE(reporter->isBackupActive());
-    ASSERT_OK(reporter->trigger(true /*allowOneMore*/));
+    ASSERT_OK(reporter->trigger(/*allowOneMore=*/true));
     ASSERT_TRUE(reporter->isBackupActive());
 
     processNetworkResponse(BSON("ok" << 1), true);
@@ -742,11 +742,11 @@ TEST_F(ReporterTest, BackupChannelFailureAlsoCauseReporterFailure) {
 
 TEST_F(ReporterTest, BackupChannelSendAnotherOneAfterResponseIfReceiveTwo) {
     ASSERT_FALSE(reporter->isBackupActive());
-    ASSERT_OK(reporter->trigger(true /*allowOneMore*/));
+    ASSERT_OK(reporter->trigger(/*allowOneMore=*/true));
     ASSERT_TRUE(reporter->isBackupActive());
     // Trigger on the backup channel one more time so reporter will send another request immediately
     // after one channel becomes free.
-    ASSERT_OK(reporter->trigger(true /*allowOneMore*/));
+    ASSERT_OK(reporter->trigger(/*allowOneMore=*/true));
     ASSERT_TRUE(reporter->isWaitingToSendReport());
     processNetworkResponse(BSON("ok" << 1), true);
     processNetworkResponse(BSON("ok" << 1), true);
@@ -764,7 +764,7 @@ TEST_F(ReporterTest, BackupChannelSendAnotherOneAfterResponseIfReceiveTwo) {
 TEST_F(ReporterTestNoTriggerAtSetUp, NotUsingBackupChannelWhenFree) {
     ASSERT_FALSE(reporter->isBackupActive());
     ASSERT_FALSE(reporter->isActive());
-    ASSERT_OK(reporter->trigger(true /*allowOneMore*/));
+    ASSERT_OK(reporter->trigger(/*allowOneMore=*/true));
     ASSERT_FALSE(reporter->isBackupActive());
     ASSERT_TRUE(reporter->isActive());
 

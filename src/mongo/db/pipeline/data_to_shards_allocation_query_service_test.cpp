@@ -18,7 +18,7 @@ class DataToShardsAllocationQueryServiceTest : public ServiceContextTest {
 public:
     DataToShardsAllocationQueryServiceTest()
         : ServiceContextTest(
-              std::make_unique<ScopedGlobalServiceContextForTest>(false /* shouldSetupTL */)) {
+              std::make_unique<ScopedGlobalServiceContextForTest>(/*shouldSetupTL=*/false)) {
         _opCtx = makeOperationContext();
     }
 

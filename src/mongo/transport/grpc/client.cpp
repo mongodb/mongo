@@ -369,7 +369,7 @@ public:
             [pool](::mongo::Client*) { pool->dropIdleChannels(Client::kDefaultChannelTimeout); },
             Client::kDefaultChannelTimeout,
             // TODO(SERVER-74659): Please revisit if this periodic job could be made killable.
-            false /*isKillableByStepdown*/);
+            /*isKillableByStepdown=*/false);
         invariant(!_pruner);
         invariant(svcCtx->getPeriodicRunner() != nullptr);
         _pruner.emplace(svcCtx->getPeriodicRunner()->makeJob(std::move(prunerJob)));
@@ -410,14 +410,14 @@ public:
                                   Date_t deadline,
                                   const CancellationToken& token) {
         // Check for the happy case first to avoid unnecessary polling.
-        auto channelState = _grpcChannel->GetState(true /*try_to_connect*/);
+        auto channelState = _grpcChannel->GetState(/*try_to_connect=*/true);
         if (MONGO_likely(channelState == GRPC_CHANNEL_READY)) {
             return Future<void>::makeReady();
         }
 
         return AsyncTry([channel = _grpcChannel, reactor, deadline] {
                    // Check for the happy case first to avoid unnecessary polling.
-                   auto channelState = channel->GetState(true /*try_to_connect*/);
+                   auto channelState = channel->GetState(/*try_to_connect=*/true);
                    if (MONGO_likely(channelState == GRPC_CHANNEL_READY)) {
                        return Future<grpc_connectivity_state>::makeReady(channelState);
                    }
@@ -444,7 +444,7 @@ public:
                    }
 
                    return std::move(pf.future).then(
-                       [channel]() { return channel->GetState(true /*try_to_connect*/); });
+                       [channel]() { return channel->GetState(/*try_to_connect=*/true); });
                })
             .until([reactor, deadline](const StatusWith<grpc_connectivity_state>& swChannelState) {
                 if (MONGO_likely(swChannelState.isOK())) {

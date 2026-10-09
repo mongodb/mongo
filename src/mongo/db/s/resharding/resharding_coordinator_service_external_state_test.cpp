@@ -224,7 +224,7 @@ public:
             std::vector<BSONObj> docs =
                 makeRecipientCloningMetricsAggregateDocuments(reshardingUUID, recipientDocsCopied);
             CursorResponse cursorResponse(
-                NamespaceString::kRecipientReshardingResumeDataNamespace, 0 /* cursorId */, docs);
+                NamespaceString::kRecipientReshardingResumeDataNamespace, /*cursorId=*/0, docs);
             auto response = cursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
 
             expectations.push_back(

@@ -136,7 +136,7 @@ TEST_F(IndexScanTest, BasicIndex) {
 
     IndexScan indexScan(_expCtx.get(), coll, std::move(params), &_ws, matchExpr);
 
-    std::vector<BSONObj> results = executeIndexScanStage(indexScan, false /*expectMemoryUsage*/);
+    std::vector<BSONObj> results = executeIndexScanStage(indexScan, /*expectMemoryUsage=*/false);
 
     std::vector<BSONObj> expectedKeyInfo = {BSON("" << 5), BSON("" << 10), BSON("" << 20)};
     ASSERT_EQ(results.size(), expectedKeyInfo.size());
@@ -168,7 +168,7 @@ TEST_F(IndexScanTest, BasicMultiKeyIndex) {
     params.shouldDedup = true;
     IndexScan indexScan(_expCtx.get(), coll, std::move(params), &_ws, matchExpr);
 
-    std::vector<BSONObj> results = executeIndexScanStage(indexScan, true /*expectMemoryUsage*/);
+    std::vector<BSONObj> results = executeIndexScanStage(indexScan, /*expectMemoryUsage=*/true);
 
     // IndexScan should return a single key from each document as 'shouldDedup' is true.
     std::vector<BSONObj> expectedKeyInfo = {BSON("" << 1), BSON("" << 3), BSON("" << 5)};

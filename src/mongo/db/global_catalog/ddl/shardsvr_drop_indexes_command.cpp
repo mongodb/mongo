@@ -144,7 +144,7 @@ ShardsvrDropIndexesCommand::Invocation::Response ShardsvrDropIndexesCommand::Inv
             const auto coordinator = [&] {
                 auto service = ShardingCoordinatorService::getService(opCtx);
                 return checked_pointer_cast<DropIndexesCoordinator>(service->getOrCreateInstance(
-                    opCtx, coordinatorDoc.toBSON(), *optFixedFcvRegion, false /*checkOptions*/));
+                    opCtx, coordinatorDoc.toBSON(), *optFixedFcvRegion, /*checkOptions=*/false));
             }();
 
             try {
@@ -218,10 +218,10 @@ ShardsvrDropIndexesCommand::Invocation::Response ShardsvrDropIndexesCommand::Inv
                 CommandHelpers::filterCommandRequestForPassthrough(dropIdxBSON),
                 ReadPreferenceSetting::get(opCtx),
                 Shard::RetryPolicy::kNotIdempotent,
-                BSONObj() /*query*/,
-                BSONObj() /*collation*/,
-                boost::none /*letParameters*/,
-                boost::none /*runtimeConstants*/);
+                /*query=*/BSONObj(),
+                /*collation=*/BSONObj(),
+                /*letParameters=*/boost::none,
+                /*runtimeConstants=*/boost::none);
 
             std::string errmsg;
             BSONObjBuilder output, rawResBuilder;

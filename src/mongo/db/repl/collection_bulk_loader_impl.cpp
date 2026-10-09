@@ -295,9 +295,9 @@ Status CollectionBulkLoaderImpl::commit() {
                                     entry,
                                     doc.value(),
                                     rid,
-                                    false /* logIfError */,
+                                    /*logIfError=*/false,
                                     options,
-                                    nullptr /* numDeleted */,
+                                    /*numDeleted=*/nullptr,
                                     // Initial sync can build an index over a collection with
                                     // duplicates, so we need to check the RecordId of the document
                                     // we are unindexing. See SERVER-17487 for more details.
@@ -389,7 +389,7 @@ Status CollectionBulkLoaderImpl::_addDocumentToIndexBlocks(const BSONObj& doc,
             loc,
             // This caller / code path does not have cursors to save/restore.
             /*saveCursorBeforeWrite*/ []() {},
-            /*restoreCursorAfterWrite*/ []() {});
+            /*restoreCursorAfterWrite=*/[]() {});
         if (!status.isOK()) {
             return status.withContext("failed to add document to _id index");
         }
@@ -403,7 +403,7 @@ Status CollectionBulkLoaderImpl::_addDocumentToIndexBlocks(const BSONObj& doc,
             loc,
             // This caller / code path does not have cursors to save/restore.
             /*saveCursorBeforeWrite*/ []() {},
-            /*restoreCursorAfterWrite*/ []() {});
+            /*restoreCursorAfterWrite=*/[]() {});
         if (!status.isOK()) {
             return status.withContext("failed to add document to secondary indexes");
         }

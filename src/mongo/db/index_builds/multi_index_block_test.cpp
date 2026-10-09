@@ -279,8 +279,8 @@ TEST_F(MultiIndexBlockTest, CommitAfterInsertingSingleDocument) {
         coll.getCollectionPtr(),
         {},
         {},
-        /*saveCursorBeforeWrite*/ []() {},
-        /*restoreCursorAfterWrite*/ []() {}));
+        /*saveCursorBeforeWrite=*/[]() {},
+        /*restoreCursorAfterWrite=*/[]() {}));
     ASSERT_OK(indexer->dumpInsertsFromBulk(operationContext(), coll));
     ASSERT_OK(indexer->checkConstraints(operationContext(), coll.getCollectionPtr()));
 
@@ -386,8 +386,8 @@ TEST_F(MultiIndexBlockTest, AbortWithoutCleanupAfterInsertingSingleDocument) {
         coll.get(),
         {},
         {},
-        /*saveCursorBeforeWrite*/ []() {},
-        /*restoreCursorAfterWrite*/ []() {}));
+        /*saveCursorBeforeWrite=*/[]() {},
+        /*restoreCursorAfterWrite=*/[]() {}));
     indexer->abortWithoutCleanup(operationContext(), coll.get());
 }
 

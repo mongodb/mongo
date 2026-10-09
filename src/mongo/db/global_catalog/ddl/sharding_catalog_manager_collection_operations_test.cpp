@@ -68,7 +68,7 @@ protected:
         CollectionType collType(nss,
                                 epoch,
                                 collectionTimestamp,
-                                Date_t::now() /* updatedAt */,
+                                /*updatedAt=*/Date_t::now(),
                                 collectionUuid,
                                 kTimestampShardKeyPattern.toBSON());
 

@@ -64,10 +64,10 @@ protected:
         AuditClientAttrs::set(_client,
                               AuditClientAttrs(local,
                                                remote,
-                                               remote /* directRemote */,
+                                               /*directRemote=*/remote,
                                                std::move(proxies),
-                                               true /* isImpersonating */));
-        AuditUserAttrs::set(opCtx(), userName, roleNames, true /* isImpersonating */);
+                                               /*isImpersonating=*/true));
+        AuditUserAttrs::set(opCtx(), userName, roleNames, /*isImpersonating=*/true);
     }
 
 private:

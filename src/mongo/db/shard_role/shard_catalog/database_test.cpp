@@ -212,7 +212,7 @@ TEST_F(DatabaseTest, CreateCollectionReportsCatalogIdentifier) {
     // OpObserver which validates each collection created in this test is persisted in the local
     // catalog and generates a 'CreateCollCatalogIdentifier'.
     auto createOpObserver =
-        std::make_unique<CreateCollCatalogIdentifierObserver>(true /* expectIdentifiers */);
+        std::make_unique<CreateCollCatalogIdentifierObserver>(/*expectIdentifiers=*/true);
     _opObserverRegistry->addObserver(std::move(createOpObserver));
 
     auto opCtx = _opCtx.get();
@@ -234,14 +234,14 @@ TEST_F(DatabaseTest, CreateCollectionReportsCatalogIdentifier) {
     CollectionOptions bucketsOptions{
         .clusteredIndex = clustered_util::makeCanonicalClusteredInfoForLegacyFormat(),
         .timeseries = TimeseriesOptions{"t"}};
-    runCreateCollection(opCtx, bucketsNSS, CollectionOptions{}, false /* createDefaultIndexes*/);
+    runCreateCollection(opCtx, bucketsNSS, CollectionOptions{}, /*createDefaultIndexes=*/false);
 }
 
 TEST_F(DatabaseTest, CreateCollectionDoesNotReportCatalogIdentifierForVirtualCollection) {
     // Register an OpObserver to validate the collection isn't persisted in the local catalog and
     // thus does not generate a 'CreateCollCatalogIdentifier'.
     auto createOpObserver =
-        std::make_unique<CreateCollCatalogIdentifierObserver>(false /* expectIdentifiers */);
+        std::make_unique<CreateCollCatalogIdentifierObserver>(/*expectIdentifiers=*/false);
     _opObserverRegistry->addObserver(std::move(createOpObserver));
 
     // Virtual collections are not persisted to the local catalog.

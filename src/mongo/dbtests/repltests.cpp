@@ -163,7 +163,7 @@ public:
         ASSERT(c->getIndexCatalog()->haveIdIndex(&_opCtx));
 
         _opCtx.getServiceContext()->getStorageEngine()->setOldestTimestamp(Timestamp(1, 1),
-                                                                           false /*force*/);
+                                                                           /*force=*/false);
 
         // Start with a fresh oplog.
         deleteAll(cllNS());
@@ -913,7 +913,7 @@ protected:
 
 class RemoveOne : public Remove {
     void doIt() const override {
-        _client.remove(nss(), q_, false /*removeMany*/);
+        _client.remove(nss(), q_, /*removeMany=*/false);
     }
     void check() const override {
         ASSERT_EQUALS(1, count());

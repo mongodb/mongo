@@ -445,7 +445,7 @@ private:
                                            FCV originalVersion,
                                            FCV requestedVersion) final {
         // This also runs in the dry run (including the dry run forwarded to shards).
-        _uassertReplicaSetWritesNotBlocked(opCtx, true /* isUpgrade */);
+        _uassertReplicaSetWritesNotBlocked(opCtx, /*isUpgrade=*/true);
     }
 
     void userCollectionsWorkForUpgrade(OperationContext* opCtx,
@@ -572,7 +572,7 @@ private:
         if (gFeatureFlagCreateViewlessTimeseriesCollections.isEnabledOnVersion(requestedVersion)) {
             if (isConfigsvr) {
                 timeseries::upgradeDowngradeViewlessTimeseriesInShardedCluster(opCtx,
-                                                                               true /*isUpgrade*/);
+                                                                               /*isUpgrade=*/true);
             } else if (!role) {
                 timeseries::upgradeAllTimeseriesToViewless(opCtx);
             }
@@ -856,7 +856,7 @@ private:
                                              FCV originalVersion,
                                              FCV requestedVersion) final {
         // This also runs in the dry run (including the dry run forwarded to shards).
-        _uassertReplicaSetWritesNotBlocked(opCtx, false /* isUpgrade */);
+        _uassertReplicaSetWritesNotBlocked(opCtx, /*isUpgrade=*/false);
 
         bool errorAndLogValidationDisabled =
             (gFeatureFlagErrorAndLogValidationAction.isDisabledOnTargetFCVButEnabledOnOriginalFCV(
@@ -1084,7 +1084,7 @@ private:
         if (!gFeatureFlagCreateViewlessTimeseriesCollections.isEnabledOnVersion(requestedVersion)) {
             if (role && role->has(ClusterRole::ConfigServer)) {
                 timeseries::upgradeDowngradeViewlessTimeseriesInShardedCluster(opCtx,
-                                                                               false /*isUpgrade*/);
+                                                                               /*isUpgrade=*/false);
             } else if (!role) {
                 timeseries::downgradeAllTimeseriesFromViewless(opCtx);
             }
@@ -1155,7 +1155,7 @@ private:
             if (sp->isEnabledOnVersion(parameterState, originalVersion) &&
                 !sp->isEnabledOnVersion(parameterState, requestedVersion)) {
                 deletes.emplace_back(
-                    write_ops::DeleteOpEntry(BSON("_id" << name), false /*multi*/));
+                    write_ops::DeleteOpEntry(BSON("_id" << name), /*multi=*/false));
             }
         }
         if (deletes.size() > 0) {

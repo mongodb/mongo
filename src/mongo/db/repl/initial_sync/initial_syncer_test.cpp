@@ -3993,7 +3993,7 @@ TEST_F(InitialSyncerTest, LastOpTimeShouldBeSetEvenIfNoOperationsAreAppliedAfter
         _mockServer->setCommandReply(
             "listCollections",
             makeCursorResponse(
-                0LL /* cursorId */,
+                /*cursorId=*/0LL,
                 nss,
                 {BSON("name" << nss.coll() << "type"
                              << "collection"

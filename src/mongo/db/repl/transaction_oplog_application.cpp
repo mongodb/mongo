@@ -203,9 +203,9 @@ Status _applyOperationsForTransaction(OperationContext* opCtx,
                 return repl::applyOperation_inlock(opCtx,
                                                    coll,
                                                    ApplierOperation{&op},
-                                                   false /*alwaysUpsert*/,
+                                                   /*alwaysUpsert=*/false,
                                                    oplogApplicationMode,
-                                                   true /*isDataConsistent*/);
+                                                   /*isDataConsistent=*/true);
             }();
             if (!status.isOK()) {
                 return status;
@@ -575,7 +575,7 @@ std::vector<OplogEntry> readTransactionOperationsFromOplogChain(
     const OplogEntry& lastEntryInTxn,
     const std::vector<OplogEntry*>& cachedOps) noexcept {
     auto [txnOps, _] = _readTransactionOperationsFromOplogChain(
-        opCtx, lastEntryInTxn, cachedOps, false /*checkForCommands*/);
+        opCtx, lastEntryInTxn, cachedOps, /*checkForCommands=*/false);
     return std::move(txnOps);
 }
 
@@ -584,7 +584,7 @@ std::pair<std::vector<OplogEntry>, bool> readTransactionOperationsFromOplogChain
     const OplogEntry& lastEntryInTxn,
     const std::vector<OplogEntry*>& cachedOps) noexcept {
     return _readTransactionOperationsFromOplogChain(
-        opCtx, lastEntryInTxn, cachedOps, true /*checkForCommands*/);
+        opCtx, lastEntryInTxn, cachedOps, /*checkForCommands=*/true);
 }
 
 namespace {
@@ -686,7 +686,7 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
 
             // Starts the WUOW.
             txnParticipant.unstashTransactionResources(
-                opCtx, "prepareTransaction", false /* forUnyield */, openSnapshotOptions);
+                opCtx, "prepareTransaction", /*forUnyield=*/false, openSnapshotOptions);
             invariant(shard_role_details::getRecoveryUnit(opCtx)->isActive());
 
             // Set this in case the application of any ops needs to use the prepare timestamp
@@ -950,7 +950,7 @@ void _recoverPreparedTransactionFromPreciseCheckpoint(
         // pass them to the op-observer. The callback is only called for completeness and is not
         // expected to do anything for a reclaimed prepared transaction.
         opObserver->onTransactionPrepareNonPrimaryForChunkMigration(
-            opCtx, lsid, boost::none /* statements */, boost::none /* prepareOpTime */);
+            opCtx, lsid, /*statements=*/boost::none, /*prepareOpTime=*/boost::none);
 
         ReclaimedPreparedTxnTracker::get(opCtx)->trackPrepareExit(txnParticipant.onExitPrepare());
 

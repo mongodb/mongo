@@ -701,7 +701,7 @@ protected:
                 false,
                 epoch,
                 timestamp,
-                boost::none /* timeseriesFields */,
+                /*timeseriesFields=*/boost::none,
                 boost::none /* resharding Fields */,
                 true,
                 {ChunkType{uuid,
@@ -734,8 +734,8 @@ protected:
                                               UUID::gen(),
                                               _lsid,
                                               _txnNumber,
-                                              boost::none /* enclosingChunk */,
-                                              false /* isAuthoritative */);
+                                              /*enclosingChunk=*/boost::none,
+                                              /*isAuthoritative=*/false);
         future.default_timed_get();
 
         return status;
@@ -860,8 +860,8 @@ TEST_F(MigrationChunkClonerSourceTest, CorrectDocumentsFetched) {
                                     UUID::gen(),
                                     _lsid,
                                     _txnNumber,
-                                    boost::none /* enclosingChunk */,
-                                    false /* isAuthoritative */));
+                                    /*enclosingChunk=*/boost::none,
+                                    /*isAuthoritative=*/false));
         futureStartClone.default_timed_get();
     }
 
@@ -948,7 +948,7 @@ TEST_F(MigrationChunkClonerSourceTest, CorrectDocumentsFetched) {
         onCommand([&](const RemoteCommandRequest& request) { return BSON("ok" << true); });
     });
 
-    ASSERT_OK(cloner.commitClone(operationContext(), true /* clearShardCatalogCache */));
+    ASSERT_OK(cloner.commitClone(operationContext(), /*clearShardCatalogCache=*/true));
     futureCommit.default_timed_get();
 }
 
@@ -977,8 +977,8 @@ TEST_F(MigrationChunkClonerSourceTest, RemoveDuplicateDocuments) {
                                     UUID::gen(),
                                     _lsid,
                                     _txnNumber,
-                                    boost::none /* enclosingChunk */,
-                                    false /* isAuthoritative */));
+                                    /*enclosingChunk=*/boost::none,
+                                    /*isAuthoritative=*/false));
         futureStartClone.default_timed_get();
     }
 
@@ -1048,7 +1048,7 @@ TEST_F(MigrationChunkClonerSourceTest, RemoveDuplicateDocuments) {
         onCommand([&](const RemoteCommandRequest& request) { return BSON("ok" << true); });
     });
 
-    ASSERT_OK(cloner.commitClone(operationContext(), true /* clearShardCatalogCache */));
+    ASSERT_OK(cloner.commitClone(operationContext(), /*clearShardCatalogCache=*/true));
     futureCommit.default_timed_get();
 }
 
@@ -1076,8 +1076,8 @@ TEST_F(MigrationChunkClonerSourceTest, OneLargeDocumentTransferMods) {
                                     UUID::gen(),
                                     _lsid,
                                     _txnNumber,
-                                    boost::none /* enclosingChunk */,
-                                    false /* isAuthoritative */));
+                                    /*enclosingChunk=*/boost::none,
+                                    /*isAuthoritative=*/false));
         futureStartClone.default_timed_get();
     }
 
@@ -1116,7 +1116,7 @@ TEST_F(MigrationChunkClonerSourceTest, OneLargeDocumentTransferMods) {
         onCommand([&](const RemoteCommandRequest& request) { return BSON("ok" << true); });
     });
 
-    ASSERT_OK(cloner.commitClone(operationContext(), true /* clearShardCatalogCache */));
+    ASSERT_OK(cloner.commitClone(operationContext(), /*clearShardCatalogCache=*/true));
     futureCommit.default_timed_get();
 }
 
@@ -1143,8 +1143,8 @@ TEST_F(MigrationChunkClonerSourceTest, ManySmallDocumentsTransferMods) {
                                     UUID::gen(),
                                     _lsid,
                                     _txnNumber,
-                                    boost::none /* enclosingChunk */,
-                                    false /* isAuthoritative */));
+                                    /*enclosingChunk=*/boost::none,
+                                    /*isAuthoritative=*/false));
         futureStartClone.default_timed_get();
     }
 
@@ -1202,7 +1202,7 @@ TEST_F(MigrationChunkClonerSourceTest, ManySmallDocumentsTransferMods) {
         onCommand([&](const RemoteCommandRequest& request) { return BSON("ok" << true); });
     });
 
-    ASSERT_OK(cloner.commitClone(operationContext(), true /* clearShardCatalogCache */));
+    ASSERT_OK(cloner.commitClone(operationContext(), /*clearShardCatalogCache=*/true));
     futureCommit.default_timed_get();
 }
 
@@ -1220,8 +1220,8 @@ TEST_F(MigrationChunkClonerSourceTest, CollectionNotFound) {
                                     UUID::gen(),
                                     _lsid,
                                     _txnNumber,
-                                    boost::none /* enclosingChunk */,
-                                    false /* isAuthoritative */));
+                                    /*enclosingChunk=*/boost::none,
+                                    /*isAuthoritative=*/false));
     cloner.cancelClone(operationContext());
 }
 
@@ -1241,8 +1241,8 @@ TEST_F(MigrationChunkClonerSourceTest, ShardKeyIndexNotFound) {
                                     UUID::gen(),
                                     _lsid,
                                     _txnNumber,
-                                    boost::none /* enclosingChunk */,
-                                    false /* isAuthoritative */));
+                                    /*enclosingChunk=*/boost::none,
+                                    /*isAuthoritative=*/false));
     cloner.cancelClone(operationContext());
 }
 
@@ -1358,8 +1358,8 @@ TEST_F(MigrationChunkClonerSourceTest, CloneFetchThatOverflows) {
                                     UUID::gen(),
                                     _lsid,
                                     _txnNumber,
-                                    boost::none /* enclosingChunk */,
-                                    false /* isAuthoritative */));
+                                    /*enclosingChunk=*/boost::none,
+                                    /*isAuthoritative=*/false));
         futureStartClone.default_timed_get();
     }
 
@@ -1405,7 +1405,7 @@ TEST_F(MigrationChunkClonerSourceTest, CloneFetchThatOverflows) {
         onCommand([&](const RemoteCommandRequest& request) { return BSON("ok" << true); });
     });
 
-    ASSERT_OK(cloner.commitClone(operationContext(), true /* clearShardCatalogCache */));
+    ASSERT_OK(cloner.commitClone(operationContext(), /*clearShardCatalogCache=*/true));
     futureCommit.default_timed_get();
 }
 
@@ -1434,8 +1434,8 @@ TEST_F(MigrationChunkClonerSourceTest, CloneShouldNotCrashWhenNextCloneBatchThro
                                     UUID::gen(),
                                     _lsid,
                                     _txnNumber,
-                                    boost::none /* enclosingChunk */,
-                                    false /* isAuthoritative */));
+                                    /*enclosingChunk=*/boost::none,
+                                    /*isAuthoritative=*/false));
         futureStartClone.default_timed_get();
     }
 
@@ -1495,7 +1495,7 @@ TEST_F(MigrationChunkClonerSourceTest, CloneShouldNotCrashWhenNextCloneBatchThro
         onCommand([&](const RemoteCommandRequest& request) { return BSON("ok" << true); });
     });
 
-    ASSERT_NOT_OK(cloner.commitClone(operationContext(), true /* clearShardCatalogCache */));
+    ASSERT_NOT_OK(cloner.commitClone(operationContext(), /*clearShardCatalogCache=*/true));
     futureCommit.default_timed_get();
 }
 
@@ -1862,8 +1862,8 @@ TEST_F(MigrationChunkClonerSourceTest, JumboChunkIndexScanWithYielding) {
                                         UUID::gen(),
                                         _lsid,
                                         _txnNumber,
-                                        boost::none /* enclosingChunk */,
-                                        false /* isAuthoritative */);
+                                        /*enclosingChunk=*/boost::none,
+                                        /*isAuthoritative=*/false);
         // The jumbo chunk should be detected but with forceJumbo, it should succeed
         ASSERT_OK(status);
         futureStartClone.default_timed_get();
@@ -1913,7 +1913,7 @@ TEST_F(MigrationChunkClonerSourceTest, JumboChunkIndexScanWithYielding) {
         // This is the return response for kRecvChunkCommit.
         onCommand([&](const RemoteCommandRequest& request) { return BSON("ok" << true); });
     });
-    ASSERT_OK(cloner.commitClone(operationContext(), true /* clearShardCatalogCache */));
+    ASSERT_OK(cloner.commitClone(operationContext(), /*clearShardCatalogCache=*/true));
     futureCommit.default_timed_get();
 }
 
@@ -1944,8 +1944,8 @@ TEST_F(MigrationChunkClonerSourceTest, NextModsBatchNonDeprioritizableAfterCommi
                                     UUID::gen(),
                                     _lsid,
                                     _txnNumber,
-                                    boost::none /* enclosingChunk */,
-                                    false /* isAuthoritative */));
+                                    /*enclosingChunk=*/boost::none,
+                                    /*isAuthoritative=*/false));
         futureStartClone.default_timed_get();
     }
 
@@ -1989,7 +1989,7 @@ TEST_F(MigrationChunkClonerSourceTest, NextModsBatchNonDeprioritizableAfterCommi
         onCommand([&](const RemoteCommandRequest& request) { return BSON("ok" << true); });
     });
 
-    ASSERT_OK(cloner.commitClone(operationContext(), true /* clearShardCatalogCache */));
+    ASSERT_OK(cloner.commitClone(operationContext(), /*clearShardCatalogCache=*/true));
     futureCommit.default_timed_get();
 
     {
@@ -2028,8 +2028,8 @@ TEST_F(MigrationChunkClonerSourceTest, NextCloneBatchNonDeprioritizableAfterComm
                                     UUID::gen(),
                                     _lsid,
                                     _txnNumber,
-                                    boost::none /* enclosingChunk */,
-                                    false /* isAuthoritative */));
+                                    /*enclosingChunk=*/boost::none,
+                                    /*isAuthoritative=*/false));
         futureStartClone.default_timed_get();
     }
 
@@ -2047,7 +2047,7 @@ TEST_F(MigrationChunkClonerSourceTest, NextCloneBatchNonDeprioritizableAfterComm
         onCommand([&](const RemoteCommandRequest& request) { return BSON("ok" << true); });
     });
 
-    ASSERT_OK(cloner.commitClone(operationContext(), true /* clearShardCatalogCache */));
+    ASSERT_OK(cloner.commitClone(operationContext(), /*clearShardCatalogCache=*/true));
     futureCommit.default_timed_get();
 
     {
@@ -2095,9 +2095,9 @@ TEST(MigrationChunkClonerSourceOpObserverTest, ShouldLogBatchedWriteForSessionMi
 
     // Missing session info (either txnNumber or lsid) is never logged.
     EXPECT_FALSE(Observer::shouldLogBatchedWriteForSessionMigration(
-        &withBatchOpTimes, WriteUnitOfWork::nonAtomicGroup, false /* hasTxnNumber */, true));
+        &withBatchOpTimes, WriteUnitOfWork::nonAtomicGroup, /*hasTxnNumber=*/false, true));
     EXPECT_FALSE(Observer::shouldLogBatchedWriteForSessionMigration(
-        &withBatchOpTimes, WriteUnitOfWork::nonAtomicGroup, true, false /* hasLogicalSessionId */));
+        &withBatchOpTimes, WriteUnitOfWork::nonAtomicGroup, true, /*hasLogicalSessionId=*/false));
 
     // No oplog entries (null accumulator or no recorded op times) is never logged.
     EXPECT_FALSE(Observer::shouldLogBatchedWriteForSessionMigration(

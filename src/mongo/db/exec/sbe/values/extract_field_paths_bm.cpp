@@ -97,9 +97,9 @@ void ExtractFieldPathsFixture::perfectTree(benchmark::State& state,
         walkField<value::ScalarProjectionPositionInfoRecorder>(&tree,
                                                                input.tag(),
                                                                input.value(),
-                                                               nullptr /* bsonPtr */,
+                                                               /*bsonPtr=*/nullptr,
                                                                callback,
-                                                               true /*traverseArrays*/);
+                                                               /*traverseArrays=*/true);
     }
 }
 

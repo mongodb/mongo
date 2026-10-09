@@ -102,13 +102,13 @@ protected:
 private:
     void _installTicketingSystem() {
         auto normalRead = std::make_unique<TicketHolder>(
-            _svcCtx, kTickets, false /* trackPeakUsed */, TicketHolder::kDefaultMaxQueueDepth);
+            _svcCtx, kTickets, /*trackPeakUsed=*/false, TicketHolder::kDefaultMaxQueueDepth);
         auto normalWrite = std::make_unique<TicketHolder>(
-            _svcCtx, kTickets, false /* trackPeakUsed */, TicketHolder::kDefaultMaxQueueDepth);
+            _svcCtx, kTickets, /*trackPeakUsed=*/false, TicketHolder::kDefaultMaxQueueDepth);
         auto lowRead = std::make_unique<TicketHolder>(
-            _svcCtx, kTickets, false /* trackPeakUsed */, TicketHolder::kDefaultMaxQueueDepth);
+            _svcCtx, kTickets, /*trackPeakUsed=*/false, TicketHolder::kDefaultMaxQueueDepth);
         auto lowWrite = std::make_unique<TicketHolder>(
-            _svcCtx, kTickets, false /* trackPeakUsed */, TicketHolder::kDefaultMaxQueueDepth);
+            _svcCtx, kTickets, /*trackPeakUsed=*/false, TicketHolder::kDefaultMaxQueueDepth);
 
         _normalRead = normalRead.get();
         _normalWrite = normalWrite.get();
@@ -154,7 +154,7 @@ TEST_P(TicketingSystemTest, LowPriorityFallsBackToNormalPoolWhenPrioritizationDi
 }
 
 TEST_P(TicketingSystemTest, LowPriorityUsesLowPoolWhenPrioritizationEnabled) {
-    enableDeprioritization(true /* gate */, true /* heuristic */, false /* backgroundTasks */);
+    enableDeprioritization(/*gate=*/true, /*heuristic=*/true, /*backgroundTasks=*/false);
     auto [client, opCtx] = makeClientAndOpCtx();
 
     ScopedAdmissionPriority<ExecutionAdmissionContext> lowPriority(
@@ -167,7 +167,7 @@ TEST_P(TicketingSystemTest, LowPriorityUsesLowPoolWhenPrioritizationEnabled) {
 }
 
 TEST_P(TicketingSystemTest, ExemptPriorityAlwaysUsesNormalPool) {
-    enableDeprioritization(true /* gate */, true /* heuristic */, false /* backgroundTasks */);
+    enableDeprioritization(/*gate=*/true, /*heuristic=*/true, /*backgroundTasks=*/false);
     auto [client, opCtx] = makeClientAndOpCtx();
 
     ScopedAdmissionPriority<ExecutionAdmissionContext> exemptPriority(
@@ -183,7 +183,7 @@ TEST_P(TicketingSystemTest, ExemptPriorityAlwaysUsesNormalPool) {
 }
 
 TEST_P(TicketingSystemTest, HeuristicDeprioritizesHighAdmissionsToLowPool) {
-    enableDeprioritization(true /* gate */, true /* heuristic */, false /* backgroundTasks */);
+    enableDeprioritization(/*gate=*/true, /*heuristic=*/true, /*backgroundTasks=*/false);
     auto [client, opCtx] = makeClientAndOpCtx();
 
     const auto threshold = gHeuristicNumAdmissionsDeprioritizeThreshold.load();
@@ -196,7 +196,7 @@ TEST_P(TicketingSystemTest, HeuristicDeprioritizesHighAdmissionsToLowPool) {
 }
 
 TEST_P(TicketingSystemTest, HeuristicDoesNotDeprioritizeBelowThreshold) {
-    enableDeprioritization(true /* gate */, true /* heuristic */, false /* backgroundTasks */);
+    enableDeprioritization(/*gate=*/true, /*heuristic=*/true, /*backgroundTasks=*/false);
     auto [client, opCtx] = makeClientAndOpCtx();
 
     ExecutionAdmissionContext::get(opCtx.get()).setAdmission_forTest(1);
@@ -209,7 +209,7 @@ TEST_P(TicketingSystemTest, HeuristicDoesNotDeprioritizeBelowThreshold) {
 
 TEST_P(TicketingSystemTest, HeuristicDisabledDoesNotDeprioritizeHighAdmissions) {
     // backgroundTasks on so usesPrioritization() = true, but heuristic off.
-    enableDeprioritization(true /* gate */, false /* heuristic */, true /* backgroundTasks */);
+    enableDeprioritization(/*gate=*/true, /*heuristic=*/false, /*backgroundTasks=*/true);
     auto [client, opCtx] = makeClientAndOpCtx();
 
     ExecutionAdmissionContext::get(opCtx.get()).setAdmission_forTest(100);
@@ -221,7 +221,7 @@ TEST_P(TicketingSystemTest, HeuristicDisabledDoesNotDeprioritizeHighAdmissions) 
 }
 
 TEST_P(TicketingSystemTest, BackgroundTaskDeprioritizedToLowPool) {
-    enableDeprioritization(true /* gate */, false /* heuristic */, true /* backgroundTasks */);
+    enableDeprioritization(/*gate=*/true, /*heuristic=*/false, /*backgroundTasks=*/true);
     auto [client, opCtx] = makeClientAndOpCtx();
 
     ScopedTaskTypeBackground backgroundTask(opCtx.get());
@@ -234,7 +234,7 @@ TEST_P(TicketingSystemTest, BackgroundTaskDeprioritizedToLowPool) {
 
 TEST_P(TicketingSystemTest, BackgroundTaskNotDeprioritizedWhenFlagDisabled) {
     // heuristic on so usesPrioritization() = true, but backgroundTasks off.
-    enableDeprioritization(true /* gate */, true /* heuristic */, false /* backgroundTasks */);
+    enableDeprioritization(/*gate=*/true, /*heuristic=*/true, /*backgroundTasks=*/false);
     auto [client, opCtx] = makeClientAndOpCtx();
 
     ScopedTaskTypeBackground backgroundTask(opCtx.get());
@@ -247,7 +247,7 @@ TEST_P(TicketingSystemTest, BackgroundTaskNotDeprioritizedWhenFlagDisabled) {
 }
 
 TEST_P(TicketingSystemTest, NonDeprioritizableTaskUsesNormalPool) {
-    enableDeprioritization(true /* gate */, true /* heuristic */, false /* backgroundTasks */);
+    enableDeprioritization(/*gate=*/true, /*heuristic=*/true, /*backgroundTasks=*/false);
     auto [client, opCtx] = makeClientAndOpCtx();
 
     ScopedTaskTypeNonDeprioritizable nonDeprioritizable(opCtx.get());
@@ -260,7 +260,7 @@ TEST_P(TicketingSystemTest, NonDeprioritizableTaskUsesNormalPool) {
 }
 
 TEST_P(TicketingSystemTest, MultiDocTransactionNotDeprioritized) {
-    enableDeprioritization(true /* gate */, true /* heuristic */, false /* backgroundTasks */);
+    enableDeprioritization(/*gate=*/true, /*heuristic=*/true, /*backgroundTasks=*/false);
     auto [client, opCtx] = makeClientAndOpCtx();
 
     opCtx->setInMultiDocumentTransaction();
@@ -274,7 +274,7 @@ TEST_P(TicketingSystemTest, MultiDocTransactionNotDeprioritized) {
 
 TEST_P(TicketingSystemTest, GateClosedDisablesAllDeprioritization) {
     // Gate off means usesPrioritization() = false regardless of heuristic/backgroundTasks.
-    enableDeprioritization(false /* gate */, true /* heuristic */, true /* backgroundTasks */);
+    enableDeprioritization(/*gate=*/false, /*heuristic=*/true, /*backgroundTasks=*/true);
     auto [client, opCtx] = makeClientAndOpCtx();
 
     ExecutionAdmissionContext::get(opCtx.get()).setAdmission_forTest(100);

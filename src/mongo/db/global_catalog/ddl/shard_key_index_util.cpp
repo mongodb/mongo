@@ -231,7 +231,7 @@ bool isLastNonHiddenRangedShardKeyIndex(OperationContext* opCtx,
     if (!index ||
         !isCompatibleWithShardKey(
 
-            opCtx, collection, index, shardKey, false /* requireSingleKey */)) {
+            opCtx, collection, index, shardKey, /*requireSingleKey=*/false)) {
         return false;
     }
 
@@ -245,7 +245,7 @@ bool isLastNonHiddenRangedShardKeyIndex(OperationContext* opCtx,
                                       collection->getIndexCatalog(),
                                       indexName,
                                       shardKey,
-                                      true /* requireSingleKey */)
+                                      /*requireSingleKey=*/true)
                 .has_value();
 }
 

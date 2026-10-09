@@ -580,7 +580,7 @@ public:
 
         if (!_cursor) {
             auto cursorParams = getWiredTigerCursorParams(
-                wtRu, _tableId, false /* allowOverwrite */, true /* random */);
+                wtRu, _tableId, /*allowOverwrite=*/false, /*random=*/true);
             _cursor = std::make_unique<WiredTigerCursor>(
                 std::move(cursorParams), _uri, *wtRu.getSession());
         }
@@ -1830,7 +1830,7 @@ WiredTigerRecordStoreCursorBase::WiredTigerRecordStoreCursorBase(OperationContex
 
 void WiredTigerRecordStoreCursorBase::init() {
     auto& wtRu = WiredTigerRecoveryUnit::get(*_ru);
-    auto cursorParams = getWiredTigerCursorParams(wtRu, _tableId, true /* allowOverwrite */);
+    auto cursorParams = getWiredTigerCursorParams(wtRu, _tableId, /*allowOverwrite=*/true);
     _cursor.emplace(std::move(cursorParams), _uri, *wtRu.getSession());
 }
 
@@ -2046,7 +2046,7 @@ bool WiredTigerRecordStoreCursorBase::restore(RecoveryUnit& ru, bool tolerateCap
 
     if (!_cursor) {
         auto& wtRu = WiredTigerRecoveryUnit::get(*_ru);
-        auto cursorParams = getWiredTigerCursorParams(wtRu, _tableId, true /* allowOverwrite */);
+        auto cursorParams = getWiredTigerCursorParams(wtRu, _tableId, /*allowOverwrite=*/true);
         _cursor.emplace(std::move(cursorParams), _uri, *wtRu.getSession());
     }
 
@@ -2059,7 +2059,7 @@ bool WiredTigerRecordStoreCursorBase::restore(RecoveryUnit& ru, bool tolerateCap
         return true;
     }
 
-    auto foundId = seekIdCommon(_lastReturnedId, BoundInclusion::kInclude, true /* restoring */);
+    auto foundId = seekIdCommon(_lastReturnedId, BoundInclusion::kInclude, /*restoring=*/true);
     _hasRestored = true;
     if (foundId.isNull()) {
         _eof = true;
@@ -2156,7 +2156,7 @@ bool WiredTigerCappedCursorBase::restore(RecoveryUnit& ru, bool tolerateCappedRe
 
     if (!_cursor) {
         auto& wtRu = WiredTigerRecoveryUnit::get(*_ru);
-        auto cursorParams = getWiredTigerCursorParams(wtRu, _tableId, true /* allowOverwrite */);
+        auto cursorParams = getWiredTigerCursorParams(wtRu, _tableId, /*allowOverwrite=*/true);
         _cursor.emplace(std::move(cursorParams), _uri, *wtRu.getSession());
     }
 
@@ -2171,7 +2171,7 @@ bool WiredTigerCappedCursorBase::restore(RecoveryUnit& ru, bool tolerateCappedRe
         return true;
     }
 
-    auto foundId = seekIdCommon(_lastReturnedId, BoundInclusion::kInclude, true /* restoring */);
+    auto foundId = seekIdCommon(_lastReturnedId, BoundInclusion::kInclude, /*restoring=*/true);
     _hasRestored = true;
     if (foundId.isNull()) {
         _eof = true;

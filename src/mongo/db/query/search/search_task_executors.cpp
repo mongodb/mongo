@@ -187,7 +187,7 @@ public:
             }
             {
                 BSONObjBuilder networkInterface = sub.subobjStart("networkInterface");
-                exec->appendNetworkInterfaceStats(networkInterface, true /*forServerStatus*/);
+                exec->appendNetworkInterfaceStats(networkInterface, /*forServerStatus=*/true);
             }
             {
                 BSONObjBuilder connectionPool = sub.subobjStart("connectionPool");

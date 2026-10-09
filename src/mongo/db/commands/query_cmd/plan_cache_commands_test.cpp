@@ -32,7 +32,7 @@ public:
         std::shared_ptr<Collection> coll = std::make_shared<CollectionMock>(nss);
         catalog->onCreateCollection(_opCtx.get(), coll);
         auto collection = catalog->establishConsistentCollection(
-            _opCtx.get(), nss, boost::none /* readTimestamp */);
+            _opCtx.get(), nss, /*readTimestamp=*/boost::none);
         _collectionAcq = std::make_unique<CollectionAcquisition>(
             shard_role_mock::acquireCollectionMocked(_opCtx.get(), nss, collection));
     }

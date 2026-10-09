@@ -107,7 +107,7 @@ GetNextResult VectorSearchStage::getNextAfterSetup() {
             "Expected vector search distance to be present",
             output.metadata().hasVectorSearchScore());
     output.metadata().setSortKey(Value{output.metadata().getVectorSearchScore()},
-                                 true /* isSingleElementKey */);
+                                 /*isSingleElementKey=*/true);
     return output.freeze();
 }
 

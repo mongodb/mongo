@@ -46,7 +46,7 @@ host::DPLCallbackOwner::CallbackInvoker makeTestInvoker(
     return [callback, userData](ExpressionContext*,
                                 ::MongoExtensionByteBuf** rawSort,
                                 ::MongoExtensionByteBuf** rawMerge) -> ::MongoExtensionStatus* {
-        return callback(userData, /*execCtx*/ nullptr, rawSort, rawMerge);
+        return callback(userData, /*execCtx=*/nullptr, rawSort, rawMerge);
     };
 }
 

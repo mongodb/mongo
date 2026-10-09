@@ -723,7 +723,7 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
         _setMyLastAppliedOpTimeAndWallTime(lock, lastOpTimeAndWallTime, isRollbackAllowed);
         _setMyLastDurableOpTimeAndWallTime(lock, lastOpTimeAndWallTime, isRollbackAllowed);
 
-        _reportUpstream(std::move(lock), false /*prioritized*/);  // unlocks _mutex.
+        _reportUpstream(std::move(lock), /*prioritized=*/false);  // unlocks _mutex.
     } else {
         lock.unlock();
     }
@@ -844,7 +844,7 @@ void ReplicationCoordinatorImpl::_initialSyncerCompletionFunction(
                             [this](const StatusWith<OpTimeAndWallTime>& opTimeStatus) {
                                 _initialSyncerCompletionFunction(opTimeStatus);
                             },
-                            true /* fallbackToLogical */);
+                            /*fallbackToLogical=*/true);
                     });
                 return;
             } else {
@@ -1531,7 +1531,7 @@ void ReplicationCoordinatorImpl::setMyLastWrittenOpTimeAndWallTimeForward(
         _setMyLastWrittenOpTimeAndWallTime(lock, opTimeAndWallTime, false);
         // When writeConcernMajorityJournalDefault = false, prioritize lastWritten update.
         auto p = getWriteConcernMajorityShouldJournal(lock);
-        _reportUpstream(std::move(lock), !p /*prioritized*/);
+        _reportUpstream(std::move(lock), /*prioritized=*/!p);
     }
 }
 
@@ -1545,7 +1545,7 @@ void ReplicationCoordinatorImpl::setMyLastAppliedOpTimeAndWallTimeForward(
 
     invariant(opTimeAndWallTime.opTime <= _getMyLastWrittenOpTime(lock));
     if (_setMyLastAppliedOpTimeAndWallTimeForward(lock, opTimeAndWallTime)) {
-        _reportUpstream(std::move(lock), false /*prioritized*/);
+        _reportUpstream(std::move(lock), /*prioritized=*/false);
     }
 }
 
@@ -1564,7 +1564,7 @@ void ReplicationCoordinatorImpl::setMyLastDurableOpTimeAndWallTimeForward(
         if (_setMyLastDurableOpTimeAndWallTimeForward(lock, opTimeAndWallTime)) {
             // When writeConcernMajorityJournalDefault = true, prioritize lastDurable update.
             auto p = getWriteConcernMajorityShouldJournal(lock);
-            _reportUpstream(std::move(lock), p /*prioritized*/);
+            _reportUpstream(std::move(lock), /*prioritized=*/p);
         }
     }
 }
@@ -1585,7 +1585,7 @@ void ReplicationCoordinatorImpl::setMyLastAppliedAndLastWrittenOpTimeAndWallTime
     }
     if (_setMyLastAppliedOpTimeAndWallTimeForward(lock, opTimeAndWallTime)) {
         // This function is only called on primary, so we don't need to prioritize the update.
-        _reportUpstream(std::move(lock), false /*prioritized*/);
+        _reportUpstream(std::move(lock), /*prioritized=*/false);
     }
 }
 
@@ -1602,14 +1602,14 @@ void ReplicationCoordinatorImpl::setMyLastDurableAndLastWrittenOpTimeAndWallTime
     }
     if (_setMyLastDurableOpTimeAndWallTimeForward(lock, opTimeAndWallTime)) {
         // This function is only called on primary, so we don't need to prioritize the update.
-        _reportUpstream(std::move(lock), false /*prioritized*/);
+        _reportUpstream(std::move(lock), /*prioritized=*/false);
     }
 }
 
 void ReplicationCoordinatorImpl::resetMyLastOpTimes() {
     LockGuard lock(_mutex);
     _resetMyLastOpTimes(lock);
-    _reportUpstream(std::move(lock), false /*prioritized*/);
+    _reportUpstream(std::move(lock), /*prioritized=*/false);
 }
 
 void ReplicationCoordinatorImpl::_resetMyLastOpTimes(LockGuard& lk) {
@@ -1948,7 +1948,7 @@ Status ReplicationCoordinatorImpl::waitUntilOpTimeWrittenUntil(OperationContext*
     // convert clusterTime to opTime so it can be used by the _lastWrittenOpTimeWaiterList for wait.
     auto targetOpTime = OpTime(clusterTime.asTimestamp(), OpTime::kUninitializedTerm);
 
-    return _waitUntilOpTime(opCtx, targetOpTime, deadline, false /* waitForLastApplied */);
+    return _waitUntilOpTime(opCtx, targetOpTime, deadline, /*waitForLastApplied=*/false);
 }
 
 Status ReplicationCoordinatorImpl::waitUntilMajorityOpTime(mongo::OperationContext* opCtx,
@@ -3469,13 +3469,13 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
 
 Status ReplicationCoordinatorImpl::doOptimizedReconfig(OperationContext* opCtx,
                                                        GetNewConfigFn getNewConfig) {
-    return _doReplSetReconfig(opCtx, getNewConfig, false /* force */, true /* skipSafetyChecks*/);
+    return _doReplSetReconfig(opCtx, getNewConfig, /*force=*/false, /*skipSafetyChecks=*/true);
 }
 
 Status ReplicationCoordinatorImpl::doReplSetReconfig(OperationContext* opCtx,
                                                      GetNewConfigFn getNewConfig,
                                                      bool force) {
-    return _doReplSetReconfig(opCtx, getNewConfig, force, false /* skipSafetyChecks*/);
+    return _doReplSetReconfig(opCtx, getNewConfig, force, /*skipSafetyChecks=*/false);
 }
 
 Status ReplicationCoordinatorImpl::_doReplSetReconfig(OperationContext* opCtx,
@@ -3810,7 +3810,7 @@ Status ReplicationCoordinatorImpl::_doReplSetReconfig(OperationContext* opCtx,
             status = _externalState->storeLocalConfigDocument(
                 opCtx,
                 newConfig.toBSON(),
-                !force && _readWriteAbility->canAcceptNonLocalWrites(opCtx) /* writeOplog */);
+                /*writeOplog=*/!force && _readWriteAbility->canAcceptNonLocalWrites(opCtx));
             if (!status.isOK()) {
                 LOGV2_ERROR(21422,
                             "replSetReconfig failed to store config document",
@@ -4150,7 +4150,7 @@ void ReplicationCoordinatorImpl::_reconfigToRemoveNewlyAddedField(
         hangDuringAutomaticReconfig.pauseWhileSet();
     }
 
-    auto status = doReplSetReconfig(opCtx.get(), getNewConfig, false /* force */);
+    auto status = doReplSetReconfig(opCtx.get(), getNewConfig, /*force=*/false);
 
     if (!status.isOK()) {
         LOGV2_DEBUG(4634503,
@@ -4310,9 +4310,9 @@ Status ReplicationCoordinatorImpl::_runReplSetInitiate(const BSONObj& configObj,
         LockGuard lk(_mutex);
         // Will call _setStableTimestampForStorage() on success.
         _advanceCommitPoint(
-            lk, lastAppliedOpTimeAndWallTime, false /* fromSyncSource */, true /* forInitiate */);
+            lk, lastAppliedOpTimeAndWallTime, /*fromSyncSource=*/false, /*forInitiate=*/true);
         _service->getStorageEngine()->waitUntilUnjournaledWritesDurable(opCtx,
-                                                                        /*stableCheckpoint*/ true);
+                                                                        /*stableCheckpoint=*/true);
     }
 
     // Initial consistent (though empty) data is available after replSetInitiate.
@@ -5060,7 +5060,7 @@ void ReplicationCoordinatorImpl::resetLastOpTimesFromOplog(OperationContext* opC
     _setMyLastWrittenOpTimeAndWallTime(lock, lastOpTimeAndWallTime, isRollbackAllowed);
     _setMyLastAppliedOpTimeAndWallTime(lock, lastOpTimeAndWallTime, isRollbackAllowed);
     _setMyLastDurableOpTimeAndWallTime(lock, lastOpTimeAndWallTime, isRollbackAllowed);
-    _reportUpstream(std::move(lock), false /*prioritized*/);
+    _reportUpstream(std::move(lock), /*prioritized=*/false);
 }
 
 ChangeSyncSourceAction ReplicationCoordinatorImpl::shouldChangeSyncSource(

@@ -193,7 +193,7 @@ Status IDLServerParameterDeprecatedAlias::setFromString(std::string_view str,
 void ServerParameterSet::disableTestParameters() {
     for (const auto& [name, sp] : _map) {
         if (sp->isTestOnly()) {
-            sp->disable(true /* permanent */);
+            sp->disable(/*permanent=*/true);
         }
     }
 }

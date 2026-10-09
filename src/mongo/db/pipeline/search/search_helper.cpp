@@ -233,8 +233,8 @@ void planShardedSearch(const boost::intrusive_ptr<ExpressionContext>& expCtx,
     // * Get a sortSpec.
     const auto cmdObj = [&]() {
         PlanShardedSearchSpec cmd(
-            std::string(expCtx->getNamespaceString().coll()) /* planShardedSearch */,
-            remoteSpec->getMongotQuery() /* query */);
+            /*planShardedSearch=*/std::string(expCtx->getNamespaceString().coll()),
+            /*query=*/remoteSpec->getMongotQuery());
 
         if (expCtx->getExplain()) {
             cmd.setExplain(
@@ -702,7 +702,7 @@ std::unique_ptr<RemoteExplainVector> getSearchRemoteExplains(
             getSearchRemoteExplain(expCtx,
                                    searchMetaStage->getSearchQuery(),
                                    searchMetaStage->getRemoteCursorId(),
-                                   boost::none /* sortSpec */,
+                                   /*sortSpec=*/boost::none,
                                    mongot_cursor::getOptimizationFlagsForSearchMeta()));
         return explainMap;
     }
@@ -818,8 +818,8 @@ std::unique_ptr<SearchNode> getSearchNode(NamespaceString nss, DocumentSource* s
         return std::make_unique<SearchNode>(std::move(nss),
                                             true,
                                             searchStage->getSearchQuery(),
-                                            boost::none /* limit */,
-                                            boost::none /* sortSpec */,
+                                            /*limit=*/boost::none,
+                                            /*sortSpec=*/boost::none,
                                             searchStage->getRemoteCursorId(),
                                             searchStage->getRemoteCursorVars());
     } else {

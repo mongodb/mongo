@@ -208,7 +208,7 @@ void GroupProcessor::spill() {
 
     // Initialize '_file' in a lazy manner only when it is needed.
     if (!_file) {
-        _spillStats = std::make_unique<SorterFileStats>(nullptr /* sorterTracker */);
+        _spillStats = std::make_unique<SorterFileStats>(/*sorterTracker=*/nullptr);
         _file = std::make_shared<sorter::File>(sorter::nextFileName(_expCtx->getTempDir()),
                                                _spillStats.get());
     }
@@ -246,7 +246,7 @@ void GroupProcessor::spill() {
 
     auto spilledDataStorageIncrease = _stats.spillingStats.updateSpillingStats(
         1, _memoryTracker.inUseTrackedMemoryBytes(), spilledRecords, _spillStats->bytesSpilled());
-    groupCounters.incrementPerSpilling(1 /* spills */,
+    groupCounters.incrementPerSpilling(/*spills=*/1,
                                        _memoryTracker.inUseTrackedMemoryBytes(),
                                        spilledRecords,
                                        spilledDataStorageIncrease);

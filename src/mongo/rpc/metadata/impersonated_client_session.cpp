@@ -36,7 +36,7 @@ ImpersonatedClientSessionGuard::ImpersonatedClientSessionGuard(
                                            std::move(remote),
                                            std::move(directRemote),
                                            std::move(intermediates),
-                                           true /* isImpersonating */));
+                                           /*isImpersonating=*/true));
 }
 
 ImpersonatedClientSessionGuard::~ImpersonatedClientSessionGuard() {

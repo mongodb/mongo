@@ -623,12 +623,12 @@ ChunkRange extendOrTruncateBoundsForMetadata(const CollectionMetadata& metadata,
     auto numFieldsInMetadataShardKey = metadataShardKeyPatternBson.nFields();
     auto numFieldsInInputRangeShardKey = range.getMin().nFields();
     if (numFieldsInInputRangeShardKey < numFieldsInMetadataShardKey) {
-        auto extendedRangeMin = metadataShardKeyPattern.extendRangeBound(
-            range.getMin(), false /* makeUpperInclusive */);
+        auto extendedRangeMin =
+            metadataShardKeyPattern.extendRangeBound(range.getMin(), /*makeUpperInclusive=*/false);
         // Use makeUpperInclusive=true when range max is all-MaxKey.
         auto extendedRangeMax = metadataShardKeyPattern.extendRangeBound(
             range.getMax(),
-            metadataShardKeyPattern.isGlobalMax(range.getMax()) /* makeUpperInclusive */);
+            /*makeUpperInclusive=*/metadataShardKeyPattern.isGlobalMax(range.getMax()));
         return ChunkRange(extendedRangeMin, extendedRangeMax);
     } else if (numFieldsInInputRangeShardKey > numFieldsInMetadataShardKey) {
         auto shortenedRangeMin = range.getMin().extractFieldsUndotted(metadataShardKeyPatternBson);

@@ -30,7 +30,7 @@ ServiceContext::ConstructorActionRegisterer planCacheRegisterer{
         uassertStatusOK(status);
         auto size = memory_util::getRequestedMemSizeInBytes(status.getValue());
         auto cappedCacheSize = memory_util::capMemorySize(
-            size /*requestedSizeBytes*/, 500 /*maximumSizeGB*/, 25 /*percentTotalSystemMemory*/);
+            /*requestedSizeBytes=*/size, /*maximumSizeGB=*/500, /*percentTotalSystemMemory=*/25);
         if (cappedCacheSize < size) {
             LOGV2_DEBUG(6007000,
                         1,

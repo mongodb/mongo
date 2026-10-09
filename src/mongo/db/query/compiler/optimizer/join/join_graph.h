@@ -405,7 +405,7 @@ public:
      * idented.
      */
     std::string toString(bool pretty) const {
-        return toBSON().jsonString(/*format*/ ExtendedCanonicalV2_0_0, pretty);
+        return toBSON().jsonString(/*format=*/ExtendedCanonicalV2_0_0, pretty);
     }
 
     const std::vector<JoinEdge>& edges() const {

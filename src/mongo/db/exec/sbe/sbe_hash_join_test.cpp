@@ -181,7 +181,7 @@ std::pair<value::SlotVector, std::unique_ptr<PlanStage>> makeHashJoinStage(
                                               innerProjectSlots,
                                               collatorSlot,
                                               allowDiskUse,
-                                              nullptr /* yieldPolicy */,
+                                              /*yieldPolicy=*/nullptr,
                                               kEmptyPlanNodeId,
                                               boost::none);
 
@@ -268,8 +268,8 @@ TEST_F(HashJoinStageTest, SpillThrowsWhenDiskUseNotAllowed) {
                                                           makeSV(outerSlots[1]),
                                                           makeSV(innerSlots[0]),
                                                           makeSV(innerSlots[1]),
-                                                          boost::none /* collatorSlot */,
-                                                          false /* allowDiskUse */);
+                                                          /*collatorSlot=*/boost::none,
+                                                          /*allowDiskUse=*/false);
 
     // The stage must throw QueryExceededMemoryLimitNoDiskUseAllowed when it tries to spill during
     // the build phase, instead of spilling.
@@ -794,8 +794,8 @@ TEST_F(HashJoinStageTest, HashJoinCollationTest) {
                                          makeSV(innerCondSlot),
                                          makeSV(innerProjSlot),
                                          boost::optional<value::SlotId>{useCollator, collatorSlot},
-                                         true /* allowDiskUse */,
-                                         nullptr /* yieldPolicy */,
+                                         /*allowDiskUse=*/true,
+                                         /*yieldPolicy=*/nullptr,
                                          kEmptyPlanNodeId,
                                          boost::none);
 
@@ -1044,7 +1044,7 @@ TEST_F(HashJoinStageTest, NoUseAfterFreeWhenYieldFiresWhileAdvancingOuterChild) 
     // The yield fires on call 2 of the wrapper's getNext(): row 1's buffers have just been freed
     // (row 2 was copied into fresh ones), while the join's probe rows still view row 1's buffers.
     auto recyclingStage = std::make_unique<BufferRecyclingYieldStage>(
-        std::move(outerScanStage), outerScanSlots, 2 /* yieldOnCallN */, kEmptyPlanNodeId);
+        std::move(outerScanStage), outerScanSlots, /*yieldOnCallN=*/2, kEmptyPlanNodeId);
     auto* recyclingStagePtr = recyclingStage.get();
 
     auto [innerT, innerV] = innerArr.releaseToRaw();
@@ -1113,7 +1113,7 @@ TEST_F(HashJoinStageTest, NoUseAfterFreeWhenYieldFiresDuringReopenedBuildPhase) 
     // The first build phase consumes four inner getNext() calls (three rows plus EOF), so the
     // injected yield fires on the first getNext() of the re-opened build phase.
     auto yieldStage = std::make_unique<YieldInjectingStage>(
-        std::move(innerScanStage), 5 /* yieldOnCallN */, kEmptyPlanNodeId);
+        std::move(innerScanStage), /*yieldOnCallN=*/5, kEmptyPlanNodeId);
     auto* yieldStagePtr = yieldStage.get();
 
     auto [outputSlots, hashJoinStage] = makeHashJoinStage(this,
@@ -1146,7 +1146,7 @@ TEST_F(HashJoinStageTest, NoUseAfterFreeWhenYieldFiresDuringReopenedBuildPhase) 
     // Re-open the stage: The stage must drop the leftover cursor and disable slot access up
     // front, so that the yield fired by the build child's first getNext() does not save the
     // dangling probe rows.
-    hashJoinStage->open(true /* reOpen */);
+    hashJoinStage->open(/*reOpen=*/true);
 
     // The re-opened join produces the full result set from scratch.
     value::TagValueOwned resultsArr =
@@ -1203,7 +1203,7 @@ TEST_F(HashJoinStageTest, NestedHashJoinNoUseAfterFreeOnYield) {
     //                                dangles)
     //   Call 3 → IS_EOF             (yield fires: saveState() → makeOwned() on dangling ptr)
     auto yieldStage = std::make_unique<YieldInjectingStage>(
-        std::move(scan1Stage), 3 /* yieldOnCallN */, kEmptyPlanNodeId);
+        std::move(scan1Stage), /*yieldOnCallN=*/3, kEmptyPlanNodeId);
     auto* yieldStagePtr = yieldStage.get();
 
     auto [scan2T, scan2V] = scan2Arr.releaseToRaw();
@@ -1464,7 +1464,7 @@ TEST_F(HashJoinStageTest, NoUseAfterFreeWhenYieldFiresAfterMidStreamReopenBefore
     ASSERT_EQ(hashJoinStage->getNext(), PlanState::ADVANCED);
 
     // Mid-stream re-open, as a nested loop join does for its inner side.
-    hashJoinStage->open(true /* reOpen */);
+    hashJoinStage->open(/*reOpen=*/true);
 
     // Simulate the yield check at the top of the re-opened getNext(), before the outer child has
     // produced a fresh row.
@@ -1544,7 +1544,7 @@ TEST_F(HashJoinStageTest, NoUseAfterFreeWhenProbeRowIsRecopiedOnSecondYield) {
     // reads the pass-through slot (correlated) after that yield.
     auto [innerXSlot, innerXScan] = generateVirtualScan(BSON_ARRAY(1));
     auto yieldStage = std::make_unique<RecyclingYieldEveryStage>(
-        std::move(innerXScan), makeSV(innerXSlot), 1 /* yieldEveryN */, kEmptyPlanNodeId);
+        std::move(innerXScan), makeSV(innerXSlot), /*yieldEveryN=*/1, kEmptyPlanNodeId);
     auto* yieldStagePtr = yieldStage.get();
     auto [expectedTag, expectedVal] = value::makeNewString("outer_proj_1_long_heap");
     auto filterStage =
@@ -1556,9 +1556,9 @@ TEST_F(HashJoinStageTest, NoUseAfterFreeWhenProbeRowIsRecopiedOnSecondYield) {
 
     auto loopJoin = makeS<LoopJoinStage>(std::move(projectStage),
                                          std::move(filterStage),
-                                         makeSV(passThroughSlot) /* outerProjects */,
-                                         makeSV(passThroughSlot) /* outerCorrelated */,
-                                         nullptr /* predicate */,
+                                         /*outerProjects=*/makeSV(passThroughSlot),
+                                         /*outerCorrelated=*/makeSV(passThroughSlot),
+                                         /*predicate=*/nullptr,
                                          kEmptyPlanNodeId);
 
     prepareTree(ctx.get(), loopJoin.get());

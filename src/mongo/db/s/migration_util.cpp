@@ -565,7 +565,7 @@ void resumeMigrationRecipientsOnStepUp(OperationContext* opCtx) {
                     nss,
                     doc.getRange(),
                     doc.getDonorShardIdForLoggingPurposesOnly(),
-                    true /* waitForCompletionOfMigrationOps */,
+                    /*waitForCompletionOfMigrationOps=*/true,
                     ActiveMigrationsRegistry::BypassRecoveryWait{})));
 
             const auto mdm = MigrationDestinationManager::get(opCtx);

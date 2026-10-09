@@ -324,7 +324,7 @@ Status ClusterServerParameterRefresher::_refreshParameters(OperationContext* opC
                     // Parameter is newly disabled on cluster
                     LOGV2_DEBUG(
                         7410703, 3, "Disabling parameter during refresh", "name"_attr = name);
-                    sp->disable(false /* permanent */);
+                    sp->disable(/*permanent=*/false);
                     continue;
                 } else if (!sp->canBeEnabledOnVersion(parameterState, _lastFcv) &&
                            sp->canBeEnabledOnVersion(parameterState, fcv)) {
@@ -409,7 +409,7 @@ void ClusterServerParameterRefresher::start(ServiceContext* serviceCtx, Operatio
         [serviceCtx](Client* client) { getClusterServerParameterRefresher(serviceCtx)->_run(); },
         loadInterval(),
         // TODO(SERVER-74659): Please revisit if this periodic job could be made killable.
-        false /*isKillableByStepdown*/);
+        /*isKillableByStepdown=*/false);
 
     refresher->_job = std::make_unique<PeriodicJobAnchor>(periodicRunner->makeJob(std::move(job)));
 

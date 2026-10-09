@@ -26,7 +26,7 @@ SortedMergeStage::SortedMergeStage(PlanStage::Vector inputStages,
                                    value::SlotVector outputVals,
                                    PlanNodeId planNodeId,
                                    bool participateInTrialRunTracking)
-    : PlanStage("smerge"sv, nullptr /* yieldPolicy */, planNodeId, participateInTrialRunTracking),
+    : PlanStage("smerge"sv, /*yieldPolicy=*/nullptr, planNodeId, participateInTrialRunTracking),
       _inputKeys(std::move(inputKeys)),
       _dirs(std::move(dirs)),
       _inputVals(std::move(inputVals)),

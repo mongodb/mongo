@@ -41,7 +41,7 @@ std::vector<std::string> generateRandomFieldPaths(int numberOfPaths,
                              stats::DistrType::kUniform,
                              dataInterval,
                              seed,
-                             /*arrayTypeLength*/ 0,
+                             /*arrayTypeLength=*/0,
                              data);
 
     std::vector<std::string> fieldPaths;
@@ -53,13 +53,13 @@ std::vector<std::string> generateRandomFieldPaths(int numberOfPaths,
         // arrayTypeLength is 0 because we are generating data of type StringSmall, so that
         // parameter is unused.
         ce::generateDataOneField(
-            /*ndv*/ length.getValue() * 5,
-            /*size*/ length.getValue(),
+            /*ndv=*/length.getValue() * 5,
+            /*size=*/length.getValue(),
             {ce::parseCollectionType(sbe::value::TypeTags::StringSmall)},
-            /*dataDistribution*/ stats::DistrType::kUniform,
+            /*dataDistribution=*/stats::DistrType::kUniform,
             rangeFieldNameLength,
             seed2,
-            /*arrayTypeLength*/ 0,
+            /*arrayTypeLength=*/0,
             fieldNames);
 
         fieldPaths.push_back(buildDottedPathFromFieldNames(fieldNames));
@@ -76,13 +76,13 @@ std::vector<std::string> generateRandomFieldNames(int numberOfFields,
     // Generate the strings for the fieldnames. Setting NDV as 5x the number of field names to
     // generate, to increase variety.
     ce::generateDataOneField(
-        /*ndv*/ numberOfFields * 5,
-        /*size*/ numberOfFields,
+        /*ndv=*/numberOfFields * 5,
+        /*size=*/numberOfFields,
         {ce::parseCollectionType(sbe::value::TypeTags::StringSmall)},
-        /*dataDistribution*/ stats::DistrType::kUniform,
+        /*dataDistribution=*/stats::DistrType::kUniform,
         rangeFieldNameLength,
         seed,
-        /*arrayTypeLength*/ 0,
+        /*arrayTypeLength=*/0,
         fieldNameValues);
 
     std::vector<std::string> fieldNames;

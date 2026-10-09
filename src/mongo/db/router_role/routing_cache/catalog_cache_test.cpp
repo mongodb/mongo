@@ -350,7 +350,7 @@ TEST_F(CatalogCacheTest, GetCollectionRoutingInfoAllowLocksReturnsImmediately) {
     auto coll = loadCollection(cachedCollVersion);
 
     const auto swCri = _catalogCache->getCollectionRoutingInfo(
-        operationContext(), coll.getNss(), true /* allowLocks */);
+        operationContext(), coll.getNss(), /*allowLocks=*/true);
     ASSERT_OK(swCri.getStatus());
 
     ASSERT(swCri.getValue().getCollectionVersion() == cachedCollVersion);
@@ -370,7 +370,7 @@ TEST_F(CatalogCacheTest, GetCollectionRoutingInfoAllowLocksNeedsToFetchNewCollIn
         FailPointEnableBlock failPoint("blockCollectionCacheLookup");
 
         const auto status =
-            _catalogCache->getCollectionRoutingInfo(operationContext(), kNss, true /* allowLocks */)
+            _catalogCache->getCollectionRoutingInfo(operationContext(), kNss, /*allowLocks=*/true)
                 .getStatus();
 
         ASSERT(status == ErrorCodes::ShardCannotRefreshDueToLocksHeld);
@@ -395,7 +395,7 @@ TEST_F(CatalogCacheTest, GetCollectionRoutingInfoAllowLocksNeedsToFetchNewDBInfo
         FailPointEnableBlock failPoint("blockDatabaseCacheLookup");
 
         const auto status =
-            _catalogCache->getCollectionRoutingInfo(operationContext(), kNss, true /* allowLocks */)
+            _catalogCache->getCollectionRoutingInfo(operationContext(), kNss, /*allowLocks=*/true)
                 .getStatus();
 
         ASSERT(status == ErrorCodes::ShardCannotRefreshDueToLocksHeld);
@@ -452,7 +452,7 @@ TEST_F(CatalogCacheTest, TimeseriesFieldsAreProperlyPropagatedOnCC) {
         const auto scopedCollProv = scopedCollectionProvider(coll);
         const auto scopedChunksProv = scopedChunksProvider(std::vector{lastChunk});
 
-        _catalogCache->onStaleCollectionVersion(coll.getNss(), boost::none /* wantedVersion */);
+        _catalogCache->onStaleCollectionVersion(coll.getNss(), /*wantedVersion=*/boost::none);
         const auto swCri =
             _catalogCache->getCollectionRoutingInfo(operationContext(), coll.getNss());
         ASSERT_OK(swCri.getStatus());

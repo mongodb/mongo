@@ -976,7 +976,7 @@ public:
                           kInvertedReason,
                           &kExpectedTypes,
                           LeafArrayBehavior::kNoTraversal,
-                          true /* isJsonSchemaKeyword */);
+                          /*isJsonSchemaKeyword=*/true);
     }
     void visit(const InternalSchemaMatchArrayIndexMatchExpression* expr) final {
         _context->pushNewFrame(*expr);
@@ -1069,7 +1069,7 @@ public:
     }
     void visit(const InternalSchemaRootDocEqMatchExpression* expr) final {}
     void visit(const InternalSchemaTypeExpression* expr) final {
-        generateTypeError(*expr, LeafArrayBehavior::kNoTraversal, true /* isJsonSchemaKeyword */);
+        generateTypeError(*expr, LeafArrayBehavior::kNoTraversal, /*isJsonSchemaKeyword=*/true);
     }
     void visit(const InternalSchemaUniqueItemsMatchExpression* expr) final {
         static constexpr auto normalReason = "found a duplicate item";
@@ -1161,7 +1161,7 @@ public:
             static constexpr auto kNormalReason = "value was not found in enum";
             static constexpr auto kInvertedReason = "value was found in enum";
             generateLogicalLeafError(
-                *expr, kNormalReason, kInvertedReason, true /* isJsonSchemaKeyword */);
+                *expr, kNormalReason, kInvertedReason, /*isJsonSchemaKeyword=*/true);
         } else {
             preVisitTreeOperator(expr);
             // An OR needs its children to call 'matches' in an inverted context to discern which
@@ -1482,7 +1482,7 @@ private:
                               kInvertedReason,
                               &kExpectedTypes,
                               LeafArrayBehavior::kNoTraversal,
-                              true /* isJsonSchemaKeyword */);
+                              /*isJsonSchemaKeyword=*/true);
         } else {
             generatePathError(*expr, kNormalReason, kInvertedReason);
         }
@@ -1658,7 +1658,7 @@ private:
                           kInvertedReason,
                           &expectedTypes,
                           LeafArrayBehavior::kNoTraversal,
-                          true /* isJsonSchemaKeyword */);
+                          /*isJsonSchemaKeyword=*/true);
     }
 
     /**

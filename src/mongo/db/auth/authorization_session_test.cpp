@@ -933,7 +933,7 @@ TEST_F(AuthorizationSessionTest, CanAggregateOutWithInsertAndRemoveOnTargetNames
         ASSERT_TRUE(authzSession->isAuthorizedForPrivileges(privileges));
 
         auto aggNoBypassDocumentValidationReq =
-            buildAggReq(nssFoo, pipeline, false /* bypassDocValidation*/);
+            buildAggReq(nssFoo, pipeline, /*bypassDocValidation=*/false);
 
         privileges = uassertStatusOK(auth::getPrivilegesForAggregate(
             _opCtx.get(), authzSession.get(), nssFoo, aggNoBypassDocumentValidationReq, false));
@@ -957,7 +957,7 @@ TEST_F(AuthorizationSessionTest,
             nssFoo.dbName());
 
         BSONArray pipeline = BSON_ARRAY(BSON("$out" << nssBar.coll()));
-        auto aggReq = buildAggReq(nssFoo, pipeline, true /* bypassDocValidation*/);
+        auto aggReq = buildAggReq(nssFoo, pipeline, /*bypassDocValidation=*/true);
         PrivilegeVector privileges = uassertStatusOK(auth::getPrivilegesForAggregate(
             _opCtx.get(), authzSession.get(), nssFoo, aggReq, false));
         ASSERT_FALSE(authzSession->isAuthorizedForPrivileges(privileges));
@@ -982,7 +982,7 @@ TEST_F(AuthorizationSessionTest,
             nssFoo.dbName());
 
         BSONArray pipeline = BSON_ARRAY(BSON("$out" << nssBar.coll()));
-        auto aggReq = buildAggReq(nssFoo, pipeline, true /* bypassDocValidation*/);
+        auto aggReq = buildAggReq(nssFoo, pipeline, /*bypassDocValidation=*/true);
         PrivilegeVector privileges = uassertStatusOK(auth::getPrivilegesForAggregate(
             _opCtx.get(), authzSession.get(), nssFoo, aggReq, true));
         ASSERT_TRUE(authzSession->isAuthorizedForPrivileges(privileges));
@@ -1577,7 +1577,7 @@ TEST_F(AuthorizationSessionTest, CheckAuthorizationForReleaseMemoryAuthorizedUse
 
     // Assume privileges for the database to allow releaseMemoryAnyCursor action.
     PrivilegeVector privileges;
-    auth::generateUniversalPrivileges(&privileges, boost::none /* tenantId */);
+    auth::generateUniversalPrivileges(&privileges, /*tenantId=*/boost::none);
     auto user = authzSessionForCommand->getAuthenticatedUser();
     ASSERT(user != boost::none);
     (*user)->addPrivileges(privileges);
@@ -1676,7 +1676,7 @@ TEST_F(AuthorizationSessionTest, CheckAuthorizationForKillCursorsAuthorizedUser)
 
     // Assume privileges for the database to allow killAnyCursor action.
     PrivilegeVector privileges;
-    auth::generateUniversalPrivileges(&privileges, boost::none /* tenantId */);
+    auth::generateUniversalPrivileges(&privileges, /*tenantId=*/boost::none);
     auto user = authzSessionForCommand->getAuthenticatedUser();
     ASSERT(user != boost::none);
     (*user)->addPrivileges(privileges);
@@ -1796,13 +1796,13 @@ const ResourcePattern SystemBucketsTest::otherDbSystemBucketResource(
 
 const ResourcePattern SystemBucketsTest::testBucketResource(
     ResourcePattern::forExactSystemBucketsCollection(NamespaceString::createNamespaceString_forTest(
-        boost::none /* tenantId */, "sb_db_test"sv, "sb_coll_test"sv)));
+        /*tenantId=*/boost::none, "sb_db_test"sv, "sb_coll_test"sv)));
 const ResourcePattern SystemBucketsTest::otherBucketResource(
     ResourcePattern::forExactSystemBucketsCollection(NamespaceString::createNamespaceString_forTest(
-        boost::none /* tenantId */, "sb_db_test"sv, "sb_coll_other"sv)));
+        /*tenantId=*/boost::none, "sb_db_test"sv, "sb_coll_other"sv)));
 const ResourcePattern SystemBucketsTest::otherDbBucketResource(
     ResourcePattern::forExactSystemBucketsCollection(NamespaceString::createNamespaceString_forTest(
-        boost::none /* tenantId */, "sb_db_other"sv, "sb_coll_test"sv)));
+        /*tenantId=*/boost::none, "sb_db_other"sv, "sb_coll_test"sv)));
 
 const ResourcePattern SystemBucketsTest::sbCollTestInAnyDB(
     ResourcePattern::forAnySystemBucketsInAnyDatabase(boost::none, "sb_coll_test"sv));

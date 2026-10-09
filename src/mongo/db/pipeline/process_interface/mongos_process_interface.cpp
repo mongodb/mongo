@@ -214,8 +214,8 @@ boost::optional<Document> MongosProcessInterface::lookupSingleDocument(
                                                           findCmd,
                                                           filterObj,
                                                           CollationSpec::kSimpleSpec,
-                                                          boost::none /*letParameters*/,
-                                                          boost::none /*runtimeConstants*/);
+                                                          /*letParameters=*/boost::none,
+                                                          /*runtimeConstants=*/boost::none);
 
                 // Dispatch the requests. The 'establishCursors' method conveniently
                 // prepares the result into a vector of cursor responses for us.
@@ -297,7 +297,7 @@ BSONObj MongosProcessInterface::_reportCurrentOpForClient(
 
     if (clientOpCtx && !client->operationContextIsPendingDestruction()) {
         if (auto txnRouter = TransactionRouter::get(clientOpCtx)) {
-            txnRouter.reportState(clientOpCtx, &builder, true /* sessionIsActive */);
+            txnRouter.reportState(clientOpCtx, &builder, /*sessionIsActive=*/true);
         }
     }
 
@@ -322,8 +322,7 @@ void MongosProcessInterface::_reportCurrentOpsForIdleSessions(OperationContext* 
 
     sessionCatalog->scanSessions({std::move(sessionFilter)}, [&](const ObservableSession& session) {
         if (!session.hasCurrentOperation()) {
-            auto op =
-                TransactionRouter::get(session).reportState(opCtx, false /* sessionIsActive */);
+            auto op = TransactionRouter::get(session).reportState(opCtx, /*sessionIsActive=*/false);
             if (!op.isEmpty()) {
                 ops->emplace_back(op);
             }

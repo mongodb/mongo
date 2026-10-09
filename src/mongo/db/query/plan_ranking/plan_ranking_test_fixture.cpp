@@ -41,7 +41,7 @@ void PlanRankingTestFixture::insertDocuments(const std::vector<BSONObj>& docs) {
                                                        coll.getCollectionPtr(),
                                                        inserts.begin(),
                                                        inserts.end(),
-                                                       nullptr /* opDebug */));
+                                                       /*opDebug=*/nullptr));
         wuow.commit();
     }
 }
@@ -126,7 +126,7 @@ PlanRankingTestFixture::createCQAndPlannerData(
 MultipleCollectionAccessor PlanRankingTestFixture::getCollsAccessor() {
     auto coll = getCollection();
     return MultipleCollectionAccessor(
-        std::move(coll), {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+        std::move(coll), {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 }
 
 }  // namespace plan_ranking

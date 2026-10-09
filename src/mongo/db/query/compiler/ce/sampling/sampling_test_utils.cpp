@@ -438,7 +438,7 @@ MultipleCollectionAccessor createColl(const std::vector<BSONObj>& dataBSON,
         CollectionOrViewAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
         LockMode::MODE_IX);
     return MultipleCollectionAccessor(
-        acquisition, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+        acquisition, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 }
 }  // namespace
 
@@ -540,7 +540,7 @@ SamplingEstimatorForTesting SamplingEstimatorTest::createSamplingEstimatorForTes
                                     operationContext(), _kTestNss, AcquisitionPrerequisites::kRead),
                                 MODE_IS);
     auto colls = MultipleCollectionAccessor(
-        collection, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+        collection, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,

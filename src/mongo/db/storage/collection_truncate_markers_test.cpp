@@ -58,7 +58,7 @@ public:
                                                                recordId,
                                                                now,
                                                                1,
-                                                               /*oplogSamplingAsyncEnabled*/ false);
+                                                               /*oplogSamplingAsyncEnabled=*/false);
             records.push_back(RecordIdAndWall{std::move(recordId), std::move(now)});
         }
         wuow.commit();
@@ -94,7 +94,7 @@ public:
         EXPECT_EQ(recordIdStatus.getValue(), recordId);
         auto now = Date_t::fromMillisSinceEpoch(timestampToUse.asInt64());
         testMarkers.updateCurrentMarkerAfterInsertOnCommit(
-            opCtx, insertedData.length(), recordId, now, 1, /*oplogSamplingAsyncEnabled*/ false);
+            opCtx, insertedData.length(), recordId, now, 1, /*oplogSamplingAsyncEnabled=*/false);
         wuow.commit();
         return recordId;
     }
@@ -154,8 +154,8 @@ public:
               {},
               RecordId{},
               Date_t{},
-              0 /* leftoverRecordsCount */,
-              0 /* leftoverRecordsBytes */,
+              /*leftoverRecordsCount=*/0,
+              /*leftoverRecordsBytes=*/0,
               minBytesPerMarker,
               Microseconds(0),
               CollectionTruncateMarkers::MarkersCreationMethod::EmptyCollection) {};
@@ -199,12 +199,12 @@ public:
     TestCollectionMarkers(int64_t minBytesPerMarker)
         : CollectionTruncateMarkers(
               {},
-              0 /* leftoverRecordsCount */,
-              0 /* leftoverRecordsBytes */,
+              /*leftoverRecordsCount=*/0,
+              /*leftoverRecordsBytes=*/0,
               minBytesPerMarker,
               Microseconds(0),
               CollectionTruncateMarkers::MarkersCreationMethod::EmptyCollection,
-              true /* initialSamplingFinished */) {};
+              /*initialSamplingFinished=*/true) {};
 
 private:
     bool _hasExcessMarkers(OperationContext* opCtx) const override {
@@ -615,13 +615,13 @@ TEST_F(CollectionMarkersTest, ComputeInitialCreationMethodEmptyCollection) {
 
     EXPECT_EQ(MarkersCreationMethod::EmptyCollection,
               CollectionTruncateMarkers::computeInitialCreationMethod(
-                  0 /* numRecords */, 0 /* dataSize */, 100 /* minBytesPerMarker */));
+                  /*numRecords=*/0, /*dataSize=*/0, /*minBytesPerMarker=*/100));
 
     EXPECT_EQ(
         MarkersCreationMethod::EmptyCollection,
-        CollectionTruncateMarkers::computeInitialCreationMethod(0 /* numRecords */,
-                                                                0 /* dataSize */,
-                                                                100 /* minBytesPerMarker */,
+        CollectionTruncateMarkers::computeInitialCreationMethod(/*numRecords=*/0,
+                                                                /*dataSize=*/0,
+                                                                /*minBytesPerMarker=*/100,
                                                                 MarkersCreationPolicy::kScanOnly));
 }
 
@@ -633,16 +633,16 @@ TEST_F(CollectionMarkersTest, ComputeInitialCreationMethodInconsistentSizeStorer
 
     EXPECT_EQ(MarkersCreationMethod::Sampling,
               CollectionTruncateMarkers::computeInitialCreationMethod(
-                  100 /* numRecords */,
-                  0 /* dataSize */,
-                  100 /* minBytesPerMarker */,
+                  /*numRecords=*/100,
+                  /*dataSize=*/0,
+                  /*minBytesPerMarker=*/100,
                   MarkersCreationPolicy::kSampleOnly));
 
     EXPECT_EQ(MarkersCreationMethod::Sampling,
               CollectionTruncateMarkers::computeInitialCreationMethod(
-                  0 /* numRecords */,
-                  10000 /* dataSize */,
-                  100 /* minBytesPerMarker */,
+                  /*numRecords=*/0,
+                  /*dataSize=*/10000,
+                  /*minBytesPerMarker=*/100,
                   MarkersCreationPolicy::kSampleOnly));
 }
 
@@ -663,9 +663,9 @@ TEST_F(CollectionMarkersTest, SamplingWithoutFallbackScanningReturnsEmptyCollect
     auto result =
         CollectionTruncateMarkers::createMarkersBySampling(opCtx.get(),
                                                            *iterator,
-                                                           100 /* minBytesPerMarker */,
+                                                           /*minBytesPerMarker=*/100,
                                                            getIdAndWallTime,
-                                                           /*allowFallbackScanning*/ false,
+                                                           /*allowFallbackScanning=*/false,
                                                            curTimeMicros64());
 
     EXPECT_EQ(result.methodUsed, CollectionTruncateMarkers::MarkersCreationMethod::EmptyCollection);
@@ -685,16 +685,16 @@ TEST_F(CollectionMarkersTest, SamplingFailureFallsBackToScanning) {
 
     auto opCtx = getClient()->makeOperationContext();
     AutoGetCollection coll(opCtx.get(), collNs, MODE_IS);
-    coll->getRecordStore()->updateStatsAfterRepair(1000 /* numRecords */, 10000 /* dataSize */);
+    coll->getRecordStore()->updateStatsAfterRepair(/*numRecords=*/1000, /*dataSize=*/10000);
 
     auto iterator = CollectionTruncateMarkers::makeIterator(
         opCtx.get(), coll->getRecordStore(), nullptr, boost::none);
 
     auto result = CollectionTruncateMarkers::createMarkersBySampling(opCtx.get(),
                                                                      *iterator,
-                                                                     100 /* minBytesPerMarker */,
+                                                                     /*minBytesPerMarker=*/100,
                                                                      getIdAndWallTime,
-                                                                     /*allowFallbackScanning*/ true,
+                                                                     /*allowFallbackScanning=*/true,
                                                                      curTimeMicros64());
 
     EXPECT_EQ(result.methodUsed, CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
@@ -716,7 +716,7 @@ TEST_F(CollectionMarkersTest, SamplingFailureWithoutFallbackScanningReturnsEmpty
 
     auto opCtx = getClient()->makeOperationContext();
     AutoGetCollection coll(opCtx.get(), collNs, MODE_IS);
-    coll->getRecordStore()->updateStatsAfterRepair(1000 /* numRecords */, 10000 /* dataSize */);
+    coll->getRecordStore()->updateStatsAfterRepair(/*numRecords=*/1000, /*dataSize=*/10000);
 
     auto iterator = CollectionTruncateMarkers::makeIterator(
         opCtx.get(), coll->getRecordStore(), nullptr, boost::none);
@@ -724,9 +724,9 @@ TEST_F(CollectionMarkersTest, SamplingFailureWithoutFallbackScanningReturnsEmpty
     auto result =
         CollectionTruncateMarkers::createMarkersBySampling(opCtx.get(),
                                                            *iterator,
-                                                           100 /* minBytesPerMarker */,
+                                                           /*minBytesPerMarker=*/100,
                                                            getIdAndWallTime,
-                                                           /*allowFallbackScanning*/ false,
+                                                           /*allowFallbackScanning=*/false,
                                                            curTimeMicros64());
 
     EXPECT_EQ(result.methodUsed, CollectionTruncateMarkers::MarkersCreationMethod::EmptyCollection);
@@ -745,7 +745,7 @@ TEST_F(CollectionMarkersTest, SamplingWithInconsistentSizeStorerReturnsEmptyColl
 
     auto opCtx = getClient()->makeOperationContext();
     AutoGetCollection coll(opCtx.get(), collNs, MODE_IS);
-    coll->getRecordStore()->updateStatsAfterRepair(totalRecords, 0 /* dataSize */);
+    coll->getRecordStore()->updateStatsAfterRepair(totalRecords, /*dataSize=*/0);
 
     auto iterator = CollectionTruncateMarkers::makeIterator(
         opCtx.get(), coll->getRecordStore(), nullptr, boost::none);
@@ -753,9 +753,9 @@ TEST_F(CollectionMarkersTest, SamplingWithInconsistentSizeStorerReturnsEmptyColl
     auto result =
         CollectionTruncateMarkers::createMarkersBySampling(opCtx.get(),
                                                            *iterator,
-                                                           100 /* minBytesPerMarker */,
+                                                           /*minBytesPerMarker=*/100,
                                                            getIdAndWallTime,
-                                                           /*allowFallbackScanning*/ false,
+                                                           /*allowFallbackScanning=*/false,
                                                            curTimeMicros64());
 
     EXPECT_EQ(result.methodUsed, CollectionTruncateMarkers::MarkersCreationMethod::EmptyCollection);
@@ -784,7 +784,7 @@ TEST_F(CollectionMarkersTest, OplogSamplingLogging) {
                                                        *iterator,
                                                        kMinBytesPerMarker,
                                                        getIdAndWallTime,
-                                                       /*allowFallbackScanning*/ true,
+                                                       /*allowFallbackScanning=*/true,
                                                        curTimeMicros64(),
                                                        &mockTickSource);
     logs.stop();
@@ -1003,7 +1003,7 @@ TEST_F(CollectionMarkersTest, SamplingWorksWithTruncate) {
                                                        *iterator,
                                                        1,
                                                        getIdAndWallTime,
-                                                       /*allowFallbackScanning*/ true,
+                                                       /*allowFallbackScanning=*/true,
                                                        curTimeMicros64());
 
     EXPECT_TRUE(hasYielded.load());
@@ -1181,29 +1181,29 @@ TEST_F(CollectionMarkersTest,
 
     // Make the minimum small so we hit it quickly.
     auto testMarkers =
-        std::make_shared<TestCollectionMarkersWithPartialExpiration>(/*minBytesPerMarker*/ 1);
+        std::make_shared<TestCollectionMarkersWithPartialExpiration>(/*minBytesPerMarker=*/1);
 
     const Date_t wallA = Date_t::now() + Milliseconds(1000);
     const Date_t wallB = Date_t::now() + Milliseconds(2000);
     const RecordId recordA(10);
     const RecordId recordB(20);
 
-    testMarkers->testUpdateCurrentMarker(/*bytesAdded*/ 1,
-                                         /*highestRecordId*/ recordA,
-                                         /*highestWallTime*/ wallA,
-                                         /*numRecordsAdded*/ 1,
-                                         /*oplogSamplingAsyncEnabled*/ false);
+    testMarkers->testUpdateCurrentMarker(/*bytesAdded=*/1,
+                                         /*highestRecordId=*/recordA,
+                                         /*highestWallTime=*/wallA,
+                                         /*numRecordsAdded=*/1,
+                                         /*oplogSamplingAsyncEnabled=*/false);
 
     // Assert that we should have created a marker here.
     ASSERT_EQ(testMarkers->getMarkersForTest().size(), 1UL);
     EXPECT_EQ(testMarkers->getMarkersForTest().back().lastRecord, recordA);
 
     // Advance _highestRecordId to B without adding any more bytes/records.
-    testMarkers->testUpdateCurrentMarker(/*bytesAdded*/ 0,
-                                         /*highestRecordId*/ recordB,
-                                         /*highestWallTime*/ wallB,
-                                         /*numRecordsAdded*/ 0,
-                                         /*oplogSamplingAsyncEnabled*/ false);
+    testMarkers->testUpdateCurrentMarker(/*bytesAdded=*/0,
+                                         /*highestRecordId=*/recordB,
+                                         /*highestWallTime=*/wallB,
+                                         /*numRecordsAdded=*/0,
+                                         /*oplogSamplingAsyncEnabled=*/false);
 
     // We should not have created another marker here since counters are zero and we didn't call
     // create partial marker if needed.

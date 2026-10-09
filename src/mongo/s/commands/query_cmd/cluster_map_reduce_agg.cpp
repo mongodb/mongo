@@ -238,7 +238,7 @@ bool _runMapReduceInRoutingContext(OperationContext* opCtx,
                     &tempResults,
                     PipelineDataSource::kNormal,
                     expCtx->eligibleForSampling(),
-                    IncludeMetrics{} /* remoteMetricsToInclude */));
+                    /*remoteMetricsToInclude=*/IncludeMetrics{}));
                 break;
             }
 

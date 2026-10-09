@@ -579,13 +579,12 @@ TEST_F(ReplCoordTest, ElectionParticipantMetricsAreCollected) {
 
     auto metricsAfterVoteRequestWithDryRun = [&](bool dryRun) {
         repl::VoteRequester::Algorithm requester(getReplCoord()->getConfig(),
-                                                 1 /* candidateIndex */,
-                                                 1 /* term */,
+                                                 /*candidateIndex=*/1,
+                                                 /*term=*/1,
                                                  dryRun,
                                                  lastOplogEntry,
                                                  lastOplogEntry,
-                                                 -1 /* primaryIndex */
-        );
+                                                 /*primaryIndex=*/-1);
 
         auto opCtxHolder{makeOperationContext()};
         auto* const opCtx{opCtxHolder.get()};

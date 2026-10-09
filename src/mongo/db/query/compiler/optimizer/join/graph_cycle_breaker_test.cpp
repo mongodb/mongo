@@ -205,7 +205,7 @@ TEST_F(GraphCycleBreakerTest, GraphWithComplexCycles) {
     // This edge is ignored due to its incompatible predicates.
     auto edge_db = addEdge(d, b, alternativePaths);
 
-    validateCycles(/*expectedNumberOfCycles*/ 3);
+    validateCycles(/*expectedNumberOfCycles=*/3);
 
     auto newEdges = breakCycles(edge_ab, edge_bc, edge_cd, edge_da, edge_ca, edge_db);
     //  Two edges are expected to be removed.
@@ -222,7 +222,7 @@ TEST_F(GraphCycleBreakerTest, NoCycleGraph) {
     auto edge_bc = addEdge(b, c);
     auto edge_cd = addEdge(c, d);
 
-    validateCycles(/*expectedNumberOfCycles*/ 0);
+    validateCycles(/*expectedNumberOfCycles=*/0);
 
     auto newEdges = breakCycles(edge_ab, edge_bc, edge_cd);
     // No edges are expected to be removed.
@@ -234,7 +234,7 @@ TEST_F(GraphCycleBreakerTest, DisconnectedGraph) {
     auto edge_ab = addEdge(a, b);
     auto edge_cd = addEdge(c, d);
 
-    validateCycles(/*expectedNumberOfCycles*/ 0);
+    validateCycles(/*expectedNumberOfCycles=*/0);
 
     auto newEdges = breakCycles(edge_ab, edge_cd);
     // No edges are expected to be removed.
@@ -252,7 +252,7 @@ TEST_F(GraphCycleBreakerTest, DisconnectedGraphWithCycles) {
     auto edge_ef = addEdge(e, f);
     auto edge_fd = addEdge(f, d);
 
-    validateCycles(/*expectedNumberOfCycles*/ 2);
+    validateCycles(/*expectedNumberOfCycles=*/2);
 
     auto newEdges = breakCycles(edge_ab, edge_bc, edge_ca, edge_de, edge_ef, edge_fd);
     // Two edges are expected to be removed.
@@ -276,7 +276,7 @@ TEST_F(GraphCycleBreakerTest, IncompatiblePredicates) {
     auto edge_da = addEdge(d, a, alternativePaths);
     auto edge_ea = addEdge(e, a, alternativePaths);
 
-    validateCycles(/*expectedNumberOfCycles*/ 1);
+    validateCycles(/*expectedNumberOfCycles=*/1);
 
     // One big loop case
     {
@@ -311,7 +311,7 @@ TEST_F(GraphCycleBreakerTest, TwoCyclesWithDifferentPredicates) {
     // Because of the predicates there it doesn't form a big cycle: A - B - C - D - E - F - A
     auto edge_fa = addEdge(f, a, p1, p2);
 
-    validateCycles(/*expectedNumberOfCycles*/ 2);
+    validateCycles(/*expectedNumberOfCycles=*/2);
 
     auto newEdges =
         breakCycles(edge_ab, edge_bc, edge_cd, edge_da, edge_de, edge_ef, edge_fd, edge_fa);
@@ -332,7 +332,7 @@ TEST_F(GraphCycleBreakerTest, TwoCyclesWithASharedEdge) {
     auto edge_ef = addEdge(e, f, alternativePaths);
     auto edge_fa = addEdge(f, a, alternativePaths);
 
-    validateCycles(/*expectedNumberOfCycles*/ 2);
+    validateCycles(/*expectedNumberOfCycles=*/2);
 
     // The shared edge
     ASSERT_EQ(edge_da, edge_ad);
@@ -365,7 +365,7 @@ TEST_F(GraphCycleBreakerTest, CliqueOf4) {
     auto edge_de = addEdge(d, e);
     auto edge_ef = addEdge(e, f);
 
-    validateCycles(/*expectedNumberOfCycles*/ cyclesInClique(4));
+    validateCycles(/*expectedNumberOfCycles=*/cyclesInClique(4));
 
     auto newEdges =
         breakCycles(edge_ab, edge_bc, edge_cd, edge_de, edge_ef, edge_ca, edge_da, edge_db);
@@ -391,7 +391,7 @@ TEST_F(GraphCycleBreakerTest, TwoCliquesOf4) {
     addEdge(d, e, alternativePaths);
     addEdge(e, f, alternativePaths);
 
-    validateCycles(/*expectedNumberOfCycles*/ 2 * cyclesInClique(4));
+    validateCycles(/*expectedNumberOfCycles=*/2 * cyclesInClique(4));
 }
 
 TEST_F(GraphCycleBreakerTest, CliqueOf6) {
@@ -405,7 +405,7 @@ TEST_F(GraphCycleBreakerTest, CliqueOf6) {
         }
     }
 
-    validateCycles(/*expectedNumberOfCycles*/ cyclesInClique(6));
+    validateCycles(/*expectedNumberOfCycles=*/cyclesInClique(6));
 }
 
 

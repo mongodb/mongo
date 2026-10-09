@@ -50,7 +50,7 @@ TEST_F(DSV2StateUninitializedAndWaitingTest, StateUninitializedAllocationNotAvai
 
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
     docSource->setState_forTest(V2Stage::State::kUninitialized,
-                                false /* validateStateTransition */);
+                                /*validateStateTransition=*/false);
 
     // Last request time should have no value initially.
     ASSERT_EQ(Date_t().toMillisSinceEpoch(),
@@ -104,7 +104,7 @@ TEST_F(DSV2StateUninitializedAndWaitingTest, StateUninitializedAllocationOk) {
 
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
     docSource->setState_forTest(V2Stage::State::kUninitialized,
-                                false /* validateStateTransition */);
+                                /*validateStateTransition=*/false);
 
     // Last request time should have no value initially.
     ASSERT_EQ(Date_t().toMillisSinceEpoch(),
@@ -120,7 +120,7 @@ TEST_F(DSV2StateUninitializedAndWaitingTest, StateUninitializedAllocationOk) {
 
     // Cursor manager should have been initialized.
     ASSERT_TRUE(getCursorManagerMock(params)->isInitialized());
-    ASSERT_BSONOBJ_EQ(ResumeToken::makeHighWaterMarkToken(ts, 1 /* version */).toBSON(),
+    ASSERT_BSONOBJ_EQ(ResumeToken::makeHighWaterMarkToken(ts, /*version=*/1).toBSON(),
                       getCursorManagerMock(params)->getResumeToken().toBSON());
 
     // Last request time should have been updated due to the query-to-shards-allocation request.
@@ -157,7 +157,7 @@ TEST_F(DSV2StateUninitializedAndWaitingTest, StateUninitializedAllocationFutureC
 
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
     docSource->setState_forTest(V2Stage::State::kUninitialized,
-                                false /* validateStateTransition */);
+                                /*validateStateTransition=*/false);
 
     // Last request time should have no value initially.
     ASSERT_EQ(Date_t().toMillisSinceEpoch(),
@@ -174,7 +174,7 @@ TEST_F(DSV2StateUninitializedAndWaitingTest, StateUninitializedAllocationFutureC
 
     // Cursor manager should have been initialized.
     ASSERT_TRUE(getCursorManagerMock(params)->isInitialized());
-    ASSERT_BSONOBJ_EQ(ResumeToken::makeHighWaterMarkToken(ts, 1 /* version */).toBSON(),
+    ASSERT_BSONOBJ_EQ(ResumeToken::makeHighWaterMarkToken(ts, /*version=*/1).toBSON(),
                       getCursorManagerMock(params)->getResumeToken().toBSON());
 
     // Last request time should have been updated due to the query-to-shards-allocation request.
@@ -219,7 +219,7 @@ TEST_F(DSV2StateUninitializedAndWaitingTest, StateWaitingNoPlacementInfoAvailabl
     ASSERT_EQ(Date_t().toMillisSinceEpoch(),
               docSource->getLastAllocationToShardsRequestTime_forTest().toMillisSinceEpoch());
 
-    docSource->setState_forTest(V2Stage::State::kWaiting, false /* validateStateTransition */);
+    docSource->setState_forTest(V2Stage::State::kWaiting, /*validateStateTransition=*/false);
 
     Date_t now = Date_t::now();
     getPreciseClockSource(getOpCtx()->getServiceContext())->reset(now);
@@ -266,7 +266,7 @@ TEST_F(DSV2StateUninitializedAndWaitingTest, StateWaitingFutureClusterTime) {
         std::make_unique<DataToShardsAllocationQueryServiceMock>();
 
     auto params = buildParametersForTest(getExpCtx(),
-                                         10 /* minAllocationToShardsPollPeriodSecs */,
+                                         /*minAllocationToShardsPollPeriodSecs=*/10,
                                          changeStreamReaderBuilder.get(),
                                          dataToShardsAllocationQueryService.get());
 
@@ -281,7 +281,7 @@ TEST_F(DSV2StateUninitializedAndWaitingTest, StateWaitingFutureClusterTime) {
     ASSERT_EQ(Date_t().toMillisSinceEpoch(),
               docSource->getLastAllocationToShardsRequestTime_forTest().toMillisSinceEpoch());
 
-    docSource->setState_forTest(V2Stage::State::kWaiting, false /* validateStateTransition */);
+    docSource->setState_forTest(V2Stage::State::kWaiting, /*validateStateTransition=*/false);
 
     Date_t now = Date_t::now();
     getPreciseClockSource(getOpCtx()->getServiceContext())->reset(now);
@@ -321,7 +321,7 @@ TEST_F(DSV2StateUninitializedAndWaitingTest,
     constexpr int kNumPolls = 3;
 
     auto params = buildParametersForTest(getExpCtx(),
-                                         kPollPeriodSecs /* minAllocationToShardsPollPeriodSecs */,
+                                         /*minAllocationToShardsPollPeriodSecs=*/kPollPeriodSecs,
                                          changeStreamReaderBuilder.get(),
                                          dataToShardsAllocationQueryService.get());
 
@@ -333,7 +333,7 @@ TEST_F(DSV2StateUninitializedAndWaitingTest,
     getDataToShardsAllocationQueryServiceMock(params)->bufferResponses(mockResponses);
 
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
-    docSource->setState_forTest(V2Stage::State::kWaiting, false /* validateStateTransition */);
+    docSource->setState_forTest(V2Stage::State::kWaiting, /*validateStateTransition=*/false);
 
     Date_t now = Date_t::now();
     getPreciseClockSource(getOpCtx()->getServiceContext())->reset(now);
@@ -395,12 +395,12 @@ TEST_F(DSV2StateUninitializedAndWaitingTest, StateWaitingHonoursAwaitDataDeadlin
 
     constexpr int kPollPeriodSecs = 10;
     auto params = buildParametersForTest(getExpCtx(),
-                                         kPollPeriodSecs /* minAllocationToShardsPollPeriodSecs */,
+                                         /*minAllocationToShardsPollPeriodSecs=*/kPollPeriodSecs,
                                          changeStreamReaderBuilder.get(),
                                          dataToShardsAllocationQueryService.get());
 
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
-    docSource->setState_forTest(V2Stage::State::kWaiting, false /* validateStateTransition */);
+    docSource->setState_forTest(V2Stage::State::kWaiting, /*validateStateTransition=*/false);
 
     Date_t now = Date_t::now();
     getPreciseClockSource(getOpCtx()->getServiceContext())->reset(now);
@@ -451,7 +451,7 @@ TEST_F(DSV2StateUninitializedAndWaitingTest,
 
     constexpr int kPollPeriodSecs = 10;
     auto params = buildParametersForTest(getExpCtx(),
-                                         kPollPeriodSecs /* minAllocationToShardsPollPeriodSecs */,
+                                         /*minAllocationToShardsPollPeriodSecs=*/kPollPeriodSecs,
                                          changeStreamReaderBuilder.get(),
                                          dataToShardsAllocationQueryService.get());
 
@@ -461,7 +461,7 @@ TEST_F(DSV2StateUninitializedAndWaitingTest,
     getDataToShardsAllocationQueryServiceMock(params)->bufferResponses(mockResponses);
 
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
-    docSource->setState_forTest(V2Stage::State::kWaiting, false /* validateStateTransition */);
+    docSource->setState_forTest(V2Stage::State::kWaiting, /*validateStateTransition=*/false);
 
     Date_t now = Date_t::now();
     getPreciseClockSource(getOpCtx()->getServiceContext())->reset(now);
@@ -539,7 +539,7 @@ TEST_F(DSV2StateUninitializedAndWaitingTest, StateWaitingTransitioningToFetching
     ASSERT_EQ(Date_t().toMillisSinceEpoch(),
               docSource->getLastAllocationToShardsRequestTime_forTest().toMillisSinceEpoch());
 
-    docSource->setState_forTest(V2Stage::State::kWaiting, false /* validateStateTransition */);
+    docSource->setState_forTest(V2Stage::State::kWaiting, /*validateStateTransition=*/false);
 
     Date_t now = Date_t::now();
     getPreciseClockSource(getOpCtx()->getServiceContext())->reset(now);
@@ -570,12 +570,12 @@ TEST_F(DSV2StateUninitializedAndWaitingTest,
         std::make_unique<DataToShardsAllocationQueryServiceMock>();
 
     auto params = buildParametersForTest(getExpCtx(),
-                                         10 /* minAllocationToShardsPollPeriodSecs */,
+                                         /*minAllocationToShardsPollPeriodSecs=*/10,
                                          changeStreamReaderBuilder.get(),
                                          dataToShardsAllocationQueryService.get());
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
 
-    docSource->setState_forTest(V2Stage::State::kWaiting, false /* validateStateTransition */);
+    docSource->setState_forTest(V2Stage::State::kWaiting, /*validateStateTransition=*/false);
 
     Date_t now = Date_t::now();
     getPreciseClockSource(getOpCtx()->getServiceContext())->reset(now);
@@ -620,12 +620,12 @@ TEST_F(DSV2StateUninitializedAndWaitingTest,
         std::make_unique<DataToShardsAllocationQueryServiceMock>();
 
     auto params = buildParametersForTest(getExpCtx(),
-                                         10 /* minAllocationToShardsPollPeriodSecs */,
+                                         /*minAllocationToShardsPollPeriodSecs=*/10,
                                          changeStreamReaderBuilder.get(),
                                          dataToShardsAllocationQueryService.get());
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
 
-    docSource->setState_forTest(V2Stage::State::kWaiting, false /* validateStateTransition */);
+    docSource->setState_forTest(V2Stage::State::kWaiting, /*validateStateTransition=*/false);
 
     Date_t now = Date_t::now();
     getPreciseClockSource(getOpCtx()->getServiceContext())->reset(now);
@@ -669,12 +669,12 @@ TEST_F(DSV2StateUninitializedAndWaitingTest, StateWaitingBehaviorWhenWaitReturns
         std::make_unique<DataToShardsAllocationQueryServiceMock>();
 
     auto params = buildParametersForTest(getExpCtx(),
-                                         10 /* minAllocationToShardsPollPeriodSecs */,
+                                         /*minAllocationToShardsPollPeriodSecs=*/10,
                                          changeStreamReaderBuilder.get(),
                                          dataToShardsAllocationQueryService.get());
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
 
-    docSource->setState_forTest(V2Stage::State::kWaiting, false /* validateStateTransition */);
+    docSource->setState_forTest(V2Stage::State::kWaiting, /*validateStateTransition=*/false);
 
     Date_t now = Date_t::now();
     getPreciseClockSource(getOpCtx()->getServiceContext())->reset(now);
@@ -722,12 +722,12 @@ TEST_F(DSV2StateUninitializedAndWaitingTest, StateWaitingBehaviorWhenWaitReturns
         std::make_unique<DataToShardsAllocationQueryServiceMock>();
 
     auto params = buildParametersForTest(getExpCtx(),
-                                         10 /* minAllocationToShardsPollPeriodSecs */,
+                                         /*minAllocationToShardsPollPeriodSecs=*/10,
                                          changeStreamReaderBuilder.get(),
                                          dataToShardsAllocationQueryService.get());
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
 
-    docSource->setState_forTest(V2Stage::State::kWaiting, false /* validateStateTransition */);
+    docSource->setState_forTest(V2Stage::State::kWaiting, /*validateStateTransition=*/false);
 
     Date_t now = Date_t::now();
     getPreciseClockSource(getOpCtx()->getServiceContext())->reset(now);

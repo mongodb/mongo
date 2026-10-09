@@ -377,7 +377,7 @@ public:
             const auto firstKey = isFirstRange ? shardZoneInfo.firstChunkMinKey : zoneRange.min;
 
             getChunkManager().forEachOverlappingChunk(
-                firstKey, zoneRange.max, false /* isMaxInclusive */, [&](const auto& chunk) {
+                firstKey, zoneRange.max, /*isMaxInclusive=*/false, [&](const auto& chunk) {
                     if (chunk.getShardId() != shardId) {
                         return true;  // continue
                     }

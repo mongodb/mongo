@@ -243,7 +243,7 @@ TEST_F(QueryStatsStoreTest, EvictionTest) {
     ASSERT_EQ(countAllEntries(queryStatsStore), 0);
 
     // This creates a queryStats store where each partition has a max size of 500 bytes.
-    QueryStatsStore queryStatsStoreTwo{/*cacheSize*/ cacheSize * 3, /*numPartitions*/ 3};
+    QueryStatsStore queryStatsStoreTwo{/*cacheSize=*/cacheSize * 3, /*numPartitions=*/3};
     // Adding a queryStats store entry that is smaller than the overal cache size but larger
     // than a single partition max size, will cause an eviction. testMetrics is larger than 500
     // bytes and thus over budget for the partitions of this cache.

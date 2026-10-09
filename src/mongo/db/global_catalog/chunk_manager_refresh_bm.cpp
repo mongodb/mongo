@@ -94,8 +94,8 @@ CollectionMetadata makeChunkManagerWithShardSelector(int nShards,
                                            true,
                                            collEpoch,
                                            Timestamp(1, 0),
-                                           boost::none /* timeseriesFields */,
-                                           boost::none /* reshardingFields */,
+                                           /*timeseriesFields=*/boost::none,
+                                           /*reshardingFields=*/boost::none,
                                            true,
                                            chunks);
     return CollectionMetadata(CurrentChunkManager(makeStandaloneRoutingTableHistory(std::move(rt))),
@@ -125,10 +125,10 @@ MONGO_COMPILER_NOINLINE auto makeChunkManagerWithOptimalBalancedDistribution(int
 MONGO_COMPILER_NOINLINE auto runIncrementalUpdate(const CollectionMetadata& cm,
                                                   const std::vector<ChunkType>& newChunks) {
     auto rt = cm.getChunkManager()->getRoutingTableHistory_forTest().makeUpdated(
-        boost::none /* timeseriesFields */,
-        boost::none /* reshardingFields */,
+        /*timeseriesFields=*/boost::none,
+        /*reshardingFields=*/boost::none,
         /*allowMigrations=*/true,
-        false /* unsplittable */,
+        /*unsplittable=*/false,
         newChunks);
     return CollectionMetadata(CurrentChunkManager(makeStandaloneRoutingTableHistory(std::move(rt))),
                               getShardId(0));
@@ -283,8 +283,8 @@ auto BM_FullBuildOfChunkManager(benchmark::State& state, ShardSelectorFn selectS
                                                true,
                                                collEpoch,
                                                Timestamp(1, 0),
-                                               boost::none /* timeseriesFields */,
-                                               boost::none /* reshardingFields */,
+                                               /*timeseriesFields=*/boost::none,
+                                               /*reshardingFields=*/boost::none,
                                                true,
                                                chunks);
         benchmark::DoNotOptimize(CollectionMetadata(

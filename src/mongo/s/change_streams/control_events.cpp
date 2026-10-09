@@ -99,7 +99,7 @@ DatabaseCreatedControlEvent DatabaseCreatedControlEvent::createFromDocument(cons
         assertFieldType(event, kFullDocumentField, BSONType::object).getDocument();
     auto dbNameString = assertFieldType(fullDocumentField, kIdField, BSONType::string).getString();
     DatabaseName createdDatabaseName = DatabaseNameUtil::deserialize(
-        boost::none /* tenantId */, dbNameString, SerializationContext::stateCatalog());
+        /*tenantId=*/boost::none, dbNameString, SerializationContext::stateCatalog());
     return DatabaseCreatedControlEvent{clusterTime, createdDatabaseName};
 }
 

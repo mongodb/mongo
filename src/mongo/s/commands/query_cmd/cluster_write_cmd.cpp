@@ -216,7 +216,7 @@ void handleWouldChangeOwningShardErrorNonTransaction(OperationContext* opCtx,
     auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
 
     auto txn = txn_api::SyncTransactionWithRetries(
-        opCtx, executor, nullptr /* resourceYielder */, inlineExecutor);
+        opCtx, executor, /*resourceYielder=*/nullptr, inlineExecutor);
 
     // Shared state for the transaction API use below.
     struct SharedBlock {
@@ -401,7 +401,7 @@ bool cluster_write_cmd::handleWouldChangeOwningShardError(OperationContext* opCt
                         // Clear the error details from the response object before sending the write
                         // again
                         response->unsetErrDetails();
-                        cluster::write(opCtx, *request, nullptr /* nss */, &stats, response);
+                        cluster::write(opCtx, *request, /*nss=*/nullptr, &stats, response);
                         wouldChangeOwningShardErrorInfo = getWouldChangeOwningShardErrorInfo(
                             opCtx, *request, response, !isRetryableWrite);
                         if (!wouldChangeOwningShardErrorInfo)
@@ -554,7 +554,7 @@ bool cluster_write_cmd::runExplainWithoutShardKey(OperationContext* opCtx,
             "explain write"sv, [&](OperationContext* opCtx, RoutingContext& originalRoutingCtx) {
                 // If supported, compute QueryShapeHash and record it in CurOp
                 query_stats::WriteCmdQueryStatsRegistrar::parseAndRegisterRequest(
-                    opCtx, WriteCommandRef{req}, true /* skipRegistration */);
+                    opCtx, WriteCommandRef{req}, /*skipRegistration=*/true);
 
                 const auto targeter = CollectionRoutingInfoTargeter(opCtx, originalNss);
                 auto [translatedNss, translatedReqBSON] = translateRequestForTimeseriesIfNeeded(
@@ -562,7 +562,7 @@ bool cluster_write_cmd::runExplainWithoutShardKey(OperationContext* opCtx,
                 const bool isTimeseriesViewRequest = (translatedNss != originalNss);
                 if (!write_without_shard_key::useTwoPhaseProtocol(opCtx,
                                                                   translatedNss,
-                                                                  true /* isUpdateOrDelete */,
+                                                                  /*isUpdateOrDelete=*/true,
                                                                   isUpsert,
                                                                   query,
                                                                   collation,
@@ -651,7 +651,7 @@ void cluster_write_cmd::executeWriteOpExplain(OperationContext* opCtx,
             "explain write"sv, [&](OperationContext* opCtx, RoutingContext& originalRoutingCtx) {
                 // If supported, compute QueryShapeHash and record it in CurOp
                 query_stats::WriteCmdQueryStatsRegistrar::parseAndRegisterRequest(
-                    opCtx, WriteCommandRef{*requestPtr}, true /* skipRegistration */);
+                    opCtx, WriteCommandRef{*requestPtr}, /*skipRegistration=*/true);
 
                 const auto targeter = CollectionRoutingInfoTargeter(opCtx, originalNss);
                 auto [translatedNss, translatedReqBSON] = translateRequestForTimeseriesIfNeeded(

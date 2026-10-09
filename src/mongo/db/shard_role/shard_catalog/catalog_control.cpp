@@ -261,7 +261,7 @@ void openCatalogAfterRollbackToStable(OperationContext* opCtx,
                                                           storageEngine,
                                                           stableTimestamp,
                                                           StorageEngine::LastShutdownState::kClean,
-                                                          false /* forRepair */));
+                                                          /*forRepair=*/false));
 
     if (index_builds::primary_driven::enabled(
             opCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {

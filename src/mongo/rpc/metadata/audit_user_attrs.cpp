@@ -57,7 +57,7 @@ void AuditUserAttrs::resetToAuthenticatedUser(OperationContext* opCtx) {
                                 *userName,
                                 roleNameIteratorToContainer<std::vector<RoleName>>(
                                     authzSession->getAuthenticatedRoleNames()),
-                                false /* isImpersonating */);
+                                /*isImpersonating=*/false);
             return;
         }
     }

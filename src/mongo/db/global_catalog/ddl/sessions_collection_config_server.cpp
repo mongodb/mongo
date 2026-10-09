@@ -137,10 +137,10 @@ void SessionsCollectionConfigServer::_generateIndexesIfNeeded(OperationContext* 
                 SessionsCollection::generateCreateIndexesCmd(),
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                 Shard::RetryPolicy::kStrictlyNotIdempotent,
-                BSONObj() /*query*/,
-                BSONObj() /*collation*/,
-                boost::none /*letParameters*/,
-                boost::none /*runtimeConstants*/);
+                /*query=*/BSONObj(),
+                /*collation=*/BSONObj(),
+                /*letParameters=*/boost::none,
+                /*runtimeConstants=*/boost::none);
 
             for (auto& shardResult : shardResults) {
                 const auto shardResponse = uassertStatusOK(std::move(shardResult.swResponse));

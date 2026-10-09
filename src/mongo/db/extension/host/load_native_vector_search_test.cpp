@@ -125,7 +125,7 @@ private:
 // Tests successful desugar extension loading and verifies stage registration works in pipelines.
 // The libnative_vector_search_mongo_extension.so adds a "$nativeVectorSearch" stage for testing.
 TEST_F(LoadNativeVectorSearchTest, ExtensionRegistration) {
-    auto stageSpec = makeNativeVectorSearchSpec(true /*filter*/);
+    auto stageSpec = makeNativeVectorSearchSpec(/*filter=*/true);
 
     auto sourceList = DocumentSource::parse(expCtx, stageSpec);
     ASSERT_EQ(sourceList.size(), 1U);
@@ -148,7 +148,7 @@ TEST_F(LoadNativeVectorSearchTest, ExtensionRegistration) {
 }
 
 TEST_F(LoadNativeVectorSearchTest, LiteParsedExpandsWithFilter) {
-    auto spec = makeNativeVectorSearchSpec(/*filter*/ true);
+    auto spec = makeNativeVectorSearchSpec(/*filter=*/true);
     expectLiteParsedNames(nss,
                           spec,
                           {
@@ -161,7 +161,7 @@ TEST_F(LoadNativeVectorSearchTest, LiteParsedExpandsWithFilter) {
 }
 
 TEST_F(LoadNativeVectorSearchTest, LiteParsedExpandsWithoutFilter) {
-    auto spec = makeNativeVectorSearchSpec(/*filter*/ false);
+    auto spec = makeNativeVectorSearchSpec(/*filter=*/false);
     expectLiteParsedNames(nss,
                           spec,
                           {
@@ -176,7 +176,7 @@ TEST_F(LoadNativeVectorSearchTest, LiteParsedExpandsWithoutFilter) {
 // matching its LiteParsedExpandable sibling and the full-parsed DocumentSourceExtensionOptimizable.
 // Otherwise the ban is silently skipped when the stage is validated in its desugared form.
 TEST_F(LoadNativeVectorSearchTest, ExpandedExtensionStageCannotRunOnTimeseries) {
-    auto spec = makeNativeVectorSearchSpec(/*filter*/ false);
+    auto spec = makeNativeVectorSearchSpec(/*filter=*/false);
     auto liteParsed = LiteParsedDocumentSource::parse(nss, spec);
     auto* lpExpandable =
         dynamic_cast<DocumentSourceExtensionOptimizable::LiteParsedExpandable*>(liteParsed.get());
@@ -193,7 +193,7 @@ TEST_F(LoadNativeVectorSearchTest, ExpandedExtensionStageCannotRunOnTimeseries) 
 }
 
 TEST_F(LoadNativeVectorSearchTest, FullParseExpandsWithFilter) {
-    auto spec = makeNativeVectorSearchSpec(/*filter*/ true);
+    auto spec = makeNativeVectorSearchSpec(/*filter=*/true);
     auto stages = desugarAndSerialize(expCtx, spec);
     ASSERT_EQ(stages.size(), 5U);
 
@@ -208,7 +208,7 @@ TEST_F(LoadNativeVectorSearchTest, FullParseExpandsWithFilter) {
 }
 
 TEST_F(LoadNativeVectorSearchTest, FullParseExpandsWithoutFilter) {
-    auto spec = makeNativeVectorSearchSpec(/*filter*/ false);  // default = "cosine"
+    auto spec = makeNativeVectorSearchSpec(/*filter=*/false);  // default = "cosine"
     auto stages = desugarAndSerialize(expCtx, spec);
     ASSERT_EQ(stages.size(), 4U);
 
@@ -222,7 +222,7 @@ TEST_F(LoadNativeVectorSearchTest, FullParseExpandsWithoutFilter) {
 }
 
 TEST_F(LoadNativeVectorSearchTest, CosineNormalizedSerializesAsExpected) {
-    auto spec = makeNativeVectorSearchSpec(/*filter*/ false, "cosine", /*normalize*/ true);
+    auto spec = makeNativeVectorSearchSpec(/*filter=*/false, "cosine", /*normalize=*/true);
     auto stages = desugarAndSerialize(expCtx, spec);
     ASSERT_EQ(stages.size(), 4U);
     expectStageEq(stages, 0, R"JSON({ $vectorSearchMetrics: { metric: "cosine" } })JSON");
@@ -234,7 +234,7 @@ TEST_F(LoadNativeVectorSearchTest, CosineNormalizedSerializesAsExpected) {
 }
 
 TEST_F(LoadNativeVectorSearchTest, DotProductNoNormalizeSerializesAsExpected) {
-    auto spec = makeNativeVectorSearchSpec(/*filter*/ false, /*metric*/ "dotProduct");
+    auto spec = makeNativeVectorSearchSpec(/*filter=*/false, /*metric=*/"dotProduct");
     auto stages = desugarAndSerialize(expCtx, spec);
     ASSERT_EQ(stages.size(), 4U);
 
@@ -248,7 +248,7 @@ TEST_F(LoadNativeVectorSearchTest, DotProductNoNormalizeSerializesAsExpected) {
 }
 
 TEST_F(LoadNativeVectorSearchTest, DotProductNormalizedSerializesAsExpected) {
-    auto spec = makeNativeVectorSearchSpec(false, "dotProduct", /*normalize*/ true);
+    auto spec = makeNativeVectorSearchSpec(false, "dotProduct", /*normalize=*/true);
     auto stages = desugarAndSerialize(expCtx, spec);
     ASSERT_EQ(stages.size(), 4U);
 
@@ -262,7 +262,7 @@ TEST_F(LoadNativeVectorSearchTest, DotProductNormalizedSerializesAsExpected) {
 
 TEST_F(LoadNativeVectorSearchTest, NativeVectorSearchEuclideanNoNormalizeUsesMultiplyNegation) {
     auto spec =
-        makeNativeVectorSearchSpec(/*filter*/ false, /*metric*/ "euclidean", /*normalize*/ false);
+        makeNativeVectorSearchSpec(/*filter=*/false, /*metric=*/"euclidean", /*normalize=*/false);
     auto stages = desugarAndSerialize(expCtx, spec);
     ASSERT_EQ(stages.size(), 4U);
 
@@ -280,7 +280,7 @@ TEST_F(LoadNativeVectorSearchTest, NativeVectorSearchEuclideanNoNormalizeUsesMul
 
 TEST_F(LoadNativeVectorSearchTest, NativeVectorSearchEuclideanNormalizedSerializesAsExpected) {
     auto spec =
-        makeNativeVectorSearchSpec(/*filter*/ false, /*metric*/ "euclidean", /*normalize*/ true);
+        makeNativeVectorSearchSpec(/*filter=*/false, /*metric=*/"euclidean", /*normalize=*/true);
     auto stages = desugarAndSerialize(expCtx, spec);
     ASSERT_EQ(stages.size(), 4U);
 
@@ -295,9 +295,9 @@ TEST_F(LoadNativeVectorSearchTest, NativeVectorSearchEuclideanNormalizedSerializ
 
 TEST_F(LoadNativeVectorSearchTest, NumCandidatesDoesNotAffectExpansionOrSerialization) {
     auto base = makeNativeVectorSearchSpec(
-        /*filter*/ false, "cosine", /*normalize*/ false, /*numCandidates*/ boost::none);
+        /*filter=*/false, "cosine", /*normalize=*/false, /*numCandidates=*/boost::none);
     auto with = makeNativeVectorSearchSpec(
-        /*filter*/ false, "cosine", /*normalize*/ false, /*numCandidates*/ 5);
+        /*filter=*/false, "cosine", /*normalize=*/false, /*numCandidates=*/5);
 
     auto a = desugarAndSerialize(expCtx, base);
     auto b = desugarAndSerialize(expCtx, with);

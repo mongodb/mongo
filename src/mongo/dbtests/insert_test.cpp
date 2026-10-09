@@ -123,7 +123,7 @@ TEST_F(InsertTest, FixDocumentForInsertDetectsDollarField) {
     auto doc = BSON("$x" << 1 << "_id" << 2);
     auto result = fixDocumentForInsert(getOperationContext(),
                                        doc,
-                                       false /* bypassEmptyTsReplacement */,
+                                       /*bypassEmptyTsReplacement=*/false,
                                        &containsDotsAndDollarsField);
     ASSERT_OK(result.getStatus());
     ASSERT(containsDotsAndDollarsField);
@@ -136,7 +136,7 @@ TEST_F(InsertTest, FixDocumentForInsertDetectsDollarField) {
 TEST_F(InsertTest, FixDocumentForInsertBypassesTimestampReplacement) {
     auto doc = BSON("ts" << Timestamp(0, 0) << "_id" << 1);
     auto result =
-        fixDocumentForInsert(getOperationContext(), doc, true /* bypassEmptyTsReplacement */);
+        fixDocumentForInsert(getOperationContext(), doc, /*bypassEmptyTsReplacement=*/true);
     ASSERT_OK(result.getStatus());
 
     auto fixed = result.getValue();

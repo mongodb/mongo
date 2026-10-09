@@ -155,7 +155,7 @@ void tellAllDonorsToStartChangeStreamsMonitor(
                           executor,
                           resharding::extractShardIdsFromParticipantEntries(doc.getDonorShards()),
                           doc.getCommonReshardingMetadata().getForwardableOpMetadata(),
-                          false /* setWriteConcern */);
+                          /*setWriteConcern=*/false);
 }
 
 void tellAllRecipientsToClone(OperationContext* opCtx,

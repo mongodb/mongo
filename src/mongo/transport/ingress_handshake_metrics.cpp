@@ -177,8 +177,8 @@ void IngressHandshakeMetrics::onCommandProcessed(const Command* command,
     }
 }
 
-void IngressHandshakeMetrics::onResponseSent(Microseconds /*processingDuration*/,
-                                             Microseconds /*sendingDuration*/) {
+void IngressHandshakeMetrics::onResponseSent(/*processingDuration=*/Microseconds,
+                                             /*sendingDuration=*/Microseconds) {
     // TODO(SERVER-63883): This function is never invoked.
 }
 

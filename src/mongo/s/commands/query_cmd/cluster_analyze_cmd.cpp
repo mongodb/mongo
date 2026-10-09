@@ -82,10 +82,10 @@ public:
                         CommandHelpers::filterCommandRequestForPassthrough(cmd.toBSON()),
                         ReadPreferenceSetting::get(opCtx),
                         Shard::RetryPolicy::kIdempotent,
-                        BSONObj() /*query*/,
-                        BSONObj() /*collation*/,
-                        boost::none /*letParameters*/,
-                        boost::none /*runtimeConstants*/);
+                        /*query=*/BSONObj(),
+                        /*collation=*/BSONObj(),
+                        /*letParameters=*/boost::none,
+                        /*runtimeConstants=*/boost::none);
 
                     for (const auto& shardResult : shardResponses) {
                         const auto& shardResponse =

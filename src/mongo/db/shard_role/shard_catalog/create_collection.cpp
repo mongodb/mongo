@@ -283,7 +283,7 @@ Status renameOutOfTheWayForApplyOps(OperationContext* opCtx,
 
         Status status = writeConflictRetry(opCtx, "createCollectionForApplyOps", newCollName, [&] {
             WriteUnitOfWork wuow(opCtx);
-            Status status = db->renameCollection(opCtx, newCollName, tmpName, true /*stayTemp*/);
+            Status status = db->renameCollection(opCtx, newCollName, tmpName, /*stayTemp=*/true);
             if (!status.isOK())
                 return status;
             auto futureCollUuid = futureColl->uuid();
@@ -291,10 +291,10 @@ Status renameOutOfTheWayForApplyOps(OperationContext* opCtx,
                                            newCollName,
                                            tmpName,
                                            futureCollUuid,
-                                           {}, /*dropTargetUUID*/
-                                           0U, /*numRecords*/
-                                           true /*stayTemp*/,
-                                           false /*markFromMigrate*/,
+                                           /*dropTargetUUID=*/{},
+                                           /*numRecords=*/0U,
+                                           /*stayTemp=*/true,
+                                           /*markFromMigrate=*/false,
                                            preConditions.isViewlessTimeseriesCollection());
             wuow.commit();
             // Re-fetch collection after commit to get a valid pointer
@@ -339,7 +339,7 @@ Status renameIntoRequestedNSSForApplyOps(OperationContext* opCtx,
         auto [currentCollLock, newCollLock] =
             acquireCollLocksForRename(opCtx, currentName, newCollName);
         WriteUnitOfWork wuow(opCtx);
-        Status status = db->renameCollection(opCtx, currentName, newCollName, true /*stayTemp*/);
+        Status status = db->renameCollection(opCtx, currentName, newCollName, /*stayTemp=*/true);
         if (!status.isOK())
             return status;
         auto preConditions = timeseries::CollectionPreConditions::getCollectionPreConditions(
@@ -348,10 +348,10 @@ Status renameIntoRequestedNSSForApplyOps(OperationContext* opCtx,
                                        currentName,
                                        newCollName,
                                        uuid,
-                                       {},   /*dropTargetUUID*/
-                                       0U,   /*numRecords*/
-                                       true, /*stayTemp*/
-                                       false /*markFromMigrate*/,
+                                       /*dropTargetUUID=*/{},
+                                       /*numRecords=*/0U,
+                                       /*stayTemp=*/true,
+                                       /*markFromMigrate=*/false,
                                        preConditions.isViewlessTimeseriesCollection());
         wuow.commit();
         return Status::OK();
@@ -624,7 +624,7 @@ void checkExistingCollectionIsCompatible(OperationContext* opCtx,
                                                    *existingOptions.timeseries);
 
         existingOptions = uassertStatusOK(CollectionOptions::parse(existingOptions.toBSON(
-            false /* includeUUID */, timeseries::kAllowedCollectionCreationOptions)));
+            /*includeUUID=*/false, timeseries::kAllowedCollectionCreationOptions)));
     }
 
     const auto& collatorFactory = CollatorFactoryInterface::get(opCtx->getServiceContext());

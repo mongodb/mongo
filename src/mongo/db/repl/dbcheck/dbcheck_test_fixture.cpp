@@ -204,7 +204,7 @@ Status DbCheckTest::runHashForCollectionCheck(
                                 end,
                                 secondaryIndexCheckParams,
                                 &dataThrottle,
-                                boost::none /* indexName */,
+                                /*indexName=*/boost::none,
                                 maxCount,
                                 maxBytes,
                                 deadlineOnSecondary);

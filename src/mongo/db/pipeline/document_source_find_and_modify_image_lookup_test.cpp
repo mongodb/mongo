@@ -106,7 +106,7 @@ repl::OplogEntry makeOplogEntry(
                           nss,
                           uuid,
                           oField,
-                          boost::none /* o2Field */,
+                          /*o2Field=*/boost::none,
                           sessionInfo,
                           stmtIds,
                           preImageOpTime,
@@ -239,8 +239,8 @@ TEST_F(FindAndModifyImageLookupTest,
                                                            BSON("_id" << 1),
                                                            sessionInfo,
                                                            {stmtId},
-                                                           boost::none /* preImageOpTime */,
-                                                           boost::none /* postImageOpTime */,
+                                                           /*preImageOpTime=*/boost::none,
+                                                           /*postImageOpTime=*/boost::none,
                                                            repl::RetryImageEnum::kPreImage)
                                                 .getEntry()
                                                 .toBSON());
@@ -289,8 +289,8 @@ TEST_F(FindAndModifyImageLookupTest, ShouldNotForgeImageEntryWhenImageDocHasDiff
                                 BSON("a" << 1),
                                 sessionInfo,
                                 {stmtId},
-                                boost::none /* preImageOpTime */,
-                                boost::none /* postImageOpTime */,
+                                /*preImageOpTime=*/boost::none,
+                                /*postImageOpTime=*/boost::none,
                                 repl::RetryImageEnum::kPreImage)
                      .getEntry()
                      .toBSON());
@@ -345,8 +345,8 @@ TEST_F(FindAndModifyImageLookupTest, ShouldForgeImageEntryWhenMatchingImageDocIs
                                                BSON("_id" << 1),
                                                sessionInfo,
                                                {stmtId},
-                                               boost::none /* preImageOpTime */,
-                                               boost::none /* postImageOpTime */,
+                                               /*preImageOpTime=*/boost::none,
+                                               /*postImageOpTime=*/boost::none,
                                                imageType)
                                     .getEntry();
         const auto oplogEntryBson = oplogEntry.toBSON();
@@ -407,7 +407,7 @@ TEST_F(FindAndModifyImageLookupTest, ShouldForgeImageEntryWhenMatchingImageDocIs
               "test"_attr = unittest::getTestName(),
               "imageType"_attr = idl::serialize(imageType));
         auto documentSourceImageLookup = DocumentSourceFindAndModifyImageLookup::create(
-            getExpCtx(), true /* includeCommitTransactionTimestamp */);
+            getExpCtx(), /*includeCommitTransactionTimestamp=*/true);
         auto imageLookupStage = exec::agg::buildStage(documentSourceImageLookup);
         const auto sessionId = makeLogicalSessionIdWithTxnNumberAndUUIDForTest();
         const auto txnNum = 1LL;
@@ -529,7 +529,7 @@ TEST_F(FindAndModifyImageLookupTest,
         }
 
         auto documentSourceImageLookup = DocumentSourceFindAndModifyImageLookup::create(
-            getExpCtx(), true /* includeCommitTransactionTimestamp */);
+            getExpCtx(), /*includeCommitTransactionTimestamp=*/true);
         auto imageLookupStage = exec::agg::buildStage(documentSourceImageLookup);
         const auto sessionId = makeLogicalSessionIdWithTxnNumberAndUUIDForTest();
         const auto txnNum = 1LL;

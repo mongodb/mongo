@@ -300,8 +300,7 @@ TEST_F(HashKeyGeneratorTest, ArrayAlongIndexFieldPathDoesNotFailWhenIgnoreFlagIs
                                        &actualKeys,
                                        key_string::Version::kLatestVersion,
                                        Ordering::make(BSONObj()),
-                                       true  // ignoreArraysAlongPath
-    );
+                                       /*ignoreArraysAlongPath=*/true);
 
     KeyStringSet expectedKeys;
     expectedKeys.insert(makeHashKey(BSON("" << BSONNULL).firstElement()));

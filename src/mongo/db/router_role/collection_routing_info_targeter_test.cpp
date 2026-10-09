@@ -1006,7 +1006,7 @@ TEST_F(CollectionRoutingInfoTargeterTimeseriesTest, TargetWritesToShardedTimeser
     // Update
     {
         const auto update = buildUpdate(
-            kNss, BSON(_metaField << -1), fromjson("{$set: {p : 1}}"), false, true /*multi*/);
+            kNss, BSON(_metaField << -1), fromjson("{$set: {p : 1}}"), false, /*multi=*/true);
         const auto endpoints =
             cri.targetUpdate(operationContext(), BatchItemRef(&update, 0)).endpoints;
         checkEndpoints(endpoints, {_shard0});
@@ -1017,7 +1017,7 @@ TEST_F(CollectionRoutingInfoTargeterTimeseriesTest, TargetWritesToShardedTimeser
                                         BSON(_metaField << BSON("$gte" << -10 << "$lt" << 10)),
                                         fromjson("{$set: {p : 1}}"),
                                         false,
-                                        true /*multi*/);
+                                        /*multi=*/true);
         const auto endpoints =
             cri.targetUpdate(operationContext(), BatchItemRef(&update, 0)).endpoints;
         checkEndpoints(endpoints, {_shard0, _shard1});
@@ -1025,7 +1025,7 @@ TEST_F(CollectionRoutingInfoTargeterTimeseriesTest, TargetWritesToShardedTimeser
 
     // Delete
     {
-        const auto deleteOp = buildDelete(kNss, BSON(_metaField << -1), true /*multi*/);
+        const auto deleteOp = buildDelete(kNss, BSON(_metaField << -1), /*multi=*/true);
         const auto endpoints =
             cri.targetDelete(operationContext(), BatchItemRef(&deleteOp, 0)).endpoints;
         checkEndpoints(endpoints, {_shard0});
@@ -1033,7 +1033,7 @@ TEST_F(CollectionRoutingInfoTargeterTimeseriesTest, TargetWritesToShardedTimeser
 
     {
         const auto deleteOp = buildDelete(
-            kNss, BSON(_metaField << BSON("$gte" << -10 << "$lt" << 10)), true /*multi*/);
+            kNss, BSON(_metaField << BSON("$gte" << -10 << "$lt" << 10)), /*multi=*/true);
         const auto endpoints =
             cri.targetDelete(operationContext(), BatchItemRef(&deleteOp, 0)).endpoints;
         checkEndpoints(endpoints, {_shard0, _shard1});

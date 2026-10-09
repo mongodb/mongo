@@ -278,8 +278,8 @@ public:
                                                false,
                                                epoch,
                                                Timestamp(1, 1),
-                                               boost::none /* timeseriesFields */,
-                                               boost::none /* reshardingFields */,
+                                               /*timeseriesFields=*/boost::none,
+                                               /*reshardingFields=*/boost::none,
 
                                                false,
                                                chunks);
@@ -330,10 +330,10 @@ public:
                                         opType,
                                         kCrudNs,
                                         kCrudUUID,
-                                        false /* fromMigrate */,
+                                        /*fromMigrate=*/false,
                                         boost::none,  // checkExistenceForDiffInsert
                                         boost::none,  // versionContext
-                                        0 /* version */,
+                                        /*version=*/0,
                                         obj1,
                                         obj2,
                                         sessionInfo,
@@ -520,7 +520,7 @@ protected:
 
 TEST_F(ReshardingOplogApplierTest, NothingToIterate) {
     std::deque<repl::OplogEntry> crudOps;
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), /*batchSize=*/2);
 
     boost::optional<ReshardingOplogApplier> applier;
 
@@ -530,7 +530,7 @@ TEST_F(ReshardingOplogApplierTest, NothingToIterate) {
                     oplogBufferNs(),
                     appliedToNs(),
                     stashCollections(),
-                    0U /* myStashIdx */,
+                    /*myStashIdx=*/0U,
                     chunkManager(),
                     std::move(iterator),
                     /* isCapped */ false,
@@ -564,7 +564,7 @@ TEST_F(ReshardingOplogApplierTest, ApplyBasicCrud) {
                                 BSON("_id" << 1),
                                 boost::none));
 
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), /*batchSize=*/2);
     boost::optional<ReshardingOplogApplier> applier;
     applier.emplace(makeApplierEnv(),
                     kApplierBatchTaskCount,
@@ -572,7 +572,7 @@ TEST_F(ReshardingOplogApplierTest, ApplyBasicCrud) {
                     oplogBufferNs(),
                     appliedToNs(),
                     stashCollections(),
-                    0U /* myStashIdx */,
+                    /*myStashIdx=*/0U,
                     chunkManager(),
                     std::move(iterator),
                     /* isCapped */ false,
@@ -613,7 +613,7 @@ TEST_F(ReshardingOplogApplierTest, CanceledApplyingBatch) {
                                 BSON("_id" << 2),
                                 boost::none));
 
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), /*batchSize=*/2);
     boost::optional<ReshardingOplogApplier> applier;
 
     applier.emplace(makeApplierEnv(),
@@ -622,7 +622,7 @@ TEST_F(ReshardingOplogApplierTest, CanceledApplyingBatch) {
                     oplogBufferNs(),
                     appliedToNs(),
                     stashCollections(),
-                    0U /* myStashIdx */,
+                    /*myStashIdx=*/0U,
                     chunkManager(),
                     std::move(iterator),
                     /* isCapped */ false,
@@ -650,7 +650,7 @@ TEST_F(ReshardingOplogApplierTest, InsertTypeOplogAppliedInMultipleBatches) {
                                     boost::none));
     }
 
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 3 /* batchSize */);
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), /*batchSize=*/3);
     boost::optional<ReshardingOplogApplier> applier;
     applier.emplace(makeApplierEnv(),
                     kApplierBatchTaskCount,
@@ -658,7 +658,7 @@ TEST_F(ReshardingOplogApplierTest, InsertTypeOplogAppliedInMultipleBatches) {
                     oplogBufferNs(),
                     appliedToNs(),
                     stashCollections(),
-                    0U /* myStashIdx */,
+                    /*myStashIdx=*/0U,
                     chunkManager(),
                     std::move(iterator),
                     /* isCapped */ false,
@@ -696,7 +696,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorDuringFirstBatchApply) {
                                 BSON("$invalidOperator" << BSON("x" << 1)),
                                 BSON("_id" << 1)));
 
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 4 /* batchSize */);
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), /*batchSize=*/4);
     boost::optional<ReshardingOplogApplier> applier;
     applier.emplace(makeApplierEnv(),
                     kApplierBatchTaskCount,
@@ -704,7 +704,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorDuringFirstBatchApply) {
                     oplogBufferNs(),
                     appliedToNs(),
                     stashCollections(),
-                    0U /* myStashIdx */,
+                    /*myStashIdx=*/0U,
                     chunkManager(),
                     std::move(iterator),
                     /* isCapped */ false,
@@ -744,7 +744,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorDuringSecondBatchApply) {
                                 BSON("$invalidOperator" << BSON("x" << 1)),
                                 BSON("_id" << 3)));
 
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), /*batchSize=*/2);
     boost::optional<ReshardingOplogApplier> applier;
     applier.emplace(makeApplierEnv(),
                     kApplierBatchTaskCount,
@@ -752,7 +752,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorDuringSecondBatchApply) {
                     oplogBufferNs(),
                     appliedToNs(),
                     stashCollections(),
-                    0U /* myStashIdx */,
+                    /*myStashIdx=*/0U,
                     chunkManager(),
                     std::move(iterator),
                     /* isCapped */ false,
@@ -788,7 +788,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstOplog) {
                                 BSON("_id" << 1),
                                 boost::none));
 
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), /*batchSize=*/2);
     iterator->setThrowWhenSingleItem();
 
     boost::optional<ReshardingOplogApplier> applier;
@@ -798,7 +798,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstOplog) {
                     oplogBufferNs(),
                     appliedToNs(),
                     stashCollections(),
-                    0U /* myStashIdx */,
+                    /*myStashIdx=*/0U,
                     chunkManager(),
                     std::move(iterator),
                     /* isCapped */ false,
@@ -829,7 +829,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstBatch) {
                                 BSON("_id" << 2),
                                 boost::none));
 
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 4 /* batchSize */);
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), /*batchSize=*/4);
     iterator->setThrowWhenSingleItem();
 
     boost::optional<ReshardingOplogApplier> applier;
@@ -839,7 +839,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstBatch) {
                     oplogBufferNs(),
                     appliedToNs(),
                     stashCollections(),
-                    0U /* myStashIdx */,
+                    /*myStashIdx=*/0U,
                     chunkManager(),
                     std::move(iterator),
                     /* isCapped */ false,
@@ -876,7 +876,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingSecondBatch) {
                                 BSON("_id" << 3),
                                 boost::none));
 
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), /*batchSize=*/2);
     iterator->setThrowWhenSingleItem();
 
     boost::optional<ReshardingOplogApplier> applier;
@@ -886,7 +886,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingSecondBatch) {
                     oplogBufferNs(),
                     appliedToNs(),
                     stashCollections(),
-                    0U /* myStashIdx */,
+                    /*myStashIdx=*/0U,
                     chunkManager(),
                     std::move(iterator),
                     /* isCapped */ false,
@@ -922,7 +922,7 @@ TEST_F(ReshardingOplogApplierTest, ExecutorIsShutDown) {
                                 BSON("_id" << 1),
                                 boost::none));
 
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 4 /* batchSize */);
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), /*batchSize=*/4);
     boost::optional<ReshardingOplogApplier> applier;
     applier.emplace(makeApplierEnv(),
                     kApplierBatchTaskCount,
@@ -930,7 +930,7 @@ TEST_F(ReshardingOplogApplierTest, ExecutorIsShutDown) {
                     oplogBufferNs(),
                     appliedToNs(),
                     stashCollections(),
-                    0U /* myStashIdx */,
+                    /*myStashIdx=*/0U,
                     chunkManager(),
                     std::move(iterator),
                     /* isCapped */ false,
@@ -969,7 +969,7 @@ TEST_F(ReshardingOplogApplierTest, UnsupportedCommandOpsShouldError) {
                             BSON("_id" << 2),
                             boost::none));
 
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(ops), 1 /* batchSize */);
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(ops), /*batchSize=*/1);
     boost::optional<ReshardingOplogApplier> applier;
     applier.emplace(makeApplierEnv(),
                     kApplierBatchTaskCount,
@@ -977,7 +977,7 @@ TEST_F(ReshardingOplogApplierTest, UnsupportedCommandOpsShouldError) {
                     oplogBufferNs(),
                     appliedToNs(),
                     stashCollections(),
-                    0U /* myStashIdx */,
+                    /*myStashIdx=*/0U,
                     chunkManager(),
                     std::move(iterator),
                     /* isCapped */ false,
@@ -1010,7 +1010,7 @@ TEST_F(ReshardingOplogApplierTest, DropSourceCollectionCmdShouldError) {
                             BSON("drop" << appliedToNs().ns_forTest()),
                             boost::none));
 
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(ops), 1 /* batchSize */);
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(ops), /*batchSize=*/1);
     boost::optional<ReshardingOplogApplier> applier;
     applier.emplace(makeApplierEnv(),
                     kApplierBatchTaskCount,
@@ -1018,7 +1018,7 @@ TEST_F(ReshardingOplogApplierTest, DropSourceCollectionCmdShouldError) {
                     oplogBufferNs(),
                     appliedToNs(),
                     stashCollections(),
-                    0U /* myStashIdx */,
+                    /*myStashIdx=*/0U,
                     chunkManager(),
                     std::move(iterator),
                     /* isCapped */ false,
@@ -1060,7 +1060,7 @@ TEST_F(ReshardingOplogApplierTest, MetricsAreReported) {
                                    oplogBufferNs(),
                                    appliedToNs(),
                                    stashCollections(),
-                                   0U /* myStashIdx */,
+                                   /*myStashIdx=*/0U,
                                    chunkManager(),
                                    std::move(iterator),
                                    /* isCapped */ false,
@@ -1158,10 +1158,9 @@ TEST_F(ReshardingOplogApplierTest, UpdateAverageTimeToApplyBasic) {
             // entry.
             advanceTime(Milliseconds(500));
             auto oplogWallTime4 = now();
-            ops.push_back(
-                makeProgressMarkNoopOplog(repl::OpTime(Timestamp(9, 3), 1),
-                                          oplogWallTime4,
-                                          true /* createdAfterOplogApplicationStarted */));
+            ops.push_back(makeProgressMarkNoopOplog(repl::OpTime(Timestamp(9, 3), 1),
+                                                    oplogWallTime4,
+                                                    /*createdAfterOplogApplicationStarted=*/true));
 
             advanceTime(Milliseconds(100));
             auto iterator = std::make_unique<OplogIteratorMock>(std::move(ops), batchSize);
@@ -1175,7 +1174,7 @@ TEST_F(ReshardingOplogApplierTest, UpdateAverageTimeToApplyBasic) {
                             oplogBufferNs(),
                             appliedToNs(),
                             stashCollections(),
-                            0U /* myStashIdx */,
+                            /*myStashIdx=*/0U,
                             chunkManager(),
                             std::move(iterator),
                             /* isCapped */ false,
@@ -1235,7 +1234,7 @@ TEST_F(ReshardingOplogApplierTest, UpdateAverageTimeToApply_EmptyBatch) {
                     oplogBufferNs(),
                     appliedToNs(),
                     stashCollections(),
-                    0U /* myStashIdx */,
+                    /*myStashIdx=*/0U,
                     chunkManager(),
                     std::move(iterator),
                     /* isCapped */ false,
@@ -1276,7 +1275,7 @@ TEST_F(ReshardingOplogApplierTest, UpdateAverageTimeToApply_ClockSkew) {
                     oplogBufferNs(),
                     appliedToNs(),
                     stashCollections(),
-                    0U /* myStashIdx */,
+                    /*myStashIdx=*/0U,
                     chunkManager(),
                     std::move(iterator),
                     /* isCapped */ false,

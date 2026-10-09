@@ -401,15 +401,15 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
     additiveMetrics.nDocsSampled = 10;
     additiveMetrics.planShapeCounts.increment(plan_shape_counters::PlanShapeCounter::kCollscan, 1);
 
-    CursorMetrics cursorMetrics(3 /* keysExamined */,
-                                4 /* docsExamined */,
-                                10 /* bytesRead */,
-                                11 /* readingTimeMicros */,
-                                5 /* workingTimeMillis */,
-                                true /* hasSortStage */,
-                                false /* usedDisk */,
-                                true /* fromMultiPlanner */,
-                                false /* fromPlanCache */);
+    CursorMetrics cursorMetrics(/*keysExamined=*/3,
+                                /*docsExamined=*/4,
+                                /*bytesRead=*/10,
+                                /*readingTimeMicros=*/11,
+                                /*workingTimeMillis=*/5,
+                                /*hasSortStage=*/true,
+                                /*usedDisk=*/false,
+                                /*fromMultiPlanner=*/true,
+                                /*fromPlanCache=*/false);
     cursorMetrics.setPlanningTimeMicros(150);
     cursorMetrics.setNDocsSampled(15);
     cursorMetrics.setCpuNanos(9);
@@ -508,15 +508,15 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateNegativeCpuNanos) {
 
     additiveMetrics.cpuNanos = Nanoseconds(-1);
 
-    CursorMetrics cursorMetrics(1 /* keysExamined */,
-                                2 /* docsExamined */,
-                                3 /* bytesRead */,
+    CursorMetrics cursorMetrics(/*keysExamined=*/1,
+                                /*docsExamined=*/2,
+                                /*bytesRead=*/3,
                                 /*readingTimeMicros=*/10,
                                 /*workingTimeMillis=*/11,
-                                true /* hasSortStage */,
-                                false /* usedDisk */,
-                                true /* fromMultiPlanner */,
-                                false /* fromPlanCache */);
+                                /*hasSortStage=*/true,
+                                /*usedDisk=*/false,
+                                /*fromMultiPlanner=*/true,
+                                /*fromPlanCache=*/false);
     cursorMetrics.setPlanningTimeMicros(12);
     cursorMetrics.setNDocsSampled(15);
     cursorMetrics.setCpuNanos(-1);
@@ -540,15 +540,15 @@ TEST(CurOpTest, AdditiveMetricsAggregateCursorMetricsTreatsNoneAsZero) {
     additiveMetrics.planningTime = boost::none;
     additiveMetrics.nDocsSampled = boost::none;
 
-    CursorMetrics cursorMetrics(1 /* keysExamined */,
-                                2 /* docsExamined */,
-                                3 /* bytesRead */,
+    CursorMetrics cursorMetrics(/*keysExamined=*/1,
+                                /*docsExamined=*/2,
+                                /*bytesRead=*/3,
                                 /*readingTimeMicros=*/10,
                                 /*workingTimeMillis=*/11,
-                                true /* hasSortStage */,
-                                false /* usedDisk */,
-                                true /* fromMultiPlanner */,
-                                false /* fromPlanCache */);
+                                /*hasSortStage=*/true,
+                                /*usedDisk=*/false,
+                                /*fromMultiPlanner=*/true,
+                                /*fromPlanCache=*/false);
     cursorMetrics.setPlanningTimeMicros(100);
     cursorMetrics.setNDocsSampled(15);
     cursorMetrics.setCpuNanos(10);
@@ -741,7 +741,7 @@ TEST(CurOpTest, OptionalAdditiveMetricsNotDisplayedIfUninitialized) {
     }
 
     BSONObjBuilder builder;
-    od.append(opCtx.get(), ls, {}, {}, 0, false /*omitCommand*/, builder);
+    od.append(opCtx.get(), ls, {}, {}, 0, /*omitCommand=*/false, builder);
     auto bs = builder.done();
 
     // Append should always include these basic fields.
@@ -779,7 +779,7 @@ TEST(CurOpTest, AppendReportsUserAcquisitionAndLDAPOperationStatsAsDistinctObjec
     ASSERT_TRUE(userAcquisitionStats->shouldReportLDAPOperationStats());
 
     BSONObjBuilder builder;
-    od.append(opCtx.get(), ls, {}, {}, 0, false /*omitCommand*/, builder);
+    od.append(opCtx.get(), ls, {}, {}, 0, /*omitCommand=*/false, builder);
     BSONObj bs = builder.done();
 
     ASSERT_TRUE(bs.hasField("authorization")) << bs;
@@ -816,7 +816,7 @@ TEST(CurOpTest, PlanSelectionStrategyAppendedToProfilerOutput) {
 
     auto appendAndGetPlanRanker = [&]() -> boost::optional<std::string> {
         BSONObjBuilder builder;
-        curop->debug().append(opCtx.get(), ls, {}, {}, 0, false /*omitCommand*/, builder);
+        curop->debug().append(opCtx.get(), ls, {}, {}, 0, /*omitCommand=*/false, builder);
         auto bs = builder.done();
         if (auto elem = bs["planRanker"]) {
             return elem.String();
@@ -912,7 +912,7 @@ TEST(CurOpTest, PlanSelectionStrategyInProfileFilterAppendStaged) {
     }
 
     auto stagedAndGetPlanRanker = [&]() -> boost::optional<std::string> {
-        auto fn = OpDebug::appendStaged(opCtx.get(), {"planRanker"}, false /*needWholeDocument*/);
+        auto fn = OpDebug::appendStaged(opCtx.get(), {"planRanker"}, /*needWholeDocument=*/false);
         OpDebug::AppendArgs args{opCtx.get(), curop->debug(), *curop};
         BSONObj result = fn(args);
         if (auto elem = result["planRanker"]) {
@@ -962,7 +962,7 @@ TEST(CurOpTest, UsedJoinOptimizationExposedInAllOutputs) {
     // Profiler output.
     auto appendAndGetUsedJoinOptimization = [&]() -> boost::optional<bool> {
         BSONObjBuilder builder;
-        curop->debug().append(opCtx.get(), ls, {}, {}, 0, false /*omitCommand*/, builder);
+        curop->debug().append(opCtx.get(), ls, {}, {}, 0, /*omitCommand=*/false, builder);
         auto bs = builder.done();
         if (auto elem = bs["usedJoinOptimization"]) {
             return elem.Bool();
@@ -987,7 +987,7 @@ TEST(CurOpTest, UsedJoinOptimizationExposedInAllOutputs) {
     // Profile filter evaluation.
     auto stagedAndGetUsedJoinOptimization = [&]() -> boost::optional<bool> {
         auto fn = OpDebug::appendStaged(
-            opCtx.get(), {"usedJoinOptimization"}, false /*needWholeDocument*/);
+            opCtx.get(), {"usedJoinOptimization"}, /*needWholeDocument=*/false);
         OpDebug::AppendArgs args{opCtx.get(), curop->debug(), *curop};
         BSONObj result = fn(args);
         if (auto elem = result["usedJoinOptimization"]) {
@@ -1034,7 +1034,7 @@ TEST(CurOpTest, JoinOptimizationFallbackReasonExposedInAllOutputs) {
 
     auto appendAndGetFallbackReason = [&]() -> boost::optional<std::string> {
         BSONObjBuilder builder;
-        curop->debug().append(opCtx.get(), ls, {}, {}, 0, false /*omitCommand*/, builder);
+        curop->debug().append(opCtx.get(), ls, {}, {}, 0, /*omitCommand=*/false, builder);
         auto bs = builder.done();
         if (auto elem = bs["fallbackReason"]) {
             return elem.String();
@@ -1057,7 +1057,7 @@ TEST(CurOpTest, JoinOptimizationFallbackReasonExposedInAllOutputs) {
 
     auto stagedAndGetFallbackReason = [&]() -> boost::optional<std::string> {
         auto fn =
-            OpDebug::appendStaged(opCtx.get(), {"fallbackReason"}, false /*needWholeDocument*/);
+            OpDebug::appendStaged(opCtx.get(), {"fallbackReason"}, /*needWholeDocument=*/false);
         OpDebug::AppendArgs args{opCtx.get(), curop->debug(), *curop};
         BSONObj result = fn(args);
         if (auto elem = result["fallbackReason"]) {
@@ -1224,7 +1224,7 @@ TEST(CurOpTest, MemoryStatsDisplayedIfNonZero) {
     SingleThreadedLockStats ls;
 
     BSONObjBuilder bob;
-    opDebug.append(opCtx.get(), ls, {}, {}, 0, true /*omitCommand*/, bob);
+    opDebug.append(opCtx.get(), ls, {}, {}, 0, /*omitCommand=*/true, bob);
 
     // If the memory tracker has not updated CurOp, the memory tracking stat should not appear in
     // the profiler output.
@@ -1234,7 +1234,7 @@ TEST(CurOpTest, MemoryStatsDisplayedIfNonZero) {
 
     curop->setMemoryTrackingStats(/*inUseTrackedMemBytes=*/10, /*peakTrackedMemBytes=*/15);
     BSONObjBuilder bobWithMemStats;
-    opDebug.append(opCtx.get(), ls, {}, {}, 0, true /*omitCommand*/, bobWithMemStats);
+    opDebug.append(opCtx.get(), ls, {}, {}, 0, /*omitCommand=*/true, bobWithMemStats);
     res = bobWithMemStats.done();
 
     ASSERT_EQ(15, curop->getPeakTrackedMemoryBytes());
@@ -1352,8 +1352,8 @@ TEST(CurOpTest, AppendIncludesDelinquentStatsIfNonZero) {
                               SingleThreadedLockStats{},
                               FlowControlTicketholder::CurOp{},
                               SingleThreadedStorageMetrics{},
-                              0 /*prepareReadConflicts*/,
-                              true /*omitCommand*/,
+                              /*prepareReadConflicts=*/0,
+                              /*omitCommand=*/true,
                               bob);
         return bob.obj();
     };
@@ -1796,7 +1796,7 @@ TEST(CurOpTest, KilledOperationReportsLatency) {
     SingleThreadedLockStats ls;
 
     BSONObjBuilder bob;
-    opDebug.append(opCtx.get(), ls, {}, {}, 0, true /*omitCommand*/, bob);
+    opDebug.append(opCtx.get(), ls, {}, {}, 0, /*omitCommand=*/true, bob);
 
     auto res = bob.done();
     ASSERT_TRUE(res.hasField("interruptLatencyNanos")) << res.toString();
@@ -1814,7 +1814,7 @@ TEST(CurOpTest, ShouldReportDeadline) {
     SingleThreadedLockStats ls;
 
     BSONObjBuilder bob;
-    opDebug.append(opCtx.get(), ls, {}, {}, 0, true /*omitCommand*/, bob);
+    opDebug.append(opCtx.get(), ls, {}, {}, 0, /*omitCommand=*/true, bob);
 
     auto res = bob.done();
     ASSERT_TRUE(res.hasField("deadline")) << res.toString();
@@ -1826,7 +1826,7 @@ TEST(CurOpTest, ShouldReportDeadline) {
                                    nullptr,
                                    boost::none,
                                    boost::none,
-                                   true /*forceLog*/);
+                                   /*forceLog=*/true);
 
 
     static constexpr long long kSlowQueryLogId = 51803;
@@ -2213,7 +2213,7 @@ TEST(CurOpTest, ReportStateReportsUnrecognizedCommand) {
         curOp->setGenericOpRequestDetails(
             clientLock,
             NamespaceString::createNamespaceString_forTest("admin.$cmd"),
-            /*command*/ nullptr,
+            /*command=*/nullptr,
             cmdObj,
             NetworkOp::dbQuery);
     }

@@ -99,12 +99,12 @@ public:
                                                          foreignKey,
                                                          asKey,
                                                          strategy,
-                                                         true /* shouldProduceBson */);
+                                                         /*shouldProduceBson=*/true);
         auto solution = makeQuerySolution(std::move(lookupNode));
 
         // Convert logical solution into the physical SBE plan.
         auto [resultSlots, stage, data, _] =
-            buildPlanStage(std::move(solution), colls, false /*hasRecordId*/);
+            buildPlanStage(std::move(solution), colls, /*hasRecordId=*/false);
 
         if (enableDebugOutput) {
             DebugPrintInfo debugPrintInfo{};
@@ -152,7 +152,7 @@ public:
 
         MultipleCollectionAccessor colls(localColl,
                                          secondaryAcquisitions,
-                                         false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+                                         /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
         auto tree = buildLookupSbeTree(strategy, colls, localKey, foreignKey, asKey);
         auto& stage = tree.stage;
@@ -217,7 +217,7 @@ public:
         expectedDocuments.reserve(expectedPairs.size());
         for (auto& [localDocument, matchedDocuments] : expectedPairs) {
             MutableDocument expectedDocument;
-            expectedDocument.reset(localDocument, false /* bsonHasMetadata */);
+            expectedDocument.reset(localDocument, /*bsonHasMetadata=*/false);
 
             std::vector<mongo::Value> matchedValues{matchedDocuments.begin(),
                                                     matchedDocuments.end()};
@@ -1214,12 +1214,12 @@ protected:
 
         MultipleCollectionAccessor colls(mainAcquisition,
                                          secondaryAcquisitions,
-                                         false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+                                         /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
         BuildPlanStageParam params;
         params.expCtx = expCtx;
         auto [resultSlots, rootStage, data, _] =
-            buildPlanStage(std::move(solution), colls, false /*hasRecordId*/, std::move(params));
+            buildPlanStage(std::move(solution), colls, /*hasRecordId=*/false, std::move(params));
         ASSERT_EQ(resultSlots.size(), 1);
 
         if (enableDebugOutput) {

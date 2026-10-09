@@ -76,7 +76,7 @@ bool TicketHolder::resize(OperationContext* opCtx, int newSize, Date_t deadline)
                 // Take tickets one-by-one without releasing.
                 for (auto remaining = -difference; remaining > 0; remaining--) {
                     if (!_semaphore->acquire(
-                            opCtx, &admCtx, effectiveDeadline, true /* interruptible */)) {
+                            opCtx, &admCtx, effectiveDeadline, /*interruptible=*/true)) {
                         // We timed out getting a ticket, fail the resize.
                         return false;
                     }

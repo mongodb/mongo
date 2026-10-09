@@ -67,7 +67,7 @@ struct ShardMetadataUtilTest : public ShardServerTestFixture {
             operationContext(),
             BSON(ShardCollectionType::kNssFieldName << kNss.ns_forTest()),
             shardCollectionType.toBSON(),
-            true /*upsert*/));
+            /*upsert=*/true));
 
         return shardCollectionType;
     }

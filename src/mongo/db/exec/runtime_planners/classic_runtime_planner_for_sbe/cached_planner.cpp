@@ -48,7 +48,7 @@ public:
                                            extractSbeYieldPolicy(),
                                            std::move(remoteCursors),
                                            std::move(remoteExplains),
-                                           boost::none /* cachedPlanHash */,
+                                           /*cachedPlanHash=*/boost::none,
                                            planSelectionStrategy());
     }
 

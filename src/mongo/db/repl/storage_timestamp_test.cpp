@@ -467,12 +467,12 @@ public:
     }
 
     BSONObj queryOplog(const BSONObj& query) {
-        OneOffRead oor(_opCtx, Timestamp::min(), true /* waitForOplog */);
+        OneOffRead oor(_opCtx, Timestamp::min(), /*waitForOplog=*/true);
         return queryCollection(NamespaceString::kRsOplogNamespace, query);
     }
 
     Timestamp getTopOfOplog() {
-        OneOffRead oor(_opCtx, Timestamp::min(), true /* waitForOplog */);
+        OneOffRead oor(_opCtx, Timestamp::min(), /*waitForOplog=*/true);
         BSONObj ret;
         ASSERT_TRUE(Helpers::getLast(_opCtx, NamespaceString::kRsOplogNamespace, ret));
         return ret["ts"].timestamp();
@@ -806,7 +806,7 @@ public:
         stdx::unordered_set<std::string> fieldNames;
         auto cursor = collectionPtr->getCursor(_opCtx);
         for (auto record = cursor->next(); record; record = cursor->next()) {
-            _extractDottedFieldNames(record->data.toBson(), "" /*prefix*/, fieldNames);
+            _extractDottedFieldNames(record->data.toBson(), /*prefix=*/"", fieldNames);
         }
         return fieldNames;
     }
@@ -1914,7 +1914,7 @@ TEST_F(StorageTimestampTest, PrimarySetsMultikeyInsideMultiDocumentTransaction) 
 
     txnParticipant.beginOrContinue(_opCtx,
                                    {*_opCtx->getTxnNumber()},
-                                   false /* autocommit */,
+                                   /*autocommit=*/false,
                                    TransactionParticipant::TransactionActions::kStart);
     txnParticipant.unstashTransactionResources(_opCtx, "insert");
     {
@@ -1949,14 +1949,13 @@ TEST_F(StorageTimestampTest, PrimarySetsMultikeyInsideMultiDocumentTransaction) 
     // but it is incorrect to assign a timestamp that is too late. In this specific case, we
     // expect the write to be timestamped at the logical clock tick directly preceding the
     // commit time.
-    assertMultikeyPaths(_opCtx, collPtr, indexName, presentTs, false /* shouldBeMultikey */, {{}});
+    assertMultikeyPaths(_opCtx, collPtr, indexName, presentTs, /*shouldBeMultikey=*/false, {{}});
+    assertMultikeyPaths(_opCtx, collPtr, indexName, beforeTxnTs, /*shouldBeMultikey=*/false, {{}});
     assertMultikeyPaths(
-        _opCtx, collPtr, indexName, beforeTxnTs, false /* shouldBeMultikey */, {{}});
+        _opCtx, collPtr, indexName, multikeyNoopTs, /*shouldBeMultikey=*/true, {{0}});
     assertMultikeyPaths(
-        _opCtx, collPtr, indexName, multikeyNoopTs, true /* shouldBeMultikey */, {{0}});
-    assertMultikeyPaths(
-        _opCtx, collPtr, indexName, commitEntryTs, true /* shouldBeMultikey */, {{0}});
-    assertMultikeyPaths(_opCtx, collPtr, indexName, _nullTs, true /* shouldBeMultikey */, {{0}});
+        _opCtx, collPtr, indexName, commitEntryTs, /*shouldBeMultikey=*/true, {{0}});
+    assertMultikeyPaths(_opCtx, collPtr, indexName, _nullTs, /*shouldBeMultikey=*/true, {{0}});
 }
 
 TEST_F(StorageTimestampTest, PrimarySetsWildcardMultikeyInsideMultiDocumentTransaction) {
@@ -1997,7 +1996,7 @@ TEST_F(StorageTimestampTest, PrimarySetsWildcardMultikeyInsideMultiDocumentTrans
 
     txnParticipant.beginOrContinue(_opCtx,
                                    {*_opCtx->getTxnNumber()},
-                                   false /* autocommit */,
+                                   /*autocommit=*/false,
                                    TransactionParticipant::TransactionActions::kStart);
     txnParticipant.unstashTransactionResources(_opCtx, "insert");
     {
@@ -2019,8 +2018,8 @@ TEST_F(StorageTimestampTest, PrimarySetsWildcardMultikeyInsideMultiDocumentTrans
     assertDocumentAtTimestamp(collPtr, _nullTs, doc);
 
     // Verify the catalog multikey flag is set at the latest timestamp.
-    assertMultikeyPaths(_opCtx, collPtr, indexName, presentTs, false /* shouldBeMultikey */, {});
-    assertMultikeyPaths(_opCtx, collPtr, indexName, _nullTs, true /* shouldBeMultikey */, {});
+    assertMultikeyPaths(_opCtx, collPtr, indexName, presentTs, /*shouldBeMultikey=*/false, {});
+    assertMultikeyPaths(_opCtx, collPtr, indexName, _nullTs, /*shouldBeMultikey=*/true, {});
 
     // Verify the wildcard metadata keys are present at the latest timestamp.
     // The field "a" is an array, so it should be recorded as a multikey path.
@@ -2042,7 +2041,7 @@ TEST_F(StorageTimestampTest, PrimarySetsWildcardMultikeyInsideMultiDocumentTrans
     }
 
     // Before the transaction, the catalog multikey flag should not be set.
-    assertMultikeyPaths(_opCtx, collPtr, indexName, beforeTxnTs, false /* shouldBeMultikey */, {});
+    assertMultikeyPaths(_opCtx, collPtr, indexName, beforeTxnTs, /*shouldBeMultikey=*/false, {});
 }
 
 TEST_F(StorageTimestampTest,
@@ -2083,7 +2082,7 @@ TEST_F(StorageTimestampTest,
 
     txnParticipant.beginOrContinue(_opCtx,
                                    {*_opCtx->getTxnNumber()},
-                                   false /* autocommit */,
+                                   /*autocommit=*/false,
                                    TransactionParticipant::TransactionActions::kStart);
     txnParticipant.unstashTransactionResources(_opCtx, "insert");
     {
@@ -2169,7 +2168,7 @@ TEST_F(StorageTimestampTest, PrimarySetsWildcardMultikeyInsideMultiDocumentTrans
 
     txnParticipant.beginOrContinue(_opCtx,
                                    {*_opCtx->getTxnNumber()},
-                                   false /* autocommit */,
+                                   /*autocommit=*/false,
                                    TransactionParticipant::TransactionActions::kStart);
     txnParticipant.unstashTransactionResources(_opCtx, "insert");
     {
@@ -2202,9 +2201,9 @@ TEST_F(StorageTimestampTest, PrimarySetsWildcardMultikeyInsideMultiDocumentTrans
     assertDocumentAtTimestamp(collPtr, _nullTs, doc);
 
     // Verify the catalog multikey flag is set at the latest timestamp.
-    assertMultikeyPaths(_opCtx, collPtr, indexName, _nullTs, true /* shouldBeMultikey */, {});
+    assertMultikeyPaths(_opCtx, collPtr, indexName, _nullTs, /*shouldBeMultikey=*/true, {});
     // Before the transaction, multikey should not be set.
-    assertMultikeyPaths(_opCtx, collPtr, indexName, beforeTxnTs, false /* shouldBeMultikey */, {});
+    assertMultikeyPaths(_opCtx, collPtr, indexName, beforeTxnTs, /*shouldBeMultikey=*/false, {});
 
     // Verify the wildcard metadata keys are present at the latest timestamp.
     auto entry = collPtr->getIndexCatalog()->findIndexByName(_opCtx, indexName);
@@ -2264,7 +2263,7 @@ TEST_F(StorageTimestampTest, PrimarySetsCompoundWildcardMultikeyInsideMultiDocum
 
     txnParticipant.beginOrContinue(_opCtx,
                                    {*_opCtx->getTxnNumber()},
-                                   false /* autocommit */,
+                                   /*autocommit=*/false,
                                    TransactionParticipant::TransactionActions::kStart);
     txnParticipant.unstashTransactionResources(_opCtx, "insert");
     {
@@ -2281,10 +2280,10 @@ TEST_F(StorageTimestampTest, PrimarySetsCompoundWildcardMultikeyInsideMultiDocum
     const auto collAcq = acquireCollForRead(_opCtx, nss);
     const auto& collPtr = collAcq.getCollectionPtr();
 
-    assertMultikeyPaths(_opCtx, collPtr, indexName, _nullTs, true /* shouldBeMultikey */, {});
+    assertMultikeyPaths(_opCtx, collPtr, indexName, _nullTs, /*shouldBeMultikey=*/true, {});
 
     // Before the transaction, the catalog multikey flag should not be set.
-    assertMultikeyPaths(_opCtx, collPtr, indexName, beforeTxnTs, false /* shouldBeMultikey */, {});
+    assertMultikeyPaths(_opCtx, collPtr, indexName, beforeTxnTs, /*shouldBeMultikey=*/false, {});
 
     auto entry = collPtr->getIndexCatalog()->findIndexByName(_opCtx, indexName);
     ASSERT(entry);
@@ -2363,8 +2362,8 @@ TEST_F(StorageTimestampTest, SecondaryAppliesWildcardMultikeyMetadataFromTransac
     const auto& collPtr = collAcq.getCollectionPtr();
 
     // Catalog flag set after apply, not before.
-    assertMultikeyPaths(_opCtx, collPtr, indexName, applyTs, true /* shouldBeMultikey */, {});
-    assertMultikeyPaths(_opCtx, collPtr, indexName, beforeTxnTs, false /* shouldBeMultikey */, {});
+    assertMultikeyPaths(_opCtx, collPtr, indexName, applyTs, /*shouldBeMultikey=*/true, {});
+    assertMultikeyPaths(_opCtx, collPtr, indexName, beforeTxnTs, /*shouldBeMultikey=*/false, {});
 
     auto entry = collPtr->getIndexCatalog()->findIndexByName(_opCtx, indexName);
     ASSERT(entry);
@@ -2498,8 +2497,8 @@ TEST_F(StorageTimestampTest, SecondaryAppliesCompoundWildcardMultikeyMetadataFro
     const auto collAcq = acquireCollForRead(_opCtx, nss);
     const auto& collPtr = collAcq.getCollectionPtr();
 
-    assertMultikeyPaths(_opCtx, collPtr, indexName, applyTs, true /* shouldBeMultikey */, {});
-    assertMultikeyPaths(_opCtx, collPtr, indexName, beforeTxnTs, false /* shouldBeMultikey */, {});
+    assertMultikeyPaths(_opCtx, collPtr, indexName, applyTs, /*shouldBeMultikey=*/true, {});
+    assertMultikeyPaths(_opCtx, collPtr, indexName, beforeTxnTs, /*shouldBeMultikey=*/false, {});
 
     auto entry = collPtr->getIndexCatalog()->findIndexByName(_opCtx, indexName);
     ASSERT(entry);
@@ -2560,9 +2559,8 @@ TEST_F(StorageTimestampTest, SecondaryAppliesRegularMultikeyMetadataFromTransact
     const auto& collPtr = collAcq.getCollectionPtr();
 
     // Regular index: catalog flag set + multikey path component is recorded.
-    assertMultikeyPaths(_opCtx, collPtr, indexName, applyTs, true /* shouldBeMultikey */, {{0}});
-    assertMultikeyPaths(
-        _opCtx, collPtr, indexName, beforeTxnTs, false /* shouldBeMultikey */, {{}});
+    assertMultikeyPaths(_opCtx, collPtr, indexName, applyTs, /*shouldBeMultikey=*/true, {{0}});
+    assertMultikeyPaths(_opCtx, collPtr, indexName, beforeTxnTs, /*shouldBeMultikey=*/false, {{}});
 }
 
 TEST_F(StorageTimestampTest, InitializeMinValid) {
@@ -3128,13 +3126,13 @@ TEST_F(StorageTimestampTest, TimestampMultiIndexBuildsDuringRename) {
     // We expect one new collection ident and one new index ident (the _id index) during this
     // rename.
     assertRenamedCollectionIdentsAtTimestamp(
-        mdbCatalog, origIdents, /*expectedNewIndexIdents*/ 1, indexCreateInitTs);
+        mdbCatalog, origIdents, /*expectedNewIndexIdents=*/1, indexCreateInitTs);
 
     // We expect one new collection ident and three new index idents (including the _id index)
     // after this rename. The a_1 and b_1 index idents are created and persisted with the
     // "ready: true" write.
     assertRenamedCollectionIdentsAtTimestamp(
-        mdbCatalog, origIdents, /*expectedNewIndexIdents*/ 3, indexCommitTs);
+        mdbCatalog, origIdents, /*expectedNewIndexIdents=*/3, indexCommitTs);
 
     // Assert the 'a_1' and `b_1` indexes becomes ready at the last oplog entry time.
     RecordId renamedCatalogId = CollectionCatalog::get(_opCtx)
@@ -3246,13 +3244,13 @@ TEST_F(StorageTimestampTest, TimestampAbortIndexBuild) {
 
     // We expect one new one new index ident during this index build.
     assertRenamedCollectionIdentsAtTimestamp(
-        mdbCatalog, origIdents, /*expectedNewIndexIdents*/ 1, indexStartTs);
+        mdbCatalog, origIdents, /*expectedNewIndexIdents=*/1, indexStartTs);
     ASSERT_FALSE(
         getIndexMetaData(getMetaDataAtTime(mdbCatalog, catalogId, indexStartTs), "a_1").ready);
 
     // We expect all new idents to be removed after the index build has aborted.
     assertRenamedCollectionIdentsAtTimestamp(
-        mdbCatalog, origIdents, /*expectedNewIndexIdents*/ 0, indexAbortTs);
+        mdbCatalog, origIdents, /*expectedNewIndexIdents=*/0, indexAbortTs);
     assertIndexMetaDataMissing(getMetaDataAtTime(mdbCatalog, catalogId, indexAbortTs), "a_1");
 
     // Assert that the index build is removed from config.system.indexBuilds collection after
@@ -4011,7 +4009,7 @@ public:
         // Start a retryable write.
         txnParticipant.beginOrContinue(_opCtx,
                                        {txnNumber},
-                                       boost::none /* autocommit */,
+                                       /*autocommit=*/boost::none,
                                        TransactionParticipant::TransactionActions::kNone);
     }
 
@@ -4055,8 +4053,8 @@ TEST_F(RetryableFindAndModifyTest, RetryableFindAndModifyUpdate) {
                                  oldObj),
             newObj,
             collection_internal::kUpdateNoIndexes,
-            nullptr /* indexesAffected */,
-            nullptr /* opDebug */,
+            /*indexesAffected=*/nullptr,
+            /*opDebug=*/nullptr,
             &args);
         wuow.commit();
     }
@@ -4118,10 +4116,10 @@ TEST_F(RetryableFindAndModifyTest, RetryableFindAndModifyUpdateWithDamages) {
                                                            source,
                                                            damages,
                                                            collection_internal::kUpdateNoIndexes,
-                                                           nullptr /* indexesAffected */,
-                                                           nullptr /* opDebug */,
+                                                           /*indexesAffected=*/nullptr,
+                                                           /*opDebug=*/nullptr,
                                                            &args,
-                                                           nullptr /*cursor*/);
+                                                           /*cursor=*/nullptr);
         wuow.commit();
         ASSERT_OK(statusWith.getStatus());
     }
@@ -4230,7 +4228,7 @@ public:
 
         txnParticipant.beginOrContinue(_opCtx,
                                        {*_opCtx->getTxnNumber()},
-                                       false /* autocommit */,
+                                       /*autocommit=*/false,
                                        TransactionParticipant::TransactionActions::kStart);
         txnParticipant.unstashTransactionResources(_opCtx, "insert");
         {

@@ -448,9 +448,9 @@ void ParseAndRunCommand::_updateStatsAndApplyErrorLabels(const Status& status) {
                                       command->getName(),
                                       status.code(),
                                       boost::none,
-                                      false /* isInternalClient */,
-                                      true /* isMongos */,
-                                      false /* isComingFromRouter */,
+                                      /*isInternalClient=*/false,
+                                      /*isMongos=*/true,
+                                      /*isComingFromRouter=*/false,
                                       repl::OpTime{},
                                       repl::OpTime{});
     _errorBuilder->appendElements(errorLabels);

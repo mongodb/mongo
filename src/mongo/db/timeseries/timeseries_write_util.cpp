@@ -118,7 +118,7 @@ void updateTimeseriesDocument(OperationContext* opCtx,
                                         original,
                                         updated,
                                         diffOnIndexes,
-                                        nullptr /*indexesAffected*/,
+                                        /*indexesAffected=*/nullptr,
                                         opDebug,
                                         &args);
 }

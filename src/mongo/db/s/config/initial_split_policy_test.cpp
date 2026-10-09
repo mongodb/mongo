@@ -1073,7 +1073,7 @@ TEST_F(PresplitHashedZonesChunksTest, MultipleContiguousZonesWithEachShardHaving
 
     // This should have 7 chunks, 5 for all zones and 2 boundaries.
     std::vector<ChunkRange> expectedChunkRanges =
-        buildExpectedChunkRanges(tags, shardKeyPattern, {1, 1, 2, 1} /* numChunksPerTag*/);
+        buildExpectedChunkRanges(tags, shardKeyPattern, /*numChunksPerTag=*/{1, 1, 2, 1});
 
     std::vector<boost::optional<ShardId>> expectedShardForEachChunk = {
         boost::none,   // Lower bound.
@@ -1152,7 +1152,7 @@ TEST_F(PresplitHashedZonesChunksTest, OneLargeZoneAndOtherSmallZonesSharingASing
 
     // This should have 15 chunks, 9 for all zones, 4 gap and 2 boundaries.
     std::vector<ChunkRange> expectedChunkRanges =
-        buildExpectedChunkRanges(tags, shardKeyPattern, {1, 1, 1, 5, 1} /* numChunksPerTag*/);
+        buildExpectedChunkRanges(tags, shardKeyPattern, /*numChunksPerTag=*/{1, 1, 1, 5, 1});
 
     std::vector<boost::optional<ShardId>> expectedShardForEachChunk = {
         boost::none,   // Lower bound.
@@ -1234,7 +1234,7 @@ TEST_F(PresplitHashedZonesChunksTest, InterweavingZones) {
 
     // This should have 13 chunks, 7 for all zones, 4 gaps and 2 boundaries.
     std::vector<ChunkRange> expectedChunkRanges = buildExpectedChunkRanges(
-        tags, shardKeyPattern, {1, 1 * 2, 1, 1, 1 * 2} /* numChunksPerTag*/);
+        tags, shardKeyPattern, /*numChunksPerTag=*/{1, 1 * 2, 1, 1, 1 * 2});
 
     std::vector<boost::optional<ShardId>> expectedShardForEachChunk = {
         boost::none,   // Lower bound.
@@ -1633,18 +1633,18 @@ TEST_F(SamplingBasedInitSplitTest, NoZones) {
         boost::none, boost::none, boost::none, boost::none};
 
     checkGeneratedInitialZoneChunks(makeInitialSplitPolicy(numInitialChunks,
-                                                           boost::none /* zones */,
+                                                           /*zones=*/boost::none,
                                                            mockSamples,
-                                                           boost::none /* availableShardIds */)
+                                                           /*availableShardIds=*/boost::none)
                                         .get(),
                                     shardKey,
                                     shardList,
                                     expectedChunkRanges,
                                     expectedShardForEachChunk);
     checkGeneratedInitialSplitPoints(makeInitialSplitPolicy(numInitialChunks,
-                                                            boost::none /* zones */,
+                                                            /*zones=*/boost::none,
                                                             mockSamples,
-                                                            boost::none /* availableShardIds */)
+                                                            /*availableShardIds=*/boost::none)
                                          .get(),
                                      shardKey,
                                      expectedChunkRanges);
@@ -1681,18 +1681,18 @@ TEST_F(SamplingBasedInitSplitTest, HashedShardKey) {
         boost::none, boost::none, boost::none, boost::none};
 
     checkGeneratedInitialZoneChunks(makeInitialSplitPolicy(numInitialChunks,
-                                                           boost::none /* zones */,
+                                                           /*zones=*/boost::none,
                                                            mockSamples,
-                                                           boost::none /* availableShardIds */)
+                                                           /*availableShardIds=*/boost::none)
                                         .get(),
                                     shardKey,
                                     shardList,
                                     expectedChunkRanges,
                                     expectedShardForEachChunk);
     checkGeneratedInitialSplitPoints(makeInitialSplitPolicy(numInitialChunks,
-                                                            boost::none /* zones */,
+                                                            /*zones=*/boost::none,
                                                             mockSamples,
-                                                            boost::none /* availableShardIds */)
+                                                            /*availableShardIds=*/boost::none)
                                          .get(),
                                      shardKey,
                                      expectedChunkRanges);
@@ -1721,18 +1721,18 @@ TEST_F(SamplingBasedInitSplitTest, SingleInitialChunk) {
     };
 
     checkGeneratedInitialZoneChunks(makeInitialSplitPolicy(numInitialChunks,
-                                                           boost::none /* zones */,
-                                                           {} /* samples */,
-                                                           boost::none /* availableShardIds */)
+                                                           /*zones=*/boost::none,
+                                                           /*samples=*/{},
+                                                           /*availableShardIds=*/boost::none)
                                         .get(),
                                     shardKey,
                                     shardList,
                                     expectedChunkRanges,
                                     expectedShardForEachChunk);
     checkGeneratedInitialSplitPoints(makeInitialSplitPolicy(numInitialChunks,
-                                                            boost::none /* zones */,
-                                                            {} /* samples */,
-                                                            boost::none /* availableShardIds */)
+                                                            /*zones=*/boost::none,
+                                                            /*samples=*/{},
+                                                            /*availableShardIds=*/boost::none)
                                          .get(),
                                      shardKey,
                                      expectedChunkRanges);
@@ -1773,7 +1773,7 @@ TEST_F(SamplingBasedInitSplitTest, ZonesCoversEntireDomainButInsufficient) {
 
     checkGeneratedInitialZoneChunks(
         makeInitialSplitPolicy(
-            numInitialChunks, zones, mockSamples, boost::none /* availableShardIds */)
+            numInitialChunks, zones, mockSamples, /*availableShardIds=*/boost::none)
             .get(),
         shardKey,
         shardList,
@@ -1781,7 +1781,7 @@ TEST_F(SamplingBasedInitSplitTest, ZonesCoversEntireDomainButInsufficient) {
         expectedShardForEachChunk);
     checkGeneratedInitialSplitPoints(
         makeInitialSplitPolicy(
-            numInitialChunks, zones, mockSamples, boost::none /* availableShardIds */)
+            numInitialChunks, zones, mockSamples, /*availableShardIds=*/boost::none)
             .get(),
         shardKey,
         expectedChunkRanges);
@@ -1825,7 +1825,7 @@ TEST_F(SamplingBasedInitSplitTest, SamplesCoincidingWithZones) {
 
     checkGeneratedInitialZoneChunks(
         makeInitialSplitPolicy(
-            numInitialChunks, zones, mockSamples, boost::none /* availableShardIds */)
+            numInitialChunks, zones, mockSamples, /*availableShardIds=*/boost::none)
             .get(),
         shardKey,
         shardList,
@@ -1833,7 +1833,7 @@ TEST_F(SamplingBasedInitSplitTest, SamplesCoincidingWithZones) {
         expectedShardForEachChunk);
     checkGeneratedInitialSplitPoints(
         makeInitialSplitPolicy(
-            numInitialChunks, zones, mockSamples, boost::none /* availableShardIds */)
+            numInitialChunks, zones, mockSamples, /*availableShardIds=*/boost::none)
             .get(),
         shardKey,
         expectedChunkRanges);
@@ -1875,7 +1875,7 @@ TEST_F(SamplingBasedInitSplitTest, ZoneWithHoles) {
 
     checkGeneratedInitialZoneChunks(
         makeInitialSplitPolicy(
-            numInitialChunks, zones, {} /* samples */, boost::none /* availableShardIds */)
+            numInitialChunks, zones, /*samples=*/{}, /*availableShardIds=*/boost::none)
             .get(),
         shardKey,
         shardList,
@@ -1883,7 +1883,7 @@ TEST_F(SamplingBasedInitSplitTest, ZoneWithHoles) {
         expectedShardForEachChunk);
     checkGeneratedInitialSplitPoints(
         makeInitialSplitPolicy(
-            numInitialChunks, zones, {} /* samples */, boost::none /* availableShardIds */)
+            numInitialChunks, zones, /*samples=*/{}, /*availableShardIds=*/boost::none)
             .get(),
         shardKey,
         expectedChunkRanges);
@@ -1925,7 +1925,7 @@ TEST_F(SamplingBasedInitSplitTest, UnsortedZoneWithHoles) {
 
     checkGeneratedInitialZoneChunks(
         makeInitialSplitPolicy(
-            numInitialChunks, zones, {} /* samples */, boost::none /* availableShardIds */)
+            numInitialChunks, zones, /*samples=*/{}, /*availableShardIds=*/boost::none)
             .get(),
         shardKey,
         shardList,
@@ -1933,7 +1933,7 @@ TEST_F(SamplingBasedInitSplitTest, UnsortedZoneWithHoles) {
         expectedShardForEachChunk);
     checkGeneratedInitialSplitPoints(
         makeInitialSplitPolicy(
-            numInitialChunks, zones, {} /* samples */, boost::none /* availableShardIds */)
+            numInitialChunks, zones, /*samples=*/{}, /*availableShardIds=*/boost::none)
             .get(),
         shardKey,
         expectedChunkRanges);
@@ -1970,7 +1970,7 @@ TEST_F(SamplingBasedInitSplitTest, ZonesIsPrefixOfShardKey) {
 
     checkGeneratedInitialZoneChunks(
         makeInitialSplitPolicy(
-            numInitialChunks, zones, {} /* samples */, boost::none /* availableShardIds */)
+            numInitialChunks, zones, /*samples=*/{}, /*availableShardIds=*/boost::none)
             .get(),
         shardKey,
         shardList,
@@ -1978,7 +1978,7 @@ TEST_F(SamplingBasedInitSplitTest, ZonesIsPrefixOfShardKey) {
         expectedShardForEachChunk);
     checkGeneratedInitialSplitPoints(
         makeInitialSplitPolicy(
-            numInitialChunks, zones, {} /* samples */, boost::none /* availableShardIds */)
+            numInitialChunks, zones, /*samples=*/{}, /*availableShardIds=*/boost::none)
             .get(),
         shardKey,
         expectedChunkRanges);
@@ -2007,13 +2007,13 @@ TEST_F(SamplingBasedInitSplitTest, ZonesHasIncompatibleShardKey) {
     SplitPolicyParams params{UUID::gen(), shardId("0")};
     {
         auto initSplitPolicy = makeInitialSplitPolicy(
-            numInitialChunks, zones, mockSamples, boost::none /* availableShardIds */);
+            numInitialChunks, zones, mockSamples, /*availableShardIds=*/boost::none);
         ASSERT_THROWS(initSplitPolicy->createFirstChunks(operationContext(), shardKey, params),
                       DBException);
     }
     {
         auto initSplitPolicy = makeInitialSplitPolicy(
-            numInitialChunks, zones, mockSamples, boost::none /* availableShardIds */);
+            numInitialChunks, zones, mockSamples, /*availableShardIds=*/boost::none);
         ASSERT_THROWS(initSplitPolicy->createFirstSplitPoints(operationContext(), shardKey),
                       DBException);
     }
@@ -2039,17 +2039,17 @@ TEST_F(SamplingBasedInitSplitTest, InsufficientSamples) {
     SplitPolicyParams params{UUID::gen(), shardId("0")};
     {
         auto initSplitPolicy = makeInitialSplitPolicy(numInitialChunks,
-                                                      boost::none /* zones */,
+                                                      /*zones=*/boost::none,
                                                       mockSamples,
-                                                      boost::none /* availableShardIds */);
+                                                      /*availableShardIds=*/boost::none);
         ASSERT_THROWS(initSplitPolicy->createFirstChunks(operationContext(), shardKey, params),
                       DBException);
     }
     {
         auto initSplitPolicy = makeInitialSplitPolicy(numInitialChunks,
-                                                      boost::none /* zones */,
+                                                      /*zones=*/boost::none,
                                                       mockSamples,
-                                                      boost::none /* availableShardIds */);
+                                                      /*availableShardIds=*/boost::none);
         ASSERT_THROWS(initSplitPolicy->createFirstSplitPoints(operationContext(), shardKey),
                       DBException);
     }
@@ -2074,17 +2074,17 @@ TEST_F(SamplingBasedInitSplitTest, ZeroInitialChunks) {
     SplitPolicyParams params{UUID::gen(), shardId("0")};
     {
         auto initSplitPolicy = makeInitialSplitPolicy(numInitialChunks,
-                                                      boost::none /* zones */,
+                                                      /*zones=*/boost::none,
                                                       mockSamples,
-                                                      boost::none /* availableShardIds */);
+                                                      /*availableShardIds=*/boost::none);
         ASSERT_THROWS(initSplitPolicy->createFirstChunks(operationContext(), shardKey, params),
                       DBException);
     }
     {
         auto initSplitPolicy = makeInitialSplitPolicy(numInitialChunks,
-                                                      boost::none /* zones */,
+                                                      /*zones=*/boost::none,
                                                       mockSamples,
-                                                      boost::none /* availableShardIds */);
+                                                      /*availableShardIds=*/boost::none);
         ASSERT_THROWS(initSplitPolicy->createFirstSplitPoints(operationContext(), shardKey),
                       DBException);
     }
@@ -2157,7 +2157,7 @@ TEST_F(SamplingBasedInitSplitTest, NoAvailableShardInZone) {
     SplitPolicyParams params{UUID::gen(), shardId("0")};
     {
         auto initSplitPolicy = makeInitialSplitPolicy(
-            numInitialChunks, boost::none /* zones */, mockSamples, availableShardIds);
+            numInitialChunks, /*zones=*/boost::none, mockSamples, availableShardIds);
         ASSERT_THROWS(initSplitPolicy->createFirstChunks(operationContext(), shardKey, params),
                       DBException);
     }
@@ -2223,7 +2223,7 @@ TEST_F(ShardDistributionInitSplitTest, WithoutZones) {
     std::vector<ShardId> expectedShardForEachChunk = {shardId("0"), shardId("1")};
 
     checkGeneratedInitialZoneChunks(
-        makeInitialSplitPolicy(shardDistribution, boost::none /*zones*/),
+        makeInitialSplitPolicy(shardDistribution, /*zones=*/boost::none),
         shardKey,
         shardList,
         shardDistribution,

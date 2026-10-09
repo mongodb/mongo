@@ -174,7 +174,7 @@ DocumentSourceContainer DocumentSourceQuerySettings::createFromBson(
     // Flatten the 0-or-1 element $lookup array, keeping configurations that have no matching
     // representative query ('includeNullIfEmptyOrMissing' keeps the field absent).
     pipeline.push_back(DocumentSourceUnwind::create(
-        expCtx, "representativeQuery", true /* includeNullIfEmptyOrMissing */, boost::none));
+        expCtx, "representativeQuery", /*includeNullIfEmptyOrMissing=*/true, boost::none));
 
     // Optionally append the debug query shape computation.
     if (showDebugQueryShape) {

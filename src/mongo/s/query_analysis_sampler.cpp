@@ -135,7 +135,7 @@ void QueryAnalysisSampler::onStartup() {
         "QueryAnalysisQueryStatsRefresher",
         [this](Client* client) { _refreshQueryStats(); },
         Seconds(1),
-        false /*isKillableByStepdown*/);
+        /*isKillableByStepdown=*/false);
     _periodicQueryStatsRefresher = periodicRunner->makeJob(std::move(queryStatsRefresherJob));
     _periodicQueryStatsRefresher.start();
 
@@ -154,7 +154,7 @@ void QueryAnalysisSampler::onStartup() {
             }
         },
         Seconds(gQueryAnalysisSamplerConfigurationRefreshSecs.load()),
-        true /*isKillableByStepdown*/);
+        /*isKillableByStepdown=*/true);
     _periodicConfigurationsRefresher = std::make_shared<PeriodicJobAnchor>(
         periodicRunner->makeJob(std::move(configurationsRefresherJob)));
     _periodicConfigurationsRefresher->start();

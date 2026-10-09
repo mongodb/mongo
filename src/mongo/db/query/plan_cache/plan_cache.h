@@ -438,8 +438,8 @@ public:
                 // All entries are always active.
                 return std::make_tuple(key.planCacheShapeHash(),
                                        key.planCacheKeyHash(),
-                                       true /* isNewEntryActive  */,
-                                       true /* shouldBeCreated  */,
+                                       /*isNewEntryActive=*/true,
+                                       /*shouldBeCreated=*/true,
                                        boost::optional<PlanCacheDecisionMetrics>(boost::none));
             } else {
                 tassert(6007020,

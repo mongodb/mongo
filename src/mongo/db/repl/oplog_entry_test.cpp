@@ -123,12 +123,12 @@ TEST_F(OplogEntryTest, Create) {
 
     // The 'object' document shouldn't contain the 'uuid' as it is specified at the top level.
     const auto oplogEntryObjectDoc =
-        MutableOplogEntry::makeCreateCollObject(nss, opts, BSONObj() /* idIndex */);
+        MutableOplogEntry::makeCreateCollObject(nss, opts, /*idIndex=*/BSONObj());
     ASSERT_BSONOBJ_EQ(oplogEntryObjectDoc,
                       BSON("create" << nss.coll() << "capped" << true << "size" << 15));
 
     const auto entry = makeCommandOplogEntry(
-        entryOpTime, nss, oplogEntryObjectDoc, boost::none /* object2 */, opts.uuid);
+        entryOpTime, nss, oplogEntryObjectDoc, /*object2=*/boost::none, opts.uuid);
 
     ASSERT(entry.isCommand());
     ASSERT_FALSE(entry.isPartialTransaction());
@@ -151,13 +151,13 @@ TEST_F(OplogEntryTest, CreateWithRecordIdsReplicatedFalse) {
 
     // The 'object' document shouldn't contain the 'uuid' as it is specified at the top level.
     const auto oplogEntryObjectDoc = MutableOplogEntry::makeCreateCollObject(
-        nss, opts, BSONObj() /* idIndex */, /*recordIdsReplicated=*/false);
+        nss, opts, /*idIndex=*/BSONObj(), /*recordIdsReplicated=*/false);
     ASSERT_BSONOBJ_EQ(oplogEntryObjectDoc,
                       BSON("create" << nss.coll() << "capped" << true << "size" << 15
                                     << "recordIdsReplicated" << false));
 
     const auto entry = makeCommandOplogEntry(
-        entryOpTime, nss, oplogEntryObjectDoc, boost::none /* object2 */, opts.uuid);
+        entryOpTime, nss, oplogEntryObjectDoc, /*object2=*/boost::none, opts.uuid);
 
     ASSERT(entry.isCommand());
     ASSERT_FALSE(entry.isPartialTransaction());
@@ -182,13 +182,13 @@ TEST_F(OplogEntryTest, CreateWithRecordIdsReplicatedTrue) {
 
     // The 'object' document shouldn't contain the 'uuid' as it is specified at the top level.
     const auto oplogEntryObjectDoc = MutableOplogEntry::makeCreateCollObject(
-        nss, opts, BSONObj() /* idIndex */, /*recordIdsReplicated=*/true);
+        nss, opts, /*idIndex=*/BSONObj(), /*recordIdsReplicated=*/true);
     ASSERT_BSONOBJ_EQ(oplogEntryObjectDoc,
                       BSON("create" << nss.coll() << "capped" << true << "size" << 15
                                     << "recordIdsReplicated" << true));
 
     const auto entry = makeCommandOplogEntry(
-        entryOpTime, nss, oplogEntryObjectDoc, boost::none /* object2 */, opts.uuid);
+        entryOpTime, nss, oplogEntryObjectDoc, /*object2=*/boost::none, opts.uuid);
 
     ASSERT(entry.isCommand());
     ASSERT_FALSE(entry.isPartialTransaction());
@@ -212,7 +212,7 @@ TEST_F(OplogEntryTest, CreateWithCatalogIdentifier) {
     opts.uuid = UUID::gen();
 
     const auto oplogEntryObjectDoc =
-        MutableOplogEntry::makeCreateCollObject(nss, opts, BSONObj() /* idIndex */);
+        MutableOplogEntry::makeCreateCollObject(nss, opts, /*idIndex=*/BSONObj());
     ASSERT_BSONOBJ_EQ(oplogEntryObjectDoc,
                       BSON("create" << nss.coll() << "capped" << true << "size" << 15));
 
@@ -2452,9 +2452,9 @@ TEST_F(OplogEntryTest,
                                               {op},
                                               osi,
                                               Date_t::now(),
-                                              {} /* stmtIds */,
+                                              /*stmtIds=*/{},
                                               /*prevWriteOpTimeInTransaction=*/repl::OpTime(),
-                                              boost::none /* multiOpType */);
+                                              /*multiOpType=*/boost::none);
     ASSERT_EQ(entry.extractCommitTransactionTimestamp(), opTime.getTimestamp());
 }
 
@@ -2471,9 +2471,9 @@ TEST_F(OplogEntryTest,
                                               {op},
                                               osi,
                                               Date_t::now(),
-                                              {} /* stmtIds */,
+                                              /*stmtIds=*/{},
                                               /*prevWriteOpTimeInTransaction=*/repl::OpTime(),
-                                              boost::none /* multiOpType */);
+                                              /*multiOpType=*/boost::none);
 
     auto swCommitTimestamp = entry.extractCommitTransactionTimestamp();
     ASSERT_EQ(swCommitTimestamp.getStatus().code(), 11730800);
@@ -2491,9 +2491,9 @@ TEST_F(OplogEntryTest, ExtractCommitTransactionTimestampFails_TerminalApplyOpsOp
                                               {op},
                                               osi,
                                               Date_t::now(),
-                                              {} /* stmtIds */,
+                                              /*stmtIds=*/{},
                                               /*prevWriteOpTimeInTransaction=*/repl::OpTime(),
-                                              boost::none /* multiOpType */);
+                                              /*multiOpType=*/boost::none);
     auto swCommitTimestamp = entry.extractCommitTransactionTimestamp();
     ASSERT_EQ(swCommitTimestamp.getStatus().code(), 11730800);
 }
@@ -2512,7 +2512,7 @@ TEST_F(OplogEntryTest,
                                               {op},
                                               osi,
                                               Date_t::now(),
-                                              {} /* stmtIds */,
+                                              /*stmtIds=*/{},
                                               /*prevWriteOpTimeInTransaction=*/repl::OpTime(),
                                               MultiOplogEntryType::kApplyOpsAppliedSeparately);
 
@@ -2533,9 +2533,9 @@ TEST_F(OplogEntryTest, ExtractCommitTransactionTimestampFails_PartialApplyOpsOpl
                                               {op},
                                               osi,
                                               Date_t::now(),
-                                              {} /* stmtIds */,
+                                              /*stmtIds=*/{},
                                               /*prevWriteOpTimeInTransaction=*/repl::OpTime(),
-                                              boost::none /* multiOpType */,
+                                              /*multiOpType=*/boost::none,
                                               repl::ApplyOpsType::kPartial);
 
     auto swCommitTimestamp = entry.extractCommitTransactionTimestamp();
@@ -2555,9 +2555,9 @@ TEST_F(OplogEntryTest, ExtractCommitTransactionTimestampFails_PrepareApplyOpsOpl
                                               {op},
                                               osi,
                                               Date_t::now(),
-                                              {} /* stmtIds */,
+                                              /*stmtIds=*/{},
                                               /*prevWriteOpTimeInTransaction=*/repl::OpTime(),
-                                              boost::none /* multiOpType */,
+                                              /*multiOpType=*/boost::none,
                                               repl::ApplyOpsType::kPrepare);
 
     auto swCommitTimestamp = entry.extractCommitTransactionTimestamp();
@@ -2596,7 +2596,7 @@ TEST_F(OplogEntryTest, ExtractCommitTransactionTimestampFails_NoopOplogEntry) {
     auto sessionId = makeLogicalSessionIdForTest();
     auto txnNumber = 0;
     auto entry = makeNoopOplogEntry(
-        opTime, nss, uuid, sessionId, txnNumber, {} /* stmtIds */, repl::OpTime() /* prevOpTime */);
+        opTime, nss, uuid, sessionId, txnNumber, /*stmtIds=*/{}, /*prevOpTime=*/repl::OpTime());
 
     auto swCommitTimestamp = entry.extractCommitTransactionTimestamp();
     ASSERT_EQ(swCommitTimestamp.getStatus().code(), 11730800);

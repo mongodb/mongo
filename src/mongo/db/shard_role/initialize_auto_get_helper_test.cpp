@@ -320,7 +320,7 @@ TEST_F(InitializeAutoGetHelperTest, ResolveShardRoleVersionsTracked) {
         {{ChunkRange(BSON("skey" << MINKEY), BSON("skey" << MAXKEY)), kMyShardName}});
 
     auto [shardVersion, resolvedDbVersion] = resolveShardRoleVersions(
-        operationContext(), cri, kMyShardName, boost::none /* placementConflictTime */);
+        operationContext(), cri, kMyShardName, /*placementConflictTime=*/boost::none);
 
     // Tracked collection: shardVersion is this shard's, dbVersion is unset.
     ASSERT_EQ(cri.getShardVersion(kMyShardName), shardVersion);
@@ -336,7 +336,7 @@ TEST_F(InitializeAutoGetHelperTest, ResolveShardRoleVersionsUntrackedOnPrimary) 
         CatalogCacheMock::makeCollectionRoutingInfoUntracked(nss, kMyShardName, dbVersion);
 
     auto [shardVersion, resolvedDbVersion] = resolveShardRoleVersions(
-        operationContext(), cri, kMyShardName, boost::none /* placementConflictTime */);
+        operationContext(), cri, kMyShardName, /*placementConflictTime=*/boost::none);
 
     // Untracked collection on its dbPrimary: UNTRACKED sentinel + the DatabaseVersion attached.
     ASSERT_EQ(ShardVersion::UNTRACKED(), shardVersion);
@@ -353,7 +353,7 @@ TEST_F(InitializeAutoGetHelperTest, ResolveShardRoleVersionsUntrackedOnNonPrimar
         CatalogCacheMock::makeCollectionRoutingInfoUntracked(nss, otherShard, dbVersion);
 
     auto [shardVersion, resolvedDbVersion] = resolveShardRoleVersions(
-        operationContext(), cri, kMyShardName, boost::none /* placementConflictTime */);
+        operationContext(), cri, kMyShardName, /*placementConflictTime=*/boost::none);
 
     ASSERT_EQ(ShardVersion::UNTRACKED(), shardVersion);
     ASSERT_EQ(boost::none, resolvedDbVersion);

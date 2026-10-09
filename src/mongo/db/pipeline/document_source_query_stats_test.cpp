@@ -91,7 +91,7 @@ public:
 
     QueryStatsStore& setUpQueryStatsStore(unsigned numPartitions = 1) {
         QueryStatsStoreManager::get(getServiceContext()) = std::make_unique<QueryStatsStoreManager>(
-            16 * 1024 * 1024 /* cacheSize */, numPartitions);
+            /*cacheSize=*/16 * 1024 * 1024, numPartitions);
         return getQueryStatsStore(getOpCtx());
     }
 
@@ -282,7 +282,7 @@ TEST_F(DocumentSourceQueryStatsTest,
 TEST_F(DocumentSourceQueryStatsTest, GetNextOverMultiplePartitions) {
     // First, populate the query stats store. One partition will have 2 entries, one will have
     // 1, and one will have none.
-    auto& queryStatsStore = setUpQueryStatsStore(3 /* numPartitions */);
+    auto& queryStatsStore = setUpQueryStatsStore(/*numPartitions=*/3);
     queryStatsStore.put(0, QueryStatsEntry{makeFindKeyFromQuery(BSON("a" << 5))});
     queryStatsStore.put(1, QueryStatsEntry{makeFindKeyFromQuery(BSON("b" << 10))});
     queryStatsStore.put(3, QueryStatsEntry{makeFindKeyFromQuery(BSON("c" << 15))});
@@ -443,7 +443,7 @@ TEST_F(DocumentSourceQueryStatsTest, GetNextKeyFailsToReParse) {
 }
 
 TEST_F(DocumentSourceQueryStatsTest, TopKReturnsOnlyCandidatesWhenAllMaterialize) {
-    auto& queryStatsStore = setUpQueryStatsStore(3 /* numPartitions */);
+    auto& queryStatsStore = setUpQueryStatsStore(/*numPartitions=*/3);
     populateStoreWithExecCounts(queryStatsStore, 10);
 
     // With no materialization failures the stage emits only the top-K candidates and never falls
@@ -453,7 +453,7 @@ TEST_F(DocumentSourceQueryStatsTest, TopKReturnsOnlyCandidatesWhenAllMaterialize
 }
 
 TEST_F(DocumentSourceQueryStatsTest, TopKFallsBackToFullScanWhenCandidateFailsToMaterialize) {
-    auto& queryStatsStore = setUpQueryStatsStore(3 /* numPartitions */);
+    auto& queryStatsStore = setUpQueryStatsStore(/*numPartitions=*/3);
     populateStoreWithExecCounts(queryStatsStore, 10);
 
     // The candidates are execCounts {7, 8, 9}. Fail the first materialization, which hits one of
@@ -573,7 +573,7 @@ TEST_F(DocumentSourceQueryStatsTest, DataTypeHashConsistency) {
     StringSet filters;
     for (size_t i = 0; i < keyHashes.size(); ++i) {
         filters.emplace(getNextAndValidateResult(
-            stage, keyHashes, shapeHashes, false /* shouldValidateFilterDataType */));
+            stage, keyHashes, shapeHashes, /*shouldValidateFilterDataType=*/false));
     }
 
     ASSERT_TRUE(stage->getNext().isEOF());

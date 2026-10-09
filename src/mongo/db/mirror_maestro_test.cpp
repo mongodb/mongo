@@ -582,7 +582,7 @@ TEST_F(TargetedMirrorMaestroTest, UninitializedConfigDefersHostCompute) {
     ASSERT_EQ(0, getCachedHosts().size());
 
     // Update the config to be initialized.
-    setAndVerifyConfig(2 /* version */, 1 /* term */, kTwoHostsEW, 2);
+    setAndVerifyConfig(/*version=*/2, /*term=*/1, kTwoHostsEW, 2);
 
     // Host list should be computed upon getting.
     auto hosts = getCachedHosts();
@@ -600,7 +600,7 @@ public:
 // Test that setting the mirrorReads parameter before initialization will update the cached hosts
 // after initialization.
 TEST_F(NoInitMirrorTest, SetParamBeforeInit) {
-    setAndVerifyConfig(2 /* version */, 1 /* term */, kTwoHostsEW, 2);
+    setAndVerifyConfig(/*version=*/2, /*term=*/1, kTwoHostsEW, 2);
 
     auto param = BSON("samplingRate"
                       << 0.0 << "targetedMirroring"

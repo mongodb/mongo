@@ -262,7 +262,7 @@ TEST_F(DBClientCursorTest, DBClientCursorHandlesOpMsgExhaustCorrectly) {
     DBClientConnectionForTest conn;
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     FindCommandRequest findCmd{nss};
-    DBClientCursor cursor(&conn, findCmd, ReadPreferenceSetting{}, true /*isExhaust*/);
+    DBClientCursor cursor(&conn, findCmd, ReadPreferenceSetting{}, /*isExhaust=*/true);
     cursor.setBatchSize(0);
 
     // Set up mock 'find' response.
@@ -325,7 +325,7 @@ TEST_F(DBClientCursorTest, DBClientCursorResendsGetMoreIfMoreToComeFlagIsOmitted
     DBClientConnectionForTest conn;
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     FindCommandRequest findCmd{nss};
-    DBClientCursor cursor(&conn, findCmd, ReadPreferenceSetting{}, true /*isExhaust*/);
+    DBClientCursor cursor(&conn, findCmd, ReadPreferenceSetting{}, /*isExhaust=*/true);
     cursor.setBatchSize(0);
 
     // Set up mock 'find' response.
@@ -409,7 +409,7 @@ TEST_F(DBClientCursorTest, DBClientCursorMoreThrowsExceptionOnNonOKResponse) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     FindCommandRequest findCmd{nss};
     auto cursor = std::make_unique<DBClientCursor>(
-        &conn, findCmd, ReadPreferenceSetting{}, true /*isExhaust*/);
+        &conn, findCmd, ReadPreferenceSetting{}, /*isExhaust=*/true);
     cursor->setBatchSize(0);
 
     // Set up mock 'find' response.
@@ -447,7 +447,7 @@ TEST_F(DBClientCursorTest, DBClientCursorMoreThrowsExceptionAndDoesntKillCursorO
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     FindCommandRequest findCmd{nss};
     auto cursor = std::make_unique<DBClientCursor>(
-        &conn, findCmd, ReadPreferenceSetting{}, true /*isExhaust*/);
+        &conn, findCmd, ReadPreferenceSetting{}, /*isExhaust=*/true);
     cursor->setBatchSize(0);
 
     // Set up mock 'find' response.
@@ -485,7 +485,7 @@ TEST_F(DBClientCursorTest, DBClientCursorMoreThrowsExceptionWhenMoreToComeFlagSe
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     FindCommandRequest findCmd{nss};
     auto cursor = std::make_unique<DBClientCursor>(
-        &conn, findCmd, ReadPreferenceSetting{}, true /*isExhaust*/);
+        &conn, findCmd, ReadPreferenceSetting{}, /*isExhaust=*/true);
     cursor->setBatchSize(0);
 
     // Set up mock 'find' response.
@@ -745,7 +745,7 @@ TEST_F(DBClientCursorTest, DBClientCursorTailableAwaitDataExhaust) {
     FindCommandRequest findCmd{nss};
     findCmd.setTailable(true);
     findCmd.setAwaitData(true);
-    DBClientCursor cursor(&conn, findCmd, ReadPreferenceSetting{}, true /*isExhaust*/);
+    DBClientCursor cursor(&conn, findCmd, ReadPreferenceSetting{}, /*isExhaust=*/true);
     cursor.setBatchSize(0);
 
     // Set up mock 'find' response.
@@ -965,7 +965,7 @@ TEST_F(DBClientCursorTest, DBClientCursorDestructorKillsCursorByDefault_FindRequ
     FindCommandRequest findCmd{nss};
 
     auto cursor = std::make_unique<DBClientCursor>(
-        &conn, findCmd, ReadPreferenceSetting{}, false /* isExhaust*/);
+        &conn, findCmd, ReadPreferenceSetting{}, /*isExhaust=*/false);
     cursor->setBatchSize(1);
 
     // Set up mock 'find' response.
@@ -994,7 +994,7 @@ TEST_F(DBClientCursorTest, DBClientCursorDestructorKillsCursorByDefault_AggReque
     conn.setCallResponse(aggResponseMsg);
 
     auto cursor = uassertStatusOK(DBClientCursor::fromAggregationRequest(
-        &conn, aggCmd, false /* secondaryOk */, false /* useExhaust */));
+        &conn, aggCmd, /*secondaryOk=*/false, /*useExhaust=*/false));
 
     cursor.reset();
     ASSERT(conn.killedCursor(cursorId));
@@ -1010,7 +1010,7 @@ TEST_F(DBClientCursorTest, DBClientCursorDestructorKillsCursorByDefault_Existing
     auto getMoreResponseMsg = mockGetMoreResponse(nss, cursorId, {docObj(1)});
     conn.setRecvResponse(getMoreResponseMsg);
 
-    auto cursor = std::make_unique<DBClientCursor>(&conn, nss, cursorId, false /* isExhaust */);
+    auto cursor = std::make_unique<DBClientCursor>(&conn, nss, cursorId, /*isExhaust=*/false);
 
     cursor.reset();
     ASSERT(conn.killedCursor(cursorId));
@@ -1026,7 +1026,7 @@ TEST_F(DBClientCursorTest, DBClientCursorDestructorRespectsKeepCursorOpen_FindRe
 
     for (bool keepCursorOpen : {true, false}) {
         auto cursor = std::make_unique<DBClientCursor>(
-            &conn, findCmd, ReadPreferenceSetting{}, false /* isExhaust*/, keepCursorOpen);
+            &conn, findCmd, ReadPreferenceSetting{}, /*isExhaust=*/false, keepCursorOpen);
         cursor->setBatchSize(1);
 
         // Set up mock 'find' response.
@@ -1059,7 +1059,7 @@ TEST_F(DBClientCursorTest, DBClientCursorDestructorRespectsKeepCursorOpen_AggReq
         conn.setCallResponse(aggResponseMsg);
 
         auto cursor = uassertStatusOK(DBClientCursor::fromAggregationRequest(
-            &conn, aggCmd, false /* secondaryOk */, false /* useExhaust */, keepCursorOpen));
+            &conn, aggCmd, /*secondaryOk=*/false, /*useExhaust=*/false, keepCursorOpen));
 
         cursor.reset();
         ASSERT_EQ(conn.killedCursor(cursorId), !keepCursorOpen);
@@ -1083,10 +1083,10 @@ TEST_F(DBClientCursorTest, DBClientCursorDestructorRespectsKeepCursorOpen_Existi
         auto cursor = std::make_unique<DBClientCursor>(&conn,
                                                        nss,
                                                        cursorId,
-                                                       false /* isExhaust */,
-                                                       std::vector<BSONObj>{} /* initialBatch */,
-                                                       boost::none /* operationTime */,
-                                                       boost::none /* operationTime */,
+                                                       /*isExhaust=*/false,
+                                                       /*initialBatch=*/std::vector<BSONObj>{},
+                                                       /*operationTime=*/boost::none,
+                                                       /*operationTime=*/boost::none,
                                                        keepCursorOpen);
 
         cursor.reset();

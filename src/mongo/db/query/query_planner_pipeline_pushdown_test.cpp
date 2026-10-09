@@ -94,7 +94,7 @@ TEST_F(QueryPlannerPipelinePushdownTest, PushdownOfASingleGroup) {
     // Check the plan after lowering $group into the find subsystem.
     ASSERT(!cq->cqPipeline().empty());
     auto solution =
-        QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]), {} /* secondaryCollInfos */);
+        QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]), /*secondaryCollInfos=*/{});
     ASSERT_OK(QueryPlannerTestLib::solutionMatches(
         "{group: {key: {_id: '$_id'}, accs: [{count: {$sum: '$x'}}], node: "
         "{cscan: {dir:1, filter: {x:1}}}"
@@ -121,7 +121,7 @@ TEST_F(QueryPlannerPipelinePushdownTest, PushdownOfTwoGroups) {
     // Check the plan after lowering $group into the find subsystem.
     ASSERT(!cq->cqPipeline().empty());
     auto solution =
-        QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]), {} /* secondaryCollInfos */);
+        QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]), /*secondaryCollInfos=*/{});
     ASSERT_OK(QueryPlannerTestLib::solutionMatches(
         "{group: {key: {_id: '$_id'}, accs: [{count: {$min: '$count'}}], node: "
         "{group: {key: {_id: '$_id'}, accs: [{count: {$sum: '$x'}}], node: "
@@ -149,7 +149,7 @@ TEST_F(QueryPlannerPipelinePushdownTest, PushdownOfOneGroupWithMultipleAccumulat
     // Check the plan after lowering $group into the find subsystem.
     ASSERT(!cq->cqPipeline().empty());
     auto solution =
-        QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]), {} /* secondaryCollInfos */);
+        QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]), /*secondaryCollInfos=*/{});
     ASSERT_OK(QueryPlannerTestLib::solutionMatches(
         "{group: {key: {_id: '$_id'}, accs: [{count: {$sum: '$x'}}, {m: {$min: '$y'}}], node: "
         "{cscan: {dir:1, filter: {x:1}}}"
@@ -326,7 +326,7 @@ TEST_F(QueryPlannerPipelinePushdownTest, ComputedProjectionBeforeZeroDependencyG
     ASSERT_EQUALS(getNumSolutions(), 1U);
 
     auto solution =
-        QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]), {} /* secondaryCollInfos */);
+        QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]), /*secondaryCollInfos=*/{});
     ASSERT_OK(QueryPlannerTestLib::solutionMatches(
         "{group: {key: {_id: {$const: null}}, accs: [{total: {$sum: {$const: 1}}}], "
         "node: {cscan: {dir: 1}}}}",
@@ -353,7 +353,7 @@ TEST_F(QueryPlannerPipelinePushdownTest,
     ASSERT_EQUALS(getNumSolutions(), 1U);
 
     auto solution =
-        QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]), {} /* secondaryCollInfos */);
+        QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]), /*secondaryCollInfos=*/{});
     // The direct-to-cscan pattern must NOT match — a proj node must still be present between the
     // group and the cscan.
     ASSERT_NOT_OK(QueryPlannerTestLib::solutionMatches(
@@ -385,7 +385,7 @@ TEST_F(QueryPlannerPipelinePushdownTest,
     ASSERT_EQUALS(getNumSolutions(), 1U);
 
     auto solution =
-        QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]), {} /* secondaryCollInfos */);
+        QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]), /*secondaryCollInfos=*/{});
     ASSERT_OK(QueryPlannerTestLib::solutionMatches(
         "{group: {key: {_id: '$b'}, accs: [{cnt: {$sum: {$const: 1}}}], "
         "node: {cscan: {dir: 1}}}}",
@@ -414,7 +414,7 @@ TEST_F(QueryPlannerPipelinePushdownTest,
     ASSERT_EQUALS(getNumSolutions(), 1U);
 
     auto solution =
-        QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]), {} /* secondaryCollInfos */);
+        QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]), /*secondaryCollInfos=*/{});
     // The direct-to-cscan pattern must NOT match — a proj node must still be present between the
     // group and the cscan.
     ASSERT_NOT_OK(QueryPlannerTestLib::solutionMatches(
@@ -441,7 +441,7 @@ TEST_F(QueryPlannerPipelinePushdownTest,
     ASSERT_EQUALS(getNumSolutions(), 1U);
 
     auto solution =
-        QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]), {} /* secondaryCollInfos */);
+        QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]), /*secondaryCollInfos=*/{});
     ASSERT_OK(QueryPlannerTestLib::solutionMatches(
         "{group: {key: {_id: '$a'}, accs: [{total: {$sum: '$b'}}], "
         "node: {cscan: {dir: 1}}}}",

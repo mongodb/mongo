@@ -51,7 +51,7 @@ protected:
     }
 
     BSONObj getPlanNodeBSON(JoinPlanNodeId nodeId, const JoinGraph& graph) {
-        return _registry.joinPlanNodeToBSON(nodeId, graph, false /* brief */);
+        return _registry.joinPlanNodeToBSON(nodeId, graph, /*brief=*/false);
     }
 
     JoinPlanNodeRegistry _registry;

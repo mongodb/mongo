@@ -107,8 +107,8 @@ public:
                         Shard::RetryPolicy::kIdempotent,
                         routingQuery,
                         CollationSpec::kSimpleSpec,
-                        boost::none /*letParameters*/,
-                        boost::none /*runtimeConstants*/);
+                        /*letParameters=*/boost::none,
+                        /*runtimeConstants=*/boost::none);
                     invariant(shardResults.size() == 1);
                     const auto shardResponse =
                         uassertStatusOK(std::move(shardResults[0].swResponse));

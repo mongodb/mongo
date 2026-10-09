@@ -461,7 +461,7 @@ BSONObj BucketCatalogTest::_getCompressedBucketDoc(const BSONObj& bucketDoc) {
     CompressionResult compressionResult = compressBucket(bucketDoc,
                                                          _timeField,
                                                          _ns1,
-                                                         /*validateDecompression*/ true);
+                                                         /*validateDecompression=*/true);
     return compressionResult.compressedBucket.value();
 }
 

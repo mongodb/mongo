@@ -55,7 +55,7 @@ TEST_F(DSV2StateFetchingInitializationAndStartingTest,
 
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
     docSource->setState_forTest(V2Stage::State::kFetchingInitialization,
-                                false /* validateStateTransition */);
+                                /*validateStateTransition=*/false);
 
     // Assuming not to have segment start or end timestamps before calling the state machine.
     ASSERT_FALSE(docSource->getSegmentStartTimestamp_forTest().has_value());
@@ -103,7 +103,7 @@ TEST_F(DSV2StateFetchingInitializationAndStartingTest,
 
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
     docSource->setState_forTest(V2Stage::State::kFetchingInitialization,
-                                false /* validateStateTransition */);
+                                /*validateStateTransition=*/false);
 
     // Assuming not to have a segment start timestamp before calling the state machine.
     ASSERT_FALSE(docSource->getSegmentStartTimestamp_forTest().has_value());
@@ -168,7 +168,7 @@ TEST_F(DSV2StateFetchingInitializationAndStartingTest,
     exec::agg::MockStage::setSource_forTest(docSource, source.get());
 
     docSource->setState_forTest(V2Stage::State::kFetchingGettingChangeEvent,
-                                false /* validateStateTransition */);
+                                /*validateStateTransition=*/false);
 
     // Check return value 1 (pause).
     auto result = docSource->runGetNextStateMachine_forTest();
@@ -245,7 +245,7 @@ TEST_F(DSV2StateFetchingInitializationAndStartingTest,
     exec::agg::MockStage::setSource_forTest(docSource, source.get());
 
     docSource->setState_forTest(V2Stage::State::kFetchingGettingChangeEvent,
-                                false /* validateStateTransition */);
+                                /*validateStateTransition=*/false);
 
     auto result = docSource->runGetNextStateMachine_forTest();
     ASSERT_FALSE(result.has_value());
@@ -282,7 +282,7 @@ TEST_F(DSV2StateFetchingInitializationAndStartingTest,
 
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
     docSource->setState_forTest(V2Stage::State::kFetchingInitialization,
-                                false /* validateStateTransition */);
+                                /*validateStateTransition=*/false);
 
     // Assuming not to have segment start or end timestamps before calling the state machine.
     ASSERT_FALSE(docSource->getSegmentStartTimestamp_forTest().has_value());
@@ -328,7 +328,7 @@ DEATH_TEST_REGEX_F(DSV2StateFetchingInitializationAndStartingTestDeathTest,
 
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
     docSource->setState_forTest(V2Stage::State::kFetchingStartingChangeStreamSegment,
-                                false /* validateStateTransition */);
+                                /*validateStateTransition=*/false);
 
     // Intentionally do not set the segment start timestamp before entering the state to trigger the
     // following tassert.
@@ -370,7 +370,7 @@ TEST_F(DSV2StateFetchingInitializationAndStartingTest,
 
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
     docSource->setState_forTest(V2Stage::State::kFetchingStartingChangeStreamSegment,
-                                false /* validateStateTransition */);
+                                /*validateStateTransition=*/false);
 
     docSource->setSegmentStartTimestamp_forTest(ts);
 
@@ -416,7 +416,7 @@ TEST_F(DSV2StateFetchingInitializationAndStartingTest,
 
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
     docSource->setState_forTest(V2Stage::State::kFetchingStartingChangeStreamSegment,
-                                false /* validateStateTransition */);
+                                /*validateStateTransition=*/false);
 
     docSource->setSegmentStartTimestamp_forTest(ts);
 
@@ -466,7 +466,7 @@ TEST_F(DSV2StateFetchingInitializationAndStartingTest,
 
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
     docSource->setState_forTest(V2Stage::State::kFetchingStartingChangeStreamSegment,
-                                false /* validateStateTransition */);
+                                /*validateStateTransition=*/false);
 
     docSource->setSegmentStartTimestamp_forTest(ts);
 
@@ -529,7 +529,7 @@ TEST_F(DSV2StateFetchingInitializationAndStartingTest,
 
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
     docSource->setState_forTest(V2Stage::State::kFetchingStartingChangeStreamSegment,
-                                false /* validateStateTransition */);
+                                /*validateStateTransition=*/false);
 
     docSource->setSegmentStartTimestamp_forTest(ts);
 
@@ -603,7 +603,7 @@ TEST_F(DSV2StateFetchingInitializationAndStartingTest,
 
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
     docSource->setState_forTest(V2Stage::State::kFetchingStartingChangeStreamSegment,
-                                false /* validateStateTransition */);
+                                /*validateStateTransition=*/false);
     docSource->setSegmentStartTimestamp_forTest(ts);
 
     getCursorManagerMock(params)->setThrowShardNotFoundExceptions(
@@ -665,7 +665,7 @@ TEST_F(DSV2StateFetchingInitializationAndStartingTest,
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
     exec::agg::MockStage::setSource_forTest(docSource, source.get());
     docSource->setState_forTest(V2Stage::State::kFetchingStartingChangeStreamSegment,
-                                false /* validateStateTransition */);
+                                /*validateStateTransition=*/false);
     docSource->setSegmentStartTimestamp_forTest(Timestamp(23, 0));
 
     // Enable 'RetryChangeStream' exception, so opening the cursor on the config server will throw.

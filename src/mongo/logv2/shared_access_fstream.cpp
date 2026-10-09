@@ -119,8 +119,7 @@ FILE* Win32SharedAccessFileDescriptor::_open(const wchar_t* filename,
                                 nullptr,                // lpSecurityAttributes
                                 creationDisposition,    // dwCreationDisposition
                                 FILE_ATTRIBUTE_NORMAL,  // dwFlagsAndAttributes
-                                nullptr                 // hTemplateFile
-    );
+                                /*hTemplateFile=*/nullptr);
     if (handle == INVALID_HANDLE_VALUE) {
         return nullptr;
     }

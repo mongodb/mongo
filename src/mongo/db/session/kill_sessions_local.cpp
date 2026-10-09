@@ -146,8 +146,8 @@ void killSessionsAbortUnpreparedTransactions(OperationContext* opCtx,
             }
         },
         reason,
-        /*perSessionTimeout*/ nullptr,
-        /*numTimeouts*/ 0,
+        /*perSessionTimeout=*/nullptr,
+        /*numTimeouts=*/0,
         killSessionsDeadline);
 }
 
@@ -216,8 +216,8 @@ void killSessionsAbortUnpreparedTransactionsForLockerIds(OperationContext* opCtx
             }
         },
         reason,
-        /*perSessionTimeout*/ nullptr,
-        /*numTimeouts*/ 0,
+        /*perSessionTimeout=*/nullptr,
+        /*numTimeouts=*/0,
         killSessionsDeadline);
 }
 

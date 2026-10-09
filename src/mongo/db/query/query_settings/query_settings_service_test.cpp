@@ -265,7 +265,7 @@ public:
         ASSERT_EQ(service().lookupQuerySettingsWithRejectionCheck(
                       expCtx(),
                       hashForShape(deferredShape),
-                      boost::none /* querySettingsFromOriginalCommand */),
+                      /*querySettingsFromOriginalCommand=*/boost::none),
                   forceClassicEngineSettings);
 
         // Simulate performing QuerySettings lookup on the shard in sharded cluster.
@@ -283,7 +283,7 @@ public:
             ASSERT_EQ(service().lookupQuerySettingsWithRejectionCheck(
                           expCtx(),
                           hashForShape(deferredShape),
-                          boost::none /* querySettingsFromOriginalCommand */),
+                          /*querySettingsFromOriginalCommand=*/boost::none),
                       QuerySettings());
         }
     }
@@ -331,12 +331,12 @@ public:
             ASSERT_DOES_NOT_THROW(service().lookupQuerySettingsWithRejectionCheck(
                 expCtx(),
                 hashForShape(deferredShape),
-                boost::none /* querySettingsFromOriginalCommand */));
+                /*querySettingsFromOriginalCommand=*/boost::none));
         } else {
             ASSERT_THROWS_CODE(service().lookupQuerySettingsWithRejectionCheck(
                                    expCtx(),
                                    hashForShape(deferredShape),
-                                   boost::none /* querySettingsFromOriginalCommand */),
+                                   /*querySettingsFromOriginalCommand=*/boost::none),
                                DBException,
                                ErrorCodes::QueryRejectedBySettings);
         }
@@ -349,7 +349,7 @@ public:
             ASSERT_DOES_NOT_THROW(service().lookupQuerySettingsWithRejectionCheck(
                 expCtx(),
                 hashForShape(deferredShape),
-                boost::none /* querySettingsFromOriginalCommand */));
+                /*querySettingsFromOriginalCommand=*/boost::none));
         }
     }
 
@@ -658,7 +658,7 @@ TEST_F(QuerySettingsServiceTest, LookupValidatesUserSuppliedQuerySettings) {
     QuerySettings duplicateHints =
         makeQuerySettings({IndexHintSpec(makeNsSpec("testCollA"sv), {IndexHint(BSON("a" << 1))}),
                            IndexHintSpec(makeNsSpec("testCollA"sv), {IndexHint(BSON("b" << 1))})},
-                          false /* setFramework */);
+                          /*setFramework=*/false);
     ASSERT_THROWS_CODE(
         service().lookupQuerySettingsWithRejectionCheck(expCtx(), hash, duplicateHints),
         DBException,

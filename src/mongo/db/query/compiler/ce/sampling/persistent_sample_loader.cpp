@@ -468,7 +468,7 @@ StatusWith<LoadedPersistentSample> PersistentSampleLoader::tryLoad(
             collection,
             PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
             InternalPlanner::FORWARD,
-            boost::none /* resumeAfterRecordId */,
+            /*resumeAfterRecordId=*/boost::none,
             recordIdForId(minId),
             recordIdForId(maxId),
             CollectionScanParams::ScanBoundInclusion::kIncludeBothStartAndEndRecords);

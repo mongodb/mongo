@@ -879,7 +879,7 @@ void executeExplain(const AggExState& aggExState,
     auto bodyBuilder = result->getBodyBuilder();
     if (auto pipelineExec = dynamic_cast<PlanExecutorPipeline*>(explainExecutor)) {
         Explain::explainPipeline(pipelineExec,
-                                 true /* executePipeline */,
+                                 /*executePipeline=*/true,
                                  *(expCtx->getExplain()),
                                  *aggExState.getDeferredCmd(),
                                  &bodyBuilder);
@@ -944,7 +944,7 @@ void setupViewContext(const AggExState& aggExState,
             ResolvedNamespace(aggExState.getResolvedNamespace().getResolvedNamespace(),
                               aggExState.getResolvedNamespace().getBsonPipeline(),
                               aggCatalogState.getUUID(),
-                              true /*involvedNamespaceIsAView*/));
+                              /*involvedNamespaceIsAView=*/true));
     }
 }
 
@@ -1366,7 +1366,7 @@ Status executeResolvedAggregate(const AggExState& aggExState,
                                             resForJoin.model.releaseSuffix(),
                                             std::move(resForJoin.executor),
                                             attachExecutorCallback,
-                                            {} /* additionalExecutors */,
+                                            /*additionalExecutors=*/{},
                                             /*hasGeoNearStage=*/false);
     } else if (dynamic_cast<DocumentSourceInternalJoinHint*>(pipeline->peekFront())) {
         uasserted(

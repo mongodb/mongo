@@ -177,7 +177,7 @@ void GoldenSbeStageBuilderTestFixture::runTest(std::unique_ptr<QuerySolutionNode
     attachCollectionAcquisition(colls);
 
     auto [resultSlots, stage, data, _] =
-        buildPlanStage(std::move(querySolution), colls, false /*hasRecordId*/, std::move(param));
+        buildPlanStage(std::move(querySolution), colls, /*hasRecordId=*/false, std::move(param));
     auto resultAccessors = prepareTree(&data.env.ctx, stage.get(), resultSlots);
     ASSERT_EQ(resultAccessors.size(), 1u);
 
@@ -227,7 +227,7 @@ void GoldenSbeExprBuilderTestFixture::setUp() {
                    _env,
                    _planStageData.get(),
                    _variables,
-                   nullptr /* yieldPolicy */,
+                   /*yieldPolicy=*/nullptr,
                    &_slotIdGenerator,
                    &_frameIdGenerator,
                    &_spoolIdGenerator,
@@ -235,8 +235,8 @@ void GoldenSbeExprBuilderTestFixture::setUp() {
                    &_collatorsMap,
                    &_sortSpecMap,
                    _expCtx,
-                   false /* needsMerge */,
-                   false /* allowDiskUse */,
+                   /*needsMerge=*/false,
+                   /*allowDiskUse=*/false,
                    *_expCtx->getIfrContext());
 }
 

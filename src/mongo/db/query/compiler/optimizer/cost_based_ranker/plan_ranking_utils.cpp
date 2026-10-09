@@ -119,7 +119,7 @@ std::vector<std::unique_ptr<QuerySolution>> cbrRankPlans(
                                                     samplingStyle,
                                                     numChunks,
                                                     collCard,
-                                                    nullptr /*customerQueryExpCtx*/);
+                                                    /*customerQueryExpCtx=*/nullptr);
 
     QueryPlannerParams plannerParams{
         QueryPlannerParams::ArgsForSingleCollectionQuery{

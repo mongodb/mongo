@@ -188,7 +188,7 @@ std::unique_ptr<MatchExpression> treeToMatchExpression(
         expCtx, "_property", BSON("propertyName" << node.name)));
     andExpr->add(createObjectExpression(expCtx, node.name, std::move(subschema)));
     andExpr->add(
-        createNotTypeExpression(expCtx, BSONType::array, node.name, false /* ignoreError */));
+        createNotTypeExpression(expCtx, BSONType::array, node.name, /*ignoreError=*/false));
     return andExpr;
 }
 
@@ -204,7 +204,7 @@ StatusWithMatchExpression generateMatchExpressionFromEncryptedFields(
     }
 
     auto root = buildTreeFromEncryptedFieldPaths(encryptedFields);
-    return treeToMatchExpression(*root, expCtx, true /* toplevel */);
+    return treeToMatchExpression(*root, expCtx, /*toplevel=*/true);
 } catch (...) {
     return exceptionToStatus();
 }

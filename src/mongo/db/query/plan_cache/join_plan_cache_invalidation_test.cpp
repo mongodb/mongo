@@ -265,7 +265,7 @@ TEST_F(JoinPlanCacheInvalidationTest, MultiCollectionTagsTrackMainAndSecondary) 
         CollectionOrViewAcquisition(CollectionAcquisition(mainColl)),
         makeAcquisitionMap(CollectionOrViewAcquisitions{
             CollectionOrViewAcquisition(CollectionAcquisition(secondaryColl))}),
-        false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+        /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
     auto tags = makeCollectionTags(mca);
     ASSERT_EQ(2, tags.size());
@@ -287,7 +287,7 @@ TEST_F(JoinPlanCacheInvalidationTest, ClassifyTagsReportsMostRestrictiveStatusAc
         CollectionOrViewAcquisition(CollectionAcquisition(mainColl)),
         makeAcquisitionMap(CollectionOrViewAcquisitions{
             CollectionOrViewAcquisition(CollectionAcquisition(secondaryColl))}),
-        false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+        /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
     auto tags = makeCollectionTags(mca);
     ASSERT_EQ(2, tags.size());

@@ -639,8 +639,7 @@ void InitialSyncer::_tearDown(WithLock lk,
     // hit an invariant when refreshing oplogTruncateAfterPoint while stepping up. So we will
     // advance stable timestamp here to make sure allDurable is advanced before we exit initial
     // sync. This call will also trigger the first stable checkpoint.
-    _storage->setStableTimestamp(
-        opCtx->getServiceContext(), initialDataTimestamp, true /* force */);
+    _storage->setStableTimestamp(opCtx->getServiceContext(), initialDataTimestamp, /*force=*/true);
 
     LOGV2(21163,
           "Initial sync done",
@@ -713,7 +712,7 @@ void InitialSyncer::_startInitialSyncAttemptCallback(
         // though the initialDataTimestamp is still set to kAllowUnstableCheckpointsSentinel.
         // We need to use force in case we are resetting the oldest timestamp backwards after a
         // failed initial sync attempt.
-        storageEngine->setOldestTimestamp(kTimestampOne, true /*force*/);
+        storageEngine->setOldestTimestamp(kTimestampOne, /*force=*/true);
     }
 
     LOGV2_DEBUG(21168,

@@ -1348,7 +1348,7 @@ TEST(SplitMatchExpression, ShouldNotMoveEqAcrossAttemptedButFailedRename) {
     // TODO SERVER-74298 Implement renaming by each path component for sub-classes of
     // PathMatchExpression so that such match expressions can be split out.
     auto [splitOutExpr, residualExpr] = expression::splitMatchExpressionBy(
-        std::move(matcher.getValue()), /*fields*/ {}, /*renames*/ {{"x.y"s, "a.b"s}});
+        std::move(matcher.getValue()), /*fields=*/{}, /*renames=*/{{"x.y"s, "a.b"s}});
 
     ASSERT_FALSE(splitOutExpr.get())
         << splitOutExpr->serialize()
@@ -1376,7 +1376,7 @@ TEST(SplitMatchExpression, ShouldNotMoveElemMatchObjectAcrossAttemptedButFailedR
     // TODO SERVER-74298 Implement renaming by each path component for sub-classes of
     // PathMatchExpression so that such match expressions can be split out.
     auto [splitOutExpr, residualExpr] = expression::splitMatchExpressionBy(
-        std::move(matcher.getValue()), /*fields*/ {}, /*renames*/ {{"x.y"s, "a.b"s}});
+        std::move(matcher.getValue()), /*fields=*/{}, /*renames=*/{{"x.y"s, "a.b"s}});
 
     ASSERT_FALSE(splitOutExpr.get())
         << splitOutExpr->serialize()

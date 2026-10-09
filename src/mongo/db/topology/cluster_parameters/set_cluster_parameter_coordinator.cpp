@@ -220,9 +220,9 @@ void SetClusterParameterCoordinator::_commit(OperationContext* opCtx) {
     invocation.invoke(opCtx,
                       setClusterParameterRequest,
                       _doc.getClusterParameterTime(),
-                      boost::none /* previousTime */,
+                      /*previousTime=*/boost::none,
                       kMajorityWriteConcern,
-                      true /* skipValidation */);
+                      /*skipValidation=*/true);
 }
 
 const ConfigsvrCoordinatorMetadata& SetClusterParameterCoordinator::metadata() const {

@@ -407,7 +407,7 @@ void PrimaryOnlyService::onStepUp_forTest() {
         return _term;
     })();
 
-    _doStepUp(currentTerm, opTime, true /* clearTestModeOnCompletion */);
+    _doStepUp(currentTerm, opTime, /*clearTestModeOnCompletion=*/true);
 }
 
 void PrimaryOnlyService::_doStepUp(long long newTerm,

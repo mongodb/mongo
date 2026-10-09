@@ -132,8 +132,8 @@ public:
                                                      slotNames,
                                                      lookupStage.get(),
                                                      params.expectMemUse,
-                                                     false /* getStats */,
-                                                     false /* executeWithSpill */);
+                                                     /*getStats=*/false,
+                                                     /*executeWithSpill=*/false);
         }
 
         sharedTest.tearDown();
@@ -146,7 +146,7 @@ public:
         static const ::testing::TestInfo* dummyTestInfo =
             ::testing::UnitTest::GetInstance()->GetTestSuite(0)->GetTestInfo(0);
         return unittest::GoldenTestContext(
-            &goldenTestConfigSbe, dummyTestInfo, false /* validateOnClose */);
+            &goldenTestConfigSbe, dummyTestInfo, /*validateOnClose=*/false);
     }
 };
 

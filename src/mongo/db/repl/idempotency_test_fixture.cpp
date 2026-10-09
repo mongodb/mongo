@@ -210,7 +210,7 @@ OplogEntry IdempotencyTest::buildIndex(const BSONObj& indexSpec,
 
 OplogEntry IdempotencyTest::dropIndex(const std::string& indexName, const UUID& uuid) {
     auto cmd = BSON("dropIndexes" << _nss.coll() << "index" << indexName);
-    return makeCommandOplogEntry(nextOpTime(), _nss, cmd, boost::none /* object2 */, uuid);
+    return makeCommandOplogEntry(nextOpTime(), _nss, cmd, /*object2=*/boost::none, uuid);
 }
 
 OplogEntry IdempotencyTest::prepare(LogicalSessionId lsid,

@@ -1153,7 +1153,7 @@ TYPED_TEST(BoundedSorterTest, WrongInput) {
     };
 
     // Disable input order checking so we can see what happens.
-    this->sorter = this->makeAsc({}, /*spiller=*/nullptr, /*checkInput*/ false);
+    this->sorter = this->makeAsc({}, /*spiller=*/nullptr, /*checkInput=*/false);
     auto output = this->sort(input);
     ASSERT_EQ(output.size(), 7);
 

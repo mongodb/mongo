@@ -43,7 +43,7 @@ LoopJoinStage::LoopJoinStage(std::unique_ptr<PlanStage> outer,
                              JoinType joinType,
                              PlanNodeId nodeId,
                              bool participateInTrialRunTracking)
-    : PlanStage("nlj"sv, nullptr /* yieldPolicy */, nodeId, participateInTrialRunTracking),
+    : PlanStage("nlj"sv, /*yieldPolicy=*/nullptr, nodeId, participateInTrialRunTracking),
       _outerProjects(std::move(outerProjects)),
       _outerCorrelated(std::move(outerCorrelated)),
       _innerProjects(std::move(innerProjects)),
@@ -280,7 +280,7 @@ void LoopJoinStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
     ret.emplace_back(DebugPrinter::Block::cmdDecIndent);
 
     if (debugPrintInfo.printBytecode) {
-        PlanStage::debugPrintBytecode(ret, _predicateCode, "PREDICATE_CODE" /*title*/);
+        PlanStage::debugPrintBytecode(ret, _predicateCode, /*title=*/"PREDICATE_CODE");
     }
 }
 

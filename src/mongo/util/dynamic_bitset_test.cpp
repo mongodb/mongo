@@ -392,9 +392,9 @@ TEST(DynamicBitsetPopulationViewTests, Iterator) {
  */
 TEST(DynamicBitsetPopulationViewTests, IteratorFullStartingBlock) {
     testPartiallyPopulatedDynamicBitsetPopulationView(
-        /*numPopulatedBlocks*/ 1,
-        /*firstBlockToPopulate*/ 0,
-        /*addZeroBitsAfterPopulatedBlocks*/ true);
+        /*numPopulatedBlocks=*/1,
+        /*firstBlockToPopulate=*/0,
+        /*addZeroBitsAfterPopulatedBlocks=*/true);
 }
 
 /**
@@ -402,9 +402,9 @@ TEST(DynamicBitsetPopulationViewTests, IteratorFullStartingBlock) {
  */
 TEST(DynamicBitsetPopulationViewTests, IteratorFullMiddleBlock) {
     testPartiallyPopulatedDynamicBitsetPopulationView(
-        /*numPopulatedBlocks*/ 1,
-        /*firstBlockToPopulate*/ 1,
-        /*addZeroBitsAfterPopulatedBlocks*/ true);
+        /*numPopulatedBlocks=*/1,
+        /*firstBlockToPopulate=*/1,
+        /*addZeroBitsAfterPopulatedBlocks=*/true);
 }
 
 /**
@@ -412,9 +412,9 @@ TEST(DynamicBitsetPopulationViewTests, IteratorFullMiddleBlock) {
  */
 TEST(DynamicBitsetPopulationViewTests, IteratorFullFinalBlock) {
     testPartiallyPopulatedDynamicBitsetPopulationView(
-        /*numPopulatedBlocks*/ 1,
-        /*firstBlockToPopulate*/ 2,
-        /*addZeroBitsAfterPopulatedBlocks*/ false);
+        /*numPopulatedBlocks=*/1,
+        /*firstBlockToPopulate=*/2,
+        /*addZeroBitsAfterPopulatedBlocks=*/false);
 }
 
 /**
@@ -422,9 +422,9 @@ TEST(DynamicBitsetPopulationViewTests, IteratorFullFinalBlock) {
  */
 TEST(DynamicBitsetPopulationViewTests, IteratorFullTwoBlocks) {
     testPartiallyPopulatedDynamicBitsetPopulationView(
-        /*numPopulatedBlocks*/ 2,
-        /*firstBlockToPopulate*/ 1,
-        /*addZeroBitsAfterPopulatedBlocks*/ true);
+        /*numPopulatedBlocks=*/2,
+        /*firstBlockToPopulate=*/1,
+        /*addZeroBitsAfterPopulatedBlocks=*/true);
 }
 }  // namespace
 }  // namespace mongo

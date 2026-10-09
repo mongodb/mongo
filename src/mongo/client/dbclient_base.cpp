@@ -658,7 +658,7 @@ BSONObj DBClientBase::findOne(const NamespaceStringOrUUID& nssOrUuid, BSONObj fi
 }
 
 unique_ptr<DBClientCursor> DBClientBase::getMore(const NamespaceString& nss, long long cursorId) {
-    unique_ptr<DBClientCursor> c(new DBClientCursor(this, nss, cursorId, false /*isExhaust*/));
+    unique_ptr<DBClientCursor> c(new DBClientCursor(this, nss, cursorId, /*isExhaust=*/false));
     if (c->init())
         return c;
     return nullptr;

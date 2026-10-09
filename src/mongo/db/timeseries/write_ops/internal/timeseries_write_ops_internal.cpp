@@ -1078,7 +1078,7 @@ Status performAtomicTimeseriesWrites(
                                             original,
                                             updated,
                                             diffOnIndexes,
-                                            nullptr /*indexesAffected*/,
+                                            /*indexesAffected=*/nullptr,
                                             &curOp->debug(),
                                             &args);
         if (slot) {

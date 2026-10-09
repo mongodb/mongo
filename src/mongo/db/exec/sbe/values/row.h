@@ -77,11 +77,11 @@ public:
 
     void reset(size_t idx, value::TagValueOwned tagValue) {
         auto [tag, val] = tagValue.releaseToRaw();
-        reset_raw(idx, true /*own*/, tag, val);
+        reset_raw(idx, /*own=*/true, tag, val);
     }
 
     void reset(size_t idx, value::TagValueView tagValue) {
-        reset_raw(idx, false /*own*/, tagValue.tag, tagValue.value);
+        reset_raw(idx, /*own=*/false, tagValue.tag, tagValue.value);
     }
 
     // The following methods are used by the sorter only.

@@ -254,7 +254,7 @@ boost::intrusive_ptr<Stage> createGroupStage(
     auto groupByExpr =
         ExpressionFieldPath::parse(expCtx.get(), "$_id", expCtx->variablesParseState);
     auto group = DocumentSourceGroup::create(
-        expCtx, groupByExpr, {countStatement}, false /*willBeMerged*/, maxMemoryUsageBytes);
+        expCtx, groupByExpr, {countStatement}, /*willBeMerged=*/false, maxMemoryUsageBytes);
     return exec::agg::buildStage(group);
 }
 
@@ -269,7 +269,7 @@ boost::intrusive_ptr<Stage> createPushGroupStage(
     auto groupByExpr =
         ExpressionFieldPath::parse(expCtx.get(), "$_id", expCtx->variablesParseState);
     auto group = DocumentSourceGroup::create(
-        expCtx, groupByExpr, {pushStatement}, false /*willBeMerged*/, maxMemoryUsageBytes);
+        expCtx, groupByExpr, {pushStatement}, /*willBeMerged=*/false, maxMemoryUsageBytes);
     return exec::agg::buildStage(group);
 }
 
@@ -393,7 +393,7 @@ TEST_F(PipelineIsEOFTest, BoundedSortWithLimitEagerlyReportsEOF) {
 
     auto mock = exec::agg::MockStage::createForTest(createTimeDocs({0, 1, 2}), expCtx);
     auto sort = DocumentSourceSort::createBoundedSort(
-        {BSON("time" << 1), expCtx}, DocumentSourceSort::kMin, -1, 2 /*limit*/, false, expCtx);
+        {BSON("time" << 1), expCtx}, DocumentSourceSort::kMin, -1, /*limit=*/2, false, expCtx);
     auto sortStage = exec::agg::buildStage(sort);
     exec::agg::MockStage::setSource_forTest(sortStage, mock.get());
 
@@ -459,7 +459,7 @@ TEST_F(PipelineIsEOFTest, SpillingGroupReportsEOF) {
         std::vector<BSONObj>{BSON("_id" << 1 << "largeStr" << largeStr),
                              BSON("_id" << 2 << "largeStr" << largeStr)},
         expCtx);
-    auto groupStage = createPushGroupStage(expCtx, 1000 /*maxMemoryUsageBytes*/);
+    auto groupStage = createPushGroupStage(expCtx, /*maxMemoryUsageBytes=*/1000);
     exec::agg::MockStage::setSource_forTest(groupStage, mock.get());
 
     StageContainer stages{mock, groupStage};

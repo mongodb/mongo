@@ -146,7 +146,7 @@ struct DefaultClonerImpl::BatchHandler {
                                            collectionOptions,
                                            createDefaultIndexes,
                                            from_id_index,
-                                           true /* fromMigrate */),
+                                           /*fromMigrate=*/true),
                           str::stream() << "collection creation failed during clone ["
                                         << nss.toStringForErrorMsg() << "]");
                 wunit.commit();
@@ -231,7 +231,7 @@ struct DefaultClonerImpl::BatchHandler {
                 Status status = collection_internal::insertDocument(opCtx,
                                                                     collection->getCollectionPtr(),
                                                                     InsertStatement(doc),
-                                                                    nullptr /* OpDebug */,
+                                                                    /*OpDebug=*/nullptr,
                                                                     true);
                 if (!status.isOK() && status.code() != ErrorCodes::DuplicateKey) {
                     LOGV2_ERROR(20424,
@@ -473,7 +473,7 @@ Status DefaultClonerImpl::_createCollectionsForDb(
                                                            collectionOptions,
                                                            createDefaultIndexes,
                                                            params.idIndexSpec,
-                                                           true /* fromMigrate */);
+                                                           /*fromMigrate=*/true);
                     if (!createStatus.isOK()) {
                         return createStatus;
                     }

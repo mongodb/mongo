@@ -41,22 +41,22 @@ public:
 #define BENCHMARK_PERCENTILE_ALGO(Fixture)                                                         \
                                                                                                    \
     BENCHMARK_F(Fixture, tdigest_k0_delta1000)(benchmark::State & state) {                         \
-        tdigest_normalData(state, TDigest::k0_limit, 1000, nLarge, false /*presorted*/, {0.5});    \
+        tdigest_normalData(state, TDigest::k0_limit, 1000, nLarge, /*presorted=*/false, {0.5});    \
     }                                                                                              \
     BENCHMARK_F(Fixture, tdigest_k1_delta1000)(benchmark::State & state) {                         \
-        tdigest_normalData(state, TDigest::k1_limit, 1000, nLarge, false /*presorted*/, {0.5});    \
+        tdigest_normalData(state, TDigest::k1_limit, 1000, nLarge, /*presorted=*/false, {0.5});    \
     }                                                                                              \
     BENCHMARK_F(Fixture, tdigest_k2_delta500)(benchmark::State & state) {                          \
-        tdigest_normalData(state, TDigest::k2_limit, 500, nLarge, false /*presorted*/, {0.5});     \
+        tdigest_normalData(state, TDigest::k2_limit, 500, nLarge, /*presorted=*/false, {0.5});     \
     }                                                                                              \
     BENCHMARK_F(Fixture, tdigest_k2_delta1000)(benchmark::State & state) {                         \
-        tdigest_normalData(state, TDigest::k2_limit, 1000, nLarge, false /*presorted*/, {0.5});    \
+        tdigest_normalData(state, TDigest::k2_limit, 1000, nLarge, /*presorted=*/false, {0.5});    \
     }                                                                                              \
     BENCHMARK_F(Fixture, tdigest_k2_delta5000)(benchmark::State & state) {                         \
-        tdigest_normalData(state, TDigest::k2_limit, 5000, nLarge, false /*presorted*/, {0.5});    \
+        tdigest_normalData(state, TDigest::k2_limit, 5000, nLarge, /*presorted=*/false, {0.5});    \
     }                                                                                              \
     BENCHMARK_F(Fixture, tdigest_k2_delta1000_sorted)(benchmark::State & state) {                  \
-        tdigest_normalData(state, TDigest::k2_limit, 1000, nLarge, false /*presorted*/, {0.5});    \
+        tdigest_normalData(state, TDigest::k2_limit, 1000, nLarge, /*presorted=*/false, {0.5});    \
     }                                                                                              \
     BENCHMARK_F(Fixture, tdigest_k2_delta1000_batched)(benchmark::State & state) {                 \
         tdigest_normalData_batched(state, TDigest::k2_limit, 1000);                                \
@@ -64,42 +64,42 @@ public:
                                                                                                    \
     BENCHMARK_F(Fixture, tdigest_mid_10)(benchmark::State & state) {                               \
         tdigest_normalData(                                                                        \
-            state, TDigest::k2_limit, 1000 /*delta*/, 10, false /*presorted*/, {0.5});             \
+            state, TDigest::k2_limit, /*delta=*/1000, 10, /*presorted=*/false, {0.5});             \
     }                                                                                              \
     BENCHMARK_F(Fixture, tdigest_mid_100)(benchmark::State & state) {                              \
         tdigest_normalData(                                                                        \
-            state, TDigest::k2_limit, 1000 /*delta*/, 100, false /*presorted*/, {0.5});            \
+            state, TDigest::k2_limit, /*delta=*/1000, 100, /*presorted=*/false, {0.5});            \
     }                                                                                              \
     BENCHMARK_F(Fixture, tdigest_mid_1000)(benchmark::State & state) {                             \
         tdigest_normalData(                                                                        \
-            state, TDigest::k2_limit, 1000 /*delta*/, 1000, false /*presorted*/, {0.5});           \
+            state, TDigest::k2_limit, /*delta=*/1000, 1000, /*presorted=*/false, {0.5});           \
     }                                                                                              \
     BENCHMARK_F(Fixture, tdigest_multi_1000)(benchmark::State & state) {                           \
         tdigest_normalData(state,                                                                  \
-                           TDigest::k2_limit,                                                      \
-                           1000 /*delta*/,                                                         \
+                           TDigest::k2_limit, /*delta=*/                                           \
                            1000,                                                                   \
-                           false /*presorted*/,                                                    \
+                           1000, /*presorted=*/                                                    \
+                           false,                                                                  \
                            {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95});                   \
     }                                                                                              \
     BENCHMARK_F(Fixture, tdigest_mid_10000)(benchmark::State & state) {                            \
-        tdigest_normalData(state, TDigest::k2_limit, 1000, 10000, false /*presorted*/, {0.5});     \
+        tdigest_normalData(state, TDigest::k2_limit, 1000, 10000, /*presorted=*/false, {0.5});     \
     }                                                                                              \
     BENCHMARK_F(Fixture, tdigest_multi_10000)(benchmark::State & state) {                          \
         tdigest_normalData(state,                                                                  \
-                           TDigest::k2_limit,                                                      \
-                           1000 /*delta*/,                                                         \
-                           10000,                                                                  \
-                           false /*presorted*/,                                                    \
+                           TDigest::k2_limit, /*delta=*/                                           \
+                           1000,                                                                   \
+                           10000, /*presorted=*/                                                   \
+                           false,                                                                  \
                            {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95});                   \
     }                                                                                              \
     BENCHMARK_F(Fixture, tdigest_multi101_10000)(benchmark::State & state) {                       \
         tdigest_normalData(                                                                        \
             state,                                                                                 \
-            TDigest::k2_limit,                                                                     \
-            1000 /*delta*/,                                                                        \
-            10000,                                                                                 \
-            false /*presorted*/,                                                                   \
+            TDigest::k2_limit, /*delta=*/                                                          \
+            1000,                                                                                  \
+            10000, /*presorted=*/                                                                  \
+            false,                                                                                 \
             {0,    0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1,  0.11, 0.12,         \
              0.13, 0.14, 0.15, 0.16, 0.17, 0.18, 0.19, 0.2,  0.21, 0.22, 0.23, 0.24, 0.25,         \
              0.26, 0.27, 0.28, 0.29, 0.3,  0.31, 0.32, 0.33, 0.34, 0.35, 0.36, 0.37, 0.38,         \
@@ -111,91 +111,91 @@ public:
     }                                                                                              \
     BENCHMARK_F(Fixture, tdigest_mid_100000)(benchmark::State & state) {                           \
         tdigest_normalData(                                                                        \
-            state, TDigest::k2_limit, 1000 /*delta*/, 100'000, false /*presorted*/, {0.5});        \
+            state, TDigest::k2_limit, /*delta=*/1000, 100'000, false /*presorted*/, {0.5});        \
     }                                                                                              \
     BENCHMARK_F(Fixture, tdigest_multi_100000)(benchmark::State & state) {                         \
         tdigest_normalData(state,                                                                  \
                            TDigest::k2_limit,                                                      \
                            1000 /*delta*/,                                                         \
-                           100'000,                                                                \
-                           false /*presorted*/,                                                    \
+                           100'000, /*presorted=*/                                                 \
+                           false,                                                                  \
                            {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95});                   \
     }                                                                                              \
     BENCHMARK_F(Fixture, tdigest_mid_1000000)(benchmark::State & state) {                          \
         tdigest_normalData(                                                                        \
-            state, TDigest::k2_limit, 1000 /*delta*/, 1'000'000, false /*presorted*/, {0.5});      \
+            state, TDigest::k2_limit, /*delta=*/1000, 1'000'000, /*presorted=*/false, {0.5});      \
     }                                                                                              \
     BENCHMARK_F(Fixture, tdigest_multi_1000000)(benchmark::State & state) {                        \
         tdigest_normalData(state,                                                                  \
-                           TDigest::k2_limit,                                                      \
-                           1000 /*delta*/,                                                         \
-                           1'000'000,                                                              \
-                           false /*presorted*/,                                                    \
+                           TDigest::k2_limit, /*delta=*/                                           \
+                           1000,                                                                   \
+                           1'000'000, /*presorted=*/                                               \
+                           false,                                                                  \
                            {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95});                   \
     }                                                                                              \
     BENCHMARK_F(Fixture, tdigest_mid_10000000)(benchmark::State & state) {                         \
         tdigest_normalData(                                                                        \
-            state, TDigest::k2_limit, 1000 /*delta*/, 10'000'000, false /*presorted*/, {0.5});     \
+            state, TDigest::k2_limit, /*delta=*/1000, 10'000'000, /*presorted=*/false, {0.5});     \
     }                                                                                              \
     BENCHMARK_F(Fixture, tdigest_multi_10000000)(benchmark::State & state) {                       \
         tdigest_normalData(state,                                                                  \
-                           TDigest::k2_limit,                                                      \
-                           1000 /*delta*/,                                                         \
-                           10'000'000,                                                             \
-                           false /*presorted*/,                                                    \
+                           TDigest::k2_limit, /*delta=*/                                           \
+                           1000,                                                                   \
+                           10'000'000, /*presorted=*/                                              \
+                           false,                                                                  \
                            {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95});                   \
     }                                                                                              \
                                                                                                    \
     BENCHMARK_F(Fixture, discrete_mid_10)(benchmark::State & state) {                              \
-        discrete_normalData(state, 10, false /*presorted*/, {0.05});                               \
+        discrete_normalData(state, 10, /*presorted=*/false, {0.05});                               \
     }                                                                                              \
     BENCHMARK_F(Fixture, discrete_mid_100)(benchmark::State & state) {                             \
-        discrete_normalData(state, 100, false /*presorted*/, {0.5});                               \
+        discrete_normalData(state, 100, /*presorted=*/false, {0.5});                               \
     }                                                                                              \
     BENCHMARK_F(Fixture, discrete_multi_100)(benchmark::State & state) {                           \
         discrete_normalData(                                                                       \
-            state, 100, false /*presorted*/, {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95}); \
+            state, 100, /*presorted=*/false, {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95}); \
     }                                                                                              \
     BENCHMARK_F(Fixture, discrete_low_1000)(benchmark::State & state) {                            \
-        discrete_normalData(state, 1000, false /*presorted*/, {0.01});                             \
+        discrete_normalData(state, 1000, /*presorted=*/false, {0.01});                             \
     }                                                                                              \
     BENCHMARK_F(Fixture, discrete_mid_1000)(benchmark::State & state) {                            \
-        discrete_normalData(state, 1000, false /*presorted*/, {0.5});                              \
+        discrete_normalData(state, 1000, /*presorted=*/false, {0.5});                              \
     }                                                                                              \
     BENCHMARK_F(Fixture, discrete_mid_1000_presorted)(benchmark::State & state) {                  \
-        discrete_normalData(state, 1000, true /*presorted*/, {0.99});                              \
+        discrete_normalData(state, 1000, /*presorted=*/true, {0.99});                              \
     }                                                                                              \
     BENCHMARK_F(Fixture, discrete_high_1000)(benchmark::State & state) {                           \
-        discrete_normalData(state, 1000, false /*presorted*/, {0.99});                             \
+        discrete_normalData(state, 1000, /*presorted=*/false, {0.99});                             \
     }                                                                                              \
     BENCHMARK_F(Fixture, discrete_multi_1000)(benchmark::State & state) {                          \
         discrete_normalData(state,                                                                 \
-                            1000,                                                                  \
-                            false /*presorted*/,                                                   \
+                            1000, /*presorted=*/                                                   \
+                            false,                                                                 \
                             {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95});                  \
     }                                                                                              \
     BENCHMARK_F(Fixture, discrete_low_10000)(benchmark::State & state) {                           \
-        discrete_normalData(state, 10000, false /*presorted*/, {0.01});                            \
+        discrete_normalData(state, 10000, /*presorted=*/false, {0.01});                            \
     }                                                                                              \
     BENCHMARK_F(Fixture, discrete_mid_10000)(benchmark::State & state) {                           \
-        discrete_normalData(state, 10000, false /*presorted*/, {0.5});                             \
+        discrete_normalData(state, 10000, /*presorted=*/false, {0.5});                             \
     }                                                                                              \
     BENCHMARK_F(Fixture, discrete_mid_10000_presorted)(benchmark::State & state) {                 \
-        discrete_normalData(state, 10000, true /*presorted*/, {0.5});                              \
+        discrete_normalData(state, 10000, /*presorted=*/true, {0.5});                              \
     }                                                                                              \
     BENCHMARK_F(Fixture, discrete_high_10000)(benchmark::State & state) {                          \
-        discrete_normalData(state, 10000, false /*presorted*/, {0.99});                            \
+        discrete_normalData(state, 10000, /*presorted=*/false, {0.99});                            \
     }                                                                                              \
     BENCHMARK_F(Fixture, discrete_multi_10000)(benchmark::State & state) {                         \
         discrete_normalData(state,                                                                 \
-                            10000,                                                                 \
-                            false /*presorted*/,                                                   \
+                            10000, /*presorted=*/                                                  \
+                            false,                                                                 \
                             {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95});                  \
     }                                                                                              \
     BENCHMARK_F(Fixture, discrete_multi18_10000)(benchmark::State & state) {                       \
         discrete_normalData(state,                                                                 \
-                            10000,                                                                 \
-                            false /*presorted*/,                                                   \
+                            10000, /*presorted=*/                                                  \
+                            false,                                                                 \
                             {0,                                                                    \
                              0.001,                                                                \
                              0.005,                                                                \
@@ -217,8 +217,8 @@ public:
     }                                                                                              \
     BENCHMARK_F(Fixture, discrete_multi51_10000)(benchmark::State & state) {                       \
         discrete_normalData(state,                                                                 \
-                            10000,                                                                 \
-                            false /*presorted*/,                                                   \
+                            10000, /*presorted=*/                                                  \
+                            false,                                                                 \
                             {0,    0.02, 0.04, 0.06, 0.08, 0.1,  0.12, 0.14, 0.16, 0.18, 0.2,      \
                              0.22, 0.24, 0.26, 0.28, 0.3,  0.32, 0.34, 0.36, 0.38, 0.4,  0.42,     \
                              0.44, 0.46, 0.48, 0.5,  0.52, 0.54, 0.56, 0.58, 0.6,  0.62, 0.64,     \
@@ -228,8 +228,8 @@ public:
     BENCHMARK_F(Fixture, discrete_multi101_10000)(benchmark::State & state) {                      \
         discrete_normalData(                                                                       \
             state,                                                                                 \
-            10000,                                                                                 \
-            false /*presorted*/,                                                                   \
+            10000, /*presorted=*/                                                                  \
+            false,                                                                                 \
             {0,    0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1,  0.11, 0.12,         \
              0.13, 0.14, 0.15, 0.16, 0.17, 0.18, 0.19, 0.2,  0.21, 0.22, 0.23, 0.24, 0.25,         \
              0.26, 0.27, 0.28, 0.29, 0.3,  0.31, 0.32, 0.33, 0.34, 0.35, 0.36, 0.37, 0.38,         \
@@ -244,26 +244,26 @@ public:
     }                                                                                              \
     BENCHMARK_F(Fixture, discrete_multi_100000)(benchmark::State & state) {                        \
         discrete_normalData(state,                                                                 \
-                            100'000,                                                               \
-                            false /*presorted*/,                                                   \
+                            100'000, /*presorted=*/                                                \
+                            false,                                                                 \
                             {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95});                  \
     }                                                                                              \
     BENCHMARK_F(Fixture, discrete_mid_1000000)(benchmark::State & state) {                         \
-        discrete_normalData(state, 1'000'000, false /*presorted*/, {0.5});                         \
+        discrete_normalData(state, 1'000'000, /*presorted=*/false, {0.5});                         \
     }                                                                                              \
     BENCHMARK_F(Fixture, discrete_multi_1000000)(benchmark::State & state) {                       \
         discrete_normalData(state,                                                                 \
-                            1'000'000,                                                             \
-                            false /*presorted*/,                                                   \
+                            1'000'000, /*presorted=*/                                              \
+                            false,                                                                 \
                             {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95});                  \
     }                                                                                              \
     BENCHMARK_F(Fixture, discrete_mid_10000000)(benchmark::State & state) {                        \
-        discrete_normalData(state, 10'000'000, false /*presorted*/, {0.5});                        \
+        discrete_normalData(state, 10'000'000, /*presorted=*/false, {0.5});                        \
     }                                                                                              \
     BENCHMARK_F(Fixture, discrete_multi_10000000)(benchmark::State & state) {                      \
         discrete_normalData(state,                                                                 \
-                            10'000'000,                                                            \
-                            false /*presorted*/,                                                   \
+                            10'000'000, /*presorted=*/                                             \
+                            false,                                                                 \
                             {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95});                  \
     }
 

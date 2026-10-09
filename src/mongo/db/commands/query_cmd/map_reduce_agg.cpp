@@ -184,7 +184,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
             tassert(
                 10610100, "The plan executor is not of type 'PlanExecutorPipeline'", pipelineExec);
             Explain::explainPipeline(
-                pipelineExec, false /* executePipeline  */, *expCtx->getExplain(), cmd, &result);
+                pipelineExec, /*executePipeline=*/false, *expCtx->getExplain(), cmd, &result);
         }
 
         PlanSummaryStats planSummaryStats;

@@ -59,9 +59,9 @@ public:
                                         ReadPreferenceSetting::get(opCtx),
                                         Shard::RetryPolicy::kIdempotent,
                                         req.getMin(),
-                                        {} /*collation*/,
-                                        boost::none /*letParameters*/,
-                                        boost::none /*runtimeConstants*/)
+                                        /*collation=*/{},
+                                        /*letParameters=*/boost::none,
+                                        /*runtimeConstants=*/boost::none)
                                         .front();
 
                     auto status = AsyncRequestsSender::Response::getEffectiveStatus(response);

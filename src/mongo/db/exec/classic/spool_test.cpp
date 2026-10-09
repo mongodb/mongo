@@ -235,7 +235,7 @@ TEST_F(SpoolStageTest, onlyNeedYieldAndNeedTime) {
     workAndAssertStateAndRecordId(spool, PlanStage::NEED_YIELD);
     workAndAssertStateAndRecordId(spool, PlanStage::NEED_TIME);
     workAndAssertStateAndRecordId(
-        spool, PlanStage::NEED_YIELD, std::monostate{}, false /* childHasMoreRecords */);
+        spool, PlanStage::NEED_YIELD, std::monostate{}, /*childHasMoreRecords=*/false);
 
     assertEofState(spool);
     ASSERT_EQ(spool.getMemoryUsageTracker_forTest()->inUseTrackedMemoryBytes(), 0);
@@ -250,7 +250,7 @@ TEST_F(SpoolStageTest, spillEveryRecordId) {
 
     const uint64_t maxAllowedMemoryUsageBytes = 1;
     auto spool =
-        makeSpool(std::move(mock), maxAllowedMemoryUsageBytes, 1024 /* maxAllowedDiskUsageBytes */);
+        makeSpool(std::move(mock), maxAllowedMemoryUsageBytes, /*maxAllowedDiskUsageBytes=*/1024);
 
     workAndAssertStateAndRecordId(spool, PlanStage::ADVANCED, 1);
     workAndAssertStateAndRecordId(spool, PlanStage::ADVANCED, 2);
@@ -276,7 +276,7 @@ TEST_F(SpoolStageTest, spillEveryOtherRecordId) {
 
     const uint64_t maxAllowedMemoryUsageBytes = sizeof(RecordId) * 1.5;
     auto spool =
-        makeSpool(std::move(mock), maxAllowedMemoryUsageBytes, 1024 /* maxAllowedDiskUsageBytes */);
+        makeSpool(std::move(mock), maxAllowedMemoryUsageBytes, /*maxAllowedDiskUsageBytes=*/1024);
 
     workAndAssertStateAndRecordId(spool, PlanStage::ADVANCED, 1);
     workAndAssertStateAndRecordId(spool, PlanStage::ADVANCED, 2);
@@ -307,7 +307,7 @@ TEST_F(SpoolStageTest, spillStringRecordId) {
 
     const uint64_t maxAllowedMemoryUsageBytes = sizeof(RecordId) + 1;
     auto spool =
-        makeSpool(std::move(mock), maxAllowedMemoryUsageBytes, 1024 /* maxAllowedDiskUsageBytes */);
+        makeSpool(std::move(mock), maxAllowedMemoryUsageBytes, /*maxAllowedDiskUsageBytes=*/1024);
 
     workAndAssertStateAndRecordId(spool, PlanStage::ADVANCED, 1);
     workAndAssertStateAndRecordId(spool, PlanStage::ADVANCED, "this is a short string");
@@ -338,7 +338,7 @@ TEST_F(SpoolStageTest, forceSpill) {
 
     const uint64_t maxAllowedMemoryUsageBytes = 100 * 1024 * 1024;
     auto spool =
-        makeSpool(std::move(mock), maxAllowedMemoryUsageBytes, 1024 /* maxAllowedDiskUsageBytes */);
+        makeSpool(std::move(mock), maxAllowedMemoryUsageBytes, /*maxAllowedDiskUsageBytes=*/1024);
 
     workAndAssertStateAndRecordId(spool, PlanStage::ADVANCED, 1);
     workAndAssertStateAndRecordId(spool, PlanStage::ADVANCED, "this is a short string");
@@ -365,8 +365,8 @@ TEST_F(SpoolStageTest, spillingDisabled) {
     mock->enqueueAdvanced(makeRecord(1));
 
     auto spool = makeSpool(std::move(mock),
-                           1 /* maxAllowedMemoryUsageBytes */,
-                           boost::none /* maxAllowedDiskUsageBytes */);
+                           /*maxAllowedMemoryUsageBytes=*/1,
+                           /*maxAllowedDiskUsageBytes=*/boost::none);
 
     WorkingSetID id;
     ASSERT_THROWS_CODE(
@@ -379,7 +379,7 @@ TEST_F(SpoolStageTest, maxDiskSpaceUsed) {
     mock->enqueueAdvanced(makeRecord(2));
 
     auto spool = makeSpool(
-        std::move(mock), 1 /* maxAllowedMemoryUsageBytes */, 1 /* maxAllowedDiskUsageBytes */);
+        std::move(mock), /*maxAllowedMemoryUsageBytes=*/1, /*maxAllowedDiskUsageBytes=*/1);
 
     WorkingSetID id;
     ASSERT_THROWS_CODE(spool.work(&id), AssertionException, 7443700);

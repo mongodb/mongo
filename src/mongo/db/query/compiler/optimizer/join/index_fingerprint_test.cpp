@@ -215,14 +215,14 @@ public:
             node->entry = std::make_unique<IndexEntry>(index.keyPattern,
                                                        IndexType::INDEX_BTREE,
                                                        IndexConfig::kLatestIndexVersion,
-                                                       false /* multikey */,
+                                                       /*multikey=*/false,
                                                        MultikeyPaths{},
                                                        std::set<FieldRef>{},
-                                                       false /* sparse */,
-                                                       false /* unique */,
+                                                       /*sparse=*/false,
+                                                       /*unique=*/false,
                                                        IndexEntry::Identifier{index.name},
-                                                       BSONObj() /* infoObj */,
-                                                       nullptr /* wildcardProjection */);
+                                                       /*infoObj=*/BSONObj(),
+                                                       /*wildcardProjection=*/nullptr);
             if (cacheData->tree) {
                 cacheData->tree->children.push_back(std::move(node));
             } else {

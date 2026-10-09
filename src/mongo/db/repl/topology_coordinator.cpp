@@ -333,9 +333,9 @@ HostAndPort TopologyCoordinator::_chooseNearbySyncSource(Date_t now,
                                        now,
                                        lastOpTimeFetched,
                                        readPreference,
-                                       attempts == 0 /* firstAttempt */,
-                                       true /* shouldCheckStaleness */,
-                                       false /* limitLogFrequency */)) {
+                                       /*firstAttempt=*/attempts == 0,
+                                       /*shouldCheckStaleness=*/true,
+                                       /*limitLogFrequency=*/false)) {
                 // Node is not a viable sync source candidate.
                 continue;
             }
@@ -1219,7 +1219,7 @@ HeartbeatResponseAction TopologyCoordinator::processHeartbeatResponse(
     }
     // Heartbeats should always be sent via the priority port if it is available, thus we only
     // act on heartbeat responses that match getHostAndPortPriority().
-    const int memberIndex = _rsConfig.findMemberIndexByHostAndPort(target, true /* strict */);
+    const int memberIndex = _rsConfig.findMemberIndexByHostAndPort(target, /*strict=*/true);
     if (memberIndex == -1) {
         LOGV2_DEBUG(21806,
                     1,
@@ -3518,7 +3518,7 @@ TopologyCoordinator::_shouldChangeSyncSourceInitialChecks(const HostAndPort& cur
     // has been added but we relax these constraints if the 'forceSyncSource' failpoint is set to
     // aid in testing.
     const int currentSourceIndex = _rsConfig.findMemberIndexByHostAndPort(
-        currentSource, !forceSyncSourceCandidate.shouldFail() /* strict */);
+        currentSource, /*strict=*/!forceSyncSourceCandidate.shouldFail());
     if (currentSourceIndex == -1) {
         LOGV2(21831,
               "Choosing new sync source because current sync source is not in our config",
@@ -3617,9 +3617,9 @@ bool TopologyCoordinator::_shouldChangeSyncSourceDueToLag(const HostAndPort& cur
                                       now,
                                       lastOpTimeFetched,
                                       ReadPreference::Nearest,
-                                      true /* firstAttempt */,
-                                      true /* shouldCheckStaleness */,
-                                      false /* limitLogFrequency */)) {
+                                      /*firstAttempt=*/true,
+                                      /*shouldCheckStaleness=*/true,
+                                      /*limitLogFrequency=*/false)) {
                 invariant(i != (size_t)_selfIndex,
                           str::stream()
                               << "Node " << i << " was eligible as a sync source for itself");
@@ -3657,18 +3657,18 @@ bool TopologyCoordinator::_shouldChangeSyncSourceDueToBetterEligibleSource(
                                now,
                                lastOpTimeFetched,
                                ReadPreference::Nearest,
-                               true /* firstAttempt */,
-                               false /* shouldCheckStaleness */,
-                               false /* limitLogFrequency */)) {
+                               /*firstAttempt=*/true,
+                               /*shouldCheckStaleness=*/false,
+                               /*limitLogFrequency=*/false)) {
 
         for (size_t i = 0; i < _memberData.size(); i++) {
             if (_isEligibleSyncSource(i,
                                       now,
                                       lastOpTimeFetched,
                                       ReadPreference::Nearest,
-                                      true /* firstAttempt */,
-                                      true /* shouldCheckStaleness */,
-                                      false /* limitLogFrequency */)) {
+                                      /*firstAttempt=*/true,
+                                      /*shouldCheckStaleness=*/true,
+                                      /*limitLogFrequency=*/false)) {
                 invariant(i != (size_t)_selfIndex,
                           str::stream()
                               << "Node " << i << " was eligible as a sync source for itself");
@@ -3771,9 +3771,9 @@ bool TopologyCoordinator::shouldChangeSyncSourceDueToPingTime(const HostAndPort&
                                   now,
                                   previousOpTimeFetched,
                                   readPreference,
-                                  true /* firstAttempt */,
-                                  true /* shouldCheckStaleness */,
-                                  true /* limitLogFrequency */)) {
+                                  /*firstAttempt=*/true,
+                                  /*shouldCheckStaleness=*/true,
+                                  /*limitLogFrequency=*/true)) {
             LOGV2(4744901,
                   "Choosing new sync source because we have found another potential sync "
                   "source that is significantly closer than our current sync source",
@@ -3797,7 +3797,7 @@ rpc::ReplSetMetadata TopologyCoordinator::prepareReplSetMetadata(
                                 _rsConfig.getConfigTerm(),
                                 _rsConfig.getReplicaSetId(),
                                 _rsConfig.findMemberIndexByHostAndPort(getSyncSourceAddress()),
-                                _role == Role::kLeader /* isPrimary */);
+                                /*isPrimary=*/_role == Role::kLeader);
 }
 
 rpc::OplogQueryMetadata TopologyCoordinator::prepareOplogQueryMetadata(int rbid) const {

@@ -316,10 +316,10 @@ BSONObj buildViewBson(OperationContext* opCtx, const ViewDefinition& view, bool 
 
     b.append("info",
              buildInfoField(opCtx,
-                            true /*readOnly*/,
+                            /*readOnly=*/true,
                             view.name(),
-                            boost::none /*uuid*/,
-                            boost::none /*recordIdsReplicated*/,
+                            /*uuid=*/boost::none,
+                            /*recordIdsReplicated=*/boost::none,
                             FastCountListCollectionsState::disabled()));
     return b.obj();
 }
@@ -337,13 +337,13 @@ BSONObj buildTimeseriesBson(OperationContext* opCtx, const Collection* collectio
 
     builder.append("options",
                    collection->getCollectionOptions().toBSON(
-                       false /* includeUUID */, timeseries::kAllowedCollectionCreationOptions));
+                       /*includeUUID=*/false, timeseries::kAllowedCollectionCreationOptions));
     builder.append("info",
                    buildInfoField(opCtx,
                                   opCtx->readOnly(),
                                   collection->ns(),
-                                  boost::none /*uuid*/,
-                                  boost::none /*recordIdsReplicated*/,
+                                  /*uuid=*/boost::none,
+                                  /*recordIdsReplicated=*/boost::none,
                                   FastCountListCollectionsState::disabled()));
     return builder.obj();
 }
@@ -362,8 +362,8 @@ BSONObj buildTimeseriesBson(OperationContext* opCtx, const NamespaceString& nss,
                    buildInfoField(opCtx,
                                   opCtx->readOnly(),
                                   nss,
-                                  boost::none /*uuid*/,
-                                  boost::none /*recordIdsReplicated*/,
+                                  /*uuid=*/boost::none,
+                                  /*recordIdsReplicated=*/boost::none,
                                   FastCountListCollectionsState::disabled()));
 
     return builder.obj();
@@ -414,7 +414,7 @@ BSONObj buildCollectionBson(OperationContext* opCtx,
     // While the UUID is stored as a collection option, from the user's perspective it is an
     // unsettable read-only property, so put it in the 'info' section. Pass 'false' to toBSON so
     // it doesn't include 'uuid' here.
-    b.append("options", options.toBSON(false /* includeUUID */, includeOptionsFields));
+    b.append("options", options.toBSON(/*includeUUID=*/false, includeOptionsFields));
     b.append("info",
              buildInfoField(opCtx,
                             opCtx->readOnly(),
@@ -778,7 +778,7 @@ public:
                     }
                     if (exec->isEOF()) {
                         return boost::make_optional(
-                            createListCollectionsCursorReply(0 /* cursorId */,
+                            createListCollectionsCursorReply(/*cursorId=*/0,
                                                              cursorNss,
                                                              respSerializationContext,
                                                              std::move(firstBatch)));

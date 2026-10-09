@@ -117,7 +117,7 @@ bool requiresOriginalQuery(OperationContext* opCtx,
                                                     res.getValue().get(),
                                                     *query,
                                                     ProjectionPolicies::findProjectionPolicies(),
-                                                    false /* shouldOptimize */);
+                                                    /*shouldOptimize=*/false);
         return proj.requiresMatchDetails() ||
             DepsTracker::needsTextScoreMetadata(proj.metadataDeps());
     }

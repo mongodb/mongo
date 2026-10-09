@@ -81,7 +81,7 @@ StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(PlannerData& 
     _multiPlanner.emplace(std::move(plannerData),
                           std::move(solutions),
                           PlanExplainerData{},
-                          false /* addingCBRChosenPlanToPlanCache */,
+                          /*addingCBRChosenPlanToPlanCache=*/false,
                           PlanSelectionStrategy::kMultiPlanner);
     // Cap the number of works per plan during this first trials phase so that the total works
     // across all plans does not exceed internalQueryPlanEvaluationWorks.

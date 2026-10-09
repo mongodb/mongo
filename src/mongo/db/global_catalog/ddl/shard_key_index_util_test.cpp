@@ -136,7 +136,7 @@ TEST_F(ShardKeyIndexUtilTest, SimpleKeyPattern) {
                            << "v" << kIndexVersion));
 
     const auto index =
-        findShardKeyPrefixedIndex(opCtx(), coll(), BSON("x" << 1), true /* requireSingleKey */);
+        findShardKeyPrefixedIndex(opCtx(), coll(), BSON("x" << 1), /*requireSingleKey=*/true);
 
     ASSERT_TRUE(index);
     ASSERT_EQ("x", index->indexEntry()->descriptor()->indexName());
@@ -154,7 +154,7 @@ TEST_F(ShardKeyIndexUtilTest, HashedKeyPattern) {
                            << "v" << kIndexVersion));
 
     const auto index = findShardKeyPrefixedIndex(
-        opCtx(), coll(), BSON("x" << "hashed"), true /* requireSingleKey */);
+        opCtx(), coll(), BSON("x" << "hashed"), /*requireSingleKey=*/true);
 
     ASSERT_TRUE(index);
     ASSERT_EQ("xhashed", index->indexEntry()->descriptor()->indexName());
@@ -169,7 +169,7 @@ TEST_F(ShardKeyIndexUtilTest, PrefixKeyPattern) {
                            << "v" << kIndexVersion));
 
     const auto index = findShardKeyPrefixedIndex(
-        opCtx(), coll(), BSON("x" << 1 << "y" << 1), true /* requireSingleKey */);
+        opCtx(), coll(), BSON("x" << 1 << "y" << 1), /*requireSingleKey=*/true);
 
     ASSERT_TRUE(index);
     ASSERT_EQ("xyz", index->indexEntry()->descriptor()->indexName());
@@ -194,7 +194,7 @@ TEST_F(ShardKeyIndexUtilTest, ExcludesIncompatibleIndexes) {
 
     {
         const auto index =
-            findShardKeyPrefixedIndex(opCtx(), coll(), BSON("x" << 1), true /* requireSingleKey */);
+            findShardKeyPrefixedIndex(opCtx(), coll(), BSON("x" << 1), /*requireSingleKey=*/true);
 
         ASSERT_FALSE(index);
     }
@@ -205,7 +205,7 @@ TEST_F(ShardKeyIndexUtilTest, ExcludesIncompatibleIndexes) {
 
     {
         const auto index =
-            findShardKeyPrefixedIndex(opCtx(), coll(), BSON("x" << 1), true /* requireSingleKey */);
+            findShardKeyPrefixedIndex(opCtx(), coll(), BSON("x" << 1), /*requireSingleKey=*/true);
 
         ASSERT_TRUE(index);
         ASSERT_EQ("x", index->indexEntry()->descriptor()->indexName());
@@ -221,7 +221,7 @@ TEST_F(ShardKeyIndexUtilTest, MultiKeyIndexIsAnIncompatibleShardKey) {
     client.insert(nss(), BSON("x" << BSON_ARRAY(1 << 2)));
 
     const auto index =
-        findShardKeyPrefixedIndex(opCtx(), coll(), BSON("x" << 1), true /* requireSingleKey */);
+        findShardKeyPrefixedIndex(opCtx(), coll(), BSON("x" << 1), /*requireSingleKey=*/true);
 
     ASSERT_FALSE(index);
 }
@@ -235,7 +235,7 @@ TEST_F(ShardKeyIndexUtilTest, ExcludesMultiKeyIfRequiresSingleKey) {
     client.insert(nss(), BSON("x" << BSON_ARRAY(1 << 2)));
 
     const auto index =
-        findShardKeyPrefixedIndex(opCtx(), coll(), BSON("x" << 1), true /* requireSingleKey */);
+        findShardKeyPrefixedIndex(opCtx(), coll(), BSON("x" << 1), /*requireSingleKey=*/true);
 
     ASSERT_FALSE(index);
 }
@@ -249,7 +249,7 @@ TEST_F(ShardKeyIndexUtilTest, IncludesMultiKeyIfSingleKeyNotRequired) {
     client.insert(nss(), BSON("x" << BSON_ARRAY(1 << 2)));
 
     const auto index =
-        findShardKeyPrefixedIndex(opCtx(), coll(), BSON("x" << 1), false /* requireSingleKey */);
+        findShardKeyPrefixedIndex(opCtx(), coll(), BSON("x" << 1), /*requireSingleKey=*/false);
 
     ASSERT_TRUE(index);
     ASSERT_EQ("x", index->indexEntry()->descriptor()->indexName());

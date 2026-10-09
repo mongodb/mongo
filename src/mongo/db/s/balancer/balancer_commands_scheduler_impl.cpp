@@ -56,7 +56,7 @@ void waitForQuiescedCluster(OperationContext* opCtx) {
                                                               joinShardOnMigrationsRequest.toBSON(),
                                                               unquiescedShardIds,
                                                               executor,
-                                                              false /*throwOnError*/);
+                                                              /*throwOnError=*/false);
     for (const auto& r : responses) {
         auto responseOutcome = r.swResponse.isOK()
             ? getStatusFromCommandResult(r.swResponse.getValue().data)

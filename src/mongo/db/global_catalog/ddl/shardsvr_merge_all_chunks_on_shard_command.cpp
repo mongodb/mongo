@@ -84,7 +84,7 @@ boost::optional<FixedFCVRegion> tryRunMergeAllChunksCoordinator(
         auto service = ShardingCoordinatorService::getService(opCtx);
         auto coordinator =
             checked_pointer_cast<MergeAllChunksCoordinator>(service->getOrCreateInstance(
-                opCtx, coordinatorDoc.toBSON(), *optFixedFcvRegion, false /*checkOptions*/));
+                opCtx, coordinatorDoc.toBSON(), *optFixedFcvRegion, /*checkOptions=*/false));
 
         try {
             coordinator->checkIfOptionsConflict(coordinatorDoc.toBSON());
@@ -156,7 +156,7 @@ public:
             // use the resolved identifier.
             const auto resolvedShardId =
                 uassertStatusOK(Grid::get(opCtx)->shardRegistry()->resolveShardId(
-                    opCtx, req.getShard(), true /* allowNonShardIdIdentifiers */));
+                    opCtx, req.getShard(), /*allowNonShardIdIdentifiers=*/true));
 
             // The coordinator uses the request document to check for conflicting operations, so we
             // need to update it with the resolved identifier if the shardId was not used.

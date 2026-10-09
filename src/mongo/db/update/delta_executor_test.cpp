@@ -38,7 +38,7 @@ unsigned long getIndexAffectedFromDiff(std::vector<const UpdateIndexData*> index
     }
     mongo::doc_diff::IndexUpdateIdentifier updateIdentifier{indexData.size() /*numIndexes*/};
     for (size_t i = 0; i < indexData.size(); i++) {
-        updateIdentifier.addIndex(i /*indexCounter*/, *indexData[i]);
+        updateIdentifier.addIndex(/*indexCounter=*/i, *indexData[i]);
     }
 
     // Convert the set bits into a numeric value to return.

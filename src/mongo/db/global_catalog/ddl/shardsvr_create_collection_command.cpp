@@ -271,7 +271,7 @@ public:
                         service->getOrCreateInstance(opCtx,
                                                      coordinatorDoc.copy(),
                                                      *optFixedFcvRegion,
-                                                     false /*checkOptions*/));
+                                                     /*checkOptions=*/false));
                 }();
                 try {
                     coordinator->checkIfOptionsConflict(coordinatorDoc);

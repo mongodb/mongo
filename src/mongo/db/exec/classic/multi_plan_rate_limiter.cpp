@@ -102,7 +102,7 @@ bool MultiPlanTicket::isTicketHolderReleased() const {
 MultiPlanTicketHolder::MultiPlanTicketHolder(ServiceContext* serviceContext, int numTickets)
     : _ticketHolder(serviceContext,
                     numTickets,
-                    /*trackPeakUsed*/ false,
+                    /*trackPeakUsed=*/false,
                     TicketHolder::kDefaultMaxQueueDepth,
                     /* delinquentCallback */ nullptr,
                     /* executionAcquisitionCallback */ nullptr,

@@ -102,7 +102,7 @@ public:
         auto tag = sbe::value::TypeTags::inList;
         auto val = sbe::value::bitcastFrom<sbe::InList*>(inListPtr.release());
 
-        bindParam(*slotId, true /*owned*/, tag, val);
+        bindParam(*slotId, /*owned=*/true, tag, val);
     }
 
     void visit(const ModMatchExpression* expr) final {
@@ -117,12 +117,12 @@ public:
 
         if (auto slotId = getSlotId(*divisorParam)) {
             auto value = sbe::value::bitcastFrom<int64_t>(expr->getDivisor());
-            bindParam(*slotId, true /*owned*/, sbe::value::TypeTags::NumberInt64, value);
+            bindParam(*slotId, /*owned=*/true, sbe::value::TypeTags::NumberInt64, value);
         }
 
         if (auto slotId = getSlotId(*remainderParam)) {
             auto value = sbe::value::bitcastFrom<int64_t>(expr->getRemainder());
-            bindParam(*slotId, true /*owned*/, sbe::value::TypeTags::NumberInt64, value);
+            bindParam(*slotId, /*owned=*/true, sbe::value::TypeTags::NumberInt64, value);
         }
     }
 
@@ -138,13 +138,13 @@ public:
         if (auto slotId = getSlotId(*sourceRegexParam)) {
             auto&& [bsonRegexTag, bsonRegexVal] =
                 sbe::value::makeNewBsonRegex(expr->getString(), expr->getFlags());
-            bindParam(*slotId, true /*owned*/, bsonRegexTag, bsonRegexVal);
+            bindParam(*slotId, /*owned=*/true, bsonRegexTag, bsonRegexVal);
         }
 
         if (auto slotId = getSlotId(*compiledRegexParam)) {
             auto [compiledRegexTag, compiledRegexVal] =
                 sbe::makeNewPcreRegex(expr->getString(), expr->getFlags()).releaseToRaw();
-            bindParam(*slotId, true /*owned*/, compiledRegexTag, compiledRegexVal);
+            bindParam(*slotId, /*owned=*/true, compiledRegexTag, compiledRegexVal);
         }
     }
 
@@ -155,7 +155,7 @@ public:
         }
 
         auto value = sbe::value::bitcastFrom<int32_t>(expr->getData());
-        bindParam(*slotId, true /*owned*/, sbe::value::TypeTags::NumberInt32, value);
+        bindParam(*slotId, /*owned=*/true, sbe::value::TypeTags::NumberInt32, value);
     }
 
     void visit(const TypeMatchExpression* expr) final {
@@ -166,7 +166,7 @@ public:
 
         auto value = sbe::value::bitcastFrom<int32_t>(expr->typeSet().getBSONTypeMask());
 
-        bindParam(*slotId, true /*owned*/, sbe::value::TypeTags::NumberInt32, value);
+        bindParam(*slotId, /*owned=*/true, sbe::value::TypeTags::NumberInt32, value);
     }
 
     void visit(const WhereMatchExpression* expr) final {
@@ -186,7 +186,7 @@ public:
             // need to call recoverWhereExprPredicate to move predicates back to
             // WhereMatchExpressions.
             bindParam(*slotId,
-                      true /*owned*/,
+                      /*owned=*/true,
                       sbe::value::TypeTags::jsFunction,
                       sbe::value::bitcastFrom<JsFunction*>(
                           const_cast<WhereMatchExpression*>(expr)->extractPredicate().release()));
@@ -195,7 +195,7 @@ public:
                 sbe::value::TypeTags::jsFunction,
                 sbe::value::bitcastFrom<JsFunction*>(new JsFunction(expr->getPredicate())));
 
-            bindParam(*slotId, true /*owned*/, typeTag, value);
+            bindParam(*slotId, /*owned=*/true, typeTag, value);
         }
     }
 
@@ -257,7 +257,7 @@ private:
         // is acceptable because the 'MatchExpression' is held by the 'CanonicalQuery', and the
         // 'CanonicalQuery' lives for the lifetime of the query.
         auto [typeTag, val] = sbe::bson::convertToView(expr->getData());
-        bindParam(*slotId, false /*owned*/, typeTag, val);
+        bindParam(*slotId, /*owned=*/false, typeTag, val);
     }
 
     void visitBitTestExpression(const BitTestMatchExpression* expr) {
@@ -275,12 +275,12 @@ private:
 
         if (auto slotId = getSlotId(*bitPositionsParam)) {
             auto&& [bitPosTag, bitPosVal] = stage_builder::convertBitTestBitPositions(expr);
-            bindParam(*slotId, true /*owned*/, bitPosTag, bitPosVal);
+            bindParam(*slotId, /*owned=*/true, bitPosTag, bitPosVal);
         }
 
         if (auto slotId = getSlotId(*bitMaskParam)) {
             auto val = sbe::value::bitcastFrom<uint64_t>(expr->getBitMask());
-            bindParam(*slotId, true /*owned*/, sbe::value::TypeTags::NumberInt64, val);
+            bindParam(*slotId, /*owned=*/true, sbe::value::TypeTags::NumberInt64, val);
         }
     }
 
@@ -405,19 +405,19 @@ void bindGenericPlanSlots(const stage_builder::IndexBoundsEvaluationInfo& indexB
     runtimeEnvironment->resetSlot(indexSlots.isGenericScan,
                                   sbe::value::TypeTags::Boolean,
                                   sbe::value::bitcastFrom<bool>(isGenericScan),
-                                  /*owned*/ true);
+                                  /*owned=*/true);
     if (isGenericScan) {
         runtimeEnvironment->resetSlot(indexSlots.indexBounds,
                                       sbe::value::TypeTags::indexBounds,
                                       sbe::value::bitcastFrom<IndexBounds*>(bounds.release()),
-                                      /*owned*/ true);
+                                      /*owned=*/true);
     } else {
         auto [boundsTag, boundsVal] =
             stage_builder::packIndexIntervalsInSbeArray(std::move(intervals));
         runtimeEnvironment->resetSlot(indexSlots.lowHighKeyIntervals,
                                       boundsTag,
                                       boundsVal,
-                                      /*owned*/ true);
+                                      /*owned=*/true);
     }
 }
 

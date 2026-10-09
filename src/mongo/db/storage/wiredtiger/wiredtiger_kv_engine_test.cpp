@@ -203,7 +203,7 @@ protected:
 
 class WiredTigerKVEngineRepairTest : public WiredTigerKVEngineTest {
 public:
-    WiredTigerKVEngineRepairTest() : WiredTigerKVEngineTest(true /* repair */) {}
+    WiredTigerKVEngineRepairTest() : WiredTigerKVEngineTest(/*repair=*/true) {}
 };
 
 TEST_F(WiredTigerKVEngineRepairTest, OrphanedDataFilesCanBeRecovered) {
@@ -1394,7 +1394,7 @@ TEST_F(WiredTigerKVEngineTest, CheckSessionCacheMax) {
 class WiredTigerKVEngineTestWithPreciseCheckpoints : public WiredTigerKVEngineTest {
 public:
     WiredTigerKVEngineTestWithPreciseCheckpoints()
-        : WiredTigerKVEngineTest(false /* repair */, true /* preciseCheckpoints */) {}
+        : WiredTigerKVEngineTest(/*repair=*/false, /*preciseCheckpoints=*/true) {}
 
 protected:
     void createPreparedTransaction(OperationContext* opCtx,

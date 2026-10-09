@@ -403,7 +403,7 @@ Status dropCollection(OperationContext* opCtx,
 }
 
 Status dropDatabase(OperationContext* opCtx, const DatabaseName& dbName) {
-    return dropCollectionsWithPrefix(opCtx, dbName, "" /*collectionNamePrefix*/);
+    return dropCollectionsWithPrefix(opCtx, dbName, /*collectionNamePrefix=*/"");
 }
 
 Status dropCollectionsWithPrefix(OperationContext* opCtx,

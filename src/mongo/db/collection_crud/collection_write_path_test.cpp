@@ -79,7 +79,7 @@ TEST_F(TruncateRangeFixture,
 
     ASSERT_THROWS_CODE(
         collection_internal::truncateRange(
-            opCtx, collPtr, minRecordId, maxRecordId, 0 /* bytesDeleted */, 0 /* docsDeleted */),
+            opCtx, collPtr, minRecordId, maxRecordId, /*bytesDeleted=*/0, /*docsDeleted=*/0),
         DBException,
         ErrorCodes::IllegalOperation);
 }
@@ -100,7 +100,7 @@ TEST_F(TruncateRangeFixture,
 
     ASSERT_THROWS_CODE(
         collection_internal::truncateRange(
-            opCtx, coll, minRecordId, maxRecordId, 0 /* bytesDeleted */, 0 /* docsDeleted */),
+            opCtx, coll, minRecordId, maxRecordId, /*bytesDeleted=*/0, /*docsDeleted=*/0),
         DBException,
         ErrorCodes::IllegalOperation);
 }
@@ -124,7 +124,7 @@ TEST_F(TruncateRangeFixture,
 
     ASSERT_THROWS_CODE(
         collection_internal::truncateRange(
-            opCtx, coll, minRecordId, maxRecordId, 0 /* bytesDeleted */, 0 /* docsDeleted */),
+            opCtx, coll, minRecordId, maxRecordId, /*bytesDeleted=*/0, /*docsDeleted=*/0),
         DBException,
         ErrorCodes::IllegalOperation);
 }
@@ -164,7 +164,7 @@ TEST_F(
 
     ASSERT_THROWS_CODE(
         collection_internal::truncateRange(
-            opCtx, coll, minRecordId, maxRecordId, 0 /* bytesDeleted */, 0 /* docsDeleted */),
+            opCtx, coll, minRecordId, maxRecordId, /*bytesDeleted=*/0, /*docsDeleted=*/0),
         DBException,
         ErrorCodes::IllegalOperation);
 }
@@ -186,7 +186,7 @@ TEST_F(TruncateRangeFixture,
 
     ASSERT_THROWS_CODE(
         collection_internal::truncateRange(
-            opCtx, coll, minRecordId, nullMaxRecordId, 0 /* bytesDeleted */, 0 /* docsDeleted */),
+            opCtx, coll, minRecordId, nullMaxRecordId, /*bytesDeleted=*/0, /*docsDeleted=*/0),
         DBException,
         ErrorCodes::IllegalOperation);
 }
@@ -211,7 +211,7 @@ TEST_F(
 
     ASSERT_THROWS_CODE(
         collection_internal::truncateRange(
-            opCtx, collPtr, minRecordId, maxRecordId, 0 /* bytesDeleted */, 0 /* docsDeleted */),
+            opCtx, collPtr, minRecordId, maxRecordId, /*bytesDeleted=*/0, /*docsDeleted=*/0),
         DBException,
         ErrorCodes::IllegalOperation);
 }
@@ -232,7 +232,7 @@ TEST_F(TruncateRangeFixture, Given_OplogCollectionWithoutIndexes_When_truncateRa
 
     WriteUnitOfWork wuow(opCtx);
     ASSERT_NO_THROW(collection_internal::truncateRange(
-        opCtx, coll, minRecordId, maxRecordId, 0 /* bytesDeleted */, 0 /* docsDeleted */));
+        opCtx, coll, minRecordId, maxRecordId, /*bytesDeleted=*/0, /*docsDeleted=*/0));
     wuow.commit();
 }
 
@@ -260,12 +260,12 @@ TEST_F(TruncateRangeFixture,
             .recordId();
     const RecordId maxRecordId =
         change_stream_pre_image_id_util::getPreImageRecordIdForNsTimestampApplyOpsIndex(
-            collUUID, maxTsEligible, std::numeric_limits<int64_t>::max() /* applyOpsIndex */)
+            collUUID, maxTsEligible, /*applyOpsIndex=*/std::numeric_limits<int64_t>::max())
             .recordId();
 
     WriteUnitOfWork wuow(opCtx);
     ASSERT_NO_THROW(collection_internal::truncateRange(
-        opCtx, collPtr, minRecordId, maxRecordId, 0 /* bytesDeleted */, 0 /* docsDeleted */));
+        opCtx, collPtr, minRecordId, maxRecordId, /*bytesDeleted=*/0, /*docsDeleted=*/0));
     wuow.commit();
 }
 

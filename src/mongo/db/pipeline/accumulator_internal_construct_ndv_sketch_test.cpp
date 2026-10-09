@@ -39,16 +39,16 @@ protected:
         if (!value.missing()) {
             doc.addField("a", value);
         }
-        accumulator.process(Value(Document{{"val", doc.freezeToValue()}}), false /* merging */);
+        accumulator.process(Value(Document{{"val", doc.freezeToValue()}}), /*merging=*/false);
     }
 
     // Composite counterpart of add(): feeds a whole document as 'val'.
     void addDoc(AccumulatorInternalConstructNdvSketch& accumulator, Document doc) {
-        accumulator.process(Value(Document{{"val", Value(std::move(doc))}}), false /* merging */);
+        accumulator.process(Value(Document{{"val", Value(std::move(doc))}}), /*merging=*/false);
     }
 
     Value sketches(AccumulatorInternalConstructNdvSketch& accumulator) {
-        return accumulator.getValue(false /* toBeMerged */);
+        return accumulator.getValue(/*toBeMerged=*/false);
     }
 
     long long ndv(AccumulatorInternalConstructNdvSketch& accumulator) {
@@ -85,8 +85,7 @@ TEST_F(InternalConstructNdvSketchTest, ParsesHistogramStyleSyntax) {
     accumulator->process(argument->evaluate(Document{}, &_expCtx->variables), false);
     // Two distinct values: 5 and missing.
     ASSERT_EQ(
-        accumulator->getValue(false /* toBeMerged */)[0][NdvSketch::kNdvFieldName].coerceToLong(),
-        2);
+        accumulator->getValue(/*toBeMerged=*/false)[0][NdvSketch::kNdvFieldName].coerceToLong(), 2);
 }
 
 TEST_F(InternalConstructNdvSketchTest, CountsDistinctValuesNearExactly) {
@@ -140,19 +139,19 @@ TEST_F(InternalConstructNdvSketchTest, RejectsArraysAlongDottedPaths) {
     auto accumulator = makeAccumulator({"a.b"});
     const Value doc{Document{
         {"val", Value(Document{{"a", Value(std::vector<Value>{Value(Document{{"b", 1}})})}})}}};
-    ASSERT_THROWS_CODE(accumulator->process(doc, false /* merging */), DBException, 13175701);
+    ASSERT_THROWS_CODE(accumulator->process(doc, /*merging=*/false), DBException, 13175701);
 }
 
 TEST_F(InternalConstructNdvSketchTest, RejectsMerging) {
     auto accumulator = makeAccumulator();
-    ASSERT_THROWS_CODE(accumulator->process(Value(1), true /* merging */), DBException, 13175700);
-    ASSERT_THROWS_CODE(accumulator->getValue(true /* toBeMerged */), DBException, 13175702);
+    ASSERT_THROWS_CODE(accumulator->process(Value(1), /*merging=*/true), DBException, 13175700);
+    ASSERT_THROWS_CODE(accumulator->getValue(/*toBeMerged=*/true), DBException, 13175702);
 }
 
 TEST_F(InternalConstructNdvSketchTest, NonDocumentValDegradesToMissing) {
     auto accumulator = makeAccumulator();
     // A spec whose 'val' evaluates to a scalar must not crash; the path walk yields missing.
-    accumulator->process(Value(Document{{"val", Value(7)}}), false /* merging */);
+    accumulator->process(Value(Document{{"val", Value(7)}}), /*merging=*/false);
     add(*accumulator, Value());  // Missing.
     ASSERT_EQ(ndv(*accumulator), 1);
 }
@@ -271,7 +270,7 @@ TEST_F(InternalConstructNdvSketchTest, CompositeRejectsArrayInAnyField) {
     auto accumulator = makeAccumulator({"a", "b"});
     const Value doc{
         Document{{"val", Value(Document{{"a", 1}, {"b", Value(std::vector<Value>{Value(1)})}})}}};
-    ASSERT_THROWS_CODE(accumulator->process(doc, false /* merging */), DBException, 13175701);
+    ASSERT_THROWS_CODE(accumulator->process(doc, /*merging=*/false), DBException, 13175701);
 }
 
 TEST_F(InternalConstructNdvSketchTest, ParseRejectsBadFieldCounts) {

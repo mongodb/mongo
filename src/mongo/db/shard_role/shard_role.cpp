@@ -1563,7 +1563,7 @@ CollectionOrViewAcquisitions acquireCollectionsOrViewsLockFree(
     // Open a consistent catalog snapshot if needed.
     bool isSnapshotOpen = shard_role_details::getRecoveryUnit(opCtx)->isActive();
     auto catalogAtReadSource =
-        getConsistentCatalog(opCtx, acquisitionRequests, false /* isWriteAcquisition */);
+        getConsistentCatalog(opCtx, acquisitionRequests, /*isWriteAcquisition=*/false);
 
     auto& txnResources = TransactionResources::get(opCtx);
     // No need to validate against the snapshot policy if this is the first collection acquisition.
@@ -1932,7 +1932,7 @@ void ScopedLocalCatalogWriteFence::_updateAcquiredLocalCollection(
         // fetched from the in-memory catalog and not from the durable catalog and no temporary
         // objects will be stored in the snapshot.
         auto collection = catalog->establishConsistentCollection(
-            opCtx, acquiredCollection->prerequisites.nss, boost::none /*readTimestamp*/);
+            opCtx, acquiredCollection->prerequisites.nss, /*readTimestamp=*/boost::none);
         checkCollectionUUIDMismatch(
             opCtx, nss, collection.get(), acquiredCollection->prerequisites.uuid);
         if (!acquiredCollection->collectionPtr && collection.get()) {
@@ -2162,7 +2162,7 @@ void restoreTransactionResourcesToOperationContext(
                 // because they have already established a ScopedCollectionFilter that acts as
                 // RangePreserver.
                 auto collOrView = acquireLocalCollectionOrView(
-                    opCtx, *catalog, prerequisites, true /* forRestore */);
+                    opCtx, *catalog, prerequisites, /*forRestore=*/true);
 
                 if (!holds_alternative<CollectionPtr>(collOrView)) {
                     uassertedCollectionIsAViewAfterRestore();
@@ -2182,7 +2182,7 @@ void restoreTransactionResourcesToOperationContext(
                 }
 
                 auto reacquiredServicesSnapshot =
-                    acquireServicesSnapshot(opCtx, *catalog, prerequisites, true /* forRestore */);
+                    acquireServicesSnapshot(opCtx, *catalog, prerequisites, /*forRestore=*/true);
 
                 if (!holds_alternative<CollectionPtr>(
                         reacquiredServicesSnapshot.collectionPtrOrView)) {
@@ -2225,7 +2225,7 @@ void restoreTransactionResourcesToOperationContext(
         for (auto& acquiredView : transactionResources.acquiredViews) {
             const auto& prerequisites = acquiredView.prerequisites;
             auto collOrView =
-                acquireLocalCollectionOrView(opCtx, *catalog, prerequisites, true /* forRestore */);
+                acquireLocalCollectionOrView(opCtx, *catalog, prerequisites, /*forRestore=*/true);
 
             uassert(ErrorCodes::QueryPlanKilled,
                     str::stream() << "Namespace '" << prerequisites.nss.toStringForErrorMsg()

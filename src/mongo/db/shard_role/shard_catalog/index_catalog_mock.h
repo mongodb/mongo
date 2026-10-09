@@ -164,7 +164,7 @@ public:
                                         CreateIndexEntryFlags) override {
         const auto ident = descriptor.indexName();
         auto entry = std::make_shared<IndexCatalogEntryMock>(
-            opCtx, CollectionPtr(collection), ident, std::move(descriptor), false /* isFrozen */);
+            opCtx, CollectionPtr(collection), ident, std::move(descriptor), /*isFrozen=*/false);
 
         auto save = entry.get();
         _indexEntries.add(std::move(entry));

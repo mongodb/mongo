@@ -101,7 +101,7 @@ public:
         ASSERT(replCoord->getMemberState().primary());
 
         auto wcAll = WriteConcernOptions(
-            nMembers, WriteConcernOptions::SyncMode::JOURNAL, Milliseconds(0) /* timeout */);
+            nMembers, WriteConcernOptions::SyncMode::JOURNAL, /*timeout=*/Milliseconds(0));
         OpTime fulfilledOpTime = OpTime{{startOpTime.getTimestamp().getSecs() + 10, 1}, 1};
         for (auto _ : state) {
             state.PauseTiming();

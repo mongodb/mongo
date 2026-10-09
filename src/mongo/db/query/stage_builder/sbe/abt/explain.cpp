@@ -124,12 +124,12 @@ public:
      * Here and below: "other" printer(s) may be siphoned out.
      */
     ExplainPrinterImpl& print(ExplainPrinterImpl& other) {
-        return print(other, false /*singleLevel*/);
+        return print(other, /*singleLevel=*/false);
     }
 
     template <class P>
     ExplainPrinterImpl& printSingleLevel(P& other, const std::string& singleLevelSpacer = " ") {
-        return print(other, true /*singleLevel*/, singleLevelSpacer);
+        return print(other, /*singleLevel=*/true, singleLevelSpacer);
     }
 
     ExplainPrinterImpl& printAppend(ExplainPrinterImpl& other) {
@@ -458,7 +458,7 @@ public:
      * Here and below: "other" printer(s) may be siphoned out.
      */
     ExplainPrinterImpl& print(ExplainPrinterImpl& other) {
-        return print(other, false /*append*/);
+        return print(other, /*append=*/false);
     }
 
     ExplainPrinterImpl& printSingleLevel(ExplainPrinterImpl& other,
@@ -468,18 +468,18 @@ public:
     }
 
     ExplainPrinterImpl& printAppend(ExplainPrinterImpl& other) {
-        return print(other, true /*append*/);
+        return print(other, /*append=*/true);
     }
 
     ExplainPrinterImpl& print(std::vector<ExplainPrinterImpl>& other) {
-        return print(other, false /*append*/);
+        return print(other, /*append=*/false);
     }
 
     ExplainPrinterImpl& printAppend(std::vector<ExplainPrinterImpl>& other) {
-        return print(other, true /*append*/);
+        return print(other, /*append=*/true);
     }
 
-    ExplainPrinterImpl& setChildCount(const size_t /*childCount*/) {
+    ExplainPrinterImpl& setChildCount(/*childCount=*/const size_t) {
         // Ignored.
         return *this;
     }
@@ -680,7 +680,7 @@ public:
     /**
      * Nodes
      */
-    ExplainPrinter transport(const ABT::reference_type /*n*/,
+    ExplainPrinter transport(/*n=*/const ABT::reference_type,
                              const References& references,
                              std::vector<ExplainPrinter> inResults) {
         ExplainPrinter printer;
@@ -695,7 +695,7 @@ public:
         return printer;
     }
 
-    ExplainPrinter transport(const ABT::reference_type /*n*/,
+    ExplainPrinter transport(/*n=*/const ABT::reference_type,
                              const ExpressionBinder& binders,
                              std::vector<ExplainPrinter> inResults) {
         ExplainPrinter printer;
@@ -721,13 +721,13 @@ public:
     /**
      * Expressions
      */
-    ExplainPrinter transport(const ABT::reference_type /*n*/, const Blackhole& expr) {
+    ExplainPrinter transport(/*n=*/const ABT::reference_type, const Blackhole& expr) {
         ExplainPrinter printer("Blackhole");
         printer.separator(" []");
         return printer;
     }
 
-    ExplainPrinter transport(const ABT::reference_type /*n*/, const Constant& expr) {
+    ExplainPrinter transport(/*n=*/const ABT::reference_type, const Constant& expr) {
         ExplainPrinter printer("Const");
         printer.separator(" [").fieldName("tag", ExplainVersion::V3);
 
@@ -742,7 +742,7 @@ public:
         return printer;
     }
 
-    ExplainPrinter transport(const ABT::reference_type /*n*/, const Variable& expr) {
+    ExplainPrinter transport(/*n=*/const ABT::reference_type, const Variable& expr) {
         ExplainPrinter printer("Variable");
         printer.separator(" [")
             .fieldName("name", ExplainVersion::V3)
@@ -751,7 +751,7 @@ public:
         return printer;
     }
 
-    ExplainPrinter transport(const ABT::reference_type /*n*/,
+    ExplainPrinter transport(/*n=*/const ABT::reference_type,
                              const UnaryOp& expr,
                              ExplainPrinter inResult) {
         ExplainPrinter printer("UnaryOp");
@@ -765,7 +765,7 @@ public:
         return printer;
     }
 
-    ExplainPrinter transport(const ABT::reference_type /*n*/,
+    ExplainPrinter transport(/*n=*/const ABT::reference_type,
                              const BinaryOp& expr,
                              ExplainPrinter leftResult,
                              ExplainPrinter rightResult) {
@@ -783,7 +783,7 @@ public:
         return printer;
     }
 
-    ExplainPrinter transport(const ABT::reference_type /*n*/,
+    ExplainPrinter transport(/*n=*/const ABT::reference_type,
                              const NaryOp& expr,
                              std::vector<ExplainPrinter> argResults) {
         ExplainPrinter printer("NaryOp");
@@ -801,7 +801,7 @@ public:
         return printer;
     }
 
-    ExplainPrinter transport(const ABT::reference_type /*n*/,
+    ExplainPrinter transport(/*n=*/const ABT::reference_type,
                              const If& expr,
                              ExplainPrinter condResult,
                              ExplainPrinter thenResult,
@@ -819,7 +819,7 @@ public:
         return printer;
     }
 
-    ExplainPrinter transport(const ABT::reference_type /*n*/,
+    ExplainPrinter transport(/*n=*/const ABT::reference_type,
                              const Switch& expr,
                              std::vector<ExplainPrinter> argResults) {
         ExplainPrinter printer("Switch");
@@ -838,7 +838,7 @@ public:
         return printer;
     }
 
-    ExplainPrinter transport(const ABT::reference_type /*n*/,
+    ExplainPrinter transport(/*n=*/const ABT::reference_type,
                              const Let& expr,
                              ExplainPrinter bindResult,
                              ExplainPrinter exprResult) {
@@ -856,7 +856,7 @@ public:
         return printer;
     }
 
-    ExplainPrinter transport(const ABT::reference_type /*n*/,
+    ExplainPrinter transport(/*n=*/const ABT::reference_type,
                              const MultiLet& expr,
                              std::vector<ExplainPrinter> results) {
         auto numBinds = expr.numBinds();
@@ -884,7 +884,7 @@ public:
         return printer;
     }
 
-    ExplainPrinter transport(const ABT::reference_type /*n*/,
+    ExplainPrinter transport(/*n=*/const ABT::reference_type,
                              const LambdaAbstraction& expr,
                              ExplainPrinter inResult) {
         ExplainPrinter printer("LambdaAbstraction");
@@ -906,7 +906,7 @@ public:
         return printer;
     }
 
-    ExplainPrinter transport(const ABT::reference_type /*n*/,
+    ExplainPrinter transport(/*n=*/const ABT::reference_type,
                              const FunctionCall& expr,
                              std::vector<ExplainPrinter> argResults) {
         ExplainPrinter printer("FunctionCall");
@@ -923,7 +923,7 @@ public:
         return printer;
     }
 
-    ExplainPrinter transport(const ABT::reference_type /*n*/, const Source& expr) {
+    ExplainPrinter transport(/*n=*/const ABT::reference_type, const Source& expr) {
         ExplainPrinter printer("Source");
         printer.separator(" []");
         return printer;

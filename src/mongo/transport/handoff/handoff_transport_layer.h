@@ -132,7 +132,7 @@ public:
 #ifdef MONGO_CONFIG_SSL
     /** unimplemented: returns an error */
     Status rotateCertificates(std::shared_ptr<SSLManagerInterface>,
-                              bool /*asyncOCSPStaple*/) override;
+                              /*asyncOCSPStaple=*/bool) override;
 
     /** unimplemented: returns an error */
     StatusWith<std::shared_ptr<const SSLConnectionContext>> createTransientSSLContext(

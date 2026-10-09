@@ -104,7 +104,7 @@ QueryAnalysisSampleTracker::_getOrCreateCollectionSampleTracker(
                  .emplace(std::make_pair(
                      nss,
                      std::make_shared<QueryAnalysisSampleTracker::CollectionSampleTracker>(
-                         nss, *collUuid, 0 /* samplesPerSec */, startTime)))
+                         nss, *collUuid, /*samplesPerSec=*/0, startTime)))
                  .first;
         _sampledNamespaces.insert(nss);
     }

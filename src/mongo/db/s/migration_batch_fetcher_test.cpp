@@ -199,7 +199,7 @@ TEST_F(MigrationBatchFetcherTestFixture, BasicEmptyFetchingTest) {
         UUID::gen(),
         UUID::gen(),
         nullptr,
-        0 /* maxBytesPerThread */);
+        /*maxBytesPerThread=*/0);
 
     // Start asynchronous task for responding to _migrateClone requests.
     // Must name the return of value std::async.  The destructor of std::future joins the
@@ -238,7 +238,7 @@ TEST_F(MigrationBatchFetcherTestFixture, BasicEmptyFetchingTestRetry) {
         UUID::gen(),
         UUID::gen(),
         nullptr,
-        0 /* maxBytesPerThread */);
+        /*maxBytesPerThread=*/0);
 
     auto fut = std::async(std::launch::async, [&]() {
         onCommand(getOnMigrateCloneCommandCb(getErrorRetryable()));
@@ -274,7 +274,7 @@ TEST_F(MigrationBatchFetcherTestFixture, BasicFetching) {
         UUID::gen(),
         UUID::gen(),
         nullptr,
-        0 /* maxBytesPerThread */);
+        /*maxBytesPerThread=*/0);
 
     auto fut = std::async(std::launch::async, [&]() {
         for (int i = 0; i < 8; ++i) {

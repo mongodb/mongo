@@ -62,7 +62,7 @@ StatusWith<KeysCollectionDocument> KeysCollectionCache::_refreshInternalKeys(
     }
 
     auto refreshStatus =
-        _client->getNewInternalKeys(opCtx, _purpose, newerThanThis, true /* tryUseMajority */);
+        _client->getNewInternalKeys(opCtx, _purpose, newerThanThis, /*tryUseMajority=*/true);
 
     if (!refreshStatus.isOK()) {
         return refreshStatus.getStatus();

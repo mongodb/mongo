@@ -1340,13 +1340,13 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
             conn->createIndex(
                 NamespaceString::createNamespaceString_forTest(this->tenantId, this->ns),
                 this->key,
-                boost::none /* writeConcernObj */);
+                /*writeConcernObj=*/boost::none);
             break;
         case OpType::DROPINDEX:
             conn->dropIndex(
                 NamespaceString::createNamespaceString_forTest(this->tenantId, this->ns),
                 this->key,
-                boost::none /* writeConcernObj */);
+                /*writeConcernObj=*/boost::none);
             break;
         case OpType::LET: {
             BSONObjBuilder templateBuilder;

@@ -143,7 +143,7 @@ void beginRetryableWriteWithTxnNumber(
     auto txnParticipant = TransactionParticipant::get(opCtx);
     txnParticipant.beginOrContinue(opCtx,
                                    {*opCtx->getTxnNumber()},
-                                   boost::none /* autocommit */,
+                                   /*autocommit=*/boost::none,
                                    TransactionParticipant::TransactionActions::kNone);
 }
 
@@ -160,7 +160,7 @@ void beginNonRetryableTransactionWithTxnNumber(
     auto txnParticipant = TransactionParticipant::get(opCtx);
     txnParticipant.beginOrContinue(opCtx,
                                    {*opCtx->getTxnNumber()},
-                                   false /* autocommit */,
+                                   /*autocommit=*/false,
                                    TransactionParticipant::TransactionActions::kStart);
 }
 
@@ -177,7 +177,7 @@ void beginRetryableInternalTransactionWithTxnNumber(
     auto txnParticipant = TransactionParticipant::get(opCtx);
     txnParticipant.beginOrContinue(opCtx,
                                    {*opCtx->getTxnNumber()},
-                                   false /* autocommit */,
+                                   /*autocommit=*/false,
                                    TransactionParticipant::TransactionActions::kStart);
 }
 
@@ -689,7 +689,7 @@ protected:
         // Simulate catalog information for a normal collection with a standard '_id_' index.
         ASSERT_TRUE(nss.isReplicated());
         auto catalogIdentifier =
-            newCatalogIdentifier(opCtx, nss.dbName(), true /* includeIdIndexIdent */);
+            newCatalogIdentifier(opCtx, nss.dbName(), /*includeIdIndexIdent=*/true);
         CollectionOptions options{.uuid = uuid};
 
         OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
@@ -701,11 +701,12 @@ protected:
             opObserver.onCreateCollection(opCtx,
                                           nss,
                                           options,
+                                          /*idIndex=*/
                                           BSON("v" << 2 << "key" << BSON("_id_" << 1) << "name"
-                                                   << "_id_") /* idIndex */,
+                                                   << "_id_"),
                                           repl::getNextOpTime(opCtx),
                                           catalogIdentifier,
-                                          false /* fromMigrate*/,
+                                          /*fromMigrate=*/false,
                                           viewless);
             wuow.commit();
         }
@@ -730,7 +731,7 @@ protected:
         // Simulate catalog information for a normal collection with a standard '_id_' index.
         ASSERT_TRUE(nss.isReplicated());
         auto catalogIdentifier =
-            newCatalogIdentifier(opCtx, nss.dbName(), true /* includeIdIndexIdent */);
+            newCatalogIdentifier(opCtx, nss.dbName(), /*includeIdIndexIdent=*/true);
         CollectionOptions options{.uuid = uuid};
 
         OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
@@ -742,11 +743,12 @@ protected:
             opObserver.onCreateCollection(opCtx,
                                           nss,
                                           options,
+                                          /*idIndex=*/
                                           BSON("v" << 2 << "key" << BSON("_id_" << 1) << "name"
-                                                   << "_id_") /* idIndex */,
+                                                   << "_id_"),
                                           repl::getNextOpTime(opCtx),
                                           catalogIdentifier,
-                                          false /* fromMigrate*/,
+                                          /*fromMigrate=*/false,
                                           false,
                                           recordIdsReplicated);
             wuow.commit();
@@ -774,7 +776,7 @@ protected:
         // an explicit '_id_' index table.
         ASSERT_TRUE(nss.isReplicated());
         auto catalogIdentifier =
-            newCatalogIdentifier(opCtx, nss.dbName(), false /* includeIdIndexIdent */);
+            newCatalogIdentifier(opCtx, nss.dbName(), /*includeIdIndexIdent=*/false);
         ASSERT_FALSE(catalogIdentifier.idIndexIdent.has_value());
 
         OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
@@ -786,10 +788,10 @@ protected:
             opObserver.onCreateCollection(opCtx,
                                           nss,
                                           clusteredCollectionOptions,
-                                          BSONObj() /* idIndex */,
+                                          /*idIndex=*/BSONObj(),
                                           repl::getNextOpTime(opCtx),
                                           catalogIdentifier,
-                                          false /* fromMigrate*/);
+                                          /*fromMigrate=*/false);
             wuow.commit();
         }
 
@@ -825,8 +827,8 @@ protected:
 
         boost::optional<CreateCollCatalogIdentifier> catalogIdentifier;
         if (isPersistedInLocalCatalog) {
-            catalogIdentifier = newCatalogIdentifier(
-                opCtx.get(), localNSS.dbName(), false /* includeIdIndexIdent */);
+            catalogIdentifier =
+                newCatalogIdentifier(opCtx.get(), localNSS.dbName(), /*includeIdIndexIdent=*/false);
         }
 
         {
@@ -836,10 +838,10 @@ protected:
             opObserver.onCreateCollection(opCtx.get(),
                                           localNSS,
                                           CollectionOptions{},
-                                          BSONObj() /* idIndex */,
-                                          repl::OpTime() /* createOpTime */,
-                                          catalogIdentifier /* createCollCatalogIdentifier */,
-                                          false /* fromMigrate*/);
+                                          /*idIndex=*/BSONObj(),
+                                          /*createOpTime=*/repl::OpTime(),
+                                          /*createCollCatalogIdentifier=*/catalogIdentifier,
+                                          /*fromMigrate=*/false);
             wuow.commit();
         }
 
@@ -849,30 +851,30 @@ protected:
 };
 
 TEST_F(OpObserverOnCreateCollectionTest, BasicReplicatedCatalogIdentifiersEnabled) {
-    testOnCreateCollBasic(true /* catalogReplicationEnabled */);
+    testOnCreateCollBasic(/*catalogReplicationEnabled=*/true);
 }
 TEST_F(OpObserverOnCreateCollectionTest, BasicReplicatedCatalogIdentifiersDisabled) {
-    testOnCreateCollBasic(false /* catalogReplicationEnabled */);
+    testOnCreateCollBasic(/*catalogReplicationEnabled=*/false);
 }
 TEST_F(OpObserverOnCreateCollectionTest,
        BasicReplicatedCatalogIdentifiersEnabledWithTimeseriesParamOff) {
     testOnCreateCollBasic(
-        true /* catalogReplicationEnabled */, true /* viewless */, false /* viewlessParam */);
+        /*catalogReplicationEnabled=*/true, /*viewless=*/true, /*viewlessParam=*/false);
 }
 TEST_F(OpObserverOnCreateCollectionTest,
        BasicReplicatedCatalogIdentifiersDisabledWithTimeseriesParamOff) {
     testOnCreateCollBasic(
-        false /* catalogReplicationEnabled */, true /* viewless */, false /* viewlessParam */);
+        /*catalogReplicationEnabled=*/false, /*viewless=*/true, /*viewlessParam=*/false);
 }
 TEST_F(OpObserverOnCreateCollectionTest,
        BasicReplicatedCatalogIdentifiersEnabledWithTimeseriesParamOn) {
     testOnCreateCollBasic(
-        true /* catalogReplicationEnabled */, true /* viewless */, true /* viewlessParam */);
+        /*catalogReplicationEnabled=*/true, /*viewless=*/true, /*viewlessParam=*/true);
 }
 TEST_F(OpObserverOnCreateCollectionTest,
        BasicReplicatedCatalogIdentifiersDisabledWithTimeseriesParamOn) {
     testOnCreateCollBasic(
-        false /* catalogReplicationEnabled */, true /* viewless */, true /* viewlessParam */);
+        /*catalogReplicationEnabled=*/false, /*viewless=*/true, /*viewlessParam=*/true);
 }
 
 TEST_F(OpObserverOnCreateCollectionTest, createCollectionRecordIdsReplicatedFalse) {
@@ -943,7 +945,7 @@ TEST_F(OpObserverOnCreateCollectionTest,
                                                << "_id_"),
                                       repl::getNextOpTime(opCtx),
                                       catalogIdentifier,
-                                      false /* fromMigrate */,
+                                      /*fromMigrate=*/false,
                                       false,
                                       /*recordIdsReplicated=*/true);
         wuow.commit();
@@ -981,7 +983,7 @@ TEST_F(OpObserverOnCreateCollectionTest,
                                                << "_id_"),
                                       repl::getNextOpTime(opCtx),
                                       catalogIdentifier,
-                                      false /* fromMigrate */,
+                                      /*fromMigrate=*/false,
                                       false,
                                       /*recordIdsReplicated=*/true);
         wuow.commit();
@@ -992,24 +994,24 @@ TEST_F(OpObserverOnCreateCollectionTest,
 }
 
 TEST_F(OpObserverOnCreateCollectionTest, ClusteredReplicatedCatalogIdentifiersEnabled) {
-    testOnCreateCollClustered(true /* catalogReplicationEnabled */);
+    testOnCreateCollClustered(/*catalogReplicationEnabled=*/true);
 }
 TEST_F(OpObserverOnCreateCollectionTest, ClusteredReplicatedCatalogIdentifiersDisabled) {
-    testOnCreateCollClustered(false /* catalogReplicationEnabled */);
+    testOnCreateCollClustered(/*catalogReplicationEnabled=*/false);
 }
 
 TEST_F(OpObserverOnCreateCollectionTest, CatalogIdentifierForUnreplicatedCollection) {
-    testOnCreateUnreplicatedCollection(true /* catalogReplicationEnabled */,
-                                       true /* isPersistedInLocalCatalog */);
-    testOnCreateUnreplicatedCollection(false /* catalogReplicationEnabled */,
-                                       true /* isPersistedInLocalCatalog */);
+    testOnCreateUnreplicatedCollection(/*catalogReplicationEnabled=*/true,
+                                       /*isPersistedInLocalCatalog=*/true);
+    testOnCreateUnreplicatedCollection(/*catalogReplicationEnabled=*/false,
+                                       /*isPersistedInLocalCatalog=*/true);
 }
 
 TEST_F(OpObserverOnCreateCollectionTest, UnreplicatedCollectionNotInLocalCatalog) {
-    testOnCreateUnreplicatedCollection(true /* catalogReplicationEnabled */,
-                                       false /* isPersistedInLocalCatalog */);
-    testOnCreateUnreplicatedCollection(false /* catalogReplicationEnabled */,
-                                       false /* isPersistedInLocalCatalog */);
+    testOnCreateUnreplicatedCollection(/*catalogReplicationEnabled=*/true,
+                                       /*isPersistedInLocalCatalog=*/false);
+    testOnCreateUnreplicatedCollection(/*catalogReplicationEnabled=*/false,
+                                       /*isPersistedInLocalCatalog=*/false);
 }
 
 using OpObserverOnCreateCollectionTestDeathTest = OpObserverOnCreateCollectionTest;
@@ -1030,11 +1032,12 @@ DEATH_TEST_F(OpObserverOnCreateCollectionTestDeathTest,
     opObserver.onCreateCollection(opCtx.get(),
                                   nss,
                                   CollectionOptions{.uuid = UUID::gen()},
+                                  /*idIndex=*/
                                   BSON("v" << 2 << "key" << BSON("_id_" << 1) << "name"
-                                           << "_id_") /* idIndex */,
+                                           << "_id_"),
                                   repl::getNextOpTime(opCtx.get()),
-                                  boost::none /* createCollCatalogIdentifier */,
-                                  false /* fromMigrate*/);
+                                  /*createCollCatalogIdentifier=*/boost::none,
+                                  /*fromMigrate=*/false);
     wuow.commit();
 }
 
@@ -1052,7 +1055,7 @@ TEST_F(OpObserverTest, StartIndexBuildExpectedOplogEntry) {
         AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
         opObserver.onStartIndexBuild(
-            opCtx.get(), nss, uuid, indexBuildUUID, indexes, false /*fromMigrate*/);
+            opCtx.get(), nss, uuid, indexBuildUUID, indexes, /*fromMigrate=*/false);
         wunit.commit();
     }
 
@@ -1086,21 +1089,21 @@ TEST_F(OpObserverTest, CommitIndexBuildExpectedOplogEntry) {
         AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
         opObserver.onCommitIndexBuild(
-            opCtx.get(), nss, uuid, indexBuildUUID, indexes, {}, false /*fromMigrate*/);
+            opCtx.get(), nss, uuid, indexBuildUUID, indexes, {}, /*fromMigrate=*/false);
         opObserver.onCommitIndexBuild(opCtx.get(),
                                       nss,
                                       uuid,
                                       indexBuildUUID,
                                       indexes,
                                       {boost::none, BSON("a" << "value")},
-                                      false /*fromMigrate*/);
+                                      /*fromMigrate=*/false);
         ASSERT_THROWS_CODE(opObserver.onCommitIndexBuild(opCtx.get(),
                                                          nss,
                                                          uuid,
                                                          indexBuildUUID,
                                                          indexes,
                                                          {boost::none},
-                                                         false /*fromMigrate*/),
+                                                         /*fromMigrate=*/false),
                            DBException,
                            11084600);
         ASSERT_THROWS_CODE(opObserver.onCommitIndexBuild(opCtx.get(),
@@ -1109,7 +1112,7 @@ TEST_F(OpObserverTest, CommitIndexBuildExpectedOplogEntry) {
                                                          indexBuildUUID,
                                                          indexes,
                                                          {boost::none, boost::none, boost::none},
-                                                         false /*fromMigrate*/),
+                                                         /*fromMigrate=*/false),
                            DBException,
                            11084600);
         wunit.commit();
@@ -1510,7 +1513,7 @@ TEST_F(OpObserverTest, OnRenameCollectionReturnsRenameOpTime) {
                                       0U,
                                       stayTemp,
                                       /*markFromMigrate=*/false,
-                                      /*isTimeseries*/ false);
+                                      /*isTimeseries=*/false);
         renameOpTime = OpObserver::Times::get(opCtx.get()).reservedOpTimes.front();
         wunit.commit();
     }
@@ -1554,7 +1557,7 @@ TEST_F(OpObserverTest, OnRenameCollectionIncludesTenantIdFeatureFlagOff) {
                                       0U,
                                       stayTemp,
                                       /*markFromMigrate=*/false,
-                                      /*isTimeseries*/ false);
+                                      /*isTimeseries=*/false);
         wunit.commit();
     }
 
@@ -1598,7 +1601,7 @@ TEST_F(OpObserverTest, OnRenameCollectionIncludesTenantIdFeatureFlagOn) {
                                       0U,
                                       stayTemp,
                                       /*markFromMigrate=*/false,
-                                      /*isTimeseries*/ false);
+                                      /*isTimeseries=*/false);
         wunit.commit();
     }
 
@@ -1639,7 +1642,7 @@ TEST_F(OpObserverTest, OnRenameCollectionOmitsDropTargetFieldIfDropTargetUuidIsN
                                       0U,
                                       stayTemp,
                                       /*markFromMigrate=*/false,
-                                      /*isTimeseries*/ false);
+                                      /*isTimeseries=*/false);
         wunit.commit();
     }
 
@@ -1694,7 +1697,7 @@ TEST_F(OpObserverTest, ImportCollectionOplogEntry) {
                                       catalogEntry,
                                       storageMetadata,
                                       isDryRun,
-                                      /*isTimeseries*/ false);
+                                      /*isTimeseries=*/false);
         wunit.commit();
     }
 
@@ -1737,7 +1740,7 @@ TEST_F(OpObserverTest, ImportCollectionOplogEntryIncludesTenantId) {
                                       catalogEntry,
                                       storageMetadata,
                                       isDryRun,
-                                      /*isTimeseries*/ false);
+                                      /*isTimeseries=*/false);
         wunit.commit();
     }
 
@@ -2353,7 +2356,7 @@ public:
                               StmtId stmtId) {
         txnParticipant.beginOrContinue(opCtx,
                                        {txnNum},
-                                       boost::none /* autocommit */,
+                                       /*autocommit=*/boost::none,
                                        TransactionParticipant::TransactionActions::kNone);
 
         {
@@ -3622,7 +3625,7 @@ public:
 protected:
     void testRetryableFindAndModifyUpdateRequestingPostImageHasNeedsRetryImage() {
         NamespaceString nss = NamespaceString::createNamespaceString_forTest(
-            boost::none /* tenantId */, "test", "coll");
+            /*tenantId=*/boost::none, "test", "coll");
         const auto criteria = BSON("_id" << 0);
         const auto preImageDoc = criteria;
         CollectionUpdateArgs updateArgs{preImageDoc};
@@ -4512,7 +4515,7 @@ TEST_F(BatchedWriteOutputsTest, RetryableWriteWithPdibGroupsAtomically) {
     resetOplogAndTransactions(opCtx);
 
     std::unique_ptr<MongoDSessionCatalog::Session> contextSession;
-    beginRetryableWriteWithTxnNumber(opCtx, 0 /*txnNumber*/, contextSession);
+    beginRetryableWriteWithTxnNumber(opCtx, /*txnNumber=*/0, contextSession);
 
     // Two ops so the batch produces an applyOps rather than the single-op fast path.
     std::vector<InsertStatement> toInsert;
@@ -4971,7 +4974,7 @@ TEST_F(BatchedWriteOutputsTest, RetryableAtomicWriteEmitsAppliedAtomicallyTag) {
     resetOplogAndTransactions(opCtx);
 
     std::unique_ptr<MongoDSessionCatalog::Session> contextSession;
-    beginRetryableWriteWithTxnNumber(opCtx, 0 /*txnNumber*/, contextSession);
+    beginRetryableWriteWithTxnNumber(opCtx, /*txnNumber=*/0, contextSession);
 
     // Two ops so the batch produces an applyOps rather than the single-op fast path; one carries a
     // statement id, one doesn't (a kUninitializedStmtId insert yields an op with no statement ids).
@@ -5038,7 +5041,7 @@ TEST_F(BatchedWriteOutputsTest, RetryableAtomicWriteChainTagsAndLinksEveryEntry)
     resetOplogAndTransactions(opCtx);
 
     std::unique_ptr<MongoDSessionCatalog::Session> contextSession;
-    beginRetryableWriteWithTxnNumber(opCtx, 0 /*txnNumber*/, contextSession);
+    beginRetryableWriteWithTxnNumber(opCtx, /*txnNumber=*/0, contextSession);
 
     // One retryable insert plus stmtId-less inserts; with the count limit at 1, each op lands in
     // its own applyOps entry, forming a chain.
@@ -5095,7 +5098,7 @@ TEST_F(BatchedWriteOutputsTest, RetryableAtomicWriteChainLinksAcrossStatements) 
     resetOplogAndTransactions(opCtx);
 
     std::unique_ptr<MongoDSessionCatalog::Session> contextSession;
-    beginRetryableWriteWithTxnNumber(opCtx, 0 /*txnNumber*/, contextSession);
+    beginRetryableWriteWithTxnNumber(opCtx, /*txnNumber=*/0, contextSession);
 
     // One statement's inserts in a WUOW; only the first carries a statement id, as a real
     // retryable statement's internal ops would.
@@ -5119,8 +5122,8 @@ TEST_F(BatchedWriteOutputsTest, RetryableAtomicWriteChainLinksAcrossStatements) 
     };
 
     // Statement 0 fits in one applyOps entry; statement 1 needs two.
-    runStatement(StmtId(0), 0 /*firstDocId*/, 2 /*numOps*/);
-    runStatement(StmtId(1), 10 /*firstDocId*/, 4 /*numOps*/);
+    runStatement(StmtId(0), /*firstDocId=*/0, /*numOps=*/2);
+    runStatement(StmtId(1), /*firstDocId=*/10, /*numOps=*/4);
 
     auto oplogs = getNOplogEntries(opCtx, 3);
     auto stmt0 = assertGet(OplogEntry::parse(oplogs[0]));
@@ -5530,7 +5533,7 @@ TEST_F(BatchedWriteOutputsTest, RetryableSessionAtomicBatchWithoutStatementIdsIs
     resetOplogAndTransactions(opCtx);
 
     std::unique_ptr<MongoDSessionCatalog::Session> contextSession;
-    beginRetryableWriteWithTxnNumber(opCtx, 0 /*txnNumber*/, contextSession);
+    beginRetryableWriteWithTxnNumber(opCtx, /*txnNumber=*/0, contextSession);
 
     // Two ops with no statement ids, so the batch is a multi-op applyOps (not the single-op fast
     // path) and carries no retryable statements despite running within a retryable write.
@@ -5580,7 +5583,7 @@ TEST_F(BatchedWriteOutputsTest, NonRetryableSingleOpAtomicBatchDoesNotWriteTxnRe
         resetOplogAndTransactions(opCtx);
 
         std::unique_ptr<MongoDSessionCatalog::Session> contextSession;
-        beginRetryableWriteWithTxnNumber(opCtx, 0 /*txnNumber*/, contextSession);
+        beginRetryableWriteWithTxnNumber(opCtx, /*txnNumber=*/0, contextSession);
         const auto sessionId = *opCtx->getLogicalSessionId();
 
         const auto doc = BSON("_id" << 0);
@@ -5633,7 +5636,7 @@ TEST_F(BatchedWriteOutputsTest, NonRetryableMultiOpBatchDoesNotWriteTxnRecord) {
         resetOplogAndTransactions(opCtx);
 
         std::unique_ptr<MongoDSessionCatalog::Session> contextSession;
-        beginRetryableWriteWithTxnNumber(opCtx, 0 /*txnNumber*/, contextSession);
+        beginRetryableWriteWithTxnNumber(opCtx, /*txnNumber=*/0, contextSession);
         const auto sessionId = *opCtx->getLogicalSessionId();
 
         std::vector<InsertStatement> toInsert;
@@ -5905,7 +5908,7 @@ TEST_F(BatchedWriteOutputsTest, ApplyOpsChainsMetricIncrementsOnRetryableAtomicW
     resetOplogAndTransactions(opCtx);
 
     std::unique_ptr<MongoDSessionCatalog::Session> session;
-    beginRetryableWriteWithTxnNumber(opCtx, 0 /*txnNumber*/, session);
+    beginRetryableWriteWithTxnNumber(opCtx, /*txnNumber=*/0, session);
 
     {
         AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
@@ -6264,7 +6267,7 @@ TEST_P(BatchedWriteOutputsTest, TestSingleInsertIsNotInApplyOps) {
                 /*fromMigrate=*/std::vector<bool>(inserts.size(), false),
                 /*defaultFromMigrate=*/false);
         },
-        GetParam() /*isRetryable*/);
+        /*isRetryable=*/GetParam());
 }
 
 TEST_P(BatchedWriteOutputsTest, TestSingleDeleteIsNotInApplyOps) {
@@ -6274,7 +6277,7 @@ TEST_P(BatchedWriteOutputsTest, TestSingleDeleteIsNotInApplyOps) {
             opCtx->getServiceContext()->getOpObserver()->onDelete(
                 opCtx, *autoColl, stmtId, doc, getDocumentKey(*autoColl, doc), {});
         },
-        GetParam() /*isRetryable*/);
+        /*isRetryable=*/GetParam());
 }
 
 TEST_P(BatchedWriteOutputsTest, TestSingleUpdateIsNotInApplyOps) {
@@ -6295,7 +6298,7 @@ TEST_P(BatchedWriteOutputsTest, TestSingleUpdateIsNotInApplyOps) {
 
             opCtx->getServiceContext()->getOpObserver()->onUpdate(opCtx, update);
         },
-        GetParam() /*isRetryable*/);
+        /*isRetryable=*/GetParam());
 }
 
 TEST_F(BatchedWriteOutputsTest, TestSingleContainerInsertIsNotInApplyOps) {
@@ -6307,7 +6310,7 @@ TEST_F(BatchedWriteOutputsTest, TestSingleContainerInsertIsNotInApplyOps) {
             opCtx->getServiceContext()->getOpObserver()->onContainerInsert(
                 opCtx, ident, key, value);
         },
-        false /*isRetryable*/);
+        /*isRetryable=*/false);
 }
 
 TEST_F(BatchedWriteOutputsTest, TestSingleContainerDeleteIsNotInApplyOps) {
@@ -6318,7 +6321,7 @@ TEST_F(BatchedWriteOutputsTest, TestSingleContainerDeleteIsNotInApplyOps) {
 
             opCtx->getServiceContext()->getOpObserver()->onContainerDelete(opCtx, ident, key);
         },
-        false /*isRetryable*/);
+        /*isRetryable=*/false);
 }
 
 repl::OplogEntry BatchedWriteOutputsTest::commitBatchedInserts(
@@ -7882,7 +7885,7 @@ TEST_F(OpObserverTest, MagicRestoreNoOplog) {
         AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
         opObserver.onStartIndexBuild(
-            opCtx.get(), nss, uuid, indexBuildUUID, indexes, false /*fromMigrate*/);
+            opCtx.get(), nss, uuid, indexBuildUUID, indexes, /*fromMigrate=*/false);
         wunit.commit();
     }
 

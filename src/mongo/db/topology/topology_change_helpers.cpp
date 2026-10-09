@@ -573,7 +573,7 @@ void deleteAllDocumentsInCollection(
         opCtx,
         targeter,
         nss,
-        BSONObj() /* filter */,
+        /*filter=*/BSONObj(),
         repl::ReadConcernLevel::kMajorityReadConcern,
         [&](const std::vector<BSONObj>& docs) -> bool {
             for (const BSONObj& doc : docs) {
@@ -976,7 +976,7 @@ void setUserWriteBlockingState(
         [opCtx, block, &osiGenerator](ShardsvrSetUserWriteBlockModePhaseEnum phase) -> BSONObj {
         ShardsvrSetUserWriteBlockMode shardsvrSetUserWriteBlockModeCmd;
         shardsvrSetUserWriteBlockModeCmd.setDbName(DatabaseName::kAdmin);
-        SetUserWriteBlockModeRequest setUserWriteBlockModeRequest(block /* global */);
+        SetUserWriteBlockModeRequest setUserWriteBlockModeRequest(/*global=*/block);
         shardsvrSetUserWriteBlockModeCmd.setSetUserWriteBlockModeRequest(
             std::move(setUserWriteBlockModeRequest));
         shardsvrSetUserWriteBlockModeCmd.setPhase(phase);
@@ -1236,7 +1236,7 @@ void getClusterTimeKeysFromReplicaSet(OperationContext* opCtx,
         opCtx,
         targeter,
         NamespaceString::kKeysCollectionNamespace,
-        BSONObj() /* filter */,
+        /*filter=*/BSONObj(),
         repl::ReadConcernLevel::kLocalReadConcern,
         [&](const std::vector<BSONObj>& docs) -> bool {
             for (const BSONObj& doc : docs) {
@@ -1434,7 +1434,7 @@ void setClusterParametersLocally(OperationContext* opCtx,
                 invocation.invoke(opCtx,
                                   setClusterParameterRequest,
                                   parameter["clusterParameterTime"].timestamp(),
-                                  boost::none /* previousTime */,
+                                  /*previousTime=*/boost::none,
                                   kMajorityWriteConcern);
             }
         });
@@ -1462,7 +1462,7 @@ TenantIdMap<std::vector<BSONObj>> getClusterParametersFromReplicaSet(
             opCtx,
             targeter,
             NamespaceString::makeClusterParametersNSS(tenantId),
-            BSONObj() /* filter */,
+            /*filter=*/BSONObj(),
             repl::ReadConcernLevel::kMajorityReadConcern,
             [&allParameters, tenantId](const std::vector<BSONObj>& docs) -> bool {
                 std::vector<BSONObj> parameters;
@@ -1665,7 +1665,7 @@ boost::optional<RemoveShardProgress> dropLocalCollectionsAndDatabases(
     LOGV2(7509600, "Locally dropping drained databases", "shardId"_attr = shardName);
 
     for (auto&& db : trackedDBs) {
-        const auto dropStatus = dropDatabase(opCtx, db.getDbName(), true /*markFromMigrate*/);
+        const auto dropStatus = dropDatabase(opCtx, db.getDbName(), /*markFromMigrate=*/true);
         if (dropStatus != ErrorCodes::NamespaceNotFound) {
             uassertStatusOK(dropStatus);
         }

@@ -18,7 +18,7 @@ public:
         grpcOpts.enableEgress = true;
         grpcOpts.clientMetadata = makeClientMetadataDocument();
         _tl = std::make_unique<grpc::GRPCTransportLayerImpl>(
-            /* serviceContext */ nullptr, std::move(grpcOpts), /*sessionManager*/ nullptr);
+            /* serviceContext */ nullptr, std::move(grpcOpts), /*sessionManager=*/nullptr);
     }
 
     TransportLayer* getTransportLayer() override {

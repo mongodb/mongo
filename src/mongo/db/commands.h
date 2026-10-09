@@ -874,7 +874,7 @@ public:
         }
 
         if (auto result = supportsReadConcern(repl::ReadConcernLevel::kMajorityReadConcern,
-                                              false /* isImplicitDefault */);
+                                              /*isImplicitDefault=*/false);
             result.readConcernSupport.isOK()) {
             // If the command supports read concern, it has storage and newtork implications.
             return false;

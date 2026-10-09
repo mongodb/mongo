@@ -169,7 +169,7 @@ TEST(ReadPreferenceSetting, NonEquality) {
                                              tagSet,
                                              kMinMaxStaleness,
                                              boost::none,
-                                             true /* isPretargeted */);
+                                             /*isPretargeted=*/true);
     ASSERT_FALSE(rps.equals(unexpected4));
 }
 
@@ -266,7 +266,7 @@ TEST(ReadPreferenceSetting, Roundtrip) {
                                          TagSet(),
                                          kMinMaxStaleness,
                                          boost::none,
-                                         true /* isPretargeted */));
+                                         /*isPretargeted=*/true));
 }
 
 // Verify TagSet isFlags work correctly

@@ -71,7 +71,7 @@ std::unique_ptr<MatchExpression> createTightExprTimeFieldPredicate(
         const auto compareMatchExpr =
             checked_cast<const ComparisonMatchExpressionBase*>(unownedExpr);
         return BucketLevelComparisonPredicateGenerator::createPredicate(
-                   compareMatchExpr, params, true /* tight */)
+                   compareMatchExpr, params, /*tight=*/true)
             .matchExpr;
     }
 
@@ -265,12 +265,12 @@ BucketSpec::BucketPredicate BucketSpec::createPredicatesOnBucketLevelField(
         auto result = BucketLevelComparisonPredicateGenerator::createPredicate(
             checked_cast<const ComparisonMatchExpressionBase*>(matchExpr),
             bucketPredicateParams,
-            false /* tight */);
+            /*tight=*/false);
 
         auto tightResult = BucketLevelComparisonPredicateGenerator::createPredicate(
             checked_cast<const ComparisonMatchExpressionBase*>(matchExpr),
             bucketPredicateParams,
-            true /* tight */);
+            /*tight=*/true);
         return {std::move(result.matchExpr),
                 std::move(tightResult.matchExpr),
                 result.rewriteProvidesExactMatchPredicate};
@@ -333,9 +333,9 @@ BucketSpec::BucketPredicate BucketSpec::createPredicatesOnBucketLevelField(
         for (auto&& elem : inExpr->getEqualities()) {
             // If inExpr is {$in: [X, Y]} then the elems are '0: X' and '1: Y'.
             auto eq = std::make_unique<EqualityMatchExpression>(
-                inExpr->path(), elem, nullptr /*annotation*/, inExpr->getCollator());
+                inExpr->path(), elem, /*annotation=*/nullptr, inExpr->getCollator());
             auto child = BucketLevelComparisonPredicateGenerator::createPredicate(
-                eq.get(), bucketPredicateParams, false /* tight */);
+                eq.get(), bucketPredicateParams, /*tight=*/false);
             rewriteProvidesExactMatchPredicate =
                 rewriteProvidesExactMatchPredicate && child.rewriteProvidesExactMatchPredicate;
 

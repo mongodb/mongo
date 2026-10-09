@@ -107,8 +107,8 @@ TEST_F(RouterMultiStatementTransactionRequestsSenderTest, TxnDetailsNotAppendedI
     onCommand([&](const auto& request) {
         checkRequestMetadata(request,
                              cmdName,
-                             false /* expectStartTxnFields */,
-                             false /* expectStartOrContinueTxnFields */);
+                             /*expectStartTxnFields=*/false,
+                             /*expectStartOrContinueTxnFields=*/false);
         return BSON("ok" << true);
     });
 
@@ -146,8 +146,8 @@ TEST_F(RouterMultiStatementTransactionRequestsSenderTest, TxnDetailsAreAppendedI
     onCommand([&](const auto& request) {
         checkRequestMetadata(request,
                              cmdName,
-                             true /* expectStartTxnFields */,
-                             false /* expectStartOrContinueTxnFields */);
+                             /*expectStartTxnFields=*/true,
+                             /*expectStartOrContinueTxnFields=*/false);
 
         // The TransactionRouter will throw when parsing this response if
         // "processParticipantResponse" does not exist
@@ -195,8 +195,8 @@ TEST_F(RouterMultiStatementTransactionRequestsSenderTest, TxnDetailsAreAppendedI
     onCommand([&](const auto& request) {
         checkRequestMetadata(request,
                              cmdName,
-                             false /* expectStartTxnFields */,
-                             true /* expectStartOrContinueTxnFields */);
+                             /*expectStartTxnFields=*/false,
+                             /*expectStartOrContinueTxnFields=*/true);
 
         // The TransactionRouter will throw when parsing this response if
         // "processParticipantResponse" does not exist

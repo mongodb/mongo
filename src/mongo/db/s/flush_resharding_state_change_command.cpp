@@ -165,7 +165,7 @@ public:
                     ? *mockStatus
                     : FilteringMetadataCache::get(opCtx.get())
                           ->onShardVersionMismatch(
-                              opCtx.get(), nss, boost::none /* chunkVersionReceived */);
+                              opCtx.get(), nss, /*chunkVersionReceived=*/boost::none);
 
                 if (refreshStatus.isOK()) {
                     shardingStatistics

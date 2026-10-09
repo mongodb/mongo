@@ -223,7 +223,7 @@ void ReplIndexBuildState::onThreadScheduled(OperationContext* opCtx) {
 
 void ReplIndexBuildState::completeSetup() {
     std::lock_guard lk(_mutex);
-    _indexBuildState.setState(IndexBuildState::kPostSetup, false /* skipCheck */);
+    _indexBuildState.setState(IndexBuildState::kPostSetup, /*skipCheck=*/false);
     _cleanUpRequired = true;
 }
 
@@ -232,7 +232,7 @@ void ReplIndexBuildState::setInProgress(OperationContext* opCtx) {
     // The index build might have been aborted/interrupted before reaching this point. Trying to
     // transtion to kInProgress would be an error.
     opCtx->checkForInterrupt();
-    _indexBuildState.setState(IndexBuildState::kInProgress, false /* skipCheck */);
+    _indexBuildState.setState(IndexBuildState::kInProgress, /*skipCheck=*/false);
 }
 
 void ReplIndexBuildState::setPostFailureState(const Status& status) {
@@ -258,7 +258,7 @@ void ReplIndexBuildState::setPostFailureState(const Status& status) {
     }
 
     _indexBuildState.setState(
-        IndexBuildState::kFailureCleanUp, false /* skipCheck */, boost::none, status);
+        IndexBuildState::kFailureCleanUp, /*skipCheck=*/false, boost::none, status);
 }
 
 void ReplIndexBuildState::setVotedForCommitReadiness(OperationContext* opCtx) {
@@ -285,7 +285,7 @@ void ReplIndexBuildState::commit(OperationContext* opCtx) {
 void ReplIndexBuildState::requestAbortFromPrimary() {
     invariant(mustReplicateCompletion(protocol));
     std::lock_guard lk(_mutex);
-    _indexBuildState.setState(IndexBuildState::kAwaitPrimaryAbort, false /* skipCheck */);
+    _indexBuildState.setState(IndexBuildState::kAwaitPrimaryAbort, /*skipCheck=*/false);
 }
 
 Timestamp ReplIndexBuildState::getCommitTimestamp() const {
@@ -585,8 +585,8 @@ bool ReplIndexBuildState::forceSelfAbort(OperationContext* opCtx, const Status& 
     }
 
     _indexBuildState.setState(IndexBuildState::kFailureCleanUp,
-                              false /* skipCheck */,
-                              boost::none /* timestamp */,
+                              /*skipCheck=*/false,
+                              /*timestamp=*/boost::none,
                               error);
 
     auto serviceContext = opCtx->getServiceContext();

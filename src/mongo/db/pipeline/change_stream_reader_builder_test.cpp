@@ -21,7 +21,7 @@ class ChangeStreamReaderBuilderTest : public ServiceContextTest {
 public:
     ChangeStreamReaderBuilderTest()
         : ServiceContextTest(
-              std::make_unique<ScopedGlobalServiceContextForTest>(false /* shouldSetupTL */)) {
+              std::make_unique<ScopedGlobalServiceContextForTest>(/*shouldSetupTL=*/false)) {
         _opCtx = makeOperationContext();
     }
 
@@ -37,7 +37,7 @@ private:
 
 TEST_F(ChangeStreamReaderBuilderTest, DefaultMockReturnsEmptyValues) {
     ChangeStream changeStream(
-        ChangeStreamReadMode::kStrict, ChangeStreamType::kAllDatabases, {} /* nss */);
+        ChangeStreamReadMode::kStrict, ChangeStreamType::kAllDatabases, /*nss=*/{});
 
     mock = std::make_unique<ChangeStreamReaderBuilderMock>();
     ASSERT_EQ(nullptr, mock->buildShardTargeter(getOpCtx(), changeStream));
@@ -109,7 +109,7 @@ TEST_F(ChangeStreamReaderBuilderTest, OperationContextAndChangeStreamAreCorrectl
 
 TEST_F(ChangeStreamReaderBuilderTest, DecorationsOnServiceContextWork) {
     ChangeStream changeStream(
-        ChangeStreamReadMode::kStrict, ChangeStreamType::kAllDatabases, {} /* nss */);
+        ChangeStreamReadMode::kStrict, ChangeStreamType::kAllDatabases, /*nss=*/{});
 
     // Note that these are just made up filters for testing and do not resemble the true filters on
     // the oplog.

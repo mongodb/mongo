@@ -131,7 +131,7 @@ StatusWith<std::unique_ptr<PlannerInterface>> planWithCBR(
                                                yieldPolicy,
                                                collections,
                                                makePlannerData(),
-                                               true /* isClassic */);
+                                               /*isClassic=*/true);
     if (!rankerResultSW.isOK()) {
         return rankerResultSW.getStatus();
     }
@@ -224,7 +224,7 @@ StatusWith<std::unique_ptr<PlannerInterface>> preparePlanner(
         planCacheCounters.incrementClassicSkippedCounter();
         auto solution = std::make_unique<QuerySolution>();
         solution->setRoot(std::make_unique<EofNode>(eof_node::EOFType::NonExistentNamespace));
-        return buildSingleSolutionPlanner(std::move(solution), boost::none /*cachedPlanHash*/);
+        return buildSingleSolutionPlanner(std::move(solution), /*cachedPlanHash=*/boost::none);
     }
 
     if (cq->getFindCommandRequest().getTailable() && !mainColl->isCapped()) {
@@ -244,7 +244,7 @@ StatusWith<std::unique_ptr<PlannerInterface>> preparePlanner(
             tryIdHack(opCtx,
                       collections,
                       cq,
-                      [&]() { return makePlannerData(boost::none /*cachedPlanHash*/); });
+                      [&]() { return makePlannerData(/*cachedPlanHash=*/boost::none); });
         idHackPlan) {
         uassertStatusOK(idHackPlan->plan());
         return {{std::move(idHackPlan)}};
@@ -343,7 +343,7 @@ StatusWith<std::unique_ptr<PlannerInterface>> preparePlanner(
         }
         return std::make_unique<MultiPlanner>(makePlannerData(cachedPlanHash),
                                               std::move(solutions),
-                                              false /* addingCBRChosenPlanToPlanCache */,
+                                              /*addingCBRChosenPlanToPlanCache=*/false,
                                               std::move(maybeExplainData),
                                               strategy);
     }();

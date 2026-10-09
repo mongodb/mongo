@@ -318,7 +318,7 @@ TEST_F(MetadataSynchronizerFixture, QueryableBackupModeRecoversFromLocalCatalogW
 
     CollectionMetadataSynchronizer synchronizer{kTestNss, CancellationToken::uncancelable()};
 
-    synchronizer.start(opCtx, nullptr /* executor */);
+    synchronizer.start(opCtx, /*executor=*/nullptr);
     ASSERT_OK(synchronizer.getMetadataFuture().getNoThrow(opCtx));
     auto collMetadata = synchronizer.drainAndApply(opCtx);
 
@@ -343,7 +343,7 @@ TEST_F(MetadataSynchronizerFixture,
 
     CollectionMetadataSynchronizer synchronizer{kTestNss, CancellationToken::uncancelable()};
 
-    synchronizer.start(opCtx, nullptr /* executor */);
+    synchronizer.start(opCtx, /*executor=*/nullptr);
     ASSERT_OK(synchronizer.getMetadataFuture().getNoThrow(opCtx));
     auto collMetadata = synchronizer.drainAndApply(opCtx);
 

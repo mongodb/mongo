@@ -487,7 +487,7 @@ ParsedAggregationPipeline parsePipelineAndRegisterQueryStats(
                               nsStruct.executionNss,
                               nsStruct.requestedNss,
                               collationObj,
-                              boost::none /* uuid */,
+                              /*uuid=*/boost::none,
                               std::move(resolvedNamespacesForExpCtx),
                               hasChangeStream,
                               verbosity,
@@ -1132,11 +1132,11 @@ void makeEOFExplainResult(OperationContext* opCtx,
     auto expCtx =
         makeExpressionContext(opCtx,
                               request,
-                              boost::none /* cri */,
+                              /*cri=*/boost::none,
                               namespaces.executionNss,
                               namespaces.requestedNss,
                               BSONObj(), /* collation obj */
-                              boost::none /* uuid */,
+                              /*uuid=*/boost::none,
                               resolveInvolvedNamespaces(liteParsedPipeline.getInvolvedNamespaces()),
                               liteParsedPipeline.hasChangeStream(),
                               verbosity,
@@ -1687,7 +1687,7 @@ Status ClusterAggregate::runAggregateWithRoutingCtx(
 
         const LiteParsedPipeline liteParsedToUse =
             maybeRebuildLiteParsedPipelineForRetry(
-                state, request, boost::none /* userLPP */, opCtx, ifrContext)
+                state, request, /*userLPP=*/boost::none, opCtx, ifrContext)
                 .value_or(liteParsedPipeline);
 
         // 'request' is deliberately reused across attempts rather than copied per attempt.

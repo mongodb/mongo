@@ -29,7 +29,7 @@ public:
             *pipeline, buildParams.get_value_or(defaultBuildParams), getFreshJoinOptMetrics());
 
         if (joinModel.isOK()) {
-            ctx.outStream() << "output: " << joinModel.getValue().toString(/*pretty*/ true)
+            ctx.outStream() << "output: " << joinModel.getValue().toString(/*pretty=*/true)
                             << std::endl;
         } else {
             ctx.outStream() << "output: " << joinModel.getStatus() << std::endl;
@@ -82,7 +82,7 @@ TEST_F(AggJoinModelGoldenTest, longPrefix) {
 }
 
 TEST_F(AggJoinModelGoldenTest, veryLargePipeline) {
-    auto pipeline = makePipelineOfSize(/*numJoins*/ kHardMaxNodesInJoin + 3);
+    auto pipeline = makePipelineOfSize(/*numJoins=*/kHardMaxNodesInJoin + 3);
     markFieldsAsScalar(*pipeline, {"a"sv}, {{"A", {"b"sv}}});
     auto joinModel = runVariation(std::move(pipeline), "veryLargePipeline");
     ASSERT_OK(joinModel);

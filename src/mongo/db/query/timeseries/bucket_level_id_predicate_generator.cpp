@@ -98,9 +98,9 @@ auto constructObjectIdValue(const BSONElement& rhs, int bucketMaxSpanSeconds) {
     // make this case faster by keeping the ObjectId as the lowest or highest possible value so as
     // to eliminate all buckets.
     if constexpr (std::is_same_v<MatchType, LTMatchExpression>) {
-        return Value{makeDateOID(rhs.date(), OIDInit::min, true /*roundMillisUpToSecond*/)};
+        return Value{makeDateOID(rhs.date(), OIDInit::min, /*roundMillisUpToSecond=*/true)};
     } else if constexpr (std::is_same_v<MatchType, LTEMatchExpression>) {
-        return Value{makeDateOID(rhs.date(), OIDInit::max, true /*roundMillisUpToSecond*/)};
+        return Value{makeDateOID(rhs.date(), OIDInit::max, /*roundMillisUpToSecond=*/true)};
     } else if constexpr (std::is_same_v<MatchType, GTMatchExpression>) {
         return Value{makeMaxAdjustedDateOID(rhs.date(), OIDInit::max)};
     } else if constexpr (std::is_same_v<MatchType, GTEMatchExpression>) {

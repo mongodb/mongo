@@ -334,7 +334,7 @@ OpTimeBundle replLogUpdate(OperationContext* opCtx,
         oplogEntry->setOpTime(args.updateArgs->oplogSlots.back());
     }
     opTimes.writeOpTime =
-        logOperation(opCtx, oplogEntry, true /*assignCommonFields*/, operationLogger);
+        logOperation(opCtx, oplogEntry, /*assignCommonFields=*/true, operationLogger);
     opTimes.wallClockTime = oplogEntry->getWallClockTime();
     return opTimes;
 }
@@ -368,7 +368,7 @@ OpTimeBundle replLogDelete(OperationContext* opCtx,
     oplogEntry->setObject(documentKey.getShardKeyAndId());
     oplogEntry->setFromMigrateIfTrue(fromMigrate);
     opTimes.writeOpTime =
-        logOperation(opCtx, oplogEntry, true /*assignCommonFields*/, operationLogger);
+        logOperation(opCtx, oplogEntry, /*assignCommonFields=*/true, operationLogger);
     opTimes.wallClockTime = oplogEntry->getWallClockTime();
     return opTimes;
 }
@@ -471,7 +471,7 @@ bool shouldTimestampIndexBuildSinglePhase(OperationContext* opCtx, const Namespa
 void reserveOplogSlotsForRetryableFindAndModify(OperationContext* opCtx,
                                                 OperationLogger* operationLogger,
                                                 MutableOplogEntry& oplogEntry) {
-    auto slots = operationLogger->getNextOpTimes(opCtx, /*count*/ 2, /*opTimeOffset*/ 1);
+    auto slots = operationLogger->getNextOpTimes(opCtx, /*count=*/2, /*opTimeOffset=*/1);
     oplogEntry.setOpTime(slots[1]);
 }
 
@@ -601,7 +601,7 @@ void OpObserverImpl::onStartIndexBuild(OperationContext* opCtx,
         setIndexBuildO2(opCtx, oplogEntry, indexBuildUUID, indexes, nss);
     }
     oplogEntry.setFromMigrateIfTrue(fromMigrate);
-    logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
+    logOperation(opCtx, &oplogEntry, /*assignCommonFields=*/true, _operationLogger.get());
 }
 
 void OpObserverImpl::onStartIndexBuildSinglePhase(OperationContext* opCtx,
@@ -678,7 +678,7 @@ void OpObserverImpl::onCommitIndexBuild(OperationContext* opCtx,
         setIndexBuildO2(opCtx, oplogEntry, indexBuildUUID, indexes, nss);
     }
     oplogEntry.setFromMigrateIfTrue(fromMigrate);
-    logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
+    logOperation(opCtx, &oplogEntry, /*assignCommonFields=*/true, _operationLogger.get());
 }
 
 void OpObserverImpl::onAbortIndexBuild(OperationContext* opCtx,
@@ -727,7 +727,7 @@ void OpObserverImpl::onAbortIndexBuild(OperationContext* opCtx,
         setIndexBuildO2(opCtx, oplogEntry, indexBuildUUID, indexes, nss);
     }
     oplogEntry.setFromMigrateIfTrue(fromMigrate);
-    logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
+    logOperation(opCtx, &oplogEntry, /*assignCommonFields=*/true, _operationLogger.get());
 }
 
 void OpObserverImpl::onSetMultikeyMetadata(OperationContext* opCtx,
@@ -745,7 +745,7 @@ void OpObserverImpl::onSetMultikeyMetadata(OperationContext* opCtx,
     oplogEntry.setObject(objectEntry.toBSON());
     oplogEntry.setNss(nss.getCommandNS());
 
-    logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
+    logOperation(opCtx, &oplogEntry, /*assignCommonFields=*/true, _operationLogger.get());
 }
 
 namespace {
@@ -1485,7 +1485,7 @@ OpTimeBundle logContainerInsert(OperationContext* opCtx,
     entry.setObject(makeContainerInsertO(opCtx, std::move(key), std::move(value)).toBSON());
 
     OpTimeBundle opTime;
-    opTime.writeOpTime = logOperation(opCtx, &entry, true /*assignCommonFields*/, &logger);
+    opTime.writeOpTime = logOperation(opCtx, &entry, /*assignCommonFields=*/true, &logger);
     opTime.wallClockTime = entry.getWallClockTime();
 
     return opTime;
@@ -1555,7 +1555,7 @@ OpTimeBundle logContainerDelete(OperationContext* opCtx,
     entry.setObject(deleteO.toBSON());
 
     OpTimeBundle opTime;
-    opTime.writeOpTime = logOperation(opCtx, &entry, true /*assignCommonFields*/, &logger);
+    opTime.writeOpTime = logOperation(opCtx, &entry, /*assignCommonFields=*/true, &logger);
     opTime.wallClockTime = entry.getWallClockTime();
 
     return opTime;
@@ -1630,7 +1630,7 @@ OpTimeBundle logContainerUpdate(OperationContext* opCtx,
     entry.setObject(updateO.toBSON());
 
     OpTimeBundle opTime;
-    opTime.writeOpTime = logOperation(opCtx, &entry, true /*assignCommonFields*/, &logger);
+    opTime.writeOpTime = logOperation(opCtx, &entry, /*assignCommonFields=*/true, &logger);
     opTime.wallClockTime = entry.getWallClockTime();
 
     return opTime;
@@ -1829,7 +1829,7 @@ void OpObserverImpl::onInternalOpMessage(
     if (wallClockTime) {
         oplogEntry.setWallClockTime(*wallClockTime);
     }
-    logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
+    logOperation(opCtx, &oplogEntry, /*assignCommonFields=*/true, _operationLogger.get());
 }
 
 void OpObserverImpl::onCreateCollection(
@@ -1968,7 +1968,7 @@ void OpObserverImpl::onCollMod(OperationContext* opCtx,
         oplogEntry.setObject(makeCollModCmdObj(collModOplogCmd, oldCollOptions, indexInfo));
         oplogEntry.setObject2(o2Builder.done());
         auto opTime =
-            logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
+            logOperation(opCtx, &oplogEntry, /*assignCommonFields=*/true, _operationLogger.get());
         if (!serverGlobalParams.quiet.load()) {
             LOGV2(7360104,
                   "Wrote oplog entry for collMod",
@@ -2010,7 +2010,7 @@ void OpObserverImpl::onDropDatabase(OperationContext* opCtx,
     oplogEntry.setFromMigrate(markFromMigrate);
     oplogEntry.setObject(BSON("dropDatabase" << 1));
     auto opTime =
-        logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
+        logOperation(opCtx, &oplogEntry, /*assignCommonFields=*/true, _operationLogger.get());
     if (opCtx->writesAreReplicated() && !serverGlobalParams.quiet.load()) {
         LOGV2(7360105,
               "Wrote oplog entry for dropDatabase",
@@ -2050,7 +2050,7 @@ repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
     oplogEntry.setObject(BSON("drop" << collectionName.coll()));
     oplogEntry.setObject2(makeObject2ForDropOrRename(numRecords));
     auto opTime =
-        logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
+        logOperation(opCtx, &oplogEntry, /*assignCommonFields=*/true, _operationLogger.get());
     if (!serverGlobalParams.quiet.load()) {
         LOGV2(7360106,
               "Wrote oplog entry for drop",
@@ -2086,7 +2086,7 @@ void OpObserverImpl::onDropIndex(OperationContext* opCtx,
     oplogEntry.setObject(BSON("dropIndexes" << nss.coll() << "index" << indexName));
     oplogEntry.setObject2(indexInfo);
     auto opTime =
-        logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
+        logOperation(opCtx, &oplogEntry, /*assignCommonFields=*/true, _operationLogger.get());
     if (!serverGlobalParams.quiet.load()) {
         LOGV2(7360107,
               "Wrote oplog entry for dropIndexes",
@@ -2137,7 +2137,7 @@ repl::OpTime OpObserverImpl::preRenameCollection(OperationContext* const opCtx,
     if (dropTargetUUID)
         oplogEntry.setObject2(makeObject2ForDropOrRename(numRecords));
     auto opTime =
-        logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
+        logOperation(opCtx, &oplogEntry, /*assignCommonFields=*/true, _operationLogger.get());
     if (!serverGlobalParams.quiet.load()) {
         LOGV2(7360108,
               "Wrote oplog entry for renameCollection",
@@ -2207,7 +2207,7 @@ void OpObserverImpl::onImportCollection(OperationContext* opCtx,
     }
     oplogEntry.setNss(nss.getCommandNS());
     oplogEntry.setObject(importCollection.toBSON());
-    logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
+    logOperation(opCtx, &oplogEntry, /*assignCommonFields=*/true, _operationLogger.get());
 }
 
 namespace {
@@ -2307,7 +2307,7 @@ repl::OpTime logApplyOps(OperationContext* opCtx,
 
     try {
         auto writeOpTime =
-            logOperation(opCtx, oplogEntry, false /*assignCommonFields*/, operationLogger);
+            logOperation(opCtx, oplogEntry, /*assignCommonFields=*/false, operationLogger);
         if (updateTxnTable) {
             SessionTxnRecord sessionTxnRecord;
             sessionTxnRecord.setLastWriteOpTime(writeOpTime);
@@ -2380,7 +2380,7 @@ void logCommitOrAbortForPreparedTransaction(OperationContext* opCtx,
 
             WriteUnitOfWork wuow(opCtx);
             const auto oplogOpTime =
-                logOperation(opCtx, oplogEntry, true /*assignCommonFields*/, operationLogger);
+                logOperation(opCtx, oplogEntry, /*assignCommonFields=*/true, operationLogger);
             invariant(oplogEntry->getOpTime().isNull() || oplogEntry->getOpTime() == oplogOpTime);
 
             SessionTxnRecord sessionTxnRecord;
@@ -2550,7 +2550,7 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx,
             case repl::OpTypeEnum::kContainerUpdate:
             case repl::OpTypeEnum::kContainerInsert: {
                 auto opTime = logOperation(
-                    opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
+                    opCtx, &oplogEntry, /*assignCommonFields=*/true, _operationLogger.get());
                 auto wallClockTime = oplogEntry.getWallClockTime();
 
                 if (opAccumulator) {
@@ -2983,7 +2983,7 @@ void OpObserverImpl::onTruncateRange(OperationContext* opCtx,
     oplogEntry.setNss(nss.isOplog() ? NamespaceString::kAdminCommandNamespace : nss.getCommandNS());
     oplogEntry.setUuid(coll->uuid());
     oplogEntry.setObject(objectEntry.toBSON());
-    opTime = logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
+    opTime = logOperation(opCtx, &oplogEntry, /*assignCommonFields=*/true, _operationLogger.get());
 }
 
 void OpObserverImpl::onUpgradeDowngradeViewlessTimeseries(OperationContext* opCtx,
@@ -3013,7 +3013,7 @@ void OpObserverImpl::onUpgradeDowngradeViewlessTimeseries(OperationContext* opCt
     oplogEntry.setUuid(uuid);
     oplogEntry.setObject(objectEntry.toBSON());
 
-    logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
+    logOperation(opCtx, &oplogEntry, /*assignCommonFields=*/true, _operationLogger.get());
 }
 
 void OpObserverImpl::onReplicatedIdentDrop(OperationContext* opCtx,
@@ -3023,7 +3023,7 @@ void OpObserverImpl::onReplicatedIdentDrop(OperationContext* opCtx,
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
     oplogEntry.setNss(NamespaceString::kAdminCommandNamespace);
     oplogEntry.setObject(BSON("dropIdent" << ident));
-    opTime = logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
+    opTime = logOperation(opCtx, &oplogEntry, /*assignCommonFields=*/true, _operationLogger.get());
 }
 
 void OpObserverImpl::onInitReplicatedFastCount(OperationContext* opCtx,
@@ -3034,7 +3034,7 @@ void OpObserverImpl::onInitReplicatedFastCount(OperationContext* opCtx,
     oplogEntry.setNss(NamespaceString::kAdminCommandNamespace);
     oplogEntry.setObject(BSON("initReplicatedFastCount" << 1));
     oplogEntry.setObject2(o2.toBSON());
-    opTime = logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
+    opTime = logOperation(opCtx, &oplogEntry, /*assignCommonFields=*/true, _operationLogger.get());
 }
 
 }  // namespace mongo

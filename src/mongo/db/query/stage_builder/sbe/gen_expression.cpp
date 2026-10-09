@@ -3306,10 +3306,10 @@ public:
         unsupportedExpression(expr->getOpName());
     }
     void visit(const ExpressionFromAccumulator<AccumulatorMax>* expr) final {
-        generateAccumulatorExpression(expr, sbe::EFn::kMaxFromAcc, true /* passCollator */);
+        generateAccumulatorExpression(expr, sbe::EFn::kMaxFromAcc, /*passCollator=*/true);
     }
     void visit(const ExpressionFromAccumulator<AccumulatorMin>* expr) final {
-        generateAccumulatorExpression(expr, sbe::EFn::kMinFromAcc, true /* passCollator */);
+        generateAccumulatorExpression(expr, sbe::EFn::kMinFromAcc, /*passCollator=*/true);
     }
     void visit(const ExpressionFromAccumulatorN<AccumulatorMaxN>* expr) final {
         unsupportedExpression(expr->getOpName());

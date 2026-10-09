@@ -105,7 +105,7 @@ SemiFuture<void> ReshardingOplogBatchApplier::applyBatch(
                                    opCtx.get(),
                                    _crudApplication.getOutputNss(),
                                    ShardVersionFactory::make(ChunkVersion::IGNORED()),
-                                   boost::none /* databaseVersion */);
+                                   /*databaseVersion=*/boost::none);
                                uassertStatusOK(
                                    _crudApplication.applyOperation(opCtx.get(), oplogEntry));
                            });
@@ -151,7 +151,7 @@ SemiFuture<void> ReshardingOplogBatchApplier::applyBatch(
 
 CancelableOperationContext ReshardingOplogBatchApplier::_makeOperationContext(
     std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) const {
-    return resharding::makeReshardingOperationContext(*factory, true /* nonDeprioritizable */);
+    return resharding::makeReshardingOperationContext(*factory, /*nonDeprioritizable=*/true);
 }
 
 template SemiFuture<void> ReshardingOplogBatchApplier::applyBatch<false>(

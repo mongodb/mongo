@@ -71,7 +71,7 @@ PlanShapeAnalysisResult analyzePlanShapeForCounters(const QuerySolution& solutio
     // Don't allow the treeSearch call to exit early, so that every rule gets a chance to
     // match on every node.
     const bool matched = treeMatchesAny(
-        findRoot, false /* allowEarlyExit */, nodeCounts, accessPaths, planShapeMatcher);
+        findRoot, /*allowEarlyExit=*/false, nodeCounts, accessPaths, planShapeMatcher);
 
     boost::optional<PlanShapeCounter> pattern;
     if (matched) {

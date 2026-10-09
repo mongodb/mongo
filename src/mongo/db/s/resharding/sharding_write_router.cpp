@@ -52,7 +52,7 @@ ShardingWriteRouter::ShardingWriteRouter(OperationContext* opCtx, const Namespac
             invariant(catalogCache);
 
             const auto& cri = uassertStatusOK(catalogCache->getCollectionRoutingInfo(
-                opCtx, op->metadata.getTempReshardingNss(), true /* allowLocks */));
+                opCtx, op->metadata.getTempReshardingNss(), /*allowLocks=*/true));
             if (!cri.hasRoutingTable()) {
                 // We could reach here if resharding operation has already committed and the
                 // temporary collection no longer exists, but the state document hasn't been cleaned
@@ -77,7 +77,7 @@ ShardingWriteRouter::ShardingWriteRouter(OperationContext* opCtx, const Namespac
             invariant(catalogCache);
 
             const auto& cri = uassertStatusOK(catalogCache->getCollectionRoutingInfo(
-                opCtx, donorFields->getTempReshardingNss(), true /* allowLocks */));
+                opCtx, donorFields->getTempReshardingNss(), /*allowLocks=*/true));
             tassert(6862800,
                     "Routing information for the temporary resharding collection is stale",
                     cri.hasRoutingTable());

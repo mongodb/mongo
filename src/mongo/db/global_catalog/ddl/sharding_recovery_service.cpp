@@ -88,7 +88,7 @@ void ShardingRecoveryService::FilteringMetadataClearer::operator()(
 
     auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nssBeingReleased);
     if (_includeStepsForNamespaceDropped) {
-        scopedCsr->clearCollectionMetadata(opCtx, true /* collIsDropped */);
+        scopedCsr->clearCollectionMetadata(opCtx, /*collIsDropped=*/true);
     } else {
         scopedCsr->clearCollectionMetadata(opCtx);
     }
@@ -216,7 +216,7 @@ void ShardingRecoveryService::acquireRecoverableCriticalSectionBlockWrites(
         // CS.
         // - Otherwise this call will fail and the CS won't be taken (neither persisted nor
         // in-mem)
-        CollectionCriticalSectionDocument newDoc(nss, reason, false /* blockReads */);
+        CollectionCriticalSectionDocument newDoc(nss, reason, /*blockReads=*/false);
         newDoc.setClearShardCatalogCache(clearShardCatalogCache);
 
         const auto commandResponse = dbClient.runCommand([&] {

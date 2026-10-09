@@ -809,40 +809,40 @@ TEST(CardinalityEstimator, SamplingCEInvokesEstimateCardinality) {
 
     std::vector<ce::CollectionFieldConfiguration> collectionFieldConfig = {
         ce::CollectionFieldConfiguration(
-            /*fieldName*/ "a",
+            /*fieldName=*/"a",
             /*fieldPositionInCollection=*/0,
             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-            /*ndv*/ 10,
-            /*dataDistribution*/ stats::DistrType::kUniform,
-            /*seed*/ seed_value1_low),
+            /*ndv=*/10,
+            /*dataDistribution=*/stats::DistrType::kUniform,
+            /*seed=*/seed_value1_low),
         ce::CollectionFieldConfiguration(
-            /*fieldName*/ "b",
+            /*fieldName=*/"b",
             /*fieldPositionInCollection=*/5,
             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-            /*ndv*/ 10,
-            /*dataDistribution*/ stats::DistrType::kUniform,
-            /*seed*/ seed_value2_low),
+            /*ndv=*/10,
+            /*dataDistribution=*/stats::DistrType::kUniform,
+            /*seed=*/seed_value2_low),
         ce::CollectionFieldConfiguration(
-            /*fieldName*/ "c",
+            /*fieldName=*/"c",
             /*fieldPositionInCollection=*/20,
             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-            /*ndv*/ 10,
-            /*dataDistribution*/ stats::DistrType::kUniform,
-            /*seed*/ seed_value3_low),
+            /*ndv=*/10,
+            /*dataDistribution=*/stats::DistrType::kUniform,
+            /*seed=*/seed_value3_low),
         ce::CollectionFieldConfiguration(
-            /*fieldName*/ "e",
+            /*fieldName=*/"e",
             /*fieldPositionInCollection=*/22,
             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-            /*ndv*/ 10,
-            /*dataDistribution*/ stats::DistrType::kUniform,
-            /*seed*/ seed_value5_low),
+            /*ndv=*/10,
+            /*dataDistribution=*/stats::DistrType::kUniform,
+            /*seed=*/seed_value5_low),
         ce::CollectionFieldConfiguration(
-            /*fieldName*/ "d",
+            /*fieldName=*/"d",
             /*fieldPositionInCollection=*/25,
             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
-            /*ndv*/ 10,
-            /*dataDistribution*/ stats::DistrType::kUniform,
-            /*seed*/ seed_value4_low)};
+            /*ndv=*/10,
+            /*dataDistribution=*/stats::DistrType::kUniform,
+            /*seed=*/seed_value4_low)};
 
     // Translate the fields and positions configurations based on the defined map.
     ce::DataConfiguration dataConfig(
@@ -866,7 +866,7 @@ TEST(CardinalityEstimator, SamplingCEInvokesEstimateCardinality) {
                                                       AcquisitionPrerequisites::kRead),
         MODE_IS);
     auto colls = MultipleCollectionAccessor(
-        collection, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+        collection, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
     ce::SamplingEstimatorAssertingKeysScanned samplingEstimator(
         planRankingTest.getOperationContext(),
@@ -1025,7 +1025,7 @@ TEST(CardinalityEstimator, SamplingCECompareIndexWithSample) {
                                                       AcquisitionPrerequisites::kRead),
         MODE_IS);
     auto colls = MultipleCollectionAccessor(
-        collection, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+        collection, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
     ce::SamplingEstimatorForTesting samplingEstimator(
         planRankingTest.getOperationContext(),

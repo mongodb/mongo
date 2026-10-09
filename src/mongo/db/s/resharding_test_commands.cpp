@@ -210,7 +210,7 @@ public:
                                               request().getShardId(),
                                               request().getAtClusterTime(),
                                               request().getOutputNs(),
-                                              true /* storeProgress */,
+                                              /*storeProgress=*/true,
                                               request().getRelaxed(),
                                               std::move(fom));
 

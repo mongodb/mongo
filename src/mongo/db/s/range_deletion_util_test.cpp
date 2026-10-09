@@ -100,8 +100,8 @@ public:
             false,
             epoch,
             Timestamp(1, 1),
-            boost::none /* timeseriesFields */,
-            boost::none /* reshardingFields */,
+            /*timeseriesFields=*/boost::none,
+            /*reshardingFields=*/boost::none,
 
             true,
             {ChunkType{uuid,
@@ -679,7 +679,7 @@ TEST_F(RangeDeleterTest, PersistRangeDeletionTaskLocallyDoesNotPersistDuplicateR
         opCtx,
         task,
         defaultMajorityWriteConcern(),
-        true /* doNotPersistIfDocCoveringSameRangeAlreadyExists */);
+        /*doNotPersistIfDocCoveringSameRangeAlreadyExists=*/true);
     ASSERT_EQ(store.count(opCtx), 1);
 
     RangeDeletionTask taskOnSameRange = createDeletionTask(
@@ -688,7 +688,7 @@ TEST_F(RangeDeleterTest, PersistRangeDeletionTaskLocallyDoesNotPersistDuplicateR
         opCtx,
         taskOnSameRange,
         defaultMajorityWriteConcern(),
-        true /* doNotPersistIfDocCoveringSameRangeAlreadyExists */);
+        /*doNotPersistIfDocCoveringSameRangeAlreadyExists=*/true);
     ASSERT_EQ(store.count(opCtx), 1);
 }
 

@@ -298,6 +298,6 @@ std::unique_ptr<Pipeline> makeFacetPipeline(const std::vector<BSONObj>& rawPipel
                                             PipelineValidatorCallback validator) {
     LiteParsedPipeline liteParsedPipeline(makeLiteParsedPipeline(expCtx, rawPipeline));
     return Pipeline::parseFromLiteParsed(
-        liteParsedPipeline, expCtx, validator, true /*isFacetPipeline*/);
+        liteParsedPipeline, expCtx, validator, /*isFacetPipeline=*/true);
 }
 }  // namespace mongo::pipeline_factory

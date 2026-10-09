@@ -41,7 +41,7 @@ struct FieldPathAndCondPreVisitor
 template <typename F>
 void walkAndActOnFieldPaths(Expression* expr, const F& fn) {
     FieldPathAndCondPreVisitor<F> preVisitor(fn);
-    ExpressionWalker walker(&preVisitor, nullptr /*inVisitor*/, nullptr /*postVisitor*/);
+    ExpressionWalker walker(&preVisitor, /*inVisitor=*/nullptr, /*postVisitor=*/nullptr);
     expression_walker::walk(expr, &walker);
 }
 
@@ -1498,7 +1498,7 @@ SlotBasedStageBuilder::buildGroupImpl(SbStage stage,  // moved in
     if (!blockSucceeded) {
         // buildGroupImplBlock() will always move 'stage' back out so we can get it from 'result'.
         result = buildGroupImplScalar(
-            std::move(std::get<0>(result)) /* stage */, reqs, childOutputs, groupNode);
+            /*stage=*/std::move(std::get<0>(result)), reqs, childOutputs, groupNode);
     }
     return result;
 }  // SlotBasedStageBuilder::buildGroupImpl
@@ -1581,7 +1581,7 @@ SlotBasedStageBuilder::buildGroupImplBlock(SbStage stage,  // moved in
     sbBlockAggExprs = tryToGenerateBlockAccumulators(_state,
                                                      *groupNode,
                                                      std::move(*accInputExprsVec),
-                                                     boost::none /* initRootSlot */,
+                                                     /*initRootSlot=*/boost::none,
                                                      bitmapInternalSlot);
     // Abort if generating block sbBlockAggExprs failed.
     if (!sbBlockAggExprs) {

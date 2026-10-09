@@ -322,10 +322,10 @@ public:
                                 CommandHelpers::filterCommandRequestForPassthrough(cmdObjToSend)),
                             ReadPreferenceSetting::get(opCtx),
                             Shard::RetryPolicy::kIdempotent,
-                            {} /*query*/,
-                            {} /*collation*/,
-                            boost::none /*letParameters*/,
-                            boost::none /*runtimeConstants*/);
+                            /*query=*/{},
+                            /*collation=*/{},
+                            /*letParameters=*/boost::none,
+                            /*runtimeConstants=*/boost::none);
 
                         BSONObjBuilder shardStats;
                         std::map<std::string, long long> counts;

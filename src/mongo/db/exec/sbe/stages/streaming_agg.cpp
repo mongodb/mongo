@@ -20,7 +20,7 @@ StreamingAggStage::StreamingAggStage(std::unique_ptr<PlanStage> input,
                                      PlanNodeId planNodeId,
                                      bool participateInTrialRunTracking)
     : PlanStage("streaming_group"sv,
-                nullptr /* yieldPolicy */,
+                /*yieldPolicy=*/nullptr,
                 planNodeId,
                 participateInTrialRunTracking),
       _keySlots(std::move(keys)),

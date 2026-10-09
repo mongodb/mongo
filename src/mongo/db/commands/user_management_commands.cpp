@@ -1172,7 +1172,7 @@ void CmdUMCTyped<CreateUserCommand>::Invocation::typedRun(OperationContext* opCt
         return &sslCoord->getSSLManager()->getSSLConfiguration();
     }();
     if (isExternal && sslConfig && sslGlobalParams.clusterAuthX509ExtensionValue.empty() &&
-        sslConfig->isClusterMember(userName.getUser(), boost::none /* clusterExtensionValue */)) {
+        sslConfig->isClusterMember(userName.getUser(), /*clusterExtensionValue=*/boost::none)) {
         if (gEnforceUserClusterSeparation) {
             uasserted(ErrorCodes::BadValue,
                       "Cannot create an x.509 user with a subjectname that would be "
@@ -1635,7 +1635,7 @@ void CmdUMCTyped<GrantPrivilegesToRoleCommand>::Invocation::typedRun(OperationCo
         opCtx,
         {roleName},
         auth::AuthorizationBackendInterface::ResolveRoleOption::kPrivileges().setDirectOnly(
-            true /* shouldEnable */)));
+            /*shouldEnable=*/true)));
     auto privileges = std::move(data.privileges.get());
     for (const auto& priv : newPrivileges) {
         Privilege::addPrivilegeToPrivilegeVector(&privileges, priv);
@@ -1685,7 +1685,7 @@ void CmdUMCTyped<RevokePrivilegesFromRoleCommand>::Invocation::typedRun(Operatio
         opCtx,
         {roleName},
         auth::AuthorizationBackendInterface::ResolveRoleOption::kPrivileges().setDirectOnly(
-            true /* shouldEnable */)));
+            /*shouldEnable=*/true)));
 
     auto privileges = std::move(data.privileges.get());
     for (const auto& rmPriv : rmPrivs) {
@@ -1746,7 +1746,7 @@ void CmdUMCTyped<GrantRolesToRoleCommand>::Invocation::typedRun(OperationContext
         opCtx,
         {roleName},
         auth::AuthorizationBackendInterface::ResolveRoleOption::kRoles().setDirectOnly(
-            true /* shouldEnable */)));
+            /*shouldEnable=*/true)));
     auto directRoles = std::move(data.roles.get());
     directRoles.insert(rolesToAdd.cbegin(), rolesToAdd.cend());
 
@@ -1782,7 +1782,7 @@ void CmdUMCTyped<RevokeRolesFromRoleCommand>::Invocation::typedRun(OperationCont
         opCtx,
         {roleName},
         auth::AuthorizationBackendInterface::ResolveRoleOption::kRoles().setDirectOnly(
-            true /* shouldEnable */)));
+            /*shouldEnable=*/true)));
     auto roles = std::move(data.roles.get());
     for (const auto& roleToRemove : rolesToRemove) {
         roles.erase(roleToRemove);

@@ -183,8 +183,8 @@ protected:
                                          false,
                                          collEpoch,
                                          collTimestamp,
-                                         boost::none /* timeseriesFields */,
-                                         boost::none /* reshardingFields */,
+                                         /*timeseriesFields=*/boost::none,
+                                         /*reshardingFields=*/boost::none,
                                          true,
                                          chunks)));
 

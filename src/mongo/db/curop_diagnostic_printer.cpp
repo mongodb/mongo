@@ -20,10 +20,10 @@ BSONObj serializeOpDebug(OperationContext* opCtx, CurOp& curOp) {
     // truncate them due to the BSON size limit.
     const bool omitCommand = true;
     curOp.debug().append(opCtx,
-                         {} /*lockStats*/,
-                         {} /*flowControlStats*/,
-                         {} /*storageMetrics*/,
-                         0 /*prepareReadConflicts*/,
+                         /*lockStats=*/{},
+                         /*flowControlStats=*/{},
+                         /*storageMetrics=*/{},
+                         /*prepareReadConflicts=*/0,
                          omitCommand,
                          bob);
     return bob.obj();

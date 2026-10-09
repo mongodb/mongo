@@ -35,7 +35,7 @@ namespace {
 class VectorClockConfigServerTest : public ConfigServerTestFixture {
 protected:
     VectorClockConfigServerTest()
-        : ConfigServerTestFixture(Options{}.useMockClock(true), false /* setUpMajorityReads */) {}
+        : ConfigServerTestFixture(Options{}.useMockClock(true), /*setUpMajorityReads=*/false) {}
 
     void setUp() override {
         ConfigServerTestFixture::setUp();

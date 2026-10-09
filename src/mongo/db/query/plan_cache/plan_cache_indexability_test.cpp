@@ -64,9 +64,9 @@ auto makeWildcardEntry(BSONObj keyPattern, const MatchExpression* filterExpr = n
     auto descriptor = IndexDescriptor(IndexNames::WILDCARD, spec.toBSON());
     auto mockIndexCatalogEntry = std::make_shared<IndexCatalogEntryMock>(nullptr,
                                                                          nullptr,
-                                                                         "" /* ident */,
+                                                                         /*ident=*/"",
                                                                          std::move(descriptor),
-                                                                         false /* isFrozen */,
+                                                                         /*isFrozen=*/false,
                                                                          filterExpr,
                                                                          nullptr);
 
@@ -98,7 +98,7 @@ IndexEntry makeIndexEntry(BSONObj keyPattern,
     auto descriptor = IndexDescriptor(IndexNames::BTREE, spec.toBSON());
     auto mockIndexCatalogEntry = std::make_shared<IndexCatalogEntryMock>(nullptr,
                                                                          nullptr,
-                                                                         "" /* ident */,
+                                                                         /*ident=*/"",
                                                                          std::move(descriptor),
                                                                          false, /* isFrozen */
                                                                          filterExpr,

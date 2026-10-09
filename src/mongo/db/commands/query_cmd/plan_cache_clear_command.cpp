@@ -212,7 +212,7 @@ public:
             sbe::clearPlanCacheEntriesWith(opCtx->getServiceContext(),
                                            collection->uuid(),
                                            version,
-                                           false /*matchSecondaryCollections*/);
+                                           /*matchSecondaryCollections=*/false);
 
             LOGV2_DEBUG(23908, 1, "Cleared plan cache", logAttrs(nss));
 

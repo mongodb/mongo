@@ -71,7 +71,7 @@ void QueryPlannerTest::addIndex(BSONObj keyPattern,
     auto descriptor = IndexDescriptor(IndexNames::BTREE, spec.toBSON());
     auto mockIndexCatalogEntry = std::make_shared<IndexCatalogEntryMock>(nullptr,
                                                                          nullptr,
-                                                                         "" /* ident */,
+                                                                         /*ident=*/"",
                                                                          std::move(descriptor),
                                                                          false, /* isFrozen */
                                                                          filterExpr,
@@ -125,9 +125,9 @@ void QueryPlannerTest::addIndex(BSONObj keyPattern, const MultikeyPaths& multike
     auto descriptor = IndexDescriptor(IndexNames::BTREE, spec.toBSON());
     auto mockIndexCatalogEntry = std::make_shared<IndexCatalogEntryMock>(nullptr,
                                                                          nullptr,
-                                                                         "" /* ident */,
+                                                                         /*ident=*/"",
                                                                          std::move(descriptor),
-                                                                         false /* isFrozen */,
+                                                                         /*isFrozen=*/false,
                                                                          filterExpr,
                                                                          collator);
     IndexEntry entry(keyPattern,

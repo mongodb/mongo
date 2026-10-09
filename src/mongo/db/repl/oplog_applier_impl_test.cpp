@@ -1203,8 +1203,7 @@ TEST_F(IdempotencyTest, CollModCommandMultitenant) {
 
     auto indexChange = fromjson("{keyPattern: {createdAt:1}, expireAfterSeconds:4000}");
     auto collModCmd = BSON("collMod" << nss.coll() << "index" << indexChange);
-    auto op =
-        makeCommandOplogEntry(nextOpTime(), nss, collModCmd, boost::none /* object2 */, kUuid);
+    auto op = makeCommandOplogEntry(nextOpTime(), nss, collModCmd, /*object2=*/boost::none, kUuid);
 
     ASSERT_OK(_applyOplogEntryOrGroupedInsertsWrapper(
         _opCtx.get(), ApplierOperation{&op}, OplogApplication::Mode::kSecondary));
@@ -1245,8 +1244,8 @@ TEST_F(IdempotencyTest, CollModCommandMultitenantWrongTenant) {
 
     auto indexChange = fromjson("{keyPattern: {createdAt:1}, expireAfterSeconds:4000}");
     auto collModCmd = BSON("collMod" << nssTenant2.coll() << "index" << indexChange);
-    auto op = makeCommandOplogEntry(
-        nextOpTime(), nssTenant2, collModCmd, boost::none /* object2 */, kUuid);
+    auto op =
+        makeCommandOplogEntry(nextOpTime(), nssTenant2, collModCmd, /*object2=*/boost::none, kUuid);
 
     // A NamespaceNotFound error is absorbed by the applier, but we can still determine the
     // op_observer callback was never called
@@ -1793,7 +1792,7 @@ TEST_F(OplogApplierImplTest, ApplySessionDeleteBeforeEarlierRetryableUpdate) {
                                    collUUID,
                                    update_oplog_entry::makeDeltaOplogEntry(BSON(
                                        doc_diff::kUpdateSectionFieldName << fromjson("{a: 1}"))),
-                                   BSON("_id" << 0) /* o2 */,
+                                   /*o2=*/BSON("_id" << 0),
                                    boost::none, /* fromMigrate*/
                                    sessionInfo,
                                    RetryImageEnum::kPreImage);
@@ -1853,7 +1852,7 @@ TEST_F(OplogApplierImplTest, ApplySessionDeleteBeforeEarlierFirstRetryableUpdate
                                    collUUID,
                                    update_oplog_entry::makeDeltaOplogEntry(BSON(
                                        doc_diff::kUpdateSectionFieldName << fromjson("{a: 1}"))),
-                                   BSON("_id" << 0) /* o2 */,
+                                   /*o2=*/BSON("_id" << 0),
                                    boost::none, /* fromMigrate*/
                                    sessionInfo,
                                    RetryImageEnum::kPreImage);
@@ -1918,7 +1917,7 @@ TEST_F(OplogApplierImplTest, ApplySessionDeleteAfterLaterRetryableUpdate) {
                                    collUUID,
                                    update_oplog_entry::makeDeltaOplogEntry(BSON(
                                        doc_diff::kUpdateSectionFieldName << fromjson("{a: 1}"))),
-                                   BSON("_id" << 0) /* o2 */,
+                                   /*o2=*/BSON("_id" << 0),
                                    boost::none, /* fromMigrate*/
                                    sessionInfo,
                                    RetryImageEnum::kPreImage);
@@ -1999,7 +1998,7 @@ TEST_F(OplogApplierImplTest, ApplySessionDeleteBeforeEarlierRetryableInternalTra
         sessionId,
         *sessionInfo.getTxnNumber(),
         {} /* no stmt id at outer level */,
-        OpTime() /* prevOpTime */);
+        /*prevOpTime=*/OpTime());
 
     auto deleteOp = makeOplogEntry(deleteOpTime,
                                    repl::OpTypeEnum::kDelete,
@@ -2069,7 +2068,7 @@ TEST_F(OplogApplierImplTest, ApplySessionDeleteAfterLaterRetryableInternalTransa
         sessionId,
         *sessionInfo.getTxnNumber(),
         {} /* no stmt id at outer level */,
-        OpTime() /* prevOpTime */);
+        /*prevOpTime=*/OpTime());
 
     auto deleteOp = makeOplogEntry(deleteOpTime,
                                    repl::OpTypeEnum::kDelete,
@@ -2136,7 +2135,7 @@ TEST_F(OplogApplierImplTest, ApplyApplyOpsSessionDeleteBeforeEarlierRetryableUpd
                                    collUUID,
                                    update_oplog_entry::makeDeltaOplogEntry(BSON(
                                        doc_diff::kUpdateSectionFieldName << fromjson("{a: 1}"))),
-                                   BSON("_id" << 0) /* o2 */,
+                                   /*o2=*/BSON("_id" << 0),
                                    boost::none, /* fromMigrate*/
                                    sessionInfo,
                                    RetryImageEnum::kPreImage);
@@ -2203,7 +2202,7 @@ TEST_F(OplogApplierImplTest, ApplyApplyOpsSessionDeleteAfterLaterRetryableUpdate
                                    collUUID,
                                    update_oplog_entry::makeDeltaOplogEntry(BSON(
                                        doc_diff::kUpdateSectionFieldName << fromjson("{a: 1}"))),
-                                   BSON("_id" << 0) /* o2 */,
+                                   /*o2=*/BSON("_id" << 0),
                                    boost::none, /* fromMigrate*/
                                    sessionInfo,
                                    RetryImageEnum::kPreImage);
@@ -3119,10 +3118,10 @@ TEST_F(RetryableAtomicBatchBoundaryTest, SingleEntryBatchLinkedToPreviousStateme
     auto stmt1 = makeAtomicBatchEntry(Timestamp(Seconds(1), 2),
                                       _nss1,
                                       *_uuid1,
-                                      1 /* docId */,
+                                      /*docId=*/1,
                                       {StmtId(1)},
                                       neverWritten,
-                                      false /* partial */);
+                                      /*partial=*/false);
 
     NoopOplogApplierObserver observer;
     auto oplogApplier = makeApplier(&observer);
@@ -3144,17 +3143,17 @@ TEST_F(RetryableAtomicBatchBoundaryTest, MultiEntryBatchDoesNotWalkIntoTruncated
     auto stmt1First = makeAtomicBatchEntry(Timestamp(Seconds(1), 2),
                                            _nss1,
                                            *_uuid1,
-                                           1 /* docId */,
+                                           /*docId=*/1,
                                            {StmtId(1)},
                                            truncatedPrevStatement /* link to a gone statement */,
-                                           true /* partial */);
+                                           /*partial=*/true);
     auto stmt1Terminal = makeAtomicBatchEntry(Timestamp(Seconds(1), 3),
                                               _nss2,
                                               *_uuid2,
-                                              2 /* docId */,
+                                              /*docId=*/2,
                                               {} /* stmtId op sits in the first entry */,
                                               stmt1First.getOpTime(),
-                                              false /* partial */,
+                                              /*partial=*/false,
                                               2 /* count: two ops across the batch */);
 
     NoopOplogApplierObserver observer;
@@ -5619,9 +5618,9 @@ TEST_F(IdempotencyTest, CollModNamespaceNotFound) {
     auto indexChange = fromjson("{keyPattern: {createdAt:1}, expireAfterSeconds:4000}");
     auto collModCmd = BSON("collMod" << _nss.coll() << "index" << indexChange);
     auto collModOp =
-        makeCommandOplogEntry(nextOpTime(), _nss, collModCmd, boost::none /* object2 */, kUuid);
+        makeCommandOplogEntry(nextOpTime(), _nss, collModCmd, /*object2=*/boost::none, kUuid);
     auto dropCollOp = makeCommandOplogEntry(
-        nextOpTime(), _nss, BSON("drop" << _nss.coll()), boost::none /* object2 */, kUuid);
+        nextOpTime(), _nss, BSON("drop" << _nss.coll()), /*object2=*/boost::none, kUuid);
 
     auto ops = {collModOp, dropCollOp};
     testOpsAreIdempotent(ops);
@@ -5638,7 +5637,7 @@ TEST_F(IdempotencyTest, CollModIndexNotFound) {
     auto indexChange = fromjson("{keyPattern: {createdAt:1}, expireAfterSeconds:4000}");
     auto collModCmd = BSON("collMod" << _nss.coll() << "index" << indexChange);
     auto collModOp =
-        makeCommandOplogEntry(nextOpTime(), _nss, collModCmd, boost::none /* object2 */, kUuid);
+        makeCommandOplogEntry(nextOpTime(), _nss, collModCmd, /*object2=*/boost::none, kUuid);
     auto dropIndexOp = dropIndex("createdAt_index", kUuid);
 
     auto ops = {collModOp, dropIndexOp};
@@ -6487,8 +6486,8 @@ TEST_F(IdempotencyTestDisableSteadyStateConstraints, AcceptableErrorsRecordedInS
     auto collModCmd = BSON("collMod" << _nss.coll());
 
     // Create a "collMod" oplog entry.
-    auto collModOp = makeCommandOplogEntry(
-        nextOpTime(), _nss, collModCmd, boost::none /* object2 */, UUID::gen());
+    auto collModOp =
+        makeCommandOplogEntry(nextOpTime(), _nss, collModCmd, /*object2=*/boost::none, UUID::gen());
 
     // Ensure that NamespaceNotFound is "acceptable" but counted.
     int prevAcceptableError = replOpCounters().acceptableErrorsInCommand->value();
@@ -6511,8 +6510,8 @@ TEST_F(IdempotencyTestEnableSteadyStateConstraints,
     auto collModCmd = BSON("collMod" << _nss.coll());
 
     // Create a "collMod" oplog entry.
-    auto collModOp = makeCommandOplogEntry(
-        nextOpTime(), _nss, collModCmd, boost::none /* object2 */, UUID::gen());
+    auto collModOp =
+        makeCommandOplogEntry(nextOpTime(), _nss, collModCmd, /*object2=*/boost::none, UUID::gen());
 
     // Ensure that NamespaceNotFound is returned.
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, runOpSteadyState(collModOp));
@@ -8060,7 +8059,7 @@ TEST_F(ContainerOpWriterVectorTest, PackedContainerOpsNestedInApplyOpsAreExpande
                                               {},
                                               Date_t::now(),
                                               {},
-                                              boost::none /* prevWriteOpTimeInTransaction */),
+                                              /*prevWriteOpTimeInTransaction=*/boost::none),
                        MultiOplogEntryType::kApplyOpsAppliedSeparately)};
 
     std::vector<std::vector<ApplierOperation>> writerVectors(
@@ -8095,7 +8094,7 @@ TEST_F(ContainerOpWriterVectorTest, SingleElementKeyArrayInApplyOpsIsStillExpand
                                               {},
                                               Date_t::now(),
                                               {},
-                                              boost::none /* prevWriteOpTimeInTransaction */),
+                                              /*prevWriteOpTimeInTransaction=*/boost::none),
                        MultiOplogEntryType::kApplyOpsAppliedSeparately)};
 
     std::vector<std::vector<ApplierOperation>> writerVectors(

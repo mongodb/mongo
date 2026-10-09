@@ -185,11 +185,11 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatch) {
          BulkWriteDeleteOp(1, BSON("a" << 2))},
         {
             getNamespaceInfoEntry(
-                nss0, boost::none /* shardVersion */, boost::none /* databaseVersion */, uuid0),
+                nss0, /*shardVersion=*/boost::none, /*databaseVersion=*/boost::none, uuid0),
             getNamespaceInfoEntry(
-                nss1, boost::none /* shardVersion */, boost::none /* databaseVersion */, uuid1),
+                nss1, /*shardVersion=*/boost::none, /*databaseVersion=*/boost::none, uuid1),
             getNamespaceInfoEntry(
-                nss2, boost::none /* shardVersion */, boost::none /* databaseVersion */, uuid2),
+                nss2, /*shardVersion=*/boost::none, /*databaseVersion=*/boost::none, uuid2),
         });
     WriteCommandRef cmdRef(bulkRequest);
 
@@ -334,9 +334,9 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatchSpecifiedWriteOptions) {
                                },
                                {
                                    getNamespaceInfoEntry(nss1,
-                                                         boost::none /* shardVersion */,
+                                                         /*shardVersion=*/boost::none,
                                                          nss1DbVersion,
-                                                         boost::none /* collectionUUID */,
+                                                         /*collectionUUID=*/boost::none,
                                                          nss1IsViewfulTimeseries),
                                },
                                lsid,
@@ -409,9 +409,9 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatchBulkOpOptions) {
             },
             {
                 getNamespaceInfoEntry(nss1,
-                                      boost::none /* shardVersion */,
+                                      /*shardVersion=*/boost::none,
                                       nss1DbVersion,
-                                      boost::none /* collectionUUID */,
+                                      /*collectionUUID=*/boost::none,
                                       nss1IsViewfulTimeseries),
             },
             lsid,
@@ -473,9 +473,9 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatchSetsStmtIds) {
             },
             {
                 getNamespaceInfoEntry(nss1,
-                                      boost::none /* shardVersion */,
+                                      /*shardVersion=*/boost::none,
                                       nss1DbVersion,
-                                      boost::none /* collectionUUID */,
+                                      /*collectionUUID=*/boost::none,
                                       nss1IsViewfulTimeseries),
             },
             lsid,

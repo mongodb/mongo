@@ -34,7 +34,7 @@ std::shared_ptr<OplogTruncateMarkers> OplogTruncateMarkers::createEmptyOplogTrun
         0,
         Microseconds{0},
         CollectionTruncateMarkers::MarkersCreationMethod::InProgress,
-        false /* initialSamplingFinished */,
+        /*initialSamplingFinished=*/false,
         *rs.oplog());
 }
 

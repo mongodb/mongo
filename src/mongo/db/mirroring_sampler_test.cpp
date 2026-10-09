@@ -178,7 +178,7 @@ TEST_F(MirroringSamplerFixture, SamplerFunctionGeneralMirror) {
         0.01, 0.02, 0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90};
     for (auto secondaryQ : secondariesCount) {
         // Set number of secondaries
-        init(true /* isPrimary */, secondaryQ);
+        init(/*isPrimary=*/true, secondaryQ);
         auto hello = getHello();
 
         for (auto ratio : ratios) {
@@ -214,7 +214,7 @@ TEST_F(MirroringSamplerFixture, GeneralMirrorAll) {
     std::vector<size_t> secondariesCount = {1, 2, 3, 4, 5, 6, 7};
     for (auto secondaryQ : secondariesCount) {
         // Set number of secondaries
-        init(true /* isPrimary */, secondaryQ);
+        init(/*isPrimary=*/true, secondaryQ);
         auto hello = getHello();
 
         for (size_t i = 0; i < repeats; i++) {

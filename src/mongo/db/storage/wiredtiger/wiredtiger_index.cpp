@@ -403,7 +403,7 @@ boost::optional<SortedDataInterface::DuplicateKey> WiredTigerIndex::dupKeyCheck(
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);
     // Allow overwrite because it's faster and this is a read-only cursor.
     auto cursorParams =
-        getWiredTigerCursorParams(wtRu, _container.tableId(), true /* allowOverwrite */);
+        getWiredTigerCursorParams(wtRu, _container.tableId(), /*allowOverwrite=*/true);
     WiredTigerCursor curwrap(std::move(cursorParams), _container.uri(), *wtRu.getSession());
     WT_CURSOR* c = curwrap.get();
 
@@ -838,7 +838,7 @@ public:
           _key(idx.getKeyStringVersion()) {
         auto& wtRu = WiredTigerRecoveryUnit::get(ru);
         // Allow overwrite because it's faster and this is a read-only cursor.
-        auto cursorParams = getWiredTigerCursorParams(wtRu, _tableId, true /* allowOverwrite */);
+        auto cursorParams = getWiredTigerCursorParams(wtRu, _tableId, /*allowOverwrite=*/true);
         _cursor.emplace(std::move(cursorParams), _uri, *wtRu.getSession());
     }
 
@@ -953,8 +953,7 @@ public:
         auto& wtRu = WiredTigerRecoveryUnit::get(ru);
         if (!_cursor) {
             // Allow overwrite because it's faster and this is a read-only cursor.
-            auto cursorParams =
-                getWiredTigerCursorParams(wtRu, _tableId, true /* allowOverwrite */);
+            auto cursorParams = getWiredTigerCursorParams(wtRu, _tableId, /*allowOverwrite=*/true);
             _cursor.emplace(std::move(cursorParams), _uri, *wtRu.getSession());
         }
 
@@ -1474,7 +1473,7 @@ boost::optional<RecordId> WiredTigerIdIndex::findLoc(OperationContext* opCtx,
     // RecordId is stored in the WT value, not the key.
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);
     auto cursorParams =
-        getWiredTigerCursorParams(wtRu, _container.tableId(), true /* allowOverwrite */);
+        getWiredTigerCursorParams(wtRu, _container.tableId(), /*allowOverwrite=*/true);
     WiredTigerCursor curwrap(std::move(cursorParams), _container.uri(), *wtRu.getSession());
     wtRu.assertInActiveTxn();
     WT_CURSOR* c = curwrap.get();

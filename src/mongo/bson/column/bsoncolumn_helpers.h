@@ -461,7 +461,7 @@ public:
         return decompressAllMissing(ptr,
                                     end,
                                     buffer,
-                                    simple8b::kSingleZero /* lastNonRLEBlock */,
+                                    /*lastNonRLEBlock=*/simple8b::kSingleZero,
                                     [](size_t count, uint64_t lastNonRLEBlock) {});
     }
 
@@ -531,7 +531,7 @@ public:
         return decompressAllLiteral<Encoding>(ptr,
                                               end,
                                               buffer,
-                                              simple8b::kSingleZero /* lastNonRLEBlock */,
+                                              /*lastNonRLEBlock=*/simple8b::kSingleZero,
                                               [](size_t count, uint64_t lastNonRLEBlock) {});
     }
 
@@ -924,7 +924,7 @@ namespace internal {
  */
 template <class Path>
 bool isRootPath(Path& path) {
-    return !path.elementsToMaterialize(BSONObj{}, /*traverseArrays*/ true).empty();
+    return !path.elementsToMaterialize(BSONObj{}, /*traverseArrays=*/true).empty();
 }
 }  // namespace internal
 }  // namespace mongo::bsoncolumn

@@ -102,7 +102,7 @@ public:
                                  Timestamp atClusterTime,
                                  const stdx::unordered_set<ShardId>& shardIds) override {
         auto openedCursors =
-            openCursors(opCtx, atClusterTime, shardIds, false /* isConfigServer */, [&]() {
+            openCursors(opCtx, atClusterTime, shardIds, /*isConfigServer=*/false, [&]() {
                 // Build the change stream pipeline command to be run on the data shards.
                 // '_originalAggregateCommand' already contains the relevant match expressions
                 // for the oplog.
@@ -146,7 +146,7 @@ public:
                     expCtx->getNamespaceString(),
                     ReadPreferenceSetting::get(opCtx),
                     remotes,
-                    false /* allowPartialResults */);
+                    /*allowPartialResults=*/false);
             });
 
         tassert(12013801,
@@ -167,7 +167,7 @@ public:
 
         const auto shardId = getConfigShardId(opCtx);
         auto openedCursors =
-            openCursors(opCtx, atClusterTime, {shardId}, true /* isConfigServer */, [&]() {
+            openCursors(opCtx, atClusterTime, {shardId}, /*isConfigServer=*/true, [&]() {
                 // The change stream on the config server will be opened as a change stream on the
                 // "admin" namespace.
                 const NamespaceString nss = buildNamespaceForConfigServerPipeline();
@@ -206,7 +206,7 @@ public:
                     aggReq.getNamespace(),
                     ReadPreferenceSetting{ReadPreference::SecondaryPreferred},
                     {{shardId, aggReq.toBSON()}},
-                    false /* allowPartialResults */);
+                    /*allowPartialResults=*/false);
             });
 
         tassert(12013800,
@@ -218,7 +218,7 @@ public:
     }
 
     void closeCursorsOnDataShards(const stdx::unordered_set<ShardId>& shardIds) override {
-        closeCursors(shardIds, false /* isConfigServer */);
+        closeCursors(shardIds, /*isConfigServer=*/false);
 
         for (const auto& shardId : shardIds) {
             _currentlyTargetedDataShards.erase(shardId);
@@ -229,7 +229,7 @@ public:
         tassert(12013802,
                 "expected to have a cursor open on the config server when closing it",
                 _hasOpenConfigServerCursor);
-        closeCursors({getConfigShardId(opCtx)}, true /* isConfigServer */);
+        closeCursors({getConfigShardId(opCtx)}, /*isConfigServer=*/true);
         _hasOpenConfigServerCursor = false;
     }
 
@@ -470,7 +470,7 @@ public:
     void openCursorsOnDataShards(Timestamp atClusterTime,
                                  const stdx::unordered_set<ShardId>& shardSet) override {
         if (!shardSet.empty()) {
-            _bufferedRequests.validateStateForDataShardsAction(shardSet, true /* isOpen */);
+            _bufferedRequests.validateStateForDataShardsAction(shardSet, /*isOpen=*/true);
             _bufferedRequests.openCursorsOnDataShards.emplace(
                 std::make_pair(atClusterTime, shardSet));
         }
@@ -486,7 +486,7 @@ public:
      */
     void closeCursorsOnDataShards(const stdx::unordered_set<ShardId>& shardSet) override {
         if (!shardSet.empty()) {
-            _bufferedRequests.validateStateForDataShardsAction(shardSet, false /* isOpen */);
+            _bufferedRequests.validateStateForDataShardsAction(shardSet, /*isOpen=*/false);
             _bufferedRequests.closeCursorsOnDataShards.emplace(shardSet);
         }
     }
@@ -498,7 +498,7 @@ public:
      * - no previous call to "openCursorOnConfigServer()" has been made in the same context.
      */
     void openCursorOnConfigServer(Timestamp atClusterTime) override {
-        _bufferedRequests.validateStateForConfigServerAction(true /* isOpen */);
+        _bufferedRequests.validateStateForConfigServerAction(/*isOpen=*/true);
         _bufferedRequests.openCursorOnConfigServer.emplace(atClusterTime);
     }
 
@@ -509,7 +509,7 @@ public:
      * - no previous call to "closeCursorOnConfigServer()" has been made in the same context.
      */
     void closeCursorOnConfigServer() override {
-        _bufferedRequests.validateStateForConfigServerAction(false /* isOpen */);
+        _bufferedRequests.validateStateForConfigServerAction(/*isOpen=*/false);
         _bufferedRequests.closeCursorOnConfigServer = true;
     }
 
@@ -1311,7 +1311,7 @@ ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingInitialization() {
     V2StageReaderContext readerContext(getContext(),
                                        getContext()->getOperationContext(),
                                        *_params->cursorManager,
-                                       false /* degradedMode */);
+                                       /*degradedMode=*/false);
 
     auto shardTargeterDecision = _shardTargeter->initialize(
         getContext()->getOperationContext(), _params->resumeToken.clusterTime, readerContext);
@@ -1354,7 +1354,7 @@ ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingGettingChangeEvent(
     V2StageReaderContext readerContext(getContext(),
                                        getContext()->getOperationContext(),
                                        *_params->cursorManager,
-                                       false /* degradedMode */);
+                                       /*degradedMode=*/false);
 
     auto shardTargeterDecision = _shardTargeter->handleEvent(
         getContext()->getOperationContext(), input.getDocument(), readerContext);
@@ -1400,7 +1400,7 @@ ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingStartingChangeStrea
     V2StageReaderContext readerContext(getContext(),
                                        getContext()->getOperationContext(),
                                        *_params->cursorManager,
-                                       true /* degradedMode */);
+                                       /*degradedMode=*/true);
 
     auto [shardTargeterDecision, segmentEndTimestamp] = _shardTargeter->startChangeStreamSegment(
         getContext()->getOperationContext(), *_segmentStartTimestamp, readerContext);
@@ -1507,7 +1507,7 @@ ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingNormalGettingChange
     V2StageReaderContext readerContext(getContext(),
                                        getContext()->getOperationContext(),
                                        *_params->cursorManager,
-                                       false /* degradedMode */);
+                                       /*degradedMode=*/false);
 
     auto shardTargeterDecision = _shardTargeter->handleEvent(
         getContext()->getOperationContext(), input.getDocument(), readerContext);
@@ -1658,7 +1658,7 @@ ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingDegradedGettingChan
     V2StageReaderContext readerContext(getContext(),
                                        getContext()->getOperationContext(),
                                        *_params->cursorManager,
-                                       true /* degradedMode */);
+                                       /*degradedMode=*/true);
 
     auto shardTargeterDecision = _shardTargeter->handleEvent(
         getContext()->getOperationContext(), input.getDocument(), readerContext);

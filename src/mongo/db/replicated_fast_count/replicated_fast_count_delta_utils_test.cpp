@@ -548,7 +548,7 @@ TEST_F(ExtractReplicatedMetadataTest, ExtractSizeCountDeltaForDelete) {
 TEST_F(ExtractCollectionHashTest, ExtractHashForInsert) {
     const int64_t hash = 0x0123456789abcdef;
     const auto insertOp =
-        makeOplogEntryWithSizeMetadata(_nss1, repl::OpTypeEnum::kInsert, 400 /* sizeDelta */, hash);
+        makeOplogEntryWithSizeMetadata(_nss1, repl::OpTypeEnum::kInsert, /*sizeDelta=*/400, hash);
     const auto extractedSizeCount = extractReplicatedMetadataForOp(insertOp);
     ASSERT(extractedSizeCount.has_value());
 
@@ -560,7 +560,7 @@ TEST_F(ExtractCollectionHashTest, ExtractHashForUpdate) {
     // surfaced unchanged.
     const int64_t hash = 0x0123456789abcdef;
     const auto updateOp =
-        makeOplogEntryWithSizeMetadata(_nss1, repl::OpTypeEnum::kUpdate, 400 /* sizeDelta */, hash);
+        makeOplogEntryWithSizeMetadata(_nss1, repl::OpTypeEnum::kUpdate, /*sizeDelta=*/400, hash);
     const auto extractedSizeCount = extractReplicatedMetadataForOp(updateOp);
     ASSERT(extractedSizeCount.has_value());
 
@@ -572,7 +572,7 @@ TEST_F(ExtractCollectionHashTest, ExtractHashForDelete) {
     // contribution, so it is surfaced unchanged as well.
     const int64_t hash = 0x0123456789abcdef;
     const auto deleteOp =
-        makeOplogEntryWithSizeMetadata(_nss1, repl::OpTypeEnum::kDelete, 400 /* sizeDelta */, hash);
+        makeOplogEntryWithSizeMetadata(_nss1, repl::OpTypeEnum::kDelete, /*sizeDelta=*/400, hash);
     const auto extractedSizeCount = extractReplicatedMetadataForOp(deleteOp);
     ASSERT(extractedSizeCount.has_value());
 
@@ -690,7 +690,7 @@ TEST_F(ExtractReplicatedMetadataTest, NoSizeCountDeltaWhenAbsentAndIncompatibleO
 
 TEST_F(ExtractReplicatedMetadataTest, ExtractSizeCountDeltaOnUnsupportedOpType) {
     const auto oplogEntry =
-        makeOplogEntryWithSizeMetadata(_nss1, repl::OpTypeEnum::kNoop, 400 /* sizeDelta */);
+        makeOplogEntryWithSizeMetadata(_nss1, repl::OpTypeEnum::kNoop, /*sizeDelta=*/400);
 
     // Size metadata is only supported for 'insert', 'delete', and 'update' operations. All other
     // operations are incompatible with a top-level 'm' field.
@@ -703,7 +703,7 @@ TEST_F(ExtractReplicatedMetadataTest, ExtractSizeCountDeltaOnNonEligibleNss) {
     EXPECT_FALSE(isReplicatedFastCountEligible(localNss));
 
     const auto oplogEntry =
-        makeOplogEntryWithSizeMetadata(localNss, repl::OpTypeEnum::kNoop, 400 /* sizeDelta */);
+        makeOplogEntryWithSizeMetadata(localNss, repl::OpTypeEnum::kNoop, /*sizeDelta=*/400);
 
     // Even though the oplog entry carries size metadata, ineligible namespaces should be skipped.
     EXPECT_FALSE(extractReplicatedMetadataForOp(oplogEntry).has_value());
@@ -2204,8 +2204,8 @@ TEST_F(AggregateSizeCountFromOplogTxnVisibilityTest, PreparedTxnBasicVisibilityN
     std::list<repl::OplogEntry> entries{
         makeApplyOpsOplogEntry(
             ts2,
-            {{collA, repl::OpTypeEnum::kInsert, /*sizeDelta*/ 50, /*includeSizeMetadata=*/true},
-             {collB, repl::OpTypeEnum::kInsert, /*sizeDelta*/ 25, /*includeSizeMetadata=*/true}},
+            {{collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/50, /*includeSizeMetadata=*/true},
+             {collB, repl::OpTypeEnum::kInsert, /*sizeDelta=*/25, /*includeSizeMetadata=*/true}},
             ApplyOpsTxnFields{.prepared = true}),
     };
     OplogCursorMock oplogCursor(std::move(entries));
@@ -2232,11 +2232,11 @@ TEST_F(AggregateSizeCountFromOplogTxnVisibilityTest, PreparedTxnBasicVisibilityW
         makeApplyOpsOplogEntry(ts1,
                                {{collA,
                                  repl::OpTypeEnum::kInsert,
-                                 /*sizeDelta*/ 50,
+                                 /*sizeDelta=*/50,
                                  /*includeSizeMetadata=*/true},
                                 {collB,
                                  repl::OpTypeEnum::kInsert,
-                                 /*sizeDelta*/ 25,
+                                 /*sizeDelta=*/25,
                                  /*includeSizeMetadata=*/true}},
                                ApplyOpsTxnFields{.prepared = true, .prevOpTime = repl::OpTime{}}),
         makeCommitTxnOplogEntry(ts2, {metaA, metaB}, opTimeAt(ts1)),

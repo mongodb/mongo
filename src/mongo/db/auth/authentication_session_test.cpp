@@ -104,7 +104,7 @@ TEST_F(AuthenticationSessionTestFixture, TestSaslSupportedMechsFollowedBySaslSup
     authenticationSessionTestHelper(opCtx.get(),
                                     AuthenticationSession::StepType::kSaslSupportedMechanisms,
                                     AuthenticationSession::StepType::kSaslSupportedMechanisms,
-                                    true /* secondStepShouldCauseOverride */);
+                                    /*secondStepShouldCauseOverride=*/true);
 }
 
 TEST_F(AuthenticationSessionTestFixture, TestSaslSupportedMechsFollowedByAuth) {
@@ -125,8 +125,8 @@ TEST_F(AuthenticationSessionTestFixture, TestSaslSupportedMechsFollowedBySaslCon
     authenticationSessionTestHelper(opCtx.get(),
                                     AuthenticationSession::StepType::kSaslSupportedMechanisms,
                                     AuthenticationSession::StepType::kSaslContinue,
-                                    false /* secondStepShouldCauseOverride */,
-                                    true /* secondStepShouldThrowException */);
+                                    /*secondStepShouldCauseOverride=*/false,
+                                    /*secondStepShouldThrowException=*/true);
 }
 
 TEST_F(AuthenticationSessionTestFixture, TestSaslSupportedMechsFollowedBySpecAuth) {
@@ -145,21 +145,21 @@ TEST_F(AuthenticationSessionTestFixture, TestAuthFollowedBySaslSupportedMechs) {
     authenticationSessionTestHelper(opCtx.get(),
                                     AuthenticationSession::StepType::kAuthenticate,
                                     AuthenticationSession::StepType::kSaslSupportedMechanisms,
-                                    true /* secondStepShouldCauseOverride */);
+                                    /*secondStepShouldCauseOverride=*/true);
 }
 
 TEST_F(AuthenticationSessionTestFixture, TestAuthFollowedByAuth) {
     authenticationSessionTestHelper(opCtx.get(),
                                     AuthenticationSession::StepType::kAuthenticate,
                                     AuthenticationSession::StepType::kAuthenticate,
-                                    true /* secondStepShouldCauseOverride */);
+                                    /*secondStepShouldCauseOverride=*/true);
 }
 
 TEST_F(AuthenticationSessionTestFixture, TestAuthFollowedBySaslStart) {
     authenticationSessionTestHelper(opCtx.get(),
                                     AuthenticationSession::StepType::kAuthenticate,
                                     AuthenticationSession::StepType::kSaslStart,
-                                    true /* secondStepShouldCauseOverride */);
+                                    /*secondStepShouldCauseOverride=*/true);
 }
 
 TEST_F(AuthenticationSessionTestFixture, TestAuthFollowedBySaslContinue) {
@@ -168,43 +168,43 @@ TEST_F(AuthenticationSessionTestFixture, TestAuthFollowedBySaslContinue) {
     authenticationSessionTestHelper(opCtx.get(),
                                     AuthenticationSession::StepType::kAuthenticate,
                                     AuthenticationSession::StepType::kSaslContinue,
-                                    false /* secondStepShouldCauseOverride */,
-                                    true /* secondStepShouldThrowException */);
+                                    /*secondStepShouldCauseOverride=*/false,
+                                    /*secondStepShouldThrowException=*/true);
 }
 
 TEST_F(AuthenticationSessionTestFixture, TestAuthFollowedBySpecAuth) {
     authenticationSessionTestHelper(opCtx.get(),
                                     AuthenticationSession::StepType::kAuthenticate,
                                     AuthenticationSession::StepType::kSpeculativeAuthenticate,
-                                    true /* secondStepShouldCauseOverride */);
+                                    /*secondStepShouldCauseOverride=*/true);
 }
 
 TEST_F(AuthenticationSessionTestFixture, TestAuthFollowedBySpecSaslStart) {
     authenticationSessionTestHelper(opCtx.get(),
                                     AuthenticationSession::StepType::kAuthenticate,
                                     AuthenticationSession::StepType::kSpeculativeSaslStart,
-                                    true /* secondStepShouldCauseOverride */);
+                                    /*secondStepShouldCauseOverride=*/true);
 }
 
 TEST_F(AuthenticationSessionTestFixture, TestSaslStartFollowedBySaslSupportedMechs) {
     authenticationSessionTestHelper(opCtx.get(),
                                     AuthenticationSession::StepType::kSaslStart,
                                     AuthenticationSession::StepType::kSaslSupportedMechanisms,
-                                    true /* secondStepShouldCauseOverride */);
+                                    /*secondStepShouldCauseOverride=*/true);
 }
 
 TEST_F(AuthenticationSessionTestFixture, TestSaslStartFollowedByAuth) {
     authenticationSessionTestHelper(opCtx.get(),
                                     AuthenticationSession::StepType::kSaslStart,
                                     AuthenticationSession::StepType::kAuthenticate,
-                                    true /* secondStepShouldCauseOverride */);
+                                    /*secondStepShouldCauseOverride=*/true);
 }
 
 TEST_F(AuthenticationSessionTestFixture, TestSaslStartFollowedBySaslStart) {
     authenticationSessionTestHelper(opCtx.get(),
                                     AuthenticationSession::StepType::kSaslStart,
                                     AuthenticationSession::StepType::kSaslStart,
-                                    true /* secondStepShouldCauseOverride */);
+                                    /*secondStepShouldCauseOverride=*/true);
 }
 
 TEST_F(AuthenticationSessionTestFixture, TestSaslStartFollowedBySaslContinue) {
@@ -217,14 +217,14 @@ TEST_F(AuthenticationSessionTestFixture, TestSaslStartFollowedBySpecAuth) {
     authenticationSessionTestHelper(opCtx.get(),
                                     AuthenticationSession::StepType::kSaslStart,
                                     AuthenticationSession::StepType::kSpeculativeAuthenticate,
-                                    true /* secondStepShouldCauseOverride */);
+                                    /*secondStepShouldCauseOverride=*/true);
 }
 
 TEST_F(AuthenticationSessionTestFixture, TestSaslStartFollowedBySpecSaslStart) {
     authenticationSessionTestHelper(opCtx.get(),
                                     AuthenticationSession::StepType::kSaslStart,
                                     AuthenticationSession::StepType::kSpeculativeSaslStart,
-                                    true /* secondStepShouldCauseOverride */);
+                                    /*secondStepShouldCauseOverride=*/true);
 }
 
 TEST_F(AuthenticationSessionTestFixture, TestSaslContinueFollowedBySaslSupportedMechs) {
@@ -234,7 +234,7 @@ TEST_F(AuthenticationSessionTestFixture, TestSaslContinueFollowedBySaslSupported
     authenticationSessionTestHelper(opCtx.get(),
                                     AuthenticationSession::StepType::kSaslContinue,
                                     AuthenticationSession::StepType::kSaslSupportedMechanisms,
-                                    true /* secondStepShouldCauseOverride */);
+                                    /*secondStepShouldCauseOverride=*/true);
 }
 
 TEST_F(AuthenticationSessionTestFixture, TestSaslContinueFollowedByAuth) {
@@ -244,7 +244,7 @@ TEST_F(AuthenticationSessionTestFixture, TestSaslContinueFollowedByAuth) {
     authenticationSessionTestHelper(opCtx.get(),
                                     AuthenticationSession::StepType::kSaslContinue,
                                     AuthenticationSession::StepType::kAuthenticate,
-                                    true /* secondStepShouldCauseOverride */);
+                                    /*secondStepShouldCauseOverride=*/true);
 }
 
 TEST_F(AuthenticationSessionTestFixture, TestSaslContinueFollowedBySaslStart) {
@@ -254,7 +254,7 @@ TEST_F(AuthenticationSessionTestFixture, TestSaslContinueFollowedBySaslStart) {
     authenticationSessionTestHelper(opCtx.get(),
                                     AuthenticationSession::StepType::kSaslContinue,
                                     AuthenticationSession::StepType::kSaslStart,
-                                    true /* secondStepShouldCauseOverride */);
+                                    /*secondStepShouldCauseOverride=*/true);
 }
 
 TEST_F(AuthenticationSessionTestFixture, TestSaslContinueFollowedBySaslContinue) {
@@ -273,7 +273,7 @@ TEST_F(AuthenticationSessionTestFixture, TestSaslContinueFollowedBySpecAuth) {
     authenticationSessionTestHelper(opCtx.get(),
                                     AuthenticationSession::StepType::kSaslContinue,
                                     AuthenticationSession::StepType::kSpeculativeAuthenticate,
-                                    true /* secondStepShouldCauseOverride */);
+                                    /*secondStepShouldCauseOverride=*/true);
 }
 
 TEST_F(AuthenticationSessionTestFixture, TestSaslContinueFollowedBySpecSaslStart) {
@@ -283,14 +283,14 @@ TEST_F(AuthenticationSessionTestFixture, TestSaslContinueFollowedBySpecSaslStart
     authenticationSessionTestHelper(opCtx.get(),
                                     AuthenticationSession::StepType::kSaslContinue,
                                     AuthenticationSession::StepType::kSpeculativeSaslStart,
-                                    true /* secondStepShouldCauseOverride */);
+                                    /*secondStepShouldCauseOverride=*/true);
 }
 
 TEST_F(AuthenticationSessionTestFixture, TestSpecAuthFollowedBySaslSupportedMechs) {
     authenticationSessionTestHelper(opCtx.get(),
                                     AuthenticationSession::StepType::kSpeculativeAuthenticate,
                                     AuthenticationSession::StepType::kSaslSupportedMechanisms,
-                                    true /* secondStepShouldCauseOverride */);
+                                    /*secondStepShouldCauseOverride=*/true);
 }
 
 TEST_F(AuthenticationSessionTestFixture, TestSpecAuthFollowedByAuth) {
@@ -311,29 +311,29 @@ TEST_F(AuthenticationSessionTestFixture, TestSpecAuthFollowedBySaslContinue) {
     authenticationSessionTestHelper(opCtx.get(),
                                     AuthenticationSession::StepType::kSpeculativeAuthenticate,
                                     AuthenticationSession::StepType::kSaslContinue,
-                                    false /* secondStepShouldCauseOverride */,
-                                    true /* secondStepShouldThrowException */);
+                                    /*secondStepShouldCauseOverride=*/false,
+                                    /*secondStepShouldThrowException=*/true);
 }
 
 TEST_F(AuthenticationSessionTestFixture, TestSpecAuthFollowedBySpecAuth) {
     authenticationSessionTestHelper(opCtx.get(),
                                     AuthenticationSession::StepType::kSpeculativeAuthenticate,
                                     AuthenticationSession::StepType::kSpeculativeAuthenticate,
-                                    true /* secondStepShouldCauseOverride */);
+                                    /*secondStepShouldCauseOverride=*/true);
 }
 
 TEST_F(AuthenticationSessionTestFixture, TestSpecAuthFollowedBySpecSaslStart) {
     authenticationSessionTestHelper(opCtx.get(),
                                     AuthenticationSession::StepType::kSpeculativeAuthenticate,
                                     AuthenticationSession::StepType::kSpeculativeSaslStart,
-                                    true /* secondStepShouldCauseOverride */);
+                                    /*secondStepShouldCauseOverride=*/true);
 }
 
 TEST_F(AuthenticationSessionTestFixture, TestSpecSaslStartFollowedBySaslSupportedMechs) {
     authenticationSessionTestHelper(opCtx.get(),
                                     AuthenticationSession::StepType::kSpeculativeSaslStart,
                                     AuthenticationSession::StepType::kSaslSupportedMechanisms,
-                                    true /* secondStepShouldCauseOverride */);
+                                    /*secondStepShouldCauseOverride=*/true);
 }
 
 TEST_F(AuthenticationSessionTestFixture, TestSpecSaslStartFollowedByAuth) {
@@ -354,22 +354,22 @@ TEST_F(AuthenticationSessionTestFixture, TestSpecSaslStartFollowedBySaslContinue
     authenticationSessionTestHelper(opCtx.get(),
                                     AuthenticationSession::StepType::kSpeculativeSaslStart,
                                     AuthenticationSession::StepType::kSaslContinue,
-                                    false /* secondStepShouldCauseOverride */,
-                                    true /* secondStepShouldThrowException */);
+                                    /*secondStepShouldCauseOverride=*/false,
+                                    /*secondStepShouldThrowException=*/true);
 }
 
 TEST_F(AuthenticationSessionTestFixture, TestSpecSaslStartFollowedBySpecAuth) {
     authenticationSessionTestHelper(opCtx.get(),
                                     AuthenticationSession::StepType::kSpeculativeSaslStart,
                                     AuthenticationSession::StepType::kSpeculativeAuthenticate,
-                                    true /* secondStepShouldCauseOverride */);
+                                    /*secondStepShouldCauseOverride=*/true);
 }
 
 TEST_F(AuthenticationSessionTestFixture, TestSpecSaslStartFollowedBySpecSaslStart) {
     authenticationSessionTestHelper(opCtx.get(),
                                     AuthenticationSession::StepType::kSpeculativeSaslStart,
                                     AuthenticationSession::StepType::kSpeculativeSaslStart,
-                                    true /* secondStepShouldCauseOverride */);
+                                    /*secondStepShouldCauseOverride=*/true);
 }
 
 }  // namespace

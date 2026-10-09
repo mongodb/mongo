@@ -28,12 +28,12 @@ IndexEntry createIndexEntry(BSONObj keyPattern, bool unique, bool sparse = false
                       IndexConfig::kLatestIndexVersion,
                       /*mk=*/false,
                       /*mkp=*/{},
-                      {} /*multikeyPathSet*/,
+                      /*multikeyPathSet=*/{},
                       sparse,
                       unique,
                       IndexEntry::Identifier{"ident"},
                       /*io=*/BSONObj(),
-                      nullptr /*wildcardProjection*/);
+                      /*wildcardProjection=*/nullptr);
 }
 
 class ExpressTest : public ServiceContextTest {
@@ -157,7 +157,7 @@ protected:
             }
         }
         ASSERT(bool(entry));
-        return IndexForExpressEquality(std::move(*entry), false /* coversProjection */);
+        return IndexForExpressEquality(std::move(*entry), /*coversProjection=*/false);
     }
 };
 
@@ -178,8 +178,8 @@ TEST_F(ExpressExecutorTest, orphanIndexKeyReturnsEofOnPlainRead) {
                                                       std::move(cq),
                                                       collection,
                                                       index,
-                                                      boost::none /* collectionFilter */,
-                                                      false /* returnOwnedBson */);
+                                                      /*collectionFilter=*/boost::none,
+                                                      /*returnOwnedBson=*/false);
 
     // Bounds only the drain loop, so setup cost cannot eat into it. One seek and one failed fetch
     // is microseconds of work; seconds of headroom covers a loaded sanitizer host.
@@ -337,8 +337,8 @@ TEST_F(ExpressTest, sparseIndexIneligibility) {
     auto cq = canonicalize("{a: 2}");
     QueryPlannerParams params{QueryPlannerParams::ArgsForTest{}};
     params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_SHARD_FILTER;
-    IndexForExpressEquality want{
-        createIndexEntry(BSON("a" << 1), true /* unique */, true /* sparse */), false};
+    IndexForExpressEquality want{createIndexEntry(BSON("a" << 1), /*unique=*/true, /*sparse=*/true),
+                                 false};
     params.mainCollectionInfo.indexes = {
         createIndexEntry(BSON("_id" << 1), true),
         want.index,
@@ -368,7 +368,7 @@ TEST_F(ExpressTest, nonBtreeEligibility) {
     params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_SHARD_FILTER;
     params.mainCollectionInfo.indexes = {
         createIndexEntry(BSON("$**" << 1), true),  // wildcard index is not a btree index type
-        createIndexEntry(BSON("a" << 1), false /* unique */),
+        createIndexEntry(BSON("a" << 1), /*unique=*/false),
     };
     auto ent = getIndexForExpressEquality(*cq, params);
     ASSERT_EQUALS(ent, boost::none);
@@ -379,11 +379,11 @@ TEST_F(ExpressTest, collationMismatchEligibility) {
     auto cq = canonicalize("{a: \"foo\"}");
     QueryPlannerParams params{QueryPlannerParams::ArgsForTest{}};
     params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_SHARD_FILTER;
-    auto revCollatorIdxEnt = createIndexEntry(BSON("a" << 1), true /* unique */);
+    auto revCollatorIdxEnt = createIndexEntry(BSON("a" << 1), /*unique=*/true);
     revCollatorIdxEnt.collator = &revCollator;
 
     params.mainCollectionInfo.indexes = {
-        createIndexEntry(BSON("a" << 1), false /* unique */),
+        createIndexEntry(BSON("a" << 1), /*unique=*/false),
         revCollatorIdxEnt,
     };
     auto ent = getIndexForExpressEquality(*cq, params);
@@ -394,12 +394,12 @@ TEST_F(ExpressTest, partialIndexEligibility) {
     auto cq = canonicalize("{a: 1}");
     QueryPlannerParams params{QueryPlannerParams::ArgsForTest{}};
     params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_SHARD_FILTER;
-    auto partialIdxEnt = createIndexEntry(BSON("a" << 1), true /* unique */);
+    auto partialIdxEnt = createIndexEntry(BSON("a" << 1), /*unique=*/true);
     auto idxExpr = canonicalize("{a: {$exists: true}}");
     partialIdxEnt.filterExpr = idxExpr->getPrimaryMatchExpression();
 
     params.mainCollectionInfo.indexes = {
-        createIndexEntry(BSON("a" << 1), false /* unique */),
+        createIndexEntry(BSON("a" << 1), /*unique=*/false),
         partialIdxEnt,
     };
     auto ent = getIndexForExpressEquality(*cq, params);
@@ -413,7 +413,7 @@ TEST_F(ExpressTest, partialIndexEligibility) {
 }
 
 TEST_F(ExpressTest, coveringIndexEligibilityWithUniqueIndex) {
-    auto cq = canonicalize("{a: 2}", false /*setLimit1*/, "{_id: 0, a: 1, c: 1}");
+    auto cq = canonicalize("{a: 2}", /*setLimit1=*/false, "{_id: 0, a: 1, c: 1}");
     QueryPlannerParams params{QueryPlannerParams::ArgsForTest{}};
     IndexForExpressEquality want{createIndexEntry(BSON("a" << 1 << "b" << 1 << "c" << 1), false),
                                  true};
@@ -430,7 +430,7 @@ TEST_F(ExpressTest, coveringIndexEligibilityWithUniqueIndex) {
 }
 
 TEST_F(ExpressTest, coveringIndexEligibilityWithoutUniqueIndex) {
-    auto cqNoLimit = canonicalize("{a: 2}", false /*setLimit1*/, "{_id: 0, a: 1, c: 1}");
+    auto cqNoLimit = canonicalize("{a: 2}", /*setLimit1=*/false, "{_id: 0, a: 1, c: 1}");
     QueryPlannerParams params{QueryPlannerParams::ArgsForTest{}};
     params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_SHARD_FILTER;
     IndexForExpressEquality want{createIndexEntry(BSON("a" << 1 << "b" << 1 << "c" << 1), false),
@@ -446,7 +446,7 @@ TEST_F(ExpressTest, coveringIndexEligibilityWithoutUniqueIndex) {
     auto ent = getIndexForExpressEquality(*cqNoLimit, params);
     ASSERT_EQUALS(ent, boost::none);
 
-    auto cqLimit = canonicalize("{a: 2}", true /*setLimit1*/, "{_id: 0, a: 1, c: 1}");
+    auto cqLimit = canonicalize("{a: 2}", /*setLimit1=*/true, "{_id: 0, a: 1, c: 1}");
     ent = getIndexForExpressEquality(*cqLimit, params);
     ASSERT_EQUALS(ent, want);
 
@@ -477,7 +477,7 @@ TEST_F(ExpressTest, coveringIndexEligibilityWithCollation) {
     }
 
     {
-        auto cq = canonicalize("{a: 2}", true /*setLimit1*/, "{_id: 0, a: 1, c: 1}");
+        auto cq = canonicalize("{a: 2}", /*setLimit1=*/true, "{_id: 0, a: 1, c: 1}");
         cq->setCollator(std::make_unique<CollatorInterfaceMock>(
             CollatorInterfaceMock::MockType::kReverseString));
 
@@ -487,7 +487,7 @@ TEST_F(ExpressTest, coveringIndexEligibilityWithCollation) {
     }
 
     {
-        auto cq = canonicalize("{a: 2}", true /*setLimit1*/, "{_id: 0, c: 1}");
+        auto cq = canonicalize("{a: 2}", /*setLimit1=*/true, "{_id: 0, c: 1}");
         cq->setCollator(std::make_unique<CollatorInterfaceMock>(
             CollatorInterfaceMock::MockType::kReverseString));
 
@@ -497,7 +497,7 @@ TEST_F(ExpressTest, coveringIndexEligibilityWithCollation) {
     }
 
     {
-        auto cq = canonicalize("{a: 2}", true /*setLimit1*/, "{_id: 0, a: 1}");
+        auto cq = canonicalize("{a: 2}", /*setLimit1=*/true, "{_id: 0, a: 1}");
         cq->setCollator(std::make_unique<CollatorInterfaceMock>(
             CollatorInterfaceMock::MockType::kReverseString));
 
@@ -507,7 +507,7 @@ TEST_F(ExpressTest, coveringIndexEligibilityWithCollation) {
     }
 
     {
-        auto cq = canonicalize("{a: \"abacaba\"}", true /*setLimit1*/, "{_id: 0, a: 1}");
+        auto cq = canonicalize("{a: \"abacaba\"}", /*setLimit1=*/true, "{_id: 0, a: 1}");
         cq->setCollator(std::make_unique<CollatorInterfaceMock>(
             CollatorInterfaceMock::MockType::kReverseString));
 
@@ -531,7 +531,7 @@ TEST_F(ExpressTest, coveringIndexEligibilityWithDuplicateKeys) {
         want.index,
     };
 
-    auto cq = canonicalize("{a: 2}", true /*setLimit1*/, "{_id: 0, a: 1, b: 1}");
+    auto cq = canonicalize("{a: 2}", /*setLimit1=*/true, "{_id: 0, a: 1, b: 1}");
     auto ent = getIndexForExpressEquality(*cq, params);
     ASSERT_EQUALS(ent, want);
 }
@@ -547,7 +547,7 @@ TEST_F(ExpressTest, coveringIndexEligibilityWithWrongKeyOrder) {
         want.index,
     };
 
-    auto cq = canonicalize("{a: 2}", true /*setLimit1*/, "{_id: 0, a: 1, b: 1}");
+    auto cq = canonicalize("{a: 2}", /*setLimit1=*/true, "{_id: 0, a: 1, b: 1}");
     auto ent = getIndexForExpressEquality(*cq, params);
     ASSERT_EQUALS(ent, want);
 }
@@ -556,7 +556,7 @@ TEST_F(ExpressTest, coveringIndexEligibilityWithMultiKey) {
     QueryPlannerParams params{QueryPlannerParams::ArgsForTest{}};
     params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_SHARD_FILTER;
 
-    const auto cq = canonicalize("{a: 2}", true /*setLimit1*/, "{_id: 0, a: 1, c: 1}");
+    const auto cq = canonicalize("{a: 2}", /*setLimit1=*/true, "{_id: 0, a: 1, c: 1}");
 
     {  // Can cover by a default index.
         auto indexEntry = createIndexEntry(BSON("a" << 1 << "b" << 1 << "c" << 1), false);
@@ -589,7 +589,7 @@ TEST_F(ExpressTest, coveringIndexEligibilityWithMultiKey) {
         ASSERT_EQUALS(ent, want);
     }
     {  // Can cover if filter field is multi-key and is not included into the projection.
-        const auto cq = canonicalize("{a: 2}", true /*setLimit1*/, "{_id: 0, c: 1}");
+        const auto cq = canonicalize("{a: 2}", /*setLimit1=*/true, "{_id: 0, c: 1}");
         auto indexEntry = createIndexEntry(BSON("a" << 1 << "b" << 1 << "c" << 1), false);
         indexEntry.multikey = true;
         indexEntry.multikeyPaths = MultikeyPaths{{0U}, {}, {}};
@@ -616,7 +616,7 @@ TEST_F(ExpressTest, coveringIndexEligibilityWithSubFields) {
     QueryPlannerParams params{QueryPlannerParams::ArgsForTest{}};
     params.mainCollectionInfo.options &= ~QueryPlannerParams::INCLUDE_SHARD_FILTER;
 
-    const auto cq = canonicalize("{'a.b': 2}", true /*setLimit1*/, "{_id: 0, c: 1}");
+    const auto cq = canonicalize("{'a.b': 2}", /*setLimit1=*/true, "{_id: 0, c: 1}");
 
     auto indexEntry = createIndexEntry(BSON("a.b" << 1 << "c" << 1), false);
     params.mainCollectionInfo.indexes = {indexEntry};

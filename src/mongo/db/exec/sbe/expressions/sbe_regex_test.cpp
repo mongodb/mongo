@@ -199,7 +199,7 @@ TEST_F(SBERegexTest, RegexFindAllEmptyMatchOnEmptyInput) {
 
     auto expectedArr = value::TagValueOwned::fromRaw(value::makeNewArray());
     auto arrayView = value::getArrayView(expectedArr.value());
-    addMatchResult(arrayView, /*matchStr*/ "", /*idx*/ 0);
+    addMatchResult(arrayView, /*matchStr=*/"", /*idx=*/0);
 
     auto [regexTag, regexVal] = makeNewPcreRegex("a*", "").releaseToRaw();
     auto [inputTag, inputVal] = value::makeNewString("");
@@ -219,7 +219,7 @@ TEST_F(SBERegexTest, RegexFindAllEndAnchorOnNonEmptyInput) {
 
     auto expectedArr = value::TagValueOwned::fromRaw(value::makeNewArray());
     auto arrayView = value::getArrayView(expectedArr.value());
-    addMatchResult(arrayView, /*matchStr*/ "", /*idx*/ 5);
+    addMatchResult(arrayView, /*matchStr=*/"", /*idx=*/5);
 
     auto [regexTag, regexVal] = makeNewPcreRegex("$", "").releaseToRaw();
     auto [inputTag, inputVal] = value::makeNewString("hello");

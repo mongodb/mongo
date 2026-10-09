@@ -85,7 +85,7 @@ void UntrackUnsplittableCollectionCoordinator::_enterCriticalSection(
         nss(),
         _critSecReason,
         ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-        !isAuthoritative /* clearShardCatalogCache */);
+        /*clearShardCatalogCache=*/!isAuthoritative);
     service->promoteRecoverableCriticalSectionToBlockAlsoReads(
         opCtx,
         nss(),
@@ -158,11 +158,11 @@ void UntrackUnsplittableCollectionCoordinator::_commitUntrackCollection(
             **executor,
             token,
             session,
-            true /* fromMigrate */,
-            false /* dropSystemCollections */,
-            !isAuthoritative /* forceLegacyRefresh */,
+            /*fromMigrate=*/true,
+            /*dropSystemCollections=*/false,
+            /*forceLegacyRefresh=*/!isAuthoritative,
             coll.getUuid(),
-            true /* requireCollectionEmpty */);
+            /*requireCollectionEmpty=*/true);
     }
 }
 

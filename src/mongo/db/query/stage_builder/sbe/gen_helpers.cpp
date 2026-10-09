@@ -507,7 +507,7 @@ SbExpr generateSortTraverse(boost::optional<SbVar> inputVar,
     binds.emplace_back(b.makeFunction(sbe::EFn::kTraverseP,
                                       var.clone(),
                                       std::move(lambdaExpr),
-                                      b.makeInt32Constant(1) /* maxDepth */));
+                                      /*maxDepth=*/b.makeInt32Constant(1)));
 
     auto helperArgs = SbExpr::makeSeq(resultVar.clone());
     if (collatorSlot) {
@@ -588,7 +588,7 @@ SortKeysExprs buildSortKeys(StageBuilderState& state,
                         state,
                         SbExpr{},
                         fp,
-                        0 /* level */,
+                        /*level=*/0,
                         state.frameIdGenerator,
                         outputs.getIfExists(
                             std::make_pair(PlanStageSlots::kField, fp.getFieldName(0)))));

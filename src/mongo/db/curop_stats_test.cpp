@@ -670,7 +670,7 @@ TEST_F(CurOpStatsTest, ProfilerEntryReportsAdmissionQueueStats) {
     // same per-gate breakdown.
     BSONObjBuilder builder;
     SingleThreadedLockStats lockStats;
-    curop->debug().append(opCtx.get(), lockStats, {}, {}, 0, true /*omitCommand*/, builder);
+    curop->debug().append(opCtx.get(), lockStats, {}, {}, 0, /*omitCommand=*/true, builder);
 
     ASSERT_BSONOBJ_EQ_UNORDERED(builder.done().getObjectField("queues"),
                                 expectedQueueStatsForIngressAndExecution());
@@ -685,7 +685,7 @@ TEST_F(CurOpStatsTest, ProfileFilterCanMatchOnAdmissionQueueStats) {
 
     // Whatever the profiler records has to be reachable from a profile filter as well, which
     // evaluates against the document staged here rather than against the one append() builds.
-    auto makeDoc = OpDebug::appendStaged(opCtx.get(), {"queues"}, false /*needWholeDocument*/);
+    auto makeDoc = OpDebug::appendStaged(opCtx.get(), {"queues"}, /*needWholeDocument=*/false);
     BSONObj staged = makeDoc(OpDebug::AppendArgs{opCtx.get(), curop->debug(), *curop});
 
     ASSERT_BSONOBJ_EQ_UNORDERED(staged.getObjectField("queues"),

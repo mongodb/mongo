@@ -359,7 +359,7 @@ TEST_F(ExternalDataSourceCommandsTest, SimpleScanMultiBatchAggRequest) {
     auto swAggReq = aggregation_request_helper::parseFromBSONForTests(aggCmdObj);
     ASSERT_OK(swAggReq.getStatus());
     auto swCursor = DBClientCursor::fromAggregationRequest(
-        &client, swAggReq.getValue(), /*secondaryOk*/ false, /*useExhaust*/ false);
+        &client, swAggReq.getValue(), /*secondaryOk=*/false, /*useExhaust=*/false);
     ASSERT_OK(swCursor.getStatus());
 
     auto cursor = std::move(swCursor.getValue());
@@ -421,7 +421,7 @@ TEST_F(ExternalDataSourceCommandsTest, SimpleMatchAggRequest) {
     auto swAggReq = aggregation_request_helper::parseFromBSONForTests(aggCmdObj);
     ASSERT_OK(swAggReq.getStatus());
     auto swCursor = DBClientCursor::fromAggregationRequest(
-        &client, swAggReq.getValue(), /*secondaryOk*/ false, /*useExhaust*/ false);
+        &client, swAggReq.getValue(), /*secondaryOk=*/false, /*useExhaust=*/false);
     ASSERT_OK(swCursor.getStatus());
 
     auto cursor = std::move(swCursor.getValue());
@@ -545,7 +545,7 @@ TEST_F(ExternalDataSourceCommandsTest, SimpleScanAndUnionWithMultipleSourcesAggR
     auto swAggReq = aggregation_request_helper::parseFromBSONForTests(aggCmdObj);
     ASSERT_OK(swAggReq.getStatus());
     auto swCursor = DBClientCursor::fromAggregationRequest(
-        &client, swAggReq.getValue(), /*secondaryOk*/ false, /*useExhaust*/ false);
+        &client, swAggReq.getValue(), /*secondaryOk=*/false, /*useExhaust=*/false);
     ASSERT_OK(swCursor.getStatus());
 
     auto cursor = std::move(swCursor.getValue());
@@ -646,7 +646,7 @@ TEST_F(ExternalDataSourceCommandsTest, GroupAggRequest) {
     auto swAggReq = aggregation_request_helper::parseFromBSONForTests(aggCmdObj);
     ASSERT_OK(swAggReq.getStatus());
     auto swCursor = DBClientCursor::fromAggregationRequest(
-        &client, swAggReq.getValue(), /*secondaryOk*/ false, /*useExhaust*/ false);
+        &client, swAggReq.getValue(), /*secondaryOk=*/false, /*useExhaust=*/false);
     ASSERT_OK(swCursor.getStatus());
 
     auto cursor = std::move(swCursor.getValue());
@@ -756,7 +756,7 @@ TEST_F(ExternalDataSourceCommandsTest, LookupAggRequest) {
     auto swAggReq = aggregation_request_helper::parseFromBSONForTests(aggCmdObj);
     ASSERT_OK(swAggReq.getStatus());
     auto swCursor = DBClientCursor::fromAggregationRequest(
-        &client, swAggReq.getValue(), /*secondaryOk*/ false, /*useExhaust*/ false);
+        &client, swAggReq.getValue(), /*secondaryOk=*/false, /*useExhaust=*/false);
     ASSERT_OK(swCursor.getStatus());
 
     auto cursor = std::move(swCursor.getValue());

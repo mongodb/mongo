@@ -54,7 +54,7 @@ void checkOutSessionAndVerifyTxnState(OperationContext* opCtx) {
     TransactionParticipant::get(opCtx).beginOrContinue(
         opCtx,
         {*opCtx->getTxnNumber()},
-        boost::none /* autocommit */,
+        /*autocommit=*/boost::none,
         TransactionParticipant::TransactionActions::kNone);
 }
 

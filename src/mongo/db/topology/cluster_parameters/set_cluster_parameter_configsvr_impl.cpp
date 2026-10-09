@@ -67,11 +67,11 @@ std::shared_ptr<SetClusterParameterCoordinator> makeSetClusterParameterCoordinat
     auto tenantId = request.getDbName().tenantId();
     invocation.normalizeParameter(opCtx,
                                   cmdParamObj,
-                                  boost::none /* clusterParameterTime */,
-                                  boost::none /* previousTime */,
+                                  /*clusterParameterTime=*/boost::none,
+                                  /*previousTime=*/boost::none,
                                   serverParameter,
                                   tenantId,
-                                  false /* skipValidation */);
+                                  /*skipValidation=*/false);
 
     SetClusterParameterCoordinatorDocument coordinatorDoc;
     ConfigsvrCoordinatorId cid(ConfigsvrCoordinatorTypeEnum::kSetClusterParameter);

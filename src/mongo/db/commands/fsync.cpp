@@ -137,7 +137,7 @@ public:
             // Take a global IS lock to ensure the storage engine is not shutdown
             auto* const storageEngine = opCtx->getServiceContext()->getStorageEngine();
             Lock::GlobalLock global(opCtx, MODE_IS);
-            storageEngine->flushAllFiles(opCtx, /*callerHoldsReadLock*/ true);
+            storageEngine->flushAllFiles(opCtx, /*callerHoldsReadLock=*/true);
 
             // This field has had a dummy value since MMAP went away. It is undocumented.
             // Maintaining it so as not to cause unnecessary user pain across upgrades.
@@ -460,7 +460,7 @@ void FSyncLockThread::run() {
         StorageEngine* storageEngine = _serviceContext->getStorageEngine();
 
         try {
-            storageEngine->flushAllFiles(&opCtx, /*callerHoldsReadLock*/ true);
+            storageEngine->flushAllFiles(&opCtx, /*callerHoldsReadLock=*/true);
         } catch (const std::exception& e) {
             if (!_allowFsyncFailure) {
                 LOGV2_ERROR(20472, "Error doing flushAll", "error"_attr = e.what());

@@ -64,7 +64,7 @@ namespace mongo {
 
 ReshardCollectionCoordinator::ReshardCollectionCoordinator(ShardingCoordinatorService* service,
                                                            const BSONObj& initialState)
-    : ReshardCollectionCoordinator(service, initialState, true /* persistCoordinatorDocument */) {}
+    : ReshardCollectionCoordinator(service, initialState, /*persistCoordinatorDocument=*/true) {}
 
 ReshardCollectionCoordinator::ReshardCollectionCoordinator(ShardingCoordinatorService* service,
                                                            const BSONObj& initialState,

@@ -90,7 +90,7 @@ public:
             ResumeToken::extractClusterTime(currentHighWaterMark.firstElement().Obj());
         if (currentHighWaterMarkClusterTime < nextEventClusterTime) {
             return BSON(
-                "" << ResumeToken::makeHighWaterMarkToken(nextEventClusterTime, 2 /* version */)
+                "" << ResumeToken::makeHighWaterMarkToken(nextEventClusterTime, /*version=*/2)
                           .toBSON());
         }
         return currentHighWaterMark;

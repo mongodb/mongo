@@ -15,7 +15,7 @@ using namespace std::literals::string_view_literals;
 TEST(ChangeStreamTest, ReadModes) {
     for (auto readMode :
          {ChangeStreamReadMode::kStrict, ChangeStreamReadMode::kIgnoreRemovedShards}) {
-        ChangeStream changeStream(readMode, ChangeStreamType::kAllDatabases, {} /* nss */);
+        ChangeStream changeStream(readMode, ChangeStreamType::kAllDatabases, /*nss=*/{});
         ASSERT_EQ(readMode, changeStream.getReadMode());
     }
 }

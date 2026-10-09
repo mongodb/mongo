@@ -263,7 +263,7 @@ void executeRetryableTimeseriesUpdate(OperationContext* opCtx,
     auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
     txn_api::SyncTransactionWithRetries txn(
-        opCtx, executor, nullptr /* resourceYielder */, inlineExecutor);
+        opCtx, executor, /*resourceYielder=*/nullptr, inlineExecutor);
     BulkWriteCommandReply bulkWriteResponse;
 
     // Execute the singleUpdateRequest (a bulkWrite command) in an internal transaction to perform
@@ -1222,8 +1222,8 @@ void BulkWriteOp::processTargetingError(const StatusWith<WriteType>& targetStatu
         // Throw when there is a transient transaction error since this should be a top
         // level error and not just a write error.
         if (isTransientTransactionError(targetStatus.getStatus().code(),
-                                        false /* hasWriteConcernError */,
-                                        false /* isCommitOrAbort */)) {
+                                        /*hasWriteConcernError=*/false,
+                                        /*isCommitOrAbort=*/false)) {
             uassertStatusOK(targetStatus);
         }
     }
@@ -1398,7 +1398,7 @@ BulkWriteReplyInfo BulkWriteOp::generateReplyInfo() {
                                                                        updateRef.getUpdateMods(),
                                                                        ns,
                                                                        updateRef.getArrayFilters(),
-                                                                       false /* isMulti */);
+                                                                       /*isMulti=*/false);
                     break;
                 }
                 case BatchedCommandRequest::BatchType_Delete:

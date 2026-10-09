@@ -19,7 +19,7 @@ TEST_F(DbCheckTest, BasicDbCheck) {
 
     auto secondaryIndexCheckParams = createSecondaryIndexCheckParams(
         DbCheckValidationModeEnum::dataConsistencyAndMissingIndexKeysCheck,
-        "" /* secondaryIndex */);
+        /*secondaryIndex=*/"");
     auto collInfo =
         createDbCheckCollectionInfo(opCtx, docMinKey, docMaxKey, secondaryIndexCheckParams);
     DbChecker dbChecker(collInfo);

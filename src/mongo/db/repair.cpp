@@ -58,7 +58,7 @@ Status rebuildIndexesForNamespace(OperationContext* opCtx,
     if (Status status = rebuildIndexesOnCollection(opCtx, collWriter); !status.isOK())
         return status;
 
-    engine->flushAllFiles(opCtx, /*callerHoldsReadLock*/ false);
+    engine->flushAllFiles(opCtx, /*callerHoldsReadLock=*/false);
     return Status::OK();
 }
 
@@ -195,7 +195,7 @@ Status repairCollection(OperationContext* opCtx,
         // RecordStore. After repairing, re-initialize the collection with a valid RecordStore.
         CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
             auto uuid = catalog.lookupUUIDByNSS(opCtx, nss).value();
-            catalog.deregisterCollection(opCtx, uuid, /*commitTime*/ boost::none);
+            catalog.deregisterCollection(opCtx, uuid, /*commitTime=*/boost::none);
         });
 
         // When repairing a record store, keep the existing behavior of not installing a minimum

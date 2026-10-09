@@ -226,7 +226,7 @@ void initCollectionObject(OperationContext* opCtx,
     auto collection = collectionFactory->make(opCtx, nss, catalogId, md, std::move(rs));
 
     CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
-        catalog.registerCollection(opCtx, std::move(collection), /*commitTime*/ minValidTs);
+        catalog.registerCollection(opCtx, std::move(collection), /*commitTime=*/minValidTs);
     });
 }
 

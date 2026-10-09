@@ -165,7 +165,7 @@ BSONObj prepareDistinctForPassthrough(
     // 'isExplain' is false.
     const auto cmdWithResolvedMaxTimeMS = [&] {
         if (auto qsMaxTimeMS =
-                query_settings::resolveMaxTimeMSForShardForwarding(qs, false /* isExplain */)) {
+                query_settings::resolveMaxTimeMSForShardForwarding(qs, /*isExplain=*/false)) {
             return cmd.addField(
                 BSON(GenericArguments::kMaxTimeMSFieldName << *qsMaxTimeMS).firstElement());
         }
@@ -264,7 +264,7 @@ void runDistinctAsAgg(OperationContext* opCtx,
                                         AuthorizationSession::get(opCtx->getClient()),
                                         distinctAggRequest.getNamespace(),
                                         distinctAggRequest,
-                                        true /* isMongos */));
+                                        /*isMongos=*/true));
     if (resolvedView.has_value()) {
         // Query against a view.
         uassertStatusOK(ClusterAggregate::retryOnViewOrIFRKickbackError(
@@ -389,7 +389,7 @@ public:
             CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
             markOperationQueryMemorySheddingEligible(opCtx);
             try {
-                executeDistinct(opCtx, boost::none /* verbosity */, reply);
+                executeDistinct(opCtx, /*verbosity=*/boost::none, reply);
             } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                 auto result = reply->getBodyBuilder();
                 result.resetToEmpty();
@@ -398,8 +398,8 @@ public:
                                  _ns,
                                  request(),
                                  ExtensionsCallbackNoop(),
-                                 nullptr /* defaultCollator */,
-                                 boost::none /* verbosity */);
+                                 /*defaultCollator=*/nullptr,
+                                 /*verbosity=*/boost::none);
                 // If the database doesn't exist, we successfully return an empty result set.
                 result.appendArray("values", BSONObj());
                 CurOp::get(opCtx)->setEndOfOpMetrics(0);
@@ -492,7 +492,7 @@ public:
                 runDistinctAsAgg(opCtx,
                                  routingCtx,
                                  std::move(canonicalQuery),
-                                 boost::none /* resolvedView */,
+                                 /*resolvedView=*/boost::none,
                                  verbosity,
                                  outputBuilder);
                 return;
@@ -512,9 +512,9 @@ public:
                     Shard::RetryPolicy::kIdempotent,
                     query,
                     collation,
-                    boost::none /*letParameters*/,
-                    boost::none /*runtimeConstants*/,
-                    !verbosity.has_value() /* eligibleForSampling */);
+                    /*letParameters=*/boost::none,
+                    /*runtimeConstants=*/boost::none,
+                    /*eligibleForSampling=*/!verbosity.has_value());
             } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
                 const auto resolvedView = *ex.extraInfo<ResolvedNamespace>();
                 runDistinctAsAgg(opCtx,

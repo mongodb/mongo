@@ -382,7 +382,7 @@ TEST_F(CanonicalQueryEncoderTest, ComputeKeyDistinctUnwindsArrays) {
     cqPlain->setDistinct(CanonicalDistinct("a"));
     unique_ptr<CanonicalQuery> cqUnwound(canonicalize(opCtx(), "{}"));
     cqUnwound->setDistinct(
-        CanonicalDistinct("a", false, boost::none, boost::none, false, true /*unwindsArrays*/));
+        CanonicalDistinct("a", false, boost::none, boost::none, false, /*unwindsArrays=*/true));
     ASSERT_NOT_EQUALS(canonical_query_encoder::encodeClassic(*cqPlain),
                       canonical_query_encoder::encodeClassic(*cqUnwound));
 }
@@ -593,9 +593,9 @@ TEST_F(CanonicalQueryEncoderTest, ComputeKeySBE) {
                       "{}",
                       "{}",
                       "{}",
-                      nullptr /* findCommand */,
+                      /*findCommand=*/nullptr,
                       /*pipelineObj=*/{},
-                      true /* isCountLike */);
+                      /*isCountLike=*/true);
 
     // With FindCommandRequest
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
@@ -733,19 +733,19 @@ TEST_F(CanonicalQueryEncoderTest, ComputeKeyWithNeedsMerge) {
                       "{}",
                       "{}",
                       "{}",
-                      nullptr /* findCommand */,
+                      /*findCommand=*/nullptr,
                       {groupStage},
-                      false /* isCountLike */,
-                      false /* needsMerge */);
+                      /*isCountLike=*/false,
+                      /*needsMerge=*/false);
 
     testComputeSBEKey(gctx,
                       "{}",
                       "{}",
                       "{}",
-                      nullptr /* findCommand */,
+                      /*findCommand=*/nullptr,
                       {groupStage},
-                      false /* isCountLike */,
-                      true /* needsMerge */);
+                      /*isCountLike=*/false,
+                      /*needsMerge=*/true);
 }
 
 TEST_F(CanonicalQueryEncoderTest, ComputeKeyForPipeline) {

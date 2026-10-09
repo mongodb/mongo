@@ -119,9 +119,9 @@ TEST_F(SbeTimeseriesTest, TestSimpleMatch) {
                                std::string("tag") /* metaField */,
                                {"_id", "a", "time"} /* fields */,
                                timeseries::BucketSpec::Behavior::kInclude},
-        nullptr /* eventFilter */,
-        nullptr /* wholeBucketFilter */,
-        true /* includeMeta */);
+        /*eventFilter=*/nullptr,
+        /*wholeBucketFilter=*/nullptr,
+        /*includeMeta=*/true);
 
     auto matchNode = std::make_unique<MatchNode>(std::move(unpackNode), std::move(matchExpr));
     auto projectNode = makeProjNode<ProjectionNodeDefault>(
@@ -145,8 +145,8 @@ TEST_F(SbeTimeseriesTest, TestMatch) {
                                {"_id", "a", "time"} /* fields */,
                                timeseries::BucketSpec::Behavior::kInclude},
         std::move(matchExpr),
-        nullptr /* wholeBucketFilter */,
-        true /* includeMeta */);
+        /*wholeBucketFilter=*/nullptr,
+        /*includeMeta=*/true);
 
     auto projectNode = makeProjNode<ProjectionNodeDefault>(
         _expCtx, std::move(unpackNode), BSON("a" << 1 << "tag" << 1 << "_id" << 0));
@@ -169,8 +169,8 @@ TEST_F(SbeTimeseriesTest, TestCount) {
                                {"_id", "a", "time"} /* fields */,
                                timeseries::BucketSpec::Behavior::kInclude},
         std::move(matchExpr),
-        nullptr /* wholeBucketFilter */,
-        false /* includeMeta */);
+        /*wholeBucketFilter=*/nullptr,
+        /*includeMeta=*/false);
 
     auto bson = fromjson("{count: {$count: {}}}");
     VariablesParseState vps = _expCtx->variablesParseState;
@@ -179,9 +179,9 @@ TEST_F(SbeTimeseriesTest, TestCount) {
         ExpressionConstant::create(_expCtx.get(), Value(BSONNULL)),
         std::vector<AccumulationStatement>{
             AccumulationStatement::parseAccumulationStatement(_expCtx.get(), bson["count"], vps)},
-        false /*doingMerge*/,
-        false /*willBeMerged*/,
-        true /*shouldProduceBson*/);
+        /*doingMerge=*/false,
+        /*willBeMerged=*/false,
+        /*shouldProduceBson=*/true);
 
     auto projectNode = makeProjNode<ProjectionNodeDefault>(
         _expCtx, std::move(groupNode), BSON("count" << 1 << "_id" << 0));
@@ -204,8 +204,8 @@ TEST_F(SbeTimeseriesTest, TestGroupAvg) {
                                {"_id", "a", "time"} /* fields */,
                                timeseries::BucketSpec::Behavior::kInclude},
         std::move(matchExpr),
-        nullptr /* wholeBucketFilter */,
-        false /* includeMeta */);
+        /*wholeBucketFilter=*/nullptr,
+        /*includeMeta=*/false);
 
     auto bson = fromjson("{average: {$avg: '$a'}}");
     VariablesParseState vps = _expCtx->variablesParseState;
@@ -214,9 +214,9 @@ TEST_F(SbeTimeseriesTest, TestGroupAvg) {
         ExpressionConstant::create(_expCtx.get(), Value(BSONNULL)),
         std::vector<AccumulationStatement>{
             AccumulationStatement::parseAccumulationStatement(_expCtx.get(), bson["average"], vps)},
-        false /*doingMerge*/,
-        false /*willBeMerged*/,
-        true /*shouldProduceBson*/);
+        /*doingMerge=*/false,
+        /*willBeMerged=*/false,
+        /*shouldProduceBson=*/true);
 
     auto projectNode =
         makeProjNode<ProjectionNodeDefault>(_expCtx, std::move(groupNode), BSON("_id" << 0));
@@ -239,8 +239,8 @@ TEST_F(SbeTimeseriesTest, TestGroupTopN) {
                                {"_id", "a", "time"} /* fields */,
                                timeseries::BucketSpec::Behavior::kInclude},
         std::move(matchExpr),
-        nullptr /* wholeBucketFilter */,
-        true /* includeMeta */);
+        /*wholeBucketFilter=*/nullptr,
+        /*includeMeta=*/true);
 
     auto bson = fromjson("{topN: {$topN: {output: {tag: '$tag'}, sortBy: {a: 1}, n: 2}}}");
     VariablesParseState vps = _expCtx->variablesParseState;
@@ -249,9 +249,9 @@ TEST_F(SbeTimeseriesTest, TestGroupTopN) {
         ExpressionConstant::create(_expCtx.get(), Value(BSONNULL)),
         std::vector<AccumulationStatement>{
             AccumulationStatement::parseAccumulationStatement(_expCtx.get(), bson["topN"], vps)},
-        false /*doingMerge*/,
-        false /*willBeMerged*/,
-        true /*shouldProduceBson*/);
+        /*doingMerge=*/false,
+        /*willBeMerged=*/false,
+        /*shouldProduceBson=*/true);
 
     auto projectNode =
         makeProjNode<ProjectionNodeDefault>(_expCtx, std::move(groupNode), BSON("_id" << 0));
@@ -274,8 +274,8 @@ TEST_F(SbeTimeseriesTest, TestGroupMax) {
                                {"_id", "a", "time"} /* fields */,
                                timeseries::BucketSpec::Behavior::kInclude},
         std::move(matchExpr),
-        nullptr /* wholeBucketFilter */,
-        true /* includeMeta */);
+        /*wholeBucketFilter=*/nullptr,
+        /*includeMeta=*/true);
 
     auto bson = fromjson("{max: {$max: '$a'}}");
     VariablesParseState vps = _expCtx->variablesParseState;
@@ -285,15 +285,15 @@ TEST_F(SbeTimeseriesTest, TestGroupMax) {
         groupByExpression,
         std::vector<AccumulationStatement>{
             AccumulationStatement::parseAccumulationStatement(_expCtx.get(), bson["max"], vps)},
-        false /*doingMerge*/,
-        false /*willBeMerged*/,
-        true /*shouldProduceBson*/);
+        /*doingMerge=*/false,
+        /*willBeMerged=*/false,
+        /*shouldProduceBson=*/true);
 
     auto projectNode =
         makeProjNode<ProjectionNodeDefault>(_expCtx, std::move(groupNode), BSON("_id" << 0));
     auto sortNode = std::make_unique<SortNodeDefault>(std::move(projectNode),
-                                                      BSON("max" << 1) /* pattern */,
-                                                      -1 /* limit */,
+                                                      /*pattern=*/BSON("max" << 1),
+                                                      /*limit=*/-1,
                                                       LimitSkipParameterization::Disabled,
                                                       kSortMaxMemoryUsageBytes);
 
@@ -316,8 +316,8 @@ TEST_F(SbeTimeseriesTest, TestGroupSum) {
                                {"_id", "a", "b", "time"} /* fields */,
                                timeseries::BucketSpec::Behavior::kInclude},
         std::move(matchExpr),
-        nullptr /* wholeBucketFilter */,
-        false /* includeMeta */);
+        /*wholeBucketFilter=*/nullptr,
+        /*includeMeta=*/false);
 
     auto bson = fromjson("{sum: {$sum: '$a'}}");
     VariablesParseState vps = _expCtx->variablesParseState;
@@ -327,13 +327,13 @@ TEST_F(SbeTimeseriesTest, TestGroupSum) {
         groupByExpression,
         std::vector<AccumulationStatement>{
             AccumulationStatement::parseAccumulationStatement(_expCtx.get(), bson["sum"], vps)},
-        false /*doingMerge*/,
-        false /*willBeMerged*/,
-        true /*shouldProduceBson*/);
+        /*doingMerge=*/false,
+        /*willBeMerged=*/false,
+        /*shouldProduceBson=*/true);
 
     auto sortNode = std::make_unique<SortNodeDefault>(std::move(groupNode),
-                                                      BSON("sum" << 1) /* pattern */,
-                                                      -1 /* limit */,
+                                                      /*pattern=*/BSON("sum" << 1),
+                                                      /*limit=*/-1,
                                                       LimitSkipParameterization::Disabled,
                                                       kSortMaxMemoryUsageBytes);
 

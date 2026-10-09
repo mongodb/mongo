@@ -82,7 +82,7 @@ void PlanEnumeratorContext::addPlanToSubset(JoinMethod method,
                 5,
                 "Enumerating plan for join subset",
                 "plan"_attr = _registry.joinPlanNodeToBSON(
-                    subset.plans.back(), _ctx.joinGraph, false /* brief */),
+                    subset.plans.back(), _ctx.joinGraph, /*brief=*/false),
                 "isBestPlan"_attr = isBestPlan);
 }
 
@@ -372,7 +372,7 @@ void PlanEnumeratorContext::enumerateJoinSubsets() {
                     5,
                     "Winning join-optimized plan",
                     "plan"_attr = _registry.joinPlanNodeToBSON(
-                        getBestFinalPlan(), _ctx.joinGraph, false /* brief */));
+                        getBestFinalPlan(), _ctx.joinGraph, /*brief=*/false));
     }
 }
 
@@ -452,7 +452,7 @@ BSONObj PlanEnumeratorContext::subsetToBSON(const JoinSubset& subset) const {
         BSONArrayBuilder plansBob(subsetBob.subarrayStart("plans"));
         for (const auto planId : subset.plans) {
             BSONObjBuilder planBob(plansBob.subobjStart());
-            _registry.joinPlanNodeToBSON(planBob, planId, _ctx.joinGraph, true /* brief */);
+            _registry.joinPlanNodeToBSON(planBob, planId, _ctx.joinGraph, /*brief=*/true);
             planBob.doneFast();
         }
     }

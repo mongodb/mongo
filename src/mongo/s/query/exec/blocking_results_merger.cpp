@@ -35,7 +35,7 @@ const AsyncResultsMergerParams& BlockingResultsMerger::asyncResultsMergerParams(
 void BlockingResultsMerger::recognizeControlEvents() {
     _arm->setNextHighWaterMarkDeterminingStrategy(
         NextHighWaterMarkDeterminingStrategyFactory::createForChangeStream(
-            _arm->getCompareWholeSortKey(), true /* recognizeControlEvents */));
+            _arm->getCompareWholeSortKey(), /*recognizeControlEvents=*/true));
 }
 
 StatusWith<stdx::cv_status> BlockingResultsMerger::doWaiting(

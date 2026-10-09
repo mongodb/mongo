@@ -247,8 +247,7 @@ TEST_F(QueryPlannerTest, NegationCannotUseSparseIndex) {
     // will match documents which don't have an "a" field.
     addIndex(fromjson("{a: 1}"),
              false,  // multikey
-             true    // sparse
-    );
+             /*sparse=*/true);
     runQuery(fromjson("{a: {$ne: 5}}"));
     assertHasOnlyCollscan();
 
@@ -261,8 +260,7 @@ TEST_F(QueryPlannerTest, NegationInElemMatchDoesNotUseSparseIndex) {
     // "$elemMatch value", but it is not something we've implemented.
     addIndex(fromjson("{a: 1}"),
              true,  // multikey
-             true   // sparse
-    );
+             /*sparse=*/true);
     runQuery(fromjson("{a: {$elemMatch: {$ne: 5}}}"));
     assertHasOnlyCollscan();
 
@@ -330,8 +328,7 @@ TEST_F(QueryPlannerTest, NotLtEmptyArrayShouldNotUseIndex) {
 TEST_F(QueryPlannerTest, SparseIndexCannotSupportEqualsNull) {
     addIndex(BSON("i" << 1),
              false,  // multikey
-             true    // sparse
-    );
+             /*sparse=*/true);
 
     runQuery(fromjson("{i: {$eq: null}}"));
     assertHasOnlyCollscan();
@@ -346,8 +343,8 @@ TEST_F(QueryPlannerTest, SparseIndexCannotSupportEqualsNull) {
 TEST_F(QueryPlannerTest, PlannerCanUseIndexesWithSameKeyButDifferentSparseProperty) {
     // Create two indexes on the same key pattern; one sparse, the other non-sparse. This is
     // permitted because the 'sparse' property is part of the index signature.
-    addIndex(fromjson("{a: 1}"), /*multikey*/ false, /*sparse*/ false);
-    addIndex(fromjson("{a: 1}"), "a_sparse", /*multikey*/ false, /*sparse*/ true, /*unique*/ false);
+    addIndex(fromjson("{a: 1}"), /*multikey=*/false, /*sparse=*/false);
+    addIndex(fromjson("{a: 1}"), "a_sparse", /*multikey=*/false, /*sparse=*/true, /*unique=*/false);
 
     runQuery(fromjson("{a: 1}"));
 
@@ -363,8 +360,8 @@ TEST_F(QueryPlannerTest, PlannerCanUseIndexesWithSameKeyButDifferentSparseProper
 TEST_F(QueryPlannerTest, PlannerCanUseIndexesWithSameKeyButDifferentUniqueProperty) {
     // Create two indexes on the same key pattern; one unique, the other non-unique. This is
     // permitted because the 'unique' property is part of the index signature.
-    addIndex(fromjson("{a: 1}"), /*multikey*/ false, /*sparse*/ false, /*unique*/ false);
-    addIndex(fromjson("{a: 1}"), "a_unique", /*multikey*/ false, /*sparse*/ false, /*unique*/ true);
+    addIndex(fromjson("{a: 1}"), /*multikey=*/false, /*sparse=*/false, /*unique=*/false);
+    addIndex(fromjson("{a: 1}"), "a_unique", /*multikey=*/false, /*sparse=*/false, /*unique=*/true);
 
     runQuery(fromjson("{a: 1}"));
 
@@ -880,7 +877,7 @@ TEST_F(QueryPlannerTest, IntersectBasicTwoPredCompoundMatchesIdxOrder2) {
 TEST_F(QueryPlannerTest, IntersectManySelfIntersections) {
     params.mainCollectionInfo.options =
         QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
-    addIndex(BSON("a" << 1), /*multikey*/ true);
+    addIndex(BSON("a" << 1), /*multikey=*/true);
 
     // This one goes to 11.
     runQuery(fromjson("{a:1, a:2, a:3, a:4, a:5, a:6, a:7, a:8, a:9, a:10, a:11}"));
@@ -905,7 +902,7 @@ TEST_F(QueryPlannerTest, IntersectManySelfIntersections) {
 TEST_F(QueryPlannerTest, IntersectSelfIntersectionsAtCapBoundary) {
     params.mainCollectionInfo.options =
         QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
-    addIndex(BSON("a" << 1), /*multikey*/ true);
+    addIndex(BSON("a" << 1), /*multikey=*/true);
 
     runQuery(fromjson("{a:1, a:2, a:3, a:4, a:5, a:6, a:7, a:8, a:9, a:10}"));
 

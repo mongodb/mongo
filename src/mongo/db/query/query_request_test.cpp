@@ -270,12 +270,12 @@ TEST(QueryRequestTest, InvalidResumeAfterWrongRecordIdType) {
     // Hint must be explicitly set for the query request to validate.
     findCommand.setHint(fromjson("{$natural: 1}"));
     ASSERT_NOT_OK(query_request_helper::validateResumeInput(
-        opCtx, findCommand.getResumeAfter(), {} /* startAt */, false /* isClusteredCollection */));
+        opCtx, findCommand.getResumeAfter(), /*startAt=*/{}, /*isClusteredCollection=*/false));
     resumeAfter = BSON("$recordId" << 1LL);
     findCommand.setResumeAfter(resumeAfter);
     ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
     ASSERT_OK(query_request_helper::validateResumeInput(
-        opCtx, findCommand.getResumeAfter(), {} /* startAt */, false /* isClusteredCollection */));
+        opCtx, findCommand.getResumeAfter(), /*startAt=*/{}, /*isClusteredCollection=*/false));
 }
 
 TEST(QueryRequestTest, InvalidStartAtWrongRecordIdType) {
@@ -288,11 +288,11 @@ TEST(QueryRequestTest, InvalidStartAtWrongRecordIdType) {
     // Hint must be explicitly set for the query request to validate.
     findCommand.setHint(fromjson("{$natural: 1}"));
     ASSERT_NOT_OK(query_request_helper::validateResumeInput(
-        opCtx, {} /* resumeAfter */, findCommand.getStartAt(), false /* isClusteredCollection */));
+        opCtx, /*resumeAfter=*/{}, findCommand.getStartAt(), /*isClusteredCollection=*/false));
     findCommand.setStartAt(fromjson("{$recordId: NumberLong(1)}"));
     ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
     ASSERT_OK(query_request_helper::validateResumeInput(
-        opCtx, {} /* resumeAfter */, findCommand.getStartAt(), false /* isClusteredCollection */));
+        opCtx, /*resumeAfter=*/{}, findCommand.getStartAt(), /*isClusteredCollection=*/false));
 }
 
 TEST(QueryRequestTest, InvalidResumeAfterExtraField) {
@@ -306,7 +306,7 @@ TEST(QueryRequestTest, InvalidResumeAfterExtraField) {
     // Hint must be explicitly set for the query request to validate.
     findCommand.setHint(fromjson("{$natural: 1}"));
     ASSERT_NOT_OK(query_request_helper::validateResumeInput(
-        opCtx, findCommand.getResumeAfter(), {} /* startAt */, false /* isClusteredCollection */));
+        opCtx, findCommand.getResumeAfter(), /*startAt=*/{}, /*isClusteredCollection=*/false));
 }
 
 TEST(QueryRequestTest, InvalidStartAtExtraField) {
@@ -319,7 +319,7 @@ TEST(QueryRequestTest, InvalidStartAtExtraField) {
     // Hint must be explicitly set for the query request to validate.
     findCommand.setHint(fromjson("{$natural: 1}"));
     ASSERT_NOT_OK(query_request_helper::validateResumeInput(
-        opCtx, {} /* resumeAfter */, findCommand.getStartAt(), false /* isClusteredCollection */));
+        opCtx, /*resumeAfter=*/{}, findCommand.getStartAt(), /*isClusteredCollection=*/false));
 }
 
 TEST(QueryRequestTest, ResumeAfterWithHint) {
@@ -357,7 +357,7 @@ TEST(QueryRequestTest, ResumeAfterWithSort) {
     findCommand.setHint(fromjson("{$natural: 1}"));
     ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
     ASSERT_OK(query_request_helper::validateResumeInput(
-        opCtx, findCommand.getResumeAfter(), {} /* startAt */, false /* isClusteredCollection */));
+        opCtx, findCommand.getResumeAfter(), /*startAt=*/{}, /*isClusteredCollection=*/false));
     findCommand.setSort(fromjson("{a: 1}"));
     ASSERT_NOT_OK(query_request_helper::validateFindCommandRequest(findCommand));
     findCommand.setSort(fromjson("{$natural: 1}"));
@@ -374,7 +374,7 @@ TEST(QueryRequestTest, StartAtWithSort) {
     findCommand.setHint(fromjson("{$natural: 1}"));
     ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
     ASSERT_OK(query_request_helper::validateResumeInput(
-        opCtx, {} /* resumeAfter */, findCommand.getStartAt(), false));
+        opCtx, /*resumeAfter=*/{}, findCommand.getStartAt(), false));
     findCommand.setSort(fromjson("{a: 1}"));
     ASSERT_NOT_OK(query_request_helper::validateFindCommandRequest(findCommand));
     findCommand.setSort(fromjson("{$natural: 1}"));
@@ -394,7 +394,7 @@ TEST(QueryRequestTest, ResumeNoSpecifiedRequestResumeToken) {
     findCommand.setRequestResumeToken(true);
     ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
     ASSERT_OK(query_request_helper::validateResumeInput(
-        opCtx, findCommand.getResumeAfter(), {} /* startAt */, false /* isClusteredCollection */));
+        opCtx, findCommand.getResumeAfter(), /*startAt=*/{}, /*isClusteredCollection=*/false));
 }
 
 TEST(QueryRequestTest, StartAtNoSpecifiedRequestResumeToken) {
@@ -408,7 +408,7 @@ TEST(QueryRequestTest, StartAtNoSpecifiedRequestResumeToken) {
     findCommand.setRequestResumeToken(true);
     ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
     ASSERT_OK(query_request_helper::validateResumeInput(
-        opCtx, {} /* resumeAfter */, findCommand.getStartAt(), false));
+        opCtx, /*resumeAfter=*/{}, findCommand.getStartAt(), false));
 }
 
 TEST(QueryRequestTest, ExplicitEmptyResumeAfter) {
@@ -424,7 +424,7 @@ TEST(QueryRequestTest, ExplicitEmptyResumeAfter) {
     findCommand.setRequestResumeToken(true);
     ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
     ASSERT_OK(query_request_helper::validateResumeInput(
-        opCtx, findCommand.getResumeAfter(), {} /* startAt */, false /* isClusteredCollection */));
+        opCtx, findCommand.getResumeAfter(), /*startAt=*/{}, /*isClusteredCollection=*/false));
 }
 
 TEST(QueryRequestTest, ExplicitEmptyStartAt) {
@@ -438,7 +438,7 @@ TEST(QueryRequestTest, ExplicitEmptyStartAt) {
     findCommand.setRequestResumeToken(true);
     ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
     ASSERT_OK(query_request_helper::validateResumeInput(
-        opCtx, {} /* resumeAfter */, findCommand.getStartAt(), false));
+        opCtx, /*resumeAfter=*/{}, findCommand.getStartAt(), false));
 }
 
 TEST(QueryRequestTest, ResumeAfterMismatchInitialSyncId) {
@@ -460,7 +460,7 @@ TEST(QueryRequestTest, ResumeAfterMismatchInitialSyncId) {
     findCommand.setRequestResumeToken(true);
     ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
     ASSERT_NOT_OK(query_request_helper::validateResumeInput(
-        opCtx, findCommand.getResumeAfter(), {} /* startAt */, false /* isClusteredCollection */));
+        opCtx, findCommand.getResumeAfter(), /*startAt=*/{}, /*isClusteredCollection=*/false));
 }
 
 TEST(QueryRequestTest, StartAtMismatchInitialSyncId) {
@@ -481,7 +481,7 @@ TEST(QueryRequestTest, StartAtMismatchInitialSyncId) {
     findCommand.setRequestResumeToken(true);
     ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
     ASSERT_NOT_OK(query_request_helper::validateResumeInput(
-        opCtx, {} /* resumeAfter */, findCommand.getStartAt(), false));
+        opCtx, /*resumeAfter=*/{}, findCommand.getStartAt(), false));
 }
 
 //

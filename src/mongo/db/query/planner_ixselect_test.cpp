@@ -1063,8 +1063,8 @@ TEST(QueryPlannerIXSelectTest, ModUnderNotCannotUseIndex) {
                     indices,
                     "a,a",
                     expectedIndices,
-                    false /* mustUseIndexedPlan */,
-                    true /* shouldNormalize */);
+                    /*mustUseIndexedPlan=*/false,
+                    /*shouldNormalize=*/true);
 }
 
 /**
@@ -1119,8 +1119,8 @@ TEST(QueryPlannerIXSelectTest, TypeUnderNotCannotUseIndex) {
                     indices,
                     "a,a",
                     expectedIndices,
-                    false /* mustUseIndexedPlan */,
-                    true /* shouldNormalize */);
+                    /*mustUseIndexedPlan=*/false,
+                    /*shouldNormalize=*/true);
 }
 
 // Helper which constructs an IndexEntry and returns it along with an owned ProjectionExecutor,
@@ -1852,8 +1852,8 @@ TEST(QueryPlannerIXSelectTest, SparseIndexCannotBeUsedInALookup) {
     std::vector<IndexEntry> result =
         QueryPlannerIXSelect::expandIndexes(fields,
                                             {wildcardIndexEntry.first, sparseIndex},
-                                            false /* hintedIndexBson */,
-                                            true /* inLookup */);
+                                            /*hintedIndexBson=*/false,
+                                            /*inLookup=*/true);
     // Sparse indexes and wildcard indexes cannot be used for the inner side of a $lookup.
     std::vector<BSONObj> expectedKeyPatterns;
     ASSERT_TRUE(indexEntryKeyPatternsMatch(&expectedKeyPatterns, &result));

@@ -103,8 +103,8 @@ BSONObj createUpdatedCommandForNewShard(
                                                                Document{shardCommand},
                                                                splitPipelines,
                                                                boost::none, /* exchangeSpec */
-                                                               true /* needsMerge */,
-                                                               boost::none /* explain */);
+                                                               /*needsMerge=*/true,
+                                                               /*explain=*/boost::none);
 }
 
 }  // namespace mongo::change_stream::topology_helpers

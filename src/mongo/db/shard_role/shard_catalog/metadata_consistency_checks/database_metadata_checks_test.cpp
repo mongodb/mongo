@@ -76,8 +76,8 @@ protected:
         client.update(NamespaceString::kServerConfigurationNamespace,
                       BSON("_id" << multiversion::kParameterName),
                       BSON("$set" << BSON("changeTimestamp" << changeTimestamp)),
-                      false /* upsert */,
-                      false /* multi */);
+                      /*upsert=*/false,
+                      /*multi=*/false);
     }
 
     std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistencyNonAuthoritative(

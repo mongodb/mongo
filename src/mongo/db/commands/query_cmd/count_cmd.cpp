@@ -341,7 +341,7 @@ public:
                 makeExpressionContextForGetExecutor(opCtx,
                                                     request().getCollation().value_or(BSONObj()),
                                                     ns,
-                                                    boost::none /* verbosity*/);
+                                                    /*verbosity=*/boost::none);
 
             // Create an RAII object that prints useful information about the ExpressionContext in
             // the case of a tassert or crash.
@@ -576,7 +576,7 @@ public:
             curOp->debug().getQueryStatsInfo().disableForSubqueryExecution = true;
             const auto vts = auth::ValidatedTenancyScope::get(opCtx);
             auto viewAggRequest =
-                query_request_conversion::asAggregateCommandRequest(req, true /* hasExplain */);
+                query_request_conversion::asAggregateCommandRequest(req, /*hasExplain=*/true);
             // This aggregation was derived locally from the explain, so any IFR flag kickback it
             // raises has to be absorbed here rather than propagated to the router.
             retryOnLocalIFRFlagKickback(opCtx, viewAggRequest, "explain count as aggregation", [&] {

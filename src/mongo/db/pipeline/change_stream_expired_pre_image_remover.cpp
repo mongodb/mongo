@@ -67,7 +67,7 @@ void ChangeStreamExpiredPreImagesRemoverService::onConsistentDataAvailable(Opera
         }
     } else {
         _startChangeStreamExpiredPreImagesRemoverServiceJob(
-            lk, opCtx, false /* useReplicatedTruncates */);
+            lk, opCtx, /*useReplicatedTruncates=*/false);
     }
 }
 
@@ -86,7 +86,7 @@ void ChangeStreamExpiredPreImagesRemoverService::onStepUpComplete(OperationConte
     _isPrimary = true;
     if (useReplicatedTruncates) {
         _startChangeStreamExpiredPreImagesRemoverServiceJob(
-            lk, opCtx, true /* useReplicatedTruncates */);
+            lk, opCtx, /*useReplicatedTruncates=*/true);
     }
 }
 
@@ -195,7 +195,7 @@ void ChangeStreamExpiredPreImagesRemoverService::
                 .performExpiredChangeStreamPreImagesRemovalPass(client, useReplicatedTruncates);
         },
         Seconds(gExpiredChangeStreamPreImageRemovalJobSleepSecs.load()),
-        true /*isKillableByStepdown*/);
+        /*isKillableByStepdown=*/true);
 
     LOGV2(7080100,
           "Starting Change Stream Expired Pre-images Remover thread",

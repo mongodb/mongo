@@ -177,7 +177,7 @@ class SetStringToNum : public SetBase {
 public:
     void run() {
         _client.insert(nss(), BSON("a" << "b"));
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$set" << BSON("a" << 5)));
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$set" << BSON("a" << 5)));
         ASSERT(!_client.findOne(nss(), BSON("a" << 5)).isEmpty());
     }
 };
@@ -186,7 +186,7 @@ class SetStringToNumInPlace : public SetBase {
 public:
     void run() {
         _client.insert(nss(), BSON("a" << "bcd"));
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$set" << BSON("a" << 5.0)));
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$set" << BSON("a" << 5.0)));
         ASSERT(!_client.findOne(nss(), BSON("a" << 5.0)).isEmpty());
     }
 };
@@ -196,11 +196,11 @@ public:
     void run() {
         // Try with upsert false first.
         _client.insert(nss(), BSONObj() /* empty document */);
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$setOnInsert" << BSON("a" << 1)), false);
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$setOnInsert" << BSON("a" << 1)), false);
         ASSERT(_client.findOne(nss(), BSON("a" << 1)).isEmpty());
 
         // Then with upsert true.
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$setOnInsert" << BSON("a" << 1)), true);
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$setOnInsert" << BSON("a" << 1)), true);
         ASSERT(_client.findOne(nss(), BSON("a" << 1)).isEmpty());
     }
 };
@@ -209,11 +209,11 @@ class SetOnInsertFromNonExistent : public SetBase {
 public:
     void run() {
         // Try with upsert false first.
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$setOnInsert" << BSON("a" << 1)), false);
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$setOnInsert" << BSON("a" << 1)), false);
         ASSERT(_client.findOne(nss(), BSON("a" << 1)).isEmpty());
 
         // Then with upsert true.
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$setOnInsert" << BSON("a" << 1)), true);
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$setOnInsert" << BSON("a" << 1)), true);
         ASSERT(!_client.findOne(nss(), BSON("a" << 1)).isEmpty());
     }
 };
@@ -249,7 +249,7 @@ public:
     void run() {
         BSONObj res = fromjson("{'_id':0, a:1}");
         _client.insert(nss(), res);
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$setOnInsert" << BSON("b" << 1)));
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$setOnInsert" << BSON("b" << 1)));
         ASSERT(_client.findOne(nss(), BSON("a" << 1)).woCompare(res) == 0);
     }
 };
@@ -258,7 +258,7 @@ class SetOnInsertExisting : public SetBase {
 public:
     void run() {
         _client.insert(nss(), BSON("a" << 1));
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$setOnInsert" << BSON("a" << 2)));
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$setOnInsert" << BSON("a" << 2)));
         ASSERT(!_client.findOne(nss(), BSON("a" << 1)).isEmpty());
     }
 };
@@ -268,14 +268,14 @@ public:
     void run() {
         // Try with upsert false first.
         _client.update(nss(),
-                       BSONObj{} /*filter*/,
+                       /*filter=*/BSONObj{},
                        BSON("$set" << BSON("a" << 1) << "$setOnInsert" << BSON("b" << 2)),
                        false);
         ASSERT(_client.findOne(nss(), BSON("a" << 1 << "b" << 2)).isEmpty());
 
         // Then with upsert true.
         _client.update(nss(),
-                       BSONObj{} /*filter*/,
+                       /*filter=*/BSONObj{},
                        BSON("$set" << BSON("a" << 1) << "$setOnInsert" << BSON("b" << 2)),
                        true);
         ASSERT(!_client.findOne(nss(), BSON("a" << 1 << "b" << 2)).isEmpty());
@@ -300,9 +300,9 @@ class ModDotted : public SetBase {
 public:
     void run() {
         _client.insert(nss(), fromjson("{a:{b:4}}"));
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$inc" << BSON("a.b" << 10)));
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$inc" << BSON("a.b" << 10)));
         ASSERT(!_client.findOne(nss(), BSON("a.b" << 14)).isEmpty());
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$set" << BSON("a.b" << 55)));
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$set" << BSON("a.b" << 55)));
         ASSERT(!_client.findOne(nss(), BSON("a.b" << 55)).isEmpty());
     }
 };
@@ -311,7 +311,7 @@ class SetInPlaceDotted : public SetBase {
 public:
     void run() {
         _client.insert(nss(), fromjson("{a:{b:'cdef'}}"));
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$set" << BSON("a.b" << "llll")));
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$set" << BSON("a.b" << "llll")));
         ASSERT(!_client.findOne(nss(), BSON("a.b" << "llll")).isEmpty());
     }
 };
@@ -320,7 +320,7 @@ class SetRecreateDotted : public SetBase {
 public:
     void run() {
         _client.insert(nss(), fromjson("{'_id':0,a:{b:'cdef'}}"));
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$set" << BSON("a.b" << "lllll")));
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$set" << BSON("a.b" << "lllll")));
         ASSERT(_client.findOne(nss(), BSON("a.b" << "lllll"))
                    .woCompare(fromjson("{'_id':0,a:{b:'lllll'}}")) == 0);
     }
@@ -340,7 +340,7 @@ class SetAdjacentDotted : public SetBase {
 public:
     void run() {
         _client.insert(nss(), fromjson("{'_id':0,a:{c:4}}"));
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$set" << BSON("a.b" << "lllll")));
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$set" << BSON("a.b" << "lllll")));
         ASSERT_EQUALS(mutablebson::unordered(_client.findOne(nss(), BSON("a.b" << "lllll"))),
                       mutablebson::unordered(fromjson("{'_id':0,a:{b:'lllll',c:4}}")));
     }
@@ -350,8 +350,8 @@ class IncMissing : public SetBase {
 public:
     void run() {
         _client.insert(nss(), fromjson("{'_id':0}"));
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$inc" << BSON("f" << 3.0)));
-        ASSERT(_client.findOne(nss(), BSONObj{} /*filter*/).woCompare(fromjson("{'_id':0,f:3}")) ==
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$inc" << BSON("f" << 3.0)));
+        ASSERT(_client.findOne(nss(), /*filter=*/BSONObj{}).woCompare(fromjson("{'_id':0,f:3}")) ==
                0);
     }
 };
@@ -398,8 +398,8 @@ public:
     void run() {
         _client.insert(nss(), fromjson("{'_id':0}"));
         _client.update(
-            nss(), BSONObj{} /*filter*/, BSON("$set" << BSON("f.g.h" << 3.0 << "f.g.a" << 2.0)));
-        ASSERT_EQUALS(mutablebson::unordered(_client.findOne(nss(), BSONObj{} /*filter*/)),
+            nss(), /*filter=*/BSONObj{}, BSON("$set" << BSON("f.g.h" << 3.0 << "f.g.a" << 2.0)));
+        ASSERT_EQUALS(mutablebson::unordered(_client.findOne(nss(), /*filter=*/BSONObj{})),
                       mutablebson::unordered(fromjson("{'_id':0,f:{g:{a:2,h:3}}}")));
     }
 };
@@ -410,7 +410,7 @@ public:
         _client.insert(nss(), fromjson("{'_id':0}"));
         _client.update(
             nss(), BSONObj(), BSON("$set" << BSON("f.g.h.b" << 3.0 << "f.g.a.b" << 2.0)));
-        ASSERT_EQUALS(mutablebson::unordered(_client.findOne(nss(), BSONObj{} /*filter*/)),
+        ASSERT_EQUALS(mutablebson::unordered(_client.findOne(nss(), /*filter=*/BSONObj{})),
                       mutablebson::unordered(fromjson("{'_id':0,f:{g:{a:{b:2},h:{b:3}}}}")));
     }
 };
@@ -419,8 +419,8 @@ class ArrayEmbeddedSet : public SetBase {
 public:
     void run() {
         _client.insert(nss(), fromjson("{'_id':0,z:[4,'b']}"));
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$set" << BSON("z.0" << "a")));
-        ASSERT_BSONOBJ_EQ(_client.findOne(nss(), BSONObj{} /*filter*/),
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$set" << BSON("z.0" << "a")));
+        ASSERT_BSONOBJ_EQ(_client.findOne(nss(), /*filter=*/BSONObj{}),
                           fromjson("{'_id':0,z:['a','b']}"));
     }
 };
@@ -429,8 +429,8 @@ class AttemptEmbedInExistingNum : public SetBase {
 public:
     void run() {
         _client.insert(nss(), fromjson("{'_id':0,a:1}"));
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$set" << BSON("a.b" << 1)));
-        ASSERT(_client.findOne(nss(), BSONObj{} /*filter*/).woCompare(fromjson("{'_id':0,a:1}")) ==
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$set" << BSON("a.b" << 1)));
+        ASSERT(_client.findOne(nss(), /*filter=*/BSONObj{}).woCompare(fromjson("{'_id':0,a:1}")) ==
                0);
     }
 };
@@ -439,8 +439,8 @@ class AttemptEmbedConflictsWithOtherSet : public SetBase {
 public:
     void run() {
         _client.insert(nss(), fromjson("{'_id':0}"));
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$set" << BSON("a" << 2 << "a.b" << 1)));
-        ASSERT_BSONOBJ_EQ(_client.findOne(nss(), BSONObj{} /*filter*/), fromjson("{'_id':0}"));
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$set" << BSON("a" << 2 << "a.b" << 1)));
+        ASSERT_BSONOBJ_EQ(_client.findOne(nss(), /*filter=*/BSONObj{}), fromjson("{'_id':0}"));
     }
 };
 
@@ -448,9 +448,9 @@ class ModMasksEmbeddedConflict : public SetBase {
 public:
     void run() {
         _client.insert(nss(), fromjson("{'_id':0,a:{b:2}}"));
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$set" << BSON("a" << 2 << "a.b" << 1)));
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$set" << BSON("a" << 2 << "a.b" << 1)));
         ASSERT(
-            _client.findOne(nss(), BSONObj{} /*filter*/).woCompare(fromjson("{'_id':0,a:{b:2}}")) ==
+            _client.findOne(nss(), /*filter=*/BSONObj{}).woCompare(fromjson("{'_id':0,a:{b:2}}")) ==
             0);
     }
 };
@@ -459,9 +459,9 @@ class ModOverwritesExistingObject : public SetBase {
 public:
     void run() {
         _client.insert(nss(), fromjson("{'_id':0,a:{b:2}}"));
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$set" << BSON("a" << BSON("c" << 2))));
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$set" << BSON("a" << BSON("c" << 2))));
         ASSERT(
-            _client.findOne(nss(), BSONObj{} /*filter*/).woCompare(fromjson("{'_id':0,a:{c:2}}")) ==
+            _client.findOne(nss(), /*filter=*/BSONObj{}).woCompare(fromjson("{'_id':0,a:{c:2}}")) ==
             0);
     }
 };
@@ -470,14 +470,14 @@ class InvalidEmbeddedSet : public Fail {
 public:
     BSONObj doIt() override {
         return _client.updateAcknowledged(
-            nss(), BSONObj{} /*filter*/, BSON("$set" << BSON("a." << 1)));
+            nss(), /*filter=*/BSONObj{}, BSON("$set" << BSON("a." << 1)));
     }
 };
 
 class UpsertMissingEmbedded : public SetBase {
 public:
     void run() {
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$set" << BSON("a.b" << 1)), true);
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$set" << BSON("a.b" << 1)), true);
         ASSERT(!_client.findOne(nss(), BSON("a.b" << 1)).isEmpty());
     }
 };
@@ -486,8 +486,8 @@ class Push : public SetBase {
 public:
     void run() {
         _client.insert(nss(), fromjson("{'_id':0,a:[1]}"));
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$push" << BSON("a" << 5)));
-        ASSERT_BSONOBJ_EQ(_client.findOne(nss(), BSONObj{} /*filter*/),
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$push" << BSON("a" << 5)));
+        ASSERT_BSONOBJ_EQ(_client.findOne(nss(), /*filter=*/BSONObj{}),
                           fromjson("{'_id':0,a:[1,5]}"));
     }
 };
@@ -496,8 +496,8 @@ class PushInvalidEltType : public SetBase {
 public:
     void run() {
         _client.insert(nss(), fromjson("{'_id':0,a:1}"));
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$push" << BSON("a" << 5)));
-        ASSERT(_client.findOne(nss(), BSONObj{} /*filter*/).woCompare(fromjson("{'_id':0,a:1}")) ==
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$push" << BSON("a" << 5)));
+        ASSERT(_client.findOne(nss(), /*filter=*/BSONObj{}).woCompare(fromjson("{'_id':0,a:1}")) ==
                0);
     }
 };
@@ -507,10 +507,10 @@ public:
     void run() {
         _client.insert(nss(), fromjson("{'_id':0,a:[1]}"));
         _client.update(nss(),
-                       BSONObj{} /*filter*/,
+                       /*filter=*/BSONObj{},
                        BSON("$set" << BSON("a" << 1) << "$push" << BSON("a" << 5)));
         ASSERT(
-            _client.findOne(nss(), BSONObj{} /*filter*/).woCompare(fromjson("{'_id':0,a:[1]}")) ==
+            _client.findOne(nss(), /*filter=*/BSONObj{}).woCompare(fromjson("{'_id':0,a:[1]}")) ==
             0);
     }
 };
@@ -519,8 +519,8 @@ class PushFromNothing : public SetBase {
 public:
     void run() {
         _client.insert(nss(), fromjson("{'_id':0}"));
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$push" << BSON("a" << 5)));
-        ASSERT_BSONOBJ_EQ(_client.findOne(nss(), BSONObj{} /*filter*/),
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$push" << BSON("a" << 5)));
+        ASSERT_BSONOBJ_EQ(_client.findOne(nss(), /*filter=*/BSONObj{}),
                           fromjson("{'_id':0,a:[5]}"));
     }
 };
@@ -529,9 +529,9 @@ class PushFromEmpty : public SetBase {
 public:
     void run() {
         _client.insert(nss(), fromjson("{'_id':0,a:[]}"));
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$push" << BSON("a" << 5)));
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$push" << BSON("a" << 5)));
         ASSERT(
-            _client.findOne(nss(), BSONObj{} /*filter*/).woCompare(fromjson("{'_id':0,a:[5]}")) ==
+            _client.findOne(nss(), /*filter=*/BSONObj{}).woCompare(fromjson("{'_id':0,a:[5]}")) ==
             0);
     }
 };
@@ -540,8 +540,8 @@ class PushInsideNothing : public SetBase {
 public:
     void run() {
         _client.insert(nss(), fromjson("{'_id':0}"));
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$push" << BSON("a.b" << 5)));
-        ASSERT(_client.findOne(nss(), BSONObj{} /*filter*/)
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$push" << BSON("a.b" << 5)));
+        ASSERT(_client.findOne(nss(), /*filter=*/BSONObj{})
                    .woCompare(fromjson("{'_id':0,a:{b:[5]}}")) == 0);
     }
 };
@@ -551,9 +551,9 @@ public:
     void run() {
         _client.insert(nss(), fromjson("{'_id':0}"));
         _client.update(nss(),
-                       BSONObj{} /*filter*/,
+                       /*filter=*/BSONObj{},
                        BSON("$set" << BSON("a" << BSONObj()) << "$push" << BSON("a.b" << 5)));
-        ASSERT(_client.findOne(nss(), BSONObj{} /*filter*/).woCompare(fromjson("{'_id':0}")) == 0);
+        ASSERT(_client.findOne(nss(), /*filter=*/BSONObj{}).woCompare(fromjson("{'_id':0}")) == 0);
     }
 };
 
@@ -562,9 +562,9 @@ public:
     void run() {
         _client.insert(nss(), fromjson("{'_id':0,a:[]}"));
         _client.update(nss(),
-                       BSONObj{} /*filter*/,
+                       /*filter=*/BSONObj{},
                        BSON("$push" << BSON("a" << 4) << "$push" << BSON("a" << 5)));
-        ASSERT(_client.findOne(nss(), BSONObj{} /*filter*/).woCompare(fromjson("{'_id':0,a:[]}")) ==
+        ASSERT(_client.findOne(nss(), /*filter=*/BSONObj{}).woCompare(fromjson("{'_id':0,a:[]}")) ==
                0);
     }
 };
@@ -573,9 +573,9 @@ class SetEncapsulationConflictsWithExistingType : public SetBase {
 public:
     void run() {
         _client.insert(nss(), fromjson("{'_id':0,a:{b:4}}"));
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$set" << BSON("a.b.c" << 4.0)));
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$set" << BSON("a.b.c" << 4.0)));
         ASSERT(
-            _client.findOne(nss(), BSONObj{} /*filter*/).woCompare(fromjson("{'_id':0,a:{b:4}}")) ==
+            _client.findOne(nss(), /*filter=*/BSONObj{}).woCompare(fromjson("{'_id':0,a:{b:4}}")) ==
             0);
     }
 };
@@ -584,9 +584,9 @@ class CantPushToParent : public SetBase {
 public:
     void run() {
         _client.insert(nss(), fromjson("{'_id':0,a:{b:4}}"));
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$push" << BSON("a" << 4.0)));
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$push" << BSON("a" << 4.0)));
         ASSERT(
-            _client.findOne(nss(), BSONObj{} /*filter*/).woCompare(fromjson("{'_id':0,a:{b:4}}")) ==
+            _client.findOne(nss(), /*filter=*/BSONObj{}).woCompare(fromjson("{'_id':0,a:{b:4}}")) ==
             0);
     }
 };
@@ -597,8 +597,8 @@ public:
         _client.insert(nss(), fromjson("{'_id':0,a:[1]}"));
         // { $push : { a : { $each : [ 2, 3 ] } } }
         BSONObj pushObj = BSON("$each" << BSON_ARRAY(2 << 3));
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$push" << BSON("a" << pushObj)));
-        ASSERT_BSONOBJ_EQ(_client.findOne(nss(), BSONObj{} /*filter*/),
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$push" << BSON("a" << pushObj)));
+        ASSERT_BSONOBJ_EQ(_client.findOne(nss(), /*filter=*/BSONObj{}),
                           fromjson("{'_id':0,a:[1,2,3]}"));
     }
 };
@@ -609,8 +609,8 @@ public:
         _client.insert(nss(), fromjson("{'_id':0,a:[]}"));
         // { $push : { a : { $each : [ 1, 2, 3 ] } } }
         BSONObj pushObj = BSON("$each" << BSON_ARRAY(1 << 2 << 3));
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$push" << BSON("a" << pushObj)));
-        ASSERT_BSONOBJ_EQ(_client.findOne(nss(), BSONObj{} /*filter*/),
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$push" << BSON("a" << pushObj)));
+        ASSERT_BSONOBJ_EQ(_client.findOne(nss(), /*filter=*/BSONObj{}),
                           fromjson("{'_id':0,a:[1,2,3]}"));
     }
 };
@@ -621,8 +621,8 @@ public:
         _client.insert(nss(), fromjson("{'_id':0,a:[1]}"));
         // { $push : { a : { $each : [ 2 ] , $slice : -3 } } }
         BSONObj pushObj = BSON("$each" << BSON_ARRAY(2) << "$slice" << -3);
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$push" << BSON("a" << pushObj)));
-        ASSERT_BSONOBJ_EQ(_client.findOne(nss(), BSONObj{} /*filter*/),
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$push" << BSON("a" << pushObj)));
+        ASSERT_BSONOBJ_EQ(_client.findOne(nss(), /*filter=*/BSONObj{}),
                           fromjson("{'_id':0,a:[1,2]}"));
     }
 };
@@ -633,8 +633,8 @@ public:
         _client.insert(nss(), fromjson("{'_id':0,a:[1]}"));
         // { $push : { a : { $each : [ 2 ] , $slice : -2 } } }
         BSONObj pushObj = BSON("$each" << BSON_ARRAY(2) << "$slice" << -2);
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$push" << BSON("a" << pushObj)));
-        ASSERT_BSONOBJ_EQ(_client.findOne(nss(), BSONObj{} /*filter*/),
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$push" << BSON("a" << pushObj)));
+        ASSERT_BSONOBJ_EQ(_client.findOne(nss(), /*filter=*/BSONObj{}),
                           fromjson("{'_id':0,a:[1,2]}"));
     }
 };
@@ -645,8 +645,8 @@ public:
         _client.insert(nss(), fromjson("{'_id':0,a:[1]}"));
         // { $push : { a : { $each : [ 2 , 3 ] , $slice : -2 } } }
         BSONObj pushObj = BSON("$each" << BSON_ARRAY(2 << 3) << "$slice" << -2);
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$push" << BSON("a" << pushObj)));
-        ASSERT_BSONOBJ_EQ(_client.findOne(nss(), BSONObj{} /*filter*/),
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$push" << BSON("a" << pushObj)));
+        ASSERT_BSONOBJ_EQ(_client.findOne(nss(), /*filter=*/BSONObj{}),
                           fromjson("{'_id':0,a:[2,3]}"));
     }
 };
@@ -657,8 +657,8 @@ public:
         _client.insert(nss(), fromjson("{'_id':0,a:[1,2]}"));
         // { $push : { a : { $each : [ 3 ] , $slice : -2 } } }
         BSONObj pushObj = BSON("$each" << BSON_ARRAY(3) << "$slice" << -2);
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$push" << BSON("a" << pushObj)));
-        ASSERT_BSONOBJ_EQ(_client.findOne(nss(), BSONObj{} /*filter*/),
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$push" << BSON("a" << pushObj)));
+        ASSERT_BSONOBJ_EQ(_client.findOne(nss(), /*filter=*/BSONObj{}),
                           fromjson("{'_id':0,a:[2,3]}"));
     }
 };
@@ -669,8 +669,8 @@ public:
         _client.insert(nss(), fromjson("{'_id':0,a:[1,2]}"));
         // { $push : { a : { $each : [ 3 ] , $slice : 0 } } }
         BSONObj pushObj = BSON("$each" << BSON_ARRAY(3) << "$slice" << 0);
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$push" << BSON("a" << pushObj)));
-        ASSERT_BSONOBJ_EQ(_client.findOne(nss(), BSONObj{} /*filter*/), fromjson("{'_id':0,a:[]}"));
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$push" << BSON("a" << pushObj)));
+        ASSERT_BSONOBJ_EQ(_client.findOne(nss(), /*filter=*/BSONObj{}), fromjson("{'_id':0,a:[]}"));
     }
 };
 
@@ -680,8 +680,8 @@ public:
         _client.insert(nss(), fromjson("{'_id':0}"));
         // { $push : { a : { $each : [ 3 ] , $slice : 0 } } }
         BSONObj pushObj = BSON("$each" << BSON_ARRAY(3) << "$slice" << 0);
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$push" << BSON("a" << pushObj)));
-        ASSERT_BSONOBJ_EQ(_client.findOne(nss(), BSONObj{} /*filter*/), fromjson("{'_id':0,a:[]}"));
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$push" << BSON("a" << pushObj)));
+        ASSERT_BSONOBJ_EQ(_client.findOne(nss(), /*filter=*/BSONObj{}), fromjson("{'_id':0,a:[]}"));
     }
 };
 
@@ -691,8 +691,8 @@ public:
         _client.insert(nss(), fromjson("{'_id':0}"));
         // { $push : { a : { $each : [ 1 , 2 ] , $slice : -3 } } }
         BSONObj pushObj = BSON("$each" << BSON_ARRAY(1 << 2) << "$slice" << -3);
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$push" << BSON("a" << pushObj)));
-        ASSERT_BSONOBJ_EQ(_client.findOne(nss(), BSONObj{} /*filter*/),
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$push" << BSON("a" << pushObj)));
+        ASSERT_BSONOBJ_EQ(_client.findOne(nss(), /*filter=*/BSONObj{}),
                           fromjson("{'_id':0,a:[1,2]}"));
     }
 };
@@ -703,8 +703,8 @@ public:
         _client.insert(nss(), fromjson("{'_id':0}"));
         // { $push : { a : { $each : [ 1 , 2 , 3 ] , $slice : -2 } } }
         BSONObj pushObj = BSON("$each" << BSON_ARRAY(1 << 2 << 3) << "$slice" << -2);
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$push" << BSON("a" << pushObj)));
-        ASSERT_BSONOBJ_EQ(_client.findOne(nss(), BSONObj{} /*filter*/),
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$push" << BSON("a" << pushObj)));
+        ASSERT_BSONOBJ_EQ(_client.findOne(nss(), /*filter=*/BSONObj{}),
                           fromjson("{'_id':0,a:[2,3]}"));
     }
 };
@@ -715,8 +715,8 @@ public:
         _client.insert(nss(), fromjson("{'_id':0,a:[]}"));
         // { $push : { a : { $each : [ 1 ] , $slice : -3 } } }
         BSONObj pushObj = BSON("$each" << BSON_ARRAY(1) << "$slice" << -3);
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$push" << BSON("a" << pushObj)));
-        ASSERT_BSONOBJ_EQ(_client.findOne(nss(), BSONObj{} /*filter*/),
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$push" << BSON("a" << pushObj)));
+        ASSERT_BSONOBJ_EQ(_client.findOne(nss(), /*filter=*/BSONObj{}),
                           fromjson("{'_id':0,a:[1]}"));
     }
 };
@@ -727,8 +727,8 @@ public:
         _client.insert(nss(), fromjson("{'_id':0,a:[]}"));
         // { $push : { a : { $each : [ 1 , 2 , 3 ] , $slice : -2 } } }
         BSONObj pushObj = BSON("$each" << BSON_ARRAY(1 << 2 << 3) << "$slice" << -2);
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$push" << BSON("a" << pushObj)));
-        ASSERT_BSONOBJ_EQ(_client.findOne(nss(), BSONObj{} /*filter*/),
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$push" << BSON("a" << pushObj)));
+        ASSERT_BSONOBJ_EQ(_client.findOne(nss(), /*filter=*/BSONObj{}),
                           fromjson("{'_id':0,a:[2,3]}"));
     }
 };
@@ -741,8 +741,8 @@ public:
         BSONObj objA = BSON("$each" << BSON_ARRAY(5) << "$slice" << -2);
         BSONObj objB = BSON("$each" << BSON_ARRAY(6) << "$slice" << -1);
         _client.update(
-            nss(), BSONObj{} /*filter*/, BSON("$push" << BSON("a" << objA << "b" << objB)));
-        ASSERT_BSONOBJ_EQ(_client.findOne(nss(), BSONObj{} /*filter*/),
+            nss(), /*filter=*/BSONObj{}, BSON("$push" << BSON("a" << objA << "b" << objB)));
+        ASSERT_BSONOBJ_EQ(_client.findOne(nss(), /*filter=*/BSONObj{}),
                           fromjson("{'_id':0,a:[2,5],b:[6]}"));
     }
 };
@@ -753,8 +753,8 @@ public:
         _client.insert(nss(), fromjson("{'_id':0,a:[1,2],b:[3]}"));
         // { $push : { a : { $each : [ 5 ] , $slice : -2 } , { b : 4 } }
         BSONObj objA = BSON("$each" << BSON_ARRAY(5) << "$slice" << -2);
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$push" << BSON("a" << objA << "b" << 4)));
-        ASSERT_BSONOBJ_EQ(_client.findOne(nss(), BSONObj{} /*filter*/),
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$push" << BSON("a" << objA << "b" << 4)));
+        ASSERT_BSONOBJ_EQ(_client.findOne(nss(), /*filter=*/BSONObj{}),
                           fromjson("{'_id':0,a:[2,5],b:[3,4]}"));
     }
 };
@@ -767,8 +767,8 @@ public:
         BSONObj objA = BSON("$each" << BSON_ARRAY(5) << "$slice" << -2);
         BSONObj other = BSON("$each" << BSON_ARRAY(6) << "$slice" << -1);
         _client.update(
-            nss(), BSONObj{} /*filter*/, BSON("$push" << BSON("a" << objA << "a" << other)));
-        ASSERT(_client.findOne(nss(), BSONObj{} /*filter*/)
+            nss(), /*filter=*/BSONObj{}, BSON("$push" << BSON("a" << objA << "a" << other)));
+        ASSERT(_client.findOne(nss(), /*filter=*/BSONObj{})
                    .woCompare(fromjson("{'_id':0,a:[1],b:[3]}")) == 0);
     }
 };
@@ -779,8 +779,8 @@ public:
         _client.insert(nss(), fromjson("{'_id':0,a:[1],b:[3]}"));
         // { $push : { a : { $each : [ 5 ] , $slice : -2 } , { a : 4 } } }
         BSONObj objA = BSON("$each" << BSON_ARRAY(5) << "$slice" << -2);
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$push" << BSON("a" << objA << "a" << 4)));
-        ASSERT(_client.findOne(nss(), BSONObj{} /*filter*/)
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$push" << BSON("a" << objA << "a" << 4)));
+        ASSERT(_client.findOne(nss(), /*filter=*/BSONObj{})
                    .woCompare(fromjson("{'_id':0,a:[1],b:[3]}")) == 0);
     }
 };
@@ -791,9 +791,9 @@ public:
         _client.insert(nss(), fromjson("{'_id':0,a:[1,2]}"));
         // { $push : { a : { $each : 3 , $slice : -2 } } }
         BSONObj pushObj = BSON("$each" << 3 << "$slice" << -2);
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$push" << BSON("a" << pushObj)));
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$push" << BSON("a" << pushObj)));
         ASSERT(
-            _client.findOne(nss(), BSONObj{} /*filter*/).woCompare(fromjson("{'_id':0,a:[1,2]}")) ==
+            _client.findOne(nss(), /*filter=*/BSONObj{}).woCompare(fromjson("{'_id':0,a:[1,2]}")) ==
             0);
     }
 };
@@ -804,9 +804,9 @@ public:
         _client.insert(nss(), fromjson("{'_id':0,a:[1,2]}"));
         // { $push : { a : { $each : [ 3 ], $slice : [ -2 ] } } }
         BSONObj pushObj = BSON("$each" << BSON_ARRAY(3) << "$slice" << BSON_ARRAY(-2));
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$push" << BSON("a" << pushObj)));
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$push" << BSON("a" << pushObj)));
         ASSERT(
-            _client.findOne(nss(), BSONObj{} /*filter*/).woCompare(fromjson("{'_id':0,a:[1,2]}")) ==
+            _client.findOne(nss(), /*filter=*/BSONObj{}).woCompare(fromjson("{'_id':0,a:[1,2]}")) ==
             0);
     }
 };
@@ -817,9 +817,9 @@ public:
         _client.insert(nss(), fromjson("{'_id':0,a:[1,2]}"));
         // { $push : { a : { $each : [ 3 ], $slice : 2 } } }
         BSONObj pushObj = BSON("$each" << BSON_ARRAY(3) << "$slice" << 2);
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$push" << BSON("a" << pushObj)));
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$push" << BSON("a" << pushObj)));
         ASSERT(
-            _client.findOne(nss(), BSONObj{} /*filter*/).woCompare(fromjson("{'_id':0,a:[1,2]}")) ==
+            _client.findOne(nss(), /*filter=*/BSONObj{}).woCompare(fromjson("{'_id':0,a:[1,2]}")) ==
             0);
     }
 };
@@ -831,9 +831,9 @@ public:
         _client.insert(nss(), fromjson("{'_id':0,a:[1,2]}"));
         // { $push : { a : { $each : [ 3 ], $slice : -2.1 } } }
         BSONObj pushObj = BSON("$each" << BSON_ARRAY(3) << "$slice" << -2.1);
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$push" << BSON("a" << pushObj)));
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$push" << BSON("a" << pushObj)));
         ASSERT(
-            _client.findOne(nss(), BSONObj{} /*filter*/).woCompare(fromjson("{'_id':0,a:[1,2]}")) ==
+            _client.findOne(nss(), /*filter=*/BSONObj{}).woCompare(fromjson("{'_id':0,a:[1,2]}")) ==
             0);
     }
 };
@@ -844,8 +844,8 @@ public:
         _client.insert(nss(), fromjson("{'_id':0,a:[1,2]}"));
         // { $push : { a : { $each : [ 3 ], $slice : -2.0 } } }
         BSONObj pushObj = BSON("$each" << BSON_ARRAY(3) << "$slice" << -2.0);
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$push" << BSON("a" << pushObj)));
-        ASSERT_BSONOBJ_EQ(_client.findOne(nss(), BSONObj{} /*filter*/),
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$push" << BSON("a" << pushObj)));
+        ASSERT_BSONOBJ_EQ(_client.findOne(nss(), /*filter=*/BSONObj{}),
                           fromjson("{'_id':0,a:[2,3]}"));
     }
 };
@@ -856,9 +856,9 @@ public:
         _client.insert(nss(), fromjson("{'_id':0,a:[1,2]}"));
         // { $push : { a : { $each : [ 3 ], $xxxx :  2 } } }
         BSONObj pushObj = BSON("$each" << BSON_ARRAY(3) << "$xxxx" << 2);
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$push" << BSON("a" << pushObj)));
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$push" << BSON("a" << pushObj)));
         ASSERT(
-            _client.findOne(nss(), BSONObj{} /*filter*/).woCompare(fromjson("{'_id':0,a:[1,2]}")) ==
+            _client.findOne(nss(), /*filter=*/BSONObj{}).woCompare(fromjson("{'_id':0,a:[1,2]}")) ==
             0);
     }
 };
@@ -952,8 +952,8 @@ protected:
 
     void check(BSONObj expected) {
         std::cout << expected.toString() << std::endl;
-        std::cout << _client.findOne(nss(), BSONObj{} /*filter*/) << std::endl;
-        ASSERT(_client.findOne(nss(), BSONObj{} /*filter*/).woCompare(expected) == 0);
+        std::cout << _client.findOne(nss(), /*filter=*/BSONObj{}) << std::endl;
+        ASSERT(_client.findOne(nss(), /*filter=*/BSONObj{}).woCompare(expected) == 0);
     }
 
 private:
@@ -986,16 +986,16 @@ public:
             switch (i) {
                 case TOPK_ASC:
                 case BOTTOMK_ASC:
-                    _client.update(nss(), BSONObj{} /*filter*/, getUpdate(i));
-                    result = _client.findOne(nss(), BSONObj{} /*filter*/);
+                    _client.update(nss(), /*filter=*/BSONObj{}, getUpdate(i));
+                    result = _client.findOne(nss(), /*filter=*/BSONObj{});
                     expected = fromjson("{'_id':0,x:[{a:1,b:1},{a:2,b:2}]}");
                     ASSERT_BSONOBJ_EQ(result, expected);
                     break;
 
                 case TOPK_DESC:
                 case BOTTOMK_DESC:
-                    _client.update(nss(), BSONObj{} /*filter*/, getUpdate(i));
-                    result = _client.findOne(nss(), BSONObj{} /*filter*/);
+                    _client.update(nss(), /*filter=*/BSONObj{}, getUpdate(i));
+                    result = _client.findOne(nss(), /*filter=*/BSONObj{});
                     expected = fromjson("{'_id':0,x:[{a:2,b:2},{a:1,b:1}]}");
                     ASSERT_BSONOBJ_EQ(result, expected);
                     break;
@@ -1027,16 +1027,16 @@ public:
             switch (i) {
                 case TOPK_ASC:
                 case BOTTOMK_ASC:
-                    _client.update(nss(), BSONObj{} /*filter*/, getUpdate(i));
-                    result = _client.findOne(nss(), BSONObj{} /*filter*/);
+                    _client.update(nss(), /*filter=*/BSONObj{}, getUpdate(i));
+                    result = _client.findOne(nss(), /*filter=*/BSONObj{});
                     expected = fromjson("{'_id':0,x:[{a:1,b:1},{a:2,b:2}]}");
                     ASSERT_BSONOBJ_EQ(result, expected);
                     break;
 
                 case TOPK_DESC:
                 case BOTTOMK_DESC:
-                    _client.update(nss(), BSONObj{} /*filter*/, getUpdate(i));
-                    result = _client.findOne(nss(), BSONObj{} /*filter*/);
+                    _client.update(nss(), /*filter=*/BSONObj{}, getUpdate(i));
+                    result = _client.findOne(nss(), /*filter=*/BSONObj{});
                     expected = fromjson("{'_id':0,x:[{a:2,b:2},{a:1,b:1}]}");
                     ASSERT_BSONOBJ_EQ(result, expected);
                     break;
@@ -1067,15 +1067,15 @@ public:
             BSONObj expected;
             switch (i) {
                 case TOPK_ASC:
-                    _client.update(nss(), BSONObj{} /*filter*/, getUpdate(i));
-                    result = _client.findOne(nss(), BSONObj{} /*filter*/);
+                    _client.update(nss(), /*filter=*/BSONObj{}, getUpdate(i));
+                    result = _client.findOne(nss(), /*filter=*/BSONObj{});
                     expected = fromjson("{'_id':0,x:[{a:2,b:2},{a:3,b:3}]}");
                     ASSERT_BSONOBJ_EQ(result, expected);
                     break;
 
                 case TOPK_DESC:
-                    _client.update(nss(), BSONObj{} /*filter*/, getUpdate(i));
-                    result = _client.findOne(nss(), BSONObj{} /*filter*/);
+                    _client.update(nss(), /*filter=*/BSONObj{}, getUpdate(i));
+                    result = _client.findOne(nss(), /*filter=*/BSONObj{});
                     expected = fromjson("{'_id':0,x:[{a:2,b:2},{a:1,b:1}]}");
                     ASSERT_BSONOBJ_EQ(result, expected);
                     break;
@@ -1110,8 +1110,8 @@ public:
             BSONObj result;
             BSONObj expected;
 
-            _client.update(nss(), BSONObj{} /*filter*/, getUpdate(i));
-            result = _client.findOne(nss(), BSONObj{} /*filter*/);
+            _client.update(nss(), /*filter=*/BSONObj{}, getUpdate(i));
+            result = _client.findOne(nss(), /*filter=*/BSONObj{});
             expected = fromjson("{'_id':0,x:[]}");
             ASSERT_BSONOBJ_EQ(result, expected);
         }
@@ -1139,8 +1139,8 @@ public:
             BSONObj result;
             BSONObj expected;
 
-            _client.update(nss(), BSONObj{} /*filter*/, getUpdate(i));
-            result = _client.findOne(nss(), BSONObj{} /*filter*/);
+            _client.update(nss(), /*filter=*/BSONObj{}, getUpdate(i));
+            result = _client.findOne(nss(), /*filter=*/BSONObj{});
             expected = fromjson("{'_id':0,x:[]}");
             ASSERT_BSONOBJ_EQ(result, expected);
         }
@@ -1172,16 +1172,16 @@ public:
             switch (i) {
                 case TOPK_ASC:
                 case BOTTOMK_ASC:
-                    _client.update(nss(), BSONObj{} /*filter*/, getUpdate(i));
-                    result = _client.findOne(nss(), BSONObj{} /*filter*/);
+                    _client.update(nss(), /*filter=*/BSONObj{}, getUpdate(i));
+                    result = _client.findOne(nss(), /*filter=*/BSONObj{});
                     expected = fromjson("{'_id':0,x:[{a:1,b:1},{a:2,b:2}]}");
                     ASSERT_BSONOBJ_EQ(result, expected);
                     break;
 
                 case TOPK_DESC:
                 case BOTTOMK_DESC:
-                    _client.update(nss(), BSONObj{} /*filter*/, getUpdate(i));
-                    result = _client.findOne(nss(), BSONObj{} /*filter*/);
+                    _client.update(nss(), /*filter=*/BSONObj{}, getUpdate(i));
+                    result = _client.findOne(nss(), /*filter=*/BSONObj{});
                     expected = fromjson("{'_id':0,x:[{a:2,b:2},{a:1,b:1}]}");
                     ASSERT_BSONOBJ_EQ(result, expected);
                     break;
@@ -1213,15 +1213,15 @@ public:
             BSONObj expected;
             switch (i) {
                 case TOPK_ASC:
-                    _client.update(nss(), BSONObj{} /*filter*/, getUpdate(i));
-                    result = _client.findOne(nss(), BSONObj{} /*filter*/);
+                    _client.update(nss(), /*filter=*/BSONObj{}, getUpdate(i));
+                    result = _client.findOne(nss(), /*filter=*/BSONObj{});
                     expected = fromjson("{'_id':0,x:[{a:2,b:2},{a:3,b:3}]}");
                     ASSERT_BSONOBJ_EQ(result, expected);
                     break;
 
                 case TOPK_DESC:
-                    _client.update(nss(), BSONObj{} /*filter*/, getUpdate(i));
-                    result = _client.findOne(nss(), BSONObj{} /*filter*/);
+                    _client.update(nss(), /*filter=*/BSONObj{}, getUpdate(i));
+                    result = _client.findOne(nss(), /*filter=*/BSONObj{});
                     expected = fromjson("{'_id':0,x:[{a:2,b:2},{a:1,b:1}]}");
                     ASSERT_BSONOBJ_EQ(result, expected);
                     break;
@@ -1259,16 +1259,16 @@ public:
             switch (i) {
                 case TOPK_ASC:
                 case BOTTOMK_ASC:
-                    _client.update(nss(), BSONObj{} /*filter*/, getUpdate(i));
-                    result = _client.findOne(nss(), BSONObj{} /*filter*/);
+                    _client.update(nss(), /*filter=*/BSONObj{}, getUpdate(i));
+                    result = _client.findOne(nss(), /*filter=*/BSONObj{});
                     expected = fromjson("{'_id':0,x:[{a:1,b:1},{a:2,b:2}]}");
                     ASSERT_BSONOBJ_EQ(result, expected);
                     break;
 
                 case TOPK_DESC:
                 case BOTTOMK_DESC:
-                    _client.update(nss(), BSONObj{} /*filter*/, getUpdate(i));
-                    result = _client.findOne(nss(), BSONObj{} /*filter*/);
+                    _client.update(nss(), /*filter=*/BSONObj{}, getUpdate(i));
+                    result = _client.findOne(nss(), /*filter=*/BSONObj{});
                     expected = fromjson("{'_id':0,x:[{a:2,b:2},{a:1,b:1}]}");
                     ASSERT_BSONOBJ_EQ(result, expected);
                     break;
@@ -1300,15 +1300,15 @@ public:
             BSONObj expected;
             switch (i) {
                 case TOPK_ASC:
-                    _client.update(nss(), BSONObj{} /*filter*/, getUpdate(i));
-                    result = _client.findOne(nss(), BSONObj{} /*filter*/);
+                    _client.update(nss(), /*filter=*/BSONObj{}, getUpdate(i));
+                    result = _client.findOne(nss(), /*filter=*/BSONObj{});
                     expected = fromjson("{'_id':0,x:[{a:2,b:2},{a:3,b:3}]}");
                     ASSERT_BSONOBJ_EQ(result, expected);
                     break;
 
                 case TOPK_DESC:
-                    _client.update(nss(), BSONObj{} /*filter*/, getUpdate(i));
-                    result = _client.findOne(nss(), BSONObj{} /*filter*/);
+                    _client.update(nss(), /*filter=*/BSONObj{}, getUpdate(i));
+                    result = _client.findOne(nss(), /*filter=*/BSONObj{});
                     expected = fromjson("{'_id':0,x:[{a:2,b:2},{a:1,b:1}]}");
                     ASSERT_BSONOBJ_EQ(result, expected);
                     break;
@@ -1468,37 +1468,37 @@ public:
         // { $push : { x : { $each : [ {a:3} ], $slice:-2, $sort : {a..d:1} } } }
         BSONObj pushObj = BSON("$each" << BSON_ARRAY(BSON("a" << 3)) << "$slice" << -2 << "$sort"
                                        << BSON("a..d" << 1));
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$push" << BSON("x" << pushObj)));
-        BSONObj result = _client.findOne(nss(), BSONObj{} /*filter*/);
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$push" << BSON("x" << pushObj)));
+        BSONObj result = _client.findOne(nss(), /*filter=*/BSONObj{});
         ASSERT_BSONOBJ_EQ(result, expected);
 
 
         // { $push : { x : { $each : [ {a:3} ], $slice:-2, $sort : {a.:1} } } }
         pushObj = BSON("$each" << BSON_ARRAY(BSON("a" << 3)) << "$slice" << -2 << "$sort"
                                << BSON("a." << 1));
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$push" << BSON("x" << pushObj)));
-        result = _client.findOne(nss(), BSONObj{} /*filter*/);
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$push" << BSON("x" << pushObj)));
+        result = _client.findOne(nss(), /*filter=*/BSONObj{});
         ASSERT_BSONOBJ_EQ(result, expected);
 
         // { $push : { x : { $each : [ {a:3} ], $slice:-2, $sort : {.b:1} } } }
         pushObj = BSON("$each" << BSON_ARRAY(BSON("a" << 3)) << "$slice" << -2 << "$sort"
                                << BSON(".b" << 1));
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$push" << BSON("x" << pushObj)));
-        result = _client.findOne(nss(), BSONObj{} /*filter*/);
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$push" << BSON("x" << pushObj)));
+        result = _client.findOne(nss(), /*filter=*/BSONObj{});
         ASSERT_BSONOBJ_EQ(result, expected);
 
         // { $push : { x : { $each : [ {a:3} ], $slice:-2, $sort : {.:1} } } }
         pushObj = BSON("$each" << BSON_ARRAY(BSON("a" << 3)) << "$slice" << -2 << "$sort"
                                << BSON("." << 1));
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$push" << BSON("x" << pushObj)));
-        result = _client.findOne(nss(), BSONObj{} /*filter*/);
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$push" << BSON("x" << pushObj)));
+        result = _client.findOne(nss(), /*filter=*/BSONObj{});
         ASSERT_BSONOBJ_EQ(result, expected);
 
         // { $push : { x : { $each : [ {a:3} ], $slice:-2, $sort : {'':1} } } }
         pushObj = BSON("$each" << BSON_ARRAY(BSON("a" << 3)) << "$slice" << -2 << "$sort"
                                << BSON("" << 1));
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$push" << BSON("x" << pushObj)));
-        result = _client.findOne(nss(), BSONObj{} /*filter*/);
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$push" << BSON("x" << pushObj)));
+        result = _client.findOne(nss(), /*filter=*/BSONObj{});
         ASSERT_BSONOBJ_EQ(result, expected);
     }
 };
@@ -1511,8 +1511,8 @@ public:
         // { $push : { x : { $each : [ 3 ], $slice:-2, $sort : {a:1} } } }
         BSONObj pushObj =
             BSON("$each" << BSON_ARRAY(3) << "$slice" << -2 << "$sort" << BSON("a" << 1));
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$push" << BSON("x" << pushObj)));
-        BSONObj result = _client.findOne(nss(), BSONObj{} /*filter*/);
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$push" << BSON("x" << pushObj)));
+        BSONObj result = _client.findOne(nss(), /*filter=*/BSONObj{});
         ASSERT_BSONOBJ_EQ(result, expected);
     }
 };
@@ -1525,8 +1525,8 @@ public:
         // { $push : { x : { $each : [ {a:3} ], $slice:-2, $sort : 2} } }
         BSONObj pushObj =
             BSON("$each" << BSON_ARRAY(BSON("a" << 3)) << "$slice" << -2 << "$sort" << 2);
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$push" << BSON("x" << pushObj)));
-        BSONObj result = _client.findOne(nss(), BSONObj{} /*filter*/);
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$push" << BSON("x" << pushObj)));
+        BSONObj result = _client.findOne(nss(), /*filter=*/BSONObj{});
         ASSERT_BSONOBJ_EQ(result, expected);
     }
 };
@@ -1539,8 +1539,8 @@ public:
         // { $push : { x : { $each : [ {a:3} ], $slice:2, $sort : {a:1} } } }
         BSONObj pushObj = BSON("$each" << BSON_ARRAY(BSON("a" << 3)) << "$slice" << 2 << "$sort"
                                        << BSON("a" << 1));
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$push" << BSON("x" << pushObj)));
-        BSONObj result = _client.findOne(nss(), BSONObj{} /*filter*/);
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$push" << BSON("x" << pushObj)));
+        BSONObj result = _client.findOne(nss(), /*filter=*/BSONObj{});
         ASSERT_BSONOBJ_EQ(result, expected);
     }
 };
@@ -1553,8 +1553,8 @@ public:
         // { $push : { x : { $each : [ {a:3} ], $slice:-2.1, $sort : {a:1} } } }
         BSONObj pushObj = BSON("$each" << BSON_ARRAY(BSON("a" << 3)) << "$slice" << -2.1 << "$sort"
                                        << BSON("a" << 1));
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$push" << BSON("x" << pushObj)));
-        BSONObj result = _client.findOne(nss(), BSONObj{} /*filter*/);
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$push" << BSON("x" << pushObj)));
+        BSONObj result = _client.findOne(nss(), /*filter=*/BSONObj{});
         ASSERT_BSONOBJ_EQ(result, expected);
     }
 };
@@ -1566,9 +1566,9 @@ public:
         // { $push : { x : { $each : [ {a:3} ], $slice:-2.0, $sort : {a:1} } } }
         BSONObj pushObj = BSON("$each" << BSON_ARRAY(BSON("a" << 3)) << "$slice" << -2.0 << "$sort"
                                        << BSON("a" << 1));
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$push" << BSON("x" << pushObj)));
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$push" << BSON("x" << pushObj)));
         BSONObj expected = fromjson("{'_id':0,x:[{a:2},{a:3}]}");
-        BSONObj result = _client.findOne(nss(), BSONObj{} /*filter*/);
+        BSONObj result = _client.findOne(nss(), /*filter=*/BSONObj{});
         ASSERT_BSONOBJ_EQ(result, expected);
     }
 };
@@ -1581,8 +1581,8 @@ public:
         // { $push : { x : { $each : [ {a:3} ], $slice:-2.0, $sort : [2, 1] } } }
         BSONObj pushObj = BSON("$each" << BSON_ARRAY(BSON("a" << 3)) << "$slice" << -2.0 << "$sort"
                                        << BSON_ARRAY(2 << 1));
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$push" << BSON("x" << pushObj)));
-        BSONObj result = _client.findOne(nss(), BSONObj{} /*filter*/);
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$push" << BSON("x" << pushObj)));
+        BSONObj result = _client.findOne(nss(), /*filter=*/BSONObj{});
         ASSERT_BSONOBJ_EQ(result, expected);
     }
 };
@@ -1595,8 +1595,8 @@ public:
         // { $push : { x : { $each : [ {a:3} ], $slice:-2, $sort : {a:10} } } }
         BSONObj pushObj = BSON("$each" << BSON_ARRAY(BSON("a" << 3)) << "$slice" << -2 << "$sort"
                                        << BSON("a" << 10));
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$push" << BSON("x" << pushObj)));
-        BSONObj result = _client.findOne(nss(), BSONObj{} /*filter*/);
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$push" << BSON("x" << pushObj)));
+        BSONObj result = _client.findOne(nss(), /*filter=*/BSONObj{});
         ASSERT_BSONOBJ_EQ(result, expected);
     }
 };
@@ -1608,9 +1608,9 @@ public:
         // { $push : { x : { $each : [ {a:2} ], $sort: {a:1}, $slice:-2 } } }
         BSONObj pushObj = BSON("$each" << BSON_ARRAY(BSON("a" << 2)) << "$sort" << BSON("a" << 1)
                                        << "$slice" << -2.0);
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$push" << BSON("x" << pushObj)));
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$push" << BSON("x" << pushObj)));
         BSONObj expected = fromjson("{'_id':0,x:[{a:2},{a:3}]}");
-        BSONObj result = _client.findOne(nss(), BSONObj{} /*filter*/);
+        BSONObj result = _client.findOne(nss(), /*filter=*/BSONObj{});
         ASSERT_BSONOBJ_EQ(result, expected);
     }
 };
@@ -1623,8 +1623,8 @@ public:
         // { $push : { x : { $each : [ {a:2} ], $sort : {a:1}, $sort: {a:1} } } }
         BSONObj pushObj = BSON("$each" << BSON_ARRAY(BSON("a" << 2)) << "$sort" << BSON("a" << 1)
                                        << "$sort" << BSON("a" << 1));
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$push" << BSON("x" << pushObj)));
-        BSONObj result = _client.findOne(nss(), BSONObj{} /*filter*/);
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$push" << BSON("x" << pushObj)));
+        BSONObj result = _client.findOne(nss(), /*filter=*/BSONObj{});
         ASSERT_BSONOBJ_EQ(result, expected);
     }
 };
@@ -1633,9 +1633,9 @@ class CantIncParent : public SetBase {
 public:
     void run() {
         _client.insert(nss(), fromjson("{'_id':0,a:{b:4}}"));
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$inc" << BSON("a" << 4.0)));
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$inc" << BSON("a" << 4.0)));
         ASSERT(
-            _client.findOne(nss(), BSONObj{} /*filter*/).woCompare(fromjson("{'_id':0,a:{b:4}}")) ==
+            _client.findOne(nss(), /*filter=*/BSONObj{}).woCompare(fromjson("{'_id':0,a:{b:4}}")) ==
             0);
     }
 };
@@ -1644,8 +1644,8 @@ class DontDropEmpty : public SetBase {
 public:
     void run() {
         _client.insert(nss(), fromjson("{'_id':0,a:{b:{}}}"));
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$set" << BSON("a.c" << 4.0)));
-        ASSERT(_client.findOne(nss(), BSONObj{} /*filter*/)
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$set" << BSON("a.c" << 4.0)));
+        ASSERT(_client.findOne(nss(), /*filter=*/BSONObj{})
                    .woCompare(fromjson("{'_id':0,a:{b:{},c:4}}")) == 0);
     }
 };
@@ -1654,8 +1654,8 @@ class InsertInEmpty : public SetBase {
 public:
     void run() {
         _client.insert(nss(), fromjson("{'_id':0,a:{b:{}}}"));
-        _client.update(nss(), BSONObj{} /*filter*/, BSON("$set" << BSON("a.b.f" << 4.0)));
-        ASSERT(_client.findOne(nss(), BSONObj{} /*filter*/)
+        _client.update(nss(), /*filter=*/BSONObj{}, BSON("$set" << BSON("a.b.f" << 4.0)));
+        ASSERT(_client.findOne(nss(), /*filter=*/BSONObj{})
                    .woCompare(fromjson("{'_id':0,a:{b:{f:4}}}")) == 0);
     }
 };
@@ -1665,9 +1665,9 @@ public:
     void run() {
         ASSERT_OK(createIndex(&_opCtx, ns(), BSON("a" << 1)));
         _client.insert(nss(), fromjson("{'_id':0}"));
-        _client.update(nss(), BSONObj{} /*filter*/, fromjson("{$set:{'a.b':4}}"));
+        _client.update(nss(), /*filter=*/BSONObj{}, fromjson("{$set:{'a.b':4}}"));
         ASSERT_BSONOBJ_EQ(fromjson("{'_id':0,a:{b:4}}"),
-                          _client.findOne(nss(), BSONObj{} /*filter*/));
+                          _client.findOne(nss(), /*filter=*/BSONObj{}));
         ASSERT_BSONOBJ_EQ(
             fromjson("{'_id':0,a:{b:4}}"),
             _client.findOne(nss(), fromjson("{'a.b':4}")));  // make sure the index works
@@ -1714,7 +1714,7 @@ public:
         _client.update(nss(), BSONObj(), BSON("$set" << BSON("x.b" << 1 << "x.c" << 1)));
         ASSERT_BSONOBJ_EQ(BSON("_id" << 0 << "a" << 1 << "x" << BSON("b" << 1 << "c" << 1) << "x"
                                      << BSONObj() << "z" << 5),
-                          _client.findOne(nss(), BSONObj{} /*filter*/));
+                          _client.findOne(nss(), /*filter=*/BSONObj{}));
     }
 };
 
@@ -1728,7 +1728,7 @@ public:
             nss(), BSONObj(), BSON("$set" << BSON("x.b" << 1 << "x.c" << 1 << "x.d" << 1)));
         ASSERT_BSONOBJ_EQ(BSON("_id" << 0 << "x" << BSON("b" << 1 << "c" << 1 << "d" << 1) << "x"
                                      << BSONObj() << "x" << BSONObj()),
-                          _client.findOne(nss(), BSONObj{} /*filter*/));
+                          _client.findOne(nss(), /*filter=*/BSONObj{}));
     }
 };
 
@@ -1738,7 +1738,7 @@ public:
         _client.insert(nss(), BSON("_id" << 0 << "x" << 5));
         _client.update(nss(), BSONObj(), BSON("$set" << BSON("a" << 1 << "b" << 1 << "x" << 10)));
         ASSERT_EQUALS(mutablebson::unordered(BSON("_id" << 0 << "a" << 1 << "b" << 1 << "x" << 10)),
-                      mutablebson::unordered(_client.findOne(nss(), BSONObj{} /*filter*/)));
+                      mutablebson::unordered(_client.findOne(nss(), /*filter=*/BSONObj{})));
     }
 };
 
@@ -1763,7 +1763,7 @@ protected:
 
     BSONObj findOne() {
         return _client.findOne(NamespaceString::createNamespaceString_forTest(ns()),
-                               BSONObj{} /*filter*/);
+                               /*filter=*/BSONObj{});
     }
 
     void test(const char* initial, const char* mod, const char* after) {

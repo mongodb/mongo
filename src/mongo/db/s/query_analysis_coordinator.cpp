@@ -66,7 +66,7 @@ QueryAnalysisCoordinator* QueryAnalysisCoordinator::get(ServiceContext* serviceC
 }
 
 bool QueryAnalysisCoordinator::shouldRegisterReplicaSetAwareService() const {
-    return supportsCoordinatingQueryAnalysis(true /* isReplEnabled */);
+    return supportsCoordinatingQueryAnalysis(/*isReplEnabled=*/true);
 }
 
 void QueryAnalysisCoordinator::onConfigurationInsert(const QueryAnalyzerDocument& doc) {

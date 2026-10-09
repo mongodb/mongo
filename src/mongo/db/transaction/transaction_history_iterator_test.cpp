@@ -199,7 +199,7 @@ TEST_F(SessionHistoryIteratorTest, CommittedUnpreparedTransactionSingleApplyOps)
               "includeCommitTimestamp"_attr = includeCommitTimestamp);
 
         TransactionHistoryIterator iter(
-            applyOpsOpTime, true /* permitYield */, includeCommitTimestamp);
+            applyOpsOpTime, /*permitYield=*/true, includeCommitTimestamp);
         ASSERT_TRUE(iter.hasNext());
 
         auto entry = iter.next(opCtx());
@@ -266,7 +266,7 @@ TEST_F(SessionHistoryIteratorTest, CommittedUnpreparedTransactionMultiApplyOps) 
               "includeCommitTimestamp"_attr = includeCommitTimestamp);
 
         TransactionHistoryIterator iter(
-            applyOpsOpTime1, true /* permitYield */, includeCommitTimestamp);
+            applyOpsOpTime1, /*permitYield=*/true, includeCommitTimestamp);
         ASSERT_TRUE(iter.hasNext());
 
         auto entry1 = iter.next(opCtx());
@@ -332,7 +332,7 @@ TEST_F(SessionHistoryIteratorTest, CommittedPreparedTransactionSingleApplyOps) {
               "includeCommitTimestamp"_attr = includeCommitTimestamp);
 
         TransactionHistoryIterator iter(
-            commitTxnOpTime, true /* permitYield */, includeCommitTimestamp);
+            commitTxnOpTime, /*permitYield=*/true, includeCommitTimestamp);
         ASSERT_TRUE(iter.hasNext());
 
         auto entry1 = iter.next(opCtx());
@@ -414,7 +414,7 @@ TEST_F(SessionHistoryIteratorTest, CommittedPreparedTransactionMultiApplyOps) {
               "includeCommitTimestamp"_attr = includeCommitTimestamp);
 
         TransactionHistoryIterator iter(
-            commitTxnOpTime, true /* permitYield */, includeCommitTimestamp);
+            commitTxnOpTime, /*permitYield=*/true, includeCommitTimestamp);
         ASSERT_TRUE(iter.hasNext());
 
         auto entry2 = iter.next(opCtx());
@@ -490,7 +490,7 @@ TEST_F(SessionHistoryIteratorTest, AbortedPreparedTransaction) {
               "includeCommitTimestamp"_attr = includeCommitTimestamp);
 
         TransactionHistoryIterator iter(
-            abortTxnOpTime, true /* permitYield */, includeCommitTimestamp);
+            abortTxnOpTime, /*permitYield=*/true, includeCommitTimestamp);
         ASSERT_TRUE(iter.hasNext());
 
         if (includeCommitTimestamp == IncludeCommitTimestamp::kYes) {
@@ -547,7 +547,7 @@ TEST_F(SessionHistoryIteratorTest, UncommittedPreparedTransaction) {
               "includeCommitTimestamp"_attr = includeCommitTimestamp);
 
         TransactionHistoryIterator iter(
-            applyOpsOpTime, true /* permitYield */, includeCommitTimestamp);
+            applyOpsOpTime, /*permitYield=*/true, includeCommitTimestamp);
         ASSERT_TRUE(iter.hasNext());
 
         if (includeCommitTimestamp == IncludeCommitTimestamp::kYes) {
@@ -597,7 +597,7 @@ TEST_F(SessionHistoryIteratorTest, UncommittedPartialTransactionSingleApplyOps) 
               "includeCommitTimestamp"_attr = includeCommitTimestamp);
 
         TransactionHistoryIterator iter(
-            applyOpsOpTime, true /* permitYield */, includeCommitTimestamp);
+            applyOpsOpTime, /*permitYield=*/true, includeCommitTimestamp);
         ASSERT_TRUE(iter.hasNext());
 
         if (includeCommitTimestamp == IncludeCommitTimestamp::kYes) {
@@ -663,7 +663,7 @@ TEST_F(SessionHistoryIteratorTest, UncommittedPartialTransactionMultiApplyOps) {
               "includeCommitTimestamp"_attr = includeCommitTimestamp);
 
         TransactionHistoryIterator iter(
-            applyOpsOpTime1, true /* permitYield */, includeCommitTimestamp);
+            applyOpsOpTime1, /*permitYield=*/true, includeCommitTimestamp);
         ASSERT_TRUE(iter.hasNext());
 
         if (includeCommitTimestamp == IncludeCommitTimestamp::kYes) {
@@ -717,8 +717,7 @@ TEST_F(SessionHistoryIteratorTest, RetryableWritesNotApplyOps) {
               "test"_attr = unittest::getTestName(),
               "includeCommitTimestamp"_attr = includeCommitTimestamp);
 
-        TransactionHistoryIterator iter(
-            insertOpTime, true /* permitYield */, includeCommitTimestamp);
+        TransactionHistoryIterator iter(insertOpTime, /*permitYield=*/true, includeCommitTimestamp);
         ASSERT_TRUE(iter.hasNext());
 
         if (includeCommitTimestamp == IncludeCommitTimestamp::kYes) {
@@ -784,7 +783,7 @@ TEST_F(SessionHistoryIteratorTest, RetryableWritesApplyOps) {
               "includeCommitTimestamp"_attr = includeCommitTimestamp);
 
         TransactionHistoryIterator iter(
-            applyOpsOpTime1, true /* permitYield */, includeCommitTimestamp);
+            applyOpsOpTime1, /*permitYield=*/true, includeCommitTimestamp);
         ASSERT_TRUE(iter.hasNext());
 
         if (includeCommitTimestamp == IncludeCommitTimestamp::kYes) {

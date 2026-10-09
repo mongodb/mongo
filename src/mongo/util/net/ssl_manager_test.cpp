@@ -724,7 +724,7 @@ TEST(SSLManager, RotateCertificatesFromFile) {
         return opts;
     }();
     transport::AsioTransportLayer tla(options, std::make_unique<SessionManagerUtil>());
-    uassertStatusOK(tla.rotateCertificates(manager, false /* asyncOCSPStaple */));
+    uassertStatusOK(tla.rotateCertificates(manager, /*asyncOCSPStaple=*/false));
 }
 
 TEST(SSLManager, InitContextFromFileShouldFail) {
@@ -761,7 +761,7 @@ TEST(SSLManager, RotateClusterCertificatesFromFile) {
         return opts;
     }();
     transport::AsioTransportLayer tla(options, std::make_unique<SessionManagerUtil>());
-    uassertStatusOK(tla.rotateCertificates(manager, false /* asyncOCSPStaple */));
+    uassertStatusOK(tla.rotateCertificates(manager, /*asyncOCSPStaple=*/false));
 }
 
 #if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
@@ -972,7 +972,7 @@ TEST(SSLManager, WindowsTLS13EnabledByDefault) {
     params.sslCAFile = "jstests/libs/ca.pem";
 
     std::shared_ptr<SSLManagerInterface> manager =
-        SSLManagerInterface::create(params, true /* isSSLServer */);
+        SSLManagerInterface::create(params, /*isSSLServer=*/true);
 
     // Test server-side (incoming) context includes TLS 1.3
     TLS_PARAMETERS serverTLSParams = {};
@@ -1008,7 +1008,7 @@ TEST(SSLManager, WindowsTLS13CanBeDisabled) {
     params.sslDisabledProtocols = {SSLParams::Protocols::TLS1_3};
 
     std::shared_ptr<SSLManagerInterface> manager =
-        SSLManagerInterface::create(params, true /* isSSLServer */);
+        SSLManagerInterface::create(params, /*isSSLServer=*/true);
 
     // Test server-side (incoming) context has TLS 1.3 disabled
     TLS_PARAMETERS serverTLSParams = {};
@@ -1046,7 +1046,7 @@ TEST(SSLManager, WindowsDisableAllTLSProtocolsFails) {
                                    SSLParams::Protocols::TLS1_2,
                                    SSLParams::Protocols::TLS1_3};
 
-    ASSERT_THROWS_CODE_AND_WHAT(SSLManagerInterface::create(params, true /* isSSLServer */),
+    ASSERT_THROWS_CODE_AND_WHAT(SSLManagerInterface::create(params, /*isSSLServer=*/true),
                                 DBException,
                                 ErrorCodes::InvalidSSLConfiguration,
                                 "All supported TLS protocols have been disabled.");
@@ -1223,7 +1223,7 @@ TEST(SSLManager, NonOpenSSLDecryptPEMKeyNotImplemented) {
     params.sslCAFile = "jstests/libs/ca.pem";
 
     std::shared_ptr<SSLManagerInterface> manager =
-        SSLManagerInterface::create(params, true /* isSSLServer */);
+        SSLManagerInterface::create(params, /*isSSLServer=*/true);
 
     auto sw = manager->decryptPEMKey("pemContents"sv, "password"sv);
     ASSERT_NOT_OK(sw.getStatus());
@@ -1579,7 +1579,7 @@ TEST(SSLManager, basicEgressValidationTests) {
             SSLTestFixture tf(serverParams, clientParams);
             tf.doHandshake();
             auto result = tf.runIngressEgressValidation();
-            checkValidationResults(result, true /*expectIngressPass*/, test.pass || weak);
+            checkValidationResults(result, /*expectIngressPass=*/true, test.pass || weak);
 
             if (result.egress.isOK()) {
                 auto& peerInfo = result.egress.getValue();
@@ -1632,7 +1632,7 @@ TEST(SSLManager, basicIngressValidationTests) {
             SSLTestFixture tf(serverParams, clientParams);
             tf.doHandshake();
             auto result = tf.runIngressEgressValidation();
-            checkValidationResults(result, test.pass || weak, true /*expectEgressPass*/);
+            checkValidationResults(result, test.pass || weak, /*expectEgressPass=*/true);
 
             if (result.ingress.isOK()) {
                 auto& peerInfo = result.ingress.getValue();
@@ -1737,10 +1737,10 @@ TEST(SSLManager, noCertificatePresentedByPeerTests) {
         serverParams.sslWeakCertificateValidation = weak;
 
         SSLTestFixture tf(
-            serverParams, clientParams, true /*ingressIsServer*/, true /*egressIsServer*/);
+            serverParams, clientParams, /*ingressIsServer=*/true, /*egressIsServer=*/true);
         tf.doHandshake();
         auto result = tf.runIngressEgressValidation();
-        checkValidationResults(result, weak /*expectIngressPass*/, true /*expectEgressPass*/);
+        checkValidationResults(result, /*expectIngressPass=*/weak, /*expectEgressPass=*/true);
     }
 }
 
@@ -1779,7 +1779,7 @@ TEST(SSLManager, transientSSLParamsOverrideGlobalParamsTests) {
 
     // First, test that validation fails on both sides without the transient params.
     SSLTestFixture tf(
-        serverParams, clientParams, true /*ingressIsServer*/, false /*egressIsServer*/);
+        serverParams, clientParams, /*ingressIsServer=*/true, /*egressIsServer=*/false);
     tf.doHandshake();
     auto result = tf.runIngressEgressValidation();
     checkValidationResults(result, false, false);
@@ -1896,7 +1896,7 @@ TEST(SSLManager, intermediateCATests) {
         SSLTestFixture tf(serverParams, clientParams);
         tf.doHandshake();
         auto result = tf.runIngressEgressValidation();
-        checkValidationResults(result, true /*expectIngressPass*/, test.clientPass);
+        checkValidationResults(result, /*expectIngressPass=*/true, test.clientPass);
     }
 }
 
@@ -1924,7 +1924,7 @@ TEST(SSLManager, expiredCRLTest) {
     SSLTestFixture tf(serverParams, clientParams);
     tf.doHandshake();
     auto result = tf.runIngressEgressValidation();
-    checkValidationResults(result, false /*expectIngressPass*/, false /*expectEgressPass*/);
+    checkValidationResults(result, /*expectIngressPass=*/false, /*expectEgressPass=*/false);
 
 #if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_WINDOWS
     constexpr const char* cause = "revocation server was offline";
@@ -1970,7 +1970,7 @@ TEST(SSLManager, multipleCRLsFromSameIssuerTests) {
         SSLTestFixture tf(serverParams, clientParams);
         tf.doHandshake();
         auto result = tf.runIngressEgressValidation();
-        checkValidationResults(result, true /*expectIngressPass*/, true);
+        checkValidationResults(result, /*expectIngressPass=*/true, true);
     }
     {
         clientParams.sslPEMKeyFile = revokedClientKeyFile;
@@ -2015,7 +2015,7 @@ TEST(SSLManager, basicCRLRevocationTests) {
         SSLTestFixture tf(serverParams, clientParams);
         tf.doHandshake();
         auto result = tf.runIngressEgressValidation();
-        checkValidationResults(result, true, true /*expectEgressPass*/);
+        checkValidationResults(result, true, /*expectEgressPass=*/true);
     }
     {
         serverParams.sslCRLFile = clientRevokedCRL;
@@ -2023,7 +2023,7 @@ TEST(SSLManager, basicCRLRevocationTests) {
         SSLTestFixture tf(serverParams, clientParams);
         tf.doHandshake();
         auto result = tf.runIngressEgressValidation();
-        checkValidationResults(result, false, true /*expectEgressPass*/);
+        checkValidationResults(result, false, /*expectEgressPass=*/true);
         ASSERT_NE(result.ingress.getStatus().reason().find("revoked"), std::string::npos);
     }
 }
@@ -2152,7 +2152,7 @@ TEST(SSLManager, basicEgressValidationTestsTLS13Only) {
             SSLTestFixture tf(serverParams, clientParams);
             tf.doHandshake();
             auto result = tf.runIngressEgressValidation();
-            checkValidationResults(result, true /*expectIngressPass*/, test.pass || weak);
+            checkValidationResults(result, /*expectIngressPass=*/true, test.pass || weak);
         }
     }
 }
@@ -2193,7 +2193,7 @@ TEST(SSLManager, basicIngressValidationTestsTLS13Only) {
             SSLTestFixture tf(serverParams, clientParams);
             tf.doHandshake();
             auto result = tf.runIngressEgressValidation();
-            checkValidationResults(result, test.pass || weak, true /*expectEgressPass*/);
+            checkValidationResults(result, test.pass || weak, /*expectEgressPass=*/true);
         }
     }
 }
@@ -2278,10 +2278,10 @@ TEST(SSLManager, noCertificatePresentedByPeerTestsTLS13Only) {
         serverParams.sslWeakCertificateValidation = weak;
 
         SSLTestFixture tf(
-            serverParams, clientParams, true /*ingressIsServer*/, true /*egressIsServer*/);
+            serverParams, clientParams, /*ingressIsServer=*/true, /*egressIsServer=*/true);
         tf.doHandshake();
         auto result = tf.runIngressEgressValidation();
-        checkValidationResults(result, weak /*expectIngressPass*/, true /*expectEgressPass*/);
+        checkValidationResults(result, /*expectIngressPass=*/weak, /*expectEgressPass=*/true);
     }
 }
 
@@ -2320,7 +2320,7 @@ TEST(SSLManager, transientSSLParamsOverrideGlobalParamsTestsTLS13Only) {
 
     // First, test that validation fails on both sides without the transient params.
     SSLTestFixture tf(
-        serverParams, clientParams, true /*ingressIsServer*/, false /*egressIsServer*/);
+        serverParams, clientParams, /*ingressIsServer=*/true, /*egressIsServer=*/false);
     tf.doHandshake();
     auto result = tf.runIngressEgressValidation();
     checkValidationResults(result, false, false);
@@ -2403,7 +2403,7 @@ TEST(SSLManager, intermediateCATestsTLS13Only) {
         SSLTestFixture tf(serverParams, clientParams);
         tf.doHandshake();
         auto result = tf.runIngressEgressValidation();
-        checkValidationResults(result, true /*expectIngressPass*/, test.clientPass);
+        checkValidationResults(result, /*expectIngressPass=*/true, test.clientPass);
     }
 }
 
@@ -2427,7 +2427,7 @@ TEST(SSLManager, expiredCRLTestTLS13Only) {
     SSLTestFixture tf(serverParams, clientParams);
     tf.doHandshake();
     auto result = tf.runIngressEgressValidation();
-    checkValidationResults(result, false /*expectIngressPass*/, false /*expectEgressPass*/);
+    checkValidationResults(result, /*expectIngressPass=*/false, /*expectEgressPass=*/false);
 
 #if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_WINDOWS
     constexpr const char* cause = "revocation server was offline";
@@ -2468,7 +2468,7 @@ TEST(SSLManager, multipleCRLsFromSameIssuerTestsTLS13Only) {
         SSLTestFixture tf(serverParams, clientParams);
         tf.doHandshake();
         auto result = tf.runIngressEgressValidation();
-        checkValidationResults(result, true /*expectIngressPass*/, true);
+        checkValidationResults(result, /*expectIngressPass=*/true, true);
     }
     {
         clientParams.sslPEMKeyFile = revokedClientKeyFile;
@@ -2508,7 +2508,7 @@ TEST(SSLManager, basicCRLRevocationTestsTLS13Only) {
         SSLTestFixture tf(serverParams, clientParams);
         tf.doHandshake();
         auto result = tf.runIngressEgressValidation();
-        checkValidationResults(result, true, true /*expectEgressPass*/);
+        checkValidationResults(result, true, /*expectEgressPass=*/true);
     }
     {
         serverParams.sslCRLFile = clientRevokedCRL;
@@ -2519,7 +2519,7 @@ TEST(SSLManager, basicCRLRevocationTestsTLS13Only) {
         SSLTestFixture tf(serverParams, clientParams);
         tf.doHandshake();
         auto result = tf.runIngressEgressValidation();
-        checkValidationResults(result, false, true /*expectEgressPass*/);
+        checkValidationResults(result, false, /*expectEgressPass=*/true);
         ASSERT_NE(result.ingress.getStatus().reason().find("revoked"), std::string::npos);
     }
 }

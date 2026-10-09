@@ -240,7 +240,7 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnDocumentUpdate) {
                 oldDoc,
                 BSON("_id" << 0 << "a" << 5 << "b" << BSON_ARRAY(1 << 2 << 3)),
                 collection_internal::kUpdateAllIndexes,
-                nullptr /* indexesAffected */,
+                /*indexesAffected=*/nullptr,
                 opDebug,
                 &args);
             wuow.commit();
@@ -288,10 +288,10 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnDocumentUpdateWithDamages) {
                 damagesOutput.damageSource.get(),
                 damagesOutput.damages,
                 collection_internal::kUpdateAllIndexes,
-                nullptr /* indexesAffected */,
+                /*indexesAffected=*/nullptr,
                 opDebug,
                 &args,
-                nullptr /*cursor*/);
+                /*cursor=*/nullptr);
             ASSERT_TRUE(newDocResult.getValue().woCompare(newDoc) == 0);
             ASSERT_TRUE(newDocResult.isOK());
             wuow.commit();

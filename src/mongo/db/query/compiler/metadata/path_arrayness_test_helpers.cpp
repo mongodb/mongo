@@ -47,7 +47,7 @@ std::vector<std::pair<std::string, MultikeyComponents>> generateRandomFieldPaths
                              distribution,
                              dataInterval,
                              seed,
-                             /*arrayTypeLength*/ 0,
+                             /*arrayTypeLength=*/0,
                              data);
 
     // If right skew, invert the generated values
@@ -71,24 +71,24 @@ std::vector<std::pair<std::string, MultikeyComponents>> generateRandomFieldPaths
         // generate, to increase variety.
         // dataInterval defines the length of the strings
         ce::generateDataOneField(
-            /*ndv*/ length.getValue() * 5,
-            /*size*/ length.getValue(),
+            /*ndv=*/length.getValue() * 5,
+            /*size=*/length.getValue(),
             {ce::parseCollectionType(sbe::value::TypeTags::StringSmall)},
-            /*dataDistribution*/ stats::DistrType::kUniform,
+            /*dataDistribution=*/stats::DistrType::kUniform,
             rangeFieldNameLength,
             seed2,
-            /*arrayTypeLength*/ 0,
+            /*arrayTypeLength=*/0,
             fieldNames);
 
         // Generate the arrayness of the individual fields randomly.
         std::vector<stats::SBEValue> fieldArrayness;
-        ce::generateDataOneField(/*ndv*/ 2,
-                                 /*size*/ length.getValue(),
+        ce::generateDataOneField(/*ndv=*/2,
+                                 /*size=*/length.getValue(),
                                  {ce::parseCollectionType(sbe::value::TypeTags::Boolean)},
-                                 /*dataDistribution*/ stats::DistrType::kUniform,
-                                 /*dataInterval*/ {0, 1},
+                                 /*dataDistribution=*/stats::DistrType::kUniform,
+                                 /*dataInterval=*/{0, 1},
                                  seed2,
-                                 /*arrayTypeLength*/ 0,
+                                 /*arrayTypeLength=*/0,
                                  fieldArrayness);
 
         // Keep the state of multikeyness across field paths.

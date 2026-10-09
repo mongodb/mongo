@@ -350,7 +350,7 @@ bool WriteOpBatcher::retryOnTargetError(RoutingContext& routingCtx, Status statu
                     "error"_attr = redact(status));
 
         for (const auto& nss : routingCtx.getNssList()) {
-            routingCtx.onStaleShardVersionError(nss, /*wantedVersion*/ boost::none);
+            routingCtx.onStaleShardVersionError(nss, /*wantedVersion=*/boost::none);
         }
 
         _retryOnTargetError = false;
@@ -385,7 +385,7 @@ BatcherResult OrderedWriteOpBatcher::getNextBatch(OperationContext* opCtx,
                 _producer.advance();
 
                 const bool transientTxnError = isTransientTransactionError(
-                    status.code(), /*hasWriteConcernError*/ false, /*isCommitOrAbort*/ false);
+                    status.code(), /*hasWriteConcernError=*/false, /*isCommitOrAbort=*/false);
 
                 return {WriteBatch{}, std::move(opsWithErrors), transientTxnError};
             }
@@ -507,8 +507,8 @@ BatcherResult UnorderedWriteOpBatcher::getNextBatch(OperationContext* opCtx,
 
                 const bool transientTxnError =
                     isTransientTransactionError(swAnalysis.getStatus().code(),
-                                                /*hasWriteConcernError*/ false,
-                                                /*isCommitOrAbort*/ false);
+                                                /*hasWriteConcernError=*/false,
+                                                /*isCommitOrAbort=*/false);
 
                 return {WriteBatch{}, std::move(opsWithErrors), transientTxnError};
             }

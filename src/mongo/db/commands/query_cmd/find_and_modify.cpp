@@ -545,7 +545,7 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
                                           preConditions,
                                           isTimeseriesLogicalRequest);
             recordStatsForTopCommand(opCtx);
-            return buildResponse(boost::none, true /* isRemove */, docFound);
+            return buildResponse(boost::none, /*isRemove=*/true, docFound);
         } else {
             if (MONGO_unlikely(hangBeforeFindAndModifyPerformsUpdate.shouldFail())) {
                 CurOpFailpointHelpers::waitWhileFailPointEnabled(

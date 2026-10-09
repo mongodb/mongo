@@ -660,7 +660,7 @@ DocumentSourceInternalUnpackBucket::DocumentSourceInternalUnpackBucket(
     if (eventFilterBson) {
         // Optimizing '_eventFilter' here duplicates predicates in $expr expressions.
         // TODO SERVER-79692 remove the 'shouldOptimize' boolean.
-        setEventFilter(eventFilterBson.get(), false /* shouldOptimize */);
+        setEventFilter(eventFilterBson.get(), /*shouldOptimize=*/false);
     }
     if (wholeBucketFilterBson) {
         _wholeBucketFilterBson = wholeBucketFilterBson->getOwned();
@@ -908,7 +908,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
         // Using the bucket span associated with the default granularity seconds.
         timeseries::getMaxSpanSecondsFromGranularity(BucketGranularityEnum::Seconds),
         assumeClean,
-        false /* fixedBuckets */);
+        /*fixedBuckets=*/false);
 }
 
 void DocumentSourceInternalUnpackBucket::serializeToArray(
@@ -1171,7 +1171,7 @@ std::pair<BSONObj, bool> DocumentSourceInternalUnpackBucket::extractOrBuildProje
     // Attempt to get an inclusion $project representing the root-level dependencies of the pipeline
     // after the $_internalUnpackBucket. If this $project is not empty, then the dependency set was
     // finite.
-    auto deps = getRestPipelineDependencies(itr, container, true /* includeEventFilter */);
+    auto deps = getRestPipelineDependencies(itr, container, /*includeEventFilter=*/true);
     if (auto dependencyProj =
             deps.toProjectionWithoutMetadata(DepsTracker::TruncateToRootLevel::yes);
         !dependencyProj.isEmpty()) {
@@ -1981,7 +1981,7 @@ DocumentSourceContainer::iterator DocumentSourceInternalUnpackBucket::optimizeAt
     {
         // Check if the rest of the pipeline needs any fields. For example we might only be
         // interested in $count.
-        auto deps = getRestPipelineDependencies(itr, container, true /* includeEventFilter */);
+        auto deps = getRestPipelineDependencies(itr, container, /*includeEventFilter=*/true);
         if (deps.hasNoRequirements() && !hasAlreadyAbsorbedProjectSpec) {
             _sharedState->_bucketUnpacker.setBucketSpec(
                 {_sharedState->_bucketUnpacker.getTimeField(),
@@ -2039,11 +2039,11 @@ DocumentSourceContainer::iterator DocumentSourceInternalUnpackBucket::optimizeAt
 
         if (!predicates.rewriteProvidesExactMatchPredicate) {
             // Push the original event predicate into the unpacking stage.
-            setEventFilter(nextMatch->getQuery(), true /* shouldOptimize */);
+            setEventFilter(nextMatch->getQuery(), /*shouldOptimize=*/true);
         }
 
         container->erase(std::next(itr));
-        auto deps = getRestPipelineDependencies(itr, container, false /* includeEventFilter */);
+        auto deps = getRestPipelineDependencies(itr, container, /*includeEventFilter=*/false);
         if (deps.fields.empty()) {
             _unpackToBson = true;
         }

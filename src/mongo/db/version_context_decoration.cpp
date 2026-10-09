@@ -170,7 +170,7 @@ void waitForOperationsNotMatchingVersionContextToComplete(OperationContext* opCt
         return futures;
     };
 
-    auto operationsDrainingFutures = getOperationsDrainingFutures(true /* firstTime */);
+    auto operationsDrainingFutures = getOperationsDrainingFutures(/*firstTime=*/true);
     const int initialNumOpsWithStaleOfcv = operationsDrainingFutures.size();
 
     LOGV2_DEBUG(11144502,
@@ -219,7 +219,7 @@ void waitForOperationsNotMatchingVersionContextToComplete(OperationContext* opCt
             }
 
             // The deadline is in the future, re-compute list of futures to wait on and loop again
-            operationsDrainingFutures = getOperationsDrainingFutures(false /* firstTime */);
+            operationsDrainingFutures = getOperationsDrainingFutures(/*firstTime=*/false);
         }
     }
 

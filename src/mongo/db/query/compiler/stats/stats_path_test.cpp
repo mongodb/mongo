@@ -81,7 +81,7 @@ TEST(StatsPath, BasicValidEmptyStatsPath) {
     std::vector<Bucket> buckets;
 
     // Create an empty scalar histogram.
-    auto cehist = CEHistogram::make(ScalarHistogram::make(), TypeCounts{}, 0.0 /* sampleSize */);
+    auto cehist = CEHistogram::make(ScalarHistogram::make(), TypeCounts{}, /*sampleSize=*/0.0);
 
     // Serialize to BSON.
     constexpr double sampleRate = 1.0;

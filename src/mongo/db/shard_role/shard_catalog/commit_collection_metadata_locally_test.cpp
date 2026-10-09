@@ -280,14 +280,14 @@ protected:
         auto rt = RoutingTableHistory::makeNew(kTestNss,
                                                collType.getUuid(),
                                                collType.getKeyPattern(),
-                                               false /* unsplittable */,
-                                               nullptr /* defaultCollator */,
+                                               /*unsplittable=*/false,
+                                               /*defaultCollator=*/nullptr,
                                                collType.getUnique(),
                                                collType.getEpoch(),
                                                collType.getTimestamp(),
-                                               boost::none /* timeseriesFields */,
-                                               boost::none /* reshardingFields */,
-                                               true /* allowMigrations */,
+                                               /*timeseriesFields=*/boost::none,
+                                               /*reshardingFields=*/boost::none,
+                                               /*allowMigrations=*/true,
                                                chunks);
         auto version = rt.getVersion();
         auto rtHandle = RoutingTableHistoryValueHandle(
@@ -455,8 +455,8 @@ TEST_F(CommitCollectionMetadataLocallyTest, CommitAllowChunkOperationsDisablesCs
 
     shard_catalog_commit::commitCollectionMetadataLocally(operationContext(),
                                                           kTestNss,
-                                                          true /* isDbPrimaryShard */,
-                                                          true /* commitAllowChunkOperations */);
+                                                          /*isDbPrimaryShard=*/true,
+                                                          /*commitAllowChunkOperations=*/true);
 
     auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
     ASSERT_FALSE(scopedCsr->allowChunkOperations());
@@ -475,8 +475,8 @@ TEST_F(CommitCollectionMetadataLocallyTest, CommitAllowChunkOperationsEnablesCsr
 
     shard_catalog_commit::commitCollectionMetadataLocally(operationContext(),
                                                           kTestNss,
-                                                          true /* isDbPrimaryShard */,
-                                                          true /* commitAllowChunkOperations */);
+                                                          /*isDbPrimaryShard=*/true,
+                                                          /*commitAllowChunkOperations=*/true);
 
     auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
     ASSERT_TRUE(scopedCsr->allowChunkOperations());
@@ -491,8 +491,8 @@ TEST_F(CommitCollectionMetadataLocallyTest, CommitWithoutAllowChunkOperationsDoe
 
     shard_catalog_commit::commitCollectionMetadataLocally(operationContext(),
                                                           kTestNss,
-                                                          true /* isDbPrimaryShard */,
-                                                          false /* commitAllowChunkOperations */);
+                                                          /*isDbPrimaryShard=*/true,
+                                                          /*commitAllowChunkOperations=*/false);
 
     // The persisted 'false' was not propagated: no oplog entry and the flag stays at its default.
     ASSERT_EQ(countCommandOplogEntries("setAllowChunkOperations", kTestNss), 0);
@@ -507,8 +507,8 @@ TEST_F(CommitCollectionMetadataLocallyTest, CommitAllowChunkOperationsEmitsOplog
 
     shard_catalog_commit::commitCollectionMetadataLocally(operationContext(),
                                                           kTestNss,
-                                                          true /* isDbPrimaryShard */,
-                                                          true /* commitAllowChunkOperations */);
+                                                          /*isDbPrimaryShard=*/true,
+                                                          /*commitAllowChunkOperations=*/true);
 
     ASSERT_EQ(countCommandOplogEntries("setAllowChunkOperations", kTestNss), 1);
 }
@@ -621,7 +621,7 @@ TEST_F(CommitCollectionMetadataLocallyTest,
     shard_catalog_commit::commitCollectionMetadataLocally(operationContext(), kTestNss);
 
     auto changedChunks = makeCoveringChunks(
-        collType, 40 /* nChunks */, chunks.back().getVersion(), 12000 /* numHistoryEntries */);
+        collType, /*nChunks=*/40, chunks.back().getVersion(), /*numHistoryEntries=*/12000);
 
     shard_catalog_commit::commitChunkOperationsMetadataLocally(
         operationContext(), kTestNss, toConfigBSONVector(changedChunks));
@@ -837,7 +837,7 @@ TEST_F(CommitCollectionMetadataLocallyTest,
         operationContext(),
         kTestNss,
         toConfigBSONVector({authoritativeChunk}),
-        true /* receivingFirstChunk */);
+        /*receivingFirstChunk=*/true);
 
     // The bootstrap clears the CSR via an invalidate rather than replicating a delta.
     ASSERT_EQ(countCommandOplogEntries("updateCollectionMetadata", kTestNss), 0);
@@ -865,9 +865,9 @@ TEST_F(CommitCollectionMetadataLocallyTest, ChunkOperationsReceivingFirstChunkIs
     auto chunkDocs = toConfigBSONVector(chunks);
 
     shard_catalog_commit::commitChunkOperationsMetadataLocally(
-        operationContext(), kTestNss, chunkDocs, true /* receivingFirstChunk */);
+        operationContext(), kTestNss, chunkDocs, /*receivingFirstChunk=*/true);
     shard_catalog_commit::commitChunkOperationsMetadataLocally(
-        operationContext(), kTestNss, chunkDocs, true /* receivingFirstChunk */);
+        operationContext(), kTestNss, chunkDocs, /*receivingFirstChunk=*/true);
 
     ASSERT_EQ(countCommandOplogEntries("updateCollectionMetadata", kTestNss), 0);
     ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogChunksNamespace), 1);
@@ -1169,7 +1169,7 @@ TEST_F(CommitCollectionMetadataLocallyTest, ChunkOperationsHandlesUnownedCsr) {
 
     // Receiving the first chunk bootstraps from the global catalog. It must not throw.
     shard_catalog_commit::commitChunkOperationsMetadataLocally(
-        operationContext(), kTestNss, toConfigBSONVector(chunks), true /* receivingFirstChunk */);
+        operationContext(), kTestNss, toConfigBSONVector(chunks), /*receivingFirstChunk=*/true);
 
     // The metadata is durable, and the in-memory metadata is installed as known (with a routing
     // table) from the global catalog instead of left cleared.
@@ -1239,7 +1239,7 @@ TEST_F(CommitCollectionMetadataLocallyTest,
 
     auto realChunk =
         makeCoveringChunks(collType,
-                           1 /* nChunks */,
+                           /*nChunks=*/1,
                            ChunkVersion({collType.getEpoch(), collType.getTimestamp()}, {0, 0}));
 
     shard_catalog_commit::commitChunkOperationsMetadataLocally(
@@ -1494,8 +1494,8 @@ TEST_F(CommitCollectionMetadataLocallyTest, RenameMarksOpCtxNonDeprioritizable) 
                                                            kToNss,
                                                            boost::none,
                                                            boost::none,
-                                                           false /* isUpgrading */,
-                                                           false /* isDbPrimaryShard */);
+                                                           /*isUpgrading=*/false,
+                                                           /*isDbPrimaryShard=*/false);
 
     ASSERT_TRUE(ExecutionAdmissionContext::get(operationContext()).getMarkedNonDeprioritizable());
 }
@@ -1506,7 +1506,7 @@ TEST_F(CommitCollectionMetadataLocallyTest, CloneDoesNotMarkOpCtxNonDeprioritiza
     mockCatalogClient()->setCollectionMetadata(collType, chunks);
 
     shard_catalog_commit::cloneCollectionMetadataLocally(
-        operationContext(), kTestNss, true /* isDbPrimaryShard */);
+        operationContext(), kTestNss, /*isDbPrimaryShard=*/true);
 
     ASSERT_FALSE(ExecutionAdmissionContext::get(operationContext()).getMarkedNonDeprioritizable());
 }
@@ -1670,7 +1670,7 @@ TEST_F(CommitCollectionMetadataLocallyTest, OnInvalidateWithShardVersionKeepsUnk
     mockCatalogClient()->setCollectionMetadata(collType, chunks);
 
     shard_catalog_commit::cloneCollectionMetadataLocally(
-        operationContext(), kTestNss, false /* isDbPrimaryShard */);
+        operationContext(), kTestNss, /*isDbPrimaryShard=*/false);
     const auto invalidateEntry = repl::OplogEntry(findLastOplogEntry());
 
     CollectionShardingRuntime::acquireExclusive(operationContext(), kTestNss)
@@ -1714,7 +1714,7 @@ TEST_F(CommitCollectionMetadataLocallyTest, OnInvalidateWithShardVersionClearsSt
     mockCatalogClient()->setCollectionMetadata(collType, chunksV1);
     shard_catalog_commit::commitCollectionMetadataLocally(operationContext(), kTestNss, false);
 
-    auto chunksV2 = makeCoveringChunks(collType, 2 /* nChunks */, chunksV1[0].getVersion());
+    auto chunksV2 = makeCoveringChunks(collType, /*nChunks=*/2, chunksV1[0].getVersion());
     for (auto& chunk : chunksV2) {
         chunk.setShard(kMyShardName);
     }
@@ -1930,7 +1930,7 @@ TEST_F(CommitCollectionMetadataLocallyTest, CommitNotifiesInFlightMetadataSynchr
         auto scopedCsr = CollectionShardingRuntime::acquireExclusive(operationContext(), kTestNss);
         scopedCsr->setMetadataSynchronizer(synchronizer);
     }
-    synchronizer->start(operationContext(), nullptr /* executor */);
+    synchronizer->start(operationContext(), /*executor=*/nullptr);
     ASSERT_OK(synchronizer->getMetadataFuture().getNoThrow(operationContext()));
 
     // Drop the collection. This should notify the synchronizer about the drop.
@@ -1961,7 +1961,7 @@ TEST_F(CommitCollectionMetadataLocallyTest,
         auto scopedCsr = CollectionShardingRuntime::acquireExclusive(operationContext(), kTestNss);
         scopedCsr->setMetadataSynchronizer(synchronizer);
     }
-    synchronizer->start(operationContext(), nullptr /* executor */);
+    synchronizer->start(operationContext(), /*executor=*/nullptr);
     ASSERT_OK(synchronizer->getMetadataFuture().getNoThrow(operationContext()));
 
     // Bump the shard version by splitting one chunk and call commitCollectionMetadataLocally()
@@ -1981,7 +1981,7 @@ TEST_F(CommitCollectionMetadataLocallyTest,
         scopedCsr->setMetadataSynchronizer(nullptr);
         scopedCsr->setMetadataSynchronizer(synchronizer);
     }
-    synchronizer->start(operationContext(), nullptr /* executor */);
+    synchronizer->start(operationContext(), /*executor=*/nullptr);
     ASSERT_OK(synchronizer->getMetadataFuture().getNoThrow(operationContext()));
 
     auto recoveredMetadata = synchronizer->drainAndApply(operationContext());
@@ -2070,7 +2070,7 @@ TEST_F(CommitCollectionMetadataLocallyTest, SetAllowChunkOperationsOplogEntryUse
         operationContext(), kTestNss, shardVersion, boost::none /* databaseVersion */};
 
     shard_catalog_commit::commitSetAllowChunkOperationsLocally(
-        operationContext(), kTestNss, false /* allowChunkOperations */, collType.getUuid());
+        operationContext(), kTestNss, /*allowChunkOperations=*/false, collType.getUuid());
 
     auto oplogEntries =
         findLocalDocs(NamespaceString::kRsOplogNamespace,
@@ -2091,7 +2091,7 @@ TEST_F(CommitCollectionMetadataLocallyTest, CloneEmitsIfStaleInvalidateWithoutIn
     mockCatalogClient()->setCollectionMetadata(collType, chunks);
 
     shard_catalog_commit::cloneCollectionMetadataLocally(
-        operationContext(), kTestNss, true /* isDbPrimaryShard */);
+        operationContext(), kTestNss, /*isDbPrimaryShard=*/true);
 
     // The durable shard catalog is written.
     ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogCollectionsNamespace), 1);
@@ -2131,14 +2131,14 @@ TEST_F(CommitCollectionMetadataLocallyTest, CloneClearsKnownButStaleCsr) {
     }
 
     // The authoritative catalog now holds a newer shard version (same collection generation).
-    auto chunksV2 = makeCoveringChunks(collType, 2 /* nChunks */, chunksV1[0].getVersion());
+    auto chunksV2 = makeCoveringChunks(collType, /*nChunks=*/2, chunksV1[0].getVersion());
     for (auto& chunk : chunksV2) {
         chunk.setShard(kMyShardName);
     }
     mockCatalogClient()->setCollectionMetadata(collType, chunksV2);
 
     shard_catalog_commit::cloneCollectionMetadataLocally(
-        operationContext(), kTestNss, false /* isDbPrimaryShard */);
+        operationContext(), kTestNss, /*isDbPrimaryShard=*/false);
 
     // The in-memory shard version was older than the cloned one, so the CSR was cleared.
     auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
@@ -2160,7 +2160,7 @@ TEST_F(CommitCollectionMetadataLocallyTest, CloneKeepsKnownUpToDateCsr) {
     // Clone the identical metadata: the disk shard version equals the in-memory one, so kIfStale
     // does not hold and the CSR is preserved.
     shard_catalog_commit::cloneCollectionMetadataLocally(
-        operationContext(), kTestNss, false /* isDbPrimaryShard */);
+        operationContext(), kTestNss, /*isDbPrimaryShard=*/false);
 
     auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
     auto metadata = scopedCsr->getCurrentMetadataIfKnown();
@@ -2183,7 +2183,7 @@ TEST_F(CommitCollectionMetadataLocallyTest, CloneKeepsChunklessCsrWithUnsetPlace
     }
 
     shard_catalog_commit::cloneCollectionMetadataLocally(
-        operationContext(), kTestNss, true /* isDbPrimaryShard */);
+        operationContext(), kTestNss, /*isDbPrimaryShard=*/true);
 
     auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
     auto metadata = scopedCsr->getCurrentMetadataIfKnown();
@@ -2210,7 +2210,7 @@ TEST_F(CommitCollectionMetadataLocallyTest, CloneDoesNotClearCsrWhenShardOwnsNoC
     // in-memory CSR is left untouched (no clear) and no further oplog entry is emitted.
     mockCatalogClient()->setCollectionMetadata(collType, {} /* no owned chunks */);
     shard_catalog_commit::cloneCollectionMetadataLocally(
-        operationContext(), kTestNss, false /* isDbPrimaryShard */);
+        operationContext(), kTestNss, /*isDbPrimaryShard=*/false);
 
     ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogCollectionsNamespace), 0);
     // Still just the single invalidate from the non-clone seed; the clone added none.
@@ -2241,7 +2241,7 @@ TEST_F(CommitCollectionMetadataLocallyTest, RenameUnshardedToShardedReplacingIt)
                                                            kToNss,
                                                            toCollType.getUuid(),
                                                            boost::none,
-                                                           false /* isUpgrading */,
+                                                           /*isUpgrading=*/false,
                                                            /*isDbPrimaryShard=*/false);
 
     shard_catalog_commit::commitDropOfStaleChunksForRename(operationContext(),
@@ -2266,8 +2266,8 @@ TEST_F(CommitCollectionMetadataLocallyTest, RenameUnshardedToUnsharded) {
                                                            kToNss,
                                                            boost::none,
                                                            boost::none,
-                                                           false /* isUpgrading */,
-                                                           false /* isDbPrimaryShard */);
+                                                           /*isUpgrading=*/false,
+                                                           /*isDbPrimaryShard=*/false);
 
     ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogCollectionsNamespace), 0);
     ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogChunksNamespace), 0);
@@ -2294,7 +2294,7 @@ TEST_F(CommitCollectionMetadataLocallyTest, RenameShardedToUnshardedReplacingIt)
                                                            kToNss,
                                                            boost::none,
                                                            boost::none,
-                                                           false /* isUpgrading */,
+                                                           /*isUpgrading=*/false,
                                                            /*isDbPrimaryShard=*/false);
 
     // Metadata now lives at toNss; fromNss entry is gone; chunks are unchanged.
@@ -2327,7 +2327,7 @@ TEST_F(CommitCollectionMetadataLocallyTest, RenameShardedToShardedReplacingIt) {
                                                            kToNss,
                                                            toCollType.getUuid(),
                                                            boost::none,
-                                                           false /* isUpgrading */,
+                                                           /*isUpgrading=*/false,
                                                            /*isDbPrimaryShard=*/false);
 
     shard_catalog_commit::commitDropOfStaleChunksForRename(operationContext(),
@@ -2361,7 +2361,7 @@ TEST_F(CommitCollectionMetadataLocallyTest, RenameShardedToShardedNoReplacement)
                                                            kToNss,
                                                            boost::none,
                                                            boost::none,
-                                                           false /* isUpgrading */,
+                                                           /*isUpgrading=*/false,
                                                            /*isDbPrimaryShard=*/false);
 
     // toNss entry reflects fromNss metadata; fromNss entry is gone.
@@ -2395,7 +2395,7 @@ TEST_F(CommitCollectionMetadataLocallyTest,
                                                            kToNss,
                                                            boost::none,
                                                            boost::none,
-                                                           false /* isUpgrading */,
+                                                           /*isUpgrading=*/false,
                                                            /*isDbPrimaryShard=*/false);
 
     ASSERT_EQ(writeOrderObserver->writes().size(), 1u);
@@ -2432,7 +2432,7 @@ TEST_F(CommitCollectionMetadataLocallyTest, RenameRecoversTargetFilteringMetadat
                                                            kToNss,
                                                            boost::none,
                                                            boost::none,
-                                                           false /* isUpgrading */,
+                                                           /*isUpgrading=*/false,
                                                            /*isDbPrimaryShard=*/false);
 
     // The target filtering metadata is recovered in-memory right away instead of being deferred to
@@ -2465,7 +2465,7 @@ TEST_F(CommitCollectionMetadataLocallyTest,
                                                            kToNss,
                                                            boost::none,
                                                            boost::none,
-                                                           false /* isUpgrading */,
+                                                           /*isUpgrading=*/false,
                                                            /*isDbPrimaryShard=*/true);
 
     ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogCollectionsNamespace), 1);
@@ -2498,7 +2498,7 @@ TEST_F(CommitCollectionMetadataLocallyTest, RenameUnownedNonPrimaryClearsTargetM
                                                            kToNss,
                                                            boost::none,
                                                            boost::none,
-                                                           false /* isUpgrading */,
+                                                           /*isUpgrading=*/false,
                                                            /*isDbPrimaryShard=*/false);
 
     ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogCollectionsNamespace), 0);

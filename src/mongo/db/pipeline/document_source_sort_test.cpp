@@ -900,8 +900,8 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldBeAbleToReportSpillingStatsInBound
     auto sort = DocumentSourceSort::createBoundedSort({BSON("time" << 1), expCtx},
                                                       "min",
                                                       -1,
-                                                      boost::none /*limit*/,
-                                                      false /*outputSortKeyMetadata*/,
+                                                      /*limit=*/boost::none,
+                                                      /*outputSortKeyMetadata=*/false,
                                                       expCtx);
 
     std::string largeStr(1024, 'x');
@@ -960,8 +960,8 @@ TEST_F(DocumentSourceSortExecutionTest,
     auto sort = DocumentSourceSort::createBoundedSort({BSON("time" << 1), expCtx},
                                                       "min",
                                                       -1,
-                                                      boost::none /*limit*/,
-                                                      true /*outputSortKeyMetadata*/,
+                                                      /*limit=*/boost::none,
+                                                      /*outputSortKeyMetadata=*/true,
                                                       expCtx);
 
     std::string largeStr(1024, 'x');

@@ -130,7 +130,7 @@ std::unique_ptr<Pipeline> ReshardingTxnCloner::_targetAggregationRequest(Operati
         pipeline.getContext(),
         std::move(request),
         _sourceId.getShardId(),
-        IncludeMetrics{} /* remoteMetricsToInclude */);
+        /*remoteMetricsToInclude=*/IncludeMetrics{});
 }
 
 std::unique_ptr<Pipeline> ReshardingTxnCloner::_restartPipeline(
@@ -180,7 +180,7 @@ boost::optional<SharedSemiFuture<void>> ReshardingTxnCloner::doOneRecord(
     }
 
     return session_catalog_migration_util::runWithSessionCheckedOutIfStatementNotExecuted(
-        opCtx, sessionId, txnNumber, boost::none /* stmtId */, [&] {
+        opCtx, sessionId, txnNumber, /*stmtId=*/boost::none, [&] {
             // If the TransactionParticipant is flagged as having an incomplete history, then the
             // dead end sentinel is already present in the oplog.
             if (TransactionParticipant::get(opCtx).hasIncompleteHistory()) {
@@ -190,8 +190,8 @@ boost::optional<SharedSemiFuture<void>> ReshardingTxnCloner::doOneRecord(
             resharding::data_copy::updateSessionRecord(opCtx,
                                                        TransactionParticipant::kDeadEndSentinel,
                                                        {kIncompleteHistoryStmtId},
-                                                       boost::none /* preImageOpTime */,
-                                                       boost::none /* postImageOpTime */,
+                                                       /*preImageOpTime=*/boost::none,
+                                                       /*postImageOpTime=*/boost::none,
                                                        {});
         });
 }

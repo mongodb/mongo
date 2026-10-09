@@ -507,7 +507,7 @@ void ReplCoordTest::shutdown(OperationContext* opCtx) {
     // point as signal for when the main thread can consume networking tasks.
     boost::optional<FailPointEnableBlock> fp("tpteHangsBeforeDrainingCallbacks");
     auto shutdownThread =
-        stdx::thread([&] { _repl->shutdown(opCtx, nullptr /* shutdownTimeElapsedBuilder */); });
+        stdx::thread([&] { _repl->shutdown(opCtx, /*shutdownTimeElapsedBuilder=*/nullptr); });
     ON_BLOCK_EXIT([&] { shutdownThread.join(); });
     fp->waitForOneNewEntry();
     NetworkInterfaceMock::InNetworkGuard(getNet())->runReadyNetworkOperations();

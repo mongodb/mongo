@@ -43,7 +43,7 @@ BSONObj buildSimpleBSONSpec(int nFields, bool isMatch, bool isExclusion = false)
  * Builds a filter BSON with 'nFields' simple equality predicates.
  */
 BSONObj buildSimpleMatchSpec(int nFields) {
-    return buildSimpleBSONSpec(nFields, true /*isMatch*/);
+    return buildSimpleBSONSpec(nFields, /*isMatch=*/true);
 }
 
 /**
@@ -51,7 +51,7 @@ BSONObj buildSimpleMatchSpec(int nFields) {
  * 'isExclusion' parameter.
  */
 BSONObj buildSimpleProjectSpec(int nFields, bool isExclusion) {
-    return buildSimpleBSONSpec(nFields, false /*isMatch*/, isExclusion);
+    return buildSimpleBSONSpec(nFields, /*isMatch=*/false, isExclusion);
 }
 
 BSONObj buildNestedBSONSpec(int depth, bool isExclusion, int offset) {
@@ -68,7 +68,7 @@ BSONObj buildNestedBSONSpec(int depth, bool isExclusion, int offset) {
  * Builds a BSON representing a predicate on one dotted path, where the field has depth 'depth'.
  */
 BSONObj buildNestedMatchSpec(int depth, int offset = 0) {
-    return buildNestedBSONSpec(depth, false /*isExclusion*/, offset);
+    return buildNestedBSONSpec(depth, /*isExclusion=*/false, offset);
 }
 
 /**
@@ -147,68 +147,68 @@ void PlanCacheBenchmarkFixture::benchmarkMatchComplex(benchmark::State& state) {
 }
 
 void PlanCacheBenchmarkFixture::benchmarkProjectExclude(benchmark::State& state) {
-    auto project = buildSimpleProjectSpec(1, true /*isExclusion*/);
+    auto project = buildSimpleProjectSpec(1, /*isExclusion=*/true);
     benchmarkQueryMatchProject(state, BSONObj(), project);
 }
 
 void PlanCacheBenchmarkFixture::benchmarkProjectInclude(benchmark::State& state) {
-    auto project = buildSimpleProjectSpec(1, false /*isExclusion*/);
+    auto project = buildSimpleProjectSpec(1, /*isExclusion=*/false);
     benchmarkQueryMatchProject(state, BSONObj(), project);
 }
 
 void PlanCacheBenchmarkFixture::benchmarkProjectIncludeTwoFields(benchmark::State& state) {
-    auto project = buildSimpleProjectSpec(2, false /*isExclusion*/);
+    auto project = buildSimpleProjectSpec(2, /*isExclusion=*/false);
     benchmarkQueryMatchProject(state, BSONObj(), project);
 }
 
 void PlanCacheBenchmarkFixture::benchmarkProjectIncludeTwentyFields(benchmark::State& state) {
-    auto project = buildSimpleProjectSpec(20, false /*isExclusion*/);
+    auto project = buildSimpleProjectSpec(20, /*isExclusion=*/false);
     benchmarkQueryMatchProject(state, BSONObj(), project);
 }
 
 void PlanCacheBenchmarkFixture::benchmarkProjectIncludeDepthTwo(benchmark::State& state) {
-    auto project = buildNestedProjectSpec(2, false /*isExclusion*/);
+    auto project = buildNestedProjectSpec(2, /*isExclusion=*/false);
     benchmarkQueryMatchProject(state, BSONObj(), project);
 }
 
 void PlanCacheBenchmarkFixture::benchmarkProjectIncludeDepthTwenty(benchmark::State& state) {
-    auto project = buildNestedProjectSpec(20, false /*isExclusion*/);
+    auto project = buildNestedProjectSpec(20, /*isExclusion=*/false);
     benchmarkQueryMatchProject(state, BSONObj(), project);
 }
 
 void PlanCacheBenchmarkFixture::benchmarkMatchProjectExclude(benchmark::State& state) {
     auto match = buildSimpleMatchSpec(1);
-    auto project = buildSimpleProjectSpec(1, true /*isExclusion*/);
+    auto project = buildSimpleProjectSpec(1, /*isExclusion=*/true);
     benchmarkQueryMatchProject(state, match, project);
 }
 
 void PlanCacheBenchmarkFixture::benchmarkMatchProjectInclude(benchmark::State& state) {
     auto match = buildSimpleMatchSpec(1);
-    auto project = buildSimpleProjectSpec(1, false /*isExclusion*/);
+    auto project = buildSimpleProjectSpec(1, /*isExclusion=*/false);
     benchmarkQueryMatchProject(state, match, project);
 }
 
 void PlanCacheBenchmarkFixture::benchmarkMatchProjectIncludeTwoFields(benchmark::State& state) {
     auto match = buildSimpleMatchSpec(1);
-    auto project = buildSimpleProjectSpec(2, false /*isExclusion*/);
+    auto project = buildSimpleProjectSpec(2, /*isExclusion=*/false);
     benchmarkQueryMatchProject(state, match, project);
 }
 
 void PlanCacheBenchmarkFixture::benchmarkMatchProjectIncludeTwentyFields(benchmark::State& state) {
     auto match = buildSimpleMatchSpec(1);
-    auto project = buildSimpleProjectSpec(20, false /*isExclusion*/);
+    auto project = buildSimpleProjectSpec(20, /*isExclusion=*/false);
     benchmarkQueryMatchProject(state, match, project);
 }
 
 void PlanCacheBenchmarkFixture::benchmarkMatchProjectIncludeDepthTwo(benchmark::State& state) {
     auto match = buildSimpleMatchSpec(1);
-    auto project = buildNestedProjectSpec(2, false /*isExclusion*/);
+    auto project = buildNestedProjectSpec(2, /*isExclusion=*/false);
     benchmarkQueryMatchProject(state, match, project);
 }
 
 void PlanCacheBenchmarkFixture::benchmarkMatchProjectIncludeDepthTwenty(benchmark::State& state) {
     auto match = buildSimpleMatchSpec(1);
-    auto project = buildNestedProjectSpec(20, false /*isExclusion*/);
+    auto project = buildNestedProjectSpec(20, /*isExclusion=*/false);
     benchmarkQueryMatchProject(state, match, project);
 }
 
@@ -223,7 +223,7 @@ void PlanCacheBenchmarkFixture::benchmarkTwoStages(benchmark::State& state) {
     // Builds a match on a nested field and then excludes that nested field.
     std::vector<BSONObj> pipeline;
     pipeline.push_back(BSON("$match" << buildNestedMatchSpec(3)));
-    pipeline.push_back(BSON("$project" << buildNestedProjectSpec(3, true /*isExclusion*/)));
+    pipeline.push_back(BSON("$project" << buildNestedProjectSpec(3, /*isExclusion=*/true)));
     benchmarkPipeline(state, pipeline);
 }
 

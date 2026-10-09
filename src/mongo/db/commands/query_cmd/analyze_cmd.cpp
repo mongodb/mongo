@@ -486,7 +486,7 @@ void runSampleMode(OperationContext* opCtx,
                                             requestedSamplingMethod,
                                             numChunksOpt,
                                             numRecords,
-                                            nullptr /*customerQueryExpCtx*/,
+                                            /*customerQueryExpCtx=*/nullptr,
                                             SamplingSourceEnum::kOnTheFlySample);
         estimator.generateSample(ce::NoProjection{});
 
@@ -570,14 +570,14 @@ void runSampleMode(OperationContext* opCtx,
 
         // Remove all existing pages of any prior sample.
         deleteObjects(
-            opCtx, collection, existingSampleLookupFilter, false /*justOne*/, true /*god*/);
+            opCtx, collection, existingSampleLookupFilter, /*justOne=*/false, /*god=*/true);
 
         // Insert the new sample.
         uassertStatusOK(collection_internal::insertDocuments(opCtx,
                                                              collection.getCollectionPtr(),
                                                              inserts.begin(),
                                                              inserts.end(),
-                                                             nullptr /*opDebug*/));
+                                                             /*opDebug=*/nullptr));
 
         wuow.commit();
     });
@@ -757,7 +757,7 @@ public:
                 runHistogramsMode(
                     opCtx,
                     nss,
-                    mode.has_value() /* explicitHistogramsMode */,
+                    /*explicitHistogramsMode=*/mode.has_value(),
                     key ? boost::optional<std::string_view>(std::get<std::string>(*key))
                         : boost::none,
                     cmd.getSampleRate(),

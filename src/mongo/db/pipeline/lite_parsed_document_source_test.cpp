@@ -894,12 +894,12 @@ protected:
 
     MockMetricResults mockSuccess(const ExtensionMetricsAllocation& allocation,
                                   const std::vector<BSONObj>& pipeline) {
-        return parsePipelineAndGetCounterDeltas(allocation, pipeline, true /* markSuccess */);
+        return parsePipelineAndGetCounterDeltas(allocation, pipeline, /*markSuccess=*/true);
     }
 
     MockMetricResults mockFailure(const ExtensionMetricsAllocation& allocation,
                                   const std::vector<BSONObj>& pipeline) {
-        return parsePipelineAndGetCounterDeltas(allocation, pipeline, false /* markSuccess */);
+        return parsePipelineAndGetCounterDeltas(allocation, pipeline, /*markSuccess=*/false);
     }
 
     /**

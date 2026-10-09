@@ -46,7 +46,7 @@ DEATH_TEST_REGEX(PostReshardingCollectionPlacementTest,
                  GetReshardingDestinedRecipientTassertsWhenInvalid,
                  "Tripwire assertion.*13150300") {
     PostReshardingCollectionPlacement placement(
-        nullptr /* opCtx */, makeScopedCollectionDescription(CollectionMetadata::UNTRACKED()));
+        /*opCtx=*/nullptr, makeScopedCollectionDescription(CollectionMetadata::UNTRACKED()));
     placement.getReshardingDestinedRecipient(BSON("_id" << 1 << "x" << 5));
 }
 
@@ -54,7 +54,7 @@ DEATH_TEST_REGEX(PostReshardingCollectionPlacementTest,
                  ExtractReshardingKeyFromDocumentTassertsWhenInvalid,
                  "Tripwire assertion.*13150300") {
     PostReshardingCollectionPlacement placement(
-        nullptr /* opCtx */, makeScopedCollectionDescription(CollectionMetadata::UNTRACKED()));
+        /*opCtx=*/nullptr, makeScopedCollectionDescription(CollectionMetadata::UNTRACKED()));
     placement.extractReshardingKeyFromDocument(BSON("_id" << 1 << "x" << 5));
 }
 
@@ -62,7 +62,7 @@ DEATH_TEST_REGEX(PostReshardingCollectionPlacementTest,
                  GetReshardingDestinedRecipientFromShardKeyTassertsWhenInvalid,
                  "Tripwire assertion.*13150300") {
     PostReshardingCollectionPlacement placement(
-        nullptr /* opCtx */, makeScopedCollectionDescription(CollectionMetadata::UNTRACKED()));
+        /*opCtx=*/nullptr, makeScopedCollectionDescription(CollectionMetadata::UNTRACKED()));
     placement.getReshardingDestinedRecipientFromShardKey(BSON("x" << 5));
 }
 

@@ -579,7 +579,7 @@ CollectionSizeCount scanForAccurateSizeCount(OperationContext* opCtx, const Name
                                      AcquisitionPrerequisites::kRead),
         MODE_IS);
 
-    auto cursor = collAcq.getCollectionPtr()->getCursor(opCtx, /*forward*/ true);
+    auto cursor = collAcq.getCollectionPtr()->getCursor(opCtx, /*forward=*/true);
 
     CollectionSizeCount sizeCount;
     for (auto record = cursor->next(); record; record = cursor->next()) {

@@ -151,8 +151,8 @@ public:
                 client.update(NamespaceString::kServerConfigurationNamespace,
                               BSON("_id" << "commitChunksMergeStats"),
                               BSON("$inc" << BSON("count" << 1)),
-                              true /* upsert */,
-                              false /* multi */);
+                              /*upsert=*/true,
+                              /*multi=*/false);
             }
 
             return ConfigSvrMergeResponse{shardAndCollVers.shardPlacementVersion};

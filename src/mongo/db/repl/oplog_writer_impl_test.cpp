@@ -43,7 +43,7 @@ public:
     std::unique_ptr<JournalListener::Token> getToken(OperationContext* opCtx) override {
         return std::make_unique<Token>(
             repl::ReplicationCoordinator::get(opCtx)->getMyLastWrittenOpTimeAndWallTime(true),
-            false /* isPrimary */);
+            /*isPrimary=*/false);
     }
 
     void onDurable(const JournalListener::Token& t) override {
@@ -150,7 +150,7 @@ JournalListenerMock* OplogWriterImplTest::getJournalListener() const {
 
 using OplogWriterImplTestDeathTest = OplogWriterImplTest;
 DEATH_TEST_F(OplogWriterImplTestDeathTest, WriteEmptyBatchFails, "!ops.empty()") {
-    OplogWriter::Options options(false /* skipWritesToOplogColl */);
+    OplogWriter::Options options(/*skipWritesToOplogColl=*/false);
 
     OplogWriterImpl oplogWriter(nullptr,  // executor
                                 nullptr,  // writeBuffer
@@ -166,7 +166,7 @@ DEATH_TEST_F(OplogWriterImplTestDeathTest, WriteEmptyBatchFails, "!ops.empty()")
 }
 
 TEST_F(OplogWriterImplTest, WriteOplogCollection) {
-    OplogWriter::Options options(false /* skipWritesToOplogColl */);
+    OplogWriter::Options options(/*skipWritesToOplogColl=*/false);
 
     OplogWriterImpl oplogWriter(nullptr,  // executor
                                 nullptr,  // writeBuffer
@@ -189,7 +189,7 @@ TEST_F(OplogWriterImplTest, WriteOplogCollection) {
 }
 
 TEST_F(OplogWriterImplTest, SkipWriteToOplogCollection) {
-    OplogWriter::Options options(true /* skipWritesToOplogColl */);
+    OplogWriter::Options options(/*skipWritesToOplogColl=*/true);
 
     OplogWriterImpl oplogWriter(nullptr,  // executor
                                 nullptr,  // writeBuffer
@@ -212,7 +212,7 @@ TEST_F(OplogWriterImplTest, SkipWriteToOplogCollection) {
 }
 
 TEST_F(OplogWriterImplTest, finalizeOplogBatchCorrectlyUpdatesOpTimes) {
-    OplogWriter::Options options(false /* skipWritesToOplogColl */);
+    OplogWriter::Options options(/*skipWritesToOplogColl=*/false);
 
     OplogWriterImpl oplogWriter(nullptr,  // executor
                                 nullptr,  // writeBuffer

@@ -13,14 +13,14 @@ void initMessageFilterPluginLoader(const char* /*processKind*/) {}
 
 void MessageHooks::onProxyHeaderReceived(Session& /*session*/,
                                          const void* /*msgHeader*/,
-                                         size_t /*size*/,
-                                         bool /*isUnixSocket*/) {}
+                                         /*size=*/size_t,
+                                         /*isUnixSocket=*/bool) {}
 
 void MessageHooks::onConnectionEstablished(Session& /*session*/) {}
 
 void MessageHooks::onHeaderReceived(Session& /*session*/,
                                     const void* /*msgHeader*/,
-                                    size_t /*size*/) {}
+                                    /*size=*/size_t) {}
 
 void MessageHooks::onMessageReceived(Session& /*session*/, const Message& /*msg*/) {}
 

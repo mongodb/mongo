@@ -183,8 +183,8 @@ public:
             client.update(NamespaceString::kServerConfigurationNamespace,
                           BSON("_id" << "CloneCatalogDataStats"),
                           BSON("$inc" << BSON("count" << 1)),
-                          true /* upsert */,
-                          false /* multi */);
+                          /*upsert=*/true,
+                          /*multi=*/false);
         } else {
             cloneDatabase(opCtx, dbName, from, result);
         }

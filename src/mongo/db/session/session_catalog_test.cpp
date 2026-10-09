@@ -724,8 +724,8 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, ScanSessionsForReapWhenParentSessionI
         ASSERT_EQ(lsidsFound.size(), lsidsNotReaped.size());
     };
 
-    runTest(false /* hangAfterIncrementingNumWaitingToCheckOut */);
-    runTest(true /* hangAfterIncrementingNumWaitingToCheckOut */);
+    runTest(/*hangAfterIncrementingNumWaitingToCheckOut=*/false);
+    runTest(/*hangAfterIncrementingNumWaitingToCheckOut=*/true);
 }
 
 TEST_F(SessionCatalogTestWithDefaultOpCtx, ScanSessionsForReapWhenChildSessionIsCheckedOut) {
@@ -848,8 +848,8 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, ScanSessionsForReapWhenChildSessionIs
         ASSERT_EQ(lsidsFound.size(), lsidsNotReaped.size());
     };
 
-    runTest(false /* hangAfterIncrementingNumWaitingToCheckOut */);
-    runTest(true /* hangAfterIncrementingNumWaitingToCheckOut */);
+    runTest(/*hangAfterIncrementingNumWaitingToCheckOut=*/false);
+    runTest(/*hangAfterIncrementingNumWaitingToCheckOut=*/true);
 }
 
 

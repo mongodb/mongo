@@ -3235,7 +3235,7 @@ TEST_F(PipelineAnalyzerTest, tooManyNodes) {
     // maximum number of nodes is hit.
     AggModelBuildParams buildParams{
         .joinGraphBuildParams =
-            JoinGraphBuildParams(/*maxNodes*/ numJoins, /*maxEdges*/ kHardMaxEdgesInJoin),
+            JoinGraphBuildParams(/*maxNodes=*/numJoins, /*maxEdges=*/kHardMaxEdgesInJoin),
         .maxNumberNodesConsideredForImplicitEdges = kMaxNumberNodesConsideredForImplicitEdges};
     auto swJoinModel =
         AggJoinModel::constructJoinModel(*pipeline, buildParams, getFreshJoinOptMetrics());
@@ -3270,7 +3270,7 @@ TEST_F(PipelineAnalyzerTest, tooManyEdges) {
     // maximum number of edges is hit.
     AggModelBuildParams buildParams{
         .joinGraphBuildParams =
-            JoinGraphBuildParams(/*maxNodes*/ kHardMaxNodesInJoin, /*maxEdges*/ numJoins - 1),
+            JoinGraphBuildParams(/*maxNodes=*/kHardMaxNodesInJoin, /*maxEdges=*/numJoins - 1),
         .maxNumberNodesConsideredForImplicitEdges = kMaxNumberNodesConsideredForImplicitEdges};
     auto swJoinModel =
         AggJoinModel::constructJoinModel(*pipeline, buildParams, getFreshJoinOptMetrics());

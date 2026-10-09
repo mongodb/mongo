@@ -54,7 +54,7 @@ TEST(QueryMemoryLoadSheddingProbability, DisabledReturnsZero) {
               shedProbability(rssAtPercent(90),
                               kMemLimit,
                               kSizeRef,
-                              /*lowMarkPercent*/ -1,
+                              /*lowMarkPercent=*/-1,
                               kHigh,
                               kSizeRef,
                               Seconds(1)));
@@ -83,7 +83,7 @@ TEST(QueryMemoryLoadSheddingProbability, NoTrackedMemoryReturnsZero) {
     ASSERT_EQ(0.0,
               shedProbability(rssAtPercent(90),
                               kMemLimit,
-                              /*opTrackedBytes*/ 0,
+                              /*opTrackedBytes=*/0,
                               kLow,
                               kHigh,
                               kSizeRef,

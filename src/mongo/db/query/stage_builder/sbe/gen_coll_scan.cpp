@@ -205,8 +205,8 @@ std::pair<SbStage, PlanStageSlots> generateCollScan(StageBuilderState& state,
                            csn->filter.get(),
                            resultSlot,
                            outputs,
-                           /*isFilterOverIxscan*/ false,
-                           /*canUsePathArrayness*/
+                           /*isFilterOverIxscan=*/false,
+                           /*canUsePathArrayness=*/
                            state.expCtx->getQueryKnobConfiguration().getEnablePathArrayness());
         if (!filterExpr.isNull()) {
             stage = b.makeFilter(std::move(stage), std::move(filterExpr));

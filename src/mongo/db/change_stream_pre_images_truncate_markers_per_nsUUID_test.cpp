@@ -865,12 +865,12 @@ public:
         const auto expireAfterSeconds = getExpireAfterSeconds();
 
         const auto minBytesPerMarker = 1;
-        const auto initialMarkers = makeInitialSetOfMarkers(
-            {makeWholeMarker(kPreImage1, 1 /* records */, bytes(kPreImage1))},
-            kPreImage1,
-            /*partialMarkerRecords=*/0,
-            /*partialMarkerBytes=*/0,
-            CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
+        const auto initialMarkers =
+            makeInitialSetOfMarkers({makeWholeMarker(kPreImage1, /*records=*/1, bytes(kPreImage1))},
+                                    kPreImage1,
+                                    /*partialMarkerRecords=*/0,
+                                    /*partialMarkerBytes=*/0,
+                                    CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
 
         PreImagesTruncateMarkersPerNsUUID truncateMarkers(
             kNsUUID, std::move(initialMarkers), minBytesPerMarker);

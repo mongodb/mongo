@@ -36,7 +36,7 @@ WasmtimeImplScope::WasmtimeImplScope(std::shared_ptr<wasm::WasmEngineContext> wa
 WasmtimeImplScope::WasmtimeImplScope(std::shared_ptr<wasm::WasmEngineContext> wasmEngineCtx,
                                      boost::optional<int> jsHeapLimitMB,
                                      std::unique_ptr<wasm::MozJSWasmBridge> idleBridge,
-                                     FunctionCacheMap /*cachedFunctions*/)
+                                     /*cachedFunctions=*/FunctionCacheMap)
     : _wasmEngineCtx(std::move(wasmEngineCtx)),
       _jsHeapLimitMB(jsHeapLimitMB),
       _bridge(std::move(idleBridge)) {

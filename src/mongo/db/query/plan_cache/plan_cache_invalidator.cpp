@@ -48,7 +48,7 @@ void PlanCacheInvalidator::clearPlanCache() const {
     // initialized to make PlanCacheKeys.
     if (_serviceContext && _uuid) {
         sbe::clearPlanCacheEntriesWith(
-            _serviceContext, *_uuid, _version, true /*matchSecondaryCollections*/);
+            _serviceContext, *_uuid, _version, /*matchSecondaryCollections=*/true);
     }
 }
 

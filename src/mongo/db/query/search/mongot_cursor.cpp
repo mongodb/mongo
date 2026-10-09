@@ -258,8 +258,8 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSe
     }
 
     auto getMoreStrategy = std::make_unique<executor::DefaultTaskExecutorCursorGetMoreStrategy>(
-        /*batchSize*/ boost::none,
-        /*preFetchNextBatch*/ false);
+        /*batchSize=*/boost::none,
+        /*preFetchNextBatch=*/false);
     return establishCursors(
         expCtx,
         getRemoteCommandRequestForSearchQuery(expCtx->getOperationContext(),

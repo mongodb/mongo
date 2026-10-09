@@ -35,7 +35,7 @@ MultipleCollectionAccessor ClusteredScanStageTestFixture::createClusteredCollect
     CollectionOptions options;
     options.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex();
     ASSERT_OK(storageInterface()->createCollection(
-        operationContext(), _nss, options, false /* createIdIndex */));
+        operationContext(), _nss, options, /*createIdIndex=*/false));
 
     {
         AutoGetCollection agc(operationContext(), _nss, LockMode::MODE_IX);

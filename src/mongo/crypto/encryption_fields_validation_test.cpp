@@ -118,10 +118,10 @@ TEST(FLEValidationUtils, ValidateTrimFactorRange) {
         validateRangeIndexTest(64, BSONType::date, Value(Date_t::min()), Value(Date_t::max())));
 
     // (2^10 > ) 1000 values in domain, we can trim top 9 layers
-    ASSERT_OK(validateRangeIndexTest(
-        9, BSONType::numberDouble, Value(0.), Value(100.), 1 /* precision */));
+    ASSERT_OK(
+        validateRangeIndexTest(9, BSONType::numberDouble, Value(0.), Value(100.), /*precision=*/1));
     ASSERT_NOT_OK(validateRangeIndexTest(
-        10, BSONType::numberDouble, Value(0.), Value(100.), 1 /* precision */));
+        10, BSONType::numberDouble, Value(0.), Value(100.), /*precision=*/1));
 
     ASSERT_OK(validateRangeIndexTest(3, BSONType::numberDouble, boost::none, boost::none));
     ASSERT_NOT_OK(validateRangeIndexTest(64, BSONType::numberDouble, boost::none, boost::none));
@@ -130,12 +130,12 @@ TEST(FLEValidationUtils, ValidateTrimFactorRange) {
                                      BSONType::numberDecimal,
                                      Value(Decimal128(0)),
                                      Value(Decimal128(100)),
-                                     1 /* precision */));
+                                     /*precision=*/1));
     ASSERT_NOT_OK(validateRangeIndexTest(10,
                                          BSONType::numberDecimal,
                                          Value(Decimal128(0)),
                                          Value(Decimal128(100)),
-                                         1 /* precision */));
+                                         /*precision=*/1));
 
     ASSERT_OK(validateRangeIndexTest(7, BSONType::numberDecimal, boost::none, boost::none));
     ASSERT_NOT_OK(validateRangeIndexTest(128, BSONType::numberDecimal, boost::none, boost::none));

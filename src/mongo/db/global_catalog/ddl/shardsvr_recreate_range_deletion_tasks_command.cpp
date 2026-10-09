@@ -80,7 +80,7 @@ public:
 
             ShardSvrRecreateRangeDeletionTasksParticipant req{
                 nss, request().getSkipEmptyRanges(), collectionUuid};
-            setReadWriteConcern(opCtx, req, true /* setRC */, true /* setWC */);
+            setReadWriteConcern(opCtx, req, /*setRC=*/true, /*setWC=*/true);
 
             auto shardResponses =
                 scatterGatherUnversionedTargetAllShards(opCtx,
@@ -200,11 +200,11 @@ public:
                         donorShardId,
                         *range,
                         CleanWhenEnum::kNow,
-                        false /* pending */,
+                        /*pending=*/false,
                         shardKey,
                         preMigrationShardVersion,
                         ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-                        true /* doNotPersistIfDocCoveringSameRangeAlreadyExists */);
+                        /*doNotPersistIfDocCoveringSameRangeAlreadyExists=*/true);
                 }
             }
         }

@@ -104,7 +104,7 @@ void runInTransaction(OperationContext* opCtx, Callable&& func) {
     ASSERT(txnParticipant);
     txnParticipant.beginOrContinue(opCtx,
                                    {txnNum},
-                                   false /* autocommit */,
+                                   /*autocommit=*/false,
                                    TransactionParticipant::TransactionActions::kStart,
                                    transactionRuntimeContext);
     txnParticipant.unstashTransactionResources(opCtx, "SetDestinedRecipient");
@@ -493,7 +493,7 @@ TEST_P(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnMultiUpdates)
     OperationShardingState::setShardRole(
         opCtx, kNss, ShardVersionFactory::make(ChunkVersion::IGNORED()), env.dbVersion);
     client.update(
-        kNss, BSON("x" << 0), BSON("$set" << BSON("z" << 5)), false /*upsert*/, true /*multi*/);
+        kNss, BSON("x" << 0), BSON("$set" << BSON("z" << 5)), /*upsert=*/false, /*multi=*/true);
 
     auto entry = getLastOplogEntry(opCtx);
     auto recipShard = entry.getDestinedRecipient();
@@ -575,7 +575,7 @@ TEST_P(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnDeletesInTran
     auto env = setupReshardingEnv(opCtx, true, true);
 
     OperationShardingState::setShardRole(
-        opCtx, kNss, env.version /* shardVersion */, /*dbVersion=*/env.dbVersion);
+        opCtx, kNss, /*shardVersion=*/env.version, /*dbVersion=*/env.dbVersion);
     runInTransaction(opCtx, [&]() { deleteDoc(opCtx, kNss, BSON("_id" << 0), env); });
 
     // Look for destined recipient in latest oplog entry. Since this write was done in a

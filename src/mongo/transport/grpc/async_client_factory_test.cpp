@@ -318,7 +318,7 @@ TEST_F(GRPCAsyncClientFactoryTest, DropConnectionsWhileConnecting) {
         // Start a stream establishment attempt that will hang until cancelled.
         auto connAttempt = getFactory().get(
             HostAndPort("localhost", 12345), ConnectSSLMode::kGlobalSSLMode, Milliseconds::max());
-        assertStatsSoon(0 /*created*/, 0 /*inUse*/, 0 /*leased*/, 1 /*open*/);
+        assertStatsSoon(/*created=*/0, /*inUse=*/0, /*leased=*/0, /*open=*/1);
         getFactory().dropConnections();
         auto status = connAttempt.getNoThrow().getStatus();
         ASSERT_NOT_OK(status);
@@ -339,7 +339,7 @@ TEST_F(GRPCAsyncClientFactoryTest, DropConnectionsWhileConnectingWithKeepOpen) {
         // Start a stream establishment attempt that will hang until cancelled.
         auto connAttempt = getFactory().get(
             remote, ConnectSSLMode::kGlobalSSLMode, Milliseconds::max(), cancelSource.token());
-        assertStatsSoon(0 /*created*/, 0 /*inUse*/, 0 /*leased*/, 1 /*open*/);
+        assertStatsSoon(/*created=*/0, /*inUse=*/0, /*leased=*/0, /*open=*/1);
         getFactory().dropConnections();
 
         // The first dropConnections does not affect the connect Future.
@@ -445,7 +445,7 @@ TEST_F(GRPCAsyncClientFactoryTest, PerClientStatsTest) {
     auto handle = getClient();
     auto anotherHandle = getClient();
     auto leasedHandle = getLeasedClient();
-    assertStatsSoon(3 /*created*/, 2 /*inUse*/, 1 /*leased*/, 1 /*open*/);
+    assertStatsSoon(/*created=*/3, /*inUse=*/2, /*leased=*/1, /*open=*/1);
 
     // Destroy two handles.
     handle->indicateSuccess();
@@ -454,18 +454,18 @@ TEST_F(GRPCAsyncClientFactoryTest, PerClientStatsTest) {
     leasedHandle.reset();
 
     // Handle outcome should not affect stats.
-    assertStatsSoon(3 /*created*/, 1 /*inUse*/, 0 /*leased*/, 1 /*open*/);
+    assertStatsSoon(/*created=*/3, /*inUse=*/1, /*leased=*/0, /*open=*/1);
 
     auto msg = makeUniqueMessage();
     auto resp = anotherHandle->getClient().runCommand_forTest(OpMsgRequest::parse(msg)).get();
     ASSERT_OK(getStatusFromCommandResult(resp->getCommandReply()));
 
     // A handle is still in use after a command is run and before it is destroyed.
-    assertStatsSoon(3 /*created*/, 1 /*inUse*/, 0 /*leased*/, 1 /*open*/);
+    assertStatsSoon(/*created=*/3, /*inUse=*/1, /*leased=*/0, /*open=*/1);
 
     anotherHandle->indicateSuccess();
     anotherHandle.reset();
-    assertStatsSoon(3 /*created*/, 0 /*inUse*/, 0 /*leased*/, 1 /*open*/);
+    assertStatsSoon(/*created=*/3, /*inUse=*/0, /*leased=*/0, /*open=*/1);
 }
 
 TEST_F(GRPCAsyncClientFactoryTest, CumulativeStatsTest) {

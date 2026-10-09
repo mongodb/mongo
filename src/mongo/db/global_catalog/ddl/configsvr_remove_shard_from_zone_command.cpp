@@ -102,7 +102,7 @@ public:
             uassertStatusOK(Grid::get(opCtx)->shardRegistry()->resolveShardId(
                 opCtx,
                 ShardId(parsedRequest.getShardName()),
-                false /* allowNonShardIdIdentifiers */));
+                /*allowNonShardIdIdentifiers=*/false));
         uassertStatusOK(ShardingCatalogManager::get(opCtx)->removeShardFromZone(
             opCtx, resolvedShardId.toString(), parsedRequest.getZoneName()));
 

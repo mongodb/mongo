@@ -829,7 +829,7 @@ Status OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
                             OplogConstraintViolationEnum::kDeleteOnMissingNs,
                             "delete",
                             opObj,
-                            boost::none /* status */);
+                            /*status=*/boost::none);
                     }
                     return Status::OK();
                 }

@@ -435,7 +435,7 @@ TEST_F(AsyncOplogTruncationTest, StartReplacesStillRunningMaintainerThread) {
 
     // First start via the public lifecycle API.
     startOplogCapMaintainerThread(
-        getServiceContext(), /*isReplSet*/ true, /*shouldSkipOplogSampling*/ false);
+        getServiceContext(), /*isReplSet=*/true, /*shouldSkipOplogSampling=*/false);
     auto* first = OplogCapMaintainerThread::get(getServiceContext());
     ASSERT(first) << "startOplogCapMaintainerThread did not install a thread";
     waitUntilMaintainerThreadRunning(getOperationContext(), hangFp, timesEnteredBefore);

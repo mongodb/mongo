@@ -2074,7 +2074,7 @@ TEST(QuerySolutionTest, EqLookupNodeWithIndexScan) {
                       "foreign",
                       "as",
                       EqLookupNode::LookupStrategy::kNestedLoopJoin,
-                      false /* shouldProduceBson */);
+                      /*shouldProduceBson=*/false);
 
     node.computeProperties();
 
@@ -2120,7 +2120,7 @@ TEST(QuerySolutionTest, EqLookupNodeWithIndexScanFieldOverwrite) {
                       "foreign",
                       "b",
                       EqLookupNode::LookupStrategy::kNestedLoopJoin,
-                      false /* shouldProduceBson */);
+                      /*shouldProduceBson=*/false);
 
     node.computeProperties();
 
@@ -2200,7 +2200,7 @@ TEST(QuerySolutionTest, GetSecondaryNamespaceVectorOverSingleEqLookupNode) {
                                                "remote",
                                                "b",
                                                EqLookupNode::LookupStrategy::kNestedLoopJoin,
-                                               false /* shouldProduceBson */);
+                                               /*shouldProduceBson=*/false);
 
 
     QuerySolution qs;
@@ -2226,7 +2226,7 @@ TEST(QuerySolutionTest, AssertSameHashes) {
                                                    "remote",
                                                    "b",
                                                    EqLookupNode::LookupStrategy::kNestedLoopJoin,
-                                                   false /* shouldProduceBson */);
+                                                   /*shouldProduceBson=*/false);
 
 
         auto qs = std::make_unique<QuerySolution>();
@@ -2352,7 +2352,7 @@ TEST(QuerySolutionTest, GetSecondaryNamespaceVectorDeduplicatesMainNss) {
                                                "remote",
                                                "b",
                                                EqLookupNode::LookupStrategy::kNestedLoopJoin,
-                                               false /* shouldProduceBson */);
+                                               /*shouldProduceBson=*/false);
 
 
     QuerySolution qs;
@@ -2381,7 +2381,7 @@ TEST(QuerySolutionTest, GetSecondaryNamespaceVectorOverNestedEqLookupNodes) {
                                        "remote",
                                        "b",
                                        EqLookupNode::LookupStrategy::kNestedLoopJoin,
-                                       false /* shouldProduceBson */);
+                                       /*shouldProduceBson=*/false);
 
     std::vector<std::unique_ptr<QuerySolutionNode>> children2;
     children2.emplace_back(std::move(childEqLookupNode));
@@ -2393,7 +2393,7 @@ TEST(QuerySolutionTest, GetSecondaryNamespaceVectorOverNestedEqLookupNodes) {
                                        "remote",
                                        "b",
                                        EqLookupNode::LookupStrategy::kNestedLoopJoin,
-                                       false /* shouldProduceBson */);
+                                       /*shouldProduceBson=*/false);
 
     QuerySolution qs;
     qs.setRoot(std::move(parentEqLookupNode));
@@ -2420,7 +2420,7 @@ TEST(QuerySolutionTest, GetSecondaryNamespaceVectorDeduplicatesNestedEqLookupNod
                                        "remote",
                                        "b",
                                        EqLookupNode::LookupStrategy::kNestedLoopJoin,
-                                       false /* shouldProduceBson */);
+                                       /*shouldProduceBson=*/false);
 
     std::vector<std::unique_ptr<QuerySolutionNode>> children2;
     children2.emplace_back(std::move(childEqLookupNode));
@@ -2432,7 +2432,7 @@ TEST(QuerySolutionTest, GetSecondaryNamespaceVectorDeduplicatesNestedEqLookupNod
                                        "remote",
                                        "b",
                                        EqLookupNode::LookupStrategy::kNestedLoopJoin,
-                                       false /* shouldProduceBson */);
+                                       /*shouldProduceBson=*/false);
 
     QuerySolution qs;
     qs.setRoot(std::move(parentEqLookupNode));
@@ -2552,7 +2552,7 @@ TEST(QuerySolutionTest, SummaryStringForHashJoinPlan) {
     auto hashJoin = std::make_unique<HashJoinEmbeddingNode>(std::move(ixscan),
                                                             std::move(collscan),
                                                             makeJoinPredicates("a", "b"),
-                                                            boost::none /* leftEmbeddingField */,
+                                                            /*leftEmbeddingField=*/boost::none,
                                                             FieldPath{"out"});
 
     QuerySolution solution;
@@ -2571,12 +2571,12 @@ TEST(QuerySolutionTest, SummaryStringForNestedJoinPlan) {
         std::make_unique<IndexedNestedLoopJoinEmbeddingNode>(std::move(collscan),
                                                              std::move(probe),
                                                              makeJoinPredicates("b", "c"),
-                                                             boost::none /* leftEmbeddingField */,
+                                                             /*leftEmbeddingField=*/boost::none,
                                                              FieldPath{"cOut"});
     auto hashJoin = std::make_unique<HashJoinEmbeddingNode>(std::move(ixscan),
                                                             std::move(inlj),
                                                             makeJoinPredicates("a", "b"),
-                                                            boost::none /* leftEmbeddingField */,
+                                                            /*leftEmbeddingField=*/boost::none,
                                                             FieldPath{"bOut"});
 
     QuerySolution solution;
@@ -2593,10 +2593,10 @@ TEST(QuerySolutionTest, SummaryStringSkipsNonJoinNodesAboveJoin) {
     auto nlj = std::make_unique<NestedLoopJoinEmbeddingNode>(std::move(collscanA),
                                                              std::move(collscanB),
                                                              makeJoinPredicates("a", "b"),
-                                                             boost::none /* leftEmbeddingField */,
+                                                             /*leftEmbeddingField=*/boost::none,
                                                              FieldPath{"out"});
     auto skip = std::make_unique<SkipNode>(
-        std::move(nlj), 10 /* skip */, LimitSkipParameterization::Disabled);
+        std::move(nlj), /*skip=*/10, LimitSkipParameterization::Disabled);
 
     QuerySolution solution;
     solution.setRoot(std::move(skip));
@@ -2621,7 +2621,7 @@ TEST(QuerySolutionTest, SummaryStringForNonJoinSubtreeAboveLeaves) {
     auto hashJoin = std::make_unique<HashJoinEmbeddingNode>(std::move(orNode),
                                                             std::move(collscan),
                                                             makeJoinPredicates("a", "b"),
-                                                            boost::none /* leftEmbeddingField */,
+                                                            /*leftEmbeddingField=*/boost::none,
                                                             FieldPath{"out"});
 
     QuerySolution solution;
@@ -2639,7 +2639,7 @@ TEST(QuerySolutionTest, SummaryStringForMultipleJoinSubtreesUnderNonJoinNode) {
             std::make_unique<CollectionScanNode>(leftNss),
             std::make_unique<CollectionScanNode>(rightNss),
             makeJoinPredicates("a", "b"),
-            boost::none /* leftEmbeddingField */,
+            /*leftEmbeddingField=*/boost::none,
             FieldPath{"out"});
     };
 
@@ -2666,7 +2666,7 @@ TEST(QuerySolutionTest, SummaryStringBracketsMultipleJoinSubtreesUnderAJoinInput
             std::make_unique<CollectionScanNode>(leftNss),
             std::make_unique<CollectionScanNode>(rightNss),
             makeJoinPredicates("a", "b"),
-            boost::none /* leftEmbeddingField */,
+            /*leftEmbeddingField=*/boost::none,
             FieldPath{"out"});
     };
 
@@ -2680,7 +2680,7 @@ TEST(QuerySolutionTest, SummaryStringBracketsMultipleJoinSubtreesUnderAJoinInput
         std::move(orNode),
         std::make_unique<IndexScanNode>(kNssC, buildSimpleIndexEntry(BSON("c" << 1))),
         makeJoinPredicates("a", "c"),
-        boost::none /* leftEmbeddingField */,
+        /*leftEmbeddingField=*/boost::none,
         FieldPath{"cOut"});
 
     QuerySolution solution;

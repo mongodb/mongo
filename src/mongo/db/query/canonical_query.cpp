@@ -83,7 +83,7 @@ CanonicalQuery::CanonicalQuery(CanonicalQueryParams&& params) {
            params.isCountLike,
            params.isSearchQuery,
            params.aggWithNonEmptyPipeline,
-           true /*optimizeMatchExpression*/);
+           /*optimizeMatchExpression=*/true);
 }
 
 CanonicalQuery::CanonicalQuery(OperationContext* opCtx, const CanonicalQuery& baseQuery, size_t i) {
@@ -121,7 +121,7 @@ CanonicalQuery::CanonicalQuery(OperationContext* opCtx, const CanonicalQuery& ba
            false,  // The parent query countLike is independent from the subquery countLike.
            baseQuery.isSearchQuery(),
            baseQuery.aggWithNonEmptyPipeline(),
-           false /*optimizeMatchExpression*/);
+           /*optimizeMatchExpression=*/false);
 
     if (baseQuery.getDistinct().has_value()) {
         setDistinct(CanonicalDistinct(baseQuery.getDistinct().get()));
@@ -198,7 +198,7 @@ void CanonicalQuery::initCq(boost::intrusive_ptr<ExpressionContext> expCtx,
             _metadataDeps.set(DocumentMetadataFields::kSortKey);
         }
     }
-    setCqPipeline(std::move(cqPipeline), false /* containsEntirePipeline */);
+    setCqPipeline(std::move(cqPipeline), /*containsEntirePipeline=*/false);
     _isCountLike = isCountLike;
     _isSearchQuery = isSearchQuery;
     _aggWithNonEmptyPipeline = aggWithNonEmptyPipeline;

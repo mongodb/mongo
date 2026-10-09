@@ -866,10 +866,9 @@ protected:
             result->runtimePlanner = std::make_unique<crp_sbe::MultiPlanner>(
                 this->makePlannerData(),
                 std::move(planRankingResult.solutions),
-                true /*shouldWriteToPlanCache*/,
-                []() {
-                } /*incrementReplannedPlanIsCachedPlanCounterCb*/,
-                boost::none /*replanReason*/,
+                /*shouldWriteToPlanCache=*/true,
+                /*incrementReplannedPlanIsCachedPlanCounterCb=*/[]() {},
+                /*replanReason=*/boost::none,
                 planRankingResult.planSelectionStrategy);
             return result;
         } else {
@@ -1157,7 +1156,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
                                  canonicalQuery.get(),
                                  yieldPolicy,
                                  std::move(plannerParams),
-                                 boost::none /* addStageFn */);
+                                 /*addStageFn=*/boost::none);
     };
 
     auto planner = retryMakePlanner(std::move(paramsForSingleCollectionQuery),
@@ -1186,17 +1185,17 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSearchMetada
     auto root = stage_builder::buildSearchMetadataExecutorSBE(
         opCtx, expCtx, metadataCursorId, remoteCursors.get(), sbeYieldPolicy.get());
     return plan_executor_factory::make(opCtx,
-                                       nullptr /* cq */,
-                                       nullptr /* solution */,
+                                       /*cq=*/nullptr,
+                                       /*solution=*/nullptr,
                                        std::move(root),
                                        emptyMca,
-                                       {} /* plannerOptions */,
+                                       /*plannerOptions=*/{},
                                        nss,
                                        std::move(sbeYieldPolicy),
                                        /*isFromPlanCache=*/false,
-                                       boost::none /* cachedPlanHash */,
-                                       false /* usedJoinOpt*/,
-                                       {} /* rejectedJoinPlans */,
+                                       /*cachedPlanHash=*/boost::none,
+                                       /*usedJoinOpt=*/false,
+                                       /*rejectedJoinPlans=*/{},
                                        std::move(remoteCursors));
 }
 
@@ -1447,7 +1446,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
 
     // Invoke the lambda returned from the factory for the initial planner params.
     auto plannerParams = makeQueryPlannerParamsFactory(opCtx, collections)(
-        *cq.get(), QueryPlannerParams::DEFAULT, boost::none /* replanningData */);
+        *cq.get(), QueryPlannerParams::DEFAULT, /*replanningData=*/boost::none);
     auto planner =
         retryMakePlanner(std::move(plannerParams),
                          makeQueryPlannerParamsFactory(opCtx, collections),
@@ -1458,7 +1457,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
                                             boost::make_optional<AddNewStageFn>(addDeleteStageFn)),
                          cq.get(),
                          QueryPlannerParams::DEFAULT,
-                         nullptr /* pipeline */);
+                         /*pipeline=*/nullptr);
 
     return planner->makeExecutor(std::move(cq));
 }
@@ -1618,7 +1617,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
 
     // Invoke the lambda returned from the factory for the initial planner params.
     auto plannerParams = makeQueryPlannerParamsFactory(opCtx, collections)(
-        *cq, QueryPlannerParams::DEFAULT, boost::none /* replanningData */);
+        *cq, QueryPlannerParams::DEFAULT, /*replanningData=*/boost::none);
     auto planner =
         retryMakePlanner(std::move(plannerParams),
                          makeQueryPlannerParamsFactory(opCtx, collections),
@@ -1629,7 +1628,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
                                             boost::make_optional<AddNewStageFn>(addUpdateStageFn)),
                          cq.get(),
                          QueryPlannerParams::DEFAULT,
-                         nullptr /* pipeline */);
+                         /*pipeline=*/nullptr);
 
     return planner->makeExecutor(std::move(cq));
 }
@@ -1725,7 +1724,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
 
     // Invoke the lambda returned from the factory for the initial planner params.
     auto plannerParams = makeQueryPlannerParamsFactory(opCtx, collections, plannerOptions)(
-        *cq, plannerOptions, boost::none /* replanningData */);
+        *cq, plannerOptions, /*replanningData=*/boost::none);
     auto planner =
         retryMakePlanner(std::move(plannerParams),
                          makeQueryPlannerParamsFactory(opCtx, collections, plannerOptions),
@@ -1736,7 +1735,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
                                             boost::make_optional<AddNewStageFn>(addCountStageFn)),
                          cq.get(),
                          plannerOptions,
-                         nullptr /* pipeline */);
+                         /*pipeline=*/nullptr);
 
     return planner->makeExecutor(std::move(cq));
 }

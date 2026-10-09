@@ -30,7 +30,7 @@ TEST(FieldPathTest, Simple) {
 
 /** Accessing hashed field names from a FieldPath without precomputed hashes */
 DEATH_TEST_REGEX(FieldPathTestDeathTest, AccessInvalidHashes, "Tripwire assertion.*11212700") {
-    FieldPath path("foo.bar.baz", false /* precomputeHashes */);
+    FieldPath path("foo.bar.baz", /*precomputeHashes=*/false);
     ASSERT_EQUALS(3U, path.getPathLength());
     ASSERT_EQUALS("foo", path.getFieldName(0));
     ASSERT_EQUALS("bar", path.getFieldName(1));
@@ -45,7 +45,7 @@ DEATH_TEST_REGEX(FieldPathTestDeathTest, AccessInvalidHashes, "Tripwire assertio
 
 /** Accessing hashed field names from a FieldPath with computed hashes */
 TEST(FieldPathTest, AccessValidHashes) {
-    FieldPath path("foo.bar.baz", true /* precomputeHashes */);
+    FieldPath path("foo.bar.baz", /*precomputeHashes=*/true);
     ASSERT_EQUALS(3U, path.getPathLength());
     ASSERT_EQUALS("foo", path.getFieldName(0));
     ASSERT_EQUALS("bar", path.getFieldName(1));
@@ -259,8 +259,8 @@ TEST(FieldPathTest, ConcatFailsIfExceedsMaxDepth) {
 DEATH_TEST_REGEX(FieldPathTestDeathTest,
                  AccessHashesOfConcatenatedPathsThatAreNotComputed,
                  "Tripwire assertion.*11212700") {
-    FieldPath head("some.long.path", false /* precomputeHashes */);
-    FieldPath tail("another.path", false /* precomputeHashes */);
+    FieldPath head("some.long.path", /*precomputeHashes=*/false);
+    FieldPath tail("another.path", /*precomputeHashes=*/false);
     FieldPath path = concatAndCheck(head, tail);
 
     ASSERT_THROWS_CODE(path.getFieldNameHashed(0), AssertionException, 11212700);
@@ -271,8 +271,8 @@ DEATH_TEST_REGEX(FieldPathTestDeathTest,
 }
 
 TEST(FieldPathTest, AccessHashesOfConcatenatedPathsThatAreFullyComputed) {
-    FieldPath head("some.long.path", true /* precomputeHashes */);
-    FieldPath tail("another.path", true /* precomputeHashes */);
+    FieldPath head("some.long.path", /*precomputeHashes=*/true);
+    FieldPath tail("another.path", /*precomputeHashes=*/true);
     FieldPath path = concatAndCheck(head, tail);
 
     ASSERT_EQ("some", path.getFieldNameHashed(0).key());
@@ -290,8 +290,8 @@ TEST(FieldPathTest, AccessHashesOfConcatenatedPathsThatAreFullyComputed) {
 DEATH_TEST_REGEX(FieldPathTestDeathTest,
                  AccessHashesOfConcatenatedPathsOnlyHeadHasComputedHashes,
                  "Tripwire assertion.*11212700") {
-    FieldPath head("some.long.path", true /* precomputeHashes */);
-    FieldPath tail("another.path", false /* precomputeHashes */);
+    FieldPath head("some.long.path", /*precomputeHashes=*/true);
+    FieldPath tail("another.path", /*precomputeHashes=*/false);
     FieldPath path = concatAndCheck(head, tail);
 
     ASSERT_EQ("some", path.getFieldNameHashed(0).key());
@@ -305,8 +305,8 @@ DEATH_TEST_REGEX(FieldPathTestDeathTest,
 }
 
 TEST(FieldPathTest, AccessHashesOfConcatenatedPathsOnlyTailHasComputedHashes) {
-    FieldPath head("some.long.path", false /* precomputeHashes */);
-    FieldPath tail("another.path", true /* precomputeHashes */);
+    FieldPath head("some.long.path", /*precomputeHashes=*/false);
+    FieldPath tail("another.path", /*precomputeHashes=*/true);
     FieldPath path = concatAndCheck(head, tail);
 
     ASSERT_EQ("some", path.getFieldNameHashed(0).key());
@@ -324,12 +324,12 @@ TEST(FieldPathTest, AccessHashesOfConcatenatedPathsOnlyTailHasComputedHashes) {
 DEATH_TEST_REGEX(FieldPathTestDeathTest,
                  AccessHashesOfMultiConcatenatedFieldPaths,
                  "Tripwire assertion.*11212700") {
-    FieldPath one("some.long.path", true /* precomputeHashes */);
-    FieldPath two("another.path", false /* precomputeHashes */);
-    FieldPath three("here", true /* precomputeHashes */);
-    FieldPath four("is.another.path", false /* precomputeHashes */);
-    FieldPath five("finally.the.end.is.near", true /* precomputeHashes */);
-    FieldPath six("really", false /* precomputeHashes */);
+    FieldPath one("some.long.path", /*precomputeHashes=*/true);
+    FieldPath two("another.path", /*precomputeHashes=*/false);
+    FieldPath three("here", /*precomputeHashes=*/true);
+    FieldPath four("is.another.path", /*precomputeHashes=*/false);
+    FieldPath five("finally.the.end.is.near", /*precomputeHashes=*/true);
+    FieldPath six("really", /*precomputeHashes=*/false);
     FieldPath path = one.concat(two).concat(three).concat(four).concat(five).concat(six);
 
     ASSERT_EQ("some.long.path.another.path.here.is.another.path.finally.the.end.is.near.really",

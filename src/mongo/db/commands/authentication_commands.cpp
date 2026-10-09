@@ -195,7 +195,7 @@ void _authenticateX509(OperationContext* opCtx, AuthenticationSession* session) 
     UserName userName = ([&] {
         if (session->getUserName().empty()) {
             auto user = UserName(clientName.toString(), std::string{session->getDatabase()});
-            session->updateUserName(user, true /* isMechX509 */);
+            session->updateUserName(user, /*isMechX509=*/true);
             return user;
         } else {
             uassert(ErrorCodes::AuthenticationFailed,

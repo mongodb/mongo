@@ -193,7 +193,7 @@ void ChangeStreamStageTest::checkTransformation(
  */
 std::unique_ptr<exec::agg::Pipeline> ChangeStreamStageTest::makeExecPipeline(BSONObj entry,
                                                                              const BSONObj& spec) {
-    return makeExecPipeline({entry}, spec, true /* removeEnsureResumeTokenStage */);
+    return makeExecPipeline({entry}, spec, /*removeEnsureResumeTokenStage=*/true);
 }
 
 /**

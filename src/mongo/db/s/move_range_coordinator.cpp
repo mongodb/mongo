@@ -752,7 +752,7 @@ void MoveRangeCoordinator::_releaseCriticalSectionAndFinalize(OperationContext* 
         migrationutil::makeCriticalSectionReasonForMoveRange(_request, _doc.getMigrationId()),
         defaultMajorityWriteConcernDoNotUse(),
         ShardingRecoveryService::NoCustomAction(),
-        false /* throwIfReasonDiffers */);
+        /*throwIfReasonDiffers=*/false);
 
     // Complete the migration from its persisted decision: release the recipient critical section,
     // schedule range deletion / orphan cleanup, and forget the on-disk coordinator document.

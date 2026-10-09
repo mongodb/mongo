@@ -77,7 +77,7 @@ public:
         auto scan = makeCollScan();
         scan->isClustered = true;
         RecordIdRange range;
-        range.maybeNarrowMin(RecordIdBound(RecordId(1)), true /* inclusive */);
+        range.maybeNarrowMin(RecordIdBound(RecordId(1)), /*inclusive=*/true);
         scan->rangeList = RecordIdRangeList(range);
         return scan;
     }
@@ -98,7 +98,7 @@ public:
     }
 
     Interval makeInterval(BSONObj base) {
-        return Interval(base, true /* startIncluded */, true /* endIncluded */);
+        return Interval(base, /*startIncluded=*/true, /*endIncluded=*/true);
     }
 
     Interval makePointInterval(int value) {
@@ -125,7 +125,7 @@ public:
                                             buildSimpleIndexEntry(BSON("_fts" << "text"
                                                                               << "_ftsx" << 1)),
                                             std::make_unique<fts::FTSQueryImpl>(),
-                                            false /* wantTextScore */);
+                                            /*wantTextScore=*/false);
         node->children.push_back(std::move(child));
         return node;
     }
@@ -230,7 +230,7 @@ public:
         // Count and distinct scans. The distinct scan can fetch by itself or under a FETCH stage.
         add(makeCountScan(), {AccessPathCounter::kCountScan});
         add(makeDistinctScan(), {AccessPathCounter::kDistinctScan});
-        add(makeDistinctScan(true /* isFetching */), {AccessPathCounter::kDistinctScanFetch});
+        add(makeDistinctScan(/*isFetching=*/true), {AccessPathCounter::kDistinctScanFetch});
         add(makeFetch(makeDistinctScan()), {AccessPathCounter::kDistinctScanFetch});
 
         // Special access paths.
@@ -462,7 +462,7 @@ TEST_F(PlanAccessPathCountersTest, CountsExcludeExtensionNodes) {
                                                    FieldPath("b"),
                                                    FieldPath("out"),
                                                    EqLookupNode::LookupStrategy::kNestedLoopJoin,
-                                                   false /* shouldProduceBson */);
+                                                   /*shouldProduceBson=*/false);
     auto solution = makePlan(makeFetch(makeIxScan()));
     solution->extendWith(std::move(eqLookup));
 

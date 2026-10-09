@@ -471,7 +471,7 @@ TEST_F(BatchWriteExecTest, SingleUpdateTargetsShardWithLet) {
             ASSERT_BSONOBJ_EQ(expectedQ, u.getQ());
 
         response.setQueryStatsMetrics({makeQueryStatsMetrics(
-            0 /*originalOpIndex*/, 10 /*keysExamined*/, 5 /*docsExamined*/, 1 /*nMatched*/)});
+            /*originalOpIndex=*/0, /*keysExamined=*/10, /*docsExamined=*/5, /*nMatched=*/1)});
 
         return response.toBSON();
     });
@@ -4471,9 +4471,9 @@ TEST_F(BatchWriteExecTest, QueryStatsMetricsAggregatedFromShardResponseForUpdate
         batchedResponse.setNModified(2);
         batchedResponse.setQueryStatsMetrics(
             {makeQueryStatsMetrics(
-                 0 /*originalOpIndex*/, 10 /*keysExamined*/, 5 /*docsExamined*/, 1 /*nMatched*/),
+                 /*originalOpIndex=*/0, /*keysExamined=*/10, /*docsExamined=*/5, /*nMatched=*/1),
              makeQueryStatsMetrics(
-                 1 /*originalOpIndex*/, 20 /*keysExamined*/, 15 /*docsExamined*/, 1 /*nMatched*/)});
+                 /*originalOpIndex=*/1, /*keysExamined=*/20, /*docsExamined=*/15, /*nMatched=*/1)});
         return batchedResponse.toBSON();
     });
 
@@ -4562,7 +4562,7 @@ TEST_F(BatchWriteExecTest, QueryStatsMetricsAggregatedFromMultipleShardsForUpdat
         batchedResponse.setN(1);
         batchedResponse.setNModified(1);
         batchedResponse.setQueryStatsMetrics({makeQueryStatsMetrics(
-            0 /*originalOpIndex*/, 10 /*keysExamined*/, 5 /*docsExamined*/, 1 /*nMatched*/)});
+            /*originalOpIndex=*/0, /*keysExamined=*/10, /*docsExamined=*/5, /*nMatched=*/1)});
         return batchedResponse.toBSON();
     });
 
@@ -4574,7 +4574,7 @@ TEST_F(BatchWriteExecTest, QueryStatsMetricsAggregatedFromMultipleShardsForUpdat
         batchedResponse.setN(1);
         batchedResponse.setNModified(1);
         batchedResponse.setQueryStatsMetrics({makeQueryStatsMetrics(
-            0 /*originalOpIndex*/, 15 /*keysExamined*/, 8 /*docsExamined*/, 1 /*nMatched*/)});
+            /*originalOpIndex=*/0, /*keysExamined=*/15, /*docsExamined=*/8, /*nMatched=*/1)});
         return batchedResponse.toBSON();
     });
 
@@ -4617,11 +4617,11 @@ TEST_F(BatchWriteExecTest, QueryStatsMetricsAggregatedFromShardResponseForDelete
         batchedResponse.setN(2);
         batchedResponse.setQueryStatsMetrics(
             {makeQueryStatsMetrics(
-                 0 /*originalOpIndex*/, 10 /*keysExamined*/, 5 /*docsExamined*/, 1 /*nMatched*/, 0),
-             makeQueryStatsMetrics(1 /*originalOpIndex*/,
-                                   20 /*keysExamined*/,
-                                   15 /*docsExamined*/,
-                                   1 /*nMatched*/,
+                 /*originalOpIndex=*/0, /*keysExamined=*/10, /*docsExamined=*/5, /*nMatched=*/1, 0),
+             makeQueryStatsMetrics(/*originalOpIndex=*/1,
+                                   /*keysExamined=*/20,
+                                   /*docsExamined=*/15,
+                                   /*nMatched=*/1,
                                    0)});
         return batchedResponse.toBSON();
     });
@@ -4703,7 +4703,7 @@ TEST_F(BatchWriteExecTest, QueryStatsMetricsAggregatedFromMultipleShardsForDelet
         batchedResponse.setStatus(Status::OK());
         batchedResponse.setN(1);
         batchedResponse.setQueryStatsMetrics({makeQueryStatsMetrics(
-            0 /*originalOpIndex*/, 10 /*keysExamined*/, 5 /*docsExamined*/, 1 /*nMatched*/)});
+            /*originalOpIndex=*/0, /*keysExamined=*/10, /*docsExamined=*/5, /*nMatched=*/1)});
         return batchedResponse.toBSON();
     });
 
@@ -4713,7 +4713,7 @@ TEST_F(BatchWriteExecTest, QueryStatsMetricsAggregatedFromMultipleShardsForDelet
         batchedResponse.setStatus(Status::OK());
         batchedResponse.setN(1);
         batchedResponse.setQueryStatsMetrics({makeQueryStatsMetrics(
-            0 /*originalOpIndex*/, 15 /*keysExamined*/, 8 /*docsExamined*/, 1 /*nMatched*/)});
+            /*originalOpIndex=*/0, /*keysExamined=*/15, /*docsExamined=*/8, /*nMatched=*/1)});
         return batchedResponse.toBSON();
     });
 
@@ -4763,9 +4763,9 @@ TEST_F(BatchWriteExecTest, QueryStatsMetricsFieldSetOnOutgoingDeleteRequest) {
         response.setN(2);
         response.setQueryStatsMetrics(
             {makeQueryStatsMetrics(
-                 0 /*originalOpIndex*/, 10 /*keysExamined*/, 5 /*docsExamined*/, 1 /*nMatched*/),
+                 /*originalOpIndex=*/0, /*keysExamined=*/10, /*docsExamined=*/5, /*nMatched=*/1),
              makeQueryStatsMetrics(
-                 1 /*originalOpIndex*/, 20 /*keysExamined*/, 15 /*docsExamined*/, 1 /*nMatched*/)});
+                 /*originalOpIndex=*/1, /*keysExamined=*/20, /*docsExamined=*/15, /*nMatched=*/1)});
         return response.toBSON();
     });
 
@@ -4810,11 +4810,11 @@ TEST_F(BatchWriteExecTest, QueryStatsMetricsAggregatedFromSingleShardForInsert) 
         BatchedCommandResponse batchedResponse;
         batchedResponse.setStatus(Status::OK());
         batchedResponse.setN(2);
-        batchedResponse.setQueryStatsMetrics({makeQueryStatsMetrics(0 /*originalOpIndex*/,
-                                                                    0 /*keysExamined*/,
-                                                                    0 /*docsExamined*/,
-                                                                    0 /*nMatched*/,
-                                                                    2 /*nInserted*/)});
+        batchedResponse.setQueryStatsMetrics({makeQueryStatsMetrics(/*originalOpIndex=*/0,
+                                                                    /*keysExamined=*/0,
+                                                                    /*docsExamined=*/0,
+                                                                    /*nMatched=*/0,
+                                                                    /*nInserted=*/2)});
         return batchedResponse.toBSON();
     });
 
@@ -4883,11 +4883,11 @@ TEST_F(BatchWriteExecTest, QueryStatsMetricsAggregatedFromMultipleShardsForInser
         BatchedCommandResponse batchedResponse;
         batchedResponse.setStatus(Status::OK());
         batchedResponse.setN(1);
-        batchedResponse.setQueryStatsMetrics({makeQueryStatsMetrics(0 /*originalOpIndex*/,
-                                                                    0 /*keysExamined*/,
-                                                                    0 /*docsExamined*/,
-                                                                    0 /*nMatched*/,
-                                                                    1 /*nInserted*/)});
+        batchedResponse.setQueryStatsMetrics({makeQueryStatsMetrics(/*originalOpIndex=*/0,
+                                                                    /*keysExamined=*/0,
+                                                                    /*docsExamined=*/0,
+                                                                    /*nMatched=*/0,
+                                                                    /*nInserted=*/1)});
         return batchedResponse.toBSON();
     });
 
@@ -4902,11 +4902,11 @@ TEST_F(BatchWriteExecTest, QueryStatsMetricsAggregatedFromMultipleShardsForInser
         BatchedCommandResponse batchedResponse;
         batchedResponse.setStatus(Status::OK());
         batchedResponse.setN(1);
-        batchedResponse.setQueryStatsMetrics({makeQueryStatsMetrics(0 /*originalOpIndex*/,
-                                                                    0 /*keysExamined*/,
-                                                                    0 /*docsExamined*/,
-                                                                    0 /*nMatched*/,
-                                                                    1 /*nInserted*/)});
+        batchedResponse.setQueryStatsMetrics({makeQueryStatsMetrics(/*originalOpIndex=*/0,
+                                                                    /*keysExamined=*/0,
+                                                                    /*docsExamined=*/0,
+                                                                    /*nMatched=*/0,
+                                                                    /*nInserted=*/1)});
         return batchedResponse.toBSON();
     });
 

@@ -49,7 +49,7 @@ void BM_SampleBased(benchmark::State& state) {
     static RateLimiter limiter;
     // Initialize the rate limiter only on the first thread to start up.
     if (state.thread_index == 0) {
-        limiter.configureSampleBased(state.range(0), 17 /* seed */);
+        limiter.configureSampleBased(state.range(0), /*seed=*/17);
     }
 
     for (auto _ : state) {

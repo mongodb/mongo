@@ -23,14 +23,14 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx = nullptr /* needed for meta sorts */)
         : _sortPatternBson(sortPatternBson.getOwned()),
           _sortPattern(_sortPatternBson, expCtx),
-          _sortKeyGen(_sortPattern, nullptr /* collator */) {
+          _sortKeyGen(_sortPattern, /*collator=*/nullptr) {
         _localBsonEltStorage.resize(_sortPattern.size());
         _localSortKeyComponentStorage.elts.resize(_sortPattern.size());
     }
     SortSpec(const SortSpec& other)
         : _sortPatternBson(other._sortPatternBson),
           _sortPattern(other._sortPattern),
-          _sortKeyGen(_sortPattern, nullptr /* collator */) {
+          _sortKeyGen(_sortPattern, /*collator=*/nullptr) {
         _localBsonEltStorage.resize(_sortPattern.size());
         _localSortKeyComponentStorage.elts.resize(_sortPattern.size());
     }

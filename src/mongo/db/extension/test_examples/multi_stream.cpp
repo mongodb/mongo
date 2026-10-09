@@ -483,7 +483,7 @@ public:
         std::vector<extension::VariantNodeHandle> expanded;
         expanded.reserve(1);
         expanded.emplace_back(sdk::HostServicesAPI::getInstance()->createDocumentResultsAndMetadata(
-            drmSpec, nullptr /* callback */, nullptr /* userData */, nullptr /* destroy */));
+            drmSpec, /*callback=*/nullptr, /*userData=*/nullptr, /*destroy=*/nullptr));
         return expanded;
     }
 

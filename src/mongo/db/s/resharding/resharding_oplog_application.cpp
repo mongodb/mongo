@@ -440,7 +440,7 @@ void ReshardingOplogApplicationRules::_applyDelete(OperationContext* opCtx,
 
         // Delete from the output collection
         invariant(!outputCollDoc.isEmpty());
-        auto nDeleted = deleteObjects(opCtx, outputCappedColl, idQuery, true /* justOne */);
+        auto nDeleted = deleteObjects(opCtx, outputCappedColl, idQuery, /*justOne=*/true);
         invariant(nDeleted != 0);
 
         // Batched writes are assigned their timestamp upon committing, unlike regular writes. In
@@ -462,7 +462,7 @@ void ReshardingOplogApplicationRules::_applyDelete(OperationContext* opCtx,
         const auto stashColl = acquireCollectionAndAssertExists(opCtx, _myStashNss);
         auto stashCollDoc = _queryStashCollById(opCtx, stashColl.getCollectionPtr(), idQuery);
         if (!stashCollDoc.isEmpty()) {
-            auto nDeleted = deleteObjects(opCtx, stashColl, idQuery, true /* justOne */);
+            auto nDeleted = deleteObjects(opCtx, stashColl, idQuery, /*justOne=*/true);
             invariant(nDeleted != 0);
 
             _applierMetrics->onWriteToStashCollections();
@@ -511,7 +511,7 @@ void ReshardingOplogApplicationRules::_applyDelete(OperationContext* opCtx,
         // 3. Insert the doc just deleted into the output collection
 
         // Delete from the output collection
-        auto nDeleted = deleteObjects(opCtx, outputColl, idQuery, true /* justOne */);
+        auto nDeleted = deleteObjects(opCtx, outputColl, idQuery, /*justOne=*/true);
         invariant(nDeleted != 0);
 
         // Attempt to delete a doc from one of the stash collections. Once we've matched a doc
@@ -551,7 +551,7 @@ void ReshardingOplogApplicationRules::_applyDelete(OperationContext* opCtx,
             auto exec = uassertStatusOK(getExecutorDelete(&CurOp::get(opCtx)->debug(),
                                                           stashColl,
                                                           canonicalDelete,
-                                                          boost::none /* verbosity */));
+                                                          /*verbosity=*/boost::none));
             BSONObj res;
             auto state = exec->getNext(&res, nullptr);
 

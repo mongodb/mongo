@@ -77,7 +77,7 @@ public:
                                               _mainNss.dbName(),
                                               UUID::gen(),
                                               cmd.toBSON(),
-                                              false /* allowRenameOutOfTheWay */));
+                                              /*allowRenameOutOfTheWay=*/false));
     }
 
     void dropViewlessTimeseriesAt(Timestamp commitTimestamp) {
@@ -376,19 +376,19 @@ TEST_F(TimeseriesCatalogHelperTest, acquireUsesPointInTimeCatalogAfterCreate) {
     createViewlessTimeseriesAt(createTimestamp);
 
     // Before the create, neither namespace existed.
-    assertAcquireAt(Timestamp(5, 1), _mainNss, boost::none /* expectedViewless */);
-    assertAcquireAt(Timestamp(5, 1), _bucketsNss, boost::none /* expectedViewless */);
+    assertAcquireAt(Timestamp(5, 1), _mainNss, /*expectedViewless=*/boost::none);
+    assertAcquireAt(Timestamp(5, 1), _bucketsNss, /*expectedViewless=*/boost::none);
 
     // At and after the create, a main namespace request acquires directly while a buckets
     // namespace request translates to the viewless collection on the main namespace.
-    assertAcquireAt(createTimestamp, _mainNss, true /* expectedViewless */);
-    assertAcquireAt(createTimestamp, _bucketsNss, true /* expectedViewless */);
-    assertAcquireAt(Timestamp(15, 1), _mainNss, true /* expectedViewless */);
-    assertAcquireAt(Timestamp(15, 1), _bucketsNss, true /* expectedViewless */);
+    assertAcquireAt(createTimestamp, _mainNss, /*expectedViewless=*/true);
+    assertAcquireAt(createTimestamp, _bucketsNss, /*expectedViewless=*/true);
+    assertAcquireAt(Timestamp(15, 1), _mainNss, /*expectedViewless=*/true);
+    assertAcquireAt(Timestamp(15, 1), _bucketsNss, /*expectedViewless=*/true);
 
     // An untimestamped read sees the latest catalog state as well.
-    assertAcquireAt(boost::none, _mainNss, true /* expectedViewless */);
-    assertAcquireAt(boost::none, _bucketsNss, true /* expectedViewless */);
+    assertAcquireAt(boost::none, _mainNss, /*expectedViewless=*/true);
+    assertAcquireAt(boost::none, _bucketsNss, /*expectedViewless=*/true);
 }
 
 TEST_F(TimeseriesCatalogHelperTest, acquireUsesPointInTimeCatalogAfterDrop) {
@@ -399,16 +399,16 @@ TEST_F(TimeseriesCatalogHelperTest, acquireUsesPointInTimeCatalogAfterDrop) {
 
     // The latest catalog is empty, but the collection still existed at this PIT. A main namespace
     // request acquires directly while a buckets namespace request translates to it.
-    assertAcquireAt(Timestamp(15, 1), _mainNss, true /* expectedViewless */);
-    assertAcquireAt(Timestamp(15, 1), _bucketsNss, true /* expectedViewless */);
+    assertAcquireAt(Timestamp(15, 1), _mainNss, /*expectedViewless=*/true);
+    assertAcquireAt(Timestamp(15, 1), _bucketsNss, /*expectedViewless=*/true);
 
     // At and after the drop, each origin namespace remains a non-existent lookup.
-    assertAcquireAt(dropTimestamp, _mainNss, boost::none /* expectedViewless */);
-    assertAcquireAt(dropTimestamp, _bucketsNss, boost::none /* expectedViewless */);
-    assertAcquireAt(Timestamp(25, 1), _mainNss, boost::none /* expectedViewless */);
-    assertAcquireAt(Timestamp(25, 1), _bucketsNss, boost::none /* expectedViewless */);
-    assertAcquireAt(boost::none, _mainNss, boost::none /* expectedViewless */);
-    assertAcquireAt(boost::none, _bucketsNss, boost::none /* expectedViewless */);
+    assertAcquireAt(dropTimestamp, _mainNss, /*expectedViewless=*/boost::none);
+    assertAcquireAt(dropTimestamp, _bucketsNss, /*expectedViewless=*/boost::none);
+    assertAcquireAt(Timestamp(25, 1), _mainNss, /*expectedViewless=*/boost::none);
+    assertAcquireAt(Timestamp(25, 1), _bucketsNss, /*expectedViewless=*/boost::none);
+    assertAcquireAt(boost::none, _mainNss, /*expectedViewless=*/boost::none);
+    assertAcquireAt(boost::none, _bucketsNss, /*expectedViewless=*/boost::none);
 }
 
 TEST_F(TimeseriesCatalogHelperTest, acquireUsesPointInTimeCatalogAcrossTransitions) {
@@ -420,23 +420,23 @@ TEST_F(TimeseriesCatalogHelperTest, acquireUsesPointInTimeCatalogAcrossTransitio
     upgradeViewfulTimeseriesAt(upgradeTimestamp);
 
     // Before the downgrade, the PIT still sees the viewless collection on the main namespace.
-    assertAcquireAt(Timestamp(15, 1), _mainNss, true /* expectedViewless */);
-    assertAcquireAt(Timestamp(15, 1), _bucketsNss, true /* expectedViewless */);
+    assertAcquireAt(Timestamp(15, 1), _mainNss, /*expectedViewless=*/true);
+    assertAcquireAt(Timestamp(15, 1), _bucketsNss, /*expectedViewless=*/true);
 
     // During the viewful interval, a main namespace request translates through the timeseries view
     // while a buckets namespace request acquires the buckets collection directly.
-    assertAcquireAt(downgradeTimestamp, _mainNss, false /* expectedViewless */);
-    assertAcquireAt(downgradeTimestamp, _bucketsNss, false /* expectedViewless */);
-    assertAcquireAt(Timestamp(25, 1), _mainNss, false /* expectedViewless */);
-    assertAcquireAt(Timestamp(25, 1), _bucketsNss, false /* expectedViewless */);
+    assertAcquireAt(downgradeTimestamp, _mainNss, /*expectedViewless=*/false);
+    assertAcquireAt(downgradeTimestamp, _bucketsNss, /*expectedViewless=*/false);
+    assertAcquireAt(Timestamp(25, 1), _mainNss, /*expectedViewless=*/false);
+    assertAcquireAt(Timestamp(25, 1), _bucketsNss, /*expectedViewless=*/false);
 
     // After the upgrade, the PIT and the latest read both see the viewless collection on the main
     // namespace. A main namespace request acquires directly while a buckets namespace request
     // translates to it.
-    assertAcquireAt(upgradeTimestamp, _mainNss, true /* expectedViewless */);
-    assertAcquireAt(upgradeTimestamp, _bucketsNss, true /* expectedViewless */);
-    assertAcquireAt(boost::none, _mainNss, true /* expectedViewless */);
-    assertAcquireAt(boost::none, _bucketsNss, true /* expectedViewless */);
+    assertAcquireAt(upgradeTimestamp, _mainNss, /*expectedViewless=*/true);
+    assertAcquireAt(upgradeTimestamp, _bucketsNss, /*expectedViewless=*/true);
+    assertAcquireAt(boost::none, _mainNss, /*expectedViewless=*/true);
+    assertAcquireAt(boost::none, _bucketsNss, /*expectedViewless=*/true);
 }
 
 /**

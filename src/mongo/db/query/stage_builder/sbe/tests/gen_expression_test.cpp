@@ -585,10 +585,10 @@ TEST_F(GoldenGenExpressionTest, TestExprDate) {
     {
         ExpressionDateAdd dateAddExpr(
             _expCtx.get(),
-            date1 /* startDate */,
-            ExpressionConstant::create(_expCtx.get(), Value("quarter"sv)) /* unit */,
-            ExpressionConstant::create(_expCtx.get(), Value(1)) /* amount */,
-            ExpressionConstant::create(_expCtx.get(), Value("America/New_York"sv)) /* timezone */,
+            /*startDate=*/date1,
+            /*unit=*/ExpressionConstant::create(_expCtx.get(), Value("quarter"sv)),
+            /*amount=*/ExpressionConstant::create(_expCtx.get(), Value(1)),
+            /*timezone=*/ExpressionConstant::create(_expCtx.get(), Value("America/New_York"sv)),
             "$dateAdd"sv);
         // expect 02/18/2025 10:43:44 PM GMT
         runTest(&dateAddExpr,
@@ -599,10 +599,10 @@ TEST_F(GoldenGenExpressionTest, TestExprDate) {
     {
         ExpressionDateSubtract dateSubExpr(
             _expCtx.get(),
-            date1 /* startDate */,
-            ExpressionConstant::create(_expCtx.get(), Value("week"sv)) /* unit */,
-            ExpressionConstant::create(_expCtx.get(), Value(1)) /* amount */,
-            ExpressionConstant::create(_expCtx.get(), Value("America/New_York"sv)) /* timezone */,
+            /*startDate=*/date1,
+            /*unit=*/ExpressionConstant::create(_expCtx.get(), Value("week"sv)),
+            /*amount=*/ExpressionConstant::create(_expCtx.get(), Value(1)),
+            /*timezone=*/ExpressionConstant::create(_expCtx.get(), Value("America/New_York"sv)),
             "$dateAdd"sv);
         // expect 11/11/2024 10:43:44 PM
         runTest(&dateSubExpr,
@@ -613,21 +613,21 @@ TEST_F(GoldenGenExpressionTest, TestExprDate) {
     {
         ExpressionDateDiff dateDiffExpr(
             _expCtx.get(),
-            date1 /* startDate */,
-            date2 /* endDate */,
-            ExpressionConstant::create(_expCtx.get(), Value("week"sv)) /* unit */,
-            ExpressionConstant::create(_expCtx.get(), Value("America/New_York"sv)) /* timezone */,
-            nullptr /* startOfWeek */);
+            /*startDate=*/date1,
+            /*endDate=*/date2,
+            /*unit=*/ExpressionConstant::create(_expCtx.get(), Value("week"sv)),
+            /*timezone=*/ExpressionConstant::create(_expCtx.get(), Value("America/New_York"sv)),
+            /*startOfWeek=*/nullptr);
         runTest(&dateDiffExpr, rootSlot, Value(-53), "ExpressionDateDiff"sv);
     }
     {
         ExpressionDateFromString dateFromStrExpr(
             _expCtx.get(),
             dateStr,
-            ExpressionConstant::create(_expCtx.get(), Value("GMT"sv)) /* timezone */,
-            ExpressionConstant::create(_expCtx.get(), Value("%m/%d/%Y %H:%M:%S"sv)) /* format */,
-            nullptr /* onNull */,
-            nullptr /* onError */);
+            /*timezone=*/ExpressionConstant::create(_expCtx.get(), Value("GMT"sv)),
+            /*format=*/ExpressionConstant::create(_expCtx.get(), Value("%m/%d/%Y %H:%M:%S"sv)),
+            /*onNull=*/nullptr,
+            /*onError=*/nullptr);
         runTest(&dateFromStrExpr,
                 rootSlot,
                 Value(Date_t::fromMillisSinceEpoch(1731924900000)),
@@ -637,17 +637,17 @@ TEST_F(GoldenGenExpressionTest, TestExprDate) {
 
         ExpressionDateFromParts dateFromPartExpr(
             _expCtx.get(),
-            ExpressionConstant::create(_expCtx.get(), Value(2024)) /* year */,
-            ExpressionConstant::create(_expCtx.get(), Value(11)) /* month */,
-            ExpressionConstant::create(_expCtx.get(), Value(18)) /* day */,
-            ExpressionConstant::create(_expCtx.get(), Value(14)) /* hour */,
-            ExpressionConstant::create(_expCtx.get(), Value(30)) /* minute */,
-            ExpressionConstant::create(_expCtx.get(), Value(15)) /* second */,
-            nullptr /* millisecond */,
-            nullptr /* isoWeekYear */,
-            nullptr /* isoWeek */,
-            nullptr /* isoDayOfWeek */,
-            nullptr /* timeZone */);
+            /*year=*/ExpressionConstant::create(_expCtx.get(), Value(2024)),
+            /*month=*/ExpressionConstant::create(_expCtx.get(), Value(11)),
+            /*day=*/ExpressionConstant::create(_expCtx.get(), Value(18)),
+            /*hour=*/ExpressionConstant::create(_expCtx.get(), Value(14)),
+            /*minute=*/ExpressionConstant::create(_expCtx.get(), Value(30)),
+            /*second=*/ExpressionConstant::create(_expCtx.get(), Value(15)),
+            /*millisecond=*/nullptr,
+            /*isoWeekYear=*/nullptr,
+            /*isoWeek=*/nullptr,
+            /*isoDayOfWeek=*/nullptr,
+            /*timeZone=*/nullptr);
         runTest(&dateFromPartExpr,
                 rootSlot,
                 Value(Date_t::fromMillisSinceEpoch(1731940215000)),
@@ -656,9 +656,9 @@ TEST_F(GoldenGenExpressionTest, TestExprDate) {
     {
         ExpressionDateToParts dateToPartExpr(
             _expCtx.get(),
-            date1 /* date */,
-            nullptr /* timeZone */,
-            ExpressionConstant::create(_expCtx.get(), Value(false)) /* iso8601 */);
+            /*date=*/date1,
+            /*timeZone=*/nullptr,
+            /*iso8601=*/ExpressionConstant::create(_expCtx.get(), Value(false)));
         runTest(&dateToPartExpr,
                 rootSlot,
                 Value(BSON("year" << 2024 << "month" << 11 << "day" << 18 << "hour" << 22
@@ -668,21 +668,21 @@ TEST_F(GoldenGenExpressionTest, TestExprDate) {
     {
         ExpressionDateToString dateToStrExpr(
             _expCtx.get(),
-            date1 /* date */,
-            ExpressionConstant::create(_expCtx.get(), Value("%m/%d/%Y %H:%M:%S"sv)) /* format */,
-            nullptr /* timeZone */,
-            ExpressionConstant::create(_expCtx.get(), Value(false)) /* onNull */);
+            /*date=*/date1,
+            /*format=*/ExpressionConstant::create(_expCtx.get(), Value("%m/%d/%Y %H:%M:%S"sv)),
+            /*timeZone=*/nullptr,
+            /*onNull=*/ExpressionConstant::create(_expCtx.get(), Value(false)));
         runTest(
             &dateToStrExpr, rootSlot, Value("11/18/2024 22:43:44"sv), "ExpressionDateToString"sv);
     }
     {
         ExpressionDateTrunc dateTruncExpr(
             _expCtx.get(),
-            date1 /* date */,
-            ExpressionConstant::create(_expCtx.get(), Value("week"sv)) /* unit */,
-            nullptr /* binSize */,
-            nullptr /* timeZone */,
-            nullptr /* startOfWeek */);
+            /*date=*/date1,
+            /*unit=*/ExpressionConstant::create(_expCtx.get(), Value("week"sv)),
+            /*binSize=*/nullptr,
+            /*timeZone=*/nullptr,
+            /*startOfWeek=*/nullptr);
         // expected 11/17/2024 12:00:00 AM
         runTest(&dateTruncExpr,
                 rootSlot,

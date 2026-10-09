@@ -52,7 +52,7 @@ void GoldenTestContext::onError(const std::string& message,
     const size_t kShellMaxLenBytes = 32 * 1024 * 1024;
     constexpr Seconds kShellDiffTimeout{60};
     auto diffOutput =
-        shellExec(diff_cmd, kShellDiffTimeout, kShellMaxLenBytes, /*ignoreExitCode*/ true);
+        shellExec(diff_cmd, kShellDiffTimeout, kShellMaxLenBytes, /*ignoreExitCode=*/true);
     if (diffOutput.isOK()) {
         std::cout << diffOutput.getValue() << std::endl;
     } else {

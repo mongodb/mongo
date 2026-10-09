@@ -841,8 +841,8 @@ bool handleGroupedInserts(OperationContext* opCtx,
                                                               ex,
                                                               nsString,
                                                               req.getOrdered(),
-                                                              false /* isMultiUpdate */,
-                                                              boost::none /* sampleId */,
+                                                              /*isMultiUpdate=*/false,
+                                                              /*sampleId=*/boost::none,
                                                               &out);
             }
             if (!out.canContinue) {
@@ -1236,7 +1236,7 @@ void explainDeleteOp(OperationContext* opCtx,
     write_ops_exec::explainDelete(
         opCtx,
         deleteRequest,
-        nullptr /* deleteOp */,  // null while bulkWrite query stats unsupported
+        /*deleteOp=*/nullptr,  // null while bulkWrite query stats unsupported
         isTimeseriesLogicalRequest,
         req.getSerializationContext(),
         command,
@@ -1464,7 +1464,7 @@ public:
             if (replies.size() == 0 || bulk_write_common::isUnacknowledgedBulkWrite(opCtx)) {
                 // Skip cursor creation and return the simplest reply.
                 auto reply = BulkWriteCommandReply(BulkWriteCommandResponseCursor(
-                                                       /*id=*/0, {} /* firstBatch */, cursorNss),
+                                                       /*id=*/0, /*firstBatch=*/{}, cursorNss),
                                                    summaryFields.nErrors,
                                                    summaryFields.nInserted,
                                                    summaryFields.nMatched,

@@ -787,7 +787,7 @@ void createOplog(OperationContext* opCtx,
     // lag later when we try to sync.
     auto& rss = rss::ReplicatedStorageService::get(service);
     if (rss.getPersistenceProvider().supportsUnstableCheckpoints()) {
-        service->getStorageEngine()->flushAllFiles(opCtx, /*callerHoldsReadLock*/ false);
+        service->getStorageEngine()->flushAllFiles(opCtx, /*callerHoldsReadLock=*/false);
     }
 }
 
@@ -1940,7 +1940,7 @@ UpdateResult updateObjectByRid(OperationContext* opCtx,
                                         OplogConstraintViolationEnum::kUpdateOnMissingDoc,
                                         "update",
                                         opObj,
-                                        boost::none /* status */);
+                                        /*status=*/boost::none);
             uasserted(11979201,
                       fmt::format("While applying an update oplog entry : '{}' during steady state "
                                   "replication with timestamp : '{}' and term : '{}' to a "
@@ -1969,7 +1969,7 @@ UpdateResult updateObjectByRid(OperationContext* opCtx,
                                         OplogConstraintViolationEnum::kUpdateOnMissingDoc,
                                         "update",
                                         opObj,
-                                        boost::none /* status */);
+                                        /*status=*/boost::none);
             // This error is always fatal regardless of steady state constraints. We throw an error
             // here instead of deferring to the typical numMatched = 0 handling since this should
             // be a fatal error for capped collections.
@@ -2028,7 +2028,7 @@ UpdateResult updateObjectByRid(OperationContext* opCtx,
                 OplogConstraintViolationEnum::kRecordIdsReplicatedDocIdMismatch,
                 "update",
                 opObj,
-                boost::none /* status */);
+                /*status=*/boost::none);
             // This error is always fatal regardless of steady state constraints. We throw an error
             // here instead of deferring to the typical numMatched = 0 handling since this should
             // also be a fatal error for capped collections.
@@ -2093,7 +2093,7 @@ UpdateResult updateObjectByRid(OperationContext* opCtx,
                         OplogConstraintViolationEnum::kReplicatedSizeDeltaMismatch,
                         "update",
                         redact(op.toBSONForLogging()),
-                        boost::none /* status */);
+                        /*status=*/boost::none);
                 }
                 uassert(
                     12380201,
@@ -2156,7 +2156,7 @@ DeleteResult deleteObjectByRid(OperationContext* opCtx,
                                         OplogConstraintViolationEnum::kDeleteOnMissingNs,
                                         "delete",
                                         opObj,
-                                        boost::none /* status */);
+                                        /*status=*/boost::none);
             uasserted(11979200,
                       fmt::format("While applying a delete oplog entry : '{}' during steady state "
                                   "replication with timestamp : '{}' and term : '{}' to a "
@@ -2183,7 +2183,7 @@ DeleteResult deleteObjectByRid(OperationContext* opCtx,
                                         OplogConstraintViolationEnum::kDeleteWasEmpty,
                                         "update",
                                         opObj,
-                                        boost::none /* status */);
+                                        /*status=*/boost::none);
             // This error is always fatal regardless of steady state constraints. We throw an error
             // here instead of deferring to the typical nDeleted = 0 handling since this should
             // be a fatal error for capped collections. We also don't need the special casing that
@@ -2216,7 +2216,7 @@ DeleteResult deleteObjectByRid(OperationContext* opCtx,
                 OplogConstraintViolationEnum::kRecordIdsReplicatedDocIdMismatch,
                 "delete",
                 opObj,
-                boost::none /* status */);
+                /*status=*/boost::none);
             // This error is always fatal regardless of steady state constraints. We throw an error
             // here instead of deferring to the typical nDeleted = 0 handling since this should also
             // be a fatal error for capped collections.
@@ -2286,7 +2286,7 @@ DeleteResult deleteObjectByRid(OperationContext* opCtx,
                         OplogConstraintViolationEnum::kReplicatedSizeDeltaMismatch,
                         "delete",
                         redact(op.toBSONForLogging()),
-                        boost::none /* status */);
+                        /*status=*/boost::none);
                 }
                 uassert(
                     12380200,
@@ -2667,7 +2667,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                                                                      insertObjs.begin(),
                                                                      insertObjs.end(),
                                                                      nullOpDebug,
-                                                                     false /* fromMigrate */);
+                                                                     /*fromMigrate=*/false);
                 if (!status.isOK()) {
                     return status;
                 }
@@ -2787,7 +2787,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     }
                     OpDebug* const nullOpDebug = nullptr;
                     Status status = collection_internal::insertDocument(
-                        opCtx, collection, insertStmt, nullOpDebug, false /* fromMigrate */);
+                        opCtx, collection, insertStmt, nullOpDebug, /*fromMigrate=*/false);
 
                     if (status.isOK()) {
                         if (shouldVerifyValidationHash(opCtx, collection, mode, op)) {
@@ -2816,7 +2816,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                                 OplogConstraintViolationEnum::kInsertOnExistingDoc,
                                 "insert",
                                 opObj,
-                                boost::none /* status */);
+                                /*status=*/boost::none);
 
                             if (oplogApplicationEnforcesSteadyStateConstraints.load()) {
                                 return status;
@@ -3111,7 +3111,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                                 OplogConstraintViolationEnum::kUpdateOnMissingDoc,
                                 "update",
                                 redact(op.toBSONForLogging()),
-                                boost::none /* status */);
+                                /*status=*/boost::none);
 
                             // We shouldn't be doing upserts in secondary mode when enforcing steady
                             // state constraints.
@@ -3351,7 +3351,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                                 OplogConstraintViolationEnum::kDeleteWasEmpty,
                                 "delete",
                                 opObj,
-                                boost::none /* status */);
+                                /*status=*/boost::none);
                         } else {
                             opCountersToUse->gotDeleteFromMissingNamespace();
                             logOplogConstraintViolation(
@@ -3360,7 +3360,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                                 OplogConstraintViolationEnum::kDeleteOnMissingNs,
                                 "delete",
                                 opObj,
-                                boost::none /* status */);
+                                /*status=*/boost::none);
                         }
 
                         if (!isCapped) {

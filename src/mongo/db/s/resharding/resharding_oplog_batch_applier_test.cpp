@@ -274,7 +274,7 @@ public:
         auto txnParticipant = TransactionParticipant::get(opCtx);
         txnParticipant.beginOrContinue(opCtx,
                                        {txnNumber},
-                                       false /* autocommit */,
+                                       /*autocommit=*/false,
                                        TransactionParticipant::TransactionActions::kStart);
 
         txnParticipant.unstashTransactionResources(opCtx, "prepareTransaction");
@@ -311,7 +311,7 @@ public:
         auto txnParticipant = TransactionParticipant::get(opCtx);
         txnParticipant.beginOrContinue(opCtx,
                                        {txnNumber},
-                                       false /* autocommit */,
+                                       /*autocommit=*/false,
                                        TransactionParticipant::TransactionActions::kContinue);
 
         txnParticipant.unstashTransactionResources(opCtx, "abortTransaction");
@@ -489,13 +489,13 @@ private:
                                                _sourceUUID,
                                                BSON(_currentShardKey << 1),
                                                false, /* unsplittable */
-                                               nullptr /* defaultCollator */,
-                                               false /* unique */,
+                                               /*defaultCollator=*/nullptr,
+                                               /*unique=*/false,
                                                epoch,
                                                Timestamp(1, 1),
-                                               boost::none /* timeseriesFields */,
-                                               boost::none /* reshardingFields */,
-                                               true /* allowMigrations */,
+                                               /*timeseriesFields=*/boost::none,
+                                               /*reshardingFields=*/boost::none,
+                                               /*allowMigrations=*/true,
                                                chunks);
 
         return CurrentChunkManager(makeStandaloneRoutingTableHistory(std::move(rt)));
@@ -623,7 +623,7 @@ TEST_F(ReshardingOplogBatchApplierTest,
     auto factory = makeCancelableOpCtxForApplier(CancellationToken::uncancelable());
 
     auto oplogEntry =
-        makeProgressMarkNoopOplogEntry(now(), true /* createdAfterOplogApplicationStarted */);
+        makeProgressMarkNoopOplogEntry(now(), /*createdAfterOplogApplicationStarted=*/true);
 
     auto future = applier()->applyBatch<false>(
         {&oplogEntry}, executor, CancellationToken::uncancelable(), factory);
@@ -669,7 +669,7 @@ DEATH_TEST_F(ReshardingOplogBatchApplierTestDeathTest,
     auto factory = makeCancelableOpCtxForApplier(CancellationToken::uncancelable());
 
     auto oplogEntry =
-        makeProgressMarkNoopOplogEntry(now(), false /* createdAfterOplogApplicationStarted */);
+        makeProgressMarkNoopOplogEntry(now(), /*createdAfterOplogApplicationStarted=*/false);
 
     auto future = applier()->applyBatch<false>(
         {&oplogEntry}, executor, CancellationToken::uncancelable(), factory);

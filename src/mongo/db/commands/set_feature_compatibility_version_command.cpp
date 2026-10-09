@@ -556,7 +556,7 @@ public:
                     resolvedTransition.transitionalVersion,
                     SetFCVPhaseEnum::kStart,
                     changeTimestamp,
-                    boost::none /* setIsCleaningServerMetadata */,
+                    /*setIsCleaningServerMetadata=*/boost::none,
                     withFCVLockHeld);
 
                 LOGV2(6744301,
@@ -622,7 +622,7 @@ public:
                 resolvedTransition.transitionalVersion,
                 SetFCVPhaseEnum::kPrepare,
                 changeTimestamp,
-                boost::none /* setIsCleaningServerMetadata*/);
+                /*setIsCleaningServerMetadata=*/boost::none);
 
             uassert(ErrorCodes::Error(7555202),
                     "Failing downgrade due to "
@@ -676,7 +676,7 @@ public:
                     resolvedTransition.transitionalVersion,
                     SetFCVPhaseEnum::kComplete,
                     changeTimestamp,
-                    true /* setIsCleaningServerMetadata*/);
+                    /*setIsCleaningServerMetadata=*/true);
 
                 uassert(ErrorCodes::Error(10778000),
                         "Failing transition due to 'failTransitionDuringIsCleaningServerMetadata' "
@@ -704,7 +704,7 @@ public:
                 resolvedTransition.transitionalVersion,
                 SetFCVPhaseEnum::kEnableTargetFeatures,
                 changeTimestamp,
-                boost::none /* setIsCleaningServerMetadata */);
+                /*setIsCleaningServerMetadata=*/boost::none);
 
             if (role && role->has(ClusterRole::ConfigServer)) {
                 _sendEnterSetFCVPhaseRequestToShard(
@@ -728,7 +728,7 @@ public:
                 resolvedTransition.transitionalVersion,
                 SetFCVPhaseEnum::kCommitAddedFeatures,
                 changeTimestamp,
-                boost::none /* setIsCleaningServerMetadata */);
+                /*setIsCleaningServerMetadata=*/boost::none);
 
             if (role && role->has(ClusterRole::ConfigServer)) {
                 _sendEnterSetFCVPhaseRequestToShard(
@@ -760,7 +760,7 @@ public:
                     requestedVersion,
                     boost::none, /* phase */
                     changeTimestamp,
-                    false /* setIsCleaningServerMetadata */,
+                    /*setIsCleaningServerMetadata=*/false,
                     withFCVLockHeld);
             }
 

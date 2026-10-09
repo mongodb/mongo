@@ -110,7 +110,7 @@ ExpressResult tryExpress(OperationContext* opCtx,
     // available and creating those now allows them to be reused for subsequent strategies if
     // the express index equality one fails.
     auto paramsForSingleCollectionQuery =
-        makePlannerParams(*canonicalQuery, plannerOptions, boost::none /* replanningData */);
+        makePlannerParams(*canonicalQuery, plannerOptions, /*replanningData=*/boost::none);
     if (expressEligibility == ExpressEligibility::IndexedEqualityEligible) {
         if (auto indexEntry =
                 getIndexForExpressEquality(*canonicalQuery, *paramsForSingleCollectionQuery)) {

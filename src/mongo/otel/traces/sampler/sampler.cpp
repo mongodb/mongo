@@ -75,7 +75,7 @@ TracingSamplerImpl::TracingSamplerImpl(TickSource* tickSource) : _tickSource(tic
     _externalRateLimiter = std::make_unique<RateLimiter>(
         externalRateLimitParams.refillRate,
         externalBurstCapacitySecs,
-        0 /* maxQueueDepth */,
+        /*maxQueueDepth=*/0,
         "external",
         makeRateLimiterOptions(
             tickSource,
@@ -202,7 +202,7 @@ std::shared_ptr<admission::RateLimiter> TracingSamplerImpl::_getOrCreateRateLimi
         entry.limiter = std::make_shared<RateLimiter>(
             refillRate,
             burstCapacitySecs,
-            0 /* maxQueueDepth */,
+            /*maxQueueDepth=*/0,
             std::string(name),
             // TODO(SERVER-131083): Once the rate limiter otel stats have span name attributes,
             // each recorder should write to its attribute rather than the aggregated total.

@@ -189,7 +189,7 @@ void setResumeTokenForEvent(const ResumeTokenData& resumeTokenData, MutableDocum
 
 NamespaceString createNamespaceStringFromOplogEntry(std::string_view ns) {
     return NamespaceStringUtil::deserialize(
-        boost::none /* tenantId */, ns, SerializationContext::stateDefault());
+        /*tenantId=*/boost::none, ns, SerializationContext::stateDefault());
 }
 
 void addTransactionIdFieldsIfPresent(const Document& input, MutableDocument& output) {
@@ -650,7 +650,7 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
                 "unexpected number of oplog entry types - when adding a new oplog entry type, "
                 "please make sure that the change stream event transformer handles it correctly!");
 
-            throwUnsupportedOplogEntryType(input, "unhandled case" /* error */);
+            throwUnsupportedOplogEntryType(input, /*error=*/"unhandled case");
         }
     }
 

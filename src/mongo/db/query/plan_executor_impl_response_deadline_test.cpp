@@ -111,7 +111,7 @@ TEST_F(PlanExecutorImplOplogScanNoCollectionTest, NonChangeStreamQuery_ReturnsAl
     auto exec = plan_executor_factory::make(expCtx,
                                             std::move(ws),
                                             std::move(mockStage),
-                                            boost::none /* collection */,
+                                            /*collection=*/boost::none,
                                             PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                             QueryPlannerParams::DEFAULT,
                                             kNss);
@@ -153,7 +153,7 @@ TEST_F(PlanExecutorImplOplogScanNoCollectionTest, ChangeStreamQuery_KnobZero_Ret
     auto exec = plan_executor_factory::make(expCtx,
                                             std::move(ws),
                                             std::move(mockStage),
-                                            boost::none /* collection */,
+                                            /*collection=*/boost::none,
                                             PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                             QueryPlannerParams::DEFAULT,
                                             kNss);
@@ -191,7 +191,7 @@ TEST_F(PlanExecutorImplOplogScanNoCollectionTest,
     auto exec = plan_executor_factory::make(expCtx,
                                             std::move(ws),
                                             std::move(mockStage),
-                                            boost::none /* collection */,
+                                            /*collection=*/boost::none,
                                             PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                             QueryPlannerParams::DEFAULT,
                                             kNss);
@@ -235,7 +235,7 @@ TEST_F(PlanExecutorImplOplogScanWithCollectionTest,
     // very first getNext() call. The auto-advancing clock ensures that by the time the yield
     // callback fires, the precise clock source has advanced well past the 1 ms deadline.
     auto [ws, mockStage] = makeMockStageWithDocuments(
-        expCtx.get(), {BSON("_id" << 1), BSON("_id" << 2)}, true /* enqueueNeedYieldFirst */);
+        expCtx.get(), {BSON("_id" << 1), BSON("_id" << 2)}, /*enqueueNeedYieldFirst=*/true);
 
     auto coll = acquireTestCollection();
     auto exec = plan_executor_factory::make(expCtx,
@@ -275,7 +275,7 @@ TEST_F(PlanExecutorImplOplogScanWithCollectionTest,
     expCtx->setChangeStreamSpec(spec);
 
     auto [ws, mockStage] = makeMockStageWithDocuments(
-        expCtx.get(), {BSON("_id" << 1), BSON("_id" << 2)}, false /* enqueueNeedYieldFirst */);
+        expCtx.get(), {BSON("_id" << 1), BSON("_id" << 2)}, /*enqueueNeedYieldFirst=*/false);
 
     auto coll = acquireTestCollection();
     auto exec = plan_executor_factory::make(expCtx,
@@ -350,7 +350,7 @@ TEST_F(PlanExecutorImplOplogScanLogInfoTest,
     // auto-advancing precise clock (100 000 ms per now() call) guarantees the callback sees a
     // time well past kLongOplogScanLogInfoDeadline (90 s).
     auto [ws, mockStage] = makeMockStageWithDocuments(
-        expCtx.get(), {BSON("_id" << 1), BSON("_id" << 2)}, true /* enqueueNeedYieldFirst */);
+        expCtx.get(), {BSON("_id" << 1), BSON("_id" << 2)}, /*enqueueNeedYieldFirst=*/true);
 
     auto coll = acquireTestCollection();
     auto exec = plan_executor_factory::make(expCtx,

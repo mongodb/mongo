@@ -30,7 +30,7 @@ const auto decorationActionRegisterer = ServiceContext::ConstructorActionRegiste
 RoutingInformationCache::RoutingInformationCache(ServiceContext* serviceCtx)
     : CatalogCache(serviceCtx,
                    std::make_shared<ConfigServerCatalogCacheLoaderImpl>(),
-                   "ConfigServerRoutingInfo"sv /*kind*/) {}
+                   /*kind=*/"ConfigServerRoutingInfo"sv) {}
 
 void RoutingInformationCache::set(ServiceContext* serviceCtx) {
     auto& decoration = getDecoration(serviceCtx);

@@ -76,7 +76,7 @@ public:
             bool writePerformed = invocation.invoke(opCtx,
                                                     setClusterParameterRequest,
                                                     request().getClusterParameterTime(),
-                                                    boost::none /* previousTime */,
+                                                    /*previousTime=*/boost::none,
                                                     kLocalWriteConcern);
             if (!writePerformed) {
                 // Since no write happened on this txnNumber, we need to make a dummy write so
@@ -85,8 +85,8 @@ public:
                 client.update(NamespaceString::kServerConfigurationNamespace,
                               BSON("_id" << "SetClusterParameterStats"),
                               BSON("$inc" << BSON("count" << 1)),
-                              true /* upsert */,
-                              false /* multi */);
+                              /*upsert=*/true,
+                              /*multi=*/false);
             }
         }
 

@@ -550,7 +550,7 @@ void Transaction::_primeTransaction(OperationContext* opCtx) {
             _setSessionInfo(lg,
                             acquiredSession.getSessionId(),
                             acquiredSession.getTxnNumber(),
-                            {true} /* startTransaction */);
+                            /*startTransaction=*/{true});
             _execContext = ExecutionContext::kOwnSession;
         } else if (!clientTxnNumber) {
             const auto acquiredSession =
@@ -559,14 +559,14 @@ void Transaction::_primeTransaction(OperationContext* opCtx) {
             _setSessionInfo(lg,
                             acquiredSession.getSessionId(),
                             acquiredSession.getTxnNumber(),
-                            {true} /* startTransaction */);
+                            /*startTransaction=*/{true});
             _execContext = ExecutionContext::kClientSession;
         } else if (!clientInMultiDocumentTransaction) {
             _setSessionInfo(
                 lg,
                 makeLogicalSessionIdWithTxnNumberAndUUID(*clientSession, *clientTxnNumber),
-                0 /* txnNumber */,
-                {true} /* startTransaction */);
+                /*txnNumber=*/0,
+                /*startTransaction=*/{true});
             _execContext = ExecutionContext::kClientRetryableWrite;
         } else {
             // Note that we don't want to include startTransaction or any first transaction command
@@ -584,8 +584,7 @@ void Transaction::_primeTransaction(OperationContext* opCtx) {
                     !_txnClient->runsClusterOperations() ||
                         serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer));
 
-            _setSessionInfo(
-                lg, *clientSession, *clientTxnNumber, boost::none /* startTransaction */);
+            _setSessionInfo(lg, *clientSession, *clientTxnNumber, /*startTransaction=*/boost::none);
             _execContext = ExecutionContext::kClientTransaction;
 
             // Skip directly to the started state since we assume the client already started this

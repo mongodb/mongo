@@ -162,14 +162,14 @@ struct String1KB {
 
 struct AlwaysHit {
     template <class FieldNamePolicy>
-    static std::string_view selectField(size_t /*i*/) {
+    static std::string_view selectField(/*i=*/size_t) {
         return FieldNamePolicy::hit();
     }
 };
 
 struct AlwaysMiss {
     template <class FieldNamePolicy>
-    static std::string_view selectField(size_t /*i*/) {
+    static std::string_view selectField(/*i=*/size_t) {
         return FieldNamePolicy::miss();
     }
 };
@@ -185,7 +185,7 @@ struct Hit90Miss10 {
 // Miss with a common first character — bypasses the first-char skip optimization.
 struct AlwaysMissCommonPrefix {
     template <class FieldNamePolicy>
-    static std::string_view selectField(size_t /*i*/) {
+    static std::string_view selectField(/*i=*/size_t) {
         return FieldNamePolicy::missCommonPrefix();
     }
 };

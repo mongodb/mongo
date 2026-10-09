@@ -609,7 +609,7 @@ Value ExpressionArray::serialize(const query_shape::SerializationOptions& option
         // Query-shape serialization folds before query settings are applied; other serialization
         // modes run post-settings and keep charging the operation-wide tracker.
         Value folded = options.isReplacingLiteralsWithRepresentativeValues()
-            ? foldConstant(false /* retainResult */)
+            ? foldConstant(/*retainResult=*/false)
             : evaluate(Document{}, &(getExpressionContext()->variables), {});
         return ExpressionConstant::serializeConstant(options, folded);
     }
@@ -915,7 +915,7 @@ intrusive_ptr<Expression> ExpressionConstant::parse(ExpressionContext* const exp
                                                     BSONElement exprElement,
                                                     const VariablesParseState& vps) {
     exec::expression::convert_utils::uassertValidUserConstructedBinData(exprElement,
-                                                                        false /* allowColumn */);
+                                                                        /*allowColumn=*/false);
     Value exprValue = Value(exprElement);
     // Shred values when parsing collection-validator constants to avoid lazily
     // populating the BSON cache on write paths.
@@ -1809,7 +1809,7 @@ intrusive_ptr<ExpressionFieldPath> ExpressionFieldPath::createVarFromString(
 ExpressionFieldPath::ExpressionFieldPath(ExpressionContext* const expCtx,
                                          const string& theFieldPath,
                                          Variables::Id variable)
-    : Expression(expCtx), _fieldPath(theFieldPath, true /*precomputeHashes*/), _variable(variable) {
+    : Expression(expCtx), _fieldPath(theFieldPath, /*precomputeHashes=*/true), _variable(variable) {
     const auto varName = theFieldPath.substr(0, theFieldPath.find('.'));
     tassert(5943201,
             std::string{"Variable with $$ROOT's id is not $$CURRENT or $$ROOT as expected, "
@@ -1875,7 +1875,7 @@ Value ExpressionFieldPath::serialize(const query_shape::SerializationOptions& op
         return ExpressionConstant::serializeConstant(
             options,
             evaluate(Document(), &(getExpressionContext()->variables), {}),
-            true /* wrapRepresentativeValue */);
+            /*wrapRepresentativeValue=*/true);
     }
 
     // First handles special cases for redaction of system variables. User variables will fall
@@ -2605,7 +2605,7 @@ Value ExpressionNary::serialize(const query_shape::SerializationOptions& options
         ExpressionConstant const* exprConst = dynamic_cast<ExpressionConstant*>(_children[i].get());
         if (exprConst) {
             array.push_back(exprConst->serializeConstant(
-                options, exprConst->getValue(), false /* wrapRepresentativeValue */));
+                options, exprConst->getValue(), /*wrapRepresentativeValue=*/false));
         } else {
             array.push_back(_children[i]->serialize(options));
         }

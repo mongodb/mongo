@@ -53,7 +53,7 @@ void testSimplify(auto input,
     (void)ClusteredCollectionScanPlanner::handleRIDRangeScanLegacy(
         expr.get(),
         nullptr /* query collator */,
-        nullptr /* ccCollator */,
+        /*ccCollator=*/nullptr,
         "_id" /* clustered field name */,
         recordRange,
         [&](const auto& expr) { redundantExprs.insert(expr); });

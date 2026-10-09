@@ -89,7 +89,7 @@ TEST_F(WritesRecoverableCriticalSectionServiceTest,
         ->acquireRecoverableCriticalSectionBlockingReplicaSetWrites(
             opCtx.get(),
             UserWritesRecoverableCriticalSectionService::kBlockReplicaSetWritesNamespace,
-            true /* allowDeletions */,
+            /*allowDeletions=*/true,
             ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace);
 
     UserWritesRecoverableCriticalSectionService::get(opCtx.get())
@@ -113,7 +113,7 @@ TEST_F(WritesRecoverableCriticalSectionServiceTest,
         ->acquireRecoverableCriticalSectionBlockingReplicaSetWrites(
             opCtx.get(),
             UserWritesRecoverableCriticalSectionService::kBlockReplicaSetWritesNamespace,
-            false /* allowDeletions */,
+            /*allowDeletions=*/false,
             ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace);
 
     UserWritesRecoverableCriticalSectionService::get(opCtx.get())
@@ -139,13 +139,13 @@ TEST_F(WritesRecoverableCriticalSectionServiceTest,
     service->acquireRecoverableCriticalSectionBlockingReplicaSetWrites(
         opCtx.get(),
         UserWritesRecoverableCriticalSectionService::kBlockReplicaSetWritesNamespace,
-        false /* allowDeletions */,
+        /*allowDeletions=*/false,
         ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace);
 
     ASSERT_TRUE(service->updateAllowDeletionsForActiveReplicaSetWriteBlock(
         opCtx.get(),
         UserWritesRecoverableCriticalSectionService::kBlockReplicaSetWritesNamespace,
-        true /* allowDeletions */,
+        /*allowDeletions=*/true,
         ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace));
 
     const auto document = getPersistedReplicaSetWriteBlockDocument(opCtx.get());
@@ -157,7 +157,7 @@ TEST_F(WritesRecoverableCriticalSectionServiceTest,
     ASSERT_TRUE(service->updateAllowDeletionsForActiveReplicaSetWriteBlock(
         opCtx.get(),
         UserWritesRecoverableCriticalSectionService::kBlockReplicaSetWritesNamespace,
-        true /* allowDeletions */,
+        /*allowDeletions=*/true,
         ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace));
 }
 
@@ -170,13 +170,13 @@ TEST_F(WritesRecoverableCriticalSectionServiceTest,
     service->acquireRecoverableCriticalSectionBlockingReplicaSetWrites(
         opCtx.get(),
         UserWritesRecoverableCriticalSectionService::kBlockReplicaSetWritesNamespace,
-        true /* allowDeletions */,
+        /*allowDeletions=*/true,
         ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace);
 
     ASSERT_TRUE(service->updateAllowDeletionsForActiveReplicaSetWriteBlock(
         opCtx.get(),
         UserWritesRecoverableCriticalSectionService::kBlockReplicaSetWritesNamespace,
-        false /* allowDeletions */,
+        /*allowDeletions=*/false,
         ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace));
 
     const auto document = getPersistedReplicaSetWriteBlockDocument(opCtx.get());
@@ -195,7 +195,7 @@ TEST_F(WritesRecoverableCriticalSectionServiceTest,
             ->updateAllowDeletionsForActiveReplicaSetWriteBlock(
                 opCtx.get(),
                 UserWritesRecoverableCriticalSectionService::kBlockReplicaSetWritesNamespace,
-                true /* allowDeletions */,
+                /*allowDeletions=*/true,
                 ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace));
 }
 
@@ -208,7 +208,7 @@ TEST_F(WritesRecoverableCriticalSectionServiceTest,
     service->acquireRecoverableCriticalSectionBlockingReplicaSetWrites(
         opCtx.get(),
         UserWritesRecoverableCriticalSectionService::kBlockReplicaSetWritesNamespace,
-        false /* allowDeletions */,
+        /*allowDeletions=*/false,
         ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace);
 
     {
@@ -249,7 +249,7 @@ TEST_F(WritesRecoverableCriticalSectionServiceTest,
     service->acquireRecoverableCriticalSectionBlockingReplicaSetWrites(
         opCtx.get(),
         UserWritesRecoverableCriticalSectionService::kBlockReplicaSetWritesNamespace,
-        false /* allowDeletions */,
+        /*allowDeletions=*/false,
         ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace);
 
     // Drop the durable document. The OpObserver clears in-memory state on commit.
@@ -290,7 +290,7 @@ TEST_F(WritesRecoverableCriticalSectionServiceTest,
     service->acquireRecoverableCriticalSectionBlockingReplicaSetWrites(
         opCtx.get(),
         UserWritesRecoverableCriticalSectionService::kBlockReplicaSetWritesNamespace,
-        false /* allowDeletions */,
+        /*allowDeletions=*/false,
         ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace);
     ASSERT_FALSE(getPersistedReplicaSetWriteBlockDocument(opCtx.get()).isEmpty());
 

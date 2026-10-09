@@ -212,7 +212,7 @@ bool getDistinctNodeIndex(const std::vector<IndexEntry>& indices,
         if (!isIndexSuitableForDistinct(indices[i],
                                         key,
                                         projectionFields,
-                                        {} /*filter*/,
+                                        /*filter=*/{},
                                         flipDistinctScanDirection,
                                         strictDistinctOnly,
                                         hasSort,
@@ -617,7 +617,7 @@ bool finalizeDistinctScan(const CanonicalQuery& canonicalQuery,
             // it. Note that 'flipDistinctScanDirection' is intentionally ignored here, since its
             // purpose is to implement $last/$bottom with a distinct scan by reversing the sort
             // direction of the query.
-            !plannerParams.traversalPreference /*reverseScanIfNeeded*/,
+            /*reverseScanIfNeeded=*/!plannerParams.traversalPreference,
             indexScanNode ? static_cast<QuerySolutionNode*>(indexScanNode)
                           : static_cast<QuerySolutionNode*>(distinctScanNode))) {
         return false;

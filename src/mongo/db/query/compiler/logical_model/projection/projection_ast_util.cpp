@@ -170,7 +170,7 @@ public:
                 BSONObjBuilder fieldSub(
                     _builders.top().subobjStart(_options.serializeFieldPathFromString(path)));
                 BSONObjBuilder elemMatchSub(fieldSub.subobjStart("$elemMatch"));
-                me->serialize(&elemMatchSub, _options, /*includePath*/ false);
+                me->serialize(&elemMatchSub, _options, /*includePath=*/false);
             } else {
                 me->serialize(&_builders.top(), _options);
             }

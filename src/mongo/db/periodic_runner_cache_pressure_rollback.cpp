@@ -138,7 +138,7 @@ void PeriodicThreadToRollbackUnderCachePressure::_init(ServiceContext* serviceCo
             }
         },
         Milliseconds(gCachePressureQueryPeriodMilliseconds.load()),
-        true /*isKillableByStepdown*/);
+        /*isKillableByStepdown=*/true);
 
     tempAnchor = std::make_shared<PeriodicJobAnchor>(periodicRunner->makeJob(std::move(job)));
 

@@ -369,14 +369,14 @@ void addDependencies(const MatchExpression* expr, DepsTracker* deps) {
     PostVisitor postVisitor(ignoreDepsDepth);
     DependencyVisitor visitor(deps, ignoreDepsDepth);
     MatchExpressionWalker walker(
-        &visitor /*preVisitor*/, nullptr /*inVisitor*/, &postVisitor /*postVisitor*/);
+        /*preVisitor=*/&visitor, /*inVisitor=*/nullptr, /*postVisitor=*/&postVisitor);
     tree_walker::walk<true, MatchExpression>(expr, &walker);
 }
 
 void addVariableRefs(const MatchExpression* expr, std::set<Variables::Id>* refs) {
     VariableRefVisitor visitor(refs);
     MatchExpressionWalker walker(
-        &visitor /*preVisitor*/, nullptr /*inVisitor*/, nullptr /*postVisitor*/);
+        /*preVisitor=*/&visitor, /*inVisitor=*/nullptr, /*postVisitor=*/nullptr);
     tree_walker::walk<true, MatchExpression>(expr, &walker);
 }
 

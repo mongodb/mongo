@@ -91,7 +91,7 @@ Value evaluate(const ExpressionInternalOwningShard& expr,
     // version the caller believes it has, so it is okay of the cached routing tables are stale
     // here.
     const auto cri =
-        uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, ns, true /* allowLocks */));
+        uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, ns, /*allowLocks=*/true));
 
     // Advances the version in the cache if the chunk manager is not yet available or its version is
     // stale.

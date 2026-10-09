@@ -84,7 +84,7 @@ void InternalListCollectionsStage::_buildCollectionsToReplyForDb(
     }
 
     const auto& collectionsList = pExpCtx->getMongoProcessInterface()->runListCollections(
-        pExpCtx->getOperationContext(), db, true /* addPrimaryShard */);
+        pExpCtx->getOperationContext(), db, /*addPrimaryShard=*/true);
     collectionsToReply.reserve(collectionsList.size());
 
     for (const auto& collObj : collectionsList) {

@@ -340,8 +340,7 @@ AccumulationExpression AccumulatorMedian::parseArgs(ExpressionContext* const exp
         VersionContext::getDecoration(expCtx->getOperationContext()), spec.getMethod());
 
     auto factory = [expCtx, method] {
-        return make_intrusive<AccumulatorMedian>(
-            expCtx, std::vector<double>{} /* unused */, method);
+        return make_intrusive<AccumulatorMedian>(expCtx, /*unused=*/std::vector<double>{}, method);
     };
 
     return {ExpressionConstant::create(expCtx, Value(BSONNULL)) /*initializer*/,
@@ -353,7 +352,7 @@ AccumulationExpression AccumulatorMedian::parseArgs(ExpressionContext* const exp
 std::pair<std::vector<double> /*ps*/, PercentileMethodEnum>
 AccumulatorMedian::parsePercentileAndMethod(ExpressionContext* expCtx,
                                             BSONElement elem,
-                                            VariablesParseState /*vps*/) {
+                                            /*vps=*/VariablesParseState) {
     auto spec = AccumulatorMedianSpec::parse(elem.Obj(), IDLParserContext(kName));
     return std::make_pair(
         std::vector<double>({0.5}),

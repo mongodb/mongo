@@ -175,7 +175,7 @@ size_t countCoordinatorDocs(OperationContext* opCtx,
     DBDirectClient client(opCtx);
     auto cursor = uassertStatusOKWithContext(
         DBClientCursor::fromAggregationRequest(
-            &client, std::move(aggRequest), false /* secondaryOk */, true /* useExhaust */),
+            &client, std::move(aggRequest), /*secondaryOk=*/false, /*useExhaust=*/true),
         "Failed to establish a cursor for aggregation");
 
     if (!cursor->more()) {

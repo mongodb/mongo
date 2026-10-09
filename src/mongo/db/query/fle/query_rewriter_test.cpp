@@ -423,7 +423,7 @@ public:
 
     void setUp() override {
         _mock = std::make_unique<MockQueryRewriter>(
-            _expCtx, _mockNss, _mockEfcMap, false /*forceCollectionScanOnAggAsMatchRewrite*/);
+            _expCtx, _mockNss, _mockEfcMap, /*forceCollectionScanOnAggAsMatchRewrite=*/false);
     }
 
     void tearDown() override {}
@@ -448,7 +448,7 @@ public:
 
     void setUp() override {
         _mock = std::make_unique<MockQueryRewriter>(
-            _expCtx, _mockNss, _mockEfcMap, true /*forceCollectionScanOnAggAsMatchRewrite*/);
+            _expCtx, _mockNss, _mockEfcMap, /*forceCollectionScanOnAggAsMatchRewrite=*/true);
     }
 
     void tearDown() override {}

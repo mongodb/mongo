@@ -284,7 +284,7 @@ void TransactionCoordinatorService::_scheduleRecoveryTask(OperationContext* opCt
                                        lsid,
                                        {txnNumber, txnRetryCounter},
                                        coordinator,
-                                       true /* forStepUp */);
+                                       /*forStepUp=*/true);
                         coordinator->continueCommit(doc);
                     }
                 })

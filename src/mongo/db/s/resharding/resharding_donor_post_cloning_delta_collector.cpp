@@ -60,7 +60,7 @@ ExecutorFuture<std::map<ShardId, int64_t>> ReshardingDonorPostCloningDeltaCollec
                        // Operations at or past kBlockingWrites are non-deprioritizable to avoid
                        // stalling while holding the critical section.
                        auto opCtx = resharding::makeReshardingOperationContext(
-                           *_cancelableOpCtxFactory, true /* nonDeprioritizable */);
+                           *_cancelableOpCtxFactory, /*nonDeprioritizable=*/true);
 
                        return _externalState->getDocumentsDeltaFromDonors(
                            opCtx.get(),

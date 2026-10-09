@@ -87,7 +87,7 @@ void ShardServerTestFixture::setCatalogCache(std::unique_ptr<CatalogCache> cache
 }
 
 std::unique_ptr<ShardingCatalogClient> ShardServerTestFixture::makeShardingCatalogClient() {
-    return std::make_unique<ShardingCatalogClientImpl>(nullptr /* overrideConfigShard */);
+    return std::make_unique<ShardingCatalogClientImpl>(/*overrideConfigShard=*/nullptr);
 }
 
 void ShardServerTestFixtureWithCatalogCacheMock::setUp() {

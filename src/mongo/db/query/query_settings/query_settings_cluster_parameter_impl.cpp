@@ -65,7 +65,7 @@ Status QuerySettingsClusterParameter::set(const BSONElement& newValueElement,
     auto newSettings = QuerySettingsClusterParameterValue::parse(
         newValueElement.Obj(),
         IDLParserContext("querySettingsParameterValue",
-                         boost::none /* vts */,
+                         /*vts=*/boost::none,
                          /* tenantId */ boost::none,
                          SerializationContext::stateDefault()));
 

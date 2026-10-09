@@ -83,17 +83,17 @@ TEST(SlottedTimestampList, EraseMiddleAndReuseFreeSlots) {
     SlottedTimestampList list;
     std::vector<std::list<Timestamp>::const_iterator> positions;
 
-    insertN(list, 0 /*startValue*/, 5 /*N*/, positions);
+    insertN(list, /*startValue=*/0, /*N=*/5, positions);
     checkListValues(list, {0, 1, 2, 3, 4});
 
     ASSERT_EQ(list.getCapacity_forTest(), 5);
 
-    eraseN(list, 1 /*startIndex*/, 2 /*N*/, positions);
+    eraseN(list, /*startIndex=*/1, /*N=*/2, positions);
     checkListValues(list, {0, 3, 4});
 
     ASSERT_EQ(list.getCapacity_forTest(), 5);
 
-    insertN(list, 10 /*startValue*/, 5 /*N*/, positions);
+    insertN(list, /*startValue=*/10, /*N=*/5, positions);
     checkListValues(list, {0, 3, 4, 10, 11, 12, 13, 14});
 
     ASSERT_EQ(list.getCapacity_forTest(), 8);
@@ -103,7 +103,7 @@ TEST(SlottedTimestampList, ClearAndEraseTimestamps) {
     SlottedTimestampList list;
     std::vector<std::list<Timestamp>::const_iterator> positions;
 
-    insertN(list, 0 /*startValue*/, 5 /*N*/, positions);
+    insertN(list, /*startValue=*/0, /*N=*/5, positions);
     checkListValues(list, {0, 1, 2, 3, 4});
 
     ASSERT_EQ(list.getCapacity_forTest(), 5);
@@ -113,17 +113,17 @@ TEST(SlottedTimestampList, ClearAndEraseTimestamps) {
 
     ASSERT_EQ(list.getCapacity_forTest(), 5);
 
-    insertN(list, 0 /*startValue*/, 3 /*N*/, positions);
+    insertN(list, /*startValue=*/0, /*N=*/3, positions);
     checkListValues(list, {0, 1, 2});
 
     ASSERT_EQ(list.getCapacity_forTest(), 5);
 
-    eraseN(list, 1 /*startIndex*/, 2 /*N*/, positions);
+    eraseN(list, /*startIndex=*/1, /*N=*/2, positions);
     checkListValues(list, {0});
 
     ASSERT_EQ(list.getCapacity_forTest(), 5);
 
-    insertN(list, 20 /*startValue*/, 6 /*N*/, positions);
+    insertN(list, /*startValue=*/20, /*N=*/6, positions);
     checkListValues(list, {0, 20, 21, 22, 23, 24, 25});
 
     ASSERT_EQ(list.getCapacity_forTest(), 7);
@@ -165,15 +165,15 @@ TEST(SlottedTimestampList, EraseAllFIFOAndReuseSlots) {
     SlottedTimestampList list;
     std::vector<SlottedTimestampList::const_iterator> iters;
 
-    insertN(list, 0 /* startValue */, 5 /* N */, iters);
+    insertN(list, /*startValue=*/0, /*N=*/5, iters);
     checkListValues(list, {0, 1, 2, 3, 4});
     ASSERT_EQ(list.getCapacity_forTest(), 5);
 
-    eraseN(list, 0 /* startIndex */, 5 /* N */, iters);
+    eraseN(list, /*startIndex=*/0, /*N=*/5, iters);
     checkListValues(list, {});
     ASSERT_EQ(list.getCapacity_forTest(), 5);
 
-    insertN(list, 5 /* startValue */, 5 /* N */, iters);
+    insertN(list, /*startValue=*/5, /*N=*/5, iters);
     checkListValues(list, {5, 6, 7, 8, 9});
     ASSERT_EQ(list.getCapacity_forTest(), 5);
 
@@ -186,16 +186,16 @@ TEST(SlottedTimestampList, EraseAllLIFOAndReuseSlots) {
     SlottedTimestampList list;
     std::vector<SlottedTimestampList::const_iterator> iters;
 
-    insertN(list, 0 /* startValue */, 5 /* N */, iters);
+    insertN(list, /*startValue=*/0, /*N=*/5, iters);
     checkListValues(list, {0, 1, 2, 3, 4});
     ASSERT_EQ(list.getCapacity_forTest(), 5);
 
     std::reverse(iters.begin(), iters.end());
-    eraseN(list, 0 /* startIndex */, 5 /* N */, iters);
+    eraseN(list, /*startIndex=*/0, /*N=*/5, iters);
     checkListValues(list, {});
     ASSERT_EQ(list.getCapacity_forTest(), 5);
 
-    insertN(list, 5 /* startValue */, 5 /* N */, iters);
+    insertN(list, /*startValue=*/5, /*N=*/5, iters);
     checkListValues(list, {5, 6, 7, 8, 9});
     ASSERT_EQ(list.getCapacity_forTest(), 5);
 
@@ -208,19 +208,19 @@ TEST(SlottedTimestampList, EraseHalfFIFOHalfLIFOAndResuseSlots) {
     SlottedTimestampList list;
     std::vector<SlottedTimestampList::const_iterator> iters;
 
-    insertN(list, 0 /* startValue */, 5 /* N */, iters);
+    insertN(list, /*startValue=*/0, /*N=*/5, iters);
     checkListValues(list, {0, 1, 2, 3, 4});
     ASSERT_EQ(list.getCapacity_forTest(), 5);
 
-    eraseN(list, 0 /* startIndex */, 3 /* N */, iters);
+    eraseN(list, /*startIndex=*/0, /*N=*/3, iters);
     checkListValues(list, {3, 4});
 
     std::reverse(iters.begin(), iters.end());
-    eraseN(list, 0 /* startIndex */, 2 /* N */, iters);
+    eraseN(list, /*startIndex=*/0, /*N=*/2, iters);
     checkListValues(list, {});
     ASSERT_EQ(list.getCapacity_forTest(), 5);
 
-    insertN(list, 5 /* startValue */, 5 /* N */, iters);
+    insertN(list, /*startValue=*/5, /*N=*/5, iters);
     checkListValues(list, {5, 6, 7, 8, 9});
     ASSERT_EQ(list.getCapacity_forTest(), 5);
 

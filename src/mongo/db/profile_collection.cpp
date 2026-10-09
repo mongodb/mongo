@@ -136,7 +136,7 @@ auto buildProfileObject(auto opCtx) {
                               shard_role_details::getLocker(opCtx)->getFlowControlStats(),
                               storageMetrics,
                               curOp->getPrepareReadConflicts(),
-                              false /*omitCommand*/,
+                              /*omitCommand=*/false,
                               profileObjBuilder);
     }
 

@@ -54,7 +54,7 @@ boost::optional<ShardId> resolvePrimaryShard(OperationContext* opCtx,
                 str::stream() << "invalid shard name: " << *optPrimaryShard,
                 optPrimaryShard->isValid());
         return uassertStatusOK(Grid::get(opCtx)->shardRegistry()->resolveShardId(
-            opCtx, *optPrimaryShard, true /* allowNonShardIdIdentifiers */));
+            opCtx, *optPrimaryShard, /*allowNonShardIdIdentifiers=*/true));
     }
     return boost::none;
 }

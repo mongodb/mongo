@@ -1261,7 +1261,7 @@ public:
                             "offset"_attr = 0,
                             "size"_attr = fileSize);
                 kvBackupBlocks.push_back(
-                    KVBackupBlock(ident, filePath.string(), 0 /* offset */, length, fileSize));
+                    KVBackupBlock(ident, filePath.string(), /*offset=*/0, length, fileSize));
             }
         }
 
@@ -1339,7 +1339,7 @@ private:
             std::string ident =
                 extractIdentFromPath(boost::filesystem::path(storageGlobalParams.dbpath), filePath);
             kvBackupBlocks->push_back(
-                KVBackupBlock(ident, filePath.string(), 0 /* offset */, 0 /* length */, fileSize));
+                KVBackupBlock(ident, filePath.string(), /*offset=*/0, /*length=*/0, fileSize));
         }
 
         // If the duplicate backup cursor has been exhausted, close it and set

@@ -226,7 +226,7 @@ void CollectionQueryInfo::updatePathArraynessForSetMultikey(
         auto newPathArrayness =
             std::make_shared<PathArrayness>(*_pathArraynessState.pathArrayness.get());
         newPathArrayness->addPathsFromIndexKeyPattern(
-            descriptor.keyPattern(), multikeyPaths, false /* isFullRebuild */);
+            descriptor.keyPattern(), multikeyPaths, /*isFullRebuild=*/false);
         newPathArrayness->incrementEpoch();
         // Re-assign PathArrayness pointer.
         _pathArraynessState.pathArrayness = std::move(newPathArrayness);
@@ -252,7 +252,7 @@ void CollectionQueryInfo::rebuildPathArrayness(OperationContext* opCtx, const Co
         // since we should just assume this path is an array.
         if (!multikeyPaths.empty()) {
             newPathArrayness->addPathsFromIndexKeyPattern(
-                desc->keyPattern(), multikeyPaths, true /* isFullRebuild */);
+                desc->keyPattern(), multikeyPaths, /*isFullRebuild=*/true);
         }
     }
     // We assume that this method will be called in a thread-safe manner and thus, can safely do

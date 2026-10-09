@@ -109,7 +109,7 @@ protected:
                 operationContext(), kNss, AcquisitionPrerequisites::OperationType::kRead),
             MODE_IS);
         auto colls = MultipleCollectionAccessor(
-            std::move(coll), {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+            std::move(coll), {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
         auto findCommand = std::make_unique<FindCommandRequest>(kNss);
         findCommand->setFilter(filter);
@@ -151,7 +151,7 @@ protected:
                     operationContext(), kNss, AcquisitionPrerequisites::OperationType::kRead),
                 MODE_IS);
             auto colls = MultipleCollectionAccessor(
-                std::move(coll), {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+                std::move(coll), {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
             // The explain printer checks the CurOp's Command to see if it is allowed to print it.
             auto request = AggregateCommandRequest(kNss, stages);
@@ -1127,7 +1127,7 @@ TEST_F(PlanExplainerTest, ExpressPlanIdHackExplain) {
 
 TEST_F(PlanExplainerTest, ExpressPlanSingleFieldEqExplain) {
     // Same as above, but testing non-_id express plan.
-    auto exec = buildFindExecAndIter(fromjson("{a: 1}"), true /* limitOne */);
+    auto exec = buildFindExecAndIter(fromjson("{a: 1}"), /*limitOne=*/true);
     auto& explainer = exec->getPlanExplainer();
 
     ASSERT(!explainer.areThereRejectedPlansToExplain());
@@ -1152,7 +1152,7 @@ TEST_F(PlanExplainerTest, ExpressPlanIdHackExplainDiagnostics) {
 TEST_F(PlanExplainerTest, ExpressPlanSingleFieldEqExplainDiagnostics) {
     // The ExplainDiagnosticPrinter includes the query planner and execution stats info for the
     // non-_id query above.
-    auto exec = buildFindExecAndIter(fromjson("{a: 1}"), true /* limitOne */);
+    auto exec = buildFindExecAndIter(fromjson("{a: 1}"), /*limitOne=*/true);
 
     auto explainDiagnostics = printExplainDiagnostics(exec.get());
     ASSERT_STRING_CONTAINS(explainDiagnostics, "EXPRESS_IXSCAN");
@@ -1409,8 +1409,8 @@ TEST_F(PlanExplainerTest, HashJoinEmbeddingTest) {
         std::vector<QSNJoinPredicate>{QSNJoinPredicate{.op = QSNJoinPredicate::ComparisonOp::Eq,
                                                        .leftField = FieldPath("a"),
                                                        .rightField = FieldPath("b")}},
-        FieldPath("xyz") /* leftFieldEmbedding */,
-        boost::none /* rightFieldEmbedding */);
+        /*leftFieldEmbedding=*/FieldPath("xyz"),
+        /*rightFieldEmbedding=*/boost::none);
 
     BSONObjBuilder outerBob;
     BSONObjBuilder innerBob(outerBob.subobjStart("inner"));
@@ -1454,7 +1454,7 @@ TEST_F(PlanExplainerTest, NLJEmbeddingTest) {
         std::vector<QSNJoinPredicate>{QSNJoinPredicate{.op = QSNJoinPredicate::ComparisonOp::Eq,
                                                        .leftField = FieldPath("x"),
                                                        .rightField = FieldPath("y")}},
-        boost::none /* leftFieldEmbedding */,
+        /*leftFieldEmbedding=*/boost::none,
         FieldPath(/*inputPath=*/"xyz"));
 
     BSONObjBuilder outerBob;
@@ -1499,7 +1499,7 @@ TEST_F(PlanExplainerTest, INLJEmbeddingTest) {
         std::vector<QSNJoinPredicate>{QSNJoinPredicate{.op = QSNJoinPredicate::ComparisonOp::Eq,
                                                        .leftField = FieldPath("x"),
                                                        .rightField = FieldPath("y")}},
-        boost::none /* leftFieldEmbedding */,
+        /*leftFieldEmbedding=*/boost::none,
         FieldPath(/*inputPath=*/"xyz"));
 
     BSONObjBuilder outerBob;
@@ -1696,7 +1696,7 @@ TEST_F(PlanExplainerTest, CBRSamplingMetadataReportsPagesForPersistedSample) {
         ce::makePersistentSamplePageDocs(collUuid,
                                          ce::SamplingTechniqueEnum::kRandom,
                                          kPersistedSampleSize,
-                                         boost::none /* numChunks */,
+                                         /*numChunks=*/boost::none,
                                          sample,
                                          Date_t::now());
     ASSERT_EQ(pages.size(), 1u);

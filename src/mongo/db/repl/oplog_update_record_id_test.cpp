@@ -821,7 +821,7 @@ public:
     using CollectionMock::CollectionMock;
 
     std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext*,
-                                                    bool /*forward*/) const override {
+                                                    /*forward=*/bool) const override {
         const auto& buf = corruptedBsonBytes();
         return std::make_unique<CorruptedRecordCursor>(buf.data(), static_cast<int>(buf.size()));
     }

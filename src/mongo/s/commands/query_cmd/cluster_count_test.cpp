@@ -55,8 +55,8 @@ TEST_F(ClusterCountTest, NoErrors) {
 }
 
 TEST_F(ClusterCountTest, IncludeQueryStatsMetrics) {
-    testIncludeQueryStatsMetrics(kCountCmdTargeted, true /* isTargeted */);
-    testIncludeQueryStatsMetrics(kCountCmdScatterGather, false /* isTargeted */);
+    testIncludeQueryStatsMetrics(kCountCmdTargeted, /*isTargeted=*/true);
+    testIncludeQueryStatsMetrics(kCountCmdScatterGather, /*isTargeted=*/false);
 }
 
 }  // namespace

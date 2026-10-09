@@ -183,8 +183,8 @@ public:
             client.update(NamespaceString::kServerConfigurationNamespace,
                           BSON("_id" << "commitChunkSplitStats"),
                           BSON("$inc" << BSON("count" << 1)),
-                          true /* upsert */,
-                          false /* multi */);
+                          /*upsert=*/true,
+                          /*multi=*/false);
         }
 
         shardAndCollVers.collectionPlacementVersion.serialize(kCollectionVersionField, &result);

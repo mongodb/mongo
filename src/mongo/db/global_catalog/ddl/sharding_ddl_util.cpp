@@ -161,7 +161,7 @@ void deleteCollection(OperationContext* opCtx,
             return entry;
         }()});
 
-        return txnClient.runCRUDOp(deleteOp, {0} /*stmtIds*/)
+        return txnClient.runCRUDOp(deleteOp, /*stmtIds=*/{0})
             .thenRunOn(txnExec)
             .then([&](const BatchedCommandResponse& deleteCollResponse) {
                 uassertStatusOK(deleteCollResponse.toStatus());
@@ -179,12 +179,12 @@ void deleteCollection(OperationContext* opCtx,
                 auto now = VectorClock::get(getGlobalServiceContext())->getTime();
                 const auto clusterTime = now.clusterTime().asTimestamp();
                 NamespacePlacementType placementInfo(
-                    NamespaceString(nss), clusterTime, {} /*shards*/);
+                    NamespaceString(nss), clusterTime, /*shards=*/{});
                 placementInfo.setUuid(uuid);
                 write_ops::InsertCommandRequest insertPlacementEntry(
                     NamespaceString::kConfigsvrPlacementHistoryNamespace, {placementInfo.toBSON()});
 
-                return txnClient.runCRUDOp(insertPlacementEntry, {1} /*stmtIds*/);
+                return txnClient.runCRUDOp(insertPlacementEntry, /*stmtIds=*/{1});
             })
             .thenRunOn(txnExec)
             .then([&](const BatchedCommandResponse& insertPlacementEntryResponse) {
@@ -735,7 +735,7 @@ void runTransactionOnShardingCatalog(OperationContext* opCtx,
 
     txn_api::SyncTransactionWithRetries txn(newOpCtx,
                                             executor,
-                                            nullptr /*resourceYielder*/,
+                                            /*resourceYielder=*/nullptr,
                                             inlineExecutor,
                                             std::move(customTxnClient));
     txn.run(newOpCtx, std::move(transactionChain));
@@ -1250,9 +1250,9 @@ boost::optional<ShardId> pickShardOwningCollectionChunks(OperationContext* opCtx
     auto chunks = uassertStatusOK(Grid::get(opCtx)->catalogClient()->getChunks(
         opCtx,
         /*filter=*/BSON(ChunkType::collectionUUID() << collUuid),
-        BSON(ChunkType::min() << 1) /*sort*/,
-        1 /*limit*/,
-        nullptr /*opTime*/,
+        /*sort=*/BSON(ChunkType::min() << 1),
+        /*limit=*/1,
+        /*opTime=*/nullptr,
         dummyEpoch,
         dummyTimestamp,
         repl::ReadConcernArgs::kMajority));
@@ -1359,7 +1359,7 @@ void updateZonesInTransaction(const txn_api::TransactionClient& txnClient,
         return updateOp;
     }());
 
-    uassertStatusOK(txnClient.runCRUDOpSync(request, {-1} /*stmtIds*/).toStatus());
+    uassertStatusOK(txnClient.runCRUDOpSync(request, /*stmtIds=*/{-1}).toStatus());
 }
 
 void upsertTrackedCollectionInTransaction(const txn_api::TransactionClient& txnClient,
@@ -1531,10 +1531,10 @@ ComputeAllMergeableChunksOnShardResult computeAllMergeableChunksOnShard(
         /* query */
         BSON(TagsType::ns(
             NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()))),
-        /*sort*/ BSON(TagsType::min << 1),
-        /*limit*/ boost::none,
-        /*hint*/ boost::none,
-        /*projection*/ BSON(TagsType::min << 1 << TagsType::max << 1)));
+        /*sort=*/BSON(TagsType::min << 1),
+        /*limit=*/boost::none,
+        /*hint=*/boost::none,
+        /*projection=*/BSON(TagsType::min << 1 << TagsType::max << 1)));
 
     auto zonesIt = zones.docs.cbegin();
 

@@ -23,7 +23,7 @@ namespace {
 
 std::unique_ptr<EExpression> makeConcatExpr(size_t arity, size_t size) {
     static const std::string kAlphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
-    PseudoRandom random(1 /*seed*/);
+    PseudoRandom random(/*seed=*/1);
 
     EExpression::Vector args;
     args.reserve(arity);
@@ -39,7 +39,7 @@ std::unique_ptr<EExpression> makeConcatExpr(size_t arity, size_t size) {
 }
 
 void runConcatBenchmark(benchmark::State& state, SimpleMemoryUsageTracker* tracker) {
-    auto expr = makeConcatExpr(state.range(0) /*arity*/, state.range(1) /*size*/);
+    auto expr = makeConcatExpr(/*arity=*/state.range(0), /*size=*/state.range(1));
     CompileCtx ctx{std::make_unique<RuntimeEnvironment>()};
     vm::CodeFragment code = expr->compileDirect(ctx);
 

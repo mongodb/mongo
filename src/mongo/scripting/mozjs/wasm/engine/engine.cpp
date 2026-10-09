@@ -946,7 +946,7 @@ err_code_t MozJSScriptEngine::invokeFunction(uint64_t handle,
             BSONElement next = it.next();
 
             JS::RootedValue value(_cx);
-            ValueReader(_cx, &value).fromBSONElementUnowned(next, false /*readOnlyArgs*/);
+            ValueReader(_cx, &value).fromBSONElementUnowned(next, /*readOnlyArgs=*/false);
 
             if (!args.append(value)) {
                 if (err) {
@@ -1191,7 +1191,7 @@ err_code_t MozJSScriptEngine::setGlobal(const char* name,
     for (BSONObjIterator it(value); it.more();) {
         BSONElement elem = it.next();
         JS::RootedValue val(_cx);
-        ValueReader(_cx, &val).fromBSONElement(elem, value, false /* readOnlyArgs */);
+        ValueReader(_cx, &val).fromBSONElement(elem, value, /*readOnlyArgs=*/false);
 
         if (!chk.ok(JS_DefineProperty(_cx, jsObj, elem.fieldName(), val, JSPROP_ENUMERATE),
                     SM_E_INTERNAL)) {

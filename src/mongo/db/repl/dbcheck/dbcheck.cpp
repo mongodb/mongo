@@ -416,7 +416,7 @@ boost::optional<KeyStringEntry> _getNextDistinctKeyInIndex(
     // to the next distinct keyString after the current one.
     key_string::Builder builder(version);
     auto keyStringForSeekWithoutRecordId = IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(
-        currKeyStringBson, ordering, true /*isForward*/, false /*inclusive*/, builder);
+        currKeyStringBson, ordering, /*isForward=*/true, /*inclusive=*/false, builder);
 
     return indexCursor->seekForKeyString(opCtx, keyStringForSeekWithoutRecordId);
 }
@@ -456,7 +456,7 @@ Status DbCheckHasher::hashForExtraIndexKeysCheck(OperationContext* opCtx,
 
     auto indexCursor =
         std::make_unique<SortedDataInterfaceThrottleCursor>(opCtx, iam, _dataThrottle);
-    indexCursor->setEndPosition(batchEndBson, true /*inclusive*/);
+    indexCursor->setEndPosition(batchEndBson, /*inclusive=*/true);
 
     LOGV2_DEBUG(8065400,
                 3,
@@ -1060,8 +1060,8 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
                                    entry.getSecondaryIndexCheckParameters(),
                                    &dataThrottle,
                                    indexName,
-                                   std::numeric_limits<int64_t>::max(), /*maxCount*/
-                                   std::numeric_limits<int64_t>::max(), /*maxBytes*/
+                                   /*maxCount=*/std::numeric_limits<int64_t>::max(),
+                                   /*maxBytes=*/std::numeric_limits<int64_t>::max(),
                                    Date_t::now() +
                                        Milliseconds(repl::dbCheckSecondaryBatchMaxTimeMs.load()));
 
@@ -1084,9 +1084,9 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
                                    batchEnd,
                                    entry.getSecondaryIndexCheckParameters(),
                                    &dataThrottle,
-                                   boost::none,                         /*indexName*/
-                                   std::numeric_limits<int64_t>::max(), /*maxCount*/
-                                   std::numeric_limits<int64_t>::max(), /*maxBytes*/
+                                   /*indexName=*/boost::none,
+                                   /*maxCount=*/std::numeric_limits<int64_t>::max(),
+                                   /*maxBytes=*/std::numeric_limits<int64_t>::max(),
                                    Date_t::now() +
                                        Milliseconds(repl::dbCheckSecondaryBatchMaxTimeMs.load()));
                     uassertStatusOK(hasher->hashForCollectionCheck(opCtx, collection));
@@ -1101,9 +1101,9 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
                            batchEnd,
                            entry.getSecondaryIndexCheckParameters(),
                            &dataThrottle,
-                           boost::none,                         /*indexName*/
-                           std::numeric_limits<int64_t>::max(), /*maxCount*/
-                           std::numeric_limits<int64_t>::max(), /*maxBytes*/
+                           /*indexName=*/boost::none,
+                           /*maxCount=*/std::numeric_limits<int64_t>::max(),
+                           /*maxBytes=*/std::numeric_limits<int64_t>::max(),
                            Date_t::now() +
                                Milliseconds(repl::dbCheckSecondaryBatchMaxTimeMs.load()));
             const auto status = hasher->hashForCollectionCheck(opCtx, collection);
@@ -1297,7 +1297,7 @@ Status dbCheckOplogCommand(OperationContext* opCtx,
             auto healthLogEntry =
                 mongo::dbCheckHealthLogEntry(invocation.getSecondaryIndexCheckParameters(),
                                              invocation.getNss(),
-                                             boost::none /*collectionUUID*/,
+                                             /*collectionUUID=*/boost::none,
                                              SeverityEnum::Warning,
                                              warningMsg,
                                              ScopeEnum::Cluster,
@@ -1323,7 +1323,7 @@ Status dbCheckOplogCommand(OperationContext* opCtx,
                 skipDbCheck ? "cannot execute dbcheck due to ongoing " + oplogApplicationMode : "",
                 ScopeEnum::Cluster,
                 type,
-                boost::none /*data*/);
+                /*data=*/boost::none);
             HealthLogInterface::get(Client::getCurrent()->getServiceContext())
                 ->log(*healthLogEntry);
             if (MONGO_unlikely(sleepToWaitForHealthLogWrite.shouldFail()) &&

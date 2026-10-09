@@ -43,7 +43,7 @@ protected:
                                                        options,
                                                        sourceUUID,
                                                        targetUUID,
-                                                       false /* isNonAuthoritative */);
+                                                       /*isNonAuthoritative=*/false);
     }
 
     NamespaceString makeTargetNss(const NamespaceString& sourceNss) const {

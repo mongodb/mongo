@@ -104,7 +104,7 @@ std::unique_ptr<SingleDocumentLookupExecutor> buildIdLookupExecutor(
             exec::SingleDocumentLookupStatsRecorder::makeSearchIdLookupSbeRecorder());
         auto aggregation = std::make_unique<InternalSearchIdLookUpLocalReadExecutor>(
             catalogResourceHandle,
-            boost::none /* view */,
+            /*view=*/boost::none,
             exec::SingleDocumentLookupStatsRecorder::makeSearchIdLookupAggregationRecorder());
         return std::make_unique<PrimaryWithFallbackSingleDocumentLookupExecutor>(
             std::move(sbe), std::move(aggregation));
@@ -245,7 +245,7 @@ boost::optional<Document> InternalSearchIdLookUpStage::enrich(Document event) {
                                                        pExpCtx->getNamespaceString(),
                                                        pExpCtx->getUUID(),
                                                        documentKey,
-                                                       boost::none /* afterClusterTime */);
+                                                       /*afterClusterTime=*/boost::none);
     tassert(13006201,
             "$_internalSearchIdLookup executor did not handle an _id lookup",
             lookupResult.status != HandledStatus::kNotHandled);

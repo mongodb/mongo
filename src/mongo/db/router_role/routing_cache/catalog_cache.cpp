@@ -184,7 +184,7 @@ ComparableDatabaseVersion ComparableDatabaseVersion::makeComparableDatabaseVersi
 
 ComparableDatabaseVersion
 ComparableDatabaseVersion::makeComparableDatabaseVersionForForcedRefresh() {
-    return ComparableDatabaseVersion(boost::none /* version */,
+    return ComparableDatabaseVersion(/*version=*/boost::none,
                                      _disambiguatingSequenceNumSource.fetchAndAdd(1),
                                      _forcedRefreshSequenceNumSource.addAndFetch(2) - 1);
 }

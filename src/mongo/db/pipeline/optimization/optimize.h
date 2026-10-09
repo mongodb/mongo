@@ -53,7 +53,7 @@ DocumentSourceContainer::iterator optimizeEndOfPipeline(ExpressionContext&,
 inline void optimizeAndValidatePipeline(Pipeline* pipeline) {
     tassert(10313300, "Expected pipeline to optimize", pipeline);
     optimizePipeline(*pipeline);
-    pipeline->validateCommon(true /* alreadyOptimized */);
+    pipeline->validateCommon(/*alreadyOptimized=*/true);
 }
 }  // namespace pipeline_optimization
 }  // namespace mongo

@@ -122,7 +122,7 @@ Value WindowFunctionMedian::getValue(boost::optional<Value> current) const {
     if (_values.empty())
         return Value{BSONNULL};
 
-    return WindowFunctionPercentileCommon::computePercentile(0.5 /* p */);
+    return WindowFunctionPercentileCommon::computePercentile(/*p=*/0.5);
 }
 
 void WindowFunctionMedian::reset() {

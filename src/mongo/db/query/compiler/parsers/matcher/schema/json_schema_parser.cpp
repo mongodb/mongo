@@ -1905,7 +1905,7 @@ StatusWithMatchExpression JSONSchemaParser::parse(
                 "schema"_attr = redact(schema.jsonString(JsonStringFormat::LegacyStrict)));
     try {
         auto translation =
-            _parse(expCtx, boost::none /* path */, schema, allowedFeatures, ignoreUnknownKeywords);
+            _parse(expCtx, /*path=*/boost::none, schema, allowedFeatures, ignoreUnknownKeywords);
         if (shouldLog(MONGO_LOGV2_DEFAULT_COMPONENT, logv2::LogSeverity::Debug(5)) &&
             translation.isOK()) {
             LOGV2_DEBUG(20729,

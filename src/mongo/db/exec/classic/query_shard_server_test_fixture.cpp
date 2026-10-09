@@ -118,8 +118,8 @@ CollectionMetadata QueryShardServerTestFixture::prepareTestData(
                                            false,
                                            epoch,
                                            Timestamp(1, 1),
-                                           boost::none /* timeseriesFields */,
-                                           boost::none /* reshardingFields */,
+                                           /*timeseriesFields=*/boost::none,
+                                           /*reshardingFields=*/boost::none,
                                            true,
                                            _chunks);
 

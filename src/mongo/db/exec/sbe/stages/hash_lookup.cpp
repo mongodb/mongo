@@ -26,7 +26,7 @@ HashLookupStage::HashLookupStage(std::unique_ptr<PlanStage> outer,
                                  PlanNodeId planNodeId,
                                  bool participateInTrialRunTracking)
     : PlanStage(
-          "hash_lookup"sv, nullptr /* yieldPolicy */, planNodeId, participateInTrialRunTracking),
+          "hash_lookup"sv, /*yieldPolicy=*/nullptr, planNodeId, participateInTrialRunTracking),
       _outerKeySlot(outerKeySlot),
       _innerKeySlot(innerKeySlot),
       _innerProjectSlot(innerProjectSlot),
@@ -141,7 +141,7 @@ void HashLookupStage::open(bool reOpen) {
     auto optTimer(getOptTimer(_opCtx));
 
     if (reOpen) {
-        reset(false /* fromClose */);
+        reset(/*fromClose=*/false);
     }
 
     _commonStats.opens++;
@@ -209,7 +209,7 @@ void HashLookupStage::close() {
     auto optTimer(getOptTimer(_opCtx));
     trackClose();
     outerChild()->close();
-    reset(true /* fromClose */);
+    reset(/*fromClose=*/true);
 }
 
 std::unique_ptr<PlanStageStats> HashLookupStage::getStats(bool includeDebugInfo) const {
@@ -276,7 +276,7 @@ void HashLookupStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
     ret.emplace_back(DebugPrinter::Block::cmdDecIndent);
 
     if (debugPrintInfo.printBytecode) {
-        PlanStage::debugPrintBytecode(ret, _aggCode, "AGGREGATE" /*title*/);
+        PlanStage::debugPrintBytecode(ret, _aggCode, /*title=*/"AGGREGATE");
     }
 }  // HashLookupStage::doDebugPrint
 

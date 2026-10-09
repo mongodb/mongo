@@ -324,7 +324,7 @@ private:
         stdx::unordered_set<std::string> fieldNames;
         auto cursor = collectionPtr->getCursor(opCtx());
         for (auto record = cursor->next(); record; record = cursor->next()) {
-            _extractDottedFieldNames(record->data.toBson(), "" /*prefix*/, fieldNames);
+            _extractDottedFieldNames(record->data.toBson(), /*prefix=*/"", fieldNames);
         }
         return fieldNames;
     }

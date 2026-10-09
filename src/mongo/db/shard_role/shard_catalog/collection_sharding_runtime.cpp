@@ -225,7 +225,7 @@ ScopedCollectionFilter CollectionShardingRuntime::getOwnershipFilter(
         _getMetadataWithVersionCheckAt(opCtx,
                                        repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime(),
                                        optReceivedShardVersion,
-                                       true /* preserveRange */,
+                                       /*preserveRange=*/true,
                                        supportNonVersionedOperations);
 
     return {std::move(metadata)};
@@ -238,7 +238,7 @@ ScopedCollectionFilter CollectionShardingRuntime::getOwnershipFilter(
     return _getMetadataWithVersionCheckAt(opCtx,
                                           repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime(),
                                           receivedShardVersion,
-                                          true /* preserveRange */);
+                                          /*preserveRange=*/true);
 }
 
 ScopedCollectionDescription CollectionShardingRuntime::getCollectionDescription(
@@ -260,7 +260,7 @@ ScopedCollectionDescription CollectionShardingRuntime::getCollectionDescription(
 
     auto& oss = OperationShardingState::get(opCtx);
 
-    auto optMetadata = _getCurrentMetadataIfKnown(boost::none, false /* preserveRange */);
+    auto optMetadata = _getCurrentMetadataIfKnown(boost::none, /*preserveRange=*/false);
     const auto receivedShardVersion{oss.getShardVersion(_nss)};
     uassert(
         StaleConfigInfo(_nss,
@@ -277,7 +277,7 @@ ScopedCollectionDescription CollectionShardingRuntime::getCollectionDescription(
 }
 
 boost::optional<CollectionMetadata> CollectionShardingRuntime::getCurrentMetadataIfKnown() const {
-    auto optMetadata = _getCurrentMetadataIfKnown(boost::none, false /* preserveRange */);
+    auto optMetadata = _getCurrentMetadataIfKnown(boost::none, /*preserveRange=*/false);
     if (!optMetadata)
         return boost::none;
     return optMetadata->get();
@@ -293,7 +293,7 @@ void CollectionShardingRuntime::checkShardVersionOrThrow(OperationContext* opCtx
 void CollectionShardingRuntime::checkShardVersionOrThrow(
     OperationContext* opCtx, const ShardVersion& receivedShardVersion) const {
     (void)_getMetadataWithVersionCheckAt(
-        opCtx, boost::none, receivedShardVersion, false /* preserveRange */);
+        opCtx, boost::none, receivedShardVersion, /*preserveRange=*/false);
 }
 
 void CollectionShardingRuntime::enterCriticalSectionCatchUpPhase(OperationContext* opCtx,

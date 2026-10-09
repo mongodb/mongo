@@ -28,7 +28,7 @@ using namespace std::literals::string_view_literals;
 class BlockStagesTest : public PlanStageTestFixture {
 protected:
     BSONObj compressBucket(const BSONObj& bucket) {
-        return *timeseries::compressBucket(bucket, /*timeFieldName*/ "time"sv, /*nss*/ {}, false)
+        return *timeseries::compressBucket(bucket, /*timeFieldName=*/"time"sv, /*nss=*/{}, false)
                     .compressedBucket;
     }
 
@@ -67,7 +67,7 @@ protected:
                                                       std::move(blockSlots),
                                                       outSlots,
                                                       bitsetSlotId,
-                                                      1 /*nodeId*/,
+                                                      /*nodeId=*/1,
                                                       getYieldPolicy());
         return {std::move(blockToRowStage), std::move(outSlots)};
     }
@@ -101,7 +101,7 @@ protected:
                                                              metaSlot,
                                                              bitmapSlot,
                                                              std::string{tsOptions.getTimeField()},
-                                                             1 /*nodeId*/);
+                                                             /*nodeId=*/1);
 
         return {std::move(tsBucketStage), std::move(blockSlots), bitmapSlot, metaSlot};
     }
@@ -318,7 +318,7 @@ TEST_F(BlockStagesTest, UnpackTwoBucketsWithSameSchemaMeasurements_Yield) {
                         cellPathsForBucketsWithSameSchemaMeasurements,
                         tsOptionsForBucketsWithSameSchemaMeasurements,
                         expectedDataForBucketsWithSameSchemaMeasurements,
-                        /*yieldAfter*/ 1);
+                        /*yieldAfter=*/1);
 }
 
 const auto compressedBucketsWithSameSchemaMeasurements =
@@ -338,7 +338,7 @@ TEST_F(BlockStagesTest, Unpack_Compressed_TwoBucketsWithSameSchemaMeasurements_Y
                         cellPathsForBucketsWithSameSchemaMeasurements,
                         tsOptionsForBucketsWithSameSchemaMeasurements,
                         expectedDataForBucketsWithSameSchemaMeasurements,
-                        /*yieldAfter*/ 1);
+                        /*yieldAfter=*/1);
 }
 
 // Stages under tests do not require 'control.min' and 'control.max' fields to be present though
@@ -380,7 +380,7 @@ TEST_F(BlockStagesTest, UnpackBucketWithNoMeta_Yield) {
                         cellPathsForBucketWithNoMeta,
                         tsOptionsForBucketWithNoMeta,
                         expectedDataForBucketWithNoMeta,
-                        /*yieldAfter*/ 1);
+                        /*yieldAfter=*/1);
 }
 
 TEST_F(BlockStagesTest, Unpack_Compressed_BucketWithNoMeta) {
@@ -396,7 +396,7 @@ TEST_F(BlockStagesTest, Unpack_Compressed_BucketWithNoMeta_Yield) {
                         cellPathsForBucketWithNoMeta,
                         tsOptionsForBucketWithNoMeta,
                         expectedDataForBucketWithNoMeta,
-                        /*yieldAfter*/ 0);
+                        /*yieldAfter=*/0);
 }
 
 // Stages under tests do not require 'control.min' and 'control.max' fields to be present though
@@ -440,7 +440,7 @@ TEST_F(BlockStagesTest, UnpackBucketWithOneMissingField_Yield) {
                         cellPathsForBucketWithOneMissingField,
                         tsOptionsForBucketWithOneMissingField,
                         expectedDataForBucketWithOneMissingField,
-                        /*yieldAfter*/ 0);
+                        /*yieldAfter=*/0);
 }
 
 TEST_F(BlockStagesTest, Unpack_Compressed_BucketWithOneMissingField) {
@@ -456,7 +456,7 @@ TEST_F(BlockStagesTest, Unpack_Compressed_BucketWithOneMissingField_Yield) {
                         cellPathsForBucketWithOneMissingField,
                         tsOptionsForBucketWithOneMissingField,
                         expectedDataForBucketWithOneMissingField,
-                        /*yieldAfter*/ 1);
+                        /*yieldAfter=*/1);
 }
 
 // Note that this data has the 'control.count' field. It facilitates testing the case where we
@@ -508,7 +508,7 @@ TEST_F(BlockStagesTest, Unpack_Compressed_BucketWithOneMissingFieldAndCount_Yiel
         cellPathsForBucketWithOneMissingFieldAndCount,
         tsOptionsForBucketWithOneMissingFieldAndCount,
         expectedDataForBucketWithOneMissingFieldAndCount,
-        /*yieldAfter*/ 1);
+        /*yieldAfter=*/1);
 }
 
 // Stages under tests do not require 'control.min' and 'control.max' fields to be present though
@@ -557,7 +557,7 @@ TEST_F(BlockStagesTest, UnpackBucketWithMultipleMissingFields_Yield) {
                         cellPathsForBucketWithMultipleMissingFields,
                         tsOptionsForBucketWithMultipleMissingFields,
                         expectedDataForBucketWithMultipleMissingFields,
-                        /*yieldAfter*/ 0);
+                        /*yieldAfter=*/0);
 }
 
 TEST_F(BlockStagesTest, Unpack_Compressed_BucketWithMultipleMissingFields) {
@@ -573,7 +573,7 @@ TEST_F(BlockStagesTest, Unpack_Compressed_BucketWithMultipleMissingFields_Yield)
                         cellPathsForBucketWithMultipleMissingFields,
                         tsOptionsForBucketWithMultipleMissingFields,
                         expectedDataForBucketWithMultipleMissingFields,
-                        /*yieldAfter*/ 1);
+                        /*yieldAfter=*/1);
 }
 
 // Stages under tests do not require 'control.min' and 'control.max' fields to be present though
@@ -654,7 +654,7 @@ TEST_F(BlockStagesTest, UnpackBucketWithArrayField_Yield) {
                         cellPathsForBucketWithArrayField,
                         tsOptionsForBucketWithArrayField,
                         expectedDataForBucketWithArrayField,
-                        /*yieldAfter*/ 1);
+                        /*yieldAfter=*/1);
 }
 
 TEST_F(BlockStagesTest, Unpack_Compressed_BucketWithArrayField) {
@@ -670,7 +670,7 @@ TEST_F(BlockStagesTest, Unpack_Compressed_BucketWithArrayField_Yield) {
                         cellPathsForBucketWithArrayField,
                         tsOptionsForBucketWithArrayField,
                         expectedDataForBucketWithArrayField,
-                        /*yieldAfter*/ 0);
+                        /*yieldAfter=*/0);
 }
 
 // Stages under tests do not require 'control.min' and 'control.max' fields to be present though
@@ -723,7 +723,7 @@ TEST_F(BlockStagesTest, UnpackBucketWithObjectField_Yield) {
                         cellPathsForBucketWithObjectField,
                         tsOptionsForBucketWithObjectField,
                         expectedDataForBucketWithObjectField,
-                        /*yieldAfter*/ 0);
+                        /*yieldAfter=*/0);
 }
 
 TEST_F(BlockStagesTest, Unpack_Compressed_BucketWithObjectField) {
@@ -739,7 +739,7 @@ TEST_F(BlockStagesTest, Unpack_Compressed_BucketWithObjectField_Yield) {
                         cellPathsForBucketWithObjectField,
                         tsOptionsForBucketWithObjectField,
                         expectedDataForBucketWithObjectField,
-                        /*yieldAfter*/ 1);
+                        /*yieldAfter=*/1);
 }
 
 /*
@@ -823,7 +823,7 @@ void BlockStagesTest::testBlockToBitmap(
 
     // Run the test twice, once without yielding and once with yielding.
     iterateBlockAndAssert(false);
-    blockToRow->open(true /* reOpen */);
+    blockToRow->open(/*reOpen=*/true);
     iterateBlockAndAssert(true);
 }
 

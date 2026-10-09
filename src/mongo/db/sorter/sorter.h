@@ -866,7 +866,7 @@ public:
     }
 
     void forceSpill() override {
-        _spill(0 /*maxMemoryUsageBytes*/);
+        _spill(/*maxMemoryUsageBytes=*/0);
     }
 
     void setBound(Key key) override;

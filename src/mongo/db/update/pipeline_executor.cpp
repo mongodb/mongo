@@ -100,7 +100,7 @@ UpdateExecutor::ApplyResult PipelineExecutor::applyUpdate(ApplyParams applyParam
         ObjectReplaceExecutor::applyReplacementUpdate(applyParams,
                                                       transformedDoc,
                                                       transformedDocHasIdField,
-                                                      true /* allowTopLevelDollarPrefixedFields */);
+                                                      /*allowTopLevelDollarPrefixedFields=*/true);
 
     // The oplog entry should not have been populated yet.
     invariant(ret.oplogEntry.isEmpty());

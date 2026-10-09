@@ -336,7 +336,7 @@ AutoMergerPolicy::_getNamespacesWithMergeableChunksPerShard(OperationContext* op
 
         auto cursor = uassertStatusOKWithContext(
             DBClientCursor::fromAggregationRequest(
-                &client, aggRequest, true /* secondaryOk */, true /* useExhaust */),
+                &client, aggRequest, /*secondaryOk=*/true, /*useExhaust=*/true),
             "Failed to establish a cursor for aggregation");
 
         while (cursor->more()) {

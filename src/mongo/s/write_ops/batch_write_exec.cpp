@@ -609,7 +609,7 @@ void executeRetryableTimeseriesUpdate(OperationContext* opCtx,
     auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
     txn_api::SyncTransactionWithRetries txn(
-        opCtx, executor, nullptr /* resourceYielder */, inlineExecutor);
+        opCtx, executor, /*resourceYielder=*/nullptr, inlineExecutor);
     BatchedCommandResponse batchedCommandResponse;
     auto swResult =
         txn.runNoThrow(opCtx,
@@ -791,8 +791,8 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                 // Throw when there is a transient transaction error since this should be a top
                 // level error and not just a write error.
                 if (isTransientTransactionError(statusWithWriteType.getStatus().code(),
-                                                false /* hasWriteConcernError */,
-                                                false /* isCommitOrAbort */)) {
+                                                /*hasWriteConcernError=*/false,
+                                                /*isCommitOrAbort=*/false)) {
                     uassertStatusOK(statusWithWriteType);
                 }
 

@@ -42,8 +42,8 @@ std::shared_ptr<const ErrorExtraInfo> ReplanningRequiredInfo::parse(const BSONOb
 
     const auto& hashStr = oldPlanHashElem.String();
     size_t oldPlanHash;
-    auto fromCharsRes = std::from_chars(
-        hashStr.data(), hashStr.data() + hashStr.size(), oldPlanHash, 16 /* base */);
+    auto fromCharsRes =
+        std::from_chars(hashStr.data(), hashStr.data() + hashStr.size(), oldPlanHash, /*base=*/16);
     uassert(8746603,
             fmt::format("Failed to parse ReplanningRequiredInfo '{}' field", kOldPlanHashFieldName),
             fromCharsRes.ec == std::errc{});

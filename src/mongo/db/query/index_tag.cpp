@@ -347,7 +347,7 @@ void resolveOrPushdowns(MatchExpression* tree) {
                     std::vector<MatchExpression*> orPushdownDescendants;
                     stdx::unordered_map<MatchExpression*, FieldRef> pathsToUpdate;
                     getElemMatchOrPushdownDescendants(indexedOrPath,
-                                                      {} /*currentPath*/,
+                                                      /*currentPath=*/{},
                                                       child,
                                                       &orPushdownDescendants,
                                                       &pathsToUpdate);
@@ -355,7 +355,7 @@ void resolveOrPushdowns(MatchExpression* tree) {
                         static_cast<void>(
                             processOrPushdownNode(descendant, indexedOr, pathsToUpdate));
                     }
-                } else if (processOrPushdownNode(child, indexedOr, {} /*pathsToUpdate*/)) {
+                } else if (processOrPushdownNode(child, indexedOr, /*pathsToUpdate=*/{})) {
                     // The indexed $or can completely satisfy the child predicate, so we trim it.
                     auto ownedChild = andNode->removeChild(i);
                     --i;

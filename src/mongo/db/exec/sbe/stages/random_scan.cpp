@@ -44,8 +44,8 @@ RandomScanStage::RandomScanStage(UUID collUuid,
                                          scanFieldSlots,
                                          yieldPolicy,
                                          nodeId,
-                                         nullptr /* scanOpenCallback */,
-                                         false /* forward */,
+                                         /*scanOpenCallback=*/nullptr,
+                                         /*forward=*/false,
                                          // Optional arguments:
                                          participateInTrialRunTracking) {}
 

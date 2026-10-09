@@ -227,7 +227,7 @@ std::unique_ptr<MigrationSourceManager> MigrationSourceManager::createMigrationS
                                                owningChunk.getMax(),
                                                cm->getShardKeyPattern(),
                                                args.getMaxChunkSizeBytes(),
-                                               true /* needMaxBound */);
+                                               /*needMaxBound=*/true);
 
             args.getMoveRangeRequestBase().setMax(max);
         } else if (!args.getMin().has_value()) {
@@ -241,7 +241,7 @@ std::unique_ptr<MigrationSourceManager> MigrationSourceManager::createMigrationS
                                                max,
                                                cm->getShardKeyPattern(),
                                                args.getMaxChunkSizeBytes(),
-                                               false /* needMaxBound */);
+                                               /*needMaxBound=*/false);
 
             args.getMoveRangeRequestBase().setMin(min);
         }
@@ -645,7 +645,7 @@ void MigrationSourceManager::enterCriticalSection() {
             nss(),
             _critSecReason,
             defaultMajorityWriteConcernDoNotUse(),
-            false /* clearShardCatalogCache */,
+            /*clearShardCatalogCache=*/false,
             Milliseconds(migrationLockAcquisitionMaxWaitMS.load()));
     } else {
         _critSec.emplace(_opCtx, nss(), _critSecReason);
@@ -660,7 +660,7 @@ void MigrationSourceManager::enterCriticalSection() {
             BSON(ShardCollectionType::kNssFieldName
                  << NamespaceStringUtil::serialize(nss(), SerializationContext::stateDefault())),
             BSON("$inc" << BSON(ShardCollectionType::kEnterCriticalSectionCounterFieldName << 1)),
-            false /*upsert*/);
+            /*upsert=*/false);
         withChangelogErrMsg(shardCollectionsEntryUpdateStatus.reason(), [&] {
             uassertStatusOKWithContext(shardCollectionsEntryUpdateStatus,
                                        "Persist critical section signal for secondaries");
@@ -753,7 +753,7 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
     {
         const auto metadata = _getCurrentMetadataAndCheckForConflictingErrors();
         _buildCommitChunkMigrationRequest(
-            &builder, metadata.getCollPlacementVersion(), false /* isAuthoritative */);
+            &builder, metadata.getCollPlacementVersion(), /*isAuthoritative=*/false);
     }
 
     // Read operations must begin to wait on the critical section just before we send the commit

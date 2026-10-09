@@ -94,7 +94,7 @@ TEST_F(PlanSizeTest, AndHash) {
                                      mockSV(),
                                      makeSV(),
                                      generateSlotId(),
-                                     nullptr /* yieldPolicy */,
+                                     /*yieldPolicy=*/nullptr,
                                      kEmptyPlanNodeId);
     assertPlanSize(*stage);
 }
@@ -135,7 +135,7 @@ TEST_F(PlanSizeTest, HashAgg) {
         true,
         generateSlotId(),
         false,
-        nullptr /* yieldPolicy */,
+        /*yieldPolicy=*/nullptr,
         kEmptyPlanNodeId);
     assertPlanSize(*stage);
 }
@@ -148,8 +148,8 @@ TEST_F(PlanSizeTest, HashJoin) {
                                       mockSV(),
                                       makeSV(),
                                       generateSlotId(),
-                                      true /* allowDiskUse */,
-                                      nullptr /* yieldPolicy */,
+                                      /*allowDiskUse=*/true,
+                                      /*yieldPolicy=*/nullptr,
                                       kEmptyPlanNodeId,
                                       boost::none);
     assertPlanSize(*stage);
@@ -233,20 +233,20 @@ TEST_F(PlanSizeTest, Scan) {
     auto collUuid = UUID::parse("00000000-0000-0000-0000-000000000000").getValue();
     auto stage = makeS<sbe::ScanStage>(collUuid,
                                        DatabaseName(),
-                                       generateSlotId() /* recordSlot */,
-                                       generateSlotId() /* recordIdSlot */,
-                                       generateSlotId() /* snapshotIdSlot */,
-                                       generateSlotId() /* indexIdSlot */,
-                                       generateSlotId() /* indexKeySlot */,
-                                       generateSlotId() /* indexKeyPatternSlot */,
-                                       std::vector<std::string>{"field"} /* scanFieldNames */,
-                                       mockSV() /* scanFieldSlots */,
-                                       generateSlotId() /* minRecordIdSlot */,
-                                       generateSlotId() /* maxRecordIdSlot */,
-                                       true /* forward */,
-                                       nullptr /* yieldPolicy */,
-                                       kEmptyPlanNodeId /* nodeId */,
-                                       nullptr /* scanOpenCallback */);
+                                       /*recordSlot=*/generateSlotId(),
+                                       /*recordIdSlot=*/generateSlotId(),
+                                       /*snapshotIdSlot=*/generateSlotId(),
+                                       /*indexIdSlot=*/generateSlotId(),
+                                       /*indexKeySlot=*/generateSlotId(),
+                                       /*indexKeyPatternSlot=*/generateSlotId(),
+                                       /*scanFieldNames=*/std::vector<std::string>{"field"},
+                                       /*scanFieldSlots=*/mockSV(),
+                                       /*minRecordIdSlot=*/generateSlotId(),
+                                       /*maxRecordIdSlot=*/generateSlotId(),
+                                       /*forward=*/true,
+                                       /*yieldPolicy=*/nullptr,
+                                       /*nodeId=*/kEmptyPlanNodeId,
+                                       /*scanOpenCallback=*/nullptr);
     assertPlanSize(*stage);
 }
 
@@ -256,10 +256,10 @@ TEST_F(PlanSizeTest, Sort) {
                          mockSV(),
                          std::vector<value::SortDirection>{value::SortDirection::Ascending},
                          mockSV(),
-                         nullptr /*limit*/,
+                         /*limit=*/nullptr,
                          204857600,
                          false,
-                         nullptr /* yieldPolicy */,
+                         /*yieldPolicy=*/nullptr,
                          kEmptyPlanNodeId);
     assertPlanSize(*stage);
 }

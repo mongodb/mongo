@@ -61,7 +61,7 @@ struct [[MONGO_MOD_PUBLIC]] PlanSummaryStats {
 
         return sizeof(*this) +
             container_size_helper::estimateObjectSizeInBytes(
-                   indexesUsed, strSize, false /* includeShallowSize */) +
+                   indexesUsed, strSize, /*includeShallowSize=*/false) +
             (replanReason ? strSize(*replanReason) : 0);
     }
 

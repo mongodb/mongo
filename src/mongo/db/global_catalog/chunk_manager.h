@@ -188,7 +188,7 @@ public:
             auto it = mapIt == mapItBegin ? _findIntersectingChunkIterator(shardKeyString,
                                                                            chunkVector.begin(),
                                                                            chunkVector.end(),
-                                                                           true /*isMaxInclusive*/)
+                                                                           /*isMaxInclusive=*/true)
                                           : chunkVector.begin();
             for (; it != chunkVector.end(); ++it) {
                 if (!handler(*it))
@@ -225,7 +225,7 @@ public:
                     return _findIntersectingChunkIterator(minShardKeyStr,
                                                           chunkVector.begin(),
                                                           chunkVector.end(),
-                                                          true /* isMaxInclusive */);
+                                                          /*isMaxInclusive=*/true);
                 }
                 return chunkVector.begin();
             }();

@@ -260,7 +260,7 @@ Status RSLocalClient::runAggregation(
     DBDirectClient client(opCtx);
     auto cursor = uassertStatusOKWithContext(
         DBClientCursor::fromAggregationRequest(
-            &client, aggRequest, true /* secondaryOk */, true /* useExhaust */),
+            &client, aggRequest, /*secondaryOk=*/true, /*useExhaust=*/true),
         "Failed to establish a cursor for aggregation");
     while (cursor->more()) {
         std::vector<BSONObj> batchDocs;

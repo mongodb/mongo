@@ -86,8 +86,8 @@ BucketAutoTestResult runBucketAutoWithObservingGroupBy(
                                                             accumulatedFields,
                                                             populated,
                                                             std::move(observerExpr),
-                                                            nullptr /* granularityRounder */,
-                                                            2 /* nBuckets */);
+                                                            /*granularityRounder=*/nullptr,
+                                                            /*nBuckets=*/2);
 
     auto source = exec::agg::MockStage::createForTest(
         {Document{{"_id", 0}}, Document{{"_id", 1}}, Document{{"_id", 2}}}, expCtx);

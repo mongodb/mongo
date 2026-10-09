@@ -75,7 +75,7 @@ protected:
                 operationContext(), kNss, AcquisitionPrerequisites::OperationType::kRead),
             MODE_IS);
         auto colls = MultipleCollectionAccessor(
-            std::move(coll), {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+            std::move(coll), {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
         auto findCommand = std::make_unique<FindCommandRequest>(kNss);
         findCommand->setFilter(filter);

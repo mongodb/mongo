@@ -261,7 +261,7 @@ void parseAndRegisterInsertOp(OperationContext* opCtx,
             return shape_helpers::computeQueryShapeHash(opCtx,
                                                         deferredShape,
                                                         insertRequest.getNamespace(),
-                                                        true /*skipInternalClientCheck*/);
+                                                        /*skipInternalClientCheck=*/true);
         });
 
     if (skipRegistration) {

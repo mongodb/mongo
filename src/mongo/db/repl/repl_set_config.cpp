@@ -74,7 +74,7 @@ bool isValidCIDRRange(std::string_view host) {
 ReplSetConfig ReplSetConfig::parse(const BSONObj& cfg,
                                    boost::optional<long long> forceTerm,
                                    OID defaultReplicaSetId) {
-    return ReplSetConfig(cfg, false /* forInitiate */, forceTerm, defaultReplicaSetId);
+    return ReplSetConfig(cfg, /*forInitiate=*/false, forceTerm, defaultReplicaSetId);
 }
 
 /* static */
@@ -82,7 +82,7 @@ ReplSetConfig ReplSetConfig::parseForInitiate(const BSONObj& cfg, OID newReplica
     uassert(
         4709000, "A replica set ID must be provided to parseForInitiate", newReplicaSetId.isSet());
     auto result = ReplSetConfig(
-        cfg, true /* forInitiate */, OpTime::kInitialTerm /* forceTerm*/, newReplicaSetId);
+        cfg, /*forInitiate=*/true, /*forceTerm=*/OpTime::kInitialTerm, newReplicaSetId);
     uassert(ErrorCodes::InvalidReplicaSetConfig,
             str::stream() << "replica set configuration cannot contain '"
                           << ReplSetConfigSettings::kReplicaSetIdFieldName
@@ -730,7 +730,7 @@ BSONObj ReplSetConfig::toBSONWithoutNewlyAdded() const {
         if (e.fieldName() == kMembersFieldName) {
             BSONArrayBuilder memberBuilder(bob.subarrayStart(kMembersFieldName));
             for (auto&& member : getMembers())
-                memberBuilder.append(member.toBSON(true /* omitNewlyAddedField */));
+                memberBuilder.append(member.toBSON(/*omitNewlyAddedField=*/true));
             memberBuilder.done();
             continue;
         }

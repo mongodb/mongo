@@ -57,8 +57,8 @@ ShardTargeterDecision ChangeStreamShardTargeterDbAbsentStateEventHandler::handle
         ctx.getHistoricalPlacementFetcher().fetch(opCtx,
                                                   readerCtx.getChangeStream().getNamespace(),
                                                   clusterTime,
-                                                  false /* checkIfPointInTimeIsInFuture */,
-                                                  false /* ignoreRemovedShards */);
+                                                  /*checkIfPointInTimeIsInFuture=*/false,
+                                                  /*ignoreRemovedShards=*/false);
     if (placement.getStatus() == HistoricalPlacementStatus::NotAvailable) {
         return ShardTargeterDecision::kSwitchToV1;
     }

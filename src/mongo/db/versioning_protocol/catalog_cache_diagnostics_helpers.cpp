@@ -144,7 +144,7 @@ void appendLatestCachedDbInfo(OperationContext* opCtx,
     const auto catalogCache = Grid::get(opCtx)->catalogCache();
     const auto cachedDbInfo = catalogCache->peekDatabaseCacheEntry(dbName);
     if (!cachedDbInfo) {
-        appendWhenUnknown(builder, false /* fullMetadata */);
+        appendWhenUnknown(builder, /*fullMetadata=*/false);
         return;
     }
     builder->append("dbVersion", cachedDbInfo->getVersion().toBSON());

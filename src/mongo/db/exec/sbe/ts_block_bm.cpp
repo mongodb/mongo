@@ -112,7 +112,7 @@ std::unique_ptr<value::TsBlock> makeTsBlock(const BSONObj& bucket,
     auto max = maxElem ? bson::convertToView(maxElem) : value::TagValueView{};
 
     return std::make_unique<value::TsBlock>(count,
-                                            false /* owned */,
+                                            /*owned=*/false,
                                             columnTag,
                                             columnVal,
                                             getBucketVersion(bucket),

@@ -57,10 +57,10 @@ public:
         // Output to a BSON object.
         builder.appendNumber("numClientConnections", DBClientConnection::getNumConnections());
         builder.appendNumber("numAScopedConnections", AScopedConnection::getNumConnections());
-        stats.appendToBSON(builder, true /* forFTDC */);
+        stats.appendToBSON(builder, /*forFTDC=*/true);
 
         // All replica sets being tracked.
-        ReplicaSetMonitorManager::get()->report(&builder, true /* forFTDC */);
+        ReplicaSetMonitorManager::get()->report(&builder, /*forFTDC=*/true);
 
         // Add Search diagnostics.
         if (auto swExec = executor::getMongotTaskExecutor(opCtx->getServiceContext());

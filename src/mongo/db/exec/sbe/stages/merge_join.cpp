@@ -55,7 +55,7 @@ MergeJoinStage::MergeJoinStage(std::unique_ptr<PlanStage> outer,
                                std::vector<value::SortDirection> sortDirs,
                                PlanNodeId planNodeId,
                                bool participateInTrialRunTracking)
-    : PlanStage("mj"sv, nullptr /* yieldPolicy */, planNodeId, participateInTrialRunTracking),
+    : PlanStage("mj"sv, /*yieldPolicy=*/nullptr, planNodeId, participateInTrialRunTracking),
       _outerKeys(std::move(outerKeys)),
       _outerProjects(std::move(outerProjects)),
       _innerKeys(std::move(innerKeys)),

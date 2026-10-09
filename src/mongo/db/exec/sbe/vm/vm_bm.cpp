@@ -150,22 +150,22 @@ private:
 };
 
 BENCHMARK_DEFINE_F(SbeVmBenchmark, BM_IsMember_ArraySet_NoCollator)(benchmark::State& state) {
-    auto strings = generateRandomStrings(state.range(0) /*count*/, state.range(1) /*size*/);
+    auto strings = generateRandomStrings(/*count=*/state.range(0), /*size=*/state.range(1));
     ValueVectorGuard guards(strings);
 
-    TagValue arraySet = makeArraySet(strings, nullptr /*collator*/);
+    TagValue arraySet = makeArraySet(strings, /*collator=*/nullptr);
     auto arraySetConstant = makeE<EConstant>(arraySet.first, arraySet.second);
 
     auto expr = makeE<EFunction>(
         sbe::EFn::kIsMember, makeEs(makeE<EVariable>(inputSlotId()), std::move(arraySetConstant)));
-    TagValue searchValue = generateRandomString(state.range(1) /*size*/);
+    TagValue searchValue = generateRandomString(/*size=*/state.range(1));
     value::TagValueOwned searchValueOwned =
         value::TagValueOwned::fromRaw(searchValue.first, searchValue.second);
     benchmarkExpression(std::move(expr), {searchValue}, state);
 }
 
 BENCHMARK_DEFINE_F(SbeVmBenchmark, BM_IsMember_ArraySet_Collator)(benchmark::State& state) {
-    auto strings = generateRandomStrings(state.range(0) /*count*/, state.range(1) /*size*/);
+    auto strings = generateRandomStrings(/*count=*/state.range(0), /*size=*/state.range(1));
     ValueVectorGuard guards(strings);
     auto collator = createCollator();
 
@@ -174,7 +174,7 @@ BENCHMARK_DEFINE_F(SbeVmBenchmark, BM_IsMember_ArraySet_Collator)(benchmark::Sta
 
     auto expr = makeE<EFunction>(
         sbe::EFn::kIsMember, makeEs(makeE<EVariable>(inputSlotId()), std::move(arraySetConstant)));
-    TagValue searchValue = generateRandomString(state.range(1) /*size*/);
+    TagValue searchValue = generateRandomString(/*size=*/state.range(1));
     value::TagValueOwned searchValueOwned =
         value::TagValueOwned::fromRaw(searchValue.first, searchValue.second);
     benchmarkExpression(std::move(expr), {searchValue}, state);

@@ -30,7 +30,7 @@ HealthLog::HealthLog()
               getOptions(),
               kMaxBufferSize,
               // Writing to the 'local' database is permitted on all nodes, not just the primary.
-              true /*retryOnReplStateChangeInterruption*/) {}
+              /*retryOnReplStateChangeInterruption=*/true) {}
 
 void HealthLog::startup() {
     _writer.startup(std::string("healthlog writer"));

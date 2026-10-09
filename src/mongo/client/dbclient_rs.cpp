@@ -360,7 +360,7 @@ Status DBClientReplicaSet::connect() {
     // Returns true if there are any up hosts.
     const ReadPreferenceSetting anyUpHost(ReadPreference::Nearest, TagSet());
     return _getMonitor()
-        ->getHostOrRefresh(anyUpHost, {} /* targetingMetadata */, CancellationToken::uncancelable())
+        ->getHostOrRefresh(anyUpHost, /*targetingMetadata=*/{}, CancellationToken::uncancelable())
         .getNoThrow()
         .getStatus();
 }
@@ -607,7 +607,7 @@ DBClientConnection* DBClientReplicaSet::selectNodeUsingTags(
 
     auto selectedNodeStatus = monitor
                                   ->getHostOrRefresh(*readPref,
-                                                     {} /* targetingMetadata */,
+                                                     /*targetingMetadata=*/{},
                                                      CancellationToken::uncancelable())
                                   .getNoThrow();
     if (!selectedNodeStatus.isOK()) {

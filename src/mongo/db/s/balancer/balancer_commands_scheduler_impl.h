@@ -169,11 +169,12 @@ public:
 
         const auto updateOp = BatchedCommandRequest::buildUpdateOp(
             NamespaceString::kConfigsvrCollectionsNamespace,
+            /*query=*/
             BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(
-                     getNameSpace(), SerializationContext::stateDefault())) /* query */,
-            updateCmd.obj() /* update */,
-            false /* upsert */,
-            false /* multi */);
+                     getNameSpace(), SerializationContext::stateDefault())),
+            /*update=*/updateCmd.obj(),
+            /*upsert=*/false,
+            /*multi=*/false);
         BSONObjBuilder cmdObj(updateOp.toBSON());
         cmdObj.append(WriteConcernOptions::kWriteConcernField,
                       WriteConcernOptions::kInternalWriteDefault);

@@ -550,7 +550,7 @@ void Simple8bBuilder<T, Allocator>::skip(F&& writeFn) {
         }
         _handleRleTermination(writeFn);
     }
-    _appendSkip(true /* tryRle */, writeFn);
+    _appendSkip(/*tryRle=*/true, writeFn);
 }
 
 template <typename T, class Allocator>
@@ -737,7 +737,7 @@ void Simple8bBuilder<T, Allocator>::_handleRleTermination(F&& writeFn) {
     // Add any values that could not be encoded in RLE.
     while (_rleCount > 0) {
         if (!_lastValueInPrevWord.has_value()) {
-            _appendSkip(false /* tryRle */, writeFn);
+            _appendSkip(/*tryRle=*/false, writeFn);
         } else {
             _appendValue(_lastValueInPrevWord.value(), false, writeFn);
         }

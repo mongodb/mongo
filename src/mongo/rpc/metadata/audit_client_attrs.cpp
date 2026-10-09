@@ -42,7 +42,7 @@ void AuditClientAttrs::resetToPeerClient(Client* client) {
                                                          std::move(remote),
                                                          std::move(directRemote),
                                                          std::move(proxies),
-                                                         false /* isImpersonating */);
+                                                         /*isImpersonating=*/false);
 }
 
 void AuditClientAttrs::reset(Client* client) {

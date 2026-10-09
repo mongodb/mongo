@@ -575,9 +575,9 @@ OplogApplierImpl::OplogApplierImpl(executor::TaskExecutor* executor,
             .shouldDisableTransactionUpdateCoalescing();
 
     _oplogWriter =
-        std::make_unique<OplogWriterImpl>(nullptr /* executor */,
-                                          nullptr /* writeBuffer */,
-                                          nullptr /* applyBuffer */,
+        std::make_unique<OplogWriterImpl>(/*executor=*/nullptr,
+                                          /*writeBuffer=*/nullptr,
+                                          /*applyBuffer=*/nullptr,
                                           workerPool,
                                           replCoord,
                                           storageInterface,
@@ -1023,7 +1023,7 @@ void OplogApplierImpl::_deriveOpsAndFillWriterVectors(
                                                      &derivedOps->back(),
                                                      writerVectors,
                                                      &collPropertiesCache,
-                                                     false /*serial*/);
+                                                     /*serial=*/false);
                 }
             };
 
@@ -1125,11 +1125,11 @@ void OplogApplierImpl::_deriveOpsAndFillWriterVectors(
                 auto applyOpsOps = ApplyOps::extractOperations(op);
                 OplogApplierUtils::expandBatchedContainerOps(applyOpsOps);
                 auto& extractedOps = retryImageRectifier.storeExtractedOpsAndDeletes(
-                    std::move(applyOpsOps), derivedOps, false /* isPrepared */);
+                    std::move(applyOpsOps), derivedOps, /*isPrepared=*/false);
 
                 // Nested entries cannot have different session updates.
                 OplogApplierUtils::addDerivedOps(
-                    opCtx, &extractedOps, writerVectors, &collPropertiesCache, false /*serial*/);
+                    opCtx, &extractedOps, writerVectors, &collPropertiesCache, /*serial=*/false);
             }
             continue;
         }
@@ -1170,7 +1170,7 @@ void OplogApplierImpl::_deriveOpsAndFillWriterVectors(
                                                  &derivedOps->back(),
                                                  writerVectors,
                                                  &collPropertiesCache,
-                                                 false /*serial*/);
+                                                 /*serial=*/false);
                 continue;
             }
         }

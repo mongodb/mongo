@@ -345,7 +345,7 @@ Status insertDocumentsImpl(OperationContext* opCtx,
             }
             status = buildDupKeyErrorStatus(obj,
                                             NamespaceString(collection->ns()),
-                                            "" /* indexName */,
+                                            /*indexName=*/"",
                                             BSON("_id" << 1),
                                             collection->getCollectionOptions().collation,
                                             DuplicateKeyErrorInfo::FoundValue{foundValue});

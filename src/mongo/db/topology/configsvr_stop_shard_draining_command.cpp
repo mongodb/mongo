@@ -71,7 +71,7 @@ public:
             boost::optional<ShardId> shardId;
 
             shardId.emplace(uassertStatusOK(Grid::get(opCtx)->shardRegistry()->resolveShardId(
-                opCtx, requestShardId, true /* allowNonShardIdIdentifiers */)));
+                opCtx, requestShardId, /*allowNonShardIdIdentifiers=*/true)));
 
             bool isTransitionToDedicatedCS =
                 request().getIsTransitionToDedicatedCS().value_or(false);

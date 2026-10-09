@@ -81,7 +81,7 @@ public:
 
     /** Converts the Aggregation Join Model to a JSON string. */
     std::string toString(bool pretty) const {
-        return toBSON().jsonString(/*format*/ ExtendedCanonicalV2_0_0, pretty);
+        return toBSON().jsonString(/*format=*/ExtendedCanonicalV2_0_0, pretty);
     }
 
     const JoinGraph& getGraph() const {

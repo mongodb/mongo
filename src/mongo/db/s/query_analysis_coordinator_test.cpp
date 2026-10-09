@@ -122,7 +122,7 @@ protected:
         assertContainsSampler(samplers,
                               mongosDoc.getName(),
                               mongosDoc.getPing(),
-                              boost::none /*numQueriesPerSecond */);
+                              /*numQueriesPerSecond=*/boost::none);
     }
 
     void assertContainsSampler(const StringMap<QueryAnalysisCoordinator::Sampler>& samplers,
@@ -225,7 +225,7 @@ TEST_F(QueryAnalysisCoordinatorTest, UpdateConfigurationsSameCollectionUUid) {
         NamespaceString::kConfigQueryAnalyzersNamespace,
         BSON(QueryAnalyzerDocument::kNsFieldName << nss0.toString_forTest()),
         analyzerDocPostUpdate.toBSON(),
-        false /* upsert */));
+        /*upsert=*/false));
 
     // The update should cause the configuration to have the new sample rate.
     configurations = coordinator->getConfigurationsForTest();
@@ -259,7 +259,7 @@ TEST_F(QueryAnalysisCoordinatorTest, UpdateConfigurationDifferentCollectionUUid)
         NamespaceString::kConfigQueryAnalyzersNamespace,
         BSON(QueryAnalyzerDocument::kNsFieldName << nss0.toString_forTest()),
         analyzerDocPostUpdate.toBSON(),
-        false /* upsert */));
+        /*upsert=*/false));
 
     // The update should cause the configuration to have the new collection uuid, sample rate and
     // start time.
@@ -292,7 +292,7 @@ TEST_F(QueryAnalysisCoordinatorTest, RemoveOrCreateConfigurationsOnModeUpdate) {
         NamespaceString::kConfigQueryAnalyzersNamespace,
         BSON(QueryAnalyzerDocument::kNsFieldName << nss0.toString_forTest()),
         analyzerDocPostUpdate0.toBSON(),
-        false /* upsert */));
+        /*upsert=*/false));
 
     // The update to mode "off" should cause the configuration to get removed.
     configurations = coordinator->getConfigurationsForTest();
@@ -305,7 +305,7 @@ TEST_F(QueryAnalysisCoordinatorTest, RemoveOrCreateConfigurationsOnModeUpdate) {
         NamespaceString::kConfigQueryAnalyzersNamespace,
         BSON(QueryAnalyzerDocument::kNsFieldName << nss0.toString_forTest()),
         analyzerDocPostUpdate1.toBSON(),
-        false /* upsert */));
+        /*upsert=*/false));
 
     // The update to mode "on" should cause the configuration to get recreated.
     configurations = coordinator->getConfigurationsForTest();
@@ -332,7 +332,7 @@ TEST_F(QueryAnalysisCoordinatorTest, DeleteConfigurationsModeOn) {
     uassertStatusOK(deleteToConfigCollection(operationContext(),
                                              NamespaceString::kConfigQueryAnalyzersNamespace,
                                              analyzerDoc.toBSON(),
-                                             false /* multi */));
+                                             /*multi=*/false));
 
     // The delete should cause the configuration to get removed.
     configurations = coordinator->getConfigurationsForTest();
@@ -357,7 +357,7 @@ TEST_F(QueryAnalysisCoordinatorTest, DeleteConfigurationsModeOff) {
     uassertStatusOK(deleteToConfigCollection(operationContext(),
                                              NamespaceString::kConfigQueryAnalyzersNamespace,
                                              analyzerDoc.toBSON(),
-                                             false /* multi */));
+                                             /*multi=*/false));
 
     // The delete should be a noop.
     configurations = coordinator->getConfigurationsForTest();
@@ -491,7 +491,7 @@ TEST_F(QueryAnalysisCoordinatorTest, UpdateSamplersOnUpdate) {
                                              MongosType::ConfigNS,
                                              BSON(MongosType::name << mongosName0),
                                              mongosDocPostUpdate.toBSON(),
-                                             false /* upsert */));
+                                             /*upsert=*/false));
 
     // The update should cause the sampler to have the new ping time.
     samplers = coordinator->getSamplersForTest();
@@ -515,7 +515,7 @@ TEST_F(QueryAnalysisCoordinatorTest, RemoveSamplersOnDelete) {
     assertContainsSampler(samplers, mongosDoc);
 
     uassertStatusOK(deleteToConfigCollection(
-        operationContext(), MongosType::ConfigNS, mongosDoc.toBSON(), false /* multi */));
+        operationContext(), MongosType::ConfigNS, mongosDoc.toBSON(), /*multi=*/false));
 
     // The delete should cause the sampler to get removed.
     samplers = coordinator->getSamplersForTest();
@@ -673,7 +673,7 @@ TEST_F(QueryAnalysisCoordinatorTest, GetNewConfigurationsOneSamplerOneDisabledCo
 
     auto startTime0 = now();
     auto analyzerDoc0 = makeConfigQueryAnalyzersDocument(
-        nss0, collUuid0, QueryAnalyzerModeEnum::kOff, boost::none /* samplesPerSec */, startTime0);
+        nss0, collUuid0, QueryAnalyzerModeEnum::kOff, /*samplesPerSec=*/boost::none, startTime0);
     uassertStatusOK(insertToConfigCollection(operationContext(),
                                              NamespaceString::kConfigQueryAnalyzersNamespace,
                                              analyzerDoc0.toBSON()));

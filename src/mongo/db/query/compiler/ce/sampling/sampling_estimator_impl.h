@@ -404,7 +404,7 @@ protected:
                 }
                 idx++;
             },
-            true /*skipDuplicateMatches*/);
+            /*skipDuplicateMatches=*/true);
     }
 
     // The sample is stored in memory for estimating the cardinality of all predicates of one query

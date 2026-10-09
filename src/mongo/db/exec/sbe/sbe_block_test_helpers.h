@@ -160,19 +160,19 @@ static TypedValues makeInterestingValues() {
     vals.push_back(makeBsonObject(BSON("b" << 7)));
     vals.push_back(makeObject(BSON("b" << 8)));
 
-    auto int32s = makeNumbers<int32_t>(10 /* magnitude */);
+    auto int32s = makeNumbers<int32_t>(/*magnitude=*/10);
     for (auto int32 : int32s) {
         vals.push_back(makeInt32(int32));
     }
-    auto int64s = makeNumbers<int64_t>(100 /* magnitude */);
+    auto int64s = makeNumbers<int64_t>(/*magnitude=*/100);
     for (auto int64 : int64s) {
         vals.push_back(makeInt64(int64));
     }
-    auto dates = makeNumbers<int64_t>(500 /* magnitude */);
+    auto dates = makeNumbers<int64_t>(/*magnitude=*/500);
     for (auto dt : dates) {
         vals.push_back(std::pair{value::TypeTags::Date, value::bitcastFrom<int64_t>(dt)});
     }
-    auto doubles = makeNumbers<double>(1000 /* magnitude */);
+    auto doubles = makeNumbers<double>(/*magnitude=*/1000);
     for (auto dbl : doubles) {
         vals.push_back(makeDouble(dbl));
     }

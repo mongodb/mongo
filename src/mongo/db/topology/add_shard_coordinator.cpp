@@ -249,7 +249,7 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                 auto dbList = _doc.getPreExistingDatabasesOnPromotion();
 
                 topology_change_helpers::blockDDLCoordinatorsAndDrain(
-                    opCtx, /*persistRecoveryDocument*/ false);
+                    opCtx, /*persistRecoveryDocument=*/false);
 
                 auto& shardingCatalogManager = *ShardingCatalogManager::get(opCtx);
 
@@ -395,7 +395,7 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                     AuthoritativeMetadataAccessLevelEnum::kWritesAllowed;
                 _unblockFCVChangesOnNewShard(opCtx, **executor, isAuthoritative);
                 topology_change_helpers::unblockDDLCoordinators(opCtx,
-                                                                /*removeRecoveryDocument*/ false);
+                                                                /*removeRecoveryDocument=*/false);
             }))
         .then(_buildPhaseHandler(Phase::kFinal,
                                  [this, _ = shared_from_this()](auto* opCtx) {
@@ -492,7 +492,7 @@ ExecutorFuture<void> AddShardCoordinator::_cleanupOnAbort(
             auto* opCtx = opCtxHolder.get();
 
             topology_change_helpers::unblockDDLCoordinators(opCtx,
-                                                            /*removeRecoveryDocument*/ false);
+                                                            /*removeRecoveryDocument=*/false);
             topology_change_helpers::removeReplicaSetMonitor(opCtx, _doc.getConnectionString());
         });
 }
@@ -657,7 +657,7 @@ bool AddShardCoordinator::_hasShardingDataOnReplicaSet(OperationContext* opCtx) 
             opCtx,
             targeter,
             nss,
-            BSONObj() /* filter */,
+            /*filter=*/BSONObj(),
             repl::ReadConcernLevel::kMajorityReadConcern,
             [&](const std::vector<BSONObj>& docs) -> bool {
                 if (!docs.empty()) {
@@ -911,7 +911,7 @@ AddShardCoordinator::_getUserWritesBlockFromReplicaSet(OperationContext* opCtx) 
         opCtx,
         targeter,
         NamespaceString::kUserWritesCriticalSectionsNamespace,
-        BSONObj() /* filter */,
+        /*filter=*/BSONObj(),
         repl::ReadConcernLevel::kMajorityReadConcern,
         [&](const std::vector<BSONObj>& docs) -> bool {
             for (const BSONObj& doc : docs) {

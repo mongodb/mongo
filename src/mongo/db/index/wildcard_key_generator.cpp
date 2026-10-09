@@ -305,14 +305,14 @@ WildcardKeyGenerator::WildcardKeyGenerator(BSONObj keyPattern,
     if (!preFields.empty()) {
         _preBtreeGenerator.emplace(std::move(preFields),
                                    std::move(preElems),
-                                   true /* isSparse */,
+                                   /*isSparse=*/true,
                                    _keyStringVersion,
                                    _ordering);
     }
     if (!postFields.empty()) {
         _postBtreeGenerator.emplace(std::move(postFields),
                                     std::move(postElems),
-                                    true /* isSparse */,
+                                    /*isSparse=*/true,
                                     _keyStringVersion,
                                     _ordering);
     }

@@ -50,7 +50,7 @@ std::array<ResolveRoleOptionTestCase, 12> resolveRoleOptionTestCases{
         ASSERT_FALSE(option.shouldMineDirectOnly());
         ASSERT_FALSE(option.shouldIgnoreUnknown());
     },
-    ResolveRoleOption::kRoles().setDirectOnly(true /* shouldEnable */),
+    ResolveRoleOption::kRoles().setDirectOnly(/*shouldEnable=*/true),
     [](const ResolveRoleOption& option) {
         ASSERT_TRUE(option.shouldMineRoles());
         ASSERT_FALSE(option.shouldMinePrivileges());
@@ -58,7 +58,7 @@ std::array<ResolveRoleOptionTestCase, 12> resolveRoleOptionTestCases{
         ASSERT_TRUE(option.shouldMineDirectOnly());
         ASSERT_FALSE(option.shouldIgnoreUnknown());
     },
-    ResolveRoleOption::kPrivileges().setDirectOnly(true /* shouldEnable */),
+    ResolveRoleOption::kPrivileges().setDirectOnly(/*shouldEnable=*/true),
     [](const ResolveRoleOption& option) {
         ASSERT_FALSE(option.shouldMineRoles());
         ASSERT_TRUE(option.shouldMinePrivileges());
@@ -66,7 +66,7 @@ std::array<ResolveRoleOptionTestCase, 12> resolveRoleOptionTestCases{
         ASSERT_TRUE(option.shouldMineDirectOnly());
         ASSERT_FALSE(option.shouldIgnoreUnknown());
     },
-    ResolveRoleOption::kRestrictions().setDirectOnly(true /* shouldEnable */),
+    ResolveRoleOption::kRestrictions().setDirectOnly(/*shouldEnable=*/true),
     [](const ResolveRoleOption& option) {
         ASSERT_FALSE(option.shouldMineRoles());
         ASSERT_FALSE(option.shouldMinePrivileges());
@@ -74,7 +74,7 @@ std::array<ResolveRoleOptionTestCase, 12> resolveRoleOptionTestCases{
         ASSERT_TRUE(option.shouldMineDirectOnly());
         ASSERT_FALSE(option.shouldIgnoreUnknown());
     },
-    ResolveRoleOption::kAllInfo().setDirectOnly(true /* shouldEnable */),
+    ResolveRoleOption::kAllInfo().setDirectOnly(/*shouldEnable=*/true),
     [](const ResolveRoleOption& option) {
         ASSERT_TRUE(option.shouldMineRoles());
         ASSERT_TRUE(option.shouldMinePrivileges());
@@ -82,7 +82,7 @@ std::array<ResolveRoleOptionTestCase, 12> resolveRoleOptionTestCases{
         ASSERT_TRUE(option.shouldMineDirectOnly());
         ASSERT_FALSE(option.shouldIgnoreUnknown());
     },
-    ResolveRoleOption::kRoles().setIgnoreUnknown(true /* shouldEnable */),
+    ResolveRoleOption::kRoles().setIgnoreUnknown(/*shouldEnable=*/true),
     [](const ResolveRoleOption& option) {
         ASSERT_TRUE(option.shouldMineRoles());
         ASSERT_FALSE(option.shouldMinePrivileges());
@@ -90,7 +90,7 @@ std::array<ResolveRoleOptionTestCase, 12> resolveRoleOptionTestCases{
         ASSERT_FALSE(option.shouldMineDirectOnly());
         ASSERT_TRUE(option.shouldIgnoreUnknown());
     },
-    ResolveRoleOption::kPrivileges().setIgnoreUnknown(true /* shouldEnable */),
+    ResolveRoleOption::kPrivileges().setIgnoreUnknown(/*shouldEnable=*/true),
     [](const ResolveRoleOption& option) {
         ASSERT_FALSE(option.shouldMineRoles());
         ASSERT_TRUE(option.shouldMinePrivileges());
@@ -98,7 +98,7 @@ std::array<ResolveRoleOptionTestCase, 12> resolveRoleOptionTestCases{
         ASSERT_FALSE(option.shouldMineDirectOnly());
         ASSERT_TRUE(option.shouldIgnoreUnknown());
     },
-    ResolveRoleOption::kRestrictions().setIgnoreUnknown(true /* shouldEnable */),
+    ResolveRoleOption::kRestrictions().setIgnoreUnknown(/*shouldEnable=*/true),
     [](const ResolveRoleOption& option) {
         ASSERT_FALSE(option.shouldMineRoles());
         ASSERT_FALSE(option.shouldMinePrivileges());
@@ -106,7 +106,7 @@ std::array<ResolveRoleOptionTestCase, 12> resolveRoleOptionTestCases{
         ASSERT_FALSE(option.shouldMineDirectOnly());
         ASSERT_TRUE(option.shouldIgnoreUnknown());
     },
-    ResolveRoleOption::kAllInfo().setIgnoreUnknown(true /* shouldEnable */),
+    ResolveRoleOption::kAllInfo().setIgnoreUnknown(/*shouldEnable=*/true),
     [](const ResolveRoleOption& option) {
         ASSERT_TRUE(option.shouldMineRoles());
         ASSERT_TRUE(option.shouldMinePrivileges());
@@ -132,25 +132,25 @@ TEST(ResolveRoleOptionTest, testDisableResolveRoleOptionFlags) {
     ASSERT_FALSE(option.shouldIgnoreUnknown());
 
     // Set the directOnly flag on the existing option.
-    option.setDirectOnly(true /* shouldEnable */);
+    option.setDirectOnly(/*shouldEnable=*/true);
     ASSERT_TRUE(option.shouldMineRoles());
     ASSERT_TRUE(option.shouldMineDirectOnly());
     ASSERT_FALSE(option.shouldIgnoreUnknown());
 
     // Set the ignoreUnknown flag on the existing option.
-    option.setIgnoreUnknown(true /* shouldEnable */);
+    option.setIgnoreUnknown(/*shouldEnable=*/true);
     ASSERT_TRUE(option.shouldMineRoles());
     ASSERT_TRUE(option.shouldMineDirectOnly());
     ASSERT_TRUE(option.shouldIgnoreUnknown());
 
     // Unset directOnly.
-    option.setDirectOnly(false /* shouldEnable */);
+    option.setDirectOnly(/*shouldEnable=*/false);
     ASSERT_TRUE(option.shouldMineRoles());
     ASSERT_FALSE(option.shouldMineDirectOnly());
     ASSERT_TRUE(option.shouldIgnoreUnknown());
 
     // Finally, unset ignoreUnknown.
-    option.setIgnoreUnknown(false /* shouldEnable */);
+    option.setIgnoreUnknown(/*shouldEnable=*/false);
     ASSERT_TRUE(option.shouldMineRoles());
     ASSERT_FALSE(option.shouldMineDirectOnly());
     ASSERT_FALSE(option.shouldIgnoreUnknown());

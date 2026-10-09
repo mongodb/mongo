@@ -67,7 +67,7 @@ public:
 
     BSONObj getServerStatusStats() const {
         BSONObjBuilder bob;
-        _stats->serialize(&bob, true /* forServerStatus */);
+        _stats->serialize(&bob, /*forServerStatus=*/true);
         return bob.obj();
     }
 

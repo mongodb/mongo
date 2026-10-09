@@ -155,7 +155,7 @@ MongoDScopedGlobalServiceContextForTest::MongoDScopedGlobalServiceContextForTest
     // Since unit tests start in their own directories, by default skip lock file and metadata file
     // for faster startup.
     catalog::startUpStorageEngineAndCollectionCatalog(serviceContext, &cc(), options._initFlags);
-    StorageControl::startStorageControls(serviceContext, true /*forTestOnly*/);
+    StorageControl::startStorageControls(serviceContext, /*forTestOnly=*/true);
 
     DatabaseHolder::set(serviceContext, std::make_unique<DatabaseHolderImpl>());
     Collection::Factory::set(serviceContext, std::make_unique<CollectionImplFactory>());
@@ -198,7 +198,7 @@ MongoDScopedGlobalServiceContextForTest::~MongoDScopedGlobalServiceContextForTes
     }
 
     catalog::shutDownCollectionCatalogAndGlobalStorageEngineCleanly(getServiceContext(),
-                                                                    true /* memLeakAllowed */);
+                                                                    /*memLeakAllowed=*/true);
 
     std::swap(storageGlobalParams.engine, _stashedStorageParams.engine);
     std::swap(storageGlobalParams.engineSetByUser, _stashedStorageParams.engineSetByUser);

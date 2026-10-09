@@ -182,8 +182,8 @@ public:
     std::vector<DebugPrinter::Block> debugPrintMerge() const final;
 
     void debugPrintCode(std::vector<DebugPrinter::Block>& blocks) const final {
-        PlanStage::debugPrintBytecode(blocks, _accumulatorCode, "ACCUMULATE" /*title*/);
-        PlanStage::debugPrintBytecode(blocks, _mergingCode, "MERGE" /*title*/);
+        PlanStage::debugPrintBytecode(blocks, _accumulatorCode, /*title=*/"ACCUMULATE");
+        PlanStage::debugPrintBytecode(blocks, _mergingCode, /*title=*/"MERGE");
         PlanStage::debugPrintBytecode(blocks, _optionalInitializerCode, "INIT" /**/);
     }
 

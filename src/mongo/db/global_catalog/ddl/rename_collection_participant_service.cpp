@@ -64,10 +64,10 @@ void dropCollectionLocally(OperationContext* opCtx,
     DropCollectionCoordinator::dropCollectionLocally(opCtx,
                                                      nss,
                                                      markFromMigrate,
-                                                     false /* dropSystemCollections */,
-                                                     isNonAuthoritative /* forceLegacyRefresh */,
-                                                     boost::none /* expectedUUID */,
-                                                     false /* requireCollectionEmpty */);
+                                                     /*dropSystemCollections=*/false,
+                                                     /*forceLegacyRefresh=*/isNonAuthoritative,
+                                                     /*expectedUUID=*/boost::none,
+                                                     /*requireCollectionEmpty=*/false);
     LOGV2_DEBUG(5515100,
                 1,
                 "Dropped target collection locally on renameCollection participant.",
@@ -460,7 +460,7 @@ SemiFuture<void> RenameParticipantInstance::_runImpl(
                 if (_doc.getClearCollMetadata()) {
                     actionFromPtr =
                         std::make_unique<ShardingRecoveryService::FilteringMetadataClearer>(
-                            true /*includeStepsForNamespaceDropped*/);
+                            /*includeStepsForNamespaceDropped=*/true);
                     actionToPtr =
                         std::make_unique<ShardingRecoveryService::FilteringMetadataClearer>();
                 } else {
@@ -474,13 +474,13 @@ SemiFuture<void> RenameParticipantInstance::_runImpl(
                     reason,
                     ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
                     *actionFromPtr,
-                    true /* throwIfReasonDiffers*/);
+                    /*throwIfReasonDiffers=*/true);
                 service->releaseRecoverableCriticalSection(opCtx,
                                                            toNss,
                                                            reason,
                                                            defaultMajorityWriteConcern(),
                                                            *actionToPtr,
-                                                           false /* throwIfReasonDiffers*/);
+                                                           /*throwIfReasonDiffers=*/false);
 
                 LOGV2(5515107, "CRUD unblocked", "fromNs"_attr = fromNss, "toNs"_attr = toNss);
             }))

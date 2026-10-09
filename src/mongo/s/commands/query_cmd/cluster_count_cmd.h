@@ -187,7 +187,7 @@ public:
         Reply typedRun(OperationContext* opCtx) {
             Impl::checkCanRunHere(opCtx);
             constexpr auto cmdName = Request::kCommandName;
-            setReadWriteConcern(opCtx, request(), true /* setRC */, false /* setWC */);
+            setReadWriteConcern(opCtx, request(), /*setRC=*/true, /*setWC=*/false);
             const auto originalCountRequest = request();
 
             CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
@@ -251,8 +251,8 @@ public:
                             cri,
                             collation,
                             /*verbosity=*/boost::none,
-                            boost::none /*letParameters*/,
-                            boost::none /*runtimeConstants*/);
+                            /*letParameters=*/boost::none,
+                            /*runtimeConstants=*/boost::none);
 
                         // Create an RAII object that prints useful information about the
                         // ExpressionContext in the case of a tassert or crash.
@@ -273,7 +273,7 @@ public:
                                     opCtx, routingCtx, aggResult, countRequestForShard, nss)) {
                                 return count_cmd_helper::buildCountReply(
                                     ViewResponseFormatter{aggResult.obj()}.getCountValue(
-                                        boost::none /*tenantId*/));
+                                        /*tenantId=*/boost::none));
                             }
                         }
 
@@ -316,7 +316,7 @@ public:
                                 Shard::RetryPolicy::kIdempotent,
                                 countRequestForShard.getQuery(),
                                 collation,
-                                true /*eligibleForSampling*/);
+                                /*eligibleForSampling=*/true);
 
                         } catch (const ExceptionFor<
                                  ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
@@ -338,7 +338,7 @@ public:
 
                             return count_cmd_helper::buildCountReply(
                                 ViewResponseFormatter{aggResult}.getCountValue(
-                                    boost::none /*tenantId*/));
+                                    /*tenantId=*/boost::none));
                         }
 
                         long long total = 0;
@@ -541,13 +541,13 @@ public:
                             Shard::RetryPolicy::kIdempotent,
                             targetingQuery,
                             targetingCollation,
-                            boost::none /*letParameters*/,
-                            boost::none /*runtimeConstants*/);
+                            /*letParameters=*/boost::none,
+                            /*runtimeConstants=*/boost::none);
                     } catch (
                         const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>&
                             ex) {
                         auto aggRequestOnView = query_request_conversion::asAggregateCommandRequest(
-                            originalCountRequest, true /* hasExplain */);
+                            originalCountRequest, /*hasExplain=*/true);
                         // An empty PrivilegeVector is acceptable because these privileges are only
                         // checked on getMore and explain will not open a cursor.
                         return ClusterAggregate::retryOnViewOrIFRKickbackError(

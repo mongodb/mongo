@@ -254,7 +254,7 @@ TEST_F(WriteOpsExecTest, TestUpdateSizeEstimationLogic) {
 TEST_F(WriteOpsExecTest, TestDeleteSizeEstimationLogic) {
     // Basic test case.
     OID id = OID::createFromString("629e1e680958e279dc29a989"sv);
-    write_ops::DeleteOpEntry deleteOpEntry(BSON("_id" << id), false /* multi */);
+    write_ops::DeleteOpEntry deleteOpEntry(BSON("_id" << id), /*multi=*/false);
     ASSERT(write_ops::verifySizeEstimate(deleteOpEntry));
 
     // Add a collation.
@@ -421,7 +421,7 @@ TEST_F(WriteOpsExecTest, TestDeleteRequestSizeEstimationLogic) {
         NamespaceString::createNamespaceString_forTest("db_write_ops_exec_test", "delete_test");
     write_ops::DeleteCommandRequest deleteReq(ns);
     // Basic test case.
-    write_ops::DeleteOpEntry deleteOpEntry(BSON("_id" << 1), false /* multi */);
+    write_ops::DeleteOpEntry deleteOpEntry(BSON("_id" << 1), /*multi=*/false);
     deleteReq.setDeletes({deleteOpEntry});
 
     ASSERT(write_ops::verifySizeEstimate(deleteReq));

@@ -255,7 +255,7 @@ long long BalancerStatsRegistry::getCollNumOrphanDocsFromDiskIfNeeded(
                                        std::string{RangeDeletionTask::kNumOrphanDocsFieldName}))));
         AggregateCommandRequest aggRequest(NamespaceString::kRangeDeletionNamespace, pipeline);
         auto swCursor = DBClientCursor::fromAggregationRequest(
-            &client, aggRequest, false /* secondaryOk */, true /* useExhaust */);
+            &client, aggRequest, /*secondaryOk=*/false, /*useExhaust=*/true);
         if (!swCursor.isOK()) {
             return 0;
         }
@@ -381,7 +381,7 @@ void BalancerStatsRegistry::_loadOrphansCount(OperationContext* opCtx) {
 
     DBDirectClient client{opCtx};
     auto cursor = uassertStatusOK(DBClientCursor::fromAggregationRequest(
-        &client, std::move(aggRequest), false /* secondaryOk */, true /* useExhaust */));
+        &client, std::move(aggRequest), /*secondaryOk=*/false, /*useExhaust=*/true));
 
     {
         std::lock_guard lk{_mutex};

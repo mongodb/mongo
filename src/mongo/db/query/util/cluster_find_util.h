@@ -54,10 +54,10 @@ inline boost::optional<CursorId> convertFindAndRunAggregateIfViewlessTimeseries(
             routingCtx,
             ClusterAggregate::Namespaces{origNss, origNss},
             aggRequest,
-            {aggRequest} /* liteParsedPipeline */,
+            /*liteParsedPipeline=*/{aggRequest},
             {Privilege(ResourcePattern::forExactNamespace(origNss), ActionType::find)},
-            boost::none /* resolvedView */,
-            boost::none /* originalRequest */,
+            /*resolvedView=*/boost::none,
+            /*originalRequest=*/boost::none,
             verbosity,
             &bodyBuilder));
 

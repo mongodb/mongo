@@ -486,7 +486,7 @@ std::unique_ptr<RecordStore> DevNullKVEngine::getInternalRecordStore(RecoveryUni
 std::unique_ptr<RecordStore> DevNullKVEngine::makeInternalRecordStore(RecoveryUnit& ru,
                                                                       std::string_view ident,
                                                                       KeyFormat keyFormat) {
-    return std::make_unique<DevNullRecordStore>(boost::none /* uuid */, ident, keyFormat);
+    return std::make_unique<DevNullRecordStore>(/*uuid=*/boost::none, ident, keyFormat);
 }
 
 std::unique_ptr<SortedDataInterface> DevNullKVEngine::getSortedDataInterface(

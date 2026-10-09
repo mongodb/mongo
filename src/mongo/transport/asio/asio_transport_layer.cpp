@@ -1918,7 +1918,7 @@ AsioTransportLayer::createTransientSSLContext(const TransientSSLParams& transien
         auto manager = coordinator->createTransientSSLManager(transientSSLParams);
         invariant(manager);
 
-        return _createSSLContext(manager, sslMode(), true /* asyncOCSPStaple */);
+        return _createSSLContext(manager, sslMode(), /*asyncOCSPStaple=*/true);
     } catch (...) {
         LOGV2_DEBUG(9079000,
                     1,

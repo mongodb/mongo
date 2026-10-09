@@ -239,7 +239,7 @@ AsyncResultsMerger::AsyncResultsMerger(OperationContext* opCtx,
         // later via a call to `setNextHighWaterMarkDeterminingStrategy()'.
         _nextHighWaterMarkDeterminingStrategy =
             NextHighWaterMarkDeterminingStrategyFactory::createForChangeStream(
-                _params.getCompareWholeSortKey(), false /* recognizeControlEvents */);
+                _params.getCompareWholeSortKey(), /*recognizeControlEvents=*/false);
     } else {
         // In all other modes than tailable, awaitData, we should never call the function to
         // determine the next high water mark. The following strategy object will ensure that.
@@ -1267,7 +1267,7 @@ Status AsyncResultsMerger::releaseMemory() {
                        requests,
                        ReadPreferenceSetting::get(_opCtx),
                        Shard::RetryPolicy::kStrictlyNotIdempotent,
-                       nullptr /*resourceYielder*/,
+                       /*resourceYielder=*/nullptr,
                        shardHostMap);
     }
 
@@ -1929,7 +1929,7 @@ void AsyncResultsMerger::_scheduleKillCursorForRemote(WithLock lk,
                                            cmdObj,
                                            rpc::makeEmptyMetadata(),
                                            opCtx,
-                                           true /* fireAndForget */);
+                                           /*fireAndForget=*/true);
 
     // The 'RemoteCommandRequest' takes the remaining time from the 'opCtx' parameter. If the cursor
     // was killed due to a maxTimeMs timeout, the remaining time will be 0, and the remote request

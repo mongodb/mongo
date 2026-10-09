@@ -26,7 +26,7 @@ MultiPlanner::MultiPlanner(PlannerData plannerData,
         cq(),
         plan_cache_util::ConditionalClassicPlanCacheWriter{
             shouldCache, opCtx(), collections().getMainCollectionPtrOrAcquisition()},
-        boost::none /* replanReason */,
+        /*replanReason=*/boost::none,
         addingCBRChosenPlanToPlanCache);
     for (auto&& solution : solutions) {
         solution->indexFilterApplied = plannerParams().indexFiltersApplied;

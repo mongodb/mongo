@@ -54,7 +54,7 @@ protected:
                                                             const Timestamp& expectedTopologyTime) {
         auto& topologyTimeTicker = TopologyTimeTicker::get(sc);
         auto vc = VectorClockMutable::get(sc);
-        topologyTimeTicker.onMajorityCommitPointUpdate(sc, repl::OpTime(majorityTime, /*term*/ -1));
+        topologyTimeTicker.onMajorityCommitPointUpdate(sc, repl::OpTime(majorityTime, /*term=*/-1));
         const auto time = vc->getTime();
         ASSERT_EQ(LogicalTime(expectedTopologyTime), time.topologyTime());
     }
@@ -146,7 +146,7 @@ TEST_F(TopologyTimeTickerConfigServer, RollbackingAllTickPoints) {
 
     // We rollback all tick points
     auto& topologyTimeTicker = TopologyTimeTicker::get(sc);
-    topologyTimeTicker.onReplicationRollback(repl::OpTime(kCommitTimePreTicks, /*term*/ -1));
+    topologyTimeTicker.onReplicationRollback(repl::OpTime(kCommitTimePreTicks, /*term=*/-1));
 
     // The majority commit point is advanced to a point that would have included all our tick
     // points, but because they were rollbacked the topology time should still be Timestamp(0, 1).
@@ -160,7 +160,7 @@ TEST_F(TopologyTimeTickerConfigServer, PartialRollbackingTickPoints) {
 
     // We rollback the last two tick points
     auto& topologyTimeTicker = TopologyTimeTicker::get(sc);
-    topologyTimeTicker.onReplicationRollback(repl::OpTime(_ticks.front().commitTime, /*term*/ -1));
+    topologyTimeTicker.onReplicationRollback(repl::OpTime(_ticks.front().commitTime, /*term=*/-1));
 
     // The majority commit point is advanced to a point that includes all the tick points. The
     // topology time should be the one from the first tick since the other two were rollbacked.

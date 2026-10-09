@@ -111,9 +111,9 @@ StatusWith<int> moveRecordToLostAndFound(OperationContext* opCtx,
                 CollectionPtr::CollectionPtr_UNSAFE(originalCollection),
                 kUninitializedStmtId,
                 dupRecord,
-                nullptr /* opDebug */,
-                false /* fromMigrate */,
-                false /* noWarn */,
+                /*opDebug=*/nullptr,
+                /*fromMigrate=*/false,
+                /*noWarn=*/false,
                 collection_internal::StoreDeletedDoc::Off,
                 CheckRecordId::On);
 

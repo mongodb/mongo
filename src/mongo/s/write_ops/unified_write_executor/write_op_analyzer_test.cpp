@@ -24,7 +24,7 @@ namespace {
 struct WriteOpAnalyzerTestImpl : public ShardingTestFixture {
     WriteOpAnalyzerTestImpl()
         : ShardingTestFixture(
-              false /* withMockCatalogCache */,
+              /*withMockCatalogCache=*/false,
               std::make_unique<ScopedGlobalServiceContextForTest>(ServiceContext::make(
                   nullptr, nullptr, std::make_unique<TickSourceMock<Nanoseconds>>()))) {}
 
@@ -105,7 +105,7 @@ struct WriteOpAnalyzerTestImpl : public ShardingTestFixture {
                                                epoch,
                                                Timestamp(1, 1),
                                                timeseriesFields,
-                                               boost::none /* reshardingFields */,
+                                               /*reshardingFields=*/boost::none,
                                                false,
                                                chunks);
 
@@ -864,7 +864,7 @@ TEST_F(WriteOpAnalyzerTestImpl, ViewfulTimeSeriesSimple) {
     const NamespaceString nssBuckets = nss.makeTimeseriesBucketsNamespace();
     UUID uuid = UUID::gen();
     auto rtx = createRoutingContextShardedTimeseries({{uuid, nss}, {uuid, nssBuckets}},
-                                                     true /* isViewfulTimeseries */);
+                                                     /*isViewfulTimeseries=*/true);
 
     BulkWriteCommandRequest request(
         {
@@ -898,7 +898,7 @@ TEST_F(WriteOpAnalyzerTestImpl, ViewfulTimeSeriesNonTargeted) {
     const NamespaceString nssBuckets = nss.makeTimeseriesBucketsNamespace();
     UUID uuid = UUID::gen();
     auto rtx = createRoutingContextShardedTimeseries({{uuid, nss}, {uuid, nssBuckets}},
-                                                     true /* isViewfulTimeseries */);
+                                                     /*isViewfulTimeseries=*/true);
 
     BulkWriteCommandRequest request(
         {
@@ -925,7 +925,7 @@ TEST_F(WriteOpAnalyzerTestImpl, ViewfulTimeSeriesRetryableWrite) {
     const NamespaceString nssBuckets = nss.makeTimeseriesBucketsNamespace();
     UUID uuid = UUID::gen();
     auto rtx = createRoutingContextShardedTimeseries({{uuid, nss}, {uuid, nssBuckets}},
-                                                     true /* isViewfulTimeseries */);
+                                                     /*isViewfulTimeseries=*/true);
 
     BulkWriteCommandRequest request(
         {

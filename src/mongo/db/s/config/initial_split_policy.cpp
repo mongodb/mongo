@@ -911,7 +911,7 @@ SamplingBasedSplitPolicy::SampleDocumentPipeline SamplingBasedSplitPolicy::_make
                       .tmpDir(boost::filesystem::path(storageGlobalParams.dbpath) / "_tmp")
                       .build();
     return pipeline_factory::makePipeline(
-        aggRequest, expCtx, boost::none /* shardCursorsSortSpec */, opts);
+        aggRequest, expCtx, /*shardCursorsSortSpec=*/boost::none, opts);
 }
 
 SamplingBasedSplitPolicy::PipelineDocumentSource::PipelineDocumentSource(

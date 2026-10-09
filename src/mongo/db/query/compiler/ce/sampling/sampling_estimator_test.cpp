@@ -86,8 +86,8 @@ TEST_F(SamplingEstimatorTest, RandomSamplingProcess) {
     insertDocuments(kTestNss, createDocuments(10));
 
     auto coll = acquireCollection(operationContext(), kTestNss);
-    auto colls = MultipleCollectionAccessor(
-        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+    auto colls =
+        MultipleCollectionAccessor(coll, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
@@ -97,7 +97,7 @@ TEST_F(SamplingEstimatorTest, RandomSamplingProcess) {
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(10),
-                                                  nullptr /*customerQueryExpCtx*/);
+                                                  /*customerQueryExpCtx=*/nullptr);
     samplingEstimator.generateSample(ce::NoProjection{});
 
     auto sample = samplingEstimator.getSample();
@@ -110,8 +110,8 @@ TEST_F(SamplingEstimatorTest, HashModStrideSampling) {
     insertDocuments(kTestNss, createDocuments(collCard));
 
     auto coll = acquireCollection(operationContext(), kTestNss);
-    auto colls = MultipleCollectionAccessor(
-        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+    auto colls =
+        MultipleCollectionAccessor(coll, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
     unittest::ServerParameterGuard stridesKnob("internalQuerySamplingByStrides", true);
 
@@ -123,7 +123,7 @@ TEST_F(SamplingEstimatorTest, HashModStrideSampling) {
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(collCard),
-                                                  nullptr /*customerQueryExpCtx*/);
+                                                  /*customerQueryExpCtx=*/nullptr);
     samplingEstimator.generateSample(ce::NoProjection{});
 
     const auto expectedIds = expectedHashModSampleIds(collCard, sampleSize);
@@ -146,8 +146,8 @@ TEST_F(SamplingEstimatorTest, HashModStrideSamplingSmallCollection) {
     insertDocuments(kTestNss, createDocuments(collCard));
 
     auto coll = acquireCollection(operationContext(), kTestNss);
-    auto colls = MultipleCollectionAccessor(
-        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+    auto colls =
+        MultipleCollectionAccessor(coll, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
     unittest::ServerParameterGuard stridesKnob("internalQuerySamplingByStrides", true);
 
@@ -159,7 +159,7 @@ TEST_F(SamplingEstimatorTest, HashModStrideSamplingSmallCollection) {
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(collCard),
-                                                  nullptr /*customerQueryExpCtx*/);
+                                                  /*customerQueryExpCtx=*/nullptr);
     samplingEstimator.generateSample(ce::NoProjection{});
 
     ASSERT_EQUALS(samplingEstimator.getSample().size(), collCard);
@@ -171,8 +171,8 @@ TEST_F(SamplingEstimatorTest, HashModStrideSamplingWithProjection) {
     insertDocuments(kTestNss, createDocuments(collCard));
 
     auto coll = acquireCollection(operationContext(), kTestNss);
-    auto colls = MultipleCollectionAccessor(
-        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+    auto colls =
+        MultipleCollectionAccessor(coll, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
     unittest::ServerParameterGuard stridesKnob("internalQuerySamplingByStrides", true);
 
@@ -184,7 +184,7 @@ TEST_F(SamplingEstimatorTest, HashModStrideSamplingWithProjection) {
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(collCard),
-                                                  nullptr /*customerQueryExpCtx*/);
+                                                  /*customerQueryExpCtx=*/nullptr);
     samplingEstimator.generateSample(includedSampleFields);
 
     const auto expectedIds = expectedHashModSampleIds(collCard, sampleSize);
@@ -208,8 +208,8 @@ TEST_F(SamplingEstimatorTest, RandomSamplingProcessWithProjection) {
     insertDocuments(kTestNss, createDocuments(10));
 
     auto coll = acquireCollection(operationContext(), kTestNss);
-    auto colls = MultipleCollectionAccessor(
-        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+    auto colls =
+        MultipleCollectionAccessor(coll, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
@@ -219,7 +219,7 @@ TEST_F(SamplingEstimatorTest, RandomSamplingProcessWithProjection) {
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(10),
-                                                  nullptr /*customerQueryExpCtx*/);
+                                                  /*customerQueryExpCtx=*/nullptr);
     samplingEstimator.generateSample(includedSampleFields);
 
     auto sample = samplingEstimator.getSample();
@@ -237,8 +237,8 @@ TEST_F(SamplingEstimatorTest, ChunkSamplingProcess) {
     insertDocuments(kTestNss, createDocuments(2000));
 
     auto coll = acquireCollection(operationContext(), kTestNss);
-    auto colls = MultipleCollectionAccessor(
-        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+    auto colls =
+        MultipleCollectionAccessor(coll, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
     auto optCtx = operationContext();
     auto testChunkBasedSampling = [&](int chunkNum, int sampleSize) {
@@ -251,7 +251,7 @@ TEST_F(SamplingEstimatorTest, ChunkSamplingProcess) {
                                                       SamplingCEMethodEnum::kChunk,
                                                       chunkNum,
                                                       makeCardinalityEstimate(2000),
-                                                      nullptr /*customerQueryExpCtx*/);
+                                                      /*customerQueryExpCtx=*/nullptr);
         samplingEstimator.generateSample(ce::NoProjection{});
 
         auto sample = samplingEstimator.getSample();
@@ -292,8 +292,8 @@ TEST_F(SamplingEstimatorTest, ChunkSamplingProcessWithProjection) {
     insertDocuments(kTestNss, createDocuments(2000));
 
     auto coll = acquireCollection(operationContext(), kTestNss);
-    auto colls = MultipleCollectionAccessor(
-        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+    auto colls =
+        MultipleCollectionAccessor(coll, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
     auto optCtx = operationContext();
     auto testChunkBasedSampling = [&](int chunkNum, int sampleSize) {
@@ -306,7 +306,7 @@ TEST_F(SamplingEstimatorTest, ChunkSamplingProcessWithProjection) {
                                                       SamplingCEMethodEnum::kChunk,
                                                       chunkNum,
                                                       makeCardinalityEstimate(2000),
-                                                      nullptr /*customerQueryExpCtx*/);
+                                                      /*customerQueryExpCtx=*/nullptr);
         samplingEstimator.generateSample(includedSampleFields);
 
         auto sample = samplingEstimator.getSample();
@@ -353,8 +353,8 @@ TEST_F(SamplingEstimatorTest, FullCollScanSamplingProcess) {
     insertDocuments(kTestNss, createDocuments(50));
 
     auto coll = acquireCollection(operationContext(), kTestNss);
-    auto colls = MultipleCollectionAccessor(
-        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+    auto colls =
+        MultipleCollectionAccessor(coll, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
     // Require a sample larger than the collection.
     const int sampleSize = 100;
@@ -367,7 +367,7 @@ TEST_F(SamplingEstimatorTest, FullCollScanSamplingProcess) {
                                                   SamplingCEMethodEnum::kRandom,
                                                   boost::none, /* numChunks */
                                                   makeCardinalityEstimate(collectionSize),
-                                                  nullptr /*customerQueryExpCtx*/);
+                                                  /*customerQueryExpCtx=*/nullptr);
     samplingEstimator.generateSample(ce::NoProjection{});
 
     auto sample = samplingEstimator.getSample();
@@ -380,8 +380,8 @@ TEST_F(SamplingEstimatorTest, FullCollScanSamplingProcessWithProjection) {
     insertDocuments(kTestNss, createDocuments(50));
 
     auto coll = acquireCollection(operationContext(), kTestNss);
-    auto colls = MultipleCollectionAccessor(
-        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+    auto colls =
+        MultipleCollectionAccessor(coll, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
     // Require a sample larger than the collection.
     const int sampleSize = 100;
@@ -394,7 +394,7 @@ TEST_F(SamplingEstimatorTest, FullCollScanSamplingProcessWithProjection) {
                                                   SamplingCEMethodEnum::kRandom,
                                                   boost::none, /* numChunks */
                                                   makeCardinalityEstimate(collectionSize),
-                                                  nullptr /*customerQueryExpCtx*/);
+                                                  /*customerQueryExpCtx=*/nullptr);
     samplingEstimator.generateSample(includedSampleFields);
 
     auto sample = samplingEstimator.getSample();
@@ -413,8 +413,8 @@ TEST_F(SamplingEstimatorTest, ProjectAllFieldsRandomSampling) {
     insertDocuments(kTestNss, createDocuments(10));
 
     auto coll = acquireCollection(operationContext(), kTestNss);
-    auto colls = MultipleCollectionAccessor(
-        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+    auto colls =
+        MultipleCollectionAccessor(coll, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
 
     const auto topLevelSampleFieldNames = StringSet{"_id", "a", "b", "nil", "arr", "obj"};
@@ -426,7 +426,7 @@ TEST_F(SamplingEstimatorTest, ProjectAllFieldsRandomSampling) {
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(10),
-                                                  nullptr /*customerQueryExpCtx*/);
+                                                  /*customerQueryExpCtx=*/nullptr);
     samplingEstimator.generateSample(topLevelSampleFieldNames);
 
     auto sample = samplingEstimator.getSample();
@@ -445,8 +445,8 @@ TEST_F(SamplingEstimatorTest, ProjectOneFieldRandomSampling) {
     insertDocuments(kTestNss, createDocuments(10));
 
     auto coll = acquireCollection(operationContext(), kTestNss);
-    auto colls = MultipleCollectionAccessor(
-        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+    auto colls =
+        MultipleCollectionAccessor(coll, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
     const auto topLevelSampleFieldNames = StringSet{"a"};
 
@@ -458,7 +458,7 @@ TEST_F(SamplingEstimatorTest, ProjectOneFieldRandomSampling) {
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(10),
-                                                  nullptr /*customerQueryExpCtx*/);
+                                                  /*customerQueryExpCtx=*/nullptr);
     samplingEstimator.generateSample(topLevelSampleFieldNames);
 
     auto sample = samplingEstimator.getSample();
@@ -475,8 +475,8 @@ TEST_F(SamplingEstimatorTest, NoProjectionRandomSampling) {
     insertDocuments(kTestNss, createDocuments(10));
 
     auto coll = acquireCollection(operationContext(), kTestNss);
-    auto colls = MultipleCollectionAccessor(
-        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+    auto colls =
+        MultipleCollectionAccessor(coll, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
@@ -486,7 +486,7 @@ TEST_F(SamplingEstimatorTest, NoProjectionRandomSampling) {
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(10),
-                                                  nullptr /*customerQueryExpCtx*/);
+                                                  /*customerQueryExpCtx=*/nullptr);
     samplingEstimator.generateSample(ce::NoProjection{});
 
     auto sample = samplingEstimator.getSample();
@@ -504,8 +504,8 @@ TEST_F(SamplingEstimatorTest, ProjectNonExistentFieldRandomSampling) {
     insertDocuments(kTestNss, createDocuments(10));
 
     auto coll = acquireCollection(operationContext(), kTestNss);
-    auto colls = MultipleCollectionAccessor(
-        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+    auto colls =
+        MultipleCollectionAccessor(coll, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
     const auto topLevelSampleFieldNames = StringSet{"c"};
     // Project field "c" which does not exist on any documents in the collection.
@@ -517,7 +517,7 @@ TEST_F(SamplingEstimatorTest, ProjectNonExistentFieldRandomSampling) {
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(10),
-                                                  nullptr /*customerQueryExpCtx*/);
+                                                  /*customerQueryExpCtx=*/nullptr);
     samplingEstimator.generateSample(topLevelSampleFieldNames);
 
     auto sample = samplingEstimator.getSample();
@@ -533,8 +533,8 @@ TEST_F(SamplingEstimatorTest, DrawANewSample) {
     insertDocuments(kTestNss, createDocuments(10));
 
     auto coll = acquireCollection(operationContext(), kTestNss);
-    auto colls = MultipleCollectionAccessor(
-        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+    auto colls =
+        MultipleCollectionAccessor(coll, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
     // A sample was generated on construction with size being the pre-determined size.
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
@@ -545,7 +545,7 @@ TEST_F(SamplingEstimatorTest, DrawANewSample) {
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(10),
-                                                  nullptr /*customerQueryExpCtx*/);
+                                                  /*customerQueryExpCtx=*/nullptr);
     samplingEstimator.generateSample(ce::NoProjection{});
 
     auto sample = samplingEstimator.getSample();
@@ -556,11 +556,11 @@ TEST_F(SamplingEstimatorTest, DrawANewSample) {
                                                  colls,
                                                  kTestNss,
                                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                                                 3 /* sampleSize */,
+                                                 /*sampleSize=*/3,
                                                  SamplingCEMethodEnum::kRandom,
                                                  numChunks,
                                                  makeCardinalityEstimate(10),
-                                                 nullptr /*customerQueryExpCtx*/);
+                                                 /*customerQueryExpCtx=*/nullptr);
     smallerEstimator.generateSample(ce::NoProjection{});
     auto newSample = smallerEstimator.getSample();
     ASSERT_EQUALS(newSample.size(), 3);
@@ -594,8 +594,8 @@ TEST_F(SamplingEstimatorTest, CalculateSampleSizeRespectsQuerySettingsKnobOverri
     insertDocuments(kTestNss, createDocuments(card));
 
     auto coll = acquireCollection(operationContext(), kTestNss);
-    auto colls = MultipleCollectionAccessor(
-        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+    auto colls =
+        MultipleCollectionAccessor(coll, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
 
     // Persistent query settings takes effect even though the global knob value is unchanged.
@@ -619,8 +619,8 @@ TEST_F(SamplingEstimatorTest, CalculateSampleSizeRespectsQuerySettingsSampleSize
     insertDocuments(kTestNss, createDocuments(card));
 
     auto coll = acquireCollection(operationContext(), kTestNss);
-    auto colls = MultipleCollectionAccessor(
-        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+    auto colls =
+        MultipleCollectionAccessor(coll, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
     query_settings::QuerySettingsGuardForTest settingsGuard{
         operationContext(), fromjson(R"({queryKnobs: {samplingSizeOverride: 77}})")};
@@ -640,8 +640,8 @@ TEST_F(SamplingEstimatorTest, SampleSizeRespectsSampleSizeParamState) {
     insertDocuments(kTestNss, createDocuments(card));
 
     auto coll = acquireCollection(operationContext(), kTestNss);
-    auto colls = MultipleCollectionAccessor(
-        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+    auto colls =
+        MultipleCollectionAccessor(coll, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
     // When 'internalSamplingSizeOverride' is not set and no query settings are applied, the sample
     // size is derived from default confidence interval and margin of error values
@@ -678,8 +678,8 @@ TEST_F(SamplingEstimatorTest, EstimateCardinality) {
     const size_t sampleSize = 400;
 
     auto coll = acquireCollection(operationContext(), kTestNss);
-    auto colls = MultipleCollectionAccessor(
-        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+    auto colls =
+        MultipleCollectionAccessor(coll, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
@@ -689,7 +689,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinality) {
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(card),
-                                                  nullptr /*customerQueryExpCtx*/);
+                                                  /*customerQueryExpCtx=*/nullptr);
     samplingEstimator.generateSample(ce::NoProjection{});
 
     {  // All documents in the collection satisfy the predicate.
@@ -732,8 +732,8 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityWithProjection) {
     const size_t sampleSize = 400;
 
     auto coll = acquireCollection(operationContext(), kTestNss);
-    auto colls = MultipleCollectionAccessor(
-        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+    auto colls =
+        MultipleCollectionAccessor(coll, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
@@ -743,7 +743,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityWithProjection) {
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(card),
-                                                  nullptr /*customerQueryExpCtx*/);
+                                                  /*customerQueryExpCtx=*/nullptr);
     samplingEstimator.generateSample(ce::NoProjection{});
 
     SamplingEstimatorForTesting samplingEstimatorWithProjection(
@@ -755,7 +755,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityWithProjection) {
         SamplingCEMethodEnum::kRandom,
         numChunks,
         makeCardinalityEstimate(card),
-        nullptr /*customerQueryExpCtx*/);
+        /*customerQueryExpCtx=*/nullptr);
     samplingEstimatorWithProjection.generateSample(StringSet{"a", "b"});
 
     {  // All documents in the collection satisfy the predicate.
@@ -813,8 +813,8 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityLogicalExpressions) {
     const size_t sampleSize = 400;
 
     auto coll = acquireCollection(operationContext(), kTestNss);
-    auto colls = MultipleCollectionAccessor(
-        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+    auto colls =
+        MultipleCollectionAccessor(coll, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
@@ -824,7 +824,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityLogicalExpressions) {
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(card),
-                                                  nullptr /*customerQueryExpCtx*/);
+                                                  /*customerQueryExpCtx=*/nullptr);
     samplingEstimator.generateSample(ce::NoProjection{});
 
     {  // Range predicate on "a" with 20% selectivity: a > 40 && a < 60.
@@ -899,8 +899,8 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityExistsWithProjection) {
 
     insertDocuments(kTestNss, docs);
     auto coll = acquireCollection(operationContext(), kTestNss);
-    auto colls = MultipleCollectionAccessor(
-        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+    auto colls =
+        MultipleCollectionAccessor(coll, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
@@ -910,7 +910,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityExistsWithProjection) {
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(card),
-                                                  nullptr /*customerQueryExpCtx*/);
+                                                  /*customerQueryExpCtx=*/nullptr);
     samplingEstimator.generateSample(ce::NoProjection{});
     SamplingEstimatorForTesting samplingEstimatorWithProjection(
         operationContext(),
@@ -921,7 +921,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityExistsWithProjection) {
         SamplingCEMethodEnum::kRandom,
         numChunks,
         makeCardinalityEstimate(card),
-        nullptr /*customerQueryExpCtx*/);
+        /*customerQueryExpCtx=*/nullptr);
     samplingEstimatorWithProjection.generateSample(StringSet{"nil"});
 
     // 1 doc that does not have field "nil".
@@ -939,8 +939,8 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityByIndexBounds) {
     const size_t sampleSize = 400;
 
     auto coll = acquireCollection(operationContext(), kTestNss);
-    auto colls = MultipleCollectionAccessor(
-        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+    auto colls =
+        MultipleCollectionAccessor(coll, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
@@ -951,7 +951,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityByIndexBounds) {
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(card),
-                                                  nullptr /*customerQueryExpCtx*/);
+                                                  /*customerQueryExpCtx=*/nullptr);
     samplingEstimator.generateSample(ce::NoProjection{});
 
     // Test IndexBounds with single field.
@@ -1028,8 +1028,8 @@ TEST_F(SamplingEstimatorTest, EstimateIndexKeysScanned) {
     const size_t sampleSize = 500;
 
     auto coll = acquireCollection(operationContext(), kTestNss);
-    auto colls = MultipleCollectionAccessor(
-        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+    auto colls =
+        MultipleCollectionAccessor(coll, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
@@ -1040,7 +1040,7 @@ TEST_F(SamplingEstimatorTest, EstimateIndexKeysScanned) {
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(card),
-                                                  nullptr /*customerQueryExpCtx*/);
+                                                  /*customerQueryExpCtx=*/nullptr);
     samplingEstimator.generateSample(ce::NoProjection{});
     // Test IndexBounds with single field.
     OrderedIntervalList list("arr");
@@ -1154,8 +1154,8 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityByIndexBoundsAndMatchExpression
     const size_t sampleSize = 400;
 
     auto coll = acquireCollection(operationContext(), kTestNss);
-    auto colls = MultipleCollectionAccessor(
-        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+    auto colls =
+        MultipleCollectionAccessor(coll, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
@@ -1166,7 +1166,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityByIndexBoundsAndMatchExpression
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(card),
-                                                  nullptr /*customerQueryExpCtx*/);
+                                                  /*customerQueryExpCtx=*/nullptr);
     samplingEstimator.generateSample(ce::NoProjection{});
 
     auto operand1 = BSON("$lt" << 20);
@@ -1333,8 +1333,8 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
     insertDocuments(kTestNss, createDocuments(10));
 
     auto coll = acquireCollection(operationContext(), kTestNss);
-    auto colls = MultipleCollectionAccessor(
-        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+    auto colls =
+        MultipleCollectionAccessor(coll, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
@@ -1344,7 +1344,7 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(10),
-                                                  nullptr /*customerQueryExpCtx*/);
+                                                  /*customerQueryExpCtx=*/nullptr);
     samplingEstimator.generateSample(ce::NoProjection{});
 
     OrderedIntervalList list("a");
@@ -1367,8 +1367,8 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
     insertDocuments(kTestNss, createDocuments(10));
 
     auto coll = acquireCollection(operationContext(), kTestNss);
-    auto colls = MultipleCollectionAccessor(
-        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+    auto colls =
+        MultipleCollectionAccessor(coll, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
@@ -1378,7 +1378,7 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(10),
-                                                  nullptr /*customerQueryExpCtx*/);
+                                                  /*customerQueryExpCtx=*/nullptr);
     samplingEstimator.generateSample(StringSet{"a", "b.c"});
 }
 
@@ -1397,7 +1397,7 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(10),
-                                                  nullptr /*customerQueryExpCtx*/);
+                                                  /*customerQueryExpCtx=*/nullptr);
     samplingEstimator.generateSample(StringSet{});
 }
 
@@ -1407,8 +1407,8 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
     insertDocuments(kTestNss, createDocuments(10));
 
     auto coll = acquireCollection(operationContext(), kTestNss);
-    auto colls = MultipleCollectionAccessor(
-        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+    auto colls =
+        MultipleCollectionAccessor(coll, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
@@ -1418,7 +1418,7 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(10),
-                                                  nullptr /*customerQueryExpCtx*/);
+                                                  /*customerQueryExpCtx=*/nullptr);
     samplingEstimator.generateSample(StringSet{"a"});
 
     auto operand = BSON("$eq" << 5);
@@ -1432,8 +1432,8 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
     insertDocuments(kTestNss, createDocuments(10));
 
     auto coll = acquireCollection(operationContext(), kTestNss);
-    auto colls = MultipleCollectionAccessor(
-        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+    auto colls =
+        MultipleCollectionAccessor(coll, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
@@ -1443,7 +1443,7 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(10),
-                                                  nullptr /*customerQueryExpCtx*/);
+                                                  /*customerQueryExpCtx=*/nullptr);
     samplingEstimator.generateSample(StringSet{"a"});
     auto operand = BSON("$eq" << 5);
     EqualityMatchExpression eq("b"sv, operand["$eq"]);
@@ -1463,8 +1463,8 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
     insertDocuments(kTestNss, createDocuments(10));
 
     auto coll = acquireCollection(operationContext(), kTestNss);
-    auto colls = MultipleCollectionAccessor(
-        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+    auto colls =
+        MultipleCollectionAccessor(coll, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
@@ -1474,7 +1474,7 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(10),
-                                                  nullptr /*customerQueryExpCtx*/);
+                                                  /*customerQueryExpCtx=*/nullptr);
     samplingEstimator.generateSample(StringSet{"a", "b"});
 
     const auto filter = fromjson("{a: 1, b: 2}");
@@ -1501,8 +1501,8 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
     insertDocuments(kTestNss, createDocuments(10));
 
     auto coll = acquireCollection(operationContext(), kTestNss);
-    auto colls = MultipleCollectionAccessor(
-        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+    auto colls =
+        MultipleCollectionAccessor(coll, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
@@ -1512,7 +1512,7 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(10),
-                                                  nullptr /*customerQueryExpCtx*/);
+                                                  /*customerQueryExpCtx=*/nullptr);
     samplingEstimator.generateSample(StringSet{"a", "b"});
 
     const auto filter = fromjson("{a: 1, b: 2}");
@@ -1539,8 +1539,8 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
     insertDocuments(kTestNss, createDocuments(10));
 
     auto coll = acquireCollection(operationContext(), kTestNss);
-    auto colls = MultipleCollectionAccessor(
-        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+    auto colls =
+        MultipleCollectionAccessor(coll, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
@@ -1550,7 +1550,7 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(10),
-                                                  nullptr /*customerQueryExpCtx*/);
+                                                  /*customerQueryExpCtx=*/nullptr);
 
     const auto filter = fromjson("{a: 1}");
     const auto expr = parse(filter);
@@ -1568,8 +1568,8 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
     insertDocuments(kTestNss, createDocuments(10));
 
     auto coll = acquireCollection(operationContext(), kTestNss);
-    auto colls = MultipleCollectionAccessor(
-        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+    auto colls =
+        MultipleCollectionAccessor(coll, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
@@ -1579,7 +1579,7 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(10),
-                                                  nullptr /*customerQueryExpCtx*/);
+                                                  /*customerQueryExpCtx=*/nullptr);
 
     const auto filter = fromjson("{a: 1}");
     const auto expr = parse(filter);
@@ -1597,8 +1597,8 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
     insertDocuments(kTestNss, createDocuments(10));
 
     auto coll = acquireCollection(operationContext(), kTestNss);
-    auto colls = MultipleCollectionAccessor(
-        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+    auto colls =
+        MultipleCollectionAccessor(coll, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
@@ -1608,7 +1608,7 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(10),
-                                                  nullptr /*customerQueryExpCtx*/);
+                                                  /*customerQueryExpCtx=*/nullptr);
 
     const auto filter = fromjson("{a: 1}");
     const auto expr = parse(filter);
@@ -1694,8 +1694,8 @@ TEST_F(SamplingEstimatorTest, EstimateNDVForFieldsSampleSizeOnePercent) {
     insertDocuments(kTestNss, createDocumentsForNDVTesting(card));
 
     auto coll = acquireCollection(operationContext(), kTestNss);
-    auto colls = MultipleCollectionAccessor(
-        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+    auto colls =
+        MultipleCollectionAccessor(coll, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
     SamplingEstimatorForTesting estimator(operationContext(),
                                           colls,
@@ -1705,7 +1705,7 @@ TEST_F(SamplingEstimatorTest, EstimateNDVForFieldsSampleSizeOnePercent) {
                                           SamplingCEMethodEnum::kRandom,
                                           numChunks,
                                           makeCardinalityEstimate(card),
-                                          nullptr /*customerQueryExpCtx*/);
+                                          /*customerQueryExpCtx=*/nullptr);
     makeNDVAssertions(estimator, sampleSize);
 }
 
@@ -1715,8 +1715,8 @@ TEST_F(SamplingEstimatorTest, EstimateNDVForFieldsSampleSizeTwoPercent) {
     insertDocuments(kTestNss, createDocumentsForNDVTesting(card));
 
     auto coll = acquireCollection(operationContext(), kTestNss);
-    auto colls = MultipleCollectionAccessor(
-        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+    auto colls =
+        MultipleCollectionAccessor(coll, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
     SamplingEstimatorForTesting estimator(operationContext(),
                                           colls,
@@ -1726,7 +1726,7 @@ TEST_F(SamplingEstimatorTest, EstimateNDVForFieldsSampleSizeTwoPercent) {
                                           SamplingCEMethodEnum::kRandom,
                                           numChunks,
                                           makeCardinalityEstimate(card),
-                                          nullptr /*customerQueryExpCtx*/);
+                                          /*customerQueryExpCtx=*/nullptr);
     makeNDVAssertions(estimator, sampleSize);
 }
 
@@ -1736,8 +1736,8 @@ TEST_F(SamplingEstimatorTest, EstimateNDVForFieldsSampleSizeTenPercent) {
     insertDocuments(kTestNss, createDocumentsForNDVTesting(card));
 
     auto coll = acquireCollection(operationContext(), kTestNss);
-    auto colls = MultipleCollectionAccessor(
-        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+    auto colls =
+        MultipleCollectionAccessor(coll, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
     SamplingEstimatorForTesting estimator(operationContext(),
                                           colls,
@@ -1747,7 +1747,7 @@ TEST_F(SamplingEstimatorTest, EstimateNDVForFieldsSampleSizeTenPercent) {
                                           SamplingCEMethodEnum::kRandom,
                                           numChunks,
                                           makeCardinalityEstimate(card),
-                                          nullptr /*customerQueryExpCtx*/);
+                                          /*customerQueryExpCtx=*/nullptr);
     makeNDVAssertions(estimator, sampleSize);
 }
 
@@ -1806,15 +1806,15 @@ TEST_P(EstimateNDVMultiKeyTest, ConsistentWithScalarForSameValueArrays) {
 
     auto scalarColl = acquireCollection(operationContext(), _kTestNss);
     auto scalarColls = MultipleCollectionAccessor(
-        scalarColl, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+        scalarColl, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
     auto singleElemColl = acquireCollection(operationContext(), singleElemNss);
     auto singleElemColls = MultipleCollectionAccessor(
-        singleElemColl, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+        singleElemColl, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
     auto multiElemColl = acquireCollection(operationContext(), multiElemNss);
     auto multiElemColls = MultipleCollectionAccessor(
-        multiElemColl, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+        multiElemColl, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
     // Baseline: scalar field {a: i%n} -> estimateNDV and estimateNDVMultiKey must agree.
     SamplingEstimatorForTesting scalarEstimator(operationContext(),
@@ -1825,7 +1825,7 @@ TEST_P(EstimateNDVMultiKeyTest, ConsistentWithScalarForSameValueArrays) {
                                                 SamplingCEMethodEnum::kRandom,
                                                 numChunks,
                                                 makeCardinalityEstimate(card),
-                                                nullptr /*customerQueryExpCtx*/);
+                                                /*customerQueryExpCtx=*/nullptr);
     scalarEstimator.generateSample(ce::NoProjection{});
     auto ndvScalar = scalarEstimator.estimateNDV({{.path = "a"}});
     auto ndvScalarMK = scalarEstimator.estimateNDVMultiKey({{.path = "a"}});
@@ -1843,7 +1843,7 @@ TEST_P(EstimateNDVMultiKeyTest, ConsistentWithScalarForSameValueArrays) {
                                                     SamplingCEMethodEnum::kRandom,
                                                     numChunks,
                                                     makeCardinalityEstimate(card),
-                                                    nullptr /*customerQueryExpCtx*/);
+                                                    /*customerQueryExpCtx=*/nullptr);
     singleElemEstimator.generateSample(ce::NoProjection{});
     auto ndvSingleElem = singleElemEstimator.estimateNDVMultiKey({{.path = "a"}});
     ASSERT_EQ(ndvScalar, ndvSingleElem);
@@ -1859,7 +1859,7 @@ TEST_P(EstimateNDVMultiKeyTest, ConsistentWithScalarForSameValueArrays) {
                                                    SamplingCEMethodEnum::kRandom,
                                                    numChunks,
                                                    makeCardinalityEstimate(card),
-                                                   nullptr /*customerQueryExpCtx*/);
+                                                   /*customerQueryExpCtx=*/nullptr);
     multiElemEstimator.generateSample(ce::NoProjection{});
     auto ndvMultiElem = multiElemEstimator.estimateNDVMultiKey({{.path = "a"}});
     assertBetween(ndvMultiElem, n * 0.5, n * 2.0 + 1.0);
@@ -1882,8 +1882,8 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
     const size_t sampleSize = 1;
 
     auto coll = acquireCollection(operationContext(), kTestNss);
-    auto colls = MultipleCollectionAccessor(
-        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+    auto colls =
+        MultipleCollectionAccessor(coll, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
                                                   kTestNss,
@@ -1892,7 +1892,7 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(card),
-                                                  nullptr /*customerQueryExpCtx*/);
+                                                  /*customerQueryExpCtx=*/nullptr);
     samplingEstimator.generateSample(StringSet{"a"});
     // Ignore $expr semantics for now.
     absl::flat_hash_set<FieldPath> exprPaths;
@@ -1921,8 +1921,8 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityAndOfEqualitiesFastPath) {
     insertDocuments(kTestNss, docs);
 
     auto coll = acquireCollection(operationContext(), kTestNss);
-    auto colls = MultipleCollectionAccessor(
-        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal*/);
+    auto colls =
+        MultipleCollectionAccessor(coll, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
     // Use the whole collection as the sample to get deterministic results.
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
@@ -1933,7 +1933,7 @@ TEST_F(SamplingEstimatorTest, EstimateCardinalityAndOfEqualitiesFastPath) {
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(card),
-                                                  nullptr /*customerQueryExpCtx*/);
+                                                  /*customerQueryExpCtx=*/nullptr);
     samplingEstimator.generateSample(ce::NoProjection{});
 
     // Helper: build AND(EQ(path, v0), EQ(path, v1), ...) and return the CE.
@@ -1973,8 +1973,8 @@ TEST_F(SamplingEstimatorTest, EstimateRIDsWithAllFastPath) {
     const size_t sampleSize = 400;
 
     auto coll = acquireCollection(operationContext(), kTestNss);
-    auto colls = MultipleCollectionAccessor(
-        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+    auto colls =
+        MultipleCollectionAccessor(coll, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
     SamplingEstimatorForTesting samplingEstimator(operationContext(),
                                                   colls,
@@ -1984,7 +1984,7 @@ TEST_F(SamplingEstimatorTest, EstimateRIDsWithAllFastPath) {
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(card),
-                                                  nullptr /*customerQueryExpCtx*/);
+                                                  /*customerQueryExpCtx=*/nullptr);
     samplingEstimator.generateSample(ce::NoProjection{});
 
     // Each document has arr: [10, 20, 30, 40, 50]. A $all query is canonically represented as an
@@ -2067,7 +2067,7 @@ TEST_F(SamplingEstimatorTest, FastPathBailsOutWithNonEqChildInMiddle) {
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(card),
-                                                  nullptr /*customerQueryExpCtx*/);
+                                                  /*customerQueryExpCtx=*/nullptr);
     samplingEstimator.generateSample(ce::NoProjection{});
 
     auto opEq1 = BSON("x" << 1);
@@ -2116,7 +2116,7 @@ TEST_F(SamplingEstimatorTest, FastPathBailsOutWithDifferentPathEqChildInMiddle) 
                                                   SamplingCEMethodEnum::kRandom,
                                                   numChunks,
                                                   makeCardinalityEstimate(card),
-                                                  nullptr /*customerQueryExpCtx*/);
+                                                  /*customerQueryExpCtx=*/nullptr);
     samplingEstimator.generateSample(ce::NoProjection{});
 
     auto opEq1 = BSON("x" << 1);
@@ -2140,8 +2140,8 @@ TEST_F(SamplingEstimatorTest, EstimateNDVReturnsCollCardWhenDuplicateDocsFromSam
     insertDocuments(kTestNss, createDocuments(card));
 
     auto coll = acquireCollection(operationContext(), kTestNss);
-    auto colls = MultipleCollectionAccessor(
-        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+    auto colls =
+        MultipleCollectionAccessor(coll, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
     const size_t sampleSize = 10;
     SamplingEstimatorForTesting estimator(operationContext(),
@@ -2152,7 +2152,7 @@ TEST_F(SamplingEstimatorTest, EstimateNDVReturnsCollCardWhenDuplicateDocsFromSam
                                           SamplingCEMethodEnum::kRandom,
                                           numChunks,
                                           makeCardinalityEstimate(card),
-                                          nullptr /*customerQueryExpCtx*/);
+                                          /*customerQueryExpCtx=*/nullptr);
 
     // Build a sample with 10 unique documents and all-unique "a" values, then append a duplicate
     // of the first document (simulating sampling with replacement producing a duplicate).
@@ -2175,8 +2175,8 @@ TEST_F(SamplingEstimatorTest, EstimateNDVUsesNRWhenFieldGenuinelyNonUnique) {
     insertDocuments(kTestNss, createDocuments(card));
 
     auto coll = acquireCollection(operationContext(), kTestNss);
-    auto colls = MultipleCollectionAccessor(
-        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+    auto colls =
+        MultipleCollectionAccessor(coll, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
     const size_t sampleSize = 5;
     SamplingEstimatorForTesting estimator(operationContext(),
@@ -2187,7 +2187,7 @@ TEST_F(SamplingEstimatorTest, EstimateNDVUsesNRWhenFieldGenuinelyNonUnique) {
                                           SamplingCEMethodEnum::kRandom,
                                           numChunks,
                                           makeCardinalityEstimate(card),
-                                          nullptr /*customerQueryExpCtx*/);
+                                          /*customerQueryExpCtx=*/nullptr);
 
     // 5 documents with distinct _id values, but "a" is not unique: docs 0 and 4 share a=0.
     std::vector<BSONObj> sample = {
@@ -2209,8 +2209,8 @@ TEST_F(SamplingEstimatorTest, EstimateKeysScannedEmptySampleReturnsZero) {
     // zero keys scanned (mirroring estimateCardinality's empty-sample handling) rather than
     // producing NaN/inf and tripping assertValid().
     auto coll = acquireCollection(operationContext(), kTestNss);
-    auto colls = MultipleCollectionAccessor(
-        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+    auto colls =
+        MultipleCollectionAccessor(coll, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
     SamplingEstimatorForTesting estimator(operationContext(),
                                           colls,
@@ -2220,7 +2220,7 @@ TEST_F(SamplingEstimatorTest, EstimateKeysScannedEmptySampleReturnsZero) {
                                           SamplingCEMethodEnum::kRandom,
                                           numChunks,
                                           makeCardinalityEstimate(5000),
-                                          nullptr /*customerQueryExpCtx*/);
+                                          /*customerQueryExpCtx=*/nullptr);
     estimator.setSampleForTesting({});  // empty sample
 
     OrderedIntervalList list("a");
@@ -2236,8 +2236,8 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest, EstimateNDVMultiKeyEmptySampleTasse
     // NDV over an empty sample is undefined. The non-bounded multikey path must fail with an
     // explicit precondition rather than divide by an empty sample and return NaN.
     auto coll = acquireCollection(operationContext(), kTestNss);
-    auto colls = MultipleCollectionAccessor(
-        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+    auto colls =
+        MultipleCollectionAccessor(coll, {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
     SamplingEstimatorForTesting estimator(operationContext(),
                                           colls,
@@ -2247,7 +2247,7 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest, EstimateNDVMultiKeyEmptySampleTasse
                                           SamplingCEMethodEnum::kRandom,
                                           numChunks,
                                           makeCardinalityEstimate(5000),
-                                          nullptr /*customerQueryExpCtx*/);
+                                          /*customerQueryExpCtx=*/nullptr);
     estimator.setSampleForTesting({});  // empty sample
 
     estimator.estimateNDVMultiKey({{.path = "a"}}, boost::none /* non-bounded */);
@@ -2302,7 +2302,7 @@ TEST_F(SamplingEstimatorTest, SamplingEstimatorLoadsMultiPageSample) {
                                           SamplingCEMethodEnum::kRandom,
                                           numChunks,
                                           makeCardinalityEstimate(100),
-                                          nullptr /*customerQueryExpCtx*/);
+                                          /*customerQueryExpCtx=*/nullptr);
     estimator.generateSample(ce::NoProjection{});
 
     const auto& sample = estimator.getSample();
@@ -2390,7 +2390,7 @@ TEST_F(SamplingEstimatorTest, RandomSamplingLoadsPersistentSample) {
                                           SamplingCEMethodEnum::kRandom,
                                           numChunks,
                                           makeCardinalityEstimate(100),
-                                          nullptr /*customerQueryExpCtx*/);
+                                          /*customerQueryExpCtx=*/nullptr);
     estimator.generateSample(ce::NoProjection{});
 
     const auto& sample = estimator.getSample();
@@ -2425,7 +2425,7 @@ TEST_F(SamplingEstimatorTest, RandomSamplingFallsBackOnPersistedMiss) {
                                           SamplingCEMethodEnum::kRandom,
                                           numChunks,
                                           makeCardinalityEstimate(10),
-                                          nullptr /*customerQueryExpCtx*/);
+                                          /*customerQueryExpCtx=*/nullptr);
     estimator.generateSample(ce::NoProjection{});
 
     const auto& sample = estimator.getSample();
@@ -2474,7 +2474,7 @@ TEST_F(SamplingEstimatorTest, OnTheFlySourceSkipsPersistedLookup) {
                                           SamplingCEMethodEnum::kRandom,
                                           numChunks,
                                           makeCardinalityEstimate(10),
-                                          nullptr /*customerQueryExpCtx*/,
+                                          /*customerQueryExpCtx=*/nullptr,
                                           SamplingSourceEnum::kOnTheFlySample);
     estimator.generateSample(ce::NoProjection{});
 
@@ -2523,7 +2523,7 @@ TEST_F(SamplingEstimatorTest, ChunkSamplingLoadsPersistentSample) {
                                           SamplingCEMethodEnum::kChunk,
                                           testNumChunks,
                                           makeCardinalityEstimate(100),
-                                          nullptr /*customerQueryExpCtx*/);
+                                          /*customerQueryExpCtx=*/nullptr);
     estimator.setPersistentSampleMethodForTesting(SamplingCEMethodEnum::kChunk);
     estimator.generateSample(ce::NoProjection{});
 
@@ -2564,7 +2564,7 @@ TEST_F(SamplingEstimatorTest, PersistedLoadFollowsPersistentSampleMethodNotSampl
                                           SamplingCEMethodEnum::kChunk,
                                           testNumChunks,
                                           makeCardinalityEstimate(100),
-                                          nullptr /*customerQueryExpCtx*/);
+                                          /*customerQueryExpCtx=*/nullptr);
     estimator.setPersistentSampleMethodForTesting(SamplingCEMethodEnum::kRandom);
     estimator.generateSample(ce::NoProjection{});
 
@@ -2620,7 +2620,7 @@ TEST_F(SamplingEstimatorTest, PersistedMissFallsBackToOnTheFlyUsingSamplingStyle
                                           SamplingCEMethodEnum::kChunk,
                                           testNumChunks,
                                           makeCardinalityEstimate(sourceDocs.size()),
-                                          nullptr /*customerQueryExpCtx*/);
+                                          /*customerQueryExpCtx=*/nullptr);
     estimator.setPersistentSampleMethodForTesting(SamplingCEMethodEnum::kRandom);
     estimator.generateSample(ce::NoProjection{});
 
@@ -2677,7 +2677,7 @@ TEST_F(SamplingEstimatorTest, RandomSamplingSkipsPersistentSampleWhenFeatureFlag
                                           SamplingCEMethodEnum::kRandom,
                                           numChunks,
                                           makeCardinalityEstimate(10),
-                                          nullptr /*customerQueryExpCtx*/);
+                                          /*customerQueryExpCtx=*/nullptr);
     estimator.generateSample(ce::NoProjection{});
 
     const auto& sample = estimator.getSample();
@@ -2730,7 +2730,7 @@ TEST_F(SamplingEstimatorTest, ChunkSamplingSkipsPersistentSampleWhenFeatureFlagD
                                           SamplingCEMethodEnum::kChunk,
                                           testNumChunks,
                                           makeCardinalityEstimate(100),
-                                          nullptr /*customerQueryExpCtx*/);
+                                          /*customerQueryExpCtx=*/nullptr);
     estimator.generateSample(ce::NoProjection{});
 
     const auto& sample = estimator.getSample();
@@ -2794,7 +2794,7 @@ TEST_F(SamplingEstimatorTest, MalformedPersistentSampleFallsBackToOnTheFly) {
                                           SamplingCEMethodEnum::kRandom,
                                           numChunks,
                                           makeCardinalityEstimate(100),
-                                          nullptr /*customerQueryExpCtx*/);
+                                          /*customerQueryExpCtx=*/nullptr);
     estimator.generateSample(ce::NoProjection{});
 
     const auto& sample = estimator.getSample();
@@ -2808,7 +2808,7 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
              GenerateSampleAssertsOnReuse,
              "SamplingEstimatorImpl must not be reused") {
     auto estimator =
-        createSamplingEstimatorForTesting(10 /* collCard */, kSampleSize, ce::NoProjection{});
+        createSamplingEstimatorForTesting(/*collCard=*/10, kSampleSize, ce::NoProjection{});
     // This is indeed the 2nd call since createSamplingEstimatorForTesting() calls generateSample()
     // once already.
     estimator.generateSample(ce::NoProjection{});
@@ -2818,7 +2818,7 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
              GetSamplingMetadataAssertsOnNonOwnedDoc,
              "Sample documents must be owned BSONObjs") {
     auto estimator =
-        createSamplingEstimatorForTesting(10 /* collCard */, kSampleSize, ce::NoProjection{});
+        createSamplingEstimatorForTesting(/*collCard=*/10, kSampleSize, ce::NoProjection{});
 
     // Create a non-owned BSONObj (raw-pointer view into an existing buffer).
     auto owned = BSON("a" << 1);
@@ -2844,7 +2844,7 @@ TEST_F(SamplingEstimatorTest, OnTheFlyFullSampleIsAuthoritative) {
                                           SamplingCEMethodEnum::kRandom,
                                           boost::none,
                                           makeCardinalityEstimate(collectionSize),
-                                          nullptr /*customerQueryExpCtx*/,
+                                          /*customerQueryExpCtx=*/nullptr,
                                           SamplingSourceEnum::kOnTheFlySample);
     estimator.generateSample(ce::NoProjection{});
     ASSERT_EQUALS(estimator.getSample().size(), static_cast<size_t>(collectionSize));

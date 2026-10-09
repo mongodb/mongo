@@ -505,7 +505,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
                         _critSecReason,
                         ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
                         *onReleaseCriticalSectionAction,
-                        false /*throwIfReasonDiffers*/);
+                        /*throwIfReasonDiffers=*/false);
 
                 // If for any reason the operation got aborted while the critical section is held
                 // and the release in resharding::withCriticalSectionForTempCollection fails then we
@@ -517,7 +517,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
                         _critSecReason,
                         ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
                         *onReleaseCriticalSectionAction,
-                        false /*throwIfReasonDiffers*/);
+                        /*throwIfReasonDiffers=*/false);
 
                 _metrics->setEndFor(ReshardingMetrics::TimedPhase::kCriticalSection,
                                     resharding::getCurrentTime());
@@ -1119,7 +1119,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_createAndStartC
                 auto opCtx = _makeOperationContext(factory);
 
                 ChangeStreamsMonitorContext changeStreamsMonitorCtx(startAtOperationTime,
-                                                                    0 /* documentsDelta */);
+                                                                    /*documentsDelta=*/0);
                 _updateDonorDocument(opCtx.get(), std::move(changeStreamsMonitorCtx));
 
                 // Wait for the write above to be majority committed to make sure it cannot be
@@ -1553,7 +1553,7 @@ void ReshardingDonorService::DonorStateMachine::_removeDonorDocument(
                       coll,
                       BSON(ReshardingDonorDocument::kReshardingUUIDFieldName
                            << _metadata.getReshardingUUID()),
-                      true /* justOne */);
+                      /*justOne=*/true);
 
         wuow.commit();
     });

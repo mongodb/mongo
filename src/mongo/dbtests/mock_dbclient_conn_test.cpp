@@ -293,7 +293,7 @@ TEST(MockDBClientConnTest, SimpleRemove) {
 
     {
         MockDBClientConnection conn(&server);
-        conn.remove(nss, BSONObj{} /*filter*/);
+        conn.remove(nss, /*filter=*/BSONObj{});
     }
 
     {
@@ -332,7 +332,7 @@ TEST(MockDBClientConnTest, MultiNSRemove) {
 
     {
         MockDBClientConnection conn(&server);
-        conn.remove(nss2, BSONObj{} /*filter*/);
+        conn.remove(nss2, /*filter=*/BSONObj{});
 
         std::unique_ptr<mongo::DBClientCursor> cursor = conn.find(FindCommandRequest(nss2));
         ASSERT(!cursor->more());
@@ -378,7 +378,7 @@ TEST(MockDBClientConnTest, InsertAfterRemove) {
 
     {
         MockDBClientConnection conn(&server);
-        conn.remove(nss, BSONObj{} /*filter*/);
+        conn.remove(nss, /*filter=*/BSONObj{});
     }
 
     {
@@ -681,7 +681,7 @@ TEST(MockDBClientConnTest, SimulateCallAndRecvResponses) {
     MockDBClientConnection conn(&server);
 
     FindCommandRequest findCmd{nss};
-    mongo::DBClientCursor cursor(&conn, findCmd, ReadPreferenceSetting{}, true /*isExhaust*/);
+    mongo::DBClientCursor cursor(&conn, findCmd, ReadPreferenceSetting{}, /*isExhaust=*/true);
     cursor.setBatchSize(2);
 
     // Two batches from the initial find and getMore command.
@@ -794,7 +794,7 @@ TEST(MockDBClientConnTest, SimulateRecvErrors) {
     MockDBClientConnection conn(&server);
 
     mongo::DBClientCursor cursor(
-        &conn, FindCommandRequest{nss}, ReadPreferenceSetting{}, true /*isExhaust*/);
+        &conn, FindCommandRequest{nss}, ReadPreferenceSetting{}, /*isExhaust=*/true);
 
     runUntilExhaustRecv(&conn, &cursor);
 
@@ -839,7 +839,7 @@ TEST(MockDBClientConnTest, BlockingNetwork) {
     MockDBClientConnection conn(&server);
 
     mongo::DBClientCursor cursor(
-        &conn, FindCommandRequest{nss}, ReadPreferenceSetting{}, true /*isExhaust*/);
+        &conn, FindCommandRequest{nss}, ReadPreferenceSetting{}, /*isExhaust=*/true);
     cursor.setBatchSize(1);
 
     mongo::stdx::thread cursorThread([&] {
@@ -892,7 +892,7 @@ TEST(MockDBClientConnTest, ShutdownServerBeforeCall) {
     MockDBClientConnection conn(&server);
     conn.connect(mongo::HostAndPort("localhost", 12345), std::string_view(), boost::none);
     mongo::DBClientCursor cursor(
-        &conn, FindCommandRequest{nss}, ReadPreferenceSetting{}, true /*isExhaust*/);
+        &conn, FindCommandRequest{nss}, ReadPreferenceSetting{}, /*isExhaust=*/true);
 
     // Shut down server before call.
     server.shutdown();
@@ -911,7 +911,7 @@ TEST(MockDBClientConnTest, ShutdownServerAfterCall) {
     MockDBClientConnection conn(&server);
 
     mongo::DBClientCursor cursor(
-        &conn, FindCommandRequest{nss}, ReadPreferenceSetting{}, true /*isExhaust*/);
+        &conn, FindCommandRequest{nss}, ReadPreferenceSetting{}, /*isExhaust=*/true);
 
     mongo::stdx::thread cursorThread([&] {
         ASSERT_THROWS_CODE(cursor.init(), mongo::DBException, mongo::ErrorCodes::HostUnreachable);
@@ -935,7 +935,7 @@ TEST(MockDBClientConnTest, ConnectionAutoReconnect) {
 
     conn.connect(mongo::HostAndPort("localhost", 12345), std::string_view(), boost::none);
     mongo::DBClientCursor cursor(
-        &conn, FindCommandRequest{nss}, ReadPreferenceSetting{}, true /*isExhaust*/);
+        &conn, FindCommandRequest{nss}, ReadPreferenceSetting{}, /*isExhaust=*/true);
 
     server.shutdown();
 
@@ -961,7 +961,7 @@ TEST(MockDBClientConnTest, ShutdownServerBeforeRecv) {
     MockDBClientConnection conn(&server, autoReconnect);
 
     mongo::DBClientCursor cursor(
-        &conn, FindCommandRequest{nss}, ReadPreferenceSetting{}, true /*isExhaust*/);
+        &conn, FindCommandRequest{nss}, ReadPreferenceSetting{}, /*isExhaust=*/true);
 
     runUntilExhaustRecv(&conn, &cursor);
 
@@ -980,7 +980,7 @@ TEST(MockDBClientConnTest, ShutdownServerAfterRecv) {
     MockDBClientConnection conn(&server);
 
     mongo::DBClientCursor cursor(
-        &conn, FindCommandRequest{nss}, ReadPreferenceSetting{}, true /*isExhaust*/);
+        &conn, FindCommandRequest{nss}, ReadPreferenceSetting{}, /*isExhaust=*/true);
 
     runUntilExhaustRecv(&conn, &cursor);
 

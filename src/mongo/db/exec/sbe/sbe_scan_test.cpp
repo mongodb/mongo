@@ -80,18 +80,18 @@ TEST_F(ScanStageTest, genericScanStage) {
             sbe::makeS<sbe::GenericScanStage>(uuid,
                                               dbName,
                                               scanSlot,
-                                              boost::none /* recordIdSlot */,
-                                              boost::none /* snapshotIdSlot */,
-                                              boost::none /* indexIdentSlot */,
-                                              boost::none /* indexKeySlot */,
-                                              boost::none /* indexKeyPatternSlot */,
-                                              std::vector<std::string>{} /* scanFieldNames */,
+                                              /*recordIdSlot=*/boost::none,
+                                              /*snapshotIdSlot=*/boost::none,
+                                              /*indexIdentSlot=*/boost::none,
+                                              /*indexKeySlot=*/boost::none,
+                                              /*indexKeyPatternSlot=*/boost::none,
+                                              /*scanFieldNames=*/std::vector<std::string>{},
                                               scanFieldSlots,
-                                              true /* forward */,
-                                              nullptr /* yieldPolicy */,
+                                              /*forward=*/true,
+                                              /*yieldPolicy=*/nullptr,
                                               kEmptyPlanNodeId,
-                                              nullptr /* scanOpenCallback */,
-                                              false /* participateInTrialRunTracking */);
+                                              /*scanOpenCallback=*/nullptr,
+                                              /*participateInTrialRunTracking=*/false);
 
         return std::make_pair(scanSlot, std::move(scanStage));
     };

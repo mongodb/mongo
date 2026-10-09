@@ -444,7 +444,7 @@ TEST_F(ReplicaSetAwareServiceTest, ReplicaSetAwareService) {
     ReplicaSetAwareServiceRegistry::get(sc).onSetCurrentConfig(opCtx);
     ReplicaSetAwareServiceRegistry::get(sc).onSetCurrentConfig(opCtx);
     ReplicaSetAwareServiceRegistry::get(sc).onConsistentDataAvailable(
-        opCtx, false /* isMajority */, false /* isRollback */);
+        opCtx, /*isMajority=*/false, /*isRollback=*/false);
     ReplicaSetAwareServiceRegistry::get(sc).onStepUpBegin(opCtx, _term);
     ReplicaSetAwareServiceRegistry::get(sc).onStepUpBegin(opCtx, _term);
     ReplicaSetAwareServiceRegistry::get(sc).onStepUpBegin(opCtx, _term);

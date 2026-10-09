@@ -262,7 +262,7 @@ void ArithmeticAverageHashAggAccumulatorBase::accumulateTransformedValue(
             "Expected count to have 64-bit integer type",
             countTagVal.tag == value::TypeTags::NumberInt64);
     arrayState->setAt(
-        1 /* idx */,
+        /*idx=*/1,
         countTagVal.tag,
         value::bitcastFrom<int64_t>(value::bitcastTo<int64_t>(countTagVal.value) + 1));
 }

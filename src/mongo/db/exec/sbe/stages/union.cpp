@@ -24,7 +24,7 @@ UnionStage::UnionStage(PlanStage::Vector inputStages,
                        value::SlotVector outputVals,
                        PlanNodeId planNodeId,
                        bool participateInTrialRunTracking)
-    : PlanStage("union"sv, nullptr /* yieldPolicy */, planNodeId, participateInTrialRunTracking),
+    : PlanStage("union"sv, /*yieldPolicy=*/nullptr, planNodeId, participateInTrialRunTracking),
       _inputVals{std::move(inputVals)},
       _outputVals{std::move(outputVals)} {
     _children = std::move(inputStages);

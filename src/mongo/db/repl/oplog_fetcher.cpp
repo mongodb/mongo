@@ -395,7 +395,7 @@ void OplogFetcher::_runQuery(const executor::TaskExecutor::CallbackArgs& callbac
     }
 
     _setMetadataWriterAndReader();
-    auto cursorStatus = _createNewCursor(true /* initialFind */);
+    auto cursorStatus = _createNewCursor(/*initialFind=*/true);
     while (true) {
         Status status{Status::OK()};
         {

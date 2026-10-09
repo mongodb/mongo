@@ -300,7 +300,7 @@ void CursorEstablisher::_waitForResponse() {
                 !throwDuringCursorResponseValidation.shouldFail());
 
         // Validate the response. If this throws, we still have the cursor in the cleanup list.
-        _ars->validateResponse(*maybeResponse, false /* forMergeCursors */);
+        _ars->validateResponse(*maybeResponse, /*forMergeCursors=*/false);
         responseData = uassertStatusOK(std::move(maybeResponse->swResponse)).data;
     } catch (const DBException& ex) {
         _handleFailure(maybeResponse, ex.toStatus(), /* isInterruption */ true);
@@ -540,9 +540,9 @@ void CursorEstablisher::killOpOnShards(std::shared_ptr<executor::TaskExecutor> e
             host,
             DatabaseName::kAdmin,
             BSON("_killOperations" << 1 << "operationKeys" << opKeyArrayBuilder.arr()),
-            nullptr /* opCtx */,
+            /*opCtx=*/nullptr,
             executor::RemoteCommandRequest::kNoTimeout,
-            true /* fireAndForget */);
+            /*fireAndForget=*/true);
 
         // We do not process the response to the killOperations request (we make a good-faith
         // attempt at cleaning up the cursors, but ignore any returned errors).

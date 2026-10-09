@@ -467,7 +467,7 @@ std::unique_ptr<RoutingContext> createDatabasesAndGetRoutingCtx(
             if (refresh) {
                 for (const auto& nss : nssList) {
                     Grid::get(opCtx)->catalogCache()->onStaleCollectionVersion(
-                        nss, boost::none /* wantedVersion */);
+                        nss, /*wantedVersion=*/boost::none);
                 }
             }
 

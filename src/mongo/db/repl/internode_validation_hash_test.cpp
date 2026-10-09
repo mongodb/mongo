@@ -1815,8 +1815,8 @@ protected:
         _workerPool = makeReplWorkerPool();
         _lsid = makeLogicalSessionId(_opCtx.get());
         _oplogApplier = std::make_unique<OplogApplierImpl>(
-            nullptr /* executor */,
-            nullptr /* oplogBuffer */,
+            /*executor=*/nullptr,
+            /*oplogBuffer=*/nullptr,
             &noopOplogApplierObserver,
             ReplicationCoordinator::get(_opCtx.get()),
             getConsistencyMarkers(),
@@ -2185,7 +2185,7 @@ protected:
                                                                Date_t::now(),
                                                                {StmtId(0)},
                                                                OpTime(),
-                                                               boost::none /* multiOpType */,
+                                                               /*multiOpType=*/boost::none,
                                                                ApplyOpsType::kPrepare);
         const OplogEntry commitEntry = makeCommandOplogEntryWithSessionInfoAndStmtIds(
             nextOpTime(),

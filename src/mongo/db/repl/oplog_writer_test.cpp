@@ -72,7 +72,7 @@ DEATH_TEST_F(OplogWriterTestDeathTest,
     auto& executor = getExecutor();
     executor.startup();
 
-    OplogWriter::Options options(false /* skipWritesToOplogColl */);
+    OplogWriter::Options options(/*skipWritesToOplogColl=*/false);
 
     FailingOplogWriter oplogWriter(&executor, options);
 

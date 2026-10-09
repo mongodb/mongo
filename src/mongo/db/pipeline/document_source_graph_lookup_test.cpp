@@ -439,8 +439,8 @@ TEST_F(DocumentSourceGraphLookUpTest, LiteParsedGraphLookupForeignExecutionNames
 
 TEST_F(DocumentSourceGraphLookUpTest, LiteParsedGraphLookupRequiredPrivileges) {
     auto liteParsed = parseLiteGraphLookup(getExpCtx());
-    auto privileges = liteParsed->requiredPrivileges(/*isMongos*/ false,
-                                                     /*bypassDocumentValidation*/ false);
+    auto privileges = liteParsed->requiredPrivileges(/*isMongos=*/false,
+                                                     /*bypassDocumentValidation=*/false);
     ASSERT_EQ(1ul, privileges.size());
     ASSERT_EQ(privileges[0].getResourcePattern(), ResourcePattern::forExactNamespace(kForeignNs));
     ASSERT_TRUE(privileges[0].getActions().contains(ActionType::find));
@@ -496,7 +496,7 @@ TEST_F(DocumentSourceGraphLookUpTest, LiteParsedGraphLookupBindResolvedNamespace
     map.emplace(
         kForeignNs,
         ResolvedNamespace(
-            kForeignNs, std::vector<BSONObj>{}, boost::none, false /*involvedNamespaceIsAView*/));
+            kForeignNs, std::vector<BSONObj>{}, boost::none, /*involvedNamespaceIsAView=*/false));
 
     liteParsed->bindResolvedNamespace(ResolvedNamespace{}, map);
 

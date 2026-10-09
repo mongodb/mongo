@@ -155,7 +155,7 @@ protected:
 
     TransactionRouterTest()
         : ShardingTestFixture(
-              false /* withMockCatalogCache */,
+              /*withMockCatalogCache=*/false,
               std::make_unique<ScopedGlobalServiceContextForTest>(
                   ServiceContext::make(std::make_unique<ClockSourceMock>(),
                                        std::make_unique<ClockSourceMock>(),
@@ -634,7 +634,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, StartOrContinueWithMatchingReadC
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStartOrContinue);
 
     // Verify that sub-router and opCtx read concern args match:
-    auto activeState = txnRouter.reportState(operationContext(), true /* sessionIsActive */);
+    auto activeState = txnRouter.reportState(operationContext(), /*sessionIsActive=*/true);
     ASSERT(activeState.hasField("transaction"));
     ASSERT(activeState["transaction"].Obj().hasField("parameters"));
     ASSERT(activeState["transaction"].Obj()["parameters"].Obj().hasField("readConcern"));
@@ -690,7 +690,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, StartOrContinueWithMismatchedRea
     repl::ReadConcernArgs::get(operationContext()) = newReadConcernArgs;
 
     // Verify that the sub-router's read concern args have not changed:
-    auto activeState = txnRouter.reportState(operationContext(), true /* sessionIsActive */);
+    auto activeState = txnRouter.reportState(operationContext(), /*sessionIsActive=*/true);
     ASSERT(activeState.hasField("transaction"));
     ASSERT(activeState["transaction"].Obj().hasField("parameters"));
     ASSERT(activeState["transaction"].Obj()["parameters"].Obj().hasField("readConcern"));
@@ -737,7 +737,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, StartOrContinueWithSnapshotRCSet
         ASSERT_BSONOBJ_EQ(expectedNewObj, newCmd);
     }
 
-    auto activeState = txnRouter.reportState(operationContext(), true /* sessionIsActive */);
+    auto activeState = txnRouter.reportState(operationContext(), /*sessionIsActive=*/true);
     ASSERT(activeState.hasField("transaction"));
     ASSERT(activeState["transaction"].Obj().hasField("globalReadTimestamp"));
     Timestamp routerGlobalReadTimestamp =
@@ -2582,7 +2582,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
         auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
         ASSERT_EQ(cmdName, "commitTransaction");
 
-        checkSessionDetails(request.cmdObj, getSessionId(), txnNum, true /* isCoordinator */);
+        checkSessionDetails(request.cmdObj, getSessionId(), txnNum, /*isCoordinator=*/true);
 
         return BSON("ok" << 1);
     });
@@ -2622,7 +2622,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
         auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
         ASSERT_EQ(cmdName, "commitTransaction");
 
-        checkSessionDetails(request.cmdObj, getSessionId(), txnNum, true /* isCoordinator */);
+        checkSessionDetails(request.cmdObj, getSessionId(), txnNum, /*isCoordinator=*/true);
 
         return BSON("ok" << 1);
     });
@@ -2723,7 +2723,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
         auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
         ASSERT_EQ(cmdName, "commitTransaction");
 
-        checkSessionDetails(request.cmdObj, getSessionId(), txnNum, true /* isCoordinator */);
+        checkSessionDetails(request.cmdObj, getSessionId(), txnNum, /*isCoordinator=*/true);
 
         return BSON("ok" << 1);
     });
@@ -2735,7 +2735,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
         auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
         ASSERT_EQ(cmdName, "commitTransaction");
 
-        checkSessionDetails(request.cmdObj, getSessionId(), txnNum, false /* isCoordinator */);
+        checkSessionDetails(request.cmdObj, getSessionId(), txnNum, /*isCoordinator=*/false);
 
         return BSON("ok" << 1);
     });
@@ -2790,7 +2790,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
             expectedParticipants.erase(shardId);
         }
 
-        checkSessionDetails(request.cmdObj, getSessionId(), txnNum, true /* isCoordinator */);
+        checkSessionDetails(request.cmdObj, getSessionId(), txnNum, /*isCoordinator=*/true);
 
         return BSON("ok" << 1);
     });
@@ -2883,7 +2883,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
         auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
         ASSERT_EQ(cmdName, "commitTransaction");
 
-        checkSessionDetails(request.cmdObj, getSessionId(), txnNum, true /* isCoordinator */);
+        checkSessionDetails(request.cmdObj, getSessionId(), txnNum, /*isCoordinator=*/true);
 
         return BSON("ok" << 1);
     });
@@ -2895,7 +2895,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
         auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
         ASSERT_EQ(cmdName, "commitTransaction");
 
-        checkSessionDetails(request.cmdObj, getSessionId(), txnNum, false /* isCoordinator */);
+        checkSessionDetails(request.cmdObj, getSessionId(), txnNum, /*isCoordinator=*/false);
 
         return BSON("ok" << 1);
     });
@@ -2936,7 +2936,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
         auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
         ASSERT_EQ(cmdName, "commitTransaction");
 
-        checkSessionDetails(request.cmdObj, getSessionId(), txnNum, false /* isCoordinator */);
+        checkSessionDetails(request.cmdObj, getSessionId(), txnNum, /*isCoordinator=*/false);
 
         return BSON("ok" << 1);
     });
@@ -2948,7 +2948,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
         auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
         ASSERT_EQ(cmdName, "commitTransaction");
 
-        checkSessionDetails(request.cmdObj, getSessionId(), txnNum, true /* isCoordinator */);
+        checkSessionDetails(request.cmdObj, getSessionId(), txnNum, /*isCoordinator=*/true);
 
         return BSON("ok" << 1);
     });
@@ -3002,7 +3002,7 @@ TEST_F(
             expectedParticipants.erase(shardId);
         }
 
-        checkSessionDetails(request.cmdObj, getSessionId(), txnNum, true /* isCoordinator */);
+        checkSessionDetails(request.cmdObj, getSessionId(), txnNum, /*isCoordinator=*/true);
 
         return BSON("ok" << 1);
     });
@@ -3149,7 +3149,7 @@ TEST_F(TransactionRouterTest, AppendFieldsForStartTransactionDefaultRC) {
             defaultRCArgs,
             boost::none,
             LogicalTime{Timestamp(10, 1)},
-            true /* doAppendStartTransaction */,
+            /*doAppendStartTransaction=*/true,
             /*startOrContinueTransaction=*/false,
             createdDatabases);
 
@@ -3174,8 +3174,8 @@ TEST_F(TransactionRouterTest, AppendFieldsForStartTransactionDefaultRC) {
         ASSERT_BSONOBJ_EQ(expectedDatabaseVersion.toBSON(), result["databaseVersion"].Obj());
     };
 
-    test(false /* hasTxnCreatedAnyDatabase */);
-    test(true /* hasTxnCreatedAnyDatabase */);
+    test(/*hasTxnCreatedAnyDatabase=*/false);
+    test(/*hasTxnCreatedAnyDatabase=*/true);
 }
 
 TEST_F(TransactionRouterTest, AppendFieldsForStartTransactionDefaultRCMajority) {
@@ -3198,7 +3198,7 @@ TEST_F(TransactionRouterTest, AppendFieldsForStartTransactionDefaultRCMajority) 
             defaultRCArgs,
             boost::none,
             placementConflictTime,
-            true /* doAppendStartTransaction */,
+            /*doAppendStartTransaction=*/true,
             /*startOrContinueTransaction=*/false,
             createdDatabases);
 
@@ -3237,8 +3237,8 @@ TEST_F(TransactionRouterTest, AppendFieldsForStartTransactionDefaultRCMajority) 
                   trcResult.getCreatedDatabases());
     };
 
-    test(false /* hasTxnCreatedAnyDatabase */);
-    test(true /* hasTxnCreatedAnyDatabase */);
+    test(/*hasTxnCreatedAnyDatabase=*/false);
+    test(/*hasTxnCreatedAnyDatabase=*/true);
 }
 
 TEST_F(TransactionRouterTest, AppendFieldsForStartTransactionDefaultRCCommandSpecifiesRCLocal) {
@@ -3261,7 +3261,7 @@ TEST_F(TransactionRouterTest, AppendFieldsForStartTransactionDefaultRCCommandSpe
             defaultRCArgs,
             boost::none,
             placementConflictTime,
-            true /* doAppendStartTransaction */,
+            /*doAppendStartTransaction=*/true,
             /*startOrContinueTransaction=*/false,
             createdDatabases);
 
@@ -3299,8 +3299,8 @@ TEST_F(TransactionRouterTest, AppendFieldsForStartTransactionDefaultRCCommandSpe
                   trcResult.getCreatedDatabases());
     };
 
-    test(false /* hasTxnCreatedAnyDatabase */);
-    test(true /* hasTxnCreatedAnyDatabase */);
+    test(/*hasTxnCreatedAnyDatabase=*/false);
+    test(/*hasTxnCreatedAnyDatabase=*/true);
 }
 
 TEST_F(TransactionRouterTest, AppendFieldsForStartTransactionDefaultRCCommandSpecifiesRCSnapshot) {
@@ -3324,7 +3324,7 @@ TEST_F(TransactionRouterTest, AppendFieldsForStartTransactionDefaultRCCommandSpe
             defaultRCArgs,
             atClusterTime,
             boost::none,
-            false /* doAppendStartTransaction */,
+            /*doAppendStartTransaction=*/false,
             /*startOrContinueTransaction=*/false,
             createdDatabases);
 
@@ -3355,8 +3355,8 @@ TEST_F(TransactionRouterTest, AppendFieldsForStartTransactionDefaultRCCommandSpe
                   trcResult.getCreatedDatabases());
     };
 
-    test(false /* hasTxnCreatedAnyDatabase */);
-    test(true /* hasTxnCreatedAnyDatabase */);
+    test(/*hasTxnCreatedAnyDatabase=*/false);
+    test(/*hasTxnCreatedAnyDatabase=*/true);
 }
 
 TEST_F(TransactionRouterTest,
@@ -3382,7 +3382,7 @@ TEST_F(TransactionRouterTest,
             defaultRCArgs,
             atClusterTime,
             boost::none,
-            false /* doAppendStartTransaction */,
+            /*doAppendStartTransaction=*/false,
             /*startOrContinueTransaction=*/false,
             createdDatabases);
 
@@ -3412,14 +3412,14 @@ TEST_F(TransactionRouterTest,
                   trcResult.getCreatedDatabases());
     };
 
-    test(false /* hasTxnCreatedAnyDatabase */);
-    test(true /* hasTxnCreatedAnyDatabase */);
+    test(/*hasTxnCreatedAnyDatabase=*/false);
+    test(/*hasTxnCreatedAnyDatabase=*/true);
 }
 
 TEST_F(TransactionRouterTest, AppendFieldsForContinueTransactionNoShardVersion) {
     const auto placementConflictTime = LogicalTime{Timestamp(10, 1)};
     auto result = TransactionRouter::appendFieldsForContinueTransaction(
-        operationContext(), BSON("MyCmd" << 1), placementConflictTime, {} /* createdDatabases */);
+        operationContext(), BSON("MyCmd" << 1), placementConflictTime, /*createdDatabases=*/{});
 
     ASSERT_BSONOBJ_EQ(BSON("MyCmd"
                            << 1 << "transactionRuntimeContext"
@@ -3466,14 +3466,14 @@ TEST_F(TransactionRouterTest, AppendFieldsForContinueTransactionWithShardVersion
     {
         unittest::ServerParameterGuard ff(
             "featureFlagAddTransactionRuntimeContextAsAGenericArgument", false);
-        test(false /* hasTxnCreatedAnyDatabase */);
-        test(true /* hasTxnCreatedAnyDatabase */);
+        test(/*hasTxnCreatedAnyDatabase=*/false);
+        test(/*hasTxnCreatedAnyDatabase=*/true);
     }
     {
         unittest::ServerParameterGuard ff(
             "featureFlagAddTransactionRuntimeContextAsAGenericArgument", true);
-        test(false /* hasTxnCreatedAnyDatabase */);
-        test(true /* hasTxnCreatedAnyDatabase */);
+        test(/*hasTxnCreatedAnyDatabase=*/false);
+        test(/*hasTxnCreatedAnyDatabase=*/true);
     }
 }
 
@@ -3508,14 +3508,14 @@ TEST_F(TransactionRouterTest, AppendFieldsForContinueTransactionWithShardVersion
     {
         unittest::ServerParameterGuard ff(
             "featureFlagAddTransactionRuntimeContextAsAGenericArgument", false);
-        test(false /* hasTxnCreatedAnyDatabase */);
-        test(true /* hasTxnCreatedAnyDatabase */);
+        test(/*hasTxnCreatedAnyDatabase=*/false);
+        test(/*hasTxnCreatedAnyDatabase=*/true);
     }
     {
         unittest::ServerParameterGuard ff(
             "featureFlagAddTransactionRuntimeContextAsAGenericArgument", true);
-        test(false /* hasTxnCreatedAnyDatabase */);
-        test(true /* hasTxnCreatedAnyDatabase */);
+        test(/*hasTxnCreatedAnyDatabase=*/false);
+        test(/*hasTxnCreatedAnyDatabase=*/true);
     }
 }
 
@@ -3589,15 +3589,15 @@ TEST_F(TransactionRouterTest,
         const bool ffEnabled = false;
         unittest::ServerParameterGuard ff(
             "featureFlagAddTransactionRuntimeContextAsAGenericArgument", ffEnabled);
-        test(false /* hasTxnCreatedAnyDatabase */, ffEnabled);
-        test(true /* hasTxnCreatedAnyDatabase */, ffEnabled);
+        test(/*hasTxnCreatedAnyDatabase=*/false, ffEnabled);
+        test(/*hasTxnCreatedAnyDatabase=*/true, ffEnabled);
     }
     {
         const bool ffEnabled = true;
         unittest::ServerParameterGuard ff(
             "featureFlagAddTransactionRuntimeContextAsAGenericArgument", ffEnabled);
-        test(false /* hasTxnCreatedAnyDatabase */, ffEnabled);
-        test(true /* hasTxnCreatedAnyDatabase */, ffEnabled);
+        test(/*hasTxnCreatedAnyDatabase=*/false, ffEnabled);
+        test(/*hasTxnCreatedAnyDatabase=*/true, ffEnabled);
     }
 }
 
@@ -3632,7 +3632,7 @@ TEST_F(TransactionRouterTest,
                                                                defaultRCArgs,
                                                                boost::none,
                                                                placementConflictTime,
-                                                               true /* doAppendStartTransaction */,
+                                                               /*doAppendStartTransaction=*/true,
                                                                /*startOrContinueTransaction=*/false,
                                                                createdDatabases);
 
@@ -3676,15 +3676,15 @@ TEST_F(TransactionRouterTest,
         const bool ffEnabled = false;
         unittest::ServerParameterGuard ff(
             "featureFlagAddTransactionRuntimeContextAsAGenericArgument", ffEnabled);
-        test(false /* hasTxnCreatedAnyDatabase */, ffEnabled);
-        test(true /* hasTxnCreatedAnyDatabase */, ffEnabled);
+        test(/*hasTxnCreatedAnyDatabase=*/false, ffEnabled);
+        test(/*hasTxnCreatedAnyDatabase=*/true, ffEnabled);
     }
     {
         const bool ffEnabled = true;
         unittest::ServerParameterGuard ff(
             "featureFlagAddTransactionRuntimeContextAsAGenericArgument", ffEnabled);
-        test(false /* hasTxnCreatedAnyDatabase */, ffEnabled);
-        test(true /* hasTxnCreatedAnyDatabase */, ffEnabled);
+        test(/*hasTxnCreatedAnyDatabase=*/false, ffEnabled);
+        test(/*hasTxnCreatedAnyDatabase=*/true, ffEnabled);
     }
 }
 
@@ -3720,7 +3720,7 @@ TEST_F(TransactionRouterTest, CommitWithRecoveryTokenWithNoParticipants) {
         auto participantElements = request.cmdObj["participants"].Array();
         ASSERT_TRUE(participantElements.empty());
 
-        checkSessionDetails(request.cmdObj, lsid, txnNum, true /* isCoordinator */);
+        checkSessionDetails(request.cmdObj, lsid, txnNum, /*isCoordinator=*/true);
         checkWriteConcern(request.cmdObj, writeConcern);
 
         return BSON("ok" << 1);
@@ -3746,7 +3746,7 @@ TEST_F(TransactionRouterTest, CommitWithRecoveryTokenWithNoParticipants) {
         auto participantElements = request.cmdObj["participants"].Array();
         ASSERT_TRUE(participantElements.empty());
 
-        checkSessionDetails(request.cmdObj, lsid, txnNum, true /* isCoordinator */);
+        checkSessionDetails(request.cmdObj, lsid, txnNum, /*isCoordinator=*/true);
         checkWriteConcern(request.cmdObj, writeConcern);
 
         return BSON("ok" << 1);
@@ -3788,7 +3788,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
             auto participantElements = request.cmdObj["participants"].Array();
             ASSERT_TRUE(participantElements.empty());
 
-            checkSessionDetails(request.cmdObj, getSessionId(), txnNum, true /* isCoordinator */);
+            checkSessionDetails(request.cmdObj, getSessionId(), txnNum, /*isCoordinator=*/true);
             checkWriteConcern(request.cmdObj, writeConcern);
 
             return BSON("ok" << 1);
@@ -3843,7 +3843,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
                 expectedParticipants.erase(shardId);
             }
 
-            checkSessionDetails(request.cmdObj, getSessionId(), txnNum, true /* isCoordinator */);
+            checkSessionDetails(request.cmdObj, getSessionId(), txnNum, /*isCoordinator=*/true);
 
             return BSON("ok" << 1);
         });
@@ -3909,7 +3909,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
                 expectedParticipants.erase(shardId);
             }
 
-            checkSessionDetails(request.cmdObj, getSessionId(), txnNum, true /* isCoordinator */);
+            checkSessionDetails(request.cmdObj, getSessionId(), txnNum, /*isCoordinator=*/true);
 
             return BSON("ok" << 1);
         });
@@ -3940,7 +3940,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
             auto participantElements = request.cmdObj["participants"].Array();
             ASSERT_TRUE(participantElements.empty());
 
-            checkSessionDetails(request.cmdObj, getSessionId(), txnNum, true /* isCoordinator */);
+            checkSessionDetails(request.cmdObj, getSessionId(), txnNum, /*isCoordinator=*/true);
             checkWriteConcern(request.cmdObj, writeConcern);
 
             return BSON("ok" << 1);
@@ -4536,7 +4536,7 @@ TEST_F(TransactionRouterTest, AbortForSingleParticipant) {
         auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
         ASSERT_EQ(cmdName, "abortTransaction");
 
-        checkSessionDetails(request.cmdObj, lsid, txnNum, true /* isCoordinator */);
+        checkSessionDetails(request.cmdObj, lsid, txnNum, /*isCoordinator=*/true);
 
         return kOkReadOnlyFalseResponse;
     });
@@ -4857,7 +4857,7 @@ TEST_F(TransactionRouterTest, ImplicitAbortForSingleParticipant) {
         auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
         ASSERT_EQ(cmdName, "abortTransaction");
 
-        checkSessionDetails(request.cmdObj, lsid, txnNum, true /* isCoordinator */);
+        checkSessionDetails(request.cmdObj, lsid, txnNum, /*isCoordinator=*/true);
 
         return kOkReadOnlyFalseResponse;
     });
@@ -4931,7 +4931,7 @@ TEST_F(TransactionRouterTest, ImplicitAbortIgnoresErrors) {
         auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
         ASSERT_EQ(cmdName, "abortTransaction");
 
-        checkSessionDetails(request.cmdObj, lsid, txnNum, true /* isCoordinator */);
+        checkSessionDetails(request.cmdObj, lsid, txnNum, /*isCoordinator=*/true);
 
         return BSON("ok" << 0);
     });
@@ -6640,14 +6640,14 @@ TEST_F(TransactionRouterMetricsTest, SlowLoggingOnTerminate_FailedCommit) {
 
 TEST_F(TransactionRouterMetricsTest, NoSlowLoggingOnUnknownCommitResult_WriteConcernError) {
     beginSlowTxnWithDefaultTxnNumber();
-    runCommit(kDummyResWithWriteConcernError, false /* expectRetries */);
+    runCommit(kDummyResWithWriteConcernError, /*expectRetries=*/false);
 
     assertDidNotPrintSlowLogLine();
 }
 
 TEST_F(TransactionRouterMetricsTest, NoSlowLoggingOnUnknownCommitResult_RetryableError) {
     beginSlowTxnWithDefaultTxnNumber();
-    runCommit(kDummyRetryableErrorRes, true /* expectRetries */);
+    runCommit(kDummyRetryableErrorRes, /*expectRetries=*/true);
 
     assertDidNotPrintSlowLogLine();
 }
@@ -6661,7 +6661,7 @@ TEST_F(TransactionRouterMetricsTest, NoSlowLoggingOnUnknownCommitResult_FailureT
 
 TEST_F(TransactionRouterMetricsTest, NoSlowLoggingOnUnknownCommitResult_RetryableFailureToSend) {
     beginSlowTxnWithDefaultTxnNumber();
-    runCommit(Status(ErrorCodes::HostUnreachable, "dummy"), true /* expectRetries */);
+    runCommit(Status(ErrorCodes::HostUnreachable, "dummy"), /*expectRetries=*/true);
 
     assertDidNotPrintSlowLogLine();
 }
@@ -6692,7 +6692,7 @@ TEST_F(TransactionRouterMetricsTest, NoSlowLoggingOnUnknownCommitResult_Transact
 
 TEST_F(TransactionRouterMetricsTest, NoSlowLoggingOnImplicitAbortAfterUnknownCommitResult) {
     beginSlowTxnWithDefaultTxnNumber();
-    runCommit(Status(ErrorCodes::HostUnreachable, "dummy"), true /* expectRetries */);
+    runCommit(Status(ErrorCodes::HostUnreachable, "dummy"), /*expectRetries=*/true);
 
     assertDidNotPrintSlowLogLine();
 
@@ -6708,7 +6708,7 @@ TEST_F(TransactionRouterMetricsTest, NoSlowLoggingOnImplicitAbortAfterUnknownCom
 
     assertDidNotPrintSlowLogLine();
 
-    retryCommit(Status(ErrorCodes::HostUnreachable, "dummy"), true /* expectRetries */);
+    retryCommit(Status(ErrorCodes::HostUnreachable, "dummy"), /*expectRetries=*/true);
 
     assertDidNotPrintSlowLogLine();
 }
@@ -6737,7 +6737,7 @@ TEST_F(TransactionRouterMetricsTest, NoSlowLoggingCommitAfterAbort_Successful) {
 
 TEST_F(TransactionRouterMetricsTest, SlowLoggingAfterUnknownCommitResult_Success) {
     beginSlowTxnWithDefaultTxnNumber();
-    runCommit(Status(ErrorCodes::HostUnreachable, "dummy"), true /* expectRetries */);
+    runCommit(Status(ErrorCodes::HostUnreachable, "dummy"), /*expectRetries=*/true);
 
     assertDidNotPrintSlowLogLine();
 
@@ -6752,7 +6752,7 @@ TEST_F(TransactionRouterMetricsTest, SlowLoggingAfterUnknownCommitResult_Success
 
 TEST_F(TransactionRouterMetricsTest, SlowLoggingAfterUnknownCommitResult_Abort) {
     beginSlowTxnWithDefaultTxnNumber();
-    runCommit(Status(ErrorCodes::HostUnreachable, "dummy"), true /* expectRetries */);
+    runCommit(Status(ErrorCodes::HostUnreachable, "dummy"), /*expectRetries=*/true);
 
     assertDidNotPrintSlowLogLine();
 
@@ -6767,11 +6767,11 @@ TEST_F(TransactionRouterMetricsTest, SlowLoggingAfterUnknownCommitResult_Abort) 
 
 TEST_F(TransactionRouterMetricsTest, SlowLoggingAfterUnknownCommitResult_Unknown) {
     beginSlowTxnWithDefaultTxnNumber();
-    runCommit(Status(ErrorCodes::HostUnreachable, "dummy"), true /* expectRetries */);
+    runCommit(Status(ErrorCodes::HostUnreachable, "dummy"), /*expectRetries=*/true);
 
     assertDidNotPrintSlowLogLine();
 
-    retryCommit(Status(ErrorCodes::HostUnreachable, "dummy"), true /* expectRetries */);
+    retryCommit(Status(ErrorCodes::HostUnreachable, "dummy"), /*expectRetries=*/true);
 
     assertDidNotPrintSlowLogLine();
 }
@@ -6949,12 +6949,12 @@ TEST_F(TransactionRouterMetricsTest, CommitStatsNotInReportStatsForFailedCommitA
     expectCommitTransaction(kDummyErrorRes);
     future.default_timed_get();
 
-    auto activeState = txnRouter().reportState(operationContext(), true /* sessionIsActive */);
+    auto activeState = txnRouter().reportState(operationContext(), /*sessionIsActive=*/true);
     ASSERT(activeState.hasField("transaction"));
     ASSERT(!activeState["transaction"].Obj().hasField("commitStartWallClockTime"));
     ASSERT(!activeState["transaction"].Obj().hasField("commitType"));
 
-    auto inactiveState = txnRouter().reportState(operationContext(), false /* sessionIsActive */);
+    auto inactiveState = txnRouter().reportState(operationContext(), /*sessionIsActive=*/false);
     ASSERT(inactiveState.hasField("transaction"));
     ASSERT(!inactiveState["transaction"].Obj().hasField("commitStartWallClockTime"));
     ASSERT(!inactiveState["transaction"].Obj().hasField("commitType"));
@@ -6971,12 +6971,12 @@ TEST_F(TransactionRouterMetricsTest, CommitStatsNotInReportStatsForSuccessfulCom
     expectCommitTransaction(kDummyOkRes);
     future.default_timed_get();
 
-    auto activeState = txnRouter().reportState(operationContext(), true /* sessionIsActive */);
+    auto activeState = txnRouter().reportState(operationContext(), /*sessionIsActive=*/true);
     ASSERT(activeState.hasField("transaction"));
     ASSERT(!activeState["transaction"].Obj().hasField("commitStartWallClockTime"));
     ASSERT(!activeState["transaction"].Obj().hasField("commitType"));
 
-    auto inactiveState = txnRouter().reportState(operationContext(), false /* sessionIsActive */);
+    auto inactiveState = txnRouter().reportState(operationContext(), /*sessionIsActive=*/false);
     ASSERT(inactiveState.hasField("transaction"));
     ASSERT(!inactiveState["transaction"].Obj().hasField("commitStartWallClockTime"));
     ASSERT(!inactiveState["transaction"].Obj().hasField("commitType"));
@@ -6988,14 +6988,14 @@ TEST_F(TransactionRouterMetricsTest, DurationsAdvanceAfterUnknownCommitResult) {
     tickSource()->advance(Microseconds(50));
     assertDurationIs(Microseconds(50));
 
-    runCommit(Status(ErrorCodes::HostUnreachable, "dummy"), true /* expectRetries */);
+    runCommit(Status(ErrorCodes::HostUnreachable, "dummy"), /*expectRetries=*/true);
 
     // Both duration and commit can still advance.
     tickSource()->advance(Microseconds(100));
     assertDurationIs(Microseconds(150));
     assertCommitDurationIs(Microseconds(100));
 
-    runCommit(kDummyRetryableErrorRes, true /* expectRetries */);
+    runCommit(kDummyRetryableErrorRes, /*expectRetries=*/true);
 
     // The result is still unknown so both can advance.
     tickSource()->advance(Microseconds(100));
@@ -7153,8 +7153,8 @@ TEST_F(TransactionRouterMetricsTest, NeitherTimeActiveNorInactiveAdvanceAfterSuc
     runCommit(kDummyOkRes);
 
     // Neither can advance.
-    assertTimeActiveAndInactiveCannotAdvance(kDefaultTimeActive /*timeActive*/,
-                                             kDefaultTimeInactive /*timeInactive*/);
+    assertTimeActiveAndInactiveCannotAdvance(/*timeActive=*/kDefaultTimeActive,
+                                             /*timeInactive=*/kDefaultTimeInactive);
 }
 
 TEST_F(TransactionRouterMetricsTest, NeitherTimeActiveNorInactiveAdvanceAfterFailedCommit) {
@@ -7167,8 +7167,8 @@ TEST_F(TransactionRouterMetricsTest, NeitherTimeActiveNorInactiveAdvanceAfterFai
     runCommit(kDummyErrorRes);
 
     // Neither can advance.
-    assertTimeActiveAndInactiveCannotAdvance(kDefaultTimeActive /*timeActive*/,
-                                             kDefaultTimeInactive /*timeInactive*/);
+    assertTimeActiveAndInactiveCannotAdvance(/*timeActive=*/kDefaultTimeActive,
+                                             /*timeInactive=*/kDefaultTimeInactive);
 }
 
 TEST_F(TransactionRouterMetricsTest, TimeActiveAndInactiveAdvanceAfterUnknownCommitResult) {
@@ -7178,7 +7178,7 @@ TEST_F(TransactionRouterMetricsTest, TimeActiveAndInactiveAdvanceAfterUnknownCom
 
     txnRouter().beginOrContinueTxn(
         operationContext(), kTxnNumber, TransactionRouter::TransactionActions::kCommit);
-    runCommit(Status(ErrorCodes::HostUnreachable, "dummy"), true /* expectRetries */);
+    runCommit(Status(ErrorCodes::HostUnreachable, "dummy"), /*expectRetries=*/true);
 
     // timeActive can advance.
     tickSource()->advance(Microseconds(100));
@@ -7193,7 +7193,7 @@ TEST_F(TransactionRouterMetricsTest, TimeActiveAndInactiveAdvanceAfterUnknownCom
 
     txnRouter().beginOrContinueTxn(
         operationContext(), kTxnNumber, TransactionRouter::TransactionActions::kCommit);
-    runCommit(kDummyRetryableErrorRes, true /* expectRetries */);
+    runCommit(kDummyRetryableErrorRes, /*expectRetries=*/true);
 
     // timeActive can advance.
     tickSource()->advance(Microseconds(100));
@@ -7211,9 +7211,9 @@ TEST_F(TransactionRouterMetricsTest, TimeActiveAndInactiveAdvanceAfterUnknownCom
     runCommit(kDummyOkRes);
 
     // The result is known, so neither can advance.
-    assertTimeActiveAndInactiveCannotAdvance(kDefaultTimeActive + Microseconds(200) /*timeActive*/,
-                                             kDefaultTimeInactive +
-                                                 Microseconds(200) /*timeInactive*/);
+    assertTimeActiveAndInactiveCannotAdvance(/*timeActive=*/kDefaultTimeActive + Microseconds(200),
+                                             /*timeInactive=*/kDefaultTimeInactive +
+                                                 Microseconds(200));
 }
 
 TEST_F(TransactionRouterMetricsTest, NeitherTimeActiveNorInactiveAdvanceAfterAbort) {
@@ -7228,8 +7228,8 @@ TEST_F(TransactionRouterMetricsTest, NeitherTimeActiveNorInactiveAdvanceAfterAbo
                        ErrorCodes::NoSuchTransaction);
 
     // Neither can advance.
-    assertTimeActiveAndInactiveCannotAdvance(kDefaultTimeActive /*timeActive*/,
-                                             kDefaultTimeInactive /*timeInactive*/);
+    assertTimeActiveAndInactiveCannotAdvance(/*timeActive=*/kDefaultTimeActive,
+                                             /*timeInactive=*/kDefaultTimeInactive);
 }
 
 TEST_F(TransactionRouterMetricsTest, NeitherTimeActiveNorInactiveAdvanceAfterImplicitAbort) {
@@ -7242,8 +7242,8 @@ TEST_F(TransactionRouterMetricsTest, NeitherTimeActiveNorInactiveAdvanceAfterImp
     txnRouter().implicitlyAbortTransaction(operationContext(), kDummyStatus);
 
     // Neither can advance.
-    assertTimeActiveAndInactiveCannotAdvance(kDefaultTimeActive /*timeActive*/,
-                                             kDefaultTimeInactive /*timeInactive*/);
+    assertTimeActiveAndInactiveCannotAdvance(/*timeActive=*/kDefaultTimeActive,
+                                             /*timeInactive=*/kDefaultTimeInactive);
 }
 
 TEST_F(TransactionRouterMetricsTest, RouterMetricsCurrent_DefaultTo0) {
@@ -7316,7 +7316,7 @@ TEST_F(TransactionRouterMetricsTest, RouterMetricsCurrent_TxnEnds) {
 
 TEST_F(TransactionRouterMetricsTest, RouterMetricsCurrent_UnknownCommit) {
     beginTxnWithDefaultTxnNumber();
-    runCommit(kDummyRetryableErrorRes, true /* expectRetries */);
+    runCommit(kDummyRetryableErrorRes, /*expectRetries=*/true);
     ASSERT_EQUALS(1L, routerTxnMetrics()->getCurrentOpen());
     ASSERT_EQUALS(1L, routerTxnMetrics()->getCurrentActive());
     ASSERT_EQUALS(0L, routerTxnMetrics()->getCurrentInactive());
@@ -7570,7 +7570,7 @@ TEST_F(TransactionRouterMetricsTest, RouterMetricsTotalCommitted_NotIncreasedByF
 
 TEST_F(TransactionRouterMetricsTest, RouterMetricsTotalCommitted_NotIncreasedByUnknownCommit) {
     beginTxnWithDefaultTxnNumber();
-    runCommit(kDummyRetryableErrorRes, true /* expectRetries */);
+    runCommit(kDummyRetryableErrorRes, /*expectRetries=*/true);
     ASSERT_EQUALS(0L, routerTxnMetrics()->getTotalCommitted());
 }
 
@@ -7631,7 +7631,7 @@ TEST_F(TransactionRouterMetricsTest, RouterMetricsTotalAborted_NotIncreasedByBeg
 
 TEST_F(TransactionRouterMetricsTest, RouterMetricsTotalAborted_NotIncreasedByUnknownCommit) {
     beginTxnWithDefaultTxnNumber();
-    runCommit(kDummyRetryableErrorRes, true /* expectRetries */);
+    runCommit(kDummyRetryableErrorRes, /*expectRetries=*/true);
     ASSERT_EQUALS(0L, routerTxnMetrics()->getTotalAborted());
 }
 
@@ -7766,7 +7766,7 @@ TEST_F(TransactionRouterMetricsTest, RouterMetricsTotalRequestsTargeted_NetworkE
     // The commit will be retried because of the retryable error, but totalRequestsTargeted should
     // only be incremented once per participant. The helper targets one participant, so expect one
     // target for the statement before commit and one for the commit itself, excluding retries.
-    runCommit(kDummyRetryableErrorRes, true /* expectRetries */);
+    runCommit(kDummyRetryableErrorRes, /*expectRetries=*/true);
     ASSERT_EQUALS(2L, routerTxnMetrics()->getTotalRequestsTargeted());
 }
 
@@ -7824,7 +7824,7 @@ TEST_F(TransactionRouterMetricsTest, RouterMetricsCommitTypeStatsNotUpdatedOnUnk
                       ->getCommitTypeStats_forTest(CommitType::kSingleShard)
                       .successfulDurationMicros.load());
 
-    runCommit(kDummyRetryableErrorRes, true /* expectRetries */);
+    runCommit(kDummyRetryableErrorRes, /*expectRetries=*/true);
 
     // The result is unknown so only initiated is increased.
     ASSERT_EQUALS(
@@ -7932,7 +7932,7 @@ TEST_F(TransactionRouterMetricsTest, ReportResources) {
     beginTxnWithDefaultTxnNumber();
 
     // Verify reported parameters match expectations.
-    auto state = txnRouter().reportState(operationContext(), false /* sessionIsActive */);
+    auto state = txnRouter().reportState(operationContext(), /*sessionIsActive=*/false);
     auto transactionDocument = state.getObjectField("transaction");
 
     auto parametersDocument = transactionDocument.getObjectField("parameters");
@@ -7972,7 +7972,7 @@ TEST_F(TransactionRouterMetricsTest, ReportResourcesWithParticipantList) {
     txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
     txnRouter().attachTxnFieldsIfNeeded(operationContext(), shard2, kDummyFindCmd);
 
-    auto state = txnRouter().reportState(operationContext(), true /* sessionIsActive */);
+    auto state = txnRouter().reportState(operationContext(), /*sessionIsActive=*/true);
     auto transactionDocument = state.getObjectField("transaction");
     auto parametersDocument = transactionDocument.getObjectField("parameters");
 
@@ -8012,7 +8012,7 @@ TEST_F(TransactionRouterMetricsTest, ReportResourcesWithParticipantList) {
 
     // Verify participants array has been updated with proper ReadOnly responses.
 
-    state = txnRouter().reportState(operationContext(), true /* sessionIsActive */);
+    state = txnRouter().reportState(operationContext(), /*sessionIsActive=*/true);
     transactionDocument = state.getObjectField("transaction");
     participantArray = transactionDocument.getField("participants").Array();
 
@@ -8048,7 +8048,7 @@ TEST_F(TransactionRouterMetricsTest, ReportResourcesCommit) {
 
     // Verify commit is reported as expected.
 
-    auto state = txnRouter().reportState(operationContext(), true /* sessionIsActive */);
+    auto state = txnRouter().reportState(operationContext(), /*sessionIsActive=*/true);
     auto transactionDocument = state.getObjectField("transaction");
     ASSERT_EQ(dateFromISOString(transactionDocument.getField("commitStartWallClockTime").String()),
               commitTime);
@@ -8061,13 +8061,13 @@ TEST_F(TransactionRouterMetricsTest, ReportResourcesRecoveryCommit) {
 
     // Verify that the participant list does not exist if the commit type is recovery.
 
-    auto state = txnRouter().reportState(operationContext(), true /* sessionIsActive */);
+    auto state = txnRouter().reportState(operationContext(), /*sessionIsActive=*/true);
     auto transactionDocument = state.getObjectField("transaction");
     ASSERT_EQ(transactionDocument.hasField("participants"), false);
 }
 
 TEST_F(TransactionRouterMetricsTest, ReportResourcesUnstartedTxn) {
-    auto state = txnRouter().reportState(operationContext(), true /* sessionIsActive */);
+    auto state = txnRouter().reportState(operationContext(), /*sessionIsActive=*/true);
     ASSERT_BSONOBJ_EQ(state, BSONObj());
 }
 
@@ -8097,7 +8097,7 @@ TEST_F(TransactionRouterMetricsTest, IsTrackingOverIfTxnImplicitlyAborted) {
 }
 
 TEST_F(TransactionRouterMetricsTest, TwoPhaseCommitExternalStatsForUserTxn) {
-    runTwoPhaseCommitOnClient(true /* withSession */, false /* markServerInitiatedExplicitly */);
+    runTwoPhaseCommitOnClient(/*withSession=*/true, /*markServerInitiatedExplicitly=*/false);
 
     ASSERT_EQUALS(0L,
                   routerTxnMetrics()->getTwoPhaseCommitInternalStats_forTest().initiated.load());
@@ -8113,7 +8113,7 @@ TEST_F(TransactionRouterMetricsTest, TwoPhaseCommitInternalStatsForSessionlessCl
     // A sessionless client (e.g. the internal transaction API's "SEP-internal-txn-client") is
     // classified internal by the base !session() predicate when no explicit override is provided.
     // This is the mechanism internal txn_api transactions rely on for classification.
-    runTwoPhaseCommitOnClient(false /* withSession */, false /* markServerInitiatedExplicitly */);
+    runTwoPhaseCommitOnClient(/*withSession=*/false, /*markServerInitiatedExplicitly=*/false);
 
     ASSERT_EQUALS(1L,
                   routerTxnMetrics()->getTwoPhaseCommitInternalStats_forTest().initiated.load());
@@ -8128,7 +8128,7 @@ TEST_F(TransactionRouterMetricsTest, TwoPhaseCommitInternalStatsForSessionlessCl
 TEST_F(TransactionRouterMetricsTest, TwoPhaseCommitInternalStatsForServerInitiatedTxn) {
     // Runs on a client with a session and relies on the explicit override (the legacy WCOS path) to
     // classify internal, so this exercises setIsServerInitiatedTransaction().
-    runTwoPhaseCommitOnClient(true /* withSession */, true /* markServerInitiatedExplicitly */);
+    runTwoPhaseCommitOnClient(/*withSession=*/true, /*markServerInitiatedExplicitly=*/true);
 
     ASSERT_EQUALS(1L,
                   routerTxnMetrics()->getTwoPhaseCommitInternalStats_forTest().initiated.load());
@@ -8725,13 +8725,13 @@ TEST_F(TransactionRouterSnapshotReadConcern,
 }
 
 TEST_F(TransactionRouterSnapshotReadConcern, SnapshotReadConcernWithoutAtClusterTime_Start) {
-    runTest(TransactionRouter::TransactionActions::kStart, boost::none /* atClusterTime */);
+    runTest(TransactionRouter::TransactionActions::kStart, /*atClusterTime=*/boost::none);
 }
 
 TEST_F(TransactionRouterSnapshotReadConcern,
        SnapshotReadConcernWithoutAtClusterTime_StartOrContinue) {
     runTest(TransactionRouter::TransactionActions::kStartOrContinue,
-            boost::none /* atClusterTime */);
+            /*atClusterTime=*/boost::none);
 }
 
 // Test static 'parseParticipantResponseMetadata()' function with various inputs.

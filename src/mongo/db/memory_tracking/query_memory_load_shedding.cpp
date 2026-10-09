@@ -498,7 +498,7 @@ Status onUpdateQueryMemoryLoadSheddingEnablement(std::int32_t newPercent) {
     if (newPercent >= 0) {
         // This hook can fire from startup-config application before the PeriodicRunner exists;
         // tolerate that (the explicit mongod startup call starts the monitor once it is installed).
-        startQueryMemoryRssMonitor(serviceContext, /*ignoreWhenNoPeriodicRunner*/ true);
+        startQueryMemoryRssMonitor(serviceContext, /*ignoreWhenNoPeriodicRunner=*/true);
     } else {
         stopQueryMemoryRssMonitor(serviceContext);
     }
@@ -545,7 +545,7 @@ void startQueryMemoryRssMonitor(ServiceContext* serviceContext, bool ignoreWhenN
             sweepQueuedOperationsForMemoryPressure(client->getServiceContext(), client->getPrng());
         },
         Milliseconds(gQueryMemoryRssMonitorIntervalMillis.load()),
-        false /*isKillableByStepdown*/);
+        /*isKillableByStepdown=*/false);
     holder.anchor = std::make_shared<PeriodicJobAnchor>(runner->makeJob(std::move(job)));
     holder.anchor->start();
 }

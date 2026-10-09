@@ -772,7 +772,7 @@ std::unique_ptr<MatchExpression> splitMatchExpressionForColumns(
                 return me->clone();
             }
             uassert(7040600, "Should have exactly one path under $not", outSub.size() == 1);
-            return tryAddExpr(outSub.begin()->first /* path */, me, pending);
+            return tryAddExpr(/*path=*/outSub.begin()->first, me, pending);
         }
 
         // We don't currently handle any of these cases, but some may be possible in the future.
@@ -890,7 +890,7 @@ namespace expression {
 bool hasPredicateOnPaths(const MatchExpression& expr,
                          mongo::MatchExpression::MatchType searchType,
                          const OrderedPathSet& paths) {
-    return hasPredicateOnPathsHelper(expr, searchType, paths, boost::none /* parentPath */);
+    return hasPredicateOnPathsHelper(expr, searchType, paths, /*parentPath=*/boost::none);
 }
 
 bool isSubsetOf(const MatchExpression* lhs, const MatchExpression* rhs) {

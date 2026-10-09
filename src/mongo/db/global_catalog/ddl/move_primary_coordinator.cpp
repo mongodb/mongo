@@ -183,7 +183,7 @@ ExecutorFuture<void> MovePrimaryCoordinator::_runImpl(
                     NamespaceString::kConfigsvrShardsNamespace,
                     BSON(ShardType::name() << toShardId),
                     BSONObj() /* No sorting */,
-                    1 /* Limit */));
+                    /*Limit=*/1));
 
                 uassert(
                     ErrorCodes::ShardNotFound,
@@ -748,7 +748,7 @@ void MovePrimaryCoordinator::dropStaleDataOnDonor(OperationContext* opCtx) const
                                nssToDrop,
                                &unusedDropReply,
                                DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops,
-                               true /* fromMigrate */));
+                               /*fromMigrate=*/true));
         } catch (const DBException& e) {
             LOGV2_WARNING(7120210,
                           "Failed to drop stale collection on donor",
@@ -787,9 +787,9 @@ void MovePrimaryCoordinator::dropOrphanedDataOnRecipient(
             **executor,
             token,
             session,
-            true /* fromMigrate */,
-            true /* dropSystemCollections */,
-            !isAuthoritative /* forceLegacyRefresh */);
+            /*fromMigrate=*/true,
+            /*dropSystemCollections=*/true,
+            /*forceLegacyRefresh=*/!isAuthoritative);
     }
 }
 
@@ -850,7 +850,7 @@ void MovePrimaryCoordinator::unblockReadsAndWrites(OperationContext* opCtx) cons
         *actionPtr,
         // In case of step-down, this operation could be re-executed and trigger a tassert if
         // the new primary runs a DDL that acquires the critical section in the old primary shard
-        false /*throwIfReasonDiffers*/);
+        /*throwIfReasonDiffers=*/false);
 }
 
 void MovePrimaryCoordinator::enterCriticalSectionOnRecipient(
@@ -919,7 +919,7 @@ void MovePrimaryCoordinator::exitCriticalSectionOnRecipient(
             session,
             executor,
             token,
-            false /* throwIfReasonDiffers */);
+            /*throwIfReasonDiffers=*/false);
     } else {
         const auto exitCriticalSectionCommand = [&] {
             ShardsvrMovePrimaryExitCriticalSection request(_dbName);

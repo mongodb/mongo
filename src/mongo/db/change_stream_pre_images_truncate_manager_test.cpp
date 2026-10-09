@@ -218,7 +218,7 @@ TEST_F(PreImagesTruncateManagerTest, ScanningSingleNsUUID) {
 
     createPreImagesCollection();
 
-    insertPreImages(kNsUUID0, /*numPreImages*/ 3000, /*docPaddingBytes*/ 1);
+    insertPreImages(kNsUUID0, /*numPreImages=*/3000, /*docPaddingBytes=*/1);
 
     auto truncateMarkers = getInitializedTruncateMarkers();
     ASSERT(truncateMarkers);
@@ -248,7 +248,7 @@ TEST_F(PreImagesTruncateManagerTest, ScanningSingleNsUUID1Doc) {
 
     createPreImagesCollection();
 
-    insertPreImages(kNsUUID0, /*numPreImages*/ 1, /*docPaddingBytes*/ 1);
+    insertPreImages(kNsUUID0, /*numPreImages=*/1, /*docPaddingBytes=*/1);
 
     auto truncateMarkers = getInitializedTruncateMarkers();
     ASSERT(truncateMarkers);
@@ -299,8 +299,8 @@ TEST_F(PreImagesTruncateManagerTest, ScanningTwoNsUUIDs) {
 
     createPreImagesCollection();
 
-    insertPreImages(kNsUUID0, /*numPreImages*/ 10, /*docPaddingBytes=*/100);
-    insertPreImages(kNsUUID1, /*numPreImages*/ 1990, /*docPaddingBytes=*/1);
+    insertPreImages(kNsUUID0, /*numPreImages=*/10, /*docPaddingBytes=*/100);
+    insertPreImages(kNsUUID1, /*numPreImages=*/1990, /*docPaddingBytes=*/1);
 
     auto truncateMarkers = getInitializedTruncateMarkers();
     ASSERT(truncateMarkers);
@@ -332,7 +332,7 @@ TEST_F(PreImagesTruncateManagerTest, SamplingSingleNsUUID) {
 
     createPreImagesCollection();
 
-    insertPreImages(kNsUUID0, /*numPreImages*/ 4000, /*docPaddingBytes*/ 1);
+    insertPreImages(kNsUUID0, /*numPreImages=*/4000, /*docPaddingBytes=*/1);
 
     auto truncateMarkers = getInitializedTruncateMarkers();
     ASSERT(truncateMarkers);
@@ -366,8 +366,8 @@ TEST_F(PreImagesTruncateManagerTest, SamplingTwoNsUUIDs) {
 
     createPreImagesCollection();
 
-    insertPreImages(kNsUUID0, /*numPreImages*/ 1000, /*docPaddingBytes=*/100);
-    insertPreImages(kNsUUID1, /*numPreImages*/ 1000, /*docPaddingBytes=*/1);
+    insertPreImages(kNsUUID0, /*numPreImages=*/1000, /*docPaddingBytes=*/100);
+    insertPreImages(kNsUUID1, /*numPreImages=*/1000, /*docPaddingBytes=*/1);
 
     auto truncateMarkers = getInitializedTruncateMarkers();
 
@@ -398,8 +398,8 @@ TEST_F(PreImagesTruncateManagerTest, SamplingTwoNsUUIDsManyRecordsToFew) {
 
     createPreImagesCollection();
 
-    insertPreImages(kNsUUID0, /*numPreImages*/ 1999, /*docPaddingBytes=*/100);
-    insertPreImages(kNsUUID1, /*numPreImages*/ 1, /*docPaddingBytes=*/1);
+    insertPreImages(kNsUUID0, /*numPreImages=*/1999, /*docPaddingBytes=*/100);
+    insertPreImages(kNsUUID1, /*numPreImages=*/1, /*docPaddingBytes=*/1);
 
     auto truncateMarkers = getInitializedTruncateMarkers();
     ASSERT(truncateMarkers);
@@ -438,7 +438,7 @@ TEST_F(PreImagesTruncateManagerTest, SamplingManyNsUUIDs) {
     }
 
     for (const auto& nsUUID : nsUUIDs) {
-        insertPreImages(nsUUID, /*numPreImages*/ 555, /*docPaddingBytes=*/100);
+        insertPreImages(nsUUID, /*numPreImages=*/555, /*docPaddingBytes=*/100);
     }
 
     auto truncateMarkers = getInitializedTruncateMarkers();
@@ -477,7 +477,7 @@ TEST_F(PreImagesTruncateManagerTest, SamplingMultiplePassesStatsAreCumulative) {
     }
 
     for (const auto& nsUUID : nsUUIDs) {
-        insertPreImages(nsUUID, /*numPreImages*/ 555, /*docPaddingBytes=*/100);
+        insertPreImages(nsUUID, /*numPreImages=*/555, /*docPaddingBytes=*/100);
     }
 
     boost::optional<long long> prevMillis;

@@ -295,7 +295,7 @@ private:
             _operationContext.get()->getServiceContext()->getPreciseClockSource()->now(),
             &callbacks,
             PlanSecurityLevel::kNotSensitive,
-            boost::none /* worksGrowthCoefficient */));
+            /*worksGrowthCoefficient=*/boost::none));
     }
 
     /**
@@ -316,7 +316,7 @@ private:
             stage_builder::PlanStageData(
                 stage_builder::Environment(std::make_unique<sbe::RuntimeEnvironment>()),
                 std::make_unique<stage_builder::PlanStageStaticData>()),
-            0 /*hash*/);
+            /*hash=*/0);
         const size_t nWorks = 1;
         auto decision = createDecision(nWorks);
         auto querySolution = std::make_unique<QuerySolution>();
@@ -342,7 +342,7 @@ private:
             _operationContext.get()->getServiceContext()->getPreciseClockSource()->now(),
             &callbacks,
             PlanSecurityLevel::kNotSensitive,
-            boost::none /* worksGrowthCoefficient */));
+            /*worksGrowthCoefficient=*/boost::none));
     }
 
     std::unique_ptr<QueryTestServiceContext> _queryTestServiceContext;

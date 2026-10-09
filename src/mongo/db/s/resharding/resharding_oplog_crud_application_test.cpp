@@ -326,13 +326,13 @@ private:
                                                uuid,
                                                shardKey,
                                                false, /* unsplittable */
-                                               nullptr /* defaultCollator */,
-                                               false /* unique */,
+                                               /*defaultCollator=*/nullptr,
+                                               /*unique=*/false,
                                                epoch,
                                                Timestamp(1, 1),
-                                               boost::none /* timeseriesFields */,
-                                               boost::none /* reshardingFields */,
-                                               true /* allowMigrations */,
+                                               /*timeseriesFields=*/boost::none,
+                                               /*reshardingFields=*/boost::none,
+                                               /*allowMigrations=*/true,
                                                chunks);
         return CurrentChunkManager(makeStandaloneRoutingTableHistory(std::move(rt)));
     }

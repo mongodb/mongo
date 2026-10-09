@@ -2247,7 +2247,7 @@ void OCSPFetcher::startPeriodicJob(StatusWith<Milliseconds> swDurationInitial) {
             "OCSP Fetch and Staple",
             [this, sm = _manager->shared_from_this()](Client* client) { doPeriodicJob(); },
             getPeriodForStapleJob(swDurationInitial),
-            true /*isKillableByStepdown*/));
+            /*isKillableByStepdown=*/true));
 
     _ocspStaplingAnchor.start();
 }
@@ -3385,7 +3385,7 @@ Future<SSLPeerInfo> SSLManagerOpenSSL::parseAndValidatePeerCertificate(
 
             if (X509_cmp_time(expiration, &threshold) < 0) {
                 int days = 0, secs = 0;
-                if (!ASN1_TIME_diff(&days, &secs, nullptr /* now */, expiration)) {
+                if (!ASN1_TIME_diff(&days, &secs, /*now=*/nullptr, expiration)) {
                     tlsEmitWarningExpiringClientCertificate(peerSubject);
                 } else {
                     tlsEmitWarningExpiringClientCertificate(peerSubject, Days(days));

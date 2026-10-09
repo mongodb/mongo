@@ -272,10 +272,10 @@ void GraphLookUpStage::performSearch() {
     _queue.clear();
     if (startingValue.isArray()) {
         for (const auto& value : startingValue.getArray()) {
-            addFromValueToQueueIfNeeded(value, 0 /*depth*/);
+            addFromValueToQueueIfNeeded(value, /*depth=*/0);
         }
     } else {
-        addFromValueToQueueIfNeeded(std::move(startingValue), 0 /*depth*/);
+        addFromValueToQueueIfNeeded(std::move(startingValue), /*depth=*/0);
     }
 
     try {
@@ -552,7 +552,7 @@ void tryOptimizeMatchOnlyPipelineDirectly(mongo::Pipeline* pipe) {
         if (!static_cast<DocumentSourceMatch&>(*match).optimize()) {
             (void)pipe->popFront();
         }
-        pipe->validateCommon(true /* alreadyOptimized */);
+        pipe->validateCommon(/*alreadyOptimized=*/true);
     } else {
         // Running on against a view, need to optimize the whole pipeline.
         pipeline_optimization::optimizeAndValidatePipeline(pipe);
@@ -594,7 +594,7 @@ std::unique_ptr<mongo::Pipeline> GraphLookUpStage::makePipeline(BSONObj match,
             return pExpCtx->getMongoProcessInterface()->finalizeAndMaybePreparePipelineForExecution(
                 _fromExpCtx,
                 mongo::Pipeline::parseFromLiteParsed(lpp, _fromExpCtx),
-                true /* attachCursorAfterOptimizing */,
+                /*attachCursorAfterOptimizing=*/true,
                 tryOptimizeMatchOnlyPipelineDirectly,
                 shardTargetingPolicy);
         } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e) {

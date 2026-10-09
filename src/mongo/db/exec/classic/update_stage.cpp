@@ -305,7 +305,7 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
                                                   _params.request,
                                                   writeToOrphan,
                                                   _updatedRecordIds.get(),
-                                                  nullptr /* cursor */);
+                                                  /*cursor=*/nullptr);
                     tassert(11533704, "Transformed doc cannot be empty", !newObj.isEmpty());
                     if (docWasModified) {
                         // Only record doc modifications if they wrote (exclude no-ops). Explains

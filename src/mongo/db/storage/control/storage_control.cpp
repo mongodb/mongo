@@ -50,7 +50,7 @@ void startStorageControls(ServiceContext* serviceContext,
         journalFlusherPaused = false;
     } else {
         std::unique_ptr<JournalFlusher> journalFlusher = std::make_unique<JournalFlusher>(
-            /*disablePeriodicFlushes*/ forTestOnly);
+            /*disablePeriodicFlushes=*/forTestOnly);
         JournalFlusher::set(serviceContext, std::move(journalFlusher));
         JournalFlusher::get(serviceContext)->go();
     }

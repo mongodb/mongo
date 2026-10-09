@@ -424,8 +424,8 @@ bool Helpers::findByIdAndNoopUpdate(OperationContext* opCtx,
                                         snapshottedDoc,
                                         result,
                                         collection_internal::kUpdateNoIndexes,
-                                        nullptr /* indexesAffected */,
-                                        nullptr /* opDebug */,
+                                        /*indexesAffected=*/nullptr,
+                                        /*opDebug=*/nullptr,
                                         &args);
 
     return true;

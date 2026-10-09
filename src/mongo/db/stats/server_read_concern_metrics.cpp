@@ -146,11 +146,11 @@ void ServerReadConcernMetrics::ReadConcernCounters::updateStats(ReadConcernOps* 
 
 void ServerReadConcernMetrics::updateStats(ReadConcernStats* stats, OperationContext* opCtx) {
     ReadConcernOps nonTransactionOps;
-    _nonTransactionOps.updateStats(&nonTransactionOps, false /* isTransaction */);
+    _nonTransactionOps.updateStats(&nonTransactionOps, /*isTransaction=*/false);
     stats->setNonTransactionOps(nonTransactionOps);
 
     ReadConcernOps transactionOps;
-    _transactionOps.updateStats(&transactionOps, true /* isTransaction */);
+    _transactionOps.updateStats(&transactionOps, /*isTransaction=*/true);
     stats->setTransactionOps(transactionOps);
 }
 

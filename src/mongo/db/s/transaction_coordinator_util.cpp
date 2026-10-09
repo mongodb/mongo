@@ -624,7 +624,7 @@ void deleteCoordinatorDocBlocking(OperationContext* opCtx,
         // immediately and try to delete the doc again.
         // TODO (SERVER-120584): Re-evaluate if the deletion of transaction coordinator doc should
         // continue to use w: 1.
-        deleteOp.setWriteConcern(WriteConcernOptions(1 /* numNodes */,
+        deleteOp.setWriteConcern(WriteConcernOptions(/*numNodes=*/1,
                                                      WriteConcernOptions::SyncMode::UNSET,
                                                      WriteConcernOptions::Timeout::kNoTimeoutVal));
         return deleteOp.serialize();

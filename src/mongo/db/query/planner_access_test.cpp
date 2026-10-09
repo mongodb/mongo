@@ -111,8 +111,8 @@ void testSimplify(const char* input,
     // First pass: compute the scan range list from the filter.
     RecordIdRangeList rangeList;
     (void)QueryPlannerAccess::handleRIDRangeScan(expr.get(),
-                                                 collator /* queryCollator */,
-                                                 nullptr /* ccCollator */,
+                                                 /*queryCollator=*/collator,
+                                                 /*ccCollator=*/nullptr,
                                                  "_id" /* clustered field name */,
                                                  rangeList);
 
@@ -150,7 +150,7 @@ void testSimplify(const char* input,
 
     // Second pass: simplify the filter given the computed scan range.
     QueryPlannerAccess::simplifyFilter(
-        expr, rangeList, collator /* queryCollator */, nullptr /* ccCollator */, "_id");
+        expr, rangeList, /*queryCollator=*/collator, /*ccCollator=*/nullptr, "_id");
 
     ASSERT_BSONOBJ_EQ(fromjson(expected), expr->serialize());
 }

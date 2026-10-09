@@ -104,7 +104,7 @@ public:
               _extensionMetrics(
                   static_cast<const AggregateCommand*>(cmd)->getExtensionMetricsAllocation()),
               _liteParsedPipeline(request(),
-                                  false /* isRunningAgainstView_ForHybridSearch */,
+                                  /*isRunningAgainstView_ForHybridSearch=*/false,
                                   {.ifrContext = _ifrContext,
                                    .opCtx = opCtx,
                                    .extensionMetrics = &_extensionMetrics}),

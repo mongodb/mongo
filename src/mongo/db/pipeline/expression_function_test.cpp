@@ -67,7 +67,7 @@ private:
 };
 
 TEST_F(ExpressionFunctionInternalClientTest, ExternalClientCannotSetInternalSetObjToThis) {
-    auto clientAndOpCtx = makeClientAndOpCtx(/*isInternalClient*/ false);
+    auto clientAndOpCtx = makeClientAndOpCtx(/*isInternalClient=*/false);
     ExpressionContextForTest expCtx(clientAndOpCtx.opCtx.get());
     auto expr = functionWithInternalFlag();
     VariablesParseState vps = expCtx.variablesParseState;
@@ -76,7 +76,7 @@ TEST_F(ExpressionFunctionInternalClientTest, ExternalClientCannotSetInternalSetO
 }
 
 TEST_F(ExpressionFunctionInternalClientTest, InternalClientCanSetInternalSetObjToThis) {
-    auto clientAndOpCtx = makeClientAndOpCtx(/*isInternalClient*/ true);
+    auto clientAndOpCtx = makeClientAndOpCtx(/*isInternalClient=*/true);
     ExpressionContextForTest expCtx(clientAndOpCtx.opCtx.get());
     auto expr = functionWithInternalFlag();
     VariablesParseState vps = expCtx.variablesParseState;
@@ -97,7 +97,7 @@ TEST_F(ExpressionFunctionInternalClientTest, SessionlessClientCanSetInternalSetO
 
 TEST_F(ExpressionFunctionInternalClientTest,
        ExternalClientCanUseFunctionWithoutInternalSetObjToThis) {
-    auto clientAndOpCtx = makeClientAndOpCtx(/*isInternalClient*/ false);
+    auto clientAndOpCtx = makeClientAndOpCtx(/*isInternalClient=*/false);
     ExpressionContextForTest expCtx(clientAndOpCtx.opCtx.get());
     auto expr = BSON("$function" << BSON("body" << "function(a) { return true; }" << "args"
                                                 << BSON_ARRAY("$$CURRENT") << "lang" << "js"));

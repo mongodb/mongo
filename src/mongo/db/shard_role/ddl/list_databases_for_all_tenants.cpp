@@ -119,8 +119,8 @@ public:
                                               getGlobalServiceContext()->getStorageEngine(),
                                               nameOnly,
                                               filter,
-                                              true /* setTenantId */,
-                                              false /* authorizedDatabases*/,
+                                              /*setTenantId=*/true,
+                                              /*authorizedDatabases=*/false,
                                               scReply);
             // We need to copy the serialization context from the request to the reply object
             Reply reply(std::move(items), scReply);

@@ -63,9 +63,9 @@ GetNextResult InternalApplyOplogUpdateStage::doGetNext() {
     uassertStatusOK(_updateDriver.update(pExpCtx->getOperationContext(),
                                          std::string_view(),
                                          &doc,
-                                         true /* validateForStorage */,
+                                         /*validateForStorage=*/true,
                                          FieldRefSet(),
-                                         false /* isInsert */));
+                                         /*isInsert=*/false));
 
     return Document(doc.getObject());
 }

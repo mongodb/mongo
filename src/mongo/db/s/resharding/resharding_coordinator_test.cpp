@@ -1130,7 +1130,7 @@ TEST_F(ReshardingCoordinatorPersistenceTest, StateTransitionToDoneSucceeds) {
 
 TEST_F(ReshardingCoordinatorPersistenceTest, StateTransitionToQuiescedSucceeds) {
     auto coordinatorDoc = insertStateAndCatalogEntries(
-        CoordinatorStateEnum::kCommitting, _finalEpoch, true /* useUserUUID */);
+        CoordinatorStateEnum::kCommitting, _finalEpoch, /*useUserUUID=*/true);
 
     // Ensure the chunks for the original namespace exist since they will be bumped as a product of
     // the state transition to kDone.
@@ -1287,8 +1287,8 @@ TEST_F(ReshardingSplitPolicySelectionTest,
     // No placement requested: the hashed presplit fast path spreads one chunk per shard.
     ShardKeyPattern hashedPrefixKey(BSON("newSK" << "hashed"));
 
-    auto result = runSplitPolicySelection(
-        hashedPrefixKey, {} /* zones */, boost::none /* shardDistribution */);
+    auto result =
+        runSplitPolicySelection(hashedPrefixKey, /*zones=*/{}, /*shardDistribution=*/boost::none);
 
     ASSERT_EQUALS(recipientShardIds(result),
                   (std::set<ShardId>{ShardId(kShardOnZone1), ShardId(kShardOnZone2)}));
@@ -1302,7 +1302,7 @@ TEST_F(ReshardingSplitPolicySelectionTest,
     restrictToZone1Shard.setMax(hashedPrefixKey.getKeyPattern().globalMax());
     std::vector<ShardKeyRange> shardDistribution{restrictToZone1Shard};
 
-    auto result = runSplitPolicySelection(hashedPrefixKey, {} /* zones */, shardDistribution);
+    auto result = runSplitPolicySelection(hashedPrefixKey, /*zones=*/{}, shardDistribution);
 
     ASSERT_EQUALS(recipientShardIds(result), (std::set<ShardId>{ShardId(kShardOnZone1)}));
 }
@@ -1332,7 +1332,7 @@ TEST_F(ReshardingSplitPolicySelectionTest, NonHashedPrefixKeyWithShardDistributi
     restrictToZone1Shard.setMax(rangeKey.getKeyPattern().globalMax());
     std::vector<ShardKeyRange> shardDistribution{restrictToZone1Shard};
 
-    auto result = runSplitPolicySelection(rangeKey, {} /* zones */, shardDistribution);
+    auto result = runSplitPolicySelection(rangeKey, /*zones=*/{}, shardDistribution);
 
     ASSERT_EQUALS(recipientShardIds(result), (std::set<ShardId>{ShardId(kShardOnZone1)}));
 }
@@ -1544,7 +1544,7 @@ protected:
         DBDirectClient client(opCtx);
         auto entry = makeOriginalCollectionCatalogEntry(
             coordinatorDoc,
-            boost::none /* reshardingFields */,
+            /*reshardingFields=*/boost::none,
             _originalEpoch,
             opCtx->getServiceContext()->getPreciseClockSource()->now());
         client.insert(NamespaceString::kConfigsvrCollectionsNamespace, entry.toBSON());
@@ -1586,7 +1586,7 @@ TEST_F(ReshardingCoordinatorAuthoritativePersistenceTest,
                                                                 coordinatorDoc,
                                                                 std::move(phaseTransitionFn),
                                                                 std::move(initialChunks),
-                                                                {} /* zones */,
+                                                                /*zones=*/{},
                                                                 boost::none));
 }
 

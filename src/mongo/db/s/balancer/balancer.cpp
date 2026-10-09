@@ -431,8 +431,7 @@ void enqueueChunkMigrations(OperationContext* opCtx,
             getSecondaryThrottleAndWriteConcern(balancerConfig->getSecondaryThrottle());
         shardSvrRequest.setSecondaryThrottle(secondaryThrottle);
 
-        return scheduler.requestMoveRange(
-            opCtx, shardSvrRequest, wc, false /* issuedByRemoteUser */);
+        return scheduler.requestMoveRange(opCtx, shardSvrRequest, wc, /*issuedByRemoteUser=*/false);
     };
 
     for (auto& migrationAndResponse : migrationsAndResponses) {
@@ -1656,7 +1655,7 @@ BalancerCollectionStatusResponse Balancer::getBalancerStatusForNs(OperationConte
     // Keep only 2 decimal digits to return a readable value
     maxChunkSizeMB = std::ceil(maxChunkSizeMB * 100.0) / 100.0;
 
-    BalancerCollectionStatusResponse response(maxChunkSizeMB, true /*balancerCompliant*/);
+    BalancerCollectionStatusResponse response(maxChunkSizeMB, /*balancerCompliant=*/true);
     auto setViolationOnResponse = [&response](std::string_view reason,
                                               const boost::optional<BSONObj>& details =
                                                   boost::none) {

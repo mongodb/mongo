@@ -146,12 +146,12 @@ BSONObj constructUpsertResponse(BatchedCommandResponse& writeRes,
         BulkWriteCommandReply bulkWriteReply(
             BulkWriteCommandResponseCursor(
                 0, std::move(items), NamespaceString::makeBulkWriteNSS(boost::none)),
-            0 /* nErrors */,
-            0 /* nInserted */,
-            0 /* nMatched */,
-            0 /* nModified */,
-            writeRes.getN() /* nUpserted */,
-            0 /* nDeleted */);
+            /*nErrors=*/0,
+            /*nInserted=*/0,
+            /*nMatched=*/0,
+            /*nModified=*/0,
+            /*nUpserted=*/writeRes.getN(),
+            /*nDeleted=*/0);
         reply = bulkWriteReply.toBSON();
     } else if (commandName == write_ops::FindAndModifyCommandRequest::kCommandName ||
                commandName == write_ops::FindAndModifyCommandRequest::kCommandAlias) {
@@ -382,8 +382,8 @@ StatusWith<ClusterWriteWithoutShardKeyResponse> runTwoPhaseWriteProtocol(
                 BSONObjBuilder bob(sharedBlock->cmdObj);
                 ClusterWriteWithoutShardKey clusterWriteWithoutShardKeyCommand(
                     bob.obj(),
-                    std::string(*queryResponse.getShardId()) /* shardId */,
-                    *queryResponse.getTargetDoc() /* targetDocId */);
+                    /*shardId=*/std::string(*queryResponse.getShardId()),
+                    /*targetDocId=*/*queryResponse.getTargetDoc());
 
                 auto writeRes = txnClient.runCommandSync(
                     sharedBlock->nss.dbName(), clusterWriteWithoutShardKeyCommand.toBSON());

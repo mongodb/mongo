@@ -74,7 +74,7 @@ void blockAndDrainConflictingDDLs(OperationContext* opCtx) {
 }
 
 void unblockConflictingDDLs(OperationContext* opCtx) {
-    broadcastHistoryInitializationState(opCtx, false /*isInProgress*/);
+    broadcastHistoryInitializationState(opCtx, /*isInProgress=*/false);
 }
 
 void broadcastPlacementHistoryChangedNotification(
@@ -97,7 +97,7 @@ void broadcastPlacementHistoryChangedNotification(
         **executor, token, std::move(request));
 
     auto responses = sharding_ddl_util::sendAuthenticatedCommandToShards(
-        opCtx, opts, std::move(allShards), false /* throwOnError */);
+        opCtx, opts, std::move(allShards), /*throwOnError=*/false);
     for (const auto& response : responses) {
         auto status = AsyncRequestsSender::Response::getEffectiveStatus(response);
         if (status.isOK()) {

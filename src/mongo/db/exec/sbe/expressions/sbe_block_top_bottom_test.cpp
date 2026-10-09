@@ -484,19 +484,19 @@ public:
             // Input bitset is all false
             std::vector<bool> falseBitset(inputKeys.size(), false);
 
-            runHandwrittenTest({inputKeys}, {outVals}, falseBitset, sortSpec, 3 /* maxSize */);
+            runHandwrittenTest({inputKeys}, {outVals}, falseBitset, sortSpec, /*maxSize=*/3);
         }
 
         {
             // Input bitset is all true
             std::vector<bool> trueBitset(inputKeys.size(), true);
 
-            runHandwrittenTest({inputKeys}, {outVals}, trueBitset, sortSpec, 3 /* maxSize */);
+            runHandwrittenTest({inputKeys}, {outVals}, trueBitset, sortSpec, /*maxSize=*/3);
         }
 
         {
             // Input bitset has trues and falses
-            runHandwrittenTest({inputKeys}, {outVals}, bitset, sortSpec, 3 /* maxSize */);
+            runHandwrittenTest({inputKeys}, {outVals}, bitset, sortSpec, /*maxSize=*/3);
         }
 
         {
@@ -505,9 +505,9 @@ public:
                                                   {outVals},
                                                   bitset,
                                                   sortSpec,
-                                                  3 /* maxSize */,
-                                                  1 /* numIters */,
-                                                  64 /* memLimit */),
+                                                  /*maxSize=*/3,
+                                                  /*numIters=*/1,
+                                                  /*memLimit=*/64),
                                DBException,
                                ErrorCodes::ExceededMemoryLimit);
         }
@@ -624,8 +624,8 @@ public:
                                    {outVals, addlOutVals},
                                    bitset,
                                    sortSpec,
-                                   8 /* maxSize */,
-                                   2 /* numIters */);
+                                   /*maxSize=*/8,
+                                   /*numIters=*/2);
             }
 
             {
@@ -635,8 +635,8 @@ public:
                                    {outVals, addlOutVals},
                                    bitset,
                                    sortSpec,
-                                   6 /* maxSize */,
-                                   2 /* numIters */);
+                                   /*maxSize=*/6,
+                                   /*numIters=*/2);
             }
 
             {
@@ -645,8 +645,8 @@ public:
                                    {outVals, addlOutVals},
                                    bitset,
                                    sortSpec,
-                                   3 /* maxSize */,
-                                   2 /* numIters */);
+                                   /*maxSize=*/3,
+                                   /*numIters=*/2);
             }
 
             {
@@ -657,9 +657,9 @@ public:
                                                       {outVals, addlOutVals},
                                                       bitset,
                                                       sortSpec,
-                                                      8 /* maxSize */,
-                                                      2 /* numIters */,
-                                                      450 /* memLimit */),
+                                                      /*maxSize=*/8,
+                                                      /*numIters=*/2,
+                                                      /*memLimit=*/450),
                                    DBException,
                                    ErrorCodes::ExceededMemoryLimit);
             }
@@ -897,8 +897,8 @@ TEST_F(SBEBlockTopBottomTest, TestArgMinMaxFastPath) {
         {outValsFirstBlock, outValsSecondBlock},
         allTrueBitset,
         sortSpec,
-        1 /*maxSize*/,
-        2 /*numIters*/);
+        /*maxSize=*/1,
+        /*numIters=*/2);
 }
 
 TEST_F(SBEBlockTopBottomTest, TopBottomNOracleTest) {
@@ -1026,8 +1026,8 @@ TEST_F(SBEBlockTopBottomTest, TopBottomNHomogeneousTest) {
 
     auto runArgMinMaxTest = [&, this]<typename BlockType, typename T>() {
         std::vector<std::unique_ptr<value::ValueBlock>> keyBlocks;
-        keyBlocks.push_back(makeTestHomogeneousBlock<BlockType, T>(false /* inclNothing */,
-                                                                   false /* multipleNaNs */));
+        keyBlocks.push_back(makeTestHomogeneousBlock<BlockType, T>(/*inclNothing=*/false,
+                                                                   /*multipleNaNs=*/false));
         std::vector<std::unique_ptr<value::ValueBlock>> valBlocks;
         size_t count = keyBlocks[0]->count();
         // The argMin/Max should use `at()` on the output block instead of calling extract().
@@ -1043,7 +1043,7 @@ TEST_F(SBEBlockTopBottomTest, TopBottomNHomogeneousTest) {
         std::vector<std::vector<bool>> bitsets;
         for (size_t i = 0; i < pow(2, count); ++i) {
             // Represent the bits of i as a bitset of size count.
-            boost::dynamic_bitset<size_t> temp(count /* numBits */, i /* value */);
+            boost::dynamic_bitset<size_t> temp(/*numBits=*/count, /*value=*/i);
             std::vector<bool> bitset(count);
             for (size_t j = 0; j < temp.size(); ++j) {
                 bitset[j] = temp[j];
@@ -1056,13 +1056,13 @@ TEST_F(SBEBlockTopBottomTest, TopBottomNHomogeneousTest) {
 
     auto runHomogeneousOracleTest = [&, this]<typename BlockType, typename T>() {
         std::vector<std::unique_ptr<value::ValueBlock>> keyBlocks;
-        keyBlocks.push_back(makeTestHomogeneousBlock<BlockType, T>(false /* inclNothing */,
-                                                                   false /* multipleNaNs */));
+        keyBlocks.push_back(makeTestHomogeneousBlock<BlockType, T>(/*inclNothing=*/false,
+                                                                   /*multipleNaNs=*/false));
         size_t count = keyBlocks[0]->count();
         std::vector<std::unique_ptr<value::ValueBlock>> valBlocks;
         valBlocks.push_back(makeDecimalBlock(count));
 
-        topBottomNOracleTest(keyBlocks, valBlocks, buildBitsets(count), 1 /* maxSizeMax */);
+        topBottomNOracleTest(keyBlocks, valBlocks, buildBitsets(count), /*maxSizeMax=*/1);
     };
 
     {
@@ -1070,7 +1070,7 @@ TEST_F(SBEBlockTopBottomTest, TopBottomNHomogeneousTest) {
         {
             std::vector<std::unique_ptr<value::ValueBlock>> keyBlocks;
             keyBlocks.push_back(
-                makeTestHomogeneousBlock<value::Int32Block, int32_t>(false /* inclNothing */));
+                makeTestHomogeneousBlock<value::Int32Block, int32_t>(/*inclNothing=*/false));
             std::vector<std::unique_ptr<value::ValueBlock>> valBlocks;
             size_t count = keyBlocks[0]->count();
             valBlocks.push_back(makeDecimalBlock(count));
@@ -1242,17 +1242,17 @@ TEST_F(SBEBlockTopBottomTest, TopBottomNLazyExtractionTest) {
         runExtractionTest.template operator()<TestBlock>({inputKeysLow, inputKeysHigh},
                                                          {outVals1, outVals2},
                                                          bitset,
-                                                         4 /* maxSize */,
-                                                         true /* isAscending */,
-                                                         2 /* numIters */);
+                                                         /*maxSize=*/4,
+                                                         /*isAscending=*/true,
+                                                         /*numIters=*/2);
 
         // Descending sort shouldn't extract the output now that the high keys come first.
         runExtractionTest.template operator()<TestBlock>({inputKeysHigh, inputKeysLow},
                                                          {outVals1, outVals2},
                                                          bitset,
-                                                         4 /* maxSize */,
-                                                         false /* isAscending */,
-                                                         2 /* numIters */);
+                                                         /*maxSize=*/4,
+                                                         /*isAscending=*/false,
+                                                         /*numIters=*/2);
     }
 
     {
@@ -1263,9 +1263,9 @@ TEST_F(SBEBlockTopBottomTest, TopBottomNLazyExtractionTest) {
             {inputKeysLow, inputKeysHigh},
             {outVals1, outVals2},
             bitset,
-            4 /* maxSize */,
-            true /* isAscending */,
-            2 /* numIters */,
+            /*maxSize=*/4,
+            /*isAscending=*/true,
+            /*numIters=*/2,
             {{{lowMin.tag(), lowMin.value()}}, {{highMin.tag(), highMin.value()}}},
             {{{lowMax.tag(), lowMax.value()}}, {{highMax.tag(), highMax.value()}}});
 
@@ -1275,9 +1275,9 @@ TEST_F(SBEBlockTopBottomTest, TopBottomNLazyExtractionTest) {
             {inputKeysHigh, inputKeysLow},
             {outVals1, outVals2},
             bitset,
-            4 /* maxSize */,
-            false /* isAscending */,
-            2 /* numIters */,
+            /*maxSize=*/4,
+            /*isAscending=*/false,
+            /*numIters=*/2,
             {{{highMin.tag(), highMin.value()}}, {{lowMin.tag(), lowMin.value()}}},
             {{{highMax.tag(), highMax.value()}}, {{lowMax.tag(), lowMax.value()}}});
     }
@@ -1290,9 +1290,9 @@ TEST_F(SBEBlockTopBottomTest, TopBottomNLazyExtractionTest) {
             runExtractionTest.template operator()<TestBlock>({inputKeysHigh, inputKeysLow},
                                                              {outVals1, outVals2},
                                                              bitset,
-                                                             4 /* maxSize */,
-                                                             true /* isAscending */,
-                                                             2 /* numIters */),
+                                                             /*maxSize=*/4,
+                                                             /*isAscending=*/true,
+                                                             /*numIters=*/2),
             DBException,
             8776400);
 
@@ -1303,9 +1303,9 @@ TEST_F(SBEBlockTopBottomTest, TopBottomNLazyExtractionTest) {
                 {inputKeysHigh, inputKeysLow},
                 {outVals1, outVals2},
                 bitset,
-                4 /* maxSize */,
-                true /* isAscending */,
-                2 /* numIters */,
+                /*maxSize=*/4,
+                /*isAscending=*/true,
+                /*numIters=*/2,
                 {{{highMin.tag(), highMin.value()}}, {{lowMin.tag(), lowMin.value()}}},
                 {{{highMax.tag(), highMax.value()}}, {{lowMax.tag(), lowMax.value()}}}),
             DBException,

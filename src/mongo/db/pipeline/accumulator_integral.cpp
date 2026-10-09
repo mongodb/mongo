@@ -18,7 +18,7 @@ REGISTER_STABLE_WINDOW_FUNCTION(integral, mongo::window_function::ExpressionInte
 AccumulatorIntegral::AccumulatorIntegral(ExpressionContext* const expCtx,
                                          boost::optional<long long> unitMillis)
     : AccumulatorForWindowFunctions(expCtx),
-      _integralWF(expCtx, unitMillis, true /* isNonremovable */) {
+      _integralWF(expCtx, unitMillis, /*isNonremovable=*/true) {
     _memUsageTracker.set(sizeof(*this));
 }
 

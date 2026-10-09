@@ -280,8 +280,8 @@ TEST_F(ReshardingSelectZonesTest, NoZonesAndNoForceRedistributionReturnsEmpty) {
     auto zones = resharding::selectZonesForParticipantShardsAndChunks(
         operationContext(),
         ReshardingProvenanceEnum::kReshardCollection,
-        boost::none /* requestedZones */,
-        false /* forceRedistribution */,
+        /*requestedZones=*/boost::none,
+        /*forceRedistribution=*/false,
         kSourceNss);
 
     ASSERT_TRUE(zones.empty());
@@ -295,7 +295,7 @@ TEST_F(ReshardingSelectZonesTest, RequestedZonesAreReturnedAndValidated) {
         operationContext(),
         ReshardingProvenanceEnum::kReshardCollection,
         requestedZones,
-        false /* forceRedistribution */,
+        /*forceRedistribution=*/false,
         kSourceNss);
 
     ASSERT_EQ(1u, zones.size());
@@ -310,7 +310,7 @@ TEST_F(ReshardingSelectZonesTest, ThrowsWhenRequestedZoneDoesNotExist) {
                            operationContext(),
                            ReshardingProvenanceEnum::kReshardCollection,
                            requestedZones,
-                           false /* forceRedistribution */,
+                           /*forceRedistribution=*/false,
                            kSourceNss),
                        DBException,
                        ErrorCodes::ZoneNotFound);
@@ -324,8 +324,8 @@ TEST_F(ReshardingSelectZonesTest, ForceRedistributionWithoutRequestedZonesUsesEx
     auto zones = resharding::selectZonesForParticipantShardsAndChunks(
         operationContext(),
         ReshardingProvenanceEnum::kReshardCollection,
-        boost::none /* requestedZones */,
-        true /* forceRedistribution */,
+        /*requestedZones=*/boost::none,
+        /*forceRedistribution=*/true,
         kSourceNss);
 
     ASSERT_EQ(1u, zones.size());
@@ -340,7 +340,7 @@ TEST_F(ReshardingSelectZonesTest, UnshardCollectionRejectsRequestedZones) {
                            operationContext(),
                            ReshardingProvenanceEnum::kUnshardCollection,
                            requestedZones,
-                           false /* forceRedistribution */,
+                           /*forceRedistribution=*/false,
                            kSourceNss),
                        DBException,
                        ErrorCodes::InvalidOptions);
@@ -357,8 +357,8 @@ TEST_F(ReshardingSelectZonesTest,
     auto zones = resharding::selectZonesForParticipantShardsAndChunks(
         operationContext(),
         ReshardingProvenanceEnum::kUnshardCollection,
-        boost::none /* requestedZones */,
-        true /* forceRedistribution */,
+        /*requestedZones=*/boost::none,
+        /*forceRedistribution=*/true,
         kSourceNss);
 
     ASSERT_TRUE(zones.empty());
@@ -756,7 +756,7 @@ TEST_F(ReshardingUtilTest, GetMajorityReplicationLag_Basic) {
         repl::OpTimeAndWallTime{repl::OpTime(Timestamp(120, 1), 2),
                                 lastCommittedOpTimeAndWallTime.wallTime + expectedReplicationLag};
     replCoord->setMyLastAppliedOpTimeAndWallTimeForward(lastAppliedOpTimeAndWallTime);
-    replCoord->advanceCommitPoint(lastCommittedOpTimeAndWallTime, false /* fromSyncSource */);
+    replCoord->advanceCommitPoint(lastCommittedOpTimeAndWallTime, /*fromSyncSource=*/false);
 
     auto actualReplicationLag = getMajorityReplicationLag(operationContext());
     ASSERT_EQ(actualReplicationLag, expectedReplicationLag);
@@ -769,7 +769,7 @@ TEST_F(ReshardingUtilTest, GetMajorityReplicationLag_LastAppliedEqualToLastCommi
         repl::OpTimeAndWallTime{repl::OpTime(Timestamp(100, 1), 1), Date_t::now()};
     auto lastAppliedOpTimeAndWallTime = lastCommittedOpTimeAndWallTime;
     replCoord->setMyLastAppliedOpTimeAndWallTimeForward(lastAppliedOpTimeAndWallTime);
-    replCoord->advanceCommitPoint(lastCommittedOpTimeAndWallTime, false /* fromSyncSource */);
+    replCoord->advanceCommitPoint(lastCommittedOpTimeAndWallTime, /*fromSyncSource=*/false);
 
     auto actualReplicationLag = getMajorityReplicationLag(operationContext());
     ASSERT_EQ(actualReplicationLag, Milliseconds(0));
@@ -831,7 +831,7 @@ TEST_F(ReshardingUtilTest, GetMajorityReplicationLag_LastAppliedLessThanLastComm
         repl::OpTimeAndWallTime{repl::OpTime(Timestamp(80, 1), 1),
                                 lastCommittedOpTimeAndWallTime.wallTime - Milliseconds(5)};
     replCoord->setMyLastAppliedOpTimeAndWallTimeForward(lastAppliedOpTimeAndWallTime);
-    replCoord->advanceCommitPoint(lastCommittedOpTimeAndWallTime, false /* fromSyncSource */);
+    replCoord->advanceCommitPoint(lastCommittedOpTimeAndWallTime, /*fromSyncSource=*/false);
 
     auto actualReplicationLag = getMajorityReplicationLag(operationContext());
     ASSERT_EQ(actualReplicationLag, Milliseconds(0));
@@ -1394,7 +1394,7 @@ private:
 };
 
 TEST_F(ReshardingDonorCloneCountUtilTest, UnshardedSourceHintsId) {
-    auto hint = determineCloneCountHint(opCtx(), coll(), boost::none /* shardKeyPattern */);
+    auto hint = determineCloneCountHint(opCtx(), coll(), /*shardKeyPattern=*/boost::none);
 
     ASSERT_TRUE(hint);
     ASSERT_BSONOBJ_EQ(*hint, BSON("_id" << 1));

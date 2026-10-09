@@ -85,7 +85,7 @@ CollectionMetadata makeTrackedCollectionMetadataImpl(
                                      false,
                                      epoch,
                                      timestamp,
-                                     boost::none /* timeseriesFields */,
+                                     /*timeseriesFields=*/boost::none,
                                      std::move(reshardingFields),
                                      true,
                                      allChunks));
@@ -150,8 +150,8 @@ CollectionMetadata makeGappedCollectionMetadata(
                                                  false,
                                                  epoch,
                                                  timestamp,
-                                                 boost::none /* timeseriesFields */,
-                                                 boost::none /* reshardingFields */,
+                                                 /*timeseriesFields=*/boost::none,
+                                                 /*reshardingFields=*/boost::none,
                                                  true,
                                                  chunks));
     return CollectionMetadata(CurrentChunkManager(std::move(routingTableHistory)), kThisShard);

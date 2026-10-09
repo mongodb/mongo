@@ -61,7 +61,7 @@ CoreCatalogCacheTestFixture::scheduleRoutingInfoForcedRefresh(const NamespaceStr
         auto client = getServiceContext()->getService()->makeClient("Test");
         auto const catalogCache = Grid::get(getServiceContext())->catalogCache();
 
-        catalogCache->onStaleCollectionVersion(nss, boost::none /* wantedVersion */);
+        catalogCache->onStaleCollectionVersion(nss, /*wantedVersion=*/boost::none);
         auto cri = uassertStatusOK(catalogCache->getCollectionRoutingInfo(operationContext(), nss));
         return boost::make_optional(cri);
     });
@@ -204,12 +204,12 @@ CollectionRoutingInfo CoreCatalogCacheTestFixture::makeUnshardedCollectionRoutin
     const NamespaceString& nss) {
     return makeCollectionRoutingInfo(nss,
                                      ShardKeyPattern(BSON("_id" << 1)),
-                                     nullptr /* defaultCollator */,
-                                     false /* unique */,
-                                     {} /* splitPoints */,
-                                     boost::none /* reshardingFields */,
-                                     boost::none /* timeseriesFields */,
-                                     true /* unsplittable */);
+                                     /*defaultCollator=*/nullptr,
+                                     /*unique=*/false,
+                                     /*splitPoints=*/{},
+                                     /*reshardingFields=*/boost::none,
+                                     /*timeseriesFields=*/boost::none,
+                                     /*unsplittable=*/true);
 }
 
 CollectionRoutingInfo CoreCatalogCacheTestFixture::makeUntrackedCollectionRoutingInfo(

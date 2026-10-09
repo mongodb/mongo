@@ -133,7 +133,7 @@ TEST(QueryPlannerAnalysis, CanUseIndexForRightSideOfLookupOnlyInClassic) {
 
     // A sparse (non-partial) index on the foreign field can now be used in SBE via the dynamic
     // indexed loop join, so it must NOT force the $lookup into the classic engine.
-    auto sparseIndex = buildSimpleIndexEntry(BSON("b" << 1), nullptr, true /* sparse */);
+    auto sparseIndex = buildSimpleIndexEntry(BSON("b" << 1), nullptr, /*sparse=*/true);
     indexList.clear();
     indexList.push_back(sparseIndex);
     ASSERT_FALSE(QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(

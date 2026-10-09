@@ -98,7 +98,7 @@ MigrationBatchFetcher<Inserter>::MigrationBatchFetcher(
       _writeConcern{writeConcern},
       _secondaryThrottleTicket(outerOpCtx->getServiceContext(),
                                1,
-                               false /* trackPeakUsed */,
+                               /*trackPeakUsed=*/false,
                                TicketHolder::kDefaultMaxQueueDepth),
       _bufferSizeTracker(maxBufferedSizeBytesPerThread) {
     _inserterWorkers->startup();

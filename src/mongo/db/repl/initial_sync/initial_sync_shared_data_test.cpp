@@ -16,10 +16,10 @@ namespace repl {
 TEST(InitialSyncSharedDataTest, SingleFailedOperation) {
     Days timeout(1);
     ClockSourceMock clock;
-    InitialSyncSharedData data(1 /* rollBackId */,
-                               false /* cleanShutdownCheckEnabled */,
-                               -1 /* baseCleanShutdownId */,
-                               Timestamp() /* beginApplyingTimestamp */,
+    InitialSyncSharedData data(/*rollBackId=*/1,
+                               /*cleanShutdownCheckEnabled=*/false,
+                               /*baseCleanShutdownId=*/-1,
+                               /*beginApplyingTimestamp=*/Timestamp(),
                                timeout,
                                &clock);
 
@@ -56,10 +56,10 @@ TEST(InitialSyncSharedDataTest, SingleFailedOperation) {
 TEST(InitialSyncSharedDataTest, SequentialFailedOperations) {
     Days timeout(1);
     ClockSourceMock clock;
-    InitialSyncSharedData data(1 /* rollBackId */,
-                               false /* cleanShutdownCheckEnabled */,
-                               -1 /* baseCleanShutdownId */,
-                               Timestamp() /* beginApplyingTimestamp */,
+    InitialSyncSharedData data(/*rollBackId=*/1,
+                               /*cleanShutdownCheckEnabled=*/false,
+                               /*baseCleanShutdownId=*/-1,
+                               /*beginApplyingTimestamp=*/Timestamp(),
                                timeout,
                                &clock);
 
@@ -123,10 +123,10 @@ TEST(InitialSyncSharedDataTest, SequentialFailedOperations) {
 TEST(InitialSyncSharedDataTest, OverlappingFailedOperations) {
     Days timeout(1);
     ClockSourceMock clock;
-    InitialSyncSharedData data(1 /* rollBackId */,
-                               false /* cleanShutdownCheckEnabled */,
-                               -1 /* baseCleanShutdownId */,
-                               Timestamp() /* beginApplyingTimestamp */,
+    InitialSyncSharedData data(/*rollBackId=*/1,
+                               /*cleanShutdownCheckEnabled=*/false,
+                               /*baseCleanShutdownId=*/-1,
+                               /*beginApplyingTimestamp=*/Timestamp(),
                                timeout,
                                &clock);
 
@@ -186,10 +186,10 @@ TEST(InitialSyncSharedDataTest, OverlappingFailedOperations) {
 TEST(InitialSyncSharedDataTest, OperationTimesOut) {
     Seconds timeout(5);
     ClockSourceMock clock;
-    InitialSyncSharedData data(1 /* rollBackId */,
-                               false /* cleanShutdownCheckEnabled */,
-                               -1 /* baseCleanShutdownId */,
-                               Timestamp() /* beginApplyingTimestamp */,
+    InitialSyncSharedData data(/*rollBackId=*/1,
+                               /*cleanShutdownCheckEnabled=*/false,
+                               /*baseCleanShutdownId=*/-1,
+                               /*beginApplyingTimestamp=*/Timestamp(),
                                timeout,
                                &clock);
 

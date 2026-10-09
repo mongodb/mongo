@@ -85,7 +85,7 @@ TEST(DottedPathSupport, ExtractElementsFromValueAndBSONObjBasedOnTemplate) {
         BSONObj lhs = bson::extractElementsBasedOnTemplate(v.isObject() ? v.getDocument().toBson()
                                                                         : v.wrap(""),
                                                            pattern,
-                                                           true /*useNullIfMissing*/);
+                                                           /*useNullIfMissing=*/true);
         BSONObj rhs = v.isObject() ? lhs : bson::extractNullForAllFieldsBasedOnTemplate(pattern);
         return lhs.woCompare(rhs);
     };

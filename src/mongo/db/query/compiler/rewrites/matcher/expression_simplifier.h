@@ -43,12 +43,12 @@ struct ExpressionSimplifierSettings {
      */
     ExpressionSimplifierSettings()
         : ExpressionSimplifierSettings(
-              /*maximumNumberOfUniquePredicates*/ std::numeric_limits<size_t>::max(),
-              /*maximumNumberOfMinterms*/ std::numeric_limits<size_t>::max(),
-              /*maxNumPrimeImplicants*/ std::numeric_limits<size_t>::max(),
-              /*maxSizeFactor*/ 1e6,
-              /*doNotOpenContainedOrs*/ false,
-              /*applyQuineMcCluskey*/ true) {}
+              /*maximumNumberOfUniquePredicates=*/std::numeric_limits<size_t>::max(),
+              /*maximumNumberOfMinterms=*/std::numeric_limits<size_t>::max(),
+              /*maxNumPrimeImplicants=*/std::numeric_limits<size_t>::max(),
+              /*maxSizeFactor=*/1e6,
+              /*doNotOpenContainedOrs=*/false,
+              /*applyQuineMcCluskey=*/true) {}
 
     ExpressionSimplifierSettings(size_t maximumNumberOfUniquePredicates,
                                  size_t maximumNumberOfMinterms,

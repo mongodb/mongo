@@ -391,8 +391,8 @@ void _initializeGlobalShardingState(OperationContext* opCtx,
                 service,
                 std::make_shared<ConfigServerCatalogCacheLoaderImpl>(),
                 shardRoleCatalogCacheLoader,
-                true /* cascadeDatabaseCacheLoaderShutdown */,
-                false /* cascadeCollectionCacheLoaderShutdown */);
+                /*cascadeDatabaseCacheLoaderShutdown=*/true,
+                /*cascadeCollectionCacheLoaderShutdown=*/false);
         }
 
         // Otherwise, use the ShardServer implementation for both caches.
@@ -429,7 +429,7 @@ void _initializeGlobalShardingState(OperationContext* opCtx,
         if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
             // The direct keys client does not use local read concern since the storage engine
             // supports majority read concern.
-            return std::make_unique<KeysCollectionClientDirect>(false /*mustUseLocalReads*/);
+            return std::make_unique<KeysCollectionClientDirect>(/*mustUseLocalReads=*/false);
         }
         return std::make_unique<KeysCollectionClientSharded>(catalogClient);
     };

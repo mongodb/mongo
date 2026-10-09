@@ -38,25 +38,25 @@ private:
 BENCHMARK_DEFINE_F(PointQueryBenchmark, IdPointQuery)
 (benchmark::State& state) {
     auto id = docs()[docs().size() / 2].getField("_id").OID();
-    runBenchmark(BSON("_id" << id), BSONObj{} /*projection*/, state);
+    runBenchmark(BSON("_id" << id), /*projection=*/BSONObj{}, state);
 }
 
 BENCHMARK_DEFINE_F(PointQueryBenchmark, UniqueFieldPointQuery)
 (benchmark::State& state) {
     int64_t fieldValue = docs().size() / 2;
-    runBenchmark(BSON("uniqueField" << fieldValue), BSONObj{} /*projection*/, state);
+    runBenchmark(BSON("uniqueField" << fieldValue), /*projection=*/BSONObj{}, state);
 }
 
 BENCHMARK_DEFINE_F(PointQueryBenchmark, NonUniqueFieldPointQuery)
 (benchmark::State& state) {
     int64_t fieldValue = docs().size() / 3;
-    runBenchmark(BSON("nonUniqueField" << fieldValue), BSONObj{} /*projection*/, state);
+    runBenchmark(BSON("nonUniqueField" << fieldValue), /*projection=*/BSONObj{}, state);
 }
 
 BENCHMARK_DEFINE_F(PointQueryBenchmark, ArrayFieldPointQuery)
 (benchmark::State& state) {
     int64_t fieldValue = docs().size() / 3;
-    runBenchmark(BSON("arrayField" << fieldValue), BSONObj{} /*projection*/, state);
+    runBenchmark(BSON("arrayField" << fieldValue), /*projection=*/BSONObj{}, state);
 }
 
 BENCHMARK_DEFINE_F(PointQueryBenchmark, UniqueFieldPointQueryWithCoveredProjection)

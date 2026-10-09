@@ -128,7 +128,7 @@ TEST_F(AsyncRequestsSenderTest, HandlesExceptionWhenYielding) {
                                    ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                    Shard::RetryPolicy::kNoRetry,
                                    std::make_unique<ThrowyResourceYielder>(),
-                                   {} /* designatedHostsMap */);
+                                   /*designatedHostsMap=*/{});
 
     // Issue blocking waits on a different thread.
     auto future = launchAsync([&]() {
@@ -185,7 +185,7 @@ TEST_F(AsyncRequestsSenderTest, HandlesExceptionWhenUnyielding) {
                                    ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                    Shard::RetryPolicy::kNoRetry,
                                    std::make_unique<ThrowyResourceYielder>(),
-                                   {} /* designatedHostsMap */);
+                                   /*designatedHostsMap=*/{});
 
     auto firstResponseProcessed = unittest::Barrier(2);
 
@@ -259,7 +259,7 @@ TEST_F(AsyncRequestsSenderTest, ExceptionWhileWaitingDoesNotSkipUnyield) {
                                    ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                    Shard::RetryPolicy::kNoRetry,
                                    std::move(yielder),
-                                   {} /* designatedHostsMap */);
+                                   /*designatedHostsMap=*/{});
 
     // Issue blocking wait on a different thread.
     auto future = launchAsync([&]() {
@@ -382,7 +382,7 @@ TEST_F(AsyncRequestsSenderTest, PreLoadedShardIsUsedForInitialRequest) {
                                    ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                    Shard::RetryPolicy::kIdempotent,
                                    nullptr /* no yielder */,
-                                   {} /* designatedHostsMap */);
+                                   /*designatedHostsMap=*/{});
 
     auto future = launchAsync([&]() {
         auto response = ars.next();
@@ -613,7 +613,7 @@ TEST_F(AsyncRequestsSenderTest, DifferentTelemetryContextsSentPerShard) {
                                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                        Shard::RetryPolicy::kNoRetry,
                                        nullptr /* no yielder */,
-                                       {} /* designatedHostsMap */);
+                                       /*designatedHostsMap=*/{});
 
         auto future = launchAsync([&]() {
             for (int i = 0; i < 3; ++i) {
@@ -672,7 +672,7 @@ TEST_F(AsyncRequestsSenderTest, SameTelemetryContextAcrossRetriesForSameShard) {
                                    ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                    Shard::RetryPolicy::kIdempotent,
                                    nullptr /* no yielder */,
-                                   {} /* designatedHostsMap */);
+                                   /*designatedHostsMap=*/{});
 
     std::shared_ptr<otel::TelemetryContext> firstAttemptCtx;
     std::shared_ptr<otel::TelemetryContext> secondAttemptCtx;
@@ -740,7 +740,7 @@ protected:
                                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                        Shard::RetryPolicy::kNoRetry,
                                        nullptr /* no yielder */,
-                                       {} /* designatedHostsMap */);
+                                       /*designatedHostsMap=*/{});
 
         auto future = launchAsync([&]() { ASSERT_OK(ars.next().swResponse.getStatus()); });
 
@@ -763,7 +763,7 @@ protected:
                                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                        Shard::RetryPolicy::kNoRetry,
                                        nullptr /* no yielder */,
-                                       {} /* designatedHostsMap */);
+                                       /*designatedHostsMap=*/{});
 
         // The tassert fires while the request is still being prepared, so the error is visible
         // without pumping the network.

@@ -21,7 +21,7 @@ public:
         JoinGraph graph(std::move(mgraph));
         unittest::GoldenTestContext ctx(&_cfg);
         ctx.outStream() << "VARIATION " << variationName << std::endl;
-        ctx.outStream() << "output: " << graph.toString(/*pretty*/ true) << std::endl;
+        ctx.outStream() << "output: " << graph.toString(/*pretty=*/true) << std::endl;
         ctx.outStream() << std::endl;
     }
 

@@ -128,7 +128,7 @@ private:
 TEST_F(BucketAutoTests, ReturnsNoBucketsWhenSourceIsEmpty) {
     auto bucketAutoSpec = fromjson("{$bucketAuto : {groupBy : '$x', buckets: 1}}");
     auto results =
-        getResults(bucketAutoSpec /*bucketAutoSpec*/, {} /*inputs*/, false /*expectedMemUse*/);
+        getResults(/*bucketAutoSpec=*/bucketAutoSpec, /*inputs=*/{}, /*expectedMemUse=*/false);
     ASSERT_EQUALS(results.size(), 0UL);
 }
 

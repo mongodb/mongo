@@ -94,7 +94,7 @@ protected:
     }
 
     std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient() override {
-        return std::make_unique<ShardingCatalogClientImpl>(nullptr /* overrideConfigShard */);
+        return std::make_unique<ShardingCatalogClientImpl>(/*overrideConfigShard=*/nullptr);
     }
 
     auto* shardingInitialization() {

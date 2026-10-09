@@ -129,7 +129,7 @@ public:
             // DDLLock in coordinator). After this we release the locks in reversed order, so we are
             // sure that we are not holding the FixedFCVRegion while we acquire the DDLLock.
             auto coordinator = AddShardCoordinator::create(
-                opCtx, *fcvRegion, configConnString, shardName, /*isConfigShard*/ true);
+                opCtx, *fcvRegion, configConnString, shardName, /*isConfigShard=*/true);
 
             fcvRegion.reset();
             ddlLock.reset();

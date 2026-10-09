@@ -96,8 +96,8 @@ public:
                                          false,
                                          epoch,
                                          timestamp,
-                                         boost::none /* timeseriesFields */,
-                                         boost::none /* reshardingFields */,
+                                         /*timeseriesFields=*/boost::none,
+                                         /*reshardingFields=*/boost::none,
 
                                          true,
                                          {std::move(chunk)})));
@@ -119,8 +119,8 @@ public:
                                          false,
                                          newVersion.epoch(),
                                          newVersion.getTimestamp(),
-                                         boost::none /* timeseriesFields */,
-                                         boost::none /* reshardingFields */,
+                                         /*timeseriesFields=*/boost::none,
+                                         /*reshardingFields=*/boost::none,
                                          true,
                                          {std::move(chunk)})));
         return CollectionMetadata{cm, metadata.shardId()};
@@ -162,8 +162,8 @@ public:
                                                      false,
                                                      epoch,
                                                      timestamp,
-                                                     boost::none /* timeseriesFields */,
-                                                     boost::none /* reshardingFields */,
+                                                     /*timeseriesFields=*/boost::none,
+                                                     /*reshardingFields=*/boost::none,
                                                      true,
                                                      chunks)));
         return CollectionMetadata(std::move(cm), std::move(collectionShardId));
@@ -278,7 +278,7 @@ void runWithinTxn(OperationContext* opCtx,
 
     txnParticipant.beginOrContinue(opCtx,
                                    {txnNumber},
-                                   false /* autocommit */,
+                                   /*autocommit=*/false,
                                    TransactionParticipant::TransactionActions::kStart,
                                    transactionRuntimeContext);
 
@@ -1697,7 +1697,7 @@ TEST_F(CollectionShardingRuntimeTest,
     }
 
     auto oplogEntry = makeInvalidateCollectionMetadataOplogEntry(
-        kTestNss, collUuid, true /* forDroppedCollection */);
+        kTestNss, collUuid, /*forDroppedCollection=*/true);
     ShardServerOpObserver observer;
     observer.onInvalidateCollectionMetadata(opCtx, oplogEntry);
 
@@ -1748,7 +1748,7 @@ TEST_F(CollectionShardingRuntimeTest, OnSetAllowChunkOperationsTracksOplogEntryA
     const auto collUuid = UUID::gen();
 
     auto oplogEntry =
-        makeSetAllowChunkOperationsOplogEntry(kTestNss, collUuid, false /* allowChunkOperations */);
+        makeSetAllowChunkOperationsOplogEntry(kTestNss, collUuid, /*allowChunkOperations=*/false);
     ShardServerOpObserver observer;
     observer.onSetAllowChunkOperations(opCtx, oplogEntry);
 

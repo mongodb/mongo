@@ -131,7 +131,7 @@ struct Lowerer {
                                               _state.yieldPolicy,
                                               node.nodeId,
                                               std::move(node.scanOpenCallback),
-                                              true /* participateInTrialRunTracking */,
+                                              /*participateInTrialRunTracking=*/true,
                                               node.scanBounds.includeScanStartRecordId,
                                               node.scanBounds.includeScanEndRecordId);
         }
@@ -151,7 +151,7 @@ struct Lowerer {
             _state.yieldPolicy,
             node.nodeId,
             std::move(node.scanOpenCallback),
-            true /* participateInTrialRunTracking */);
+            /*participateInTrialRunTracking=*/true);
     }
 
     std::unique_ptr<sbe::PlanStage> operator()(SbBlueprintSimpleIndexScan node) {
@@ -313,7 +313,7 @@ struct Lowerer {
                                              _state.allowDiskUse,
                                              _state.yieldPolicy,
                                              node.nodeId,
-                                             true /* participateInTrialRunTracking */,
+                                             /*participateInTrialRunTracking=*/true,
                                              node.forceIncreasedSpilling);
     }
 
@@ -351,7 +351,7 @@ struct Lowerer {
                                                   std::move(mergingExprs),
                                                   _state.yieldPolicy,
                                                   node.nodeId,
-                                                  true /* participateInTrialRunTracking */,
+                                                  /*participateInTrialRunTracking=*/true,
                                                   node.forceIncreasedSpilling);
     }
 
@@ -421,7 +421,7 @@ struct Lowerer {
                                            std::move(stageState),
                                            _state.yieldPolicy,
                                            node.nodeId,
-                                           true /* participateInTrialRunTracking */);
+                                           /*participateInTrialRunTracking=*/true);
     }
 
     std::unique_ptr<sbe::PlanStage> operator()(SbBlueprintExtractFieldPaths node) {

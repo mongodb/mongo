@@ -61,7 +61,7 @@ public:
 
         client.dropCollection(nss);
 
-        response = client.insertAcknowledged(nss, objs, false /*ordered*/);
+        response = client.insertAcknowledged(nss, objs, /*ordered=*/false);
         ASSERT_EQUALS(ErrorCodes::DuplicateKey, getStatusFromWriteCommandReply(response));
         ASSERT_EQUALS((int)client.count(nss), 2);
     }
@@ -134,7 +134,7 @@ public:
 
         auto response =
             client.updateAcknowledged(NamespaceString::createNamespaceString_forTest(""),
-                                      BSONObj{} /*filter*/,
+                                      /*filter=*/BSONObj{},
                                       BSON("$set" << BSON("x" << 1)));
         ASSERT_EQ(ErrorCodes::InvalidNamespace, getStatusFromCommandResult(response));
     }
@@ -148,7 +148,7 @@ public:
         DBDirectClient client(&opCtx);
 
         auto response = client.removeAcknowledged(
-            NamespaceString::createNamespaceString_forTest(""), BSONObj{} /*filter*/);
+            NamespaceString::createNamespaceString_forTest(""), /*filter=*/BSONObj{});
         ASSERT_EQ(ErrorCodes::InvalidNamespace, getStatusFromCommandResult(response));
     }
 };

@@ -98,14 +98,14 @@ public:
                        get<BSONObj>(batchObject),
                        get<write_ops::UpdateModification>(batchObject),
                        get<boost::optional<BSONObj>>(batchObject),
-                       type != UpsertType::kNone /* includeUpsertSupplied */,
-                       boost::none /* collation */,
-                       boost::none /* arrayFilters */,
-                       boost::none /* sort */,
-                       BSONObj() /* hint*/,
-                       boost::none /* sampleId */,
+                       /*includeUpsertSupplied=*/type != UpsertType::kNone,
+                       /*collation=*/boost::none,
+                       /*arrayFilters=*/boost::none,
+                       /*sort=*/boost::none,
+                       /*hint=*/BSONObj(),
+                       /*sampleId=*/boost::none,
                        false /* $_allowShardKeyUpdatesWithoutFullShardKeyInQuery */,
-                       boost::none /* includeQueryStatsMetricsForOpIndex */) +
+                       /*includeQueryStatsMetricsForOpIndex=*/boost::none) +
                 write_ops::kWriteCommandBSONArrayPerElementOverheadBytes;
         }
     };

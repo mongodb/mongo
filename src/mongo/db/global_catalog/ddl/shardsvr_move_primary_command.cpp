@@ -83,7 +83,7 @@ public:
                 shardRegistry->reload(opCtx);
                 const auto resolvedToShardId = uassertStatusOKWithContext(
                     shardRegistry->resolveShardId(
-                        opCtx, toShardId, true /* allowNonShardIdIdentifiers */),
+                        opCtx, toShardId, /*allowNonShardIdIdentifiers=*/true),
                     fmt::format("requested primary shard {} does not exist", toShardId.toString()));
 
                 auto coordinatorDoc = [&] {

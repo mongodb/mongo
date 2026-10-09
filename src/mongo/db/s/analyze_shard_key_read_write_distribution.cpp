@@ -282,7 +282,7 @@ void WriteDistributionMetricsCalculator::_addFindAndModifyQuery(
                                           cmd.getCollation().value_or(BSONObj()),
                                           cmd.getLet(),
                                           cmd.getLegacyRuntimeConstants());
-    _incrementMetricsForQuery(info, false /* isMulti */);
+    _incrementMetricsForQuery(info, /*isMulti=*/false);
 }
 
 void WriteDistributionMetricsCalculator::_addBulkWriteQuery(OperationContext* opCtx,

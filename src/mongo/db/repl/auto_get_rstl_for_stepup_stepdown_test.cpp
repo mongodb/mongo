@@ -242,7 +242,7 @@ TEST_F(OpsAndSessionsKillerTest, killConflictingOps_KillsMultipleOps) {
 
 TEST_F(OpsAndSessionsKillerTest, killConflictingOps_NonKillableOpNotKilled) {
     auto killer = makeKiller();
-    auto nonKillableOpCtx = makeInterruptibleOpCtx("nonKillableClient", false /* killable */);
+    auto nonKillableOpCtx = makeInterruptibleOpCtx("nonKillableClient", /*killable=*/false);
 
     killer->killConflictingOpsAndSessionsOnStepUpAndStepDown();
 
@@ -257,7 +257,7 @@ DEATH_TEST_F(OpsAndSessionsKillerDeathTest,
              killConflictingOps_NonKillableOpWithPreparedConflict,
              "9699100") {
     auto killer = makeKiller();
-    makePrepareConflictOpCtx("nonKillableClient", false /* killable */);
+    makePrepareConflictOpCtx("nonKillableClient", /*killable=*/false);
 
     killer->killConflictingOpsAndSessionsOnStepUpAndStepDown();
 }

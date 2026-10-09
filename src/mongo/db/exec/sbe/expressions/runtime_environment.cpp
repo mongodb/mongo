@@ -108,7 +108,7 @@ std::unique_ptr<RuntimeEnvironment> RuntimeEnvironment::makeDeepCopy() const {
         auto [tag, val] = _accessors.at(slotId).getCopyOfValue().releaseToRaw();
 
         env->emplaceAccessor(slotId, index);
-        env->resetSlot(slotId, tag, val, true /* owned */);
+        env->resetSlot(slotId, tag, val, /*owned=*/true);
     }
     env->_isSmp = _isSmp;
 

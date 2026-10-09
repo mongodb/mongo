@@ -108,7 +108,7 @@ inline void arrayForEach(TypeTags tag, Value val, const Cb& cb) {
                 tv.first = value::TypeTags::Nothing;
                 tv.second = 0;
             }
-            invokeCb(cb, t, v, nullptr /*rawBson*/);
+            invokeCb(cb, t, v, /*rawBson=*/nullptr);
         }
         if constexpr (MoveOrCopy) {
             array->values().clear();
@@ -122,7 +122,7 @@ inline void arrayForEach(TypeTags tag, Value val, const Cb& cb) {
             } else {
                 ++it;
             }
-            invokeCb(cb, t, v, nullptr /*rawBson*/);
+            invokeCb(cb, t, v, /*rawBson=*/nullptr);
         }
     } else if (tag == TypeTags::ArrayMultiSet) {
         auto arrayMultiSet = getArrayMultiSetView(val);
@@ -133,7 +133,7 @@ inline void arrayForEach(TypeTags tag, Value val, const Cb& cb) {
             } else {
                 ++it;
             }
-            invokeCb(cb, t, v, nullptr /*rawBson*/);
+            invokeCb(cb, t, v, /*rawBson=*/nullptr);
         }
     } else {
         MONGO_UNREACHABLE_TASSERT(11122919);

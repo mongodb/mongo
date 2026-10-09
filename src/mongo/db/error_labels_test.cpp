@@ -38,66 +38,66 @@ const repl::OpTime kLaterOpTime{Timestamp(10, 11), 10};
 
 TEST(IsTransientTransactionErrorTest, WriteConflictIsTransient) {
     ASSERT_TRUE(isTransientTransactionError(
-        ErrorCodes::WriteConflict, false /* hasWriteConcernError */, false /* isCommitOrAbort */));
+        ErrorCodes::WriteConflict, /*hasWriteConcernError=*/false, /*isCommitOrAbort=*/false));
 }
 
 TEST(IsTransientTransactionErrorTest, LockTimeoutIsTransient) {
     ASSERT_TRUE(isTransientTransactionError(
-        ErrorCodes::LockTimeout, false /* hasWriteConcernError */, false /* isCommitOrAbort */));
+        ErrorCodes::LockTimeout, /*hasWriteConcernError=*/false, /*isCommitOrAbort=*/false));
 }
 
 TEST(IsTransientTransactionErrorTest, PreparedTransactionInProgressIsTransient) {
     ASSERT_TRUE(isTransientTransactionError(ErrorCodes::PreparedTransactionInProgress,
-                                            false /* hasWriteConcernError */,
-                                            false /* isCommitOrAbort */));
+                                            /*hasWriteConcernError=*/false,
+                                            /*isCommitOrAbort=*/false));
 }
 
 TEST(IsTransientTransactionErrorTest, ShardCannotRefreshDueToLocksHeldIsTransient) {
     ASSERT_TRUE(isTransientTransactionError(ErrorCodes::ShardCannotRefreshDueToLocksHeld,
-                                            false /* hasWriteConcernError */,
-                                            false /* isCommitOrAbort */));
+                                            /*hasWriteConcernError=*/false,
+                                            /*isCommitOrAbort=*/false));
 }
 
 TEST(IsTransientTransactionErrorTest, StaleDbVersionIsTransient) {
     ASSERT_TRUE(isTransientTransactionError(
-        ErrorCodes::StaleDbVersion, false /* hasWriteConcernError */, false /* isCommitOrAbort */));
+        ErrorCodes::StaleDbVersion, /*hasWriteConcernError=*/false, /*isCommitOrAbort=*/false));
 }
 
 TEST(IsTransientTransactionErrorTest, InterruptedDueToReshardingCriticalSectionIsTransient) {
     ASSERT_TRUE(isTransientTransactionError(ErrorCodes::InterruptedDueToReshardingCriticalSection,
-                                            false /* hasWriteConcernError */,
-                                            false /* isCommitOrAbort */));
+                                            /*hasWriteConcernError=*/false,
+                                            /*isCommitOrAbort=*/false));
 }
 
 TEST(IsTransientTransactionErrorTest, NetworkErrorsAreTransientBeforeCommit) {
     ASSERT_TRUE(isTransientTransactionError(ErrorCodes::HostUnreachable,
-                                            false /* hasWriteConcernError */,
-                                            false /* isCommitOrAbort */));
+                                            /*hasWriteConcernError=*/false,
+                                            /*isCommitOrAbort=*/false));
 }
 
 TEST(IsTransientTransactionErrorTest, NetworkErrorsAreNotTransientOnCommit) {
     ASSERT_FALSE(isTransientTransactionError(
-        ErrorCodes::HostUnreachable, false /* hasWriteConcernError */, true /* isCommitOrAbort */));
+        ErrorCodes::HostUnreachable, /*hasWriteConcernError=*/false, /*isCommitOrAbort=*/true));
 }
 
 TEST(IsTransientTransactionErrorTest, RetryableWriteErrorsAreNotTransientOnAbort) {
     ASSERT_FALSE(isTransientTransactionError(ErrorCodes::NotWritablePrimary,
-                                             false /* hasWriteConcernError */,
-                                             true /* isCommitOrAbort */));
+                                             /*hasWriteConcernError=*/false,
+                                             /*isCommitOrAbort=*/true));
 }
 
 TEST(IsTransientTransactionErrorTest,
      NoSuchTransactionWithWriteConcernErrorsAreNotTransientOnCommit) {
     ASSERT_FALSE(isTransientTransactionError(ErrorCodes::NoSuchTransaction,
-                                             true /* hasWriteConcernError */,
-                                             true /* isCommitOrAbort */));
+                                             /*hasWriteConcernError=*/true,
+                                             /*isCommitOrAbort=*/true));
 }
 
 TEST(IsTransientTransactionErrorTest,
      NoSuchTransactionWithoutWriteConcernErrorsAreTransientOnCommit) {
     ASSERT_TRUE(isTransientTransactionError(ErrorCodes::NoSuchTransaction,
-                                            false /* hasWriteConcernError */,
-                                            true /* isCommitOrAbort */));
+                                            /*hasWriteConcernError=*/false,
+                                            /*isCommitOrAbort=*/true));
 }
 
 class ErrorLabelBuilderTest : public ServiceContextTest {
@@ -139,8 +139,8 @@ TEST_F(ErrorLabelBuilderTest, NonErrorCodesHaveNoLabel) {
                               boost::none,
                               boost::none,
                               false,
-                              false /* isMongos */,
-                              false /* isComingFromRouter */,
+                              /*isMongos=*/false,
+                              /*isComingFromRouter=*/false,
                               kOpTime,
                               kOpTime);
     ASSERT_FALSE(builder.isTransientTransactionError());
@@ -157,9 +157,9 @@ TEST_F(ErrorLabelBuilderTest, NonTransactionsHaveNoTransientTransactionErrorLabe
                               commandName,
                               ErrorCodes::WriteConflict,
                               boost::none,
-                              false /* isInternalClient */,
-                              false /* isMongos */,
-                              false /* isComingFromRouter */,
+                              /*isInternalClient=*/false,
+                              /*isMongos=*/false,
+                              /*isComingFromRouter=*/false,
                               repl::OpTime{},
                               repl::OpTime{});
     ASSERT_FALSE(builder.isTransientTransactionError());
@@ -174,9 +174,9 @@ TEST_F(ErrorLabelBuilderTest, RetryableWritesHaveNoTransientTransactionErrorLabe
                               commandName,
                               ErrorCodes::WriteConflict,
                               boost::none,
-                              false /* isInternalClient */,
-                              false /* isMongos */,
-                              false /* isComingFromRouter */,
+                              /*isInternalClient=*/false,
+                              /*isMongos=*/false,
+                              /*isComingFromRouter=*/false,
                               repl::OpTime{},
                               repl::OpTime{});
     ASSERT_FALSE(builder.isTransientTransactionError());
@@ -192,9 +192,9 @@ TEST_F(ErrorLabelBuilderTest, NonTransientTransactionErrorsHaveNoTransientTransa
                               commandName,
                               ErrorCodes::NotWritablePrimary,
                               boost::none,
-                              false /* isInternalClient */,
-                              false /* isMongos */,
-                              false /* isComingFromRouter */,
+                              /*isInternalClient=*/false,
+                              /*isMongos=*/false,
+                              /*isComingFromRouter=*/false,
                               repl::OpTime{},
                               repl::OpTime{});
     ASSERT_FALSE(builder.isTransientTransactionError());
@@ -208,9 +208,9 @@ TEST_F(ErrorLabelBuilderTest, SystemOverloadedErrorLabel) {
                               commandName,
                               ErrorCodes::AdmissionQueueOverflow,
                               boost::none,
-                              false /* isInternalClient */,
-                              false /* isMongos */,
-                              false /* isComingFromRouter */,
+                              /*isInternalClient=*/false,
+                              /*isMongos=*/false,
+                              /*isComingFromRouter=*/false,
                               repl::OpTime{},
                               repl::OpTime{});
     ASSERT_TRUE(builder.isSystemOverloadedError());
@@ -226,9 +226,9 @@ TEST_F(ErrorLabelBuilderTest, TransientTransactionErrorsHaveTransientTransaction
                               commandName,
                               ErrorCodes::NoSuchTransaction,
                               boost::none,
-                              false /* isInternalClient */,
-                              false /* isMongos */,
-                              false /* isComingFromRouter */,
+                              /*isInternalClient=*/false,
+                              /*isMongos=*/false,
+                              /*isComingFromRouter=*/false,
                               repl::OpTime{},
                               repl::OpTime{});
     ASSERT_TRUE(builder.isTransientTransactionError());
@@ -249,9 +249,9 @@ TEST_F(
                                             commandName,
                                             transientError,
                                             retryableError,
-                                            false /* isInternalClient */,
-                                            false /* isMongos */,
-                                            false /* isComingFromRouter */,
+                                            /*isInternalClient=*/false,
+                                            /*isMongos=*/false,
+                                            /*isComingFromRouter=*/false,
                                             repl::OpTime{},
                                             repl::OpTime{});
 
@@ -270,9 +270,9 @@ TEST_F(ErrorLabelBuilderTest, NonRetryableWritesHaveNoRetryableWriteErrorLabel) 
                               commandName,
                               ErrorCodes::NotWritablePrimary,
                               boost::none,
-                              false /* isInternalClient */,
-                              false /* isMongos */,
-                              false /* isComingFromRouter */,
+                              /*isInternalClient=*/false,
+                              /*isMongos=*/false,
+                              /*isComingFromRouter=*/false,
                               repl::OpTime{},
                               repl::OpTime{});
 
@@ -294,9 +294,9 @@ TEST_F(ErrorLabelBuilderTest, NonRetryableWriteErrorsHaveNoRetryableWriteErrorLa
                               commandName,
                               ErrorCodes::WriteConflict,
                               boost::none,
-                              false /* isInternalClient */,
-                              false /* isMongos */,
-                              false /* isComingFromRouter */,
+                              /*isInternalClient=*/false,
+                              /*isMongos=*/false,
+                              /*isComingFromRouter=*/false,
                               repl::OpTime{},
                               repl::OpTime{});
     ASSERT_FALSE(builder.isRetryableWriteError());
@@ -314,9 +314,9 @@ TEST_F(ErrorLabelBuilderTest, IFRFlagRetryHasNoRetryableWriteErrorLabel) {
                               commandName,
                               ErrorCodes::IFRFlagRetry,
                               boost::none,
-                              false /* isInternalClient */,
-                              false /* isMongos */,
-                              false /* isComingFromRouter */,
+                              /*isInternalClient=*/false,
+                              /*isMongos=*/false,
+                              /*isComingFromRouter=*/false,
                               repl::OpTime{},
                               repl::OpTime{});
     ASSERT_FALSE(builder.isRetryableWriteError());
@@ -331,9 +331,9 @@ TEST_F(ErrorLabelBuilderTest, RetryableWriteErrorsHaveRetryableWriteErrorLabel) 
                               commandName,
                               ErrorCodes::NotWritablePrimary,
                               boost::none,
-                              false /* isInternalClient */,
-                              false /* isMongos */,
-                              false /* isComingFromRouter */,
+                              /*isInternalClient=*/false,
+                              /*isMongos=*/false,
+                              /*isComingFromRouter=*/false,
                               repl::OpTime{},
                               repl::OpTime{});
     ASSERT_TRUE(builder.isRetryableWriteError());
@@ -348,9 +348,9 @@ TEST_F(ErrorLabelBuilderTest, NonLocalShutDownErrorsOnMongosDoNotHaveRetryableWr
                               commandName,
                               ErrorCodes::InterruptedAtShutdown,
                               boost::none,
-                              false /* isInternalClient */,
-                              true /* isMongos */,
-                              false /* isComingFromRouter */,
+                              /*isInternalClient=*/false,
+                              /*isMongos=*/true,
+                              /*isComingFromRouter=*/false,
                               repl::OpTime{},
                               repl::OpTime{});
     ASSERT_FALSE(builder.isRetryableWriteError());
@@ -367,9 +367,9 @@ TEST_F(ErrorLabelBuilderTest,
                               commandName,
                               ErrorCodes::InterruptedAtShutdown,
                               boost::none,
-                              false /* isInternalClient */,
-                              true /* isMongos */,
-                              false /* isComingFromRouter */,
+                              /*isInternalClient=*/false,
+                              /*isMongos=*/true,
+                              /*isComingFromRouter=*/false,
                               repl::OpTime{},
                               repl::OpTime{});
     ASSERT_TRUE(builder.isRetryableWriteError());
@@ -386,9 +386,9 @@ TEST_F(ErrorLabelBuilderTest,
                               commandName,
                               ErrorCodes::CallbackCanceled,
                               boost::none,
-                              false /* isInternalClient */,
-                              true /* isMongos */,
-                              false /* isComingFromRouter */,
+                              /*isInternalClient=*/false,
+                              /*isMongos=*/true,
+                              /*isComingFromRouter=*/false,
                               repl::OpTime{},
                               repl::OpTime{});
     ASSERT_TRUE(builder.isRetryableWriteError());
@@ -404,9 +404,9 @@ TEST_F(ErrorLabelBuilderTest,
                               commandName,
                               ErrorCodes::NotWritablePrimary,
                               boost::none,
-                              true /* isInternalClient */,
-                              false /* isMongos */,
-                              false /* isComingFromRouter */,
+                              /*isInternalClient=*/true,
+                              /*isMongos=*/false,
+                              /*isComingFromRouter=*/false,
                               repl::OpTime{},
                               repl::OpTime{});
     ASSERT_FALSE(builder.isRetryableWriteError());
@@ -422,9 +422,9 @@ TEST_F(ErrorLabelBuilderTest,
                               commandName,
                               ErrorCodes::WriteConcernTimeout,
                               ErrorCodes::WriteConcernTimeout,
-                              false /* isInternalClient */,
-                              false /* isMongos */,
-                              false /* isComingFromRouter */,
+                              /*isInternalClient=*/false,
+                              /*isMongos=*/false,
+                              /*isComingFromRouter=*/false,
                               repl::OpTime{},
                               repl::OpTime{});
     ASSERT_FALSE(builder.isRetryableWriteError());
@@ -440,9 +440,9 @@ TEST_F(ErrorLabelBuilderTest,
                               commandName,
                               ErrorCodes::WriteConcernTimeout,
                               ErrorCodes::PrimarySteppedDown,
-                              false /* isInternalClient */,
-                              false /* isMongos */,
-                              false /* isComingFromRouter */,
+                              /*isInternalClient=*/false,
+                              /*isMongos=*/false,
+                              /*isComingFromRouter=*/false,
                               repl::OpTime{},
                               repl::OpTime{});
     ASSERT_TRUE(builder.isRetryableWriteError());
@@ -460,9 +460,9 @@ TEST_F(ErrorLabelBuilderTest, RetryableWriteErrorsOnCommitAbortHaveRetryableWrit
                                     commandName,
                                     ErrorCodes::NotWritablePrimary,
                                     boost::none,
-                                    false /* isInternalClient */,
-                                    false /* isMongos */,
-                                    false /* isComingFromRouter */,
+                                    /*isInternalClient=*/false,
+                                    /*isMongos=*/false,
+                                    /*isComingFromRouter=*/false,
                                     repl::OpTime{},
                                     repl::OpTime{});
     ASSERT_TRUE(commitBuilder.isRetryableWriteError());
@@ -474,9 +474,9 @@ TEST_F(ErrorLabelBuilderTest, RetryableWriteErrorsOnCommitAbortHaveRetryableWrit
                                            commandName,
                                            ErrorCodes::NotWritablePrimary,
                                            boost::none,
-                                           false /* isInternalClient */,
-                                           true /* isMongos */,
-                                           false /* isComingFromRouter */,
+                                           /*isInternalClient=*/false,
+                                           /*isMongos=*/true,
+                                           /*isComingFromRouter=*/false,
                                            repl::OpTime{},
                                            repl::OpTime{});
     ASSERT_TRUE(commitBuilder.isRetryableWriteError());
@@ -488,9 +488,9 @@ TEST_F(ErrorLabelBuilderTest, RetryableWriteErrorsOnCommitAbortHaveRetryableWrit
                                               commandName,
                                               ErrorCodes::NotWritablePrimary,
                                               boost::none,
-                                              false /* isInternalClient */,
-                                              false /* isMongos */,
-                                              false /* isComingFromRouter */,
+                                              /*isInternalClient=*/false,
+                                              /*isMongos=*/false,
+                                              /*isComingFromRouter=*/false,
                                               repl::OpTime{},
                                               repl::OpTime{});
     ASSERT_TRUE(coordinateCommitBuilder.isRetryableWriteError());
@@ -502,9 +502,9 @@ TEST_F(ErrorLabelBuilderTest, RetryableWriteErrorsOnCommitAbortHaveRetryableWrit
                                    commandName,
                                    ErrorCodes::NotWritablePrimary,
                                    boost::none,
-                                   false /* isInternalClient */,
-                                   false /* isMongos */,
-                                   false /* isComingFromRouter */,
+                                   /*isInternalClient=*/false,
+                                   /*isMongos=*/false,
+                                   /*isComingFromRouter=*/false,
                                    repl::OpTime{},
                                    repl::OpTime{});
     ASSERT_TRUE(abortBuilder.isRetryableWriteError());
@@ -516,9 +516,9 @@ TEST_F(ErrorLabelBuilderTest, RetryableWriteErrorsOnCommitAbortHaveRetryableWrit
                                           commandName,
                                           ErrorCodes::NotWritablePrimary,
                                           boost::none,
-                                          false /* isInternalClient */,
-                                          true /* isMongos */,
-                                          false /* isComingFromRouter */,
+                                          /*isInternalClient=*/false,
+                                          /*isMongos=*/true,
+                                          /*isComingFromRouter=*/false,
                                           repl::OpTime{},
                                           repl::OpTime{});
     ASSERT_TRUE(commitBuilder.isRetryableWriteError());
@@ -535,9 +535,9 @@ TEST_F(ErrorLabelBuilderTest,
                               commandName,
                               ErrorCodes::StaleConfig,
                               boost::none,
-                              false /* isInternalClient */,
-                              false /* isMongos */,
-                              false /* isComingFromRouter */,
+                              /*isInternalClient=*/false,
+                              /*isMongos=*/false,
+                              /*isComingFromRouter=*/false,
                               repl::OpTime{},
                               repl::OpTime{});
     ASSERT_TRUE(builder.isRetryableWriteError());
@@ -553,9 +553,9 @@ TEST_F(ErrorLabelBuilderTest,
                               commandName,
                               ErrorCodes::StaleConfig,
                               boost::none,
-                              false /* isInternalClient */,
-                              false /* isMongos */,
-                              true /* isComingFromRouter */,
+                              /*isInternalClient=*/false,
+                              /*isMongos=*/false,
+                              /*isComingFromRouter=*/true,
                               repl::OpTime{},
                               repl::OpTime{});
     ASSERT_FALSE(builder.isRetryableWriteError());
@@ -569,9 +569,9 @@ TEST_F(ErrorLabelBuilderTest, NonResumableChangeStreamError) {
                               commandName,
                               ErrorCodes::ChangeStreamHistoryLost,
                               boost::none,
-                              false /* isInternalClient */,
-                              false /* isMongos */,
-                              true /* isComingFromRouter  */,
+                              /*isInternalClient=*/false,
+                              /*isMongos=*/false,
+                              /*isComingFromRouter=*/true,
                               repl::OpTime{},
                               repl::OpTime{});
     ASSERT_TRUE(builder.isNonResumableChangeStreamError());
@@ -599,9 +599,9 @@ TEST_F(ErrorLabelBuilderTest, ResumableChangeStreamErrorAppliesToChangeStreamAgg
                                               commandName,
                                               errorCode,
                                               boost::none,
-                                              false /* isInternalClient */,
-                                              false /* isMongos */,
-                                              false /* isComingFromRouter  */,
+                                              /*isInternalClient=*/false,
+                                              /*isMongos=*/false,
+                                              /*isComingFromRouter=*/false,
                                               repl::OpTime{},
                                               repl::OpTime{});
         ASSERT_TRUE(resumableAggBuilder.isResumableChangeStreamError());
@@ -614,9 +614,9 @@ TEST_F(ErrorLabelBuilderTest, ResumableChangeStreamErrorAppliesToChangeStreamAgg
                                                   commandName,
                                                   errorCode,
                                                   boost::none,
-                                                  false /* isInternalClient */,
-                                                  false /* isMongos */,
-                                                  false /* isComingFromRouter  */,
+                                                  /*isInternalClient=*/false,
+                                                  /*isMongos=*/false,
+                                                  /*isComingFromRouter=*/false,
                                                   repl::OpTime{},
                                                   repl::OpTime{});
         ASSERT_TRUE(resumableGetMoreBuilder.isResumableChangeStreamError());
@@ -641,9 +641,9 @@ TEST_F(ErrorLabelBuilderTest, ResumableChangeStreamErrorDoesNotApplyToNonResumab
                                           commandName,
                                           ErrorCodes::ChangeStreamFatalError,
                                           boost::none,
-                                          false /* isInternalClient */,
-                                          false /* isMongos */,
-                                          false /* isComingFromRouter  */,
+                                          /*isInternalClient=*/false,
+                                          /*isMongos=*/false,
+                                          /*isComingFromRouter=*/false,
                                           repl::OpTime{},
                                           repl::OpTime{});
     ASSERT_FALSE(resumableAggBuilder.isResumableChangeStreamError());
@@ -655,9 +655,9 @@ TEST_F(ErrorLabelBuilderTest, ResumableChangeStreamErrorDoesNotApplyToNonResumab
                                               commandName,
                                               ErrorCodes::ChangeStreamFatalError,
                                               boost::none,
-                                              false /* isInternalClient */,
-                                              false /* isMongos */,
-                                              false /* isComingFromRouter  */,
+                                              /*isInternalClient=*/false,
+                                              /*isMongos=*/false,
+                                              /*isComingFromRouter=*/false,
                                               repl::OpTime{},
                                               repl::OpTime{});
     ASSERT_FALSE(resumableGetMoreBuilder.isResumableChangeStreamError());
@@ -681,9 +681,9 @@ TEST_F(ErrorLabelBuilderTest, ResumableChangeStreamErrorDoesNotApplyToNonChangeS
                                              commandName,
                                              ErrorCodes::NetworkTimeout,
                                              boost::none,
-                                             false /* isInternalClient */,
-                                             false /* isMongos */,
-                                             false /* isComingFromRouter  */,
+                                             /*isInternalClient=*/false,
+                                             /*isMongos=*/false,
+                                             /*isComingFromRouter=*/false,
                                              repl::OpTime{},
                                              repl::OpTime{});
     ASSERT_FALSE(nonResumableAggBuilder.isResumableChangeStreamError());
@@ -695,9 +695,9 @@ TEST_F(ErrorLabelBuilderTest, ResumableChangeStreamErrorDoesNotApplyToNonChangeS
                                                  commandName,
                                                  ErrorCodes::NetworkTimeout,
                                                  boost::none,
-                                                 false /* isInternalClient */,
-                                                 false /* isMongos */,
-                                                 false /* isComingFromRouter */,
+                                                 /*isInternalClient=*/false,
+                                                 /*isMongos=*/false,
+                                                 /*isComingFromRouter=*/false,
                                                  repl::OpTime{},
                                                  repl::OpTime{});
     ASSERT_FALSE(nonResumableGetMoreBuilder.isResumableChangeStreamError());
@@ -714,9 +714,9 @@ TEST_F(ErrorLabelBuilderTest, ResumableChangeStreamErrorDoesNotApplyToNonAggrega
                                               commandName,
                                               ErrorCodes::NetworkTimeout,
                                               boost::none,
-                                              false /* isInternalClient */,
-                                              false /* isMongos */,
-                                              false /* isComingFromRouter  */,
+                                              /*isInternalClient=*/false,
+                                              /*isMongos=*/false,
+                                              /*isComingFromRouter=*/false,
                                               repl::OpTime{},
                                               repl::OpTime{});
     ASSERT_FALSE(nonResumableFindBuilder.isResumableChangeStreamError());
@@ -728,9 +728,9 @@ TEST_F(ErrorLabelBuilderTest, ResumableChangeStreamErrorDoesNotApplyToNonAggrega
                                                  commandName,
                                                  ErrorCodes::NetworkTimeout,
                                                  boost::none,
-                                                 false /* isInternalClient */,
-                                                 false /* isMongos */,
-                                                 false /* isComingFromRouter  */,
+                                                 /*isInternalClient=*/false,
+                                                 /*isMongos=*/false,
+                                                 /*isComingFromRouter=*/false,
                                                  repl::OpTime{},
                                                  repl::OpTime{});
     ASSERT_FALSE(nonResumableGetMoreBuilder.isResumableChangeStreamError());
@@ -745,8 +745,8 @@ TEST_F(ErrorLabelBuilderTest, NoWritesPerformedLabelApplied) {
                               ErrorCodes::WriteConcernTimeout,
                               ErrorCodes::WriteConcernTimeout,
                               false,
-                              false /* isMongos */,
-                              false /* isComingFromRouter */,
+                              /*isMongos=*/false,
+                              /*isComingFromRouter=*/false,
                               kOpTime,
                               kOpTime);
     ASSERT_TRUE(builder.isErrorWithNoWritesPerformed());
@@ -761,8 +761,8 @@ TEST_F(ErrorLabelBuilderTest, NoWritesPerformedLabelNotAppliedAfterWrite) {
                               ErrorCodes::WriteConcernTimeout,
                               ErrorCodes::WriteConcernTimeout,
                               false,
-                              false /* isMongos */,
-                              false /* isComingFromRouter */,
+                              /*isMongos=*/false,
+                              /*isComingFromRouter=*/false,
                               kOpTime,
                               kLaterOpTime);
     ASSERT_FALSE(builder.isErrorWithNoWritesPerformed());
@@ -777,8 +777,8 @@ TEST_F(ErrorLabelBuilderTest, NoWritesPerformedLabelNotAppliedIfUnknown) {
                               ErrorCodes::WriteConcernTimeout,
                               ErrorCodes::WriteConcernTimeout,
                               false,
-                              false /* isMongos */,
-                              false /* isComingFromRouter */,
+                              /*isMongos=*/false,
+                              /*isComingFromRouter=*/false,
                               repl::OpTime{},
                               repl::OpTime{});
     ASSERT_FALSE(builder.isErrorWithNoWritesPerformed());
@@ -793,9 +793,9 @@ TEST_F(ErrorLabelBuilderTest, SystemOverloadedErrorLabelApplied) {
                                             commandName,
                                             ErrorCodes::AdmissionQueueOverflow,
                                             boost::none,
-                                            false /* isInternalClient */,
-                                            false /* isMongos */,
-                                            false /* isComingFromRouter */,
+                                            /*isInternalClient=*/false,
+                                            /*isMongos=*/false,
+                                            /*isComingFromRouter=*/false,
                                             kOpTime,
                                             kOpTime);
     BSONArrayBuilder expectedLabelArray;
@@ -812,9 +812,9 @@ TEST_F(ErrorLabelBuilderTest, NoWritesPerformedAndRetryableWriteAppliesBothLabel
                                             commandName,
                                             ErrorCodes::NotWritablePrimary,
                                             boost::none,
-                                            false /* isInternalClient */,
-                                            false /* isMongos */,
-                                            false /* isComingFromRouter */,
+                                            /*isInternalClient=*/false,
+                                            /*isMongos=*/false,
+                                            /*isComingFromRouter=*/false,
                                             kOpTime,
                                             kOpTime);
     BSONArrayBuilder expectedLabelArray;
@@ -831,9 +831,9 @@ TEST_F(ErrorLabelBuilderTest, NoWritesPerformedNotAppliedDuringOrdinaryUpdate) {
                                             commandName,
                                             ErrorCodes::NotWritablePrimary,
                                             boost::none,
-                                            false /* isInternalClient */,
-                                            false /* isMongos */,
-                                            false /* isComingFromRouter */,
+                                            /*isInternalClient=*/false,
+                                            /*isMongos=*/false,
+                                            /*isComingFromRouter=*/false,
                                             kOpTime,
                                             kOpTime);
     ASSERT_BSONOBJ_EQ(actualErrorLabels, BSONObj());
@@ -849,9 +849,9 @@ TEST_F(ErrorLabelBuilderTest, NoWritesPerformedNotAppliedDuringTransientTransact
                                             commandName,
                                             ErrorCodes::NoSuchTransaction,
                                             boost::none,
-                                            false /* isInternalClient */,
-                                            false /* isMongos */,
-                                            false /* isComingFromRouter */,
+                                            /*isInternalClient=*/false,
+                                            /*isMongos=*/false,
+                                            /*isComingFromRouter=*/false,
                                             kOpTime,
                                             kOpTime);
     BSONArrayBuilder expectedLabelArray;
@@ -872,9 +872,9 @@ TEST_F(ErrorLabelBuilderTest, ErrorLabelsOverrideAppendsBaseBackoffMS) {
                                             "find",
                                             ErrorCodes::IngressRequestRateLimitExceeded,
                                             boost::none,
-                                            false /* isInternalClient */,
-                                            false /* isMongos */,
-                                            false /* isComingFromRouter */,
+                                            /*isInternalClient=*/false,
+                                            /*isMongos=*/false,
+                                            /*isComingFromRouter=*/false,
                                             kOpTime,
                                             kOpTime);
     ASSERT_BSONOBJ_EQ(actualErrorLabels.getObjectField(kErrorLabelsFieldName), expectedErrorLabels);
@@ -894,9 +894,9 @@ TEST_F(ErrorLabelBuilderTest, ErrorLabelsOverrideSkipsBaseBackoffMSWithoutOverlo
                                             "find",
                                             ErrorCodes::IngressRequestRateLimitExceeded,
                                             boost::none,
-                                            false /* isInternalClient */,
-                                            false /* isMongos */,
-                                            false /* isComingFromRouter */,
+                                            /*isInternalClient=*/false,
+                                            /*isMongos=*/false,
+                                            /*isComingFromRouter=*/false,
                                             kOpTime,
                                             kOpTime);
     ASSERT_BSONOBJ_EQ(actualErrorLabels.getObjectField(kErrorLabelsFieldName), expectedErrorLabels);
@@ -916,9 +916,9 @@ TEST_F(ErrorLabelBuilderTest, ErrorLabelsOverrideSkipsBaseBackoffMSWithoutRetrya
                                             "find",
                                             ErrorCodes::IngressRequestRateLimitExceeded,
                                             boost::none,
-                                            false /* isInternalClient */,
-                                            false /* isMongos */,
-                                            false /* isComingFromRouter */,
+                                            /*isInternalClient=*/false,
+                                            /*isMongos=*/false,
+                                            /*isComingFromRouter=*/false,
                                             kOpTime,
                                             kOpTime);
     ASSERT_BSONOBJ_EQ(actualErrorLabels.getObjectField(kErrorLabelsFieldName), expectedErrorLabels);
@@ -938,9 +938,9 @@ TEST_F(ErrorLabelBuilderTest, ErrorLabelsOverrideSkipsBaseBackoffMSByDefault) {
                                             "find",
                                             ErrorCodes::IngressRequestRateLimitExceeded,
                                             boost::none,
-                                            false /* isInternalClient */,
-                                            false /* isMongos */,
-                                            false /* isComingFromRouter */,
+                                            /*isInternalClient=*/false,
+                                            /*isMongos=*/false,
+                                            /*isComingFromRouter=*/false,
                                             kOpTime,
                                             kOpTime);
     ASSERT_BSONOBJ_EQ(actualErrorLabels.getObjectField(kErrorLabelsFieldName), expectedErrorLabels);
@@ -959,9 +959,9 @@ TEST_F(ErrorLabelBuilderTest, ErrorLabelsOverrideSkipsBaseBackoffMSWithoutParame
                                             "find",
                                             ErrorCodes::IngressRequestRateLimitExceeded,
                                             boost::none,
-                                            false /* isInternalClient */,
-                                            false /* isMongos */,
-                                            false /* isComingFromRouter */,
+                                            /*isInternalClient=*/false,
+                                            /*isMongos=*/false,
+                                            /*isComingFromRouter=*/false,
                                             kOpTime,
                                             kOpTime);
     ASSERT_BSONOBJ_EQ(actualErrorLabels.getObjectField(kErrorLabelsFieldName), expectedErrorLabels);
@@ -983,9 +983,9 @@ TEST_F(ErrorLabelBuilderTest, StreamProcessorErrorLabels) {
                                                 commandName,
                                                 ErrorCodes::StreamProcessorKafkaConnectionError,
                                                 boost::none,
-                                                false /* isInternalClient */,
-                                                false /* isMongos */,
-                                                false /* isComingFromRouter */,
+                                                /*isInternalClient=*/false,
+                                                /*isMongos=*/false,
+                                                /*isComingFromRouter=*/false,
                                                 kOpTime,
                                                 kOpTime);
         BSONArrayBuilder expectedLabelArray;
@@ -1000,9 +1000,9 @@ TEST_F(ErrorLabelBuilderTest, StreamProcessorErrorLabels) {
                                                 commandName,
                                                 ErrorCodes::StreamProcessorWorkerOutOfMemory,
                                                 boost::none,
-                                                false /* isInternalClient */,
-                                                false /* isMongos */,
-                                                false /* isComingFromRouter */,
+                                                /*isInternalClient=*/false,
+                                                /*isMongos=*/false,
+                                                /*isComingFromRouter=*/false,
                                                 kOpTime,
                                                 kOpTime);
         BSONArrayBuilder expectedLabelArray;

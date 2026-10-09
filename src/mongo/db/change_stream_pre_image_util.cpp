@@ -125,7 +125,7 @@ void truncatePreImagesByTimestampExpirationApproximation(
                                            maxRecordIdApproximation,
                                            0,
                                            0,
-                                           false /* shouldValidateRecordIdRange */);
+                                           /*shouldValidateRecordIdRange=*/false);
         wuow.commit();
     }
 }
@@ -148,7 +148,7 @@ boost::optional<UUID> findNextCollectionUUID(OperationContext* opCtx,
                                         preImagesColl,
                                         PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                         InternalPlanner::Direction::FORWARD,
-                                        boost::none /* resumeAfterRecordId */,
+                                        /*resumeAfterRecordId=*/boost::none,
                                         std::move(minRecordId));
     if (planExecutor->getNext(&preImageObj, nullptr) == PlanExecutor::IS_EOF) {
         return boost::none;

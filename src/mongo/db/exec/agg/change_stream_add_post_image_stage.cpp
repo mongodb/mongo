@@ -134,9 +134,9 @@ boost::optional<Document> ChangeStreamAddPostImageStage::generatePostImage(
     uassertStatusOK(updateDriver.update(pExpCtx->getOperationContext(),
                                         std::string_view(),
                                         &postImage,
-                                        false /* validateForStorage */,
+                                        /*validateForStorage=*/false,
                                         FieldRefSet(),
-                                        false /* isInsert */));
+                                        /*isInsert=*/false));
     return Document(postImage.getObject());
 }
 

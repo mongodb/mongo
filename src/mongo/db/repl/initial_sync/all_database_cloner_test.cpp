@@ -456,7 +456,7 @@ TEST_F(AllDatabaseClonerTest, DoesNotCheckCleanShutdownWhenDisabledForThisAttemp
     // Rebuild the shared data as an attempt that started with enableInitialSyncCleanShutdownCheck
     // off. Whether the check runs is decided once, when the attempt starts, and carried here.
     _sharedData = std::make_unique<InitialSyncSharedData>(kInitialRollbackId,
-                                                          false /* cleanShutdownCheckEnabled */,
+                                                          /*cleanShutdownCheckEnabled=*/false,
                                                           kBaseCleanShutdownId,
                                                           kBeginApplyingTimestamp,
                                                           Days(1),
@@ -507,7 +507,7 @@ TEST_F(AllDatabaseClonerTest, RetriesListDatabasesButInitialSyncIdChanges) {
 
     // Clear and change the initial sync ID
     const auto nss = NamespaceString::kDefaultInitialSyncIdNamespace;
-    _mockServer->remove(nss, BSONObj{} /*filter*/);
+    _mockServer->remove(nss, /*filter=*/BSONObj{});
     _mockServer->insert(nss, BSON("_id" << UUID::gen()));
 
     // Allow the cloner to finish.

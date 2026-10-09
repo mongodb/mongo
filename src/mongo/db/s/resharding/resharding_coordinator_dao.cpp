@@ -43,8 +43,7 @@ ReshardingCoordinatorDocument buildAndExecuteRequest(OperationContext* opCtx,
                                              BSON("_id" << reshardingUUID),
                                              bob.obj(),
                                              false,  // upsert
-                                             false   // multi
-        );
+                                             /*multi=*/false);
     client->alterState(opCtx, request);
     return client->readState(opCtx, reshardingUUID);
 }

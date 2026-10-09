@@ -451,7 +451,7 @@ size_t getNumSbeCompatibleStagesForPushdown(
                 pipeline->getContext()->getOperationContext(),
                 *cq,
                 collections,
-                false /* includeSizeStats */);
+                /*includeSizeStats=*/false);
         }
 
         if (!pipelineStageIsCompatible(pipeline->getContext(),

@@ -96,7 +96,7 @@ protected:
 
 TEST_F(SBEBuiltinZipArraysTest, ZipWithoutDefaults) {
     runAndAssertExpression({BSON_ARRAY(1 << 2 << 3), BSON_ARRAY("A" << "B")},
-                           false /* useLongestLength */,
+                           /*useLongestLength=*/false,
                            boost::none,
                            BSON_ARRAY(BSON_ARRAY(1 << "A") << BSON_ARRAY(2 << "B")));
 }
@@ -104,7 +104,7 @@ TEST_F(SBEBuiltinZipArraysTest, ZipWithoutDefaults) {
 TEST_F(SBEBuiltinZipArraysTest, ZipLongestLengthWithoutDefaultsPadsWithNulls) {
     runAndAssertExpression(
         {BSON_ARRAY(1 << 2 << 3), BSON_ARRAY("A" << "B")},
-        true /* useLongestLength */,
+        /*useLongestLength=*/true,
         boost::none,
         BSON_ARRAY(BSON_ARRAY(1 << "A") << BSON_ARRAY(2 << "B") << BSON_ARRAY(3 << BSONNULL)));
 }
@@ -112,7 +112,7 @@ TEST_F(SBEBuiltinZipArraysTest, ZipLongestLengthWithoutDefaultsPadsWithNulls) {
 TEST_F(SBEBuiltinZipArraysTest, ZipWithWholeArrayDefaults) {
     runAndAssertExpression(
         {BSON_ARRAY(1 << 2 << 3), BSON_ARRAY("A" << "B")},
-        true /* useLongestLength */,
+        /*useLongestLength=*/true,
         makeArray(BSON_ARRAY("C" << "D")),
         BSON_ARRAY(BSON_ARRAY(1 << "A") << BSON_ARRAY(2 << "B") << BSON_ARRAY(3 << "D")));
 }
@@ -120,7 +120,7 @@ TEST_F(SBEBuiltinZipArraysTest, ZipWithWholeArrayDefaults) {
 TEST_F(SBEBuiltinZipArraysTest, ZipWithBsonArrayDefaults) {
     runAndAssertExpression(
         {BSON_ARRAY(1 << 2 << 3), BSON_ARRAY("A" << "B")},
-        true /* useLongestLength */,
+        /*useLongestLength=*/true,
         makeBsonArray(BSON_ARRAY("C" << "D")),
         BSON_ARRAY(BSON_ARRAY(1 << "A") << BSON_ARRAY(2 << "B") << BSON_ARRAY(3 << "D")));
 }
@@ -128,12 +128,12 @@ TEST_F(SBEBuiltinZipArraysTest, ZipWithBsonArrayDefaults) {
 TEST_F(SBEBuiltinZipArraysTest, NullishDefaultsBehaveAsAbsent) {
     runAndAssertExpression(
         {BSON_ARRAY(1 << 2 << 3), BSON_ARRAY("A" << "B")},
-        true /* useLongestLength */,
+        /*useLongestLength=*/true,
         makeNothing(),
         BSON_ARRAY(BSON_ARRAY(1 << "A") << BSON_ARRAY(2 << "B") << BSON_ARRAY(3 << BSONNULL)));
     runAndAssertExpression(
         {BSON_ARRAY(1 << 2 << 3), BSON_ARRAY("A" << "B")},
-        true /* useLongestLength */,
+        /*useLongestLength=*/true,
         TypedValue{value::TypeTags::Null, 0},
         BSON_ARRAY(BSON_ARRAY(1 << "A") << BSON_ARRAY(2 << "B") << BSON_ARRAY(3 << BSONNULL)));
 }
@@ -146,7 +146,7 @@ TEST_F(SBEBuiltinZipArraysTest, NonArrayDefaultsThrows) {
 
     ASSERT_THROWS_CODE(
         runExpression({input1, input2},
-                      true /* useLongestLength */,
+                      /*useLongestLength=*/true,
                       TypedValue{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(42)}),
         DBException,
         10961502);
@@ -160,7 +160,7 @@ TEST_F(SBEBuiltinZipArraysTest, WrongLengthDefaultsThrows) {
     auto defaults = makeArray(BSON_ARRAY("C"));
     value::TagValueOwned defaultsGuard = value::TagValueOwned::fromRaw(defaults);
 
-    ASSERT_THROWS_CODE(runExpression({input1, input2}, true /* useLongestLength */, defaults),
+    ASSERT_THROWS_CODE(runExpression({input1, input2}, /*useLongestLength=*/true, defaults),
                        DBException,
                        10961503);
 }
@@ -171,7 +171,7 @@ TEST_F(SBEBuiltinZipArraysTest, NonArrayInputReturnsNothing) {
 
     auto result = runExpression(
         {input1, TypedValue{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)}},
-        false /* useLongestLength */,
+        /*useLongestLength=*/false,
         boost::none);
     value::TagValueOwned resultGuard = value::TagValueOwned::fromRaw(result);
 
@@ -187,7 +187,7 @@ TEST_F(SBEBuiltinZipArraysTest, ZipArraysWithinLimitSucceeds) {
     // 2 arrays * 10 elements * 1024 bytes zipped = ~20KB; limit set well above that.
     unittest::ServerParameterGuard limit{"internalQueryMaxSingleExpressionMemoryUsageBytes",
                                          30 * 1024};
-    auto result = runExpression({input1, input2}, false /* useLongestLength */, boost::none);
+    auto result = runExpression({input1, input2}, /*useLongestLength=*/false, boost::none);
     value::TagValueOwned resultGuard = value::TagValueOwned::fromRaw(result);
 
     ASSERT(value::isArray(result.first));
@@ -202,7 +202,7 @@ TEST_F(SBEBuiltinZipArraysTest, ZipArraysExceedsMemoryLimit) {
 
     unittest::ServerParameterGuard limit{"internalQueryMaxSingleExpressionMemoryUsageBytes",
                                          10 * 1024};
-    ASSERT_THROWS_CODE(runExpression({input1, input2}, false /* useLongestLength */, boost::none),
+    ASSERT_THROWS_CODE(runExpression({input1, input2}, /*useLongestLength=*/false, boost::none),
                        AssertionException,
                        ErrorCodes::ExceededMemoryLimit);
 }

@@ -95,7 +95,7 @@ void Stats::incrementOpCounters(OperationContext* opCtx,
                                                            updateRef.getUpdateMods(),
                                                            op.getNss(),
                                                            updateRef.getArrayFilters(),
-                                                           false /* isMulti */);
+                                                           /*isMulti=*/false);
     } else if (op.isDeleteOp()) {
         globalOpCounters().gotDelete();
     }

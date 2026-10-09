@@ -121,7 +121,7 @@ void scanDocument(const mutablebson::Document& doc,
                 // We need to recursively validate the _id field while ensuring we disallow
                 // top-level $-prefix fields in the _id object.
                 scanDocument(currElem,
-                             true /* deep */,
+                             /*deep=*/true,
                              0 /* recursionLevel - forces _id fields to be treated as top-level. */,
                              false /* Top-level _id fields cannot be $-prefixed. */,
                              shouldValidate,

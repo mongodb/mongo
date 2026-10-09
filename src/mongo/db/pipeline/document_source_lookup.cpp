@@ -701,7 +701,7 @@ DocumentSourceContainer DocumentSourceLookUp::createFromStageParams(
                 std::move(localForeignFields),
                 std::move(params.unwindSpec),
                 expCtx,
-                true /* containsUserSpecifiedPipeline */,
+                /*containsUserSpecifiedPipeline=*/true,
                 FirstStageViewApplicationPolicy::kDefaultPrepend,
                 viewPrefixLen)};
         }
@@ -988,15 +988,15 @@ void DocumentSourceLookUp::describeTransformation(
     if (_unwindSrc) {
         // After $lookup+$unwind the 'as' field holds one document from the subpipeline
         // (or null/absent for preserveNullAndEmptyArrays), never an array.
-        visitor(NonArrayModifyPath{_as.fullPath(), /*canLeafBeArray*/ false});
+        visitor(NonArrayModifyPath{_as.fullPath(), /*canLeafBeArray=*/false});
         if (const auto& idxPath = _unwindSrc->indexPath()) {
             // includeArrayIndex is a numeric position, never an array.
-            visitor(NonArrayModifyPath{idxPath->fullPath(), /*canLeafBeArray*/ false});
+            visitor(NonArrayModifyPath{idxPath->fullPath(), /*canLeafBeArray=*/false});
         }
         return;
     }
     // Without an absorbed $unwind the 'as' field is an array.
-    visitor(NonArrayModifyPath{_as.fullPath(), /*canLeafBeArray*/ true});
+    visitor(NonArrayModifyPath{_as.fullPath(), /*canLeafBeArray=*/true});
 }
 
 DocumentSourceContainer::iterator DocumentSourceLookUp::optimizeAt(

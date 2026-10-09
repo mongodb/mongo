@@ -300,9 +300,9 @@ TEST_F(GoldenSbeStageBuilderTest, TestCountScan) {
         groupByExpression,
         std::vector<AccumulationStatement>{
             AccumulationStatement::parseAccumulationStatement(_expCtx.get(), bson["count"], vps)},
-        false /*doingMerge*/,
-        false /*willBeMerged*/,
-        true /*shouldProduceBson*/);
+        /*doingMerge=*/false,
+        /*willBeMerged=*/false,
+        /*shouldProduceBson=*/true);
 
     runTest(std::move(groupNode), BSON_ARRAY(BSON("_id" << BSONNULL << "count" << 3)));
 }
@@ -313,8 +313,8 @@ TEST_F(GoldenSbeStageBuilderTest, TestLimitSkip) {
         BSON("a" << 1));
 
     auto node = std::make_unique<LimitNode>(
-        std::make_unique<SkipNode>(getScanNode(), 1 /* skip */, LimitSkipParameterization::Enabled),
-        1 /* limit */,
+        std::make_unique<SkipNode>(getScanNode(), /*skip=*/1, LimitSkipParameterization::Enabled),
+        /*limit=*/1,
         LimitSkipParameterization::Enabled);
     runTest(std::move(node), BSON_ARRAY(BSON("_id" << 1 << "a" << 2)));
 }
@@ -325,7 +325,7 @@ TEST_F(GoldenSbeStageBuilderTest, TestSkipOnly) {
         BSON("a" << 1));
 
     auto node =
-        std::make_unique<SkipNode>(getScanNode(), 2 /* skip */, LimitSkipParameterization::Enabled);
+        std::make_unique<SkipNode>(getScanNode(), /*skip=*/2, LimitSkipParameterization::Enabled);
     runTest(std::move(node), BSON_ARRAY(BSON("_id" << 2 << "a" << 3)));
 }
 
@@ -339,8 +339,8 @@ TEST_F(GoldenSbeStageBuilderTest, TestSort) {
     // Build a collection scan node for uncovered sort.
     auto sortNode = std::make_unique<SortNodeDefault>(
         std::make_unique<VirtualScanNode>(docs, VirtualScanNode::ScanType::kCollScan, false),
-        BSON("a" << -1) /* pattern */,
-        -1 /* limit */,
+        /*pattern=*/BSON("a" << -1),
+        /*limit=*/-1,
         LimitSkipParameterization::Disabled,
         kSortMaxMemoryUsageBytes);
     runTest(std::move(sortNode), expected);
@@ -355,8 +355,8 @@ TEST_F(GoldenSbeStageBuilderTest, TestSortLimit) {
     // Build a collection scan node for uncovered sort.
     auto sortNode = std::make_unique<SortNodeDefault>(
         std::make_unique<VirtualScanNode>(docs, VirtualScanNode::ScanType::kCollScan, false),
-        BSON("a" << -1) /* pattern */,
-        1 /* limit */,
+        /*pattern=*/BSON("a" << -1),
+        /*limit=*/1,
         LimitSkipParameterization::Enabled,
         kSortMaxMemoryUsageBytes);
     runTest(std::move(sortNode), expected, {.limit = 1});
@@ -371,15 +371,15 @@ TEST_F(GoldenSbeStageBuilderTest, TestSortLimitSkip) {
     // Build a collection scan node for uncovered sort.
     auto sortNode = std::make_unique<SortNodeDefault>(
         std::make_unique<VirtualScanNode>(docs, VirtualScanNode::ScanType::kCollScan, false),
-        BSON("a" << -1) /* pattern */,
-        2 /* limit */,
+        /*pattern=*/BSON("a" << -1),
+        /*limit=*/2,
         LimitSkipParameterization::Enabled,
         kSortMaxMemoryUsageBytes);
 
     auto limitSkipNode = std::make_unique<LimitNode>(
         std::make_unique<SkipNode>(
-            std::move(sortNode), 1 /* skip */, LimitSkipParameterization::Enabled),
-        1 /* limit */,
+            std::move(sortNode), /*skip=*/1, LimitSkipParameterization::Enabled),
+        /*limit=*/1,
         LimitSkipParameterization::Enabled);
     runTest(std::move(limitSkipNode), expected, {.limit = 1, .skip = 1});
 }
@@ -424,8 +424,8 @@ TEST_F(GoldenSbeStageBuilderTest, TestSortCovered) {
     // Build an index scan node for covered sort.
     auto coveredSortNode = std::make_unique<SortNodeDefault>(
         makeIdxScanNode(_nss, makeIndexEntry(indexKeyPattern), "a", 1, 3),
-        BSON("a" << -1) /* pattern */,
-        -1 /* limit */,
+        /*pattern=*/BSON("a" << -1),
+        /*limit=*/-1,
         LimitSkipParameterization::Disabled,
         kSortMaxMemoryUsageBytes);
 

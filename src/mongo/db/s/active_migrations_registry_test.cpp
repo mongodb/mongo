@@ -156,7 +156,7 @@ TEST_F(MoveChunkRegistration, TestReceiveChunkIsRejectedWhenRegistryIsLocked) {
                   NamespaceString::createNamespaceString_forTest("TestDB", "TestColl"),
                   ChunkRange(BSON("Key" << -100), BSON("Key" << 100)),
                   ShardId("shard0001"),
-                  false /* waitForCompletionOfMigrationOps */));
+                  /*waitForCompletionOfMigrationOps=*/false));
     _registry.unlock("dummy");
 }
 
@@ -190,7 +190,7 @@ TEST_F(MoveChunkRegistration, SplitOrMergeBlocksWhileReceiveInProgressOnSameNss)
                                                      nss,
                                                      chunkRange,
                                                      ShardId("shard0001"),
-                                                     false /* waitForCompletionOfMigrationOps */));
+                                                     /*waitForCompletionOfMigrationOps=*/false));
 
         // 3. Signal the split/merge thread that the receive is registered.
         readyToSplitMerge.set_value();
@@ -248,7 +248,7 @@ TEST_F(MoveChunkRegistration, SplitOrMergeAllowedWhileReceivingDifferentNss) {
                                                  receiveNss,
                                                  chunkRange,
                                                  ShardId("shard0001"),
-                                                 false /* waitForCompletionOfMigrationOps */));
+                                                 /*waitForCompletionOfMigrationOps=*/false));
 
     ASSERT_OK(_registry.registerSplitOrMergeChunk(_opCtx, splitNss, chunkRange).getStatus());
 }
@@ -303,7 +303,7 @@ TEST_F(MoveChunkRegistration, ReceiveBlocksWhileSplitOrMergeInProgressOnSameNss)
                                            nss,
                                            chunkRange,
                                            ShardId("shard0001"),
-                                           false /* waitForCompletionOfMigrationOps */);
+                                           /*waitForCompletionOfMigrationOps=*/false);
 
         // 10. The receive proceeds once the split/merge has completed.
         ASSERT_OK(scopedReceiveChunk.getStatus());
@@ -334,7 +334,7 @@ TEST_F(MoveChunkRegistration, ReceiveAllowedWhileSplitOrMergeOnDifferentNss) {
                                         receiveNss,
                                         chunkRange,
                                         ShardId("shard0001"),
-                                        false /* waitForCompletionOfMigrationOps */)
+                                        /*waitForCompletionOfMigrationOps=*/false)
                   .getStatus());
 }
 
@@ -386,7 +386,7 @@ TEST_F(MoveChunkRegistration,
             NamespaceString::createNamespaceString_forTest("TestDB", "TestColl"),
             ChunkRange(BSON("Key" << -100), BSON("Key" << 100)),
             ShardId("shard0001"),
-            true /* waitForCompletionOfMigrationOps */);
+            /*waitForCompletionOfMigrationOps=*/true);
 
         ASSERT_OK(scopedReceiveChunk.getStatus());
 

@@ -184,7 +184,7 @@ BSONObj TestKeyVault::getEncryptedKey(const UUID& uuid) {
 
 UUID fieldNameToUUID(std::string_view field) {
     std::array<char, UUID::kNumBytes> buf;
-    murmur3(field, 123456 /*seed*/, buf);
+    murmur3(field, /*seed=*/123456, buf);
     return UUID::fromCDR(buf);
 }
 
@@ -1586,7 +1586,7 @@ EncryptedFieldConfig makeTextEfcSingleField(std::string_view path,
 TEST_F(FleCrudTest, validateTextSearchInsertContentionExceedsMax) {
     unittest::ServerParameterGuard ffctrl{"featureFlagQETextSearchPreview", true};
     const UUID keyId = UUID::gen();
-    auto efc = makeTextEfcSingleField("encrypted"sv, keyId, 1 /* contention */);
+    auto efc = makeTextEfcSingleField("encrypted"sv, keyId, /*contention=*/1);
     auto fields = efc.getFields();
 
     auto doc = makeTextInsertPayload("encrypted"sv, keyId, 100 /* sampled c */);
@@ -1598,7 +1598,7 @@ TEST_F(FleCrudTest, validateTextSearchInsertContentionExceedsMax) {
 TEST_F(FleCrudTest, validateTextSearchInsertValidContention) {
     unittest::ServerParameterGuard ffctrl{"featureFlagQETextSearchPreview", true};
     const UUID keyId = UUID::gen();
-    auto efc = makeTextEfcSingleField("encrypted"sv, keyId, 1 /* contention */);
+    auto efc = makeTextEfcSingleField("encrypted"sv, keyId, /*contention=*/1);
     auto fields = efc.getFields();
 
     auto doc = makeTextInsertPayload("encrypted"sv, keyId, 1 /* sampled c */);
@@ -2302,7 +2302,7 @@ void QETextSearchCrudTest::verifyExpectationsAfterInsertions(
     for (auto qt : {QueryTypeEnum::Substring, QueryTypeEnum::Suffix, QueryTypeEnum::Prefix}) {
         auto qt_index = queryTypeToIndex(qt);
         for (const auto& [exactStr, count] : paddingCounts[qt_index]) {
-            verifyESCEntriesForString(exactStr, count, qt, true /*padding*/);
+            verifyESCEntriesForString(exactStr, count, qt, /*padding=*/true);
         }
         for (const auto& [affix, count] : affixCounts[qt_index]) {
             verifyESCEntriesForString(affix, count, qt);
@@ -2469,7 +2469,7 @@ TEST_F(QETextSearchCrudTest, InsertPayloadHasInvalidExactEncryptedTokensForTextS
         StateCollectionTokensV2(ESCDerivedFromDataTokenAndContentionFactorToken(
                                     exactSet.getEscDerivedToken().asPrfBlock()),
                                 boost::none,
-                                boost::none /* msize */)
+                                /*msize=*/boost::none)
             .encrypt({{}}));
     ASSERT_THROWS_CODE_AND_WHAT(
         processInsert(_queryImpl.get(), _edcNs, serverPayload, efc, 0, result, false),
@@ -2505,7 +2505,7 @@ TEST_F(QETextSearchCrudTest, InsertPayloadHasInvalidSubstringEncryptedTokensForT
     ts.setEncryptedTokens(StateCollectionTokensV2(ESCDerivedFromDataTokenAndContentionFactorToken(
                                                       ts.getEscDerivedToken().asPrfBlock()),
                                                   boost::none,
-                                                  boost::none /* msize */)
+                                                  /*msize=*/boost::none)
                               .encrypt({{}}));
     ASSERT_THROWS_CODE_AND_WHAT(
         processInsert(_queryImpl.get(), _edcNs, serverPayload, efc, 0, result, false),

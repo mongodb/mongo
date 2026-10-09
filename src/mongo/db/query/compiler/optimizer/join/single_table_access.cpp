@@ -145,7 +145,7 @@ StatusWith<SingleTablePlanResult> accessPlanForFilterWithDerivedPredicates(
     auto swCbrResult =
         QueryPlanner::planWithCostBasedRanking(querySolutionParams,
                                                samplingEstimator,
-                                               nullptr /*exactCardinality*/,
+                                               /*exactCardinality=*/nullptr,
                                                std::move(swSolns.getValue()),
                                                *node.accessPath,
                                                QueryCBRCEModeEnum::kSamplingCE,

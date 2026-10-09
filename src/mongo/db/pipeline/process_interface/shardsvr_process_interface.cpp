@@ -202,7 +202,7 @@ MongoProcessInterface::InsertResult ShardServerProcessInterface::insert(
 
     cluster::write(expCtx->getOperationContext(),
                    batchInsertCommand,
-                   nullptr /* nss */,
+                   /*nss=*/nullptr,
                    &stats,
                    &response,
                    targetEpoch);
@@ -238,7 +238,7 @@ StatusWith<MongoProcessInterface::UpdateResult> ShardServerProcessInterface::upd
 
     cluster::write(expCtx->getOperationContext(),
                    batchUpdateCommand,
-                   nullptr /* nss */,
+                   /*nss=*/nullptr,
                    &stats,
                    &response,
                    targetEpoch);
@@ -547,10 +547,10 @@ void ShardServerProcessInterface::createIndexesOnEmptyCollection(
                         cmdToBeSent,
                         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                         Shard::RetryPolicy::kStrictlyNotIdempotent,
-                        BSONObj() /*query*/,
-                        BSONObj() /*collation*/,
-                        boost::none /*letParameters*/,
-                        boost::none /*runtimeConstants*/);
+                        /*query=*/BSONObj(),
+                        /*collation=*/BSONObj(),
+                        /*letParameters=*/boost::none,
+                        /*runtimeConstants=*/boost::none);
 
                     for (const auto& response : shardResponses) {
                         uassertStatusOKWithContext(response.swResponse,
@@ -619,7 +619,7 @@ void ShardServerProcessInterface::dropTempCollection(OperationContext* opCtx,
         NamespaceString(NamespaceString::kAggTempCollections),
         {write_ops::DeleteOpEntry(BSON("_id" << NamespaceStringUtil::serialize(
                                            nss, SerializationContext::stateDefault())),
-                                  false /* multi */)}});
+                                  /*multi=*/false)}});
     writeToLocalShard(opCtx, std::move(bcr), defaultMajorityWriteConcernDoNotUse());
 }
 

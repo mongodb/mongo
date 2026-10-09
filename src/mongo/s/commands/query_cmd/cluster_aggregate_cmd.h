@@ -69,7 +69,7 @@ public:
                                     ->getExtensionMetricsAllocation()),
               _ifrContext(IncrementalFeatureRolloutContext::get(opCtx)),
               _liteParsedPipeline(request(),
-                                  false /* isRunningAgainstView_ForHybridSearch */,
+                                  /*isRunningAgainstView_ForHybridSearch=*/false,
                                   {.ifrContext = _ifrContext,
                                    .opCtx = opCtx,
                                    .extensionMetrics = &_extensionMetrics}),
@@ -117,7 +117,7 @@ public:
                     opCtx, unparsedRequest().body, *pipelineForLog);
             }
 
-            setReadWriteConcern(opCtx, request(), true /* setRC */, !verbosity /* setWC */);
+            setReadWriteConcern(opCtx, request(), /*setRC=*/true, /*setWC=*/!verbosity);
 
             const auto& nss = ns();
             uassertStatusOK(ClusterAggregate::runAggregate(opCtx,

@@ -202,9 +202,9 @@ TEST_F(CheckpointerWithStorageTest, PauseWaitsForInProgressCheckpoint) {
     // Let the loop reach the schedule, then trigger a checkpoint so it leaves the schedule and
     // advances into the (failpoint-held) checkpoint phase.
     waitForEnteredCountAtLeast(policyPtr->enteredCount, 1);
-    checkpointer.triggerFirstStableCheckpoint(Timestamp(1, 1) /* prevStable */,
-                                              Timestamp(1, 2) /* initialData */,
-                                              Timestamp(1, 2) /* currStable */);
+    checkpointer.triggerFirstStableCheckpoint(/*prevStable=*/Timestamp(1, 1),
+                                              /*initialData=*/Timestamp(1, 2),
+                                              /*currStable=*/Timestamp(1, 2));
 
     // Wait until the thread is parked in the failpoint: a checkpoint is now genuinely in progress.
     fp->waitForTimesEntered(timesEnteredBefore + 1);

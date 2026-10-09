@@ -160,7 +160,7 @@ void CloneAuthoritativeMetadataCoordinator::_cloneSingleDatabaseWithShardRole(
     }
 
     ScopedSetShardRole scopedShardRole(
-        opCtx, NamespaceString{dbName}, boost::none /* shardVersion */, dbMetadata.getVersion());
+        opCtx, NamespaceString{dbName}, /*shardVersion=*/boost::none, dbMetadata.getVersion());
 
     if (MONGO_unlikely(hangAfterEnterInShardRoleCloneAuthoritativeMetadataDDL.shouldFail())) {
         hangAfterEnterInShardRoleCloneAuthoritativeMetadataDDL.executeIf(
@@ -189,7 +189,7 @@ void CloneAuthoritativeMetadataCoordinator::_cloneSingleDatabaseWithShardRole(
             opCtx, BypassDatabaseMetadataAccess::Type::kWriteOnly);  // NOLINT
 
         shard_catalog_commit::commitCreateDatabaseMetadataLocally(
-            opCtx, dbMetadata, true /* fromClone */);
+            opCtx, dbMetadata, /*fromClone=*/true);
     }
 
     // Clone the tracked collections in namespace order, persisting the last cloned one after each

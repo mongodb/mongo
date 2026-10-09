@@ -112,7 +112,7 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, UpgradeOneWithExpectedUUID) {
 
     unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", true);
-    upgradeToViewlessTimeseries(operationContext(), nss1, uuid1 /* expectedUUID */);
+    upgradeToViewlessTimeseries(operationContext(), nss1, /*expectedUUID=*/uuid1);
     assertIsViewlessTimeseries(nss1, uuid1);
 }
 
@@ -130,7 +130,7 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, DowngradeOneWithExpectedUUID) {
 
     unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", false);
-    downgradeFromViewlessTimeseries(operationContext(), nss1, uuid1 /* expectedUUID */);
+    downgradeFromViewlessTimeseries(operationContext(), nss1, /*expectedUUID=*/uuid1);
     assertIsViewfulTimeseries(nss1, uuid1);
 }
 
@@ -171,7 +171,7 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, UpgradedOptionsConsistentWithNewV
         opts1.timeseries->setFixedBucketing(OptionalBool{});
     if (opts2.timeseries)
         opts2.timeseries->setFixedBucketing(OptionalBool{});
-    ASSERT_BSONOBJ_EQ(opts1.toBSON(false /* includeUUID */), opts2.toBSON(false /* includeUUID */));
+    ASSERT_BSONOBJ_EQ(opts1.toBSON(/*includeUUID=*/false), opts2.toBSON(/*includeUUID=*/false));
 
     ASSERT_BSONOBJ_EQ(collPtr1->getValidatorDoc(), collPtr2->getValidatorDoc());
     ASSERT(!collPtr2->getValidatorDoc().isEmpty());
@@ -195,8 +195,8 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, DowngradedOptionsConsistentWithNe
     auto collPtr2 = catalog->lookupCollectionByNamespace(operationContext(),
                                                          nss2.makeTimeseriesBucketsNamespace());
 
-    ASSERT_BSONOBJ_EQ(collPtr1->getCollectionOptions().toBSON(false /* includeUUID */),
-                      collPtr2->getCollectionOptions().toBSON(false /* includeUUID */));
+    ASSERT_BSONOBJ_EQ(collPtr1->getCollectionOptions().toBSON(/*includeUUID=*/false),
+                      collPtr2->getCollectionOptions().toBSON(/*includeUUID=*/false));
 
     ASSERT_BSONOBJ_EQ(collPtr1->getValidatorDoc(), collPtr2->getValidatorDoc());
     ASSERT(!collPtr2->getValidatorDoc().isEmpty());
@@ -287,7 +287,7 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, DowngradeWithSkipViewCreation) {
     unittest::ServerParameterGuard featureFlagController(
         "featureFlagCreateViewlessTimeseriesCollections", false);
     downgradeFromViewlessTimeseries(
-        operationContext(), nss1, boost::none /* expectedUUID */, true /* skipViewCreation */);
+        operationContext(), nss1, /*expectedUUID=*/boost::none, /*skipViewCreation=*/true);
 
     auto opCtx = operationContext();
     auto catalog = CollectionCatalog::get(opCtx);
@@ -310,10 +310,10 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, DowngradeWithSkipViewCreationIdem
         "featureFlagCreateViewlessTimeseriesCollections", false);
 
     downgradeFromViewlessTimeseries(
-        operationContext(), nss1, boost::none /* expectedUUID */, true /* skipViewCreation */);
+        operationContext(), nss1, /*expectedUUID=*/boost::none, /*skipViewCreation=*/true);
 
     downgradeFromViewlessTimeseries(
-        operationContext(), nss1, boost::none /* expectedUUID */, true /* skipViewCreation */);
+        operationContext(), nss1, /*expectedUUID=*/boost::none, /*skipViewCreation=*/true);
 
     auto opCtx = operationContext();
     auto catalog = CollectionCatalog::get(opCtx);
@@ -439,7 +439,7 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest,
     VersionContext::FixedOperationFCVRegion fixedOfcvRegion(operationContext());
     // Must pass skipViewCreation=true to match the non-primary shard scenario
     ASSERT_OK(
-        canDowngradeFromViewlessTimeseries(operationContext(), nss1, true /* skipViewCreation */));
+        canDowngradeFromViewlessTimeseries(operationContext(), nss1, /*skipViewCreation=*/true));
 }
 
 TEST_F(UpgradeDowngradeViewlessTimeseriesTest,

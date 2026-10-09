@@ -264,7 +264,7 @@ void refineCollectionShardKeyInTxn(OperationContext* opCtx,
         const auto oldShardKeyPattern = ShardKeyPattern(collType.getKeyPattern());
         const auto oldFields = oldShardKeyPattern.toBSON();
         const auto newFields =
-            newShardKeyPattern.toBSON().filterFieldsUndotted(oldFields, false /* inFilter */);
+            newShardKeyPattern.toBSON().filterFieldsUndotted(oldFields, /*inFilter=*/false);
 
         collType.setEpoch(newEpoch);
         collType.setTimestamp(newTimestamp);
@@ -276,8 +276,8 @@ void refineCollectionShardKeyInTxn(OperationContext* opCtx,
             BSON(CollectionType::kNssFieldName
                  << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())),
             collType.toBSON(),
-            false /* upsert */,
-            false /* multi */);
+            /*upsert=*/false,
+            /*multi=*/false);
         auto updateCollResponse = txnClient.runCRUDOpSync(catalogUpdateRequest, {});
         uassertStatusOK(updateCollResponse.toStatus());
 
@@ -299,8 +299,8 @@ void refineCollectionShardKeyInTxn(OperationContext* opCtx,
             BatchedCommandRequest::buildPipelineUpdateOp(NamespaceString::kConfigsvrChunksNamespace,
                                                          chunksQuery,
                                                          chunkUpdates,
-                                                         false /* upsert */,
-                                                         true /* useMultiUpdate */);
+                                                         /*upsert=*/false,
+                                                         /*useMultiUpdate=*/true);
 
         auto updateChunksResponse = txnClient.runCRUDOpSync(chunksUpdateRequest, {});
         uassertStatusOK(updateChunksResponse.toStatus());
@@ -323,8 +323,8 @@ void refineCollectionShardKeyInTxn(OperationContext* opCtx,
             TagsType::ConfigNS,
             BSON("ns" << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())),
             tagUpdates,
-            false /* upsert */,
-            true /* useMultiUpdate */);
+            /*upsert=*/false,
+            /*useMultiUpdate=*/true);
         auto updateTagResponse = txnClient.runCRUDOpSync(tagUpdateRequest, {});
         uassertStatusOK(updateTagResponse.toStatus());
 
@@ -503,7 +503,7 @@ void ShardingCatalogManager::configureCollectionBalancing(
             NamespaceString::kConfigsvrCollectionsNamespace,
             query,
             update,
-            false /* upsert */,
+            /*upsert=*/false,
             defaultMajorityWriteConcernDoNotUse()));
         uassert(ErrorCodes::NamespaceNotSharded,
                 str::stream() << "Expected to match one doc for query " << query,
@@ -628,11 +628,12 @@ void ShardingCatalogManager::updateTimeSeriesBucketingParameters(
                 NamespaceString::kConfigsvrCollectionsNamespace,
                 BatchedCommandRequest::buildUpdateOp(
                     NamespaceString::kConfigsvrCollectionsNamespace,
+                    /*query=*/
                     BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(
-                             nss, SerializationContext::stateDefault())) /* query */,
+                             nss, SerializationContext::stateDefault())),
                     update,
-                    false /* upsert */,
-                    false /* multi */),
+                    /*upsert=*/false,
+                    /*multi=*/false),
                 txnNumber);
 
             // Bump the chunk version for shards.

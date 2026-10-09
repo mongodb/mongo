@@ -238,7 +238,7 @@ public:
                                                      std::move(aggs),
                                                      allowDiskUse,
                                                      std::move(mergingExprs),
-                                                     nullptr /* yieldPolicy */,
+                                                     /*yieldPolicy=*/nullptr,
                                                      kEmptyPlanNodeId,
                                                      true,
                                                      forceIncreasedSpilling);
@@ -388,22 +388,22 @@ public:
                                   accNames,
                                   expectedResultsMap,
                                   expectedOutputBlockSizes,
-                                  false /* allowDiskUse */,
-                                  false /* forceIncreasedSpilling */,
+                                  /*allowDiskUse=*/false,
+                                  /*forceIncreasedSpilling=*/false,
                                   assertNoSpillStats);
         runBlockHashAggTestHelper(buckets,
                                   accNames,
                                   expectedResultsMap,
                                   expectedOutputBlockSizes,
-                                  true /* allowDiskUse */,
-                                  true /* forceIncreasedSpilling */,
+                                  /*allowDiskUse=*/true,
+                                  /*forceIncreasedSpilling=*/true,
                                   assertFirstBatchSpillingStats);
         runBlockHashAggTestHelper(buckets,
                                   accNames,
                                   expectedResultsMap,
                                   expectedOutputBlockSizes,
-                                  true /* allowDiskUse */,
-                                  false /* forceIncreasedSpilling */,
+                                  /*allowDiskUse=*/true,
+                                  /*forceIncreasedSpilling=*/false,
                                   assertForceSpillingStats);
 
     }  // runBlockHashAggTest
@@ -486,12 +486,12 @@ public:
                                                      accDataSlots,
                                                      accumulatorBitset,
                                                      std::move(aggs),
-                                                     false /* allowDiskUse */,
+                                                     /*allowDiskUse=*/false,
                                                      std::move(mergingExprs),
-                                                     nullptr /* yieldPolicy */,
+                                                     /*yieldPolicy=*/nullptr,
                                                      kEmptyPlanNodeId,
                                                      true,
-                                                     false /* forceIncreasedSpilling */);
+                                                     /*forceIncreasedSpilling=*/false);
             return std::make_pair(outputSlots, std::move(outStage));
         };
 

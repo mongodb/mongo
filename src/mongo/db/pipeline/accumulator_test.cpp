@@ -504,7 +504,7 @@ TEST(Accumulators, MinN) {
             {{Value(100), Value(), Value(BSONNULL), Value(), Value(3)},
              {Value(std::vector<Value>{Value(3), Value(100)})}},
         },
-        false /*skipMerging*/,
+        /*skipMerging=*/false,
         n);
 }
 
@@ -518,7 +518,7 @@ TEST(Accumulators, MinNRespectsCollation) {
         &expCtx,
         {{{Value("abc"sv), Value("cba"sv), Value("cca"sv)},
           Value(std::vector<Value>{Value("cba"sv), Value("cca"sv)})}},
-        false /* skipMerging */,
+        /*skipMerging=*/false,
         n);
 }
 
@@ -551,7 +551,7 @@ TEST(Accumulators, MaxN) {
             {{Value(100), Value(), Value(BSONNULL), Value(), Value(3)},
              {Value(std::vector<Value>{Value(100), Value(3)})}},
         },
-        false /*skipMerging*/,
+        /*skipMerging=*/false,
         n);
 }
 
@@ -565,7 +565,7 @@ TEST(Accumulators, MaxNRespectsCollation) {
         &expCtx,
         {{{Value("abc"sv), Value("cba"sv), Value("cca"sv)},
           Value(std::vector<Value>{Value("abc"sv), Value("cca"sv)})}},
-        false /* skipMerging */,
+        /*skipMerging=*/false,
         n);
 }
 
@@ -1727,7 +1727,7 @@ TEST_F(BottomRemoveTest, BottomRemoveNoUnderflow) {
 
 template <typename RankType>
 auto makeLegacyRank(ExpressionContext* const expCtx) {
-    return make_intrusive<RankType>(expCtx, true /* isAscending */);
+    return make_intrusive<RankType>(expCtx, /*isAscending=*/true);
 }
 
 TEST(Accumulators, Rank) {
@@ -1987,30 +1987,30 @@ TEST(Accumulators, AccumulatorExpMovingAvg) {
     AccumulatorExpMovingAvg acc{expCtx.get(), Decimal128{0.75}};  // alpha (decay factor) == 0.75
 
     // The constructor arg does not "initialize" 'acc', it just sets its decaying avg multiplier.
-    ASSERT_EQ(BSONType::null, acc.getValue(false /* toBeMerged */).getType());
+    ASSERT_EQ(BSONType::null, acc.getValue(/*toBeMerged=*/false).getType());
 
     // Process a non-numeric input. Still not initialized.
-    acc.processInternal(Value("string"sv), false /* merging */);
-    ASSERT_EQ(BSONType::null, acc.getValue(false /* toBeMerged */).getType());
+    acc.processInternal(Value("string"sv), /*merging=*/false);
+    ASSERT_EQ(BSONType::null, acc.getValue(/*toBeMerged=*/false).getType());
 
     // Process integer input 1. This will initialize the accumulator to the value of the input,
     // but it will not be internally stored as a decimal as this is not needed to maintain the
     // precision.
-    acc.processInternal(Value(1), false /* merging */);
-    ASSERT_EQ(0, ValueComparator().compare(acc.getValue(false /* toBeMerged */), Value(1)))
+    acc.processInternal(Value(1), /*merging=*/false);
+    ASSERT_EQ(0, ValueComparator().compare(acc.getValue(/*toBeMerged=*/false), Value(1)))
         << " acc: " << acc.getValue(false);
 
     // Now process decimal input 4.0. This will change the internal representation to decimal to
     // maintain the precision and will, under the configured alpha == 0.75, give decaying average as
     // 3.25 == 0.75 * 4.0 + 0.25 * 1.
-    acc.processInternal(Value(Decimal128{4.0}), false /* merging */);
+    acc.processInternal(Value(Decimal128{4.0}), /*merging=*/false);
     ASSERT_EQ(
-        0, ValueComparator().compare(acc.getValue(false /* toBeMerged */), Value(Decimal128{3.25})))
+        0, ValueComparator().compare(acc.getValue(/*toBeMerged=*/false), Value(Decimal128{3.25})))
         << " acc: " << acc.getValue(false);
 
     // Back to uninitialized after reset().
     acc.reset();
-    ASSERT_EQ(BSONType::null, acc.getValue(false /* toBeMerged */).getType());
+    ASSERT_EQ(BSONType::null, acc.getValue(/*toBeMerged=*/false).getType());
 }
 
 /* ------------------------- AccumulatorPercentile ---------------------------------------------- */
@@ -2027,29 +2027,29 @@ void accumulatorPercentileHelper(
 
     // Processing a non-numeric input when not merging does not accumulate anything, so the current
     // value should be an array of [null, null].
-    acc.processInternal(Value("string"sv), false /* merging */);
-    ASSERT_EQ(BSONType::array, acc.getValue(false /* toBeMerged */).getType());
+    acc.processInternal(Value("string"sv), /*merging=*/false);
+    ASSERT_EQ(BSONType::array, acc.getValue(/*toBeMerged=*/false).getType());
     std::ostringstream oss;
-    oss << acc.getValue(false /* toBeMerged */);  // final value
+    oss << acc.getValue(/*toBeMerged=*/false);  // final value
     ASSERT_EQ("[null, null]", oss.str());
 
     // Process some numbers the percentiles of which are easy to understand.
     for (int i = 1; i <= 10; ++i) {
         double val = 0.1 * i;
-        acc.processInternal(Value(val), false /* merging */);
+        acc.processInternal(Value(val), /*merging=*/false);
     }
-    ASSERT_EQ(BSONType::array, acc.getValue(false /* toBeMerged */).getType());
+    ASSERT_EQ(BSONType::array, acc.getValue(/*toBeMerged=*/false).getType());
     oss.str("");
-    oss << acc.getValue(false /* toBeMerged */);  // final value
+    oss << acc.getValue(/*toBeMerged=*/false);  // final value
     ASSERT_EQ(mergeFalseExpected, oss.str());
-    ASSERT_EQ(BSONType::array, acc.getValue(true /* toBeMerged */).getType());
+    ASSERT_EQ(BSONType::array, acc.getValue(/*toBeMerged=*/true).getType());
     // We cannot easily test the getValue(true) values as they differ on different platforms.
 
     // Verify reset() clears the accumulator.
     acc.reset();
-    ASSERT_EQ(BSONType::array, acc.getValue(false /* toBeMerged */).getType());
+    ASSERT_EQ(BSONType::array, acc.getValue(/*toBeMerged=*/false).getType());
     oss.str("");
-    oss << acc.getValue(false /* toBeMerged */);  // final value
+    oss << acc.getValue(/*toBeMerged=*/false);  // final value
     ASSERT_EQ("[null, null]", oss.str());
 }
 
@@ -2610,8 +2610,8 @@ static void assertSetUnionResults(
     assertExpectedResults1(expCtx,
                            OperationsType(operations),
                            initializeAccumulator,
-                           false /*skipMerging*/,
-                           true /*ignoreArrayOrdering*/);
+                           /*skipMerging=*/false,
+                           /*ignoreArrayOrdering=*/true);
 }
 
 TEST(AccumulatorSetUnion, SetUnionRespectsMaxMemoryContraint) {
@@ -2880,12 +2880,12 @@ TEST(ExpressionFromAccumulators, StdDevSampRepeated) {
 
     for (int i = 0; i < 100; i++) {
         AccumulatorStdDevPop acc(&expCtx);
-        acc.process(Value(std::exp(14.0)), false /*merging*/);
-        Value mergedValue = acc.getValue(true /*toBeMerged*/);
-        mergedAcc.process(mergedValue, true /*merging*/);
+        acc.process(Value(std::exp(14.0)), /*merging=*/false);
+        Value mergedValue = acc.getValue(/*toBeMerged=*/true);
+        mergedAcc.process(mergedValue, /*merging=*/true);
     }
 
-    Value result = mergedAcc.getValue(false /*toBeMerged*/);
+    Value result = mergedAcc.getValue(/*toBeMerged=*/false);
     const double doubleVal = result.coerceToDouble();
     ASSERT_EQ(0.0, doubleVal);
 }
@@ -2898,12 +2898,12 @@ TEST(ExpressionFromAccumulators, StdDevExtremeValuesMerging) {
 
     for (int i = 0; i < 100; i++) {
         AccumulatorStdDevPop acc(&expCtx);
-        acc.process(Value(kValue), false /*merging*/);
-        Value mergedValue = acc.getValue(true /*toBeMerged*/);
-        mergedAcc.process(mergedValue, true /*merging*/);
+        acc.process(Value(kValue), /*merging=*/false);
+        Value mergedValue = acc.getValue(/*toBeMerged=*/true);
+        mergedAcc.process(mergedValue, /*merging=*/true);
     }
 
-    Value result = mergedAcc.getValue(false /*toBeMerged*/);
+    Value result = mergedAcc.getValue(/*toBeMerged=*/false);
     const double doubleVal = result.coerceToDouble();
     ASSERT_EQ(0.0, doubleVal);
 }

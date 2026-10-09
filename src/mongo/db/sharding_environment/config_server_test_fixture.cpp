@@ -153,7 +153,7 @@ void ConfigServerTestFixture::tearDown() {
 }
 
 std::unique_ptr<ShardingCatalogClient> ConfigServerTestFixture::makeShardingCatalogClient() {
-    return std::make_unique<ShardingCatalogClientImpl>(nullptr /* overrideConfigShard */);
+    return std::make_unique<ShardingCatalogClientImpl>(/*overrideConfigShard=*/nullptr);
 }
 
 std::unique_ptr<BalancerConfiguration> ConfigServerTestFixture::makeBalancerConfiguration() {
@@ -396,7 +396,7 @@ StatusWith<ChunkVersion> ConfigServerTestFixture::getCollectionPlacementVersion(
         findOneOnConfigCollection(opCtx,
                                   NamespaceString::kConfigsvrChunksNamespace,
                                   /*filter=*/BSON(ChunkType::collectionUUID << coll.getUuid()),
-                                  BSON(ChunkType::lastmod << -1) /* sort */);
+                                  /*sort=*/BSON(ChunkType::lastmod << -1));
 
     if (!chunkDoc.isOK())
         return chunkDoc.getStatus();

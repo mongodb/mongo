@@ -204,7 +204,7 @@ void StorageEngineImpl::loadMDBCatalog(OperationContext* opCtx,
                                                   kCatalogInfoNamespace,
                                                   ident::kMdbCatalog,
                                                   catalogRecordStoreOpts,
-                                                  boost::none /* uuid */);
+                                                  /*uuid=*/boost::none);
 
     if (shouldLog(::mongo::logv2::LogComponent::kStorageRecovery, kCatalogLogLevel)) {
         LOGV2_FOR_RECOVERY(4615631, kCatalogLogLevel.toInt(), "loadMDBCatalog:");
@@ -696,7 +696,7 @@ void StorageEngineImpl::dropSpillTable(RecoveryUnit& ru, std::string_view ident)
     // Dropping the spill table may transiently return ObjectIsBusy if another spill engine user has
     // a storage snapshot from before an earlier write to this table. Retry until the drop succeeds.
     for (size_t retries = 0;; ++retries) {
-        auto status = _spillEngine->dropIdent(ru, ident, false /* identHasSizeInfo */);
+        auto status = _spillEngine->dropIdent(ru, ident, /*identHasSizeInfo=*/false);
         if (status.isOK()) {
             return;
         }
@@ -742,7 +742,7 @@ std::unique_ptr<RecordStore> StorageEngineImpl::makeInternalRecordStore(Operatio
         // so, we can re-use the ident if it is empty, which should always be the case. When layered
         // table drops are supported, dropIdent's effect should always be consistent with its
         // return status and a collision on re-creating an ident should be an error.
-        uassertStatusOK(_engine->dropIdent(ru, ident, false /* identHasSizeInfo */));
+        uassertStatusOK(_engine->dropIdent(ru, ident, /*identHasSizeInfo=*/false));
 
         try {
             rs = createInternal();
@@ -1037,7 +1037,7 @@ void StorageEngineImpl::TimestampMonitor::_startup() {
             }
         },
         Seconds(1),
-        true /*isKillableByStepdown*/);
+        /*isKillableByStepdown=*/true);
 
     _job = _periodicRunner->makeJob(std::move(job));
     _job.start();

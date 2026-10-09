@@ -35,7 +35,7 @@ PostReshardingCollectionPlacement::PostReshardingCollectionPlacement(
     auto catalogCache = Grid::get(opCtx)->catalogCache();
     invariant(catalogCache);
     auto tmpNssRoutingInfoWithStatus = catalogCache->getCollectionRoutingInfo(
-        opCtx, donorFields->getTempReshardingNss(), true /* allowLocks */);
+        opCtx, donorFields->getTempReshardingNss(), /*allowLocks=*/true);
     uassertStatusOK(tmpNssRoutingInfoWithStatus);
 
     if (!tmpNssRoutingInfoWithStatus.getValue().hasRoutingTable()) {

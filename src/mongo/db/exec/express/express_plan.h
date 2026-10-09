@@ -738,7 +738,7 @@ public:
         }
 
         auto progress =
-            continuation(collection, *keyEntry.getRecordId(), std::move(obj), nullptr /*cursor*/);
+            continuation(collection, *keyEntry.getRecordId(), std::move(obj), /*cursor=*/nullptr);
 
         // Only advance the iterator if the continuation completely processed its item, as indicated
         // by its return value.
@@ -950,12 +950,12 @@ public:
                                               obj,
                                               doc,
                                               _isUserInitiatedWrite,
-                                              nullptr /* cq */,
+                                              /*cq=*/nullptr,
                                               rid,
                                               _updateDriver,
                                               _request,
                                               shouldWriteToOrphan,
-                                              nullptr /* updatedRecordIds*/,
+                                              /*updatedRecordIds=*/nullptr,
                                               cursor);
                 if (docWasModified) {
                     _stats->incDocsUpdated(1);  // explains are also treated as though they wrote

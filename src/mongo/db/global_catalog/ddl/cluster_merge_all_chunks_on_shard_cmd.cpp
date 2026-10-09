@@ -64,7 +64,7 @@ public:
             // identifier to be a connection string or host and port and we need to be able to
             // target the shard correctly.
             auto targetShard = uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(
-                opCtx, shardId, true /* allowNonShardIdIdentifiers */));
+                opCtx, shardId, /*allowNonShardIdIdentifiers=*/true));
 
             ShardSvrMergeAllChunksOnShard shardSvrMergeAllChunksOnShard(nss);
             shardSvrMergeAllChunksOnShard.setDbName(DatabaseName::kAdmin);

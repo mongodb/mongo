@@ -50,27 +50,27 @@ TEST_F(IdentGenerationTest, CollectionIdentsAreUnique) {
                                         << ", directoryForIndexes: " << directoryForIndexes;
     };
 
-    testGeneratesUniqueIdents(false /* directoryPerDB */, false /* directoryForIndexes */);
-    testGeneratesUniqueIdents(true /* directoryPerDB */, false /* directoryForIndexes */);
-    testGeneratesUniqueIdents(false /* directoryPerDB */, true /* directoryForIndexes */);
-    testGeneratesUniqueIdents(true /* directoryPerDB */, true /* directoryForIndexes */);
+    testGeneratesUniqueIdents(/*directoryPerDB=*/false, /*directoryForIndexes=*/false);
+    testGeneratesUniqueIdents(/*directoryPerDB=*/true, /*directoryForIndexes=*/false);
+    testGeneratesUniqueIdents(/*directoryPerDB=*/false, /*directoryForIndexes=*/true);
+    testGeneratesUniqueIdents(/*directoryPerDB=*/true, /*directoryForIndexes=*/true);
 }
 
 TEST_F(IdentGenerationTest, CollectionIdentsYieldIsCollectionIdentTrue) {
     const auto identDefault = ident::generateNewCollectionIdent(
-        kTestDB, false /* directoryPerDB */, false /* directoryForIndexes */);
+        kTestDB, /*directoryPerDB=*/false, /*directoryForIndexes=*/false);
     assertIsCollectionIdent(identDefault);
 
     const auto identDirectoryPerDB = ident::generateNewCollectionIdent(
-        kTestDB, true /* directoryPerDB */, false /* directoryForIndexes */);
+        kTestDB, /*directoryPerDB=*/true, /*directoryForIndexes=*/false);
     assertIsCollectionIdent(identDirectoryPerDB);
 
     const auto identDirectoryForIndexes = ident::generateNewCollectionIdent(
-        kTestDB, false /* directoryPerDB */, true /* directoryForIndexes */);
+        kTestDB, /*directoryPerDB=*/false, /*directoryForIndexes=*/true);
     assertIsCollectionIdent(identDirectoryForIndexes);
 
     const auto identDirectoryPerDBAndIndexes = ident::generateNewCollectionIdent(
-        kTestDB, false /* directoryPerDB */, true /* directoryForIndexes */);
+        kTestDB, /*directoryPerDB=*/false, /*directoryForIndexes=*/true);
     assertIsCollectionIdent(identDirectoryPerDBAndIndexes);
 }
 
@@ -109,27 +109,27 @@ TEST_F(IdentGenerationTest, IndexIdentsAreUnique) {
                                         << ", directoryForIndexes: " << directoryForIndexes;
     };
 
-    testGeneratesUniqueIdents(false /* directoryPerDB */, false /* directoryForIndexes */);
-    testGeneratesUniqueIdents(true /* directoryPerDB */, false /* directoryForIndexes */);
-    testGeneratesUniqueIdents(false /* directoryPerDB */, true /* directoryForIndexes */);
-    testGeneratesUniqueIdents(true /* directoryPerDB */, true /* directoryForIndexes */);
+    testGeneratesUniqueIdents(/*directoryPerDB=*/false, /*directoryForIndexes=*/false);
+    testGeneratesUniqueIdents(/*directoryPerDB=*/true, /*directoryForIndexes=*/false);
+    testGeneratesUniqueIdents(/*directoryPerDB=*/false, /*directoryForIndexes=*/true);
+    testGeneratesUniqueIdents(/*directoryPerDB=*/true, /*directoryForIndexes=*/true);
 }
 
 TEST_F(IdentGenerationTest, IndexIdentsYieldIsIndexIdentTrue) {
     const auto identDefault = ident::generateNewIndexIdent(
-        kTestDB, false /* directoryPerDB */, false /* directoryForIndexes */);
+        kTestDB, /*directoryPerDB=*/false, /*directoryForIndexes=*/false);
     assertIsIndexIdent(identDefault);
 
     const auto identDirectoryPerDB = ident::generateNewIndexIdent(
-        kTestDB, true /* directoryPerDB */, false /* directoryForIndexes */);
+        kTestDB, /*directoryPerDB=*/true, /*directoryForIndexes=*/false);
     assertIsIndexIdent(identDirectoryPerDB);
 
     const auto identDirectoryForIndexes = ident::generateNewIndexIdent(
-        kTestDB, false /* directoryPerDB */, true /* directoryForIndexes */);
+        kTestDB, /*directoryPerDB=*/false, /*directoryForIndexes=*/true);
     assertIsIndexIdent(identDirectoryForIndexes);
 
     const auto identDirectoryPerDBAndIndexes = ident::generateNewIndexIdent(
-        kTestDB, false /* directoryPerDB */, true /* directoryForIndexes */);
+        kTestDB, /*directoryPerDB=*/false, /*directoryForIndexes=*/true);
     assertIsIndexIdent(identDirectoryPerDBAndIndexes);
 }
 
@@ -262,21 +262,21 @@ TEST_F(IdentGenerationTest, ValidCollectionIdents) {
 
 TEST_F(IdentGenerationTest, IdentDirectoryForCollectionIdents) {
     const auto identDefault = ident::generateNewCollectionIdent(
-        kTestDB, false /* directoryPerDB */, false /* directoryForIndexes */);
+        kTestDB, /*directoryPerDB=*/false, /*directoryForIndexes=*/false);
 
     EXPECT_EQ(ident::getDirectory(identDefault), ""sv);
 
     const auto identDirectoryPerDB = ident::generateNewCollectionIdent(
-        kTestDB, true /* directoryPerDB */, false /* directoryForIndexes */);
+        kTestDB, /*directoryPerDB=*/true, /*directoryForIndexes=*/false);
     const auto dbComponent = ident::createDBNamePathComponent(kTestDB);
     EXPECT_EQ(ident::getDirectory(identDirectoryPerDB), std::string_view{dbComponent});
 
     const auto identDirectoryForIndexes = ident::generateNewCollectionIdent(
-        kTestDB, false /* directoryPerDB */, true /* directoryForIndexes */);
+        kTestDB, /*directoryPerDB=*/false, /*directoryForIndexes=*/true);
     EXPECT_EQ(ident::getDirectory(identDirectoryForIndexes), "collection"sv);
 
     const auto identDirectoryPerDBAndIndexes = ident::generateNewCollectionIdent(
-        kTestDB, true /* directoryPerDB */, true /* directoryForIndexes */);
+        kTestDB, /*directoryPerDB=*/true, /*directoryForIndexes=*/true);
     const auto dbComponentWithCollection = dbComponent + "/collection";
     EXPECT_EQ(ident::getDirectory(identDirectoryPerDBAndIndexes),
               std::string_view{dbComponentWithCollection});

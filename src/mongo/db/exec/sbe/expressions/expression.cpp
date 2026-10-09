@@ -274,7 +274,7 @@ vm::CodeFragment buildShortCircuitCode(CompileCtx& ctx, const Vector& clauses, b
 
 vm::CodeFragment EPrimNary::compileDirect(CompileCtx& ctx) const {
     if (_op == EPrimNary::logicAnd || _op == EPrimNary::logicOr) {
-        return buildShortCircuitCode(ctx, _nodes, _op == EPrimNary::logicOr /*isDisjunction*/);
+        return buildShortCircuitCode(ctx, _nodes, /*isDisjunction=*/_op == EPrimNary::logicOr);
     }
 
     vm::CodeFragment code;
@@ -358,10 +358,10 @@ vm::CodeFragment EPrimBinary::compileDirect(CompileCtx& ctx) const {
 
     if (_op == EPrimBinary::logicAnd) {
         auto clauses = collectAndClauses();
-        return buildShortCircuitCode(ctx, clauses, false /*isDisjunction*/);
+        return buildShortCircuitCode(ctx, clauses, /*isDisjunction=*/false);
     } else if (_op == EPrimBinary::logicOr) {
         auto clauses = collectOrClauses();
-        return buildShortCircuitCode(ctx, clauses, true /*isDisjunction*/);
+        return buildShortCircuitCode(ctx, clauses, /*isDisjunction=*/true);
     } else if (_op == EPrimBinary::fillEmpty) {
         // Special cases: rhs is trivial to evaluate -> avoid a jump
         if (EConstant* rhsConst = _nodes[1]->as<EConstant>()) {

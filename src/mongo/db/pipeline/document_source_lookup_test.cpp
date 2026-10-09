@@ -1419,7 +1419,7 @@ TEST_F(DocumentSourceLookUpTest, KDoNothingViewWithEmptySubpipelineDoesNotInsert
     boost::intrusive_ptr<ExpressionContext> expCtx;
     std::list<boost::intrusive_ptr<DocumentSource>> sources;
     auto* lookup = makeKDoNothingLookupOnView(
-        getOpCtx(), expCtx, sources, BSONArray{}, false /* withLocalForeignFields */);
+        getOpCtx(), expCtx, sources, BSONArray{}, /*withLocalForeignFields=*/false);
     ASSERT_TRUE(lookup != nullptr);
 
     const auto& resolvedPipeline = lookup->getResolvedPipelineForTest();
@@ -1433,7 +1433,7 @@ TEST_F(DocumentSourceLookUpTest, KDoNothingViewWithEmptySubpipelineAndFieldJoinR
     boost::intrusive_ptr<ExpressionContext> expCtx;
     std::list<boost::intrusive_ptr<DocumentSource>> sources;
     auto* lookup = makeKDoNothingLookupOnView(
-        getOpCtx(), expCtx, sources, BSONArray{}, true /* withLocalForeignFields */);
+        getOpCtx(), expCtx, sources, BSONArray{}, /*withLocalForeignFields=*/true);
     ASSERT_TRUE(lookup != nullptr);
 
     const auto& resolvedPipeline = lookup->getResolvedPipelineForTest();
@@ -1451,7 +1451,7 @@ TEST_F(DocumentSourceLookUpTest, KDoNothingViewWithNonEmptySubpipelineAndFieldJo
                                               expCtx,
                                               sources,
                                               BSON_ARRAY(BSON("$match" << BSON("x" << 1))),
-                                              true /* withLocalForeignFields */);
+                                              /*withLocalForeignFields=*/true);
     ASSERT_TRUE(lookup != nullptr);
 
     const auto& resolvedPipeline = lookup->getResolvedPipelineForTest();

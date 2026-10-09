@@ -145,7 +145,7 @@ public:
                 hasRenameablePath || expr->isRenameableByAnyPrefixNameIn(renameList);
         });
         stage_builder::ExpressionWalker walker(
-            &visitor, nullptr /*inVisitor*/, nullptr /*postVisitor*/);
+            &visitor, /*inVisitor=*/nullptr, /*postVisitor=*/nullptr);
         expression_walker::walk(_expression.get(), &walker);
         return hasRenameablePath;
     }

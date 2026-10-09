@@ -427,7 +427,7 @@ public:
                                     minBytesPerMarker,
                                     totalTimeSpentBuilding,
                                     creationMethod,
-                                    false /* initialSamplingFinished */),
+                                    /*initialSamplingFinished=*/false),
           _highestRecordId(std::move(highestRecordId)),
           _highestWallTime(highestWallTime) {}
 

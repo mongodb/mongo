@@ -1382,9 +1382,8 @@ TEST(SbeBlockTest, GetApproximateSize_MaterializedCellBlock_DeepType) {
 TEST_F(ValueBlockTest, EmptyBlockMapTest) {
     auto emptyTestBlock = std::make_unique<TestBlock>();
     auto emptyHeterogeneousBlock = std::make_unique<value::HeterogeneousBlock>(
-        std::vector<value::TypeTags>{} /* tags */, std::vector<value::Value>{} /* vals */);
-    auto emptyIntBlock =
-        std::make_unique<value::Int32Block>(std::vector<value::Value>{} /* vals */);
+        /*tags=*/std::vector<value::TypeTags>{}, /*vals=*/std::vector<value::Value>{});
+    auto emptyIntBlock = std::make_unique<value::Int32Block>(/*vals=*/std::vector<value::Value>{});
 
     std::vector<std::unique_ptr<value::ValueBlock>> emptyBlocks;
     emptyBlocks.push_back(std::move(emptyTestBlock));           // ValueBlock::defaultMapImpl
@@ -1602,7 +1601,7 @@ TEST_F(ValueBlockTest, ArgMinMaxGetAt) {
         ASSERT_EQ(block->argMin(), boost::optional<size_t>(6));
         ASSERT_EQ(block->argMax(), boost::optional<size_t>(5));
 
-        auto blockWNothing = makeArgMinMaxBlock<value::Int32Block, int32_t>(true /* inclNothing */);
+        auto blockWNothing = makeArgMinMaxBlock<value::Int32Block, int32_t>(/*inclNothing=*/true);
         ASSERT_EQ(blockWNothing->argMin(), boost::none);
         ASSERT_EQ(blockWNothing->argMax(), boost::none);
     }
@@ -1626,7 +1625,7 @@ TEST_F(ValueBlockTest, ArgMinMaxGetAt) {
         auto tempBlockWLHSNaN = std::make_unique<value::DoubleBlock>();
         tempBlockWLHSNaN->push_back(std::numeric_limits<double>::quiet_NaN());
         auto blockWLHSNaN = makeArgMinMaxBlock<value::DoubleBlock, double>(
-            false /* inclNothing */, std::move(tempBlockWLHSNaN));
+            /*inclNothing=*/false, std::move(tempBlockWLHSNaN));
         ASSERT_EQ(blockWLHSNaN->argMin(), boost::optional<size_t>(0));
         ASSERT_EQ(blockWLHSNaN->argMax(), boost::optional<size_t>(4));
 

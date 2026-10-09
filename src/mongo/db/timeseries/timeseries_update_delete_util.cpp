@@ -292,8 +292,8 @@ BSONObj getBucketLevelPredicateForRouting(const BSONObj& originalQuery,
     // Split out the time field predicate which can be potentially used for bucket-level routing.
     auto timeOnlyPred = residualPred
         ? expression::splitMatchExpressionBy(std::move(residualPred),
-                                             {std::string{tsOptions.getTimeField()}} /*fields*/,
-                                             {} /*renames*/,
+                                             /*fields=*/{std::string{tsOptions.getTimeField()}},
+                                             /*renames=*/{},
                                              expression::isOnlyDependentOn,
                                              expression::isExprOnlyDependentOn)
               .first
@@ -313,11 +313,11 @@ BSONObj getBucketLevelPredicateForRouting(const BSONObj& originalQuery,
               routingBucketSpec,
               *tsOptions.getBucketMaxSpanSeconds(),
               expCtx,
-              false /*haveComputedMetaField*/,
-              false /*includeMetaField*/,
-              true /*assumeNoMixedSchemaData*/,
-              BucketSpec::IneligiblePredicatePolicy::kIgnore /*policy*/,
-              false /* fixedBuckets */)
+              /*haveComputedMetaField=*/false,
+              /*includeMetaField=*/false,
+              /*assumeNoMixedSchemaData=*/true,
+              /*policy=*/BucketSpec::IneligiblePredicatePolicy::kIgnore,
+              /*fixedBuckets=*/false)
               .loosePredicate
         : nullptr;
 
@@ -345,9 +345,9 @@ TimeseriesWritesQueryExprs getMatchExprsForWrites(
         BucketSpec::getPushdownPredicates(expCtx,
                                           tsOptions,
                                           writeQuery,
-                                          /*haveComputedMetaField*/ false,
+                                          /*haveComputedMetaField=*/false,
                                           tsOptions.getMetaField().has_value(),
-                                          /*assumeNoMixedSchemaData*/ true,
+                                          /*assumeNoMixedSchemaData=*/true,
                                           BucketSpec::IneligiblePredicatePolicy::kIgnore,
                                           fixedBuckets);
 

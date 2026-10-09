@@ -29,8 +29,8 @@ UpdateExecutor::ApplyResult ObjectTransformExecutor::applyTransformUpdate(
     return ObjectReplaceExecutor::applyReplacementUpdate(
         std::move(applyParams),
         *transformedDoc,
-        true /* replacementDocContainsIdField */,
-        true /* allowTopLevelDollarPrefixedFields */);
+        /*replacementDocContainsIdField=*/true,
+        /*allowTopLevelDollarPrefixedFields=*/true);
 }
 
 UpdateExecutor::ApplyResult ObjectTransformExecutor::applyUpdate(ApplyParams applyParams) const {

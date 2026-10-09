@@ -189,8 +189,8 @@ public:
         // do not include in the benchmark the time to write to the oplog.
         repl::OplogApplier::Options oplogApplierOptions(
             repl::OplogApplication::Mode::kSecondary,
-            false /* allowNamespaceNotFoundErrorsOnCrudOps */,
-            true /* skipWritesToOplog */);
+            /*allowNamespaceNotFoundErrorsOnCrudOps=*/false,
+            /*skipWritesToOplog=*/true);
         _oplogApplier = std::make_unique<repl::OplogApplierImpl>(nullptr,
                                                                  _oplogBuffer.get(),
                                                                  &repl::noopOplogApplierObserver,
@@ -227,7 +227,7 @@ public:
 
         // Shut down storage engine and free memory.
         catalog::shutDownCollectionCatalogAndGlobalStorageEngineCleanly(_svcCtx,
-                                                                        false /* memLeakAllowed */);
+                                                                        /*memLeakAllowed=*/false);
     }
 
     // Shut down the storage engine, clear the dbpath, and restart the storage engine with empty

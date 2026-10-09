@@ -166,7 +166,7 @@ boost::optional<SharedSemiFuture<void>> ReshardingOplogSessionApplication::tryAp
                                                        std::move(postImageOpTime),
                                                        std::move(sourceNss));
         },
-        false /*ignoreIncompleteHistory*/);
+        /*ignoreIncompleteHistory=*/false);
 }
 
 }  // namespace mongo

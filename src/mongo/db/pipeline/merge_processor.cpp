@@ -346,7 +346,7 @@ MergeStrategy makeInsertStrategyWithBackup(BatchTransform backupTransform,
                           backupStrategy,
                           backupTransform,
                           // Stats are already updated, so passing nullptr to backup strategy
-                          nullptr /* mergeStats */);
+                          /*mergeStats=*/nullptr);
     };
 }
 

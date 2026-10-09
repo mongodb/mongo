@@ -111,7 +111,7 @@ protected:
 
     void doUpdate(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& updatedDoc) {
         auto [_, collPtr] = makeCollPtr(nss);
-        CollectionUpdateArgs updateArgs(BSONObj{} /* preImageDoc */);
+        CollectionUpdateArgs updateArgs(/*preImageDoc=*/BSONObj{});
         updateArgs.updatedDoc = updatedDoc;
         OplogUpdateEntryArgs update(&updateArgs, collPtr);
         // We add a WUOW here to transition recovery unit state from Inactive to InUnitOfWork. The

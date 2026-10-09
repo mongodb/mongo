@@ -684,7 +684,7 @@ std::pair<SbSlot /* matched docs */, SbStage> buildForeignMatches(SbSlot localKe
             filter = b.makeFunction(sbe::EFn::kTraverseF,
                                     var,
                                     std::move(arrayLambda),
-                                    b.makeBoolConstant(isLeafField) /*compareArray*/);
+                                    /*compareArray=*/b.makeBoolConstant(isLeafField));
             if (!state.legacyDottedPathNullSemantics) {
                 if (!isLeafField) {
                     // If the result of getField() was Nothing or a scalar value, then don't bother
@@ -848,9 +848,9 @@ std::pair<SbSlot /* matched docs */, SbStage> buildNljLookupStage(
     SbStage nlj = b.makeLoopJoin(std::move(outerRootStage),
                                  std::move(innerRootStage),
                                  buildLocalSlots(state, localRecordSlot),
-                                 SbExpr::makeSV(localKeySlot) /* outerCorrelated */,
-                                 std::move(innerProj) /* innerProjects */,
-                                 SbExpr{} /* predicate */,
+                                 /*outerCorrelated=*/SbExpr::makeSV(localKeySlot),
+                                 /*innerProjects=*/std::move(innerProj),
+                                 /*predicate=*/SbExpr{},
                                  joinType);
 
     return {matchedRecordsSlot, std::move(nlj)};
@@ -1016,8 +1016,8 @@ SbStage buildIndexSeek(StageBuilderState& state,
                 cursor->children()[0] =
                     b.makeLoopJoin(std::move(indexBoundKeyStage),
                                    std::move(cursor->children()[0]),
-                                   SbSlotVector{} /* outerProjects */,
-                                   SbExpr::makeSV(lowKeySlot, highKeySlot) /* outerCorrelated */);
+                                   /*outerProjects=*/SbSlotVector{},
+                                   /*outerCorrelated=*/SbExpr::makeSV(lowKeySlot, highKeySlot));
                 return indexStage;
             }
             for (auto& child : cursor->children()) {
@@ -1030,8 +1030,8 @@ SbStage buildIndexSeek(StageBuilderState& state,
         // foreign document.
         return b.makeLoopJoin(std::move(indexBoundKeyStage),
                               std::move(indexStage),
-                              SbSlotVector{} /* outerProjects */,
-                              SbExpr::makeSV(lowKeySlot, highKeySlot) /* outerCorrelated */);
+                              /*outerProjects=*/SbSlotVector{},
+                              /*outerCorrelated=*/SbExpr::makeSV(lowKeySlot, highKeySlot));
     }
 }  // buildIndexSeek
 
@@ -1052,7 +1052,7 @@ SbStage buildIndexJoinLookupForeignSideStage(
 
     // Unwind local keys one by one into 'valueForIndexBound'.
     auto [valueGeneratorStage, valueForIndexBound, _] = b.makeUnwind(
-        std::move(localKeysSetStage), localKeysIndexSetSlot, true /*preserveNullAndEmptyArrays*/);
+        std::move(localKeysSetStage), localKeysIndexSetSlot, /*preserveNullAndEmptyArrays=*/true);
 
     // Create a very simple mapping from foreignFieldName to the SbSlot holding the local field
     // value.
@@ -1146,9 +1146,9 @@ std::pair<SbSlot, SbStage> buildIndexJoinLookupStage(
     auto nljStage = b.makeLoopJoin(std::move(localKeysSetStage),
                                    std::move(foreignGroupStage),
                                    buildLocalSlots(state, localRecordSlot),
-                                   SbExpr::makeSV(localKeysSetSlot) /* outerCorrelated */,
-                                   std::move(innerProj) /* innerProjects */,
-                                   SbExpr{} /* predicate */,
+                                   /*outerCorrelated=*/SbExpr::makeSV(localKeysSetSlot),
+                                   /*innerProjects=*/std::move(innerProj),
+                                   /*predicate=*/SbExpr{},
                                    joinType);
     return {foreignGroupSlot, std::move(nljStage)};
 }  // buildIndexJoinLookupStage
@@ -1254,7 +1254,7 @@ std::pair<SbSlot, SbStage> buildDynamicIndexedLoopJoinLookupStage(
         return b.makeNot(b.makeFunction(sbe::EFn::kTraverseF,
                                         SbExpr{localKeysSetSlot},
                                         std::move(lambda),
-                                        b.makeBoolConstant(false) /*compareArray*/));
+                                        /*compareArray=*/b.makeBoolConstant(false)));
     };
 
     uint32_t typeMask = 0;
@@ -1365,8 +1365,8 @@ std::pair<SbSlot, SbStage> buildDynamicIndexedLoopJoinLookupStage(
                                  std::move(finalForeignStage),
                                  buildLocalSlots(state, localRecordSlot),
                                  std::move(outerCorrelated),
-                                 std::move(innerProj) /* innerProjects */,
-                                 SbExpr{} /* predicate */,
+                                 /*innerProjects=*/std::move(innerProj),
+                                 /*predicate=*/SbExpr{},
                                  joinType);
 
     return {finalForeignSlot, std::move(nlj)};
@@ -1431,7 +1431,7 @@ std::pair<SbSlot /*matched docs*/, SbStage> buildHashJoinLookupStage(
                                                             foreignKeySlot,
                                                             foreignRecordSlot,
                                                             std::move(agg),
-                                                            boost::none /* optOutputSlot */,
+                                                            /*optOutputSlot=*/boost::none,
                                                             state.getCollatorSlot());
 
         // Add a projection that returns an empty array in the "as" field if no foreign row matched.
@@ -1485,7 +1485,7 @@ std::pair<SbStage, PlanStageSlots> buildLookupResultObject(SbStage stage,
                                                std::move(paths),
                                                std::move(nodes),
                                                localDocSlot,
-                                               nullptr /* slots */,
+                                               /*slots=*/nullptr,
                                                traversalDepth,
                                                shouldProduceBson);
 
@@ -1949,9 +1949,9 @@ std::pair<SbStage, PlanStageSlots> generateJoinResult(const BinaryJoinEmbeddingN
                                                    std::move(paths),
                                                    std::move(nodes),
                                                    rootDocumentSlot,
-                                                   nullptr /* slots */,
+                                                   /*slots=*/nullptr,
                                                    0,
-                                                   true /* shouldProduceBson */);
+                                                   /*shouldProduceBson=*/true);
 
                             SbBuilder b(state, node->nodeId());
                             auto [outStage, outSlots] =
@@ -2020,7 +2020,7 @@ std::pair<SbStage, PlanStageSlots> generateJoinResult(const BinaryJoinEmbeddingN
                                    std::move(paths),
                                    node->nodeId(),
                                    state,
-                                   true /* shouldProduceBson */);
+                                   /*shouldProduceBson=*/true);
 }
 
 /**
@@ -2267,8 +2267,8 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildNestedLoopJoinEmb
         b.makeLoopJoin(std::move(leftStage),
                        std::move(rightStage),
                        outerProjects,
-                       {} /* outerCorrelated */,
-                       {} /* innerProjects */,
+                       /*outerCorrelated=*/{},
+                       /*innerProjects=*/{},
                        b.makeBooleanOpTree(abt::Operations::And, std::move(equalityPredicates)));
 
     return generateJoinResult(nestedLoopJoinEmbeddingNode,
@@ -2465,7 +2465,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildIndexedJoinIndexP
                                                 collection,
                                                 indexName,
                                                 indexDescriptor->keyPattern(),
-                                                true /* forward */,
+                                                /*forward=*/true,
                                                 std::move(lowKey),
                                                 std::move(highKey),
                                                 ixScanReqs,
@@ -2635,8 +2635,8 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildIndexedJoinEmbedd
     auto indexStage =
         b.makeLoopJoin(std::move(leftStage),
                        std::move(outStage),
-                       projectedSlots /* outerProjects */,
-                       projectedSlots /* outerCorrelated */,
+                       /*outerProjects=*/projectedSlots,
+                       /*outerCorrelated=*/projectedSlots,
                        {}, /* innerProjects */
                        b.makeBooleanOpTree(abt::Operations::And, std::move(equalityPredicates)));
 

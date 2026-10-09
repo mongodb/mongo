@@ -781,7 +781,7 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, FireAndForget) {
     for (int i = 0; i < numFireAndForgetRequests; i++) {
         auto cbh = makeCallbackHandle();
         auto fireAndForgetRequest = makeTestCommand(
-            kNoTimeout, makeEchoCmdObj(), nullptr /* opCtx */, true /* fireAndForget */);
+            kNoTimeout, makeEchoCmdObj(), /*opCtx=*/nullptr, /*fireAndForget=*/true);
         futures.push_back(runCommand(cbh, fireAndForgetRequest));
     }
 

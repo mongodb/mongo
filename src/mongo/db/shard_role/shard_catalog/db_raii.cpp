@@ -265,7 +265,7 @@ AutoReadLockFree::AutoReadLockFree(OperationContext* opCtx, Date_t deadline)
           return options;
       }()) {
 
-    acquireConsistentCatalogAndSnapshotUnsafe(opCtx, /*dbName*/ boost::none);
+    acquireConsistentCatalogAndSnapshotUnsafe(opCtx, /*dbName=*/boost::none);
 }
 
 AutoGetDbForReadLockFree::AutoGetDbForReadLockFree(OperationContext* opCtx,

@@ -274,8 +274,8 @@ Status ReplicationConsistencyMarkersImpl::_upsertOplogTruncateAfterPointDocument
                     auto status = collection_internal::insertDocument(opCtx,
                                                                       collection,
                                                                       InsertStatement(doc),
-                                                                      nullptr /* opDebug */,
-                                                                      false /* fromMigrate */);
+                                                                      /*opDebug=*/nullptr,
+                                                                      /*fromMigrate=*/false);
 
                     if (!status.isOK()) {
                         return status;

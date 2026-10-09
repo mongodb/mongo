@@ -78,9 +78,9 @@ TEST(WiredTigerIndexTest, GenerateCreateStringProviderConfigOverridesConfigStrin
 
     auto result =
         WiredTigerIndex::generateCreateString(std::string{kWiredTigerEngineName},
-                                              "" /* sysIndexConfig */,
-                                              "type=file" /* collIndexConfig */,
-                                              "type=layered" /* providerConfig */,
+                                              /*sysIndexConfig=*/"",
+                                              /*collIndexConfig=*/"type=file",
+                                              /*providerConfig=*/"type=layered",
                                               NamespaceStringUtil::serializeForCatalog(nss),
                                               config,
                                               /*isLogged=*/false);

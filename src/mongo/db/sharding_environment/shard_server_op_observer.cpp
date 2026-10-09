@@ -830,7 +830,7 @@ void ShardServerOpObserver::onDropDatabaseMetadata(OperationContext* opCtx,
             LOGV2_INFO(13247700,
                        "Clearing collection metadata after dropDatabase metadata commit",
                        logAttrs(nss));
-            scopedCsr->clearCollectionMetadata(opCtx, true /* collIsDropped */);
+            scopedCsr->clearCollectionMetadata(opCtx, /*collIsDropped=*/true);
         }
     }
 }
@@ -992,7 +992,7 @@ void ShardServerOpObserver::onUpdateCollectionMetadata(OperationContext* opCtx,
                                                 currentMetadata->getUUID(),
                                                 collPlacementVersion.epoch(),
                                                 collPlacementVersion.getTimestamp()),
-            true /* forceAllowGaps */),
+            /*forceAllowGaps=*/true),
         CollectionShardingRuntime::NoRoutingTableAs::kUnowned);
 }
 

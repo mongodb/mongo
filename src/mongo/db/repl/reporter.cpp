@@ -269,8 +269,7 @@ void Reporter::_processResponseCallback(
             bool fromTrigger = false;
             auto scheduleResult = _executor->scheduleWorkAt(
                 when, [=, this](const executor::TaskExecutor::CallbackArgs& args) {
-                    _prepareAndSendCommandCallback(args, fromTrigger, false
-                                                   /*useBackupChannel*/);
+                    _prepareAndSendCommandCallback(args, fromTrigger, /*useBackupChannel=*/false);
                 });
             _status = scheduleResult.getStatus();
             if (!_status.isOK()) {

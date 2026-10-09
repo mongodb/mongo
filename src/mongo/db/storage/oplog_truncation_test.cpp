@@ -376,7 +376,7 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_CappedTruncateAfter) {
             rs->capped()->truncateAfter(opCtx,
                                         *shard_role_details::getRecoveryUnit(opCtx),
                                         RecordId(1, 8),
-                                        true /* inclusive */);
+                                        /*inclusive=*/true);
         wunit.commit();
         oplogTruncateMarkers->updateMarkersAfterCappedTruncateAfter(
             result.recordsRemoved, result.bytesRemoved, result.firstRemovedId);
@@ -397,7 +397,7 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_CappedTruncateAfter) {
             rs->capped()->truncateAfter(opCtx,
                                         *shard_role_details::getRecoveryUnit(opCtx),
                                         RecordId(1, 6),
-                                        true /* inclusive */);
+                                        /*inclusive=*/true);
         wunit.commit();
         oplogTruncateMarkers->updateMarkersAfterCappedTruncateAfter(
             result.recordsRemoved, result.bytesRemoved, result.firstRemovedId);

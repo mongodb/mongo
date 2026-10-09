@@ -87,7 +87,7 @@ public:
         swt.commit();
 
         return std::make_unique<WiredTigerIdIndex>(
-            opCtx, ru, uri, UUID::gen(), "" /* ident */, config, kIsLogged);
+            opCtx, ru, uri, UUID::gen(), /*ident=*/"", config, kIsLogged);
     }
 
     std::unique_ptr<SortedDataInterface> newSortedDataInterface(OperationContext* opCtx,
@@ -132,10 +132,10 @@ public:
 
         if (unique) {
             return std::make_unique<WiredTigerIndexUnique>(
-                opCtx, ru, uri, UUID::gen(), "" /* ident */, keyFormat, config, kIsLogged);
+                opCtx, ru, uri, UUID::gen(), /*ident=*/"", keyFormat, config, kIsLogged);
         }
         return std::make_unique<WiredTigerIndexStandard>(
-            opCtx, ru, uri, UUID::gen(), "" /* ident */, keyFormat, config, kIsLogged);
+            opCtx, ru, uri, UUID::gen(), /*ident=*/"", keyFormat, config, kIsLogged);
     }
 
     std::unique_ptr<RecoveryUnit> newRecoveryUnit() final {

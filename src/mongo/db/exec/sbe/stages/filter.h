@@ -42,7 +42,7 @@ public:
                 PlanNodeId planNodeId,
                 bool participateInTrialRunTracking = true)
         : PlanStage(IsConst ? "cfilter"sv : (IsEof ? "efilter" : "filter"sv),
-                    nullptr /* yieldPolicy */,
+                    /*yieldPolicy=*/nullptr,
                     planNodeId,
                     participateInTrialRunTracking),
           _filter(std::move(filter)) {
@@ -160,7 +160,7 @@ public:
         DebugPrinter::addNewLine(ret);
 
         if (debugPrintInfo.printBytecode) {
-            PlanStage::debugPrintBytecode(ret, _filterCode, "FILTER" /*title*/);
+            PlanStage::debugPrintBytecode(ret, _filterCode, /*title=*/"FILTER");
         }
 
         DebugPrinter::addBlocks(ret, _children[0]->debugPrint(debugPrintInfo));

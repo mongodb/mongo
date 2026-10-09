@@ -207,28 +207,28 @@ public:
 
 TEST_F(ShardingCatalogClientReadPreferenceWithNoCachedDataInShardRegistry,
        CatalogQueriesUsePrimaryPreferredReadPreferenceNoCached) {
-    setClusterParameter(false /* mustAlwaysUseNearest */);
+    setClusterParameter(/*mustAlwaysUseNearest=*/false);
 
     assertReadPreferenceForCatalogQuery(ReadPreference::PrimaryPreferred);
 }
 
 TEST_F(ShardingCatalogClientReadPreferenceWithoutConfigShardTest,
        CatalogQueriesUseNearestReadPreference) {
-    setClusterParameter(false /* mustAlwaysUseNearest */);
+    setClusterParameter(/*mustAlwaysUseNearest=*/false);
 
     assertReadPreferenceForCatalogQuery(ReadPreference::Nearest);
 }
 
 TEST_F(ShardingCatalogClientReadPreferenceWithConfigShardTest,
        CatalogQueriesUsePrimaryPreferredReadPreference) {
-    setClusterParameter(false /* mustAlwaysUseNearest */);
+    setClusterParameter(/*mustAlwaysUseNearest=*/false);
 
     assertReadPreferenceForCatalogQuery(ReadPreference::PrimaryPreferred);
 }
 
 TEST_F(ShardingCatalogClientReadPreferenceWithConfigShardTest,
        ClusterServerParameterForcesNearestReadPreference) {
-    setClusterParameter(true /* mustAlwaysUseNearest */);
+    setClusterParameter(/*mustAlwaysUseNearest=*/true);
 
     assertReadPreferenceForCatalogQuery(ReadPreference::Nearest);
 }
@@ -249,7 +249,7 @@ TEST_F(ShardingCatalogClientReadPreferenceWithNoCachedDataInShardRegistry,
 
 TEST_F(ShardingCatalogClientReadPreferenceWithConfigShardTest,
        GetAllDBsOverridesPrimaryOnlyReadPreference) {
-    setClusterParameter(false /* mustAlwaysUseNearest */);
+    setClusterParameter(/*mustAlwaysUseNearest=*/false);
 
     // With a config shard the default would be PrimaryPreferred, but the explicit override
     // should force PrimaryOnly.
@@ -259,7 +259,7 @@ TEST_F(ShardingCatalogClientReadPreferenceWithConfigShardTest,
 
 TEST_F(ShardingCatalogClientReadPreferenceWithConfigShardTest,
        GetAllDBsUsesDefaultReadPreferenceWhenNoOverride) {
-    setClusterParameter(false /* mustAlwaysUseNearest */);
+    setClusterParameter(/*mustAlwaysUseNearest=*/false);
 
     // Without an override, getAllDBs should use the default PrimaryPreferred for config shard.
     assertReadPreferenceForGetAllDBs(ReadPreference::PrimaryPreferred);
@@ -267,7 +267,7 @@ TEST_F(ShardingCatalogClientReadPreferenceWithConfigShardTest,
 
 TEST_F(ShardingCatalogClientReadPreferenceWithoutConfigShardTest,
        GetAllDBsOverridesPrimaryOnlyReadPreference) {
-    setClusterParameter(false /* mustAlwaysUseNearest */);
+    setClusterParameter(/*mustAlwaysUseNearest=*/false);
 
     // Without a config shard the default would be Nearest, but the explicit override
     // should force PrimaryOnly.

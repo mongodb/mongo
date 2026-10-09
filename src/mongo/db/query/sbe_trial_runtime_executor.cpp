@@ -106,7 +106,7 @@ void TrialRuntimeExecutor::prepareCandidate(plan_ranker::CandidatePlan* candidat
 
 void TrialRuntimeExecutor::executeCachedCandidateTrial(plan_ranker::CandidatePlan* candidate,
                                                        size_t maxNumResults) {
-    prepareCandidate(candidate, true /*preparingFromCache*/);
+    prepareCandidate(candidate, /*preparingFromCache=*/true);
     _stashSizeBytes = 0;
     while (fetchNextDocument(candidate, maxNumResults)) {
     }

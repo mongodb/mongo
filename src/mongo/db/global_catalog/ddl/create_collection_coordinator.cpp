@@ -546,8 +546,8 @@ void broadcastDropCollection(OperationContext* opCtx,
         token,
         osi,
         fromMigrate,
-        false /* dropSystemCollections */,
-        !isAuthoritative /* forceLegacyRefresh */,
+        /*dropSystemCollections=*/false,
+        /*forceLegacyRefresh=*/!isAuthoritative,
         expectedUUID);
 }
 
@@ -1085,7 +1085,7 @@ void enterCriticalSectionsOnCoordinator(OperationContext* opCtx,
         mainNss,
         critSecReason,
         defaultMajorityWriteConcernDoNotUse(),
-        !isAuthoritative /* clearShardCatalogCache */);
+        /*clearShardCatalogCache=*/!isAuthoritative);
 
     // Preventively acquire the critical section protecting the buckets namespace that the
     // creation of a timeseries collection would require.
@@ -1094,7 +1094,7 @@ void enterCriticalSectionsOnCoordinator(OperationContext* opCtx,
         mainNss.makeTimeseriesBucketsNamespace(),
         critSecReason,
         defaultMajorityWriteConcernDoNotUse(),
-        !isAuthoritative /* clearShardCatalogCache */);
+        /*clearShardCatalogCache=*/!isAuthoritative);
 }
 
 void exitCriticalSectionsOnCoordinator(OperationContext* opCtx,
@@ -2363,9 +2363,9 @@ void CreateCollectionCoordinator::_setPostCommitMetadata(
                 **executor,
                 token,
                 session,
-                true /* fromMigrate */,
-                false /* dropSystemCollections */,
-                !isAuthoritative /* forceLegacyRefresh */,
+                /*fromMigrate=*/true,
+                /*dropSystemCollections=*/false,
+                /*forceLegacyRefresh=*/!isAuthoritative,
                 _uuid);
         }
     }
@@ -2390,7 +2390,7 @@ void CreateCollectionCoordinator::_setPostCommitMetadata(
             session,
             true,
             false,
-            !isAuthoritative /* forceLegacyRefresh */,
+            /*forceLegacyRefresh=*/!isAuthoritative,
             _uuid);
     }
 }
@@ -2418,14 +2418,14 @@ void CreateCollectionCoordinator::_exitCriticalSection(
     std::erase(participants, ShardingState::get(opCtx)->shardId());
 
     _exitCriticalSectionOnShards(
-        opCtx, false /* throwIfReasonDiffers */, executor, token, participants);
+        opCtx, /*throwIfReasonDiffers=*/false, executor, token, participants);
 
     // If the coordinator successfully committed the collection during a previous execution, the
     // critical section may have already been released. In such case, it is safe to skip the release
     // if the reason does not match because a migration may have already re-acquired it.
     exitCriticalSectionsOnCoordinator(opCtx,
                                       _doc.getAuthoritativeMetadataAccessLevel(),
-                                      _firstExecution /* throwIfReasonDiffers */,
+                                      /*throwIfReasonDiffers=*/_firstExecution,
                                       _critSecReason,
                                       originalNss());
 
@@ -2463,13 +2463,13 @@ ExecutorFuture<void> CreateCollectionCoordinator::_cleanupOnAbort(
                 const auto session = getNewSession(opCtx);
                 broadcastDropCollection(opCtx,
                                         nss(),
-                                        *_doc.getOriginalDataShard() /* excludedDataShard */,
+                                        /*excludedDataShard=*/*_doc.getOriginalDataShard(),
                                         **executor,
                                         token,
                                         session,
                                         _uuid,
-                                        false /*fromMigrate*/,
-                                        isAuthoritative /*isAuthoritative*/);
+                                        /*fromMigrate=*/false,
+                                        /*isAuthoritative=*/isAuthoritative);
             }
 
 
@@ -2490,14 +2490,14 @@ ExecutorFuture<void> CreateCollectionCoordinator::_cleanupOnAbort(
             // Exit critical section on any participant shards, including the data shard.
             if (!participants.empty()) {
                 _exitCriticalSectionOnShards(
-                    opCtx, true /* throwIfReasonDiffers */, executor, token, participants);
+                    opCtx, /*throwIfReasonDiffers=*/true, executor, token, participants);
             }
 
 
             // Exit both critical sections on the coordinator
             exitCriticalSectionsOnCoordinator(opCtx,
                                               _doc.getAuthoritativeMetadataAccessLevel(),
-                                              true /* throwIfReasonDiffers */,
+                                              /*throwIfReasonDiffers=*/true,
                                               _critSecReason,
                                               originalNss());
         })

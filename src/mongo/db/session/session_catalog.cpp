@@ -232,7 +232,7 @@ SessionCatalog::ScopedCheckedOutSession SessionCatalog::_checkOutSession(Operati
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());
 
     auto lsid = *opCtx->getLogicalSessionId();
-    return _checkOutSessionInner(opCtx, lsid, boost::none /* killToken */);
+    return _checkOutSessionInner(opCtx, lsid, /*killToken=*/boost::none);
 }
 
 SessionCatalog::SessionToKill SessionCatalog::checkOutSessionForKill(OperationContext* opCtx,

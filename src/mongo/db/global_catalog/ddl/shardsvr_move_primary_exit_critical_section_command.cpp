@@ -82,7 +82,7 @@ public:
                         csReason,
                         ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
                         ShardingRecoveryService::FilteringMetadataClearer(),
-                        false /* throwIfReasonDiffers */);
+                        /*throwIfReasonDiffers=*/false);
             }
 
             // Since no write that generated a retryable write oplog entry with this sessionId and
@@ -92,8 +92,8 @@ public:
             dbClient.update(NamespaceString::kServerConfigurationNamespace,
                             BSON("_id" << Request::kCommandName),
                             BSON("$inc" << BSON("count" << 1)),
-                            true /* upsert */,
-                            false /* multi */);
+                            /*upsert=*/true,
+                            /*multi=*/false);
         }
 
     private:

@@ -998,7 +998,7 @@ private:
                                               ByteOrderArg byteOrder,
                                               SubtypeArg subtypeValue) {
         // Validate the requested subtype even though we always produce a Vector below.
-        computeBinDataType(subtypeValue, true /* allowVector */);
+        computeBinDataType(subtypeValue, /*allowVector=*/true);
 
         uassert(ErrorCodes::ConversionFailure,
                 "Converting array to BinData requires array",
@@ -1540,13 +1540,13 @@ private:
         auto conversionFunc =
             table.findConversionFunc(input.getType(),
                                      BSONType::string,
-                                     boost::none /*base*/,
+                                     /*base=*/boost::none,
                                      BinDataFormat::kAuto,
                                      // Unused.
                                      ExpressionConvert::ConvertTargetTypeInfo::defaultSubtypeVal,
-                                     boost::none /*byteOrder*/,
+                                     /*byteOrder=*/boost::none,
                                      // Conversions using this class are already gated by this FF.
-                                     true /*featureFlagMqlJsEngineGapEnabled*/);
+                                     /*featureFlagMqlJsEngineGapEnabled=*/true);
 
         Value result = conversionFunc(_expCtx, input);
         tassert(4607903, "Expected string", result.getType() == BSONType::string);

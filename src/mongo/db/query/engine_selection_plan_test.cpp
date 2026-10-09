@@ -151,9 +151,9 @@ public:
             ExpressionConstant::create(expCtx.get(), Value(BSONNULL)),
             std::vector<AccumulationStatement>{AccumulationStatement::parseAccumulationStatement(
                 expCtx.get(), countSpec["n"], expCtx->variablesParseState)},
-            false /* merging */,
-            false /* willBeMerged */,
-            true /* shouldProduceBson */);
+            /*merging=*/false,
+            /*willBeMerged=*/false,
+            /*shouldProduceBson=*/true);
     }
 
 protected:
@@ -292,8 +292,7 @@ TEST_F(EngineSelectionPlanFixture, MatchProjectLookupUnwindFetchSortIxScanSelect
 }
 
 TEST_F(EngineSelectionPlanFixture, LookupUnwindFetchSortIxScanWithAbsorbedLimitSelection) {
-    auto dataAccess =
-        makeFetchSortIxScanNode(fromjson("{a: 1}"), fromjson("{a: 1}"), 1 /* limit */);
+    auto dataAccess = makeFetchSortIxScanNode(fromjson("{a: 1}"), fromjson("{a: 1}"), /*limit=*/1);
     const auto* dataAccessNode = dataAccess.get();
     auto solution = makePlan(
         makeLuNodeWithStrategy(std::move(dataAccess), EqLookupNode::LookupStrategy::kHashJoin));
@@ -502,7 +501,7 @@ TEST_F(EngineSelectionPlanFixture, LuRuleMatchesListedPatternsAndRejectsOthers) 
     // Unlisted patterns: all should be rejected (Classic).
 
     // FETCH -> SORT_DEFAULT -> IXSCAN with absorbed limit
-    ASSERT_EQ(runRule(makeFetchSortIxScanNode(fromjson("{a: 1}"), fromjson("{a: 1}"), 1 /*limit*/)),
+    ASSERT_EQ(runRule(makeFetchSortIxScanNode(fromjson("{a: 1}"), fromjson("{a: 1}"), /*limit=*/1)),
               EngineChoice::kClassic);
 
     // OR -> FETCH -> IXSCAN with more than 100 branches

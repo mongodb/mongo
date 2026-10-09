@@ -52,7 +52,7 @@ protected:
         _catalogClient = std::make_unique<KeysCollectionClientSharded>(
             Grid::get(operationContext())->catalogClient());
 
-        _directClient = std::make_unique<KeysCollectionClientDirect>(false /*mustUseLocalReads*/);
+        _directClient = std::make_unique<KeysCollectionClientDirect>(/*mustUseLocalReads=*/false);
     }
 
     KeysCollectionClient* catalogClient() const {
@@ -739,7 +739,7 @@ TEST_F(CacheTest, RefreshHandlesKeysReceivingTTLValueDirectClient) {
 }
 
 TEST_F(CacheTest, ResetCacheShouldNotClearKeysIfMajorityReadsAreSupported) {
-    auto directClient = std::make_unique<KeysCollectionClientDirect>(false /* mustUseLocalReads */);
+    auto directClient = std::make_unique<KeysCollectionClientDirect>(/*mustUseLocalReads=*/false);
     KeysCollectionCache cache("test", directClient.get());
 
     KeysCollectionDocument origKey0(1);
@@ -762,7 +762,7 @@ TEST_F(CacheTest, ResetCacheShouldNotClearKeysIfMajorityReadsAreSupported) {
 }
 
 TEST_F(CacheTest, ResetCacheShouldClearKeysIfMajorityReadsAreNotSupported) {
-    auto directClient = std::make_unique<KeysCollectionClientDirect>(true /* mustUseLocalReads */);
+    auto directClient = std::make_unique<KeysCollectionClientDirect>(/*mustUseLocalReads=*/true);
     KeysCollectionCache cache("test", directClient.get());
 
     KeysCollectionDocument origKey0(1);

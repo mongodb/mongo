@@ -16,15 +16,15 @@ void BM_CreateHistogram(benchmark::State& state) {
     size_t seed = 1354754;
 
     CollectionFieldConfiguration field(
-        /*fieldName*/ "a",
-        /*fieldPositionInCollection*/ 0,
+        /*fieldName=*/"a",
+        /*fieldPositionInCollection=*/0,
         /*fieldDataType=*/dataType,
-        /*ndv*/ ndv,
-        /*dataDistribution*/ static_cast<stats::DistrType>(state.range(2)),
-        /*seed*/ seed);
+        /*ndv=*/ndv,
+        /*dataDistribution=*/static_cast<stats::DistrType>(state.range(2)),
+        /*seed=*/seed);
 
     DataConfiguration dataConfig(
-        /*size*/ static_cast<int>(state.range(1)),
+        /*size=*/static_cast<int>(state.range(1)),
         /*allDataFieldConfig=*/{field});
 
     auto numberOfBuckets = static_cast<int>(state.range(0));
@@ -45,15 +45,15 @@ void BM_RunHistogramEstimations(benchmark::State& state) {
     size_t seed2 = 1354754;
 
     CollectionFieldConfiguration field(
-        /*fieldName*/ "a",
-        /*fieldPositionInCollection*/ 0,
+        /*fieldName=*/"a",
+        /*fieldPositionInCollection=*/0,
         /*fieldDataType=*/dataType,
-        /*ndv*/ ndv,
-        /*dataDistribution*/ static_cast<stats::DistrType>(state.range(2)),
-        /*seed*/ seed);
+        /*ndv=*/ndv,
+        /*dataDistribution=*/static_cast<stats::DistrType>(state.range(2)),
+        /*seed=*/seed);
 
     DataConfiguration dataConfig(
-        /*size*/ static_cast<int>(state.range(1)),
+        /*size=*/static_cast<int>(state.range(1)),
         /*allDataFieldConfig=*/{field});
 
     std::vector<std::vector<stats::SBEValue>> data;
@@ -71,15 +71,15 @@ void BM_RunHistogramEstimations(benchmark::State& state) {
 
     QueryConfiguration queryConfig(
         {DataFieldDefinition(
-            /*fieldName*/ "a",
+            /*fieldName=*/"a",
             /*fieldDataType=*/typeQuery,
-            /*ndv*/ ndv,
-            /*dataDistribution*/ static_cast<stats::DistrType>(state.range(2)),
+            /*ndv=*/ndv,
+            /*dataDistribution=*/static_cast<stats::DistrType>(state.range(2)),
             /*seed (optional)*/ {seed, seed2})},
-        /*queryTypes*/ {static_cast<QueryType>(state.range(5))});
+        /*queryTypes=*/{static_cast<QueryType>(state.range(5))});
 
-    WorkloadConfiguration workloadConfig(/*numberOfQueries*/ numberOfQueries,
-                                         /*queryConfig*/ queryConfig);
+    WorkloadConfiguration workloadConfig(/*numberOfQueries=*/numberOfQueries,
+                                         /*queryConfig=*/queryConfig);
 
     // We assume there is only one field i.e., we get always the index 0 in all vectors.
     auto queryIntervals =
@@ -104,9 +104,9 @@ void BM_RunHistogramEstimations(benchmark::State& state) {
                                                 queryIntervals[i].first,
                                                 queryIntervals[i].second,
                                                 ceHist,
-                                                /*includeScalar*/ true,
+                                                /*includeScalar=*/true,
                                                 ArrayRangeEstimationAlgo::kConjunctArrayCE,
-                                                /*useE2EAPI*/ useE2EAPI,
+                                                /*useE2EAPI=*/useE2EAPI,
                                                 dataConfig.size));
         i = (i + 1) % queryIntervals.size();
     }

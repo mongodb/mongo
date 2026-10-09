@@ -1080,7 +1080,7 @@ public:
                 sortedDataInterface->insert(&_opCtx,
                                             *shard_role_details::getRecoveryUnit(&_opCtx),
                                             indexKey,
-                                            true /* dupsAllowed */));
+                                            /*dupsAllowed=*/true));
             commitTransaction();
         }
 
@@ -1104,7 +1104,7 @@ public:
             sortedDataInterface->unindex(&_opCtx,
                                          *shard_role_details::getRecoveryUnit(&_opCtx),
                                          indexKey,
-                                         true /* dupsAllowed */);
+                                         /*dupsAllowed=*/true);
             commitTransaction();
         }
 
@@ -1175,7 +1175,7 @@ public:
             sortedDataInterface->unindex(&_opCtx,
                                          *shard_role_details::getRecoveryUnit(&_opCtx),
                                          indexKey,
-                                         true /* dupsAllowed */);
+                                         /*dupsAllowed=*/true);
             commitTransaction();
         }
         releaseDb();
@@ -4506,7 +4506,7 @@ public:
                             entry,
                             doc,
                             record->id,
-                            false /* logIfError */,
+                            /*logIfError=*/false,
                             options,
                             &numDeleted,
                             CheckRecordId::Off);
@@ -4521,7 +4521,7 @@ public:
                     sortedDataInterface->insert(&_opCtx,
                                                 *shard_role_details::getRecoveryUnit(&_opCtx),
                                                 key,
-                                                true /* dupsAllowed */);
+                                                /*dupsAllowed=*/true);
                 }
             }
 

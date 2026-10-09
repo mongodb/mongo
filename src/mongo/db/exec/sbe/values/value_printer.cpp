@@ -513,7 +513,7 @@ void ValuePrinter<T>::writeValueToStream(TypeTags tag, Value val, size_t depth) 
         case TypeTags::keyString: {
             auto ks = getKeyString(val);
             stream << "KS(";
-            writeStringDataToStream(ks->toString(), false /*addQuotes*/);
+            writeStringDataToStream(ks->toString(), /*addQuotes=*/false);
             stream << ")";
             break;
         }
@@ -530,7 +530,7 @@ void ValuePrinter<T>::writeValueToStream(TypeTags tag, Value val, size_t depth) 
         }
         case TypeTags::RecordId:
             stream << "RecordId(";
-            writeStringDataToStream(getRecordIdView(val)->toString(), false /*addQuotes*/);
+            writeStringDataToStream(getRecordIdView(val)->toString(), /*addQuotes=*/false);
             stream << ")";
             break;
         case TypeTags::collator:
@@ -542,7 +542,7 @@ void ValuePrinter<T>::writeValueToStream(TypeTags tag, Value val, size_t depth) 
         }
         case TypeTags::bsonJavascript:
             stream << "Javascript(";
-            writeStringDataToStream(getStringView(TypeTags::StringBig, val), false /*addQuotes*/);
+            writeStringDataToStream(getStringView(TypeTags::StringBig, val), /*addQuotes=*/false);
             stream << ")";
             break;
         case TypeTags::bsonDBPointer: {

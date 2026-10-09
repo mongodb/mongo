@@ -211,7 +211,7 @@ protected:
                 operationContext(), kTestNss, AcquisitionPrerequisites::OperationType::kRead),
             MODE_IS);
         auto collections = MultipleCollectionAccessor(
-            std::move(coll), {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+            std::move(coll), {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
         auto transactionResourcesStasher =
             make_intrusive<ShardRoleTransactionResourcesStasherForPipeline>();
@@ -236,7 +236,7 @@ protected:
             std::make_shared<exec::agg::InternalSearchIdLookUpStage::SearchIdLookupMetrics>();
         auto executor = std::make_unique<exec::agg::InternalSearchIdLookUpLocalReadExecutor>(
             catalogResourceHandle,
-            boost::none /* view */,
+            /*view=*/boost::none,
             exec::SingleDocumentLookupStatsRecorder::makeSearchIdLookupAggregationRecorder());
         exec::agg::StagePtr stage = make_intrusive<exec::agg::InternalSearchIdLookUpStage>(
             DocumentSourceInternalSearchIdLookUp::kStageName,
@@ -866,9 +866,9 @@ protected:
                                                false,
                                                epoch,
                                                timestamp,
-                                               boost::none /* timeseriesFields */,
-                                               boost::none /* reshardingFields */,
-                                               true /* allowMigrations */,
+                                               /*timeseriesFields=*/boost::none,
+                                               /*reshardingFields=*/boost::none,
+                                               /*allowMigrations=*/true,
                                                {ownedChunk, orphanChunk});
 
         CurrentChunkManager cm(makeStandaloneRoutingTableHistory(std::move(rt)));
@@ -895,7 +895,7 @@ protected:
             scopedSetShardRole.emplace(opCtx,
                                        kTestNss,
                                        ShardVersionFactory::make(*metadata),
-                                       boost::none /* databaseVersion */);
+                                       /*databaseVersion=*/boost::none);
         }
 
         auto coll =
@@ -905,7 +905,7 @@ protected:
                               MODE_IS);
 
         auto collections = MultipleCollectionAccessor(
-            std::move(coll), {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+            std::move(coll), {}, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
 
         auto transactionResourcesStasher =
             make_intrusive<ShardRoleTransactionResourcesStasherForPipeline>();

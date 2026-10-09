@@ -65,7 +65,7 @@ void setAuditMetadata(OperationContext* opCtx,
             }
 
             if (user || !roles.empty()) {
-                rpc::AuditUserAttrs::set(opCtx, *user, roles, true /* isImpersonating */);
+                rpc::AuditUserAttrs::set(opCtx, *user, roles, /*isImpersonating=*/true);
             }
         }
     }

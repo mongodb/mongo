@@ -619,7 +619,7 @@ Status SortedDataIndexAccessMethod::insertKeys(OperationContext* opCtx,
                 invariant(unique);
 
                 result = _newInterface->insert(
-                    opCtx, ru, keyString, true /* dupsAllowed */, includeDuplicateRecordId);
+                    opCtx, ru, keyString, /*dupsAllowed=*/true, includeDuplicateRecordId);
                 if (auto status = std::get_if<Status>(&result)) {
                     if (status->isOK() && onDuplicateKey) {
                         result = onDuplicateKey(coll, keyString);
@@ -1484,7 +1484,7 @@ Status BulkBuilderImpl::commit(OperationContext* opCtx,
         std::unique_lock<Client> lk(*opCtx->getClient());
         pm.set(lk,
                CurOp::get(opCtx)->setProgress(
-                   lk, _progressMessage, _keysInserted, 3 /* secondsBetween */),
+                   lk, _progressMessage, _keysInserted, /*secondsBetween=*/3),
                opCtx);
     }
 

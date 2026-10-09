@@ -102,7 +102,7 @@ DEATH_TEST_REGEX_F(EqualStepSamplingStrategyDeathTest,
 
     EqualStepSamplingStrategy samplingStrategy(1, 1);
     samplingStrategy.sampleNSUUIDRangeEqually(
-        opCtx, preImagesCollection, kNsUUID, lastRidAndWall, 0 /* numSamples */);
+        opCtx, preImagesCollection, kNsUUID, lastRidAndWall, /*numSamples=*/0);
 }
 
 // Tests for sample size 1, which has a few special cases.
@@ -327,7 +327,7 @@ TEST_F(EqualStepSamplingStrategyTest, SampleNSUUIDRangeEquallySameTimestampDiffe
     // Insert 50 documents with same timestamp, but different 'applyOpsIndex' values.
     for (int i = 0; i < 50; ++i) {
         auto preImage = buildPreImage(
-            kNsUUID, Timestamp(Seconds(baseTime), 0), i /* applyOpsIndex */, BSON("x" << i));
+            kNsUUID, Timestamp(Seconds(baseTime), 0), /*applyOpsIndex=*/i, BSON("x" << i));
         insertDirectlyToPreImagesCollection(opCtx, preImage);
     }
 
@@ -345,7 +345,7 @@ TEST_F(EqualStepSamplingStrategyTest, SampleNSUUIDRangeEquallySameTimestampDiffe
     std::vector<ChangeStreamPreImage> expectedPreImages;
     for (int i : {0, 5, 10, 15, 20, 25, 30, 35, 40, 49}) {
         expectedPreImages.push_back(buildPreImage(
-            kNsUUID, Timestamp(Seconds(baseTime), 0), i /* applyOpsIndex */, BSON("x" << i)));
+            kNsUUID, Timestamp(Seconds(baseTime), 0), /*applyOpsIndex=*/i, BSON("x" << i)));
     }
 
     constexpr uint64_t kNumSamples = 10;

@@ -243,7 +243,7 @@ BSONObj StartMongoProgram(const BSONObj& a, void* data) {
     auto runner = registry->createProgramRunner(args, env, /*isMongo=*/true, loggingPrefix);
     runner.start();
     invariant(registry->isPidRegistered(runner.pid()));
-    stdx::thread t(runner, registry->getProgramOutputMultiplexer(), true /* shouldLogOutput */);
+    stdx::thread t(runner, registry->getProgramOutputMultiplexer(), /*shouldLogOutput=*/true);
     registry->registerReaderThread(runner.pid(), std::move(t));
     return BSON(string("") << runner.pid().asLongLong());
 }
@@ -256,7 +256,7 @@ BSONObj RunProgram(const BSONObj& a, void* data, bool isMongo, bool isQuiet = fa
     runner.start(!isQuiet);
 
     invariant(registry->isPidRegistered(runner.pid()));
-    stdx::thread t(runner, registry->getProgramOutputMultiplexer(), !isQuiet /* shouldLogOutput */);
+    stdx::thread t(runner, registry->getProgramOutputMultiplexer(), /*shouldLogOutput=*/!isQuiet);
     registry->registerReaderThread(runner.pid(), std::move(t));
     int exit_code = -123456;  // sentinel value
     registry->waitForPid(runner.pid(), true, &exit_code);

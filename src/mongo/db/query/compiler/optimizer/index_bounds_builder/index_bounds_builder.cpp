@@ -366,7 +366,7 @@ void IndexBoundsBuilder::translate(const MatchExpression* expr,
                                    const IndexEntry& index,
                                    OrderedIntervalList* oilOut) {
     BoundsTightness tightnessOut;
-    _translatePredicate(expr, elt, index, oilOut, &tightnessOut, /*ietBuilder*/ nullptr);
+    _translatePredicate(expr, elt, index, oilOut, &tightnessOut, /*ietBuilder=*/nullptr);
 }
 
 namespace {

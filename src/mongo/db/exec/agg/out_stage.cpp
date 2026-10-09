@@ -168,7 +168,7 @@ void OutStage::retrieveOriginalOutCollInfo() {
             auto originalIndexes =
                 pExpCtx->getMongoProcessInterface()->getIndexSpecs(pExpCtx->getOperationContext(),
                                                                    outputNsForFetchingIndexes,
-                                                                   false /* includeBuildUUIDs */);
+                                                                   /*includeBuildUUIDs=*/false);
 
             // The uuid field is considered an option, but cannot be passed to createCollection.
             originalOptions = originalOptions.removeField("uuid");
@@ -602,8 +602,8 @@ void OutStage::renameTemporaryCollection() {
             pExpCtx->getOperationContext(),
             _tempNs,
             outputNs,
-            true /* dropTarget */,
-            false /* stayTemp */,
+            /*dropTarget=*/true,
+            /*stayTemp=*/false,
             _originalOutCollInfo ? _originalOutCollInfo->options : BSONObj{},
             _originalOutCollInfo ? _originalOutCollInfo->indexes : std::vector<BSONObj>{});
     } catch (DBException& ex) {

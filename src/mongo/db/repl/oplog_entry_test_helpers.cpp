@@ -261,7 +261,7 @@ OplogEntry makeCommitIndexBuildOplogEntry(OpTime opTime,
     oplogEntryBuilder.append("indexes", BSON_ARRAY(indexBuildInfo.spec));
 
     return makeCommandOplogEntry(
-        opTime, nss, oplogEntryBuilder.obj(), boost::none /* object2 */, uuid);
+        opTime, nss, oplogEntryBuilder.obj(), /*object2=*/boost::none, uuid);
 }
 
 OplogEntry makeInsertDocumentOplogEntryWithSessionInfo(OpTime opTime,

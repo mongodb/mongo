@@ -134,25 +134,25 @@ TEST_F(WriteWithoutShardKeyUtilTest, WriteQueryContainingFullShardKeyCanTargetSi
     auto useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
-                                                     true /* isUpdateOrDelete */,
-                                                     false /* isUpsert */,
+                                                     /*isUpdateOrDelete=*/true,
+                                                     /*isUpsert=*/false,
                                                      BSON("a" << 1 << "b" << 1),
-                                                     {} /* collation */,
-                                                     boost::none /* let */,
-                                                     boost::none /* legacyRuntimeConstants */,
-                                                     false /* isTimeseriesViewRequest */);
+                                                     /*collation=*/{},
+                                                     /*let=*/boost::none,
+                                                     /*legacyRuntimeConstants=*/boost::none,
+                                                     /*isTimeseriesViewRequest=*/false);
     ASSERT_EQ(useTwoPhaseProtocol, false);
 
     useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
-                                                     false /* isUpdateOrDelete */,
-                                                     false /* isUpsert */,
+                                                     /*isUpdateOrDelete=*/false,
+                                                     /*isUpsert=*/false,
                                                      BSON("a" << 1 << "b" << 1),
-                                                     {} /* collation */,
-                                                     boost::none /* let */,
-                                                     boost::none /* legacyRuntimeConstants */,
-                                                     false /* isTimeseriesViewRequest */);
+                                                     /*collation=*/{},
+                                                     /*let=*/boost::none,
+                                                     /*legacyRuntimeConstants=*/boost::none,
+                                                     /*isTimeseriesViewRequest=*/false);
     ASSERT_EQ(useTwoPhaseProtocol, false);
 }
 
@@ -161,25 +161,25 @@ TEST_F(TimeseriesWriteWithoutShardKeyUtilTest,
     auto useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
-                                                     true /* isUpdateOrDelete */,
-                                                     false /* isUpsert */,
+                                                     /*isUpdateOrDelete=*/true,
+                                                     /*isUpsert=*/false,
                                                      BSON("m.a" << 1 << "m.b" << 1),
-                                                     {} /* collation */,
-                                                     boost::none /* let */,
-                                                     boost::none /* legacyRuntimeConstants */,
-                                                     true /* isTimeseriesViewRequest */);
+                                                     /*collation=*/{},
+                                                     /*let=*/boost::none,
+                                                     /*legacyRuntimeConstants=*/boost::none,
+                                                     /*isTimeseriesViewRequest=*/true);
     ASSERT_EQ(useTwoPhaseProtocol, false);
 
     useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
-                                                     false /* isUpdateOrDelete */,
-                                                     false /* isUpsert */,
+                                                     /*isUpdateOrDelete=*/false,
+                                                     /*isUpsert=*/false,
                                                      BSON("m.a" << 1 << "m.b" << 1),
-                                                     {} /* collation */,
-                                                     boost::none /* let */,
-                                                     boost::none /* legacyRuntimeConstants */,
-                                                     true /* isTimeseriesViewRequest */);
+                                                     /*collation=*/{},
+                                                     /*let=*/boost::none,
+                                                     /*legacyRuntimeConstants=*/boost::none,
+                                                     /*isTimeseriesViewRequest=*/true);
     ASSERT_EQ(useTwoPhaseProtocol, false);
 }
 
@@ -188,25 +188,25 @@ TEST_F(WriteWithoutShardKeyUtilTest,
     auto useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
-                                                     true /* isUpdateOrDelete */,
-                                                     false /* isUpsert */,
+                                                     /*isUpdateOrDelete=*/true,
+                                                     /*isUpsert=*/false,
                                                      BSON("a" << 1),
-                                                     {} /* collation */,
-                                                     boost::none /* let */,
-                                                     boost::none /* legacyRuntimeConstants */,
-                                                     false /* isTimeseriesViewRequest */);
+                                                     /*collation=*/{},
+                                                     /*let=*/boost::none,
+                                                     /*legacyRuntimeConstants=*/boost::none,
+                                                     /*isTimeseriesViewRequest=*/false);
     ASSERT_EQ(useTwoPhaseProtocol, true);
 
     useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
-                                                     false /* isUpdateOrDelete */,
-                                                     false /* isUpsert */,
+                                                     /*isUpdateOrDelete=*/false,
+                                                     /*isUpsert=*/false,
                                                      BSON("a" << 1),
-                                                     {} /* collation */,
-                                                     boost::none /* let */,
-                                                     boost::none /* legacyRuntimeConstants */,
-                                                     false /* isTimeseriesViewRequest */);
+                                                     /*collation=*/{},
+                                                     /*let=*/boost::none,
+                                                     /*legacyRuntimeConstants=*/boost::none,
+                                                     /*isTimeseriesViewRequest=*/false);
     ASSERT_EQ(useTwoPhaseProtocol, true);
 }
 
@@ -215,25 +215,25 @@ TEST_F(TimeseriesWriteWithoutShardKeyUtilTest,
     auto useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
-                                                     true /* isUpdateOrDelete */,
-                                                     false /* isUpsert */,
+                                                     /*isUpdateOrDelete=*/true,
+                                                     /*isUpsert=*/false,
                                                      BSON("m.a" << 1),
-                                                     {} /* collation */,
-                                                     boost::none /* let */,
-                                                     boost::none /* legacyRuntimeConstants */,
-                                                     true /* isTimeseriesViewRequest */);
+                                                     /*collation=*/{},
+                                                     /*let=*/boost::none,
+                                                     /*legacyRuntimeConstants=*/boost::none,
+                                                     /*isTimeseriesViewRequest=*/true);
     ASSERT_EQ(useTwoPhaseProtocol, true);
 
     useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
-                                                     false /* isUpdateOrDelete */,
-                                                     false /* isUpsert */,
+                                                     /*isUpdateOrDelete=*/false,
+                                                     /*isUpsert=*/false,
                                                      BSON("m.a" << 1),
-                                                     {} /* collation */,
-                                                     boost::none /* let */,
-                                                     boost::none /* legacyRuntimeConstants */,
-                                                     true /* isTimeseriesViewRequest */);
+                                                     /*collation=*/{},
+                                                     /*let=*/boost::none,
+                                                     /*legacyRuntimeConstants=*/boost::none,
+                                                     /*isTimeseriesViewRequest=*/true);
     ASSERT_EQ(useTwoPhaseProtocol, true);
 }
 
@@ -242,13 +242,13 @@ TEST_F(WriteWithoutShardKeyUtilTest,
     auto useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
-                                                     true /* isUpdateOrDelete */,
-                                                     false /* isUpsert */,
+                                                     /*isUpdateOrDelete=*/true,
+                                                     /*isUpsert=*/false,
                                                      BSON("_id" << 1),
-                                                     {} /* collation */,
-                                                     boost::none /* let */,
-                                                     boost::none /* legacyRuntimeConstants */,
-                                                     false /* isTimeseriesViewRequest */);
+                                                     /*collation=*/{},
+                                                     /*let=*/boost::none,
+                                                     /*legacyRuntimeConstants=*/boost::none,
+                                                     /*isTimeseriesViewRequest=*/false);
     ASSERT_EQ(useTwoPhaseProtocol, false);
 }
 
@@ -257,13 +257,13 @@ TEST_F(TimeseriesWriteWithoutShardKeyUtilTest,
     auto useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
-                                                     true /* isUpdateOrDelete */,
-                                                     false /* isUpsert */,
+                                                     /*isUpdateOrDelete=*/true,
+                                                     /*isUpsert=*/false,
                                                      BSON("_id" << 1),
-                                                     {} /* collation */,
-                                                     boost::none /* let */,
-                                                     boost::none /* legacyRuntimeConstants */,
-                                                     true /* isTimeseriesViewRequest */);
+                                                     /*collation=*/{},
+                                                     /*let=*/boost::none,
+                                                     /*legacyRuntimeConstants=*/boost::none,
+                                                     /*isTimeseriesViewRequest=*/true);
     ASSERT_EQ(useTwoPhaseProtocol, true);
 }
 
@@ -272,25 +272,25 @@ TEST_F(WriteWithoutShardKeyUtilTest,
     auto useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
-                                                     true /* isUpdateOrDelete */,
-                                                     false /* isUpsert */,
+                                                     /*isUpdateOrDelete=*/true,
+                                                     /*isUpsert=*/false,
                                                      BSON("x" << 1),
-                                                     {} /* collation */,
-                                                     boost::none /* let */,
-                                                     boost::none /* legacyRuntimeConstants */,
-                                                     false /* isTimeseriesViewRequest */);
+                                                     /*collation=*/{},
+                                                     /*let=*/boost::none,
+                                                     /*legacyRuntimeConstants=*/boost::none,
+                                                     /*isTimeseriesViewRequest=*/false);
     ASSERT_EQ(useTwoPhaseProtocol, true);
 
     useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
-                                                     false /* isUpdateOrDelete */,
-                                                     false /* isUpsert */,
+                                                     /*isUpdateOrDelete=*/false,
+                                                     /*isUpsert=*/false,
                                                      BSON("x" << 1),
-                                                     {} /* collation */,
-                                                     boost::none /* let */,
-                                                     boost::none /* legacyRuntimeConstants */,
-                                                     false /* isTimeseriesViewRequest */);
+                                                     /*collation=*/{},
+                                                     /*let=*/boost::none,
+                                                     /*legacyRuntimeConstants=*/boost::none,
+                                                     /*isTimeseriesViewRequest=*/false);
     ASSERT_EQ(useTwoPhaseProtocol, true);
 }
 
@@ -299,25 +299,25 @@ TEST_F(TimeseriesWriteWithoutShardKeyUtilTest,
     auto useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
-                                                     true /* isUpdateOrDelete */,
-                                                     false /* isUpsert */,
+                                                     /*isUpdateOrDelete=*/true,
+                                                     /*isUpsert=*/false,
                                                      BSON("x" << 1),
-                                                     {} /* collation */,
-                                                     boost::none /* let */,
-                                                     boost::none /* legacyRuntimeConstants */,
-                                                     true /* isTimeseriesViewRequest */);
+                                                     /*collation=*/{},
+                                                     /*let=*/boost::none,
+                                                     /*legacyRuntimeConstants=*/boost::none,
+                                                     /*isTimeseriesViewRequest=*/true);
     ASSERT_EQ(useTwoPhaseProtocol, true);
 
     useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
-                                                     false /* isUpdateOrDelete */,
-                                                     false /* isUpsert */,
+                                                     /*isUpdateOrDelete=*/false,
+                                                     /*isUpsert=*/false,
                                                      BSON("x" << 1),
-                                                     {} /* collation */,
-                                                     boost::none /* let */,
-                                                     boost::none /* legacyRuntimeConstants */,
-                                                     true /* isTimeseriesViewRequest */);
+                                                     /*collation=*/{},
+                                                     /*let=*/boost::none,
+                                                     /*legacyRuntimeConstants=*/boost::none,
+                                                     /*isTimeseriesViewRequest=*/true);
     ASSERT_EQ(useTwoPhaseProtocol, true);
 }
 
@@ -325,13 +325,13 @@ TEST_F(WriteWithoutShardKeyUtilTest, FindAndModifyQueryWithOnlyIdMustUseTwoPhase
     auto useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
-                                                     false /* isUpdateOrDelete */,
-                                                     false /* isUpsert */,
+                                                     /*isUpdateOrDelete=*/false,
+                                                     /*isUpsert=*/false,
                                                      BSON("_id" << 1),
-                                                     {} /* collation */,
-                                                     boost::none /* let */,
-                                                     boost::none /* legacyRuntimeConstants */,
-                                                     false /* isTimeseriesViewRequest */);
+                                                     /*collation=*/{},
+                                                     /*let=*/boost::none,
+                                                     /*legacyRuntimeConstants=*/boost::none,
+                                                     /*isTimeseriesViewRequest=*/false);
     ;
     ASSERT_EQ(useTwoPhaseProtocol, true);
 }
@@ -341,13 +341,13 @@ TEST_F(TimeseriesWriteWithoutShardKeyUtilTest,
     auto useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
-                                                     false /* isUpdateOrDelete */,
-                                                     false /* isUpsert */,
+                                                     /*isUpdateOrDelete=*/false,
+                                                     /*isUpsert=*/false,
                                                      BSON("_id" << 1),
-                                                     {} /* collation */,
-                                                     boost::none /* let */,
-                                                     boost::none /* legacyRuntimeConstants */,
-                                                     true /* isTimeseriesViewRequest */);
+                                                     /*collation=*/{},
+                                                     /*let=*/boost::none,
+                                                     /*legacyRuntimeConstants=*/boost::none,
+                                                     /*isTimeseriesViewRequest=*/true);
     ;
     ASSERT_EQ(useTwoPhaseProtocol, true);
 }
@@ -356,13 +356,13 @@ TEST_F(WriteWithoutShardKeyUtilTest, FindAndModifyQueryWithoutShardKeyMustUseTwo
     auto useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
-                                                     false /* isUpdateOrDelete */,
-                                                     false /* isUpsert */,
+                                                     /*isUpdateOrDelete=*/false,
+                                                     /*isUpsert=*/false,
                                                      BSON("x" << 1),
-                                                     {} /* collation */,
-                                                     boost::none /* let */,
-                                                     boost::none /* legacyRuntimeConstants */,
-                                                     false /* isTimeseriesViewRequest */);
+                                                     /*collation=*/{},
+                                                     /*let=*/boost::none,
+                                                     /*legacyRuntimeConstants=*/boost::none,
+                                                     /*isTimeseriesViewRequest=*/false);
     ASSERT_EQ(useTwoPhaseProtocol, true);
 }
 
@@ -371,13 +371,13 @@ TEST_F(TimeseriesWriteWithoutShardKeyUtilTest,
     auto useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
-                                                     false /* isUpdateOrDelete */,
-                                                     false /* isUpsert */,
+                                                     /*isUpdateOrDelete=*/false,
+                                                     /*isUpsert=*/false,
                                                      BSON("x" << 1),
-                                                     {} /* collation */,
-                                                     boost::none /* let */,
-                                                     boost::none /* legacyRuntimeConstants */,
-                                                     true /* isTimeseriesViewRequest */);
+                                                     /*collation=*/{},
+                                                     /*let=*/boost::none,
+                                                     /*legacyRuntimeConstants=*/boost::none,
+                                                     /*isTimeseriesViewRequest=*/true);
     ASSERT_EQ(useTwoPhaseProtocol, true);
 }
 
@@ -395,13 +395,13 @@ TEST_F(UnshardedCollectionTest, UnshardedCollectionDoesNotUseTwoPhaseProtocol) {
     auto useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
-                                                     true /* isUpdateOrDelete */,
-                                                     false /* isUpsert */,
+                                                     /*isUpdateOrDelete=*/true,
+                                                     /*isUpsert=*/false,
                                                      BSON("x" << 1),
-                                                     {} /* collation */,
-                                                     boost::none /* let */,
-                                                     boost::none /* legacyRuntimeConstants */,
-                                                     false /* isTimeseriesViewRequest */);
+                                                     /*collation=*/{},
+                                                     /*let=*/boost::none,
+                                                     /*legacyRuntimeConstants=*/boost::none,
+                                                     /*isTimeseriesViewRequest=*/false);
     ASSERT_EQ(useTwoPhaseProtocol, false);
 }
 
@@ -419,137 +419,137 @@ TEST_F(TimeseriesUnshardedCollectionTest, UnshardedCollectionDoesNotUseTwoPhaseP
     auto useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
-                                                     true /* isUpdateOrDelete */,
-                                                     false /* isUpsert */,
+                                                     /*isUpdateOrDelete=*/true,
+                                                     /*isUpsert=*/false,
                                                      BSON("x" << 1),
-                                                     {} /* collation */,
-                                                     boost::none /* let */,
-                                                     boost::none /* legacyRuntimeConstants */,
-                                                     true /* isTimeseriesViewRequest */);
+                                                     /*collation=*/{},
+                                                     /*let=*/boost::none,
+                                                     /*legacyRuntimeConstants=*/boost::none,
+                                                     /*isTimeseriesViewRequest=*/true);
     ASSERT_EQ(useTwoPhaseProtocol, false);
 }
 
 TEST_F(WriteWithoutShardKeyUtilTest,
        WriteQueryWithFullShardKeyAndCollationWithCollatableTypesUsesTwoPhaseProtocol) {
-    auto useTwoPhaseProtocol = write_without_shard_key::useTwoPhaseProtocol(
-        getOpCtx(),
-        ns(),
-        true /* isUpdateOrDelete */,
-        false /* isUpsert */,
-        BSON("a" << "a"
-                 << "b"
-                 << "b"),
-        BSON("collation" << "lowercase") /* collation */,
-        boost::none /* let */,
-        boost::none /* legacyRuntimeConstants */,
-        false /* isTimeseriesViewRequest */);
+    auto useTwoPhaseProtocol =
+        write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
+                                                     ns(),
+                                                     /*isUpdateOrDelete=*/true,
+                                                     /*isUpsert=*/false,
+                                                     BSON("a" << "a"
+                                                              << "b"
+                                                              << "b"),
+                                                     /*collation=*/BSON("collation" << "lowercase"),
+                                                     /*let=*/boost::none,
+                                                     /*legacyRuntimeConstants=*/boost::none,
+                                                     /*isTimeseriesViewRequest=*/false);
     ASSERT_EQ(useTwoPhaseProtocol, true);
 }
 
 TEST_F(TimeseriesWriteWithoutShardKeyUtilTest,
        WriteQueryWithFullShardKeyAndCollationWithCollatableTypesUsesTwoPhaseProtocol) {
-    auto useTwoPhaseProtocol = write_without_shard_key::useTwoPhaseProtocol(
-        getOpCtx(),
-        ns(),
-        true /* isUpdateOrDelete */,
-        false /* isUpsert */,
-        BSON("m.a" << "a"
-                   << "m.b"
-                   << "b"),
-        BSON("collation" << "lowercase") /* collation */,
-        boost::none /* let */,
-        boost::none /* legacyRuntimeConstants */,
-        true /* isTimeseriesViewRequest */);
+    auto useTwoPhaseProtocol =
+        write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
+                                                     ns(),
+                                                     /*isUpdateOrDelete=*/true,
+                                                     /*isUpsert=*/false,
+                                                     BSON("m.a" << "a"
+                                                                << "m.b"
+                                                                << "b"),
+                                                     /*collation=*/BSON("collation" << "lowercase"),
+                                                     /*let=*/boost::none,
+                                                     /*legacyRuntimeConstants=*/boost::none,
+                                                     /*isTimeseriesViewRequest=*/true);
     ASSERT_EQ(useTwoPhaseProtocol, true);
 }
 
 TEST_F(WriteWithoutShardKeyUtilTest,
        WriteQueryWithFullShardKeyAndCollationWithoutCollatableTypesDoesNotUseTwoPhaseProtocol) {
-    auto useTwoPhaseProtocol = write_without_shard_key::useTwoPhaseProtocol(
-        getOpCtx(),
-        ns(),
-        true /* isUpdateOrDelete */,
-        false /* isUpsert */,
-        BSON("a" << 1 << "b" << 1),
-        BSON("collation" << "lowercase") /* collation */,
-        boost::none /* let */,
-        boost::none /* legacyRuntimeConstants */,
-        false /* isTimeseriesViewRequest */);
+    auto useTwoPhaseProtocol =
+        write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
+                                                     ns(),
+                                                     /*isUpdateOrDelete=*/true,
+                                                     /*isUpsert=*/false,
+                                                     BSON("a" << 1 << "b" << 1),
+                                                     /*collation=*/BSON("collation" << "lowercase"),
+                                                     /*let=*/boost::none,
+                                                     /*legacyRuntimeConstants=*/boost::none,
+                                                     /*isTimeseriesViewRequest=*/false);
     ASSERT_EQ(useTwoPhaseProtocol, false);
 }
 
 TEST_F(TimeseriesWriteWithoutShardKeyUtilTest,
        WriteQueryWithFullShardKeyAndCollationWithoutCollatableTypesDoesNotUseTwoPhaseProtocol) {
-    auto useTwoPhaseProtocol = write_without_shard_key::useTwoPhaseProtocol(
-        getOpCtx(),
-        ns(),
-        true /* isUpdateOrDelete */,
-        false /* isUpsert */,
-        BSON("m.a" << 1 << "m.b" << 1),
-        BSON("collation" << "lowercase") /* collation */,
-        boost::none /* let */,
-        boost::none /* legacyRuntimeConstants */,
-        true /* isTimeseriesViewRequest */);
+    auto useTwoPhaseProtocol =
+        write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
+                                                     ns(),
+                                                     /*isUpdateOrDelete=*/true,
+                                                     /*isUpsert=*/false,
+                                                     BSON("m.a" << 1 << "m.b" << 1),
+                                                     /*collation=*/BSON("collation" << "lowercase"),
+                                                     /*let=*/boost::none,
+                                                     /*legacyRuntimeConstants=*/boost::none,
+                                                     /*isTimeseriesViewRequest=*/true);
     ASSERT_EQ(useTwoPhaseProtocol, false);
 }
 
 TEST_F(WriteWithoutShardKeyUtilTest,
        WriteQueryWithOnlyIdAndCollationWithCollatableTypeUsesTwoPhaseProtocol) {
-    auto useTwoPhaseProtocol = write_without_shard_key::useTwoPhaseProtocol(
-        getOpCtx(),
-        ns(),
-        true /* isUpdateOrDelete */,
-        false /* isUpsert */,
-        BSON("_id" << "hello"),
-        BSON("collation" << "lowercase") /* collation */,
-        boost::none /* let */,
-        boost::none /* legacyRuntimeConstants */,
-        false /* isTimeseriesViewRequest */);
+    auto useTwoPhaseProtocol =
+        write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
+                                                     ns(),
+                                                     /*isUpdateOrDelete=*/true,
+                                                     /*isUpsert=*/false,
+                                                     BSON("_id" << "hello"),
+                                                     /*collation=*/BSON("collation" << "lowercase"),
+                                                     /*let=*/boost::none,
+                                                     /*legacyRuntimeConstants=*/boost::none,
+                                                     /*isTimeseriesViewRequest=*/false);
     ASSERT_EQ(useTwoPhaseProtocol, true);
 }
 
 TEST_F(TimeseriesWriteWithoutShardKeyUtilTest,
        WriteQueryWithOnlyIdAndCollationWithCollatableTypeUsesTwoPhaseProtocol) {
-    auto useTwoPhaseProtocol = write_without_shard_key::useTwoPhaseProtocol(
-        getOpCtx(),
-        ns(),
-        true /* isUpdateOrDelete */,
-        false /* isUpsert */,
-        BSON("_id" << "hello"),
-        BSON("collation" << "lowercase") /* collation */,
-        boost::none /* let */,
-        boost::none /* legacyRuntimeConstants */,
-        true /* isTimeseriesViewRequest */);
+    auto useTwoPhaseProtocol =
+        write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
+                                                     ns(),
+                                                     /*isUpdateOrDelete=*/true,
+                                                     /*isUpsert=*/false,
+                                                     BSON("_id" << "hello"),
+                                                     /*collation=*/BSON("collation" << "lowercase"),
+                                                     /*let=*/boost::none,
+                                                     /*legacyRuntimeConstants=*/boost::none,
+                                                     /*isTimeseriesViewRequest=*/true);
     ASSERT_EQ(useTwoPhaseProtocol, true);
 }
 
 TEST_F(WriteWithoutShardKeyUtilTest,
        WriteQueryWithOnlyIdAndCollationWithoutCollatableTypeDoesNotUseTwoPhaseProtocol) {
-    auto useTwoPhaseProtocol = write_without_shard_key::useTwoPhaseProtocol(
-        getOpCtx(),
-        ns(),
-        true /* isUpdateOrDelete */,
-        false /* isUpsert */,
-        BSON("_id" << 1),
-        BSON("collation" << "lowercase") /* collation */,
-        boost::none /* let */,
-        boost::none /* legacyRuntimeConstants */,
-        false /* isTimeseriesViewRequest */);
+    auto useTwoPhaseProtocol =
+        write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
+                                                     ns(),
+                                                     /*isUpdateOrDelete=*/true,
+                                                     /*isUpsert=*/false,
+                                                     BSON("_id" << 1),
+                                                     /*collation=*/BSON("collation" << "lowercase"),
+                                                     /*let=*/boost::none,
+                                                     /*legacyRuntimeConstants=*/boost::none,
+                                                     /*isTimeseriesViewRequest=*/false);
     ASSERT_EQ(useTwoPhaseProtocol, false);
 }
 
 TEST_F(TimeseriesWriteWithoutShardKeyUtilTest,
        WriteQueryWithOnlyIdAndCollationWithoutCollatableTypeDoesUsesTwoPhaseProtocol) {
-    auto useTwoPhaseProtocol = write_without_shard_key::useTwoPhaseProtocol(
-        getOpCtx(),
-        ns(),
-        true /* isUpdateOrDelete */,
-        false /* isUpsert */,
-        BSON("_id" << 1),
-        BSON("collation" << "lowercase") /* collation */,
-        boost::none /* let */,
-        boost::none /* legacyRuntimeConstants */,
-        true /* isTimeseriesViewRequest */);
+    auto useTwoPhaseProtocol =
+        write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
+                                                     ns(),
+                                                     /*isUpdateOrDelete=*/true,
+                                                     /*isUpsert=*/false,
+                                                     BSON("_id" << 1),
+                                                     /*collation=*/BSON("collation" << "lowercase"),
+                                                     /*let=*/boost::none,
+                                                     /*legacyRuntimeConstants=*/boost::none,
+                                                     /*isTimeseriesViewRequest=*/true);
     ASSERT_EQ(useTwoPhaseProtocol, true);
 }
 
@@ -557,13 +557,13 @@ TEST_F(WriteWithoutShardKeyUtilTest, WriteQueryWithOnlyIdAndUpsertUsesTwoPhasePr
     auto useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
-                                                     true /* isUpdateOrDelete */,
-                                                     true /* isUpsert */,
+                                                     /*isUpdateOrDelete=*/true,
+                                                     /*isUpsert=*/true,
                                                      BSON("_id" << BSON("$eq" << 1)),
-                                                     {} /* collation */,
-                                                     boost::none /* let */,
-                                                     boost::none /* legacyRuntimeConstants */,
-                                                     false /* isTimeseriesViewRequest */);
+                                                     /*collation=*/{},
+                                                     /*let=*/boost::none,
+                                                     /*legacyRuntimeConstants=*/boost::none,
+                                                     /*isTimeseriesViewRequest=*/false);
     ASSERT_EQ(useTwoPhaseProtocol, true);
 }
 
@@ -571,13 +571,13 @@ TEST_F(TimeseriesWriteWithoutShardKeyUtilTest, WriteQueryWithOnlyIdAndUpsertUses
     auto useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
-                                                     true /* isUpdateOrDelete */,
-                                                     true /* isUpsert */,
+                                                     /*isUpdateOrDelete=*/true,
+                                                     /*isUpsert=*/true,
                                                      BSON("_id" << BSON("$eq" << 1)),
-                                                     {} /* collation */,
-                                                     boost::none /* let */,
-                                                     boost::none /* legacyRuntimeConstants */,
-                                                     true /* isTimeseriesViewRequest */);
+                                                     /*collation=*/{},
+                                                     /*let=*/boost::none,
+                                                     /*legacyRuntimeConstants=*/boost::none,
+                                                     /*isTimeseriesViewRequest=*/true);
     ASSERT_EQ(useTwoPhaseProtocol, true);
 }
 
@@ -586,13 +586,13 @@ TEST_F(WriteWithoutShardKeyUtilTest,
     auto useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
-                                                     true /* isUpdateOrDelete */,
-                                                     true /* isUpsert */,
+                                                     /*isUpdateOrDelete=*/true,
+                                                     /*isUpsert=*/true,
                                                      BSON("a" << 1 << "_id" << BSON("$eq" << 1)),
-                                                     {} /* collation */,
-                                                     boost::none /* let */,
-                                                     boost::none /* legacyRuntimeConstants */,
-                                                     false /* isTimeseriesViewRequest */);
+                                                     /*collation=*/{},
+                                                     /*let=*/boost::none,
+                                                     /*legacyRuntimeConstants=*/boost::none,
+                                                     /*isTimeseriesViewRequest=*/false);
     ASSERT_EQ(useTwoPhaseProtocol, true);
 }
 
@@ -601,13 +601,13 @@ TEST_F(TimeseriesWriteWithoutShardKeyUtilTest,
     auto useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
-                                                     true /* isUpdateOrDelete */,
-                                                     true /* isUpsert */,
+                                                     /*isUpdateOrDelete=*/true,
+                                                     /*isUpsert=*/true,
                                                      BSON("m.a" << 1 << "_id" << BSON("$eq" << 1)),
-                                                     {} /* collation */,
-                                                     boost::none /* let */,
-                                                     boost::none /* legacyRuntimeConstants */,
-                                                     true /* isTimeseriesViewRequest */);
+                                                     /*collation=*/{},
+                                                     /*let=*/boost::none,
+                                                     /*legacyRuntimeConstants=*/boost::none,
+                                                     /*isTimeseriesViewRequest=*/true);
     ASSERT_EQ(useTwoPhaseProtocol, true);
 }
 
@@ -616,13 +616,13 @@ TEST_F(WriteWithoutShardKeyUtilTest,
     auto useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
-                                                     true /* isUpdateOrDelete */,
-                                                     false /* isUpsert */,
+                                                     /*isUpdateOrDelete=*/true,
+                                                     /*isUpsert=*/false,
                                                      BSON("_id" << BSON("$gt" << 1)),
-                                                     {} /* collation */,
-                                                     boost::none /* let */,
-                                                     boost::none /* legacyRuntimeConstants */,
-                                                     false /* isTimeseriesViewRequest */);
+                                                     /*collation=*/{},
+                                                     /*let=*/boost::none,
+                                                     /*legacyRuntimeConstants=*/boost::none,
+                                                     /*isTimeseriesViewRequest=*/false);
     ASSERT_EQ(useTwoPhaseProtocol, true);
 }
 
@@ -631,13 +631,13 @@ TEST_F(TimeseriesWriteWithoutShardKeyUtilTest,
     auto useTwoPhaseProtocol =
         write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
                                                      ns(),
-                                                     true /* isUpdateOrDelete */,
-                                                     false /* isUpsert */,
+                                                     /*isUpdateOrDelete=*/true,
+                                                     /*isUpsert=*/false,
                                                      BSON("_id" << BSON("$gt" << 1)),
-                                                     {} /* collation */,
-                                                     boost::none /* let */,
-                                                     boost::none /* legacyRuntimeConstants */,
-                                                     true /* isTimeseriesViewRequest */);
+                                                     /*collation=*/{},
+                                                     /*let=*/boost::none,
+                                                     /*legacyRuntimeConstants=*/boost::none,
+                                                     /*isTimeseriesViewRequest=*/true);
     ASSERT_EQ(useTwoPhaseProtocol, true);
 }
 

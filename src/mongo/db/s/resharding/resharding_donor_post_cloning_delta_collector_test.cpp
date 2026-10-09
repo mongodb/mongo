@@ -88,7 +88,7 @@ TEST_F(ReshardingDonorPostCloningDeltaCollectorTest, SkipsFetchWhenDocumentsFina
     // Simulate a resume after the delta was already persisted.
     auto doc = makeDoc(CoordinatorStateEnum::kBlockingWrites,
                        {ShardId("shard0")},
-                       true /* documentsFinalAlreadySet */);
+                       /*documentsFinalAlreadySet=*/true);
     auto collector = makeCollector(doc, externalState, abortSource.token());
 
     auto future = launchCollector(collector);

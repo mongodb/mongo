@@ -153,7 +153,7 @@ AsyncRequestsSender::Response establishMergingShardCursor(OperationContext* opCt
         ReadPreferenceSetting::get(opCtx),
         sharded_agg_helpers::getDesiredRetryPolicy(opCtx));
 
-    auto response = ars.next(true /* forMergeCursors*/);
+    auto response = ars.next(/*forMergeCursors=*/true);
     tassert(6273807,
             "requested and received data from just one shard, but results are still pending",
             ars.done());
@@ -490,7 +490,7 @@ Status dispatchMergingPipeline(const boost::intrusive_ptr<ExpressionContext>& ex
                             Grid::get(opCtx)->getCursorManager(),
                             privileges,
                             expCtx->getTailableMode(),
-                            boost::none /* routerSort */,
+                            /*routerSort=*/boost::none,
                             expCtx->getAllowPartialResults()));
 
     // If the mergingShard returned an error and did not accept ownership it is our responsibility
@@ -737,9 +737,9 @@ DispatchShardPipelineResults dispatchExchangeConsumerPipeline(
                                                                 serializedCommand,
                                                                 consumerPipelines.back(),
                                                                 boost::none, /* exchangeSpec */
-                                                                false /* needsMerge */,
-                                                                boost::none /* explain */,
-                                                                boost::none /* readConcern */,
+                                                                /*needsMerge=*/false,
+                                                                /*explain=*/boost::none,
+                                                                /*readConcern=*/boost::none,
                                                                 remoteMetricsToInclude);
 
         requests.emplace_back(shardDispatchResults->exchangeSpec->consumerShards[idx],
@@ -979,7 +979,7 @@ Status dispatchPipelineAndMerge(OperationContext* opCtx,
         // cursors will be later added by the ChangeStreamHandleTopologyChangeV2 stage.
         sharded_agg_helpers::partitionAndAddMergeCursorsSource(
             mongosPipeline.get(),
-            {} /* cursors */,
+            /*cursors=*/{},
             shardDispatchResults.splitPipeline->shardCursorsSortSpec,
             remoteMetricsToInclude);
         return runPipelineOnMongoS(namespaces,
@@ -1120,7 +1120,7 @@ Status runPipelineOnSpecificShardOnly(const boost::intrusive_ptr<ExpressionConte
     BSONObj cmdObj = sharded_agg_helpers::createPassthroughCommandForShard(expCtx,
                                                                            serializedCommand,
                                                                            explain,
-                                                                           nullptr /* pipeline */,
+                                                                           /*pipeline=*/nullptr,
                                                                            boost::none,
                                                                            overrideBatchSize,
                                                                            remoteMetricsToInclude);
@@ -1184,7 +1184,7 @@ Status runPipelineOnSpecificShardOnly(const boost::intrusive_ptr<ExpressionConte
             Grid::get(opCtx)->getCursorManager(),
             privileges,
             expCtx->getTailableMode(),
-            boost::optional<BSONObj>(change_stream_constants::kSortSpec) /* routerSort */,
+            /*routerSort=*/boost::optional<BSONObj>(change_stream_constants::kSortSpec),
             expCtx->getAllowPartialResults()));
     }
 

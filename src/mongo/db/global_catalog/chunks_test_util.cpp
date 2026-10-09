@@ -125,7 +125,7 @@ std::vector<ChunkType> genChunkVector(const UUID& uuid,
             genChunkHistory(shard,
                             oldestValidAfter + version.majorVersion() * 10 + version.minorVersion(),
                             numShards,
-                            10 /* maxLenght */));
+                            /*maxLenght=*/10));
         chunks.emplace_back(std::move(chunk));
         minKey = std::move(maxKey);
     }

@@ -68,7 +68,7 @@ bool PreWriteFilter::_documentBelongsToMe(const BSONObj& doc) {
             return std::make_unique<ShardFiltererImpl>(scopedCss->getOwnershipFilter(
                 _opCtx,
                 CollectionShardingState::OrphanCleanupPolicy::kAllowOrphanCleanup,
-                true /*supportNonVersionedOperations*/));
+                /*supportNonVersionedOperations=*/true));
         }();
     }
 

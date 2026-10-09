@@ -132,7 +132,7 @@ Value evaluate(const ExpressionReduce& expr,
         if ((interval > 0) && (i % interval) == 0 &&
             (accumulatedValue.isObject() || accumulatedValue.isArray())) {
             int32_t depth =
-                accumulatedValue.depth(2 * BSONDepth::getMaxAllowableDepth() /*maxDepth*/);
+                accumulatedValue.depth(/*maxDepth=*/2 * BSONDepth::getMaxAllowableDepth());
             if (MONGO_unlikely(depth == -1)) {
                 uasserted(ErrorCodes::Overflow,
                           "$reduce accumulated value exceeded max allowable BSON depth");

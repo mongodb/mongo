@@ -73,7 +73,7 @@ TEST_F(DSV2StateFetchingNormalAndDegradedTest,
     exec::agg::MockStage::setSource_forTest(docSource, source.get());
 
     docSource->setState_forTest(V2Stage::State::kFetchingNormalGettingChangeEvent,
-                                false /* validateStateTransition */);
+                                /*validateStateTransition=*/false);
 
     // Check return value 1 (pause).
     auto result = docSource->runGetNextStateMachine_forTest();
@@ -150,7 +150,7 @@ TEST_F(DSV2StateFetchingNormalAndDegradedTest, StateFetchingNormalGettingChangeE
     exec::agg::MockStage::setSource_forTest(docSource, source.get());
 
     docSource->setState_forTest(V2Stage::State::kFetchingNormalGettingChangeEvent,
-                                false /* validateStateTransition */);
+                                /*validateStateTransition=*/false);
 
     auto result = docSource->runGetNextStateMachine_forTest();
     ASSERT_FALSE(result.has_value());
@@ -217,7 +217,7 @@ TEST_F(
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
     exec::agg::MockStage::setSource_forTest(docSource, source.get());
     docSource->setState_forTest(V2Stage::State::kFetchingNormalGettingChangeEvent,
-                                false /* validateStateTransition */);
+                                /*validateStateTransition=*/false);
 
     // Before executing the stage, fake that there is already another data-shard cursor open.
     getCursorManagerMock(params)->openCursorsOnDataShards(
@@ -327,7 +327,7 @@ TEST_F(
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
     exec::agg::MockStage::setSource_forTest(docSource, source.get());
     docSource->setState_forTest(V2Stage::State::kFetchingNormalGettingChangeEvent,
-                                false /* validateStateTransition */);
+                                /*validateStateTransition=*/false);
 
     // Enable 'ShardNotFound' exceptions, so opening the next cursor will throw. This makes the
     // stage start a new segment.
@@ -396,7 +396,7 @@ TEST_F(DSV2StateFetchingNormalAndDegradedTest,
     exec::agg::MockStage::setSource_forTest(docSource, source.get());
 
     docSource->setState_forTest(V2Stage::State::kFetchingNormalGettingChangeEvent,
-                                false /* validateStateTransition */);
+                                /*validateStateTransition=*/false);
 
     auto result = docSource->runGetNextStateMachine_forTest();
     ASSERT_TRUE(result.has_value());
@@ -474,7 +474,7 @@ TEST_F(DSV2StateFetchingNormalAndDegradedTest,
     exec::agg::MockStage::setSource_forTest(docSource, source.get());
 
     docSource->setState_forTest(V2Stage::State::kFetchingDegradedGettingChangeEvent,
-                                false /* validateStateTransition */);
+                                /*validateStateTransition=*/false);
     docSource->setSegmentStartTimestamp_forTest(ts);
     docSource->setSegmentEndTimestamp_forTest(segmentEndTimestamp);
 
@@ -601,7 +601,7 @@ TEST_F(DSV2StateFetchingNormalAndDegradedTest,
     // Must enable undo mode when entering the degraded fetching mode.
     getCursorManagerMock(params)->enableUndoNextMode();
     docSource->setState_forTest(V2Stage::State::kFetchingDegradedGettingChangeEvent,
-                                false /* validateStateTransition */);
+                                /*validateStateTransition=*/false);
     docSource->setSegmentStartTimestamp_forTest(ts);
     docSource->setSegmentEndTimestamp_forTest(segmentEndTimestamp);
 
@@ -745,7 +745,7 @@ TEST_F(DSV2StateFetchingNormalAndDegradedTest,
     exec::agg::MockStage::setSource_forTest(docSource, source.get());
 
     docSource->setState_forTest(V2Stage::State::kFetchingDegradedGettingChangeEvent,
-                                false /* validateStateTransition */);
+                                /*validateStateTransition=*/false);
     docSource->setSegmentStartTimestamp_forTest(ts);
     docSource->setSegmentEndTimestamp_forTest(segmentEndTimestamp);
 
@@ -836,7 +836,7 @@ DEATH_TEST_REGEX_F(DSV2StateFetchingNormalAndDegradedTestDeathTest,
     exec::agg::MockStage::setSource_forTest(docSource, source.get());
 
     docSource->setState_forTest(V2Stage::State::kFetchingDegradedGettingChangeEvent,
-                                false /* validateStateTransition */);
+                                /*validateStateTransition=*/false);
     docSource->setSegmentStartTimestamp_forTest(ts);
     docSource->setSegmentEndTimestamp_forTest(segmentEndTimestamp);
 
@@ -863,7 +863,7 @@ TEST_F(DSV2StateFetchingNormalAndDegradedTest, StateDowngrading) {
                                dataToShardsAllocationQueryService.get());
 
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
-    docSource->setState_forTest(V2Stage::State::kDowngrading, false /* validateStateTransition */);
+    docSource->setState_forTest(V2Stage::State::kDowngrading, /*validateStateTransition=*/false);
 
     ASSERT_THROWS_CODE(docSource->runGetNextStateMachine_forTest(),
                        AssertionException,

@@ -39,13 +39,13 @@ namespace {
 class VectorClockShardServerTest : public ShardServerTestFixture {
 protected:
     VectorClockShardServerTest()
-        : ShardServerTestFixture(Options{}.useMockClock(true), false /* setUpMajorityReads */) {}
+        : ShardServerTestFixture(Options{}.useMockClock(true), /*setUpMajorityReads=*/false) {}
 
     void setUp() override {
         ShardServerTestFixture::setUp();
 
         auto keysCollectionClient =
-            std::make_unique<KeysCollectionClientDirect>(false /*mustUseLocalReads*/);
+            std::make_unique<KeysCollectionClientDirect>(/*mustUseLocalReads=*/false);
 
         VectorClockMutable::get(getServiceContext())
             ->tickClusterTimeTo(LogicalTime(Timestamp(1, 0)));

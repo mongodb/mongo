@@ -29,7 +29,7 @@ TsBucketToCellBlockStage::TsBucketToCellBlockStage(std::unique_ptr<PlanStage> in
                                                    PlanNodeId nodeId,
                                                    bool participateInTrialRunTracking)
     : PlanStage("ts_bucket_to_cellblock"sv,
-                nullptr /* yieldPolicy */,
+                /*yieldPolicy=*/nullptr,
                 nodeId,
                 participateInTrialRunTracking),
       _bucketSlotId(bucketSlot),

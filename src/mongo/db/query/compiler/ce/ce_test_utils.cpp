@@ -329,7 +329,7 @@ void populateTypeDistrVectorAccordingToInputConfig(stats::TypeDistrVector& td,
                                                                       ndv,
                                                                       interval.first,
                                                                       interval.second,
-                                                                      0 /*nullsRatio*/,
+                                                                      /*nullsRatio=*/0,
                                                                       type.nanProb));
                 break;
             case sbe::value::TypeTags::NumberDouble:
@@ -338,7 +338,7 @@ void populateTypeDistrVectorAccordingToInputConfig(stats::TypeDistrVector& td,
                                                                          ndv,
                                                                          interval.first,
                                                                          interval.second,
-                                                                         0 /*nullsRatio*/,
+                                                                         /*nullsRatio=*/0,
                                                                          type.nanProb));
                 break;
             case sbe::value::TypeTags::StringSmall:
@@ -353,10 +353,10 @@ void populateTypeDistrVectorAccordingToInputConfig(stats::TypeDistrVector& td,
                 auto arrayDataDesc =
                     std::make_unique<stats::DatasetDescriptor>(std::move(arrayData), seedArray);
                 td.push_back(std::make_unique<stats::ArrDistribution>(mdd,
-                                                                      1.0 /*weight*/,
-                                                                      10 /*ndv*/,
-                                                                      0 /*minArraLen*/,
-                                                                      arrayLength /*maxArrLen*/,
+                                                                      /*weight=*/1.0,
+                                                                      /*ndv=*/10,
+                                                                      /*minArraLen=*/0,
+                                                                      /*maxArrLen=*/arrayLength,
                                                                       std::move(arrayDataDesc)));
                 break;
             }
@@ -455,7 +455,7 @@ std::vector<std::pair<stats::SBEValue, stats::SBEValue>> generateIntervals(
                                  stats::DistrType::kUniform,
                                  interval,
                                  seedQueriesLow,
-                                 /*arrayTypeLength*/ 0,
+                                 /*arrayTypeLength=*/0,
                                  sbeValLow);
             break;
         }
@@ -475,7 +475,7 @@ std::vector<std::pair<stats::SBEValue, stats::SBEValue>> generateIntervals(
                                  stats::DistrType::kUniform,
                                  intervalLow,
                                  seedQueriesLow,
-                                 /*arrayTypeLength*/ 0,
+                                 /*arrayTypeLength=*/0,
                                  sbeValLow);
 
             generateDataOneField(ndv,
@@ -484,7 +484,7 @@ std::vector<std::pair<stats::SBEValue, stats::SBEValue>> generateIntervals(
                                  stats::DistrType::kUniform,
                                  intervalHigh,
                                  seedQueriesHigh,
-                                 /*arrayTypeLength*/ 0,
+                                 /*arrayTypeLength=*/0,
                                  sbeValHigh);
 
             for (size_t i = 0; i < sbeValLow.size(); i++) {

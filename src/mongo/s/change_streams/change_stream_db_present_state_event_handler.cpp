@@ -92,8 +92,8 @@ ShardTargeterDecision ChangeStreamShardTargeterDbPresentStateEventHandler::handl
         ctx.getHistoricalPlacementFetcher().fetch(opCtx,
                                                   readerCtx.getChangeStream().getNamespace(),
                                                   clusterTime,
-                                                  false /* checkIfPointInTimeIsInFuture */,
-                                                  false /* ignoreRemovedShards */);
+                                                  /*checkIfPointInTimeIsInFuture=*/false,
+                                                  /*ignoreRemovedShards=*/false);
     if (placement.getStatus() == HistoricalPlacementStatus::NotAvailable) {
         LOGV2_DEBUG(12321700,
                     3,

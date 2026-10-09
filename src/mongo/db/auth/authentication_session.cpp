@@ -248,7 +248,7 @@ void AuthenticationSession::setUserNameForSaslSupportedMechanisms(UserName userN
                 "Set user name for session",
                 "userName"_attr = userName,
                 "oldName"_attr = _userName);
-    _verifyUserNameFromSaslSupportedMechanisms(userName, false /* isMechX509 */);
+    _verifyUserNameFromSaslSupportedMechanisms(userName, /*isMechX509=*/false);
 
     _ssmUserName = userName;
 }

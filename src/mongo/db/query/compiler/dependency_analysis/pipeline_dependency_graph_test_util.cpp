@@ -15,7 +15,7 @@ std::string toString(const Pipeline& pipeline) {
     auto bson = pipeline.serializeToBson();
     BSONArrayBuilder ba{};
     ba.append(bson.begin(), bson.end());
-    return BSON("pipeline" << ba.arr()).jsonString(ExtendedRelaxedV2_0_0, true /*pretty*/);
+    return BSON("pipeline" << ba.arr()).jsonString(ExtendedRelaxedV2_0_0, /*pretty=*/true);
 }
 
 std::unique_ptr<Pipeline> parsePipeline(const std::string& inputPipeJson) {

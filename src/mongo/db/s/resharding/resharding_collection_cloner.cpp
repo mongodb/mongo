@@ -252,11 +252,11 @@ ReshardingCollectionCloner::_queryOnceWithNaturalOrder(
                 routingCtx,
                 Document(request.toBSON()),
                 sharded_agg_helpers::PipelineDataSource::kNormal,
-                false /* eligibleForSampling */,
+                /*eligibleForSampling=*/false,
                 std::move(pipeline),
-                boost::none /* explain */,
+                /*explain=*/boost::none,
                 _sourceNss,
-                IncludeMetrics{} /* remoteMetricsToInclude */,
+                /*remoteMetricsToInclude=*/IncludeMetrics{},
                 ShardTargetingPolicy::kAllowed,
                 readConcern.toBSONInner(),
                 std::move(designatedHostsMap),
@@ -381,8 +381,8 @@ void ReshardingCollectionCloner::writeOneBatch(OperationContext* opCtx,
         ScopedSetShardRole scopedSetShardRole(
             opCtx,
             _outputNss,
-            ShardVersionFactory::make(ChunkVersion::IGNORED()) /* shardVersion */,
-            boost::none /* databaseVersion */);
+            /*shardVersion=*/ShardVersionFactory::make(ChunkVersion::IGNORED()),
+            /*databaseVersion=*/boost::none);
 
         Timer batchInsertTimer;
         int bytesInserted = resharding::data_copy::insertBatchTransactionally(opCtx,

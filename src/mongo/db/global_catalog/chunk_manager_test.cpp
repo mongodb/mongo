@@ -178,8 +178,8 @@ public:
                                                            false,
                                                            _epoch,
                                                            _collTimestamp,
-                                                           boost::none /* timeseriesFields */,
-                                                           boost::none /* reshardingFields */,
+                                                           /*timeseriesFields=*/boost::none,
+                                                           /*reshardingFields=*/boost::none,
                                                            true,
                                                            chunks);
         auto version = rt.getVersion();

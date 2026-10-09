@@ -767,8 +767,8 @@ public:
                 client.update(nss,
                               BSON("_id" << query.get_id().toHexString()),
                               query.toBSON(),
-                              true /* upsert */,
-                              false /* multi */,
+                              /*upsert=*/true,
+                              /*multi=*/false,
                               defaultMajorityWriteConcern().toBSON());
             } catch (const DBException& ex) {
                 LOGV2_DEBUG(10445110,
@@ -791,7 +791,7 @@ public:
                            << QueryShapeRepresentativeQuery::kLastModifiedTimeFieldName
                            << BSON("$lte" << latestClusterParameterTime.asTimestamp()));
             client.remove(
-                nss, predicate, false /* removeMany */, defaultMajorityWriteConcern().toBSON());
+                nss, predicate, /*removeMany=*/false, defaultMajorityWriteConcern().toBSON());
         } catch (const DBException& ex) {
             LOGV2_DEBUG(10445111,
                         1,

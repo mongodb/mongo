@@ -32,7 +32,7 @@ auto shapifyAndGenerateKey(const boost::intrusive_ptr<ExpressionContext>& expCtx
     query_stats::UpdateKey key(
         expCtx,
         updateCommandRequest,
-        boost::none /* hint */,
+        /*hint=*/boost::none,
         std::make_unique<query_shape::UpdateCmdShape>(updateCommandRequest, parsedUpdate, expCtx),
         query_benchmark_constants::kCollectionType);
 

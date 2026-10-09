@@ -168,9 +168,9 @@ TEST_F(TaskExecutorCursorFixture, Basic) {
                                          << "batchSize" << 10),
                              opCtx.get());
 
-    executor::TaskExecutorCursorOptions opts(/*pinConnection*/ gPinTaskExecCursorConns.load() ||
+    executor::TaskExecutorCursorOptions opts(/*pinConnection=*/gPinTaskExecCursorConns.load() ||
                                                  unittest::shouldUseGRPCEgress(),
-                                             /*batchSize*/ 10);
+                                             /*batchSize=*/10);
     auto tec = std::make_unique<TaskExecutorCursor>(executor(), rcr, std::move(opts));
 
     size_t count = 0;
@@ -193,9 +193,9 @@ TEST_F(TaskExecutorCursorFixture, BasicNonPinned) {
                              BSON("find" << "test"
                                          << "batchSize" << 10),
                              opCtx.get());
-    executor::TaskExecutorCursorOptions opts(/*pinConnection*/ false,
-                                             /*batchSize*/ 10,
-                                             /*preFetchNextBatch*/ true,
+    executor::TaskExecutorCursorOptions opts(/*pinConnection=*/false,
+                                             /*batchSize=*/10,
+                                             /*preFetchNextBatch=*/true,
                                              /*yieldPolicy=*/nullptr);
     auto tec = std::make_unique<TaskExecutorCursor>(executor(), rcr, std::move(opts));
 
@@ -220,9 +220,9 @@ TEST_F(TaskExecutorCursorFixture, PinnedExecutorDestroyedOnUnderlying) {
                                          << "batchSize" << 10),
                              opCtx.get());
 
-    executor::TaskExecutorCursorOptions opts(/*pinConnection*/ true,
-                                             /*batchSize*/ 10,
-                                             /*preFetchNextBatch*/ true,
+    executor::TaskExecutorCursorOptions opts(/*pinConnection=*/true,
+                                             /*batchSize=*/10,
+                                             /*preFetchNextBatch=*/true,
                                              /*yieldPolicy=*/nullptr);
     auto tec = std::make_unique<TaskExecutorCursor>(executor(), rcr, std::move(opts));
 
@@ -306,9 +306,9 @@ TEST_F(TaskExecutorCursorFixture, ConnectionRemainsOpenAfterKillingTheCursor) {
                                  opCtx.get());
 
         executor::TaskExecutorCursorOptions opts(
-            /*pinConnection*/ false,  // Test relies on being in non-pinned mode
+            /*pinConnection=*/false,  // Test relies on being in non-pinned mode
             /*batchSize*/ 10,
-            /*preFetchNextBatch*/ true,
+            /*preFetchNextBatch=*/true,
             /*yieldPolicy=*/nullptr);
 
         auto tec = std::make_unique<TaskExecutorCursor>(executor(), rcr, std::move(opts));

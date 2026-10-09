@@ -80,8 +80,8 @@ void BM_ReusingHalfSlots(benchmark::State& state) {
         for (int i = 0; i < round; i++) {
             timeForHelpers += measureOperationTime([&] {
                 insertN(
-                    list, timestampsPerRound * i /*startValue*/, timestampsPerRound /*N*/, iters);
-                eraseN(list, 0 /*startIndex*/, (timestampsPerRound / 2) /*N/2*/, iters);
+                    list, /*startValue=*/timestampsPerRound * i, /*N=*/timestampsPerRound, iters);
+                eraseN(list, /*startIndex=*/0, (timestampsPerRound / 2) /*N/2*/, iters);
             });
             iters.erase(iters.begin(), iters.begin() + (timestampsPerRound / 2));
         }
@@ -97,10 +97,10 @@ void BM_EraseFIFO(benchmark::State& state) {
         const int64_t count = state.range(0);
 
         iters.reserve(count);
-        insertN(list, /*startValue=*/0, count /* N */, iters);
+        insertN(list, /*startValue=*/0, /*N=*/count, iters);
 
         auto duration =
-            measureOperationTime([&]() { eraseN(list, 0 /* startIndex */, count /* N */, iters); });
+            measureOperationTime([&]() { eraseN(list, /*startIndex=*/0, /*N=*/count, iters); });
 
         state.SetIterationTime(duration.count());
     }
@@ -113,12 +113,12 @@ void BM_EraseLIFO(benchmark::State& state) {
         const int64_t count = state.range(0);
 
         iters.reserve(count);
-        insertN(list, /*startValue=*/0, count /* N */, iters);
+        insertN(list, /*startValue=*/0, /*N=*/count, iters);
 
         std::reverse(iters.begin(), iters.end());
 
         auto duration =
-            measureOperationTime([&] { eraseN(list, 0 /* startIndex */, count /* N */, iters); });
+            measureOperationTime([&] { eraseN(list, /*startIndex=*/0, /*N=*/count, iters); });
 
         state.SetIterationTime(duration.count());
     }
@@ -132,12 +132,12 @@ void BM_InsertAfterEraseFIFO(benchmark::State& state) {
 
         iters.reserve(count);
 
-        insertN(list, /*startValue=*/0, count /* N */, iters);
-        eraseN(list, 0 /* startIndex */, count /* N */, iters);
+        insertN(list, /*startValue=*/0, /*N=*/count, iters);
+        eraseN(list, /*startIndex=*/0, /*N=*/count, iters);
         iters.clear();
 
         auto duration =
-            measureOperationTime([&] { insertN(list, /*startValue=*/0, count /* N */, iters); });
+            measureOperationTime([&] { insertN(list, /*startValue=*/0, /*N=*/count, iters); });
 
         state.SetIterationTime(duration.count());
     }
@@ -151,13 +151,13 @@ void BM_InsertAfterEraseLIFO(benchmark::State& state) {
 
         iters.reserve(count);
 
-        insertN(list, /*startValue=*/0, count /* N */, iters);
+        insertN(list, /*startValue=*/0, /*N=*/count, iters);
         std::reverse(iters.begin(), iters.end());
-        eraseN(list, 0 /* startIndex */, count /* N */, iters);
+        eraseN(list, /*startIndex=*/0, /*N=*/count, iters);
         iters.clear();
 
         auto duration =
-            measureOperationTime([&] { insertN(list, /*startValue=*/0, count /* N */, iters); });
+            measureOperationTime([&] { insertN(list, /*startValue=*/0, /*N=*/count, iters); });
 
         state.SetIterationTime(duration.count());
     }

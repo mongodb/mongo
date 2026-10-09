@@ -82,7 +82,7 @@ boost::optional<FixedFCVRegion> tryRunMergeChunksCoordinator(OperationContext* o
         auto service = ShardingCoordinatorService::getService(opCtx);
         auto coordinator =
             checked_pointer_cast<MergeChunksCoordinator>(service->getOrCreateInstance(
-                opCtx, coordinatorDoc.toBSON(), *optFixedFcvRegion, false /*checkOptions*/));
+                opCtx, coordinatorDoc.toBSON(), *optFixedFcvRegion, /*checkOptions=*/false));
 
         try {
             coordinator->checkIfOptionsConflict(coordinatorDoc.toBSON());

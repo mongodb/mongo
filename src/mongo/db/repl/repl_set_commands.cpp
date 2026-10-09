@@ -450,7 +450,7 @@ public:
         if (!parsedArgs.force) {
             auto configTerm = replCoord->getConfigTerm();
             auto status = replCoord->awaitConfigCommitment(
-                opCtx, false /* waitForOplogCommitment */, configTerm);
+                opCtx, /*waitForOplogCommitment=*/false, configTerm);
             uassertStatusOK(
                 status.withContext("Reconfig finished but failed to propagate to a majority"));
         }

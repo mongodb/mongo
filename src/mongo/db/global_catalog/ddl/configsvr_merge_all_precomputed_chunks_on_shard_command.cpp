@@ -83,7 +83,7 @@ public:
             newChunks.reserve(request().getNewChunks().size());
             for (const auto& chunk : request().getNewChunks()) {
                 auto chunkBson = uassertStatusOK(
-                    ChunkType::parseFromNetworkRequest(chunk, true /*acceptMissingVersion*/));
+                    ChunkType::parseFromNetworkRequest(chunk, /*acceptMissingVersion=*/true));
                 newChunks.emplace_back(std::move(chunkBson));
             }
 
@@ -122,8 +122,8 @@ public:
             client.update(NamespaceString::kServerConfigurationNamespace,
                           BSON("_id" << "commitMergeAllPrecomputedChunksOnShardStats"),
                           BSON("$inc" << BSON("count" << 1)),
-                          true /* upsert */,
-                          false /* multi */);
+                          /*upsert=*/true,
+                          /*multi=*/false);
 
             return {placementVersions.collectionPlacementVersion, std::move(changedChunkDocs)};
         }

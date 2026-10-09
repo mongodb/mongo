@@ -199,8 +199,8 @@ public:
                 client.update(NamespaceString::kServerConfigurationNamespace,
                               BSON("_id" << "commitChunkMigrationStats"),
                               BSON("$inc" << BSON("count" << 1)),
-                              true /* upsert */,
-                              false /* multi */);
+                              /*upsert=*/true,
+                              /*multi=*/false);
             }
 
             return Response{shardAndCollVers.shardPlacementVersion};

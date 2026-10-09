@@ -316,7 +316,7 @@ StatusWith<std::unique_ptr<RecordStore>> createCollection(
     // creating the record store we check if the catalog already contains the ident we're trying to
     // create, and that's easier to do if we haven't already added our entry containing the ident.
     auto mdbCatalogEntryObj =
-        internal::buildRawMDBCatalogEntry(ident, BSONObj() /* idxIdent */, md, nss);
+        internal::buildRawMDBCatalogEntry(ident, /*idxIdent=*/BSONObj(), md, nss);
     status = mdbCatalog->addEntry(opCtx, ident, nss, mdbCatalogEntryObj, catalogId).getStatus();
     if (!status.isOK()) {
         return status;

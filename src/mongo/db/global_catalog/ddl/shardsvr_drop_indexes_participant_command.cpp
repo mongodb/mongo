@@ -66,7 +66,7 @@ public:
                     req.getCollectionUUID(),
                     req.getIndex(),
                     req.getShardKeyPattern(),
-                    timeseries::isRawDataRequest(opCtx, req) /* forceRawDataMode*/);
+                    /*forceRawDataMode=*/timeseries::isRawDataRequest(opCtx, req));
             }
 
             auto txnParticipant = TransactionParticipant::get(opCtx);
@@ -121,8 +121,8 @@ public:
                 dbClient.update(NamespaceString::kServerConfigurationNamespace,
                                 BSON("_id" << Request::kCommandName),
                                 BSON("$inc" << BSON("count" << 1)),
-                                true /* upsert */,
-                                false /* multi */);
+                                /*upsert=*/true,
+                                /*multi=*/false);
 
                 LOGV2(10666601,
                       "Successfully dropped indexes on participant shard",

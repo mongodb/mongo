@@ -103,7 +103,7 @@ void CompactHashAggStageTest::performCompactHashAgg(
                                    makeSV(scanSlot),
                                    true,
                                    boost::optional<value::SlotId>{shouldUseCollator, collatorSlot},
-                                   nullptr /* yieldPolicy */,
+                                   /*yieldPolicy=*/nullptr,
                                    kEmptyPlanNodeId);
     auto resultAccessor = prepareTree(ctx.get(), stage.get(), scanSlot);
 
@@ -148,7 +148,7 @@ TEST_F(CompactHashAggStageTest, CompactHashAggBasicNoSpill) {
                                             makeSV(scanSlot),
                                             true,
                                             boost::none,
-                                            nullptr /* yieldPolicy */,
+                                            /*yieldPolicy=*/nullptr,
                                             kEmptyPlanNodeId);
     auto resultAccessor = prepareTree(ctx.get(), stage.get(), scanSlot);
 
@@ -182,7 +182,7 @@ TEST_F(CompactHashAggStageTest, CompactHashAggNoGroupByProducesSingleGroup) {
                                             makeSV(),
                                             true,
                                             boost::none,
-                                            nullptr /* yieldPolicy */,
+                                            /*yieldPolicy=*/nullptr,
                                             kEmptyPlanNodeId);
 
     // There are no output slots, so prepare the tree without requesting any and count the
@@ -222,7 +222,7 @@ TEST_F(CompactHashAggStageTest, CompactHashAggCloneTest) {
                                             makeSV(scanSlot),
                                             true,
                                             boost::none,
-                                            nullptr /* yieldPolicy */,
+                                            /*yieldPolicy=*/nullptr,
                                             kEmptyPlanNodeId);
     auto resultAccessor = prepareTree(ctx.get(), stage.get(), scanSlot);
     auto results = collectIntKeys(stage.get(), resultAccessor);
@@ -260,7 +260,7 @@ TEST_F(CompactHashAggStageTest, CompactHashAggWithRecordIds) {
                                             makeSV(scanSlot),
                                             true,
                                             boost::none,
-                                            nullptr /* yieldPolicy */,
+                                            /*yieldPolicy=*/nullptr,
                                             kEmptyPlanNodeId);
     auto resultAccessor = prepareTree(ctx.get(), stage.get(), scanSlot);
 
@@ -305,7 +305,7 @@ TEST_F(CompactHashAggStageTest, CompactHashAggMemoryLimitNoDiskUse) {
                                             makeSV(scanSlot),
                                             true,
                                             boost::none,
-                                            nullptr /* yieldPolicy */,
+                                            /*yieldPolicy=*/nullptr,
                                             kEmptyPlanNodeId);
 
     // The stage must throw QueryExceededMemoryLimitNoDiskUseAllowed while building the hash

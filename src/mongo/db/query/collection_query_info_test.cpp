@@ -67,7 +67,7 @@ public:
                     ASSERT_OK(collection_internal::insertDocument(operationContext(),
                                                                   coll.getCollectionPtr(),
                                                                   inserts[currentInsertion],
-                                                                  nullptr /* opDebug */));
+                                                                  /*opDebug=*/nullptr));
                     insertionsBeforeCommit++;
                     currentInsertion++;
 

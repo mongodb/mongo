@@ -449,10 +449,10 @@ public:
      */
     void runReshardingToCompletionWithFailoverAt(CoordinatorStateEnum failoverAtState) {
         runReshardingToCompletion(TransitionFunctionMap{},
-                                  nullptr /* stateTransitionsGuard */,
+                                  /*stateTransitionsGuard=*/nullptr,
                                   defaultReshardingCompletionStates(),
-                                  boost::none /* reshardingOptions */,
-                                  boost::none /* errorState */,
+                                  /*reshardingOptions=*/boost::none,
+                                  /*errorState=*/boost::none,
                                   failoverAtState);
     }
 
@@ -579,7 +579,7 @@ public:
                        CoordinatorStateEnum::kBlockingWrites,
                        CoordinatorStateEnum::kCommitting};
         runReshardingToCompletion(
-            transitionFunctions, nullptr /* stateTransitionsGuard */, states, reshardingOptions);
+            transitionFunctions, /*stateTransitionsGuard=*/nullptr, states, reshardingOptions);
     }
 
     void runReshardingAbortWithoutQuiescingBeforeFailover(
@@ -995,7 +995,7 @@ TEST_F(ReshardingCoordinatorServiceTest, ReshardingCoordinatorTransitionsTokDone
                               {CoordinatorStateEnum::kCloning, interrupt},
                               {CoordinatorStateEnum::kApplying, interrupt},
                               {CoordinatorStateEnum::kBlockingWrites, interrupt}},
-        nullptr /* stateTransitionsGuard */,
+        /*stateTransitionsGuard=*/nullptr,
         {CoordinatorStateEnum::kPreparingToDonate,
          CoordinatorStateEnum::kCloning,
          CoordinatorStateEnum::kApplying,
@@ -1783,7 +1783,7 @@ TEST_F(ReshardingCoordinatorServiceFailCloningVerificationTest, CommitIfNotPerfo
     reshardingOptions.performVerification = false;
 
     runReshardingToCompletion(TransitionFunctionMap{},
-                              nullptr /* stateTransitionsGuard */,
+                              /*stateTransitionsGuard=*/nullptr,
                               {CoordinatorStateEnum::kPreparingToDonate,
                                CoordinatorStateEnum::kCloning,
                                CoordinatorStateEnum::kApplying,
@@ -1870,7 +1870,7 @@ TEST_F(ReshardingCoordinatorServiceIncompleteDataVerificationTest,
     auto reshardingOptions = makeDefaultReshardingOptions();
 
     runReshardingToCompletion(TransitionFunctionMap{},
-                              nullptr /* stateTransitionsGuard */,
+                              /*stateTransitionsGuard=*/nullptr,
                               {CoordinatorStateEnum::kPreparingToDonate,
                                CoordinatorStateEnum::kCloning,
                                CoordinatorStateEnum::kApplying,
@@ -1884,7 +1884,7 @@ TEST_F(ReshardingCoordinatorServiceFailFinalVerificationTest, CommitIfNotPerform
     reshardingOptions.performVerification = false;
 
     runReshardingToCompletion(TransitionFunctionMap{},
-                              nullptr /* stateTransitionsGuard */,
+                              /*stateTransitionsGuard=*/nullptr,
                               {CoordinatorStateEnum::kPreparingToDonate,
                                CoordinatorStateEnum::kCloning,
                                CoordinatorStateEnum::kApplying,
@@ -1914,7 +1914,7 @@ TEST_F(ReshardingCoordinatorServiceTest,
                    CoordinatorStateEnum::kBlockingWrites,
                    CoordinatorStateEnum::kCommitting};
     runReshardingToCompletion(
-        transitionFunctions, nullptr /* stateTransitionsGuard */, states, reshardingOptions);
+        transitionFunctions, /*stateTransitionsGuard=*/nullptr, states, reshardingOptions);
 }
 
 TEST_F(ReshardingCoordinatorServiceTest, ReshardingSendsDonorInitCmd) {
@@ -2094,7 +2094,7 @@ TEST_F(
                    CoordinatorStateEnum::kBlockingWrites,
                    CoordinatorStateEnum::kCommitting};
     runReshardingToCompletion(
-        transitionFunctions, nullptr /* stateTransitionsGuard */, states, reshardingOptions);
+        transitionFunctions, /*stateTransitionsGuard=*/nullptr, states, reshardingOptions);
 }
 
 class ReshardingCoordinatorServiceReturnZeroFromGetDocumentsToCopy
@@ -2136,7 +2136,7 @@ TEST_F(ReshardingCoordinatorServiceReturnZeroFromGetDocumentsToCopy,
                    CoordinatorStateEnum::kBlockingWrites,
                    CoordinatorStateEnum::kCommitting};
     runReshardingToCompletion(
-        transitionFunctions, nullptr /* stateTransitionsGuard */, states, reshardingOptions);
+        transitionFunctions, /*stateTransitionsGuard=*/nullptr, states, reshardingOptions);
 }
 
 class ReshardingCoordinatorServiceFailGetDocumentsDelta
@@ -2229,7 +2229,7 @@ TEST_F(ReshardingCoordinatorServiceFailGetDocumentsDelta,
                    CoordinatorStateEnum::kBlockingWrites,
                    CoordinatorStateEnum::kCommitting};
     runReshardingToCompletion(
-        transitionFunctions, nullptr /* stateTransitionsGuard */, states, reshardingOptions);
+        transitionFunctions, /*stateTransitionsGuard=*/nullptr, states, reshardingOptions);
 }
 
 TEST_F(ReshardingCoordinatorServiceTest,

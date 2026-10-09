@@ -422,7 +422,7 @@ public:
 
     MultiLet(std::vector<std::pair<ProjectionName, ABT>> inBinds, ABT inExpr)
         : Base(std::vector<ABT>()) {
-        nodes().reserve(inBinds.size() + 1 /*inExpr*/);
+        nodes().reserve(/*inExpr=*/inBinds.size() + 1);
         for (auto&& inBind : inBinds) {
             assertExprSort(inBind.second);
             nodes().emplace_back(std::move(inBind.second));

@@ -137,7 +137,7 @@ std::unique_ptr<DBClientCursor> MockDBClientConnection::bsonArrayToCursor(BSONAr
 std::unique_ptr<DBClientCursor> MockDBClientConnection::find(
     FindCommandRequest findRequest,
     const ReadPreferenceSetting& /*unused*/,
-    ExhaustMode /*unused*/) {
+    /*unused=*/ExhaustMode) {
     ensureConnection();
     try {
         int nToSkip = nToSkipFromResumeAfter(findRequest.getResumeAfter());

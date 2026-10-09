@@ -105,7 +105,7 @@ CollectionRoutingInfo CatalogCacheMock::makeCollectionRoutingInfoUnsplittable(
                                              dbVersion,
                                              shardKeyPattern,
                                              {chunk},
-                                             true /*unsplittable*/,
+                                             /*unsplittable=*/true,
                                              extraOptions);
 }
 
@@ -123,7 +123,7 @@ CollectionRoutingInfo CatalogCacheMock::makeCollectionRoutingInfoSharded(
                                              dbVersion,
                                              shardKeyPattern,
                                              chunks,
-                                             false /*unsplittable*/,
+                                             /*unsplittable=*/false,
                                              extraOptions,
                                              reshardingFields);
 }
@@ -163,13 +163,13 @@ CollectionRoutingInfo CatalogCacheMock::_makeCollectionRoutingInfoTracked(
                                             collectionUUID,
                                             shardKeyPattern,
                                             unsplittable,
-                                            nullptr /*defaultCollator*/,
-                                            false /*unique*/,
+                                            /*defaultCollator=*/nullptr,
+                                            /*unique=*/false,
                                             collectionEpoch,
                                             collectionTimestamp,
                                             optTimeseriesFields,
                                             reshardingFields,
-                                            true /*allowMigrations*/,
+                                            /*allowMigrations=*/true,
                                             chunkTypes);
 
     CurrentChunkManager cm(

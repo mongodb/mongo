@@ -58,7 +58,7 @@ ShardTargeterDecision ChangeStreamShardTargeterBase::initialize(
     auto placement = _fetcher->fetch(opCtx,
                                      readerContext.getChangeStream().getNamespace(),
                                      atClusterTime,
-                                     false /* checkIfPointInTimeIsInFuture */,
+                                     /*checkIfPointInTimeIsInFuture=*/false,
                                      /*ignoreRemovedShards=*/false);
     if (placement.getStatus() == HistoricalPlacementStatus::NotAvailable) {
         LOGV2_DEBUG(12321701,
@@ -117,7 +117,7 @@ ChangeStreamShardTargeterBase::startChangeStreamSegment(OperationContext* opCtx,
     auto placement = _fetcher->fetch(opCtx,
                                      readerContext.getChangeStream().getNamespace(),
                                      atClusterTime,
-                                     false /* checkIfPointInTimeIsInFuture */,
+                                     /*checkIfPointInTimeIsInFuture=*/false,
                                      /*ignoreRemovedShards=*/true);
     if (placement.getStatus() == HistoricalPlacementStatus::NotAvailable) {
         return std::make_pair(ShardTargeterDecision::kSwitchToV1,

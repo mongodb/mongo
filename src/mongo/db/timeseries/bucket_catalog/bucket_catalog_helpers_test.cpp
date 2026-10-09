@@ -101,7 +101,7 @@ BSONObj BucketCatalogHelpersTest::_findSuitableBucket(const NamespaceString& tim
     // Run an aggregation to find a suitable bucket to reopen.
     DBDirectClient client(_opCtx);
     auto cursor = uassertStatusOK(DBClientCursor::fromAggregationRequest(
-        &client, aggRequest, false /* secondaryOk */, false /* useExhaust*/));
+        &client, aggRequest, /*secondaryOk=*/false, /*useExhaust=*/false));
     if (cursor->more()) {
         return cursor->next();
     }

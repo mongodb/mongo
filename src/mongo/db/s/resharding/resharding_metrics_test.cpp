@@ -207,13 +207,13 @@ public:
     void validateEstimatedRemainingTimeIfDisableMovingAverage(
         ReshardingMetrics* metrics, boost::optional<Milliseconds> expectedEstimate) {
         _validateEstimatedRemainingTime(
-            metrics, false /* enableEstimateBasedOnMovingAvg */, expectedEstimate);
+            metrics, /*enableEstimateBasedOnMovingAvg=*/false, expectedEstimate);
     }
 
     void validateEstimatedRemainingTimeIfEnableMovingAverage(
         ReshardingMetrics* metrics, boost::optional<Milliseconds> expectedEstimate) {
         _validateEstimatedRemainingTime(
-            metrics, true /* enableEstimateBasedOnMovingAvg */, expectedEstimate);
+            metrics, /*enableEstimateBasedOnMovingAvg=*/true, expectedEstimate);
     }
 
 private:

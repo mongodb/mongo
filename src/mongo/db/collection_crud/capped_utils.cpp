@@ -219,8 +219,8 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
             uassertStatusOK(collection_internal::insertDocument(opCtx,
                                                                 toCollection.getCollectionPtr(),
                                                                 std::move(insertStmt),
-                                                                nullptr /* OpDebug */,
-                                                                true /*fromMigrate*/));
+                                                                /*OpDebug=*/nullptr,
+                                                                /*fromMigrate=*/true));
             wunit.commit();
 
             // Go to the next document
@@ -384,7 +384,7 @@ void convertToCapped(OperationContext* opCtx,
         }
     }
 
-    cloneCollectionAsCapped(opCtx, db, sourceAcq, tmpAcq, size, true /* temp */, targetUUID);
+    cloneCollectionAsCapped(opCtx, db, sourceAcq, tmpAcq, size, /*temp=*/true, targetUUID);
 
     RenameCollectionOptions options;
     options.dropTarget = true;

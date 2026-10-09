@@ -37,7 +37,7 @@ MONGO_INITIALIZER_GENERAL(MongosOptions,
     }
     // Run validation, but tell the Environment that we don't want it to be set as "valid",
     // since we may be making it invalid in the canonicalization process.
-    uassertStatusOK(moe::startupOptionsParsed.validate(false /*setValid*/));
+    uassertStatusOK(moe::startupOptionsParsed.validate(/*setValid=*/false));
     uassertStatusOK(validateMongosOptions(moe::startupOptionsParsed));
     uassertStatusOK(canonicalizeMongosOptions(&moe::startupOptionsParsed));
     uassertStatusOK(moe::startupOptionsParsed.validate());

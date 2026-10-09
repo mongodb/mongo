@@ -75,7 +75,7 @@ sendAuthenticatedCommandToShards(
         opCtx,
         originalOpts,
         shardIds,
-        boost::none /* shardVersions */,
+        /*shardVersions=*/boost::none,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         throwOnError);
 }

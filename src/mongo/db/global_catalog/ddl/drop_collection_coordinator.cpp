@@ -353,7 +353,7 @@ void DropCollectionCoordinator::_commitDropCollection(
             defaultMajorityWriteConcernDoNotUse(),
             getNewSession(opCtx),
             **executor,
-            false /*logCommitOnConfigPlacementHistory*/);
+            /*logCommitOnConfigPlacementHistory=*/false);
 
         if (isAuthoritative) {
             const auto session = getNewSession(opCtx);
@@ -395,10 +395,10 @@ void DropCollectionCoordinator::_commitDropCollection(
             token,
             session,
             fromMigrate,
-            false /* dropSystemCollections */,
-            !isAuthoritative /* forceLegacyRefresh */,
-            boost::none /* collectionUUID */,
-            false /* requireCollectionEmpty */);
+            /*dropSystemCollections=*/false,
+            /*forceLegacyRefresh=*/!isAuthoritative,
+            /*collectionUUID=*/boost::none,
+            /*requireCollectionEmpty=*/false);
     };
 
     auto otherParticipants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
@@ -407,8 +407,8 @@ void DropCollectionCoordinator::_commitDropCollection(
                                         changeStreamsNotifierShardId),
                             otherParticipants.end());
 
-    sendParticipantCommand(otherParticipants, true /*fromMigrateParam*/);
-    sendParticipantCommand({changeStreamsNotifierShardId}, false /*fromMigrateParam*/);
+    sendParticipantCommand(otherParticipants, /*fromMigrateParam=*/true);
+    sendParticipantCommand({changeStreamsNotifierShardId}, /*fromMigrateParam=*/false);
 
     if (collIsTracked) {
         // 3. Insert the effects of the commit into config.placementHistory, if not already present.

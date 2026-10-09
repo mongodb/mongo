@@ -180,7 +180,7 @@ void BM_OnInserts(benchmark::State& state, const char* nss) {
                            collptr,
                            statements.cbegin(),
                            statements.cend(),
-                           {} /* recordIds */,
+                           /*recordIds=*/{},
                            {false},
                            false,
                            nullptr);

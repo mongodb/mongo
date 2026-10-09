@@ -27,7 +27,7 @@ void testRange(auto getBoundOptional,
     };
 
     // narrow from unset
-    maybeNarrowBound(BSON("value" << initialValue), true /* inclusive */);
+    maybeNarrowBound(BSON("value" << initialValue), /*inclusive=*/true);
     ASSERT_TRUE(getBoundOptional());
     assertValueEq(initialValue);
     ASSERT_TRUE(checkInclusivity());
@@ -39,13 +39,13 @@ void testRange(auto getBoundOptional,
     ASSERT_FALSE(checkInclusivity());
 
     // cannot widen by re-adding inclusivity
-    maybeNarrowBound(BSON("value" << initialValue), true /* inclusive */);
+    maybeNarrowBound(BSON("value" << initialValue), /*inclusive=*/true);
     ASSERT_TRUE(getBoundOptional());
     assertValueEq(initialValue);
     ASSERT_FALSE(checkInclusivity());
 
     // cannot widen by setting a wider bound
-    maybeNarrowBound(BSON("value" << widerValue), true /* inclusive */);
+    maybeNarrowBound(BSON("value" << widerValue), /*inclusive=*/true);
     ASSERT_TRUE(getBoundOptional());
     assertValueEq(initialValue);
     ASSERT_FALSE(checkInclusivity());

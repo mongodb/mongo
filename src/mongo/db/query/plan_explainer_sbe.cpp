@@ -278,7 +278,7 @@ PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
     if (auto execPlanDebugInfo =
             buildSbeDebugInfoWithinBudget(sbePlanStageRoot,
                                           sbePlanStageData,
-                                          explainThresholdBytes - plan.len() /* lengthCap */,
+                                          /*lengthCap=*/explainThresholdBytes - plan.len(),
                                           explainPolicy.hasByteCode())) {
         plan.append("slotBasedPlan", *execPlanDebugInfo);
     } else {
@@ -768,15 +768,15 @@ std::vector<ExplainPlanEntry> PlanExplainerSBEBase::getPlanEntries(const Explain
             "the SBE base explainer produces only legacy-format plan entries",
             format == PlanStatsFormat::kLegacy);
     tassert(9378606, "encountered unexpected nullptr for root PlanStage", _root);
-    auto stats = _root->getStats(true /* includeDebugInfo  */);
+    auto stats = _root->getStats(/*includeDebugInfo=*/true);
     tassert(9378611, "encountered unexpected nullptr for PlanStageStats", stats);
 
     auto [planStatsTree, summary] = buildPlanStatsDetails(_solution,
                                                           *stats,
                                                           _root,
                                                           _rootData,
-                                                          boost::none /* planSummary */,
-                                                          boost::none /* queryParams */,
+                                                          /*planSummary=*/boost::none,
+                                                          /*queryParams=*/boost::none,
                                                           buildRemotePlanInfo(),
                                                           policy,
                                                           matchesCachedPlan(),
@@ -889,12 +889,12 @@ PlanExplainerClassicRuntimePlannerForSBE::PlanExplainerClassicRuntimePlannerForS
           _classicRuntimePlannerStage  // If there were no multi-planning, this will be nullptr.
               ? plan_explainer_factory::make(_classicRuntimePlannerStage.get(),
                                              cachedPlanHash,
-                                             boost::none /* replanReason */,
+                                             /*replanReason=*/boost::none,
                                              std::move(maybeExplainData),
                                              // No construction-time snapshot of the trial
                                              // statistics is needed on this path, not even for the
                                              // V3 per-plan view.
-                                             false /* isExplain */,
+                                             /*isExplain=*/false,
                                              planSelectionStrategy)
               : nullptr} {
     if (_classicRuntimePlannerExplainer) {
@@ -924,17 +924,17 @@ std::vector<ExplainPlanEntry> PlanExplainerClassicRuntimePlannerForSBE::_getPlan
     if (_usedJoinOpt) {
         // Join optimization keeps its rejected candidates as fully built SBE plans of its own.
         for (auto&& soln : _rejectedPlansForJoinOpt) {
-            auto stats = soln.stage->getStats(true /* includeDebugInfo  */);
+            auto stats = soln.stage->getStats(/*includeDebugInfo=*/true);
             auto [planStatsTree, summary] = buildPlanStatsDetails(soln.soln.get(),
                                                                   *stats,
                                                                   soln.stage.get(),
                                                                   &soln.data,
-                                                                  boost::none /* planSummary */,
-                                                                  boost::none /* queryParams */,
-                                                                  boost::none /* remotePlanInfo */,
+                                                                  /*planSummary=*/boost::none,
+                                                                  /*queryParams=*/boost::none,
+                                                                  /*remotePlanInfo=*/boost::none,
                                                                   policy,
                                                                   /*isCached=*/false,
-                                                                  true /* usedJoinOpt */,
+                                                                  /*usedJoinOpt=*/true,
                                                                   _estimates);
             ExplainPlanEntry entry;
             entry.planStatsTree = std::move(planStatsTree);
@@ -994,7 +994,7 @@ void PlanExplainerClassicRuntimePlannerForSBE::attachWinnerSbeInfo(
             winner.planStatsTree.objsize() -
             (winner.executedPlanStages ? winner.executedPlanStages->objsize() : 0);
         if (auto debugInfo = buildSbeDebugInfoWithinBudget(
-                _root, _rootData, lengthCap, policy.hasByteCode() /*printBytecode*/)) {
+                _root, _rootData, lengthCap, /*printBytecode=*/policy.hasByteCode())) {
             winner.slotBasedPlan = std::move(*debugInfo);
         } else {
             winner.warning = "slotBasedPlan exceeded BSON size limit for explain";

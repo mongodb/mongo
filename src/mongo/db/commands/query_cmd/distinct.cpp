@@ -581,7 +581,7 @@ public:
                 // Relinquish locks. The aggregation command will re-acquire them.
                 collectionOrView.reset();
                 runDistinctAsAgg(
-                    opCtx, std::move(canonicalQuery), boost::none /* verbosity */, reply);
+                    opCtx, std::move(canonicalQuery), /*verbosity=*/boost::none, reply);
                 return;
             }
 
@@ -781,7 +781,7 @@ public:
                                                 AuthorizationSession::get(opCtx->getClient()),
                                                 distinctAggRequest.getNamespace(),
                                                 distinctAggRequest,
-                                                false /* isMongos */));
+                                                /*isMongos=*/false));
             retryOnLocalIFRFlagKickback(opCtx, distinctAggRequest, "distinct as aggregation", [&] {
                 uassertStatusOK(runAggregate(opCtx,
                                              distinctAggRequest,

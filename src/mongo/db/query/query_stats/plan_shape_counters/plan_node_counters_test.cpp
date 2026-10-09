@@ -193,7 +193,7 @@ public:
                                        size_t limit,
                                        LimitSkipParameterization canBeParameterized) {
         return std::make_unique<SortType>(
-            std::move(child), pattern, limit, canBeParameterized, 0 /*maxMemoryUsageBytes*/);
+            std::move(child), pattern, limit, canBeParameterized, /*maxMemoryUsageBytes=*/0);
     }
 
     std::unique_ptr<ShardingFilterNode> makeShardingFilter(
@@ -207,9 +207,9 @@ public:
         return std::make_unique<GroupNode>(std::move(child),
                                            ExpressionConstant::create(_expCtx.get(), Value(1)),
                                            std::vector<AccumulationStatement>{},
-                                           false /* merging */,
-                                           false /* willBeMerged */,
-                                           false /* shouldProduceBson */);
+                                           /*merging=*/false,
+                                           /*willBeMerged=*/false,
+                                           /*shouldProduceBson=*/false);
     }
 
     std::unique_ptr<StreamingGroupNode> makeStreamingGroup(
@@ -218,7 +218,7 @@ public:
             std::move(child),
             ExpressionConstant::create(_expCtx.get(), Value(1)),
             std::vector<AccumulationStatement>{},
-            false /* shouldProduceBson */,
+            /*shouldProduceBson=*/false,
             std::vector<FieldPath>{FieldPath("a")});
     }
 
@@ -228,9 +228,9 @@ public:
             std::move(child),
             timeseries::BucketSpec(
                 "time", boost::none, {}, timeseries::BucketSpec::Behavior::kInclude),
-            nullptr /* eventFilter */,
-            nullptr /* wholeBucketFilter */,
-            false /* includeMeta */);
+            /*eventFilter=*/nullptr,
+            /*wholeBucketFilter=*/nullptr,
+            /*includeMeta=*/false);
     }
 
     std::unique_ptr<EqLookupNode> makeEqLookup(bool withUnwind) {
@@ -245,9 +245,9 @@ public:
                                                   FieldPath("b"),
                                                   FieldPath("out"),
                                                   EqLookupNode::LookupStrategy::kNestedLoopJoin,
-                                                  false /* shouldProduceBson */,
-                                                  false /* preserveNullAndEmptyArrays */,
-                                                  boost::none /* indexPath */);
+                                                  /*shouldProduceBson=*/false,
+                                                  /*preserveNullAndEmptyArrays=*/false,
+                                                  /*indexPath=*/boost::none);
         }
         return std::make_unique<EqLookupNode>(std::move(children),
                                               foreignNss,
@@ -255,7 +255,7 @@ public:
                                               FieldPath("b"),
                                               FieldPath("out"),
                                               EqLookupNode::LookupStrategy::kNestedLoopJoin,
-                                              false /* shouldProduceBson */);
+                                              /*shouldProduceBson=*/false);
     }
 
     std::unique_ptr<IndexProbeNode> makeIndexProbe() {
@@ -278,12 +278,12 @@ public:
 
         // Each counted node type, with and without a filter.
         add(makeCollScan(), {QsnNodeCounter::kCollscanNoFilter});
-        add(makeCollScan(true /* withFilter */), {QsnNodeCounter::kCollscanWithFilter});
+        add(makeCollScan(/*withFilter=*/true), {QsnNodeCounter::kCollscanWithFilter});
         add(makeIxScan(), {QsnNodeCounter::kIxscanNoFilter});
-        add(makeIxScan(true /* withFilter */), {QsnNodeCounter::kIxscanWithFilter});
+        add(makeIxScan(/*withFilter=*/true), {QsnNodeCounter::kIxscanWithFilter});
         add(makeFetch(makeIxScan()),
             {QsnNodeCounter::kFetchNoFilter, QsnNodeCounter::kIxscanNoFilter});
-        add(makeFetch(makeIxScan(), true /* withFilter */),
+        add(makeFetch(makeIxScan(), /*withFilter=*/true),
             {QsnNodeCounter::kFetchWithFilter, QsnNodeCounter::kIxscanNoFilter});
 
         // Batched fetches are not tracked yet, but their children are still counted.
@@ -338,16 +338,16 @@ public:
 
         // Sorts are counted by implementation and by whether they have a limit.
         add(makeSort<SortNodeDefault>(
-                makeCollScan(), BSON("a" << 1), 0 /* limit */, LimitSkipParameterization::Disabled),
+                makeCollScan(), BSON("a" << 1), /*limit=*/0, LimitSkipParameterization::Disabled),
             {QsnNodeCounter::kSortDefaultNoLimit, QsnNodeCounter::kCollscanNoFilter});
         add(makeSort<SortNodeDefault>(
-                makeCollScan(), BSON("a" << 1), 5 /* limit */, LimitSkipParameterization::Disabled),
+                makeCollScan(), BSON("a" << 1), /*limit=*/5, LimitSkipParameterization::Disabled),
             {QsnNodeCounter::kSortDefaultWithLimit, QsnNodeCounter::kCollscanNoFilter});
         add(makeSort<SortNodeSimple>(
-                makeCollScan(), BSON("a" << 1), 0 /* limit */, LimitSkipParameterization::Disabled),
+                makeCollScan(), BSON("a" << 1), /*limit=*/0, LimitSkipParameterization::Disabled),
             {QsnNodeCounter::kSortSimpleNoLimit, QsnNodeCounter::kCollscanNoFilter});
         add(makeSort<SortNodeSimple>(
-                makeCollScan(), BSON("a" << 1), 5 /* limit */, LimitSkipParameterization::Disabled),
+                makeCollScan(), BSON("a" << 1), /*limit=*/5, LimitSkipParameterization::Disabled),
             {QsnNodeCounter::kSortSimpleWithLimit, QsnNodeCounter::kCollscanNoFilter});
 
         // Limits and skips are counted by size. Small is up to 100, medium up to 10000, and
@@ -382,9 +382,9 @@ public:
             {QsnNodeCounter::kStreamingGroup, QsnNodeCounter::kCollscanNoFilter});
         add(makeUnpackTsBucket(makeCollScan()),
             {QsnNodeCounter::kUnpackTsBucket, QsnNodeCounter::kCollscanNoFilter});
-        addExtended(makeEqLookup(false /* withUnwind */),
+        addExtended(makeEqLookup(/*withUnwind=*/false),
                     {QsnNodeCounter::kEqLookupNoUnwind, QsnNodeCounter::kCollscanNoFilter});
-        addExtended(makeEqLookup(true /* withUnwind */),
+        addExtended(makeEqLookup(/*withUnwind=*/true),
                     {QsnNodeCounter::kEqLookupWithUnwind, QsnNodeCounter::kCollscanNoFilter});
 
         // Join nodes.
@@ -411,7 +411,7 @@ public:
 
         // One plan can set several counters, including the no_filter and with_filter variants of
         // the same node type.
-        add(makeOr(makeFetch(makeIxScan()), makeFetch(makeIxScan(true /* withFilter */), true)),
+        add(makeOr(makeFetch(makeIxScan()), makeFetch(makeIxScan(/*withFilter=*/true), true)),
             {QsnNodeCounter::kOrNoFilterLte100Children,
              QsnNodeCounter::kFetchNoFilter,
              QsnNodeCounter::kFetchWithFilter,
@@ -469,7 +469,7 @@ TEST_F(PlanNodeCountersTest, ExtensionStagesAreCounted) {
 // winning plan on the local collection, not the foreign side hanging off the EQ_LOOKUP stage.
 TEST_F(PlanNodeCountersTest, ForeignSideOfLookupIsNotCounted) {
     auto solution = makePlan(makeFetch(makeIxScan()));
-    solution->extendWith(makeEqLookup(false /* withUnwind */));
+    solution->extendWith(makeEqLookup(/*withUnwind=*/false));
 
     // The foreign-side collection scan is not counted; the EQ_LOOKUP, find-layer fetch, and index
     // scan are.

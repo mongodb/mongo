@@ -406,7 +406,7 @@ TEST_P(UpdateDocumentPreviousVersionTestFixture, UpdateDocumentPreviousVersion) 
         multiversion::GenericFCV::kUpgradingFromLastLTSToLatest,
         params.phase,
         ts,
-        params.phase >= SetFCVPhaseEnum::kEnableTargetFeatures /* setIsCleaningServerMetadata */);
+        /*setIsCleaningServerMetadata=*/params.phase >= SetFCVPhaseEnum::kEnableTargetFeatures);
 
     auto docResult =
         FeatureCompatibilityVersion::findFeatureCompatibilityVersionDocument(operationContext());
@@ -470,9 +470,9 @@ TEST_F(FeatureCompatibilityVersionTestFixture, UpdateDocumentClearsPreviousVersi
     FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
         operationContext(),
         multiversion::GenericFCV::kLatest,
-        boost::none /* phase */,
+        /*phase=*/boost::none,
         ts,
-        boost::none /* setIsCleaningServerMetadata */);
+        /*setIsCleaningServerMetadata=*/boost::none);
 
     auto docResult =
         FeatureCompatibilityVersion::findFeatureCompatibilityVersionDocument(operationContext());
@@ -494,7 +494,7 @@ TEST_F(FeatureCompatibilityVersionTestFixture,
         multiversion::GenericFCV::kUpgradingFromLastLTSToLatest,
         SetFCVPhaseEnum::kPrepare,
         ts,
-        boost::none /* setIsCleaningServerMetadata */);
+        /*setIsCleaningServerMetadata=*/boost::none);
 
     auto docResult =
         FeatureCompatibilityVersion::findFeatureCompatibilityVersionDocument(operationContext());
@@ -519,8 +519,7 @@ void seedFcvDocAtPhase(OperationContext* opCtx,
         version,
         phase,
         Timestamp(1, 1),
-        phase &&
-            *phase >= SetFCVPhaseEnum::kEnableTargetFeatures /* setIsCleaningServerMetadata */);
+        /*setIsCleaningServerMetadata=*/phase && *phase >= SetFCVPhaseEnum::kEnableTargetFeatures);
     // The FCV op observer that normally mirrors disk writes to in-memory FCV does not run in
     // unit tests. Replicate its effect here so callers see consistent in-memory state.
     auto docResult = FeatureCompatibilityVersion::findFeatureCompatibilityVersionDocument(opCtx);

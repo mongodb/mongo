@@ -2409,7 +2409,7 @@ TEST_F(ChangeStreamStageTest, TransformNonTxnNumberApplyOps) {
 
     LogicalSessionFromClient lsid = testLsid();
     std::vector<Document> results =
-        getApplyOpsResults(applyOpsDoc, lsid, kDefaultSpec, false /* hasTxnNumber */);
+        getApplyOpsResults(applyOpsDoc, lsid, kDefaultSpec, /*hasTxnNumber=*/false);
 
     ASSERT_EQ(results.size(), 1u);
 
@@ -2443,7 +2443,7 @@ TEST_F(ChangeStreamStageTest, TransformNonTxnNumberBatchedDeleteApplyOps) {
     };
     LogicalSessionFromClient lsid = testLsid();
     std::vector<Document> results =
-        getApplyOpsResults(applyOpsDoc, lsid, kDefaultSpec, false /* hasTxnNumber */);
+        getApplyOpsResults(applyOpsDoc, lsid, kDefaultSpec, /*hasTxnNumber=*/false);
 
     ASSERT_EQ(results.size(), 3u);
 
@@ -2481,7 +2481,7 @@ TEST_F(ChangeStreamStageTest, TransformApplyOpsAppliedAtomicallyOmitsSessionInfo
         getApplyOpsResults(applyOpsDoc,
                            lsid,
                            kDefaultSpec,
-                           true /* hasTxnNumber */,
+                           /*hasTxnNumber=*/true,
                            repl::MultiOplogEntryType::kApplyOpsAppliedAtomically);
 
     // Both inner operations are unwound into insert events.
@@ -2522,7 +2522,7 @@ TEST_F(ChangeStreamStageTest, TransformApplyOpsAppliedAtomicallyDoesNotEmitEndOf
         getApplyOpsResults(applyOpsDoc,
                            lsid,
                            kShowExpandedEventsSpec,
-                           true /* hasTxnNumber */,
+                           /*hasTxnNumber=*/true,
                            repl::MultiOplogEntryType::kApplyOpsAppliedAtomically);
 
     // Only the two inserts are emitted -- there is no trailing endOfTransaction event.
@@ -2751,7 +2751,7 @@ TEST_F(ChangeStreamStageTest, TransactionWithMultipleOplogEntries) {
     ASSERT_EQ(nextDoc[DSChangeStream::kFullDocumentField]["_id"].getInt(), 123);
     // Note that we never expect to see a 'commitTimestamp' event field because the events are
     // not from a prepared transaction.
-    assertCommitTimestamp(false /* showCommitTimestamp */, nextDoc);
+    assertCommitTimestamp(/*showCommitTimestamp=*/false, nextDoc);
     ASSERT_EQ(
         nextDoc["lsid"].getDocument().toBson().woCompare(sessionInfo.getSessionId()->toBSON()), 0);
     auto resumeToken = ResumeToken::parse(nextDoc["_id"].getDocument()).toDocument();
@@ -2772,7 +2772,7 @@ TEST_F(ChangeStreamStageTest, TransactionWithMultipleOplogEntries) {
     ASSERT_EQ(nextDoc[DSChangeStream::kFullDocumentField]["_id"].getInt(), 456);
     // Note that we never expect to see a 'commitTimestamp' event field because the events are
     // not from a prepared transaction.
-    assertCommitTimestamp(false /* showCommitTimestamp */, nextDoc);
+    assertCommitTimestamp(/*showCommitTimestamp=*/false, nextDoc);
     ASSERT_EQ(
         nextDoc["lsid"].getDocument().toBson().woCompare(sessionInfo.getSessionId()->toBSON()), 0);
     resumeToken = ResumeToken::parse(nextDoc["_id"].getDocument()).toDocument();
@@ -2793,7 +2793,7 @@ TEST_F(ChangeStreamStageTest, TransactionWithMultipleOplogEntries) {
     ASSERT_EQ(nextDoc[DSChangeStream::kFullDocumentField]["_id"].getInt(), 789);
     // Note that we never expect to see a 'commitTimestamp' event field because the events are
     // not from a prepared transaction.
-    assertCommitTimestamp(false /* showCommitTimestamp */, nextDoc);
+    assertCommitTimestamp(/*showCommitTimestamp=*/false, nextDoc);
     ASSERT_EQ(
         nextDoc["lsid"].getDocument().toBson().woCompare(sessionInfo.getSessionId()->toBSON()), 0);
     resumeToken = ResumeToken::parse(nextDoc["_id"].getDocument()).toDocument();
@@ -2855,13 +2855,13 @@ TEST_F(ChangeStreamStageTest, RetryableAtomicBatchUnwindToleratesTruncatedPrevio
     repl::OpTime stmt1FirstOpTime(Timestamp(100, 2), 1);
     repl::OpTime stmt1TerminalOpTime(Timestamp(100, 3), 1);
     auto stmt1First = makeAtomicBatchEntry(
-        sessionInfo, stmt1FirstOpTime, truncatedStmt0OpTime, 456, true /* partialTxn */);
+        sessionInfo, stmt1FirstOpTime, truncatedStmt0OpTime, 456, /*partialTxn=*/true);
     auto stmt1Terminal = makeAtomicBatchEntry(sessionInfo,
                                               stmt1TerminalOpTime,
                                               stmt1FirstOpTime,
                                               789,
-                                              false /* partialTxn */,
-                                              2 /* count */);
+                                              /*partialTxn=*/false,
+                                              /*count=*/2);
 
     auto execPipeline = makeExecPipeline(stmt1Terminal, kDefaultSpec);
     auto transform = execPipeline->getStages()[3].get();
@@ -3365,7 +3365,7 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionEndingWithEmptyApplyOps) {
     ASSERT_EQ(nextDoc[DSChangeStream::kOperationTypeField].getString(),
               DSChangeStream::kInsertOpType);
     ASSERT_EQ(nextDoc[DSChangeStream::kFullDocumentField]["_id"].getInt(), 123);
-    assertCommitTimestamp(false /* showCommitTimestamp */, nextDoc);
+    assertCommitTimestamp(/*showCommitTimestamp=*/false, nextDoc);
     ASSERT_EQ(
         nextDoc["lsid"].getDocument().toBson().woCompare(sessionInfo.getSessionId()->toBSON()), 0);
     auto resumeToken = ResumeToken::parse(nextDoc["_id"].getDocument()).toDocument();
@@ -3385,7 +3385,7 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionEndingWithEmptyApplyOps) {
     ASSERT_EQ(nextDoc[DSChangeStream::kOperationTypeField].getString(),
               DSChangeStream::kInsertOpType);
     ASSERT_EQ(nextDoc[DSChangeStream::kFullDocumentField]["_id"].getInt(), 456);
-    assertCommitTimestamp(false /* showCommitTimestamp */, nextDoc);
+    assertCommitTimestamp(/*showCommitTimestamp=*/false, nextDoc);
     ASSERT_EQ(
         nextDoc["lsid"].getDocument().toBson().woCompare(sessionInfo.getSessionId()->toBSON()), 0);
     resumeToken = ResumeToken::parse(nextDoc["_id"].getDocument()).toDocument();
@@ -3657,7 +3657,7 @@ TEST_F(ChangeStreamStageTest, MatchFiltersNoOp) {
 // A `ci` (container insert) is an internal storage operation used for inserting into containers.
 // `ci` ops should always be filtered out by the change stream.
 TEST_F(ChangeStreamStageTest, MatchFiltersContainerInsert) {
-    auto ci = repl::makeContainerInsertOplogEntry(repl::OpTime(Timestamp(10, 10), 1 /* term */),
+    auto ci = repl::makeContainerInsertOplogEntry(repl::OpTime(Timestamp(10, 10), /*term=*/1),
                                                   "containerIdent"sv,
                                                   1LL,
                                                   BSONBinData("V", 1, BinDataGeneral));
@@ -3669,7 +3669,7 @@ TEST_F(ChangeStreamStageTest, MatchFiltersContainerInsert) {
 // `cd` ops should always be filtered out by the change stream.
 TEST_F(ChangeStreamStageTest, MatchFiltersContainerDelete) {
     auto cd = repl::makeContainerDeleteOplogEntry(
-        repl::OpTime(Timestamp(10, 10), 1 /* term */), "containerIdent"sv, 1LL);
+        repl::OpTime(Timestamp(10, 10), /*term=*/1), "containerIdent"sv, 1LL);
 
     checkTransformation(cd, boost::none);
 }

@@ -1022,7 +1022,7 @@ void validateDurableShardCatalogEntries(const NamespaceString& nss,
                                 chunksInGlobalCatalog,
                                 shardId,
                                 kDurableShardCatalogSourceScope,
-                                true /* useStrictChunkValidation */,
+                                /*useStrictChunkValidation=*/true,
                                 rsMode,
                                 inconsistencies);
 }
@@ -1407,7 +1407,7 @@ void _checkShardKeyIndexInconsistencies(OperationContext* opCtx,
     // this check. Manual creation of a supportive shard key index (the operation does not run under
     // the DDL lock) immediately after the check below is not considered. As a result, this scenario
     // will lead to reporting an inconsistency.
-    if (findShardKeyPrefixedIndex(opCtx, localColl, shardKey, false /*requireSingleKey*/)) {
+    if (findShardKeyPrefixedIndex(opCtx, localColl, shardKey, /*requireSingleKey=*/false)) {
         return;
     }
 
@@ -1428,7 +1428,7 @@ void _checkShardKeyIndexInconsistencies(OperationContext* opCtx,
             throwCollectionDisappearedError(opCtx, nss, rsMode);
         }
 
-        if (findShardKeyPrefixedIndex(opCtx, *ac, shardKey, false /*requireSingleKey*/)) {
+        if (findShardKeyPrefixedIndex(opCtx, *ac, shardKey, /*requireSingleKey=*/false)) {
             return;
         }
 
@@ -1774,7 +1774,7 @@ std::vector<BSONObj> _runExhaustiveAggregation(OperationContext* opCtx,
                                                          ClusterAggregate::Namespaces{nss, nss},
                                                          aggRequest,
                                                          PrivilegeVector(),
-                                                         boost::none, /*verbosity*/
+                                                         /*verbosity=*/boost::none,
                                                          &responseBuilder,
                                                          reason);
             uassertStatusOKWithContext(
@@ -1845,8 +1845,8 @@ std::unique_ptr<DBClientCursor> _getCollectionChunksCursor(DBDirectClient* clien
                 repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern));
             return aggRequest;
         }),
-        false /* secondaryOK */,
-        false /* useExhaust */));
+        /*secondaryOK=*/false,
+        /*useExhaust=*/false));
 }
 
 std::vector<MetadataInconsistencyItem> _checkShardedCollectionUniqueIndexConsistency(
@@ -1896,7 +1896,7 @@ std::vector<CollectionType> getCollectionsListFromConfigServer(
                 opCtx,
                 nss.dbName(),
                 getReadConcernForConfigServer(opCtx),
-                BSON(CollectionType::kNssFieldName << 1) /*sort*/);
+                /*sort=*/BSON(CollectionType::kNssFieldName << 1));
         }
         case MetadataConsistencyCommandLevelEnum::kCollectionLevel: {
             try {
@@ -3024,7 +3024,7 @@ std::vector<MetadataInconsistencyItem> checkConfigCollectionsDoNotExistLocally(
                         NamespaceString::kServerConfigurationNamespace,
                         BSON("_id" << multiversion::kParameterName),
                         BSONObj{},
-                        1 /* limit */));
+                        /*limit=*/1));
                 tassert(
                     13070900,
                     "Could not find the featureCompatibilityVersion document on the config server",
@@ -3064,7 +3064,7 @@ std::vector<MetadataInconsistencyItem> checkShardCatalogCollectionsConsistentWit
                              NamespaceString::kConfigShardCatalogDatabasesNamespace.coll()
                              << NamespaceString::kConfigShardCatalogCollectionsNamespace.coll()
                              << NamespaceString::kConfigShardCatalogChunksNamespace.coll()))),
-                true /* validateNonEmptyAndConfigSvrFcvStable */);
+                /*validateNonEmptyAndConfigSvrFcvStable=*/true);
         }
 
         if (accessLevel == AuthoritativeMetadataAccessLevelEnum::kWritesAndReadsAllowed) {

@@ -233,8 +233,7 @@ void updateQueryAnalyzerMetadata(OperationContext* opCtx,
              << coordinatorDoc.getSourceUUID()),  // query
         writeOp,
         false,  // upsert
-        false   // multi
-    );
+        /*multi=*/false);
 
     auto res = ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
         opCtx, NamespaceString::kConfigQueryAnalyzersNamespace, request, txnNumber);
@@ -304,10 +303,9 @@ void removeTagsDocs(OperationContext* opCtx, const BSONObj& tagsQuery, TxnNumber
         opCtx,
         TagsType::ConfigNS,
         BatchedCommandRequest::buildDeleteOp(TagsType::ConfigNS,
-                                             tagsQuery,              // query
-                                             true,                   // multi
-                                             tagDeleteOperationHint  // hint
-                                             ),
+                                             tagsQuery,  // query
+                                             true,       // multi
+                                             /*hint=*/tagDeleteOperationHint),
         txnNumber);
 }
 
@@ -491,13 +489,12 @@ void issueConfigCollectionsUpdate(OperationContext* opCtx,
              << NamespaceStringUtil::serialize(sourceNss, SerializationContext::stateDefault())),
         update,
         false,  // upsert
-        false   // multi
-    );
+        /*multi=*/false);
 
     auto res = ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
         opCtx, NamespaceString::kConfigsvrCollectionsNamespace, request, txnNumber);
 
-    assertNumDocsMatchedEqualsExpected(request, res, 1 /* expected */);
+    assertNumDocsMatchedEqualsExpected(request, res, /*expected=*/1);
 }
 
 // Runs changeMetadataFunc in a transaction. On the non-authoritative path, also bumps the
@@ -720,8 +717,7 @@ void updateTagsDocsForTempNss(OperationContext* opCtx,
                                 SerializationContext::stateDefault()))),  // update
         false,                                                            // upsert
         true,                                                             // multi
-        hint                                                              // hint
-    );
+        /*hint=*/hint);
 
     // Update the 'ns' field to be the original collection namespace for all tags documents that
     // currently have 'ns' as the temporary collection namespace.
@@ -1020,8 +1016,7 @@ void writeToCoordinatorStateNss(OperationContext* opCtx,
                     BSON("_id" << coordinatorDoc.getReshardingUUID()),
                     updateBuilder.obj(),
                     false,  // upsert
-                    false   // multi
-                );
+                    /*multi=*/false);
             }
         }
     }());
@@ -1180,8 +1175,7 @@ boost::optional<BatchedCommandRequest> createLegacyTempCollectionReshardingField
                                     << donorShardsBuilder.arr() << "lastmod"
                                     << opCtx->getServiceContext()->getPreciseClockSource()->now())),
                 false,  // upsert
-                false   // multi
-            );
+                /*multi=*/false);
         }
         default: {
             // Update the 'state' field, and 'abortReason' field if it exists, in the
@@ -1210,8 +1204,7 @@ boost::optional<BatchedCommandRequest> createLegacyTempCollectionReshardingField
                                                        SerializationContext::stateDefault())),
                 updateBuilder.obj(),
                 true,  // upsert
-                false  // multi
-            );
+                /*multi=*/false);
         }
     }
 }

@@ -183,8 +183,7 @@ TEST(RegexMatchExpression, RegexOptionsStringCannotContainEmbeddedNullByte) {
 TEST(RegexMatchExpression, MalformedRegexNotAccepted) {
     ASSERT_THROWS_CODE(RegexMatchExpression("a"sv,  // path
                                             "[",    // regex
-                                            ""      // options
-                                            ),
+                                            /*options=*/""),
                        AssertionException,
                        51091);
 }

@@ -159,12 +159,12 @@ CollectionRoutingInfoTargeter makeCollectionRoutingInfoTargeter(
                                                             shardKey,
                                                             false, /* unsplittable */
                                                             getDefaultCollator(opCtx, nss),
-                                                            false /* unique */,
+                                                            /*unique=*/false,
                                                             epoch,
                                                             validAfter,
-                                                            boost::none /* timeseriesFields */,
-                                                            boost::none /* reshardingFields */,
-                                                            true /* allowMigrations */,
+                                                            /*timeseriesFields=*/boost::none,
+                                                            /*reshardingFields=*/boost::none,
+                                                            /*allowMigrations=*/true,
                                                             chunks);
 
     CurrentChunkManager cm(RoutingTableHistoryValueHandle(
@@ -270,7 +270,7 @@ void processSampledDiffs(OperationContext* opCtx,
 
     DBDirectClient client(opCtx);
     auto cursor = uassertStatusOK(DBClientCursor::fromAggregationRequest(
-        &client, aggRequest, true /* secondaryOk */, false /* useExhaust*/));
+        &client, aggRequest, /*secondaryOk=*/true, /*useExhaust=*/false));
 
     if (cursor->more()) {
         const auto doc = cursor->next();

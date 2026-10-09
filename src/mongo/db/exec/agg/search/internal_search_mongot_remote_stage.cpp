@@ -33,7 +33,7 @@ auto withSortKeyMetadata(auto&& resultBson, const auto& stageSpec, const auto& s
         // If this stage is getting metadata documents from mongot, those don't include
         // searchScore.
         output.metadata().setSortKey(Value{output.metadata().getSearchScore()},
-                                     true /* isSingleElementKey */);
+                                     /*isSingleElementKey=*/true);
     }
     return output.freeze();
 }

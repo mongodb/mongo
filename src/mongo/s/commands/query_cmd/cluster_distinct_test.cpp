@@ -75,8 +75,8 @@ TEST_F(ClusterDistinctTest, SnapshotReadConcernWithAfterClusterTime) {
 }
 
 TEST_F(ClusterDistinctTest, IncludeQueryStatsMetrics) {
-    testIncludeQueryStatsMetrics(kDistinctCmdTargeted, true /* isTargeted */);
-    testIncludeQueryStatsMetrics(kDistinctCmdScatterGather, false /* isTargeted */);
+    testIncludeQueryStatsMetrics(kDistinctCmdTargeted, /*isTargeted=*/true);
+    testIncludeQueryStatsMetrics(kDistinctCmdScatterGather, /*isTargeted=*/false);
 }
 
 }  // namespace

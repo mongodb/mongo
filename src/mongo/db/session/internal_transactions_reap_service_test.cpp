@@ -314,11 +314,11 @@ TEST_F(InternalTransactionsReapServiceTest, DoesNotErrorIfReceivedSameSessionTwi
 
 TEST_F(InternalTransactionsReapServiceTest, DoesNotErrorIfSessionOrImageIsNotOnDisk) {
     auto lsidsNoImage = generateLsids(2);
-    insertSessionDocuments(lsidsNoImage, true /* skipImageEntry */);
+    insertSessionDocuments(lsidsNoImage, /*skipImageEntry=*/true);
     reapService()->addEagerlyReapedSessions(getServiceContext(), lsidsNoImage);
 
     auto lsidsNoSession = generateLsids(2);
-    insertSessionDocuments(lsidsNoSession, false /* skipImageEntry */, true /* skipSessionEntry */);
+    insertSessionDocuments(lsidsNoSession, /*skipImageEntry=*/false, /*skipSessionEntry=*/true);
     reapService()->addEagerlyReapedSessions(getServiceContext(), lsidsNoSession);
 
     auto normalLsids = generateLsids(3);

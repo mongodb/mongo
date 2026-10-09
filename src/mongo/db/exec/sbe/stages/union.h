@@ -66,7 +66,7 @@ private:
 
         void open() {
             if (!isOpen) {
-                stage->open(false /*reOpen*/);
+                stage->open(/*reOpen=*/false);
                 isOpen = true;
             }
         }

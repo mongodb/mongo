@@ -74,7 +74,7 @@ public:
         if (cmdObj.hasField("seed")) {
             if (!cmdObj["seed"].isNumber()) {
                 CommandHelpers::appendSimpleCommandStatus(
-                    result, false /* ok */, "seed must be a number" /* errmsg */);
+                    result, /*ok=*/false, /*errmsg=*/"seed must be a number");
                 return false;
             }
             seed = cmdObj["seed"].safeNumberInt();

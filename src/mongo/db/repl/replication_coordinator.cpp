@@ -77,7 +77,7 @@ bool ReplicationCoordinator::isOplogDisabledFor(OperationContext* opCtx,
 }
 
 void ReplicationCoordinator::setOldestTimestamp(const Timestamp& timestamp) {
-    getServiceContext()->getStorageEngine()->setOldestTimestamp(timestamp, false /*force*/);
+    getServiceContext()->getStorageEngine()->setOldestTimestamp(timestamp, /*force=*/false);
 }
 
 bool ReplicationCoordinator::isOplogDisabledForNS(const NamespaceString& nss) {

@@ -353,8 +353,8 @@ TEST_F(CollectionTest, VerifyIndexIsUpdated) {
                                             oldSnap,
                                             newDoc,
                                             collection_internal::kUpdateAllIndexes,
-                                            nullptr /* indexesAffected */,
-                                            nullptr /* opDebug */,
+                                            /*indexesAffected=*/nullptr,
+                                            /*opDebug=*/nullptr,
                                             &args);
         wuow.commit();
     }
@@ -410,10 +410,10 @@ TEST_F(CollectionTest, VerifyIndexIsUpdatedWithDamages) {
                                                            damagesOutput.damageSource.get(),
                                                            damagesOutput.damages,
                                                            collection_internal::kUpdateAllIndexes,
-                                                           nullptr /* indexesAffected */,
-                                                           nullptr /* opDebug */,
+                                                           /*indexesAffected=*/nullptr,
+                                                           /*opDebug=*/nullptr,
                                                            &args,
-                                                           nullptr /*cursor*/);
+                                                           /*cursor=*/nullptr);
         ASSERT_OK(newDocStatus);
         ASSERT_BSONOBJ_EQ(newDoc, newDocStatus.getValue());
         wuow.commit();

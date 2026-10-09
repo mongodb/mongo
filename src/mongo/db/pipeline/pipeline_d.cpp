@@ -1326,7 +1326,7 @@ tryPrepareDistinctExecutor(const intrusive_ptr<ExpressionContext>& expCtx,
             new DocumentSourceSingleDocumentTransformation(expCtx,
                                                            std::move(rewrittenGroupStage),
                                                            "$groupByDistinctScan",
-                                                           false /* independentOfAnyCollection */));
+                                                           /*independentOfAnyCollection=*/false));
         pipeline->addInitialSource(std::move(groupTransform));
 
         return StatusWith{std::move(swExecutorGrouped.getValue())};
@@ -1468,7 +1468,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecutor
                 expCtx,
                 std::move(rewrittenGroupStage),
                 "$groupByDistinctScan",
-                false /* independentOfAnyCollection */);
+                /*independentOfAnyCollection=*/false);
             pipeline->addInitialSource(std::move(groupTransform));
         } else {
             // $groupByDistinctScan doesn't preserve metadata and the $unwind+$group rewrite must
@@ -1688,8 +1688,8 @@ bool PipelineD::sortAndKeyPatternPartAgreeAndOnMeta(
     const timeseries::BucketUnpacker& bucketUnpacker,
     std::string_view keyPatternFieldName,
     const FieldPath& sortFieldPath) {
-    FieldPath keyPatternFieldPath = FieldPath(
-        keyPatternFieldName, false /* precomputeHashes */, false /* validateFieldNames */);
+    FieldPath keyPatternFieldPath =
+        FieldPath(keyPatternFieldName, /*precomputeHashes=*/false, /*validateFieldNames=*/false);
 
     // If they don't have the same path length they cannot agree.
     if (keyPatternFieldPath.getPathLength() != sortFieldPath.getPathLength())
@@ -1984,7 +1984,7 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorGeoNear(
                                                 aggRequest,
                                                 Pipeline::kGeoNearMatcherFeatures,
                                                 &shouldProduceEmptyDocs,
-                                                false /* timeseriesBoundedSortOptimization */));
+                                                /*timeseriesBoundedSortOptimization=*/false));
 
     auto attachExecutorCallback =
         [distanceField = geoNearStage->getDistanceField(),
@@ -2236,7 +2236,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> createCanonicalQuery(
                                 boost::none,
                                 nullptr,
                                 MatchExpressionParser::kDefaultSpecialFeatures,
-                                false /*timeseriesBoundedSortOptimization*/,
+                                /*timeseriesBoundedSortOptimization=*/false,
                                 &shouldProduceEmptyDocs);
 }
 }  // namespace mongo

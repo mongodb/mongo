@@ -82,7 +82,7 @@ public:
             mongotGetMoreStrategy =
                 std::make_unique<MongotTaskExecutorCursorGetMoreStrategy>(startingBatchSize,
                                                                           bounds,
-                                                                          /*tenantId*/ boost::none,
+                                                                          /*tenantId=*/boost::none,
                                                                           searchIdLookupMetrics);
         } else {
             // If we have no starting batchSize or idLookupMetrics, use the default GetMoreStrategy.
@@ -116,7 +116,7 @@ public:
 
             // Mock the response for the first batch.
             scheduleSuccessfulCursorResponse(
-                "firstBatch", 1, 101, cursorId, /*expectedPrefetch*/ false);
+                "firstBatch", 1, 101, cursorId, /*expectedPrefetch=*/false);
 
             // Exhaust the first batch.
             for (int docNum = 1; docNum <= 101; docNum++) {
@@ -131,7 +131,7 @@ public:
             // kInternalSearchBatchSizeGrowthFactor = 152.
             auto responseSchedulerThread = monitor.spawn([&] {
                 auto receivedGetMoreCmd = scheduleSuccessfulCursorResponse(
-                    "nextBatch", 102, 253, cursorId, /*expectedPrefetch*/ false);
+                    "nextBatch", 102, 253, cursorId, /*expectedPrefetch=*/false);
                 const auto expectedGetMoreCmd =
                     BSON("getMore" << 1LL << "collection"
                                    << "test"
@@ -150,7 +150,7 @@ public:
             // kDefaultMongotBatchSize * (kInternalSearchBatchSizeGrowthFactor)^2 = 228.
             responseSchedulerThread = monitor.spawn([&] {
                 auto receivedGetMoreCmd = scheduleSuccessfulCursorResponse(
-                    "nextBatch", 253, 253, 0, /*expectedPrefetch*/ false);
+                    "nextBatch", 253, 253, 0, /*expectedPrefetch=*/false);
                 const auto expectedGetMoreCmd =
                     BSON("getMore" << 1LL << "collection"
                                    << "test"
@@ -181,10 +181,10 @@ public:
             // Construction of the TaskExecutorCursor enqueues a request in the
             // NetworkInterfaceMock.
             auto tec = makeMongotCursor(rcr,
-                                        /*startingBatchSize*/ 3);
+                                        /*startingBatchSize=*/3);
             // Mock the response for the first batch.
             scheduleSuccessfulCursorResponse(
-                "firstBatch", 1, 3, cursorId, /*expectedPrefetch*/ false);
+                "firstBatch", 1, 3, cursorId, /*expectedPrefetch=*/false);
 
             // Exhaust the first batch.
             for (int docNum = 1; docNum <= 3; docNum++) {
@@ -199,7 +199,7 @@ public:
             // kInternalSearchBatchSizeGrowthFactor.
             auto responseSchedulerThread = monitor.spawn([&] {
                 auto receivedGetMoreCmd = scheduleSuccessfulCursorResponse(
-                    "nextBatch", 3, 7, cursorId, /*expectedPrefetch*/ false);
+                    "nextBatch", 3, 7, cursorId, /*expectedPrefetch=*/false);
                 const auto expectedGetMoreCmd =
                     BSON("getMore" << 1LL << "collection"
                                    << "test"
@@ -218,7 +218,7 @@ public:
             // startingBatchSize * (kInternalSearchBatchSizeGrowthFactor)^2.
             responseSchedulerThread = monitor.spawn([&] {
                 auto receivedGetMoreCmd = scheduleSuccessfulCursorResponse(
-                    "nextBatch", 8, 8, 0, /*expectedPrefetch*/ false);
+                    "nextBatch", 8, 8, 0, /*expectedPrefetch=*/false);
                 const auto expectedGetMoreCmd =
                     BSON("getMore" << 1LL << "collection"
                                    << "test"
@@ -249,11 +249,11 @@ public:
             // Construction of the TaskExecutorCursor enqueues a request in the
             // NetworkInterfaceMock.
             auto tec = makeMongotCursor(rcr,
-                                        /*startingBatchSize*/ 20);
+                                        /*startingBatchSize=*/20);
             // Mock the response for the first batch, which only returns 15 documents, rather than
             // the requested 20.
             scheduleSuccessfulCursorResponse(
-                "firstBatch", 1, 15, cursorId, /*expectedPrefetch*/ false);
+                "firstBatch", 1, 15, cursorId, /*expectedPrefetch=*/false);
 
             // Exhaust the first batch.
             for (int docNum = 1; docNum <= 15; docNum++) {
@@ -267,7 +267,7 @@ public:
             // batchSize requested wasn't fulfilled. This batch will only return 10 documents.
             auto responseSchedulerThread = monitor.spawn([&] {
                 auto receivedGetMoreCmd = scheduleSuccessfulCursorResponse(
-                    "nextBatch", 16, 25, cursorId, /*expectedPrefetch*/ false);
+                    "nextBatch", 16, 25, cursorId, /*expectedPrefetch=*/false);
                 const auto expectedGetMoreCmd =
                     BSON("getMore" << 1LL << "collection"
                                    << "test"
@@ -285,7 +285,7 @@ public:
             // batchSize requested wasn't fulfilled again.
             responseSchedulerThread = monitor.spawn([&] {
                 auto receivedGetMoreCmd = scheduleSuccessfulCursorResponse(
-                    "nextBatch", 26, 26, 0, /*expectedPrefetch*/ false);
+                    "nextBatch", 26, 26, 0, /*expectedPrefetch=*/false);
                 const auto expectedGetMoreCmd =
                     BSON("getMore" << 1LL << "collection"
                                    << "test"
@@ -316,10 +316,10 @@ public:
             // Construction of the TaskExecutorCursor enqueues a request in the
             // NetworkInterfaceMock.
             auto tec = makeMongotCursor(rcr,
-                                        /*startingBatchSize*/ 5);
+                                        /*startingBatchSize=*/5);
             // Mock the response for the first batch, which fulfills the requested batchSize of 5.
             scheduleSuccessfulCursorResponse(
-                "firstBatch", 1, 5, cursorId, /*expectedPrefetch*/ false);
+                "firstBatch", 1, 5, cursorId, /*expectedPrefetch=*/false);
 
             // Exhaust the first batch.
             for (int docNum = 1; docNum <= 5; docNum++) {
@@ -333,7 +333,7 @@ public:
             // only return 7.
             auto responseSchedulerThread = monitor.spawn([&] {
                 auto receivedGetMoreCmd = scheduleSuccessfulCursorResponse(
-                    "nextBatch", 6, 12, cursorId, /*expectedPrefetch*/ false);
+                    "nextBatch", 6, 12, cursorId, /*expectedPrefetch=*/false);
                 const auto expectedGetMoreCmd =
                     BSON("getMore" << 1LL << "collection"
                                    << "test"
@@ -351,7 +351,7 @@ public:
             // of 8.
             responseSchedulerThread = monitor.spawn([&] {
                 auto receivedGetMoreCmd = scheduleSuccessfulCursorResponse(
-                    "nextBatch", 13, 20, cursorId, /*expectedPrefetch*/ false);
+                    "nextBatch", 13, 20, cursorId, /*expectedPrefetch=*/false);
                 const auto expectedGetMoreCmd =
                     BSON("getMore" << 1LL << "collection"
                                    << "test"
@@ -369,7 +369,7 @@ public:
             // and will now request 12.
             responseSchedulerThread = monitor.spawn([&] {
                 auto receivedGetMoreCmd = scheduleSuccessfulCursorResponse(
-                    "nextBatch", 20, 32, 0, /*expectedPrefetch*/ false);
+                    "nextBatch", 20, 32, 0, /*expectedPrefetch=*/false);
                 const auto expectedGetMoreCmd =
                     BSON("getMore" << 1LL << "collection"
                                    << "test"
@@ -398,11 +398,11 @@ public:
         // Use NeedAll bounds to trigger pre-fetching for all batches.
         auto tec = makeMongotCursor(
             rcr,
-            /*startingBatchSize*/ 5,
+            /*startingBatchSize=*/5,
             DocsNeededBounds(docs_needed_bounds::NeedAll(), docs_needed_bounds::NeedAll()));
         // Assert the initial request is received.
         ASSERT_TRUE(tryWaitUntilReadyRequests());
-        scheduleSuccessfulCursorResponse("firstBatch", 1, 5, cursorId, /*expectedPrefetch*/ true);
+        scheduleSuccessfulCursorResponse("firstBatch", 1, 5, cursorId, /*expectedPrefetch=*/true);
 
         // Populate the cursor to process the initial batch, which should dispatch the pre-fetched
         // request for the first getMore, even before any getNexts.
@@ -410,7 +410,7 @@ public:
         // Assert the pre-fetched GetMore was recevied.
         ASSERT_TRUE(tryWaitUntilReadyRequests());
         // Mock the response for the first getMore.
-        scheduleSuccessfulCursorResponse("nextBatch", 6, 10, cursorId, /*expectedPrefetch*/ true);
+        scheduleSuccessfulCursorResponse("nextBatch", 6, 10, cursorId, /*expectedPrefetch=*/true);
 
         // Exhaust the first batch, then request the first result of the first getMore, prompting
         // another pre-fetched batch.
@@ -421,7 +421,7 @@ public:
         ASSERT_TRUE(tryWaitUntilReadyRequests());
         // Mock the response for the second getMore, which returns a closed cursor.
         scheduleSuccessfulCursorResponse(
-            "nextBatch", 11, 15, /*cursorId*/ 0, /*expectedPrefetch*/ true);
+            "nextBatch", 11, 15, /*cursorId=*/0, /*expectedPrefetch=*/true);
 
         // Exhaust the second batch, then request the first result of the second getMore, to ensure
         // no requests are sent since the cursor was closed.
@@ -451,7 +451,7 @@ public:
             auto tec = makeMongotCursor(rcr);
             // Mock and exhaust the response for the first batch.
             scheduleSuccessfulCursorResponse(
-                "firstBatch", 1, 101, cursorId, /*expectedPrefetch*/ false);
+                "firstBatch", 1, 101, cursorId, /*expectedPrefetch=*/false);
             for (int docNum = 1; docNum <= 101; docNum++) {
                 ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), docNum);
             }
@@ -461,7 +461,7 @@ public:
             // Schedule and exhaust the second batch.
             auto responseSchedulerThread = monitor.spawn([&] {
                 scheduleSuccessfulCursorResponse(
-                    "nextBatch", 102, 303, cursorId, /*expectedPrefetch*/ false);
+                    "nextBatch", 102, 303, cursorId, /*expectedPrefetch=*/false);
             });
             for (int docNum = 102; docNum <= 303; docNum++) {
                 ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), docNum);
@@ -475,7 +475,7 @@ public:
             // receipt of the third batch, a request to pre-fetch the fourth batch should be sent.
             responseSchedulerThread = monitor.spawn([&] {
                 scheduleSuccessfulCursorResponse(
-                    "nextBatch", 304, 707, cursorId, /*expectedPrefetch*/ false);
+                    "nextBatch", 304, 707, cursorId, /*expectedPrefetch=*/false);
             });
             ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), 304);
             responseSchedulerThread.join();
@@ -517,13 +517,13 @@ public:
             // Construction of the TaskExecutorCursor enqueues a request in the
             // NetworkInterfaceMock.
             auto tec = makeMongotCursor(rcr,
-                                        /*startingBatchSize*/ 107,
+                                        /*startingBatchSize=*/107,
                                         DocsNeededBounds(100, 100),
                                         searchIdLookupMetrics);
 
             // Mock the response for the first batch, which fulfills the requested batchSize of 101.
             scheduleSuccessfulCursorResponse(
-                "firstBatch", 1, 107, cursorId, /*expectedPrefetch*/ false);
+                "firstBatch", 1, 107, cursorId, /*expectedPrefetch=*/false);
 
             // Exhaust the first batch.
             for (int docNum = 1; docNum <= 107; docNum++) {
@@ -549,7 +549,7 @@ public:
             // Schedule another batch, where the batchSize is now 24.
             auto responseSchedulerThread = monitor.spawn([&] {
                 auto receivedGetMoreCmd = scheduleSuccessfulCursorResponse(
-                    "nextBatch", 102, 126, cursorId, /*expectedPrefetch*/ false);
+                    "nextBatch", 102, 126, cursorId, /*expectedPrefetch=*/false);
                 const auto expectedGetMoreCmd =
                     BSON("getMore" << 1LL << "collection"
                                    << "test"
@@ -581,7 +581,7 @@ public:
 
             responseSchedulerThread = monitor.spawn([&] {
                 auto receivedGetMoreCmd = scheduleSuccessfulCursorResponse(
-                    "nextBatch", 126, 128, /*cursorId*/ 0, /*expectedPrefetch*/ false);
+                    "nextBatch", 126, 128, /*cursorId=*/0, /*expectedPrefetch=*/false);
                 const auto expectedGetMoreCmd =
                     BSON("getMore" << 1LL << "collection"
                                    << "test"

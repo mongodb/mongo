@@ -50,7 +50,7 @@ TEST(StartChunkCloneRequest, CreateAsCommandComplete) {
         BSON("Key" << 1),
         MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kOff),
         ChunkRange(BSON("Key" << -200), BSON("Key" << 200)),
-        true /* isAuthoritative */);
+        /*isAuthoritative=*/true);
 
     BSONObj cmdObj = builder.obj();
 
@@ -93,7 +93,7 @@ TEST(StartChunkCloneRequest, IsAuthoritativeRoundTrip) {
             NamespaceString::createNamespaceString_forTest("TestDB.TestColl"),
             UUID::gen(),
             makeLogicalSessionId(opCtx.get()),
-            0 /* txnNumber */,
+            /*txnNumber=*/0,
             MigrationSessionId::generate("shard0001", "shard0002"),
             assertGet(ConnectionString::parse("TestDonorRS/Donor1:12345")),
             ShardId("shard0001"),
@@ -102,7 +102,7 @@ TEST(StartChunkCloneRequest, IsAuthoritativeRoundTrip) {
             BSON("Key" << 100),
             BSON("Key" << 1),
             MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kOff),
-            boost::none /* enclosingChunk */,
+            /*enclosingChunk=*/boost::none,
             isAuthoritative);
 
         BSONObj cmdObj = builder.obj();
@@ -127,7 +127,7 @@ TEST(StartChunkCloneRequest, IsAuthoritativeDefaultsToFalseWhenAbsent) {
         NamespaceString::createNamespaceString_forTest("TestDB.TestColl"),
         UUID::gen(),
         makeLogicalSessionId(opCtx.get()),
-        0 /* txnNumber */,
+        /*txnNumber=*/0,
         MigrationSessionId::generate("shard0001", "shard0002"),
         assertGet(ConnectionString::parse("TestDonorRS/Donor1:12345")),
         ShardId("shard0001"),
@@ -136,8 +136,8 @@ TEST(StartChunkCloneRequest, IsAuthoritativeDefaultsToFalseWhenAbsent) {
         BSON("Key" << 100),
         BSON("Key" << 1),
         MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kOff),
-        boost::none /* enclosingChunk */,
-        true /* isAuthoritative */);
+        /*enclosingChunk=*/boost::none,
+        /*isAuthoritative=*/true);
 
     // Drop the field to simulate a donor that does not send it.
     BSONObjBuilder strippedBuilder;

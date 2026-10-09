@@ -216,13 +216,13 @@ bool CollectionRoutingInfoTargeter::refreshIfNeeded(OperationContext* opCtx) {
 
     // Get the latest metadata information from the cache if there were issues
     auto lastManager = _cri;
-    _routingCtx = _init(opCtx, /*refresh*/ false);
+    _routingCtx = _init(opCtx, /*refresh=*/false);
     _cri = _routingCtx->getCollectionRoutingInfo(_nss);
     auto metadataChanged = isMetadataDifferent(lastManager, _cri);
 
     if (_lastError.value() == LastErrorType::kCouldNotTarget && !metadataChanged) {
         // If we couldn't target, and we didn't already update the metadata we must force a refresh.
-        _routingCtx = _init(opCtx, /*refresh*/ true);
+        _routingCtx = _init(opCtx, /*refresh=*/true);
         _cri = _routingCtx->getCollectionRoutingInfo(_nss);
         metadataChanged = isMetadataDifferent(lastManager, _cri);
     }

@@ -221,9 +221,9 @@ public:
         appendReplicationInfo(opCtx,
                               &result,
                               appendReplicationProcess,
-                              false /* useLegacyResponseFields */,
-                              boost::none /* clientTopologyVersion */,
-                              boost::none /* maxAwaitTimeMS */);
+                              /*useLegacyResponseFields=*/false,
+                              /*clientTopologyVersion=*/boost::none,
+                              /*maxAwaitTimeMS=*/boost::none);
 
         appendPrimaryOnlyServiceInfo(opCtx->getServiceContext(), &result);
 

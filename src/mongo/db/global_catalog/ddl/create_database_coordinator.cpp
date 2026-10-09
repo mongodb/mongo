@@ -79,7 +79,7 @@ ExecutorFuture<void> CreateDatabaseCoordinator::_cleanupOnAbort(
                 auto opCtxHolder = makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
 
-                _exitCriticalSection(opCtx, executor, token, true /* throwIfReasonDiffers */);
+                _exitCriticalSection(opCtx, executor, token, /*throwIfReasonDiffers=*/true);
             }
         });
 }
@@ -200,7 +200,7 @@ ExecutorFuture<void> CreateDatabaseCoordinator::_runImpl(
                             dbVersion.is_initialized());
                     _result = ConfigsvrCreateDatabaseResponse(dbVersion.get());
                 }
-                _exitCriticalSection(opCtx, executor, token, false /* throwIfReasonDiffers */);
+                _exitCriticalSection(opCtx, executor, token, /*throwIfReasonDiffers=*/false);
                 if (_doc.getAuthoritativeMetadataAccessLevel() ==
                     AuthoritativeMetadataAccessLevelEnum::kNone) {
                     refreshDatabaseCache(opCtx, dbName, _doc.getPrimaryShard().get());

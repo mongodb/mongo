@@ -105,12 +105,12 @@ boost::optional<long long> extractLimitForPushdownHelper(DocumentSourceContainer
 
 boost::optional<long long> extractLimitForPushdown(DocumentSourceContainer::iterator itr,
                                                    DocumentSourceContainer* container) {
-    return extractLimitForPushdownHelper(itr, container, true /* shouldModifyPipeline */);
+    return extractLimitForPushdownHelper(itr, container, /*shouldModifyPipeline=*/true);
 }
 
 boost::optional<long long> getUserLimit(DocumentSourceContainer::iterator itr,
                                         DocumentSourceContainer* container) {
-    return extractLimitForPushdownHelper(itr, container, false /* shouldModifyPipeline */);
+    return extractLimitForPushdownHelper(itr, container, /*shouldModifyPipeline=*/false);
 }
 
 boost::optional<long long> extractSkipForPushdown(DocumentSourceContainer::iterator itr,

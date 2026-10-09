@@ -5516,7 +5516,7 @@ protected:
 };
 
 TEST_F(PipelineOptimizations, Empty) {
-    doTest("[]" /*inputPipeJson*/, "[]" /*shardPipeJson*/, "[]" /*mergePipeJson*/);
+    doTest(/*inputPipeJson=*/"[]", /*shardPipeJson=*/"[]", /*mergePipeJson=*/"[]");
 }
 
 
@@ -5544,7 +5544,7 @@ TEST_F(PipelineOptimizationsLookupFromShardsInParallel, LookupWithDBAndColl) {
         "[{$lookup: {from: {db: 'config', coll: 'cache.chunks.test.foo'}, as: 'results', "
         "localField: 'x', foreignField: '_id'}}]";
     doTest(kInputPipeJson,
-           kInputPipeJson /*shardPipeJson*/,
+           /*shardPipeJson=*/kInputPipeJson,
            NamespaceString::createNamespaceString_forTest("config", "cache.chunks.test.foo"));
 };
 
@@ -5553,7 +5553,7 @@ TEST_F(PipelineOptimizationsLookupFromShardsInParallel, LookupWithLetWithDBAndCo
         "[{$lookup: {from: {db: 'config', coll: 'cache.chunks.test.foo'}, as: 'results', "
         "let: {x_field: '$x'}, pipeline: []}}]";
     doTest(kInputPipeJson,
-           kInputPipeJson /*shardPipeJson*/,
+           /*shardPipeJson=*/kInputPipeJson,
            NamespaceString::createNamespaceString_forTest("config", "cache.chunks.test.foo"));
 };
 
@@ -5585,27 +5585,27 @@ TEST_F(PipelineOptimizationsLookupFromShardsInParallel, CollectionCloningPipelin
 namespace moveFinalUnwindFromShardsToMerger {
 
 TEST_F(PipelineOptimizations, MoveFinalUnwindFromShardsToMerger) {
-    doTest("[{$unwind: {path: '$a'}}]" /*inputPipeJson*/,
-           "[]" /*shardPipeJson*/,
-           "[{$unwind: {path: '$a'}}]" /*mergePipeJson*/);
+    doTest(/*inputPipeJson=*/"[{$unwind: {path: '$a'}}]",
+           /*shardPipeJson=*/"[]",
+           /*mergePipeJson=*/"[{$unwind: {path: '$a'}}]");
 };
 
 TEST_F(PipelineOptimizations, MoveFinalUnwindTwoFromShardsToMerger) {
-    doTest("[{$unwind: {path: '$a'}}, {$unwind: {path: '$b'}}]" /*inputPipeJson*/,
-           "[]" /*shardPipeJson*/,
-           "[{$unwind: {path: '$a'}}, {$unwind: {path: '$b'}}]" /*mergePipeJson*/);
+    doTest(/*inputPipeJson=*/"[{$unwind: {path: '$a'}}, {$unwind: {path: '$b'}}]",
+           /*shardPipeJson=*/"[]",
+           /*mergePipeJson=*/"[{$unwind: {path: '$a'}}, {$unwind: {path: '$b'}}]");
 };
 
 TEST_F(PipelineOptimizations, DontMoveNonFinalUnwindTwoFromShardsToMerger) {
-    doTest("[{$unwind: {path: '$a'}}, {$match: {a:1}}]" /*inputPipeJson*/,
-           "[{$unwind: {path: '$a'}}, {$match: {a:{$eq:1}}}]" /*shardPipeJson*/,
-           "[]" /*mergePipeJson*/);
+    doTest(/*inputPipeJson=*/"[{$unwind: {path: '$a'}}, {$match: {a:1}}]",
+           /*shardPipeJson=*/"[{$unwind: {path: '$a'}}, {$match: {a:{$eq:1}}}]",
+           /*mergePipeJson=*/"[]");
 };
 
 TEST_F(PipelineOptimizations, MoveFinalUnwindWithOtherShardsToMerger) {
-    doTest("[{$match: {a:1}}, {$unwind: {path: '$a'}}]" /*inputPipeJson*/,
-           "[{$match: {a: {$eq: 1}}}]" /*shardPipeJson*/,
-           "[{$unwind: {path: '$a'}}]" /*mergePipeJson*/);
+    doTest(/*inputPipeJson=*/"[{$match: {a:1}}, {$unwind: {path: '$a'}}]",
+           /*shardPipeJson=*/"[{$match: {a: {$eq: 1}}}]",
+           /*mergePipeJson=*/"[{$unwind: {path: '$a'}}]");
 };
 
 }  // namespace moveFinalUnwindFromShardsToMerger
@@ -5621,9 +5621,9 @@ namespace propagateDocLimitToShards {
  */
 
 TEST_F(PipelineOptimizations, MatchWithSkipAndLimit) {
-    doTest("[{$match: {x: 4}}, {$skip: 10}, {$limit: 5}]" /*inputPipeJson*/,
-           "[{$match: {x: {$eq: 4}}}, {$limit: 15}]" /*shardPipeJson*/,
-           "[{$skip: 10}, {$limit: 5}]" /*mergePipeJson*/);
+    doTest(/*inputPipeJson=*/"[{$match: {x: 4}}, {$skip: 10}, {$limit: 5}]",
+           /*shardPipeJson=*/"[{$match: {x: {$eq: 4}}}, {$limit: 15}]",
+           /*mergePipeJson=*/"[{$skip: 10}, {$limit: 5}]");
 };
 
 /**
@@ -5631,9 +5631,9 @@ TEST_F(PipelineOptimizations, MatchWithSkipAndLimit) {
  * all $skip stages in any pipeline that has more than one.
  */
 TEST_F(PipelineOptimizations, MatchWithMultipleSkipsAndLimit) {
-    doTest("[{$match: {x: 4}}, {$skip: 7}, {$skip: 3}, {$limit: 5}]" /*inputPipeJson*/,
-           "[{$match: {x: {$eq: 4}}}, {$limit: 15}]" /*shardPipeJson*/,
-           "[{$skip: 10}, {$limit: 5}]" /*mergePipeJson*/);
+    doTest(/*inputPipeJson=*/"[{$match: {x: 4}}, {$skip: 7}, {$skip: 3}, {$limit: 5}]",
+           /*shardPipeJson=*/"[{$match: {x: {$eq: 4}}}, {$limit: 15}]",
+           /*mergePipeJson=*/"[{$skip: 10}, {$limit: 5}]");
 };
 
 /**
@@ -5642,9 +5642,9 @@ TEST_F(PipelineOptimizations, MatchWithMultipleSkipsAndLimit) {
  * $limit to the shard pipeline.
  */
 TEST_F(PipelineOptimizations, MatchWithLimitAndSkip) {
-    doTest("[{$match: {x: 4}}, {$limit: 10}, {$skip: 5}]" /*inputPipeJson*/,
-           "[{$match: {x: {$eq: 4}}}, {$limit: 10}]" /*shardPipeJson*/,
-           "[{$limit: 10}, {$skip: 5}]" /*mergePipeJson*/);
+    doTest(/*inputPipeJson=*/"[{$match: {x: 4}}, {$limit: 10}, {$skip: 5}]",
+           /*shardPipeJson=*/"[{$match: {x: {$eq: 4}}}, {$limit: 10}]",
+           /*mergePipeJson=*/"[{$limit: 10}, {$skip: 5}]");
 };
 
 /**
@@ -5652,9 +5652,9 @@ TEST_F(PipelineOptimizations, MatchWithLimitAndSkip) {
  * propagating the limit to the shards.
  */
 TEST_F(PipelineOptimizations, MatchWithSkipAddFieldsAndLimit) {
-    doTest("[{$match: {x: 4}}, {$skip: 10}, {$addFields: {y: 1}}, {$limit: 5}]" /*inputPipeJson*/,
-           "[{$match: {x: {$eq: 4}}}, {$limit: 15}]" /*shardPipeJson*/,
-           "[{$skip: 10}, {$addFields: {y: {$const: 1}}}, {$limit: 5}]" /*mergePipeJson*/);
+    doTest(/*inputPipeJson=*/"[{$match: {x: 4}}, {$skip: 10}, {$addFields: {y: 1}}, {$limit: 5}]",
+           /*shardPipeJson=*/"[{$match: {x: {$eq: 4}}}, {$limit: 15}]",
+           /*mergePipeJson=*/"[{$skip: 10}, {$addFields: {y: {$const: 1}}}, {$limit: 5}]");
 };
 
 /**
@@ -5664,9 +5664,10 @@ TEST_F(PipelineOptimizations, MatchWithSkipAddFieldsAndLimit) {
  */
 TEST_F(PipelineOptimizations, MatchWithSkipGroupAndLimit) {
     doTest(
-        "[{$match: {x: 4}}, {$skip: 10}, {$group: {_id: '$y'}}, {$limit: 5}]" /*inputPipeJson*/,
-        "[{$match: {x: {$eq: 4}}}, {$project: {y: true, _id: false}}]" /*shardPipeJson*/,
-        "[{$skip: 10}, {$group: {_id: '$y', $willBeMerged: false}}, {$limit: 5}]" /*mergePipeJson*/);
+        /*inputPipeJson=*/"[{$match: {x: 4}}, {$skip: 10}, {$group: {_id: '$y'}}, {$limit: 5}]",
+        /*shardPipeJson=*/"[{$match: {x: {$eq: 4}}}, {$project: {y: true, _id: false}}]",
+        /*mergePipeJson=*/
+        "[{$skip: 10}, {$group: {_id: '$y', $willBeMerged: false}}, {$limit: 5}]");
 };
 
 /**
@@ -5676,9 +5677,9 @@ TEST_F(PipelineOptimizations, MatchWithSkipGroupAndLimit) {
  */
 TEST_F(PipelineOptimizations, MatchWithSkipSecondMatchAndLimit) {
     doTest(
-        "[{$match: {x: 4}}, {$skip: 10}, {$match: {y: {$gt: 10}}}, {$limit: 5}]" /*inputPipeJson*/,
-        "[{$match: {x: {$eq: 4}}}]" /*shardPipeJson*/,
-        "[{$skip: 10}, {$match: {y: {$gt: 10}}}, {$limit: 5}]" /*mergePipeJson*/);
+        /*inputPipeJson=*/"[{$match: {x: 4}}, {$skip: 10}, {$match: {y: {$gt: 10}}}, {$limit: 5}]",
+        /*shardPipeJson=*/"[{$match: {x: {$eq: 4}}}]",
+        /*mergePipeJson=*/"[{$skip: 10}, {$match: {y: {$gt: 10}}}, {$limit: 5}]");
 };
 }  // namespace propagateDocLimitToShards
 
@@ -5686,21 +5687,21 @@ namespace limitFieldsSentFromShardsToMerger {
 // These tests use $limit to split the pipelines between shards and merger as it is
 // always a split point and neutral in terms of needed fields.
 TEST_F(PipelineOptimizations, LimitFieldsSentFromShardsToMergerNeedWholeDoc) {
-    doTest("[{$limit:1}]" /*inputPipeJson*/,
-           "[{$limit:1}]" /*shardPipeJson*/,
-           "[{$limit:1}]" /*mergePipeJson*/);
+    doTest(/*inputPipeJson=*/"[{$limit:1}]",
+           /*shardPipeJson=*/"[{$limit:1}]",
+           /*mergePipeJson=*/"[{$limit:1}]");
 };
 
 TEST_F(PipelineOptimizations, LimitFieldsSentFromShardsToMergerJustNeedsId) {
-    doTest("[{$limit:1}, {$group: {_id: '$_id'}}]" /*inputPipeJson*/,
-           "[{$limit:1}, {$project: {_id:true}}]" /*shardPipeJson*/,
-           "[{$limit:1}, {$group: {_id: '$_id', $willBeMerged: false}}]" /*mergePipeJson*/);
+    doTest(/*inputPipeJson=*/"[{$limit:1}, {$group: {_id: '$_id'}}]",
+           /*shardPipeJson=*/"[{$limit:1}, {$project: {_id:true}}]",
+           /*mergePipeJson=*/"[{$limit:1}, {$group: {_id: '$_id', $willBeMerged: false}}]");
 };
 
 TEST_F(PipelineOptimizations, LimitFieldsSentFromShardsToMergerJustNeedsNonId) {
-    doTest("[{$limit:1}, {$group: {_id: '$a.b'}}]" /*inputPipeJson*/,
-           "[{$limit:1}, {$project: {a: {b: true}, _id: false}}]" /*shardPipeJson*/,
-           "[{$limit:1}, {$group: {_id: '$a.b', $willBeMerged: false}}]" /*mergePipeJson*/);
+    doTest(/*inputPipeJson=*/"[{$limit:1}, {$group: {_id: '$a.b'}}]",
+           /*shardPipeJson=*/"[{$limit:1}, {$project: {a: {b: true}, _id: false}}]",
+           /*mergePipeJson=*/"[{$limit:1}, {$group: {_id: '$a.b', $willBeMerged: false}}]");
 };
 
 TEST_F(PipelineOptimizations, LimitFieldsSentFromShardsToMergerNothingNeeded) {
@@ -5708,9 +5709,10 @@ TEST_F(PipelineOptimizations, LimitFieldsSentFromShardsToMergerNothingNeeded) {
         "[{$limit:1},"
         "{$group: {_id: {$const: null}, count: {$sum: {$const: 1}}}}]";
     doTest(kInputPipeJson,
-           "[{$limit:1}, {$project: {_id: true}}]" /*shardPipeJson*/,
+           /*shardPipeJson=*/"[{$limit:1}, {$project: {_id: true}}]",
+           /*mergePipeJson=*/
            "[{$limit:1}, {$group: {_id: {$const: null}, count: {$sum: {$const: 1}}, $willBeMerged: "
-           "false}}]" /*mergePipeJson*/);
+           "false}}]");
 };
 
 // No new project should be added. This test reflects current behavior where the
@@ -5722,8 +5724,8 @@ TEST_F(PipelineOptimizations, LimitFieldsSentFromShardsToMergerShardAlreadyExhau
         "[{$project: {_id:true, a:true}},"
         "{$group: {_id: '$_id'}}]";
     doTest(kInputPipeJson,
-           kInputPipeJson /*shardPipeJson*/,
-           "[{$group: {_id: '$$ROOT._id', $doingMerge: true}}]" /*mergePipeJson*/);
+           /*shardPipeJson=*/kInputPipeJson,
+           /*mergePipeJson=*/"[{$group: {_id: '$$ROOT._id', $doingMerge: true}}]");
 };
 
 TEST_F(PipelineOptimizations,
@@ -5751,35 +5753,37 @@ TEST_F(PipelineOptimizations,
 TEST_F(PipelineOptimizations,
        LimitFieldsSentFromShardsToMergerShardedMatchProjLimDoesNotBecomeMatchLimProj) {
     doTest(
-        "[{$match: {a: 1}}, {$project : {a: 1}}, {$limit: 5}]" /*inputPipeJson*/,
-        "[{$match: {a: {$eq : 1}}},{$project: {_id: true, a: true}},{$limit: 5}]" /*shardPipeJson*/,
-        "[{$limit: 5}]" /*mergePipeJson*/);
+        /*inputPipeJson=*/"[{$match: {a: 1}}, {$project : {a: 1}}, {$limit: 5}]",
+        /*shardPipeJson=*/"[{$match: {a: {$eq : 1}}},{$project: {_id: true, a: true}},{$limit: 5}]",
+        /*mergePipeJson=*/"[{$limit: 5}]");
 };
 
 TEST_F(PipelineOptimizations,
        LimitFieldsSentFromShardsToMergerShardedSortProjLimBecomesTopKSortProj) {
     doTest(
-        "[{$sort: {a: 1}}, {$project : {a: 1}}, {$limit: 5}]" /*inputPipeJson*/,
-        "[{$sort: {sortKey:{a: 1}, limit:5}},{$project: {_id: true, a: true}}]" /*shardPipeJson*/,
-        "[{$limit: 5}, {$project: {_id: true, a: true}}]" /*mergePipeJson*/);
+        /*inputPipeJson=*/"[{$sort: {a: 1}}, {$project : {a: 1}}, {$limit: 5}]",
+        /*shardPipeJson=*/"[{$sort: {sortKey:{a: 1}, limit:5}},{$project: {_id: true, a: true}}]",
+        /*mergePipeJson=*/"[{$limit: 5}, {$project: {_id: true, a: true}}]");
 };
 
 TEST_F(PipelineOptimizations,
        LimitFieldsSentFromShardsToMergerShardedSortGroupProjLimDoesNotBecomeTopKSortProjGroup) {
     doTest(
-        "[{$sort:{a: 1}},{$group:{_id:{a:'$a'}}},{$project:{a: 1}},{$limit:5}]" /*inputPipeJson*/,
-        "[{$sort: {sortKey: {a: 1}}},{$project : {a: true, _id: false}}]" /*shardPipeJson*/,
+        /*inputPipeJson=*/"[{$sort:{a: 1}},{$group:{_id:{a:'$a'}}},{$project:{a: 1}},{$limit:5}]",
+        /*shardPipeJson=*/"[{$sort: {sortKey: {a: 1}}},{$project : {a: true, _id: false}}]",
+        /*mergePipeJson=*/
         "[{$group: {_id:{a: '$a'}, $willBeMerged: false}},{$project:{_id: true, a: true}},{$limit: "
-        "5}]" /*mergePipeJson*/);
+        "5}]");
 };
 
 TEST_F(PipelineOptimizations,
        LimitFieldsSentFromShardsToMergerShardedMatchSortProjLimBecomesMatchTopKSortProj) {
     doTest(
-        "[{$match:{a:{$eq: 1}}},{$sort:{a: -1}},{$project:{a: 1}},{$limit: 6}]" /*inputPipeJson*/,
+        /*inputPipeJson=*/"[{$match:{a:{$eq: 1}}},{$sort:{a: -1}},{$project:{a: 1}},{$limit: 6}]",
+        /*shardPipeJson=*/
         "[{$match:{a:{$eq: 1}}},{$sort:{sortKey: {a: -1}, limit: 6}},{$project:{_id: true, a: "
-        "true}}]" /*shardPipeJson*/,
-        "[{$limit: 6},{$project: {_id: true, a: true}}]" /*mergePipeJson*/);
+        "true}}]",
+        /*mergePipeJson=*/"[{$limit: 6},{$project: {_id: true, a: true}}]");
 };
 
 }  // namespace limitFieldsSentFromShardsToMerger
@@ -5788,38 +5792,46 @@ namespace coalesceLookUpAndUnwind {
 
 TEST_F(PipelineOptimizations, ShouldCoalesceUnwindOnAs) {
     doTest(
+        /*inputPipeJson=*/
         "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
-        "'right'}},{$unwind: {path: '$same'}}]" /*inputPipeJson*/,
-        "[]" /*shardPipeJson*/,
+        "'right'}},{$unwind: {path: '$same'}}]",
+        /*shardPipeJson=*/"[]",
+        /*mergePipeJson=*/
         "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: 'right', "
-        "unwinding: {preserveNullAndEmptyArrays: false}}}]" /*mergePipeJson*/);
+        "unwinding: {preserveNullAndEmptyArrays: false}}}]");
 };
 
 TEST_F(PipelineOptimizations, ShouldCoalesceUnwindOnAsWithPreserveEmpty) {
     doTest(
+        /*inputPipeJson=*/
         "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
-        "'right'}},{$unwind: {path: '$same', preserveNullAndEmptyArrays: true}}]" /*inputPipeJson*/,
-        "[]" /*shardPipeJson*/,
+        "'right'}},{$unwind: {path: '$same', preserveNullAndEmptyArrays: true}}]",
+        /*shardPipeJson=*/"[]",
+        /*mergePipeJson=*/
         "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: 'right', "
-        "unwinding: {preserveNullAndEmptyArrays: true}}}]" /*mergePipeJson*/);
+        "unwinding: {preserveNullAndEmptyArrays: true}}}]");
 };
 
 TEST_F(PipelineOptimizations, ShouldCoalesceUnwindOnAsWithIncludeArrayIndex) {
     doTest(
+        /*inputPipeJson=*/
         "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
-        "'right'}},{$unwind: {path: '$same', includeArrayIndex: 'index'}}]" /*inputPipeJson*/,
-        "[]" /*shardPipeJson*/,
+        "'right'}},{$unwind: {path: '$same', includeArrayIndex: 'index'}}]",
+        /*shardPipeJson=*/"[]",
+        /*mergePipeJson=*/
         "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: 'right', "
-        "unwinding: {preserveNullAndEmptyArrays: false, includeArrayIndex: 'index'}}}]" /*mergePipeJson*/);
+        "unwinding: {preserveNullAndEmptyArrays: false, includeArrayIndex: 'index'}}}]");
 };
 
 TEST_F(PipelineOptimizations, ShouldNotCoalesceUnwindNotOnAs) {
     doTest(
+        /*inputPipeJson=*/
         "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
-        "'right'}},{$unwind: {path: '$from'}}]" /*inputPipeJson*/,
-        "[]" /*shardPipeJson*/,
+        "'right'}},{$unwind: {path: '$from'}}]",
+        /*shardPipeJson=*/"[]",
+        /*mergePipeJson=*/
         "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
-        "'right'}},{$unwind: {path: '$from'}}]" /*mergePipeJson*/);
+        "'right'}},{$unwind: {path: '$from'}}]");
 };
 
 }  // namespace coalesceLookUpAndUnwind
@@ -5827,51 +5839,54 @@ TEST_F(PipelineOptimizations, ShouldNotCoalesceUnwindNotOnAs) {
 namespace pushDownGroupPrecededBySort {
 
 TEST_F(PipelineOptimizations, ShouldNotPushdownGroupWithoutShardKey) {
-    doTest("[{$sort: {a: 1}}, {$group: {_id: '$_id'}}]" /*inputPipeJson*/,
-           "[{$sort: {sortKey: {a: 1}}}, {$project: {_id: true}}]" /*shardPipeJson*/,
-           "[{$group: {_id: '$_id', $willBeMerged: false}}]" /*mergePipeJson*/);
+    doTest(/*inputPipeJson=*/"[{$sort: {a: 1}}, {$group: {_id: '$_id'}}]",
+           /*shardPipeJson=*/"[{$sort: {sortKey: {a: 1}}}, {$project: {_id: true}}]",
+           /*mergePipeJson=*/"[{$group: {_id: '$_id', $willBeMerged: false}}]");
 };
 
 TEST_F(PipelineOptimizations, ShouldNotPushdownGroupIfNotOnShardKey) {
     const OrderedPathSet shardKey = {"a", "c"};
-    doTest("[{$sort: {a: 1}}, {$group: {_id: '$c'}}]" /*inputPipeJson*/,
-           "[{$sort: {sortKey: {a: 1}}}, {$project: {c: true, _id: false}}]" /*shardPipeJson*/,
-           "[{$group: {_id: '$c', $willBeMerged: false}}]" /*mergePipeJson*/,
+    doTest(/*inputPipeJson=*/"[{$sort: {a: 1}}, {$group: {_id: '$c'}}]",
+           /*shardPipeJson=*/"[{$sort: {sortKey: {a: 1}}}, {$project: {c: true, _id: false}}]",
+           /*mergePipeJson=*/"[{$group: {_id: '$c', $willBeMerged: false}}]",
            shardKey);
 };
 
 TEST_F(PipelineOptimizations, ShouldNotPushdownGroupIfProjectDoesNotPreserveShardKey) {
     const OrderedPathSet shardKey = {"shardKey"};
     doTest(
-        "[{$project: {shardKey: '$other'}}, {$sort: {shardKey: 1}}, {$group: {_id: '$shardKey'}}]" /*inputPipeJson*/
-        ,
-        "[{$project: {_id: true, shardKey: '$other'}}, {$sort: {sortKey: {shardKey: 1}}}]" /*shardPipeJson*/
-        ,
-        "[{$group: {_id: '$shardKey', $willBeMerged: false}}]" /*mergePipeJson*/,
+        /*inputPipeJson=*/
+        "[{$project: {shardKey: '$other'}}, {$sort: {shardKey: 1}}, {$group: {_id: '$shardKey'}}]",
+        /*shardPipeJson=*/
+        "[{$project: {_id: true, shardKey: '$other'}}, {$sort: {sortKey: {shardKey: 1}}}]",
+        /*mergePipeJson=*/"[{$group: {_id: '$shardKey', $willBeMerged: false}}]",
         shardKey);
 };
 
 TEST_F(PipelineOptimizations, ShouldNotPushdownGroupIfShardKeyIsUnset) {
     const OrderedPathSet shardKey = {"shardKey"};
     doTest(
-        "[{$unset: 'shardKey'}, {$sort: {shardKey: 1}}, {$group: {_id: '$shardKey'}}]" /*inputPipeJson*/
-        ,
+        /*inputPipeJson=*/
+        "[{$unset: 'shardKey'}, {$sort: {shardKey: 1}}, {$group: {_id: '$shardKey'}}]",
+        /*shardPipeJson=*/
         "[{$project: {shardKey: false, _id: true}}"
         ",{$sort: {sortKey: {shardKey: 1}}}"
-        ",{$project: {shardKey: true, _id: false}}]" /*shardPipeJson*/,
-        "[{$group: {_id: '$shardKey', $willBeMerged: false}}]" /*mergePipeJson*/,
+        ",{$project: {shardKey: true, _id: false}}]",
+        /*mergePipeJson=*/"[{$group: {_id: '$shardKey', $willBeMerged: false}}]",
         shardKey);
 };
 
 TEST_F(PipelineOptimizations, ShouldNotPushdownGroupIfAddFieldsOverwritesShardKey) {
     const OrderedPathSet shardKey = {"shardKey"};
     doTest(
-        "[{$addFields: {shardKey: '$other'}}, {$sort: {shardKey: 1}}, {$group: {_id: '$shardKey'}}]" /*inputPipeJson*/
-        ,
+        /*inputPipeJson=*/
+        "[{$addFields: {shardKey: '$other'}}, {$sort: {shardKey: 1}}, {$group: {_id: "
+        "'$shardKey'}}]",
+        /*shardPipeJson=*/
         "[{$addFields: {shardKey: '$other'}}"
         ",{$sort: {sortKey: {shardKey: 1}}}"
-        ",{$project: {shardKey: true, _id: false}}]" /*shardPipeJson*/,
-        "[{$group: {_id: '$shardKey', $willBeMerged: false}}]" /*mergePipeJson*/,
+        ",{$project: {shardKey: true, _id: false}}]",
+        /*mergePipeJson=*/"[{$group: {_id: '$shardKey', $willBeMerged: false}}]",
         shardKey);
 };
 
@@ -5879,12 +5894,13 @@ TEST_F(PipelineOptimizations, ShouldNotPushdownGroupIfUsingAddFieldsWithoutShard
     unittest::ServerParameterGuard controller("featureFlagShardFilteringDistinctScan", false);
     const OrderedPathSet shardKey = {"shardKey"};
     doTest(
-        "[{$addFields: {new: '$shardKey'}}, {$sort: {shardKey: 1}}, {$group: {_id: '$shardKey'}}]" /*inputPipeJson*/
-        ,
+        /*inputPipeJson=*/
+        "[{$addFields: {new: '$shardKey'}}, {$sort: {shardKey: 1}}, {$group: {_id: '$shardKey'}}]",
+        /*shardPipeJson=*/
         "[{$addFields: {new: '$shardKey'}}"
         ",{$sort: {sortKey: {shardKey: 1}}}"
-        ",{$project: {shardKey: true, _id: false}}]" /*shardPipeJson*/,
-        "[{$group: {_id: '$shardKey'}}]" /*mergePipeJson*/,
+        ",{$project: {shardKey: true, _id: false}}]",
+        /*mergePipeJson=*/"[{$group: {_id: '$shardKey'}}]",
         shardKey);
 };
 
@@ -5892,12 +5908,14 @@ TEST_F(PipelineOptimizations, ShouldPushdownGroupIfUsingAddFields) {
     unittest::ServerParameterGuard controller("featureFlagShardFilteringDistinctScan", true);
     const OrderedPathSet shardKey = {"shardKey"};
     doTest(
-        "[{$addFields: {new: '$shardKey'}}, {$sort: {shardKey: 1}}, {$group: {_id: '$shardKey'}}]", /*inputPipeJson*/
+        /*inputPipeJson=*/
+        "[{$addFields: {new: '$shardKey'}}, {$sort: {shardKey: 1}}, {$group: {_id: '$shardKey'}}]",
+        /*shardPipeJson=*/
         "[{$addFields: {new: '$shardKey'}}"
         ",{$sort: {sortKey: {shardKey: 1}}}"
-        ",{$group: {_id: '$shardKey', $willBeMerged: false}}]", /*shardPipeJson*/
+        ",{$group: {_id: '$shardKey', $willBeMerged: false}}]",
         // Empty merge as group is fully pushed down.
-        "[]", /*mergePipeJson*/
+        /*mergePipeJson=*/"[]",
         shardKey);
 };
 
@@ -5905,44 +5923,47 @@ TEST_F(PipelineOptimizations, ShouldPushdownGroupOnShardKey) {
     unittest::ServerParameterGuard controller("featureFlagShardFilteringDistinctScan", true);
     const OrderedPathSet shardKey = {"_id"};
     doTest(
-        "[{$sort: {a: 1}}, {$group: {_id: '$_id'}}]" /*inputPipeJson*/,
-        "[{$sort: {sortKey: {a: 1}}}, {$group: {_id: '$_id', $willBeMerged: false}}]" /*shardPipeJson*/
-        ,
+        /*inputPipeJson=*/"[{$sort: {a: 1}}, {$group: {_id: '$_id'}}]",
+        /*shardPipeJson=*/
+        "[{$sort: {sortKey: {a: 1}}}, {$group: {_id: '$_id', $willBeMerged: false}}]",
         // Empty merge as group is fully pushed down.
-        "[]" /*mergePipeJson*/,
+        /*mergePipeJson=*/"[]",
         shardKey);
 };
 
 TEST_F(PipelineOptimizations, ShouldPushdownGroupOnSupersetOfShardKey) {
     unittest::ServerParameterGuard controller("featureFlagShardFilteringDistinctScan", true);
     const OrderedPathSet shardKey = {"a", "b"};
-    doTest("[{$sort: {a: 1}}, {$group: {_id: {a: '$a', b: '$b', c: '$c'}}}]", /*inputPipeJson*/
+    doTest(/*inputPipeJson=*/"[{$sort: {a: 1}}, {$group: {_id: {a: '$a', b: '$b', c: '$c'}}}]",
+           /*shardPipeJson=*/
            "[{$sort: {sortKey: {a: 1}}}, {$group: {_id: {a: '$a', b: '$b', c: '$c'}, "
-           "$willBeMerged: false}}]", /*shardPipeJson*/
+           "$willBeMerged: false}}]",
            // Empty merge as group is fully pushed down.
-           "[]", /*mergePipeJson*/
+           /*mergePipeJson=*/"[]",
            shardKey);
 };
 
 TEST_F(PipelineOptimizations, ShouldPushdownGroupOnSupersetOfShardKeyInArray) {
     unittest::ServerParameterGuard controller("featureFlagShardFilteringDistinctScan", true);
     const OrderedPathSet shardKey = {"a", "b"};
-    doTest("[{$sort: {a: 1}}, {$group: {_id: ['$a', '$b', '$c']}}]", /*inputPipeJson*/
+    doTest(/*inputPipeJson=*/"[{$sort: {a: 1}}, {$group: {_id: ['$a', '$b', '$c']}}]",
+           /*shardPipeJson=*/
            "[{$sort: {sortKey: {a: 1}}}, {$group: {_id: ['$a', '$b', '$c'], $willBeMerged: "
-           "false}}]", /*shardPipeJson*/
+           "false}}]",
            // Empty merge as group is fully pushed down.
-           "[]", /*mergePipeJson*/
+           /*mergePipeJson=*/"[]",
            shardKey);
 };
 
 TEST_F(PipelineOptimizations, ShouldPushdownGroupOnSupersetOfShardKeyInNestedStructure) {
     unittest::ServerParameterGuard controller("featureFlagShardFilteringDistinctScan", true);
     const OrderedPathSet shardKey = {"a", "b"};
-    doTest("[{$sort: {a: 1}}, {$group: {_id: {foo:[{bar:'$a'}, '$b', '$c']}}}]", /*inputPipeJson*/
+    doTest(/*inputPipeJson=*/"[{$sort: {a: 1}}, {$group: {_id: {foo:[{bar:'$a'}, '$b', '$c']}}}]",
+           /*shardPipeJson=*/
            "[{$sort: {sortKey: {a: 1}}}, {$group: {_id: {foo:[{bar:'$a'}, '$b', '$c']}, "
-           "$willBeMerged: false}}]", /*shardPipeJson*/
+           "$willBeMerged: false}}]",
            // Empty merge as group is fully pushed down.
-           "[]", /*mergePipeJson*/
+           /*mergePipeJson=*/"[]",
            shardKey);
 };
 
@@ -5950,12 +5971,14 @@ TEST_F(PipelineOptimizations, ShouldPushdownGroupOnSupersetOfShardKeyWithIrrelev
     unittest::ServerParameterGuard controller("featureFlagShardFilteringDistinctScan", true);
     const OrderedPathSet shardKey = {"a", "b"};
     doTest(
+        /*inputPipeJson=*/
         "[{$addFields: {c:{$const:'foobar'}}}, {$sort: {a: 1}}, {$group: {_id: ['$a', '$b', "
-        "'$c']}}]", /*inputPipeJson*/
+        "'$c']}}]",
+        /*shardPipeJson=*/
         "[{$addFields: {c:{$const:'foobar'}}}, {$sort: {sortKey: {a: 1}}}, {$group: {_id: ['$a', "
-        "'$b', '$c'], $willBeMerged: false}}]", /*shardPipeJson*/
+        "'$b', '$c'], $willBeMerged: false}}]",
         // Empty merge as group is fully pushed down.
-        "[]", /*mergePipeJson*/
+        /*mergePipeJson=*/"[]",
         shardKey);
 };
 
@@ -5963,11 +5986,13 @@ TEST_F(PipelineOptimizations, ShouldPushdownGroupOnShardKeyWithDuplicatesViaRena
     unittest::ServerParameterGuard controller("featureFlagShardFilteringDistinctScan", true);
     const OrderedPathSet shardKey = {"a"};
     doTest(
-        "[{$project:{'a':true, b:'$a'}}, {$sort: {a: 1}}, {$group: {_id: ['$a', '$b']}}]", /*inputPipeJson*/
+        /*inputPipeJson=*/
+        "[{$project:{'a':true, b:'$a'}}, {$sort: {a: 1}}, {$group: {_id: ['$a', '$b']}}]",
+        /*shardPipeJson=*/
         "[{$project:{_id:true, 'a':true, b:'$a'}}, {$sort: {sortKey: {a: 1}}}, {$group: {_id: "
-        "['$a', '$b'], $willBeMerged: false}}]", /*shardPipeJson*/
+        "['$a', '$b'], $willBeMerged: false}}]",
         // Empty merge as group is fully pushed down.
-        "[]", /*mergePipeJson*/
+        /*mergePipeJson=*/"[]",
         shardKey);
 };
 
@@ -5975,11 +6000,12 @@ TEST_F(PipelineOptimizations, ShouldPushdownGroupOnShardKeyWithDuplicatesViaRena
     unittest::ServerParameterGuard controller("featureFlagShardFilteringDistinctScan", true);
     const OrderedPathSet shardKey = {"a"};
     doTest(
-        "[{$addFields:{b:'$a'}}, {$sort: {a: 1}}, {$group: {_id: ['$a', '$b']}}]", /*inputPipeJson*/
+        /*inputPipeJson=*/"[{$addFields:{b:'$a'}}, {$sort: {a: 1}}, {$group: {_id: ['$a', '$b']}}]",
+        /*shardPipeJson=*/
         "[{$addFields:{b:'$a'}}, {$sort: {sortKey: {a: 1}}}, {$group: {_id: ['$a', '$b'], "
-        "$willBeMerged: false}}]", /*shardPipeJson*/
+        "$willBeMerged: false}}]",
         // Empty merge as group is fully pushed down.
-        "[]", /*mergePipeJson*/
+        /*mergePipeJson=*/"[]",
         shardKey);
 };
 
@@ -5987,11 +6013,13 @@ TEST_F(PipelineOptimizations, ShouldPushdownGroupOnShardKeyWithUnrelatedExclusio
     unittest::ServerParameterGuard controller("featureFlagShardFilteringDistinctScan", true);
     const OrderedPathSet shardKey = {"a"};
     doTest(
-        "[{$project:{'c':false}}, {$sort: {a: 1}}, {$group: {_id: ['$a', '$b']}}]", /*inputPipeJson*/
+        /*inputPipeJson=*/
+        "[{$project:{'c':false}}, {$sort: {a: 1}}, {$group: {_id: ['$a', '$b']}}]",
+        /*shardPipeJson=*/
         "[{$project:{'c':false, _id:true}}, {$sort: {sortKey: {a: 1}}}, {$group: {_id: ['$a', "
-        "'$b'], $willBeMerged: false}}]", /*shardPipeJson*/
+        "'$b'], $willBeMerged: false}}]",
         // Empty merge as group is fully pushed down.
-        "[]", /*mergePipeJson*/
+        /*mergePipeJson=*/"[]",
         shardKey);
 };
 
@@ -5999,9 +6027,12 @@ TEST_F(PipelineOptimizations, ShouldNotPushdownGroupIfComputesValue) {
     // A group _id which is _derived_ from the shard key is not sufficient.
     const OrderedPathSet shardKey = {"shardKey"};
     doTest(
-        "[{$sort: {shardKey: 1}}, {$group: {_id: {'$add':[{$const: 1}, '$shardKey']}}}]", /*inputPipeJson*/
-        "[{$sort: {sortKey: {shardKey: 1}}} ,{$project: {shardKey: true, _id: false}}]", /*shardPipeJson*/
-        "[{$group: {_id: {'$add':[{$const: 1}, '$shardKey']}, $willBeMerged: false}}]", /*mergePipeJson*/
+        /*inputPipeJson=*/
+        "[{$sort: {shardKey: 1}}, {$group: {_id: {'$add':[{$const: 1}, '$shardKey']}}}]",
+        /*shardPipeJson=*/
+        "[{$sort: {sortKey: {shardKey: 1}}} ,{$project: {shardKey: true, _id: false}}]",
+        /*mergePipeJson=*/
+        "[{$group: {_id: {'$add':[{$const: 1}, '$shardKey']}, $willBeMerged: false}}]",
         shardKey);
 };
 
@@ -6009,16 +6040,18 @@ TEST_F(PipelineOptimizations, ShouldPushdownGroupOnShardKeyWithRenames) {
     unittest::ServerParameterGuard controller("featureFlagShardFilteringDistinctScan", true);
     const OrderedPathSet shardKey = {"shardKey"};
     doTest(
+        /*inputPipeJson=*/
         "[{$project: {rename: '$shardKey'}}"
         ",{$project: {anotherRename: '$rename'}}"
         ",{$sort: {anotherRename: 1}}"
-        ",{$group: {_id: '$anotherRename'}}]" /*inputPipeJson*/,
+        ",{$group: {_id: '$anotherRename'}}]",
+        /*shardPipeJson=*/
         "[{$project: {_id: true, rename: '$shardKey'}}"
         ",{$project: {_id: true, anotherRename: '$rename'}}"
         ",{$sort: {sortKey: {anotherRename: 1}}}"
-        ",{$group: {_id: '$anotherRename', $willBeMerged: false}}]" /*shardPipeJson*/,
+        ",{$group: {_id: '$anotherRename', $willBeMerged: false}}]",
         // Empty merge as group is fully pushed down.
-        "[]" /*mergePipeJson*/,
+        /*mergePipeJson=*/"[]",
         shardKey);
 };
 
@@ -6026,16 +6059,18 @@ TEST_F(PipelineOptimizations, ShouldPushdownGroupOnShardKeyWithMultipleRenames) 
     unittest::ServerParameterGuard controller("featureFlagShardFilteringDistinctScan", true);
     const OrderedPathSet shardKey = {"shardKey"};
     doTest(
+        /*inputPipeJson=*/
         "[{$project: {rename: '$shardKey'}}"
         ",{$project: {anotherRename: '$rename', anotherRename2: '$rename'}}"
         ",{$sort: {anotherRename2: 1}}"
-        ",{$group: {_id: '$anotherRename2'}}]" /*inputPipeJson*/,
+        ",{$group: {_id: '$anotherRename2'}}]",
+        /*shardPipeJson=*/
         "[{$project: {_id: true, rename: '$shardKey'}}"
         ",{$project: {_id: true, anotherRename: '$rename', anotherRename2: '$rename'}}"
         ",{$sort: {sortKey: {anotherRename2: 1}}}"
-        ",{$group: {_id: '$anotherRename2', $willBeMerged: false}}]" /*shardPipeJson*/,
+        ",{$group: {_id: '$anotherRename2', $willBeMerged: false}}]",
         // Empty merge as group is fully pushed down.
-        "[]" /*mergePipeJson*/,
+        /*mergePipeJson=*/"[]",
         shardKey);
 };
 
@@ -6043,13 +6078,14 @@ TEST_F(PipelineOptimizations, ShouldPushdownGroupOnShardKeyWithMatchBetweenSortA
     unittest::ServerParameterGuard controller("featureFlagShardFilteringDistinctScan", true);
     const OrderedPathSet shardKey = {"shardKey"};
     doTest(
-        "[{$sort: {shardKey: 1}}, {$match: {shardKey: 'val'}}, {$group: {_id: '$shardKey'}}]" /*inputPipeJson*/
-        ,
+        /*inputPipeJson=*/
+        "[{$sort: {shardKey: 1}}, {$match: {shardKey: 'val'}}, {$group: {_id: '$shardKey'}}]",
+        /*shardPipeJson=*/
         "[{$match: {shardKey: {$eq: 'val'}}}"
         ",{$sort: {sortKey: {shardKey: 1}}}"
-        ",{$group: {_id: '$shardKey', $willBeMerged: false}}]" /*shardPipeJson*/,
+        ",{$group: {_id: '$shardKey', $willBeMerged: false}}]",
         // Empty merge as group is fully pushed down.
-        "[]" /*mergePipeJson*/,
+        /*mergePipeJson=*/"[]",
         shardKey);
 };
 
@@ -6057,13 +6093,13 @@ TEST_F(PipelineOptimizations, ShouldPushdownGroupOnShardKeyWithFirstAccumulator)
     unittest::ServerParameterGuard controller("featureFlagShardFilteringDistinctScan", true);
     const OrderedPathSet shardKey = {"shardKey"};
     doTest(
-        "[{$sort: {shardKey: 1}}, {$group: {_id: '$shardKey', first: {$first: '$other'}}}]" /*inputPipeJson*/
-        ,
+        /*inputPipeJson=*/
+        "[{$sort: {shardKey: 1}}, {$group: {_id: '$shardKey', first: {$first: '$other'}}}]",
+        /*shardPipeJson=*/
         "[{$sort: {sortKey: {shardKey: 1}}}, {$group: {_id: '$shardKey', first: {$first: "
-        "'$other'}, $willBeMerged: false}}]" /*shardPipeJson*/,
+        "'$other'}, $willBeMerged: false}}]",
         // Empty merge as group is fully pushed down.
-        "[]" /*mergePipeJson*/
-        ,
+        /*mergePipeJson=*/"[]",
         shardKey);
 };
 
@@ -6071,15 +6107,15 @@ TEST_F(PipelineOptimizations, ShouldPushdownGroupOnShardKeyWithTopAccumulator) {
     unittest::ServerParameterGuard controller("featureFlagShardFilteringDistinctScan", true);
     const OrderedPathSet shardKey = {"shardKey"};
     doTest(
+        /*inputPipeJson=*/
         "[{$sort: {shardKey: 1}}"
-        ",{$group: {_id: '$shardKey', top: {$top: {output: '$other', sortBy: {other: 1}}}}}]" /*inputPipeJson*/
-        ,
+        ",{$group: {_id: '$shardKey', top: {$top: {output: '$other', sortBy: {other: 1}}}}}]",
+        /*shardPipeJson=*/
         "[{$sort: {sortKey: {shardKey: 1}}}"
         ",{$group: {_id: '$shardKey', top: {$top: {output: '$other', sortBy: {other: 1}}}, "
-        "$willBeMerged: false}}]" /*shardPipeJson*/
-        ,
+        "$willBeMerged: false}}]",
         // Empty merge as group is fully pushed down.
-        "[]" /*mergePipeJson*/,
+        /*mergePipeJson=*/"[]",
         shardKey);
 };
 
@@ -6118,12 +6154,12 @@ public:
             uuid,
             KeyPattern{BSON("_id" << 1)},
             unsplittable,
-            nullptr /* defaultCollator */,
-            false /* unique */,
+            /*defaultCollator=*/nullptr,
+            /*unique=*/false,
             epoch,
             Timestamp(1, 1),
-            boost::none /* timeseriesFields */,
-            boost::none /* reshardingFields */,
+            /*timeseriesFields=*/boost::none,
+            /*reshardingFields=*/boost::none,
             true,
             {ChunkType{uuid, range, ChunkVersion({epoch, timestamp}, {1, 0}), kMyShardName}});
 
@@ -6146,7 +6182,7 @@ public:
         std::string mergePipeJson = unsplittable ? kSentPipeJson : "[]";
         boost::optional<ShardId> mergeShardId{unsplittable, kMyShardName};
 
-        doTest("[{$merge: 'outColl'}]" /*inputPipeJson*/,
+        doTest(/*inputPipeJson=*/"[{$merge: 'outColl'}]",
                std::move(shardPipeJson),
                std::move(mergePipeJson),
                mergeShardId);
@@ -6162,9 +6198,9 @@ TEST_F(PipelineOptimizationsShardMerger, Out) {
         CatalogCacheMock::makeCollectionRoutingInfoUnsplittable(
             nss, ShardId("dbPrimary"), DatabaseVersion{UUID::gen(), timestamp}, kMyShardName));
 
-    doTest("[{$out: 'outColl'}]" /*inputPipeJson*/,
-           "[]" /*shardPipeJson*/,
-           "[{$out: {coll: 'outColl', db: '" + std::string(kDBName) + "'}}]" /*mergePipeJson*/,
+    doTest(/*inputPipeJson=*/"[{$out: 'outColl'}]",
+           /*shardPipeJson=*/"[]",
+           /*mergePipeJson=*/"[{$out: {coll: 'outColl', db: '" + std::string(kDBName) + "'}}]",
            /*needsSpecificShardMerger=*/kMyShardName);
 };
 
@@ -6182,31 +6218,31 @@ TEST_F(PipelineOptimizationsShardMerger, MergeWithUntrackedCollection) {
                 DatabaseType{DatabaseName::createDatabaseName_forTest(boost::none, kDBName),
                              kMyShardName,
                              DatabaseVersion{UUID::gen(), timestamp}})});
-    doTest("[{$merge: 'outColl'}]" /*inputPipeJson*/,
-           "[]" /*shardPipeJson*/,
-           "[{$merge: {into: {db: '" + std::string(kDBName) +
+    doTest(/*inputPipeJson=*/"[{$merge: 'outColl'}]",
+           /*shardPipeJson=*/"[]",
+           /*mergePipeJson=*/"[{$merge: {into: {db: '" + std::string(kDBName) +
                "', coll: 'outColl'}, on: '_id', "
                "whenMatched: 'merge', whenNotMatched: 'insert', "
-               "allowMergeOnNullishValues: true}}]" /*mergePipeJson*/,
-           kMyShardName /*needsSpecificShardMerger*/);
+               "allowMergeOnNullishValues: true}}]",
+           /*needsSpecificShardMerger=*/kMyShardName);
 };
 
 TEST_F(PipelineOptimizationsShardMerger, MergeWithShardedCollection) {
     unittest::ServerParameterGuard featureFlagController("featureFlagAllowMergeOnNullishValues",
                                                          true);
-    doMergeWithCollectionWithRoutingTableTest(false /*unsplittable*/);
+    doMergeWithCollectionWithRoutingTableTest(/*unsplittable=*/false);
 };
 
 TEST_F(PipelineOptimizationsShardMerger, MergeWithUnsplittableCollection) {
     unittest::ServerParameterGuard featureFlagController("featureFlagAllowMergeOnNullishValues",
                                                          true);
-    doMergeWithCollectionWithRoutingTableTest(true /*unsplittable*/);
+    doMergeWithCollectionWithRoutingTableTest(/*unsplittable=*/true);
 };
 
 TEST_F(PipelineOptimizationsShardMerger, Project) {
-    doTest("[{$project: {a : 1}}]" /*inputPipeJson*/,
-           "[{$project: {_id: true, a: true}}]" /*shardPipeJson*/,
-           "[]" /*mergePipeJson*/);
+    doTest(/*inputPipeJson=*/"[{$project: {a : 1}}]",
+           /*shardPipeJson=*/"[{$project: {_id: true, a: true}}]",
+           /*mergePipeJson=*/"[]");
 };
 
 TEST_F(PipelineOptimizationsShardMerger, LookUpUnsplittableFromCollection) {
@@ -6219,14 +6255,14 @@ TEST_F(PipelineOptimizationsShardMerger, LookUpUnsplittableFromCollection) {
         fromCollNs,
         uuid,
         KeyPattern{BSON("right" << 1)},
-        true /* unsplittable */,
-        nullptr /* defaultCollator */,
-        false /* unique */,
+        /*unsplittable=*/true,
+        /*defaultCollator=*/nullptr,
+        /*unique=*/false,
         epoch,
         Timestamp(1, 1),
-        boost::none /* timeseriesFields */,
-        boost::none /* reshardingFields */,
-        true /* allowMigrations */,
+        /*timeseriesFields=*/boost::none,
+        /*reshardingFields=*/boost::none,
+        /*allowMigrations=*/true,
         {ChunkType{uuid, range, ChunkVersion({epoch, timestamp}, {1, 0}), kMyShardName}});
 
     getCatalogCacheMock()->setCollectionReturnValue(
@@ -6238,12 +6274,14 @@ TEST_F(PipelineOptimizationsShardMerger, LookUpUnsplittableFromCollection) {
                              kMyShardName,
                              DatabaseVersion{UUID::gen(), timestamp}})});
     doTest(
-        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: 'right'}}]" /* inputPipeJson */
-        ,
-        "[]" /* shardPipeJson */,
-        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: 'right'}}]" /* mergePipeJson */
-        ,
-        kMyShardName /* needsSpecificShardMerger */);
+        /*inputPipeJson=*/
+        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
+        "'right'}}]",
+        /*shardPipeJson=*/"[]",
+        /*mergePipeJson=*/
+        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
+        "'right'}}]",
+        /*needsSpecificShardMerger=*/kMyShardName);
 };
 
 TEST_F(PipelineOptimizationsShardMerger, LookUpShardedFromCollection) {
@@ -6256,14 +6294,14 @@ TEST_F(PipelineOptimizationsShardMerger, LookUpShardedFromCollection) {
         fromCollNs,
         uuid,
         KeyPattern{BSON("right" << 1)},
-        false /* unsplittable */,
-        nullptr /* defaultCollator */,
-        false /* unique */,
+        /*unsplittable=*/false,
+        /*defaultCollator=*/nullptr,
+        /*unique=*/false,
         epoch,
         Timestamp(1, 1),
-        boost::none /* timeseriesFields */,
-        boost::none /* reshardingFields */,
-        true /* allowMigrations */,
+        /*timeseriesFields=*/boost::none,
+        /*reshardingFields=*/boost::none,
+        /*allowMigrations=*/true,
         {ChunkType{uuid, range, ChunkVersion({epoch, timestamp}, {1, 0}), kMyShardName}});
 
     getCatalogCacheMock()->setCollectionReturnValue(
@@ -6275,12 +6313,14 @@ TEST_F(PipelineOptimizationsShardMerger, LookUpShardedFromCollection) {
                              kMyShardName,
                              DatabaseVersion{UUID::gen(), timestamp}})});
     doTest(
-        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: 'right'}}]" /* inputPipeJson */
-        ,
-        "[]" /* shardPipeJson */,
-        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: 'right'}}]" /* mergePipeJson */
-        ,
-        kMyShardName /* needsSpecificShardMerger */);
+        /*inputPipeJson=*/
+        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
+        "'right'}}]",
+        /*shardPipeJson=*/"[]",
+        /*mergePipeJson=*/
+        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
+        "'right'}}]",
+        /*needsSpecificShardMerger=*/kMyShardName);
 };
 
 }  // namespace needsSpecificShardMerger
@@ -6399,8 +6439,8 @@ TEST_F(PipelineDeferredMergeSortTest, StageWithDeferredSortDoesNotSplit) {
                                                splitStage(HostTypeRequirement::kNone),
                                                matchStage("{b: 5}")});
     verifyPipelineForDeferredMergeSortTest(std::move(splitPipeline),
-                                           2 /* shardsPipelineSize */,
-                                           2 /* mergePipelineSize */,
+                                           /*shardsPipelineSize=*/2,
+                                           /*mergePipelineSize=*/2,
                                            BSON("a" << 1));
 }
 
@@ -6412,8 +6452,8 @@ TEST_F(PipelineDeferredMergeSortTest, EarliestSortIsSelectedIfDeferred) {
                                                splitStage(HostTypeRequirement::kNone),
                                                matchStage("{b: 5}")});
     verifyPipelineForDeferredMergeSortTest(std::move(splitPipeline),
-                                           2 /* shardsPipelineSize */,
-                                           3 /* mergePipelineSize */,
+                                           /*shardsPipelineSize=*/2,
+                                           /*mergePipelineSize=*/3,
                                            BSON("a" << 1));
 }
 
@@ -6424,8 +6464,8 @@ TEST_F(PipelineDeferredMergeSortTest, StageThatCantSwapGoesToMergingHalf) {
     auto splitPipeline = makeAndSplitPipeline(
         {mockDeferredSortStage(), match1, splitStage(HostTypeRequirement::kNone), match2});
     verifyPipelineForDeferredMergeSortTest(std::move(splitPipeline),
-                                           1 /* shardsPipelineSize */,
-                                           3 /* mergePipelineSize */,
+                                           /*shardsPipelineSize=*/1,
+                                           /*mergePipelineSize=*/3,
                                            BSON("a" << 1));
 }
 }  // namespace DeferredSort
@@ -6959,13 +6999,13 @@ TEST_F(PipelineRenameTracking, ReportsIdentityMapWhenEmpty) {
     {
         // Tracking renames backwards.
         trackPipelineRenames(makePipeline({mockSource()}),
-                             {"a", "b", "c.d"} /* pathsOfInterest */,
+                             /*pathsOfInterest=*/{"a", "b", "c.d"},
                              Tracking::backwards);
     }
     {
         // Tracking renames forwards.
         trackPipelineRenames(makePipeline({mockSource()}),
-                             {"a", "b", "c.d"} /* pathsOfInterest */,
+                             /*pathsOfInterest=*/{"a", "b", "c.d"},
                              Tracking::forwards);
     }
 }
@@ -6992,13 +7032,13 @@ TEST_F(PipelineRenameTracking, ReportsIdentityWhenNoStageModifiesAnything) {
     {
         // Tracking renames backwards.
         trackPipelineRenames(makePipeline({mockSource(), NoModifications::create(expCtx)}),
-                             {"a", "b", "c.d"} /* pathsOfInterest */,
+                             /*pathsOfInterest=*/{"a", "b", "c.d"},
                              Tracking::backwards);
     }
     {
         // Tracking renames forwards.
         trackPipelineRenames(makePipeline({mockSource(), NoModifications::create(expCtx)}),
-                             {"a", "b", "c.d"} /* pathsOfInterest */,
+                             /*pathsOfInterest=*/{"a", "b", "c.d"},
                              Tracking::forwards);
     }
     {
@@ -7007,7 +7047,7 @@ TEST_F(PipelineRenameTracking, ReportsIdentityWhenNoStageModifiesAnything) {
                                            NoModifications::create(expCtx),
                                            NoModifications::create(expCtx),
                                            NoModifications::create(expCtx)}),
-                             {"a", "b", "c.d"} /* pathsOfInterest */,
+                             /*pathsOfInterest=*/{"a", "b", "c.d"},
                              Tracking::backwards);
     }
     {
@@ -7016,7 +7056,7 @@ TEST_F(PipelineRenameTracking, ReportsIdentityWhenNoStageModifiesAnything) {
                                            NoModifications::create(expCtx),
                                            NoModifications::create(expCtx),
                                            NoModifications::create(expCtx)}),
-                             {"a", "b", "c.d"} /* pathsOfInterest */,
+                             /*pathsOfInterest=*/{"a", "b", "c.d"},
                              Tracking::forwards);
     }
 }
@@ -7162,25 +7202,25 @@ TEST_F(PipelineRenameTracking, ReportsIdentityMapWhenGivenEmptyIteratorRange) {
     {
         // Tracking backwards.
         trackPipelineRenamesOnEmptyRange(makePipeline({mockSource(), RenamesAToB::create(expCtx)}),
-                                         {"b"} /* pathsOfInterest */,
+                                         /*pathsOfInterest=*/{"b"},
                                          Tracking::backwards);
     }
     {
         // Tracking forwards.
         trackPipelineRenamesOnEmptyRange(makePipeline({mockSource(), RenamesAToB::create(expCtx)}),
-                                         {"b"} /* pathsOfInterest */,
+                                         /*pathsOfInterest=*/{"b"},
                                          Tracking::forwards);
     }
     {
         // Tracking backwards.
         trackPipelineRenamesOnEmptyRange(makePipeline({mockSource(), RenamesAToB::create(expCtx)}),
-                                         {"b", "c.d"} /* pathsOfInterest */,
+                                         /*pathsOfInterest=*/{"b", "c.d"},
                                          Tracking::backwards);
     }
     {
         // Tracking forwards.
         trackPipelineRenamesOnEmptyRange(makePipeline({mockSource(), RenamesAToB::create(expCtx)}),
-                                         {"b", "c.d"} /* pathsOfInterest */,
+                                         /*pathsOfInterest=*/{"b", "c.d"},
                                          Tracking::forwards);
     }
 }
@@ -7243,14 +7283,14 @@ TEST_F(PipelineRenameTracking, CanHandleBackAndForthRename) {
         // Tracking backwards.
         trackPipelineRenames(
             makePipeline({mockSource(), RenamesAToB::create(expCtx), RenamesBToA::create(expCtx)}),
-            {"a"} /* pathsOfInterest */,
+            /*pathsOfInterest=*/{"a"},
             Tracking::backwards);
     }
     {
         // Tracking forwards.
         trackPipelineRenames(
             makePipeline({mockSource(), RenamesAToB::create(expCtx), RenamesBToA::create(expCtx)}),
-            {"a"} /* pathsOfInterest */,
+            /*pathsOfInterest=*/{"a"},
             Tracking::forwards);
     }
 }

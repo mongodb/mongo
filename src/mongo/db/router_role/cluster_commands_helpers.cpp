@@ -437,7 +437,7 @@ std::vector<AsyncRequestsSender::Response> gatherResponses(
         readPref,
         retryPolicy,
         requests,
-        true /* throwOnStaleShardVersionErrors */,
+        /*throwOnStaleShardVersionErrors=*/true,
         executor ? executor : Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
         routingCtx);
 }
@@ -567,7 +567,7 @@ std::vector<AsyncRequestsSender::Response> scatterGatherUnversionedTargetAllShar
                            readPref,
                            retryPolicy,
                            requests,
-                           nullptr /* routingCtx */,
+                           /*routingCtx=*/nullptr,
                            executor);
 }
 
@@ -637,7 +637,7 @@ std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRouting
         buildVersionedRequestsForTargetedShards(expCtx,
                                                 nss,
                                                 routingCtx.getCollectionRoutingInfo(nss),
-                                                {} /* shardsToSkip */,
+                                                /*shardsToSkip=*/{},
                                                 cmdObj,
                                                 query,
                                                 collation,
@@ -674,7 +674,7 @@ std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRouting
                                readPref,
                                retryPolicy,
                                requests,
-                               false /* throwOnStaleShardVersionErrors */,
+                               /*throwOnStaleShardVersionErrors=*/false,
                                Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
                                &routingCtx);
 }
@@ -711,10 +711,10 @@ AsyncRequestsSender::Response executeCommandAgainstShardWithMinKeyChunk(
     auto expCtx = makeExpressionContextWithDefaultsForTargeter(opCtx,
                                                                nss,
                                                                cri,
-                                                               BSONObj() /*collation*/,
+                                                               /*collation=*/BSONObj(),
                                                                /*verbosity=*/boost::none,
-                                                               boost::none /*letParameters*/,
-                                                               boost::none /*runtimeConstants*/);
+                                                               /*letParameters=*/boost::none,
+                                                               /*runtimeConstants=*/boost::none);
 
     const auto query = cri.isSharded()
         ? cri.getChunkManager().getShardKeyPattern().getKeyPattern().globalMin()
@@ -727,7 +727,7 @@ AsyncRequestsSender::Response executeCommandAgainstShardWithMinKeyChunk(
         readPref,
         retryPolicy,
         buildVersionedRequestsForTargetedShards(
-            expCtx, nss, cri, {} /* shardsToSkip */, cmdObj, query, BSONObj() /* collation */),
+            expCtx, nss, cri, /*shardsToSkip=*/{}, cmdObj, query, /*collation=*/BSONObj()),
         &routingCtx);
     return std::move(responses.front());
 }
@@ -755,7 +755,7 @@ RawResponsesResult appendRawResponses(
         // run inside transactions do not wait for write concern, except for commit and abort.
         if (TransactionRouter::get(opCtx) &&
             isTransientTransactionError(
-                status.code(), false /*hasWriteConcernError*/, false /*isCommitOrAbort*/)) {
+                status.code(), /*hasWriteConcernError=*/false, /*isCommitOrAbort=*/false)) {
             // Re-throw on transient transaction errors to make sure appropriate error labels are
             // appended to the result.
             uassertStatusOK(status);
@@ -912,7 +912,7 @@ std::vector<AsyncRequestsSender::Request> getVersionedRequestsForTargetedShards(
                                                                letParameters,
                                                                runtimeConstants);
     return buildVersionedRequestsForTargetedShards(
-        expCtx, nss, cri, {} /* shardsToSkip */, cmdObj, query, collation);
+        expCtx, nss, cri, /*shardsToSkip=*/{}, cmdObj, query, collation);
 }
 
 StatusWith<CollectionRoutingInfo> getCollectionRoutingInfoForTxnCmd_DEPRECATED(
@@ -979,7 +979,7 @@ CollectionRoutingInfo getRefreshedCollectionRoutingInfoAssertSharded_DEPRECATED(
     OperationContext* opCtx, const NamespaceString& nss) {
     const auto& catalogCache = Grid::get(opCtx)->catalogCache();
 
-    catalogCache->onStaleCollectionVersion(nss, boost::none /* wantedVersion */);
+    catalogCache->onStaleCollectionVersion(nss, /*wantedVersion=*/boost::none);
 
     auto cri = uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss));
 

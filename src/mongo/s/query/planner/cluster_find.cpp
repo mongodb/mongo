@@ -582,7 +582,7 @@ void earlyExitWithNoResults(OperationContext* opCtx,
         std::move(origRequest),
         boost::none,
         allowedFeatures,
-        !didDoFLERewrite /* mustRegisterRequestToQueryStats */);
+        /*mustRegisterRequestToQueryStats=*/!didDoFLERewrite);
     collectQueryStatsMongos(opCtx, std::move(CurOp::get(opCtx)->debug().getQueryStatsInfo().key));
 
     auto cursorId = CursorId(0);
@@ -794,7 +794,7 @@ void ClusterFind::runQuery(OperationContext* opCtx,
                     std::move(cmdRequest),
                     boost::none,
                     allowedFeatures,
-                    !didDoFLERewrite /* mustRegisterRequestToQueryStats */);
+                    /*mustRegisterRequestToQueryStats=*/!didDoFLERewrite);
 
                 // Create an RAII object that prints useful information about the ExpressionContext
                 // in the case of a tassert or crash.
@@ -868,7 +868,7 @@ void ClusterFind::runQuery(OperationContext* opCtx,
                     bodyBuilder.resetToEmpty();
 
                     auto aggRequestOnView = query_request_conversion::asAggregateCommandRequest(
-                        query->getFindCommandRequest(), false /* hasExplain */);
+                        query->getFindCommandRequest(), /*hasExplain=*/false);
 
                     if (!query_settings::isDefault(query->getExpCtx()->getQuerySettings())) {
                         aggRequestOnView.setQuerySettings(query->getExpCtx()->getQuerySettings());

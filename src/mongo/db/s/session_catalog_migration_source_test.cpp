@@ -1346,7 +1346,7 @@ TEST_F(SessionCatalogMigrationSourceTest,
                                      BSON("$set" << BSON("_id" << 1)),
                                      BSON("x" << 2),
                                      {2},
-                                     testCase.imageType /* needsRetryImage */);
+                                     /*needsRetryImage=*/testCase.imageType);
         auto op3 =
             makeDurableReplOp(repl::OpTypeEnum::kInsert, kNs, BSON("x" << 3), BSONObj(), {3});
         // op for a different ns.
@@ -1822,8 +1822,8 @@ TEST_F(SessionCatalogMigrationSourceTest,
         client.remove(NamespaceString::kSessionTransactionsTableNamespace, txnRecord.toBSON());
     };
 
-    runTest(false /*isPrepared */);
-    runTest(true /*isPrepared */);
+    runTest(/*isPrepared=*/false);
+    runTest(/*isPrepared=*/true);
 }
 
 TEST_F(SessionCatalogMigrationSourceTest,
@@ -1956,8 +1956,8 @@ TEST_F(SessionCatalogMigrationSourceTest,
         client.remove(NamespaceString::kSessionTransactionsTableNamespace, txnRecord.toBSON());
     };
 
-    runTest(false /*isPrepared */);
-    runTest(true /*isPrepared */);
+    runTest(/*isPrepared=*/false);
+    runTest(/*isPrepared=*/true);
 }
 
 TEST_F(SessionCatalogMigrationSourceTest,
@@ -2121,7 +2121,7 @@ TEST_F(
                                      BSON("$set" << BSON("_id" << 2)),
                                      BSON("x" << 2),
                                      {2},
-                                     testCase.imageType /* needsRetryImage */);
+                                     /*needsRetryImage=*/testCase.imageType);
         auto op3 =
             makeDurableReplOp(repl::OpTypeEnum::kInsert, kNs, BSON("x" << 3), BSONObj(), {3});
 
@@ -2339,7 +2339,7 @@ TEST_F(SessionCatalogMigrationSourceTest, MissingImageDocumentForNewCommittedInt
                                      BSON("$set" << BSON("y" << 1)),
                                      BSON("_id" << 1 << "x" << 2),
                                      {2},
-                                     testCase.imageType /* needsRetryImage */);
+                                     /*needsRetryImage=*/testCase.imageType);
         auto op3 =
             makeDurableReplOp(repl::OpTypeEnum::kInsert, kNs, BSON("x" << 3), BSONObj(), {3});
 
@@ -2459,7 +2459,7 @@ TEST_F(SessionCatalogMigrationSourceTest, MissingImageDocumentForCommittedIntern
                                      BSON("$set" << BSON("y" << 2)),
                                      BSON("_id" << 2 << "x" << 2),
                                      {2},
-                                     testCase.imageType /* needsRetryImage */);
+                                     /*needsRetryImage=*/testCase.imageType);
         auto op3 =
             makeDurableReplOp(repl::OpTypeEnum::kInsert, kNs, BSON("x" << 3), BSONObj(), {3});
 
@@ -2656,7 +2656,7 @@ TEST_F(SessionCatalogMigrationSourceTest,
                                      BSON("$set" << BSON("y" << 2)),
                                      BSON("_id" << 2 << "x" << 2),
                                      {2},
-                                     testCase.imageType /* needsRetryImage */);
+                                     /*needsRetryImage=*/testCase.imageType);
         auto op3 =
             makeDurableReplOp(repl::OpTypeEnum::kInsert, kNs, BSON("x" << 3), BSONObj(), {3});
         auto op4 =
@@ -2772,7 +2772,7 @@ TEST_F(SessionCatalogMigrationSourceTest,
                                      BSON("$set" << BSON("y" << 2)),
                                      BSON("_id" << 2 << "x" << 2),
                                      {2},
-                                     testCase.imageType /* needsRetryImage */);
+                                     /*needsRetryImage=*/testCase.imageType);
         auto op3 =
             makeDurableReplOp(repl::OpTypeEnum::kInsert, kNs, BSON("x" << 3), BSONObj(), {3});
 

@@ -265,8 +265,8 @@ public:
                 const auto dbNss = NamespaceStringUtil::deserialize(db.getDbName(), nss.coll());
                 ScopedSetShardRole scopedSetShardRole(opCtx,
                                                       dbNss,
-                                                      boost::none /* shardVersion */,
-                                                      db.getVersion() /* databaseVersion */);
+                                                      /*shardVersion=*/boost::none,
+                                                      /*databaseVersion=*/db.getVersion());
 
                 const auto dbCheckWithDeadlineIfSet = [&] {
                     auto checkMetadataForDb = [&]() {
@@ -483,7 +483,7 @@ public:
                                             nss,
                                             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                                             requests,
-                                            false /* allowPartialResults */,
+                                            /*allowPartialResults=*/false,
                                             /*routingCtx=*/nullptr,
                                             Shard::RetryPolicy::kIdempotentOrCursorInvalidated,
                                             {shardOpKey, configOpKey});

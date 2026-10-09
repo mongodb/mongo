@@ -87,13 +87,13 @@ public:
     std::unique_ptr<TicketHolder> makeImmediateResizeHolder(int initialNumTickets) {
         return std::make_unique<TicketHolder>(getServiceContext(),
                                               initialNumTickets,
-                                              false /* trackPeakUsed */,
+                                              /*trackPeakUsed=*/false,
                                               TicketHolder::kDefaultMaxQueueDepth,
-                                              nullptr /* delinquentCallback */,
-                                              nullptr /* executionAcquisitionCallback */,
-                                              nullptr /* executionWaitedAcquisitionCallback */,
-                                              nullptr /* executionReleaseCallback */,
-                                              nullptr /* startQueueingCallback */,
+                                              /*delinquentCallback=*/nullptr,
+                                              /*executionAcquisitionCallback=*/nullptr,
+                                              /*executionWaitedAcquisitionCallback=*/nullptr,
+                                              /*executionReleaseCallback=*/nullptr,
+                                              /*startQueueingCallback=*/nullptr,
                                               TicketHolder::ResizePolicy::kImmediate);
     }
 
@@ -230,7 +230,7 @@ struct TicketHolderTest::MockAdmission {
 
 TEST_F(TicketHolderTest, BasicTimeout) {
     auto holder = std::make_unique<TicketHolder>(
-        getServiceContext(), 1, false /* trackPeakUsed */, TicketHolder::kDefaultMaxQueueDepth);
+        getServiceContext(), 1, /*trackPeakUsed=*/false, TicketHolder::kDefaultMaxQueueDepth);
     OperationContext* opCtx = _opCtx.get();
     ASSERT_EQ(holder->used(), 0);
     ASSERT_EQ(holder->available(), 1);
@@ -261,8 +261,8 @@ TEST_F(TicketHolderTest, DelinquentAcquisitionStats) {
 
     auto holder = std::make_unique<TicketHolder>(
         getServiceContext(),
-        1 /* numTickets */,
-        false /* trackPeakUsed */,
+        /*numTickets=*/1,
+        /*trackPeakUsed=*/false,
         TicketHolder::kDefaultMaxQueueDepth,
         [](AdmissionContext* admCtx, Milliseconds delta) {
             static_cast<MockAdmissionContext*>(admCtx)->recordDelinquentAcquisition(delta);
@@ -340,7 +340,7 @@ TEST_F(TicketHolderTest, DelinquentAcquisitionStats) {
  */
 TEST_F(TicketHolderTest, ResizeStats) {
     auto holder = std::make_unique<TicketHolder>(
-        getServiceContext(), 1, false /* trackPeakUsed */, TicketHolder::kDefaultMaxQueueDepth);
+        getServiceContext(), 1, /*trackPeakUsed=*/false, TicketHolder::kDefaultMaxQueueDepth);
     OperationContext* opCtx = _opCtx.get();
     auto tickSource = getTickSource();
     Stats stats(holder.get());
@@ -408,7 +408,7 @@ TEST_F(TicketHolderTest, ResizeStats) {
 
 TEST_F(TicketHolderTest, Interruption) {
     auto holder = std::make_unique<TicketHolder>(
-        getServiceContext(), 1, false /* trackPeakUsed */, TicketHolder::kDefaultMaxQueueDepth);
+        getServiceContext(), 1, /*trackPeakUsed=*/false, TicketHolder::kDefaultMaxQueueDepth);
     OperationContext* opCtx = _opCtx.get();
 
     ASSERT_TRUE(holder->resize(opCtx, 0));
@@ -432,7 +432,7 @@ TEST_F(TicketHolderTest, Interruption) {
 
 TEST_F(TicketHolderTest, InterruptResize) {
     auto ticketHolder = std::make_unique<TicketHolder>(
-        getServiceContext(), 1, false /* trackPeakUsed */, TicketHolder::kDefaultMaxQueueDepth);
+        getServiceContext(), 1, /*trackPeakUsed=*/false, TicketHolder::kDefaultMaxQueueDepth);
 
     _opCtx->markKilled(ErrorCodes::ClientMarkedKilled);
     ASSERT_THROWS_CODE(
@@ -441,7 +441,7 @@ TEST_F(TicketHolderTest, InterruptResize) {
 
 TEST_F(TicketHolderTest, PriorityBookkeeping) {
     auto holder = std::make_unique<TicketHolder>(
-        getServiceContext(), 1, false /* trackPeakUsed */, TicketHolder::kDefaultMaxQueueDepth);
+        getServiceContext(), 1, /*trackPeakUsed=*/false, TicketHolder::kDefaultMaxQueueDepth);
     OperationContext* opCtx = _opCtx.get();
     MockAdmissionContext admCtx{};
     ScopedAdmissionPriorityBase initialPriority{opCtx, admCtx, AdmissionContext::Priority::kNormal};
@@ -478,7 +478,7 @@ TEST_F(TicketHolderTest, HighlyConcurrentAcquireReleaseTicket) {
     Hotel hotel{numRooms};
     auto holder = std::make_unique<TicketHolder>(getServiceContext(),
                                                  numRooms,
-                                                 false /* trackPeakUsed */,
+                                                 /*trackPeakUsed=*/false,
                                                  TicketHolder::kDefaultMaxQueueDepth);
 
     for (size_t i = 0; i < numThreads; ++i) {
@@ -831,13 +831,13 @@ TEST_F(TicketHolderImmediateResizeTest, WaitQueueMax0) {
     constexpr int maxNumberOfWaiters = 0;
     auto holder = std::make_unique<TicketHolder>(getServiceContext(),
                                                  initialNumTickets,
-                                                 false /* trackPeakUsed */,
+                                                 /*trackPeakUsed=*/false,
                                                  maxNumberOfWaiters,
-                                                 nullptr /* delinquentCallback */,
-                                                 nullptr /* executionAcquisitionCallback */,
-                                                 nullptr /* executionWaitedAcquisitionCallback */,
-                                                 nullptr /* executionReleaseCallback */,
-                                                 nullptr /* startQueueingCallback */,
+                                                 /*delinquentCallback=*/nullptr,
+                                                 /*executionAcquisitionCallback=*/nullptr,
+                                                 /*executionWaitedAcquisitionCallback=*/nullptr,
+                                                 /*executionReleaseCallback=*/nullptr,
+                                                 /*startQueueingCallback=*/nullptr,
                                                  TicketHolder::ResizePolicy::kImmediate);
 
     // acquire 4 tickets
@@ -870,13 +870,13 @@ TEST_F(TicketHolderImmediateResizeTest, WaitQueueMax1) {
     constexpr int maxNumberOfWaiters = 1;
     auto holder = std::make_unique<TicketHolder>(getServiceContext(),
                                                  initialNumTickets,
-                                                 false /* trackPeakUsed */,
+                                                 /*trackPeakUsed=*/false,
                                                  maxNumberOfWaiters,
-                                                 nullptr /* delinquentCallback */,
-                                                 nullptr /* executionAcquisitionCallback */,
-                                                 nullptr /* executionWaitedAcquisitionCallback */,
-                                                 nullptr /* executionReleaseCallback */,
-                                                 nullptr /* startQueueingCallback */,
+                                                 /*delinquentCallback=*/nullptr,
+                                                 /*executionAcquisitionCallback=*/nullptr,
+                                                 /*executionWaitedAcquisitionCallback=*/nullptr,
+                                                 /*executionReleaseCallback=*/nullptr,
+                                                 /*startQueueingCallback=*/nullptr,
                                                  TicketHolder::ResizePolicy::kImmediate);
 
     // acquire 4 tickets
@@ -937,13 +937,13 @@ TEST_F(TicketHolderImmediateResizeTest, WaitQueueMaxChange) {
     constexpr int initialNumTickets = 4;
     auto holder = std::make_unique<TicketHolder>(getServiceContext(),
                                                  initialNumTickets,
-                                                 false /* trackPeakUsed */,
+                                                 /*trackPeakUsed=*/false,
                                                  TicketHolder::kDefaultMaxQueueDepth,
-                                                 nullptr /* delinquentCallback */,
-                                                 nullptr /* executionAcquisitionCallback */,
-                                                 nullptr /* executionWaitedAcquisitionCallback */,
-                                                 nullptr /* executionReleaseCallback */,
-                                                 nullptr /* startQueueingCallback */,
+                                                 /*delinquentCallback=*/nullptr,
+                                                 /*executionAcquisitionCallback=*/nullptr,
+                                                 /*executionWaitedAcquisitionCallback=*/nullptr,
+                                                 /*executionReleaseCallback=*/nullptr,
+                                                 /*startQueueingCallback=*/nullptr,
                                                  TicketHolder::ResizePolicy::kImmediate);
 
     // acquire 4 tickets
@@ -1021,13 +1021,13 @@ TEST_F(TicketHolderTestTick, TotalTimeQueueMicrosAccumulated) {
     constexpr int initialNumTickets = 0;
     auto holder = std::make_unique<TicketHolder>(getServiceContext(),
                                                  initialNumTickets,
-                                                 false /* trackPeakUsed */,
+                                                 /*trackPeakUsed=*/false,
                                                  TicketHolder::kDefaultMaxQueueDepth,
-                                                 nullptr /* delinquentCallback */,
-                                                 nullptr /* executionAcquisitionCallback */,
-                                                 nullptr /* executionWaitedAcquisitionCallback */,
-                                                 nullptr /* executionReleaseCallback */,
-                                                 nullptr /* startQueueingCallback */,
+                                                 /*delinquentCallback=*/nullptr,
+                                                 /*executionAcquisitionCallback=*/nullptr,
+                                                 /*executionWaitedAcquisitionCallback=*/nullptr,
+                                                 /*executionReleaseCallback=*/nullptr,
+                                                 /*startQueueingCallback=*/nullptr,
                                                  TicketHolder::ResizePolicy::kImmediate);
 
 

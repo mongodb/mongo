@@ -388,7 +388,7 @@ void logStartup(OperationContext* opCtx) {
         uassertStatusOK(collection_internal::insertDocument(opCtx,
                                                             collection.getCollectionPtr(),
                                                             InsertStatement(o),
-                                                            nullptr /* OpDebug */,
+                                                            /*OpDebug=*/nullptr,
                                                             false));
         wunit.commit();
     });
@@ -1930,7 +1930,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     }
 
     if (auto grid = Grid::get(serviceContext)) {
-        grid->shutdown(opCtx, &shutdownTimeElapsedBuilder, false /* isMongos */);
+        grid->shutdown(opCtx, &shutdownTimeElapsedBuilder, /*isMongos=*/false);
     }
 
     LOGV2_OPTIONS(9439300, {LogComponent::kSharding}, "Shutting down the filtering metadata cache");
@@ -1997,7 +1997,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         LOGV2(4784930, "Shutting down the storage engine");
         // Allow memory leak for faster shutdown.
         catalog::shutDownCollectionCatalogAndGlobalStorageEngineCleanly(serviceContext,
-                                                                        true /* memLeakAllowed */);
+                                                                        /*memLeakAllowed=*/true);
     }
 
     // Stop FTDC before tearing down FlowControl. The FTDC background thread runs serverStatus

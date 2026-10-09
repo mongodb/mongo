@@ -434,7 +434,7 @@ TEST_F(JoinPlanEnumeratorTest, LeftDeep8Nodes) {
 
 TEST_F(JoinPlanEnumeratorTest, LeftDeep8NodesINLJ) {
     unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
-    testLargeSubset(&goldenCtx, PlanTreeShape::LEFT_DEEP, 8, true /* withIndexes */);
+    testLargeSubset(&goldenCtx, PlanTreeShape::LEFT_DEEP, 8, /*withIndexes=*/true);
 }
 
 TEST_F(JoinPlanEnumeratorTest, RightDeep8Nodes) {
@@ -444,7 +444,7 @@ TEST_F(JoinPlanEnumeratorTest, RightDeep8Nodes) {
 
 TEST_F(JoinPlanEnumeratorTest, RightDeep8NodesINLJ) {
     unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
-    testLargeSubset(&goldenCtx, PlanTreeShape::RIGHT_DEEP, 8, true /* withIndexes */);
+    testLargeSubset(&goldenCtx, PlanTreeShape::RIGHT_DEEP, 8, /*withIndexes=*/true);
 }
 
 TEST_F(JoinPlanEnumeratorTest, ZigZag8Nodes) {
@@ -454,7 +454,7 @@ TEST_F(JoinPlanEnumeratorTest, ZigZag8Nodes) {
 
 TEST_F(JoinPlanEnumeratorTest, ZigZag8NodesINLJ) {
     unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
-    testLargeSubset(&goldenCtx, PlanTreeShape::ZIG_ZAG, 8, true /* withIndexes */);
+    testLargeSubset(&goldenCtx, PlanTreeShape::ZIG_ZAG, 8, /*withIndexes=*/true);
 }
 
 TEST_F(JoinPlanEnumeratorTest, ZigZag3NodesINLJ) {
@@ -465,7 +465,7 @@ TEST_F(JoinPlanEnumeratorTest, ZigZag3NodesINLJ) {
                                         .mode = PlanEnumerationMode::ALL,
                                         .enableHJOrderPruning = false},
                     3,
-                    true /* withIndexes */);
+                    /*withIndexes=*/true);
 }
 
 TEST_F(JoinPlanEnumeratorTest, InitialzeLargeSubsets) {

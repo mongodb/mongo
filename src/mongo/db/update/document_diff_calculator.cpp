@@ -456,7 +456,7 @@ void IndexUpdateIdentifier::determineAffectedIndexes(ArrayDiffReader* reader,
 }
 
 boost::optional<Diff> computeOplogDiff(const BSONObj& pre, const BSONObj& post, size_t padding) {
-    if (auto diffNode = computeDocDiff(pre, post, false /* ignoreSizeLimit */, padding)) {
+    if (auto diffNode = computeDocDiff(pre, post, /*ignoreSizeLimit=*/false, padding)) {
         auto diff = diffNode->serialize();
         if (diff.objsize() < post.objsize()) {
             return diff;
@@ -468,14 +468,14 @@ boost::optional<Diff> computeOplogDiff(const BSONObj& pre, const BSONObj& post, 
 
 Diff computeOplogDiff_forTest(const BSONObj& pre, const BSONObj& post) {
     // Compute the full document differences between 'pre' and 'post'.
-    auto diffNode = computeDocDiff(pre, post, true /* ignoreSizeLimit */, 0 /* padding */);
+    auto diffNode = computeDocDiff(pre, post, /*ignoreSizeLimit=*/true, /*padding=*/0);
     tassert(7639006, "diffNode should always have a value", diffNode);
     return diffNode->serialize();
 }
 
 boost::optional<BSONObj> computeInlineDiff(const BSONObj& pre, const BSONObj& post) {
     // Compute the full document differences between 'pre' and 'post'.
-    auto diffNode = computeDocDiff(pre, post, true /* ignoreSizeLimit */, 0);
+    auto diffNode = computeDocDiff(pre, post, /*ignoreSizeLimit=*/true, 0);
     BSONObjBuilder bob;
     serializeInlineDiff(diffNode.get(), &bob);
     if (bob.bb().len() >= BSONObjMaxUserSize) {

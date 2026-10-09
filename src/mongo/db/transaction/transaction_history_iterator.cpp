@@ -151,7 +151,7 @@ repl::OplogEntry TransactionHistoryIterator::nextFatalOnErrors(OperationContext*
 }
 
 repl::OpTime TransactionHistoryIterator::nextOpTime(OperationContext* opCtx) {
-    BSONObj oplogBSON = findOneOplogEntry(opCtx, _nextOpTime, _permitYield, true /* prevOpOnly */);
+    BSONObj oplogBSON = findOneOplogEntry(opCtx, _nextOpTime, _permitYield, /*prevOpOnly=*/true);
 
     auto prevOpTime = oplogBSON[repl::OplogEntry::kPrevWriteOpTimeInTransactionFieldName];
     uassert(ErrorCodes::FailedToParse,

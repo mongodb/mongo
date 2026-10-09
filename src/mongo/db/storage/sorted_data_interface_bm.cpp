@@ -38,7 +38,7 @@ struct Fixture {
           harness(newSortedDataInterfaceHarnessHelper(1024)),
           opCtx(harness->newOperationContext()),
           sorted(harness->newSortedDataInterface(
-              opCtx.get(), uniqueness == kUnique, /*partial*/ false, keyFormat)),
+              opCtx.get(), uniqueness == kUnique, /*partial=*/false, keyFormat)),
           cursor(sorted->newCursor(opCtx.get(),
                                    *shard_role_details::getRecoveryUnit(opCtx.get()),
                                    direction == kForward)),
@@ -85,7 +85,7 @@ void BM_SDIInsertionBulk(benchmark::State& state, int64_t numDocs) {
         newSortedDataInterfaceHarnessHelper();
     ServiceContext::UniqueOperationContext opCtx = harness->newOperationContext();
     std::unique_ptr<SortedDataInterface> sorted =
-        harness->newSortedDataInterface(opCtx.get(), false, /*partial*/ false, KeyFormat::Long);
+        harness->newSortedDataInterface(opCtx.get(), false, /*partial=*/false, KeyFormat::Long);
 
     for (auto _ : state) {
         auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
@@ -115,7 +115,7 @@ void BM_SDIInsertion(benchmark::State& state, int64_t numDocs) {
         newSortedDataInterfaceHarnessHelper();
     ServiceContext::UniqueOperationContext opCtx = harness->newOperationContext();
     std::unique_ptr<SortedDataInterface> sorted =
-        harness->newSortedDataInterface(opCtx.get(), false, /*partial*/ false, KeyFormat::Long);
+        harness->newSortedDataInterface(opCtx.get(), false, /*partial=*/false, KeyFormat::Long);
 
     for (auto _ : state) {
         auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
@@ -145,7 +145,7 @@ void BM_SDIInsertionChunked(benchmark::State& state, int64_t numDocs, int numChu
         newSortedDataInterfaceHarnessHelper();
     ServiceContext::UniqueOperationContext opCtx = harness->newOperationContext();
     std::unique_ptr<SortedDataInterface> sorted =
-        harness->newSortedDataInterface(opCtx.get(), false, /*partial*/ false, KeyFormat::Long);
+        harness->newSortedDataInterface(opCtx.get(), false, /*partial=*/false, KeyFormat::Long);
 
     for (auto _ : state) {
         auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
@@ -229,7 +229,7 @@ void BM_SDIAdvanceWithEnd(benchmark::State& state,
     auto& ru = *shard_role_details::getRecoveryUnit(fix.opCtx.get());
     for (auto _ : state) {
         BSONObj lastKey = BSON("" << (direction == kForward ? fix.nToInsert : 1));
-        fix.cursor->setEndPosition(lastKey, /*inclusive*/ true);
+        fix.cursor->setEndPosition(lastKey, /*inclusive=*/true);
         fix.cursor->seek(ru, fix.firstKey.finishAndGetBuffer());
         for (int i = 1; i < fix.nToInsert; i++)
             fix.cursor->next(ru, kRecordId);

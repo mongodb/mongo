@@ -84,7 +84,7 @@ public:
             const CollectionOptions&,
             BSONObj,
             const std::vector<BSONObj>&,
-            bool /*recordIdsReplicated*/)>;
+            /*recordIdsReplicated=*/bool)>;
     using InsertDocumentFn = std::function<Status(
         OperationContext*, const NamespaceStringOrUUID&, const TimestampedBSONObj&, long long)>;
     using InsertDocumentsFn = std::function<Status(

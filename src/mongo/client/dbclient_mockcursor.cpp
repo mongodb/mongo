@@ -28,7 +28,7 @@ DBClientMockCursor::DBClientMockCursor(mongo::DBClientBase* client,
                                        const BSONArray& mockCollection,
                                        const bool provideResumeToken,
                                        unsigned long batchSize)
-    : mongo::DBClientCursor(client, NamespaceString::kEmpty, 0 /*cursorId*/, false /*isExhaust*/),
+    : mongo::DBClientCursor(client, NamespaceString::kEmpty, /*cursorId=*/0, /*isExhaust=*/false),
       _collectionArray(mockCollection),
       _iter(_collectionArray),
       _provideResumeToken(provideResumeToken),

@@ -219,7 +219,7 @@ TEST_F(AggCmdShapeTest, SizeOfAggCmdShapeComponents) {
     auto aggComponents = makeShapeComponentsFromPipeline(
         {R"({$match: {x: 3, y: {$lte: 3}}})"sv,
          R"({$group: {_id: "$y", z: {$max: "$z"}, w: {$avg: "$w"}}})"},
-        false /*allowDiskUse*/);
+        /*allowDiskUse=*/false);
 
     // The sizes of any members of AggCmdShapeComponents are typically accounted for by
     // sizeof(AggCmdShapeComponents). The important part of the test here is to ensure that any
@@ -240,21 +240,21 @@ TEST_F(AggCmdShapeTest, EquivalentAggCmdShapeComponentSizes) {
     auto aggComponentsDiskUseFalse = makeShapeComponentsFromPipeline(
         {R"({$match: {x: 3, y: {$lte: 3}}})"sv,
          R"({$group: {_id: "$y", z: {$max: "$z"}, w: {$avg: "$w"}}})"},
-        false /*allowDiskUse*/);
+        /*allowDiskUse=*/false);
     auto aggComponentsDiskUseTrue = makeShapeComponentsFromPipeline(
         {R"({$match: {x: 3, y: {$lte: 3}}})"sv,
          R"({$group: {_id: "$y", z: {$max: "$z"}, w: {$avg: "$w"}}})"},
-        true /*allowDiskUse*/);
+        /*allowDiskUse=*/true);
     ASSERT_EQ(aggComponentsDiskUseFalse->size(), aggComponentsDiskUseTrue->size());
 }
 
 TEST_F(AggCmdShapeTest, DifferentAggCmdShapeComponentSizes) {
     auto smallAggComponents = makeShapeComponentsFromPipeline({R"({$match: {x: 3, y: {$lte: 3}}})"},
-                                                              false /*allowDiskUse*/);
+                                                              /*allowDiskUse=*/false);
     auto largeAggComponents = makeShapeComponentsFromPipeline(
         {R"({$match: {x: 3, y: {$lte: 3}}})"sv,
          R"({$group: {_id: "$y", z: {$max: "$z"}, w: {$avg: "$w"}}})"},
-        false /*allowDiskUse*/);
+        /*allowDiskUse=*/false);
     ASSERT_LT(smallAggComponents->size(), largeAggComponents->size());
 }
 

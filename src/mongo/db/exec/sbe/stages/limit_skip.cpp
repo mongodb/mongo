@@ -21,7 +21,7 @@ LimitSkipStage::LimitSkipStage(std::unique_ptr<PlanStage> input,
                                PlanNodeId planNodeId,
                                bool participateInTrialRunTracking)
     : PlanStage(!skip ? "limit"sv : "limitskip"sv,
-                nullptr /* yieldPolicy */,
+                /*yieldPolicy=*/nullptr,
                 planNodeId,
                 participateInTrialRunTracking),
       _limitExpr(std::move(limit)),
@@ -128,8 +128,8 @@ void LimitSkipStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
     DebugPrinter::addNewLine(ret);
 
     if (debugPrintInfo.printBytecode) {
-        PlanStage::debugPrintBytecode(ret, _limitCode, "LIMIT" /*title*/);
-        PlanStage::debugPrintBytecode(ret, _skipCode, "SKIP" /*title*/);
+        PlanStage::debugPrintBytecode(ret, _limitCode, /*title=*/"LIMIT");
+        PlanStage::debugPrintBytecode(ret, _skipCode, /*title=*/"SKIP");
     }
 
     DebugPrinter::addBlocks(ret, _children[0]->debugPrint(debugPrintInfo));

@@ -56,7 +56,7 @@ protected:
         ShardingMongoDTestFixture::setUp();
 
         auto keysCollectionClient =
-            std::make_unique<KeysCollectionClientDirect>(false /*mustUseLocalReads*/);
+            std::make_unique<KeysCollectionClientDirect>(/*mustUseLocalReads=*/false);
 
         VectorClockMutable::get(getServiceContext())
             ->tickClusterTimeTo(LogicalTime(Timestamp(1, 0)));
@@ -155,7 +155,7 @@ TEST_F(VectorClockMongoDTest, GossipOutInternal) {
     const auto clusterTime = vc->tickClusterTime(1);
 
     BSONObjBuilder bob;
-    vc->gossipOut(operationContext(), &bob, true /* forceInternal */);
+    vc->gossipOut(operationContext(), &bob, /*forceInternal=*/true);
     auto obj = bob.obj();
 
     // On plain replset servers, gossip out to internal clients should have $clusterTime, but not
@@ -283,7 +283,7 @@ TEST_F(VectorClockMongoDTest, GossipInExternal) {
 class VectorClockMongoDDurableTest : public ShardServerTestFixture {
 protected:
     VectorClockMongoDDurableTest()
-        : ShardServerTestFixture(Options{}.useMockClock(true), false /* setUpMajorityReads */) {}
+        : ShardServerTestFixture(Options{}.useMockClock(true), /*setUpMajorityReads=*/false) {}
 };
 
 TEST_F(VectorClockMongoDDurableTest, DurableTimeDoesNotHangAfterShutdown) {

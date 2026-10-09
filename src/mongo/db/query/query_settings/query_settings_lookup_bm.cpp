@@ -61,7 +61,7 @@ std::unique_ptr<ParsedFindCommand> generateSmallParsedFindRequest(
                                    << nss.dbName().serializeWithoutTenantPrefix_UNSAFE() << "filter"
                                    << rawFilter));
     auto findCmd = query_request_helper::makeFromFindCommand(std::move(bob.asTempObj()),
-                                                             boost::none /* vts */,
+                                                             /*vts=*/boost::none,
                                                              /* tenantId */ boost::none,
                                                              kSerializationContext);
     return uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(findCmd)}));
@@ -97,7 +97,7 @@ std::unique_ptr<ParsedFindCommand> generateMediumParsedFindRequest(
                                    << nss.dbName().serializeWithoutTenantPrefix_UNSAFE() << "filter"
                                    << rawFilter << "projection" << rawProjection));
     auto findCmd = query_request_helper::makeFromFindCommand(std::move(bob.asTempObj()),
-                                                             boost::none /* vts */,
+                                                             /*vts=*/boost::none,
                                                              /* tenantId */ boost::none,
                                                              kSerializationContext);
     return uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(findCmd)}));
@@ -141,7 +141,7 @@ std::unique_ptr<ParsedFindCommand> generateLargeParsedFindRequest(
     const boost::intrusive_ptr<ExpressionContext> expCtx,
     const NamespaceString& nss,
     BSONObjBuilder& bob) {
-    PseudoRandom randomNumberGenerator(1 /* seed */);
+    PseudoRandom randomNumberGenerator(/*seed=*/1);
     auto rawFilter =
         BSON("$or" << BSON_ARRAY(BSON(generateFieldName() << 1)
                                  << BSON(generateFieldName() << BSON("$ne" << 1))
@@ -161,7 +161,7 @@ std::unique_ptr<ParsedFindCommand> generateLargeParsedFindRequest(
         "find" << nss.coll() << "$db" << nss.dbName().serializeWithoutTenantPrefix_UNSAFE()
                << "filter" << rawFilter << "projection" << rawProjection << "sort" << rawSort));
     auto findCmd = query_request_helper::makeFromFindCommand(std::move(bob.asTempObj()),
-                                                             boost::none /* vts */,
+                                                             /*vts=*/boost::none,
                                                              /* tenantId */ boost::none,
                                                              kSerializationContext);
     return uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(findCmd)}));

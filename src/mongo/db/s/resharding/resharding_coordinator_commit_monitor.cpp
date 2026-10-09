@@ -148,7 +148,7 @@ CoordinatorCommitMonitor::queryRemainingOperationTime() const {
                             requests,
                             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                             Shard::RetryPolicy::kIdempotent,
-                            nullptr /* resourceYielder */,
+                            /*resourceYielder=*/nullptr,
                             /*designatedHostsMap=*/{});
 
 

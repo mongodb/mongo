@@ -102,7 +102,7 @@ OpMsgFuzzerShardFixture::OpMsgFuzzerShardFixture(bool skipGlobalInitializers)
 
     catalog::startUpStorageEngineAndCollectionCatalog(
         _serviceContext, clientGuard.get(), StorageEngineInitFlags::kSkipMetadataFile);
-    StorageControl::startStorageControls(_serviceContext, true /*forTestOnly*/);
+    StorageControl::startStorageControls(_serviceContext, /*forTestOnly=*/true);
 
     ShardingState::create(_serviceContext);
     CollectionShardingStateFactory::set(
@@ -133,7 +133,7 @@ OpMsgFuzzerShardFixture::~OpMsgFuzzerShardFixture() {
     }
 
     catalog::shutDownCollectionCatalogAndGlobalStorageEngineCleanly(_serviceContext,
-                                                                    true /* memLeakAllowed */);
+                                                                    /*memLeakAllowed=*/true);
 }
 
 int OpMsgFuzzerShardFixture::testOneInput(const char* Data, size_t Size) {

@@ -85,7 +85,7 @@ TEST_F(ClusteredCollectionFastPathTest, UpdateAppliesViaFastPath) {
     auto op = makeUpdateDocumentOplogEntry(nextOpTime(),
                                            _nss,
                                            /*documentToUpdate=*/BSON("_id" << 1),
-                                           BSON("$set" << BSON("x" << 200)) /* o */);
+                                           /*o=*/BSON("$set" << BSON("x" << 200)));
     ASSERT_OK(runOpSteadyState(op));
 
     // The document should be updated and remain at the RecordId derived from its _id.

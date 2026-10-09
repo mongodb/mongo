@@ -89,7 +89,7 @@ std::vector<BSONObj> Test::getAllResults(DBClientConnection* const conn, const B
                                result.getField("cursor").embeddedObject().getStringField("ns"),
                                SerializationContext::stateDefault()),
                            id,
-                           false /*isExhaust*/);
+                           /*isExhaust=*/false);
         while (cursor.more()) {
             actualObjs.push_back(cursor.nextSafe().getOwned());
         }
@@ -322,7 +322,7 @@ Test Test::parseTest(std::fstream& fs,
                     std::move(preQueryComments),
                     std::move(postQueryComments),
                     std::move(postTestComments),
-                    {} /* expectedResult */,
+                    /*expectedResult=*/{},
                     overrideOption);
     }
 }

@@ -1704,10 +1704,10 @@ TEST_F(BulkWriteOpTest, TestBulkWriteInsertSizeEstimation) {
 // Test that we calculate accurate estimates for bulkWrite update ops.
 // TODO (SERVER-82382): Replace ASSERT_GTE with ASSERT_EQ for the following test.
 TEST_F(BulkWriteOpTest, TestBulkWriteUpdateSizeEstimation) {
-    auto basicUpdate = makeTestUpdateOp(fromjson("{x: 1}") /* filter */,
+    auto basicUpdate = makeTestUpdateOp(/*filter=*/fromjson("{x: 1}"),
                                         write_ops::UpdateModification(fromjson("{$set: {y: 1}}")),
-                                        mongo::OptionalBool() /* upsertSupplied */,
-                                        BSONObj() /* hint */,
+                                        /*upsertSupplied=*/mongo::OptionalBool(),
+                                        /*hint=*/BSONObj(),
                                         boost::none,
                                         boost::none,
                                         boost::none,
@@ -1715,36 +1715,36 @@ TEST_F(BulkWriteOpTest, TestBulkWriteUpdateSizeEstimation) {
     ASSERT_GTE(getSizeEstimate(basicUpdate), getActualSize(basicUpdate));
 
     auto updateAllFieldsSetBesidesArrayFilters =
-        makeTestUpdateOp(fromjson("{x: 1}") /* filter */,
+        makeTestUpdateOp(/*filter=*/fromjson("{x: 1}"),
                          write_ops::UpdateModification(fromjson("{$set: {y: 1}}")),
-                         mongo::OptionalBool(true) /* upsertSupplied */,
-                         fromjson("{a: 1}") /* hint */,
+                         /*upsertSupplied=*/mongo::OptionalBool(true),
+                         /*hint=*/fromjson("{a: 1}"),
                          boost::none,
-                         fromjson("{a: 1}") /* sort */,
-                         fromjson("{z: 1}") /* constants */,
-                         fromjson("{locale: 'simple'}") /* collation */);
+                         /*sort=*/fromjson("{a: 1}"),
+                         /*constants=*/fromjson("{z: 1}"),
+                         /*collation=*/fromjson("{locale: 'simple'}"));
     ASSERT_GTE(getSizeEstimate(updateAllFieldsSetBesidesArrayFilters),
                getActualSize(updateAllFieldsSetBesidesArrayFilters));
 
     std::vector<BSONObj> arrayFilters = {fromjson("{j: 1}"), fromjson("{k: 1}")};
     auto updateAllFieldsSet =
-        makeTestUpdateOp(fromjson("{x: 1}") /* filter */,
+        makeTestUpdateOp(/*filter=*/fromjson("{x: 1}"),
                          write_ops::UpdateModification(fromjson("{$set: {y: 1}}")),
-                         mongo::OptionalBool(true) /* upsertSupplied */,
-                         fromjson("{a: 1}") /* hint */,
+                         /*upsertSupplied=*/mongo::OptionalBool(true),
+                         /*hint=*/fromjson("{a: 1}"),
                          arrayFilters,
-                         fromjson("{a: 1}") /* sort */,
-                         fromjson("{z: 1}") /* constants */,
-                         fromjson("{locale: 'simple'}") /* collation */);
+                         /*sort=*/fromjson("{a: 1}"),
+                         /*constants=*/fromjson("{z: 1}"),
+                         /*collation=*/fromjson("{locale: 'simple'}"));
     // We can't make an exact assertion when arrayFilters is set, because the way we estimate BSON
     // array index size overcounts for simplicity.
     ASSERT_GT(getSizeEstimate(updateAllFieldsSet), getActualSize(updateAllFieldsSet));
 
     std::vector<BSONObj> pipeline = {fromjson("{$set: {y: 1}}")};
-    auto updateWithPipeline = makeTestUpdateOp(fromjson("{x: 1}") /* filter */,
+    auto updateWithPipeline = makeTestUpdateOp(/*filter=*/fromjson("{x: 1}"),
                                                write_ops::UpdateModification(pipeline),
-                                               mongo::OptionalBool() /* upsertSupplied */,
-                                               BSONObj() /* hint */,
+                                               /*upsertSupplied=*/mongo::OptionalBool(),
+                                               /*hint=*/BSONObj(),
                                                boost::none,
                                                boost::none,
                                                boost::none,
@@ -1757,12 +1757,12 @@ TEST_F(BulkWriteOpTest, TestBulkWriteUpdateSizeEstimation) {
 // Test that we calculate accurate estimates for bulkWrite delete ops.
 // TODO (SERVER-82382): Replace ASSERT_GTE with ASSERT_EQ for the following test.
 TEST_F(BulkWriteOpTest, TestBulkWriteDeleteSizeEstimation) {
-    auto basicDelete = makeTestDeleteOp(fromjson("{x: 1}"), BSONObj() /* hint */, boost::none);
+    auto basicDelete = makeTestDeleteOp(fromjson("{x: 1}"), /*hint=*/BSONObj(), boost::none);
     ASSERT_GTE(getSizeEstimate(basicDelete), getActualSize(basicDelete));
 
-    auto deleteAllFieldsSet = makeTestDeleteOp(fromjson("{x: 1}") /* filter */,
-                                               fromjson("{y: 1}") /* hint */,
-                                               fromjson("{locale: 'simple'}") /* collation */);
+    auto deleteAllFieldsSet = makeTestDeleteOp(/*filter=*/fromjson("{x: 1}"),
+                                               /*hint=*/fromjson("{y: 1}"),
+                                               /*collation=*/fromjson("{locale: 'simple'}"));
     ASSERT_GTE(getSizeEstimate(deleteAllFieldsSet), getActualSize(deleteAllFieldsSet));
 }
 
@@ -5531,12 +5531,12 @@ TEST_F(BulkWriteOpTest, SuccessAndErrorsAreMerged) {
     auto reply1 =
         BulkWriteCommandReply(BulkWriteCommandResponseCursor(
                                   0, {item}, NamespaceString::makeBulkWriteNSS(boost::none)),
-                              0 /* nErrors */,
-                              0 /* nInserted */,
-                              1 /* nMatched */,
-                              1 /* nModified */,
-                              0 /* nUpserted */,
-                              0 /* nDeleted*/)
+                              /*nErrors=*/0,
+                              /*nInserted=*/0,
+                              /*nMatched=*/1,
+                              /*nModified=*/1,
+                              /*nUpserted=*/0,
+                              /*nDeleted=*/0)
             .toBSON()
             .addFields(BSON("ok" << 1));
     auto response1 = AsyncRequestsSender::Response{
@@ -5552,12 +5552,12 @@ TEST_F(BulkWriteOpTest, SuccessAndErrorsAreMerged) {
                           0,
                           {BulkWriteReplyItem(0, Status(ErrorCodes::BadValue, "test error"))},
                           NamespaceString::makeBulkWriteNSS(boost::none)),
-                      1 /* nErrors */,
-                      0 /* nInserted */,
-                      0 /* nMatched */,
-                      0 /* nModified */,
-                      0 /* nUpserted */,
-                      0 /* nDeleted */)
+                      /*nErrors=*/1,
+                      /*nInserted=*/0,
+                      /*nMatched=*/0,
+                      /*nModified=*/0,
+                      /*nUpserted=*/0,
+                      /*nDeleted=*/0)
                       .toBSON()
                       .addFields(BSON("ok" << 1));
     auto response2 = AsyncRequestsSender::Response{
@@ -5693,7 +5693,7 @@ TEST_F(BulkWriteOpTest, ProcessFLEResponseCalculatesSummaryFields) {
     insertReply.setStatus(Status::OK());
     insertReply.setN(2); /* nInserted=2 */
     auto replyInfo = processFLEResponse(
-        _opCtx, request, BulkWriteCRUDOp::kInsert, true /* errorsOnly */, insertReply);
+        _opCtx, request, BulkWriteCRUDOp::kInsert, /*errorsOnly=*/true, insertReply);
     ASSERT_EQ(replyInfo.summaryFields.nErrors, 0);
     ASSERT_EQ(replyInfo.summaryFields.nInserted, 2);
     ASSERT_EQ(replyInfo.summaryFields.nMatched, 0);
@@ -5710,7 +5710,7 @@ TEST_F(BulkWriteOpTest, ProcessFLEResponseCalculatesSummaryFields) {
     insertReplyWithError.addToErrDetails(
         write_ops::WriteError(1, Status(ErrorCodes::BadValue, "Dummy BadValue"))); /* nErrors=1 */
     replyInfo = processFLEResponse(
-        _opCtx, request, BulkWriteCRUDOp::kInsert, true /* errorsOnly */, insertReplyWithError);
+        _opCtx, request, BulkWriteCRUDOp::kInsert, /*errorsOnly=*/true, insertReplyWithError);
     ASSERT_EQ(replyInfo.summaryFields.nErrors, 1);
     ASSERT_EQ(replyInfo.summaryFields.nInserted, 1);
     ASSERT_EQ(replyInfo.summaryFields.nMatched, 0);
@@ -5727,7 +5727,7 @@ TEST_F(BulkWriteOpTest, ProcessFLEResponseCalculatesSummaryFields) {
     deleteReply.setStatus(Status::OK());
     deleteReply.setN(1); /* nDeleted=1 */
     replyInfo = processFLEResponse(
-        _opCtx, request, BulkWriteCRUDOp::kDelete, false /* errorsOnly */, deleteReply);
+        _opCtx, request, BulkWriteCRUDOp::kDelete, /*errorsOnly=*/false, deleteReply);
     ASSERT_EQ(replyInfo.summaryFields.nErrors, 0);
     ASSERT_EQ(replyInfo.summaryFields.nInserted, 0);
     ASSERT_EQ(replyInfo.summaryFields.nMatched, 0);
@@ -5743,7 +5743,7 @@ TEST_F(BulkWriteOpTest, ProcessFLEResponseCalculatesSummaryFields) {
     singleReplyWithError.addToErrDetails(
         write_ops::WriteError(0, Status(ErrorCodes::BadValue, "Dummy BadValue"))); /* nErrors=1 */
     replyInfo = processFLEResponse(
-        _opCtx, request, BulkWriteCRUDOp::kDelete, false /* errorsOnly */, singleReplyWithError);
+        _opCtx, request, BulkWriteCRUDOp::kDelete, /*errorsOnly=*/false, singleReplyWithError);
     ASSERT_EQ(replyInfo.summaryFields.nErrors, 1);
     ASSERT_EQ(replyInfo.summaryFields.nInserted, 0);
     ASSERT_EQ(replyInfo.summaryFields.nMatched, 0);
@@ -5761,7 +5761,7 @@ TEST_F(BulkWriteOpTest, ProcessFLEResponseCalculatesSummaryFields) {
     updateReply.setN(1);         /* nMatched=1 */
     updateReply.setNModified(1); /* nModified=1 */
     replyInfo = processFLEResponse(
-        _opCtx, request, BulkWriteCRUDOp::kUpdate, false /* errorsOnly */, updateReply);
+        _opCtx, request, BulkWriteCRUDOp::kUpdate, /*errorsOnly=*/false, updateReply);
     ASSERT_EQ(replyInfo.summaryFields.nErrors, 0);
     ASSERT_EQ(replyInfo.summaryFields.nInserted, 0);
     ASSERT_EQ(replyInfo.summaryFields.nMatched, 1);
@@ -5771,7 +5771,7 @@ TEST_F(BulkWriteOpTest, ProcessFLEResponseCalculatesSummaryFields) {
 
     // Reuse the single error reply from delete above.
     replyInfo = processFLEResponse(
-        _opCtx, request, BulkWriteCRUDOp::kUpdate, false /* errorsOnly */, singleReplyWithError);
+        _opCtx, request, BulkWriteCRUDOp::kUpdate, /*errorsOnly=*/false, singleReplyWithError);
     ASSERT_EQ(replyInfo.summaryFields.nErrors, 1);
     ASSERT_EQ(replyInfo.summaryFields.nInserted, 0);
     ASSERT_EQ(replyInfo.summaryFields.nMatched, 0);
@@ -5788,7 +5788,7 @@ TEST_F(BulkWriteOpTest, ProcessFLEResponseCalculatesSummaryFields) {
     upsertDetails->setUpsertedID(BSON("_id" << 1));
     upsertReply.addToUpsertDetails(upsertDetails.release()); /* nUpserted=1 */
     replyInfo = processFLEResponse(
-        _opCtx, request, BulkWriteCRUDOp::kUpdate, false /* errorsOnly */, upsertReply);
+        _opCtx, request, BulkWriteCRUDOp::kUpdate, /*errorsOnly=*/false, upsertReply);
     ASSERT_EQ(replyInfo.summaryFields.nErrors, 0);
     ASSERT_EQ(replyInfo.summaryFields.nInserted, 0);
     ASSERT_EQ(replyInfo.summaryFields.nMatched, 0);
@@ -6047,7 +6047,7 @@ TEST_F(BulkWriteExecTest, BulkWriteWriteConcernErrorSingleShardTest) {
     });
 
     onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
-        auto reply = createBulkWriteShardResponse(request, true /* withWriteConcernError */);
+        auto reply = createBulkWriteShardResponse(request, /*withWriteConcernError=*/true);
         return reply.toBSON();
     });
     future.default_timed_get();
@@ -6065,7 +6065,7 @@ TEST_F(BulkWriteExecTest, BulkWriteWriteConcernErrorSingleShardTest) {
     });
 
     onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
-        auto reply = createBulkWriteShardResponse(request, true /* withWriteConcernError */);
+        auto reply = createBulkWriteShardResponse(request, /*withWriteConcernError=*/true);
         reply.setCursor(BulkWriteCommandResponseCursor(
             0,  // cursorId
             std::vector<mongo::BulkWriteReplyItem>{
@@ -6113,13 +6113,13 @@ TEST_F(BulkWriteExecTest, BulkWriteWriteConcernErrorMultiShardTest) {
 
     // ShardA response.
     onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
-        auto reply = createBulkWriteShardResponse(request, true /* withWriteConcernError */);
+        auto reply = createBulkWriteShardResponse(request, /*withWriteConcernError=*/true);
         return reply.toBSON();
     });
 
     // Shard B response.
     onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
-        auto reply = createBulkWriteShardResponse(request, true /* withWriteConcernError */);
+        auto reply = createBulkWriteShardResponse(request, /*withWriteConcernError=*/true);
         return reply.toBSON();
     });
     future.default_timed_get();
@@ -6146,11 +6146,11 @@ TEST_F(BulkWriteExecTest, BulkWriteWriteConcernErrorMultiShardTest) {
     // In the unordered case it isn't clear which of these is triggered for which shard request, but
     // since the two are the same, it doesn't matter in this case.
     onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
-        auto reply = createBulkWriteShardResponse(request, true /* withWriteConcernError */);
+        auto reply = createBulkWriteShardResponse(request, /*withWriteConcernError=*/true);
         return reply.toBSON();
     });
     onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
-        auto reply = createBulkWriteShardResponse(request, true /* withWriteConcernError */);
+        auto reply = createBulkWriteShardResponse(request, /*withWriteConcernError=*/true);
         return reply.toBSON();
     });
     future.default_timed_get();
@@ -6178,7 +6178,7 @@ TEST_F(BulkWriteExecTest, BulkWriteWriteConcernErrorMultiShardTest) {
     // In the unordered case it isn't clear which of these is triggered for which shard request, but
     // since the two are the same, it doesn't matter in this case.
     onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
-        auto reply = createBulkWriteShardResponse(request, true /* withWriteConcernError */);
+        auto reply = createBulkWriteShardResponse(request, /*withWriteConcernError=*/true);
         reply.setCursor(BulkWriteCommandResponseCursor(
             0,  // cursorId
             std::vector<mongo::BulkWriteReplyItem>{

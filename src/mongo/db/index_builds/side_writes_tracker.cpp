@@ -244,7 +244,7 @@ Status SideWritesTracker::drainWritesIntoIndex(
         // meter only logs after a large number of calls to hit(), but since we use such large
         // batch sizes, progress would rarely be displayed.
         progress.get(lk)->reset(
-            count() - appliedAtStart /* total */, 3 /* secondsBetween */, 1 /* checkInterval */);
+            /*total=*/count() - appliedAtStart, /*secondsBetween=*/3, /*checkInterval=*/1);
     }
 
     // Apply operations in batches per WriteUnitOfWork. The batch size limit allows the drain to

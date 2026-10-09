@@ -213,8 +213,8 @@ public:
                 visit(OverloadedVisitor{
                           [&](const query_shape::QueryShapeHash& queryShapeHash) {
                               return setQuerySettings(opCtx,
-                                                      boost::none /*representativeQuery*/,
-                                                      boost::none /*representativeQueryInfo*/,
+                                                      /*representativeQuery=*/boost::none,
+                                                      /*representativeQueryInfo=*/boost::none,
                                                       queryShapeHash);
                           },
                           [&](const QueryInstance& representativeQuery) {

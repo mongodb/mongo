@@ -966,15 +966,15 @@ TEST_F(CursorResponseBuilderTest, buildResponseNonEmptyBatch) {
 TEST_F(CursorResponseBuilderTest, buildResponseWithAllKnownFields) {
     auto& builder = makeBuilder();
 
-    CursorMetrics metrics(2 /* keysExamined */,
-                          3 /* docsExamined */,
-                          10 /* bytesRead */,
-                          11 /* readingTimeMicros */,
-                          4 /* workingTimeMillis */,
-                          false /* hasSortStage */,
-                          true /* usedDisk */,
-                          true /* fromMultiPlanner */,
-                          false /* fromPlanCache */);
+    CursorMetrics metrics(/*keysExamined=*/2,
+                          /*docsExamined=*/3,
+                          /*bytesRead=*/10,
+                          /*readingTimeMicros=*/11,
+                          /*workingTimeMillis=*/4,
+                          /*hasSortStage=*/false,
+                          /*usedDisk=*/true,
+                          /*fromMultiPlanner=*/true,
+                          /*fromPlanCache=*/false);
     metrics.setPlanningTimeMicros(26);
     metrics.setNDocsSampled(15);
     metrics.setCpuNanos(-1);

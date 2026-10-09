@@ -112,7 +112,7 @@ protected:
                                      *autoColl,
                                      inserts.begin(),
                                      inserts.end(),
-                                     /*recordIds*/ {},
+                                     /*recordIds=*/{},
                                      /*fromMigrate=*/std::vector<bool>(inserts.size(), fromMigrate),
                                      /*defaultFromMigrate=*/fromMigrate);
                 opObserver.onUpdate(opCtx, updateArgs);
@@ -128,7 +128,7 @@ protected:
                                      *autoColl,
                                      inserts.begin(),
                                      inserts.end(),
-                                     /*recordIds*/ {},
+                                     /*recordIds=*/{},
                                      /*fromMigrate=*/std::vector<bool>(inserts.size(), fromMigrate),
                                      /*defaultFromMigrate=*/fromMigrate),
                 AssertionException);
@@ -173,7 +173,7 @@ protected:
                                             uuid,
                                             0,
                                             /*markFromMigrate=*/false,
-                                            /*isTimeseries*/ false);
+                                            /*isTimeseries=*/false);
                 opObserver.onDropIndex(opCtx, nss, uuid, "", BSONObj(), false);
                 // For renames, make sure we check both from and to for the given namespace
                 opObserver.preRenameCollection(opCtx,
@@ -184,7 +184,7 @@ protected:
                                                0,
                                                /*stayTemp=*/false,
                                                /*markFromMigrate=*/false,
-                                               /*isTimeseries*/ false);
+                                               /*isTimeseries=*/false);
                 opObserver.preRenameCollection(opCtx,
                                                adminNss,
                                                nss,
@@ -193,7 +193,7 @@ protected:
                                                0,
                                                /*stayTemp=*/false,
                                                /*markFromMigrate=*/false,
-                                               /*isTimeseries*/ false);
+                                               /*isTimeseries=*/false);
                 opObserver.onRenameCollection(opCtx,
                                               nss,
                                               adminNss,
@@ -202,7 +202,7 @@ protected:
                                               0,
                                               /*stayTemp=*/false,
                                               /*markFromMigrate=*/false,
-                                              /*isTimeseries*/ false);
+                                              /*isTimeseries=*/false);
                 opObserver.onRenameCollection(opCtx,
                                               adminNss,
                                               nss,
@@ -211,7 +211,7 @@ protected:
                                               0,
                                               /*stayTemp=*/false,
                                               /*markFromMigrate=*/false,
-                                              /*isTimeseries*/ false);
+                                              /*isTimeseries=*/false);
                 opObserver.onImportCollection(
                     opCtx, uuid, nss, 0, 0, BSONObj(), BSONObj(), false, false);
             } catch (...) {
@@ -245,7 +245,7 @@ protected:
                                                       uuid,
                                                       0,
                                                       /*markFromMigrate=*/false,
-                                                      /*isTimeseries*/ false),
+                                                      /*isTimeseries=*/false),
                           AssertionException);
             ASSERT_THROWS(opObserver.onDropIndex(opCtx, nss, uuid, "", BSONObj(), false),
                           AssertionException);
@@ -257,7 +257,7 @@ protected:
                                                          0,
                                                          /*stayTemp=*/false,
                                                          /*markFromMigrate=*/false,
-                                                         /*isTimeseries*/ false),
+                                                         /*isTimeseries=*/false),
                           AssertionException);
             ASSERT_THROWS(opObserver.preRenameCollection(opCtx,
                                                          adminNss,
@@ -267,7 +267,7 @@ protected:
                                                          0,
                                                          /*stayTemp=*/false,
                                                          /*markFromMigrate=*/false,
-                                                         /*isTimeseries*/ false),
+                                                         /*isTimeseries=*/false),
                           AssertionException);
             ASSERT_THROWS(opObserver.onRenameCollection(opCtx,
                                                         nss,
@@ -277,7 +277,7 @@ protected:
                                                         0,
                                                         /*stayTemp=*/false,
                                                         /*markFromMigrate=*/false,
-                                                        /*isTimeseries*/ false),
+                                                        /*isTimeseries=*/false),
                           AssertionException);
             ASSERT_THROWS(opObserver.onRenameCollection(opCtx,
                                                         adminNss,
@@ -287,7 +287,7 @@ protected:
                                                         0,
                                                         /*stayTemp=*/false,
                                                         /*markFromMigrate=*/false,
-                                                        /*isTimeseries*/ false),
+                                                        /*isTimeseries=*/false),
                           AssertionException);
             ASSERT_THROWS(opObserver.onImportCollection(
                               opCtx, uuid, nss, 0, 0, BSONObj(), BSONObj(), false, false),
@@ -360,13 +360,13 @@ TEST_F(UserWriteBlockModeOpObserverTest, WriteBlockingEnabledNoBypass) {
     runCUD(opCtx.get(),
            NamespaceString::createNamespaceString_forTest("userDB.coll"),
            true,
-           true /* fromMigrate */);
+           /*fromMigrate=*/true);
 
     // Ensure that writes to the <db>.system.profile collections are always allowed
     runCUD(opCtx.get(),
            NamespaceString::createNamespaceString_forTest("userDB.system.profile"),
-           true /* shouldSucceed */,
-           false /* fromMigrate */);
+           /*shouldSucceed=*/true,
+           /*fromMigrate=*/false);
 }
 
 TEST_F(UserWriteBlockModeOpObserverTest, WriteBlockingEnabledWithBypass) {

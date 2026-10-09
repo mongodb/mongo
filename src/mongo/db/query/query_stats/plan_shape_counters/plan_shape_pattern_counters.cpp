@@ -190,7 +190,7 @@ query_solution_analyzer::StateMachineMatcher makePlanShapeMatcher() {
     // Pass ignoreNonEssentialNodes=true to have the state machine only consider
     // nodes that are involved in defining the plan shape.
     return query_solution_analyzer::StateMachineMatcher(planShapeMachine(),
-                                                        true /* ignoreNonEssentialNodes */);
+                                                        /*ignoreNonEssentialNodes=*/true);
 }
 
 }  // namespace mongo::plan_shape_counters

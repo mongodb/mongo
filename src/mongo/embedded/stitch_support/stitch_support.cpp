@@ -599,10 +599,10 @@ stitch_support_v1_update_apply(stitch_support_v1_update* const update,
         uassertStatusOK(update->updateDriver.update(update->opCtx.get(),
                                                     matchedField,
                                                     &mutableDoc,
-                                                    false /* validateForStorage */,
+                                                    /*validateForStorage=*/false,
                                                     immutablePaths,
-                                                    false /* isInsert */,
-                                                    nullptr /* updateRecord */,
+                                                    /*isInsert=*/false,
+                                                    /*updateRecord=*/nullptr,
                                                     &docWasModified,
                                                     &modifiedPaths));
 
@@ -644,14 +644,14 @@ uint8_t* MONGO_API_CALL stitch_support_v1_update_upsert(stitch_support_v1_update
         }
 
         uassertStatusOK(update->updateDriver.update(update->opCtx.get(),
-                                                    std::string_view() /* matchedField */,
+                                                    /*matchedField=*/std::string_view(),
                                                     &mutableDoc,
-                                                    false /* validateForStorage */,
+                                                    /*validateForStorage=*/false,
                                                     immutablePaths,
-                                                    true /* isInsert */,
-                                                    nullptr /* updateRecord */,
+                                                    /*isInsert=*/true,
+                                                    /*updateRecord=*/nullptr,
                                                     &docWasModified,
-                                                    nullptr /* modifiedPaths */));
+                                                    /*modifiedPaths=*/nullptr));
 
         auto outputObj = mutableDoc.getObject();
         size_t outputSize = static_cast<size_t>(outputObj.objsize());

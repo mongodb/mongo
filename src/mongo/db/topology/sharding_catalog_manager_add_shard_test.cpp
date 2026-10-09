@@ -882,7 +882,7 @@ TEST_F(AddShardTest, SuccessfullyAddConfigShard) {
                                                   FixedFCVRegion(opCtx.get()),
                                                   nullptr,
                                                   connString,
-                                                  true /* isConfigShard */));
+                                                  /*isConfigShard=*/true));
         ASSERT_EQUALS(expectedShardName, shardName);
     });
 

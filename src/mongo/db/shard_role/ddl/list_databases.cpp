@@ -158,7 +158,7 @@ public:
                                               getGlobalServiceContext()->getStorageEngine(),
                                               nameOnly,
                                               filter,
-                                              false /* setTenantId */,
+                                              /*setTenantId=*/false,
                                               authorizedDatabases,
                                               scReply);
 

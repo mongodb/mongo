@@ -34,7 +34,7 @@ long long deleteObjects(OperationContext* opCtx,
         CanonicalDelete::makeFromRequest(opCtx, collection.getCollectionPtr(), request));
 
     auto exec = uassertStatusOK(getExecutorDelete(
-        &CurOp::get(opCtx)->debug(), collection, canonicalDelete, boost::none /* verbosity */));
+        &CurOp::get(opCtx)->debug(), collection, canonicalDelete, /*verbosity=*/boost::none));
 
     return exec->executeDelete();
 }
@@ -46,7 +46,7 @@ DeleteResult deleteObject(OperationContext* opCtx,
         CanonicalDelete::makeFromRequest(opCtx, collection.getCollectionPtr(), request));
 
     auto exec = uassertStatusOK(getExecutorDelete(
-        &CurOp::get(opCtx)->debug(), collection, canonicalDelete, boost::none /* verbosity */));
+        &CurOp::get(opCtx)->debug(), collection, canonicalDelete, /*verbosity=*/boost::none));
 
     if (!request.getReturnDeleted()) {
         return {exec->executeDelete(), boost::none};

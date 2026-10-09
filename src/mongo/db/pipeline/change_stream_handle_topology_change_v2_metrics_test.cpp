@@ -149,7 +149,7 @@ TEST_F(V2StageDegradedMetricsTest, DegradedEntryAndExitThroughSetState) {
     docSource->setState_forTest(State::kFetchingInitialization, false);
     docSource->setState_forTest(State::kFetchingStartingChangeStreamSegment, false);
     docSource->setState_forTest(State::kFetchingDegradedGettingChangeEvent,
-                                true /* validateStateTransition */);
+                                /*validateStateTransition=*/true);
 
     ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamShardTargetingDegraded),
               degradedBefore + 1);
@@ -160,7 +160,7 @@ TEST_F(V2StageDegradedMetricsTest, DegradedEntryAndExitThroughSetState) {
 
     // Leaving degraded mode decrements the gauge again and counts a normal-mode entry.
     docSource->setState_forTest(State::kFetchingNormalGettingChangeEvent,
-                                true /* validateStateTransition */);
+                                /*validateStateTransition=*/true);
     ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamShardTargetingDegraded),
               degradedBefore);
     ASSERT_EQ(
@@ -189,7 +189,7 @@ TEST_F(V2StageDegradedMetricsTest, DisposeWhileDegradedDecrementsGauge) {
     docSource->setState_forTest(State::kFetchingInitialization, false);
     docSource->setState_forTest(State::kFetchingStartingChangeStreamSegment, false);
     docSource->setState_forTest(State::kFetchingDegradedGettingChangeEvent,
-                                true /* validateStateTransition */);
+                                /*validateStateTransition=*/true);
     ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamShardTargetingDegraded),
               degradedBefore + 1);
 

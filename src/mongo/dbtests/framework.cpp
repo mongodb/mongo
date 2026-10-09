@@ -75,7 +75,7 @@ int runDbTests(unittest::MainProgress& progress) {
             return;
 
         catalog::shutDownCollectionCatalogAndGlobalStorageEngineCleanly(serviceContext,
-                                                                        true /* memLeakAllowed */);
+                                                                        /*memLeakAllowed=*/true);
     });
 
     ThreadClient tc("testsuite", serviceContext->getService());
@@ -93,7 +93,7 @@ int runDbTests(unittest::MainProgress& progress) {
     serviceContext->setPeriodicRunner(std::move(runner));
 
     catalog::startUpStorageEngineAndCollectionCatalog(serviceContext, &cc());
-    StorageControl::startStorageControls(serviceContext, true /*forTestOnly*/);
+    StorageControl::startStorageControls(serviceContext, /*forTestOnly=*/true);
     DatabaseHolder::set(serviceContext, std::make_unique<DatabaseHolderImpl>());
     Collection::Factory::set(serviceContext, std::make_unique<CollectionImplFactory>());
     IndexBuildsCoordinator::set(serviceContext, std::make_unique<IndexBuildsCoordinatorMongod>());

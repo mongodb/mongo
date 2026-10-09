@@ -230,7 +230,7 @@ TEST_F(ClusterAggregateTest, AllowPartialResultsIsNotForwardedToShardAggregateCo
         [](const executor::RemoteCommandRequest& request) {
             ASSERT_FALSE(request.cmdObj.hasField("allowPartialResults"));
         },
-        true /* isTargeted */);
+        /*isTargeted=*/true);
 }
 
 // When a shard asks for an IFR flag to be disabled, the router disables it and re-dispatches the

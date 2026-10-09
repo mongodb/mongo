@@ -1718,7 +1718,7 @@ class StreamingDoesNotSpill final
 
 class StreamingCanSpill final : public CheckResultsAndSpills {
 public:
-    StreamingCanSpill() : CheckResultsAndSpills(GroupStageType::Streaming, 2 /*expectedSpills*/) {}
+    StreamingCanSpill() : CheckResultsAndSpills(GroupStageType::Streaming, /*expectedSpills=*/2) {}
 
 private:
     static constexpr int kCount = 11;

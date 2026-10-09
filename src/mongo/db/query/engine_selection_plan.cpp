@@ -313,11 +313,11 @@ EngineSelectionResult engineSelectionForPlan(const QuerySolution* solution,
     if (auto scoped = engineSelectionOverrideByIndexName.scoped();
         MONGO_unlikely(scoped.isActive())) {
         if (treeMatchesAny(
-                solution->root(), true /* allowEarlyExit*/, IndexNameRule_ForTest("sbe"))) {
+                solution->root(), /*allowEarlyExit=*/true, IndexNameRule_ForTest("sbe"))) {
             return {EngineChoice::kSbe, solution->root()};
         }
         if (treeMatchesAny(
-                solution->root(), true /* allowEarlyExit*/, IndexNameRule_ForTest("classic"))) {
+                solution->root(), /*allowEarlyExit=*/true, IndexNameRule_ForTest("classic"))) {
             return {EngineChoice::kClassic, nullptr};
         }
     }
@@ -325,7 +325,7 @@ EngineSelectionResult engineSelectionForPlan(const QuerySolution* solution,
     // TODO SERVER-129910 statically generate LU rule.
     const auto luRule = makeLookupUnwindRule(ifrContext);
     const bool containsLuPattern =
-        treeMatchesAny(dataAccessNode, true /* allowEarlyExit*/, StateMachineMatcher(luRule));
+        treeMatchesAny(dataAccessNode, /*allowEarlyExit=*/true, StateMachineMatcher(luRule));
     LOGV2_DEBUG(13022705,
                 5,
                 "Engine selection analyzed plan for LU pattern",

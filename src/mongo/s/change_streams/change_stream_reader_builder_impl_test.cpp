@@ -27,7 +27,7 @@ class ChangeStreamReaderBuilderImplTest : public ServiceContextTest {
 public:
     ChangeStreamReaderBuilderImplTest()
         : ServiceContextTest(
-              std::make_unique<ScopedGlobalServiceContextForTest>(false /* shouldSetupTL */)) {
+              std::make_unique<ScopedGlobalServiceContextForTest>(/*shouldSetupTL=*/false)) {
         _opCtx = makeOperationContext();
         _expCtx = boost::intrusive_ptr<ExpressionContextForTest>(new ExpressionContextForTest());
     }
@@ -54,7 +54,7 @@ public:
 
     ChangeStream clusterChangeStream() const {
         return ChangeStream(
-            ChangeStreamReadMode::kStrict, ChangeStreamType::kAllDatabases, boost::none /* nss */);
+            ChangeStreamReadMode::kStrict, ChangeStreamType::kAllDatabases, /*nss=*/boost::none);
     }
 
     bool assertMoveChunk(const ChangeStream& changeStream,
@@ -67,11 +67,11 @@ public:
         auto moveChunkOplogEntriesWithMatchingNss =
             buildMoveChunkOplogEntries(opCtx(),
                                        nss,
-                                       boost::none /* collUUID */,
+                                       /*collUUID=*/boost::none,
                                        fromShard,
                                        toShard,
-                                       true /* noMoreCollectionChunksOnDonor */,
-                                       false /* firstCollectionChunkOnRecipient */);
+                                       /*noMoreCollectionChunksOnDonor=*/true,
+                                       /*firstCollectionChunkOnRecipient=*/false);
         auto lastMoveChunkOplogEntryIt = --moveChunkOplogEntriesWithMatchingNss.end();
         for (auto it = moveChunkOplogEntriesWithMatchingNss.begin();
              it != lastMoveChunkOplogEntryIt;
@@ -210,7 +210,7 @@ TEST_F(
         // Ensure db only namespaces are matched accordingly.
         {
             const auto nssWithMatchingDb = NamespaceString(
-                DatabaseName::createDatabaseName_forTest(boost::none /* tenantId*/, "testDB"));
+                DatabaseName::createDatabaseName_forTest(/*tenantId=*/boost::none, "testDB"));
             NamespacePlacementChanged eventWithMatchingNss(nssWithMatchingDb, Timestamp(100));
             auto namespacePlacementChangedWithMatchingOplogEntryBSON =
                 buildNamespacePlacementChangedOplogEntry(opCtx(), eventWithMatchingNss).toBSON();
@@ -218,7 +218,7 @@ TEST_F(
             ASSERT_TRUE(exec::matcher::matches(matchExpr.get(), &matchingDoc));
 
             const auto nssWithNonMatchingDb = NamespaceString(
-                DatabaseName::createDatabaseName_forTest(boost::none /* tenantId */, "nonTestDB"));
+                DatabaseName::createDatabaseName_forTest(/*tenantId=*/boost::none, "nonTestDB"));
             NamespacePlacementChanged eventWithoutMatchingNss(nssWithNonMatchingDb, Timestamp(100));
             auto namespacePlacementChangedWithoutMatchingOplogEntryBSON =
                 buildNamespacePlacementChangedOplogEntry(opCtx(), eventWithoutMatchingNss).toBSON();
@@ -309,7 +309,7 @@ TEST_F(
         // Ensure db only namespaces are matched accordingly.
         {
             const auto nssWithMatchingDb = NamespaceString(
-                DatabaseName::createDatabaseName_forTest(boost::none /* tenantId*/, "testDB"));
+                DatabaseName::createDatabaseName_forTest(/*tenantId=*/boost::none, "testDB"));
             NamespacePlacementChanged eventWithMatchingNss(nssWithMatchingDb, Timestamp(100));
             auto namespacePlacementChangedWithMatchingOplogEntryBSON =
                 buildNamespacePlacementChangedOplogEntry(opCtx(), eventWithMatchingNss).toBSON();
@@ -317,7 +317,7 @@ TEST_F(
             ASSERT_TRUE(exec::matcher::matches(matchExpr.get(), &matchingDoc));
 
             const auto nssWithNonMatchingDb = NamespaceString(
-                DatabaseName::createDatabaseName_forTest(boost::none /* tenantId */, "nonTestDB"));
+                DatabaseName::createDatabaseName_forTest(/*tenantId=*/boost::none, "nonTestDB"));
             NamespacePlacementChanged eventWithoutMatchingNss(nssWithNonMatchingDb, Timestamp(100));
             auto namespacePlacementChangedWithoutMatchingOplogEntryBSON =
                 buildNamespacePlacementChangedOplogEntry(opCtx(), eventWithoutMatchingNss).toBSON();

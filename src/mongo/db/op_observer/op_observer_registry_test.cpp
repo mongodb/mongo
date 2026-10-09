@@ -136,7 +136,7 @@ TEST_F(OpObserverRegistryTest, NoObservers) {
     // Check that it's OK to call observer methods with no observers registered.
     registry.onDropDatabase(opCtx,
                             DatabaseName::createDatabaseName_forTest(boost::none, "test"),
-                            false /*markFromMigrate*/);
+                            /*markFromMigrate=*/false);
 }
 
 TEST_F(OpObserverRegistryTest, TwoObservers) {
@@ -145,7 +145,7 @@ TEST_F(OpObserverRegistryTest, TwoObservers) {
     registry.addObserver(std::move(unique2));
     registry.onDropDatabase(opCtx,
                             DatabaseName::createDatabaseName_forTest(boost::none, "test"),
-                            false /*markFromMigrate*/);
+                            /*markFromMigrate=*/false);
     ASSERT_EQUALS(observer1->drops, 1);
     ASSERT_EQUALS(observer2->drops, 1);
 }
@@ -158,7 +158,7 @@ TEST_F(OpObserverRegistryTest, ThrowingObserver1) {
     ASSERT_THROWS(
         registry.onDropDatabase(opCtx,
                                 DatabaseName::createDatabaseName_forTest(boost::none, "test"),
-                                false /*markFromMigrate*/),
+                                /*markFromMigrate=*/false),
         AssertionException);
     ASSERT_EQUALS(observer1->drops, 1);
     ASSERT_EQUALS(observer2->drops, 0);
@@ -172,7 +172,7 @@ TEST_F(OpObserverRegistryTest, ThrowingObserver2) {
     ASSERT_THROWS(
         registry.onDropDatabase(opCtx,
                                 DatabaseName::createDatabaseName_forTest(boost::none, "test"),
-                                false /*markFromMigrate*/),
+                                /*markFromMigrate=*/false),
         AssertionException);
     ASSERT_EQUALS(observer1->drops, 1);
     ASSERT_EQUALS(observer2->drops, 1);
@@ -263,7 +263,7 @@ TEST_F(OpObserverRegistryTest, SealDoesNotAffectCallbacks) {
     registry.seal();
     registry.onDropDatabase(opCtx,
                             DatabaseName::createDatabaseName_forTest(boost::none, "test"),
-                            false /*markFromMigrate*/);
+                            /*markFromMigrate=*/false);
     ASSERT_EQUALS(observer1->drops, 1);
     ASSERT_EQUALS(observer2->drops, 1);
 }

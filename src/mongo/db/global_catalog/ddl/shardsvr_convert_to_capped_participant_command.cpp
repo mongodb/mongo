@@ -78,7 +78,7 @@ public:
             // Note: the receiver of this command is expected to be the only data bearing shard for
             // the collection - change stream readers expect to observe the effects of the DDL from
             // here.
-            convertToCapped(opCtx, ns(), size, false /*fromMigrate*/, request().getTargetUUID());
+            convertToCapped(opCtx, ns(), size, /*fromMigrate=*/false, request().getTargetUUID());
 
             // In case no write that generated a retryable write oplog entry with this sessionId
             // and txnNumber has happened, we need to make a dummy write so that the session gets
@@ -88,8 +88,8 @@ public:
             dbClient.update(NamespaceString::kServerConfigurationNamespace,
                             BSON("_id" << Request::kCommandName),
                             BSON("$inc" << BSON("count" << 1)),
-                            true /* upsert */,
-                            false /* multi */);
+                            /*upsert=*/true,
+                            /*multi=*/false);
         }
 
     private:

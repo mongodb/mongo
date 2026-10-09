@@ -81,7 +81,7 @@ TEST_F(DispatchShardPipelineTest, DoesNotSplitPipelineIfTargetingOneShard) {
                                                                           pipelineDataSource,
                                                                           eligibleForSampling,
                                                                           std::move(pipeline),
-                                                                          boost::none /*explain*/,
+                                                                          /*explain=*/boost::none,
                                                                           kTestAggregateNss);
                 ASSERT_EQ(results.remoteCursors.size(), 1UL);
                 ASSERT(!results.splitPipeline);
@@ -121,7 +121,7 @@ TEST_F(DispatchShardPipelineTest, DoesSplitPipelineIfMatchSpansTwoShards) {
                                                                           pipelineDataSource,
                                                                           eligibleForSampling,
                                                                           std::move(pipeline),
-                                                                          boost::none /*explain*/,
+                                                                          /*explain=*/boost::none,
                                                                           kTestAggregateNss);
                 ASSERT_EQ(results.remoteCursors.size(), 2UL);
                 ASSERT(bool(results.splitPipeline));
@@ -165,7 +165,7 @@ TEST_F(DispatchShardPipelineTest, DispatchShardPipelineRetriesOnNetworkError) {
                                                                           pipelineDataSource,
                                                                           eligibleForSampling,
                                                                           std::move(pipeline),
-                                                                          boost::none /*explain*/,
+                                                                          /*explain=*/boost::none,
                                                                           kTestAggregateNss);
                 ASSERT_EQ(results.remoteCursors.size(), 2UL);
                 ASSERT(bool(results.splitPipeline));
@@ -220,7 +220,7 @@ TEST_F(DispatchShardPipelineTest, DispatchShardPipelineDoesNotRetryOnStaleConfig
                                                                pipelineDataSource,
                                                                eligibleForSampling,
                                                                std::move(pipeline),
-                                                               boost::none /*explain*/,
+                                                               /*explain=*/boost::none,
                                                                kTestAggregateNss),
                     AssertionException,
                     ErrorCodes::StaleConfig);
@@ -267,7 +267,7 @@ TEST_F(DispatchShardPipelineTest, WrappedDispatchDoesRetryOnStaleConfigError) {
                                                                   pipelineDataSource,
                                                                   eligibleForSampling,
                                                                   pipeline->clone(),
-                                                                  boost::none /*explain*/,
+                                                                  /*explain=*/boost::none,
                                                                   kTestAggregateNss);
             });
         ASSERT_EQ(results.remoteCursors.size(), 1UL);

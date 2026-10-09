@@ -192,7 +192,7 @@ TEST_F(CollectionIndexUsageTrackerTest, ExhaustiveFeatures) {
         const std::string pluginName = IndexNames::findPluginName(spec["key"].Obj());
         const auto desc = IndexDescriptor(pluginName, spec);
         const auto name = "test";
-        getTracker()->registerIndex(name, spec, IndexFeatures::make(&desc, false /* internal */));
+        getTracker()->registerIndex(name, spec, IndexFeatures::make(&desc, /*internal=*/false));
         ASSERT_EQ(1, getAggregatedIndexUsage()->getCount());
 
         getAggregatedIndexUsage()->forEachFeature([&](auto f, auto& stats) {

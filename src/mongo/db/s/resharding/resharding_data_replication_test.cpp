@@ -88,12 +88,12 @@ public:
                                                BSON(_currentShardKey << 1),
                                                false, /* unsplittable */
                                                std::move(defaultCollator),
-                                               false /* unique */,
+                                               /*unique=*/false,
                                                epoch,
                                                Timestamp(1, 1),
-                                               boost::none /* timeseriesFields */,
-                                               boost::none /* reshardingFields */,
-                                               true /* allowMigrations */,
+                                               /*timeseriesFields=*/boost::none,
+                                               /*reshardingFields=*/boost::none,
+                                               /*allowMigrations=*/true,
                                                chunks);
 
         return CurrentChunkManager(makeStandaloneRoutingTableHistory(std::move(rt)));
@@ -174,15 +174,15 @@ protected:
             ReshardingDataReplication::make(opCtx.get(),
                                             reshardingMetrics.get(),
                                             &applierMetricsMap,
-                                            1 /* oplogBatchTaskCount */,
+                                            /*oplogBatchTaskCount=*/1,
                                             recipientDoc.getCommonReshardingMetadata(),
                                             recipientDoc.getDonorShards(),
                                             *recipientDoc.getCloneTimestamp(),
-                                            true /* cloningDone */,
+                                            /*cloningDone=*/true,
                                             myShardId,
                                             sourceChunkMgr,
                                             storeOplogFetcherProgress,
-                                            false /* relaxed */);
+                                            /*relaxed=*/false);
 
         const auto oplopFetcherProgressColl =
             acquireCollection(opCtx.get(),
@@ -426,11 +426,11 @@ TEST_F(ReshardingDataReplicationTest, GetOplogApplierResumeId) {
 }
 
 TEST_F(ReshardingDataReplicationTest, CreateProgressCollection) {
-    testCreateOplogFetcherProgressCollection(true /* storeOplogFetcherProgress */);
+    testCreateOplogFetcherProgressCollection(/*storeOplogFetcherProgress=*/true);
 }
 
 TEST_F(ReshardingDataReplicationTest, NotCreateProgressCollection) {
-    testCreateOplogFetcherProgressCollection(false /* storeOplogFetcherProgress */);
+    testCreateOplogFetcherProgressCollection(/*storeOplogFetcherProgress=*/false);
 }
 
 }  // namespace

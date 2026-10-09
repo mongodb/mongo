@@ -164,8 +164,8 @@ public:
                 client.update(NamespaceString::kServerConfigurationNamespace,
                               BSON("_id" << Request::kCommandName),
                               BSON("$inc" << BSON("count" << 1)),
-                              true /* upsert */,
-                              false /* multi */);
+                              /*upsert=*/true,
+                              /*multi=*/false);
             }
 
             if (allowChunkOperations) {
@@ -209,7 +209,7 @@ public:
             TransactionParticipant::get(opCtx).beginOrContinue(
                 opCtx,
                 {*opCtx->getTxnNumber()},
-                boost::none /* autocommit */,
+                /*autocommit=*/boost::none,
                 TransactionParticipant::TransactionActions::kNone);
 
             LOGV2_INFO(12120902,

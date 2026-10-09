@@ -155,7 +155,7 @@ void startTransactionWithNoopFind(OperationContext* opCtx,
         ReadWriteConcernDefaults::get(opCtx).getImplicitDefaultReadConcern());
 
     auto res = runCommandInLocalTxn(
-                   opCtx, nss.dbName(), true /*startTransaction*/, txnNumber, findCommand.toBSON())
+                   opCtx, nss.dbName(), /*startTransaction=*/true, txnNumber, findCommand.toBSON())
                    .body;
     uassertStatusOK(getStatusFromCommandResult(res));
 }
@@ -631,7 +631,7 @@ BSONObj ShardingCatalogManager::writeToConfigDocumentInTxn(OperationContext* opC
     invariant(nss.dbName() == DatabaseName::kConfig);
     auto response =
         runCommandInLocalTxn(
-            opCtx, nss.dbName(), false /* startTransaction */, txnNumber, request.toBSON())
+            opCtx, nss.dbName(), /*startTransaction=*/false, txnNumber, request.toBSON())
             .body;
 
     uassertStatusOK(getStatusFromWriteCommandReply(response));
@@ -682,7 +682,7 @@ boost::optional<BSONObj> ShardingCatalogManager::findOneConfigDocumentInTxn(
     findCommand.setLimit(1);
 
     auto res = runCommandInLocalTxn(
-                   opCtx, nss.dbName(), false /*startTransaction*/, txnNumber, findCommand.toBSON())
+                   opCtx, nss.dbName(), /*startTransaction=*/false, txnNumber, findCommand.toBSON())
                    .body;
     uassertStatusOK(getStatusFromCommandResult(res));
 
@@ -830,7 +830,7 @@ void ShardingCatalogManager::withTransactionAPI(OperationContext* opCtx,
     auto& executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
 
     auto txn = txn_api::SyncTransactionWithRetries(
-        opCtx, executor, nullptr /* resourceYielder */, inlineExecutor);
+        opCtx, executor, /*resourceYielder=*/nullptr, inlineExecutor);
     txn.run(opCtx,
             [innerCallback = std::move(callback),
              namespaceForInitialFind](const txn_api::TransactionClient& txnClient,
@@ -897,7 +897,7 @@ void ShardingCatalogManager::withTransaction(
             throw;
         } catch (const DBException& ex) {
             if (isTransientTransactionError(
-                    ex.code(), false /* hasWriteConcernError */, false /* isCommitOrAbort */)) {
+                    ex.code(), /*hasWriteConcernError=*/false, /*isCommitOrAbort=*/false)) {
                 logAndBackoff(5108800,
                               ::mongo::logv2::LogComponent::kSharding,
                               logv2::LogSeverity::Debug(1),
@@ -914,7 +914,7 @@ void ShardingCatalogManager::withTransaction(
         if (!cmdStatus.isOK() && !cmdStatus.isA<ErrorCategory::NotPrimaryError>() &&
             !cmdStatus.isA<ErrorCategory::ShutdownError>() &&
             isTransientTransactionError(
-                cmdStatus.code(), !wcStatus.isOK(), true /* isCommitOrAbort */)) {
+                cmdStatus.code(), !wcStatus.isOK(), /*isCommitOrAbort=*/true)) {
             logAndBackoff(5108801,
                           ::mongo::logv2::LogComponent::kSharding,
                           logv2::LogSeverity::Debug(1),

@@ -439,7 +439,7 @@ TEST_F(JoinPlanEnumeratorHintingTest, HintedEnumeration) {
 }
 
 TEST_F(JoinPlanEnumeratorHintingTest, HintedEnumerationINLJ) {
-    initGraph(2, true /* withIndexes */);
+    initGraph(2, /*withIndexes=*/true);
     graph.addSimpleEqualityEdge(NodeId(0), NodeId(1), 0, 1);
 
     auto jCtx = makeContext();
@@ -489,7 +489,7 @@ TEST_F(JoinPlanEnumeratorHintingTest, HintedEnumerationINLJ) {
 }
 
 TEST_F(JoinPlanEnumeratorHintingTest, HintedEnumerationNoContradictoryShapes) {
-    initGraph(3, true /* withIndexes */);
+    initGraph(3, /*withIndexes=*/true);
     graph.addSimpleEqualityEdge(NodeId(0), NodeId(1), 0, 1);
     graph.addSimpleEqualityEdge(NodeId(1), NodeId(2), 1, 2);
     graph.addSimpleEqualityEdge(NodeId(0), NodeId(2), 0, 2);
@@ -559,7 +559,7 @@ assertJoinShapeAndGetChildNodes(const PlanEnumeratorContext& ctx,
 }
 
 TEST_F(JoinPlanEnumeratorHintingTest, WildcardEnumerationHinting) {
-    initGraph(2, true /* withIndexes */);
+    initGraph(2, /*withIndexes=*/true);
     graph.addSimpleEqualityEdge(NodeId(0), NodeId(1), 0, 1);
 
     auto jCtx = makeContext();
@@ -725,7 +725,7 @@ TEST_F(JoinPlanEnumeratorHintingTest, WildcardEnumerationHinting) {
 }
 
 TEST_F(JoinPlanEnumeratorHintingTest, WildcardEnumeration3Node) {
-    initGraph(3, true /* withIndexes */);
+    initGraph(3, /*withIndexes=*/true);
     graph.addSimpleEqualityEdge(NodeId(0), NodeId(1), 0, 1);
     graph.addSimpleEqualityEdge(NodeId(1), NodeId(2), 0, 1);
 

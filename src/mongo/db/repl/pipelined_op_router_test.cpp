@@ -49,7 +49,7 @@ protected:
 
     OplogEntry noopOp(const NamespaceString& nss, const BSONObj& object) {
         return repl::makeOplogEntry(
-            nextOpTime(), OpTypeEnum::kNoop, nss, boost::none /* uuid */, object);
+            nextOpTime(), OpTypeEnum::kNoop, nss, /*uuid=*/boost::none, object);
     }
 
     OplogEntry commandOp(const NamespaceString& nss, const BSONObj& command) {
@@ -62,8 +62,8 @@ protected:
                                             std::move(ops),
                                             OperationSessionInfo(),
                                             Date_t::now(),
-                                            {} /* stmtIds */,
-                                            boost::none /* prevWriteOpTimeInTransaction */);
+                                            /*stmtIds=*/{},
+                                            /*prevWriteOpTimeInTransaction=*/boost::none);
     }
 
     // A transaction applyOps entry. A null 'prevOpTime' marks the transaction's first entry.
@@ -75,9 +75,9 @@ protected:
                                             std::move(ops),
                                             sessionInfo,
                                             Date_t::now(),
-                                            {} /* stmtIds */,
+                                            /*stmtIds=*/{},
                                             prevOpTime,
-                                            boost::none /* multiOpType */,
+                                            /*multiOpType=*/boost::none,
                                             applyOpsType);
     }
 
@@ -122,27 +122,26 @@ TEST_F(PipelinedOpRouterTest, ClassifiesContainerOpsAsPipelined) {
     auto ident = serviceContext->getStorageEngine()->generateNewInternalIdent();
     auto value = BSONBinData("V", 1, BinDataGeneral);
     ASSERT_EQ(_router.classify(
-                  repl::makeContainerInsertOplogEntry(nextOpTime(), ident, 1 /* key */, value)),
+                  repl::makeContainerInsertOplogEntry(nextOpTime(), ident, /*key=*/1, value)),
               OpClass::kPipelined);
     ASSERT_EQ(_router.classify(
-                  repl::makeContainerUpdateOplogEntry(nextOpTime(), ident, 1 /* key */, value)),
+                  repl::makeContainerUpdateOplogEntry(nextOpTime(), ident, /*key=*/1, value)),
               OpClass::kPipelined);
-    ASSERT_EQ(
-        _router.classify(repl::makeContainerDeleteOplogEntry(nextOpTime(), ident, 1 /* key */)),
-        OpClass::kPipelined);
+    ASSERT_EQ(_router.classify(repl::makeContainerDeleteOplogEntry(nextOpTime(), ident, /*key=*/1)),
+              OpClass::kPipelined);
 }
 
 TEST_F(PipelinedOpRouterTest, ClassifiesKeyMaterialOpsAsPipelined) {
     ASSERT_EQ(_router.classify(repl::makeOplogEntry(nextOpTime(),
                                                     OpTypeEnum::kKeyMaterial,
                                                     kNss,
-                                                    boost::none /* uuid */,
+                                                    /*uuid=*/boost::none,
                                                     BSON("keyId" << 1))),
               OpClass::kPipelined);
     ASSERT_EQ(_router.classify(repl::makeOplogEntry(nextOpTime(),
                                                     OpTypeEnum::kCMKRotation,
                                                     kNss,
-                                                    boost::none /* uuid */,
+                                                    /*uuid=*/boost::none,
                                                     BSON("keyId" << 1))),
               OpClass::kPipelined);
 }
@@ -192,8 +191,8 @@ TEST_F(PipelinedOpRouterTest, ClassifiesRetryableWriteApplyOpsAsPipelinedApplyOp
                                            {innerInsert(kNss, BSON("_id" << 0))},
                                            makeSessionInfo(),
                                            Date_t::now(),
-                                           {0} /* stmtIds */,
-                                           repl::OpTime() /* prevWriteOpTimeInTransaction */,
+                                           /*stmtIds=*/{0},
+                                           /*prevWriteOpTimeInTransaction=*/repl::OpTime(),
                                            repl::MultiOplogEntryType::kApplyOpsAppliedSeparately);
     ASSERT_FALSE(op.applyOpsIsLinkedTransactionally());
     ASSERT_EQ(_router.classify(op), OpClass::kPipelinedApplyOps);
@@ -205,8 +204,8 @@ TEST_F(PipelinedOpRouterTest, ClassifiesAtomicRetryableWriteApplyOpsAsRequiresIn
                                            {innerInsert(kNss, BSON("_id" << 0))},
                                            makeSessionInfo(),
                                            Date_t::now(),
-                                           {0} /* stmtIds */,
-                                           repl::OpTime() /* prevWriteOpTimeInTransaction */,
+                                           /*stmtIds=*/{0},
+                                           /*prevWriteOpTimeInTransaction=*/repl::OpTime(),
                                            repl::MultiOplogEntryType::kApplyOpsAppliedAtomically);
     ASSERT_TRUE(op.applyOpsIsLinkedTransactionally());
     ASSERT_EQ(_router.classify(op), OpClass::kRequiresInline);
@@ -304,9 +303,9 @@ TEST_F(PipelinedOpRouterTest, SelectsTheSameWorkerForContainerOpsOnTheSameKey) {
     auto ident = serviceContext->getStorageEngine()->generateNewInternalIdent();
     auto value = BSONBinData("V", 1, BinDataGeneral);
 
-    auto insert = repl::makeContainerInsertOplogEntry(nextOpTime(), ident, 1 /* key */, value);
-    auto update = repl::makeContainerUpdateOplogEntry(nextOpTime(), ident, 1 /* key */, value);
-    auto remove = repl::makeContainerDeleteOplogEntry(nextOpTime(), ident, 1 /* key */);
+    auto insert = repl::makeContainerInsertOplogEntry(nextOpTime(), ident, /*key=*/1, value);
+    auto update = repl::makeContainerUpdateOplogEntry(nextOpTime(), ident, /*key=*/1, value);
+    auto remove = repl::makeContainerDeleteOplogEntry(nextOpTime(), ident, /*key=*/1);
 
     auto worker = selectWorkerCheckedAgainstClassic(insert);
     ASSERT_EQ(selectWorkerCheckedAgainstClassic(update), worker);
@@ -339,7 +338,7 @@ TEST_F(PipelinedOpRouterTest, ClassifyingAnInlineOpRefreshesCollectionProperties
 
 TEST_F(PipelinedOpRouterTest, SelectsWorkersWithinRangeForASingleWorker) {
     repl::createCollectionWithUuid(_opCtx.get(), kNss);
-    PipelinedOpRouter router(1 /* numWorkers */);
+    PipelinedOpRouter router(/*numWorkers=*/1);
 
     for (int id = 0; id < 8; ++id) {
         auto op = insertOp(kNss, BSON("_id" << id));
@@ -350,7 +349,7 @@ TEST_F(PipelinedOpRouterTest, SelectsWorkersWithinRangeForASingleWorker) {
 using PipelinedOpRouterDeathTest = PipelinedOpRouterTest;
 
 DEATH_TEST_REGEX_F(PipelinedOpRouterDeathTest, RejectsZeroWorkers, "numWorkers > 0") {
-    PipelinedOpRouter router(0 /* numWorkers */);
+    PipelinedOpRouter router(/*numWorkers=*/0);
 }
 
 }  // namespace

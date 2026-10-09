@@ -761,7 +761,7 @@ Status copySourceToTemporaryCollectionOnTargetDB(
 
             OpDebug* const opDebug = nullptr;
             auto status = collection_internal::insertDocuments(
-                opCtx, *autoTmpColl, stmts.begin(), stmts.end(), opDebug, false /* fromMigrate */);
+                opCtx, *autoTmpColl, stmts.begin(), stmts.end(), opDebug, /*fromMigrate=*/false);
             if (!status.isOK()) {
                 return status;
             }

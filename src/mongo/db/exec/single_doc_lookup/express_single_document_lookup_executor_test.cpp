@@ -151,7 +151,7 @@ protected:
 
     LookupResult lookup(ExpressSingleDocumentLookupExecutor& exec, const Document& documentKey) {
         return exec.performLookup(
-            makeExpCtx(), kTestNss, /*collectionUUID*/ boost::none, documentKey, boost::none);
+            makeExpCtx(), kTestNss, /*collectionUUID=*/boost::none, documentKey, boost::none);
     }
 };
 
@@ -554,14 +554,14 @@ protected:
         auto rt = RoutingTableHistory::makeNew(kShardedTestNss,
                                                uuid,
                                                keyPattern,
-                                               false /* unsplittable */,
+                                               /*unsplittable=*/false,
                                                nullptr,
                                                false,
                                                epoch,
                                                timestamp,
-                                               boost::none /* timeseriesFields */,
-                                               boost::none /* reshardingFields */,
-                                               true /* allowMigrations */,
+                                               /*timeseriesFields=*/boost::none,
+                                               /*reshardingFields=*/boost::none,
+                                               /*allowMigrations=*/true,
                                                {ownedChunk, orphanChunk});
         CurrentChunkManager cm(makeStandaloneRoutingTableHistory(std::move(rt)));
         CollectionMetadata metadata(std::move(cm), kMyShardName);
@@ -592,7 +592,7 @@ protected:
 // EligibilityWithoutOwnershipCheckAppliesShardFilterAndDropsOrphan.
 TEST_F(ExpressLookupShardFilteringTest,
        EligibilityWithoutOwnershipCheckAppliesShardFilterAndDropsOrphan) {
-    auto metadata = setupShardingMetadata(/*splitPoint*/ 10);
+    auto metadata = setupShardingMetadata(/*splitPoint=*/10);
     _client->insert(kShardedTestNss, BSON("_id" << 1 << "sk" << 99));  // orphan: sk >= 10
 
     ScopedSetShardRole scopedSetShardRole{
@@ -609,7 +609,7 @@ TEST_F(ExpressLookupShardFilteringTest,
 // includes the shard-filter stage (Express has no plan tree to introspect).
 TEST_F(ExpressLookupShardFilteringTest,
        EligibilityWithoutOwnershipCheckReturnsOwnedDocumentUnfiltered) {
-    auto metadata = setupShardingMetadata(/*splitPoint*/ 10);
+    auto metadata = setupShardingMetadata(/*splitPoint=*/10);
     _client->insert(kShardedTestNss, BSON("_id" << 1 << "sk" << 1));  // owned: sk < 10
 
     ScopedSetShardRole scopedSetShardRole{
@@ -626,7 +626,7 @@ TEST_F(ExpressLookupShardFilteringTest,
 // EligibilityThatChecksOwnershipSkipsShardFilterAndReturnsOrphan.
 TEST_F(ExpressLookupShardFilteringTest,
        EligibilityThatChecksOwnershipSkipsShardFilterAndReturnsOrphan) {
-    auto metadata = setupShardingMetadata(/*splitPoint*/ 10);
+    auto metadata = setupShardingMetadata(/*splitPoint=*/10);
     _client->insert(kShardedTestNss, BSON("_id" << 1 << "sk" << 99));  // orphan: sk >= 10
 
     ScopedSetShardRole scopedSetShardRole{

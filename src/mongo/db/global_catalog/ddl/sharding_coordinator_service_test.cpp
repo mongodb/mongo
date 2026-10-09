@@ -177,7 +177,7 @@ protected:
                                                       LockMode mode,
                                                       int32_t timeoutMillisecs) {
         return acquireDbAndCollDDLLocks(
-            opCtx, ns, reason, mode, timeoutMillisecs, false /*waitForRecovery*/);
+            opCtx, ns, reason, mode, timeoutMillisecs, /*waitForRecovery=*/false);
     }
 
     MigrationBlockingOperationCoordinatorDocument createMBOCDoc(

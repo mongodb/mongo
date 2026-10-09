@@ -56,7 +56,7 @@ void APIVersionMetrics::update(std::string_view appName, const APIParameters& ap
         }
 
         auto versionOpt = apiParams.getAPIVersion();
-        parsedVersion = versionOpt ? getAPIVersion(*versionOpt, true /* allowTestVersion */)
+        parsedVersion = versionOpt ? getAPIVersion(*versionOpt, /*allowTestVersion=*/true)
                                    : APIVersionMetrics::kVersionMetricsDefaultVersionPosition;
 
         auto appNameIter = _apiVersionMetrics.find(appNameStr);

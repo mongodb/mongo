@@ -883,7 +883,7 @@ TEST_F(PipelineDependencyGraphTest, SubPipelineUsesSecondaryCollPathArrayness) {
     // Set up a PathArrayness for coll_b that marks 'b_non_array' as provably not an array.
     auto secondaryPathArrayness = std::make_shared<PathArrayness>();
     secondaryPathArrayness->addPath(
-        FieldPath("b_non_array"), {} /*multikeyPath*/, true /*isFullRebuild*/);
+        FieldPath("b_non_array"), /*multikeyPath=*/{}, /*isFullRebuild=*/true);
 
     // Inject the main ExpCtx using the sub-pipeline NSS as the key.
     auto subExpCtx = subPipeline->front()->getExpCtx();
@@ -919,7 +919,7 @@ TEST_F(PipelineDependencyGraphTest, SubPipelineEmptyCanPathBeArray) {
     // Set up a PathArrayness for coll_b that marks 'b_non_array' as provably not an array.
     auto secondaryPathArrayness = std::make_shared<PathArrayness>();
     secondaryPathArrayness->addPath(
-        FieldPath("b_non_array"), {} /*multikeyPath*/, true /*isFullRebuild*/);
+        FieldPath("b_non_array"), /*multikeyPath=*/{}, /*isFullRebuild=*/true);
 
     // Use getSubpipelineExpCtx() to obtain the from-collection's ExpCtx
     // even though the sub-pipeline is empty.

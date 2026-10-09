@@ -51,7 +51,7 @@ public:
         const auto parsedRequest = uassertStatusOK(
             parsed_find_command::parseFromCount(expCtx, *ccr, extensionsCallback, testNss));
         return std::make_unique<CountCmdShapeComponents>(
-            *parsedRequest, false /* hasLimit */, false /* hasSkip */);
+            *parsedRequest, /*hasLimit=*/false, /*hasSkip=*/false);
     }
 
     const query_shape::SerializationOptions representativeShapeOptions =

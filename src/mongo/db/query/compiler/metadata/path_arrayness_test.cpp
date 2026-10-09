@@ -334,7 +334,7 @@ TEST(PathArraynessTest, AddPathsFromIndexKeyPatternSkipsOverDeepFieldName) {
 
     // Must not throw even though the field name exceeds the FieldPath depth limit.
     ASSERT_DOES_NOT_THROW(pathArrayness.addPathsFromIndexKeyPattern(
-        keyPattern, multikeyPaths, true /* isFullRebuild */));
+        keyPattern, multikeyPaths, /*isFullRebuild=*/true));
 
     // The over-deep path is skipped, so the trie is unchanged.
     ASSERT_EQ(initialState, pathArrayness.exportToMap_forTest());
@@ -360,7 +360,7 @@ TEST(PathArraynessTest, AddPathsFromIndexKeyPatternSkipsOnlyOverDeepComponent) {
 
     PathArrayness pathArrayness;
     ASSERT_DOES_NOT_THROW(pathArrayness.addPathsFromIndexKeyPattern(
-        keyPattern, multikeyPaths, true /* isFullRebuild */));
+        keyPattern, multikeyPaths, /*isFullRebuild=*/true));
 
     auto state = pathArrayness.exportToMap_forTest();
     // Only the valid "a" component was added.

@@ -242,7 +242,7 @@ TEST(CanonicalQueryTest, NormalizeQueryTree) {
     // Single-child $and elimination.
     testNormalizeQuery("{$or: [{$and: [{a: 1}]}, {b: 1}]}", "{$or: [{a: 1}, {b: 1}]}");
     // Single-child $_internalSchemaXor elimination.
-    testNormalizeQuery("{$_internalSchemaXor: [{b: 1}]}", "{b: 1}", /*skipHashTest*/ true);
+    testNormalizeQuery("{$_internalSchemaXor: [{b: 1}]}", "{b: 1}", /*skipHashTest=*/true);
     // $or absorbs $or children.
     testNormalizeQuery("{$or: [{a: 1}, {$or: [{b: 1}, {$or: [{c: 1}]}]}, {d: 1}]}",
                        "{$or: [{a: 1}, {b: 1}, {c: 1}, {d: 1}]}");
@@ -254,7 +254,7 @@ TEST(CanonicalQueryTest, NormalizeQueryTree) {
         "{$_internalSchemaXor: [{$and: [{a: 1}, {b:1}]}, {$_internalSchemaXor: [{c: 1}, {d: 1}]}]}",
         "{$_internalSchemaXor: [{$and: [{a: 1}, {b:1}]}, {$_internalSchemaXor: [{c: 1}, {d: "
         "1}]}]}",
-        /*skipHashTest*/ true);
+        /*skipHashTest=*/true);
     // $in with 0 arguments is alwaysFalse
     testNormalizeQuery("{a: {$in: []}}", "{$alwaysFalse: 1}");
     // $in with one argument is rewritten as an equality or regex predicate.
@@ -274,7 +274,7 @@ TEST(CanonicalQueryTest, NormalizeQueryTree) {
         "  {$_internalSchemaXor: [{c: 1}]}"
         "]}",
         "{$_internalSchemaCond: [{a: 1}, {b: 1}, {c: 1}]}",
-        /*skipHashTest*/ true);
+        /*skipHashTest=*/true);
 }
 
 TEST(CanonicalQueryTest, CanonicalizeFromBaseQuery) {

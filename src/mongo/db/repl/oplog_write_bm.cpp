@@ -190,7 +190,7 @@ public:
             _replCoord,
             _storageInterface,
             &_consistencyMarkers,
-            repl::OplogWriter::Options(false /* skipWritesToOplogColl */));
+            repl::OplogWriter::Options(/*skipWritesToOplogColl=*/false));
 
         _svcCtx->notifyStorageStartupRecoveryComplete();
     }
@@ -219,7 +219,7 @@ public:
 
         // Shut down storage engine and free memory.
         catalog::shutDownCollectionCatalogAndGlobalStorageEngineCleanly(_svcCtx,
-                                                                        false /* memLeakAllowed */);
+                                                                        /*memLeakAllowed=*/false);
     }
 
     // Shut down the storage engine, clear the dbpath, and restart the storage engine with empty

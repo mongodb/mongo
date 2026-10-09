@@ -326,24 +326,24 @@ TEST_F(ValueUtilsTest, ReturnsFalseForNonFullBracketIntervalsWithStaticWidthType
     // Asserts that the function returns false if either bound is exclusive.
     ASSERT_FALSE(isFullBracketInterval(start.getTag(),
                                        start.getValue(),
-                                       false /*startInclusive*/,
+                                       /*startInclusive=*/false,
                                        end.getTag(),
                                        end.getValue(),
-                                       false /*endInclusive*/));
+                                       /*endInclusive=*/false));
 
     ASSERT_FALSE(isFullBracketInterval(start.getTag(),
                                        start.getValue(),
-                                       true /*startInclusive*/,
+                                       /*startInclusive=*/true,
                                        end.getTag(),
                                        end.getValue(),
-                                       false /*endInclusive*/));
+                                       /*endInclusive=*/false));
 
     ASSERT_FALSE(isFullBracketInterval(start.getTag(),
                                        start.getValue(),
-                                       false /*startInclusive*/,
+                                       /*startInclusive=*/false,
                                        end.getTag(),
                                        end.getValue(),
-                                       true /*endInclusive*/));
+                                       /*endInclusive=*/true));
 }
 
 TEST_F(ValueUtilsTest, ReturnsFalseForNonFullBracketIntervalsWithVariableWidthType) {
@@ -362,18 +362,18 @@ TEST_F(ValueUtilsTest, ReturnsFalseForNonFullBracketIntervalsWithVariableWidthTy
     // Asserts that the function returns false if 'endInclusive' is true.
     ASSERT_FALSE(isFullBracketInterval(start.getTag(),
                                        start.getValue(),
-                                       startInclusive /*startInclusive*/,
+                                       /*startInclusive=*/startInclusive,
                                        end.getTag(),
                                        end.getValue(),
-                                       true /*endInclusive*/));
+                                       /*endInclusive=*/true));
 
     // Asserts that the function returns false the end bound is incorrect.
     ASSERT_FALSE(isFullBracketInterval(start.getTag(),
                                        start.getValue(),
-                                       true /*startInclusive*/,
+                                       /*startInclusive=*/true,
                                        start.getTag(),
                                        start.getValue(),
-                                       endInclusive /*endInclusive*/));
+                                       /*endInclusive=*/endInclusive));
 
     // Asserts that the short-circuit returns false when the function detects the end tag is not the
     // next type of the start tag.
@@ -390,7 +390,7 @@ TEST_F(ValueUtilsTest, BracketizeSingleTypeInterval) {
     auto [startTag, startVal] = makeInt64Value(100);
     auto [endTag, endVal] = makeInt64Value(200);
     auto intervals = bracketizeInterval(
-        startTag, startVal, false /*startInclusive*/, endTag, endVal, false /*endInclusive*/);
+        startTag, startVal, /*startInclusive=*/false, endTag, endVal, /*endInclusive=*/false);
 
     std::pair<std::pair<SBEValue, bool>, std::pair<SBEValue, bool>> expected{
         {SBEValue{makeInt64Value(100)}, false}, {SBEValue{makeInt64Value(200)}, false}};
@@ -409,7 +409,7 @@ TEST_F(ValueUtilsTest, BracketizeSameTypeBracketInterval) {
     auto [startTag, startVal] = makeInt64Value(100);
     auto [endTag, endVal] = sbe::value::makeNewString("");
     auto intervals = bracketizeInterval(
-        startTag, startVal, false /*startInclusive*/, endTag, endVal, false /*endInclusive*/);
+        startTag, startVal, /*startInclusive=*/false, endTag, endVal, /*endInclusive=*/false);
 
     std::pair<std::pair<SBEValue, bool>, std::pair<SBEValue, bool>> expected{
         {SBEValue{makeInt64Value(100)}, false}, {sbe::value::makeNewString(""), false}};
@@ -425,7 +425,7 @@ TEST_F(ValueUtilsTest, BracketizeMixedTypeInterval) {
     auto [startTag, startVal] = makeInt64Value(100);
     auto [endTag, endVal] = makeBooleanValue(1);
     auto intervals = bracketizeInterval(
-        startTag, startVal, false /*startInclusive*/, endTag, endVal, false /*endInclusive*/);
+        startTag, startVal, /*startInclusive=*/false, endTag, endVal, /*endInclusive=*/false);
 
     std::vector<std::pair<std::pair<SBEValue, bool>, std::pair<SBEValue, bool>>> expected = {
         {{SBEValue{makeInt64Value(100)}, false}, getMaxBound(TypeTags::NumberInt64)},
@@ -446,7 +446,7 @@ TEST_F(ValueUtilsTest, BracketizeEmptyInterval) {
     auto [startTag, startVal] = makeInt64Value(100);
     auto [endTag, endVal] = makeInt64Value(100);
     auto intervals = bracketizeInterval(
-        startTag, startVal, false /*startInclusive*/, endTag, endVal, true /*endInclusive*/);
+        startTag, startVal, /*startInclusive=*/false, endTag, endVal, /*endInclusive=*/true);
 
     // (100, 100] is an empty interval as no number is included. We expect the returned
     // sub-intervals to be an empty vector.

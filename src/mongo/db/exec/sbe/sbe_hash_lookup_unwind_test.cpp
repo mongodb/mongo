@@ -70,7 +70,7 @@ public:
                                                         lookupStageOutputSlot,
                                                         collatorSlot,
                                                         sbe::JoinType::Inner,
-                                                        boost::none /*indexSlot*/,
+                                                        /*indexSlot=*/boost::none,
                                                         kEmptyPlanNodeId);
 
         StageResultsPrinters::SlotNames slotNames;
@@ -284,7 +284,7 @@ TEST_F(HashLookupUnwindStageTest, ForceSpillTest) {
                                                     lookupStageOutputSlot,
                                                     collatorSlot,
                                                     sbe::JoinType::Inner,
-                                                    boost::none /*indexSlot*/,
+                                                    /*indexSlot=*/boost::none,
                                                     kEmptyPlanNodeId);
 
     value::SlotVector lookupSlots;
@@ -333,7 +333,7 @@ TEST_F(HashLookupUnwindStageTest, ForceSpillTest) {
             lookupStage->saveState();
 
             // Force spill.
-            lookupStage->forceSpill(nullptr /*yieldPolicy*/);
+            lookupStage->forceSpill(/*yieldPolicy=*/nullptr);
 
             // Check stats to make sure it spilled
             stats = static_cast<const HashLookupStats*>(lookupStage->getSpecificStats());

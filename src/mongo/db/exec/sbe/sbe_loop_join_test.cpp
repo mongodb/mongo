@@ -35,9 +35,9 @@ TEST_F(LoopJoinStageTest, LoopJoinNoPredicate) {
     // Build and prepare for execution loop join of the two scan stages.
     auto loopJoin = makeS<LoopJoinStage>(std::move(outerScanStage),
                                          std::move(innerScanStage),
-                                         makeSV(outerScanSlot) /*outerProjects*/,
-                                         makeSV() /*outerCorrelated*/,
-                                         nullptr /*predicate*/,
+                                         /*outerProjects=*/makeSV(outerScanSlot),
+                                         /*outerCorrelated=*/makeSV(),
+                                         /*predicate=*/nullptr,
                                          kEmptyPlanNodeId);
 
     prepareTree(ctx.get(), loopJoin.get());
@@ -71,9 +71,9 @@ TEST_F(LoopJoinStageTest, LoopJoinConstTruePredicate) {
     // Build and prepare for execution loop join of the two scan stages.
     auto loopJoin = makeS<LoopJoinStage>(std::move(outerScanStage),
                                          std::move(innerScanStage),
-                                         makeSV(outerScanSlot) /*outerProjects*/,
-                                         makeSV() /*outerCorrelated*/,
-                                         makeBoolConstant(true) /*predicate*/,
+                                         /*outerProjects=*/makeSV(outerScanSlot),
+                                         /*outerCorrelated=*/makeSV(),
+                                         /*predicate=*/makeBoolConstant(true),
                                          kEmptyPlanNodeId);
     prepareTree(ctx.get(), loopJoin.get());
     auto outer = loopJoin->getAccessor(*ctx, outerScanSlot);
@@ -106,9 +106,9 @@ TEST_F(LoopJoinStageTest, LoopJoinConstFalsePredicate) {
     // Build and prepare for execution loop join of the two scan stages.
     auto loopJoin = makeS<LoopJoinStage>(std::move(outerScanStage),
                                          std::move(innerScanStage),
-                                         makeSV(outerScanSlot) /*outerProjects*/,
-                                         makeSV() /*outerCorrelated*/,
-                                         makeBoolConstant(false) /*predicate*/,
+                                         /*outerProjects=*/makeSV(outerScanSlot),
+                                         /*outerCorrelated=*/makeSV(),
+                                         /*predicate=*/makeBoolConstant(false),
                                          kEmptyPlanNodeId);
     prepareTree(ctx.get(), loopJoin.get());
 
@@ -128,10 +128,10 @@ TEST_F(LoopJoinStageTest, LeftLoopJoinConstFalsePredicate) {
     // Build and prepare for execution loop join of the two scan stages.
     auto loopJoin = makeS<LoopJoinStage>(std::move(outerScanStage),
                                          std::move(innerScanStage),
-                                         makeSV(outerScanSlot) /*outerProjects*/,
-                                         makeSV() /*outerCorrelated*/,
-                                         makeSV(innerScanSlot) /*innerProjects*/,
-                                         makeBoolConstant(false) /*predicate*/,
+                                         /*outerProjects=*/makeSV(outerScanSlot),
+                                         /*outerCorrelated=*/makeSV(),
+                                         /*innerProjects=*/makeSV(innerScanSlot),
+                                         /*predicate=*/makeBoolConstant(false),
                                          JoinType::Left,
                                          kEmptyPlanNodeId);
     prepareTree(ctx.get(), loopJoin.get());
@@ -168,8 +168,8 @@ TEST_F(LoopJoinStageTest, LoopJoinEqualityPredicate) {
         EPrimBinary::eq, makeE<EVariable>(outerScanSlot), makeE<EVariable>(innerScanSlot));
     auto loopJoin = makeS<LoopJoinStage>(std::move(outerScanStage),
                                          std::move(innerScanStage),
-                                         makeSV(outerScanSlot) /*outerProjects*/,
-                                         makeSV() /*outerCorrelated*/,
+                                         /*outerProjects=*/makeSV(outerScanSlot),
+                                         /*outerCorrelated=*/makeSV(),
                                          std::move(predicate),
                                          kEmptyPlanNodeId);
     prepareTree(ctx.get(), loopJoin.get());

@@ -139,7 +139,7 @@ void PeriodicShardedIndexConsistencyChecker::_launchShardedIndexConsistencyCheck
                 long long numShardedCollsWithInconsistentIndexes = 0;
                 const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
                 auto collections = catalogClient->getShardedCollections(
-                    opCtx, DatabaseName::kEmpty, repl::ReadConcernArgs::kLocal, {} /*sort*/);
+                    opCtx, DatabaseName::kEmpty, repl::ReadConcernArgs::kLocal, /*sort=*/{});
 
                 for (const auto& coll : collections) {
                     auto nss = coll.getNss();
@@ -178,7 +178,7 @@ void PeriodicShardedIndexConsistencyChecker::_launchShardedIndexConsistencyCheck
                         ClusterAggregate::Namespaces{nss, nss},
                         request,
                         PrivilegeVector(),
-                        boost::none /* verbosity */,
+                        /*verbosity=*/boost::none,
                         &responseBuilder,
                         "pipeline to detect inconsistent sharded indexes"sv);
 
@@ -208,7 +208,7 @@ void PeriodicShardedIndexConsistencyChecker::_launchShardedIndexConsistencyCheck
                     if (!expectedState.isPrimary()) {
                         return;
                     }
-                    newState = State(true /* isPrimary */, numShardedCollsWithInconsistentIndexes);
+                    newState = State(/*isPrimary=*/true, numShardedCollsWithInconsistentIndexes);
                 } while (!_state.compareAndSwap(&expectedState, newState));
             } catch (DBException& ex) {
                 LOGV2(22052,
@@ -259,7 +259,7 @@ void PeriodicShardedIndexConsistencyChecker::onStepUp(ServiceContext* serviceCon
     std::lock_guard<std::mutex> lk(_mutex);
     auto state = _state.load();
     if (!state.isPrimary()) {
-        _state.store(State(true /* isPrimary */, state.count()));
+        _state.store(State(/*isPrimary=*/true, state.count()));
 
         _launchShardedIndexConsistencyChecker(lk, serviceContext);
         _launchShardedTimeseriesShardkeyChecker(lk, serviceContext);
@@ -271,7 +271,7 @@ void PeriodicShardedIndexConsistencyChecker::onStepDown() {
     auto state = _state.load();
     if (state.isPrimary()) {
         // Clear the counter to prevent a secondary from reporting an out-of-date count.
-        _state.store(State(false /* isPrimary */, 0));
+        _state.store(State(/*isPrimary=*/false, 0));
 
         invariant(_shardedIndexConsistencyChecker.isValid());
         _shardedIndexConsistencyChecker.stop();

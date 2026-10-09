@@ -192,7 +192,7 @@ TEST_P(TicketSemaphoreTest, AcquireSucceedsWhenAvailable) {
     auto sem = makeSemaphore(3);
     MockAdmissionContext admCtx;
 
-    ASSERT_TRUE(sem->acquire(opCtx(), &admCtx, Date_t::max(), true /* interruptible */));
+    ASSERT_TRUE(sem->acquire(opCtx(), &admCtx, Date_t::max(), /*interruptible=*/true));
     ASSERT_EQ(sem->available(), 2);
 }
 
@@ -201,11 +201,11 @@ TEST_P(TicketSemaphoreTest, AcquireTimesOut) {
     MockAdmissionContext admCtx;
 
     auto deadline = Date_t::now() + Milliseconds{50};
-    ASSERT_FALSE(sem->acquire(opCtx(), &admCtx, deadline, true /* interruptible */));
+    ASSERT_FALSE(sem->acquire(opCtx(), &admCtx, deadline, /*interruptible=*/true));
 
     MockAdmissionContext admCtx2;
     auto deadline2 = Date_t::now() + Milliseconds{50};
-    ASSERT_FALSE(sem->acquire(opCtx(), &admCtx2, deadline2, false /* interruptible */));
+    ASSERT_FALSE(sem->acquire(opCtx(), &admCtx2, deadline2, /*interruptible=*/false));
 }
 
 TEST_P(TicketSemaphoreTest, AcquireOpCtxDeadlineThrows) {
@@ -217,7 +217,7 @@ TEST_P(TicketSemaphoreTest, AcquireOpCtxDeadlineThrows) {
 
     MockAdmissionContext admCtx;
     ASSERT_THROWS_CODE(
-        sem->acquire(deadlineOpCtx.get(), &admCtx, Date_t::max(), true /* interruptible */),
+        sem->acquire(deadlineOpCtx.get(), &admCtx, Date_t::max(), /*interruptible=*/true),
         DBException,
         ErrorCodes::MaxTimeMSExpired);
 }
@@ -231,8 +231,7 @@ TEST_P(TicketSemaphoreTest, AcquireExplicitDeadlineReturnsFalse) {
 
     MockAdmissionContext admCtx;
     auto shortDeadline = Date_t::now() + Milliseconds{50};
-    ASSERT_FALSE(
-        sem->acquire(deadlineOpCtx.get(), &admCtx, shortDeadline, true /* interruptible */));
+    ASSERT_FALSE(sem->acquire(deadlineOpCtx.get(), &admCtx, shortDeadline, /*interruptible=*/true));
 }
 
 TEST_P(TicketSemaphoreTest, AcquireBlocksAndSucceedsWhenReleased) {
@@ -306,7 +305,7 @@ TEST_P(TicketSemaphoreTest, AcquireRespectsInterrupt) {
 
     Future<void> acquireFuture = spawn([&, rawSem, rawOpCtx]() {
         MockAdmissionContext admCtx;
-        rawSem->acquire(rawOpCtx, &admCtx, Date_t::max(), true /* interruptible */);
+        rawSem->acquire(rawOpCtx, &admCtx, Date_t::max(), /*interruptible=*/true);
     });
 
     waitUntilBlocked(rawSem, 1);
@@ -437,12 +436,12 @@ TEST_P(TicketSemaphoreTest, MaxWaitersZeroRejectsWaiters) {
 
     // Acquire succeeds without queuing when a permit is available.
     MockAdmissionContext admCtx;
-    ASSERT_TRUE(sem->acquire(opCtx(), &admCtx, getDeadline(), true /* interruptible */));
+    ASSERT_TRUE(sem->acquire(opCtx(), &admCtx, getDeadline(), /*interruptible=*/true));
     ASSERT_EQ(sem->available(), 0);
 
     // But once no permits are available, it must queue — which is rejected at maxWaiters 0.
     MockAdmissionContext admCtx2;
-    ASSERT_THROWS_CODE(sem->acquire(opCtx(), &admCtx2, getDeadline(), true /* interruptible */),
+    ASSERT_THROWS_CODE(sem->acquire(opCtx(), &admCtx2, getDeadline(), /*interruptible=*/true),
                        DBException,
                        ErrorCodes::AdmissionQueueOverflow);
 }
@@ -467,7 +466,7 @@ TEST_P(TicketSemaphoreTest, MaxWaitersAllowsUpToLimit) {
 
     // A 3rd waiter exceeds the limit.
     MockAdmissionContext admCtx;
-    ASSERT_THROWS_CODE(sem->acquire(opCtx(), &admCtx, getDeadline(), true /* interruptible */),
+    ASSERT_THROWS_CODE(sem->acquire(opCtx(), &admCtx, getDeadline(), /*interruptible=*/true),
                        DBException,
                        ErrorCodes::AdmissionQueueOverflow);
 
@@ -560,7 +559,7 @@ TEST_P(TicketSemaphoreTest, NonInterruptibleAcquireReturnsFalseOnKillAndTimeout)
     auto deadline = Date_t::now() + Milliseconds{500};
     Future<bool> acquireFuture = spawn([&, rawSem, rawOpCtx, deadline]() {
         MockAdmissionContext admCtx;
-        return rawSem->acquire(rawOpCtx, &admCtx, deadline, false /* interruptible */);
+        return rawSem->acquire(rawOpCtx, &admCtx, deadline, /*interruptible=*/false);
     });
 
     waitUntilBlocked(rawSem, 1);
@@ -583,7 +582,7 @@ TEST_P(TicketSemaphoreTest, NonInterruptibleAcquireWaitsForPermitAfterKill) {
 
     Future<bool> acquireFuture = spawn([&, rawSem, rawOpCtx]() {
         MockAdmissionContext admCtx;
-        return rawSem->acquire(rawOpCtx, &admCtx, Date_t::max(), false /* interruptible */);
+        return rawSem->acquire(rawOpCtx, &admCtx, Date_t::max(), /*interruptible=*/false);
     });
 
     waitUntilBlocked(rawSem, 1);
@@ -608,7 +607,7 @@ TEST_P(TicketSemaphoreTest, WaiterCountDecreasesAfterTimeout) {
 
     MockAdmissionContext admCtx;
     auto shortDeadline = Date_t::now() + Milliseconds{50};
-    ASSERT_FALSE(sem->acquire(opCtx(), &admCtx, shortDeadline, false /* interruptible */));
+    ASSERT_FALSE(sem->acquire(opCtx(), &admCtx, shortDeadline, /*interruptible=*/false));
     ASSERT_EQ(rawSem->waiters(), 0);
 
     // The waiter slot was reclaimed, so a new waiter can queue without overflow.
@@ -616,8 +615,7 @@ TEST_P(TicketSemaphoreTest, WaiterCountDecreasesAfterTimeout) {
         auto client = svcCtx->getService()->makeClient("waiter");
         auto waiterOpCtx = client->makeOperationContext();
         MockAdmissionContext admCtx2;
-        return rawSem->acquire(
-            waiterOpCtx.get(), &admCtx2, getDeadline(), true /* interruptible */);
+        return rawSem->acquire(waiterOpCtx.get(), &admCtx2, getDeadline(), /*interruptible=*/true);
     });
 
     waitUntilBlocked(rawSem, 1);

@@ -164,7 +164,7 @@ JoinCostEstimate JoinCostEstimatorImpl::costHashJoinFragment(const JoinPlanNode&
     JoinCostEstimate rightCost = getNodeCost(right);
 
     return JoinCostEstimate(
-        numDocsProcessed, numDocsOutput, ioSeq, zeroCE /*numRandIOs*/, leftCost, rightCost);
+        numDocsProcessed, numDocsOutput, ioSeq, /*numRandIOs=*/zeroCE, leftCost, rightCost);
 }
 
 // The costing formula currently makes two assumptions:

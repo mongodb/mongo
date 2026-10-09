@@ -65,7 +65,7 @@ boost::optional<FixedFCVRegion> tryRunSplitChunkCoordinator(OperationContext* op
         // call below, allowing the retry loop to handle ConflictingOperationInProgress.
         auto service = ShardingCoordinatorService::getService(opCtx);
         auto coordinator = checked_pointer_cast<SplitChunkCoordinator>(service->getOrCreateInstance(
-            opCtx, coordinatorDoc.toBSON(), *optFixedFcvRegion, false /*checkOptions*/));
+            opCtx, coordinatorDoc.toBSON(), *optFixedFcvRegion, /*checkOptions=*/false));
 
         try {
             coordinator->checkIfOptionsConflict(coordinatorDoc.toBSON());

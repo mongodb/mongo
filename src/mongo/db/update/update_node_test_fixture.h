@@ -79,7 +79,7 @@ protected:
         }
 
         mongo::doc_diff::IndexUpdateIdentifier updateIdentifier{1 /*numIndexes*/};
-        updateIdentifier.addIndex(0 /*indexCounter*/, *_indexData);
+        updateIdentifier.addIndex(/*indexCounter=*/0, *_indexData);
         return updateIdentifier.determineAffectedIndexes(diffElem.embeddedObject()).any();
     }
 

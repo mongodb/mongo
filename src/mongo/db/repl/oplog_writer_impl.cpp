@@ -271,7 +271,7 @@ void OplogWriterImpl::finalizeOplogBatch(OperationContext* opCtx,
                                          bool flushJournal) {
     // 1. Update oplog visibility by notifying the storage engine of the latest opTime.
     _storageInterface->oplogDiskLocRegister(
-        opCtx, lastOpTimeAndWallTime.opTime.getTimestamp(), true /* orderedCommit */);
+        opCtx, lastOpTimeAndWallTime.opTime.getTimestamp(), /*orderedCommit=*/true);
 
     // 2. Advance the lastWritten opTime to the last opTime in batch.
     _replCoord->setMyLastWrittenOpTimeAndWallTimeForward(lastOpTimeAndWallTime);

@@ -126,11 +126,11 @@ Status ViewsForDatabase::_reload(OperationContext* opCtx,
 }
 
 Status ViewsForDatabase::reloadAllViews(OperationContext* opCtx, const CollectionPtr& systemViews) {
-    return _reload(opCtx, systemViews, true /*errorOnInvalid*/);
+    return _reload(opCtx, systemViews, /*errorOnInvalid=*/true);
 }
 
 void ViewsForDatabase::reloadValidViews(OperationContext* opCtx, const CollectionPtr& systemViews) {
-    (void)_reload(opCtx, systemViews, false /*errorOnInvalid*/);
+    (void)_reload(opCtx, systemViews, /*errorOnInvalid=*/false);
 }
 
 Status ViewsForDatabase::insert(OperationContext* opCtx,
@@ -316,7 +316,7 @@ Status ViewsForDatabase::_upsertIntoCatalog(OperationContext* opCtx,
                                             oldView,
                                             viewObj,
                                             collection_internal::kUpdateAllIndexes,
-                                            nullptr /* indexesAffected */,
+                                            /*indexesAffected=*/nullptr,
                                             &CurOp::get(opCtx)->debug(),
                                             &args);
     }

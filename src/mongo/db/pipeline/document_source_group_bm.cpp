@@ -78,27 +78,27 @@ void DocumentSourceGroupBMFixture::runDocumentSourceGroup(int numGroups,
 
 BENCHMARK_F(DocumentSourceGroupBMFixture, BM_DSGroupBuildPhase100KDocsPerGroup)
 (benchmark::State& state) {
-    runDocumentSourceGroup(/*numGroups*/ 5, /*countPerGroup*/ 100000, state);
+    runDocumentSourceGroup(/*numGroups=*/5, /*countPerGroup=*/100000, state);
 }
 
 BENCHMARK_F(DocumentSourceGroupBMFixture, BM_DSGroupBuildPhase1KDocsPerGroup)
 (benchmark::State& state) {
-    runDocumentSourceGroup(/*numGroups*/ 500, /*countPerGroup*/ 1000, state);
+    runDocumentSourceGroup(/*numGroups=*/500, /*countPerGroup=*/1000, state);
 }
 
 BENCHMARK_F(DocumentSourceGroupBMFixture, BM_DSGroupBuildPhase100DocsPerGroup)
 (benchmark::State& state) {
-    runDocumentSourceGroup(/*numGroups*/ 5000, /*countPerGroup*/ 100, state);
+    runDocumentSourceGroup(/*numGroups=*/5000, /*countPerGroup=*/100, state);
 }
 
 BENCHMARK_F(DocumentSourceGroupBMFixture, BM_DSGroupBuildPhase10DocsPerGroup)
 (benchmark::State& state) {
-    runDocumentSourceGroup(/*numGroups*/ 50000, /*countPerGroup*/ 10, state);
+    runDocumentSourceGroup(/*numGroups=*/50000, /*countPerGroup=*/10, state);
 }
 
 BENCHMARK_F(DocumentSourceGroupBMFixture, BM_DSGroupBuildPhase1DocPerGroup)
 (benchmark::State& state) {
-    runDocumentSourceGroup(/*numGroups*/ 500000, /*countPerGroup*/ 1, state);
+    runDocumentSourceGroup(/*numGroups=*/500000, /*countPerGroup=*/1, state);
 }
 
 }  // namespace

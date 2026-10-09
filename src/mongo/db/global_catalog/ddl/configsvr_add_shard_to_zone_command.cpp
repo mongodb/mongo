@@ -57,7 +57,7 @@ public:
                 uassertStatusOK(Grid::get(opCtx)->shardRegistry()->resolveShardId(
                     opCtx,
                     ShardId(std::string{getShard()}),
-                    false /* allowNonShardIdIdentifiers */));
+                    /*allowNonShardIdIdentifiers=*/false));
             uassertStatusOK(ShardingCatalogManager::get(opCtx)->addShardToZone(
                 opCtx, resolvedShardId.toString(), std::string{request().getZone()}));
         }

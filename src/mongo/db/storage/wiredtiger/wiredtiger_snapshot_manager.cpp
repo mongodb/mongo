@@ -82,7 +82,7 @@ Timestamp WiredTigerSnapshotManager::beginTransactionOnCommittedSnapshot(
                                     roundUpPreparedTimestamps,
                                     RoundUpReadTimestamp::kRound,
                                     untimestampedWriteAssertion,
-                                    boost::none /* claimPreparedId */,
+                                    /*claimPreparedId=*/boost::none,
                                     operationTimeoutMs);
     auto status = txnOpen.setReadSnapshot(committedSnapshot);
     fassert(30635, status);

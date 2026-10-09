@@ -62,13 +62,13 @@ namespace {
 
 std::unique_ptr<PipelinedOplogApplier> makeApplier() {
     return std::make_unique<PipelinedOplogApplier>(
-        nullptr /* executor */,
-        nullptr /* oplogBuffer */,
+        /*executor=*/nullptr,
+        /*oplogBuffer=*/nullptr,
         &noopOplogApplierObserver,
-        nullptr /* replCoord */,
-        nullptr /* storageInterface */,
+        /*replCoord=*/nullptr,
+        /*storageInterface=*/nullptr,
         OplogApplier::Options(OplogApplication::Mode::kSecondary),
-        16 /* numWorkers */);
+        /*numWorkers=*/16);
 }
 
 using PipelinedOplogApplierTest = ServiceContextTest;
@@ -83,7 +83,7 @@ DEATH_TEST_REGEX_F(PipelinedOplogApplierDeathTest,
                    ApplyOplogBatchIsUnimplemented,
                    "Hit a MONGO_UNIMPLEMENTED") {
     auto applier = makeApplier();
-    applier->applyOplogBatch(nullptr /* opCtx */, {}).getStatus().ignore();
+    applier->applyOplogBatch(/*opCtx=*/nullptr, {}).getStatus().ignore();
 }
 
 // Exercises applyWorkItem() and consumeWorkItem() against real oplog entries.
@@ -126,7 +126,7 @@ protected:
     // finish.
     void consumeOnWorker(const OplogApplier::Options& options, std::vector<WorkItem> items) {
         PipelinedApplierBatchTracker tracker;
-        PipelinedApplierWorkerPool pool(1 /* numWorkers */,
+        PipelinedApplierWorkerPool pool(/*numWorkers=*/1,
                                         [&](size_t workerIdx, const WorkItem& item) {
                                             consumeWorkItem(workerIdx, options, item, tracker);
                                         });
@@ -683,8 +683,8 @@ protected:
                                       std::move(innerOps),
                                       OperationSessionInfo(),
                                       Date_t::now(),
-                                      {} /* stmtIds */,
-                                      boost::none /* prevWriteOpTimeInTransaction */);
+                                      /*stmtIds=*/{},
+                                      /*prevWriteOpTimeInTransaction=*/boost::none);
     }
 
     // A non-transactional applyOps entry holding inserts of 'docs' into 'nss'.
@@ -1202,8 +1202,8 @@ TEST_F(PipelinedOplogApplierRunTest, DispatchesTheNextBatchWhileAnEarlierBatchIs
     createCollectionWithUuid(_opCtx.get(), kNss);
     const int heldId = idRoutedTo(0);
     const int laterId = idRoutedTo(1);
-    auto& held = watchWriteOf(heldId, true /* hold */);
-    auto& later = watchWriteOf(laterId, false /* hold */);
+    auto& held = watchWriteOf(heldId, /*hold=*/true);
+    auto& later = watchWriteOf(laterId, /*hold=*/false);
 
     auto* replCoord = ReplicationCoordinator::get(serviceContext);
     const auto before = replCoord->getMyLastAppliedOpTimeAndWallTime();
@@ -1246,10 +1246,10 @@ TEST_F(PipelinedOplogApplierRunTest, WorkItemsOwnDerivedOpsAfterTheDispatcherMov
     setServerParameter("replBatchLimitOperations", 1);
 
     const int heldId = idRoutedTo(0);
-    auto& held = watchWriteOf(heldId, true /* hold */);
+    auto& held = watchWriteOf(heldId, /*hold=*/true);
     const int derivedId = idRoutedTo(0, heldId + 1);
     const int markerId = idRoutedTo(1, derivedId + 1);
-    auto& marker = watchWriteOf(markerId, false /* hold */);
+    auto& marker = watchWriteOf(markerId, /*hold=*/false);
 
     pushToBuffer({insertOp(kNss, BSON("_id" << heldId))});
     startApplier();

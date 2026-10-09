@@ -138,7 +138,7 @@ void HashJoinStage::open(bool reOpen) {
     _cursor.reset();
     disableSlotAccess();
 
-    outerChild()->disableSlotAccess(true /* recursive */);
+    outerChild()->disableSlotAccess(/*recursive=*/true);
 
     innerChild()->open(false);
 
@@ -363,8 +363,8 @@ void HashJoinStage::doSaveState() {
     if (!probeRowsLiveAcrossYield()) {
         // Nothing to preserve; poison the probe rows in debug builds to catch any read before
         // they are overwritten.
-        prepareForYielding(_probeKey, false /* isAccessible */);
-        prepareForYielding(_probeProject, false /* isAccessible */);
+        prepareForYielding(_probeKey, /*isAccessible=*/false);
+        prepareForYielding(_probeProject, /*isAccessible=*/false);
         return;
     }
     _cursor.saveState();

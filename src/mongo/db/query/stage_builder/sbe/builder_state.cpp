@@ -54,7 +54,7 @@ sbe::value::SlotId StageBuilderState::getGlobalVariableSlot(Variables::Id variab
     }
 
     auto slotId =
-        env->registerSlot(sbe::value::TypeTags::Nothing, 0, false /* owned */, slotIdGenerator);
+        env->registerSlot(sbe::value::TypeTags::Nothing, 0, /*owned=*/false, slotIdGenerator);
     data->variableIdToSlotMap.emplace(variableId, slotId);
     return slotId;
 }
@@ -156,7 +156,7 @@ sbe::value::SlotId StageBuilderState::registerInputParamSlot(
     }
 
     auto slotId =
-        env->registerSlot(sbe::value::TypeTags::Nothing, 0, false /* owned */, slotIdGenerator);
+        env->registerSlot(sbe::value::TypeTags::Nothing, 0, /*owned=*/false, slotIdGenerator);
     data->inputParamToSlotMap.emplace(paramId, slotId);
     return slotId;
 }

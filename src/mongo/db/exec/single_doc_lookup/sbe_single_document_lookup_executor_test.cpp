@@ -1499,14 +1499,14 @@ protected:
         auto rt = RoutingTableHistory::makeNew(kShardedNss,
                                                uuid,
                                                keyPattern,
-                                               false /* unsplittable */,
+                                               /*unsplittable=*/false,
                                                nullptr,
                                                false,
                                                epoch,
                                                timestamp,
-                                               boost::none /* timeseriesFields */,
-                                               boost::none /* reshardingFields */,
-                                               true /* allowMigrations */,
+                                               /*timeseriesFields=*/boost::none,
+                                               /*reshardingFields=*/boost::none,
+                                               /*allowMigrations=*/true,
                                                {ownedChunk, orphanChunk});
         CurrentChunkManager cm(makeStandaloneRoutingTableHistory(std::move(rt)));
         CollectionMetadata metadata(std::move(cm), kMyShardName);
@@ -1537,7 +1537,7 @@ protected:
 // include the shard-filter stage.
 TEST_F(SbeSingleDocumentLookupExecutorShardFilteringTest,
        EligibilityWithoutOwnershipCheckIncludesShardFilterStage) {
-    auto metadata = setupShardingMetadata(/*splitPoint*/ 10);
+    auto metadata = setupShardingMetadata(/*splitPoint=*/10);
     _client->insert(kShardedNss, BSON("_id" << 1 << "sk" << 1));  // owned: sk < 10
 
     ScopedSetShardRole scopedSetShardRole{
@@ -1560,7 +1560,7 @@ TEST_F(SbeSingleDocumentLookupExecutorShardFilteringTest,
 // EligibilityWithoutOwnershipCheckAppliesShardFilterAndDropsOrphan.
 TEST_F(SbeSingleDocumentLookupExecutorShardFilteringTest,
        EligibilityWithoutOwnershipCheckAppliesShardFilterAndDropsOrphan) {
-    auto metadata = setupShardingMetadata(/*splitPoint*/ 10);
+    auto metadata = setupShardingMetadata(/*splitPoint=*/10);
     _client->insert(kShardedNss, BSON("_id" << 1 << "sk" << 99));  // orphan: sk >= 10
 
     ScopedSetShardRole scopedSetShardRole{
@@ -1575,7 +1575,7 @@ TEST_F(SbeSingleDocumentLookupExecutorShardFilteringTest,
 // a per-lookup ScopedSetShardRole.
 TEST_F(SbeSingleDocumentLookupExecutorShardFilteringTest,
        PreAcquiredShardVersionedAcquisitionDropsOrphanWithoutPerLookupShardRole) {
-    auto metadata = setupShardingMetadata(/*splitPoint*/ 10);
+    auto metadata = setupShardingMetadata(/*splitPoint=*/10);
     _client->insert(kShardedNss, BSON("_id" << 1 << "sk" << 99));  // orphan: sk >= 10
 
     // Acquire under the shard version, then stash so PreAcquired swaps it back on per lookup.
@@ -1604,7 +1604,7 @@ TEST_F(SbeSingleDocumentLookupExecutorShardFilteringTest,
 // dropping orphans across lookups.
 TEST_F(SbeSingleDocumentLookupExecutorShardFilteringTest,
        ReusedPlanKeepsDroppingOrphansAcrossBatchLookups) {
-    auto metadata = setupShardingMetadata(/*splitPoint*/ 10);
+    auto metadata = setupShardingMetadata(/*splitPoint=*/10);
     _client->insert(kShardedNss, BSON("_id" << 1 << "sk" << 1));    // owned:  sk < 10
     _client->insert(kShardedNss, BSON("_id" << 2 << "sk" << 99));   // orphan: sk >= 10
     _client->insert(kShardedNss, BSON("_id" << 3 << "sk" << 100));  // orphan: sk >= 10
@@ -1629,7 +1629,7 @@ TEST_F(SbeSingleDocumentLookupExecutorShardFilteringTest,
 // When sharded on _id, the scan field and shard key coincide; the filter must still drop orphans.
 TEST_F(SbeSingleDocumentLookupExecutorShardFilteringTest,
        IdShardKeyDropsOrphansAcrossBatchLookups) {
-    auto metadata = setupShardingMetadata(/*splitPoint*/ 2, /*shardKeyField*/ "_id");
+    auto metadata = setupShardingMetadata(/*splitPoint=*/2, /*shardKeyField=*/"_id");
     _client->insert(kShardedNss, BSON("_id" << 1));  // owned:  _id < 2
     _client->insert(kShardedNss, BSON("_id" << 2));  // orphan: _id >= 2
     _client->insert(kShardedNss, BSON("_id" << 3));  // orphan: _id >= 2
@@ -1655,7 +1655,7 @@ TEST_F(SbeSingleDocumentLookupExecutorShardFilteringTest,
 // must omit the redundant shard-filter stage.
 TEST_F(SbeSingleDocumentLookupExecutorShardFilteringTest,
        EligibilityThatChecksOwnershipOmitsShardFilterStage) {
-    auto metadata = setupShardingMetadata(/*splitPoint*/ 10);
+    auto metadata = setupShardingMetadata(/*splitPoint=*/10);
     _client->insert(kShardedNss, BSON("_id" << 1 << "sk" << 1));  // owned: sk < 10
 
     ScopedSetShardRole scopedSetShardRole{
@@ -1680,7 +1680,7 @@ TEST_F(SbeSingleDocumentLookupExecutorShardFilteringTest,
 // ExpressLookupShardFilteringTest's EligibilityThatChecksOwnershipSkipsShardFilterAndReturnsOrphan.
 TEST_F(SbeSingleDocumentLookupExecutorShardFilteringTest,
        EligibilityThatChecksOwnershipSkipsShardFilterAndReturnsOrphan) {
-    auto metadata = setupShardingMetadata(/*splitPoint*/ 10);
+    auto metadata = setupShardingMetadata(/*splitPoint=*/10);
     _client->insert(kShardedNss, BSON("_id" << 1 << "sk" << 99));  // orphan: sk >= 10
 
     ScopedSetShardRole scopedSetShardRole{

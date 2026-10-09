@@ -923,7 +923,7 @@ boost::optional<Document> CommonMongodProcessInterface::doLookupSingleDocument(
             aggRequest.setCollectionUUID(collectionUUID);
         }
         pipeline = pipeline_factory::makePipeline(
-            aggRequest, foreignExpCtx, boost::none /* shardCursorsSortSpec */, opts);
+            aggRequest, foreignExpCtx, /*shardCursorsSortSpec=*/boost::none, opts);
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
         LOGV2_DEBUG(
             6726700, 1, "Namespace not found while looking up document", "error"_attr = redact(ex));
@@ -1016,7 +1016,7 @@ std::vector<BSONObj> CommonMongodProcessInterface::getMatchingPlanCacheEntryStat
     invariant(planCache);
 
     auto planCacheEntries =
-        planCache->getMatchingStats({} /* cacheKeyFilterFunc */, serializer, predicate);
+        planCache->getMatchingStats(/*cacheKeyFilterFunc=*/{}, serializer, predicate);
 
     // Retrieve plan cache entries from the SBE plan cache.
     const auto cacheKeyFilter = [uuid = acquisition.uuid(),

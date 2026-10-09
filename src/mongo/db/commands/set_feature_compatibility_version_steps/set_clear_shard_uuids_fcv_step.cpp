@@ -102,7 +102,7 @@ void generateShardUUIDMetadata(OperationContext* opCtx) {
         auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
         txn_api::SyncTransactionWithRetries txn(opCtx,
                                                 executor,
-                                                nullptr, /*resourceYielder*/
+                                                /*resourceYielder=*/nullptr,
                                                 inlineExecutor);
         txn.run(opCtx, transactionChain);
     }
@@ -144,8 +144,8 @@ void generateShardUUIDMetadata(OperationContext* opCtx) {
                                 requests,
                                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                                 Shard::RetryPolicy::kIdempotent,
-                                nullptr /* resourceYielder */,
-                                {} /* designatedHostsMap */);
+                                /*resourceYielder=*/nullptr,
+                                /*designatedHostsMap=*/{});
 
         while (!ars.done()) {
             auto response = ars.next();

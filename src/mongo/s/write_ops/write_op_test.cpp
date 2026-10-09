@@ -503,7 +503,7 @@ TEST_F(WriteOpTransactionTest, TargetMultiDoesNotTargetAllShards) {
 
     BatchedCommandRequest request([&] {
         write_ops::DeleteCommandRequest deleteOp(kNss);
-        deleteOp.setDeletes({buildDelete(BSON("x" << GTE << -1 << LT << 1), true /*multi*/)});
+        deleteOp.setDeletes({buildDelete(BSON("x" << GTE << -1 << LT << 1), /*multi=*/true)});
         return deleteOp;
     }());
 

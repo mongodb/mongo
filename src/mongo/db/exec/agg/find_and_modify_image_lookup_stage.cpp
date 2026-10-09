@@ -90,7 +90,7 @@ boost::optional<BSONObj> findOneLocally(const boost::intrusive_ptr<ExpressionCon
         auto status = mongo::waitForReadConcern(pExpCtx->getOperationContext(),
                                                 *readConcern,
                                                 nss.dbName(),
-                                                true /* allowAfterClusterTime */);
+                                                /*allowAfterClusterTime=*/true);
         if (!status.isOK()) {
             LOGV2_WARNING(11731902,
                           "Failed to wait for read concern before doing a local find",
@@ -253,7 +253,7 @@ Document FindAndModifyImageLookupStage::downConvertIfNeedsRetryImage(Document in
                     auto lastOplogEntryDoc = findOneLocally(pExpCtx,
                                                             NamespaceString::kRsOplogNamespace,
                                                             BSON("ts" << *commitTxnTs),
-                                                            boost::none /* readConcern */);
+                                                            /*readConcern=*/boost::none);
 
                     if (!lastOplogEntryDoc) {
                         // The commit oplog entry is no longer available.

@@ -29,7 +29,7 @@ auto shapifyAndGenerateKey(const boost::intrusive_ptr<ExpressionContext>& expCtx
     query_stats::DeleteKey key(
         expCtx,
         deleteCommandRequest,
-        boost::none /* hint */,
+        /*hint=*/boost::none,
         std::make_unique<query_shape::DeleteCmdShape>(deleteCommandRequest, parsedDelete, expCtx),
         query_benchmark_constants::kCollectionType);
 

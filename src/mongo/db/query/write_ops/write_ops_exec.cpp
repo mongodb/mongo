@@ -501,7 +501,7 @@ bool handleError(OperationContext* opCtx,
     auto txnParticipant = TransactionParticipant::get(opCtx);
     if (txnParticipant && opCtx->inMultiDocumentTransaction()) {
         if (isTransientTransactionError(
-                ex.code(), false /* hasWriteConcernError */, false /* isCommitOrAbort */)) {
+                ex.code(), /*hasWriteConcernError=*/false, /*isCommitOrAbort=*/false)) {
             // Tell the client to try the whole txn again, by returning ok: 0 with errorLabels.
             throw;
         }
@@ -619,7 +619,7 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
             // It is not safe to ignore errors from collection creation while inside a
             // multi-document transaction.
             auto canContinue = handleError(
-                opCtx, ex, nss, ordered, /*isMultiUpdate=*/false, boost::none /* sampleId */, out);
+                opCtx, ex, nss, ordered, /*isMultiUpdate=*/false, /*sampleId=*/boost::none, out);
             invariant(!canContinue);
             return false;
         }
@@ -730,7 +730,7 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
             });
         } catch (const DBException& ex) {
             bool canContinue = handleError(
-                opCtx, ex, nss, ordered, /*isMultiUpdate=*/false, boost::none /* sampleId */, out);
+                opCtx, ex, nss, ordered, /*isMultiUpdate=*/false, /*sampleId=*/boost::none, out);
 
             if (!canContinue) {
                 // Failed in ordered batch, or in a transaction, or from some unrecoverable error.
@@ -875,9 +875,8 @@ UpdateResult performUpdate(OperationContext* opCtx,
         uasserted(ErrorCodes::InternalError, "failAllUpdates failpoint active!");
     }
 
-    const auto exec = uassertStatusOK(
-        getExecutorUpdate(&curOp->debug(), collection, *canonicalUpdate, boost::none /* verbosity
-        */));
+    const auto exec = uassertStatusOK(getExecutorUpdate(
+        &curOp->debug(), collection, *canonicalUpdate, /*verbosity=*/boost::none));
     // Capture diagnostics to be logged in the case of a failure.
     ScopedDebugInfo explainDiagnostics("explainDiagnostics",
                                        diagnostic_printers::ExplainDiagnosticPrinter{exec.get()});
@@ -1014,8 +1013,7 @@ long long performDelete(OperationContext* opCtx,
     }
 
     const auto exec = uassertStatusOK(
-        getExecutorDelete(&curOp->debug(), collection, canonicalDelete, boost::none /* verbosity
-        */));
+        getExecutorDelete(&curOp->debug(), collection, canonicalDelete, /*verbosity=*/boost::none));
     // Capture diagnostics to be logged in the case of a failure.
     ScopedDebugInfo explainDiagnostics("explainDiagnostics",
                                        diagnostic_printers::ExplainDiagnosticPrinter{exec.get()});
@@ -1383,7 +1381,7 @@ WriteResult performInserts(
                                               actualNs,
                                               wholeOp.getOrdered(),
                                               /*isMultiUpdate=*/false,
-                                              boost::none /* sampleId */,
+                                              /*sampleId=*/boost::none,
                                               &out);
             }
 
@@ -1417,8 +1415,8 @@ static SingleWriteResult performSingleUpdateOpNoRetry(OperationContext* opCtx,
                                                       CollectionAcquisition collection,
                                                       CanonicalUpdate& canonicalUpdate,
                                                       bool* containsDotsAndDollarsField) {
-    auto exec = uassertStatusOK(getExecutorUpdate(
-        &curOp.debug(), collection, canonicalUpdate, boost::none /* verbosity */));
+    auto exec = uassertStatusOK(
+        getExecutorUpdate(&curOp.debug(), collection, canonicalUpdate, /*verbosity=*/boost::none));
     // Capture diagnostics to be logged in the case of a failure.
     ScopedDebugInfo explainDiagnostics("explainDiagnostics",
                                        diagnostic_printers::ExplainDiagnosticPrinter{exec.get()});
@@ -2151,8 +2149,8 @@ static SingleWriteResult performSingleDeleteOp(
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &hangWithLockDuringBatchRemove, opCtx, "hangWithLockDuringBatchRemove");
 
-    auto exec = uassertStatusOK(getExecutorDelete(
-        &curOp.debug(), collection, canonicalDelete, boost::none /* verbosity */));
+    auto exec = uassertStatusOK(
+        getExecutorDelete(&curOp.debug(), collection, canonicalDelete, /*verbosity=*/boost::none));
     // Capture diagnostics to be logged in the case of a failure.
     ScopedDebugInfo explainDiagnostics("explainDiagnostics",
                                        diagnostic_printers::ExplainDiagnosticPrinter{exec.get()});

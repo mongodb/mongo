@@ -127,8 +127,8 @@ TEST_F(JSCustomAllocatorTest, SingleAlloc) {
 
     ASSERT_DOES_NOT_THROW(scope->exec(code,
                                       "root_module",
-                                      true /* printResult */,
-                                      true /* reportError */,
+                                      /*printResult=*/true,
+                                      /*reportError=*/true,
                                       true /* assertOnError , timeout*/));
     scope.reset();
     setGlobalScriptEngine(nullptr);
@@ -171,8 +171,8 @@ TEST_F(JSCustomAllocatorTest, ResizeMany) {
 
     ASSERT_DOES_NOT_THROW(scope->exec(code,
                                       "root_module",
-                                      true /* printResult */,
-                                      true /* reportError */,
+                                      /*printResult=*/true,
+                                      /*reportError=*/true,
                                       true /* assertOnError , timeout*/));
     scope.reset();
     setGlobalScriptEngine(nullptr);

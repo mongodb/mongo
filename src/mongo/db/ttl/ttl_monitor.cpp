@@ -292,7 +292,7 @@ Date_t safeExpirationDate(OperationContext* opCtx,
 RecordIdBound makeCollScanStartBound(const CollectionPtr& collection, const Date_t startDate) {
     if (collection->getTimeseriesOptions()) {
         auto startOID = OID();
-        startOID.init(startDate, false /* max */);
+        startOID.init(startDate, /*max=*/false);
         return RecordIdBound(record_id_helpers::keyForOID(startOID));
     }
 
@@ -305,7 +305,7 @@ RecordIdBound makeCollScanStartBound(const CollectionPtr& collection, const Date
 RecordIdBound makeCollScanEndBound(const CollectionPtr& collection, Date_t expirationDate) {
     if (collection->getTimeseriesOptions()) {
         auto endOID = OID();
-        endOID.init(expirationDate, true /* max */);
+        endOID.init(expirationDate, /*max=*/true);
         return RecordIdBound(record_id_helpers::keyForOID(endOID));
     }
 
@@ -358,7 +358,7 @@ const IndexCatalogEntry* getValidTTLIndex(OperationContext* opCtx,
 }  // namespace
 
 TTLMonitor::TTLMonitor()
-    : BackgroundJob(false /* selfDelete */),
+    : BackgroundJob(/*selfDelete=*/false),
       _ttlMonitorSleepSecs(Seconds{ttlMonitorSleepSecs.load()}) {
 
     _metadataRefreshTaskExecutor = executor::ThreadPoolTaskExecutor::create(
@@ -813,7 +813,7 @@ bool TTLMonitor::_deleteExpiredWithCollscan(OperationContext* opCtx,
     const auto endId = makeCollScanEndBound(collectionPtr, expirationDate);
 
     return _performDeleteExpiredWithCollscan(
-        opCtx, collection, startId, endId, /*forward*/ true, /*filter*/ nullptr);
+        opCtx, collection, startId, endId, /*forward=*/true, /*filter=*/nullptr);
 }
 
 bool TTLMonitor::_deleteExpiredWithCollscanForTimeseriesExtendedRange(
@@ -853,7 +853,7 @@ bool TTLMonitor::_deleteExpiredWithCollscanForTimeseriesExtendedRange(
         const auto endId = makeCollScanEndBound(collectionPtr, expirationDate);
 
         passTargetMet |= _performDeleteExpiredWithCollscan(
-            opCtx, collection, startId, endId, /*forward*/ true, &filter);
+            opCtx, collection, startId, endId, /*forward=*/true, &filter);
     }
 
     // Delete from the end of the clustered _id index. In the typical case nothing should be
@@ -873,7 +873,7 @@ bool TTLMonitor::_deleteExpiredWithCollscanForTimeseriesExtendedRange(
             collectionPtr, Date_t::fromMillisSinceEpoch(static_cast<long long>(0xFFFFFFFF) * 1000));
 
         passTargetMet |= _performDeleteExpiredWithCollscan(
-            opCtx, collection, startId, endId, /*forward*/ false, &filter);
+            opCtx, collection, startId, endId, /*forward=*/false, &filter);
     }
     return passTargetMet;
 }

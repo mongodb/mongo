@@ -116,7 +116,7 @@ public:
         auto verifyWalk = [&](value::TypeTags t, value::Value v) {
             // Extract paths from input data in a single pass.
             value::walkField<value::ScalarProjectionPositionInfoRecorder>(
-                &root, t, v, nullptr /* bsonPtr */, dummyCallBack, true /* traverseArrays */);
+                &root, t, v, /*bsonPtr=*/nullptr, dummyCallBack, /*traverseArrays=*/true);
 
             // Verify the extracted values are correct.
             size_t idx = 0;

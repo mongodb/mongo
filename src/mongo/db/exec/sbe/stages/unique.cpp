@@ -42,7 +42,7 @@ UniqueStage::UniqueStage(std::unique_ptr<PlanStage> input,
                          value::SlotVector keys,
                          PlanNodeId planNodeId,
                          bool participateInTrialRunTracking)
-    : PlanStage("unique"sv, nullptr /* yieldPolicy */, planNodeId, participateInTrialRunTracking),
+    : PlanStage("unique"sv, /*yieldPolicy=*/nullptr, planNodeId, participateInTrialRunTracking),
       _keySlots(keys),
       _dedupReporter(OperationMemoryUsageTracker::createDeduplicatorReporter(
           [](int64_t deduplicatedBytes, int64_t deduplicatedRecords) {
@@ -180,7 +180,7 @@ UniqueRoaringStage::UniqueRoaringStage(std::unique_ptr<PlanStage> input,
                                        PlanNodeId planNodeId,
                                        bool participateInTrialRunTracking)
     : PlanStage(
-          "unique_roaring"sv, nullptr /* yieldPolicy */, planNodeId, participateInTrialRunTracking),
+          "unique_roaring"sv, /*yieldPolicy=*/nullptr, planNodeId, participateInTrialRunTracking),
       _keySlot(key),
       _seen(static_cast<size_t>(internalRoaringBitmapsThreshold.load()),
             static_cast<size_t>(internalRoaringBitmapsBatchSize.load()),

@@ -38,7 +38,7 @@ const BSONObj kGroupStage = fromjson(R"({$group: {_id: null, foo: {$count: {}}}}
 std::unique_ptr<QuerySolution> makeVirtualScan(std::vector<BSONArray> docs) {
     auto solution = std::make_unique<QuerySolution>();
     solution->setRoot(std::make_unique<VirtualScanNode>(
-        std::move(docs), VirtualScanNode::ScanType::kCollScan, false /*hasRecordId*/));
+        std::move(docs), VirtualScanNode::ScanType::kCollScan, /*hasRecordId=*/false));
     return solution;
 }
 
@@ -209,7 +209,7 @@ TEST_F(DeferredEngineChoiceLoweringTest, IdhackUsesClassic) {
                                operationContext(),
                                collections(),
                                PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
-                               nullptr /*pipeline*/);
+                               /*pipeline=*/nullptr);
     ASSERT(dynamic_cast<PlanExecutorImpl*>(exec.get()));
 }
 
@@ -229,7 +229,7 @@ TEST_F(DeferredEngineChoiceLoweringTest, BasicScanUsesClassic) {
                                operationContext(),
                                collections(),
                                PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
-                               nullptr /*pipeline*/);
+                               /*pipeline=*/nullptr);
     ASSERT(dynamic_cast<PlanExecutorImpl*>(exec.get()));
 }
 
@@ -271,7 +271,7 @@ TEST_F(DeferredEngineChoiceLoweringTest, MultiplanningUsesEof) {
     auto testExpectedEngine = [&](size_t numDocs, bool hasGroupPipeline, bool shouldUseSbe) {
         auto [cq, plannerData] = createPlannerData(kFindFilter);
         auto solutions = createVirtualScanQuerySolutionsForDefaultFilter(
-            numDocs /*resultDocCount*/, cq->getPrimaryMatchExpression());
+            /*resultDocCount=*/numDocs, cq->getPrimaryMatchExpression());
         // Include the SBE-eligible pipeline, so that if multiplanning hits EOF we see classic used,
         // and if EOF is not reached we see SBE used.
         auto pipeline = makeSbeEligiblePipeline();
@@ -279,8 +279,8 @@ TEST_F(DeferredEngineChoiceLoweringTest, MultiplanningUsesEof) {
         auto multiplanner = std::make_unique<exec_deferred_engine_choice::MultiPlanner>(
             std::move(plannerData),
             std::move(solutions),
-            false /* addingCBRChosenPlanToPlanCache */,
-            boost::none /* maybeExplainData */,
+            /*addingCBRChosenPlanToPlanCache=*/false,
+            /*maybeExplainData=*/boost::none,
             PlanSelectionStrategy::kMultiPlanner);
         EngineSelectionPlanner planner(
             std::move(multiplanner), operationContext(), cq.get(), pipelinePtr, collections());
@@ -306,9 +306,9 @@ TEST_F(DeferredEngineChoiceLoweringTest, MultiplanningUsesEof) {
     std::vector<int> numDocsCases = {1, 50, 150, 200};
     for (int numDocs : numDocsCases) {
         // With default flags, if there is a $group stage, SBE should always be used.
-        testExpectedEngine(numDocs, true /*hasGroupPipeline*/, true /*shouldUseSbe*/);
+        testExpectedEngine(numDocs, /*hasGroupPipeline=*/true, /*shouldUseSbe=*/true);
         // If there is no pipeline, classic will always be used.
-        testExpectedEngine(numDocs, false /*hasGroupPipeline*/, false /*shouldUseSbe*/);
+        testExpectedEngine(numDocs, /*hasGroupPipeline=*/false, /*shouldUseSbe=*/false);
     }
 
     unittest::ServerParameterGuard sbeFullController{"featureFlagSbeFull", true};
@@ -316,9 +316,9 @@ TEST_F(DeferredEngineChoiceLoweringTest, MultiplanningUsesEof) {
         bool hitEof = numDocs < 100;
         // With SBE full enabled, we can use SBE even when there is no pipeline. We should use the
         // EOF optimization (classic) if it's not a debug build and we hit EOF.
-        testExpectedEngine(numDocs, false /*hasGroupPipeline*/, kDebugBuild || !hitEof);
+        testExpectedEngine(numDocs, /*hasGroupPipeline=*/false, kDebugBuild || !hitEof);
         // If there is a pipeline, SBE is always used.
-        testExpectedEngine(numDocs, true /*hasGroupPipeline*/, true /*shouldUseSbe*/);
+        testExpectedEngine(numDocs, /*hasGroupPipeline=*/true, /*shouldUseSbe=*/true);
     }
 }
 

@@ -62,7 +62,7 @@ void computeInsertShapeAndRegisterQueryStats(OperationContext* opCtx,
     std::ignore = CurOp::get(opCtx)->debug().ensureQueryShapeHash(
         opCtx, [&]() -> boost::optional<query_shape::QueryShapeHash> {
             return shape_helpers::computeQueryShapeHash(
-                opCtx, deferredShape, wholeOp.getNamespace(), true /*skipInternalClientCheck*/);
+                opCtx, deferredShape, wholeOp.getNamespace(), /*skipInternalClientCheck=*/true);
         });
 
     // Register query stats collection.
@@ -109,7 +109,7 @@ boost::optional<query_shape::DeferredQueryShape> computeAndStoreQueryShapeHash(
                 return boost::none;
             }
             return shape_helpers::computeQueryShapeHash(
-                expCtx, deferredShape, true /*skipInternalClientCheck*/);
+                expCtx, deferredShape, /*skipInternalClientCheck=*/true);
         });
 
     return deferredShape;

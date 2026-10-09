@@ -219,7 +219,7 @@ TEST_F(ChunkMapTest, ConstructChunkMapMismatchingTimestamp) {
 TEST_F(ChunkMapTest, UpdateMapNotLeaveSmallVectors) {
     const ChunkVersion initialVersion{{collEpoch(), collTimestamp()}, {1, 0}};
     auto chunkVector = toChunkInfoPtrVector(
-        genChunkVector(uuid(), genRandomSplitPoints(8), initialVersion, 1 /*numShards*/));
+        genChunkVector(uuid(), genRandomSplitPoints(8), initialVersion, /*numShards=*/1));
 
     const auto chunkBucketSize = 4;
     LOGV2(7162703, "Constructing new chunk map", "chunkBucketSize"_attr = chunkBucketSize);
@@ -433,7 +433,7 @@ TEST_F(ChunkMapTest, TestIntersectingChunkRandom) {
 
     auto targetChunkIt = chunks.begin() + _random.nextInt64(chunks.size());
     auto intermediateKey = calculateIntermediateShardKey(
-        (*targetChunkIt)->getMin(), (*targetChunkIt)->getMax(), 0.2 /* minKeyProb */);
+        (*targetChunkIt)->getMin(), (*targetChunkIt)->getMax(), /*minKeyProb=*/0.2);
 
     auto intersectingChunkPtr = chunkMap.findIntersectingChunk(intermediateKey);
     assertEqualChunkInfo(**(targetChunkIt), *intersectingChunkPtr);
@@ -519,7 +519,7 @@ TEST_F(ChunkMapTest, ForEachWithShardKey) {
     auto firstChunkIdx = static_cast<size_t>(_random.nextInt64(chunks.size()));
     const auto& firstChunk = chunks[firstChunkIdx];
     auto skey = calculateIntermediateShardKey(
-        firstChunk->getMin(), firstChunk->getMax(), 0.2 /* minKeyProb */);
+        firstChunk->getMin(), firstChunk->getMax(), /*minKeyProb=*/0.2);
 
     size_t i = firstChunkIdx;
     auto lastChunkIdx = firstChunkIdx +
@@ -543,9 +543,9 @@ TEST_F(ChunkMapTest, TestEnumerateOverlappingChunksRandom) {
     auto lastChunkIt = firstChunkIt + _random.nextInt64(std::distance(firstChunkIt, chunks.end()));
 
     auto minBound = calculateIntermediateShardKey(
-        (*firstChunkIt)->getMin(), (*firstChunkIt)->getMax(), 0.2 /* minKeyProb */);
+        (*firstChunkIt)->getMin(), (*firstChunkIt)->getMax(), /*minKeyProb=*/0.2);
     auto maxBound = calculateIntermediateShardKey(
-        (*lastChunkIt)->getMin(), (*lastChunkIt)->getMax(), 0.2 /* minKeyProb */);
+        (*lastChunkIt)->getMin(), (*lastChunkIt)->getMax(), /*minKeyProb=*/0.2);
 
     auto it = firstChunkIt;
     chunkMap.forEachOverlappingChunk(minBound, maxBound, true, [&](const auto& chunkInfoPtr) {
@@ -602,7 +602,7 @@ TEST_F(ChunkMapTest, TestChunkMapReverseIteration) {
  * is produced by removing a random chunk, which also covers the case of a missing min or max key.
  */
 TEST_F(ChunkMapTest, CreateWithMissingChunkFail) {
-    auto chunks = genRandomChunkVector(30, 2 /* minNumChunks */);
+    auto chunks = genRandomChunkVector(30, /*minNumChunks=*/2);
 
     // Remove one random chunk to simulate a gap in the shard key space.
     chunks.erase(chunks.begin() + _random.nextInt64(chunks.size()));
@@ -616,7 +616,7 @@ TEST_F(ChunkMapTest, CreateWithMissingChunkFail) {
  * Constructing a ChunkMap with a gap, produced by shrinking the range of a random chunk, fails.
  */
 TEST_F(ChunkMapTest, CreateWithChunkGapFail) {
-    auto chunks = genRandomChunkVector(30, 2 /* minNumChunks */);
+    auto chunks = genRandomChunkVector(30, /*minNumChunks=*/2);
 
     auto& shrinkedChunk = chunks.at(_random.nextInt64(chunks.size()));
     auto intermediateKey =
@@ -667,7 +667,7 @@ TEST_F(ChunkMapTest, UpdateWithChunkGapFail) {
  * Constructing a ChunkMap with overlapping chunks fails.
  */
 TEST_F(ChunkMapTest, CreateWithChunkOverlapFail) {
-    auto chunks = genRandomChunkVector(30, 2 /* minNumChunks */);
+    auto chunks = genRandomChunkVector(30, /*minNumChunks=*/2);
 
     auto chunkToExtendIt = chunks.begin() + _random.nextInt64(chunks.size());
 
@@ -678,8 +678,8 @@ TEST_F(ChunkMapTest, CreateWithChunkOverlapFail) {
     if (extendRight) {
         auto newMax = calculateIntermediateShardKey(chunkToExtendIt->getMax(),
                                                     std::next(chunkToExtendIt)->getMax(),
-                                                    0.0 /* minKeyProb */,
-                                                    0.1 /* maxKeyProb */);
+                                                    /*minKeyProb=*/0.0,
+                                                    /*maxKeyProb=*/0.1);
         // extend right bound
         chunkToExtendIt->setRange({chunkToExtendIt->getMin(), newMax});
         auto newVersion = chunkToExtendIt->getVersion();
@@ -691,8 +691,8 @@ TEST_F(ChunkMapTest, CreateWithChunkOverlapFail) {
         invariant(canExtendLeft);
         auto newMin = calculateIntermediateShardKey(std::prev(chunkToExtendIt)->getMin(),
                                                     chunkToExtendIt->getMin(),
-                                                    0.1 /* minKeyProb */,
-                                                    0.0 /* maxKeyProb */);
+                                                    /*minKeyProb=*/0.1,
+                                                    /*maxKeyProb=*/0.0);
         // extend left bound
         chunkToExtendIt->setRange({newMin, chunkToExtendIt->getMax()});
         auto newVersion = chunkToExtendIt->getVersion();
@@ -709,7 +709,7 @@ TEST_F(ChunkMapTest, CreateWithChunkOverlapFail) {
  * Updating a ChunkMap with overlapping chunks fails.
  */
 TEST_F(ChunkMapTest, UpdateWithChunkOverlapFail) {
-    auto chunks = genRandomChunkVector(30, 2 /* minNumChunks */);
+    auto chunks = genRandomChunkVector(30, /*minNumChunks=*/2);
 
     auto chunkMap = makeChunkMap(toChunkInfoPtrVector(chunks));
     auto collVersion = chunkMap.getVersion();

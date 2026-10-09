@@ -308,12 +308,12 @@ protected:
         if (multiDocTxn) {
             txnParticipant.beginOrContinue(opCtx,
                                            {txnNum},
-                                           false /* autocommit */,
+                                           /*autocommit=*/false,
                                            TransactionParticipant::TransactionActions::kStart);
         } else {
             txnParticipant.beginOrContinue(opCtx,
                                            {txnNum},
-                                           boost::none /* autocommit */,
+                                           /*autocommit=*/boost::none,
                                            TransactionParticipant::TransactionActions::kNone);
         }
     }
@@ -420,7 +420,7 @@ protected:
         auto txnParticipant = TransactionParticipant::get(opCtx);
         txnParticipant.beginOrContinue(opCtx,
                                        {txnNumber},
-                                       false /* autocommit */,
+                                       /*autocommit=*/false,
                                        TransactionParticipant::TransactionActions::kStart);
 
         txnParticipant.unstashTransactionResources(opCtx, "insert");
@@ -439,7 +439,7 @@ protected:
         auto txnParticipant = TransactionParticipant::get(opCtx);
         txnParticipant.beginOrContinue(opCtx,
                                        {txnNumber},
-                                       false /* autocommit */,
+                                       /*autocommit=*/false,
                                        TransactionParticipant::TransactionActions::kStart);
 
         txnParticipant.unstashTransactionResources(opCtx, "prepareTransaction");
@@ -476,7 +476,7 @@ protected:
         auto txnParticipant = TransactionParticipant::get(opCtx);
         txnParticipant.beginOrContinue(opCtx,
                                        {txnNumber},
-                                       false /* autocommit */,
+                                       /*autocommit=*/false,
                                        TransactionParticipant::TransactionActions::kContinue);
 
         txnParticipant.unstashTransactionResources(opCtx, "abortTransaction");
@@ -809,7 +809,7 @@ TEST_F(ReshardingTxnClonerTest, ClonerStoresProgressSingleBatch) {
         ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
         auto future = runCloner(cloner);
 
-        onCommandReturnTxnBatch(txns, CursorId{0}, true /* isFirstBatch */);
+        onCommandReturnTxnBatch(txns, CursorId{0}, /*isFirstBatch=*/true);
 
         auto status = future.getNoThrow();
         ASSERT_OK(status);
@@ -827,7 +827,7 @@ TEST_F(ReshardingTxnClonerTest, ClonerStoresProgressSingleBatch) {
         ReshardingTxnCloner cloner(kTwoSourceIdList[0], Timestamp::max());
         auto future = runCloner(cloner);
 
-        onCommandReturnTxnBatch(txns, CursorId{0}, true /* isFirstBatch */);
+        onCommandReturnTxnBatch(txns, CursorId{0}, /*isFirstBatch=*/true);
 
         auto status = future.getNoThrow();
         ASSERT_OK(status);
@@ -858,7 +858,7 @@ TEST_F(ReshardingTxnClonerTest, ClonerStoresProgressMultipleBatches) {
     // has been processed.
     onCommandReturnTxnBatch(std::vector<BSONObj>(txns.begin(), txns.begin() + 2),
                             CursorId{123},
-                            true /* isFirstBatch */);
+                            /*isFirstBatch=*/true);
     onCommand([&](const executor::RemoteCommandRequest& request) {
         // Simulate a stepdown.
         cancelSource.cancel();
@@ -881,7 +881,7 @@ TEST_F(ReshardingTxnClonerTest, ClonerStoresProgressMultipleBatches) {
     future = runCloner(cloner);
 
     onCommandReturnTxnBatch(
-        std::vector<BSONObj>(txns.begin() + 1, txns.end()), CursorId{0}, false /* isFirstBatch */);
+        std::vector<BSONObj>(txns.begin() + 1, txns.end()), CursorId{0}, /*isFirstBatch=*/false);
 
     status = future.getNoThrow();
     ASSERT_OK(status);
@@ -904,7 +904,7 @@ TEST_F(ReshardingTxnClonerTest, ClonerStoresProgressResume) {
     auto cancelSource = CancellationSource(operationContext()->getCancellationToken());
     auto future = runCloner(cloner, cancelSource.token());
 
-    onCommandReturnTxnBatch({txns.front()}, CursorId{123}, true /* isFirstBatch */);
+    onCommandReturnTxnBatch({txns.front()}, CursorId{123}, /*isFirstBatch=*/true);
 
     // Simulate the cloning operation being canceled as the batch was being filled.
     onCommand([&](const executor::RemoteCommandRequest& request) {
@@ -992,7 +992,7 @@ TEST_F(ReshardingTxnClonerTest, ClonerDoesNotUpdateProgressOnEmptyBatch) {
     ReshardingTxnCloner cloner(kTwoSourceIdList[0], Timestamp::max());
     auto future = runCloner(cloner);
 
-    onCommandReturnTxnBatch({}, CursorId{0}, true /* isFirstBatch */);
+    onCommandReturnTxnBatch({}, CursorId{0}, /*isFirstBatch=*/true);
 
     auto status = future.getNoThrow();
     ASSERT_OK(status);

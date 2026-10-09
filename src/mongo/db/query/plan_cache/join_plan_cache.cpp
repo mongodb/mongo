@@ -37,7 +37,7 @@ ServiceContext::ConstructorActionRegisterer joinPlanCacheRegisterer{
         uassertStatusOK(status);
         auto requestedBytes = memory_util::getRequestedMemSizeInBytes(status.getValue());
         auto cappedBytes = memory_util::capMemorySize(
-            requestedBytes, /*maximumSizeGB*/ 500, /*percentTotalSystemMemory*/ 25);
+            requestedBytes, /*maximumSizeGB=*/500, /*percentTotalSystemMemory=*/25);
         getJoinPlanCacheDecoration(serviceCtx) =
             std::make_unique<JoinPlanCache>(cappedBytes, kJoinPlanCacheNumPartitions);
     }};
@@ -68,7 +68,7 @@ size_t CachedJoinNode::estimateHeapBytes() const {
             return estimateFieldPathHeapBytes(pred.leftField) +
                 estimateFieldPathHeapBytes(pred.rightField);
         },
-        /*includeShallowSize*/ true);
+        /*includeShallowSize=*/true);
     if (leftEmbeddingField) {
         size += estimateFieldPathHeapBytes(*leftEmbeddingField);
     }
@@ -149,7 +149,7 @@ JoinPlanCacheEntry::JoinPlanCacheEntry(std::unique_ptr<CachedJoinPlan> joinTree,
           container_size_helper::estimateObjectSizeInBytes(
               nodeFingerprints,
               [](const NodeFingerprint& fp) { return fp.estimateObjectSizeInBytes(); },
-              /*includeShallowSize*/ true)),
+              /*includeShallowSize=*/true)),
       joinTree(std::move(joinTree)),
       baseNode(baseNode),
       nodeFingerprints(std::move(nodeFingerprints)),

@@ -53,7 +53,7 @@ public:
         spec.version(1).name("a_1").addKeys(BSON("a" << 1));
         auto desc = IndexDescriptor(IndexNames::BTREE, spec.toBSON());
         indexCatalog->createIndexEntry(
-            _opCtx.get(), nullptr /*collection*/, std::move(desc), CreateIndexEntryFlags::kNone);
+            _opCtx.get(), /*collection=*/nullptr, std::move(desc), CreateIndexEntryFlags::kNone);
         _collection = std::make_unique<CollectionMock>(UUID::gen(), kNss, std::move(indexCatalog));
     }
 
@@ -104,7 +104,7 @@ public:
         spec.version(1).name(std::move(indexName)).addKeys(kp);
         indexCatalog->createIndexEntry(
             _opCtx.get(),
-            nullptr /*collection*/,
+            /*collection=*/nullptr,
             IndexDescriptor(IndexNames::findPluginName(kp), spec.toBSON()),
             CreateIndexEntryFlags::kNone);
         return std::make_unique<CollectionMock>(UUID::gen(), kNss, std::move(indexCatalog));
@@ -163,7 +163,7 @@ IndexEntry buildIndexEntryWithIdent(const BSONObj& kp,
                                                 CollectionPtr{},
                                                 std::string(ident),
                                                 IndexDescriptor(pluginName, spec.toBSON()),
-                                                false /* isFrozen */);
+                                                /*isFrozen=*/false);
     IndexEntry entry{kp,
                      IndexNames::nameToType(pluginName),
                      IndexConfig::kLatestIndexVersion,
@@ -363,7 +363,7 @@ TEST_F(ClassicStageBuilderTest, TextMatchDroppedIndexThrowsQueryPlanKilled) {
         kNss,
         buildIndexEntryWithIdent(BSON("txt" << "text"), "original-ident", "txt_text"),
         std::make_unique<fts::FTSQueryImpl>(),
-        false /* wantTextScore */);
+        /*wantTextScore=*/false);
     ASSERT_THROWS_CODE(
         buildPlanStage(makeQuerySolution(std::move(textMatch)), emptyCollection.get()),
         DBException,
@@ -376,7 +376,7 @@ TEST_F(ClassicStageBuilderTest, TextMatchDroppedAndReplacedIndexThrowsQueryPlanK
         kNss,
         buildIndexEntryWithIdent(BSON("txt" << "text"), "original-ident", "txt_text"),
         std::make_unique<fts::FTSQueryImpl>(),
-        false /* wantTextScore */);
+        /*wantTextScore=*/false);
     ASSERT_THROWS_CODE(buildPlanStage(makeQuerySolution(std::move(textMatch)), collection.get()),
                        DBException,
                        ErrorCodes::QueryPlanKilled);

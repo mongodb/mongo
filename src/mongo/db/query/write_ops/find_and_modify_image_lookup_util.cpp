@@ -48,7 +48,7 @@ boost::optional<BSONObj> fetchPreOrPostImageFromImageCollection(
     const repl::OplogEntry oplogEntry, FindOneLocallyFunc findOneLocallyFunc) {
     auto imageDoc = findOneLocallyFunc(NamespaceString::kConfigImagesNamespace,
                                        BSON("_id" << oplogEntry.getSessionId()->toBSON()),
-                                       boost::none /* readConcern */);
+                                       /*readConcern=*/boost::none);
 
     if (!imageDoc) {
         return boost::none;

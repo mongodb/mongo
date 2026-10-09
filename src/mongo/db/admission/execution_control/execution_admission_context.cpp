@@ -175,8 +175,8 @@ boost::optional<ExecutionAdmissionContext::FinalizedStats> ExecutionAdmissionCon
         // Record CPU and elapsed time to the appropriate finalized stats bucket
         // (deprioritizable/non-deprioritizable). This is independent of operation type (read/write)
         // since the type may have changed during the operation's lifetime.
-        auto& stats = _isDeprioritizable(true /* isFinalization */) ? _deprioritizableFinalStats
-                                                                    : _nonDeprioritizableFinalStats;
+        auto& stats = _isDeprioritizable(/*isFinalization=*/true) ? _deprioritizableFinalStats
+                                                                  : _nonDeprioritizableFinalStats;
 
         stats.totalOpsFinished.fetchAndAddRelaxed(1);
         stats.totalCPUUsageMicros.fetchAndAddRelaxed(cpuUsageMicros);

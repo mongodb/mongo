@@ -155,9 +155,9 @@ protected:
 
             // ShardingWriteRouter discovers the donor operation via the
             // LocalReshardingOperationsRegistry, so register a matching donor operation.
-            CommonReshardingMetadata reshardingMetadata(UUID::gen() /* reshardingUUID */,
+            CommonReshardingMetadata reshardingMetadata(/*reshardingUUID=*/UUID::gen(),
                                                         kNss,
-                                                        chunkManager.getUUID() /* sourceUUID */,
+                                                        /*sourceUUID=*/chunkManager.getUUID(),
                                                         reshardingTempNs,
                                                         reshardKey);
             LocalReshardingOperationsRegistry::get().registerOperation(
@@ -241,8 +241,8 @@ protected:
                                          false,
                                          collEpoch,
                                          collTimestamp,
-                                         boost::none /* timeseriesFields */,
-                                         boost::none /* reshardingFields */,
+                                         /*timeseriesFields=*/boost::none,
+                                         /*reshardingFields=*/boost::none,
                                          true,
                                          chunks)));
 

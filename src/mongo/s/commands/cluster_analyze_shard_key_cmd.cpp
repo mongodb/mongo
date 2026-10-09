@@ -59,7 +59,7 @@ public:
         Response typedRun(OperationContext* opCtx) {
             const auto& nss = ns();
             uassertStatusOK(validateNamespace(nss));
-            setReadWriteConcern(opCtx, request(), true /* setRC */, false /* setWC */);
+            setReadWriteConcern(opCtx, request(), /*setRC=*/true, /*setWC=*/false);
 
             sharding::router::CollectionRouter router(opCtx, nss);
             return router.routeWithRoutingContext(

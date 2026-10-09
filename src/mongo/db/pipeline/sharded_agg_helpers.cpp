@@ -310,7 +310,7 @@ std::vector<RemoteCursor> establishShardCursors(
                                 allowPartialResults,
                                 &routingCtx,
                                 getDesiredRetryPolicy(opCtx),
-                                {} /* providedOpKeys */,
+                                /*providedOpKeys=*/{},
                                 std::move(designatedHostsMap));
     }
 }
@@ -542,7 +542,7 @@ bool canUseLocalReadAsCursorSource(OperationContext* opCtx,
     useLocalRead = useLocalRead &&
         (!readConcern ||
          readConcern->woCompare(repl::ReadConcernArgs::get(opCtx).toBSONInner(),
-                                BSONObj{} /* ordering */,
+                                /*ordering=*/BSONObj{},
                                 BSONObj::ComparisonRules::kConsiderFieldName |
                                     BSONObj::ComparisonRules::kIgnoreFieldOrder) == 0);
     return useLocalRead;
@@ -597,7 +597,7 @@ std::unique_ptr<Pipeline> tryAttachCursorSourceForLocalRead(
             ? expCtx->getMongoProcessInterface()->finalizeAndAttachCursorToPipelineForLocalRead(
                   expCtx,
                   std::move(preFinalizedPipeline),
-                  true /* attachCursorAfterOptimizing */,
+                  /*attachCursorAfterOptimizing=*/true,
                   optimizePipeline,
                   useCollectionDefaultCollator,
                   aggRequest)
@@ -735,7 +735,7 @@ std::unique_ptr<Pipeline> runPipelineDirectlyOnSingleShard(
                 nss,
                 std::move(readPreference),
                 requests,
-                false /* allowPartialResults */,
+                /*allowPartialResults=*/false,
                 &routingCtx,
                 Shard::RetryPolicy::kIdempotent);
             tassert(11282917,
@@ -1187,7 +1187,7 @@ DispatchShardPipelineResults dispatchTargetedShardPipeline(
                                                          serializedCommand,
                                                          *splitPipelines,
                                                          exchangeSpec,
-                                                         true /* needsMerge */,
+                                                         /*needsMerge=*/true,
                                                          explain,
                                                          std::move(readConcern),
                                                          remoteMetricsToInclude)
@@ -1623,7 +1623,7 @@ Status appendExplainResults(DispatchShardPipelineResults&& dispatchResults,
             buildArmParams(dispatchResults.splitPipeline->mergePipeline->getContext(),
                            std::vector<OwnedRemoteCursor>(),
                            std::move(dispatchResults.splitPipeline->shardCursorsSortSpec),
-                           IncludeMetrics{} /* remoteMetricsToInclude */)
+                           /*remoteMetricsToInclude=*/IncludeMetrics{})
                 .toBSON()
                 .removeField(AsyncResultsMergerParams::kRemotesFieldName);
 
@@ -1673,7 +1673,7 @@ BSONObj finalizePipelineAndTargetShardsForExplain(
             LiteParsedPipeline liteParsedPipeline(
                 expCtx->getNamespaceString(),
                 pipelineToTarget->serializeToBson(wireOpts),
-                false /* isRunningAgainstView_ForHybridSearch */,
+                /*isRunningAgainstView_ForHybridSearch=*/false,
                 LiteParserOptions{.ifrContext = expCtx->getIfrContext()});
             PipelineDataSource pipelineDataSource = getPipelineDataSource(liteParsedPipeline);
 
@@ -1707,7 +1707,7 @@ BSONObj finalizePipelineAndTargetShardsForExplain(
                                       std::move(pipelineToTarget),
                                       expCtx->getExplain(),
                                       expCtx->getNamespaceString(),
-                                      IncludeMetrics{} /* remoteMetricsToInclude */);
+                                      /*remoteMetricsToInclude=*/IncludeMetrics{});
 
             BSONObjBuilder explainBuilder;
             auto appendStatus =
@@ -1774,11 +1774,11 @@ std::unique_ptr<Pipeline> dispatchTargetedPipelineAndAddMergeCursors(
                                                               expCtx->eligibleForSampling(),
                                                               expCtx->getNamespaceString(),
                                                               std::move(pipeline),
-                                                              boost::none /* explain */,
+                                                              /*explain=*/boost::none,
                                                               remoteMetricsToInclude,
                                                               readConcern,
-                                                              {} /* designatedHostsMap */,
-                                                              {} /* resumeTokenMap */);
+                                                              /*designatedHostsMap=*/{},
+                                                              /*resumeTokenMap=*/{});
 
     std::vector<ShardId> targetedShards;
     targetedShards.reserve(shardDispatchResults.remoteCursors.size());
@@ -1962,7 +1962,7 @@ std::unique_ptr<Pipeline> preparePipelineForExecution(std::unique_ptr<Pipeline> 
     auto expCtx = pipeline->getContext();
     return targetShardsAndAddMergeCursors(expCtx,
                                           std::move(pipeline),
-                                          boost::none /* shardCursorsSortSpec */,
+                                          /*shardCursorsSortSpec=*/boost::none,
                                           shardTargetingPolicy,
                                           readConcern);
 }
@@ -2015,7 +2015,7 @@ std::unique_ptr<Pipeline> finalizeAndMaybePreparePipelineForExecution(
             LiteParsedPipeline liteParsedPipeline(
                 expCtx->getNamespaceString(),
                 pipelineToTarget->serializeToBson(wireOpts),
-                false /* isRunningAgainstView_ForHybridSearch */,
+                /*isRunningAgainstView_ForHybridSearch=*/false,
                 LiteParserOptions{.ifrContext = expCtx->getIfrContext()});
             PipelineDataSource pipelineDataSource = getPipelineDataSource(liteParsedPipeline);
 
@@ -2048,7 +2048,7 @@ std::unique_ptr<Pipeline> finalizeAndMaybePreparePipelineForExecution(
                 aggRequest,
                 pipelineDataSource,
                 routingCtx,
-                boost::none /* shardCursorsSortSpec */,
+                /*shardCursorsSortSpec=*/boost::none,
                 shardTargetingPolicy,
                 readConcern,
                 shouldUseCollectionDefaultCollator,

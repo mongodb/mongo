@@ -51,7 +51,7 @@ void sampleRangeEquallyWithCursor(SeekableRecordCursor& cursor,
 
         RecordId seekTo =
             change_stream_pre_image_id_util::getPreImageRecordIdForNsTimestampApplyOpsIndex(
-                nsUUID, /*ts=*/currentTs, currentApplyOpsIndex /* applyOpsIndex */)
+                nsUUID, /*ts=*/currentTs, /*applyOpsIndex=*/currentApplyOpsIndex)
                 .recordId();
 
         boost::optional<Record> record =
@@ -115,7 +115,7 @@ std::vector<RecordIdAndWallTime> EqualStepSamplingStrategy::sampleNSUUIDRangeEqu
         // approximately equal-sized steps.
         const auto rs = preImagesCollection.getCollectionPtr()->getRecordStore();
         auto cursor =
-            rs->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx), true /*forward*/);
+            rs->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx), /*forward=*/true);
 
         // Seek to lowest possible entry for this 'nsUUID' value, i.e. the one with timestamp 0 and
         // applyOpsIndex 0.
@@ -287,7 +287,7 @@ bool EqualStepSamplingStrategy::performSampling(OperationContext* opCtx,
                                    numRecords,
                                    dataSize,
                                    minBytesPerMarker,
-                                   1 /* randomSamplesPerMarker */,
+                                   /*randomSamplesPerMarker=*/1,
                                    estimatedRecordsPerMarker,
                                    estimatedBytesPerMarker,
                                    markersMap);

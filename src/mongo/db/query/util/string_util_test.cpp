@@ -70,7 +70,7 @@ TEST(ComputeTypoSuggestionsWithMaxCellsTest, ExceedsBudgetFallsBackToAllValidStr
     // maxCells = 1 forces the budget to be exceeded by any non-empty input pair.
     std::vector<std::string> valid = {"pipelineA", "pipelineB"};
     std::vector<std::string> typos = {"pipelineC"};
-    auto result = computeTypoSuggestions(valid, typos, /*maxCells*/ 1);
+    auto result = computeTypoSuggestions(valid, typos, /*maxCells=*/1);
     ASSERT_EQ(result.size(), 1U);
     ASSERT_EQ(result[0].first, "pipelineC");
     // All valid strings returned unranked.
@@ -80,7 +80,7 @@ TEST(ComputeTypoSuggestionsWithMaxCellsTest, ExceedsBudgetFallsBackToAllValidStr
 TEST(ComputeTypoSuggestionsWithMaxCellsTest, ExceedsBudgetMultipleTypos) {
     std::vector<std::string> valid = {"foo", "bar"};
     std::vector<std::string> typos = {"fo", "ba"};
-    auto result = computeTypoSuggestions(valid, typos, /*maxCells*/ 1);
+    auto result = computeTypoSuggestions(valid, typos, /*maxCells=*/1);
     ASSERT_EQ(result.size(), 2U);
     ASSERT_EQ(result[0].second, valid);
     ASSERT_EQ(result[1].second, valid);

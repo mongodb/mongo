@@ -61,7 +61,7 @@ std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* opCtx,
 bool hasNoPreimages(OperationContext* opCtx,
                     const CollectionAcquisition& preImagesCollection,
                     const UUID& uuid) {
-    auto cursor = getCursor(opCtx, preImagesCollection, true /*forward*/);
+    auto cursor = getCursor(opCtx, preImagesCollection, /*forward=*/true);
     RecordId start =
         change_stream_pre_image_id_util::getAbsoluteMinPreImageRecordIdBoundForNs(uuid).recordId();
 

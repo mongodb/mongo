@@ -255,7 +255,7 @@ protected:
         osi.setSessionId(lsid);
         osi.setTxnNumber(txnNumber);
         auto oplogEntry = repl::makeApplyOpsMutableOplogEntry(
-            ops, osi, Date_t::now(), {} /* stmtIds */, prevOpTime);
+            ops, osi, Date_t::now(), /*stmtIds=*/{}, prevOpTime);
         return repl::logOp(opCtx, &oplogEntry);
     }
 
@@ -268,7 +268,7 @@ protected:
         auto txnParticipant = TransactionParticipant::get(opCtx());
         txnParticipant.beginOrContinue(opCtx(),
                                        {txnNum},
-                                       boost::none /* autocommit */,
+                                       /*autocommit=*/boost::none,
                                        TransactionParticipant::TransactionActions::kNone);
 
         const auto uuid = UUID::gen();
@@ -359,7 +359,7 @@ TEST_F(TransactionParticipantRetryableWritesTest, SessionEntryNotWrittenOnBegin)
     opCtx()->setTxnNumber(txnNum);
     txnParticipant.beginOrContinue(opCtx(),
                                    {txnNum},
-                                   boost::none /* autocommit */,
+                                   /*autocommit=*/boost::none,
                                    TransactionParticipant::TransactionActions::kNone);
     ASSERT(txnParticipant.getLastWriteOpTime().isNull());
 
@@ -380,7 +380,7 @@ TEST_F(TransactionParticipantRetryableWritesTest, SessionEntryWrittenAtFirstWrit
     opCtx()->setTxnNumber(txnNum);
     txnParticipant.beginOrContinue(opCtx(),
                                    {txnNum},
-                                   boost::none /* autocommit */,
+                                   /*autocommit=*/boost::none,
                                    TransactionParticipant::TransactionActions::kNone);
 
     const auto opTime = writeTxnRecord(txnNum, {0}, {}, boost::none);
@@ -471,13 +471,13 @@ TEST_F(TransactionParticipantRetryableWritesTest, StartingOldTxnShouldAssert) {
     opCtx()->setTxnNumber(txnNum);
     txnParticipant.beginOrContinue(opCtx(),
                                    {txnNum},
-                                   boost::none /* autocommit */,
+                                   /*autocommit=*/boost::none,
                                    TransactionParticipant::TransactionActions::kNone);
 
     ASSERT_THROWS_CODE(
         txnParticipant.beginOrContinue(opCtx(),
                                        {txnNum - 1},
-                                       boost::none /* autocommit */,
+                                       /*autocommit=*/boost::none,
                                        TransactionParticipant::TransactionActions::kNone),
         AssertionException,
         ErrorCodes::TransactionTooOld);
@@ -497,12 +497,12 @@ TEST_F(TransactionParticipantRetryableWritesTest,
        << " because a newer retryable write with txnNumber 22 has already started on this session.";
     txnParticipant.beginOrContinue(opCtx(),
                                    {txnNum},
-                                   boost::none /* autocommit */,
+                                   /*autocommit=*/boost::none,
                                    TransactionParticipant::TransactionActions::kNone);
     ASSERT_THROWS_WHAT(
         txnParticipant.beginOrContinue(opCtx(),
                                        {txnNum - 1},
-                                       boost::none /* autocommit */,
+                                       /*autocommit=*/boost::none,
                                        TransactionParticipant::TransactionActions::kNone),
         AssertionException,
         sb.str());
@@ -526,7 +526,7 @@ TEST_F(TransactionParticipantRetryableWritesTest,
           "txnRetryCounter: -1 } has already started on this session.";
     txnParticipant.beginOrContinue(opCtx(),
                                    txnNumberAndRetryCounter2,
-                                   boost::none /* autocommit */,
+                                   /*autocommit=*/boost::none,
                                    TransactionParticipant::TransactionActions::kNone);
     ASSERT_THROWS_WHAT(
         txnParticipant.beginOrContinue(opCtx(),
@@ -554,7 +554,7 @@ TEST_F(TransactionParticipantRetryableWritesTest, SessionTransactionsCollectionN
     opCtx()->setTxnNumber(txnNum);
     txnParticipant.beginOrContinue(opCtx(),
                                    {txnNum},
-                                   boost::none /* autocommit */,
+                                   /*autocommit=*/boost::none,
                                    TransactionParticipant::TransactionActions::kNone);
 
     AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
@@ -580,7 +580,7 @@ TEST_F(TransactionParticipantRetryableWritesTest,
     opCtx()->setTxnNumber(txnNum);
     txnParticipant.beginOrContinue(opCtx(),
                                    {txnNum},
-                                   boost::none /* autocommit */,
+                                   /*autocommit=*/boost::none,
                                    TransactionParticipant::TransactionActions::kNone);
 
     ASSERT(!txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 1000));
@@ -614,7 +614,7 @@ TEST_F(TransactionParticipantRetryableWritesTest, CheckStatementExecutedAndGetOp
     opCtx()->setTxnNumber(txnNum);
     txnParticipant.beginOrContinue(opCtx(),
                                    {txnNum},
-                                   boost::none /* autocommit */,
+                                   /*autocommit=*/boost::none,
                                    TransactionParticipant::TransactionActions::kNone);
 
     // Returns boost::none before the statement has executed.
@@ -651,7 +651,7 @@ TEST_F(ShardTransactionParticipantRetryableWritesTest,
 
     parentTxnParticipant.beginOrContinue(opCtx(),
                                          {parentTxnNumber},
-                                         boost::none /* autocommit */,
+                                         /*autocommit=*/boost::none,
                                          TransactionParticipant::TransactionActions::kNone);
     ASSERT(!parentTxnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 1000));
     ASSERT(!parentTxnParticipant.checkStatementExecuted(opCtx(), 1000));
@@ -669,7 +669,7 @@ TEST_F(ShardTransactionParticipantRetryableWritesTest,
 
     childTxnParticipant.beginOrContinue(opCtx(),
                                         {childTxnNumber},
-                                        boost::none /* autocommit */,
+                                        /*autocommit=*/boost::none,
                                         TransactionParticipant::TransactionActions::kNone);
     ASSERT(!childTxnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 2000));
     ASSERT(!childTxnParticipant.checkStatementExecuted(opCtx(), 2000));
@@ -721,7 +721,7 @@ TEST_F(ShardTransactionParticipantRetryableWritesTest,
                                                {op0},
                                                osi,
                                                Date_t::now(),
-                                               {} /* stmtIds */,
+                                               /*stmtIds=*/{},
                                                /*prevWriteOpTimeInTransaction=*/repl::OpTime());
 
     insertOplogEntry(entry0);
@@ -786,9 +786,9 @@ TEST_F(ShardTransactionParticipantRetryableWritesTest,
                                                {op0},
                                                osi,
                                                Date_t::now(),
-                                               {} /* stmtIds */,
+                                               /*stmtIds=*/{},
                                                /*prevWriteOpTimeInTransaction=*/repl::OpTime(),
-                                               boost::none /* multiOpType */,
+                                               /*multiOpType=*/boost::none,
                                                repl::ApplyOpsType::kPartial);
 
     insertOplogEntry(entry0);
@@ -800,9 +800,9 @@ TEST_F(ShardTransactionParticipantRetryableWritesTest,
                                                {op1},
                                                osi,
                                                Date_t::now(),
-                                               {} /* stmtIds */,
+                                               /*stmtIds=*/{},
                                                /*prevWriteOpTimeInTransaction=*/entry0.getOpTime(),
-                                               boost::none /* multiOpType */,
+                                               /*multiOpType=*/boost::none,
                                                repl::ApplyOpsType::kTerminal);
 
     insertOplogEntry(entry1);
@@ -867,9 +867,9 @@ TEST_F(ShardTransactionParticipantRetryableWritesTest,
                                                {op0},
                                                osi,
                                                Date_t::now(),
-                                               {} /* stmtIds */,
+                                               /*stmtIds=*/{},
                                                /*prevWriteOpTimeInTransaction=*/repl::OpTime(),
-                                               boost::none /* multiOpType */,
+                                               /*multiOpType=*/boost::none,
                                                repl::ApplyOpsType::kPrepare);
 
     insertOplogEntry(entry0);
@@ -938,9 +938,9 @@ TEST_F(ShardTransactionParticipantRetryableWritesTest,
                                                {op0},
                                                osi,
                                                Date_t::now(),
-                                               {} /* stmtIds */,
+                                               /*stmtIds=*/{},
                                                /*prevWriteOpTimeInTransaction=*/repl::OpTime(),
-                                               boost::none /* multiOpType */,
+                                               /*multiOpType=*/boost::none,
                                                repl::ApplyOpsType::kPartial);
 
     insertOplogEntry(entry0);
@@ -952,9 +952,9 @@ TEST_F(ShardTransactionParticipantRetryableWritesTest,
                                                {op1},
                                                osi,
                                                Date_t::now(),
-                                               {} /* stmtIds */,
+                                               /*stmtIds=*/{},
                                                /*prevWriteOpTimeInTransaction=*/entry0.getOpTime(),
-                                               boost::none /* multiOpType */,
+                                               /*multiOpType=*/boost::none,
                                                repl::ApplyOpsType::kPrepare);
 
     insertOplogEntry(entry1);
@@ -1023,7 +1023,7 @@ TEST_F(TransactionParticipantRetryableWritesTest,
                                                {op0},
                                                osi,
                                                Date_t::now(),
-                                               {} /* stmtIds */,
+                                               /*stmtIds=*/{},
                                                /*prevWriteOpTimeInTransaction=*/repl::OpTime());
 
     insertOplogEntry(entry0);
@@ -1047,7 +1047,7 @@ TEST_F(TransactionParticipantRetryableWritesTest,
     opCtx()->setTxnNumber(parentTxnNumber);
     parentTxnParticipant.beginOrContinue(opCtx(),
                                          {parentTxnNumber},
-                                         boost::none /* autocommit */,
+                                         /*autocommit=*/boost::none,
                                          TransactionParticipant::TransactionActions::kNone);
 
     writeTxnRecord(parentTxnNumber, {stmtId1}, {}, boost::none);
@@ -1098,7 +1098,7 @@ TEST_F(TransactionParticipantRetryableWritesTest,
                                                    {op0},
                                                    osi,
                                                    Date_t::now(),
-                                                   {} /* stmtIds */,
+                                                   /*stmtIds=*/{},
                                                    /*prevWriteOpTimeInTransaction=*/repl::OpTime());
 
         insertOplogEntry(entry0);
@@ -1132,7 +1132,7 @@ TEST_F(TransactionParticipantRetryableWritesTest,
                                          {op1},
                                          osi,
                                          Date_t::now(),
-                                         {} /* stmtIds */,
+                                         /*stmtIds=*/{},
                                          /*prevWriteOpTimeInTransaction=*/repl::OpTime(),
                                          repl::MultiOplogEntryType::kApplyOpsAppliedSeparately);
 
@@ -1147,7 +1147,7 @@ TEST_F(TransactionParticipantRetryableWritesTest,
                                          {op2},
                                          osi,
                                          Date_t::now(),
-                                         {} /* stmtIds */,
+                                         /*stmtIds=*/{},
                                          opTime1,
                                          repl::MultiOplogEntryType::kApplyOpsAppliedSeparately);
 
@@ -1232,7 +1232,7 @@ DEATH_TEST_REGEX_F(ShardTransactionParticipantRetryableWritesTestDeathTest,
     opCtx()->setInMultiDocumentTransaction();
     opCtx()->setTxnNumber(0);
     childTxnParticipant.beginOrContinue(
-        opCtx(), {0}, false /* autocommit */, TransactionParticipant::TransactionActions::kStart);
+        opCtx(), {0}, /*autocommit=*/false, TransactionParticipant::TransactionActions::kStart);
 
     parentTxnParticipant.invalidate(opCtx());
     childTxnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 0);
@@ -1257,7 +1257,7 @@ DEATH_TEST_REGEX_F(ShardTransactionParticipantRetryableWritesTestDeathTest,
     opCtx()->setInMultiDocumentTransaction();
     opCtx()->setTxnNumber(0);
     childTxnParticipant.beginOrContinue(
-        opCtx(), {0}, false /* autocommit */, TransactionParticipant::TransactionActions::kStart);
+        opCtx(), {0}, /*autocommit=*/false, TransactionParticipant::TransactionActions::kStart);
 
     childTxnParticipant.invalidate(opCtx());
     parentTxnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 0);
@@ -1275,7 +1275,7 @@ DEATH_TEST_REGEX_F(
     opCtx()->setTxnNumber(txnNum);
     txnParticipant.beginOrContinue(opCtx(),
                                    {txnNum},
-                                   boost::none /* autocommit */,
+                                   /*autocommit=*/boost::none,
                                    TransactionParticipant::TransactionActions::kNone);
 
     const auto uuid = UUID::gen();
@@ -1320,7 +1320,7 @@ DEATH_TEST_REGEX_F(
     opCtx()->setTxnNumber(txnNum);
     txnParticipant.beginOrContinue(opCtx(),
                                    {txnNum},
-                                   boost::none /* autocommit */,
+                                   /*autocommit=*/boost::none,
                                    TransactionParticipant::TransactionActions::kNone);
 
     const auto uuid = UUID::gen();
@@ -1364,7 +1364,7 @@ DEATH_TEST_REGEX_F(
     opCtx()->setTxnNumber(txnNum);
     txnParticipant.beginOrContinue(opCtx(),
                                    {txnNum},
-                                   boost::none /* autocommit */,
+                                   /*autocommit=*/boost::none,
                                    TransactionParticipant::TransactionActions::kNone);
 
     AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
@@ -1540,7 +1540,7 @@ TEST_F(TransactionParticipantRetryableWritesTest, ErrorOnlyWhenStmtIdBeingChecke
     opCtx()->setTxnNumber(txnNum);
     txnParticipant.beginOrContinue(opCtx(),
                                    {txnNum},
-                                   boost::none /* autocommit */,
+                                   /*autocommit=*/boost::none,
                                    TransactionParticipant::TransactionActions::kNone);
 
     repl::MutableOplogEntry oplogEntry;
@@ -1880,7 +1880,7 @@ TEST_F(ShardTxnParticipantRetryableWritesTest,
 
     txnParticipant.beginOrContinue(opCtx(),
                                    {txnNum},
-                                   boost::none /* autocommit */,
+                                   /*autocommit=*/boost::none,
                                    TransactionParticipant::TransactionActions::kNone);
 
     {

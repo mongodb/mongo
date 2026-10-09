@@ -297,7 +297,7 @@ BSONObj getQueryTemplate(CanonicalQueryBenchmarkParameters params) {
                                              params.findQueryParams.numOfDistinctFields,
                                              params.findQueryParams.numDistinctMatchStatements,
                                              params.findQueryParams.numOfRepetitionsPerStatement,
-                                             /*idQuery*/ false,
+                                             /*idQuery=*/false,
                                              params.findQueryParams.dottedPaths,
                                              params.findQueryParams.dottedPathType,
                                              params.findQueryParams.dottedPathLength);
@@ -313,10 +313,10 @@ BSONObj getQueryTemplate(CanonicalQueryBenchmarkParameters params) {
             BSONObjBuilder filter;
 
             std::vector<std::vector<std::string>> fields = generateFieldNames(
-                /*numOfDistinctFields*/ params.findQueryParams.numOfDistinctFields,
-                /*noOfValues*/ params.findQueryParams.numDistinctMatchStatements,
-                /*dottedPath*/ false,
-                /*dottedPathLength*/ 1);
+                /*numOfDistinctFields=*/params.findQueryParams.numOfDistinctFields,
+                /*noOfValues=*/params.findQueryParams.numDistinctMatchStatements,
+                /*dottedPath=*/false,
+                /*dottedPathLength=*/1);
 
             // generating here all the values to allow having a specific seed for random number
             // while creating different values in each array.
@@ -353,7 +353,7 @@ BSONObj getQueryTemplate(CanonicalQueryBenchmarkParameters params) {
                                              params.findQueryParams.numOfDistinctFields,
                                              params.findQueryParams.numDistinctMatchStatements,
                                              params.findQueryParams.numOfRepetitionsPerStatement,
-                                             /*idQuery*/ true);
+                                             /*idQuery=*/true);
 
             return BSON("find" << kCollName << "$db" << kDbName << "filter" << filterStatement);
         }
@@ -369,7 +369,7 @@ BSONObj getQueryTemplate(CanonicalQueryBenchmarkParameters params) {
                 params.findQueryParams.numDistinctMatchStatements,
                 params.findQueryParams.numOfRepetitionsPerStatement,
                 params.nestedOpsParams.numOfNestings,
-                /*logicalOperator*/ LogicalOperator::kOr);
+                /*logicalOperator=*/LogicalOperator::kOr);
 
             return BSON("find" << kCollName << "$db" << kDbName << "filter" << nestedOrs);
         }
@@ -385,7 +385,7 @@ BSONObj getQueryTemplate(CanonicalQueryBenchmarkParameters params) {
                 params.findQueryParams.numDistinctMatchStatements,
                 params.findQueryParams.numOfRepetitionsPerStatement,
                 params.nestedOpsParams.numOfNestings,
-                /*logicalOperator*/ LogicalOperator::kAnd);
+                /*logicalOperator=*/LogicalOperator::kAnd);
 
             return BSON("find" << kCollName << "$db" << kDbName << "filter" << nestedAnds);
         }
@@ -401,7 +401,7 @@ BSONObj getQueryTemplate(CanonicalQueryBenchmarkParameters params) {
                 params.findQueryParams.numDistinctMatchStatements,
                 params.findQueryParams.numOfRepetitionsPerStatement,
                 params.nestedOpsParams.numOfNestings,
-                /*logicalOperator*/ LogicalOperator::kMix);
+                /*logicalOperator=*/LogicalOperator::kMix);
 
             return BSON("find" << kCollName << "$db" << kDbName << "filter" << nestedLogicalOps);
 

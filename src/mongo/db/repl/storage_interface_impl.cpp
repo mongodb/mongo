@@ -586,7 +586,7 @@ Status StorageInterfaceImpl::createIndexesOnEmptyCollection(
             // IndexCatalog::createIndexOnEmptyCollection() as the former generates
             // 'createIndexes' oplog entry for replicated writes.
             IndexBuildsCoordinator::get(opCtx)->createIndexesOnEmptyCollection(
-                opCtx, collection, secondaryIndexSpecs, false /* fromMigrate */);
+                opCtx, collection, secondaryIndexSpecs, /*fromMigrate=*/false);
             wunit.commit();
         });
     } catch (DBException& ex) {
@@ -1136,7 +1136,7 @@ Status _updateWithQuery(OperationContext* opCtx,
         }
 
         auto planExecutorResult = mongo::getExecutorUpdate(
-            nullptr, collection, *canonicalUpdate, boost::none /* verbosity */);
+            nullptr, collection, *canonicalUpdate, /*verbosity=*/boost::none);
         if (!planExecutorResult.isOK()) {
             return planExecutorResult.getStatus();
         }
@@ -1247,7 +1247,7 @@ Status StorageInterfaceImpl::upsertById(OperationContext* opCtx,
 Status StorageInterfaceImpl::putSingleton(OperationContext* opCtx,
                                           const NamespaceString& nss,
                                           const TimestampedBSONObj& update) {
-    return putSingleton(opCtx, nss, {} /* query */, update);
+    return putSingleton(opCtx, nss, /*query=*/{}, update);
 }
 
 Status StorageInterfaceImpl::putSingleton(OperationContext* opCtx,
@@ -1337,7 +1337,7 @@ Status StorageInterfaceImpl::deleteByFilter(OperationContext* opCtx,
         auto canonicalDelete = std::move(swCanonicalDelete.getValue());
 
         auto planExecutorResult = mongo::getExecutorDelete(
-            nullptr, collection, canonicalDelete, boost::none /* verbosity */);
+            nullptr, collection, canonicalDelete, /*verbosity=*/boost::none);
         if (!planExecutorResult.isOK()) {
             return planExecutorResult.getStatus();
         }
@@ -1365,7 +1365,7 @@ boost::optional<OpTimeAndWallTime> StorageInterfaceImpl::findOplogOpTimeLessThan
     // Define a backward cursor so that the seek operation returns the first recordId less than or
     // equal to the 'desiredRecordId', if it exists.
     auto cursor = oplog->getRecordStore()->getCursor(
-        opCtx, *shard_role_details::getRecoveryUnit(opCtx), false /* forward */);
+        opCtx, *shard_role_details::getRecoveryUnit(opCtx), /*forward=*/false);
     if (auto record =
             cursor->seek(desiredRecordId, SeekableRecordCursor::BoundInclusion::kInclude)) {
         invariant(record->id <= desiredRecordId,

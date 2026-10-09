@@ -33,12 +33,12 @@ public:
 
     template <typename OtherType>
     StorageMetrics& operator+=(const StorageMetrics<OtherType>& other) {
-        return add(other, /*positive*/ true);
+        return add(other, /*positive=*/true);
     }
 
     template <typename OtherType>
     StorageMetrics& operator-=(const StorageMetrics<OtherType>& other) {
-        return add(other, /*positive*/ false);
+        return add(other, /*positive=*/false);
     }
 
     /**

@@ -308,7 +308,7 @@ bool isPipelinePrefixEligible(const DocumentSourceContainer& suffix) {
     // stage builders do not yet support exclusion projections there. They remain supported in
     // $lookup sub-pipelines. TODO SERVER-131452: Relax this restriction.
     return isSubPipelineOrPrefixEligible(
-        suffix.begin(), suffixIt, false /* allowExclusionProjection */);
+        suffix.begin(), suffixIt, /*allowExclusionProjection=*/false);
 }
 
 boost::optional<JoinFallbackReason> isLookupEligible(const DocumentSourceLookUp& lookup) {
@@ -342,7 +342,7 @@ boost::optional<JoinFallbackReason> isLookupEligible(const DocumentSourceLookUp&
     if (!isSubPipelineOrPrefixEligible(
             lookup.getResolvedIntrospectionPipeline().getSources().begin(),
             lookup.getResolvedIntrospectionPipeline().getSources().end(),
-            true /* allowExclusionProjection */)) {
+            /*allowExclusionProjection=*/true)) {
         return JoinFallbackReason::kIneligibleSubPipelineStage;
     }
     return boost::none;

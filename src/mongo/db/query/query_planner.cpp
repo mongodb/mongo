@@ -2106,7 +2106,7 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
                                                      groupStage->getAccumulationStatements(),
                                                      groupStage->doingMerge(),
                                                      groupStage->willBeMerged(),
-                                                     isLastSource /* shouldProduceBson */);
+                                                     /*shouldProduceBson=*/isLastSource);
             continue;
         }
 
@@ -2196,7 +2196,7 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
                                                    lookupStage->getForeignField()->fullPath(),
                                                    lookupStage->getAsField().fullPath(),
                                                    strategy,
-                                                   isLastSource /* shouldProduceBson */,
+                                                   /*shouldProduceBson=*/isLastSource,
                                                    collationCompatibleForDilj);
             } else {
                 const boost::intrusive_ptr<DocumentSourceUnwind>& unwindSrc =
@@ -2209,7 +2209,7 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
                                                    lookupStage->getForeignField()->fullPath(),
                                                    lookupStage->getAsField().fullPath(),
                                                    strategy,
-                                                   isLastSource /* shouldProduceBson */,
+                                                   /*shouldProduceBson=*/isLastSource,
                                                    // $unwind-specific data members.
                                                    unwindSrc->preserveNullAndEmptyArrays(),
                                                    unwindSrc->indexPath(),
@@ -2230,7 +2230,7 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
         auto unwindStage = dynamic_cast<DocumentSourceUnwind*>(innerStage);
         if (unwindStage) {
             solnForAgg = std::make_unique<UnwindNode>(
-                std::move(solnForAgg) /* child */,
+                /*child=*/std::move(solnForAgg),
                 UnwindNode::UnwindSpec{unwindStage->getUnwindPath() /* fieldPath */,
                                        unwindStage->preserveNullAndEmptyArrays(),
                                        unwindStage->indexPath()});

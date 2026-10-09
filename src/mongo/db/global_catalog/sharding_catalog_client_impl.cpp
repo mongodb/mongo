@@ -391,8 +391,8 @@ AggregateCommandRequest makeCollectionAndChunksAggregation(
         }
     };
 
-    stages.emplace_back(buildUnionWithStage(true /* incremental */));
-    stages.emplace_back(buildUnionWithStage(false /* incremental */));
+    stages.emplace_back(buildUnionWithStage(/*incremental=*/true));
+    stages.emplace_back(buildUnionWithStage(/*incremental=*/false));
 
     auto pipeline = Pipeline::create(std::move(stages), expCtx);
     auto serializedPipeline = pipeline->serializeToBson();
@@ -1397,8 +1397,8 @@ bool ShardingCatalogClientImpl::anyShardRemovedSince(OperationContext* opCtx,
                                     BSON("_id" << ShardingCatalogClient::kLatestShardRemovalLogId
                                                << RemoveShardEventType::kTimestampFieldName
                                                << BSON("$gte" << clusterTime)),
-                                    BSONObj() /*sort*/,
-                                    1 /*limit*/))
+                                    /*sort=*/BSONObj(),
+                                    /*limit=*/1))
             .value;
     return !loggedRemoveShardEvents.empty();
 }

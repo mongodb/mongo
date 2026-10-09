@@ -495,7 +495,7 @@ TEST(PipelineResolverTest, BindOnlyDoesNotInfiniteLoopOnMutualLookupViewCycle) {
     // This must complete without hanging or crashing (stack overflow) even though viewB <-> viewE
     // form a mutual cycle.
     PipelineResolver::resolveInvolvedNamespacesOnLiteParsedPipeline(
-        &userLpp, kBaseColl, nsMap, /*bindOnly*/ true);
+        &userLpp, kBaseColl, nsMap, /*bindOnly=*/true);
 
     // bindOnly never prepends the view pipeline: the top-level user $lookup is the only stage.
     ASSERT_EQ(userLpp.getStages().size(), 1U);

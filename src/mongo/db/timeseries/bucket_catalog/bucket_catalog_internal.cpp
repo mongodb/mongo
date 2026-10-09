@@ -329,7 +329,7 @@ BSONObj reopenQueriedBucket(OperationContext* opCtx,
         aggRequest.setQuerySettings(querySettings);
 
         auto swCursor = DBClientCursor::fromAggregationRequest(
-            &client, aggRequest, false /* secondaryOk */, false /* useExhaust */);
+            &client, aggRequest, /*secondaryOk=*/false, /*useExhaust=*/false);
         if (swCursor.isOK() && swCursor.getValue()->more()) {
             stats.incNumBucketsQueried();
             return swCursor.getValue()->next();

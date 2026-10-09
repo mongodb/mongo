@@ -73,7 +73,7 @@ auto& queryStatsStoreWriteErrorsMetric =
  */
 size_t capQueryStatsStoreSize(size_t requestedSize) {
     size_t cappedStoreSize = memory_util::capMemorySize(
-        requestedSize /*requestedSizeBytes*/, 1 /*maximumSizeGB*/, 25 /*percentTotalSystemMemory*/);
+        /*requestedSizeBytes=*/requestedSize, /*maximumSizeGB=*/1, /*percentTotalSystemMemory=*/25);
     // If capped size is less than requested size, the queryStats store has been capped at its
     // upper limit.
     if (cappedStoreSize < requestedSize) {

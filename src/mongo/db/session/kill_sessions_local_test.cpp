@@ -297,7 +297,7 @@ TEST_F(KillSessionsForLockerIdsTest, EmptyLockerIdsIsNoOp) {
 
     withSideClient("killer", [&](OperationContext* killOpCtx) {
         killSessionsAbortUnpreparedTransactionsForLockerIds(
-            killOpCtx, /*lockerIds*/ {}, ErrorCodes::Interrupted);
+            killOpCtx, /*lockerIds=*/{}, ErrorCodes::Interrupted);
     });
 
     ASSERT_TRUE(isTransactionOpen(lsid));

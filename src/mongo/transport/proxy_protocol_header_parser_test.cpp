@@ -593,7 +593,7 @@ TEST(ProxyProtocolHeaderParser, MacSockAddrUnParsing) {
 
 boost::optional<ParserResults> parseWithTLV(AddressFamily type, const std::string& tlvData) {
     auto header = buildValidPP2Header(type, tlvData);
-    return parseProxyProtocolHeader(header.toString(), true /* isProxyUnixSock */);
+    return parseProxyProtocolHeader(header.toString(), /*isProxyUnixSock=*/true);
 }
 
 std::string buildTLV(uint8_t type, const std::string& data) {
@@ -682,7 +682,7 @@ TEST_P(ProxyProtocolParameterizedTestFixture, BufferIncludesDataAfterProxyProtoc
     auto header = buildValidPP2Header(type);
     header.metadata = "Adding some junk data";
 
-    ASSERT_THROWS_CODE(parseProxyProtocolHeader(header.toString(), true /* isProxyUnixSock */),
+    ASSERT_THROWS_CODE(parseProxyProtocolHeader(header.toString(), /*isProxyUnixSock=*/true),
                        DBException,
                        ErrorCodes::FailedToParse);
 }
@@ -693,7 +693,7 @@ TEST_P(ProxyProtocolParameterizedTestFixture, BufferIncludesDataAfterProxyProtoc
     auto header = buildValidPP2Header(type, tlvData);
     header.metadata = "Adding some junk data";
 
-    auto result = parseProxyProtocolHeader(header.toString(), true /* isProxyUnixSock */);
+    auto result = parseProxyProtocolHeader(header.toString(), /*isProxyUnixSock=*/true);
     ASSERT_TRUE(result);
     ASSERT_TRUE(result->endpoints);
     ASSERT_EQ(result->tlvs.size(), 1u);
@@ -703,7 +703,7 @@ TEST_P(ProxyProtocolParameterizedTestFixture, BufferIncludesDataAfterProxyProtoc
 
 TEST_P(ProxyProtocolParameterizedTestFixture, UnixProxySocketWithV1ProtocolIsRejected) {
     auto header = "PROXY TCP4 1.1.1.1 2.2.2.2 10 300\r\n";
-    ASSERT_THROWS_CODE(parseProxyProtocolHeader(header, true /* isProxyUnixSock */),
+    ASSERT_THROWS_CODE(parseProxyProtocolHeader(header, /*isProxyUnixSock=*/true),
                        DBException,
                        ErrorCodes::FailedToParse);
 }

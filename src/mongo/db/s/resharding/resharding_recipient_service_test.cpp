@@ -212,13 +212,13 @@ public:
                                                _sourceUUID,
                                                BSON(_currentShardKey << 1),
                                                false, /* unsplittable */
-                                               nullptr /* defaultCollator */,
-                                               false /* unique */,
+                                               /*defaultCollator=*/nullptr,
+                                               /*unique=*/false,
                                                epoch,
                                                Timestamp(1, 1),
-                                               boost::none /* timeseriesFields */,
-                                               boost::none /* reshardingFields */,
-                                               true /* allowMigrations */,
+                                               /*timeseriesFields=*/boost::none,
+                                               /*reshardingFields=*/boost::none,
+                                               /*allowMigrations=*/true,
                                                chunks);
         return CollectionRoutingInfo{
             CurrentChunkManager(
@@ -296,7 +296,7 @@ public:
         OperationContext* opCtx, const NamespaceString& tempReshardingNss) {
         stdx::unordered_set<NamespaceString> namespacesToRefresh{tempReshardingNss};
         resharding::clearCollectionMetadata(
-            opCtx, namespacesToRefresh, true /* scheduleAsyncRefresh */);
+            opCtx, namespacesToRefresh, /*scheduleAsyncRefresh=*/true);
     }
 
     void ensureReshardingStashCollectionsEmpty(
@@ -2523,7 +2523,7 @@ TEST_F(ReshardingRecipientServiceTest, ReshardingMetricsBasic) {
             auto persistedRecipientState = persistedRecipientDoc.getMutableState().getState();
 
             checkRecipientMetrics(
-                testOptions, testRecipientMetrics, persistedRecipientDoc, boost::none /* currOp */);
+                testOptions, testRecipientMetrics, persistedRecipientDoc, /*currOp=*/boost::none);
             checkCoordinatorMetrics(testOptions,
                                     testRecipientMetrics,
                                     persistedCoordinatorDoc,
@@ -2894,7 +2894,7 @@ TEST_F(ReshardingRecipientServiceTest,
     ASSERT_OK(swDocumentsDelta.getStatus());
     ASSERT_EQ(swDocumentsDelta.getValue(), 0);
 
-    recipient->abort(false /* isUserCancelled */);
+    recipient->abort(/*isUserCancelled=*/false);
     ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
 }
 
@@ -2910,7 +2910,7 @@ TEST_F(ReshardingRecipientServiceTest,
     auto swDocumentsDelta = recipient->awaitChangeStreamsMonitorCompleted().getNoThrow(opCtx.get());
     ASSERT_EQ(swDocumentsDelta.getStatus(), ErrorCodes::IllegalOperation);
 
-    recipient->abort(false /* isUserCancelled */);
+    recipient->abort(/*isUserCancelled=*/false);
     ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
 }
 
@@ -3452,7 +3452,7 @@ TEST_F(ReshardingRecipientServiceTest, OnReshardingFieldsChangesTassertsInAuthor
 
     // onReshardingFieldsChanges throws when called in the authoritative path.
     ASSERT_THROWS_WITH_CHECK(recipient.onReshardingFieldsChanges(
-                                 opCtx.get(), reshardingFields, false /* noChunksToCopy */),
+                                 opCtx.get(), reshardingFields, /*noChunksToCopy=*/false),
                              DBException,
                              [](const DBException& ex) {
                                  EXPECT_EQ(ex.code(), 12862901);

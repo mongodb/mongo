@@ -37,7 +37,7 @@ public:
         {
             WriteUnitOfWork wuow{operationContext()};
             ASSERT_OK(collection_internal::insertDocuments(
-                operationContext(), *agc, inserts.begin(), inserts.end(), nullptr /* opDebug */));
+                operationContext(), *agc, inserts.begin(), inserts.end(), /*opDebug=*/nullptr));
             wuow.commit();
         }
     }

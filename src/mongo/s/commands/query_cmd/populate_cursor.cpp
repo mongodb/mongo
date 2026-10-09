@@ -28,7 +28,7 @@ BulkWriteCommandReply populateCursorReply(OperationContext* opCtx,
     if (bulk_write_common::isUnacknowledgedBulkWrite(opCtx)) {
         // Skip cursor creation and return the simplest reply.
         return BulkWriteCommandReply(
-            BulkWriteCommandResponseCursor(/*id=*/0, {} /* firstBatch */, cursorNss),
+            BulkWriteCommandResponseCursor(/*id=*/0, /*firstBatch=*/{}, cursorNss),
             summaryFields.nErrors,
             summaryFields.nInserted,
             summaryFields.nMatched,

@@ -373,12 +373,12 @@ void testClientDisconnect(bool disconnectAfterGetMoreBatch) {
 
 TEST(CurrentOpExhaustCursorTest, InterruptExhaustCursorPseudoGetMoreOnClientDisconnect) {
     // Test that an exhaust getMore is interrupted on client disconnect.
-    testClientDisconnect(false /* disconnectAfterGetMoreBatch */);
+    testClientDisconnect(/*disconnectAfterGetMoreBatch=*/false);
 }
 
 TEST(CurrentOpExhaustCursorTest, CleanupExhaustCursorOnBrokenPipe) {
     // Test that exhaust cursor is cleaned up on broken pipe even if the exhaust getMore succeeded.
-    testClientDisconnect(true /* disconnectAfterGetMoreBatch */);
+    testClientDisconnect(/*disconnectAfterGetMoreBatch=*/true);
 }
 
 TEST(CurrentOpExhaustCursorTest, ExhaustCursorUpdatesLastKnownCommittedOpTime) {
@@ -397,7 +397,7 @@ TEST(CurrentOpExhaustCursorTest, ExhaustCursorUpdatesLastKnownCommittedOpTime) {
     conn->dropCollection(testNSS);
     // Create a capped collection to run tailable awaitData queries on.
     conn->createCollection(
-        testNSS, 1024 /* size of collection */, true /* capped */, 10 /* max number of objects */);
+        testNSS, 1024 /* size of collection */, /*capped=*/true, 10 /* max number of objects */);
     // Insert initial records into the capped collection.
     for (int i = 0; i < 5; i++) {
         auto insertCmd =

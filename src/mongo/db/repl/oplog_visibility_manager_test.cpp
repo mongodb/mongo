@@ -42,14 +42,14 @@ void OplogVisibilityManagerTest::setUp() {
     RecordStore::Options options;
     options.isCapped = true;
     DevNullKVEngine engine{};
-    _rs = engine.getRecordStore(nullptr /* opCtx */,
+    _rs = engine.getRecordStore(/*opCtx=*/nullptr,
                                 NamespaceString::kEmpty,
-                                std::string_view() /* ident */,
+                                /*ident=*/std::string_view(),
                                 options,
-                                boost::none /* uuid */);
+                                /*uuid=*/boost::none);
 
     _notifier = _rs->capped()->getInsertNotifier();
-    _manager.reInit(_rs.get(), Timestamp(1) /* initialTs */);
+    _manager.reInit(_rs.get(), /*initialTs=*/Timestamp(1));
     ASSERT_EQ(_manager.getOplogVisibilityTimestamp(), Timestamp(1));
 }
 
@@ -82,59 +82,59 @@ void OplogVisibilityManagerTest::untrackTimestamps(OplogVisibilityManager::const
 }
 
 TEST_F(OplogVisibilityManagerTest, TrackAndUntrackTimestampsFIFO) {
-    auto iter1 = trackTimestamps({3, 4} /* timestampRange */, true /* managerIsEmpty */);
-    auto iter2 = trackTimestamps({6, 6} /* timestampRange */, false /* managerIsEmpty */);
-    auto iter3 = trackTimestamps({8, 9} /* timestampRange */, false /* managerIsEmpty */);
+    auto iter1 = trackTimestamps(/*timestampRange=*/{3, 4}, /*managerIsEmpty=*/true);
+    auto iter2 = trackTimestamps(/*timestampRange=*/{6, 6}, /*managerIsEmpty=*/false);
+    auto iter3 = trackTimestamps(/*timestampRange=*/{8, 9}, /*managerIsEmpty=*/false);
 
-    untrackTimestamps(iter1, 5 /* expectedVisibility */);
-    untrackTimestamps(iter2, 7 /* expectedVisibility */);
-    untrackTimestamps(iter3, 9 /* expectedVisibility */);
+    untrackTimestamps(iter1, /*expectedVisibility=*/5);
+    untrackTimestamps(iter2, /*expectedVisibility=*/7);
+    untrackTimestamps(iter3, /*expectedVisibility=*/9);
 
-    iter1 = trackTimestamps({10, 10} /* timestampRange */, true /* managerIsEmpty */);
-    iter2 = trackTimestamps({12, 13} /* timestampRange */, false /* managerIsEmpty */);
-    iter3 = trackTimestamps({15, 15} /* timestampRange */, false /* managerIsEmpty */);
+    iter1 = trackTimestamps(/*timestampRange=*/{10, 10}, /*managerIsEmpty=*/true);
+    iter2 = trackTimestamps(/*timestampRange=*/{12, 13}, /*managerIsEmpty=*/false);
+    iter3 = trackTimestamps(/*timestampRange=*/{15, 15}, /*managerIsEmpty=*/false);
 
-    untrackTimestamps(iter1, 11 /* expectedVisibility */);
-    untrackTimestamps(iter2, 14 /* expectedVisibility */);
-    untrackTimestamps(iter3, 15 /* expectedVisibility */);
+    untrackTimestamps(iter1, /*expectedVisibility=*/11);
+    untrackTimestamps(iter2, /*expectedVisibility=*/14);
+    untrackTimestamps(iter3, /*expectedVisibility=*/15);
 }
 
 TEST_F(OplogVisibilityManagerTest, TrackAndUntrackTimestampsLIFO) {
-    auto iter1 = trackTimestamps({3, 4} /* timestampRange */, true /* managerIsEmpty */);
-    auto iter2 = trackTimestamps({6, 6} /* timestampRange */, false /* managerIsEmpty */);
-    auto iter3 = trackTimestamps({8, 9} /* timestampRange */, false /* managerIsEmpty */);
+    auto iter1 = trackTimestamps(/*timestampRange=*/{3, 4}, /*managerIsEmpty=*/true);
+    auto iter2 = trackTimestamps(/*timestampRange=*/{6, 6}, /*managerIsEmpty=*/false);
+    auto iter3 = trackTimestamps(/*timestampRange=*/{8, 9}, /*managerIsEmpty=*/false);
 
-    untrackTimestamps(iter3, 2 /* expectedVisibility */);
-    untrackTimestamps(iter2, 2 /* expectedVisibility */);
-    untrackTimestamps(iter1, 9 /* expectedVisibility */);
+    untrackTimestamps(iter3, /*expectedVisibility=*/2);
+    untrackTimestamps(iter2, /*expectedVisibility=*/2);
+    untrackTimestamps(iter1, /*expectedVisibility=*/9);
 
-    iter1 = trackTimestamps({10, 10} /* timestampRange */, true /* managerIsEmpty */);
-    iter2 = trackTimestamps({12, 13} /* timestampRange */, false /* managerIsEmpty */);
-    iter3 = trackTimestamps({15, 15} /* timestampRange */, false /* managerIsEmpty */);
+    iter1 = trackTimestamps(/*timestampRange=*/{10, 10}, /*managerIsEmpty=*/true);
+    iter2 = trackTimestamps(/*timestampRange=*/{12, 13}, /*managerIsEmpty=*/false);
+    iter3 = trackTimestamps(/*timestampRange=*/{15, 15}, /*managerIsEmpty=*/false);
 
-    untrackTimestamps(iter3, 9 /* expectedVisibility */);
-    untrackTimestamps(iter2, 9 /* expectedVisibility */);
-    untrackTimestamps(iter1, 15 /* expectedVisibility */);
+    untrackTimestamps(iter3, /*expectedVisibility=*/9);
+    untrackTimestamps(iter2, /*expectedVisibility=*/9);
+    untrackTimestamps(iter1, /*expectedVisibility=*/15);
 }
 
 using OplogVisibilityManagerTestDeathTest = OplogVisibilityManagerTest;
 DEATH_TEST_F(OplogVisibilityManagerTestDeathTest,
              TrackTimestampFirstTimestampLessThanLastTimestamp,
              "invariant") {
-    trackTimestamps({4, 3} /* timestampRange */, true /* managerIsEmpty */);
+    trackTimestamps(/*timestampRange=*/{4, 3}, /*managerIsEmpty=*/true);
 }
 
 DEATH_TEST_F(OplogVisibilityManagerTestDeathTest,
              TrackTimestampsFirstLessThanLatestTimeSeen,
              "invariant") {
-    trackTimestamps({5, 6} /* timestampRange */, true /* managerIsEmpty */);
-    trackTimestamps({3, 4} /* timestampRange */, false /* managerIsEmpty */);
+    trackTimestamps(/*timestampRange=*/{5, 6}, /*managerIsEmpty=*/true);
+    trackTimestamps(/*timestampRange=*/{3, 4}, /*managerIsEmpty=*/false);
 }
 
 DEATH_TEST_F(OplogVisibilityManagerTestDeathTest,
              AdvanceVisibilityTimestampWhenTrackingOtherTimestamps,
              "invariant") {
-    trackTimestamps({3, 5} /* timestampRange */, true /* managerIsEmpty */);
+    trackTimestamps(/*timestampRange=*/{3, 5}, /*managerIsEmpty=*/true);
 
     ASSERT_EQ(_manager.getOplogVisibilityTimestamp().asULL(), 2);
 
@@ -142,7 +142,7 @@ DEATH_TEST_F(OplogVisibilityManagerTestDeathTest,
 }
 
 TEST_F(OplogVisibilityManagerTest, SetVisibilityTimestampBackward) {
-    trackTimestamps({4, 5} /* timestampRange */, true /* managerIsEmpty */);
+    trackTimestamps(/*timestampRange=*/{4, 5}, /*managerIsEmpty=*/true);
 
     ASSERT_EQ(_manager.getOplogVisibilityTimestamp().asULL(), 3);
 
@@ -152,9 +152,9 @@ TEST_F(OplogVisibilityManagerTest, SetVisibilityTimestampBackward) {
 }
 
 TEST_F(OplogVisibilityManagerTest, SetVisibilityTimestampForward) {
-    auto it1 = trackTimestamps({4, 5} /* timestampRange */, true /* managerIsEmpty */);
+    auto it1 = trackTimestamps(/*timestampRange=*/{4, 5}, /*managerIsEmpty=*/true);
 
-    untrackTimestamps(it1, 5 /* expectedVisibility */);
+    untrackTimestamps(it1, /*expectedVisibility=*/5);
 
     _manager.setOplogVisibilityTimestamp(Timestamp(10));
 
@@ -164,8 +164,8 @@ TEST_F(OplogVisibilityManagerTest, SetVisibilityTimestampForward) {
 TEST_F(OplogVisibilityManagerTest, WaitForTimestampToBecomeVisibile) {
     auto opCtxHolder = makeOperationContext();
 
-    auto it1 = trackTimestamps({3, 3} /* timestampRange */, true /* managerIsEmpty */);
-    auto it2 = trackTimestamps({4, 4} /* timestampRange */, false /* managerIsEmpty */);
+    auto it1 = trackTimestamps(/*timestampRange=*/{3, 3}, /*managerIsEmpty=*/true);
+    auto it2 = trackTimestamps(/*timestampRange=*/{4, 4}, /*managerIsEmpty=*/false);
 
     bool doneWait = false;
 
@@ -177,20 +177,20 @@ TEST_F(OplogVisibilityManagerTest, WaitForTimestampToBecomeVisibile) {
     sleepFor(Seconds(2));
     ASSERT(!doneWait);
 
-    auto it3 = trackTimestamps({5, 5} /* timestampRange */, false /* managerIsEmpty */);
+    auto it3 = trackTimestamps(/*timestampRange=*/{5, 5}, /*managerIsEmpty=*/false);
     sleepFor(Seconds(2));
     ASSERT(!doneWait);
 
-    untrackTimestamps(it1, 3 /* expectedVisibility */);
+    untrackTimestamps(it1, /*expectedVisibility=*/3);
     sleepFor(Seconds(2));
     ASSERT(!doneWait);
-    untrackTimestamps(it2, 4 /* expectedVisibility */);
+    untrackTimestamps(it2, /*expectedVisibility=*/4);
 
     pushThread.join();
     ASSERT(doneWait);
     ASSERT_EQ(_manager.getOplogVisibilityTimestamp().asULL(), 4);
 
-    untrackTimestamps(it3, 5 /* expectedVisibility */);
+    untrackTimestamps(it3, /*expectedVisibility=*/5);
     ASSERT_EQ(_manager.getOplogVisibilityTimestamp().asULL(), 5);
 }
 

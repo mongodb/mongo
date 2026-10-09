@@ -351,7 +351,7 @@ void testSaveAndRestoreSeesNewInserts(OperationContext* opCtx,
             opCtx, IndexType::kUnique == type, /*partial=*/false);
     }
 
-    insertToIndex(opCtx, sorted.get(), {{key1, loc1}, {key3, loc3}}, /*dupsAllowed*/ false);
+    insertToIndex(opCtx, sorted.get(), {{key1, loc1}, {key3, loc3}}, /*dupsAllowed=*/false);
 
     auto cursor = sorted->newCursor(opCtx, ru, forward);
     if (forward) {
@@ -371,7 +371,7 @@ void testSaveAndRestoreSeesNewInserts(OperationContext* opCtx,
     }
 
     cursor->save();
-    insertToIndex(opCtx, sorted.get(), {{key2, loc2}}, /*dupsAllowed*/ false);
+    insertToIndex(opCtx, sorted.get(), {{key2, loc2}}, /*dupsAllowed=*/false);
     cursor->restore(ru);
 
     ASSERT_EQ(cursor->next(ru), IndexKeyEntry(key2, loc2));
@@ -416,7 +416,7 @@ void testSaveAndRestoreSeesNewInsertsAfterRemove(OperationContext* opCtx,
             opCtx, IndexType::kUnique == type, /*partial=*/false);
     }
 
-    insertToIndex(opCtx, sorted.get(), {{key1, loc1}, {key3, loc1}}, /*dupsAllowed*/ false);
+    insertToIndex(opCtx, sorted.get(), {{key1, loc1}, {key3, loc1}}, /*dupsAllowed=*/false);
 
     auto cursor = sorted->newCursor(opCtx, ru, forward);
     const auto seekPoint = forward ? key1 : key3;
@@ -432,7 +432,7 @@ void testSaveAndRestoreSeesNewInsertsAfterRemove(OperationContext* opCtx,
     // The restore may have seeked since it can't return to the saved position.
 
     cursor->save();  // Should still save originally saved key as "current position".
-    insertToIndex(opCtx, sorted.get(), {{key2, loc1}}, /*dupsAllowed*/ false);
+    insertToIndex(opCtx, sorted.get(), {{key2, loc1}}, /*dupsAllowed=*/false);
     cursor->restore(ru);
 
     ASSERT_EQ(cursor->next(ru), IndexKeyEntry(key2, loc1));
@@ -478,7 +478,7 @@ void testSaveAndRestoreSeesNewInsertsAfterEOF(OperationContext* opCtx,
             opCtx, IndexType::kUnique == type, /*partial=*/false);
     }
 
-    insertToIndex(opCtx, sorted.get(), {{key1, loc1}}, /*dupsAllowed*/ false);
+    insertToIndex(opCtx, sorted.get(), {{key1, loc1}}, /*dupsAllowed=*/false);
 
     auto cursor = sorted->newCursor(opCtx, ru, forward);
 
@@ -494,7 +494,7 @@ void testSaveAndRestoreSeesNewInsertsAfterEOF(OperationContext* opCtx,
 
     auto insertPoint = forward ? key2 : key0;
     cursor->save();  // Should still save key1 as "current position".
-    insertToIndex(opCtx, sorted.get(), {{insertPoint, loc1}}, /*dupsAllowed*/ false);
+    insertToIndex(opCtx, sorted.get(), {{insertPoint, loc1}}, /*dupsAllowed=*/false);
     cursor->restore(ru);
 
     ASSERT_EQ(cursor->next(ru), IndexKeyEntry(insertPoint, loc1));
@@ -528,7 +528,7 @@ TEST_F(SortedDataInterfaceTest, SaveAndRestoreSeesNewInsertsAfterEOF_Reverse_Id)
 // Make sure we restore to a RecordId at or ahead of save point if same key.
 TEST_F(SortedDataInterfaceTest, SaveAndRestoreStandardIndexConsidersRecordId_Forward) {
     auto sorted = harnessHelper()->newSortedDataInterface(opCtx(),
-                                                          /*unique*/ false,
+                                                          /*unique=*/false,
                                                           /*partial=*/false,
                                                           {
                                                               {key1, loc1},
@@ -572,7 +572,7 @@ TEST_F(SortedDataInterfaceTest, SaveAndRestoreStandardIndexConsidersRecordId_For
 // Test that cursors over unique indices will never return the same key twice.
 TEST_F(SortedDataInterfaceTest, SaveAndRestoreUniqueIndexWontReturnDupKeys_Forward) {
     auto sorted = harnessHelper()->newSortedDataInterface(opCtx(),
-                                                          /*unique*/ true,
+                                                          /*unique=*/true,
                                                           /*partial=*/false,
                                                           {
                                                               {key1, loc1},
@@ -620,7 +620,7 @@ TEST_F(SortedDataInterfaceTest, SaveAndRestoreUniqueIndexWontReturnDupKeys_Forwa
 // Make sure we restore to a RecordId at or ahead of save point if same key on reverse cursor.
 TEST_F(SortedDataInterfaceTest, SaveAndRestoreStandardIndexConsidersRecordId_Reverse) {
     auto sorted = harnessHelper()->newSortedDataInterface(opCtx(),
-                                                          /*unique*/ false,
+                                                          /*unique=*/false,
                                                           /*partial=*/false,
                                                           {
                                                               {key0, loc1},
@@ -664,7 +664,7 @@ TEST_F(SortedDataInterfaceTest, SaveAndRestoreStandardIndexConsidersRecordId_Rev
 // Test that reverse cursors over unique indices will never return the same key twice.
 TEST_F(SortedDataInterfaceTest, SaveAndRestoreUniqueIndexWontReturnDupKeys_Reverse) {
     auto sorted = harnessHelper()->newSortedDataInterface(opCtx(),
-                                                          /*unique*/ true,
+                                                          /*unique=*/true,
                                                           /*partial=*/false,
                                                           {
                                                               {key1, loc1},

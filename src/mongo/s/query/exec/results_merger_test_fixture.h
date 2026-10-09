@@ -187,7 +187,7 @@ protected:
 
         return buildARM(
             makeARMParamsFromExistingCursors(std::move(remoteCursors), findCmd, getMoreBatchSize),
-            false /* recognizeControlEvents */);
+            /*recognizeControlEvents=*/false);
     }
 
     /**

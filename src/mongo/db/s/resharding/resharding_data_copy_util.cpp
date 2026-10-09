@@ -109,7 +109,7 @@ void ensureCollectionDropped(OperationContext* opCtx,
 
         WriteUnitOfWork wuow(opCtx);
         uassertStatusOK(autoDb.getDb()->dropCollectionEvenIfSystem(
-            opCtx, nss, {} /* dropOpTime */, true /* markFromMigrate */));
+            opCtx, nss, /*dropOpTime=*/{}, /*markFromMigrate=*/true));
         wuow.commit();
     });
 }
@@ -236,7 +236,7 @@ void deleteRecipientResumeData(OperationContext* opCtx, const UUID& reshardingUU
                 BSON(std::string{ReshardingRecipientResumeData::kIdFieldName} + "." +
                          std::string{ReshardingRecipientResumeDataId::kReshardingUUIDFieldName}
                      << reshardingUUID),
-                false /* justOne */);
+                /*justOne=*/false);
         });
 }
 
@@ -370,7 +370,7 @@ int insertBatchTransactionally(OperationContext* opCtx,
             // on errors in ErrorCodes::isRetriableError like InterruptedDueToReplStateChange.
             if (ErrorCodes::isStaleShardVersionError(ex.code()) ||
                 !isTransientTransactionError(
-                    ex.code(), false /* hasWriteConcernError */, true /* isCommitOrAbort */))
+                    ex.code(), /*hasWriteConcernError=*/false, /*isCommitOrAbort=*/true))
                 throw;
             logAndBackoff(7973400,
                           MONGO_LOGV2_DEFAULT_COMPONENT,
@@ -457,7 +457,7 @@ void runWithTransactionFromOpCtx(OperationContext* opCtx,
 
     txnParticipant.beginOrContinue(opCtx,
                                    {txnNumber},
-                                   false /* autocommit */,
+                                   /*autocommit=*/false,
                                    TransactionParticipant::TransactionActions::kStart,
                                    boost::none);
     txnParticipant.unstashTransactionResources(opCtx, "reshardingOplogApplication");

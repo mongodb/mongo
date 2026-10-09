@@ -346,12 +346,12 @@ std::unique_ptr<Pipeline> createOplogFetchingPipelineForResharding(
 
     // Emits transaction entries chronologically.
     stages.emplace_back(DocumentSourceReshardingIterateTransaction::create(
-        expCtx, true /* includeCommitTransactionTimestamp */));
+        expCtx, /*includeCommitTransactionTimestamp=*/true));
 
     // Converts oplog entries with kNeedsRetryImageFieldName into the old style pair of
     // update/delete oplog and pre/post image no-op oplog.
     stages.emplace_back(DocumentSourceFindAndModifyImageLookup::create(
-        expCtx, true /* includeCommitTransactionTimestamp */));
+        expCtx, /*includeCommitTransactionTimestamp=*/true));
 
     // Adds _id to all events in the stream.
     stages.emplace_back(DocumentSourceReshardingAddResumeId::create(expCtx));
@@ -499,7 +499,7 @@ void validateShardDistribution(const std::vector<ShardKeyRange>& shardDistributi
     stdx::unordered_set<ShardId> shardIds;
     for (const auto& shard : shardDistribution) {
         uassertStatusOK(Grid::get(opCtx)->shardRegistry()->resolveShardId(
-            opCtx, shard.getShard(), false /* allowNonShardIdIdentifiers */));
+            opCtx, shard.getShard(), /*allowNonShardIdIdentifiers=*/false));
         uassert(ErrorCodes::InvalidOptions,
                 "ShardKeyRange should have a pair of min/max or none of them",
                 !(shard.getMax().has_value() ^ shard.getMin().has_value()));
@@ -681,7 +681,7 @@ ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
     const bool& setProvenance,
     CollSizeEstimator collSizeEstimator) {
     auto coordinatorDoc = ReshardingCoordinatorDocument(
-        std::move(CoordinatorStateEnum::kUnused), {} /* donorShards */, {} /* recipientShards */);
+        std::move(CoordinatorStateEnum::kUnused), /*donorShards=*/{}, /*recipientShards=*/{});
 
     // Generate the resharding metadata for the ReshardingCoordinatorDocument.
     auto reshardingUUID = UUID::gen();
@@ -1073,7 +1073,7 @@ boost::optional<BSONObj> determineCloneCountHint(OperationContext* opCtx,
     // Sharded source: orphans must be filtered out, which only stays covered with an index that
     // contains the full shard key.
     if (auto idx = findShardKeyPrefixedIndex(
-            opCtx, collection, *shardKeyPattern, true /* requireSingleKey */)) {
+            opCtx, collection, *shardKeyPattern, /*requireSingleKey=*/true)) {
         return idx->keyPattern();
     }
 

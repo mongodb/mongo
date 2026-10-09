@@ -54,7 +54,7 @@ boost::optional<Timestamp> getEarliestOpLogTimestampAmongAllShards(OperationCont
     const auto recipients = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
 
     auto responses = sharding_util::sendCommandToShards(
-        opCtx, DatabaseName::kAdmin, serverStatusCmd, recipients, executor, false /*throwOnError*/);
+        opCtx, DatabaseName::kAdmin, serverStatusCmd, recipients, executor, /*throwOnError=*/false);
     boost::optional<Timestamp> earliestOplogTime = boost::none;
     for (const auto& cmdResponse : responses) {
         if (!cmdResponse.swResponse.isOK()) {
@@ -153,19 +153,19 @@ void PlacementHistoryCleaner::runOnce(Client* client, size_t minPlacementHistory
 }
 
 void PlacementHistoryCleaner::onStepDown() {
-    _stop(true /* steppingDown*/);
+    _stop(/*steppingDown=*/true);
 }
 
 void PlacementHistoryCleaner::onStepUpComplete(OperationContext* opCtx, long long term) {
-    _start(opCtx, true /* steppingUp*/);
+    _start(opCtx, /*steppingUp=*/true);
 }
 
 void PlacementHistoryCleaner::pause() {
-    _stop(false /* steppingDown*/);
+    _stop(/*steppingDown=*/false);
 }
 
 void PlacementHistoryCleaner::resume(OperationContext* opCtx) {
-    _start(opCtx, false /* steppingUp*/);
+    _start(opCtx, /*steppingUp=*/false);
 }
 
 void PlacementHistoryCleaner::_start(OperationContext* opCtx, bool steppingUp) {

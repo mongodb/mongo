@@ -142,7 +142,7 @@ TEST_F(CommitDatabaseMetadataLocallyTest, CommitCreatePersistsMetadataAndInstall
 TEST_F(CommitDatabaseMetadataLocallyTest, CommitCreateFromCloneCountsAsClone) {
     const auto dbType = makeDatabaseType();
 
-    commitCreate(dbType, true /* fromClone */);
+    commitCreate(dbType, /*fromClone=*/true);
 
     ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogDatabasesNamespace), 1);
     ASSERT_EQ(countCommandOplogEntries("createDatabaseMetadata"), 1);
@@ -185,7 +185,7 @@ TEST_F(CommitDatabaseMetadataLocallyTest,
         ASSERT_FALSE(scopedCsr->isUnowned());
     }
 
-    commitCreate(dbType, true /* fromClone */);
+    commitCreate(dbType, /*fromClone=*/true);
 
     // Already-known, owned collection metadata is not cleared just because a create commit (clone
     // or otherwise) ran for the owning database (SERVER-129871).
@@ -271,7 +271,7 @@ TEST_F(CommitDatabaseMetadataLocallyTest, DropDeletesMetadataWithoutInvalidation
     commitCreate(dbType);
     ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogDatabasesNamespace), 1);
 
-    dropDatabase(false /* writeDropDBMetadataEntry */);
+    dropDatabase(/*writeDropDBMetadataEntry=*/false);
 
     ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogDatabasesNamespace), 0);
     ASSERT_EQ(countCommandOplogEntries("dropDatabaseMetadata"), 0);

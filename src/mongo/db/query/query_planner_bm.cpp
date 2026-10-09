@@ -38,12 +38,12 @@ IndexEntry createIndexEntry(BSONObj keyPattern) {
                       IndexConfig::kLatestIndexVersion,
                       /*mk=*/false,
                       /*mkp=*/{},
-                      {} /*multikeyPathSet*/,
+                      /*multikeyPathSet=*/{},
                       /*sp=*/false,
                       /*unq=*/false,
                       IndexEntry::Identifier{"ident"},
                       /*io=*/BSONObj(),
-                      nullptr /*wildcardProjection*/);
+                      /*wildcardProjection=*/nullptr);
 }
 
 void BM_NoIndexes(benchmark::State& state) {

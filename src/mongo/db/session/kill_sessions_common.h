@@ -65,7 +65,7 @@ public:
         // Set AuditUserAttrs to match the pattern passed in
         auto [name, roles] = getKillAllSessionsByPatternImpersonateData(pattern);
         if (name) {
-            rpc::AuditUserAttrs::set(opCtx, *name, roles, true /* isImpersonating */);
+            rpc::AuditUserAttrs::set(opCtx, *name, roles, /*isImpersonating=*/true);
         } else {
             rpc::AuditUserAttrs::resetToAuthenticatedUser(opCtx);
         }

@@ -46,9 +46,9 @@ TEST_F(MozJSImplScopeTest, JsThrownOutOfMemoryMessageIsNotTreatedAsRealOOM) {
 
         ASSERT_THROWS(scope->exec("throw new Error('out of memory');",
                                   "jsThrownOOM",
-                                  false /* printResult */,
-                                  true /* reportError */,
-                                  true /* assertOnError */),
+                                  /*printResult=*/false,
+                                  /*reportError=*/true,
+                                  /*assertOnError=*/true),
                       DBException);
 
         // The message says "out of memory", but the engine never reported one.
@@ -71,9 +71,9 @@ TEST_F(MozJSImplScopeTest, BuildStackStringResolvesJSFramesDuringExecution) {
             "function aDistinctlyNamedFrame() { __captureJSStack(); }"
             "aDistinctlyNamedFrame();",
             "buildStackStringTest",
-            false /* printResult */,
-            true /* reportError */,
-            true /* assertOnError */);
+            /*printResult=*/false,
+            /*reportError=*/true,
+            /*assertOnError=*/true);
 
         // The captured stack must name the JS function that was on the stack; an empty or
         // frameless string would make the OOM report no more useful than it is today.
@@ -159,9 +159,9 @@ TEST_F(MozJSImplScopeTest, DBPointerPropertiesAreReadOnly) {
             "var nsUnchanged = (dbp.ns === 'originalNs');"
             "var idUnchanged = (dbp.id.toString() === originalId);",
             "dbPointerReadOnlySloppy",
-            false /* printResult */,
-            true /* reportError */,
-            true /* assertOnError */);
+            /*printResult=*/false,
+            /*reportError=*/true,
+            /*assertOnError=*/true);
 
         ASSERT_TRUE(scope->getBoolean("nsUnchanged"));
         ASSERT_TRUE(scope->getBoolean("idUnchanged"));
@@ -178,9 +178,9 @@ TEST_F(MozJSImplScopeTest, DBPointerPropertiesAreReadOnly) {
             "})(); }"
             "catch (e) { threwForId = (e instanceof TypeError); }",
             "dbPointerReadOnlyStrict",
-            false /* printResult */,
-            true /* reportError */,
-            true /* assertOnError */);
+            /*printResult=*/false,
+            /*reportError=*/true,
+            /*assertOnError=*/true);
 
         ASSERT_TRUE(scope->getBoolean("threwForNs"));
         ASSERT_TRUE(scope->getBoolean("threwForId"));
@@ -259,8 +259,7 @@ TEST_F(MozJSImplScopeTest, AccumulatedPinnedHostBytesForcesGC) {
             const BSONObj doc = builder.obj();
 
             ASSERT_EQ(
-                0,
-                scope->invoke(mapFn, &emptyArgs, &doc, 0 /* timeoutMs */, true /* ignoreReturn */));
+                0, scope->invoke(mapFn, &emptyArgs, &doc, /*timeoutMs=*/0, /*ignoreReturn=*/true));
         }
 
         const auto gcs1 = JS_GetGCParameter(cx, JSGC_NUMBER);
@@ -277,8 +276,7 @@ TEST_F(MozJSImplScopeTest, AccumulatedPinnedHostBytesForcesGC) {
             const BSONObj doc = builder.obj();
 
             ASSERT_EQ(
-                0,
-                scope->invoke(mapFn, &emptyArgs, &doc, 0 /* timeoutMs */, true /* ignoreReturn */));
+                0, scope->invoke(mapFn, &emptyArgs, &doc, /*timeoutMs=*/0, /*ignoreReturn=*/true));
         }
 
         scope->reset();

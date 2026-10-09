@@ -93,12 +93,12 @@ value::TagValueMaybeOwned ByteCode::builtinDoubleDoublePartialSumFinalizeImpl(
 
 value::TagValueMaybeOwned ByteCode::builtinStdDevPopFinalize(ArityType arity) {
     auto fieldView = viewFromStack(0);
-    return aggStdDevFinalizeImpl(fieldView.value, false /* isSamp */);
+    return aggStdDevFinalizeImpl(fieldView.value, /*isSamp=*/false);
 }
 
 value::TagValueMaybeOwned ByteCode::builtinStdDevSampFinalize(ArityType arity) {
     auto fieldView = viewFromStack(0);
-    return aggStdDevFinalizeImpl(fieldView.value, true /* isSamp */);
+    return aggStdDevFinalizeImpl(fieldView.value, /*isSamp=*/true);
 }
 
 }  // namespace vm

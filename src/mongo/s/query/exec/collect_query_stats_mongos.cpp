@@ -48,7 +48,7 @@ void collectQueryStatsMongos(OperationContext* opCtx, ClusterClientCursorGuard& 
                                      opDebug.getQueryStatsInfo().keyHash,
                                      cursor->takeKey(),
                                      snapshot,
-                                     {} /* supplementalMetrics */,
+                                     /*supplementalMetrics=*/{},
                                      cursor->isChangeStreamCursor());
     }
 }
@@ -71,7 +71,7 @@ void collectQueryStatsMongos(OperationContext* opCtx, ClusterCursorManager::Pinn
                                      opDebug.getQueryStatsInfo().keyHash,
                                      nullptr,
                                      snapshot,
-                                     {} /* supplementalMetrics */,
+                                     /*supplementalMetrics=*/{},
                                      cursor->isChangeStreamCursor());
     }
 }

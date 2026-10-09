@@ -129,7 +129,7 @@ protected:
                                      *autoColl,
                                      inserts.begin(),
                                      inserts.end(),
-                                     /*recordIds*/ {},
+                                     /*recordIds=*/{},
                                      /*fromMigrate=*/std::vector<bool>(inserts.size(), fromMigrate),
                                      /*defaultFromMigrate=*/fromMigrate);
                 opObserver.onUpdate(opCtx, updateArgs);
@@ -143,7 +143,7 @@ protected:
                                      *autoColl,
                                      inserts.begin(),
                                      inserts.end(),
-                                     /*recordIds*/ {},
+                                     /*recordIds=*/{},
                                      /*fromMigrate=*/std::vector<bool>(inserts.size(), fromMigrate),
                                      /*defaultFromMigrate=*/fromMigrate),
                 AssertionException);
@@ -257,16 +257,16 @@ protected:
                                                                collUUID,
                                                                UUID::gen(),
                                                                {},
-                                                               false /* fromMigrate */,
-                                                               false /* isTimeseries */));
+                                                               /*fromMigrate=*/false,
+                                                               /*isTimeseries=*/false));
         } else {
             ASSERT_THROWS_CODE(opObserver.onStartIndexBuild(opCtx,
                                                             nss,
                                                             collUUID,
                                                             UUID::gen(),
                                                             {},
-                                                            false /* fromMigrate */,
-                                                            false /* isTimeseries */),
+                                                            /*fromMigrate=*/false,
+                                                            /*isTimeseries=*/false),
                                AssertionException,
                                ErrorCodes::ReplicaSetWritesBlocked);
         }
@@ -305,12 +305,12 @@ TEST_F(ReplicaSetWriteBlockOpObserverTest, ReplicaSetWriteAndDeletionBlockingDis
     ASSERT(!ReplicaSetWriteBlockBypass::get(opCtx.get()).isEnabled());
 
     const auto runWrites = [&](const NamespaceString& nss) {
-        runInsertAndUpdate(opCtx.get(), nss, false /* fromMigrate */, true /* shouldSucceed */);
+        runInsertAndUpdate(opCtx.get(), nss, /*fromMigrate=*/false, /*shouldSucceed=*/true);
         runDelete(opCtx.get(),
                   nss,
-                  false /* useDirectClient */,
-                  false /* fromMigrate */,
-                  true /* shouldSucceed */);
+                  /*useDirectClient=*/false,
+                  /*fromMigrate=*/false,
+                  /*shouldSucceed=*/true);
     };
 
     // Ensure writes succeed
@@ -321,12 +321,12 @@ TEST_F(ReplicaSetWriteBlockOpObserverTest, ReplicaSetWriteAndDeletionBlockingDis
 
     // Ensure range deletions and TTL deletions succeed.
     const auto userColl = NamespaceString::createNamespaceString_forTest("userDB.coll");
-    runDelete(opCtx.get(), userColl, false, true /* fromMigrate */, true /* shouldSucceed */);
+    runDelete(opCtx.get(), userColl, false, /*fromMigrate=*/true, /*shouldSucceed=*/true);
     runDelete(opCtx.get(),
               userColl,
-              true /* useDirectClient */,
-              false /* fromMigrate */,
-              true /* shouldSucceed */);
+              /*useDirectClient=*/true,
+              /*fromMigrate=*/false,
+              /*shouldSucceed=*/true);
 }
 
 // Write blocking disabled but bypass on: all tested namespaces should still succeed.
@@ -346,12 +346,12 @@ TEST_F(ReplicaSetWriteBlockOpObserverTest, ReplicaSetWriteAndDeletionBlockingDis
     ASSERT(ReplicaSetWriteBlockBypass::get(opCtx.get()).isEnabled());
 
     const auto runWrites = [&](const NamespaceString& nss) {
-        runInsertAndUpdate(opCtx.get(), nss, false /* fromMigrate */, true /* shouldSucceed */);
+        runInsertAndUpdate(opCtx.get(), nss, /*fromMigrate=*/false, /*shouldSucceed=*/true);
         runDelete(opCtx.get(),
                   nss,
-                  false /* useDirectClient */,
-                  false /* fromMigrate */,
-                  true /* shouldSucceed */);
+                  /*useDirectClient=*/false,
+                  /*fromMigrate=*/false,
+                  /*shouldSucceed=*/true);
     };
 
     // Ensure writes succeed.
@@ -362,12 +362,12 @@ TEST_F(ReplicaSetWriteBlockOpObserverTest, ReplicaSetWriteAndDeletionBlockingDis
 
     // Ensure range deletions and TTL deletions succeed.
     const auto userColl = NamespaceString::createNamespaceString_forTest("userDB.coll");
-    runDelete(opCtx.get(), userColl, false, true /* fromMigrate */, true /* shouldSucceed */);
+    runDelete(opCtx.get(), userColl, false, /*fromMigrate=*/true, /*shouldSucceed=*/true);
     runDelete(opCtx.get(),
               userColl,
-              true /* useDirectClient */,
-              false /* fromMigrate */,
-              true /* shouldSucceed */);
+              /*useDirectClient=*/true,
+              /*fromMigrate=*/false,
+              /*shouldSucceed=*/true);
 }
 
 TEST_F(ReplicaSetWriteBlockOpObserverTest,
@@ -382,7 +382,7 @@ TEST_F(ReplicaSetWriteBlockOpObserverTest,
 
     // An update that disallows deletions leaves writes blocking active while enabling deletion
     // blocking.
-    updateReplicaSetWriteBlockCriticalSection(opCtx.get(), false /* allowDeletions */);
+    updateReplicaSetWriteBlockCriticalSection(opCtx.get(), /*allowDeletions=*/false);
     {
         Lock::GlobalLock lock(opCtx.get(), MODE_IX);
         ASSERT_TRUE(rsBlock->isReplicaSetWriteBlockingEnabled());
@@ -397,7 +397,7 @@ TEST_F(ReplicaSetWriteBlockOpObserverTest,
             .safeNumberLong();
 
     // An allowDeletions-only update must leave write blocking active while allowing deletions.
-    updateReplicaSetWriteBlockCriticalSection(opCtx.get(), true /* allowDeletions */);
+    updateReplicaSetWriteBlockCriticalSection(opCtx.get(), /*allowDeletions=*/true);
     {
         Lock::GlobalLock lock(opCtx.get(), MODE_IX);
         ASSERT_TRUE(rsBlock->isReplicaSetWriteBlockingEnabled());
@@ -415,7 +415,7 @@ TEST_F(ReplicaSetWriteBlockOpObserverTest,
 TEST_F(ReplicaSetWriteBlockOpObserverTest,
        RollbackReblocksDeletionsWhenAllowDeletionsUpdateToTrueIsRolledBack) {
     auto opCtx = cc().makeOperationContext();
-    insertReplicaSetWriteBlockCriticalSection(opCtx.get(), false /* allowDeletions */);
+    insertReplicaSetWriteBlockCriticalSection(opCtx.get(), /*allowDeletions=*/false);
 
     auto* rsBlock = ReplicaSetWriteBlockState::get(opCtx.get());
     {
@@ -457,7 +457,7 @@ TEST_F(ReplicaSetWriteBlockOpObserverTest,
 TEST_F(ReplicaSetWriteBlockOpObserverTest,
        RollbackAllowsDeletionsWhenAllowDeletionsUpdateToFalseIsRolledBack) {
     auto opCtx = cc().makeOperationContext();
-    insertReplicaSetWriteBlockCriticalSection(opCtx.get(), true /* allowDeletions */);
+    insertReplicaSetWriteBlockCriticalSection(opCtx.get(), /*allowDeletions=*/true);
 
     auto* rsBlock = ReplicaSetWriteBlockState::get(opCtx.get());
     {
@@ -499,7 +499,7 @@ TEST_F(ReplicaSetWriteBlockOpObserverTest,
 TEST_F(ReplicaSetWriteBlockOpObserverTest,
        RollbackDoesNotDisableOrReenableGlobalUserWriteBlocking) {
     auto opCtx = cc().makeOperationContext();
-    insertReplicaSetWriteBlockCriticalSection(opCtx.get(), false /* allowDeletions */);
+    insertReplicaSetWriteBlockCriticalSection(opCtx.get(), /*allowDeletions=*/false);
 
     auto* userWriteBlockState = GlobalUserWriteBlockState::get(opCtx.get());
     auto* rsBlock = ReplicaSetWriteBlockState::get(opCtx.get());
@@ -548,62 +548,62 @@ TEST_F(ReplicaSetWriteBlockOpObserverTest, ReplicaSetWriteAndDeletionBlockingEna
     const auto profileNss = NamespaceString::createNamespaceString_forTest("userDB.system.profile");
 
     // User collection: insert/update are blocked while deletes are allowed.
-    runInsertAndUpdate(opCtx.get(), userColl, false /* fromMigrate */, false /* shouldSucceed */);
+    runInsertAndUpdate(opCtx.get(), userColl, /*fromMigrate=*/false, /*shouldSucceed=*/false);
     runDelete(opCtx.get(),
               userColl,
-              false /* useDirectClient */,
-              false /* fromMigrate */,
-              true /* shouldSucceed */);
+              /*useDirectClient=*/false,
+              /*fromMigrate=*/false,
+              /*shouldSucceed=*/true);
 
     // fromMigrate writes that do not enable the bypass (e.g. movePrimary catalog cloning) are also
     // blocked. Operations that must run during a block, such as chunk migration, instead enable
     // ReplicaSetWriteBlockBypass.
-    runInsertAndUpdate(opCtx.get(), userColl, true /* fromMigrate */, false /* shouldSucceed */);
+    runInsertAndUpdate(opCtx.get(), userColl, /*fromMigrate=*/true, /*shouldSucceed=*/false);
 
     // admin/local/config: exempt from replica set write blocking; insert/update/delete allowed.
     runInsertAndUpdate(opCtx.get(),
                        NamespaceString::createNamespaceString_forTest("admin.coll"),
-                       false /* fromMigrate */,
-                       true /* shouldSucceed */);
+                       /*fromMigrate=*/false,
+                       /*shouldSucceed=*/true);
     runDelete(opCtx.get(),
               NamespaceString::createNamespaceString_forTest("admin.coll"),
-              false /* useDirectClient */,
-              false /* fromMigrate */,
-              true /* shouldSucceed */);
+              /*useDirectClient=*/false,
+              /*fromMigrate=*/false,
+              /*shouldSucceed=*/true);
     runInsertAndUpdate(opCtx.get(),
                        NamespaceString::createNamespaceString_forTest("local.coll"),
-                       false /* fromMigrate */,
-                       true /* shouldSucceed */);
+                       /*fromMigrate=*/false,
+                       /*shouldSucceed=*/true);
     runDelete(opCtx.get(),
               NamespaceString::createNamespaceString_forTest("local.coll"),
-              false /* useDirectClient */,
-              false /* fromMigrate */,
-              true /* shouldSucceed */);
+              /*useDirectClient=*/false,
+              /*fromMigrate=*/false,
+              /*shouldSucceed=*/true);
     runInsertAndUpdate(opCtx.get(),
                        NamespaceString::createNamespaceString_forTest("config.coll"),
-                       false /* fromMigrate */,
-                       true /* shouldSucceed */);
+                       /*fromMigrate=*/false,
+                       /*shouldSucceed=*/true);
     runDelete(opCtx.get(),
               NamespaceString::createNamespaceString_forTest("config.coll"),
-              false /* useDirectClient */,
-              false /* fromMigrate */,
-              true /* shouldSucceed */);
+              /*useDirectClient=*/false,
+              /*fromMigrate=*/false,
+              /*shouldSucceed=*/true);
 
     // Ensure operations on system.profile on user DB are exempt from write blocking.
-    runInsertAndUpdate(opCtx.get(), profileNss, false /* fromMigrate */, true /* shouldSucceed */);
+    runInsertAndUpdate(opCtx.get(), profileNss, /*fromMigrate=*/false, /*shouldSucceed=*/true);
     runDelete(opCtx.get(),
               profileNss,
-              false /* useDirectClient */,
-              false /* fromMigrate */,
-              true /* shouldSucceed */);
+              /*useDirectClient=*/false,
+              /*fromMigrate=*/false,
+              /*shouldSucceed=*/true);
 
     // Ensure range deletions and TTL deletions are allowed.
-    runDelete(opCtx.get(), userColl, false, true /* fromMigrate */, true /* shouldSucceed */);
+    runDelete(opCtx.get(), userColl, false, /*fromMigrate=*/true, /*shouldSucceed=*/true);
     runDelete(opCtx.get(),
               userColl,
-              true /* useDirectClient */,
-              false /* fromMigrate */,
-              true /* shouldSucceed */);
+              /*useDirectClient=*/true,
+              /*fromMigrate=*/false,
+              /*shouldSucceed=*/true);
 
     // Enable deletions blocking.
     rsBlock->enableReplicaSetDeletionsBlocking();
@@ -611,22 +611,22 @@ TEST_F(ReplicaSetWriteBlockOpObserverTest, ReplicaSetWriteAndDeletionBlockingEna
     // Ensure range deletions and TTL deletions are blocked.
     runDelete(opCtx.get(),
               userColl,
-              false /* useDirectClient */,
-              true /* fromMigrate */,
-              false /* shouldSucceed */);
+              /*useDirectClient=*/false,
+              /*fromMigrate=*/true,
+              /*shouldSucceed=*/false);
     runDelete(opCtx.get(),
               userColl,
-              true /* useDirectClient */,
-              false /* fromMigrate */,
-              false /* shouldSucceed */);
+              /*useDirectClient=*/true,
+              /*fromMigrate=*/false,
+              /*shouldSucceed=*/false);
 
     // Ensure operations on system.profile on user DB are still exempt.
-    runInsertAndUpdate(opCtx.get(), profileNss, false /* fromMigrate */, true /* shouldSucceed */);
+    runInsertAndUpdate(opCtx.get(), profileNss, /*fromMigrate=*/false, /*shouldSucceed=*/true);
     runDelete(opCtx.get(),
               profileNss,
-              false /* useDirectClient */,
-              false /* fromMigrate */,
-              true /* shouldSucceed */);
+              /*useDirectClient=*/false,
+              /*fromMigrate=*/false,
+              /*shouldSucceed=*/true);
 }
 
 TEST_F(ReplicaSetWriteBlockOpObserverTest, ReplicaSetWriteAndDeletionBlockingEnabledWithBypass) {
@@ -644,12 +644,12 @@ TEST_F(ReplicaSetWriteBlockOpObserverTest, ReplicaSetWriteAndDeletionBlockingEna
     ASSERT(ReplicaSetWriteBlockBypass::get(opCtx.get()).isEnabled());
 
     const auto runWrites = [&](const NamespaceString& nss) {
-        runInsertAndUpdate(opCtx.get(), nss, false /* fromMigrate */, true /* shouldSucceed */);
+        runInsertAndUpdate(opCtx.get(), nss, /*fromMigrate=*/false, /*shouldSucceed=*/true);
         runDelete(opCtx.get(),
                   nss,
-                  false /* useDirectClient */,
-                  false /* fromMigrate */,
-                  true /* shouldSucceed */);
+                  /*useDirectClient=*/false,
+                  /*fromMigrate=*/false,
+                  /*shouldSucceed=*/true);
     };
 
     // Ensure writes succeed
@@ -662,21 +662,21 @@ TEST_F(ReplicaSetWriteBlockOpObserverTest, ReplicaSetWriteAndDeletionBlockingEna
     // while writes are blocked.
     runInsertAndUpdate(opCtx.get(),
                        NamespaceString::createNamespaceString_forTest("userDB.coll"),
-                       true /* fromMigrate */,
-                       true /* shouldSucceed */);
+                       /*fromMigrate=*/true,
+                       /*shouldSucceed=*/true);
 
     // Ensure range deletions and TTL deletions succeed.
     const auto userColl = NamespaceString::createNamespaceString_forTest("userDB.coll");
     runDelete(opCtx.get(),
               userColl,
-              false /* useDirectClient */,
-              true /* fromMigrate */,
-              true /* shouldSucceed */);
+              /*useDirectClient=*/false,
+              /*fromMigrate=*/true,
+              /*shouldSucceed=*/true);
     runDelete(opCtx.get(),
               userColl,
-              true /* useDirectClient */,
-              false /* fromMigrate */,
-              true /* shouldSucceed */);
+              /*useDirectClient=*/true,
+              /*fromMigrate=*/false,
+              /*shouldSucceed=*/true);
 }
 
 TEST_F(ReplicaSetWriteBlockOpObserverTest,
@@ -694,28 +694,28 @@ TEST_F(ReplicaSetWriteBlockOpObserverTest,
     const auto userColl = NamespaceString::createNamespaceString_forTest("userDB.coll");
 
     // Ensure user writes fail.
-    runInsertAndUpdate(opCtx.get(), userColl, false /* fromMigrate */, false /* shouldSucceed */);
+    runInsertAndUpdate(opCtx.get(), userColl, /*fromMigrate=*/false, /*shouldSucceed=*/false);
 
     // Ensure user deletions succeded.
     runDelete(opCtx.get(),
               userColl,
-              false /* useDirectClient */,
-              false /* fromMigrate */,
-              true /* shouldSucceed */);
+              /*useDirectClient=*/false,
+              /*fromMigrate=*/false,
+              /*shouldSucceed=*/true);
 
     // Ensure TTL deletions succeded.
     runDelete(opCtx.get(),
               userColl,
-              true /* useDirectClient */,
-              false /* fromMigrate */,
-              true /* shouldSucceed */);
+              /*useDirectClient=*/true,
+              /*fromMigrate=*/false,
+              /*shouldSucceed=*/true);
 
     // Ensure range deletions succeded.
     runDelete(opCtx.get(),
               userColl,
-              false /* useDirectClient */,
-              true /* fromMigrate */,
-              true /* shouldSucceed */);
+              /*useDirectClient=*/false,
+              /*fromMigrate=*/true,
+              /*shouldSucceed=*/true);
 }
 
 TEST_F(ReplicaSetWriteBlockOpObserverTest,
@@ -733,28 +733,28 @@ TEST_F(ReplicaSetWriteBlockOpObserverTest,
     const auto userColl = NamespaceString::createNamespaceString_forTest("userDB.coll");
 
     // Ensure user writes suceeded.
-    runInsertAndUpdate(opCtx.get(), userColl, false /* fromMigrate */, true /* shouldSucceed */);
+    runInsertAndUpdate(opCtx.get(), userColl, /*fromMigrate=*/false, /*shouldSucceed=*/true);
 
     // Ensure user deletions succeded.
     runDelete(opCtx.get(),
               userColl,
-              false /* useDirectClient */,
-              false /* fromMigrate */,
-              true /* shouldSucceed */);
+              /*useDirectClient=*/false,
+              /*fromMigrate=*/false,
+              /*shouldSucceed=*/true);
 
     // Ensure TTL deletions succeded.
     runDelete(opCtx.get(),
               userColl,
-              true /* useDirectClient */,
-              false /* fromMigrate */,
-              true /* shouldSucceed */);
+              /*useDirectClient=*/true,
+              /*fromMigrate=*/false,
+              /*shouldSucceed=*/true);
 
     // Ensure range deletions succeded.
     runDelete(opCtx.get(),
               userColl,
-              false /* useDirectClient */,
-              true /* fromMigrate */,
-              true /* shouldSucceed */);
+              /*useDirectClient=*/false,
+              /*fromMigrate=*/true,
+              /*shouldSucceed=*/true);
 }
 
 // Index build observer tests: onStartIndexBuild
@@ -769,7 +769,7 @@ TEST_F(ReplicaSetWriteBlockOpObserverTest, OnStartIndexBuildAllowedOnEmptyCollec
 
     // "userDB.coll" is empty (no documents inserted); the observer should bypass the block.
     const auto emptyNss = NamespaceString::createNamespaceString_forTest("userDB.coll");
-    runStartIndexBuild(opCtx.get(), emptyNss, true /* shouldSucceed */);
+    runStartIndexBuild(opCtx.get(), emptyNss, /*shouldSucceed=*/true);
 }
 
 TEST_F(ReplicaSetWriteBlockOpObserverTest,
@@ -784,7 +784,7 @@ TEST_F(ReplicaSetWriteBlockOpObserverTest,
     rsBlock->enableReplicaSetWriteBlocking(ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace);
     ReplicaSetWriteBlockBypass::get(opCtx.get()).set(false);
 
-    runStartIndexBuild(opCtx.get(), nss, false /* shouldSucceed */);
+    runStartIndexBuild(opCtx.get(), nss, /*shouldSucceed=*/false);
 }
 
 TEST_F(ReplicaSetWriteBlockOpObserverTest,
@@ -799,7 +799,7 @@ TEST_F(ReplicaSetWriteBlockOpObserverTest,
     rsBlock->disableReplicaSetWriteBlocking();
     ReplicaSetWriteBlockBypass::get(opCtx.get()).set(false);
 
-    runStartIndexBuild(opCtx.get(), nss, true /* shouldSucceed */);
+    runStartIndexBuild(opCtx.get(), nss, /*shouldSucceed=*/true);
 }
 
 TEST_F(ReplicaSetWriteBlockOpObserverTest,
@@ -818,7 +818,7 @@ TEST_F(ReplicaSetWriteBlockOpObserverTest,
     ReplicaSetWriteBlockBypass::get(opCtx.get()).setFromMetadata(opCtx.get(), {});
     ASSERT(ReplicaSetWriteBlockBypass::get(opCtx.get()).isEnabled());
 
-    runStartIndexBuild(opCtx.get(), nss, true /* shouldSucceed */);
+    runStartIndexBuild(opCtx.get(), nss, /*shouldSucceed=*/true);
 }
 
 // Index build observer tests: onStartIndexBuildSinglePhase
@@ -833,7 +833,7 @@ TEST_F(ReplicaSetWriteBlockOpObserverTest,
     ReplicaSetWriteBlockBypass::get(opCtx.get()).set(false);
 
     const auto emptyNss = NamespaceString::createNamespaceString_forTest("userDB.coll");
-    runStartIndexBuildSinglePhase(opCtx.get(), emptyNss, true /* shouldSucceed */);
+    runStartIndexBuildSinglePhase(opCtx.get(), emptyNss, /*shouldSucceed=*/true);
 }
 
 TEST_F(ReplicaSetWriteBlockOpObserverTest,
@@ -848,7 +848,7 @@ TEST_F(ReplicaSetWriteBlockOpObserverTest,
     rsBlock->enableReplicaSetWriteBlocking(ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace);
     ReplicaSetWriteBlockBypass::get(opCtx.get()).set(false);
 
-    runStartIndexBuildSinglePhase(opCtx.get(), nss, false /* shouldSucceed */);
+    runStartIndexBuildSinglePhase(opCtx.get(), nss, /*shouldSucceed=*/false);
 }
 
 TEST_F(ReplicaSetWriteBlockOpObserverTest,
@@ -863,7 +863,7 @@ TEST_F(ReplicaSetWriteBlockOpObserverTest,
     rsBlock->disableReplicaSetWriteBlocking();
     ReplicaSetWriteBlockBypass::get(opCtx.get()).set(false);
 
-    runStartIndexBuildSinglePhase(opCtx.get(), nss, true /* shouldSucceed */);
+    runStartIndexBuildSinglePhase(opCtx.get(), nss, /*shouldSucceed=*/true);
 }
 
 TEST_F(ReplicaSetWriteBlockOpObserverTest,
@@ -882,7 +882,7 @@ TEST_F(ReplicaSetWriteBlockOpObserverTest,
     ReplicaSetWriteBlockBypass::get(opCtx.get()).setFromMetadata(opCtx.get(), {});
     ASSERT(ReplicaSetWriteBlockBypass::get(opCtx.get()).isEnabled());
 
-    runStartIndexBuildSinglePhase(opCtx.get(), nss, true /* shouldSucceed */);
+    runStartIndexBuildSinglePhase(opCtx.get(), nss, /*shouldSucceed=*/true);
 }
 
 }  // namespace

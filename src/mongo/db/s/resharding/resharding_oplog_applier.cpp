@@ -95,7 +95,7 @@ ReshardingOplogApplier::ReshardingOplogApplier(
 
 CancelableOperationContext ReshardingOplogApplier::_makeOperationContext(
     std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) const {
-    return resharding::makeReshardingOperationContext(*factory, true /* nonDeprioritizable */);
+    return resharding::makeReshardingOperationContext(*factory, /*nonDeprioritizable=*/true);
 }
 
 SemiFuture<void> ReshardingOplogApplier::_applyBatch(

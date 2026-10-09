@@ -47,7 +47,7 @@ value::TagValueMaybeOwned ByteCode::builtinAddToSetCapped(ArityType arity) {
     return addToSetCappedImpl(std::move(accumulatorState),
                               std::move(newElem),
                               value::bitcastTo<int32_t>(sizeCap.value),
-                              nullptr /*collator*/);
+                              /*collator=*/nullptr);
 }
 
 value::TagValueMaybeOwned ByteCode::builtinCollAddToSet(ArityType arity) {
@@ -117,7 +117,7 @@ value::TagValueMaybeOwned ByteCode::builtinSetUnionCapped(ArityType arity) {
     return setUnionAccumImpl(std::move(accumulatorState),
                              std::move(newSetMembers),
                              value::bitcastTo<int32_t>(sizeCap.value),
-                             nullptr /*collator*/);
+                             /*collator=*/nullptr);
 }
 
 value::TagValueMaybeOwned ByteCode::builtinCollSetUnionCapped(ArityType arity) {

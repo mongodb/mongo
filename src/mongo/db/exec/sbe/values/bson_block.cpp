@@ -94,9 +94,9 @@ std::vector<std::unique_ptr<CellBlock>> BSONExtractorImpl::extractFromTopLevelFi
         walkField<BlockProjectionPositionInfoRecorder>(node,
                                                        tags[i],
                                                        vals[i],
-                                                       nullptr /* bsonPtr */,
+                                                       /*bsonPtr=*/nullptr,
                                                        visitElementExtractorCallback,
-                                                       /*traverseArrays*/ true);
+                                                       /*traverseArrays=*/true);
 
         for (auto& rec : _filterPositionInfoRecorders) {
             rec.endDoc();
@@ -123,7 +123,7 @@ std::vector<std::unique_ptr<CellBlock>> BSONExtractorImpl::extractFromBsons(
                                                          bitcastFrom<const char*>(obj.objdata()),
                                                          obj.objdata(),
                                                          visitElementExtractorCallback,
-                                                         true /* traverseArrays */);
+                                                         /*traverseArrays=*/true);
 
         for (auto& rec : _filterPositionInfoRecorders) {
             rec.endDoc();

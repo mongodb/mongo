@@ -496,7 +496,7 @@ TEST_F(ServerDescriptionTestFixture, ShouldStoreTopologyVersion) {
         kTopologyVersion.getObjectField("topologyVersion"), IDLParserContext("TopologyVersion"));
 
     auto description =
-        ServerDescription(clockSource, response, boost::none /*lastRtt*/, topologyVersion);
+        ServerDescription(clockSource, response, /*lastRtt=*/boost::none, topologyVersion);
     ASSERT_EQUALS(topologyVersion.getProcessId(), description.getTopologyVersion()->getProcessId());
     ASSERT_EQUALS(topologyVersion.getCounter(), description.getTopologyVersion()->getCounter());
 }

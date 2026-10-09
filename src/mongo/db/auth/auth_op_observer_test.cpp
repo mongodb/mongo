@@ -154,7 +154,7 @@ public:
                              *coll,
                              stmts.cbegin(),
                              stmts.cend(),
-                             /*recordIds*/ {},
+                             /*recordIds=*/{},
                              /*fromMigrate=*/std::vector<bool>(stmts.size(), false),
                              /*defaultFromMigrate=*/false);
         assertCounts(0, 0, 0);

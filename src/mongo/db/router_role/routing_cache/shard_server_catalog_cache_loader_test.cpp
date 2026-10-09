@@ -585,7 +585,7 @@ TEST_F(ShardServerCatalogCacheLoaderTest, PersistedCachedDataIsDroppedWhenCorrup
             BSON(ShardCollectionType::kNssFieldName
                  << NamespaceStringUtil::serialize(kNss, SerializationContext::stateDefault())),
             BSON("$unset" << BSON(fieldName << 1)),
-            false /*upsert*/));
+            /*upsert=*/false));
 
         // Assert that data in config.cache.collections is corrupted
         const auto status =

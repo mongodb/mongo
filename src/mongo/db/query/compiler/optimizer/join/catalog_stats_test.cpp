@@ -94,9 +94,9 @@ TEST_F(CatalogStatsTest, NumPagesInStorageEngineCache) {
 
     // A larger cache should fit more pages.
     ASSERT_GT(numPages(CollectionStats{1000, 500, 100},
-                       /*cacheBytes*/ 2000),
+                       /*cacheBytes=*/2000),
               numPages(CollectionStats{1000, 500, 100},
-                       /*cacheBytes*/ 1000));
+                       /*cacheBytes=*/1000));
 
     // Smaller on-disk page size → more pages on disk → smaller average in-memory page size →
     // more pages fit in the cache.
@@ -113,7 +113,7 @@ TEST_F(CatalogStatsTest, NumPagesInStorageEngineCache) {
     // When the cache is smaller than the average in-memory page size, fewer than 1 page fits.
     // The result should again be a positive fraction.
     const double tinyCachePages = numPages(CollectionStats{1000, 500, 100},
-                                           /*cacheBytes*/ 50);
+                                           /*cacheBytes=*/50);
     ASSERT_GT(tinyCachePages, 0);
     ASSERT_LT(tinyCachePages, 1);
 

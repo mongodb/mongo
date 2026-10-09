@@ -75,7 +75,7 @@ public:
                 LockMode::MODE_X);
 
             const auto& shardId = uassertStatusOK(Grid::get(opCtx)->shardRegistry()->resolveShardId(
-                opCtx, requestShardId, true /* allowNonShardIdIdentifiers */));
+                opCtx, requestShardId, /*allowNonShardIdIdentifiers=*/true));
             bool isTransitionToDedicatedCS =
                 request().getIsTransitionToDedicatedCS().value_or(false);
             uassert(

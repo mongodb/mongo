@@ -15,7 +15,7 @@ AggProjectStage::AggProjectStage(std::unique_ptr<PlanStage> input,
                                  AggExprVector aggExprPairs,
                                  PlanNodeId nodeId,
                                  bool participateInTrialRunTracking)
-    : PlanStage("agg_project"sv, nullptr /* yieldPolicy */, nodeId, participateInTrialRunTracking),
+    : PlanStage("agg_project"sv, /*yieldPolicy=*/nullptr, nodeId, participateInTrialRunTracking),
       _projects(std::move(aggExprPairs)) {
     _children.emplace_back(std::move(input));
 }

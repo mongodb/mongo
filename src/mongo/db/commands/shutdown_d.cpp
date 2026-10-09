@@ -48,7 +48,7 @@ Status stepDownForShutdown(OperationContext* opCtx,
             // does not run for election.
             auto& rss = rss::ReplicatedStorageService::get(opCtx);
             if (rss.getPersistenceProvider().shouldStepDownForShutdown()) {
-                replCoord->stepDown(opCtx, false /* force */, waitTime, Days(1));
+                replCoord->stepDown(opCtx, /*force=*/false, waitTime, Days(1));
             }
 
             if (MONGO_unlikely(hangInShutdownAfterStepdown.shouldFail())) {

@@ -131,7 +131,7 @@ public:
             // Upgrade to latest. If this release's lastContinuous ==
             // lastLTS then the second loop iteration just overwrites the first.
             _transitions[{from, to}] = {upgrading};
-            _fcvDocuments[upgrading] = makeFCVDoc(from /* effective */, to /* target */);
+            _fcvDocuments[upgrading] = makeFCVDoc(/*effective=*/from, /*target=*/to);
         }
 
         if (GenericFCV::kLastLTS != GenericFCV::kLastContinuous) {
@@ -140,7 +140,7 @@ public:
                 .transitionalVersion = GenericFCV::kUpgradingFromLastLTSToLastContinuous,
                 .onlyFromConfigServer = true};
             _fcvDocuments[GenericFCV::kUpgradingFromLastLTSToLastContinuous] = makeFCVDoc(
-                GenericFCV::kLastLTS /* effective */, GenericFCV::kLastContinuous /* target */);
+                /*effective=*/GenericFCV::kLastLTS, /*target=*/GenericFCV::kLastContinuous);
         }
 
         for (auto [downgrading, upgrading, to] :
@@ -154,8 +154,7 @@ public:
             // lastLTS then the second loop iteration just overwrites the first.
             _transitions[{GenericFCV::kLatest, to}] = {downgrading};
             _fcvDocuments[downgrading] =
-                makeFCVDoc(to /* effective */, to /* target */, GenericFCV::kLatest /* previous */
-                );
+                makeFCVDoc(/*effective=*/to, /*target=*/to, /*previous=*/GenericFCV::kLatest);
         }
     }
 

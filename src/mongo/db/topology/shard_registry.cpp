@@ -145,7 +145,7 @@ ShardRegistry::ShardRegistry(ServiceContext* service,
                  const Singleton& key,
                  const Cache::ValueHandle& cachedData,
                  const Time& timeInStore) { return _lookup(opCtx, key, cachedData, timeInStore); },
-          1 /* cacheSize */)) {
+          /*cacheSize=*/1)) {
 
     if (_initConfigServerCS) {
         invariant(_initConfigServerCS->isValid());
@@ -804,7 +804,7 @@ void ShardRegistry::scheduleReplicaSetUpdateOnConfigServerIfNeeded(
                                                         NamespaceString::kConfigsvrShardsNamespace,
                                                         filter,
                                                         update,
-                                                        false /* upsert */,
+                                                        /*upsert=*/false,
                                                         defaultMajorityWriteConcernDoNotUse());
         auto status = swWasUpdated.getStatus();
         if (!status.isOK()) {

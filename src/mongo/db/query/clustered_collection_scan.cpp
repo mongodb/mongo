@@ -169,11 +169,11 @@ void simplifyFilterInnerLegacy(std::unique_ptr<MatchExpression>& expr,
         // may be tightened here.
         BSONObjBuilder minb;
         minb.appendMinForType("", stdx::to_underlying(element.type()));
-        recordRange.maybeNarrowMin(minb.obj(), true /* inclusive */);
+        recordRange.maybeNarrowMin(minb.obj(), /*inclusive=*/true);
 
         BSONObjBuilder maxb;
         maxb.appendMaxForType("", stdx::to_underlying(element.type()));
-        recordRange.maybeNarrowMax(maxb.obj(), true /* inclusive */);
+        recordRange.maybeNarrowMax(maxb.obj(), /*inclusive=*/true);
     }
 
     bool compatible = compatibleCollator(ccCollator, queryCollator, element);
@@ -189,8 +189,8 @@ void simplifyFilterInnerLegacy(std::unique_ptr<MatchExpression>& expr,
     switch (match->matchType()) {
         case MType::EQ:
         case MType::INTERNAL_EXPR_EQ:
-            recordRange.maybeNarrowMin(collated, true /* inclusive */);
-            recordRange.maybeNarrowMax(collated, true /* inclusive */);
+            recordRange.maybeNarrowMin(collated, /*inclusive=*/true);
+            recordRange.maybeNarrowMax(collated, /*inclusive=*/true);
             break;
         case MType::LT:
         case MType::INTERNAL_EXPR_LT:
@@ -198,7 +198,7 @@ void simplifyFilterInnerLegacy(std::unique_ptr<MatchExpression>& expr,
             break;
         case MType::LTE:
         case MType::INTERNAL_EXPR_LTE:
-            recordRange.maybeNarrowMax(collated, true /* inclusive */);
+            recordRange.maybeNarrowMax(collated, /*inclusive=*/true);
             break;
         case MType::GT:
         case MType::INTERNAL_EXPR_GT:
@@ -206,7 +206,7 @@ void simplifyFilterInnerLegacy(std::unique_ptr<MatchExpression>& expr,
             break;
         case MType::GTE:
         case MType::INTERNAL_EXPR_GTE:
-            recordRange.maybeNarrowMin(collated, true /* inclusive */);
+            recordRange.maybeNarrowMin(collated, /*inclusive=*/true);
             break;
         default:
             // This expr is _not_ redundant, it could not be re-expressed via {min,max} record
