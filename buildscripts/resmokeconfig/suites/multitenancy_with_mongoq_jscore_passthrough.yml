@@ -7,6 +7,7 @@ selector:
   roots:
     - jstests/core/**/*.js
     - jstests/aggregation/**/*.js
+    - jstests/core/catalog/fcv_suite_selftest.js
   exclude_with_any_tags:
     # This passthrough uses the `simulate_mongoq` override, which some tests are incompatible with.
     - simulate_mongoq_incompatible

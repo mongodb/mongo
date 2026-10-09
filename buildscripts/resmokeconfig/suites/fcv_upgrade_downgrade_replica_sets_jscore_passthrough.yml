@@ -8,6 +8,7 @@ selector:
     - jstests/core/**/*.js
     - jstests/fle2/**/*.js
     - jstests/aggregation/**/*.js
+    - jstests/core/catalog/fcv_suite_selftest.js
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - featureFlagFLE2CleanupCommand

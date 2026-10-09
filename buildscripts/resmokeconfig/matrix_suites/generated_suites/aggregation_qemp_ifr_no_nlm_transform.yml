@@ -48,4 +48,5 @@ selector:
     - jstests/aggregation/data/*.js
   roots:
     - jstests/aggregation/**/*.js
+    - jstests/core/catalog/fcv_suite_selftest.js
 test_kind: js_test

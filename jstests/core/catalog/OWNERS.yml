@@ -3,3 +3,6 @@ filters:
   - "**/*":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog
+  - "fcv_suite_selftest.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology

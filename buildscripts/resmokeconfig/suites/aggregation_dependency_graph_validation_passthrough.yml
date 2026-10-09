@@ -12,6 +12,7 @@ test_kind: js_test
 selector:
   roots:
     - jstests/aggregation/**/*.js
+    - jstests/core/catalog/fcv_suite_selftest.js
   exclude_files:
     # Exclude helper and utility files that aren't actual tests
     - jstests/aggregation/extras/**/*.js

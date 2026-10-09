@@ -54,4 +54,5 @@ selector:
     - query_intensive_pbt
   roots:
     - jstests/aggregation/**/*.js
+    - jstests/core/catalog/fcv_suite_selftest.js
 test_kind: js_test

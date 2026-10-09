@@ -9,6 +9,7 @@ selector:
     - jstests/fle2/**/*.js
     - jstests/core_sharding/**/*.js
     - jstests/aggregation/**/*.js
+    - jstests/core/catalog/fcv_suite_selftest.js
 
   exclude_files:
     # The following tests fail because a certain command or functionality is not supported on

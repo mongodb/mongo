@@ -4,6 +4,7 @@ selector:
   roots:
     - jstests/sharding/**/*.js
     - jstests/aggregation/**/*.js
+    - jstests/core/catalog/fcv_suite_selftest.js
     - jstests/core/**/*.js
     - jstests/core_standalone/**/*.js
     - jstests/noPassthrough/**/*.js

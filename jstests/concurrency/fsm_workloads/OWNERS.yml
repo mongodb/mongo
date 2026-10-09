@@ -24,3 +24,6 @@ filters:
   - "random_moveChunk/random_moveChunk_constraint_validation.js":
     approvers:
       - 10gen/query-execution
+  - "fcv_suite_selftest.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology

@@ -96,4 +96,5 @@ selector:
     - requires_2_or_more_shards
   roots:
     - jstests/aggregation/**/*.js
+    - jstests/core/catalog/fcv_suite_selftest.js
 test_kind: js_test

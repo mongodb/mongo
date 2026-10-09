@@ -35,6 +35,7 @@
  */
 
 import {handleRandomSetFCVErrors} from "jstests/concurrency/fsm_workload_helpers/fcv/handle_setFCV_errors.js";
+import {getCurrentFCV} from "jstests/libs/feature_compatibility_version.js";
 import {setFCVWithRetryOnBackgroundOpInProgress} from "jstests/libs/set_fcv_helpers.js";
 
 export const $config = (function () {
@@ -128,7 +129,7 @@ export const $config = (function () {
                 // CannotDowngrade: a concurrent createIndex added a v4 2dsphere index between
                 // setFCV's first dry-run (which passed) and kPrepare's second dry-run. Not a
                 // bug. FCV may be left in a transitional downgrading state; teardown restores
-                // latestFCV.
+                // the original FCV.
                 if (e.code === ErrorCodes.CannotDowngrade) return;
                 // ConflictingOperationInProgress: the FCV command is blocked when a replica set
                 // is being added to the sharded cluster. Expected in config-transitions suites.
@@ -145,16 +146,18 @@ export const $config = (function () {
         setFCV: {createIndex: 0.5, dropIndex: 0.3, setFCV: 0.2},
     };
 
-    function setup(db, collName, cluster) {}
+    function setup(db, collName, cluster) {
+        this.originalFCV = getCurrentFCV(db);
+    }
 
     function teardown(db, collName, cluster) {
         // Drop all per-thread collections to remove any v4 2dsphere indexes that could block
         // the FCV restore. CannotDowngrade during the workload can leave FCV in a transitional
-        // downgrading state; clearing the blocking indexes lets the upgrade succeed.
+        // downgrading state; clearing the blocking indexes lets the FCV restore succeed.
         try {
             db.dropDatabase();
         } finally {
-            setFCVWithRetryOnBackgroundOpInProgress(db, latestFCV);
+            setFCVWithRetryOnBackgroundOpInProgress(db, this.originalFCV);
         }
     }
 

@@ -233,3 +233,6 @@ filters:
   - "mongos_unsharded_commands_interface_parity_with_replica_set.js":
     approvers:
       - 10gen/server-catalog-and-routing-ddl
+  - "fcv_suite_selftest.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology

@@ -247,4 +247,5 @@ selector:
     - jstests/core_sharding/**/*.js
     - jstests/fle2/**/*.js
     - jstests/aggregation/**/*.js
+    - jstests/core/catalog/fcv_suite_selftest.js
 test_kind: js_test
