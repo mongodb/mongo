@@ -23,6 +23,7 @@
 #include "mongo/db/query/stage_builder/stage_builder_util.h"
 #include "mongo/db/query/util/validate_id.h"
 #include "mongo/db/record_id_helpers.h"
+#include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/shard_role/shard_catalog/collection_uuid_mismatch.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/shard_role/shard_catalog/scoped_collection_metadata.h"
@@ -30,6 +31,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
 #include "mongo/util/timer.h"
 
 #include <string_view>
@@ -479,8 +481,27 @@ bool SbeSingleDocumentLookupExecutor::getOrMakeExecutor(OperationContext* opCtx,
         isExecutorInvalidated(
             coll, _preparedExecutor->collectionUUID, _preparedExecutor->collectionVersion)) {
         resetPlan();
-        auto cq =
-            buildCanonicalQuery(opCtx, nss, filter, coll.getCollectionPtr()->getDefaultCollator());
+
+        // If collection pointer is not defined, early exit as executor can not be made.
+        const auto& collPtr = coll.getCollectionPtr();
+        if (!collPtr) {
+            return false;
+        }
+
+        // A non-clustered collection is expected to always have its _id index. Its absence
+        // means something is wrong, decline.
+        const bool isClusteredOnId =
+            collPtr->isClustered() && clustered_util::isClusteredOnId(collPtr->getClusteredInfo());
+        if (!isClusteredOnId && !collPtr->getIndexCatalog()->haveIdIndex(opCtx)) {
+            LOGV2_DEBUG(13082301,
+                        1,
+                        "SbeSingleDocumentLookupExecutor: missing _id index on "
+                        "non-clustered collection, falling back",
+                        "nss"_attr = nss);
+            return false;
+        }
+
+        auto cq = buildCanonicalQuery(opCtx, nss, filter, collPtr->getDefaultCollator());
         if (!cq) {
             return false;
         }

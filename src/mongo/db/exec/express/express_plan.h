@@ -441,8 +441,10 @@ private:
                                                                    const Collection& collection) {
         const IndexCatalog* catalog = collection.getIndexCatalog();
         const auto entry = catalog->findIdIndex(opCtx);
-        tassert(8884401, "Missing _id index on non-clustered collection", entry);
 
+        // Throw QueryPlanKilled in case the index entry is missing.
+        uassert(
+            ErrorCodes::QueryPlanKilled, "Missing _id index on non-clustered collection", entry);
         return entry;
     }
 

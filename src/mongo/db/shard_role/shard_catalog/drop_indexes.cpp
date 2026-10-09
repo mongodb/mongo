@@ -69,6 +69,10 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangAfterAbortingIndexes);
 
+// Lifts the "cannot drop _id index" rejection in dropIndexByDescriptor() below, so tests can
+// produce a committed catalog state where a collection exists but has no _id index.
+MONGO_FAIL_POINT_DEFINE(allowDroppingIdIndexForTesting);
+
 // Field name in dropIndexes command for indexes to drop.
 constexpr auto kIndexFieldName = "index"sv;
 
@@ -225,7 +229,7 @@ Status dropIndexByDescriptor(OperationContext* opCtx,
                              Collection* collection,
                              IndexCatalog* indexCatalog,
                              IndexCatalogEntry* entry) {
-    if (entry->descriptor()->isIdIndex()) {
+    if (entry->descriptor()->isIdIndex() && !allowDroppingIdIndexForTesting.shouldFail()) {
         return Status(ErrorCodes::InvalidOptions, "cannot drop _id index");
     }
 

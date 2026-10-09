@@ -275,6 +275,8 @@ mongo_cc_library(
         "//src/mongo/db/query/stage_builder/sbe:stage_builder",
         # checkCollectionUUIDMismatch.
         "//src/mongo/db/shard_role",
+        # clustered_util::isClusteredOnId.
+        "//src/mongo/db/shard_role/shard_catalog:collection_options",
     ],
 )
 

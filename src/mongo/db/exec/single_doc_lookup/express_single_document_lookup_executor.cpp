@@ -29,7 +29,7 @@ using namespace std::literals::string_view_literals;
 
 /**
  * Build the Express PlanExecutor for an _id-equality lookup. Returns nullptr if the documentKey
- * carries no _id, the caller should treat this as kNotHandled.
+ * carries no _id, or if the collection is non-clustered and missing its _id index.
  */
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutor(
     OperationContext* opCtx,
@@ -37,6 +37,12 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutor(
     const CollectionAcquirer::Handle& coll,
     const Document& documentKey,
     bool shouldApplyShardFilter) {
+    // If collection pointer is not defined, early exit as executor can not be made.
+    const auto& collPtr = coll.getCollectionPtr();
+    if (!collPtr) {
+        return nullptr;
+    }
+
     const auto idFilter = makeIdEqualityFilter(documentKey);
     if (!idFilter) {
         LOGV2_DEBUG(12841302,
@@ -65,13 +71,24 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutor(
     }
 
     // The find command carries no collation, so adopt the collection's default collation.
-    const auto& collPtr = coll.getCollectionPtr();
-    if (cq->getCollator() == nullptr && collPtr && collPtr->getDefaultCollator()) {
+    if (cq->getCollator() == nullptr && collPtr->getDefaultCollator()) {
         cq->setCollator(collPtr->getDefaultCollator()->clone());
     }
 
-    const bool isClusteredOnId = collPtr && collPtr->isClustered() &&
-        clustered_util::isClusteredOnId(collPtr->getClusteredInfo());
+    const bool isClusteredOnId =
+        collPtr->isClustered() && clustered_util::isClusteredOnId(collPtr->getClusteredInfo());
+
+    // A non-clustered collection is expected to always have its _id index. Its absence means
+    // something is wrong, decline.
+    if (!isClusteredOnId && !collPtr->getIndexCatalog()->haveIdIndex(opCtx)) {
+        LOGV2_DEBUG(13082300,
+                    1,
+                    "ExpressSingleDocumentLookupExecutor: missing _id index on non-clustered "
+                    "collection, falling back",
+                    "nss"_attr = nss);
+        return nullptr;
+    }
+
     return isClusteredOnId ? makeExpressExecutorForFindByClusteredId(opCtx,
                                                                      std::move(cq),
                                                                      coll.collection(),

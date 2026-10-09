@@ -85,6 +85,8 @@ last-patch:
       ticket: SERVER-127745
     - test_file: jstests/sharding/query/change_streams/change_stream_update_lookup_uncataloged_db.js
       ticket: SERVER-134952
+    - test_file: jstests/sharding/query/change_streams/express_id_lookup_missing_index_race.js
+      ticket: SERVER-130823
     - test_file: jstests/sharding/timeseries/timeseries_bucket_untracked_premature_optimization.js
       ticket: SERVER-126814
     - test_file: jstests/sharding/txn_prepared_participant_unauthorized_commit_abort.js
@@ -218,6 +220,8 @@ last-continuous:
       ticket: SERVER-135656
     - test_file: jstests/sharding/query/change_streams/change_stream_v2_topology_stage_state_transitions_ignore_removed_shards_database.js
       ticket: SERVER-135656
+    - test_file: jstests/sharding/query/change_streams/express_id_lookup_missing_index_race.js
+      ticket: SERVER-130823
     - test_file: jstests/sharding/query/search/internal_search_id_lookup_ddl_concurrency.js
       ticket: SERVER-134581
     - test_file: jstests/sharding/query/search/internal_search_id_lookup_ddl_concurrency.js
@@ -367,6 +371,8 @@ last-lts:
       ticket: SERVER-135656
     - test_file: jstests/sharding/query/change_streams/change_stream_v2_topology_stage_state_transitions_ignore_removed_shards_database.js
       ticket: SERVER-135656
+    - test_file: jstests/sharding/query/change_streams/express_id_lookup_missing_index_race.js
+      ticket: SERVER-130823
     - test_file: jstests/sharding/query/search/internal_search_id_lookup_ddl_concurrency.js
       ticket: SERVER-134581
     - test_file: jstests/sharding/query/search/internal_search_id_lookup_ddl_concurrency.js

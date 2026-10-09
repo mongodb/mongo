@@ -139,6 +139,22 @@ protected:
         wuow.commit();
     }
 
+    void dropIdIndex() {
+        auto coll = acquireCollection(
+            operationContext(),
+            CollectionAcquisitionRequest::fromOpCtx(
+                operationContext(), kNss, AcquisitionPrerequisites::OperationType::kWrite),
+            MODE_X);
+        WriteUnitOfWork wuow(operationContext());
+        CollectionWriter writer{operationContext(), &coll};
+        auto* indexCatalog = writer.getWritableCollection(operationContext())->getIndexCatalog();
+        auto* entry = indexCatalog->getWritableEntryByName(operationContext(), "_id_");
+        ASSERT(entry);
+        ASSERT_OK(indexCatalog->dropIndexEntry(
+            operationContext(), writer.getWritableCollection(operationContext()), entry));
+        wuow.commit();
+    }
+
     void insertDocuments(std::vector<BSONObj> docs) {
         auto coll = acquireCollection(
             operationContext(),
@@ -646,6 +662,18 @@ TEST_F(SbeSingleDocumentLookupExecutorTest, RegularCollectionUsesIndexScan) {
     ASSERT_FALSE(contains(types, "scan"))
         << "Plan must not contain a record-store scan on a non-clustered collection: "
         << joinStageTypes(types);
+}
+
+// A non-clustered collection missing its _id index must not plan a collection scan: the strategy
+// declines so the caller's aggregation fallback resolves it instead.
+TEST_F(SbeSingleDocumentLookupExecutorTest, MissingIdIndexOnNonClusteredCollectionIsNotHandled) {
+    createCollection();
+    insertDocuments({fromjson("{_id: 1, x: 'a'}")});
+    dropIdIndex();
+
+    auto strategy = makeStrategy();
+    auto result = lookup(&strategy, fromjson("{_id: 1}"));
+    ASSERT_EQ(result.status, LookupResult::HandledStatus::kNotHandled);
 }
 
 // On a clustered collection the planner emits a bounded STAGE_COLLSCAN. SBE compiles that to a
