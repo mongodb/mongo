@@ -152,7 +152,7 @@ BaseCloner::AfterStageBehavior AllDatabaseCloner::listDatabasesStage() {
         BSONObj(),
         true /* nameOnly */,
         false /*authorizedDatabases*/,
-        multiTenancyAndRequireTenantIdEnabled /*useListDatabsesForAllTenants*/);
+        /*useListDatabasesForAllTenants=*/multiTenancyAndRequireTenantIdEnabled);
 
     size_t idxToInsertNextAdmin = 0;
     for (const auto& dbBSON : databasesArray) {

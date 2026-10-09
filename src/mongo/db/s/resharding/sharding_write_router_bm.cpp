@@ -141,7 +141,7 @@ protected:
             _shardVersion.emplace(ShardVersionFactory::make(chunkManager, originatorShard));
 
             OperationShardingState::setShardRole(
-                opCtx, kNss, _shardVersion, boost::none /* databaseVersion */);
+                opCtx, kNss, _shardVersion, /*dbVersion=*/boost::none);
 
             // Install filtering metadata so that getCollectionDescription reports a sharded
             // collection with a routing table. The resharding key and temp namespace are
@@ -274,7 +274,7 @@ BENCHMARK_DEFINE_F(ShardingWriteRouterTestFixture, BM_InsertGetDestinedRecipient
         const auto opCtx = client->makeOperationContext();
 
         OperationShardingState::setShardRole(
-            opCtx.get(), kNss, _shardVersion, boost::none /* databaseVersion */);
+            opCtx.get(), kNss, _shardVersion, /*dbVersion=*/boost::none);
 
         Lock::DBLock dbLock{opCtx.get(), kNss.dbName(), MODE_IX};
         Lock::CollectionLock collLock{opCtx.get(), kNss, MODE_IX};
@@ -297,7 +297,7 @@ BENCHMARK_DEFINE_F(ShardingWriteRouterTestFixture, BM_UpdateGetDestinedRecipient
         const auto opCtx = client->makeOperationContext();
 
         OperationShardingState::setShardRole(
-            opCtx.get(), kNss, _shardVersion, boost::none /* databaseVersion */);
+            opCtx.get(), kNss, _shardVersion, /*dbVersion=*/boost::none);
 
         Lock::DBLock dbLock{opCtx.get(), kNss.dbName(), MODE_IX};
         Lock::CollectionLock collLock{opCtx.get(), kNss, MODE_IX};

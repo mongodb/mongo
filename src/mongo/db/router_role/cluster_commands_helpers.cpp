@@ -607,7 +607,7 @@ std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRouting
                                                      nss,
                                                      routingCtx.getCollectionRoutingInfo(nss),
                                                      collation,
-                                                     boost::none /*explainVerbosity*/,
+                                                     /*verbosity=*/boost::none,
                                                      letParameters,
                                                      runtimeConstants);
     return scatterGatherVersionedTargetByRoutingTable(expCtx,
@@ -712,7 +712,7 @@ AsyncRequestsSender::Response executeCommandAgainstShardWithMinKeyChunk(
                                                                nss,
                                                                cri,
                                                                BSONObj() /*collation*/,
-                                                               boost::none /*explainVerbosity*/,
+                                                               /*verbosity=*/boost::none,
                                                                boost::none /*letParameters*/,
                                                                boost::none /*runtimeConstants*/);
 
@@ -908,7 +908,7 @@ std::vector<AsyncRequestsSender::Request> getVersionedRequestsForTargetedShards(
                                                                nss,
                                                                cri,
                                                                collation,
-                                                               boost::none /*explainVerbosity*/,
+                                                               /*verbosity=*/boost::none,
                                                                letParameters,
                                                                runtimeConstants);
     return buildVersionedRequestsForTargetedShards(

@@ -144,7 +144,7 @@ void FaultManager::_healthMonitoringIntensitiesUpdatedImpl(HealthObserverIntensi
                 // off -> {critical, non-critical}
                 if (auto* observer = _getHealthObserver(toFaultFacetType(setting.getType()));
                     observer != nullptr) {
-                    scheduleNextHealthCheck(observer, cancellationToken, true /* immediate */);
+                    scheduleNextHealthCheck(observer, cancellationToken, /*immediately=*/true);
                 }
             } else if (newIntensity == HealthObserverIntensityEnum::kOff) {
                 // {critical, non-critical} -> off
@@ -421,7 +421,7 @@ void FaultManager::schedulePeriodicHealthCheckThread() {
             setState(FaultState::kActiveFault, HealthCheckStatus(observer->getType()));
             return;
         }
-        scheduleNextHealthCheck(observer, token, true /* immediate */);
+        scheduleNextHealthCheck(observer, token, /*immediately=*/true);
     }
     LOGV2(5936804, "Health observers started", "detail"_attr = listOfActiveObservers);
 }
@@ -599,7 +599,7 @@ void FaultManager::healthCheck(HealthObserver* observer, CancellationToken token
                 }
                 if (!_config->periodicChecksDisabledForTests() &&
                     _config->isHealthObserverEnabled(observer->getType())) {
-                    scheduleNextHealthCheck(observer, token, false /* immediate */);
+                    scheduleNextHealthCheck(observer, token, /*immediately=*/false);
                 }
             });
 

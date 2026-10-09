@@ -315,7 +315,7 @@ TEST_F(DocumentSourceUnionWithTest, RejectsUserSuppliedIsHybridSearchWhenExtensi
 
     // A client with a transport session and no internal tag is an external (user) client.
     auto client = getServiceContext()->getService()->makeClient(
-        "external", transport::MockSession::create(/*transportLayer=*/nullptr));
+        "external", transport::MockSession::create(/*tl=*/nullptr));
     auto opCtx = client->makeOperationContext();
     auto expCtx = ExpressionContextBuilder{}
                       .opCtx(opCtx.get())

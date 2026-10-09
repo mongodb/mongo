@@ -95,7 +95,7 @@ CountScan::CountScan(ExpressionContext* expCtx,
     // endKey must be after startKey in index order since we only do forward scans.
     dassert(_startKey.woCompare(_endKey,
                                 Ordering::make(_keyPattern),
-                                /*compareFieldNames*/ false) <= 0);
+                                /*rules=*/false) <= 0);
 }
 
 PlanStage::StageState CountScan::doWork(WorkingSetID* out) {

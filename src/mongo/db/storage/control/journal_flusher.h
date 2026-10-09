@@ -43,7 +43,7 @@ public:
      * instead).
      */
     explicit JournalFlusher(bool disablePeriodicFlushes)
-        : BackgroundJob(/*deleteSelf*/ false), _disablePeriodicFlushes(disablePeriodicFlushes) {}
+        : BackgroundJob(/*selfDelete=*/false), _disablePeriodicFlushes(disablePeriodicFlushes) {}
 
     static JournalFlusher* get(ServiceContext* serviceCtx);
     static JournalFlusher* get(OperationContext* opCtx);

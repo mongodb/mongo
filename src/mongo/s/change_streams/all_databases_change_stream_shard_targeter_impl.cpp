@@ -25,7 +25,7 @@ ShardTargeterDecision AllDatabasesChangeStreamShardTargeterImpl::initialize(
                                      context.getChangeStream().getNamespace(),
                                      atClusterTime,
                                      false /* checkIfPointInTimeIsInFuture */,
-                                     false /* ignoreRemovedShardsMode */);
+                                     /*ignoreRemovedShards=*/false);
     if (placement.getStatus() == HistoricalPlacementStatus::NotAvailable) {
         return ShardTargeterDecision::kSwitchToV1;
     }
@@ -83,7 +83,7 @@ AllDatabasesChangeStreamShardTargeterImpl::startChangeStreamSegment(
                                      context.getChangeStream().getNamespace(),
                                      atClusterTime,
                                      false /* checkIfPointInTimeIsInFuture */,
-                                     true /* ignoreRemovedShardsMode */);
+                                     /*ignoreRemovedShards=*/true);
     if (placement.getStatus() == HistoricalPlacementStatus::NotAvailable) {
         return std::make_pair(ShardTargeterDecision::kSwitchToV1,
                               boost::optional<Timestamp>(boost::none));

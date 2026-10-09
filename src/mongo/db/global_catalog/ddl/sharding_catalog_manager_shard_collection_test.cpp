@@ -91,7 +91,7 @@ TEST_F(CreateFirstChunksTest, NonEmptyCollection_NoZones_OneChunkToPrimary) {
         CollectionCatalog::write(getServiceContext(), [&](CollectionCatalog& catalog) {
             catalog.registerCollection(operationContext(),
                                        std::make_shared<CollectionMock>(uuid, kNamespace),
-                                       /*ts=*/boost::none);
+                                       /*commitTime=*/boost::none);
         });
     }
 
@@ -108,7 +108,7 @@ TEST_F(CreateFirstChunksTest, NonEmptyCollection_NoZones_OneChunkToPrimary) {
                                                  {}, /* tags */
                                                  3 /* numShards */,
                                                  false /* collectionIsEmpty */,
-                                                 false /* unsplittable */,
+                                                 /*isUnsplittable=*/false,
                                                  boost::none /* dataShard */);
         return optimization->createFirstChunks(
             opCtx.get(), kShardKeyPattern, {uuid, ShardId("shard1")});
@@ -140,7 +140,7 @@ TEST_F(CreateFirstChunksTest, NonEmptyCollection_WithZones_OneChunkToPrimary) {
                                              std::move(zones),
                                              3 /* numShards */,
                                              collectionIsEmpty,
-                                             false /* unsplittable */,
+                                             /*isUnsplittable=*/false,
                                              boost::none /* dataShard */);
 
     const auto firstChunks = optimization->createFirstChunks(
@@ -221,7 +221,7 @@ TEST_F(CreateFirstChunksTest, Unsplittable_OneChunkToPrimary) {
                                                  {} /* tags */,
                                                  3 /* numShards */,
                                                  true /*collectionIsEmpty*/,
-                                                 true /* unsplittable */,
+                                                 /*isUnsplittable=*/true,
                                                  boost::none /* dataShard */);
 
         return optimization->createFirstChunks(
@@ -253,7 +253,7 @@ TEST_F(CreateFirstChunksTest, EmptyCollection_WithZones_ManyChunksOnFirstZoneSha
                                              std::move(zones),
                                              3 /* numShards */,
                                              collectionIsEmpty,
-                                             false /* unsplittable */,
+                                             /*isUnsplittable=*/false,
                                              boost::none /* dataShard */);
 
     const auto firstChunks = optimization->createFirstChunks(

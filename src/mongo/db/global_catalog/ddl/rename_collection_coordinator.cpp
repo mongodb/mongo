@@ -672,7 +672,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     const auto optTargetCollType =
                         sharding_ddl_util::getCollectionFromConfigServer(opCtx, toNss);
                     _doc.setTargetUUID(getCollectionUUID(
-                        opCtx, toNss, optTargetCollType, /*throwNotFound*/ false));
+                        opCtx, toNss, optTargetCollType, /*throwOnNotFound=*/false));
 
                     checkDatabaseRestrictions(opCtx, fromNss, optSourceCollType, toNss);
 

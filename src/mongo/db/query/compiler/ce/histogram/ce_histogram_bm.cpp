@@ -18,14 +18,14 @@ void BM_CreateHistogram(benchmark::State& state) {
     CollectionFieldConfiguration field(
         /*fieldName*/ "a",
         /*fieldPositionInCollection*/ 0,
-        /*dataType*/ dataType,
+        /*fieldDataType=*/dataType,
         /*ndv*/ ndv,
         /*dataDistribution*/ static_cast<stats::DistrType>(state.range(2)),
         /*seed*/ seed);
 
     DataConfiguration dataConfig(
         /*size*/ static_cast<int>(state.range(1)),
-        /*dataFieldConfig*/ {field});
+        /*allDataFieldConfig=*/{field});
 
     auto numberOfBuckets = static_cast<int>(state.range(0));
 
@@ -47,14 +47,14 @@ void BM_RunHistogramEstimations(benchmark::State& state) {
     CollectionFieldConfiguration field(
         /*fieldName*/ "a",
         /*fieldPositionInCollection*/ 0,
-        /*dataType*/ dataType,
+        /*fieldDataType=*/dataType,
         /*ndv*/ ndv,
         /*dataDistribution*/ static_cast<stats::DistrType>(state.range(2)),
         /*seed*/ seed);
 
     DataConfiguration dataConfig(
         /*size*/ static_cast<int>(state.range(1)),
-        /*dataFieldConfig*/ {field});
+        /*allDataFieldConfig=*/{field});
 
     std::vector<std::vector<stats::SBEValue>> data;
     generateDataBasedOnConfig(dataConfig, data);
@@ -72,7 +72,7 @@ void BM_RunHistogramEstimations(benchmark::State& state) {
     QueryConfiguration queryConfig(
         {DataFieldDefinition(
             /*fieldName*/ "a",
-            /*fieldType*/ typeQuery,
+            /*fieldDataType=*/typeQuery,
             /*ndv*/ ndv,
             /*dataDistribution*/ static_cast<stats::DistrType>(state.range(2)),
             /*seed (optional)*/ {seed, seed2})},

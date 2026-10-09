@@ -405,7 +405,7 @@ void TextOrStage::doForceSpill() {
     _sorter->spill();
 
     auto spilledDataStorageIncrease =
-        _specificStats.spillingStats.updateSpillingStats(1 /*spills*/,
+        _specificStats.spillingStats.updateSpillingStats(/*additionalSpills=*/1,
                                                          _memoryTracker.inUseTrackedMemoryBytes(),
                                                          recordsToSpill,
                                                          _sorterStats->bytesSpilled());

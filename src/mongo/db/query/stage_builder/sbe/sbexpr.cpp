@@ -98,7 +98,7 @@ TypeSignature constantFold(abt::ABT& abt, StageBuilderState& state, const Variab
     auto& runtimeEnv = *state.env;
 
     // Do not use descriptive names here.
-    auto prefixId = PrefixId::create(false /*useDescriptiveNames*/);
+    auto prefixId = PrefixId::create(/*useDescriptiveVarNames=*/false);
 
     const CollatorInterface* collator = nullptr;
     boost::optional<SlotId> collatorSlot = state.getCollatorSlot();

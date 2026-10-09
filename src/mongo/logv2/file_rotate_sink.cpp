@@ -215,7 +215,7 @@ void FileRotateSink::consume(const boost::log::record_view& rec,
                         "Writing to log file failed, aborting application",
                         TypeErasedAttributeStorage(attrs),
                         LogTag::kNone,
-                        std::string() /* tenantID */,
+                        /*tenant=*/std::string(),
                         LogTruncation::Disabled);
             // Commented out log line below to get validation of the log id with the errorcodes
             // linter LOGV2(4522200, "Writing to log file failed, aborting application");

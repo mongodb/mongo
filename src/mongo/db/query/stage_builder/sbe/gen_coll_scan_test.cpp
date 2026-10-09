@@ -296,7 +296,7 @@ TEST_F(GenCollScanTest, GenericScanFilterFieldsAreExposedAsSlots) {
 
     // 'a' is referenced only by the filter, not by the requested fields (which are empty here).
     auto [stage, slots] =
-        stage_builder::generateCollScan(builderState, collection, csn.get(), {} /* fields */);
+        stage_builder::generateCollScan(builderState, collection, csn.get(), /*scanFieldNames=*/{});
 
     ASSERT((dynamic_cast<FilterStage<false, false>*>(stage.get())));
     ASSERT_TRUE(

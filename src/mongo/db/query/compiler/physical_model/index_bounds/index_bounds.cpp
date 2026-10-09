@@ -280,7 +280,7 @@ void OrderedIntervalList::complement() {
     // We will build up a list of intervals that represents the inversion of those in the OIL.
     vector<Interval> newIntervals;
     for (const auto& curInt : intervals) {
-        if ((0 != curInt.start.woCompare(curBoundary, /*compareFieldNames*/ false) ||
+        if ((0 != curInt.start.woCompare(curBoundary, /*rules=*/false) ||
              (!curInclusive && !curInt.startInclusive))) {
             // Make a new interval from 'curBoundary' to the start of 'curInterval'.
             BSONObjBuilder intBob;
@@ -300,7 +300,7 @@ void OrderedIntervalList::complement() {
     maxBob.appendMaxKey("");
     BSONObj maxObj = maxBob.obj();
     BSONElement maxKey = maxObj.firstElement();
-    if (0 != maxKey.woCompare(curBoundary, /*compareFieldNames*/ false) || !curInclusive) {
+    if (0 != maxKey.woCompare(curBoundary, /*rules=*/false) || !curInclusive) {
         BSONObjBuilder intBob;
         intBob.append(curBoundary);
         intBob.append(maxKey);

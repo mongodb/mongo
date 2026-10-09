@@ -121,7 +121,7 @@ void SessionsCollectionConfigServer::_generateIndexesIfNeeded(OperationContext* 
             // the sessions collection as sharded, guaranteeing the retrieval of a
             // valid routing table.
             uassert(StaleConfigInfo(nss,
-                                    cri.getCollectionVersion() /* receivedVersion */,
+                                    /*received=*/cri.getCollectionVersion(),
                                     /*wanted=*/ShardVersion::UNTRACKED(),
                                     ShardingState::get(opCtx)->shardId()),
                     str::stream() << "Collection " << nss.toStringForErrorMsg()

@@ -730,7 +730,7 @@ void BucketCatalogTest::_testBuildBatchedInsertContextWithoutMetaField(
                                               bucketsColl->getTimeseriesOptions().get(),
                                               userMeasurementsBatch,
                                               /*startIndex=*/0,
-                                              /*numDocsToStage=*/userMeasurementsBatch.size(),
+                                              /*numDocs=*/userMeasurementsBatch.size(),
                                               /*indices=*/{},
                                               stats,
                                               trackingContext,

@@ -967,16 +967,16 @@ CEResult CardinalityEstimator::estimateConjWithHistogram(
 
     // At this point, we know that 'path' is non-multikey, so we can safely build an interval for
     // each conjunct and intersect them.
-    IndexEntry fakeIndex(BSON(path << "1") /* keyPattern */,
+    IndexEntry fakeIndex(/*kp=*/BSON(path << "1"),
                          INDEX_BTREE,
                          IndexDescriptor::IndexVersion::kV2,
-                         false /* multikey */,
-                         {} /* multikeyPaths */,
+                         /*mk=*/false,
+                         /*mkp=*/{},
                          {} /* multikeyPathSet */,
-                         false /* sparse */,
-                         false /* unique */,
+                         /*sp=*/false,
+                         /*unq=*/false,
                          CoreIndexInfo::Identifier("idx"),
-                         BSONObj::kEmptyObject /* infoObj */,
+                         /*io=*/BSONObj::kEmptyObject,
                          nullptr /* wildcardProjection */);
     OrderedIntervalList oil;
     IndexBoundsBuilder::allValuesForField(fakeIndex.keyPattern.firstElement(), &oil);

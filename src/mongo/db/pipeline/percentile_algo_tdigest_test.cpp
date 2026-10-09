@@ -158,7 +158,7 @@ TEST(TDigestTest, GetPercentile_SingleCentroid_SinglePoint) {
                    42.0,  // min
                    42.0,  // max
                    {{1, 42.0}},
-                   nullptr /* k1_limit */,
+                   /*k_limit=*/nullptr,
                    1 /* delta */);
     ASSERT_EQ(42.0, digest.computePercentile(0.1));
     ASSERT_EQ(42.0, digest.computePercentile(0.5));
@@ -172,7 +172,7 @@ TEST(TDigestTest, GetPercentile_SingleCentroid_Min) {
                    1.0,  // min
                    5.0,  // max
                    {{10, 3.7}},
-                   nullptr /* k1_limit */,
+                   /*k_limit=*/nullptr,
                    1 /* delta */);
     ASSERT_EQ(1.0, digest.computePercentile(0));
 }
@@ -184,7 +184,7 @@ TEST(TDigestTest, GetPercentile_SingleCentroid_Max) {
                    1.0,  // min
                    5.0,  // max
                    {{10, 3.7}},
-                   nullptr /* k1_limit */,
+                   /*k_limit=*/nullptr,
                    1 /* delta */);
     ASSERT_EQ(5.0, digest.computePercentile(1));
 }
@@ -199,7 +199,7 @@ TEST(TDigestTest, GetPercentile_SingleCentroid_EvenlyDistributed) {
                    1.0,                         // min
                    100.0,                       // max
                    {{100, (1.0 + 100.0) / 2}},  // the single centroid
-                   nullptr /* k1_limit */,
+                   /*k_limit=*/nullptr,
                    1 /* delta */);
 
     for (int i = 1; i < 10; ++i) {
@@ -263,7 +263,7 @@ TEST(TDigestTest, GetPercentile_SinglePointCentroids) {
                        {1, 900.0},
                        {1, 10000.0},
                    },  // 100 datapoints total
-                   nullptr /* k1_limit */,
+                   /*k_limit=*/nullptr,
                    1 /* delta */);
 
     ASSERT_EQ(2.0, digest.computePercentile(0.02));
@@ -972,14 +972,14 @@ TEST(TDigestTest, Duplicates_uniform_mid) {
                                 "Uniform distribution with clustered dupes mid (10'000x10)");
 
     runTestWithDuplicatesInData(generateUniform,
-                                1000 /* nUnique*/,
+                                /*n=*/1000,
                                 100 /* dupes */,
                                 false /* keepDupesTogether*/,
                                 percentiles,
                                 0.01 /* accuracy */,
                                 "Uniform distribution with shuffled dupes mid (1000x100)");
     runTestWithDuplicatesInData(generateUniform,
-                                1000 /* nUnique*/,
+                                /*n=*/1000,
                                 100 /* dupes */,
                                 true /* keepDupesTogether*/,
                                 percentiles,
@@ -1006,14 +1006,14 @@ TEST(TDigestTest, Duplicates_uniform_extr) {
                                 "Uniform distribution with clustered dupes extr (10'000x10)");
 
     runTestWithDuplicatesInData(generateUniform,
-                                1000 /* nUnique*/,
+                                /*n=*/1000,
                                 100 /* dupes */,
                                 false /* keepDupesTogether*/,
                                 percentiles,
                                 0.005 /* accuracy */,
                                 "Uniform distribution with shuffled dupes extr (1000x100)");
     runTestWithDuplicatesInData(generateUniform,
-                                1000 /* nUnique*/,
+                                /*n=*/1000,
                                 100 /* dupes */,
                                 true /* keepDupesTogether*/,
                                 percentiles,
@@ -1039,7 +1039,7 @@ TEST(TDigestTest, Duplicates_all) {
         inputs,
         digest,
         {0.0001, 0.001, 0.01, 0.1, 0.2, 0.5, 0.8, 0.9, 0.99, 0.999, 0.9999} /* percentiles */,
-        0.0 /* accuracy */,
+        /*accuracyError=*/0.0,
         "All duplicates mid");
 }
 
@@ -1066,12 +1066,12 @@ TEST(TDigestTest, Duplicates_two_clusters) {
     assertExpectedAccuracy(sorted,
                            digest,
                            {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9} /* percentiles */,
-                           0.01 /* accuracy */,
+                           /*accuracyError=*/0.01,
                            "Duplicates two clusters mid");
     assertExpectedAccuracy(sorted,
                            digest,
                            {0.0001, 0.001, 0.01, 0.99, 0.999, 0.9999} /* percentiles */,
-                           0.005 /* accuracy */,
+                           /*accuracyError=*/0.005,
                            "Duplicates two clusters extr");
 }
 

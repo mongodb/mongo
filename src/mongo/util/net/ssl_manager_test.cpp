@@ -715,7 +715,7 @@ TEST(SSLManager, RotateCertificatesFromFile) {
     params.sslClusterFile = "jstests/libs/client.pem";
 
     std::shared_ptr<SSLManagerInterface> manager =
-        SSLManagerInterface::create(params, true /* isSSLServer */);
+        SSLManagerInterface::create(params, /*isServer=*/true);
 
     auto options = [] {
         ServerGlobalParams params;
@@ -737,7 +737,7 @@ TEST(SSLManager, InitContextFromFileShouldFail) {
 #if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
     ASSERT_THROWS_CODE(
         [&params] {
-            SSLManagerInterface::create(params, true /* isSSLServer */);
+            SSLManagerInterface::create(params, /*isServer=*/true);
         }(),
         DBException,
         ErrorCodes::InvalidSSLConfiguration);
@@ -752,7 +752,7 @@ TEST(SSLManager, RotateClusterCertificatesFromFile) {
     params.sslClusterFile = "jstests/libs/client.pem";
 
     std::shared_ptr<SSLManagerInterface> manager =
-        SSLManagerInterface::create(params, false /* isSSLServer */);
+        SSLManagerInterface::create(params, /*isServer=*/false);
 
     auto options = [] {
         ServerGlobalParams params;
@@ -773,7 +773,7 @@ TEST(SSLManager, InitContextFromFile) {
     params.sslClusterFile = "jstests/libs/client.pem";
 
     std::shared_ptr<SSLManagerInterface> manager =
-        SSLManagerInterface::create(params, false /* isSSLServer */);
+        SSLManagerInterface::create(params, /*isServer=*/false);
 
     auto egress = std::make_unique<asio::ssl::context>(asio::ssl::context::sslv23);
     uassertStatusOK(manager->initSSLContext(
@@ -792,7 +792,7 @@ TEST(SSLManager, InitContextFromMemory) {
     TransientSSLParams transientParams(clusterConnection);
 
     std::shared_ptr<SSLManagerInterface> manager =
-        SSLManagerInterface::create(params, transientParams, false /* isSSLServer */);
+        SSLManagerInterface::create(params, transientParams, /*isServer=*/false);
 
     auto egress = std::make_unique<asio::ssl::context>(asio::ssl::context::sslv23);
     uassertStatusOK(manager->initSSLContext(
@@ -813,7 +813,7 @@ TEST(SSLManager, IgnoreInitServerSideContextFromMemory) {
     TransientSSLParams transientParams(clusterConnection);
 
     std::shared_ptr<SSLManagerInterface> manager =
-        SSLManagerInterface::create(params, transientParams, true /* isSSLServer */);
+        SSLManagerInterface::create(params, transientParams, /*isServer=*/true);
 
     auto egress = std::make_unique<asio::ssl::context>(asio::ssl::context::sslv23);
     uassertStatusOK(manager->initSSLContext(
@@ -931,7 +931,7 @@ TEST(SSLManager, TransientSSLParamsStressTestWithManager) {
             Timer timer;
             while (timer.elapsed() < Seconds(3)) {
                 std::shared_ptr<SSLManagerInterface> manager =
-                    SSLManagerInterface::create(params, transientParams, true /* isSSLServer */);
+                    SSLManagerInterface::create(params, transientParams, /*isServer=*/true);
 
                 auto egress = std::make_unique<asio::ssl::context>(asio::ssl::context::sslv23);
                 invariant(
@@ -1162,7 +1162,7 @@ TEST(SSLManager, OpenSSLDecryptBadPEMKey) {
     params.sslCAFile = "jstests/libs/ca.pem";
 
     std::shared_ptr<SSLManagerInterface> manager =
-        SSLManagerInterface::create(params, true /* isSSLServer */);
+        SSLManagerInterface::create(params, /*isServer=*/true);
 
     auto sw = manager->decryptPEMKey("badPEMContents"sv, "password"sv);
     ASSERT_NOT_OK(sw.getStatus());
@@ -1176,7 +1176,7 @@ TEST(SSLManager, OpenSSLDecryptPEMKeyEmbeddedNullInPasswordNotAllowed) {
     params.sslCAFile = "jstests/libs/ca.pem";
 
     std::shared_ptr<SSLManagerInterface> manager =
-        SSLManagerInterface::create(params, true /* isSSLServer */);
+        SSLManagerInterface::create(params, /*isServer=*/true);
 
     ASSERT_THROWS_CODE(
         manager->decryptPEMKey("whatever"sv, "password\0extrastuff"sv), DBException, 9527900);
@@ -1193,7 +1193,7 @@ TEST(SSLManager, OpenSSLDecryptPEMKeyPasswordWithoutNulTermination) {
     std::string_view password = fullStr.substr(0, 6);  // no null termination
 
     std::shared_ptr<SSLManagerInterface> manager =
-        SSLManagerInterface::create(params, true /* isSSLServer */);
+        SSLManagerInterface::create(params, /*isServer=*/true);
 
     ASSERT_OK(manager->decryptPEMKey(pemContents, password));
 }
@@ -1208,7 +1208,7 @@ TEST(SSLManager, OpenSSLDecryptPEMKeyEmptyPasswordShouldFail) {
     auto password = ""sv;
 
     std::shared_ptr<SSLManagerInterface> manager =
-        SSLManagerInterface::create(params, true /* isSSLServer */);
+        SSLManagerInterface::create(params, /*isServer=*/true);
 
     auto sw = manager->decryptPEMKey(pemContents, password);
     ASSERT_NOT_OK(sw.getStatus());
@@ -1245,8 +1245,8 @@ TEST(SSLManager, CheckCertificateInTransientManager) {
     params.sslPEMKeyFile = "jstests/libs/client.pem";
 
     std::shared_ptr<SSLManagerInterface> manager;
-    ASSERT_DOES_NOT_THROW(
-        manager = SSLManagerInterface::create(params, boost::none, false /* isSSLServer */));
+    ASSERT_DOES_NOT_THROW(manager =
+                              SSLManagerInterface::create(params, boost::none, /*isServer=*/false));
 
     auto sslinfo = manager->getSSLConfiguration();
     // Manager should have client cert as client.pem
@@ -1263,7 +1263,7 @@ TEST(SSLManager, CheckCertificateInTransientManager) {
 
     TransientSSLParams transientParams(tlsCredentials);
 
-    manager = SSLManagerInterface::create(params, transientParams, false /* isSSLServer */);
+    manager = SSLManagerInterface::create(params, transientParams, /*isServer=*/false);
 
     // Manager should have trustdclient cert as trusted-client.pem
     sslinfo = manager->getSSLConfiguration();

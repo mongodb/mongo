@@ -24,7 +24,7 @@
 namespace mongo {
 
 VectorClockTestFixture::VectorClockTestFixture()
-    : ShardingMongoDTestFixture(Options{}.useMockClock(true), false /* setUpMajorityReads */) {}
+    : ShardingMongoDTestFixture(Options{}.useMockClock(true), /*allowMajorityReads=*/false) {}
 
 VectorClockTestFixture::~VectorClockTestFixture() = default;
 

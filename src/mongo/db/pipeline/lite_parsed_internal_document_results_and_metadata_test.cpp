@@ -59,14 +59,15 @@ TEST_F(LiteParsedInternalDocumentResultsAndMetadataTest,
        RequiredPrivilegesEmptyForDocumentsSource) {
     auto spec = fromjson(R"({$_internalDocumentResultsAndMetadata: {source: {$documents: []}}})");
     auto lp = parse(spec);
-    ASSERT_EQ(lp->requiredPrivileges(false /*isMongos*/, false /*bypass*/).size(), 0u);
+    ASSERT_EQ(lp->requiredPrivileges(false /*isMongos*/, /*bypassDocumentValidation=*/false).size(),
+              0u);
 }
 
 TEST_F(LiteParsedInternalDocumentResultsAndMetadataTest,
        RequiredPrivilegesForwardsFromNestedSource) {
     auto spec = fromjson(R"({$_internalDocumentResultsAndMetadata: {source: {$collStats: {}}}})");
     auto lp = parse(spec);
-    auto privs = lp->requiredPrivileges(false /*isMongos*/, false /*bypass*/);
+    auto privs = lp->requiredPrivileges(false /*isMongos*/, /*bypassDocumentValidation=*/false);
     ASSERT_EQ(privs.size(), 1u);
     ASSERT_TRUE(privs[0].getActions().contains(ActionType::collStats));
     ASSERT_EQ(privs[0].getResourcePattern(),

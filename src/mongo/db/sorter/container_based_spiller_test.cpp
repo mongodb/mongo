@@ -115,7 +115,7 @@ TEST(ContainerIteratorTest, Iterate) {
                                                        containerKey1,
                                                        containerKey5 + 1,
                                                        Iterator<IntWrapper, IntWrapper>::Settings{},
-                                                       /*_checksumCalculator=*/3272515249,
+                                                       /*checksum=*/3272515249,
                                                        sorter::kLatestChecksumVersion};
 
     // Before iteration starts, getRange() reports no current position.
@@ -262,14 +262,14 @@ TEST(ContainerIteratorTest, MultipleCursors) {
         containerKey1,
         containerKey2 + 1,
         Iterator<IntWrapper, IntWrapper>::Settings{},
-        /*_checksumCalculator=*/71873048,
+        /*checksum=*/71873048,
         sorter::kLatestChecksumVersion};
     ContainerIterator<IntWrapper, IntWrapper> iterator2{
         container.getCursor(ru),
         containerKey3,
         containerKey4 + 1,
         Iterator<IntWrapper, IntWrapper>::Settings{},
-        /*_checksumCalculator=*/2815298670,
+        /*checksum=*/2815298670,
         sorter::kLatestChecksumVersion};
 
     ASSERT_TRUE(iterator1.more());
@@ -308,7 +308,7 @@ TEST(ContainerIteratorTest, ContainerMissingKey) {
                                                        containerKey1,
                                                        containerKey1 + 1,
                                                        Iterator<IntWrapper, IntWrapper>::Settings{},
-                                                       /*_checksumCalculator=*/4104690164,
+                                                       /*checksum=*/4104690164,
                                                        sorter::kLatestChecksumVersion};
 
     ASSERT_TRUE(iterator.more());
@@ -347,7 +347,7 @@ TEST(ContainerIteratorTest, InvalidDeferredValueUsage) {
                                                        containerKey1,
                                                        containerKey1 + 1,
                                                        Iterator<IntWrapper, IntWrapper>::Settings{},
-                                                       /*_checksumCalculator=*/4104690164,
+                                                       /*checksum=*/4104690164,
                                                        sorter::kLatestChecksumVersion};
 
     ASSERT_TRUE(iterator.more());
@@ -379,7 +379,7 @@ DEATH_TEST(ContainerIteratorChecksumDeathTest, IncorrectChecksumV1Fails, "116059
                                                        containerKey1,
                                                        containerKey1 + 1,
                                                        Iterator<IntWrapper, IntWrapper>::Settings{},
-                                                       /*_checksumCalculator=*/0,
+                                                       /*checksum=*/0,
                                                        SorterChecksumVersion::v1};
 
     ASSERT_TRUE(iterator.more());
@@ -408,7 +408,7 @@ DEATH_TEST(ContainerIteratorChecksumDeathTest, IncorrectChecksumV2Fails, "116059
                                                        containerKey1,
                                                        containerKey1 + 1,
                                                        Iterator<IntWrapper, IntWrapper>::Settings{},
-                                                       /*_checksumCalculator=*/0,
+                                                       /*checksum=*/0,
                                                        sorter::kLatestChecksumVersion};
 
     ASSERT_TRUE(iterator.more());
@@ -434,7 +434,7 @@ TEST_P(ContainerIteratorTest, EmptyIteratorHasZeroChecksum) {
                                                        /*start=*/0,
                                                        /*end=*/1,
                                                        Iterator<IntWrapper, IntWrapper>::Settings{},
-                                                       /*_checksumCalculator=*/0,
+                                                       /*checksum=*/0,
                                                        ContainerIteratorTest::GetParam()};
 }
 

@@ -810,44 +810,44 @@ TEST(CardinalityEstimator, SamplingCEInvokesEstimateCardinality) {
     std::vector<ce::CollectionFieldConfiguration> collectionFieldConfig = {
         ce::CollectionFieldConfiguration(
             /*fieldName*/ "a",
-            /*fieldPosition*/ 0,
-            /*fieldType*/ sbe::value::TypeTags::NumberInt64,
+            /*fieldPositionInCollection=*/0,
+            /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
             /*ndv*/ 10,
             /*dataDistribution*/ stats::DistrType::kUniform,
             /*seed*/ seed_value1_low),
         ce::CollectionFieldConfiguration(
             /*fieldName*/ "b",
-            /*fieldPosition*/ 5,
-            /*fieldType*/ sbe::value::TypeTags::NumberInt64,
+            /*fieldPositionInCollection=*/5,
+            /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
             /*ndv*/ 10,
             /*dataDistribution*/ stats::DistrType::kUniform,
             /*seed*/ seed_value2_low),
         ce::CollectionFieldConfiguration(
             /*fieldName*/ "c",
-            /*fieldPosition*/ 20,
-            /*fieldType*/ sbe::value::TypeTags::NumberInt64,
+            /*fieldPositionInCollection=*/20,
+            /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
             /*ndv*/ 10,
             /*dataDistribution*/ stats::DistrType::kUniform,
             /*seed*/ seed_value3_low),
         ce::CollectionFieldConfiguration(
             /*fieldName*/ "e",
-            /*fieldPosition*/ 22,
-            /*fieldType*/ sbe::value::TypeTags::NumberInt64,
+            /*fieldPositionInCollection=*/22,
+            /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
             /*ndv*/ 10,
             /*dataDistribution*/ stats::DistrType::kUniform,
             /*seed*/ seed_value5_low),
         ce::CollectionFieldConfiguration(
             /*fieldName*/ "d",
-            /*fieldPosition*/ 25,
-            /*fieldType*/ sbe::value::TypeTags::NumberInt64,
+            /*fieldPositionInCollection=*/25,
+            /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
             /*ndv*/ 10,
             /*dataDistribution*/ stats::DistrType::kUniform,
             /*seed*/ seed_value4_low)};
 
     // Translate the fields and positions configurations based on the defined map.
     ce::DataConfiguration dataConfig(
-        /*dataSize*/ collCard,
-        /*dataFieldConfig*/ collectionFieldConfig);
+        /*size=*/collCard,
+        /*allDataFieldConfig=*/collectionFieldConfig);
 
     // Generate data and populate source collection
     std::vector<std::vector<stats::SBEValue>> allData;

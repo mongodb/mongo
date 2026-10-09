@@ -414,7 +414,7 @@ TEST_F(QueryAnalysisSampleTrackerTest, IsSamplingActive) {
 
     ASSERT_FALSE(tracker.isSamplingActive(nss0, collUuid0));
     auto configuration0 =
-        CollectionQueryAnalyzerConfiguration(nss0, collUuid0, 100 /* samplesPerSec */, now());
+        CollectionQueryAnalyzerConfiguration(nss0, collUuid0, /*samplesPerSecond=*/100, now());
     tracker.refreshConfigurations({configuration0});
     ASSERT(tracker.isSamplingActive(nss0, collUuid0));
     ASSERT_FALSE(tracker.isSamplingActive(nss0, UUID::gen()));

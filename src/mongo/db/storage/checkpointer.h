@@ -19,7 +19,7 @@ namespace [[MONGO_MOD_PUBLIC]] mongo {
 class Checkpointer final : public BackgroundJob {
 public:
     explicit Checkpointer(std::unique_ptr<CheckpointSchedulePolicy> policy)
-        : BackgroundJob(false /* deleteSelf */),
+        : BackgroundJob(/*selfDelete=*/false),
           _shuttingDown(false),
           _shutdownReason(Status::OK()),
           _hasTriggeredFirstStableCheckpoint(false),

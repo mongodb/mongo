@@ -167,7 +167,7 @@ protected:
                                               false,
                                               /*recordIdsReplicated=*/false);
                 opObserver.onCollMod(opCtx, nss, uuid, BSONObj(), {}, boost::none, false);
-                opObserver.onDropDatabase(opCtx, nss.dbName(), false /*fromMigrate*/);
+                opObserver.onDropDatabase(opCtx, nss.dbName(), /*markFromMigrate=*/false);
                 opObserver.onDropCollection(opCtx,
                                             nss,
                                             uuid,
@@ -238,7 +238,7 @@ protected:
                           AssertionException);
             ASSERT_THROWS(opObserver.onCollMod(opCtx, nss, uuid, BSONObj(), {}, boost::none, false),
                           AssertionException);
-            ASSERT_THROWS(opObserver.onDropDatabase(opCtx, nss.dbName(), false /*fromMigrate*/),
+            ASSERT_THROWS(opObserver.onDropDatabase(opCtx, nss.dbName(), /*markFromMigrate=*/false),
                           AssertionException);
             ASSERT_THROWS(opObserver.onDropCollection(opCtx,
                                                       nss,

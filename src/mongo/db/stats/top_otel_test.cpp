@@ -26,7 +26,7 @@ public:
     ServiceLatencyTrackerOtelTest()
         : ServiceContextTest(
               std::make_unique<ScopedGlobalServiceContextForTest>(/*shouldSetupTL=*/false),
-              transport::MockSession::create(/*transportLayer=*/nullptr)),
+              transport::MockSession::create(/*tl=*/nullptr)),
           _opCtx{makeOperationContext()} {}
 
     void SetUp() override {

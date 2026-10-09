@@ -77,7 +77,7 @@ BulkWriteCommandReply parseBulkWriteCommandReplySingleOp(const BSONObj& response
         }
 
         auto cursor =
-            BulkWriteCommandResponseCursor(/*cursorId*/ 0,
+            BulkWriteCommandResponseCursor(/*id=*/0,
                                            std::vector<BulkWriteReplyItem>{std::move(replyItem)},
                                            NamespaceString::makeBulkWriteNSS(boost::none));
         return BulkWriteCommandReply(std::move(cursor), 0, 0, 0, 0, 0, 0);
@@ -93,7 +93,7 @@ write_ops::FindAndModifyCommandReply parseFindAndModifyCommandReply(const BSONOb
     //
     // In this case, we create a FindAndModifyCommandReply with an OK status and n=0.
     if (responseData.isEmpty()) {
-        write_ops::FindAndModifyLastError lastError(/*n*/ 0);
+        write_ops::FindAndModifyLastError lastError(/*numDocs=*/0);
         lastError.setUpdatedExisting(false);
 
         write_ops::FindAndModifyCommandReply reply;

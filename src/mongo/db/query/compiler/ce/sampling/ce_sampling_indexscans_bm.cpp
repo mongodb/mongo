@@ -35,16 +35,16 @@ std::map<int, std::vector<CollectionFieldConfiguration>> collectionFieldConfigur
     {1,
      {CollectionFieldConfiguration(
          /*fieldName*/ "f0",
-         /*fieldPosition*/ 0,
-         /*fieldType*/ sbe::value::TypeTags::NumberInt64,
+         /*fieldPositionInCollection=*/0,
+         /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
          /*ndv*/ 1000,
          /*dataDistribution*/ stats::DistrType::kUniform,
          /*seed*/ seed_value1)}},
     {2,
      {CollectionFieldConfiguration(
          /*fieldName*/ "f0",
-         /*fieldPosition*/ 50,
-         /*fieldType*/ sbe::value::TypeTags::NumberInt64,
+         /*fieldPositionInCollection=*/50,
+         /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
          /*ndv*/ 1000,
          /*dataDistribution*/ stats::DistrType::kUniform,
          /*seed*/ seed_value1)}},
@@ -52,36 +52,36 @@ std::map<int, std::vector<CollectionFieldConfiguration>> collectionFieldConfigur
      {
          CollectionFieldConfiguration(
              /*fieldName*/ "f0",
-             /*fieldPosition*/ 0,
-             /*fieldType*/ sbe::value::TypeTags::NumberInt64,
+             /*fieldPositionInCollection=*/0,
+             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
              /*ndv*/ 1000,
              /*dataDistribution*/ stats::DistrType::kUniform,
              /*seed*/ seed_value1),
          CollectionFieldConfiguration(
              /*fieldName*/ "f1",
-             /*fieldPosition*/ 1,
-             /*fieldType*/ sbe::value::TypeTags::NumberInt64,
+             /*fieldPositionInCollection=*/1,
+             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
              /*ndv*/ 1000,
              /*dataDistribution*/ stats::DistrType::kUniform,
              /*seed*/ seed_value1),
          CollectionFieldConfiguration(
              /*fieldName*/ "f2",
-             /*fieldPosition*/ 2,
-             /*fieldType*/ sbe::value::TypeTags::NumberInt64,
+             /*fieldPositionInCollection=*/2,
+             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
              /*ndv*/ 1000,
              /*dataDistribution*/ stats::DistrType::kUniform,
              /*seed*/ seed_value1),
          CollectionFieldConfiguration(
              /*fieldName*/ "f3",
-             /*fieldPosition*/ 3,
-             /*fieldType*/ sbe::value::TypeTags::NumberInt64,
+             /*fieldPositionInCollection=*/3,
+             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
              /*ndv*/ 1000,
              /*dataDistribution*/ stats::DistrType::kUniform,
              /*seed*/ seed_value1),
          CollectionFieldConfiguration(
              /*fieldName*/ "f4",
-             /*fieldPosition*/ 4,
-             /*fieldType*/ sbe::value::TypeTags::NumberInt64,
+             /*fieldPositionInCollection=*/4,
+             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
              /*ndv*/ 1000,
              /*dataDistribution*/ stats::DistrType::kUniform,
              /*seed*/ seed_value1),
@@ -90,36 +90,36 @@ std::map<int, std::vector<CollectionFieldConfiguration>> collectionFieldConfigur
      {
          CollectionFieldConfiguration(
              /*fieldName*/ "f0",
-             /*fieldPosition*/ 50,
-             /*fieldType*/ sbe::value::TypeTags::NumberInt64,
+             /*fieldPositionInCollection=*/50,
+             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
              /*ndv*/ 1000,
              /*dataDistribution*/ stats::DistrType::kUniform,
              /*seed*/ seed_value1),
          CollectionFieldConfiguration(
              /*fieldName*/ "f1",
-             /*fieldPosition*/ 51,
-             /*fieldType*/ sbe::value::TypeTags::NumberInt64,
+             /*fieldPositionInCollection=*/51,
+             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
              /*ndv*/ 1000,
              /*dataDistribution*/ stats::DistrType::kUniform,
              /*seed*/ seed_value1),
          CollectionFieldConfiguration(
              /*fieldName*/ "f2",
-             /*fieldPosition*/ 52,
-             /*fieldType*/ sbe::value::TypeTags::NumberInt64,
+             /*fieldPositionInCollection=*/52,
+             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
              /*ndv*/ 1000,
              /*dataDistribution*/ stats::DistrType::kUniform,
              /*seed*/ seed_value1),
          CollectionFieldConfiguration(
              /*fieldName*/ "f3",
-             /*fieldPosition*/ 53,
-             /*fieldType*/ sbe::value::TypeTags::NumberInt64,
+             /*fieldPositionInCollection=*/53,
+             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
              /*ndv*/ 1000,
              /*dataDistribution*/ stats::DistrType::kUniform,
              /*seed*/ seed_value1),
          CollectionFieldConfiguration(
              /*fieldName*/ "f4",
-             /*fieldPosition*/ 54,
-             /*fieldType*/ sbe::value::TypeTags::NumberInt64,
+             /*fieldPositionInCollection=*/54,
+             /*fieldDataType=*/sbe::value::TypeTags::NumberInt64,
              /*ndv*/ 1000,
              /*dataDistribution*/ stats::DistrType::kUniform,
              /*seed*/ seed_value1),
@@ -251,8 +251,8 @@ std::map<int, WorkloadConfiguration> queryFieldsConfigurations(queryConfigVector
 void BM_RunCardinalityEstimationOnSampleWithIndexBounds(benchmark::State& state) {
     auto fieldsConfig = collectionFieldConfigurations[state.range(1)];
     DataConfiguration dataConfig(
-        /*dataSize*/ state.range(0),
-        /*dataFieldConfig*/ fieldsConfig);
+        /*size=*/state.range(0),
+        /*allDataFieldConfig=*/fieldsConfig);
 
     // Setup query types.
     WorkloadConfiguration& workloadConfig = queryFieldsConfigurations[state.range(4)];
@@ -321,8 +321,8 @@ void BM_RunCardinalityEstimationOnSampleWithIndexBounds(benchmark::State& state)
 void BM_RunCardinalityEstimationOnSampleWithMatchExpressions(benchmark::State& state) {
     auto fieldsConfig = collectionFieldConfigurations[state.range(1)];
     DataConfiguration dataConfig(
-        /*dataSize*/ state.range(0),
-        /*dataFieldConfig*/ fieldsConfig);
+        /*size=*/state.range(0),
+        /*allDataFieldConfig=*/fieldsConfig);
 
     // Setup query types.
     WorkloadConfiguration& workloadConfig = queryFieldsConfigurations[state.range(4)];

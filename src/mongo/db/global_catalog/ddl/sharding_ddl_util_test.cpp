@@ -215,8 +215,11 @@ TEST_F(ShardingDDLUtilTest, RenamePreconditionsAreMet) {
     const auto fromColl = setupShardedCollection(kFromNss);
 
     // No exception is thrown if the TO collection does not exist and has no associated tags
-    sharding_ddl_util::checkRenamePreconditions(
-        opCtx, kToNss, boost::none /*toColl*/, false /*isSourceUnsharded*/, false /* dropTarget */);
+    sharding_ddl_util::checkRenamePreconditions(opCtx,
+                                                kToNss,
+                                                /*optTargetCollType=*/boost::none,
+                                                false /*isSourceUnsharded*/,
+                                                false /* dropTarget */);
 
     // Initialize the sharded TO collection
     const auto toColl = setupShardedCollection(kToNss);

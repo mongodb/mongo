@@ -6165,7 +6165,7 @@ TEST_F(PipelineOptimizationsShardMerger, Out) {
     doTest("[{$out: 'outColl'}]" /*inputPipeJson*/,
            "[]" /*shardPipeJson*/,
            "[{$out: {coll: 'outColl', db: '" + std::string(kDBName) + "'}}]" /*mergePipeJson*/,
-           kMyShardName /* mergeShardId */);
+           /*needsSpecificShardMerger=*/kMyShardName);
 };
 
 TEST_F(PipelineOptimizationsShardMerger, MergeWithUntrackedCollection) {

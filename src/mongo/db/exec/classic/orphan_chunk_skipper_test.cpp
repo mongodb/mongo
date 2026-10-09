@@ -272,7 +272,7 @@ TEST_F(OrphanChunkSkipperTest, MakeSeekPointSingleKey) {
             shardKey, {.containsShardKey = true, .nearestOwnedChunk = nearest});
 
         auto cs = getOrphanChunkSkipper(
-            shardFilter, shardKey, BSON("a" << -1) /* indexKeyPattern */, -1 /* scanDir */);
+            shardFilter, shardKey, /*keyPattern=*/BSON("a" << -1), /*scanDirection=*/-1);
         ASSERT_CHUNK_SKIPPER(cs, 1 /* expectedScanDirection */, "1"sv /* expectedBitSet */);
         ASSERT_NO_NEXT_SEEK_POINT(
             cs, BSON("a" << 0) /* currentShardKeyValue */, OrphanChunkSkipper::NotOrphan);
@@ -287,7 +287,7 @@ TEST_F(OrphanChunkSkipperTest, MakeSeekPointSingleKey) {
             shardKey, {.containsShardKey = false, .nearestOwnedChunk = nearest});
 
         auto cs = getOrphanChunkSkipper(
-            shardFilter, shardKey, BSON("a" << 1) /* indexKeyPattern */, 1 /* scanDir */);
+            shardFilter, shardKey, /*keyPattern=*/BSON("a" << 1), /*scanDirection=*/1);
         ASSERT_CHUNK_SKIPPER(cs, 1 /* expectedScanDirection */, "1"sv /* expectedBitSet */);
         ASSERT_EXPECTED_SEEK_POINT_EXCLUSIVE(cs,
                                              BSON("a" << 0) /* currentShardKeyValue */,
@@ -302,7 +302,7 @@ TEST_F(OrphanChunkSkipperTest, MakeSeekPointSingleKey) {
             shardKey, {.containsShardKey = false, .nearestOwnedChunk = nearest});
 
         auto cs = getOrphanChunkSkipper(
-            shardFilter, shardKey, BSON("a" << -1) /* indexKeyPattern */, 1 /* scanDir */);
+            shardFilter, shardKey, /*keyPattern=*/BSON("a" << -1), /*scanDirection=*/1);
         ASSERT_CHUNK_SKIPPER(cs, -1 /* expectedScanDirection */, "1"sv /* expectedBitSet */);
         ASSERT_EXPECTED_SEEK_POINT_INCLUSIVE(cs,
                                              BSON("a" << 0) /* currentShardKeyValue */,
@@ -318,7 +318,7 @@ TEST_F(OrphanChunkSkipperTest, MakeSeekPointSingleKey) {
             shardKey, {.containsShardKey = false, .nearestOwnedChunk = boost::none});
 
         auto cs = getOrphanChunkSkipper(
-            shardFilter, shardKey, BSON("a" << -1) /* indexKeyPattern */, 1 /* scanDir */);
+            shardFilter, shardKey, /*keyPattern=*/BSON("a" << -1), /*scanDirection=*/1);
         ASSERT_CHUNK_SKIPPER(cs, -1 /* expectedScanDirection */, "1"sv /* expectedBitSet */);
         ASSERT_NO_NEXT_SEEK_POINT(
             cs, BSON("a" << 0) /* currentShardKeyValue */, OrphanChunkSkipper::NoMoreOwned);
@@ -328,7 +328,7 @@ TEST_F(OrphanChunkSkipperTest, MakeSeekPointSingleKey) {
             shardKey, {.containsShardKey = false, .nearestOwnedChunk = boost::none});
 
         auto cs = getOrphanChunkSkipper(
-            shardFilter, shardKey, BSON("a" << -1) /* indexKeyPattern */, -1 /* scanDir */);
+            shardFilter, shardKey, /*keyPattern=*/BSON("a" << -1), /*scanDirection=*/-1);
         ASSERT_CHUNK_SKIPPER(cs, 1 /* expectedScanDirection */, "1"sv /* expectedBitSet */);
         ASSERT_NO_NEXT_SEEK_POINT(
             cs, BSON("a" << 0) /* currentShardKeyValue */, OrphanChunkSkipper::NoMoreOwned);
@@ -346,7 +346,7 @@ TEST_F(OrphanChunkSkipperTest, MakeSeekPointSingleShardKeyCompoundIndexForwardSc
             shardKey, {.containsShardKey = true, .nearestOwnedChunk = nearest});
 
         auto cs = getOrphanChunkSkipper(
-            shardFilter, shardKey, BSON("b" << 1) /* indexKeyPattern */, 1 /* scanDir */);
+            shardFilter, shardKey, /*keyPattern=*/BSON("b" << 1), /*scanDirection=*/1);
         ASSERT_CHUNK_SKIPPER(cs, 1 /* expectedScanDirection */, "1"sv /* expectedBitSet */);
         ASSERT_NO_NEXT_SEEK_POINT(
             cs, BSON("b" << "zed") /* currentShardKeyValue */, OrphanChunkSkipper::NotOrphan);
@@ -361,11 +361,10 @@ TEST_F(OrphanChunkSkipperTest, MakeSeekPointSingleShardKeyCompoundIndexForwardSc
         MockNearestOwnedChunkFilter shardFilter(
             shardKey, {.containsShardKey = false, .nearestOwnedChunk = nearest});
 
-        auto cs =
-            getOrphanChunkSkipper(shardFilter,
-                                  shardKey,
-                                  BSON("a" << 1 << "b" << 1 << "c" << 1) /* indexKeyPattern */,
-                                  1 /* scanDir */);
+        auto cs = getOrphanChunkSkipper(shardFilter,
+                                        shardKey,
+                                        /*keyPattern=*/BSON("a" << 1 << "b" << 1 << "c" << 1),
+                                        /*scanDirection=*/1);
         ASSERT_CHUNK_SKIPPER(cs, 1 /* expectedScanDirection */, "100"sv /* expectedBitSet */);
         ASSERT_EXPECTED_SEEK_POINT_EXCLUSIVE(cs,
                                              BSON("a" << 0 << "b"
@@ -383,11 +382,10 @@ TEST_F(OrphanChunkSkipperTest, MakeSeekPointSingleShardKeyCompoundIndexForwardSc
         MockNearestOwnedChunkFilter shardFilter(
             shardKey, {.containsShardKey = false, .nearestOwnedChunk = nearest});
 
-        auto cs =
-            getOrphanChunkSkipper(shardFilter,
-                                  shardKey,
-                                  BSON("a" << 1 << "b" << 1 << "c" << 1) /* indexKeyPattern */,
-                                  1 /* scanDir */);
+        auto cs = getOrphanChunkSkipper(shardFilter,
+                                        shardKey,
+                                        /*keyPattern=*/BSON("a" << 1 << "b" << 1 << "c" << 1),
+                                        /*scanDirection=*/1);
         ASSERT_CHUNK_SKIPPER(cs, 1 /* expectedScanDirection */, "010"sv /* expectedBitSet */);
         ASSERT_EXPECTED_SEEK_POINT_EXCLUSIVE(cs,
                                              BSON("a" << 0 << "b"
@@ -405,11 +403,10 @@ TEST_F(OrphanChunkSkipperTest, MakeSeekPointSingleShardKeyCompoundIndexForwardSc
         MockNearestOwnedChunkFilter shardFilter(
             shardKey, {.containsShardKey = false, .nearestOwnedChunk = nearest});
 
-        auto cs =
-            getOrphanChunkSkipper(shardFilter,
-                                  shardKey,
-                                  BSON("a" << 1 << "b" << 1 << "c" << 1) /* indexKeyPattern */,
-                                  1 /* scanDir */);
+        auto cs = getOrphanChunkSkipper(shardFilter,
+                                        shardKey,
+                                        /*keyPattern=*/BSON("a" << 1 << "b" << 1 << "c" << 1),
+                                        /*scanDirection=*/1);
         ASSERT_CHUNK_SKIPPER(cs, 1 /* expectedScanDirection */, "001"sv /* expectedBitSet */);
         ASSERT_EXPECTED_SEEK_POINT_EXCLUSIVE(cs,
                                              BSON("a" << 0 << "b"
@@ -427,11 +424,10 @@ TEST_F(OrphanChunkSkipperTest, MakeSeekPointSingleShardKeyCompoundIndexForwardSc
         MockNearestOwnedChunkFilter shardFilter(
             shardKey, {.containsShardKey = false, .nearestOwnedChunk = boost::none});
 
-        auto cs =
-            getOrphanChunkSkipper(shardFilter,
-                                  shardKey,
-                                  BSON("a" << 1 << "b" << 1 << "c" << -1) /* indexKeyPattern */,
-                                  1 /* scanDir */);
+        auto cs = getOrphanChunkSkipper(shardFilter,
+                                        shardKey,
+                                        /*keyPattern=*/BSON("a" << 1 << "b" << 1 << "c" << -1),
+                                        /*scanDirection=*/1);
         ASSERT_CHUNK_SKIPPER(cs, -1 /* expectedScanDirection */, "001"sv /* expectedBitSet */);
         ASSERT_NO_NEXT_SEEK_POINT(cs,
                                   BSON("a" << 0) /* currentShardKeyValue */,
@@ -449,7 +445,7 @@ TEST_F(OrphanChunkSkipperTest, MakeSeekPointSingleShardKeyCompoundIndexReverseSc
             shardKey, {.containsShardKey = true, .nearestOwnedChunk = nearest});
 
         auto cs = getOrphanChunkSkipper(
-            shardFilter, shardKey, BSON("b" << -1) /* indexKeyPattern */, 1 /* scanDir */);
+            shardFilter, shardKey, /*keyPattern=*/BSON("b" << -1), /*scanDirection=*/1);
         ASSERT_CHUNK_SKIPPER(cs, -1 /* expectedScanDirection */, "1"sv /* expectedBitSet */);
         ASSERT_NO_NEXT_SEEK_POINT(
             cs, BSON("b" << "zed") /* currentShardKeyValue */, OrphanChunkSkipper::NotOrphan);
@@ -464,11 +460,10 @@ TEST_F(OrphanChunkSkipperTest, MakeSeekPointSingleShardKeyCompoundIndexReverseSc
         MockNearestOwnedChunkFilter shardFilter(
             shardKey, {.containsShardKey = false, .nearestOwnedChunk = nearest});
 
-        auto cs =
-            getOrphanChunkSkipper(shardFilter,
-                                  shardKey,
-                                  BSON("a" << 1 << "b" << 1 << "c" << 1) /* indexKeyPattern */,
-                                  -1 /* scanDir */);
+        auto cs = getOrphanChunkSkipper(shardFilter,
+                                        shardKey,
+                                        /*keyPattern=*/BSON("a" << 1 << "b" << 1 << "c" << 1),
+                                        /*scanDirection=*/-1);
         ASSERT_CHUNK_SKIPPER(cs, -1 /* expectedScanDirection */, "100"sv /* expectedBitSet */);
         ASSERT_EXPECTED_SEEK_POINT_INCLUSIVE(cs,
                                              BSON("a" << 0 << "b"
@@ -486,11 +481,10 @@ TEST_F(OrphanChunkSkipperTest, MakeSeekPointSingleShardKeyCompoundIndexReverseSc
         MockNearestOwnedChunkFilter shardFilter(
             shardKey, {.containsShardKey = false, .nearestOwnedChunk = nearest});
 
-        auto cs =
-            getOrphanChunkSkipper(shardFilter,
-                                  shardKey,
-                                  BSON("a" << 1 << "b" << 1 << "c" << 1) /* indexKeyPattern */,
-                                  -1 /* scanDir */);
+        auto cs = getOrphanChunkSkipper(shardFilter,
+                                        shardKey,
+                                        /*keyPattern=*/BSON("a" << 1 << "b" << 1 << "c" << 1),
+                                        /*scanDirection=*/-1);
         ASSERT_CHUNK_SKIPPER(cs, -1 /* expectedScanDirection */, "010"sv /* expectedBitSet */);
         ASSERT_EXPECTED_SEEK_POINT_INCLUSIVE(cs,
                                              BSON("a" << 0 << "b"
@@ -508,11 +502,10 @@ TEST_F(OrphanChunkSkipperTest, MakeSeekPointSingleShardKeyCompoundIndexReverseSc
         MockNearestOwnedChunkFilter shardFilter(
             shardKey, {.containsShardKey = false, .nearestOwnedChunk = nearest});
 
-        auto cs =
-            getOrphanChunkSkipper(shardFilter,
-                                  shardKey,
-                                  BSON("a" << 1 << "b" << 1 << "c" << 1) /* indexKeyPattern */,
-                                  -1 /* scanDir */);
+        auto cs = getOrphanChunkSkipper(shardFilter,
+                                        shardKey,
+                                        /*keyPattern=*/BSON("a" << 1 << "b" << 1 << "c" << 1),
+                                        /*scanDirection=*/-1);
         ASSERT_CHUNK_SKIPPER(cs, -1 /* expectedScanDirection */, "001"sv /* expectedBitSet */);
         ASSERT_EXPECTED_SEEK_POINT_INCLUSIVE(cs,
                                              BSON("a" << 0 << "b"
@@ -536,7 +529,7 @@ TEST_F(OrphanChunkSkipperTest, MakeSeekPointOrphanInLeadingGapWithOwnedChunkAhea
         shardKey, {.containsShardKey = false, .nearestOwnedChunk = nearest});
 
     auto cs = getOrphanChunkSkipper(
-        shardFilter, shardKey, BSON("a" << 1) /* indexKeyPattern */, 1 /* scanDir */);
+        shardFilter, shardKey, /*keyPattern=*/BSON("a" << 1), /*scanDirection=*/1);
     ASSERT_CHUNK_SKIPPER(cs, 1 /* expectedScanDirection */, "1"sv /* expectedBitSet */);
     ASSERT_EXPECTED_SEEK_POINT_EXCLUSIVE(cs,
                                          BSON("a" << 5) /* currentShardKeyValue */,

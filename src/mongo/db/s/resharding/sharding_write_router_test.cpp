@@ -108,7 +108,7 @@ public:
             const auto client = _serviceContext->getService()->makeClient("test-setup-metadata");
             const auto opCtx = client->makeOperationContext();
             OperationShardingState::setShardRole(
-                opCtx.get(), kNss, _shardVersion, boost::none /* databaseVersion */);
+                opCtx.get(), kNss, _shardVersion, /*dbVersion=*/boost::none);
 
             CollectionShardingRuntime::acquireExclusive(opCtx.get(), kNss)
                 ->setCollectionMetadata(opCtx.get(), CollectionMetadata(chunkManager, kDonorShard));
@@ -155,7 +155,7 @@ public:
         const auto client = _serviceContext->getService()->makeClient("test-make-router");
         const auto opCtx = client->makeOperationContext();
         OperationShardingState::setShardRole(
-            opCtx.get(), kNss, _shardVersion, boost::none /* databaseVersion */);
+            opCtx.get(), kNss, _shardVersion, /*dbVersion=*/boost::none);
 
         Lock::DBLock dbLock{opCtx.get(), kNss.dbName(), MODE_IX};
         Lock::CollectionLock collLock{opCtx.get(), kNss, MODE_IX};

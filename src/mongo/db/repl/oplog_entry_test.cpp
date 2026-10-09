@@ -2453,7 +2453,7 @@ TEST_F(OplogEntryTest,
                                               osi,
                                               Date_t::now(),
                                               {} /* stmtIds */,
-                                              repl::OpTime() /* prevOpTime */,
+                                              /*prevWriteOpTimeInTransaction=*/repl::OpTime(),
                                               boost::none /* multiOpType */);
     ASSERT_EQ(entry.extractCommitTransactionTimestamp(), opTime.getTimestamp());
 }
@@ -2472,7 +2472,7 @@ TEST_F(OplogEntryTest,
                                               osi,
                                               Date_t::now(),
                                               {} /* stmtIds */,
-                                              repl::OpTime() /* prevOpTime */,
+                                              /*prevWriteOpTimeInTransaction=*/repl::OpTime(),
                                               boost::none /* multiOpType */);
 
     auto swCommitTimestamp = entry.extractCommitTransactionTimestamp();
@@ -2492,7 +2492,7 @@ TEST_F(OplogEntryTest, ExtractCommitTransactionTimestampFails_TerminalApplyOpsOp
                                               osi,
                                               Date_t::now(),
                                               {} /* stmtIds */,
-                                              repl::OpTime() /* prevOpTime */,
+                                              /*prevWriteOpTimeInTransaction=*/repl::OpTime(),
                                               boost::none /* multiOpType */);
     auto swCommitTimestamp = entry.extractCommitTransactionTimestamp();
     ASSERT_EQ(swCommitTimestamp.getStatus().code(), 11730800);
@@ -2513,7 +2513,7 @@ TEST_F(OplogEntryTest,
                                               osi,
                                               Date_t::now(),
                                               {} /* stmtIds */,
-                                              repl::OpTime() /* prevOpTime */,
+                                              /*prevWriteOpTimeInTransaction=*/repl::OpTime(),
                                               MultiOplogEntryType::kApplyOpsAppliedSeparately);
 
     auto swCommitTimestamp = entry.extractCommitTransactionTimestamp();
@@ -2534,7 +2534,7 @@ TEST_F(OplogEntryTest, ExtractCommitTransactionTimestampFails_PartialApplyOpsOpl
                                               osi,
                                               Date_t::now(),
                                               {} /* stmtIds */,
-                                              repl::OpTime() /* prevOpTime */,
+                                              /*prevWriteOpTimeInTransaction=*/repl::OpTime(),
                                               boost::none /* multiOpType */,
                                               repl::ApplyOpsType::kPartial);
 
@@ -2556,7 +2556,7 @@ TEST_F(OplogEntryTest, ExtractCommitTransactionTimestampFails_PrepareApplyOpsOpl
                                               osi,
                                               Date_t::now(),
                                               {} /* stmtIds */,
-                                              repl::OpTime() /* prevOpTime */,
+                                              /*prevWriteOpTimeInTransaction=*/repl::OpTime(),
                                               boost::none /* multiOpType */,
                                               repl::ApplyOpsType::kPrepare);
 

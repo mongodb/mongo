@@ -193,7 +193,7 @@ TEST_F(WindowFunctionExecNonRemovableTest, CanReceiveSortByExpression) {
     const auto docs = std::deque<DocumentSource::GetNextResult>{
         Document{{"x", 1}, {"y", 0}}, Document{{"x", 3}, {"y", 2}}, Document{{"x", 5}, {"y", 4}}};
     auto mgr = createForFieldPath<AccumulatorIntegral>(
-        docs, "$y" /* input */, 0, std::string("$x") /* sortBy */);
+        docs, /*inputPath=*/"$y", 0, /*sortByPath=*/std::string("$x"));
     double expectedIntegral = 0;
     ASSERT_VALUE_EQ(Value(expectedIntegral), mgr.getNext());
     advanceIterator();

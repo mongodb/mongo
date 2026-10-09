@@ -217,7 +217,7 @@ TEST_F(BalancerCommandsSchedulerTest, SuccessfulRequestChunkDataSizeCommand) {
                                    chunk.getRange(),
                                    ShardVersionFactory::make(chunk.getVersion()),
                                    KeyPattern(BSON("x" << 1)),
-                                   false /* issuedByRemoteUser */,
+                                   /*estimatedValue=*/false,
                                    (kDefaultMaxChunkSizeBytes / 100) * 25 /* maxSize */);
     auto swReceivedDataSize = futureResponse.getNoThrow();
     ASSERT_OK(swReceivedDataSize.getStatus());

@@ -21,7 +21,7 @@ void stopOplogCapMaintainerThread(ServiceContext* serviceContext, const Status& 
  */
 class [[MONGO_MOD_OPEN]] OplogCapMaintainerThread : public BackgroundJob {
 public:
-    OplogCapMaintainerThread() : BackgroundJob(false /* deleteSelf */) {}
+    OplogCapMaintainerThread() : BackgroundJob(/*selfDelete=*/false) {}
 
     static OplogCapMaintainerThread* get(ServiceContext* serviceCtx);
     static OplogCapMaintainerThread* get(OperationContext* opCtx);

@@ -1525,7 +1525,7 @@ TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,
 
     const auto task = createRangeDeletionTask(opCtx, kTestNss, uuid(), range, 0);
     auto taskCompletionFuture = registerAndCreatePersistentTask(
-        opCtx, task, SemiFuture<void>::makeReady() /* waitForActiveQueries */);
+        opCtx, task, /*waitForActiveQueriesToComplete=*/SemiFuture<void>::makeReady());
 
     opCtx->setDeadlineAfterNowBy(Milliseconds(100), ErrorCodes::MaxTimeMSExpired);
     auto status =
@@ -1550,10 +1550,10 @@ TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,
     const auto task2 = createRangeDeletionTask(opCtx, kTestNss, uuid(), range2, 0);
 
     auto cleanupCompleteFirst = registerAndCreatePersistentTask(
-        opCtx, task1, SemiFuture<void>::makeReady() /* waitForActiveQueries */);
+        opCtx, task1, /*waitForActiveQueriesToComplete=*/SemiFuture<void>::makeReady());
 
     auto cleanupCompleteSecond = registerAndCreatePersistentTask(
-        opCtx, task2, SemiFuture<void>::makeReady() /* waitForActiveQueries */);
+        opCtx, task2, /*waitForActiveQueriesToComplete=*/SemiFuture<void>::makeReady());
 
     auto status = CollectionShardingRuntime::waitForClean(
         opCtx,
@@ -1580,7 +1580,7 @@ TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,
     const auto task = createRangeDeletionTask(opCtx, kTestNss, uuid(), range, 0);
 
     auto cleanupComplete = registerAndCreatePersistentTask(
-        opCtx, task, SemiFuture<void>::makeReady() /* waitForActiveQueries */);
+        opCtx, task, /*waitForActiveQueriesToComplete=*/SemiFuture<void>::makeReady());
 
     auto status =
         CollectionShardingRuntime::waitForClean(opCtx, kTestNss, uuid(), range, Date_t::max());

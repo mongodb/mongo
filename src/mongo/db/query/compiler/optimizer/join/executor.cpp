@@ -351,7 +351,7 @@ lowerToSbePlanStageTree(OperationContext* opCtx,
                                                       baseCQ,
                                                       mca,
                                                       sbeYieldPolicy.get(),
-                                                      false /*preparingFromCache*/,
+                                                      /*preparingFromSbeCache=*/false,
                                                       nullptr /*remoteCursors*/);
     }
     return std::make_pair(std::move(planStagesAndData), std::move(sbeYieldPolicy));
@@ -423,7 +423,7 @@ void pushDownSbeEligibleSuffix(OperationContext* opCtx,
             soln = QueryPlanner::extendWithAggPipeline(prefix,
                                                        std::move(soln),
                                                        plannerParams.secondaryCollectionsInfo,
-                                                       false /* skipOptimization */);
+                                                       /*skipProjectGroupOptimization=*/false);
         }
         // Remove any of the stages pushed down via attachPipelineStages, from the pipeline 'suffix'
         // so they are not executed twice (once in SBE and again in classic). Only the remaining
@@ -629,7 +629,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> checkPlanCacheForPlan(
                                             true /* isFromPlanCache */,
                                             false /* cachedPlanHash */,
                                             true /*usedJoinOpt*/,
-                                            {} /* rejectedPlans */,
+                                            /*rejectedJoinPlans=*/{},
                                             nullptr /* remoteCursors */,
                                             nullptr /* remoteExplains */,
                                             nullptr /* classicRuntimePlannerStage */,
@@ -847,7 +847,7 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
                                              costEstimator,
                                              hintedStrat ? std::move(*hintedStrat)
                                                          : getEnumerationStrategy(qkc),
-                                             cacheWinningPlan /* populateCachedJoinPlan */,
+                                             /*populateCachedPlan=*/cacheWinningPlan,
                                              *metrics.planEnumerationMetrics);
         }
 

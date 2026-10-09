@@ -215,7 +215,7 @@ TEST_F(InitialSingleChunkOnShardSplitChunks, InitialSingleChunkOnShardSplitChunk
                        ErrorCodes::InvalidOptions);
 
     auto singleChunksOnShardPolicy = create_collection_util::createPolicy(
-        opCtx(), kCorrectShardKey, false, {}, 1, true, true /*unsplittable*/, kShardId0);
+        opCtx(), kCorrectShardKey, false, {}, 1, true, /*isUnsplittable=*/true, kShardId0);
 
     auto config = singleChunksOnShardPolicy->createFirstChunks(
         opCtx(), kCorrectShardKey, {UUID::gen(), kShardId0});
@@ -224,7 +224,7 @@ TEST_F(InitialSingleChunkOnShardSplitChunks, InitialSingleChunkOnShardSplitChunk
     ASSERT_EQ(config.chunks[0].getShard(), kShardId0);
 
     auto singleChunksOnNonPrimaryShardPolicy = create_collection_util::createPolicy(
-        opCtx(), kCorrectShardKey, false, {}, 1, true, true /*unsplittable*/, kShardId1);
+        opCtx(), kCorrectShardKey, false, {}, 1, true, /*isUnsplittable=*/true, kShardId1);
 
     auto nonPrimaryConfig = singleChunksOnNonPrimaryShardPolicy->createFirstChunks(
         opCtx(), kCorrectShardKey, {UUID::gen(), kShardId1});
@@ -233,7 +233,7 @@ TEST_F(InitialSingleChunkOnShardSplitChunks, InitialSingleChunkOnShardSplitChunk
     ASSERT_EQ(nonPrimaryConfig.chunks[0].getShard(), kShardId1);
 
     auto shardedSingleChunksOnShardPolicy = create_collection_util::createPolicy(
-        opCtx(), kCorrectShardKey, false, {}, 1, true, false /*unsplittable*/, kShardId0);
+        opCtx(), kCorrectShardKey, false, {}, 1, true, /*isUnsplittable=*/false, kShardId0);
 
     auto shardedConfig = shardedSingleChunksOnShardPolicy->createFirstChunks(
         opCtx(), kCorrectShardKey, {UUID::gen(), kShardId0});
@@ -242,7 +242,7 @@ TEST_F(InitialSingleChunkOnShardSplitChunks, InitialSingleChunkOnShardSplitChunk
     ASSERT_EQ(shardedConfig.chunks[0].getShard(), kShardId0);
 
     auto shardedSingleChunksOnNonPrimaryShardPolicy = create_collection_util::createPolicy(
-        opCtx(), kCorrectShardKey, false, {}, 1, true, false /*unsplittable*/, kShardId1);
+        opCtx(), kCorrectShardKey, false, {}, 1, true, /*isUnsplittable=*/false, kShardId1);
 
     auto shardedNonPrimaryConfig = shardedSingleChunksOnNonPrimaryShardPolicy->createFirstChunks(
         opCtx(), kCorrectShardKey, {UUID::gen(), kShardId1});
@@ -1425,7 +1425,7 @@ TEST_F(PresplitHashedZonesChunksTest, WithAvailableShards) {
     const std::vector<TagsType> tags = {makeTag(zoneRange, zoneName("0"))};
 
     PresplitHashedZonesSplitPolicy splitPolicy(
-        operationContext(), shardKeyPattern, tags, true /* isCollEmpty */, kAllShardsIds);
+        operationContext(), shardKeyPattern, tags, /*isCollectionEmpty=*/true, kAllShardsIds);
 
     const auto config = splitPolicy.createFirstChunks(
         operationContext(), shardKeyPattern, {UUID::gen(), shardId("0")} /* primaryShard */);
@@ -1454,11 +1454,13 @@ TEST_F(PresplitHashedZonesChunksTest, CannotCreateChunkDistribution) {
     const auto zoneRange = ChunkRange(BSON("x" << MINKEY), BSON("x" << MAXKEY));
     const std::vector<TagsType> tags = {makeTag(zoneRange, zoneName("0"))};
 
-    ASSERT_THROWS_CODE(
-        PresplitHashedZonesSplitPolicy(
-            operationContext(), shardKeyPattern, tags, true /* isCollEmpty */, kAvailableShardIds),
-        DBException,
-        ErrorCodes::CannotCreateChunkDistribution);
+    ASSERT_THROWS_CODE(PresplitHashedZonesSplitPolicy(operationContext(),
+                                                      shardKeyPattern,
+                                                      tags,
+                                                      /*isCollectionEmpty=*/true,
+                                                      kAvailableShardIds),
+                       DBException,
+                       ErrorCodes::CannotCreateChunkDistribution);
 }
 
 TEST_F(PresplitHashedZonesChunksTest, ChunkDistributionWillIgnoreShardNotInAvaiableShards) {

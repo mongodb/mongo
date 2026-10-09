@@ -376,7 +376,7 @@ TEST_F(WindowFunctionExecRemovableDocumentTest, CanReceiveSortByExpression) {
                                                                 Document{{"x", 6}, {"y", 3}}};
     // Test 'sortBy'.
     auto mgr = createForFieldPath(
-        docs, "$y" /* input */, "$x" /* sortBy */, WindowBounds::DocumentBased{-1, 1});
+        docs, /*inputPath=*/"$y", /*sortByPath=*/"$x", WindowBounds::DocumentBased{-1, 1});
     double expectedIntegral = 2.0;  // (2 + 0) * (3 - 1) / 2.0 = 2.0
     ASSERT_VALUE_EQ(Value(expectedIntegral), mgr.getNext());
     advanceIterator();

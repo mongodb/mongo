@@ -310,7 +310,8 @@ TEST_P(TicketingSystemTest, QueueWaitTimeHistogramSeparatesQueuesAndAccumulatesP
     admCtx.recordExecutionWaitedAcquisition(Milliseconds{200}, QueueType::kLow);
     admCtx.recordExecutionAcquisition(Priority::kLow, QueueType::kLow);
 
-    ticketingSystem()->finalizeOperationStats(opCtx.get(), 0 /* elapsed */, 0 /* cpu */);
+    ticketingSystem()->finalizeOperationStats(
+        opCtx.get(), /*elapsedMicros=*/0, /*cpuUsageMicros=*/0);
 
     BSONObjBuilder b;
     ticketingSystem()->appendStats(b);
@@ -348,7 +349,8 @@ TEST_P(TicketingSystemTest, QueueWaitTimeHistogramRecordsNonWaitingOpsInZeroBuck
 
     admCtx.recordExecutionAcquisition(Priority::kNormal, QueueType::kNormal);
 
-    ticketingSystem()->finalizeOperationStats(opCtx.get(), 0 /* elapsed */, 0 /* cpu */);
+    ticketingSystem()->finalizeOperationStats(
+        opCtx.get(), /*elapsedMicros=*/0, /*cpuUsageMicros=*/0);
 
     BSONObjBuilder b;
     ticketingSystem()->appendStats(b);

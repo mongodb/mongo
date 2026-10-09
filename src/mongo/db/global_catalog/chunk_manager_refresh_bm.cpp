@@ -127,7 +127,7 @@ MONGO_COMPILER_NOINLINE auto runIncrementalUpdate(const CollectionMetadata& cm,
     auto rt = cm.getChunkManager()->getRoutingTableHistory_forTest().makeUpdated(
         boost::none /* timeseriesFields */,
         boost::none /* reshardingFields */,
-        true /* allowMigration */,
+        /*allowMigrations=*/true,
         false /* unsplittable */,
         newChunks);
     return CollectionMetadata(CurrentChunkManager(makeStandaloneRoutingTableHistory(std::move(rt))),

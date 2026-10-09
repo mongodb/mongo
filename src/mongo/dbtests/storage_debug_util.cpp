@@ -67,7 +67,7 @@ void printCollectionAndIndexTableEntries(OperationContext* opCtx, const Namespac
                   "index_name"_attr = indexDescriptor->indexName());
             continue;
         }
-        auto indexCursor = iam->newCursor(opCtx, ru, /*forward*/ true);
+        auto indexCursor = iam->newCursor(opCtx, ru, /*isForward=*/true);
 
         const BSONObj& keyPattern = indexDescriptor->keyPattern();
         const auto ordering = Ordering::make(keyPattern);

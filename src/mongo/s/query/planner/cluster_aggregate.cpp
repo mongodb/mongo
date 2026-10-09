@@ -642,7 +642,7 @@ Status _parseQueryStatsAndReturnEmptyResult(
                                                namespaces,
                                                request,
                                                liteParsedPipeline,
-                                               boost::none /* CollectionRoutingInfo */,
+                                               /*cri=*/boost::none,
                                                hasChangeStream,
                                                shouldDoFLERewrite,
                                                requiresCollationForParsingUnshardedAggregate,

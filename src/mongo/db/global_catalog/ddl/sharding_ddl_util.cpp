@@ -1249,7 +1249,7 @@ boost::optional<ShardId> pickShardOwningCollectionChunks(OperationContext* opCtx
     const OID dummyEpoch;
     auto chunks = uassertStatusOK(Grid::get(opCtx)->catalogClient()->getChunks(
         opCtx,
-        BSON(ChunkType::collectionUUID() << collUuid) /*query*/,
+        /*filter=*/BSON(ChunkType::collectionUUID() << collUuid),
         BSON(ChunkType::min() << 1) /*sort*/,
         1 /*limit*/,
         nullptr /*opTime*/,

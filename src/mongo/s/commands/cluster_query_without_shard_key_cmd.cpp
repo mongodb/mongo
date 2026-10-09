@@ -157,14 +157,13 @@ std::set<ShardId> getShardsToTarget(OperationContext* opCtx,
 
     auto query = parsedInfo.query;
     auto collation = parsedInfo.collation;
-    auto expCtx =
-        makeExpressionContextWithDefaultsForTargeter(opCtx,
-                                                     nss,
-                                                     cri,
-                                                     collation,
-                                                     boost::none,  // explain
-                                                     parsedInfo.let,
-                                                     boost::none /* legacyRuntimeConstants */);
+    auto expCtx = makeExpressionContextWithDefaultsForTargeter(opCtx,
+                                                               nss,
+                                                               cri,
+                                                               collation,
+                                                               boost::none,  // explain
+                                                               parsedInfo.let,
+                                                               /*runtimeConstants=*/boost::none);
 
     std::set<ShardId> allShardsContainingChunksForNs;
     getShardIdsForQuery(

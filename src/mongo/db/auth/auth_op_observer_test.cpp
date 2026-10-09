@@ -226,7 +226,7 @@ public:
         mockRouter->resetCounts();
 
         WriteUnitOfWork wuow(opCtx.get());
-        opObserver.onDropDatabase(opCtx.get(), dbname, false /*fromMigrate*/);
+        opObserver.onDropDatabase(opCtx.get(), dbname, /*markFromMigrate=*/false);
         assertCounts(0, 0, 0);
         wuow.commit();
 

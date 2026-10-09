@@ -748,8 +748,7 @@ FLE2InsertUpdatePayloadV2 EDCClientPayload::serializeInsertUpdatePayloadV2ForRan
     FLE2InsertUpdatePayloadV2 iupayload;
 
     iupayload.setEncryptedTokens(
-        StateCollectionTokensV2(escDataCounterkey, false /* isLeaf */, boost::none)
-            .encrypt(ecocToken));
+        StateCollectionTokensV2(escDataCounterkey, /*leaf=*/false, boost::none).encrypt(ecocToken));
 
     iupayload.setEdcDerivedToken(std::move(edcDataCounterkey));
     iupayload.setEscDerivedToken(std::move(escDataCounterkey));

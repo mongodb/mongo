@@ -116,7 +116,7 @@ ExecutorFuture<void> DropIndexesCoordinator::_cleanupOnAbort(
             sharding_ddl_util::resumeMigrations(
                 opCtx,
                 nss(),
-                boost::none /* uuid */,
+                /*expectedCollectionUUID=*/boost::none,
                 [&] { return getNewSession(opCtx); },
                 _doc.getAuthoritativeMetadataAccessLevel());
 

@@ -257,7 +257,7 @@ public:
         Milliseconds timeout,
         CancellationToken token = CancellationToken::uncancelable(),
         ConnectionAcquisitionPurpose purpose = ConnectionAcquisitionPurpose::kNormal) {
-        return _get(hostAndPort, sslMode, timeout, false /*lease*/, std::move(token), purpose);
+        return _get(hostAndPort, sslMode, timeout, /*leased=*/false, std::move(token), purpose);
     }
 
     void get_forTest(const HostAndPort& hostAndPort,
@@ -279,7 +279,7 @@ public:
         return _get(hostAndPort,
                     sslMode,
                     timeout,
-                    true /*lease*/,
+                    /*leased=*/true,
                     std::move(token),
                     ConnectionAcquisitionPurpose::kNormal);
     }

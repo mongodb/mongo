@@ -113,7 +113,7 @@ void logCollStats(OperationContext* opCtx, const NamespaceString& nss) {
     BSONObj collStatsResult;
     try {
         // Run $collStats via aggregation.
-        client.runCommand(nss.dbName() /* DatabaseName */,
+        client.runCommand(nss.dbName(),
                           makeCollStatsCommand(nss.coll()),
                           collStatsResult /* command return results */);
         // Logging $collStats information is best effort. If the collection doesn't exist, for

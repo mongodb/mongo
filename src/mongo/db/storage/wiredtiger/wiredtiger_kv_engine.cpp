@@ -265,7 +265,7 @@ using std::string;
 class WiredTigerSessionSweeper : public BackgroundJob {
 public:
     explicit WiredTigerSessionSweeper(WiredTigerConnection* connection)
-        : BackgroundJob(false /* deleteSelf */), _connection(connection) {}
+        : BackgroundJob(/*selfDelete=*/false), _connection(connection) {}
 
     string name() const override {
         return "WTIdleSessionSweeper";

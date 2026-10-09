@@ -253,7 +253,7 @@ TEST_F(PlacementHistoryCleanerTest, SkipsBelowThreshold) {
     // minEntries = 10 > 3 docs -> cleaner must skip without sending any network command.
     auto future = launchAsync([&] {
         ThreadClient tc(getServiceContext()->getService());
-        PlacementHistoryCleaner::runOnce(Client::getCurrent(), 10 /* minEntries */);
+        PlacementHistoryCleaner::runOnce(Client::getCurrent(), /*minPlacementHistoryEntries=*/10);
     });
     future.default_timed_get();
 
@@ -286,7 +286,7 @@ TEST_F(PlacementHistoryCleanerTest, SkipsWhenShardResponseFails) {
 
     auto future = launchAsync([&] {
         ThreadClient tc(getServiceContext()->getService());
-        PlacementHistoryCleaner::runOnce(Client::getCurrent(), 0 /* minEntries */);
+        PlacementHistoryCleaner::runOnce(Client::getCurrent(), /*minPlacementHistoryEntries=*/0);
     });
 
     // sendCommandToShards() dispatches to all shards asynchronously. Respond to both; the error
@@ -332,7 +332,7 @@ TEST_F(PlacementHistoryCleanerTest, SkipsWhenAllShardsReturnZeroTimestamp) {
 
     auto future = launchAsync([&] {
         ThreadClient tc(getServiceContext()->getService());
-        PlacementHistoryCleaner::runOnce(Client::getCurrent(), 0 /* minEntries */);
+        PlacementHistoryCleaner::runOnce(Client::getCurrent(), /*minPlacementHistoryEntries=*/0);
     });
 
     onCommand([](const executor::RemoteCommandRequest&) {
@@ -376,7 +376,7 @@ TEST_F(PlacementHistoryCleanerTest, SkipsWhenInitMarkerIsAheadOfEarliestOptime) 
 
     auto future = launchAsync([&] {
         ThreadClient tc(getServiceContext()->getService());
-        PlacementHistoryCleaner::runOnce(Client::getCurrent(), 0 /* minEntries */);
+        PlacementHistoryCleaner::runOnce(Client::getCurrent(), /*minPlacementHistoryEntries=*/0);
     });
 
     onCommand([](const executor::RemoteCommandRequest&) {
@@ -431,7 +431,7 @@ TEST_F(PlacementHistoryCleanerTest, PerformsCleanupWhenAllConditionsAreMet) {
 
     auto future = launchAsync([&] {
         ThreadClient tc(getServiceContext()->getService());
-        PlacementHistoryCleaner::runOnce(Client::getCurrent(), 0 /* minEntries */);
+        PlacementHistoryCleaner::runOnce(Client::getCurrent(), /*minPlacementHistoryEntries=*/0);
     });
 
     // Set earliest op times on each shard (The minimum value will be the one setting the cut
@@ -490,7 +490,7 @@ TEST_F(PlacementHistoryCleanerTest, CleanupFailsWhenEmptyShardsInitMarkerIsMissi
 
     auto future = launchAsync([&] {
         ThreadClient tc(getServiceContext()->getService());
-        PlacementHistoryCleaner::runOnce(Client::getCurrent(), 0 /* minEntries */);
+        PlacementHistoryCleaner::runOnce(Client::getCurrent(), /*minPlacementHistoryEntries=*/0);
     });
 
     // The dawn-of-time marker at T(0,1) does not satisfy timestamp >= T(100,0), so the
@@ -538,7 +538,7 @@ TEST_F(PlacementHistoryCleanerTest, CleanupSucceedsWithMultipleEmptyShardsInitMa
 
     auto future = launchAsync([&] {
         ThreadClient tc(getServiceContext()->getService());
-        PlacementHistoryCleaner::runOnce(Client::getCurrent(), 0 /* minEntries */);
+        PlacementHistoryCleaner::runOnce(Client::getCurrent(), /*minPlacementHistoryEntries=*/0);
     });
 
     onCommand([&](const executor::RemoteCommandRequest&) {
@@ -571,7 +571,7 @@ TEST_F(PlacementHistoryCleanerRecoveryFailedTest, SkipsWhenShardingStateRecovery
     // No DB setup or network mocks are needed: runOnce() must return before touching anything.
     auto future = launchAsync([&] {
         ThreadClient tc(getServiceContext()->getService());
-        PlacementHistoryCleaner::runOnce(Client::getCurrent(), 0 /* minEntries */);
+        PlacementHistoryCleaner::runOnce(Client::getCurrent(), /*minPlacementHistoryEntries=*/0);
     });
     // If runOnce() hangs or crashes the test fails; a clean return is the expected outcome.
     future.default_timed_get();

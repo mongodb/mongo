@@ -406,8 +406,8 @@ boost::optional<IndexBounds> getIndexBoundsForQuery(const BSONObj& key,
                           MultikeyPaths{},
                           // Empty multikey path set, since the shard key index cannot be multikey.
                           {},
-                          false /* sparse */,
-                          false /* unique */,
+                          /*sp=*/false,
+                          /*unq=*/false,
                           IndexEntry::Identifier{"shardkey"},
                           BSONObj(),
                           /*wildcardProjection=*/nullptr);

@@ -619,7 +619,7 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
             // It is not safe to ignore errors from collection creation while inside a
             // multi-document transaction.
             auto canContinue = handleError(
-                opCtx, ex, nss, ordered, false /* multiUpdate */, boost::none /* sampleId */, out);
+                opCtx, ex, nss, ordered, /*isMultiUpdate=*/false, boost::none /* sampleId */, out);
             invariant(!canContinue);
             return false;
         }
@@ -730,7 +730,7 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
             });
         } catch (const DBException& ex) {
             bool canContinue = handleError(
-                opCtx, ex, nss, ordered, false /* multiUpdate */, boost::none /* sampleId */, out);
+                opCtx, ex, nss, ordered, /*isMultiUpdate=*/false, boost::none /* sampleId */, out);
 
             if (!canContinue) {
                 // Failed in ordered batch, or in a transaction, or from some unrecoverable error.
@@ -1382,7 +1382,7 @@ WriteResult performInserts(
                                               ex,
                                               actualNs,
                                               wholeOp.getOrdered(),
-                                              false /* multiUpdate */,
+                                              /*isMultiUpdate=*/false,
                                               boost::none /* sampleId */,
                                               &out);
             }
@@ -2324,7 +2324,7 @@ WriteResult performDeletes(
                                           ex,
                                           ns,
                                           wholeOp.getOrdered(),
-                                          false /* multiUpdate */,
+                                          /*isMultiUpdate=*/false,
                                           singleOp.getSampleId(),
                                           &out);
             if (!out.canContinue)

@@ -717,8 +717,12 @@ TEST_F(ShardTransactionParticipantRetryableWritesTest,
     auto stmtId0 = 0;
     op0.setStatementIds({stmtId0});
     auto opTime0 = repl::OpTime(Timestamp(100, 0), 0);
-    auto entry0 = repl::makeApplyOpsOplogEntry(
-        opTime0, {op0}, osi, Date_t::now(), {} /* stmtIds */, repl::OpTime() /* prevOpTime */);
+    auto entry0 = repl::makeApplyOpsOplogEntry(opTime0,
+                                               {op0},
+                                               osi,
+                                               Date_t::now(),
+                                               {} /* stmtIds */,
+                                               /*prevWriteOpTimeInTransaction=*/repl::OpTime());
 
     insertOplogEntry(entry0);
 
@@ -783,7 +787,7 @@ TEST_F(ShardTransactionParticipantRetryableWritesTest,
                                                osi,
                                                Date_t::now(),
                                                {} /* stmtIds */,
-                                               repl::OpTime() /* prevOpTime */,
+                                               /*prevWriteOpTimeInTransaction=*/repl::OpTime(),
                                                boost::none /* multiOpType */,
                                                repl::ApplyOpsType::kPartial);
 
@@ -797,7 +801,7 @@ TEST_F(ShardTransactionParticipantRetryableWritesTest,
                                                osi,
                                                Date_t::now(),
                                                {} /* stmtIds */,
-                                               entry0.getOpTime() /* prevOpTime */,
+                                               /*prevWriteOpTimeInTransaction=*/entry0.getOpTime(),
                                                boost::none /* multiOpType */,
                                                repl::ApplyOpsType::kTerminal);
 
@@ -864,7 +868,7 @@ TEST_F(ShardTransactionParticipantRetryableWritesTest,
                                                osi,
                                                Date_t::now(),
                                                {} /* stmtIds */,
-                                               repl::OpTime() /* prevOpTime */,
+                                               /*prevWriteOpTimeInTransaction=*/repl::OpTime(),
                                                boost::none /* multiOpType */,
                                                repl::ApplyOpsType::kPrepare);
 
@@ -935,7 +939,7 @@ TEST_F(ShardTransactionParticipantRetryableWritesTest,
                                                osi,
                                                Date_t::now(),
                                                {} /* stmtIds */,
-                                               repl::OpTime() /* prevOpTime */,
+                                               /*prevWriteOpTimeInTransaction=*/repl::OpTime(),
                                                boost::none /* multiOpType */,
                                                repl::ApplyOpsType::kPartial);
 
@@ -949,7 +953,7 @@ TEST_F(ShardTransactionParticipantRetryableWritesTest,
                                                osi,
                                                Date_t::now(),
                                                {} /* stmtIds */,
-                                               entry0.getOpTime() /* prevOpTime */,
+                                               /*prevWriteOpTimeInTransaction=*/entry0.getOpTime(),
                                                boost::none /* multiOpType */,
                                                repl::ApplyOpsType::kPrepare);
 
@@ -1015,8 +1019,12 @@ TEST_F(TransactionParticipantRetryableWritesTest,
     auto stmtId0 = 0;
     op0.setStatementIds({stmtId0});
     auto opTime0 = repl::OpTime(Timestamp(100, 0), 0);
-    auto entry0 = repl::makeApplyOpsOplogEntry(
-        opTime0, {op0}, osi, Date_t::now(), {} /* stmtIds */, repl::OpTime() /* prevOpTime */);
+    auto entry0 = repl::makeApplyOpsOplogEntry(opTime0,
+                                               {op0},
+                                               osi,
+                                               Date_t::now(),
+                                               {} /* stmtIds */,
+                                               /*prevWriteOpTimeInTransaction=*/repl::OpTime());
 
     insertOplogEntry(entry0);
 
@@ -1086,8 +1094,12 @@ TEST_F(TransactionParticipantRetryableWritesTest,
         auto op0 = repl::MutableOplogEntry::makeInsertOperation(
             kNss, uuid, BSON("_id" << 0 << "x" << 10), BSON("_id" << 0));
         op0.setStatementIds({stmtId0});
-        auto entry0 = repl::makeApplyOpsOplogEntry(
-            opTime0, {op0}, osi, Date_t::now(), {} /* stmtIds */, repl::OpTime() /* prevOpTime */);
+        auto entry0 = repl::makeApplyOpsOplogEntry(opTime0,
+                                                   {op0},
+                                                   osi,
+                                                   Date_t::now(),
+                                                   {} /* stmtIds */,
+                                                   /*prevWriteOpTimeInTransaction=*/repl::OpTime());
 
         insertOplogEntry(entry0);
 
@@ -1121,7 +1133,7 @@ TEST_F(TransactionParticipantRetryableWritesTest,
                                          osi,
                                          Date_t::now(),
                                          {} /* stmtIds */,
-                                         repl::OpTime() /* prevOpTime */,
+                                         /*prevWriteOpTimeInTransaction=*/repl::OpTime(),
                                          repl::MultiOplogEntryType::kApplyOpsAppliedSeparately);
 
         insertOplogEntry(entry1);

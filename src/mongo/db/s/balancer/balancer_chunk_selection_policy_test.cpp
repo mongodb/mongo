@@ -521,7 +521,7 @@ TEST_F(BalancerChunkSelectionTest, MaxTimeToScheduleBalancingOperationsExceeded)
     // migrations per batch since the maximum number of migrations per balancing round is 2 (with 4
     // shards)
     expectGetStatsForBalancingCommandsWithOneMigration(
-        4 /*numShards*/, kShardId0 /*donor*/, kShardId1 /*recipient*/);
+        4 /*numShards*/, /*donorShardId=*/kShardId0, /*recipientShardId=*/kShardId1);
 
     future.default_timed_get();
 }
@@ -553,9 +553,9 @@ TEST_F(BalancerChunkSelectionTest, MoreThanOneBatchIsProcessedIfNeeded) {
     // We are scheduling one migration on the first batch to make sure that the second batch is
     // processed
     expectGetStatsForBalancingCommandsWithOneMigration(
-        4 /*numShards*/, kShardId0 /*donor*/, kShardId1 /*recipient*/);
+        4 /*numShards*/, /*donorShardId=*/kShardId0, /*recipientShardId=*/kShardId1);
     expectGetStatsForBalancingCommandsWithOneMigration(
-        4 /*numShards*/, kShardId2 /*donor*/, kShardId3 /*recipient*/);
+        4 /*numShards*/, /*donorShardId=*/kShardId2, /*recipientShardId=*/kShardId3);
 
     future.default_timed_get();
 }
@@ -588,7 +588,7 @@ TEST_F(BalancerChunkSelectionTest, StopChunksSelectionIfThereAreNoMoreShardsAvai
     // Only 1 batch must be processed, so we expect only 1 call to `getStatsForBalancing` since
     // the cluster has 2 shards
     expectGetStatsForBalancingCommandsWithOneMigration(
-        2 /*numShards*/, kShardId0 /*donor*/, kShardId1 /*recipient*/);
+        2 /*numShards*/, /*donorShardId=*/kShardId0, /*recipientShardId=*/kShardId1);
 
     future.default_timed_get();
 }
@@ -623,7 +623,7 @@ TEST_F(BalancerChunkSelectionTest, DontSelectChunksFromCollectionsWithDefragment
     });
 
     expectGetStatsForBalancingCommandsWithOneMigration(
-        2 /*numShards*/, kShardId0 /*donor*/, kShardId1 /*recipient*/);
+        2 /*numShards*/, /*donorShardId=*/kShardId0, /*recipientShardId=*/kShardId1);
     future.default_timed_get();
 }
 
@@ -656,7 +656,7 @@ TEST_F(BalancerChunkSelectionTest, DontSelectChunksFromCollectionsWithBalancingD
     });
 
     expectGetStatsForBalancingCommandsWithOneMigration(
-        2 /*numShards*/, kShardId0 /*donor*/, kShardId1 /*recipient*/);
+        2 /*numShards*/, /*donorShardId=*/kShardId0, /*recipientShardId=*/kShardId1);
     future.default_timed_get();
 }
 
@@ -690,7 +690,7 @@ TEST_F(BalancerChunkSelectionTest, DontSelectChunksFromCollectionsWithChunkOpera
     });
 
     expectGetStatsForBalancingCommandsWithOneMigration(
-        2 /*numShards*/, kShardId0 /*donor*/, kShardId1 /*recipient*/);
+        2 /*numShards*/, /*donorShardId=*/kShardId0, /*recipientShardId=*/kShardId1);
     future.default_timed_get();
 }
 

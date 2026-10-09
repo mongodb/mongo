@@ -2570,7 +2570,7 @@ TEST_F(OplogFetcherTest, CheckFindCommandIncludesFilter) {
     auto oplogFetcher =
         getOplogFetcherAfterConnectionCreated(std::ref(shutdownState),
                                               0 /* numRestarts */,
-                                              true /* requireFresherSyncSourc */,
+                                              /*requireFresherSyncSource=*/true,
                                               OplogFetcher::StartingPoint::kSkipFirstDoc,
                                               filter);
 
@@ -2605,7 +2605,7 @@ TEST_F(OplogFetcherTest, CheckFindCommandIncludesCustomReadConcern) {
     auto oplogFetcher =
         getOplogFetcherAfterConnectionCreated(std::ref(shutdownState),
                                               0 /* numRestarts */,
-                                              true /* requireFresherSyncSourc */,
+                                              /*requireFresherSyncSource=*/true,
                                               OplogFetcher::StartingPoint::kSkipFirstDoc,
                                               BSONObj() /* filter */,
                                               readConcern);
@@ -2640,7 +2640,7 @@ TEST_F(OplogFetcherTest, CheckFindCommandIncludesRequestResumeTokenWhenRequested
     auto oplogFetcher =
         getOplogFetcherAfterConnectionCreated(std::ref(shutdownState),
                                               0 /* numRestarts */,
-                                              true /* requireFresherSyncSourc */,
+                                              /*requireFresherSyncSource=*/true,
                                               OplogFetcher::StartingPoint::kSkipFirstDoc,
                                               BSONObj() /* filter */,
                                               ReadConcernArgs() /* readConcern */,

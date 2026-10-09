@@ -594,7 +594,7 @@ TEST_F(CanonicalQueryEncoderTest, ComputeKeySBE) {
                       "{}",
                       "{}",
                       nullptr /* findCommand */,
-                      {} /* pipeline */,
+                      /*pipelineObj=*/{},
                       true /* isCountLike */);
 
     // With FindCommandRequest

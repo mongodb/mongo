@@ -903,7 +903,7 @@ Status DbChecker::_hashExtraIndexKeysCheck(OperationContext* opCtx,
         batchStats->nHasherConsecutiveIdenticalKeysAtEnd,
         batchStats->readTimestamp,
         batchStats->time,
-        boost::none /* collOpts */,
+        /*options=*/boost::none,
         batchStats->indexSpec);
 
     if (kDebugBuild || logEntry->getSeverity() != SeverityEnum::Info ||

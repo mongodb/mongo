@@ -986,7 +986,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
         shard1,
         TransactionRouter::Router::parseParticipantResponseMetadata(
             kOkReadOnlyFalseAdditionalParticipantsMissingReadOnly),
-        true /* fromAsyncGetMore*/);
+        /*forAsyncGetMore=*/true);
 
     auto future =
         launchAsync([&] { txnRouter.commitTransaction(operationContext(), boost::none); });
@@ -3150,7 +3150,7 @@ TEST_F(TransactionRouterTest, AppendFieldsForStartTransactionDefaultRC) {
             boost::none,
             LogicalTime{Timestamp(10, 1)},
             true /* doAppendStartTransaction */,
-            false /* doAppendStartOrContinueTransaction */,
+            /*startOrContinueTransaction=*/false,
             createdDatabases);
 
         ASSERT_EQ(result["MyCmd"].numberLong(), 1);
@@ -3199,7 +3199,7 @@ TEST_F(TransactionRouterTest, AppendFieldsForStartTransactionDefaultRCMajority) 
             boost::none,
             placementConflictTime,
             true /* doAppendStartTransaction */,
-            false /* doAppendStartOrContinueTransaction */,
+            /*startOrContinueTransaction=*/false,
             createdDatabases);
 
         ASSERT_EQ(result["MyCmd"].numberLong(), 1);
@@ -3262,7 +3262,7 @@ TEST_F(TransactionRouterTest, AppendFieldsForStartTransactionDefaultRCCommandSpe
             boost::none,
             placementConflictTime,
             true /* doAppendStartTransaction */,
-            false /* doAppendStartOrContinueTransaction */,
+            /*startOrContinueTransaction=*/false,
             createdDatabases);
 
         ASSERT_EQ(result["MyCmd"].numberLong(), 1);
@@ -3325,7 +3325,7 @@ TEST_F(TransactionRouterTest, AppendFieldsForStartTransactionDefaultRCCommandSpe
             atClusterTime,
             boost::none,
             false /* doAppendStartTransaction */,
-            false /* doAppendStartOrContinueTransaction */,
+            /*startOrContinueTransaction=*/false,
             createdDatabases);
 
         ASSERT_EQ(result["MyCmd"].numberLong(), 1);
@@ -3383,7 +3383,7 @@ TEST_F(TransactionRouterTest,
             atClusterTime,
             boost::none,
             false /* doAppendStartTransaction */,
-            false /* doAppendStartOrContinueTransaction */,
+            /*startOrContinueTransaction=*/false,
             createdDatabases);
 
         ASSERT_EQ(result["MyCmd"].numberLong(), 1);
@@ -3626,15 +3626,15 @@ TEST_F(TransactionRouterTest,
             : std::set<DatabaseName>{};
         auto placementConflictTime = LogicalTime{Timestamp(10, 1)};
         repl::ReadConcernArgs defaultRCArgs;
-        auto resultObj = TransactionRouter::appendFieldsForStartTransaction(
-            operationContext(),
-            cmdObj,
-            defaultRCArgs,
-            boost::none,
-            placementConflictTime,
-            true /* doAppendStartTransaction */,
-            false /* doAppendStartOrContinueTransaction */,
-            createdDatabases);
+        auto resultObj =
+            TransactionRouter::appendFieldsForStartTransaction(operationContext(),
+                                                               cmdObj,
+                                                               defaultRCArgs,
+                                                               boost::none,
+                                                               placementConflictTime,
+                                                               true /* doAppendStartTransaction */,
+                                                               /*startOrContinueTransaction=*/false,
+                                                               createdDatabases);
 
         // Deserialize the resulted bulkWrite object
         auto opMsgRequest = OpMsgRequestBuilder::create(

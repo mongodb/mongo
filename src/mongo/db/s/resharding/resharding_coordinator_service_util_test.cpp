@@ -224,8 +224,7 @@ TEST_F(ReshardingCoordinatorServiceUtilTest,
         BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(
                  NamespaceString::createNamespaceString_forTest("db.foo"),
                  SerializationContext::stateDefault())),
-        false  // multi
-    );
+        /*multiDelete=*/false);
     BSONObjBuilder resultOneDelete;
     resultOneDelete.append("n", 1);
     ASSERT_DOES_NOT_THROW(

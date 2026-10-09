@@ -991,11 +991,10 @@ private:
             _expCtx);
 
         // b. Merge the placement of each matched namespace into a single set field.
-        auto unwindShardsStage =
-            DocumentSourceUnwind::create(_expCtx,
-                                         std::string("shards"),
-                                         false /* preserveNullAndEmptyArrays */,
-                                         boost::none /* indexPath */);
+        auto unwindShardsStage = DocumentSourceUnwind::create(_expCtx,
+                                                              std::string("shards"),
+                                                              /*includeNullIfEmptyOrMissing=*/false,
+                                                              /*includeArrayIndex=*/boost::none);
 
         auto mergeAllGroupsInASingleShardListSpec =
             BSON("_id" << "" << "shards" << BSON("$addToSet" << "$shards"));

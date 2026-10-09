@@ -1519,7 +1519,7 @@ TEST_F(ReplCoordReconfigTest, WaitForConfigCommitmentTimesOutIfConfigIsNotCommit
     const auto opCtx = makeOperationContext();
     Status status(ErrorCodes::InternalError, "Not Set");
     configVersion = 3;
-    ASSERT_OK(doSafeReconfig(opCtx.get(), configVersion, Cb_members, 1 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), configVersion, Cb_members, /*quorumHeartbeats=*/1));
 
     opCtx->setDeadlineAfterNowBy(Milliseconds(1), ErrorCodes::MaxTimeMSExpired);
     stdx::thread reconfigThread = stdx::thread([&] {
@@ -1559,7 +1559,7 @@ TEST_F(ReplCoordReconfigTest, WaitForConfigCommitmentReturnsOKIfConfigIsCommitte
     // Do a first reconfig that should succeed since the current config is committed.
     const auto opCtx = makeOperationContext();
     configVersion = 3;
-    ASSERT_OK(doSafeReconfig(opCtx.get(), configVersion, Cb_members, 1 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), configVersion, Cb_members, /*quorumHeartbeats=*/1));
 
     // Replicate op to ensure config is committed.
     replicateOpTo(2, commitPoint);
@@ -1591,16 +1591,16 @@ TEST_F(ReplCoordReconfigTest,
 
     // Do a first reconfig that should succeed since the current config is committed.
     configVersion = 3;
-    ASSERT_OK(doSafeReconfig(opCtx.get(), configVersion, Cb_members, 1 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), configVersion, Cb_members, /*quorumHeartbeats=*/1));
 
     // Try to reconfig out of Cb which should fail.
     configVersion = 4;
-    Status status = doSafeReconfig(opCtx.get(), configVersion, Cb_members, 0 /* quorumHbs */);
+    Status status = doSafeReconfig(opCtx.get(), configVersion, Cb_members, /*quorumHeartbeats=*/0);
     ASSERT_EQUALS(status.code(), ErrorCodes::CurrentConfigNotCommittedYet);
 
     // Catch up node and try reconfig again.
     replicateOpTo(2, commitPoint);
-    ASSERT_OK(doSafeReconfig(opCtx.get(), configVersion, Cb_members, 1 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), configVersion, Cb_members, /*quorumHeartbeats=*/1));
 }
 
 TEST_F(ReplCoordReconfigTest,
@@ -1631,16 +1631,16 @@ TEST_F(ReplCoordReconfigTest,
 
     // Do a first reconfig that should succeed since the current config is committed.
     configVersion = 3;
-    ASSERT_OK(doSafeReconfig(opCtx.get(), configVersion, Cb_members, 3 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), configVersion, Cb_members, /*quorumHeartbeats=*/3));
 
     // Try to reconfig out of Cb which should fail.
     configVersion = 4;
-    Status status = doSafeReconfig(opCtx.get(), configVersion, Cb_members, 0 /* quorumHbs */);
+    Status status = doSafeReconfig(opCtx.get(), configVersion, Cb_members, /*quorumHeartbeats=*/0);
     ASSERT_EQUALS(status.code(), ErrorCodes::CurrentConfigNotCommittedYet);
 
     // Catch up node and try reconfig again.
     replicateOpTo(3, commitPoint);
-    ASSERT_OK(doSafeReconfig(opCtx.get(), configVersion, Cb_members, 3 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), configVersion, Cb_members, /*quorumHeartbeats=*/3));
 }
 
 TEST_F(ReplCoordReconfigTest,
@@ -1670,16 +1670,16 @@ TEST_F(ReplCoordReconfigTest,
 
     // Do a first reconfig that should succeed since the current config is committed.
     configVersion = 3;
-    ASSERT_OK(doSafeReconfig(opCtx.get(), configVersion, Cb_members, 2 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), configVersion, Cb_members, /*quorumHeartbeats=*/2));
 
     // Try to reconfig out of Cb which should fail.
     configVersion = 4;
-    Status status = doSafeReconfig(opCtx.get(), configVersion, Cb_members, 0 /* quorumHbs */);
+    Status status = doSafeReconfig(opCtx.get(), configVersion, Cb_members, /*quorumHeartbeats=*/0);
     ASSERT_EQUALS(status.code(), ErrorCodes::CurrentConfigNotCommittedYet);
 
     // Catch up node and try reconfig again.
     replicateOpTo(2, commitPoint);
-    ASSERT_OK(doSafeReconfig(opCtx.get(), configVersion, Cb_members, 2 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), configVersion, Cb_members, /*quorumHeartbeats=*/2));
 }
 
 TEST_F(ReplCoordReconfigTest,
@@ -1712,16 +1712,16 @@ TEST_F(ReplCoordReconfigTest,
 
     // Do a first reconfig that should succeed since the current config is committed.
     configVersion = 3;
-    ASSERT_OK(doSafeReconfig(opCtx.get(), configVersion, Cb_members, 3 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), configVersion, Cb_members, /*quorumHeartbeats=*/3));
 
     // Try to reconfig out of Cb which should fail.
     configVersion = 4;
-    Status status = doSafeReconfig(opCtx.get(), configVersion, Cb_members, 0 /* quorumHbs */);
+    Status status = doSafeReconfig(opCtx.get(), configVersion, Cb_members, /*quorumHeartbeats=*/0);
     ASSERT_EQUALS(status.code(), ErrorCodes::CurrentConfigNotCommittedYet);
 
     // Catch up node and try reconfig again.
     replicateOpTo(2, commitPoint);
-    ASSERT_OK(doSafeReconfig(opCtx.get(), configVersion, Cb_members, 3 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), configVersion, Cb_members, /*quorumHeartbeats=*/3));
 }
 
 TEST_F(ReplCoordReconfigTest,
@@ -1875,7 +1875,7 @@ TEST_F(ReplCoordReconfigTest, NewlyAddedFieldIsTrueForNewMembersInReconfig) {
     const auto members = BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1") << member(3, "n3:1"));
 
     unittest::LogCaptureGuard logs;
-    Status status = doSafeReconfig(opCtx.get(), 2, members, 2 /* quorumHbs */);
+    Status status = doSafeReconfig(opCtx.get(), 2, members, /*quorumHeartbeats=*/2);
     ASSERT_OK(status);
     logs.stop();
 
@@ -1904,7 +1904,7 @@ TEST_F(ReplCoordReconfigTest, NewlyAddedFieldIsNotPresentForNodesWithVotesZero) 
                                                    << "votes" << 0 << "priority" << 0));
 
     unittest::LogCaptureGuard logs;
-    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, 2 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, /*quorumHeartbeats=*/2));
     logs.stop();
 
     const auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
@@ -1928,7 +1928,7 @@ TEST_F(ReplCoordReconfigTest, NewlyAddedFieldIsNotPresentForNodesWithModifiedHos
     const auto members = BSON_ARRAY(member(1, "n1:1") << member(2, "newHostName:12345"));
 
     unittest::LogCaptureGuard logs;
-    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, 1 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, /*quorumHeartbeats=*/1));
 
     logs.stop();
 
@@ -1953,7 +1953,7 @@ TEST_F(ReplCoordReconfigTest, NewlyAddedFieldIsNotPresentForNodesWithDifferentIn
     const auto members = BSON_ARRAY(member(2, "n2:1") << member(1, "n1:1"));
 
     unittest::LogCaptureGuard logs;
-    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, 1 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, /*quorumHeartbeats=*/1));
     logs.stop();
 
     const auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
@@ -1976,7 +1976,7 @@ TEST_F(ReplCoordReconfigTest, ForceReconfigDoesNotPersistNewlyAddedFieldFromOldN
     auto members = BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1") << member(3, "n3:1"));
 
     unittest::LogCaptureGuard logs;
-    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, 2 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, /*quorumHeartbeats=*/2));
     logs.stop();
 
     auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
@@ -2103,7 +2103,7 @@ TEST_F(ReplCoordReconfigTest, ParseFailedIfUserProvidesNewlyAddedFieldDuringSafe
                                                                     << "newlyAdded" << true));
 
     unittest::LogCaptureGuard logs;
-    Status status = doSafeReconfig(opCtx.get(), 2, members, 0 /* quorumHbs */);
+    Status status = doSafeReconfig(opCtx.get(), 2, members, /*quorumHeartbeats=*/0);
     logs.stop();
 
     ASSERT_EQ(ErrorCodes::InvalidReplicaSetConfig, status);
@@ -2130,7 +2130,7 @@ TEST_F(ReplCoordReconfigTest, ReconfigNeverModifiesExistingNewlyAddedFieldForMem
     initialSyncNodes.emplace_back(HostAndPort("n3:1"));
 
     unittest::LogCaptureGuard logs;
-    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, 2 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, /*quorumHeartbeats=*/2));
     logs.stop();
 
     auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
@@ -2153,7 +2153,7 @@ TEST_F(ReplCoordReconfigTest, ReconfigNeverModifiesExistingNewlyAddedFieldForMem
     members = BSON_ARRAY(member(2, "n2:1") << member(1, "n1:1") << member(3, "n3:1"));
 
     logs.start();
-    ASSERT_OK(doSafeReconfig(opCtx.get(), 3, members, 2 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), 3, members, /*quorumHeartbeats=*/2));
     logs.stop();
 
     rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
@@ -2176,7 +2176,7 @@ TEST_F(ReplCoordReconfigTest, ReconfigNeverModifiesExistingNewlyAddedFieldForPre
     initialSyncNodes.emplace_back(HostAndPort("n3:1"));
 
     unittest::LogCaptureGuard logs;
-    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, 2 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, /*quorumHeartbeats=*/2));
     logs.stop();
 
     auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
@@ -2201,7 +2201,7 @@ TEST_F(ReplCoordReconfigTest, ReconfigNeverModifiesExistingNewlyAddedFieldForPre
     initialSyncNodes.emplace_back(HostAndPort("n4:1"));
 
     logs.start();
-    ASSERT_OK(doSafeReconfig(opCtx.get(), 3, members, 3 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), 3, members, /*quorumHeartbeats=*/3));
     logs.stop();
 
     rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
@@ -2225,7 +2225,7 @@ TEST_F(ReplCoordReconfigTest, NodesWithNewlyAddedFieldSetAreTreatedAsVotesZero) 
     auto members = BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1") << member(3, "n3:1"));
 
     unittest::LogCaptureGuard logs;
-    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, 2 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, /*quorumHeartbeats=*/2));
     logs.stop();
 
     const auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
@@ -2257,7 +2257,7 @@ TEST_F(ReplCoordReconfigTest, NodesWithNewlyAddedFieldSetHavePriorityZero) {
     initialSyncNodes.emplace_back(HostAndPort("n3:1"));
 
     unittest::LogCaptureGuard logs;
-    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, 2 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, /*quorumHeartbeats=*/2));
     logs.stop();
 
     ASSERT_EQUALS(
@@ -2289,7 +2289,7 @@ TEST_F(ReplCoordReconfigTest, NodesWithNewlyAddedFieldSetHavePriorityZero) {
     initialSyncNodes.emplace_back(HostAndPort("n4:1"));
 
     logs.start();
-    ASSERT_OK(doSafeReconfig(opCtx.get(), 3, members, 3 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), 3, members, /*quorumHeartbeats=*/3));
     logs.stop();
 
     ASSERT_EQUALS(
@@ -2326,7 +2326,7 @@ TEST_F(ReplCoordReconfigTest, ArbiterNodesShouldNeverHaveNewlyAddedField) {
                                                               << "arbiterOnly" << true));
 
     unittest::LogCaptureGuard logs;
-    ASSERT_OK(doSafeReconfig(opCtx.get(), 3, members, 2 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), 3, members, /*quorumHeartbeats=*/2));
     logs.stop();
 
     const auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();

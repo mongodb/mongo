@@ -287,7 +287,7 @@ TEST_F(ReplCoordHBV1Test, RestartingHeartbeatsShouldOnlyCancelScheduledHeartbeat
     // Receive a request from node3 saying it's the primary, so that we restart scheduled
     // heartbeats.
     receiveHeartbeatFrom(rsConfig,
-                         3 /* senderId */,
+                         /*sourceId=*/3,
                          HostAndPort("node3", 12345),
                          1 /* term */,
                          3 /* currentPrimaryId */);
@@ -348,7 +348,7 @@ TEST_F(ReplCoordHBV1Test,
 
     // We're a secondary and we receive a request from node3 saying it's the primary.
     receiveHeartbeatFrom(rsConfig,
-                         3 /* senderId */,
+                         /*sourceId=*/3,
                          HostAndPort("node3", 12345),
                          1 /* term */,
                          3 /* currentPrimaryId */);
@@ -373,7 +373,7 @@ TEST_F(ReplCoordHBV1Test,
 
     // Heartbeat in a stale term shouldn't re-schedule heartbeats.
     receiveHeartbeatFrom(rsConfig,
-                         3 /* senderId */,
+                         /*sourceId=*/3,
                          HostAndPort("node3", 12345),
                          0 /* term */,
                          3 /* currentPrimaryId */);
@@ -411,7 +411,7 @@ TEST_F(
 
     // Node 2 thinks 3 is the primary. We don't restart heartbeats for that.
     receiveHeartbeatFrom(getReplCoord()->getConfig(),
-                         2 /* senderId */,
+                         /*sourceId=*/2,
                          HostAndPort("node3", 12345),
                          0 /* term */,
                          3 /* currentPrimaryId */);

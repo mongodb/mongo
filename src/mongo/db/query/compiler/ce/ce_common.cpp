@@ -28,7 +28,7 @@ public:
         tassert(11214702, "Vectors must be the same size", l.size() == r.size());
 
         for (size_t i = 0; i < l.size(); i++) {
-            auto cmp = l[i].woCompare(r[i], false, nullptr /* stringComparator */);
+            auto cmp = l[i].woCompare(r[i], false, /*comparator=*/nullptr);
             if (cmp != 0) {
                 return cmp < 0;
             }

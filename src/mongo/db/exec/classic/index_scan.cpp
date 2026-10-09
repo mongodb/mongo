@@ -177,14 +177,14 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
 
         // In debug mode, check that the cursor isn't lying to us.
         if (kDebugBuild && !_startKey.isEmpty()) {
-            int cmp = dehydratedKey.woCompare(_startKey, _ordering, /*compareFieldNames*/ false);
+            int cmp = dehydratedKey.woCompare(_startKey, _ordering, /*rules=*/false);
             if (cmp == 0)
                 dassert(_startKeyInclusive);
             dassert(_forward ? cmp >= 0 : cmp <= 0);
         }
 
         if (kDebugBuild && !_endKey.isEmpty()) {
-            int cmp = dehydratedKey.woCompare(_endKey, _ordering, /*compareFieldNames*/ false);
+            int cmp = dehydratedKey.woCompare(_endKey, _ordering, /*rules=*/false);
             if (cmp == 0)
                 dassert(_endKeyInclusive);
             dassert(_forward ? cmp <= 0 : cmp >= 0);

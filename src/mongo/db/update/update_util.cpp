@@ -271,7 +271,7 @@ void ShardingChecksForUpdate::checkUpdateChangesReshardingKey(OperationContext* 
 
     uassert(WouldChangeOwningShardInfo(oldObj.value(),
                                        newObj,
-                                       false /* upsert */,
+                                       /*shouldUpsert=*/false,
                                        _collAcq.nss(),
                                        _collAcq.uuid(),
                                        boost::none,
@@ -345,7 +345,7 @@ void ShardingChecksForUpdate::checkUpdateChangesExistingShardKey(
         auto& collectionPtr = _collAcq.getCollectionPtr();
         uasserted(WouldChangeOwningShardInfo(oldObj.value(),
                                              newObj,
-                                             false /* upsert */,
+                                             /*shouldUpsert=*/false,
                                              collectionPtr->ns(),
                                              collectionPtr->uuid()),
                   "This update would cause the doc to change owning shards");
@@ -491,7 +491,8 @@ std::pair<BSONObj, bool> transformDocument(OperationContext* opCtx,
                     request->getAllowShardKeyUpdatesWithoutFullShardKeyInQuery(),
                     request->isMulti(),
                     cq);
-                scfu.checkUpdateChangesShardKeyFields(opCtx, doc, boost::none /* newObj */, oldObj);
+                scfu.checkUpdateChangesShardKeyFields(
+                    opCtx, doc, /*newObjCopy=*/boost::none, oldObj);
             }
 
             WriteUnitOfWork wunit(opCtx);

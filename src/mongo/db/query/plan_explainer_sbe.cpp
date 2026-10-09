@@ -933,7 +933,7 @@ std::vector<ExplainPlanEntry> PlanExplainerClassicRuntimePlannerForSBE::_getPlan
                                                                   boost::none /* queryParams */,
                                                                   boost::none /* remotePlanInfo */,
                                                                   policy,
-                                                                  false /* matchesCachedPlan */,
+                                                                  /*isCached=*/false,
                                                                   true /* usedJoinOpt */,
                                                                   _estimates);
             ExplainPlanEntry entry;

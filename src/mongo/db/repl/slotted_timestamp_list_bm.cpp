@@ -97,7 +97,7 @@ void BM_EraseFIFO(benchmark::State& state) {
         const int64_t count = state.range(0);
 
         iters.reserve(count);
-        insertN(list, 0 /* startIndex */, count /* N */, iters);
+        insertN(list, /*startValue=*/0, count /* N */, iters);
 
         auto duration =
             measureOperationTime([&]() { eraseN(list, 0 /* startIndex */, count /* N */, iters); });
@@ -113,7 +113,7 @@ void BM_EraseLIFO(benchmark::State& state) {
         const int64_t count = state.range(0);
 
         iters.reserve(count);
-        insertN(list, 0 /* startIndex */, count /* N */, iters);
+        insertN(list, /*startValue=*/0, count /* N */, iters);
 
         std::reverse(iters.begin(), iters.end());
 
@@ -132,12 +132,12 @@ void BM_InsertAfterEraseFIFO(benchmark::State& state) {
 
         iters.reserve(count);
 
-        insertN(list, 0 /* startIndex */, count /* N */, iters);
+        insertN(list, /*startValue=*/0, count /* N */, iters);
         eraseN(list, 0 /* startIndex */, count /* N */, iters);
         iters.clear();
 
         auto duration =
-            measureOperationTime([&] { insertN(list, 0 /* startIndex */, count /* N */, iters); });
+            measureOperationTime([&] { insertN(list, /*startValue=*/0, count /* N */, iters); });
 
         state.SetIterationTime(duration.count());
     }
@@ -151,13 +151,13 @@ void BM_InsertAfterEraseLIFO(benchmark::State& state) {
 
         iters.reserve(count);
 
-        insertN(list, 0 /* startIndex */, count /* N */, iters);
+        insertN(list, /*startValue=*/0, count /* N */, iters);
         std::reverse(iters.begin(), iters.end());
         eraseN(list, 0 /* startIndex */, count /* N */, iters);
         iters.clear();
 
         auto duration =
-            measureOperationTime([&] { insertN(list, 0 /* startIndex */, count /* N */, iters); });
+            measureOperationTime([&] { insertN(list, /*startValue=*/0, count /* N */, iters); });
 
         state.SetIterationTime(duration.count());
     }

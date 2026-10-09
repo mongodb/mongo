@@ -502,7 +502,7 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, CanDowngradeFailsWithConflictingB
         CreateCommand cmd = CreateCommand(bucketsNss);
         cmd.getCreateCollectionRequest().setTimeseries(TimeseriesOptions("timestamp"));
         ASSERT_OK(createCollectionForApplyOps(
-            operationContext(), bucketsNss.dbName(), boost::none /*UUID*/, cmd.toBSON(), false));
+            operationContext(), bucketsNss.dbName(), /*ui=*/boost::none, cmd.toBSON(), false));
     }
 
     VersionContext::FixedOperationFCVRegion fixedOfcvRegion(operationContext());

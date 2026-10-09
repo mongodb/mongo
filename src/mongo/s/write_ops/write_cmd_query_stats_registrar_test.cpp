@@ -748,7 +748,7 @@ TEST_F(WriteCmdQueryStatsRegistrarRegisterRequestFixture,
         OpDebug::QueryStatsInfo qsi;
         qsi.key = std::make_unique<query_stats::MockKey>(ctx);
         qsi.keyHash = 42;
-        CurOp::get(ctx)->debug().setQueryStatsInfoAtOpIndex(0 /* kInsertOpIndex */, std::move(qsi));
+        CurOp::get(ctx)->debug().setQueryStatsInfoAtOpIndex(/*opIndex=*/0, std::move(qsi));
     };
 
     // No query stats entry registered: the flag is explicitly cleared, even if the client pre-set

@@ -484,7 +484,7 @@ public:
                                             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                                             requests,
                                             false /* allowPartialResults */,
-                                            nullptr /* RoutingContext */,
+                                            /*routingCtx=*/nullptr,
                                             Shard::RetryPolicy::kIdempotentOrCursorInvalidated,
                                             {shardOpKey, configOpKey});
             tassert(9504004,

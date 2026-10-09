@@ -41,7 +41,7 @@ void ExtractFieldPathsStage::constructRoot() {
     for (size_t i = 0; i < _outputs.size(); ++i) {
         _recorders.emplace_back();
         _root->add(_outputs[i].first,
-                   nullptr /* filterRecorder */,
+                   /*outFilterRecorder=*/nullptr,
                    &_recorders.back() /* outProjRecorder */);
     }
 }

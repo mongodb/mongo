@@ -97,11 +97,10 @@ protected:
 
         const auto scopedCsr = CollectionShardingRuntime::acquireShared(opCtx, nss());
 
-        uassert(StaleConfigInfo(
-                    nss(),
-                    ShardVersionFactory::make(ChunkVersion::IGNORED()) /* receivedVersion */,
-                    /*wanted=*/boost::none,
-                    ShardingState::get(opCtx)->shardId()),
+        uassert(StaleConfigInfo(nss(),
+                                /*received=*/ShardVersionFactory::make(ChunkVersion::IGNORED()),
+                                /*wanted=*/boost::none,
+                                ShardingState::get(opCtx)->shardId()),
                 str::stream() << "The critical section for " << nss().toStringForErrorMsg()
                               << " is taken",
                 !scopedCsr->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite));

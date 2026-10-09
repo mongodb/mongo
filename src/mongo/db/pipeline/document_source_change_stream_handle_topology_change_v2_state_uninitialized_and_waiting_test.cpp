@@ -524,7 +524,7 @@ TEST_F(DSV2StateUninitializedAndWaitingTest, StateWaitingTransitioningToFetching
         std::make_unique<DataToShardsAllocationQueryServiceMock>();
 
     auto params = buildParametersForTest(getExpCtx(),
-                                         10 /* allocationToShardsPollPeriodSecs */,
+                                         /*minAllocationToShardsPollPeriodSecs=*/10,
                                          changeStreamReaderBuilder.get(),
                                          dataToShardsAllocationQueryService.get());
 

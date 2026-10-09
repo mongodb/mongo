@@ -33,8 +33,8 @@ TEST(PipelinedApplierBatchTrackerTest, WaitTimesOutWithoutACompletedFrontBatch) 
 
 TEST(PipelinedApplierBatchTrackerTest, CountsParticipatingWorkersAndPopsInDispatchOrder) {
     PipelinedApplierBatchTracker tracker;
-    auto first = tracker.addBatch(batchTime(1), 2 /* remainingWorkers */);
-    auto second = tracker.addBatch(batchTime(2), 1 /* remainingWorkers */);
+    auto first = tracker.addBatch(batchTime(1), /*numWorkers=*/2);
+    auto second = tracker.addBatch(batchTime(2), /*numWorkers=*/1);
     // Ensure the pointers to the atomic counters are different.
     ASSERT_NE(first, second);
     ASSERT_EQ(first->load(), 2);

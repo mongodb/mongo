@@ -821,7 +821,7 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::planFromCache(
     QueryPlannerIXSelect::getFields(query.getPrimaryMatchExpression(), &fields);
     // We will not cache queries with 'hint'.
     std::vector<IndexEntry> expandedIndexes = QueryPlannerIXSelect::expandIndexes(
-        fields, params.mainCollectionInfo.indexes, false /* indexHinted */);
+        fields, params.mainCollectionInfo.indexes, /*hintedIndexBson=*/false);
 
     // Map from index name to index number.
     std::map<IndexEntry::Identifier, size_t> indexMap;

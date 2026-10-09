@@ -1116,17 +1116,17 @@ TEST(CurOpTest, ShouldUpdateMemoryStats) {
     ASSERT_EQ(0, curop->getInUseTrackedMemoryBytes());
     ASSERT_EQ(0, curop->getPeakTrackedMemoryBytes());
 
-    curop->setMemoryTrackingStats(10 /*inUseTrackedMemoryBytes*/, 15 /*peakTrackedMemoryBytes*/);
+    curop->setMemoryTrackingStats(/*inUseTrackedMemBytes=*/10, /*peakTrackedMemBytes=*/15);
     ASSERT_EQ(10, curop->getInUseTrackedMemoryBytes());
     ASSERT_EQ(15, curop->getPeakTrackedMemoryBytes());
 
     // The max memory usage is updated if the new max is greater than the current max.
-    curop->setMemoryTrackingStats(21 /*inUseTrackedMemoryBytes*/, 20 /*peakTrackedMemoryBytes*/);
+    curop->setMemoryTrackingStats(/*inUseTrackedMemBytes=*/21, /*peakTrackedMemBytes=*/20);
     ASSERT_EQ(21, curop->getInUseTrackedMemoryBytes());
     ASSERT_EQ(20, curop->getPeakTrackedMemoryBytes());
 
     // The max memory usage is not updated if the new max is not greater than the current max.
-    curop->setMemoryTrackingStats(31 /*inUseTrackedMemoryBytes*/, 15 /*peakTrackedMemoryBytes*/);
+    curop->setMemoryTrackingStats(/*inUseTrackedMemBytes=*/31, /*peakTrackedMemBytes=*/15);
     ASSERT_EQ(31, curop->getInUseTrackedMemoryBytes());
     ASSERT_EQ(20, curop->getPeakTrackedMemoryBytes());
 }
@@ -1181,13 +1181,13 @@ TEST(CurOpTest, SystemWidePeakMemoryUsageOperationMetric) {
     // The metric is process-wide and monotonically non-decreasing, so it may already reflect peaks
     // observed by other operations/tests. Establish a new maximum well above anything else sets.
     const int64_t newPeak = *before + (1LL << 30);
-    curop->setMemoryTrackingStats(1 /*inUseTrackedMemoryBytes*/,
-                                  newPeak /*peakTrackedMemoryBytes*/);
+    curop->setMemoryTrackingStats(/*inUseTrackedMemBytes=*/1,
+                                  /*peakTrackedMemBytes=*/newPeak);
     ASSERT_EQ(*readSystemPeak(), newPeak);
 
     // A smaller per-operation peak must not lower the system-wide high-water mark.
-    curop->setMemoryTrackingStats(1 /*inUseTrackedMemoryBytes*/,
-                                  newPeak - 100 /*peakTrackedMemoryBytes*/);
+    curop->setMemoryTrackingStats(/*inUseTrackedMemBytes=*/1,
+                                  /*peakTrackedMemBytes=*/newPeak - 100);
     ASSERT_EQ(*readSystemPeak(), newPeak);
 }
 
@@ -1206,7 +1206,7 @@ DEATH_TEST(CurOpTestDeathTest, RequireFeatureFlagEnabledToUpdateMemoryStats, "ta
     auto opCtx = serviceContext.makeOperationContext();
     auto curop = CurOp::get(*opCtx);
     unittest::ServerParameterGuard featureFlagController("featureFlagQueryMemoryTracking", false);
-    curop->setMemoryTrackingStats(10 /*inUseTrackedMemoryBytes*/, 15 /*peakTrackedMemoryBytes*/);
+    curop->setMemoryTrackingStats(/*inUseTrackedMemBytes=*/10, /*peakTrackedMemBytes=*/15);
 }
 
 /**
@@ -1232,7 +1232,7 @@ TEST(CurOpTest, MemoryStatsDisplayedIfNonZero) {
     ASSERT_EQ(0, curop->getPeakTrackedMemoryBytes());
     ASSERT_FALSE(res.hasField("peakTrackedMemBytes"));
 
-    curop->setMemoryTrackingStats(10 /*inUseTrackedMemoryBytes*/, 15 /*peakTrackedMemoryBytes*/);
+    curop->setMemoryTrackingStats(/*inUseTrackedMemBytes=*/10, /*peakTrackedMemBytes=*/15);
     BSONObjBuilder bobWithMemStats;
     opDebug.append(opCtx.get(), ls, {}, {}, 0, true /*omitCommand*/, bobWithMemStats);
     res = bobWithMemStats.done();

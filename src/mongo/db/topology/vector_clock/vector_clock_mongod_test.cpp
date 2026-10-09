@@ -47,7 +47,7 @@ namespace {
 class VectorClockMongoDTest : public ShardingMongoDTestFixture {
 protected:
     VectorClockMongoDTest()
-        : ShardingMongoDTestFixture(Options{}.useMockClock(true), false /* setUpMajorityReads */) {}
+        : ShardingMongoDTestFixture(Options{}.useMockClock(true), /*allowMajorityReads=*/false) {}
 
     void setUp() override {
         // Ensure that this node is neither "config server" nor "shard server".

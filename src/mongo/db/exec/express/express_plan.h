@@ -696,15 +696,15 @@ public:
         // Now seek to the first matching key in the index.
         auto sortedAccessMethod = _indexCatalogEntry->accessMethod()->asSortedData();
         auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
-        auto indexCursor = sortedAccessMethod->newCursor(opCtx, ru, true /* forward */);
-        indexCursor->setEndPosition(endKey, true /* endKeyInclusive */);
+        auto indexCursor = sortedAccessMethod->newCursor(opCtx, ru, /*isForward=*/true);
+        indexCursor->setEndPosition(endKey, /*inclusive=*/true);
         key_string::Builder builder(
             sortedAccessMethod->getSortedDataInterface()->getKeyStringVersion());
         auto keyStringForSeek = IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(
             startKey,
             sortedAccessMethod->getSortedDataInterface()->getOrdering(),
-            true /* forward */,
-            true /* startKeyInclusive */,
+            /*isForward=*/true,
+            /*inclusive=*/true,
             builder);
 
         auto keyEntry = indexCursor->seekForKeyValueView(ru, keyStringForSeek);

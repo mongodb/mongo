@@ -1178,7 +1178,7 @@ AllocationToShardsStatus ChangeStreamHandleTopologyChangeV2Stage::_getAllocation
 
 boost::optional<DocumentSource::GetNextResult>
 ChangeStreamHandleTopologyChangeV2Stage::_handleStateUninitialized() {
-    _assertState(State::kUninitialized, {} /* mode */, "_handleStateUninitialized");
+    _assertState(State::kUninitialized, /*expectedMode=*/{}, "_handleStateUninitialized");
 
     auto allocationToShardsStatus = _getAllocationToShardsStatus(_params->resumeToken.clusterTime);
 
@@ -1206,7 +1206,7 @@ ChangeStreamHandleTopologyChangeV2Stage::_handleStateUninitialized() {
 
 boost::optional<DocumentSource::GetNextResult>
 ChangeStreamHandleTopologyChangeV2Stage::_handleStateWaiting() {
-    _assertState(State::kWaiting, {} /* mode */, "_handleStateWaiting");
+    _assertState(State::kWaiting, /*expectedMode=*/{}, "_handleStateWaiting");
 
     OperationContext* opCtx = getContext()->getOperationContext();
     Date_t now = opCtx->getServiceContext()->getPreciseClockSource()->now();
@@ -1284,7 +1284,7 @@ ChangeStreamHandleTopologyChangeV2Stage::_handleStateWaiting() {
 boost::optional<DocumentSource::GetNextResult>
 ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingInitialization() {
     _assertState(
-        State::kFetchingInitialization, {} /* mode */, "_handleStateFetchingInitialization");
+        State::kFetchingInitialization, /*expectedMode=*/{}, "_handleStateFetchingInitialization");
 
     tassert(10657513, "should not have shardTargeter object", _shardTargeter == nullptr);
 
@@ -1336,7 +1336,7 @@ ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingInitialization() {
 boost::optional<DocumentSource::GetNextResult>
 ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingGettingChangeEvent() {
     _assertState(State::kFetchingGettingChangeEvent,
-                 ChangeStreamReadMode::kStrict /* mode */,
+                 /*expectedMode=*/ChangeStreamReadMode::kStrict,
                  "_handleStateFetchingGettingChangeEvent");
 
     auto input = pSource->getNext();
@@ -1378,7 +1378,7 @@ ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingGettingChangeEvent(
 boost::optional<DocumentSource::GetNextResult>
 ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingStartingChangeStreamSegment() {
     _assertState(State::kFetchingStartingChangeStreamSegment,
-                 ChangeStreamReadMode::kIgnoreRemovedShards /* mode */,
+                 /*expectedMode=*/ChangeStreamReadMode::kIgnoreRemovedShards,
                  "_handleStateFetchingStartingChangeStreamSegment");
 
     // Shard targeter should always be already present here in non-testing mode, but it may be
@@ -1481,7 +1481,7 @@ ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingStartingChangeStrea
 boost::optional<DocumentSource::GetNextResult>
 ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingNormalGettingChangeEvent() {
     _assertState(State::kFetchingNormalGettingChangeEvent,
-                 ChangeStreamReadMode::kIgnoreRemovedShards /* mode */,
+                 /*expectedMode=*/ChangeStreamReadMode::kIgnoreRemovedShards,
                  "_handleStateFetchingNormalGettingChangeEvent");
 
     auto input = pSource->getNext();
@@ -1583,7 +1583,7 @@ ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingNormalGettingChange
 boost::optional<DocumentSource::GetNextResult>
 ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingDegradedGettingChangeEvent() {
     _assertState(State::kFetchingDegradedGettingChangeEvent,
-                 ChangeStreamReadMode::kIgnoreRemovedShards /* mode */,
+                 /*expectedMode=*/ChangeStreamReadMode::kIgnoreRemovedShards,
                  "_handleStateFetchingDegradedGettingChangeEvent");
 
     tassert(
@@ -1683,7 +1683,7 @@ ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingDegradedGettingChan
 }
 
 void ChangeStreamHandleTopologyChangeV2Stage::_handleStateDowngrading() {
-    _assertState(State::kDowngrading, {} /* mode */, "_handleStateDowngrading");
+    _assertState(State::kDowngrading, /*expectedMode=*/{}, "_handleStateDowngrading");
 
     uasserted(ErrorCodes::RetryChangeStream, "Downgrading change stream reader to v1 version");
 }

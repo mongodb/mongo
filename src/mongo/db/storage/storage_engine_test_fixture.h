@@ -67,7 +67,7 @@ public:
         coll->init(opCtx);
 
         CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
-            catalog.registerCollection(opCtx, std::move(coll), /*ts=*/boost::none);
+            catalog.registerCollection(opCtx, std::move(coll), /*commitTime=*/boost::none);
         });
 
         return mdbCatalog->getEntry(catalogId);

@@ -1571,7 +1571,7 @@ TEST_F(QueryStatsStoreTest, AggKeyWithInternalOnlyExpressionIsSerializableByExte
 
     // A client with a transport session and no internal tag is an external (user) client.
     auto readClient = getServiceContext()->getService()->makeClient(
-        "external", transport::MockSession::create(/*transportLayer=*/nullptr));
+        "external", transport::MockSession::create(/*tl=*/nullptr));
     auto readOpCtx = readClient->makeOperationContext();
     auto shapified =
         aggKey->toBson(readOpCtx.get(),

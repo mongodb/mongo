@@ -977,7 +977,7 @@ TEST_F(IndexAccessMethodPartialFilterWithInterceptor, InsertMatchingDocumentSide
     int64_t numInserted = 0;
     ASSERT_OK(insertDoc(BSON("_id" << 0 << "a" << kIndexedValue), RecordId(1), &numInserted));
 
-    assertSideWrites(/*deleted=*/{}, /*inserted=*/{BSON("" << kIndexedValue)});
+    assertSideWrites(/*expectedDeleted=*/{}, /*expectedInserted=*/{BSON("" << kIndexedValue)});
     EXPECT_EQ(1, numInserted);
 }
 
@@ -1003,7 +1003,7 @@ TEST_F(IndexAccessMethodPartialFilterWithInterceptor, InsertOnlySideWritesMatchi
         ASSERT_OK(am.insert(opCtx(), pooledBuilder, coll, entry, records, _options, &numInserted));
     });
 
-    assertSideWrites(/*deleted=*/{}, /*inserted=*/{BSON("" << kIndexedValue)});
+    assertSideWrites(/*expectedDeleted=*/{}, /*expectedInserted=*/{BSON("" << kIndexedValue)});
     EXPECT_EQ(1, numInserted);
 }
 
@@ -1011,7 +1011,7 @@ TEST_F(IndexAccessMethodPartialFilterWithInterceptor, RemoveMatchingDocumentSide
     int64_t numDeleted = 0;
     removeDoc(BSON("_id" << 0 << "a" << kIndexedValue), RecordId(1), &numDeleted);
 
-    assertSideWrites(/*deleted=*/{BSON("" << kIndexedValue)}, /*inserted=*/{});
+    assertSideWrites(/*expectedDeleted=*/{BSON("" << kIndexedValue)}, /*expectedInserted=*/{});
     EXPECT_EQ(1, numDeleted);
 }
 
@@ -1032,8 +1032,8 @@ TEST_F(IndexAccessMethodPartialFilterWithInterceptor, UpdateWhenBothDocumentsMat
                         &numInserted,
                         &numDeleted));
 
-    assertSideWrites(/*deleted=*/{BSON("" << kIndexedValue)},
-                     /*inserted=*/{BSON("" << kIndexedValue + 1)});
+    assertSideWrites(/*expectedDeleted=*/{BSON("" << kIndexedValue)},
+                     /*expectedInserted=*/{BSON("" << kIndexedValue + 1)});
     EXPECT_EQ(1, numInserted);
     EXPECT_EQ(1, numDeleted);
 }
@@ -1047,7 +1047,7 @@ TEST_F(IndexAccessMethodPartialFilterWithInterceptor, UpdateWhenOnlyOldDocumentM
                         &numInserted,
                         &numDeleted));
 
-    assertSideWrites(/*deleted=*/{BSON("" << kIndexedValue)}, /*inserted=*/{});
+    assertSideWrites(/*expectedDeleted=*/{BSON("" << kIndexedValue)}, /*expectedInserted=*/{});
     EXPECT_EQ(0, numInserted);
     EXPECT_EQ(1, numDeleted);
 }
@@ -1061,7 +1061,7 @@ TEST_F(IndexAccessMethodPartialFilterWithInterceptor, UpdateWhenOnlyNewDocumentM
                         &numInserted,
                         &numDeleted));
 
-    assertSideWrites(/*deleted=*/{}, /*inserted=*/{BSON("" << kIndexedValue)});
+    assertSideWrites(/*expectedDeleted=*/{}, /*expectedInserted=*/{BSON("" << kIndexedValue)});
     EXPECT_EQ(1, numInserted);
     EXPECT_EQ(0, numDeleted);
 }

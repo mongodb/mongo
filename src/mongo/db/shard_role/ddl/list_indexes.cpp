@@ -374,7 +374,7 @@ public:
 
             if (exec->isEOF()) {
                 return ListIndexesReplyCursor(
-                    0 /* cursorId */,
+                    /*id=*/0,
                     nss,
                     std::move(firstBatch),
                     SerializationContext::stateCommandReply(serializationContext));

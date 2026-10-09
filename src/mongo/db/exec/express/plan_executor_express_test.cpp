@@ -26,13 +26,13 @@ IndexEntry createIndexEntry(BSONObj keyPattern, bool unique, bool sparse = false
     return IndexEntry(keyPattern,
                       IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
                       IndexConfig::kLatestIndexVersion,
-                      false /*multikey*/,
-                      {} /*mutikeyPaths*/,
+                      /*mk=*/false,
+                      /*mkp=*/{},
                       {} /*multikeyPathSet*/,
                       sparse,
                       unique,
                       IndexEntry::Identifier{"ident"},
-                      BSONObj() /*infoObj*/,
+                      /*io=*/BSONObj(),
                       nullptr /*wildcardProjection*/);
 }
 

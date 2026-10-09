@@ -136,7 +136,7 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
 
     ClusterClientCursorParams params(incomingCursorResponse.getNSS(),
                                      APIParameters::get(opCtx),
-                                     boost::none /* ReadPreferenceSetting */,
+                                     /*readPreference=*/boost::none,
                                      repl::ReadConcernArgs::get(opCtx),
                                      [&] {
                                          if (!opCtx->getLogicalSessionId())
@@ -257,7 +257,7 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
     // Build the cursor params pointing at the shard's open cursor.
     ClusterClientCursorParams params(response.getNSS(),
                                      APIParameters::get(opCtx),
-                                     boost::none /* ReadPreferenceSetting */,
+                                     /*readPreference=*/boost::none,
                                      repl::ReadConcernArgs::get(opCtx),
                                      [&] {
                                          if (!opCtx->getLogicalSessionId())

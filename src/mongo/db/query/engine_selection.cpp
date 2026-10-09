@@ -248,7 +248,7 @@ EngineChoice extendSolutionAndSelectEngine(std::unique_ptr<QuerySolution>& solut
         solution = QueryPlanner::extendWithAggPipeline(*cq,
                                                        std::move(solution),
                                                        plannerParams.secondaryCollectionsInfo,
-                                                       true /* skipOptimization */);
+                                                       /*skipProjectGroupOptimization=*/true);
     };
 
     const auto [engine, planPushdownRoot] = chooseEngine(

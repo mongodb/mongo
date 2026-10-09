@@ -631,8 +631,7 @@ TEST_F(QueryAnalysisCoordinatorTest, ResetLastNumQueriesExecutedOnStepUp) {
 
     // After stepup, the sampler should have an unknown number of queries executed per second.
     samplers = coordinator->getSamplersForTest();
-    assertContainsSampler(
-        samplers, mongosName0, pingTime, boost::none /* numQueriesExecutedPerSecond */);
+    assertContainsSampler(samplers, mongosName0, pingTime, /*numQueriesPerSecond=*/boost::none);
 }
 
 TEST_F(QueryAnalysisCoordinatorTest, GetNewConfigurationsOneSamplerBasic) {

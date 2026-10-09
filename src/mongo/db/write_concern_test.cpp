@@ -81,8 +81,8 @@ TEST_F(WriteConcernTest, ExtractOverridesWMajorityJFalse) {
     WriteConcernIdl wc;
     wc.setWriteConcernW(WriteConcernW("majority"));
     wc.setJ(false);
-    auto swWriteConcernOptions =
-        extractWriteConcern(_opCtx.get(), makeGenericArgs(wc), kCommandName, false /*internal*/);
+    auto swWriteConcernOptions = extractWriteConcern(
+        _opCtx.get(), makeGenericArgs(wc), kCommandName, /*isInternalClient=*/false);
     auto writeConcernOptions = unittest::assertGet(swWriteConcernOptions);
     ASSERT(writeConcernOptions.isMajority());
     ASSERT_EQ(writeConcernOptions.syncMode, WriteConcernOptions::SyncMode::JOURNAL);
@@ -95,8 +95,8 @@ TEST_F(WriteConcernTest,
     wc.setWriteConcernW(WriteConcernW("majority"));
     wc.setJ(false);
     _mockReplCoord->setWriteConcernMajorityShouldJournal(false);
-    auto swWriteConcernOptions =
-        extractWriteConcern(_opCtx.get(), makeGenericArgs(wc), kCommandName, false /*internal*/);
+    auto swWriteConcernOptions = extractWriteConcern(
+        _opCtx.get(), makeGenericArgs(wc), kCommandName, /*isInternalClient=*/false);
     auto writeConcernOptions = unittest::assertGet(swWriteConcernOptions);
     ASSERT(writeConcernOptions.isMajority());
     ASSERT_EQ(writeConcernOptions.syncMode, WriteConcernOptions::SyncMode::NONE);
@@ -107,8 +107,8 @@ TEST_F(WriteConcernTest, ExtractDoesNotOverrideW1JFalse) {
     WriteConcernIdl wc;
     wc.setWriteConcernW(WriteConcernW(1));
     wc.setJ(false);
-    auto swWriteConcernOptions =
-        extractWriteConcern(_opCtx.get(), makeGenericArgs(wc), kCommandName, false /*internal*/);
+    auto swWriteConcernOptions = extractWriteConcern(
+        _opCtx.get(), makeGenericArgs(wc), kCommandName, /*isInternalClient=*/false);
     auto writeConcernOptions = unittest::assertGet(swWriteConcernOptions);
     ASSERT_EQ(writeConcernOptions.w, WriteConcernW{1});
     ASSERT_EQ(writeConcernOptions.syncMode, WriteConcernOptions::SyncMode::NONE);
@@ -118,8 +118,8 @@ TEST_F(WriteConcernTest, ExtractDoesNotOverrideW1JFalse) {
 TEST_F(WriteConcernTest, ExtractDoesNotOverrideWMajorityJUnset) {
     WriteConcernIdl wc;
     wc.setWriteConcernW(WriteConcernW("majority"));
-    auto swWriteConcernOptions =
-        extractWriteConcern(_opCtx.get(), makeGenericArgs(wc), kCommandName, false /*internal*/);
+    auto swWriteConcernOptions = extractWriteConcern(
+        _opCtx.get(), makeGenericArgs(wc), kCommandName, /*isInternalClient=*/false);
     auto writeConcernOptions = unittest::assertGet(swWriteConcernOptions);
     ASSERT(writeConcernOptions.isMajority());
     ASSERT_EQ(writeConcernOptions.syncMode, WriteConcernOptions::SyncMode::UNSET);
@@ -130,8 +130,8 @@ TEST_F(WriteConcernTest, ExtractDoesNotOverrideWMajorityJTrue) {
     WriteConcernIdl wc;
     wc.setWriteConcernW(WriteConcernW("majority"));
     wc.setJ(true);
-    auto swWriteConcernOptions =
-        extractWriteConcern(_opCtx.get(), makeGenericArgs(wc), kCommandName, false /*internal*/);
+    auto swWriteConcernOptions = extractWriteConcern(
+        _opCtx.get(), makeGenericArgs(wc), kCommandName, /*isInternalClient=*/false);
     auto writeConcernOptions = unittest::assertGet(swWriteConcernOptions);
     ASSERT(writeConcernOptions.isMajority());
     ASSERT_EQ(writeConcernOptions.syncMode, WriteConcernOptions::SyncMode::JOURNAL);
@@ -144,8 +144,8 @@ TEST_F(WriteConcernEphemeralTest, ExtractDoesNotOverrideWMajorityJFalseOnEphemer
     WriteConcernIdl wc;
     wc.setWriteConcernW(WriteConcernW("majority"));
     wc.setJ(false);
-    auto swWriteConcernOptions =
-        extractWriteConcern(_opCtx.get(), makeGenericArgs(wc), kCommandName, false /*internal*/);
+    auto swWriteConcernOptions = extractWriteConcern(
+        _opCtx.get(), makeGenericArgs(wc), kCommandName, /*isInternalClient=*/false);
     auto writeConcernOptions = unittest::assertGet(swWriteConcernOptions);
     ASSERT(writeConcernOptions.isMajority());
     ASSERT_EQ(writeConcernOptions.syncMode, WriteConcernOptions::SyncMode::NONE);

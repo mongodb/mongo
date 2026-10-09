@@ -612,7 +612,7 @@ protected:
     // the default unittest client has no session at all, which counts as internal.
     ServiceContext::UniqueClient makeExternalClient() {
         return getServiceContext()->getService()->makeClient(
-            "external", transport::MockSession::create(/*transportLayer=*/nullptr));
+            "external", transport::MockSession::create(/*tl=*/nullptr));
     }
 };
 

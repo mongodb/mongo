@@ -110,7 +110,7 @@ TEST(ExpressionMetaTest, ExpressionMetaSortKey) {
 
     MutableDocument doc;
     Value sortKey = Value(std::vector<Value>{Value(1), Value(2)});
-    doc.metadata().setSortKey(sortKey, /* isSingleElementSortKey = */ false);
+    doc.metadata().setSortKey(sortKey, /*isSingleElementKey=*/false);
     Value val = expressionMeta->evaluate(doc.freeze(), &expCtx.variables);
     ASSERT_VALUE_EQ(val, Value(std::vector<Value>{Value(1), Value(2)}));
 }

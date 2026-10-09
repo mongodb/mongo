@@ -1049,7 +1049,7 @@ TEST_F(ReshardingOplogFetcherTest, TestTrackLastSeen) {
     // the insert(s).
     assertExpectedOplogEntries(outputCollectionNss,
                                storeProgress /* usedApplyOpsToBatch */,
-                               1 /* numApplyOpsOplogEntries */);
+                               /*numOplogEntries=*/1);
 }
 
 TEST_F(ReshardingOplogFetcherTest, TestFallingOffOplog) {
@@ -1105,7 +1105,7 @@ TEST_F(ReshardingOplogFetcherTest, TestFallingOffOplog) {
     // the insert(s).
     assertExpectedOplogEntries(outputCollectionNss,
                                storeProgress /* usedApplyOpsToBatch */,
-                               0 /* numApplyOpsOplogEntries */);
+                               /*numOplogEntries=*/0);
 }
 
 TEST_F(ReshardingOplogFetcherTest, TestAwaitInsert) {
@@ -1282,7 +1282,7 @@ TEST_F(ReshardingOplogFetcherTest, TestStartAtUpdatedWithProgressMarkOplogTs) {
         // the insert(s).
         assertExpectedOplogEntries(outputCollectionNss,
                                    storeProgress /* usedApplyOpsToBatch */,
-                                   1 /* numApplyOpsOplogEntries */);
+                                   /*numOplogEntries=*/1);
 
         // Now, insert a document into a different collection that is not involved in resharding.
         auto writeToOtherCollectionTs = [&] {
@@ -1325,7 +1325,7 @@ TEST_F(ReshardingOplogFetcherTest, TestStartAtUpdatedWithProgressMarkOplogTs) {
         // the insert(s).
         assertExpectedOplogEntries(outputCollectionNss,
                                    storeProgress /* usedApplyOpsToBatch */,
-                                   2 /* numApplyOpsOplogEntries */);
+                                   /*numOplogEntries=*/2);
 
         // The last document returned by ReshardingDonorOplogIterator::getNextBatch() would be
         // `writeToDataCollectionTs`, but ReshardingOplogFetcher would have inserted a doc with

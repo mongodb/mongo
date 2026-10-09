@@ -271,7 +271,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
                                                      ws.get(),
                                                      &collectionPtr,
                                                      direction,
-                                                     boost::none /* resumeAfterId */,
+                                                     /*resumeAfterRecordId=*/boost::none,
                                                      std::move(minRecord),
                                                      std::move(maxRecord),
                                                      boundInclusion,

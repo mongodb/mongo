@@ -77,7 +77,7 @@ TEST_F(MoveUnshardedPolicyTest, MigrateUnsplittableCollection) {
         _unshardedPolicy.selectCollectionsToMove(operationContext(),
                                                  getShardStats(operationContext()),
                                                  &availableShards,
-                                                 true /*onlyTrackedCollections*/);
+                                                 /*onlyTrackedCollection=*/true);
     ASSERT_EQ(1, migrateInfoVector.size());
     ASSERT_EQ(collections[0].getUuid(), migrateInfoVector[0].uuid);
 }
@@ -128,7 +128,7 @@ TEST_F(MoveUnshardedPolicyTest, MigrateAnyCollectionFPOn) {
             _unshardedPolicy.selectCollectionsToMove(operationContext(),
                                                      getShardStats(operationContext()),
                                                      &availableShards,
-                                                     true /*onlyTrackedCollections*/);
+                                                     /*onlyTrackedCollection=*/true);
 
         ASSERT_EQ(1, migrateInfoVector.size());
         std::cout << "Removing " << migrateInfoVector[0].nss.toString_forTest() << std::endl;
@@ -168,7 +168,7 @@ TEST_F(MoveUnshardedPolicyTest, DontMigrateAnyCollectionIfReshardingMinimumDurat
         _unshardedPolicy.selectCollectionsToMove(operationContext(),
                                                  getShardStats(operationContext()),
                                                  &availableShards,
-                                                 true /*onlyTrackedCollections*/);
+                                                 /*onlyTrackedCollection=*/true);
     ASSERT_EQ(0, migrateInfoVector.size());
 }
 
@@ -207,7 +207,7 @@ TEST_F(MoveUnshardedPolicyTest, SkipMoveCollectionThresholdOfOneAlwaysSkipsWhenS
             _unshardedPolicy.selectCollectionsToMove(operationContext(),
                                                      getShardStats(operationContext()),
                                                      &availableShards,
-                                                     true /*onlyTrackedCollections*/);
+                                                     /*onlyTrackedCollection=*/true);
         ASSERT_EQ(0, migrateInfoVector.size());
     }
 }
@@ -246,7 +246,7 @@ TEST_F(MoveUnshardedPolicyTest, SkipMoveCollectionThresholdOfZeroNeverSkips) {
         _unshardedPolicy.selectCollectionsToMove(operationContext(),
                                                  getShardStats(operationContext()),
                                                  &availableShards,
-                                                 true /*onlyTrackedCollections*/);
+                                                 /*onlyTrackedCollection=*/true);
     ASSERT_EQ(1, migrateInfoVector.size());
     ASSERT_EQ(unsplittableColl.getUuid(), migrateInfoVector[0].uuid);
 }

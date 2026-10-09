@@ -864,7 +864,7 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
                                                   collection,
                                                   PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                                   direction,
-                                                  boost::none /* resumeAfterId */,
+                                                  /*resumeAfterRecordId=*/boost::none,
                                                   minRecord,
                                                   maxRecord,
                                                   collScanBoundInclusion)

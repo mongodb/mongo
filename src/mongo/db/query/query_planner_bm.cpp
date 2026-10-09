@@ -36,13 +36,13 @@ IndexEntry createIndexEntry(BSONObj keyPattern) {
     return IndexEntry(keyPattern,
                       IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
                       IndexConfig::kLatestIndexVersion,
-                      false /*multikey*/,
-                      {} /*mutikeyPaths*/,
+                      /*mk=*/false,
+                      /*mkp=*/{},
                       {} /*multikeyPathSet*/,
-                      false /*sparse*/,
-                      false /*unique*/,
+                      /*sp=*/false,
+                      /*unq=*/false,
                       IndexEntry::Identifier{"ident"},
-                      BSONObj() /*infoObj*/,
+                      /*io=*/BSONObj(),
                       nullptr /*wildcardProjection*/);
 }
 

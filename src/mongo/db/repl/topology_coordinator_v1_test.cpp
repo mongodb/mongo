@@ -5489,7 +5489,7 @@ TEST_F(ReevalSyncSourceTest, NoChangeWhenPrimaryPrefAndCurrentlySyncingFromPrima
     HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host2"),
                                                             "rs0",
                                                             MemberState::RS_PRIMARY,
-                                                            OpTime() /* election */,
+                                                            /*electionTime=*/OpTime(),
                                                             syncSourceOpTime);
     ASSERT_NO_ACTION(nextAction.getAction());
 
@@ -5514,7 +5514,7 @@ TEST_F(ReevalSyncSourceTest, ChangeWhenPrimaryPrefAndNotCurrentlySyncingFromPrim
     HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host3"),
                                                             "rs0",
                                                             MemberState::RS_PRIMARY,
-                                                            OpTime() /* election */,
+                                                            /*electionTime=*/OpTime(),
                                                             syncSourceOpTime);
     ASSERT_NO_ACTION(nextAction.getAction());
 

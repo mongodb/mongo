@@ -3146,7 +3146,7 @@ std::string explain(std::span<const char> buffer,
     TypeBits::Reader typeBitsReader(typeBits);
     for (int i = 0; reader.remaining(); i++) {
         const bool invert = (ord.get(i) == -1);
-        uint8_t ctype = readType<uint8_t>(&reader, false /* invert */);
+        uint8_t ctype = readType<uint8_t>(&reader, /*inverted=*/false);
         str << fmt::format("Byte: {0:#x} ", ctype);
         if (invert) {
             ctype = ~ctype;

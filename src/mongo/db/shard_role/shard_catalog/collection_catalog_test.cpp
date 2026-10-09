@@ -1191,7 +1191,7 @@ public:
         uassertStatusOK(indexBuildBlock->init(opCtx,
                                               writableColl,
                                               indexBuildInfo,
-                                              /*forRecover=*/false));
+                                              /*forRecovery=*/false));
         uassertStatusOK(indexBuildBlock->getWritableEntry(opCtx, writableColl)
                             ->accessMethod()
                             ->initializeAsEmpty());
@@ -4030,11 +4030,11 @@ TEST_F(CollectionCatalogTimestampTest, MixedModeWrites) {
         });
     }
     // Create and drop the collection. We have a time window where the namespace exists.
-    createCollection(opCtx.get(), nss, Timestamp::min(), true /* allowMixedModeWrite */);
+    createCollection(opCtx.get(), nss, Timestamp::min(), /*allowMixedModeWrites=*/true);
     dropCollection(opCtx.get(), nss, Timestamp(10, 10));
 
     // Before performing cleanup, re-create the collection.
-    createCollection(opCtx.get(), nss, Timestamp::min(), true /* allowMixedModeWrite */);
+    createCollection(opCtx.get(), nss, Timestamp::min(), /*allowMixedModeWrites=*/true);
 
     // Perform collection catalog cleanup.
     {

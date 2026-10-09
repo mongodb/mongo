@@ -264,8 +264,7 @@ TEST_F(UnifiedWriteExecutorTest, BulkWriteBasic) {
                                 0 /* nMatched */,
                                 0 /* nModified */,
                                 0 /* nUpserted */,
-                                0 /* nDelete */
-    );
+                                /*nDeleted=*/0);
 
     // Second batch of ops for shard 2
     expectBulkWriteShardRequest({BSON("insert" << 0 << "document" << BSON("x" << 2))} /* opList */,
@@ -277,8 +276,7 @@ TEST_F(UnifiedWriteExecutorTest, BulkWriteBasic) {
                                 0 /* nMatched */,
                                 0 /* nModified */,
                                 0 /* nUpserted */,
-                                0 /* nDelete */
-    );
+                                /*nDeleted=*/0);
 
     future.default_timed_get();
 }
@@ -423,8 +421,7 @@ TEST_F(UnifiedWriteExecutorTest, BulkWriteImplicitCollectionCreation) {
         0 /* nMatched */,
         0 /* nModified */,
         0 /* nUpserted */,
-        0 /* nDelete */
-    );
+        /*nDeleted=*/0);
 
     // Create collection explicitly
     onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
@@ -449,8 +446,7 @@ TEST_F(UnifiedWriteExecutorTest, BulkWriteImplicitCollectionCreation) {
                                 0 /* nMatched */,
                                 0 /* nModified */,
                                 0 /* nUpserted */,
-                                0 /* nDelete */
-    );
+                                /*nDeleted=*/0);
 
     future.default_timed_get();
 }
@@ -499,8 +495,7 @@ TEST_F(UnifiedWriteExecutorTest, OrderedBulkWriteErrorsAndStops) {
         0 /* nMatched */,
         0 /* nModified */,
         0 /* nUpserted */,
-        0 /* nDelete */
-    );
+        /*nDeleted=*/0);
 
     future.default_timed_get();
 }
@@ -551,8 +546,7 @@ TEST_F(UnifiedWriteExecutorTest, UnorderedBulkWriteErrorsAndStops) {
         0 /* nMatched */,
         0 /* nModified */,
         0 /* nUpserted */,
-        0 /* nDelete */
-    );
+        /*nDeleted=*/0);
 
     // Second batch of ops for shard 2
     expectBulkWriteShardRequest({BSON("insert" << 0 << "document" << BSON("x" << 2))} /* opList */,
@@ -564,8 +558,7 @@ TEST_F(UnifiedWriteExecutorTest, UnorderedBulkWriteErrorsAndStops) {
                                 0 /* nMatched */,
                                 0 /* nModified */,
                                 0 /* nUpserted */,
-                                0 /* nDelete */
-    );
+                                /*nDeleted=*/0);
 
     future.default_timed_get();
 }

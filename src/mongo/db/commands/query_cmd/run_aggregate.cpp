@@ -1367,7 +1367,7 @@ Status executeResolvedAggregate(const AggExState& aggExState,
                                             std::move(resForJoin.executor),
                                             attachExecutorCallback,
                                             {} /* additionalExecutors */,
-                                            false /* hasGeoNear */);
+                                            /*hasGeoNearStage=*/false);
     } else if (dynamic_cast<DocumentSourceInternalJoinHint*>(pipeline->peekFront())) {
         uasserted(
             swResForJoin.getStatus().code(),

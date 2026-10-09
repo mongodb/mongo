@@ -1193,7 +1193,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSearchMetada
                                        {} /* plannerOptions */,
                                        nss,
                                        std::move(sbeYieldPolicy),
-                                       false /* planIsFromCache */,
+                                       /*isFromPlanCache=*/false,
                                        boost::none /* cachedPlanHash */,
                                        false /* usedJoinOpt*/,
                                        {} /* rejectedJoinPlans */,

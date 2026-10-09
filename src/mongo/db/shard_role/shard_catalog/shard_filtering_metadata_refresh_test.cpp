@@ -1218,7 +1218,7 @@ void runRecoveryAndInjectInModeB(OperationContext* opCtx,
         auto threadOpCtx = client->makeOperationContext();
         ASSERT_OK(FilteringMetadataCache::get(threadOpCtx.get())
                       ->onShardVersionMismatch(
-                          threadOpCtx.get(), nss, boost::none /* receivedShardVersion */));
+                          threadOpCtx.get(), nss, /*chunkVersionReceived=*/boost::none));
     });
 
     fp->waitForTimesEntered(initialTimesEntered + 1);

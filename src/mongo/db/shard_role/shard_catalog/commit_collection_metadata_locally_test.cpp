@@ -2242,7 +2242,7 @@ TEST_F(CommitCollectionMetadataLocallyTest, RenameUnshardedToShardedReplacingIt)
                                                            toCollType.getUuid(),
                                                            boost::none,
                                                            false /* isUpgrading */,
-                                                           false /* isDbPrimary */);
+                                                           /*isDbPrimaryShard=*/false);
 
     shard_catalog_commit::commitDropOfStaleChunksForRename(operationContext(),
                                                            toCollType.getUuid());
@@ -2295,7 +2295,7 @@ TEST_F(CommitCollectionMetadataLocallyTest, RenameShardedToUnshardedReplacingIt)
                                                            boost::none,
                                                            boost::none,
                                                            false /* isUpgrading */,
-                                                           false /* isDbPrimary */);
+                                                           /*isDbPrimaryShard=*/false);
 
     // Metadata now lives at toNss; fromNss entry is gone; chunks are unchanged.
     ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogCollectionsNamespace), 1);
@@ -2328,7 +2328,7 @@ TEST_F(CommitCollectionMetadataLocallyTest, RenameShardedToShardedReplacingIt) {
                                                            toCollType.getUuid(),
                                                            boost::none,
                                                            false /* isUpgrading */,
-                                                           false /* isDbPrimary */);
+                                                           /*isDbPrimaryShard=*/false);
 
     shard_catalog_commit::commitDropOfStaleChunksForRename(operationContext(),
                                                            toCollType.getUuid());
@@ -2362,7 +2362,7 @@ TEST_F(CommitCollectionMetadataLocallyTest, RenameShardedToShardedNoReplacement)
                                                            boost::none,
                                                            boost::none,
                                                            false /* isUpgrading */,
-                                                           false /* isDbPrimary */);
+                                                           /*isDbPrimaryShard=*/false);
 
     // toNss entry reflects fromNss metadata; fromNss entry is gone.
     ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogCollectionsNamespace), 1);
@@ -2396,7 +2396,7 @@ TEST_F(CommitCollectionMetadataLocallyTest,
                                                            boost::none,
                                                            boost::none,
                                                            false /* isUpgrading */,
-                                                           false /* isDbPrimary */);
+                                                           /*isDbPrimaryShard=*/false);
 
     ASSERT_EQ(writeOrderObserver->writes().size(), 1u);
     ASSERT_EQ(writeOrderObserver->writes()[0],
@@ -2433,7 +2433,7 @@ TEST_F(CommitCollectionMetadataLocallyTest, RenameRecoversTargetFilteringMetadat
                                                            boost::none,
                                                            boost::none,
                                                            false /* isUpgrading */,
-                                                           false /* isDbPrimary */);
+                                                           /*isDbPrimaryShard=*/false);
 
     // The target filtering metadata is recovered in-memory right away instead of being deferred to
     // the first query.
@@ -2466,7 +2466,7 @@ TEST_F(CommitCollectionMetadataLocallyTest,
                                                            boost::none,
                                                            boost::none,
                                                            false /* isUpgrading */,
-                                                           true /* isDbPrimary */);
+                                                           /*isDbPrimaryShard=*/true);
 
     ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogCollectionsNamespace), 1);
     ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogChunksNamespace), 0);
@@ -2499,7 +2499,7 @@ TEST_F(CommitCollectionMetadataLocallyTest, RenameUnownedNonPrimaryClearsTargetM
                                                            boost::none,
                                                            boost::none,
                                                            false /* isUpgrading */,
-                                                           false /* isDbPrimary */);
+                                                           /*isDbPrimaryShard=*/false);
 
     ASSERT_EQ(countLocalDocs(NamespaceString::kConfigShardCatalogCollectionsNamespace), 0);
 

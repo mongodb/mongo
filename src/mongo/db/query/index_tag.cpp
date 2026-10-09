@@ -226,7 +226,7 @@ bool pushdownNode(MatchExpression* node,
     }
 
     if (MatchExpression::AND == target->matchType()) {
-        auto [indexedOr, fieldRef_unused] = getIndexedOr({} /*fieldRef*/, target);
+        auto [indexedOr, fieldRef_unused] = getIndexedOr(/*currentPath=*/{}, target);
         tassert(11321003, "indexedOr must not be null", indexedOr);
         return pushdownNode(node, indexedOr, std::move(destinations), pathsToUpdate);
     }
@@ -334,7 +334,7 @@ void resolveOrPushdowns(MatchExpression* tree) {
     }
     if (MatchExpression::AND == tree->matchType()) {
         AndMatchExpression* andNode = static_cast<AndMatchExpression*>(tree);
-        auto [indexedOr, indexedOrPath] = getIndexedOr({} /*fieldRef*/, andNode);
+        auto [indexedOr, indexedOrPath] = getIndexedOr(/*currentPath=*/{}, andNode);
 
         if (indexedOr) {
             for (size_t i = 0; i < andNode->numChildren(); ++i) {

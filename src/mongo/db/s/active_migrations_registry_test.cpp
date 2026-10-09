@@ -589,7 +589,7 @@ TEST_F(MoveChunkRegistration, RegisterChunkOperationsRejectDuringFCVTransitionWi
                   NamespaceString::createNamespaceString_forTest("TestDB", "ReceiveColl"),
                   ChunkRange(BSON("Key" << -100), BSON("Key" << 100)),
                   ShardId("shard0001"),
-                  false /* waitForCompletionOfConflictingOps */));
+                  /*waitForCompletionOfMigrationOps=*/false));
 
     ASSERT_EQ(ErrorCodes::ConflictingOperationInProgress,
               _registry.registerSplitOrMergeChunk(
@@ -633,7 +633,7 @@ TEST_F(MoveChunkRegistration, RegisterChunkOperationsWithStableOperationFCVRejec
                   NamespaceString::createNamespaceString_forTest("TestDB", "ReceiveColl"),
                   ChunkRange(BSON("Key" << -100), BSON("Key" << 100)),
                   ShardId("shard0001"),
-                  false /* waitForCompletionOfConflictingOps */));
+                  /*waitForCompletionOfMigrationOps=*/false));
 
     ASSERT_EQ(ErrorCodes::ConflictingOperationInProgress,
               _registry.registerSplitOrMergeChunk(
@@ -669,7 +669,7 @@ TEST_F(MoveChunkRegistration, RecoveryBypassWithStableOperationFCVAllowsRegistra
             NamespaceString::createNamespaceString_forTest("TestDB", "RecoveryReceiveColl"),
             ChunkRange(BSON("Key" << -100), BSON("Key" << 100)),
             ShardId("shard0001"),
-            false /* waitForCompletionOfConflictingOps */,
+            /*waitForCompletionOfMigrationOps=*/false,
             ActiveMigrationsRegistryTestAccessor::makeRecoveryBypass()));
     }
 

@@ -264,7 +264,7 @@ TEST_F(EstablishCursorsTest, SingleRemoteRespondsWithInvalidMessage) {
                                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                        remotes,
                                        false,  // allowPartialResults
-                                       nullptr /* RoutingContext */,
+                                       /*routingCtx=*/nullptr,
                                        Shard::RetryPolicy::kIdempotent,
                                        {},  // providedOpKeys
                                        designatedHosts),
@@ -339,7 +339,7 @@ TEST_F(EstablishCursorsTest, SingleRemoteRespondsWithDesignatedHost) {
                                         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                         remotes,
                                         false,  // allowPartialResults
-                                        nullptr /* RoutingContext */,
+                                        /*routingCtx=*/nullptr,
                                         Shard::RetryPolicy::kIdempotent,
                                         {},  // providedOpKeys
                                         designatedHosts);
@@ -764,7 +764,7 @@ TEST_F(EstablishCursorsTest,
                                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                        remotes,
                                        false,  // allowPartialResults
-                                       nullptr /* RoutingContext */,
+                                       /*routingCtx=*/nullptr,
                                        Shard::RetryPolicy::kIdempotent,
                                        providedOpKeys),
                       ExceptionFor<ErrorCodes::FailedToParse>);
@@ -829,7 +829,7 @@ TEST_F(EstablishCursorsTest, AcceptsCustomOpKeys) {
                                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                        remotes,
                                        false,  // allowPartialResults
-                                       nullptr /* RoutingContext */,
+                                       /*routingCtx=*/nullptr,
                                        Shard::RetryPolicy::kIdempotent,
                                        providedOpKeys),
                       ExceptionFor<ErrorCodes::FailedToParse>);

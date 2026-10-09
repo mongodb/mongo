@@ -53,7 +53,7 @@ protected:
         std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
         CollectionCatalog::write(getServiceContext(), [&](CollectionCatalog& catalog) {
             catalog.registerCollection(
-                operationContext(), std::move(collection), /*ts=*/boost::none);
+                operationContext(), std::move(collection), /*commitTime=*/boost::none);
         });
     }
 

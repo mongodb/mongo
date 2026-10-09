@@ -725,7 +725,7 @@ bool chunkFieldValuesEqual(const BSONObj& lhs, const BSONObj& rhs, std::string_v
     if (lhsElem.eoo() || rhsElem.eoo()) {
         return false;
     }
-    return lhsElem.woCompare(rhsElem, /*compareFieldNames*/ false) == 0;
+    return lhsElem.woCompare(rhsElem, /*rules=*/false) == 0;
 }
 
 boost::optional<BSONObj> validateChunksStrictEquality(

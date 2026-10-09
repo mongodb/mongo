@@ -169,7 +169,7 @@ PlanStage::StageState UpsertStage::_performInsert(const BSONObj& newDocument, Wo
                 }
                 uasserted(WouldChangeOwningShardInfo(_params.request->getQuery(),
                                                      newDocument,
-                                                     true /* upsert */,
+                                                     /*shouldUpsert=*/true,
                                                      collectionPtr()->ns(),
                                                      collectionPtr()->uuid()),
                           "The document we are inserting belongs on a different shard");

@@ -99,7 +99,7 @@ protected:
     CollectionRoutingInfo shardedOnId(const ShardId& owner) {
         return CatalogCacheMock::makeCollectionRoutingInfoSharded(
             kNss,
-            kThisShard /* dbPrimary */,
+            /*dbPrimaryShard=*/kThisShard,
             dbVersion(),
             KeyPattern(BSON("_id" << 1)),
             {{ChunkRange(BSON("_id" << MINKEY), BSON("_id" << MAXKEY)), owner}});
@@ -193,7 +193,7 @@ TEST_F(ShardedEligibilityTest, DollarPrefixedSubdocShardKeyValueIsTreatedAsLiter
     // Single-chunk collection owned by this shard, sharded on 'sk'.
     auto cri = CatalogCacheMock::makeCollectionRoutingInfoSharded(
         kNss,
-        kThisShard /* dbPrimary */,
+        /*dbPrimaryShard=*/kThisShard,
         dbVersion(),
         KeyPattern(BSON("sk" << 1)),
         {{ChunkRange(BSON("sk" << MINKEY), BSON("sk" << MAXKEY)), kThisShard}});
@@ -298,7 +298,7 @@ protected:
     CollectionRoutingInfo shardedOnId(const ShardId& owner) {
         return CatalogCacheMock::makeCollectionRoutingInfoSharded(
             kNss,
-            kMyShardName /* dbPrimary */,
+            /*dbPrimaryShard=*/kMyShardName,
             dbVersion(),
             KeyPattern(BSON("_id" << 1)),
             {{ChunkRange(BSON("_id" << MINKEY), BSON("_id" << MAXKEY)), owner}});

@@ -116,7 +116,7 @@ protected:
                                          collUuid,
                                          chunkSplitInfo.shardKeyPattern.getKeyPattern(),
                                          false, /* unsplittable */
-                                         std::move(defaultCollator) /* collator */,
+                                         /*defaultCollator=*/std::move(defaultCollator),
                                          false /* unique */,
                                          epoch,
                                          timestamp,

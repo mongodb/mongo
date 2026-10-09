@@ -879,7 +879,7 @@ UpdateResult PlanExecutorImpl::getUpdateResult() const {
                 stats.isModUpdate /* Is this a $mod update? */,
                 stats.nMeasurementsModified /* number of modified docs, no no-ops */,
                 stats.nMeasurementsMatched /* # of docs matched/updated, even no-ops */,
-                stats.objInserted /* objInserted */,
+                /*upsertedObject=*/stats.objInserted,
                 static_cast<TimeseriesModifyStage*>(updateStage)->containsDotsAndDollarsField());
         }
         case StageType::STAGE_UPDATE: {

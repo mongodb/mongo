@@ -171,7 +171,7 @@ public:
         CollectionCatalog::write(operationContext(), [&](CollectionCatalog& catalog) {
             catalog.registerCollection(operationContext(),
                                        std::move(collection),
-                                       /*ts=*/boost::none);
+                                       /*commitTime=*/boost::none);
         });
 
         wuow.commit();

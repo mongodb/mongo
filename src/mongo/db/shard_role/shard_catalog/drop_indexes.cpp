@@ -325,7 +325,7 @@ void dropReadyIndexes(OperationContext* opCtx,
                                                  CollectionPtr(collection),
                                                  entry,
                                                  shardKey.toBSON(),
-                                                 false /* requiresSingleKey */) &&
+                                                 /*requireSingleKey=*/false) &&
                         skipDropIndex) {
                         return false;
                     }

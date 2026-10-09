@@ -51,7 +51,7 @@ CollectionMetadata checkCollectionIdentity(OperationContext* opCtx,
     auto optMetadata = csr.getCurrentMetadataIfKnown();
 
     uassert(StaleConfigInfo(nss,
-                            ShardVersionPlacementIgnored() /* receivedVersion */,
+                            /*received=*/ShardVersionPlacementIgnored(),
                             /*wanted=*/boost::none,
                             shardId),
             str::stream() << "Collection " << nss.toStringForErrorMsg() << " needs to be recovered",
@@ -60,7 +60,7 @@ CollectionMetadata checkCollectionIdentity(OperationContext* opCtx,
     const auto& metadata = *optMetadata;
 
     uassert(StaleConfigInfo(nss,
-                            ShardVersionPlacementIgnored() /* receivedVersion */,
+                            /*received=*/ShardVersionPlacementIgnored(),
                             /*wanted=*/ShardVersionFactory::make(metadata),
                             shardId),
             str::stream() << "Collection " << nss.toStringForErrorMsg() << " is not sharded",
@@ -94,7 +94,7 @@ void checkCollectionIdentity(OperationContext* opCtx,
     const auto shardVersion = ShardVersionFactory::make(metadata);
 
     uassert(StaleConfigInfo(nss,
-                            ShardVersionPlacementIgnored() /* receivedVersion */,
+                            /*received=*/ShardVersionPlacementIgnored(),
                             /*wanted=*/shardVersion,
                             shardId),
             str::stream() << "Collection " << nss.toStringForErrorMsg() << " is not sharded",
@@ -103,7 +103,7 @@ void checkCollectionIdentity(OperationContext* opCtx,
     const auto placementVersion = metadata.getShardPlacementVersion();
 
     uassert(StaleConfigInfo(nss,
-                            ShardVersionPlacementIgnored() /* receivedVersion */,
+                            /*received=*/ShardVersionPlacementIgnored(),
                             /*wanted=*/shardVersion,
                             shardId),
             str::stream() << "Collection " << nss.toStringForErrorMsg()
@@ -113,7 +113,7 @@ void checkCollectionIdentity(OperationContext* opCtx,
                 (!expectedTimestamp || expectedTimestamp == placementVersion.getTimestamp()));
 
     uassert(StaleConfigInfo(nss,
-                            ShardVersionPlacementIgnored() /* receivedVersion */,
+                            /*received=*/ShardVersionPlacementIgnored(),
                             /*wanted=*/shardVersion,
                             shardId),
             str::stream() << "Shard does not contain any chunks for collection.",
@@ -129,7 +129,7 @@ void checkShardKeyPattern(OperationContext* opCtx,
     const auto shardVersion = ShardVersionFactory::make(metadata);
 
     uassert(StaleConfigInfo(nss,
-                            ShardVersionPlacementIgnored() /* receivedVersion */,
+                            /*received=*/ShardVersionPlacementIgnored(),
                             /*wanted=*/shardVersion,
                             shardId),
             str::stream() << "The range " << chunkRange.toString()
@@ -147,7 +147,7 @@ void checkChunkMatchesRange(OperationContext* opCtx,
 
     ChunkType existingChunk;
     uassert(StaleConfigInfo(nss,
-                            ShardVersionPlacementIgnored() /* receivedVersion */,
+                            /*received=*/ShardVersionPlacementIgnored(),
                             /*wanted=*/shardVersion,
                             shardId),
             str::stream() << "Range with bounds " << chunkRange.toString()
@@ -156,7 +156,7 @@ void checkChunkMatchesRange(OperationContext* opCtx,
                 existingChunk.getMin().woCompare(chunkRange.getMin()) == 0);
 
     uassert(StaleConfigInfo(nss,
-                            ShardVersionPlacementIgnored() /* receivedVersion */,
+                            /*received=*/ShardVersionPlacementIgnored(),
                             /*wanted=*/shardVersion,
                             shardId),
             str::stream() << "Chunk bounds " << chunkRange.toString() << " do not exist.",
@@ -172,7 +172,7 @@ void checkRangeWithinChunk(OperationContext* opCtx,
 
     ChunkType existingChunk;
     uassert(StaleConfigInfo(nss,
-                            ShardVersionPlacementIgnored() /* receivedVersion */,
+                            /*received=*/ShardVersionPlacementIgnored(),
                             /*wanted=*/shardVersion,
                             shardId),
             str::stream() << "Range with bounds " << chunkRange.toString()
@@ -192,7 +192,7 @@ void checkRangeOwnership(OperationContext* opCtx,
     BSONObj minKey = chunkRange.getMin();
     do {
         uassert(StaleConfigInfo(nss,
-                                ShardVersionPlacementIgnored() /* receivedVersion */,
+                                /*received=*/ShardVersionPlacementIgnored(),
                                 /*wanted=*/shardVersion,
                                 shardId),
                 str::stream() << "Range with bounds " << chunkRange.toString()
@@ -203,7 +203,7 @@ void checkRangeOwnership(OperationContext* opCtx,
     } while (existingChunk.getMax().woCompare(chunkRange.getMax()) < 0);
     uassert(
         StaleConfigInfo(nss,
-                        ShardVersionPlacementIgnored() /* receivedVersion */,
+                        /*received=*/ShardVersionPlacementIgnored(),
                         /*wanted=*/shardVersion,
                         shardId),
         str::stream() << "Shard does not contain a sequence of chunks that exactly fills the range "
@@ -242,7 +242,7 @@ void validateSplitPoints(OperationContext* opCtx,
         uassertStatusOK(ShardKeyPattern::checkShardKeyIsValidForMetadataStorage(endKey));
 
         uassert(StaleConfigInfo(nss,
-                                ShardVersionPlacementIgnored() /* receivedVersion */,
+                                /*received=*/ShardVersionPlacementIgnored(),
                                 /*wanted=*/shardVersion,
                                 shardId),
                 str::stream() << "Split key " << endKey << " is not valid for collection "

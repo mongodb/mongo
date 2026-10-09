@@ -208,7 +208,7 @@ public:
 
         {
             QuerySettingsService::initializeForShard(getServiceContext(),
-                                                     nullptr /* setClusterParameterImplFn */);
+                                                     /*setClusterParameterFn=*/nullptr);
             assertQuerySettingsLookupWithoutRejectionCheckForShard(cmdBSON, deferredShape);
             assertQuerySettingsLookupWithRejectionCheckForShard(cmdBSON, deferredShape);
         }
@@ -608,7 +608,7 @@ TEST_F(QuerySettingsServiceTest, MergeClusterAndUserQuerySettingsOnRouter) {
 
 TEST_F(QuerySettingsServiceTest, MergeClusterAndUserQuerySettingsOnShard) {
     QuerySettingsService::initializeForShard(getServiceContext(),
-                                             nullptr /* setClusterParameterImplFn */);
+                                             /*setClusterParameterFn=*/nullptr);
 
     auto findCmdBSON = fromjson("{find: 'exampleColl', '$db': 'foo'}");
     auto findCmd = query_request_helper::makeFromFindCommandForTests(findCmdBSON, nss());
@@ -698,7 +698,7 @@ TEST_F(QuerySettingsServiceTest, MergeQuerySettingsMaxTimeMS) {
 
 TEST_F(QuerySettingsServiceTest, MaxTimeMSFromSettingsIsAppliedOnLookup) {
     QuerySettingsService::initializeForShard(getServiceContext(),
-                                             nullptr /* setClusterParameterImplFn */);
+                                             /*setClusterParameterFn=*/nullptr);
 
     auto findCmdBSON = fromjson("{find: 'exampleColl', '$db': 'foo'}");
     auto findCmd = query_request_helper::makeFromFindCommandForTests(findCmdBSON, nss());
@@ -725,7 +725,7 @@ TEST_F(QuerySettingsServiceTest, MaxTimeMSFromSettingsIsAppliedOnLookup) {
 
 TEST_F(QuerySettingsServiceTest, MaxTimeMSFromSettingsLoosensExistingDeadline) {
     QuerySettingsService::initializeForShard(getServiceContext(),
-                                             nullptr /* setClusterParameterImplFn */);
+                                             /*setClusterParameterFn=*/nullptr);
 
     auto findCmdBSON = fromjson("{find: 'exampleColl', '$db': 'foo'}");
     auto findCmd = query_request_helper::makeFromFindCommandForTests(findCmdBSON, nss());
@@ -756,7 +756,7 @@ TEST_F(QuerySettingsServiceTest, MaxTimeMSFromSettingsLoosensExistingDeadline) {
 
 TEST_F(QuerySettingsServiceTest, MaxTimeMSZeroRemovesDeadline) {
     QuerySettingsService::initializeForShard(getServiceContext(),
-                                             nullptr /* setClusterParameterImplFn */);
+                                             /*setClusterParameterFn=*/nullptr);
 
     auto findCmdBSON = fromjson("{find: 'exampleColl', '$db': 'foo'}");
     auto findCmd = query_request_helper::makeFromFindCommandForTests(findCmdBSON, nss());
@@ -786,7 +786,7 @@ TEST_F(QuerySettingsServiceTest, MaxTimeMSZeroRemovesDeadline) {
 
 TEST_F(QuerySettingsServiceTest, MaxTimeMSFromSettingsIsNotAppliedForExplain) {
     QuerySettingsService::initializeForShard(getServiceContext(),
-                                             nullptr /* setClusterParameterImplFn */);
+                                             /*setClusterParameterFn=*/nullptr);
 
     auto findCmdBSON = fromjson("{find: 'exampleColl', '$db': 'foo'}");
     auto findCmd = query_request_helper::makeFromFindCommandForTests(findCmdBSON, nss());

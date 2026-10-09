@@ -209,7 +209,7 @@ std::unique_ptr<MigrationSourceManager> MigrationSourceManager::createMigrationS
                 CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
             const auto metadata = checkCollectionIdentity(opCtx,
                                                           nss,
-                                                          boost::none /* epoch */,
+                                                          /*expectedEpoch=*/boost::none,
                                                           args.getCollectionTimestamp(),
                                                           acquisition.getCollectionPtr(),
                                                           *scopedCsr);
@@ -303,7 +303,7 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
 
         auto metadata = checkCollectionIdentity(_opCtx,
                                                 nss(),
-                                                boost::none /* epoch */,
+                                                /*expectedEpoch=*/boost::none,
                                                 _args.getCollectionTimestamp(),
                                                 *autoColl,
                                                 *scopedCsr);

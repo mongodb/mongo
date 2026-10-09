@@ -472,7 +472,7 @@ void SamplingEstimatorImpl::executeSamplingQueryAndSample(
                                    *cq,
                                    _collections,
                                    sbeYieldPolicy.get(),
-                                   false /* preparingFromCache */);
+                                   /*preparingFromSbeCache=*/false);
 
     // Create a PlanExecutor for the execution of the sampling plan.
     auto exec = mongo::plan_executor_factory::make(_opCtx,

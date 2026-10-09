@@ -65,12 +65,12 @@ std::tuple<BSONObj, BSONObj, bool> getMinMaxExtendedBounds(const ShardKeyIndex& 
     KeyPattern kp(shardKeyIdx.keyPattern());
 
     // Extend min to get (min, MinKey, MinKey, ....)
-    BSONObj minKey = Helpers::toKeyFormat(kp.extendRangeBound(min, false /* upperInclusive */));
+    BSONObj minKey = Helpers::toKeyFormat(kp.extendRangeBound(min, /*makeUpperInclusive=*/false));
     BSONObj maxKey;
     bool isMaxGlobal = false;
     if (max.isEmpty()) {
         // if max not specified, make it (MaxKey, Maxkey, MaxKey...)
-        maxKey = Helpers::toKeyFormat(kp.extendRangeBound(max, true /* upperInclusive */));
+        maxKey = Helpers::toKeyFormat(kp.extendRangeBound(max, /*makeUpperInclusive=*/true));
         isMaxGlobal = true;
     } else {
         // Use makeUpperInclusive=true when max is all-MaxKey so that trailing

@@ -196,7 +196,7 @@ TEST_F(FeatureCompatibilityVersionTestFixture, ResolveStartNewUpgrade) {
         multiversion::GenericFCV::kLastLTS,
         boost::none,
         lastChangeTimestamp,
-        false /* isCleaningServerMetadata */);
+        /*setIsCleaningServerMetadata=*/false);
 
     SetFeatureCompatibilityVersion request(multiversion::GenericFCV::kLatest);
     auto result = FeatureCompatibilityVersion::validateSetFeatureCompatibilityVersionRequest(
@@ -220,7 +220,7 @@ TEST_F(FeatureCompatibilityVersionTestFixture, ResolveReturnToOriginalFCVBeforeC
         multiversion::GenericFCV::kUpgradingFromLastLTSToLatest,
         SetFCVPhaseEnum::kStart,
         lastChangeTimestamp,
-        false /* isCleaningServerMetadata */);
+        /*setIsCleaningServerMetadata=*/false);
 
     SetFeatureCompatibilityVersion request(multiversion::GenericFCV::kLastLTS);
     auto result = FeatureCompatibilityVersion::validateSetFeatureCompatibilityVersionRequest(
@@ -242,7 +242,7 @@ TEST_F(FeatureCompatibilityVersionTestFixture, ResolveReturnToOriginalFCVDuringC
         multiversion::GenericFCV::kUpgradingFromLastLTSToLatest,
         SetFCVPhaseEnum::kStart,
         Timestamp(10, 10),
-        true /* isCleaningServerMetadata */);
+        /*setIsCleaningServerMetadata=*/true);
 
     SetFeatureCompatibilityVersion request(multiversion::GenericFCV::kLastLTS);
     ASSERT_THROWS_CODE(
@@ -349,7 +349,7 @@ TEST_P(SetFeatureCompatibilityVersionParamTestFixture, ResolveResumeInterruptedU
         multiversion::GenericFCV::kUpgradingFromLastLTSToLatest,
         params.phase,
         lastChangeTimestamp,
-        params.isCleaningServerMetadata /* isCleaningServerMetadata */);
+        /*setIsCleaningServerMetadata=*/params.isCleaningServerMetadata);
 
     SetFeatureCompatibilityVersion request(multiversion::GenericFCV::kLatest);
     auto result = FeatureCompatibilityVersion::validateSetFeatureCompatibilityVersionRequest(

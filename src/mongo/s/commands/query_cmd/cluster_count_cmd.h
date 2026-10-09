@@ -250,7 +250,7 @@ public:
                             nss,
                             cri,
                             collation,
-                            boost::none /*explainVerbosity*/,
+                            /*verbosity=*/boost::none,
                             boost::none /*letParameters*/,
                             boost::none /*runtimeConstants*/);
 

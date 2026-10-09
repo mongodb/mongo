@@ -46,7 +46,7 @@ void createCollections(OperationContext* opCtx, int numCollections) {
                 "collection_catalog_bm", std::to_string(i));
             catalog.registerCollection(opCtx,
                                        std::make_shared<CollectionMock>(nss),
-                                       /*ts=*/boost::none);
+                                       /*commitTime=*/boost::none);
         }
     });
 }

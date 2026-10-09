@@ -97,7 +97,7 @@ std::vector<ChunkType> getCollectionChunks(OperationContext* opCtx, const Collec
     auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
     return uassertStatusOK(
         catalogClient->getChunks(opCtx,
-                                 BSON(ChunkType::collectionUUID() << coll.getUuid()) /*query*/,
+                                 /*filter=*/BSON(ChunkType::collectionUUID() << coll.getUuid()),
                                  BSON(ChunkType::min() << 1) /*sort*/,
                                  boost::none /*limit*/,
                                  nullptr /*opTime*/,
@@ -258,7 +258,7 @@ public:
                                  rangeToMeasure,
                                  shardVersion,
                                  _shardKey,
-                                 true /* estimate */,
+                                 /*estimatedValue=*/true,
                                  _smallChunkSizeThresholdBytes /* maxSize */));
                 pendingActions.rangesWithoutDataSize.pop_back();
             } else if (!pendingActions.rangesToMerge.empty()) {

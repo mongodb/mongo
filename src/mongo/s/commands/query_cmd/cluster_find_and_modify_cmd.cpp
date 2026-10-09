@@ -1069,7 +1069,7 @@ void FindAndModifyCmd::_runCommandWithoutShardKey(
 
     if (swRes.isOK()) {
         if (swRes.getValue().getResponse().isEmpty()) {
-            write_ops::FindAndModifyLastError lastError(0 /* n */);
+            write_ops::FindAndModifyLastError lastError(/*numDocs=*/0);
             lastError.setUpdatedExisting(false);
 
             write_ops::FindAndModifyCommandReply findAndModifyResponse;

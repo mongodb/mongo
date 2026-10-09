@@ -949,8 +949,7 @@ void writeToCoordinatorStateNss(OperationContext* opCtx,
                 return BatchedCommandRequest::buildDeleteOp(
                     NamespaceString::kConfigReshardingOperationsNamespace,
                     BSON("_id" << coordinatorDoc.getReshardingUUID()),  // query
-                    false                                               // multi
-                );
+                    /*multiDelete=*/false);
             default: {
                 // Partially update the coordinator document.
                 BSONObjBuilder updateBuilder;
@@ -1140,8 +1139,7 @@ boost::optional<BatchedCommandRequest> createTempCollectionLifecycleRequest(
                 BSON(CollectionType::kNssFieldName
                      << NamespaceStringUtil::serialize(coordinatorDoc.getTempReshardingNss(),
                                                        SerializationContext::stateDefault())),
-                false  // multi
-            );
+                /*multiDelete=*/false);
         default:
             return boost::none;
     }

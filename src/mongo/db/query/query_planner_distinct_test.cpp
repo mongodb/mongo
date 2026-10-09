@@ -242,7 +242,12 @@ TEST_F(QueryPlannerDistinctTest, MultikeyIndexEligibleOnlyForUnwoundDistinct) {
     assertNumSolutions(1);
     assertCandidateExists("{cscan: {dir: 1}}");
 
-    runDistinctQuery("x", BSONObj(), BSONObj(), BSONObj(), false /*flip*/, true /*unwindsArrays*/);
+    runDistinctQuery("x",
+                     BSONObj(),
+                     BSONObj(),
+                     BSONObj(),
+                     /*flipDistinctScanDirection=*/false,
+                     true /*unwindsArrays*/);
     assertNumSolutions(1);
     assertCandidateExists(
         "{proj: {spec: {_id: 0, x: 1}, node: {distinct: {key: 'x', indexPattern: {x: 1}}}}}");
@@ -254,7 +259,12 @@ TEST_F(QueryPlannerDistinctTest, UnwoundDistinctReversesDescendingIndexScan) {
     unittest::ServerParameterGuard shardFiltering("featureFlagShardFilteringDistinctScan", true);
     addIndex(fromjson("{x: -1}"), true /*multikey*/);
 
-    runDistinctQuery("x", BSONObj(), BSONObj(), BSONObj(), false /*flip*/, true /*unwindsArrays*/);
+    runDistinctQuery("x",
+                     BSONObj(),
+                     BSONObj(),
+                     BSONObj(),
+                     /*flipDistinctScanDirection=*/false,
+                     true /*unwindsArrays*/);
     assertNumSolutions(1);
     assertCandidateExists(
         "{proj: {spec: {_id: 0, x: 1}, node: {distinct: {key: 'x', indexPattern: {x: -1}, "
@@ -284,7 +294,12 @@ TEST_F(QueryPlannerDistinctTest, UnwoundDistinctWithNonMultikeyIndex) {
     unittest::ServerParameterGuard shardFiltering("featureFlagShardFilteringDistinctScan", true);
     addIndex(fromjson("{x: 1}"));
 
-    runDistinctQuery("x", BSONObj(), BSONObj(), BSONObj(), false /*flip*/, true /*unwindsArrays*/);
+    runDistinctQuery("x",
+                     BSONObj(),
+                     BSONObj(),
+                     BSONObj(),
+                     /*flipDistinctScanDirection=*/false,
+                     true /*unwindsArrays*/);
     assertNumSolutions(1);
     assertCandidateExists(
         "{proj: {spec: {_id: 0, x: 1}, node: {distinct: {key: 'x', indexPattern: {x: 1}}}}}");

@@ -233,7 +233,7 @@ void PlanCacheBenchmarkFixture::benchmarkTwentyStages(benchmark::State& state) {
     std::vector<BSONObj> pipeline;
     for (int i = 0; i < 10; i++) {
         pipeline.push_back(BSON("$match" << buildNestedMatchSpec(3, i)));
-        pipeline.push_back(BSON("$project" << buildNestedProjectSpec(3, true /*exclusion*/, i)));
+        pipeline.push_back(BSON("$project" << buildNestedProjectSpec(3, /*isExclusion=*/true, i)));
     }
     benchmarkPipeline(state, pipeline);
 }

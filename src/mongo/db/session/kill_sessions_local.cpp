@@ -321,7 +321,7 @@ void killOldestTransaction(OperationContext* opCtx,
         auto session = sessionCatalog->checkOutSessionForKill(
             opCtx,
             std::move(killToken),
-            getSessionCheckoutDeadline(&perSessionTimeout, /*killSessionsDeadline*/ Date_t::max()));
+            getSessionCheckoutDeadline(&perSessionTimeout, /*deadline=*/Date_t::max()));
 
         // TODO (SERVER-33850): Rename KillAllSessionsByPattern and
         // ScopedKillAllSessionsByPatternImpersonator to not refer to session kill

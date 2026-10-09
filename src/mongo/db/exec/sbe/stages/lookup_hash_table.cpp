@@ -316,7 +316,10 @@ void LookupHashTable::spillIndicesToRecordStore(SpillingStore* rs,
     opDebug.hashLookupSpillToDiskBytes += spillToDiskBytes;
 
     auto spilledDataStorageIncrease = _hashLookupStats.spillingHtStats.updateSpillingStats(
-        1 /*spills*/, spillToDiskBytes, update ? 0 : 1, _recordStoreHt->storageSize(_opCtx));
+        /*additionalSpills=*/1,
+        spillToDiskBytes,
+        update ? 0 : 1,
+        _recordStoreHt->storageSize(_opCtx));
     lookupPushdownCounters.incrementPerSpilling(
         1 /* spills */, spillToDiskBytes, update ? 0 : 1, spilledDataStorageIncrease);
     _recordStoreHt->updateSpillStorageStatsForOperation(_opCtx);

@@ -51,7 +51,7 @@ void sampleRangeEquallyWithCursor(SeekableRecordCursor& cursor,
 
         RecordId seekTo =
             change_stream_pre_image_id_util::getPreImageRecordIdForNsTimestampApplyOpsIndex(
-                nsUUID, currentTs /* timestamp */, currentApplyOpsIndex /* applyOpsIndex */)
+                nsUUID, /*ts=*/currentTs, currentApplyOpsIndex /* applyOpsIndex */)
                 .recordId();
 
         boost::optional<Record> record =

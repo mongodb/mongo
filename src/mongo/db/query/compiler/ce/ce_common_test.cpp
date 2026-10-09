@@ -38,7 +38,7 @@ static size_t countUniqueKeysBtree(
 
     BtreeKeyGenerator keyGen(fieldNames,
                              fixed,
-                             false /* isSparse */,
+                             /*isSetSparseByUser=*/false,
                              key_string::Version::kLatestVersion,
                              Ordering::make(BSONObj()));
 

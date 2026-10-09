@@ -80,7 +80,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> MultiPlanner::makeExecutor(
                                            yieldPolicy(),
                                            plannerOptions(),
                                            std::move(nss),
-                                           nullptr /* querySolution */,
+                                           /*qs=*/nullptr,
                                            cachedPlanHash(),
                                            boost::none /* replanReason */,
                                            planSelectionStrategy());

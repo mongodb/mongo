@@ -298,9 +298,9 @@ void upgradeToViewlessTimeseries(OperationContext* opCtx,
             CollectionWriter collWriter{opCtx, mainNs};
             Collection* writableColl = collWriter.getWritableCollection(opCtx);
             uassertStatusOK(writableColl->updateValidator(opCtx,
-                                                          BSONObj() /* newValidator */,
-                                                          boost::none /* validationLevel */,
-                                                          boost::none /* validatorAction */));
+                                                          /*newValidatorDoc=*/BSONObj(),
+                                                          /*newLevel=*/boost::none,
+                                                          /*newAction=*/boost::none));
 
             // Conservatively set the viewless-only 'fixedBucketing' option to false: a legacy
             // collection predates this option, so we cannot prove its buckets are fixed.
@@ -401,8 +401,8 @@ void downgradeFromViewlessTimeseries(OperationContext* opCtx,
             uassertStatusOK(writableColl->updateValidator(
                 opCtx,
                 timeseries::generateTimeseriesValidator(bucketVersion, timeField),
-                boost::none /* validationLevel */,
-                boost::none /* validatorAction */));
+                /*newLevel=*/boost::none,
+                /*newAction=*/boost::none));
 
             // Strip the viewless-only 'fixedBucketing' option from the timeseries collection;
             // the viewful (legacy) format does not carry it.

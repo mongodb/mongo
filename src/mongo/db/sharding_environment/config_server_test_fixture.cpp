@@ -395,7 +395,7 @@ StatusWith<ChunkVersion> ConfigServerTestFixture::getCollectionPlacementVersion(
     auto chunkDoc =
         findOneOnConfigCollection(opCtx,
                                   NamespaceString::kConfigsvrChunksNamespace,
-                                  BSON(ChunkType::collectionUUID << coll.getUuid()) /* query */,
+                                  /*filter=*/BSON(ChunkType::collectionUUID << coll.getUuid()),
                                   BSON(ChunkType::lastmod << -1) /* sort */);
 
     if (!chunkDoc.isOK())

@@ -394,7 +394,7 @@ void createTransactionTable(OperationContext* opCtx) {
                     autoColl->uuid(),
                     MongoDSessionCatalog::getConfigTxnPartialIndexSpec(),
                     IndexBuildsManager::IndexConstraints::kEnforce,
-                    false /* fromMigration */);
+                    /*fromMigrate=*/false);
             }
 
             return;

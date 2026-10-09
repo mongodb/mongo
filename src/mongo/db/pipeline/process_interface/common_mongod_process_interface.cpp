@@ -841,7 +841,7 @@ CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalReadWithCatalo
     PipelineD::buildAndAttachInnerQueryExecutorAndBindCatalogInfoToPipeline(
         collections,
         expCtx->getNamespaceString(),
-        nullptr /*resolvedAggRequest*/,
+        /*aggRequest=*/nullptr,
         pipeline.get(),
         stasher);
 

@@ -90,7 +90,7 @@ void SpoolStage::spill() {
     }
     _spillFileIters.emplace_back(writer->done());
 
-    _specificStats.spillingStats.updateSpillingStats(1 /* spills */,
+    _specificStats.spillingStats.updateSpillingStats(/*additionalSpills=*/1,
                                                      _memTracker.inUseTrackedMemoryBytes(),
                                                      _buffer.size() - (_nextIndex + 1),
                                                      _spillStats->bytesSpilled());

@@ -167,7 +167,7 @@ void validateHistogramTypeCounts(const TypeCounts& tc,
     // Ensure that all histogrammable type counts are accounted for in the type counters.
     // While typeCount include types for nans but nans are in a separate counts the typeCounts needs
     // to subtract nan counts.
-    const double totalTC = getTotalCount(tc, true /* histogrammable*/) - nanCount;
+    const double totalTC = getTotalCount(tc, /*isHistogrammable=*/true) - nanCount;
     const double totalCard = s.getCardinality();
     if (!isValid(totalTC, totalCard)) {
         uasserted(7105701,

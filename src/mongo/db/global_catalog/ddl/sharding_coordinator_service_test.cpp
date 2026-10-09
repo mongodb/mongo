@@ -274,12 +274,12 @@ TEST_F(ShardingCoordinatorServiceTest,
     stepDown();
 
     ASSERT_THROWS_CODE(
-        acquireDbAndCollDDLLocks(opCtx.get(), nss, reason, MODE_X, 0 /*timeoutMillisec*/),
+        acquireDbAndCollDDLLocks(opCtx.get(), nss, reason, MODE_X, /*timeoutMillisecs=*/0),
         DBException,
         ErrorCodes::LockTimeout);
 
     ASSERT_DOES_NOT_THROW(acquireDbAndCollDDLLocksWithoutWaitingForRecovery(
-        opCtx.get(), nss, reason, MODE_X, 0 /*timeoutMillisec*/));
+        opCtx.get(), nss, reason, MODE_X, /*timeoutMillisecs=*/0));
 
     // 2- Stepping up and pausing on Recovery state
     // Only DDL coordinators can acquire DDL locks during recovery, otherwise trying to acquire a
@@ -291,11 +291,11 @@ TEST_F(ShardingCoordinatorServiceTest,
     pauseOnRecoveryFailPoint->waitForTimesEntered(fpCount + 1);
 
     ASSERT_THROWS_CODE(
-        acquireDbAndCollDDLLocks(opCtx.get(), nss, reason, MODE_X, 10 /*timeoutMillisec*/),
+        acquireDbAndCollDDLLocks(opCtx.get(), nss, reason, MODE_X, /*timeoutMillisecs=*/10),
         DBException,
         ErrorCodes::LockTimeout);
     ASSERT_DOES_NOT_THROW(acquireDbAndCollDDLLocksWithoutWaitingForRecovery(
-        opCtx.get(), nss, reason, MODE_X, 0 /*timeoutMillisec*/));
+        opCtx.get(), nss, reason, MODE_X, /*timeoutMillisecs=*/0));
 
     // 3- Ending Recovery and enter on Recovered state
     // Once ShardingCoordinatorService is recovered, anyone can aquire a DDL lock
@@ -303,9 +303,9 @@ TEST_F(ShardingCoordinatorServiceTest,
     ddlService()->waitForRecovery(opCtx.get());
 
     ASSERT_DOES_NOT_THROW(
-        acquireDbAndCollDDLLocks(opCtx.get(), nss, reason, MODE_X, 10 /*timeoutMillisec*/));
+        acquireDbAndCollDDLLocks(opCtx.get(), nss, reason, MODE_X, /*timeoutMillisecs=*/10));
     ASSERT_DOES_NOT_THROW(acquireDbAndCollDDLLocksWithoutWaitingForRecovery(
-        opCtx.get(), nss, reason, MODE_X, 0 /*timeoutMillisec*/));
+        opCtx.get(), nss, reason, MODE_X, /*timeoutMillisecs=*/0));
 }
 
 TEST_F(ShardingCoordinatorServiceTest, DDLLockMustBeEventuallyAcquiredAfterAStepUp) {
@@ -321,7 +321,7 @@ TEST_F(ShardingCoordinatorServiceTest, DDLLockMustBeEventuallyAcquiredAfterAStep
     stepDown();
 
     ASSERT_THROWS_CODE(
-        acquireDbAndCollDDLLocks(opCtx.get(), nss, reason, MODE_X, 10 /*timeoutMillisec*/),
+        acquireDbAndCollDDLLocks(opCtx.get(), nss, reason, MODE_X, /*timeoutMillisecs=*/10),
         DBException,
         ErrorCodes::NotWritablePrimary);
 
@@ -347,7 +347,7 @@ TEST_F(ShardingCoordinatorServiceTest, DDLLockMustBeEventuallyAcquiredAfterAStep
 
     syncPoint.countDownAndWait();
     ASSERT_DOES_NOT_THROW(
-        acquireDbAndCollDDLLocks(opCtx.get(), nss, reason, MODE_X, 10000 /*timeoutMillisec*/));
+        acquireDbAndCollDDLLocks(opCtx.get(), nss, reason, MODE_X, /*timeoutMillisecs=*/10000));
 
     // Lock should be acquired after step up conclusion
     ASSERT(stepUpFuture.isReady());

@@ -110,7 +110,7 @@ TEST_F(ClusterBulkWriteUWETest, FireAndForgetRequestGetsReplyWithOnlyOkStatus) {
     const BSONObj expectedReplySections[2] = {
         BulkWriteCommandReply(
             BulkWriteCommandResponseCursor(
-                0 /* cursorId */,
+                /*id=*/0,
                 {} /* firstBatch */,
                 NamespaceString::createNamespaceString_forTest("admin.$cmd.bulkWrite")),
             0 /*nErrors*/,
@@ -122,7 +122,7 @@ TEST_F(ClusterBulkWriteUWETest, FireAndForgetRequestGetsReplyWithOnlyOkStatus) {
             .toBSON(),
         BulkWriteCommandReply(
             BulkWriteCommandResponseCursor(
-                0 /* cursorId */,
+                /*id=*/0,
                 {} /* firstBatch */,
                 NamespaceString::createNamespaceString_forTest("admin.$cmd.bulkWrite")),
             0 /*nErrors*/,

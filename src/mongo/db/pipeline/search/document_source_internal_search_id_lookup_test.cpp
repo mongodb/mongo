@@ -119,7 +119,7 @@ public:
         PipelineD::buildAndAttachInnerQueryExecutorAndBindCatalogInfoToPipeline(
             collections,
             expCtx->getNamespaceString(),
-            nullptr /*resolvedAggRequest*/,
+            /*aggRequest=*/nullptr,
             pipeline.get(),
             stasher);
         return pipeline;
@@ -303,8 +303,8 @@ TEST_F(InternalSearchIdLookupWithCatalogTest,
     auto [sharedStasher, collections] = createCatalogResources();
     auto catalogResourceHandle = make_intrusive<DSInternalSearchIdLookUpCatalogResourceHandle>(
         sharedStasher, collections.getMainCollectionAcquisition());
-    auto executor =
-        exec::agg::buildIdLookupExecutor(expCtx, catalogResourceHandle, boost::none /* view */);
+    auto executor = exec::agg::buildIdLookupExecutor(
+        expCtx, catalogResourceHandle, /*viewPipeline=*/boost::none);
     // No Express fast path: the executor is the local-read executor itself.
     ASSERT_TRUE(
         dynamic_cast<const exec::agg::InternalSearchIdLookUpLocalReadExecutor*>(executor.get()));
@@ -332,8 +332,8 @@ TEST_F(InternalSearchIdLookupWithCatalogTest, BuildIdLookupExecutorReturnsSbeWhe
     auto [sharedStasher, collections] = createCatalogResources();
     auto catalogResourceHandle = make_intrusive<DSInternalSearchIdLookUpCatalogResourceHandle>(
         sharedStasher, collections.getMainCollectionAcquisition());
-    auto executor =
-        exec::agg::buildIdLookupExecutor(expCtx, catalogResourceHandle, boost::none /* view */);
+    auto executor = exec::agg::buildIdLookupExecutor(
+        expCtx, catalogResourceHandle, /*viewPipeline=*/boost::none);
 
     // Flag on + no view: SBE with local-read fallback for _ids SBE declines (kNotHandled).
     auto* chain = dynamic_cast<const exec::agg::PrimaryWithFallbackSingleDocumentLookupExecutor*>(

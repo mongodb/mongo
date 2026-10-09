@@ -80,7 +80,7 @@ typename HashAggBaseStage<Derived>::SpilledRow HashAggBaseStage<Derived>::deseri
 
     keyBuffer.reset();
     auto key = value::MaterializedRow::deserializeFromKeyString(
-        decodeKeyString(record.id, typeBits), &keyBuffer, numKeys /*numPrefixValuesToRead*/);
+        decodeKeyString(record.id, typeBits), &keyBuffer, /*numPrefixValsToRead=*/numKeys);
     return std::make_pair(std::move(key), std::move(val));
 }
 
@@ -173,7 +173,10 @@ void HashAggBaseStage<Derived>::spill() {
 
     auto spilledDataStorageIncrease =
         static_cast<Derived*>(this)->getHashAggStats()->spillingStats.updateSpillingStats(
-            1 /* spills */, spilledBytes, spilledRecords, _recordStore->storageSize(_opCtx));
+            /*additionalSpills=*/1,
+            spilledBytes,
+            spilledRecords,
+            _recordStore->storageSize(_opCtx));
     groupCounters.incrementPerSpilling(
         1 /* spills */, spilledBytes, spilledRecords, spilledDataStorageIncrease);
     _recordStore->updateSpillStorageStatsForOperation(_opCtx);

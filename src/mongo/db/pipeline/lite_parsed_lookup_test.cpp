@@ -145,7 +145,7 @@ TEST_F(LiteParsedLookUpTest, StageParamsCarriesLetVarsAndUnwindSpec) {
 
 TEST_F(LiteParsedLookUpTest, RequiredPrivilegesIncludesForeignFind) {
     auto lp = parse(R"({$lookup: {from: "foreign", as: "a", pipeline: []}})");
-    auto privs = lp->requiredPrivileges(false /*isMongos*/, false /*bypass*/);
+    auto privs = lp->requiredPrivileges(false /*isMongos*/, /*bypassDocumentValidation=*/false);
     ASSERT_EQ(privs.size(), 1u);
 }
 

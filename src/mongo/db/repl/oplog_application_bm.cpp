@@ -353,7 +353,7 @@ public:
             const OID id = OID::gen();
             const BSONObj preImage = makeValidationHashDoc(id, idx, 0, payload);
             const BSONObj postImage = makeValidationHashDoc(id, idx, 1, payload);
-            const auto diff = doc_diff::computeOplogDiff(preImage, postImage, 0 /* padding */);
+            const auto diff = doc_diff::computeOplogDiff(preImage, postImage, /*paddingForDiff=*/0);
             invariant(diff);
 
             BSONObjBuilder builder;

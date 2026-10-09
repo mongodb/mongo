@@ -128,7 +128,7 @@ public:
     void doDropDatabase(const DatabaseName& dbname, bool commit = true) {
         auto opCtx = cc().makeOperationContext();
         WriteUnitOfWork wuow(opCtx.get());
-        observer.onDropDatabase(opCtx.get(), dbname, false /*fromMigrate*/);
+        observer.onDropDatabase(opCtx.get(), dbname, /*markFromMigrate=*/false);
         if (commit)
             wuow.commit();
     }

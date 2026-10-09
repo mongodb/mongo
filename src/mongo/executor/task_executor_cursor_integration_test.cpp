@@ -196,7 +196,7 @@ TEST_F(TaskExecutorCursorFixture, BasicNonPinned) {
     executor::TaskExecutorCursorOptions opts(/*pinConnection*/ false,
                                              /*batchSize*/ 10,
                                              /*preFetchNextBatch*/ true,
-                                             /*planYieldPolicy*/ nullptr);
+                                             /*yieldPolicy=*/nullptr);
     auto tec = std::make_unique<TaskExecutorCursor>(executor(), rcr, std::move(opts));
 
     size_t count = 0;
@@ -223,7 +223,7 @@ TEST_F(TaskExecutorCursorFixture, PinnedExecutorDestroyedOnUnderlying) {
     executor::TaskExecutorCursorOptions opts(/*pinConnection*/ true,
                                              /*batchSize*/ 10,
                                              /*preFetchNextBatch*/ true,
-                                             /*planYieldPolicy*/ nullptr);
+                                             /*yieldPolicy=*/nullptr);
     auto tec = std::make_unique<TaskExecutorCursor>(executor(), rcr, std::move(opts));
 
     // Fetch a documents to make sure the TEC was initialized properly.
@@ -309,7 +309,7 @@ TEST_F(TaskExecutorCursorFixture, ConnectionRemainsOpenAfterKillingTheCursor) {
             /*pinConnection*/ false,  // Test relies on being in non-pinned mode
             /*batchSize*/ 10,
             /*preFetchNextBatch*/ true,
-            /*planYieldPolicy*/ nullptr);
+            /*yieldPolicy=*/nullptr);
 
         auto tec = std::make_unique<TaskExecutorCursor>(executor(), rcr, std::move(opts));
 

@@ -1628,8 +1628,7 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_Range_Payloads_V2) {
     iupayload.setServerDerivedFromDataToken(serverDerivedFromDataToken);
 
     auto encryptedTokens =
-        StateCollectionTokensV2(escDataCounterkey, false /* isLeaf */, boost::none)
-            .encrypt(ecocToken);
+        StateCollectionTokensV2(escDataCounterkey, /*leaf=*/false, boost::none).encrypt(ecocToken);
     ASSERT_EQ(encryptedTokens.toCDR().length(), crypto::aesCTRIVSize + sizeof(PrfBlock) + 1);
     iupayload.setEncryptedTokens(encryptedTokens);
     iupayload.setIndexKeyId(indexKeyId);
