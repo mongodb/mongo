@@ -163,18 +163,8 @@ bool shouldInvalidateCollectionMetadataLocally(const InvalidateCollectionMetadat
         // The in-memory metadata already reflects what's on disk, nothing to do.
         return false;
     } else if (compareResult == std::partial_ordering::unordered) {
-        // Both sides agree the collection is untracked, so there is nothing to reconcile.
-        if (currentShardVersion == ChunkVersion::UNTRACKED() &&
-            diskShardVersion == ChunkVersion::UNTRACKED()) {
-            return false;
-        }
-
-        // Neither side has ever had a shard version, so there's nothing to reconcile either.
-        if (!currentShardVersion.isSet() && !diskShardVersion.isSet()) {
-            return false;
-        }
-
-        // Any other unordered relationship should not happen; clear anyway and surface it.
+        // Unordered versions are not equivalent, so clear the metadata and surface the unexpected
+        // relationship.
         warnUnexpectedVersionRelationship(
             "invalidateCollectionMetadata disk shard version is unordered with the in-memory shard "
             "version",

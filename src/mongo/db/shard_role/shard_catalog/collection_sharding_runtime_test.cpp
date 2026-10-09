@@ -957,7 +957,7 @@ TEST_F(CollectionShardingRuntimeTest, WaiterIsWokenForMatchingUntrackedAuthorita
     OperationContext* opCtx = operationContext();
 
     ASSERT_EQ(ChunkVersion::UNTRACKED() <=> ChunkVersion::UNTRACKED(),
-              std::partial_ordering::unordered);
+              std::partial_ordering::equivalent);
 
     auto future = csr.registerWaiterForChunkVersion(
         opCtx, ShardVersionFactory::make(ChunkVersion::UNTRACKED()));
@@ -981,7 +981,7 @@ TEST_F(CollectionShardingRuntimeTest, WaiterIsWokenForMatchingTrackedZeroChunksA
     ASSERT_EQ(trackedZeroChunks.minorVersion(), 0u);
     ASSERT_NE(trackedZeroChunks, ChunkVersion::UNTRACKED());
 
-    ASSERT_EQ(trackedZeroChunks <=> trackedZeroChunks, std::partial_ordering::unordered);
+    ASSERT_EQ(trackedZeroChunks <=> trackedZeroChunks, std::partial_ordering::equivalent);
 
     auto future =
         csr.registerWaiterForChunkVersion(opCtx, ShardVersionFactory::make(trackedZeroChunks));

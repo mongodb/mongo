@@ -192,18 +192,33 @@ public:
      * - IGNORED versions
      * - Versions from the same collection generation where at least one has unset placement version
      * ({0,0})
-     * Note: Versions with unset placement from different collection generations can be compared. *
+     * Note: Versions with unset placement from different collection generations can be compared.
+     *
+     * The cases above only make two *different* versions non-comparable: any two versions that are
+     * equal per operator== compare equivalent, so that this operator stays consistent with
+     * operator==. The one exception is a pair with an unset placement version on at least one side
+     * whose epochs and timestamps are inconsistent with each other; isSameCollection rejects that
+     * combination with a tripwire assertion instead of ordering. Pairs with placement versions set
+     * on both sides are not checked this way, so an illegal epoch/timestamp pairing between them
+     * would order by timestamp rather than tripwire.
      */
     std::partial_ordering operator<=>(const ChunkVersion& otherVersion) const {
+        // Both branches below repeat the operator== check instead of short-circuiting on it once at
+        // the top of the function. That is deliberate: operator== ignores the epoch, so an early
+        // return would also swallow the isSameCollection tripwire below for versions whose epoch
+        // and timestamp disagree.
+
         // Check for non-comparable versions (UNTRACKED, IGNORED)
         if (*this == UNTRACKED() || otherVersion == UNTRACKED() || *this == IGNORED() ||
             otherVersion == IGNORED()) {
-            return std::partial_ordering::unordered;
+            return *this == otherVersion ? std::partial_ordering::equivalent
+                                         : std::partial_ordering::unordered;
         }
 
         // Check for unset placement versions from the same collection generation
         if ((!this->isSet() || !otherVersion.isSet()) && this->isSameCollection(otherVersion)) {
-            return std::partial_ordering::unordered;
+            return *this == otherVersion ? std::partial_ordering::equivalent
+                                         : std::partial_ordering::unordered;
         }
 
         if (getTimestamp() != otherVersion.getTimestamp()) {

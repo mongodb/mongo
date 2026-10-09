@@ -24,6 +24,7 @@
 #include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -1785,6 +1786,33 @@ TEST_F(CommitCollectionMetadataLocallyTest, OnInvalidateWithShardVersionKeepsUnt
     ASSERT_TRUE(metadata);
     ASSERT_FALSE(metadata->isSharded());
     ASSERT_EQ(metadata->getShardPlacementVersion(), ChunkVersion::UNTRACKED());
+}
+
+// A tracked zero-chunks version is not equivalent to UNTRACKED. Production clears the stale
+// in-memory view; testing diagnostics instead tasserts after warning about the unexpected
+// relationship.
+using CommitCollectionMetadataLocallyTestDeathTest = CommitCollectionMetadataLocallyTest;
+DEATH_TEST_REGEX_F(CommitCollectionMetadataLocallyTestDeathTest,
+                   OnInvalidateWithShardVersionRejectsUntrackedCsrForTrackedZeroChunks,
+                   "Tripwire assertion.*13069801") {
+    auto [collType, chunks] = makeCollectionMetadata(1);
+    mockCatalogClient()->setCollectionMetadata(collType, chunks);
+
+    CollectionShardingRuntime::acquireExclusive(operationContext(), kTestNss)
+        ->setCollectionMetadata(operationContext(),
+                                CollectionMetadata::UNTRACKED(),
+                                CollectionShardingRuntime::NoRoutingTableAs::kUntracked);
+
+    const auto trackedZeroChunks =
+        ChunkVersion({collType.getEpoch(), collType.getTimestamp()}, {0, 0});
+    const auto invalidateEntry = makeInvalidateOplogEntry(collType.getUuid(), [&] {
+        InvalidateCollectionMetadataOplogEntry entry{std::string(kTestNss.coll())};
+        entry.setShardVersion(trackedZeroChunks);
+        return entry;
+    }());
+
+    ShardServerOpObserver observer;
+    observer.onInvalidateCollectionMetadata(operationContext(), invalidateEntry);
 }
 
 // An unconditional invalidate (no shardVersion) clears even an unknown CSR.

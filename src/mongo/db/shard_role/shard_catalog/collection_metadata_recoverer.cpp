@@ -504,6 +504,8 @@ AttemptResult waitForConfigTimeOrShardVersionChange(OperationContext* opCtx,
     return AttemptResult::kDone;
 }
 
+}  // namespace
+
 bool isRecoveredShardVersionSufficient(
     OperationContext* opCtx,
     const NamespaceString& nss,
@@ -554,21 +556,11 @@ bool isRecoveredShardVersionSufficient(
         return true;
     }
 
-    // Both untracked: the shard is recovered. The database version check is handled separately
-    // by the authoritative DB versioning protocol.
-    if (receivedShardVersion == ChunkVersion::UNTRACKED() &&
-        installedShardVersion == ChunkVersion::UNTRACKED()) {
-        LOGV2_DEBUG(12307907,
-                    3,
-                    "Authoritative metadata recovery: both router and shard versions are "
-                    "untracked, versions are comparable",
-                    logAttrs(nss));
-        return true;
-    }
-
-    // Both tracked: accept when received <= installed (shard up to date, or router stale). If the
-    // comparison yields unordered (e.g. one tracked and one untracked) or received > installed,
-    // fall through and return false so the configTime wait runs.
+    // Accept when received <= installed (shard up to date, or router stale). Identical versions
+    // compare equivalent, so this also covers both sides being UNTRACKED or both being tracked
+    // with zero owned chunks. If the comparison yields unordered (e.g. one tracked and one
+    // untracked) or received > installed, fall through and return false so the configTime wait
+    // runs.
     auto compareResult = receivedShardVersion <=> installedShardVersion;
     if (compareResult == std::partial_ordering::less ||
         compareResult == std::partial_ordering::equivalent) {
@@ -592,8 +584,6 @@ bool isRecoveredShardVersionSufficient(
 
     return false;
 }
-
-}  // namespace
 
 AttemptResult onShardVersionMismatchAuthoritative(
     OperationContext* opCtx,

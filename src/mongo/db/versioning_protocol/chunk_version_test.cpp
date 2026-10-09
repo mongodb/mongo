@@ -7,6 +7,7 @@
 #include "mongo/unittest/unittest.h"
 
 #include <limits>
+#include <vector>
 
 namespace mongo {
 namespace {
@@ -120,16 +121,12 @@ TEST(ChunkVersionTest, ThreeWayComparisonOperator) {
               ChunkVersion::UNTRACKED() <=> ChunkVersion({epoch, timestamp}, {3, 1}));
     ASSERT_EQ(std::partial_ordering::unordered,
               ChunkVersion({epoch, timestamp}, {3, 1}) <=> ChunkVersion::UNTRACKED());
-    ASSERT_EQ(std::partial_ordering::unordered,
-              ChunkVersion::UNTRACKED() <=> ChunkVersion::UNTRACKED());
 
     // Test unordered cases - IGNORED versions
     ASSERT_EQ(std::partial_ordering::unordered,
               ChunkVersion::IGNORED() <=> ChunkVersion({epoch, timestamp}, {3, 1}));
     ASSERT_EQ(std::partial_ordering::unordered,
               ChunkVersion({epoch, timestamp}, {3, 1}) <=> ChunkVersion::IGNORED());
-    ASSERT_EQ(std::partial_ordering::unordered,
-              ChunkVersion::IGNORED() <=> ChunkVersion::IGNORED());
 
     // Test unordered cases - UNTRACKED vs IGNORED
     ASSERT_EQ(std::partial_ordering::unordered,
@@ -144,9 +141,13 @@ TEST(ChunkVersionTest, ThreeWayComparisonOperator) {
     ASSERT_EQ(std::partial_ordering::unordered,
               ChunkVersion({epoch, timestamp}, {3, 1}) <=>
                   ChunkVersion({epoch, timestamp}, {0, 0}));
+
+    // Test unordered cases - UNTRACKED vs tracked-with-no-owned-chunks are genuinely different
+    // states even though both have an unset placement.
     ASSERT_EQ(std::partial_ordering::unordered,
-              ChunkVersion({epoch, timestamp}, {0, 0}) <=>
-                  ChunkVersion({epoch, timestamp}, {0, 0}));
+              ChunkVersion::UNTRACKED() <=> ChunkVersion({epoch, timestamp}, {0, 0}));
+    ASSERT_EQ(std::partial_ordering::unordered,
+              ChunkVersion({epoch, timestamp}, {0, 0}) <=> ChunkVersion::UNTRACKED());
 
     // Test equivalent cases
     ASSERT_EQ(std::partial_ordering::equivalent,
@@ -155,6 +156,17 @@ TEST(ChunkVersionTest, ThreeWayComparisonOperator) {
     ASSERT_EQ(std::partial_ordering::equivalent,
               ChunkVersion({epoch, timestamp}, {5, 2}) <=>
                   ChunkVersion({epoch, timestamp}, {5, 2}));
+
+    // Test equivalent cases - a version is always comparable against an identical version, even
+    // when it is one of the special or unset versions that are otherwise non-comparable. This
+    // keeps <=> consistent with ==.
+    ASSERT_EQ(std::partial_ordering::equivalent,
+              ChunkVersion::UNTRACKED() <=> ChunkVersion::UNTRACKED());
+    ASSERT_EQ(std::partial_ordering::equivalent,
+              ChunkVersion::IGNORED() <=> ChunkVersion::IGNORED());
+    ASSERT_EQ(std::partial_ordering::equivalent,
+              ChunkVersion({epoch, timestamp}, {0, 0}) <=>
+                  ChunkVersion({epoch, timestamp}, {0, 0}));
 
     // Test timestamp comparison - less
     ASSERT_EQ(std::partial_ordering::less,
@@ -231,6 +243,66 @@ TEST(ChunkVersionTest, ThreeWayComparisonOperator) {
     ASSERT_EQ(std::partial_ordering::greater,
               ChunkVersion({differentEpoch, newerTimestamp}, {0, 0}) <=>
                   ChunkVersion({epoch, timestamp}, {0, 0}));
+}
+
+TEST(ChunkVersionTest, ThreeWayComparisonOperatorIsConsistentWithEquality) {
+    const OID epoch = OID::gen();
+    const Timestamp timestamp(1);
+
+    // A default constructed version is equal to UNTRACKED(), so it exercises the equivalent case
+    // against a differently spelled but equal version.
+    const std::vector<ChunkVersion> versions{ChunkVersion::UNTRACKED(),
+                                             ChunkVersion::IGNORED(),
+                                             ChunkVersion(),
+                                             ChunkVersion({epoch, timestamp}, {0, 0}),
+                                             ChunkVersion({epoch, timestamp}, {0, 1}),
+                                             ChunkVersion({epoch, timestamp}, {3, 1})};
+
+    for (const auto& version : versions) {
+        for (const auto& otherVersion : versions) {
+            if (version == otherVersion) {
+                ASSERT_EQ(std::partial_ordering::equivalent, version <=> otherVersion)
+                    << version << " vs " << otherVersion;
+            } else {
+                ASSERT_NE(std::partial_ordering::equivalent, version <=> otherVersion)
+                    << version << " vs " << otherVersion;
+            }
+        }
+    }
+}
+
+// The shard version check throws StaleConfig based on isWriteCompatibleWith, while the recovery and
+// refresh paths decide whether there is anything left to do based on <=>. If a pair of versions
+// could ever compare equivalent while not being write compatible, the shard would keep throwing
+// StaleConfig for versions that recovery considers already matching, looping forever. Guard against
+// that combination by checking that equivalence implies write compatibility.
+TEST(ChunkVersionTest, EquivalenceImpliesWriteCompatibility) {
+    const OID epoch = OID::gen();
+    const Timestamp timestamp(1);
+    const OID otherEpoch = OID::gen();
+    const Timestamp otherTimestamp(2);
+
+    // Every version pairs its epoch with its own timestamp, so that isSameCollection never sees the
+    // illegal "one of epoch/timestamp matches" combination and tasserts.
+    const std::vector<ChunkVersion> versions{ChunkVersion::UNTRACKED(),
+                                             ChunkVersion::IGNORED(),
+                                             ChunkVersion({epoch, timestamp}, {0, 0}),
+                                             ChunkVersion({epoch, timestamp}, {1, 0}),
+                                             ChunkVersion({epoch, timestamp}, {1, 5}),
+                                             ChunkVersion({epoch, timestamp}, {3, 1}),
+                                             ChunkVersion({otherEpoch, otherTimestamp}, {0, 0}),
+                                             ChunkVersion({otherEpoch, otherTimestamp}, {1, 0}),
+                                             ChunkVersion({otherEpoch, otherTimestamp}, {3, 1})};
+
+    for (const auto& installed : versions) {
+        for (const auto& received : versions) {
+            if ((received <=> installed) == std::partial_ordering::equivalent) {
+                ASSERT_TRUE(installed.isWriteCompatibleWith(received))
+                    << "received " << received << " compares equivalent to installed " << installed
+                    << " but is not write compatible with it";
+            }
+        }
+    }
 }
 
 }  // namespace
