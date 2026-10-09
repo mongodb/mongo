@@ -95,6 +95,18 @@ sh_test(
     data = ["prelude_workdir.sh"],
 )
 
+sh_test(
+    name = "prelude_python_test",
+    srcs = ["prelude_python_test.sh"],
+    data = ["prelude_python_windows.sh"],
+)
+
+sh_test(
+    name = "venv_adjust_test",
+    srcs = ["venv_adjust_test.sh"],
+    data = ["//evergreen/functions:venv_adjust.sh"],
+)
+
 sh_binary(
     name = "check_idl_compat",
     srcs = ["check_idl_compat.sh"],
@@ -453,6 +465,7 @@ sh_binary(
 sh_binary(
     name = "prelude_python",
     srcs = ["prelude_python.sh"],
+    data = ["prelude_python_windows.sh"],
 )
 
 sh_binary(

@@ -5,7 +5,7 @@ evergreen_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)/.."
 . "$evergreen_dir/prelude_workdir.sh"
 . "$evergreen_dir/prelude_python.sh"
 
-python_loc=$(which ${python})
+python_loc=$(command -v "$python")
 echo "python_loc set to $python_loc"
 
 venv_dir="${workdir}/venv"

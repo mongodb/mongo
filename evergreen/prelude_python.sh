@@ -1,5 +1,6 @@
 if [ "Windows_NT" = "$OS" ]; then
-    python='/cygdrive/c/python/python313/python.exe'
+    . "$(dirname "${BASH_SOURCE[0]}")/prelude_python_windows.sh" || return 1
+    python=$(_windows_python '/cygdrive/c/python/python313/python.exe') || return 1
     echo "Executing on windows, setting python to ${python}"
 elif [ "$(uname)" = "Darwin" ]; then
     python='/Library/Frameworks/Python.Framework/Versions/3.13/bin/python3'
