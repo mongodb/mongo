@@ -197,7 +197,7 @@ void scanDocument(mutablebson::ConstElement elem,
         BSONElement bsonElem = elem.getValue();
         if (bsonElem.binDataType() == BinDataType::Column) {
             int len = 0;
-            const char* buf = bsonElem.binData(len /*out*/);
+            const char* buf = bsonElem.binData(len);
             auto status = validateBSONColumn(buf, len);
             if (!status.isOK()) {
                 uasserted(ErrorCodes::InvalidBSONColumn,

@@ -748,7 +748,7 @@ RecordId SortedDataIndexAccessMethod::findSingle(OperationContext* opCtx,
                     keys.get(),
                     multikeyMetadataKeys,
                     multikeyPaths,
-                    boost::none /* loc */);
+                    /*id=*/boost::none);
             invariant(keys->size() == 1);
             const key_string::Value& actualKey = *keys->begin();
             dassert(key_string::decodeDiscriminator(actualKey.getView(),

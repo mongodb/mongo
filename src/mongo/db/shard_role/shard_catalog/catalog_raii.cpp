@@ -381,7 +381,7 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
 
             uassert(StaleConfigInfo(_resolvedNss,
                                     *receivedShardVersion,
-                                    ShardVersion::UNTRACKED() /* wantedVersion */,
+                                    /*wanted=*/ShardVersion::UNTRACKED(),
                                     ShardingState::get(opCtx)->shardId()),
                     str::stream() << "Namespace " << _resolvedNss.toStringForErrorMsg()
                                   << " is a view therefore the shard "
@@ -405,7 +405,7 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
 
     uassert(StaleConfigInfo(_resolvedNss,
                             *receivedShardVersion,
-                            boost::none /* wantedVersion */,
+                            /*wanted=*/boost::none,
                             ShardingState::get(opCtx)->shardId()),
             str::stream() << "No metadata for namespace " << _resolvedNss.toStringForErrorMsg()
                           << " therefore the shard "

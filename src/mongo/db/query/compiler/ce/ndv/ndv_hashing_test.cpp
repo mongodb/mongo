@@ -180,7 +180,7 @@ TEST(NdvHashingTest, HashEqualityMatchesWoCompareOverCorpus) {
             const BSONElement lhs = docs[i].firstElement();
             const BSONElement rhs = docs[j].firstElement();
             const bool valuesEqual =
-                lhs.woCompare(rhs, false /* considerFieldName */, nullptr /* comparator */) == 0;
+                lhs.woCompare(rhs, /*rules=*/false, nullptr /* comparator */) == 0;
             const bool hashesEqual = hashValueForNdv(lhs) == hashValueForNdv(rhs);
             ASSERT_EQ(hashesEqual, valuesEqual)
                 << "lhs=" << docs[i] << " rhs=" << docs[j] << " valuesEqual=" << valuesEqual;

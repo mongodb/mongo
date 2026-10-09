@@ -2373,7 +2373,7 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataConsistency(
                                                   localNss,
                                                   localCatalogSnapshot,
                                                   localColl,
-                                                  primaryShardId == shardId /* isPrimaryShard */,
+                                                  /*checkView=*/primaryShardId == shardId,
                                                   rsMode,
                                                   inconsistencies);
             if (optionalCheckIndexes && !catalogColl.getUnsplittable()) {

@@ -873,7 +873,7 @@ public:
 protected:
     fle::QueryRewriter getQueryRewriterForEsc(FLETagQueryInterface* queryImpl) override {
         return MockQueryRewriter::getQueryRewriterWithMockedMaps(
-            expCtx, nssEsc, _efcMap, /*forceTextSearchGenerateTagsAsMatchException*/ false);
+            expCtx, nssEsc, _efcMap, /*forceCollectionScanOnAggAsMatchRewrite=*/false);
     }
 };
 

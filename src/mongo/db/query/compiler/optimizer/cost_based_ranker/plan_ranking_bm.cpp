@@ -800,7 +800,7 @@ void BM_RunAllConfigs(benchmark::State& state) {
                                 // and sampling algo. This benchmark given as input numOfChunks <= 0
                                 // will use kRandom.
                                 auto samplingStyle = iniitalizeSamplingAlgoBasedOnChunks(
-                                    /*samplingAlgo*/ samplingStyleConfig[samplingStyleConfig_idx]);
+                                    /*numOfChunks=*/samplingStyleConfig[samplingStyleConfig_idx]);
 
                                 plan_ranking_tests::PlanningTimeProfile sampleAndPlanningTime;
                                 std::vector<std::unique_ptr<QuerySolution>> bestCBRPlan;

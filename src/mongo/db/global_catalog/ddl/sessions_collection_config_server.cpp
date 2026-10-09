@@ -122,7 +122,7 @@ void SessionsCollectionConfigServer::_generateIndexesIfNeeded(OperationContext* 
             // valid routing table.
             uassert(StaleConfigInfo(nss,
                                     cri.getCollectionVersion() /* receivedVersion */,
-                                    ShardVersion::UNTRACKED() /* wantedVersion */,
+                                    /*wanted=*/ShardVersion::UNTRACKED(),
                                     ShardingState::get(opCtx)->shardId()),
                     str::stream() << "Collection " << nss.toStringForErrorMsg()
                                   << " is not sharded",

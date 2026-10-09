@@ -927,7 +927,7 @@ void commitSetAllowChunkOperationsLocally(OperationContext* opCtx,
     uassert(StaleConfigInfo(nss,
                             OperationShardingState::get(opCtx).getShardVersion(nss).value_or(
                                 ShardVersionFactory::make(ChunkVersion::IGNORED())),
-                            boost::none /* wantedVersion */,
+                            /*wanted=*/boost::none,
                             ShardingState::get(opCtx)->shardId()),
             fmt::format("commitSetAllowChunkOperationsLocally: collection metadata for {} is "
                         "not currently known and needs to be recovered",

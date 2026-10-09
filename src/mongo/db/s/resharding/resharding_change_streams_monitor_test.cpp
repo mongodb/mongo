@@ -820,7 +820,7 @@ TEST_F(ReshardingChangeStreamsMonitorTest, ProcessSingleDeleteMany) {
     // Update doc {x:0} to {x:1} to ensure there are two documents matching the delete query.
     client.update(
         tempNss, BSON("x" << 0), BSON("$set" << BSON("x" << 1)), false /*upsert*/, false /*multi*/);
-    client.remove(tempNss, BSON("x" << 1), true /*multi*/);
+    client.remove(tempNss, BSON("x" << 1), /*removeMany=*/true);
 
     auto monitor = std::make_shared<ReshardingChangeStreamsMonitor>(
         reshardingUUID, tempNss, startAtTime, boost::none /* startAfterResumeToken */, callback);

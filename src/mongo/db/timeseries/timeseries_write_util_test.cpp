@@ -315,10 +315,11 @@ TEST_F(TimeseriesWriteUtilTest, MakeTimeseriesCompressedDiffUpdateOpFromBatch) {
                     "a":{"0":1,"1":2,"2":3},
                     "b":{"0":1,"1":2,"2":3}}})");
 
-    const auto preImageCompressionResult = timeseries::compressBucket(uncompressedPreImage,
-                                                                      _timeField,
-                                                                      _nsNoMeta,
-                                                                      /*validateCompression=*/true);
+    const auto preImageCompressionResult =
+        timeseries::compressBucket(uncompressedPreImage,
+                                   _timeField,
+                                   _nsNoMeta,
+                                   /*validateDecompression=*/true);
     ASSERT_TRUE(preImageCompressionResult.compressedBucket);
 
     batch->numPreviouslyCommittedMeasurements = 3;
@@ -382,10 +383,11 @@ TEST_F(TimeseriesWriteUtilTest, MakeTimeseriesCompressedDiffUpdateOpFromBatchWit
     batch->measurements = {measurements.begin(), measurements.end()};
     auto metadata = fromjson(R"({"meta":{"tag":1}})");
 
-    const auto preImageCompressionResult = timeseries::compressBucket(uncompressedPreImage,
-                                                                      _timeField,
-                                                                      _nsNoMeta,
-                                                                      /*validateCompression=*/true);
+    const auto preImageCompressionResult =
+        timeseries::compressBucket(uncompressedPreImage,
+                                   _timeField,
+                                   _nsNoMeta,
+                                   /*validateDecompression=*/true);
     ASSERT_TRUE(preImageCompressionResult.compressedBucket);
 
     batch->numPreviouslyCommittedMeasurements = 3;

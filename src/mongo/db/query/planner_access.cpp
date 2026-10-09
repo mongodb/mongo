@@ -488,7 +488,7 @@ void QueryPlannerAccess::handleRIDRangeMinMax(const CanonicalQuery& query,
             break;
         case MType::LT:
         case MType::INTERNAL_EXPR_LT:
-            recordRange.maybeNarrowMax(collated, false /* EXclusive */);
+            recordRange.maybeNarrowMax(collated, /*inclusive=*/false);
             break;
         case MType::LTE:
         case MType::INTERNAL_EXPR_LTE:
@@ -496,7 +496,7 @@ void QueryPlannerAccess::handleRIDRangeMinMax(const CanonicalQuery& query,
             break;
         case MType::GT:
         case MType::INTERNAL_EXPR_GT:
-            recordRange.maybeNarrowMin(collated, false /* EXclusive */);
+            recordRange.maybeNarrowMin(collated, /*inclusive=*/false);
             break;
         case MType::GTE:
         case MType::INTERNAL_EXPR_GTE:

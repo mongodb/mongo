@@ -51,7 +51,7 @@ void BucketCatalogInternalTest::_rolloverWithRolloverReason(RolloverReason reaso
                                                                             {_measurement},
                                                                             /*startIndex=*/0,
                                                                             /*numDocsToStage=*/1,
-                                                                            /*docsToRetry=*/{},
+                                                                            /*indices=*/{},
                                                                             errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 

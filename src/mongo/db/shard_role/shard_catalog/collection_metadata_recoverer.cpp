@@ -112,7 +112,7 @@ void maybeThrowStaleConfigOnNoopWriteFailure(OperationContext* opCtx,
 
     uasserted(StaleConfigInfo(nss,
                               ShardVersionFactory::make(receivedShardVersion),
-                              boost::none /* wantedVersion */,
+                              /*wanted=*/boost::none,
                               ShardingState::get(opCtx)->shardId()),
               str::stream() << "Could not advance configTime to resolve an incomparable shard "
                                "version for "

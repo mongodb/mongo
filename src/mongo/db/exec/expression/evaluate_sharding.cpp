@@ -98,7 +98,7 @@ Value evaluate(const ExpressionInternalOwningShard& expr,
     if (!cri.hasRoutingTable() ||
         (cri.getCollectionVersion().placementVersion() <=> shardVersion.placementVersion()) ==
             std::partial_ordering::less) {
-        catalogCache->onStaleCollectionVersion(ns, boost::none /* wanted */);
+        catalogCache->onStaleCollectionVersion(ns, /*wantedVersion=*/boost::none);
 
         uasserted(ShardCannotRefreshDueToLocksHeldInfo(ns),
                   str::stream()

@@ -432,7 +432,7 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
                 }
 
                 logConvertToCappedOnChangelog(
-                    opCtx, nss(), _doc.getSize(), false /* end */, localCollUuid);
+                    opCtx, nss(), _doc.getSize(), /*start=*/false, localCollUuid);
             }))
         .then(_buildPhaseHandler(
             Phase::kReleaseCriticalSectionOnDataShard,

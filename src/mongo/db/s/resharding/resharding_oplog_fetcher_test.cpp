@@ -514,7 +514,7 @@ public:
                         nss,
                         uuid,
                         BSON("msg" << "other noop"),
-                        boost::none /* o2 */,
+                        /*o2MsgObj=*/boost::none,
                         boost::none,
                         boost::none,
                         boost::none,

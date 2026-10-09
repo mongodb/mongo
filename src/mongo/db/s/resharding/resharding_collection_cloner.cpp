@@ -320,7 +320,7 @@ void ReshardingCollectionCloner::_writeOnceWithNaturalOrder(
         uassert(StaleConfigInfo(
                     _outputNss,
                     ShardVersionFactory::make(ChunkVersion::IGNORED()) /* receivedVersion */,
-                    boost::none /* wantedVersion */,
+                    /*wanted=*/boost::none,
                     ShardId{"0"}),
                 str::stream() << "Throwing staleConfig for reshardingCollectionCloner failpoint.",
                 false);

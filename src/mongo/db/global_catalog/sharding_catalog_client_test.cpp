@@ -357,7 +357,7 @@ TEST_F(ShardingCatalogClientTest, GetAllShardsWithDrainingShard) {
         const auto shards =
             catalogClient()->getAllShards(operationContext(),
                                           repl::ReadConcernArgs::kMajority,
-                                          BSON(ShardType::draining.ne(true)) /* excludeDraining */);
+                                          /*filter=*/BSON(ShardType::draining.ne(true)));
         return shards.value;
     });
 

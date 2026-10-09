@@ -2053,7 +2053,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildOnlyUnwind(
     // 'unwindSlot' and place the array index value into 'arrayIndexSlot'.
     //
     auto [unwindStage, unwindSlot, arrayIndexSlot] =
-        b.makeUnwind(std::move(stage), getFieldSlot /* inField */, un.preserveNullAndEmptyArrays);
+        b.makeUnwind(std::move(stage), /*inputSlot=*/getFieldSlot, un.preserveNullAndEmptyArrays);
     stage = std::move(unwindStage);
 
     //

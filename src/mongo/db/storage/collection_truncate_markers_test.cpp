@@ -1054,7 +1054,7 @@ TEST_F(CollectionMarkersTest, ScanningWorksWithTruncate) {
     EXPECT_FALSE(hasYielded.load());
 
     CollectionTruncateMarkers::createMarkersByScanning(
-        opCtx.get(), *iterator, /*estimatedBytesPerMarker=*/1, getIdAndWallTime, curTimeMicros64());
+        opCtx.get(), *iterator, /*minBytesPerMarker=*/1, getIdAndWallTime, curTimeMicros64());
 
     EXPECT_TRUE(hasYielded.load());
     yieldNotifier.join();

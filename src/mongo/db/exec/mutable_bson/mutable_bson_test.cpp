@@ -3534,7 +3534,7 @@ BSONObj makeObjWithChildrenPastClaimedObjectSize() {
     auto buf = SharedBuffer::allocate(valid.objsize());
     std::memcpy(buf.get(), valid.objdata(), valid.objsize());
     constexpr int kChildOffset = 4 /*objsize*/ + 1 /*type*/ + 2 /*"a\0"*/ + 4 /*subobject objsize*/;
-    DataView(buf.get()).write<LittleEndian<int32_t>>(kChildOffset, 0 /*objsize*/);
+    DataView(buf.get()).write<LittleEndian<int32_t>>(kChildOffset, /*offset=*/0);
 
     return BSONObj(std::move(buf));
 }

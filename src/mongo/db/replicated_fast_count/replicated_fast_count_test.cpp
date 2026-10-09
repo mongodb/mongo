@@ -184,8 +184,8 @@ TEST_F(ReplicatedFastCountTest, DeletesAreCorrectlyAccountedFor) {
                              _fastCountManager,
                              _nss1,
                              numDocs,
-                             /*startingSize=*/0,
                              /*startingCount=*/0,
+                             /*startingSize=*/0,
                              docGeneratorForInsert,
                              sampleDocForInsert);
 

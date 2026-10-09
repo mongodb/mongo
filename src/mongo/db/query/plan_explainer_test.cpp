@@ -1455,7 +1455,7 @@ TEST_F(PlanExplainerTest, NLJEmbeddingTest) {
                                                        .leftField = FieldPath("x"),
                                                        .rightField = FieldPath("y")}},
         boost::none /* leftFieldEmbedding */,
-        FieldPath("xyz" /* rightFieldEmbedding */));
+        FieldPath(/*inputPath=*/"xyz"));
 
     BSONObjBuilder outerBob;
     BSONObjBuilder innerBob(outerBob.subobjStart("inner"));
@@ -1500,7 +1500,7 @@ TEST_F(PlanExplainerTest, INLJEmbeddingTest) {
                                                        .leftField = FieldPath("x"),
                                                        .rightField = FieldPath("y")}},
         boost::none /* leftFieldEmbedding */,
-        FieldPath("xyz" /* rightFieldEmbedding */));
+        FieldPath(/*inputPath=*/"xyz"));
 
     BSONObjBuilder outerBob;
     BSONObjBuilder innerBob(outerBob.subobjStart("inner"));

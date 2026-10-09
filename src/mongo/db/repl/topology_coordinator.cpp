@@ -261,7 +261,7 @@ HostAndPort TopologyCoordinator::chooseNewSyncSource(Date_t now,
     // set.
     auto maybeSyncSource = _chooseSyncSourceUnsupportedSyncSourceParameter(now);
     if (maybeSyncSource) {
-        _setSyncSource(*maybeSyncSource, now, false /* fromReplSetSyncFrom */);
+        _setSyncSource(*maybeSyncSource, now, /*forced=*/false);
         return _syncSource;
     }
 
@@ -270,7 +270,7 @@ HostAndPort TopologyCoordinator::chooseNewSyncSource(Date_t now,
     if (maybeSyncSource) {
         // If we have a forced sync source via 'replSetSyncFrom', set the _replSetSyncFromSet flag
         // to true.
-        _setSyncSource(*maybeSyncSource, now, true /* fromReplSetSyncFrom */);
+        _setSyncSource(*maybeSyncSource, now, /*forced=*/true);
         return _syncSource;
     }
 

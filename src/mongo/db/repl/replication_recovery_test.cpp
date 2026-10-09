@@ -1774,7 +1774,7 @@ TEST_F(ReplicationRecoveryTest, RecoverySetsValidateFeaturesAsPrimaryToFalseWhil
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
     getConsistencyMarkers()->setAppliedThrough(opCtx, OpTime(Timestamp(3, 3), 1));
     _setUpOplog(opCtx, getStorageInterface(), {1, 2, 3, 4, 5});
-    recovery.recoverFromOplog(opCtx, boost::none /* recoveryTs */);
+    recovery.recoverFromOplog(opCtx, /*stableTimestamp=*/boost::none);
 
     ASSERT_FALSE(serverGlobalParams.validateFeaturesAsPrimary.load());
 }

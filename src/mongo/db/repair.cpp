@@ -116,7 +116,7 @@ Status dropUnfinishedIndexes(OperationContext* opCtx, Collection* collection) {
                 opCtx,
                 indexName,
                 collection,
-                nullptr /*ident */,
+                /*entry=*/nullptr,
                 // Unfinished indexes do not need two-phase drop because the incomplete index will
                 // never be recovered. This is an optimization that will return disk space to the
                 // user more quickly.

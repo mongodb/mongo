@@ -56,7 +56,7 @@ Status VectorClockMetadataHook::readReplyMetadata(OperationContext* opCtx,
         metadataObj, IDLParserContext("VectorClockComponents"));
     VectorClock::get(_service)->gossipIn(opCtx,
                                          receivedComponents,
-                                         false /* couldBeUnauthorized */,
+                                         /*couldBeUnauthenticated=*/false,
                                          true /* defaultIsInternalClient */);
     return Status::OK();
 }

@@ -334,7 +334,7 @@ BatchedInsertContext _buildSingleInsertContext(BucketCatalog& bucketCatalog,
                                                             measurements,
                                                             /*startIndex=*/0,
                                                             /*numDocsToStage=*/measurements.size(),
-                                                            /*docsToRetry=*/{},
+                                                            /*indices=*/{},
                                                             errorsAndIndices);
     ASSERT_TRUE(errorsAndIndices.empty());
     ASSERT_EQ(1, batchedInsertContexts.size());
@@ -620,7 +620,7 @@ void BucketCatalogTest::_testBuildBatchedInsertContextWithMetaField(
         userMeasurementsBatch,
         /*startIndex=*/0,
         /*numDocsToStage=*/userMeasurementsBatch.size(),
-        /*docsToRetry=*/{},
+        /*indices=*/{},
         stats,
         trackingContext,
         errorsAndIndices);
@@ -731,7 +731,7 @@ void BucketCatalogTest::_testBuildBatchedInsertContextWithoutMetaField(
                                               userMeasurementsBatch,
                                               /*startIndex=*/0,
                                               /*numDocsToStage=*/userMeasurementsBatch.size(),
-                                              /*docsToRetry=*/{},
+                                              /*indices=*/{},
                                               stats,
                                               trackingContext,
                                               errorsAndIndices);
@@ -901,7 +901,7 @@ void BucketCatalogTest::_testStageInsertBatch(const NamespaceString& ns,
                                                    batchOfMeasurements,
                                                    /*startIndex=*/0,
                                                    /*numDocsToStage=*/batchOfMeasurements.size(),
-                                                   /*docsToRetry=*/{},
+                                                   /*indices=*/{},
                                                    errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
@@ -1034,7 +1034,7 @@ void BucketCatalogTest::_testStageInsertBatchIntoEligibleBucket(
                                                    measurements,
                                                    /*startIndex=*/0,
                                                    /*numDocsToStage=*/measurements.size(),
-                                                   /*docsToRetry=*/{},
+                                                   /*indices=*/{},
                                                    errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
     EXPECT_EQ(batchedInsertContexts.size(), numBatchedInsertContexts);
@@ -1298,7 +1298,7 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucketArray) {
         {BSON(_timeField << Date_t::now() << _metaField << BSON_ARRAY(BSON("a" << 0 << "b" << 1)))},
         /*startIndex=*/0,
         /*numDocsToStage=*/1,
-        /*docsToRetry=*/{},
+        /*indices=*/{},
         errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
     auto batchedInsertCtx1 = batchedInsertContexts1[0];
@@ -1310,7 +1310,7 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucketArray) {
         {BSON(_timeField << Date_t::now() << _metaField << BSON_ARRAY(BSON("b" << 1 << "a" << 0)))},
         /*startIndex=*/0,
         /*numDocsToStage=*/1,
-        /*docsToRetry=*/{},
+        /*indices=*/{},
         errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
     auto batchedInsertCtx2 = batchedInsertContexts2[0];
@@ -1331,7 +1331,7 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucketObjArray) {
                                                            << BSON("f" << 1 << "g" << 0)))))},
         /*startIndex=*/0,
         /*numDocsToStage=*/1,
-        /*docsToRetry=*/{},
+        /*indices=*/{},
         errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
     auto batchedInsertCtx1 = batchedInsertContexts1[0];
@@ -1345,7 +1345,7 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucketObjArray) {
                                                            << BSON("g" << 0 << "f" << 1)))))},
         /*startIndex=*/0,
         /*numDocsToStage=*/1,
-        /*docsToRetry=*/{},
+        /*indices=*/{},
         errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
     auto batchedInsertCtx2 = batchedInsertContexts2[0];
@@ -1367,7 +1367,7 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucketNestedArray) {
                                                            << BSON_ARRAY("123" << "456")))))},
         /*startIndex=*/0,
         /*numDocsToStage=*/1,
-        /*docsToRetry=*/{},
+        /*indices=*/{},
         errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
     auto batchedInsertCtx1 = batchedInsertContexts1[0];
@@ -1381,7 +1381,7 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucketNestedArray) {
                                                            << BSON_ARRAY("123" << "456")))))},
         /*startIndex=*/0,
         /*numDocsToStage=*/1,
-        /*docsToRetry=*/{},
+        /*indices=*/{},
         errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
     auto batchedInsertCtx2 = batchedInsertContexts2[0];
@@ -1400,7 +1400,7 @@ TEST_F(BucketCatalogTest, InsertNullAndMissingMetaFieldIntoDifferentBuckets) {
         {BSON(_timeField << Date_t::now() << _metaField << BSONNULL)},
         /*startIndex=*/0,
         /*numDocsToStage=*/1,
-        /*docsToRetry=*/{},
+        /*indices=*/{},
         errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
     auto batchedInsertCtx1 = batchedInsertContexts1[0];
@@ -1412,7 +1412,7 @@ TEST_F(BucketCatalogTest, InsertNullAndMissingMetaFieldIntoDifferentBuckets) {
                                                    {BSON(_timeField << Date_t::now())},
                                                    /*startIndex=*/0,
                                                    /*numDocsToStage=*/1,
-                                                   /*docsToRetry=*/{},
+                                                   /*indices=*/{},
                                                    errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
     auto batchedInsertCtx2 = batchedInsertContexts2[0];
@@ -2535,7 +2535,7 @@ TEST_F(BucketCatalogTest, OIDCollisionIsHandledForFrozenBucket) {
                                                                             {doc},
                                                                             /*startIndex=*/0,
                                                                             /*numDocsToStage=*/1,
-                                                                            /*docsToRetry=*/{},
+                                                                            /*indices=*/{},
                                                                             errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
     auto batchedInsertCtx = batchedInsertContexts[0];
@@ -2636,7 +2636,7 @@ TEST_F(BucketCatalogTest, FindOpenBucketsReturnsBucket) {
                                                                             {_measurement},
                                                                             /*startIndex=*/0,
                                                                             /*numDocsToStage=*/1,
-                                                                            /*docsToRetry=*/{},
+                                                                            /*indices=*/{},
                                                                             errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
     auto batchedInsertCtx = batchedInsertContexts[0];
@@ -2668,7 +2668,7 @@ TEST_F(BucketCatalogTest, CheckBucketStateAndCleanupWithBucketWithDirectWrite) {
                                                                             {_measurement},
                                                                             /*startIndex=*/0,
                                                                             /*numDocsToStage=*/1,
-                                                                            /*docsToRetry=*/{},
+                                                                            /*indices=*/{},
                                                                             errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
     auto batchedInsertCtx = batchedInsertContexts[0];
@@ -2704,7 +2704,7 @@ TEST_F(BucketCatalogTest, CheckBucketStateAndCleanupWithClearedBucket) {
                                                                             {_measurement},
                                                                             /*startIndex=*/0,
                                                                             /*numDocsToStage=*/1,
-                                                                            /*docsToRetry=*/{},
+                                                                            /*indices=*/{},
                                                                             errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
     auto batchedInsertCtx = batchedInsertContexts[0];
@@ -2740,7 +2740,7 @@ TEST_F(BucketCatalogTest, CheckBucketStateAndCleanupWithFrozenBucket) {
                                                                             {_measurement},
                                                                             /*startIndex=*/0,
                                                                             /*numDocsToStage=*/1,
-                                                                            /*docsToRetry=*/{},
+                                                                            /*indices=*/{},
                                                                             errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
     auto batchedInsertCtx = batchedInsertContexts[0];
@@ -2776,7 +2776,7 @@ TEST_F(BucketCatalogTest, determineBucketRolloverForMeasurementNone) {
                                                                             {_measurement},
                                                                             /*startIndex=*/0,
                                                                             /*numDocsToStage=*/1,
-                                                                            /*docsToRetry=*/{},
+                                                                            /*indices=*/{},
                                                                             errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
@@ -2816,7 +2816,7 @@ TEST_F(BucketCatalogTest, determineBucketRolloverForMeasurementTimeForward) {
                                                                             {_measurement},
                                                                             /*startIndex=*/0,
                                                                             /*numDocsToStage=*/1,
-                                                                            /*docsToRetry=*/{},
+                                                                            /*indices=*/{},
                                                                             errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
@@ -2858,7 +2858,7 @@ TEST_F(BucketCatalogTest, determineBucketRolloverForMeasurementTimeBackward) {
                                                                             {_measurement},
                                                                             /*startIndex=*/0,
                                                                             /*numDocsToStage=*/1,
-                                                                            /*docsToRetry=*/{},
+                                                                            /*indices=*/{},
                                                                             errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
@@ -2901,7 +2901,7 @@ TEST_F(BucketCatalogTest, determineBucketRolloverForMeasurementCount) {
                                                                             {_measurement},
                                                                             /*startIndex=*/0,
                                                                             /*numDocsToStage=*/1,
-                                                                            /*docsToRetry=*/{},
+                                                                            /*indices=*/{},
                                                                             errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
@@ -2942,7 +2942,7 @@ TEST_F(BucketCatalogTest, determineBucketRolloverForMeasurementSize) {
                                                                             {_measurement},
                                                                             /*startIndex=*/0,
                                                                             /*numDocsToStage=*/1,
-                                                                            /*docsToRetry=*/{},
+                                                                            /*indices=*/{},
                                                                             errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
@@ -2984,7 +2984,7 @@ TEST_F(BucketCatalogTest, determineBucketRolloverForMeasurementCachePressure) {
                                                                             {_measurement},
                                                                             /*startIndex=*/0,
                                                                             /*numDocsToStage=*/1,
-                                                                            /*docsToRetry=*/{},
+                                                                            /*indices=*/{},
                                                                             errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
@@ -3031,7 +3031,7 @@ TEST_F(BucketCatalogTest, determineBucketRolloverForMeasurementSchemaChange) {
                                                                             {measurementSchema1},
                                                                             /*startIndex=*/0,
                                                                             /*numDocsToStage=*/1,
-                                                                            /*docsToRetry=*/{},
+                                                                            /*indices=*/{},
                                                                             errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
@@ -3074,7 +3074,7 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsOpen) {
                                                                             {_measurement},
                                                                             /*startIndex=*/0,
                                                                             /*numDocsToStage=*/1,
-                                                                            /*docsToRetry=*/{},
+                                                                            /*indices=*/{},
                                                                             errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
@@ -3117,7 +3117,7 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsSoftClose) {
                                                                             {_measurement},
                                                                             /*startIndex=*/0,
                                                                             /*numDocsToStage=*/1,
-                                                                            /*docsToRetry=*/{},
+                                                                            /*indices=*/{},
                                                                             errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
@@ -3161,7 +3161,7 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsSoftCloseNotSelected) {
                                                                             {_measurement},
                                                                             /*startIndex=*/0,
                                                                             /*numDocsToStage=*/1,
-                                                                            /*docsToRetry=*/{},
+                                                                            /*indices=*/{},
                                                                             errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
@@ -3204,7 +3204,7 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsArchive) {
                                                                             {_measurement},
                                                                             /*startIndex=*/0,
                                                                             /*numDocsToStage=*/1,
-                                                                            /*docsToRetry=*/{},
+                                                                            /*indices=*/{},
                                                                             errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
@@ -3248,7 +3248,7 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsHardClose) {
                                                                             {_measurement},
                                                                             /*startIndex=*/0,
                                                                             /*numDocsToStage=*/1,
-                                                                            /*docsToRetry=*/{},
+                                                                            /*indices=*/{},
                                                                             errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
@@ -3298,7 +3298,7 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsUncommitted) {
                                                                             {_measurement},
                                                                             /*startIndex=*/0,
                                                                             /*numDocsToStage=*/1,
-                                                                            /*docsToRetry=*/{},
+                                                                            /*indices=*/{},
                                                                             errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
@@ -3353,7 +3353,7 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsOrder) {
                                                                             {_measurement},
                                                                             /*startIndex=*/0,
                                                                             /*numDocsToStage=*/1,
-                                                                            /*docsToRetry=*/{},
+                                                                            /*indices=*/{},
                                                                             errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
@@ -3411,7 +3411,7 @@ TEST_F(BucketCatalogTest, GetEligibleBucketAllocateBucket) {
                                                                             {measurement},
                                                                             /*startIndex=*/0,
                                                                             /*numDocsToStage=*/1,
-                                                                            /*docsToRetry=*/{},
+                                                                            /*indices=*/{},
                                                                             errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
@@ -3462,7 +3462,7 @@ TEST_F(BucketCatalogTest, GetEligibleBucketOpenBucket) {
                                                                             {measurement},
                                                                             /*startIndex=*/0,
                                                                             /*numDocsToStage=*/1,
-                                                                            /*docsToRetry=*/{},
+                                                                            /*indices=*/{},
                                                                             errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
 
@@ -5377,7 +5377,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsToBucketsSimpleOneFullBucket) {
                                                   userBatch,
                                                   /*startIndex=*/0,
                                                   /*numDocsToStage=*/userBatch.size(),
-                                                  /*docsToRetry=*/{},
+                                                  /*indices=*/{},
                                                   AllowQueryBasedReopening::kAllow,
                                                   errorsAndIndices);
 
@@ -5417,7 +5417,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsToBucketsMultipleBucketsOneMeta) {
                                                   userBatch,
                                                   /*startIndex=*/0,
                                                   /*numDocsToStage=*/userBatch.size(),
-                                                  /*docsToRetry=*/{},
+                                                  /*indices=*/{},
                                                   AllowQueryBasedReopening::kAllow,
                                                   errorsAndIndices);
 
@@ -5460,7 +5460,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsToBucketsMultipleBucketsMultipleMetas) {
                                                   userBatch,
                                                   /*startIndex=*/0,
                                                   /*numDocsToStage=*/userBatch.size(),
-                                                  /*docsToRetry=*/{},
+                                                  /*indices=*/{},
                                                   AllowQueryBasedReopening::kAllow,
                                                   errorsAndIndices);
 
@@ -5501,7 +5501,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsToBucketsMultipleBucketsMultipleMetasInt
                                                   userBatch,
                                                   /*startIndex=*/0,
                                                   /*numDocsToStage=*/userBatch.size(),
-                                                  /*docsToRetry=*/{},
+                                                  /*indices=*/{},
                                                   AllowQueryBasedReopening::kAllow,
                                                   errorsAndIndices);
 
@@ -5541,7 +5541,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsBadMeasurementsAll) {
                                                   userMeasurementsBatch,
                                                   /*startIndex=*/0,
                                                   /*numDocsToStage=*/userMeasurementsBatch.size(),
-                                                  /*docsToRetry=*/{},
+                                                  /*indices=*/{},
                                                   AllowQueryBasedReopening::kAllow,
                                                   errorsAndIndices);
 
@@ -5578,7 +5578,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsBadMeasurementsSome) {
                                                   userMeasurementsBatch,
                                                   /*startIndex=*/0,
                                                   /*numDocsToStage=*/userMeasurementsBatch.size(),
-                                                  /*docsToRetry=*/{},
+                                                  /*indices=*/{},
                                                   AllowQueryBasedReopening::kAllow,
                                                   errorsAndIndices);
 
@@ -5621,7 +5621,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsToBucketsRespectsStartIndexNoMeta) {
                                                   originalUserBatch,
                                                   /*startIndex=*/startIndex,
                                                   /*numDocsToStage=*/numDocsToStage,
-                                                  /*docsToRetry=*/{},
+                                                  /*indices=*/{},
                                                   AllowQueryBasedReopening::kAllow,
                                                   errorsAndIndices);
     ASSERT_OK(swWriteBatches);
@@ -5667,7 +5667,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsToBucketsRespectsStartIndexWithMeta) {
                                                   originalUserBatch,
                                                   /*startIndex=*/startIndex,
                                                   /*numDocsToStage=*/numDocsToStage,
-                                                  /*docsToRetry=*/{},
+                                                  /*indices=*/{},
                                                   AllowQueryBasedReopening::kAllow,
                                                   errorsAndIndices);
     ASSERT_OK(swWriteBatches);
@@ -5718,7 +5718,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsToBucketsRespectsDocsToRetryNoMeta) {
                                                   originalUserBatch,
                                                   /*startIndex=*/startIndex,
                                                   /*numDocsToStage=*/numDocsToStage,
-                                                  /*docsToRetry=*/docsToRetry,
+                                                  /*indices=*/docsToRetry,
                                                   AllowQueryBasedReopening::kAllow,
                                                   errorsAndIndices);
 
@@ -5767,7 +5767,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsToBucketsRespectsDocsToRetryWithMeta) {
                                                   originalUserBatch,
                                                   /*startIndex=*/startIndex,
                                                   /*numDocsToStage=*/numDocsToStage,
-                                                  /*docsToRetry=*/docsToRetry,
+                                                  /*indices=*/docsToRetry,
                                                   AllowQueryBasedReopening::kAllow,
                                                   errorsAndIndices);
 

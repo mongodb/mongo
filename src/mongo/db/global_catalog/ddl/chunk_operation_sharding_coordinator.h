@@ -100,7 +100,7 @@ protected:
         uassert(StaleConfigInfo(
                     nss(),
                     ShardVersionFactory::make(ChunkVersion::IGNORED()) /* receivedVersion */,
-                    boost::none /* wantedVersion */,
+                    /*wanted=*/boost::none,
                     ShardingState::get(opCtx)->shardId()),
                 str::stream() << "The critical section for " << nss().toStringForErrorMsg()
                               << " is taken",

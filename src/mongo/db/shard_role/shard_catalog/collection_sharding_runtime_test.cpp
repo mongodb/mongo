@@ -1436,7 +1436,7 @@ TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,
         uuid(),
         ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY)),
         Date_t::max(),
-        false /* isAuthoritative */);
+        /*refreshMetadataIfUnknown=*/false);
     ASSERT_EQ(status.code(), ErrorCodes::ConflictingOperationInProgress);
 }
 
@@ -1471,7 +1471,7 @@ TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,
         randomUuid,
         ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY)),
         Date_t::max(),
-        true /* isAuthoritative */);
+        /*refreshMetadataIfUnknown=*/true);
     ASSERT_EQ(status.code(), ErrorCodes::ConflictingOperationInProgress);
 }
 

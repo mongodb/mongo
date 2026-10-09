@@ -104,11 +104,11 @@ public:
             beginTransaction();
 
             // Create both collections
-            auto coll1 =
-                db->createCollection(&_opCtx, _nss1, CollectionOptions(), /*createIdIndex*/ true);
+            auto coll1 = db->createCollection(
+                &_opCtx, _nss1, CollectionOptions(), /*createDefaultIndexes=*/true);
             ASSERT_TRUE(coll1) << _nss1.toStringForErrorMsg();
-            auto coll2 =
-                db->createCollection(&_opCtx, _nss2, CollectionOptions(), /*createIdIndex*/ true);
+            auto coll2 = db->createCollection(
+                &_opCtx, _nss2, CollectionOptions(), /*createDefaultIndexes=*/true);
             ASSERT_TRUE(coll2) << _nss2.toStringForErrorMsg();
 
             // Insert documents on both collections.

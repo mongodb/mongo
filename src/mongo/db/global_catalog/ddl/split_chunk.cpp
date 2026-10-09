@@ -84,13 +84,13 @@ bool checkMetadataForSuccessfulSplitChunk(OperationContext* opCtx,
 
     uassert(StaleConfigInfo(nss,
                             ShardVersionPlacementIgnored() /* receivedVersion */,
-                            boost::none /* wantedVersion */,
+                            /*wanted=*/boost::none,
                             shardId),
             str::stream() << "Collection " << nss.toStringForErrorMsg() << " needs to be recovered",
             metadataAfterSplit);
     uassert(StaleConfigInfo(nss,
                             ShardVersionPlacementIgnored() /* receivedVersion */,
-                            ShardVersion::UNTRACKED() /* wantedVersion */,
+                            /*wanted=*/ShardVersion::UNTRACKED(),
                             shardId),
             str::stream() << "Collection " << nss.toStringForErrorMsg() << " is not sharded",
             metadataAfterSplit->isSharded());
@@ -98,7 +98,7 @@ bool checkMetadataForSuccessfulSplitChunk(OperationContext* opCtx,
     const auto epoch = placementVersion.epoch();
     uassert(StaleConfigInfo(nss,
                             ShardVersionPlacementIgnored() /* receivedVersion */,
-                            ShardVersionFactory::make(*metadataAfterSplit) /* wantedVersion */,
+                            /*wanted=*/ShardVersionFactory::make(*metadataAfterSplit),
                             shardId),
             str::stream() << "Collection " << nss.toStringForErrorMsg()
                           << " changed since split start",

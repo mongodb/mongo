@@ -410,7 +410,7 @@ boost::optional<IndexBounds> getIndexBoundsForQuery(const BSONObj& key,
                           false /* unique */,
                           IndexEntry::Identifier{"shardkey"},
                           BSONObj(),
-                          nullptr /* projExec */);
+                          /*wildcardProjection=*/nullptr);
     ;
 
     auto statusWithMultiPlanSolns =

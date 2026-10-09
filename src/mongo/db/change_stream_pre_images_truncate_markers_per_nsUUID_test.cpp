@@ -98,8 +98,8 @@ TEST_F(PreImageInitialSetOfMarkersScanningTest, InitialMarkersNoFullMarkers1PreI
     const auto expectedInitialMarkers =
         makeInitialSetOfMarkers({},
                                 kPreImage1,
-                                1 /* leftoverRecordsCount */,
-                                bytes(kPreImage1) /* leftoverRecordsBytes */,
+                                /*partialMarkerRecords=*/1,
+                                /*partialMarkerBytes=*/bytes(kPreImage1),
                                 CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
     ASSERT_BSONOBJ_EQ(toBSON(expectedInitialMarkers), toBSON(actualInitialMarkers));
 }
@@ -121,8 +121,8 @@ TEST_F(PreImageInitialSetOfMarkersScanningTest, InitialMarkersFullMarker1PreImag
     const auto expectedInitialMarkers =
         makeInitialSetOfMarkers({makeWholeMarker(kPreImage1, 1, bytes(kPreImage1))},
                                 kPreImage1,
-                                0 /* leftoverRecordsCount */,
-                                0 /* leftoverRecordsBytes */,
+                                /*partialMarkerRecords=*/0,
+                                /*partialMarkerBytes=*/0,
                                 CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
     ASSERT_BSONOBJ_EQ(toBSON(expectedInitialMarkers), toBSON(actualInitialMarkers));
 }
@@ -148,8 +148,8 @@ TEST_F(PreImageInitialSetOfMarkersScanningTest, InitialMarkersFullMarkerNoLeftov
     const auto expectedInitialMarkers =
         makeInitialSetOfMarkers({makeWholeMarker(kPreImage2, 2, preImageBytesTotal)},
                                 kPreImage2,
-                                0 /* leftoverRecordsCount */,
-                                0 /* leftoverRecordsBytes */,
+                                /*partialMarkerRecords=*/0,
+                                /*partialMarkerBytes=*/0,
                                 CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
     ASSERT_BSONOBJ_EQ(toBSON(expectedInitialMarkers), toBSON(actualInitialMarkers));
 }
@@ -175,8 +175,8 @@ TEST_F(PreImageInitialSetOfMarkersScanningTest, InitialMarkersFullMarkerLeftover
     const auto expectedInitialMarkers =
         makeInitialSetOfMarkers({makeWholeMarker(kPreImage2, 2, bytesPreImage1And2)},
                                 kPreImage3,
-                                1 /* leftoverRecordsCount */,
-                                bytes(kPreImage3) /* leftoverRecordsBytes */,
+                                /*partialMarkerRecords=*/1,
+                                /*partialMarkerBytes=*/bytes(kPreImage3),
                                 CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
     ASSERT_BSONOBJ_EQ(toBSON(expectedInitialMarkers), toBSON(actualInitialMarkers));
 }
@@ -251,8 +251,8 @@ TEST_F(PreImageInitialSetOfMarkersScanningTest, InitialMarkersIncludeMinAndMax) 
         makeInitialSetOfMarkers({makeWholeMarker(kPreImageMin, 1, bytes(kPreImageMin)),
                                  makeWholeMarker(kPreImageMax, 1, bytes(kPreImageMax))},
                                 kPreImageMax,
-                                0 /* leftoverRecordsCount */,
-                                0 /* leftoverRecordsBytes */,
+                                /*partialMarkerRecords=*/0,
+                                /*partialMarkerBytes=*/0,
                                 CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
     ASSERT_BSONOBJ_EQ(toBSON(expectedInitialMarkers), toBSON(actualInitialMarkers));
 }
@@ -284,8 +284,8 @@ TEST_F(PreImageInitialSetOfMarkersScanningTest, InitialMarkersIsolatedPerNsUUID)
                                      makeWholeMarker(kPreImage1, 1, bytes(kPreImage1)),
                                      makeWholeMarker(kPreImageMax, 1, bytes(kPreImageMax))},
                                     kPreImageMax,
-                                    0 /* leftoverRecordsCount */,
-                                    0 /* leftoverRecordsBytes */,
+                                    /*partialMarkerRecords=*/0,
+                                    /*partialMarkerBytes=*/0,
                                     CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
         ASSERT_BSONOBJ_EQ(toBSON(expectedInitialMarkers), toBSON(actualInitialMarkers));
     }
@@ -303,8 +303,8 @@ TEST_F(PreImageInitialSetOfMarkersScanningTest, InitialMarkersIsolatedPerNsUUID)
              makeWholeMarker(kPreImageOther, 1, bytes(kPreImageOther)),
              makeWholeMarker(kPreImageOtherMax, 1, bytes(kPreImageOtherMax))},
             kPreImageOtherMax,
-            0 /* leftoverRecordsCount */,
-            0 /* leftoverRecordsBytes */,
+            /*partialMarkerRecords=*/0,
+            /*partialMarkerBytes=*/0,
             CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
 
         ASSERT_BSONOBJ_EQ(toBSON(expectedInitialMarkers), toBSON(actualInitialMarkers));
@@ -574,8 +574,8 @@ TEST_F(PreImagesPerNsUUIDRefreshHighestTrackedRecord, RefreshTracksNewInsert) {
     const auto initialSetOfMarkers =
         makeInitialSetOfMarkers({},
                                 kPreImage1,
-                                1 /* leftoverRecordsCount */,
-                                bytes(kPreImage1) /* leftoverRecordsBytes */,
+                                /*partialMarkerRecords=*/1,
+                                /*partialMarkerBytes=*/bytes(kPreImage1),
                                 CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
     PreImagesTruncateMarkersPerNsUUID nsUUIDTruncateMarkers{
         kNsUUID, initialSetOfMarkers, minBytesPerMarker};
@@ -601,8 +601,8 @@ TEST_F(PreImagesPerNsUUIDRefreshHighestTrackedRecord, RefreshAfterRollbackOfTrac
     const auto initialSetOfMarkers =
         makeInitialSetOfMarkers({},
                                 kPreImage1,
-                                1 /* leftoverRecordsCount */,
-                                bytes(kPreImage1) /* leftoverRecordsBytes */,
+                                /*partialMarkerRecords=*/1,
+                                /*partialMarkerBytes=*/bytes(kPreImage1),
                                 CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
     PreImagesTruncateMarkersPerNsUUID nsUUIDTruncateMarkers{
         kNsUUID, initialSetOfMarkers, minBytesPerMarker};
@@ -868,8 +868,8 @@ public:
         const auto initialMarkers = makeInitialSetOfMarkers(
             {makeWholeMarker(kPreImage1, 1 /* records */, bytes(kPreImage1))},
             kPreImage1,
-            0 /* leftoverRecordsCount */,
-            0 /* leftoverRecordsBytes */,
+            /*partialMarkerRecords=*/0,
+            /*partialMarkerBytes=*/0,
             CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
 
         PreImagesTruncateMarkersPerNsUUID truncateMarkers(

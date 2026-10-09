@@ -1298,7 +1298,7 @@ std::pair<SbSlot, SbStage> buildDynamicIndexedLoopJoinLookupStage(
         filterSlots.set(std::make_pair(PlanStageSlots::SlotType::kField, foreignFieldName.front()),
                         *localKeySlot);
         SbExpr satisfiesPartial =
-            generateFilter(state, partialFilterExpr, boost::none /*rootSlot*/, filterSlots);
+            generateFilter(state, partialFilterExpr, /*inputSlot=*/boost::none, filterSlots);
 
         if (!satisfiesPartial.isNull()) {
             // Use the index branch only if the document has exactly one key AND that key satisfies

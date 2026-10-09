@@ -82,8 +82,10 @@ using ClusteredCollectionFastPathDisabledTestEnableSteadyStateConstraints =
 TEST_F(ClusteredCollectionFastPathTest, UpdateAppliesViaFastPath) {
     insertDoc(BSON("_id" << 1 << "x" << 100));
 
-    auto op = makeUpdateDocumentOplogEntry(
-        nextOpTime(), _nss, BSON("_id" << 1) /* o2 */, BSON("$set" << BSON("x" << 200)) /* o */);
+    auto op = makeUpdateDocumentOplogEntry(nextOpTime(),
+                                           _nss,
+                                           /*documentToUpdate=*/BSON("_id" << 1),
+                                           BSON("$set" << BSON("x" << 200)) /* o */);
     ASSERT_OK(runOpSteadyState(op));
 
     // The document should be updated and remain at the RecordId derived from its _id.

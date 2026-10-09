@@ -358,7 +358,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildUnpackTsBucket(
 
     if (eventFilter) {
         auto eventFilterSbExpr =
-            generateFilter(_state, eventFilter, boost::none /* rootSlot */, outputs);
+            generateFilter(_state, eventFilter, /*inputSlot=*/boost::none, outputs);
 
         auto [newStage, isVectorised] = buildVectorizedFilterExpr(
             std::move(stage), reqs, std::move(eventFilterSbExpr), outputs, unpackNode->nodeId());
@@ -368,7 +368,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildUnpackTsBucket(
             // The last step was to convert the block to row. Generate the filter expression
             // again to use the scalar slots instead of the block slots.
             auto eventFilterSbExpr =
-                generateFilter(_state, eventFilter, boost::none /* rootSlot */, outputs);
+                generateFilter(_state, eventFilter, /*inputSlot=*/boost::none, outputs);
             if (!eventFilterSbExpr.isNull()) {
                 stage = b.makeFilter(std::move(stage), std::move(eventFilterSbExpr));
                 printPlan(*stage);
