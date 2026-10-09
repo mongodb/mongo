@@ -46,6 +46,38 @@ run_helper "${symlink_workdir}" 0
 # An unrelated existing path must still be rejected.
 run_helper "${invalid_workdir}" 1
 
+# Running from inside the symlinked workdir, so the checkout only matches logically.
+symlink_cwd_output=$(
+    cd "${symlink_workdir}"
+    evergreen_dir="${symlink_workdir}/src/evergreen"
+    workdir="${symlink_workdir}"
+    OS=""
+    source "${source_helper}"
+    printf '%s\n' "$workdir"
+)
+if [[ "${symlink_cwd_output}" != "${symlink_workdir}" ]]; then
+    echo "helper changed the supplied workdir from a symlinked cwd: ${symlink_cwd_output}" >&2
+    exit 1
+fi
+
+# setup_spawnhost_coredump sources prelude.sh from $HOME through a ~/src symlink to the checkout.
+spawnhost_home="${TEST_TMPDIR}/prelude_workdir_spawnhost_home"
+spawnhost_source="${TEST_TMPDIR}/prelude_workdir_spawnhost_mci/source-abc"
+mkdir -p "${spawnhost_home}" "${spawnhost_source}/evergreen"
+ln -s "${spawnhost_source}" "${spawnhost_home}/src"
+spawnhost_workdir_output=$(
+    cd "${spawnhost_home}"
+    evergreen_dir="${spawnhost_home}/src/evergreen"
+    workdir=""
+    OS=""
+    source "${source_helper}"
+    printf '%s\n' "$workdir"
+)
+if [[ "${spawnhost_workdir_output}" != "${spawnhost_home}" ]]; then
+    echo "spawn host workdir was not the logical home directory: ${spawnhost_workdir_output}" >&2
+    exit 1
+fi
+
 windows_physical_root="${TEST_TMPDIR}/prelude_workdir_windows"
 windows_logical_root="${TEST_TMPDIR}/prelude_workdir_windows_link"
 mkdir -p "${windows_physical_root}/src/evergreen"

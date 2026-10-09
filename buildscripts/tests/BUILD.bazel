@@ -140,6 +140,15 @@ py_test(
 )
 
 py_test(
+    name = "test_gdb_rbe_sysroot",
+    srcs = ["test_gdb_rbe_sysroot.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:gdb_rbe_sysroot",
+    ],
+)
+
+py_test(
     name = "test_local_rbe_container_url",
     srcs = ["test_local_rbe_container_url.py"],
     visibility = ["//visibility:public"],
