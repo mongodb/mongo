@@ -8,6 +8,7 @@
 #include "mongo/scripting/mozjs/common/error.h"
 #include "mongo/scripting/mozjs/common/global.h"
 #include "mongo/scripting/mozjs/common/internedstring.h"
+#include "mongo/scripting/mozjs/common/print_budget.h"
 #include "mongo/scripting/mozjs/common/runtime.h"
 #include "mongo/scripting/mozjs/common/types/bindata.h"
 #include "mongo/scripting/mozjs/common/types/bson.h"
@@ -324,6 +325,7 @@ public:
     bool isJavaScriptProtectionEnabled() const override;
     void newFunction(std::string_view code, JS::MutableHandleValue out) override;
     bool requiresOwnedObjects() const override;
+    JSPrintBudget* printBudget() override;
     void trackNewPointer(void* ptr) override;
     void trackDeletePointer(void* ptr) override;
 
@@ -389,6 +391,8 @@ private:
     std::unique_ptr<InternedStringTable> _internedStrings;
 
     Status _status = Status::OK();
+
+    JSPrintBudget _printBudget;
 
     std::vector<mongo::BSONObj> _emitBuffer;
     int64_t _emitBytesUsed = 0;

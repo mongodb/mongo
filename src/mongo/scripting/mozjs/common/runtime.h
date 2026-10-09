@@ -24,6 +24,8 @@ namespace mongo::mozjs {
 template <typename T>
 class WrapType;
 
+class JSPrintBudget;
+
 enum class InternedString;
 
 struct BinDataInfo;
@@ -97,6 +99,9 @@ struct [[MONGO_MOD_PUBLIC]] MozJSCommonRuntimeInterface {
     virtual bool requiresOwnedObjects() const = 0;
 
     virtual void newFunction(std::string_view code, JS::MutableHandleValue out) = 0;
+
+    // Budget for print() output, or nullptr when print() output is unbounded (the shell).
+    virtual JSPrintBudget* printBudget() = 0;
 
     // Pointer tracking for ASAN
     virtual void trackNewPointer(void* ptr) = 0;

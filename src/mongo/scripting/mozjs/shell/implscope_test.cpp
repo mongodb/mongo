@@ -5,14 +5,19 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
+#include "mongo/logv2/constants.h"
+#include "mongo/scripting/mozjs/common/print_budget.h"
 #include "mongo/scripting/mozjs/common/runtime.h"
 #include "mongo/scripting/mozjs/common/types/oid.h"
+#include "mongo/unittest/log_capture.h"
 #include "mongo/unittest/unittest.h"
 
+#include <algorithm>
 #include <memory>
 #include <string>
 
 #include <boost/smart_ptr/shared_ptr.hpp>
+#include <fmt/format.h>
 #include <js/GCAPI.h>
 #include <js/RootingAPI.h>
 #include <js/TypeDecls.h>
@@ -280,6 +285,130 @@ TEST_F(MozJSImplScopeTest, AccumulatedPinnedHostBytesForcesGC) {
 
         const auto gcs2 = JS_GetGCParameter(cx, JSGC_NUMBER);
         ASSERT_GT(gcs2, gcs1);
+    }
+    setGlobalScriptEngine(nullptr);
+}
+
+void runPrint(Scope& scope, const std::string& code) {
+    scope.exec(code,
+               "printTest",
+               false /* printResult */,
+               true /* reportError */,
+               true /* assertOnError */);
+}
+
+size_t longestLineContaining(const unittest::LogCaptureGuard& logs, const std::string& needle) {
+    size_t longest = 0;
+    for (auto&& line : logs.getText()) {
+        if (line.find(needle) != std::string::npos) {
+            longest = std::max(longest, line.size());
+        }
+    }
+    return longest;
+}
+
+TEST_F(MozJSImplScopeTest, ServerPrintIsThrottledAfterBudgetAndResetRestoresIt) {
+    mongo::ScriptEngine::setup(ExecutionEnvironment::Server);
+    {
+        std::unique_ptr<mongo::Scope> scope(
+            mongo::getGlobalScriptEngine()->newScopeForCurrentThread());
+        const auto kLine = std::string(1024, 'p');
+        const auto kNumPrints = 2 * JSPrintBudget::kLimitBytes / kLine.size();
+
+        unittest::LogCaptureGuard logs;
+        runPrint(*scope,
+                 fmt::format("for (let i = 0; i < {}; i++) print('{}');", kNumPrints, kLine));
+        logs.stop();
+
+        ASSERT_EQ(logs.countTextContaining(kLine), JSPrintBudget::kLimitBytes / kLine.size());
+        ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << 13604400)), 1);
+
+        scope->reset();
+        logs.start();
+        runPrint(*scope, "print('afterReset');");
+        logs.stop();
+        ASSERT_EQ(logs.countTextContaining("afterReset"), 1);
+    }
+    setGlobalScriptEngine(nullptr);
+}
+
+TEST_F(MozJSImplScopeTest, ServerPrintIsTruncated) {
+    mongo::ScriptEngine::setup(ExecutionEnvironment::Server);
+    {
+        std::unique_ptr<mongo::Scope> scope(
+            mongo::getGlobalScriptEngine()->newScopeForCurrentThread());
+        constexpr size_t kPrintBytes =
+            2 * logv2::constants::kDefaultMaxAttributeOutputSizeKB * 1024;
+
+        unittest::LogCaptureGuard logs;
+        runPrint(*scope, fmt::format("print('t'.repeat({}));", kPrintBytes));
+        logs.stop();
+
+        ASSERT_LTE(longestLineContaining(logs, "tttt"),
+                   logv2::constants::kDefaultMaxAttributeOutputSizeKB * 1024);
+    }
+    setGlobalScriptEngine(nullptr);
+}
+
+TEST_F(MozJSImplScopeTest, ShellPrintIsNeitherThrottledNorTruncated) {
+    mongo::ScriptEngine::setup(ExecutionEnvironment::TestRunner);
+    {
+        std::unique_ptr<mongo::Scope> scope(
+            mongo::getGlobalScriptEngine()->newScopeForCurrentThread());
+        constexpr size_t kPrintBytes = 2 * JSPrintBudget::kLimitBytes;
+
+        unittest::LogCaptureGuard logs;
+        runPrint(*scope, fmt::format("print('s'.repeat({})); print('stillPrinted');", kPrintBytes));
+        logs.stop();
+
+        ASSERT_EQ(longestLineContaining(logs, "ssss"), kPrintBytes);
+        ASSERT_EQ(logs.countTextContaining("stillPrinted"), 1);
+        ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << 13604400)), 0);
+    }
+    setGlobalScriptEngine(nullptr);
+}
+
+void runThrowWithStack(Scope& scope, size_t stackBytes) {
+    scope.exec(
+        fmt::format("var e = new Error('x'); e.stack = 'k'.repeat({}); throw e;", stackBytes),
+        "errorTest",
+        false /* printResult */,
+        true /* reportError */,
+        false /* assertOnError */);
+}
+
+TEST_F(MozJSImplScopeTest, ServerErrorStackIsTruncated) {
+    mongo::ScriptEngine::setup(ExecutionEnvironment::Server);
+    {
+        std::unique_ptr<mongo::Scope> scope(
+            mongo::getGlobalScriptEngine()->newScopeForCurrentThread());
+        constexpr size_t kStackBytes =
+            4 * logv2::constants::kDefaultMaxAttributeOutputSizeKB * 1024;
+
+        unittest::LogCaptureGuard logs;
+        runThrowWithStack(*scope, kStackBytes);
+        logs.stop();
+
+        const auto longest = longestLineContaining(logs, "kkkk");
+        ASSERT_GT(longest, 0);
+        ASSERT_LTE(longest, logv2::constants::kDefaultMaxAttributeOutputSizeKB * 1024);
+    }
+    setGlobalScriptEngine(nullptr);
+}
+
+TEST_F(MozJSImplScopeTest, ShellErrorStackIsNotTruncated) {
+    mongo::ScriptEngine::setup(ExecutionEnvironment::TestRunner);
+    {
+        std::unique_ptr<mongo::Scope> scope(
+            mongo::getGlobalScriptEngine()->newScopeForCurrentThread());
+        constexpr size_t kStackBytes =
+            4 * logv2::constants::kDefaultMaxAttributeOutputSizeKB * 1024;
+
+        unittest::LogCaptureGuard logs;
+        runThrowWithStack(*scope, kStackBytes);
+        logs.stop();
+
+        ASSERT_GT(longestLineContaining(logs, "kkkk"), kStackBytes);
     }
     setGlobalScriptEngine(nullptr);
 }

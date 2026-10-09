@@ -213,8 +213,13 @@ std::string tryBuildJSStack(JSContext* cx) try {
 
 /**
  * Logs the given status either as plain text or as JSON depending on the 'plainShell' parameter.
+ * 'truncation' applies to the plain text output, whose stack is user-controlled.
  */
-void logStatus(JSContext* cx, const Status& status, bool reportMemoryDiagnostics, bool plainShell) {
+void logStatus(JSContext* cx,
+               const Status& status,
+               bool reportMemoryDiagnostics,
+               bool plainShell,
+               logv2::LogTruncation truncation) {
     if (plainShell) {
         str::stream ss;
         ss << redact(status.reason());
@@ -236,11 +241,10 @@ void logStatus(JSContext* cx, const Status& status, bool reportMemoryDiagnostics
             }
         }
 
-        LOGV2_INFO_OPTIONS(
-            10077200,
-            logv2::LogOptions(logv2::LogTag::kPlainShell, logv2::LogTruncation::Disabled),
-            "{jsError}",
-            "jsError"_attr = std::string(ss));
+        LOGV2_INFO_OPTIONS(10077200,
+                           logv2::LogOptions(logv2::LogTag::kPlainShell, truncation),
+                           "{jsError}",
+                           "jsError"_attr = std::string(ss));
     } else {
         // Collect status data into log entry attributes.
         logv2::DynamicAttributes attrs;
@@ -674,6 +678,12 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine, boost::optional<int> j
       _timestampProto(_context),
       _uriProto(_context) {
     {
+        // Only mongod/mongos scopes have user-controlled JS output, which must be bounded. The
+        // shell keeps print() unbounded.
+        if (_engine->executionEnvironment() == ExecutionEnvironment::Server) {
+            _printBudget.emplace();
+        }
+
         JS_AddInterruptCallback(_context, _interruptCallback);
         JS_SetGCCallback(_context, _gcCallback, this);
         JS_SetContextPrivate(_context, static_cast<MozJSCommonRuntimeInterface*>(this));
@@ -1348,6 +1358,9 @@ void MozJSImplScope::reset() {
     _killStatus = Status::OK();
     _pendingGC.store(false);
     _requireOwnedObjects = false;
+    if (_printBudget) {
+        _printBudget->reset();
+    }
     _checkPinnedHostBytesAndGc(kPinnedBytesResetGcThreshold);
     advanceGeneration();
 }
@@ -1419,10 +1432,13 @@ bool MozJSImplScope::_checkErrorState(bool success, bool reportError, bool asser
 
     if (reportError || abortForOOM) {
         try {
+            // Only the shell logs errors untruncated; server-side JS output is user-controlled.
             logStatus(_context,
                       _status,
                       _hasOutOfMemoryException,
-                      !isLogFormatJson(_engine, _context, _global));
+                      !isLogFormatJson(_engine, _context, _global),
+                      _printBudget ? logv2::LogTruncation::Enabled
+                                   : logv2::LogTruncation::Disabled);
         } catch (...) {
             if (!abortForOOM) {
                 throw;
@@ -1498,6 +1514,9 @@ Status MozJSImplScope::_checkForPendingException() {
             auto lineNum = errorObj.getNumberInt(InternedString::lineNumber);
             auto colNum = errorObj.getNumberInt(InternedString::columnNumber);
             stackStr = str::stream() << "@" << fnameStr << ":" << lineNum << ":" << colNum << "\n";
+        } else if (_printBudget) {
+            // Server-side JS can assign an arbitrarily large 'stack', so bound it like the message.
+            stackStr.resize(str::UTF8SafeTruncation(stackStr, kMaxErrorStringSize).size());
         }
         // Extract 'extraAttr' object property that might be present in case of an assertion error.
         auto extraAttrObj = errorObj.getObject(kExtraAttrFieldName);
@@ -1538,6 +1557,10 @@ void MozJSImplScope::requireOwnedObjects() {
 
 bool MozJSImplScope::requiresOwnedObjects() const {
     return _requireOwnedObjects;
+}
+
+JSPrintBudget* MozJSImplScope::printBudget() {
+    return _printBudget ? &*_printBudget : nullptr;
 }
 
 const std::string& MozJSImplScope::getParentStack() const {

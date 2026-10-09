@@ -18,6 +18,7 @@
 #include "mongo/scripting/mozjs/common/freeOpToJSContext.h"
 #include "mongo/scripting/mozjs/common/global.h"
 #include "mongo/scripting/mozjs/common/internedstring.h"
+#include "mongo/scripting/mozjs/common/print_budget.h"
 #include "mongo/scripting/mozjs/common/types/bindata.h"
 #include "mongo/scripting/mozjs/common/types/bson.h"
 #include "mongo/scripting/mozjs/common/types/code.h"
@@ -448,6 +449,8 @@ public:
 
     bool requiresOwnedObjects() const override;
 
+    JSPrintBudget* printBudget() override;
+
     JS::HandleId getInternedStringId(InternedString name) override {
         return _internedStrings.getInternedString(name);
     }
@@ -592,6 +595,7 @@ private:
     static void _outOfMemoryCallback(JSContext* cx, void* data);
 
     bool _checkErrorState(bool success, bool reportError = true, bool assertOnError = true);
+
     Status _checkForPendingException();
 
     /**
@@ -645,6 +649,10 @@ private:
     bool _requireOwnedObjects;
     Deferred<std::string (*)(const MozJSImplScope&)> _baseURL;
     bool _hasOutOfMemoryException;
+
+    // Engaged only for mongod/mongos scopes, where JS output is user-controlled and must be
+    // bounded; the shell keeps print() unbounded.
+    boost::optional<JSPrintBudget> _printBudget;
 
     // Host-supplied BSON bytes pinned by live BSONHolder proxies since the last GC.
     // ValueReader wraps the argument/global BSON in lazy proxies whose holders keep the
