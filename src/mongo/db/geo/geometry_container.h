@@ -29,6 +29,13 @@
 
 namespace mongo {
 
+/**
+ * Owns the parsed geometry for a single predicate, including its S2 representations. Immutable once
+ * parsed, but may be shared across threads: GeoExpression holds it via shared_ptr, and
+ * MatchExpressions carrying geo predicates (e.g. collection validators and partial index filters)
+ * are shared and evaluated concurrently. The S2 types it owns must therefore support concurrent
+ * const queries.
+ */
 class GeometryContainer {
 public:
     /**

@@ -3,10 +3,12 @@
 #ifndef UTIL_GEOMETRY_S2LOOP_H__
 #define UTIL_GEOMETRY_S2LOOP_H__
 
+#include <atomic>
 #include <map>
 using std::map;
 using std::multimap;
 
+#include <mutex>
 #include <vector>
 using std::vector;
 
@@ -306,9 +308,14 @@ class S2Loop : public S2Region {
   bool AreBoundariesCrossing(
       S2Loop const* b, WedgeProcessor* wedge_processor) const;
 
-  // When the loop is modified (the only cae being Invert() at this time),
+  // When the loop is modified (the only case being Invert() at this time),
   // the indexing structures need to be deleted as they become invalid.
+  // Must not run concurrently with queries: it clears state that const queries read
+  // without holding a lock. Only called from construction/Init/Decode/Invert paths.
   void ResetMutableFields();
+
+  // Builds vertex_to_index_ on first use. See the member comments below.
+  void ComputeVertexMap() const;
 
   // We store the vertices in an array rather than a vector because we don't
   // need any STL methods, and computing the number of vertices using size()
@@ -329,7 +336,14 @@ class S2Loop : public S2Region {
 
   // Map for speeding up FindVertex: We will compute a map from vertex to
   // index in the vertex array as soon as there has been enough calls.
-  mutable int num_find_vertex_calls_;
+  //
+  // A loop can be shared across threads, and FindVertex is called from const
+  // spatial queries. num_find_vertex_calls_ is therefore atomic and the lazy
+  // vertex_to_index_ map is built under vertex_map_mutex_, gated by vertex_map_computed_
+  // (release-store after the map is fully populated; acquire-load before reading it).
+  mutable std::atomic<int> num_find_vertex_calls_;
+  mutable std::mutex vertex_map_mutex_;
+  mutable std::atomic<bool> vertex_map_computed_{false};
   mutable map<S2Point, int> vertex_to_index_;
 
   DISALLOW_EVIL_CONSTRUCTORS(S2Loop);
