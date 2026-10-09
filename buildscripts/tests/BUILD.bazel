@@ -48,6 +48,17 @@ py_test(
 )
 
 py_test(
+    name = "test_clang_format_vscode",
+    srcs = ["test_clang_format_vscode.py"],
+    data = ["//buildscripts:clang_format_vscode.sh"],
+    target_compatible_with = select({
+        "@platforms//os:windows": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    visibility = ["//visibility:public"],
+)
+
+py_test(
     name = "test_mongo_toolchain",
     srcs = ["test_mongo_toolchain.py"],
     data = ["//bazel:bazelisk"],
