@@ -9,7 +9,9 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/change_stream_pre_image_util.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/scoped_timer.h"
@@ -27,6 +29,7 @@
 #include "mongo/db/mongod_options_storage_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/profile_settings.h"
 #include "mongo/db/repair.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_set_member_in_standalone_mode.h"
@@ -741,6 +744,43 @@ void startupRepair(OperationContext* opCtx,
     }
 }
 
+/**
+ * Runs collection_validation::validate() as its own operation, so that a validation slower than
+ * 'slowms' reports the same "Slow query" log line as the 'validate' command. 'validateOptions' are
+ * the options the validation was configured with, reported as part of the command.
+ */
+Status validateAndLogOperation(OperationContext* opCtx,
+                               const NamespaceString& nss,
+                               const BSONObj& validateOptions,
+                               const collection_validation::ValidationOptions& options,
+                               ValidateResults& results) {
+    CurOp curOp;
+    curOp.push(opCtx);
+    {
+        BSONObjBuilder cmdObj;
+        cmdObj.append("validate", nss.coll());
+        cmdObj.appendElementsUnique(validateOptions);
+        ClientLock lk(opCtx->getClient());
+        // The registered command lets the log line redact and report the command as it does for
+        // the 'validate' command.
+        curOp.setGenericOpRequestDetails(
+            lk, nss, CommandHelpers::findCommand(opCtx, "validate"), cmdObj.obj(), dbMsg);
+    }
+    curOp.ensureStarted();
+    ON_BLOCK_EXIT([&] {
+        try {
+            curOp.completeAndLogOperation(
+                {logv2::LogComponent::kCommand, toLogService(opCtx->getService())},
+                DatabaseProfileSettings::get(opCtx->getServiceContext())
+                    .getDatabaseProfileSettings(nss.dbName())
+                    .filter);
+        } catch (const DBException& e) {
+            LOGV2(13618301, "Unable to log offline validation operation", "error"_attr = e);
+        }
+    });
+    return collection_validation::validate(opCtx, nss, options, results);
+}
+
 // Performs collection validation for a singular collection.
 // Returns if the collection is valid, or the validation didn't complete correctly.
 StatusWith<bool> offlineValidateCollection(OperationContext* opCtx,
@@ -776,7 +816,8 @@ StatusWith<bool> offlineValidateCollection(OperationContext* opCtx,
     }
     ValidateResults validateResults;
     try {
-        Status status = collection_validation::validate(opCtx, nss, parsedOptions, validateResults);
+        Status status =
+            validateAndLogOperation(opCtx, nss, validateOptions, parsedOptions, validateResults);
 
         if (!status.isOK()) {
             LOGV2_ERROR(11790200,

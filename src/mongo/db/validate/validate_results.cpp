@@ -188,6 +188,9 @@ void ValidateResults::appendToResultObj(BSONObjBuilder* resultObj,
     if (_numRecords.has_value()) {
         resultObj->appendNumber("nrecords", _numRecords.value());
     }
+    if (_dataSize.has_value()) {
+        resultObj->appendNumber("dataSize", _dataSize.value());
+    }
     // Only present when the record store traversal was split across slices, so that the output of a
     // single-threaded validation is unchanged.
     if (_numRecordStoreSlices.has_value()) {
@@ -260,6 +263,7 @@ void ValidateResults::appendToResultObj(BSONObjBuilder* resultObj,
         bob.appendBool("valid", ivr.isValid());
         bob.append("spec", ivr.getSpec());
         bob.appendBool("isMultikey", ivr.isMultikey());
+        bob.appendNumber("keyBytes", static_cast<long long>(ivr.getKeyBytesTraversed()));
 
         if (!ivr.getWarnings().empty()) {
             buildFixedSizedArray(bob, "warnings", ivr.getWarnings(), maxSizePerEntry);
@@ -321,6 +325,7 @@ void ValidateResults::merge(const ValidateResults& other) {
         ivr.getWarningsUnsafe()->insert(otherIvr.getWarnings().begin(),
                                         otherIvr.getWarnings().end());
         ivr.addKeysTraversed(otherIvr.getKeysTraversed());
+        ivr.addKeyBytesTraversed(otherIvr.getKeyBytesTraversed());
         ivr.addKeysRemovedFromRecordStore(otherIvr.getKeysRemovedFromRecordStore());
         ivr.setHasStructuralDamage(ivr.hasStructuralDamage() || otherIvr.hasStructuralDamage());
         ivr.setIsMultikey(ivr.isMultikey() || otherIvr.isMultikey());
@@ -359,6 +364,7 @@ void ValidateResults::merge(const ValidateResults& other) {
     addOptional(tmp._numInvalidDocuments, other._numInvalidDocuments);
     addOptional(tmp._numNonCompliantDocuments, other._numNonCompliantDocuments);
     addOptional(tmp._numRecords, other._numRecords);
+    addOptional(tmp._dataSize, other._dataSize);
 
     tmp._numRemovedCorruptRecords += other._numRemovedCorruptRecords;
     tmp._numRemovedExtraIndexEntries += other._numRemovedExtraIndexEntries;

@@ -11,6 +11,7 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/basic_types_gen.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index_key_validate.h"
@@ -50,6 +51,7 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
+#include "mongo/util/timer.h"
 #include "mongo/util/uuid.h"
 
 #include <algorithm>
@@ -986,12 +988,124 @@ ValidationOptions parseValidateOptions(OperationContext* opCtx,
             sizeStats};
 }
 
+namespace {
+
+/**
+ * Timings describing the cost of each stage of a collection validation. A field is only populated
+ * if validation reached the corresponding stage. These vary between otherwise identical
+ * validations, so they are logged rather than kept in ValidateResults.
+ */
+struct ValidationMetrics {
+    // Whether the collection is a time-series collection. Only known once the collection is found.
+    boost::optional<bool> isTimeseries;
+    // Wall-clock time spent in collection_validation::validate().
+    boost::optional<Microseconds> totalDuration;
+    // Time spent validating the internal structure of the record store. Only full validation runs
+    // WT_SESSION::verify, so this is much smaller otherwise.
+    boost::optional<Microseconds> recordStoreValidateDuration;
+    // Time spent validating the internal structure of all indexes. Only full validation runs
+    // WT_SESSION::verify, so this is much smaller otherwise.
+    boost::optional<Microseconds> indexValidateDuration;
+    // Time spent in the first phase of index consistency checks, which covers the record store and
+    // index traversals.
+    boost::optional<Microseconds> phase1Duration;
+    boost::optional<Microseconds> recordStoreTraversalDuration;
+    boost::optional<Microseconds> indexTraversalDuration;
+    // Time spent in the second phase, which only runs when index inconsistencies are found.
+    boost::optional<Microseconds> phase2Duration;
+
+    /**
+     * Serializes the metrics along with the bytes traversed, as recorded in 'results'.
+     */
+    BSONObj toBSON(const ValidateResults& results) const {
+        BSONObjBuilder bob;
+        if (isTimeseries) {
+            bob.append("isTimeseries", *isTimeseries);
+        }
+        // Durations are reported in whole seconds, as the validations they are meant to track run
+        // for hours to days.
+        appendSeconds(bob, "totalDurationSecs", totalDuration);
+        appendSeconds(bob, "recordStoreValidateDurationSecs", recordStoreValidateDuration);
+        appendSeconds(bob, "indexValidateDurationSecs", indexValidateDuration);
+        appendSeconds(bob, "phase1DurationSecs", phase1Duration);
+        appendSeconds(bob, "recordStoreTraversalDurationSecs", recordStoreTraversalDuration);
+        appendSeconds(bob, "indexTraversalDurationSecs", indexTraversalDuration);
+        appendSeconds(bob, "phase2DurationSecs", phase2Duration);
+        // The sizes come from ValidateResults, where they are also reported in the result object.
+        // Startup validation has no command reply, so they are logged too.
+        if (const auto dataSize = results.getDataSize()) {
+            bob.appendNumber("recordStoreDataSize", *dataSize);
+        }
+        // Index key bytes are only accumulated once the index traversal has run.
+        if (indexTraversalDuration) {
+            long long indexDataSize = 0;
+            for (const auto& [_, ivr] : results.getIndexResultsMap()) {
+                indexDataSize += ivr.getKeyBytesTraversed();
+            }
+            bob.appendNumber("indexDataSize", indexDataSize);
+        }
+        return bob.obj();
+    }
+
+private:
+    // Appends 'duration' to 'bob' as a whole number of seconds, if it was recorded.
+    static void appendSeconds(BSONObjBuilder& bob,
+                              std::string_view fieldName,
+                              const boost::optional<Microseconds>& duration) {
+        if (duration) {
+            bob.append(fieldName, durationCount<Seconds>(*duration));
+        }
+    }
+};
+
+}  // namespace
+
 Status validate(OperationContext* opCtx,
                 const NamespaceString& nss,
                 ValidationOptions options,
                 ValidateResults& results) {
     invariant(!shard_role_details::getLocker(opCtx)->isLocked() || storageGlobalParams.repair ||
               storageGlobalParams.validate);
+
+    // Report the cost of every validation, including those that fail or throw. 'valid' only
+    // describes the collection when 'completed' is true; a validation that stopped early may not
+    // have reached the checks that would have found errors.
+    const ValidateMode mode = options.getValidateMode();
+    Timer totalTimer;
+    ValidationMetrics metrics;
+    // Cleared if validation stopped early because of an exception it reports as a warning or
+    // interruption rather than propagating.
+    bool completed = true;
+    // The status validate() returns, or the error it throws.
+    Status status = Status::OK();
+    const int uncaughtExceptionsAtStart = std::uncaught_exceptions();
+    ScopeGuard logMetrics([&] {
+        metrics.totalDuration = totalTimer.elapsed();
+        // Covers exceptions not recorded in 'status', which are not DBExceptions.
+        const bool threw = std::uncaught_exceptions() > uncaughtExceptionsAtStart;
+        // Surface the failure in the slow query log and profiler entry for this operation.
+        if (!status.isOK()) {
+            CurOp::get(opCtx)->debug().errInfo = status;
+        }
+        LOGV2(13618300,
+              "Collection validation metrics",
+              logAttrs(nss),
+              "uuid"_attr = results.getUUID(),
+              "mode"_attr = toString(mode),
+              "completed"_attr = completed && status.isOK() && !threw,
+              "status"_attr = status,
+              "valid"_attr = results.isValid(),
+              "metrics"_attr = metrics.toBSON(results));
+    });
+    // Runs a setup step that fails validation by throwing, recording its error for the metrics.
+    auto recordError = [&](auto&& step) -> decltype(auto) {
+        try {
+            return step();
+        } catch (const DBException& e) {
+            status = e.toStatus();
+            throw;
+        }
+    };
 
     // Foreground validation needs to ignore prepare conflicts, or else it would deadlock.
     // Repair mode cannot use ignore-prepare because it needs to be able to do writes, and there is
@@ -1038,14 +1152,17 @@ Status validate(OperationContext* opCtx,
     if (auto readTimestamp = options.getReadTimestamp()) {
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         if (replCoord->getSettings().isReplSet()) {
-            uassertStatusOK(replCoord->waitUntilOpTimeForRead(
-                opCtx, repl::ReadConcernArgs::snapshot(*readTimestamp)));
+            recordError([&] {
+                uassertStatusOK(replCoord->waitUntilOpTimeForRead(
+                    opCtx, repl::ReadConcernArgs::snapshot(*readTimestamp)));
+            });
         }
     }
 
     // This is deliberately outside of the try-catch block, so that any errors thrown in the
     // constructor fail the cmd, as opposed to returning OK with valid:false.
-    ValidateState validateState(opCtx, nss, std::move(options));
+    ValidateState validateState =
+        recordError([&] { return ValidateState(opCtx, nss, std::move(options)); });
 
     // Relax corruption detection so that we log and continue scanning instead of failing early.
     auto oldDataCorruptionMode =
@@ -1079,14 +1196,16 @@ Status validate(OperationContext* opCtx,
         shard_role_details::getRecoveryUnit(opCtx)->setPrefetching(true);
     }
 
-    Status status = validateState.initializeCollection(opCtx);
-    uassertStatusOK(status);
+    recordError([&] { uassertStatusOK(validateState.initializeCollection(opCtx)); });
+    metrics.isTimeseries = validateState.getCollection()->isTimeseriesCollection();
 
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     // Check whether we are allowed to read from this node after acquiring our locks. If we are
     // in a state where we cannot read, we should not run validate.
-    uassertStatusOK(replCoord->checkCanServeReadsFor(
-        opCtx, nss, ReadPreferenceSetting::get(opCtx).canRunOnSecondary()));
+    recordError([&] {
+        uassertStatusOK(replCoord->checkCanServeReadsFor(
+            opCtx, nss, ReadPreferenceSetting::get(opCtx).canRunOnSecondary()));
+    });
 
     results.setNamespaceString(validateState.nss());
     results.setUUID(validateState.uuid());
@@ -1114,12 +1233,20 @@ Status validate(OperationContext* opCtx,
 
         // Record store validation code is executed before we open cursors because it may close
         // and/or invalidate all open cursors.
-        validateState.getCollection()->getRecordStore()->validate(
-            *shard_role_details::getRecoveryUnit(opCtx), validateState, &results);
+        {
+            Timer timer;
+            validateState.getCollection()->getRecordStore()->validate(
+                *shard_role_details::getRecoveryUnit(opCtx), validateState, &results);
+            metrics.recordStoreValidateDuration = timer.elapsed();
+        }
 
         // For full index validation, we validate the internal structure of each index and save
         // the number of keys in the index to compare against _validateIndexes()'s count results.
-        _validateIndexesInternalStructure(opCtx, validateState, results);
+        {
+            Timer timer;
+            _validateIndexesInternalStructure(opCtx, validateState, results);
+            metrics.indexValidateDuration = timer.elapsed();
+        }
 
         if (!results.isValid()) {
             _reportInvalidResults(opCtx, validateState, results);
@@ -1161,10 +1288,25 @@ Status validate(OperationContext* opCtx,
         // record key (RecordId) matches the cluster key field in the record value (document's
         // cluster key).
 
-        indexValidator.traverseRecordStore(opCtx,
-                                           results,
-                                           validateState.validationVersion(),
-                                           validateState.getTargetRecordsPerRecordStoreSlice());
+        Timer phase1Timer;
+        {
+            Timer timer;
+            indexValidator.traverseRecordStore(opCtx,
+                                               results,
+                                               validateState.validationVersion(),
+                                               validateState.getTargetRecordsPerRecordStoreSlice());
+            metrics.recordStoreTraversalDuration = timer.elapsed();
+            // The slices traverse on their own operation contexts, so their storage statistics
+            // are added to this operation's to keep its slow operation reporting complete.
+            if (const auto* sliceStats = indexValidator.getSliceStorageStats()) {
+                auto& opStats = CurOp::get(opCtx)->debug().storageStats;
+                if (opStats) {
+                    *opStats += *sliceStats;
+                } else {
+                    opStats = sliceStats->clone();
+                }
+            }
+        }
 
         if (validateState.isCollHashValidation()) {
             indexValidator.computeMetadataHash(opCtx, validateState.getCollection(), results);
@@ -1216,7 +1358,12 @@ Status validate(OperationContext* opCtx,
         }
 
         // Validate indexes and check for mismatches.
-        _validateIndexes(opCtx, validateState, indexValidator, results);
+        {
+            Timer timer;
+            _validateIndexes(opCtx, validateState, indexValidator, results);
+            metrics.indexTraversalDuration = timer.elapsed();
+        }
+        metrics.phase1Duration = phase1Timer.elapsed();
 
         if (indexValidator.haveEntryMismatch()) {
             LOGV2_OPTIONS(20305,
@@ -1224,7 +1371,9 @@ Status validate(OperationContext* opCtx,
                           "Index inconsistencies were detected. "
                           "Starting the second phase of index validation to gather concise errors",
                           logAttrs(validateState.nss()));
+            Timer phase2Timer;
             _gatherIndexEntryErrors(opCtx, validateState, indexValidator, results);
+            metrics.phase2Duration = phase2Timer.elapsed();
         }
 
         if (!results.isValid() && !results.continueValidation()) {
@@ -1248,6 +1397,7 @@ Status validate(OperationContext* opCtx,
                       logAttrs(validateState.nss()),
                       logAttrs(validateState.uuid()));
     } catch (const DBException& e) {
+        completed = false;
         auto interruptStatus = opCtx->checkForInterruptNoAssert();
         if (!interruptStatus.isOK() || e.code() == ErrorCodes::Interrupted) {
             LOGV2_OPTIONS(5160301,
@@ -1255,7 +1405,9 @@ Status validate(OperationContext* opCtx,
                           "Validation interrupted",
                           logAttrs(validateState.nss()),
                           "error"_attr = e.toString());
-            return interruptStatus.isOK() ? e.toStatus() : interruptStatus;
+            status = interruptStatus.isOK() ? e.toStatus() : interruptStatus;
+            // Return a copy, as returning 'status' would move it out before 'logMetrics' runs.
+            return Status(status);
         }
 
         string err = str::stream() << "exception during collection validation: " << e.toString();

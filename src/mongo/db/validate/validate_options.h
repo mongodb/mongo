@@ -135,6 +135,10 @@ public:
             _validateMode == ValidateMode::kHashDrillDown;
     }
 
+    ValidateMode getValidateMode() const {
+        return _validateMode;
+    }
+
     bool isCollHashValidation() const {
         return _validateMode == ValidateMode::kCollectionHash;
     }

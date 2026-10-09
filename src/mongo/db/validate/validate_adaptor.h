@@ -12,6 +12,7 @@
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/storage_stats.h"
 #include "mongo/db/validate/concurrent_progress_meter.h"
 #include "mongo/db/validate/key_string_index_consistency.h"
 #include "mongo/db/validate/validate_results.h"
@@ -158,6 +159,8 @@ public:
         int64_t dataSizeTotal{0};
         ValidateResults validateResults;
         KeyStringIndexConsistency keyStringIndexConsistency;
+        // Storage statistics accrued by a slice traversing on its own operation context.
+        std::unique_ptr<StorageStats> storageStats;
     };
 
     /**
@@ -188,6 +191,15 @@ public:
     /**
      * Computes the hash of the collection's local catalog idents and sets it in 'results'.
      **/
+    /**
+     * Returns the storage statistics accrued by the record store slices that traversed on their own
+     * operation contexts during the last call to traverseRecordStore(), or nullptr if there were
+     * none. Statistics of the caller's operation context are not included.
+     */
+    const StorageStats* getSliceStorageStats() const {
+        return _sliceStorageStats.get();
+    }
+
     void computeMetadataHash(OperationContext* opCtx,
                              const CollectionPtr& coll,
                              ValidateResults& results);
@@ -250,6 +262,10 @@ private:
     // Saves the record count from the record store traversal to be used later to validate the index
     // entries count. Reset every time traverseRecordStore() is called.
     long long _numRecords = 0;
+
+    // Storage statistics of the parallel record store slices. Reset every time
+    // traverseRecordStore() is called.
+    std::unique_ptr<StorageStats> _sliceStorageStats;
 
     ConcurrentProgressMeterHolder _progress;
 };

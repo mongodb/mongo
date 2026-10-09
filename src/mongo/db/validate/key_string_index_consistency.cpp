@@ -800,6 +800,10 @@ int64_t KeyStringIndexConsistency::traverseIndex(OperationContext* opCtx,
         }
         progress.hit();
         numKeys++;
+        // Only count key bytes once, the second phase re-traverses the same keys.
+        if (_phase == Phase::kFirst) {
+            indexResults.addKeyBytesTraversed(indexEntry->keyString.getSize());
+        }
         prevIndexKeyStringEntry = indexEntry;
 
         if (numKeys % kInterruptIntervalNumRecords == 0) {

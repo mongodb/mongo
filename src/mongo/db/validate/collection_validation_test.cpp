@@ -13,6 +13,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/client.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/operation_context.h"
@@ -44,6 +45,7 @@
 #include "mongo/db/timeseries/viewless_timeseries_collection_creation_helpers.h"
 #include "mongo/db/validate/validate_results.h"
 #include "mongo/db/validate/validate_timeseries.h"
+#include "mongo/unittest/log_capture.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -348,6 +350,231 @@ TEST_F(CollectionValidationTest, Validate) {
                         .numRecords = insertDataRange(opCtx, 0, 5),
                         .numInvalidDocuments = 0,
                         .numErrors = 0});
+}
+
+constexpr int kValidationMetricsLogId = 13618300;
+
+/**
+ * Returns the 'metrics' object of every validation metrics log line captured by 'logs'.
+ */
+std::vector<BSONObj> getLoggedMetrics(const unittest::LogCaptureGuard& logs) {
+    std::vector<BSONObj> metrics;
+    for (const auto& line : logs.getBSON()) {
+        if (line["id"].numberInt() == kValidationMetricsLogId) {
+            metrics.push_back(line["attr"]["metrics"].Obj().getOwned());
+        }
+    }
+    return metrics;
+}
+
+// Validation logs timings for each stage it reaches and the bytes it traversed.
+TEST_F(CollectionValidationTest, ValidateLogsMetrics) {
+    auto opCtx = operationContext();
+    insertDataRange(opCtx, 0, 5);
+    unittest::LogCaptureGuard logs;
+    const auto results = foregroundValidate(
+        kNss,
+        opCtx,
+        {.valid = true, .numRecords = 5, .numInvalidDocuments = 0, .numErrors = 0},
+        {collection_validation::ValidateMode::kForegroundFull});
+    logs.stop();
+    ASSERT_EQ(results.size(), 1);
+    const auto metrics = getLoggedMetrics(logs);
+    ASSERT_EQ(metrics.size(), 1);
+    const auto& m = metrics[0];
+    for (auto field : {"totalDurationSecs",
+                       "recordStoreValidateDurationSecs",
+                       "indexValidateDurationSecs",
+                       "phase1DurationSecs",
+                       "recordStoreTraversalDurationSecs",
+                       "indexTraversalDurationSecs"}) {
+        EXPECT_TRUE(m.hasField(field)) << field;
+    }
+    // No index inconsistencies, so the second phase never runs.
+    EXPECT_FALSE(m.hasField("phase2DurationSecs"));
+    EXPECT_EQ(m["isTimeseries"].type(), BSONType::boolean) << m;
+    EXPECT_FALSE(m["isTimeseries"].boolean()) << m;
+
+    // The sizes are logged as reported by the results.
+    const auto dataSize = results[0].getDataSize();
+    ASSERT_TRUE(dataSize);
+    EXPECT_GT(*dataSize, 0);
+    EXPECT_EQ(m["recordStoreDataSize"].safeNumberLong(), *dataSize);
+    long long keyBytes = 0;
+    for (const auto& [_, ivr] : results[0].getIndexResultsMap()) {
+        keyBytes += ivr.getKeyBytesTraversed();
+    }
+    EXPECT_GT(keyBytes, 0);
+    EXPECT_EQ(m["indexDataSize"].safeNumberLong(), keyBytes);
+}
+
+// Every call to validate() emits exactly one metrics log line identifying the validation.
+TEST_F(CollectionValidationTest, ValidateLogsMetricsOncePerCall) {
+    auto opCtx = operationContext();
+    unittest::LogCaptureGuard logs;
+    foregroundValidate(kNss,
+                       opCtx,
+                       {.valid = true,
+                        .numRecords = insertDataRange(opCtx, 0, 5),
+                        .numInvalidDocuments = 0,
+                        .numErrors = 0});
+    logs.stop();
+
+    // foregroundValidate() runs one validation per mode.
+    EXPECT_EQ(logs.countBSONContainingSubset(BSON("id" << kValidationMetricsLogId)), 3);
+    EXPECT_EQ(logs.countBSONContainingSubset(
+                  BSON("id" << kValidationMetricsLogId << "attr"
+                            << BSON("mode" << "foregroundFull"
+                                           << "completed" << true << "valid" << true))),
+              1);
+    EXPECT_EQ(logs.countBSONContainingSubset(
+                  BSON("id" << kValidationMetricsLogId << "attr"
+                            << BSON("metrics" << BSON("totalDurationSecs" << BSONUndefined)))),
+              3);
+}
+
+// Validations that find corruption still report their metrics, flagged as invalid.
+TEST_F(CollectionValidationTest, ValidateLogsMetricsForInvalidCollection) {
+    auto opCtx = operationContext();
+    unittest::LogCaptureGuard logs;
+    foregroundValidate(kNss,
+                       opCtx,
+                       {.valid = false,
+                        .numRecords = setUpInvalidData(opCtx),
+                        .numInvalidDocuments = 1,
+                        .numErrors = 1});
+    logs.stop();
+    EXPECT_EQ(logs.countBSONContainingSubset(
+                  BSON("id" << kValidationMetricsLogId << "attr" << BSON("valid" << false))),
+              3);
+}
+
+/**
+ * Runs a foreground validation of 'nss' with the 'throwBeforeIndexValidation' fail point throwing
+ * 'errorCode', returning the status validate() reported.
+ */
+Status validateThrowingBeforeIndexValidation(OperationContext* opCtx,
+                                             const NamespaceString& nss,
+                                             ErrorCodes::Error errorCode) {
+    FailPointEnableBlock fp("throwBeforeIndexValidation", BSON("errorCode" << errorCode));
+    ValidateResults results;
+    return collection_validation::validate(
+        opCtx,
+        nss,
+        collection_validation::ValidationOptions{collection_validation::ValidateMode::kForeground,
+                                                 collection_validation::RepairMode::kNone,
+                                                 /*logDiagnostics=*/false,
+                                                 currentValidationVersion},
+        results);
+}
+
+// An interrupted validation still emits its metrics line, marked as not completed.
+TEST_F(CollectionValidationTest, ValidateLogsMetricsWhenInterrupted) {
+    auto opCtx = operationContext();
+    insertDataRange(opCtx, 0, 5);
+    unittest::LogCaptureGuard logs;
+    ASSERT_EQ(ErrorCodes::Interrupted,
+              validateThrowingBeforeIndexValidation(opCtx, kNss, ErrorCodes::Interrupted));
+    logs.stop();
+    EXPECT_EQ(logs.countBSONContainingSubset(BSON("id" << kValidationMetricsLogId)), 1);
+    EXPECT_EQ(
+        logs.countBSONContainingSubset(BSON(
+            "id" << kValidationMetricsLogId << "attr"
+                 << BSON("completed" << false << "status" << BSON("codeName" << "Interrupted")))),
+        1);
+    EXPECT_EQ(CurOp::get(opCtx)->debug().errInfo.code(), ErrorCodes::Interrupted);
+}
+
+// An exception that validate() reports as a warning still returns OK, but the validation did not
+// reach the index checks, so it is marked as not completed even though no errors were found.
+TEST_F(CollectionValidationTest, ValidateLogsMetricsWhenExceptionBecomesWarning) {
+    auto opCtx = operationContext();
+    insertDataRange(opCtx, 0, 5);
+    unittest::LogCaptureGuard logs;
+    ASSERT_OK(validateThrowingBeforeIndexValidation(opCtx, kNss, ErrorCodes::InternalError));
+    logs.stop();
+    EXPECT_EQ(logs.countBSONContainingSubset(
+                  BSON("id" << kValidationMetricsLogId << "attr"
+                            << BSON("completed" << false << "valid" << true << "status"
+                                                << BSON("code" << 0)))),
+              1);
+    EXPECT_OK(CurOp::get(opCtx)->debug().errInfo);
+}
+
+// A validation that throws out of validate() before starting still emits its metrics line.
+TEST_F(CollectionValidationTest, ValidateLogsMetricsWhenCollectionMissing) {
+    auto opCtx = operationContext();
+    const auto missingNss = NamespaceString::createNamespaceString_forTest("test.missing");
+    unittest::LogCaptureGuard logs;
+    ValidateResults results;
+    ASSERT_THROWS_CODE(
+        collection_validation::validate(opCtx,
+                                        missingNss,
+                                        collection_validation::ValidationOptions{
+                                            collection_validation::ValidateMode::kForeground,
+                                            collection_validation::RepairMode::kNone,
+                                            /*logDiagnostics=*/false,
+                                            currentValidationVersion},
+                                        results),
+        DBException,
+        ErrorCodes::NamespaceNotFound);
+    logs.stop();
+    EXPECT_EQ(logs.countBSONContainingSubset(
+                  BSON("id" << kValidationMetricsLogId << "attr"
+                            << BSON("completed" << false << "status"
+                                                << BSON("codeName" << "NamespaceNotFound")))),
+              1);
+    // Whether the collection is time-series is unknown when it is not found.
+    const auto metrics = getLoggedMetrics(logs);
+    ASSERT_EQ(metrics.size(), 1);
+    EXPECT_FALSE(metrics[0].hasField("isTimeseries")) << metrics[0];
+    EXPECT_EQ(CurOp::get(opCtx)->debug().errInfo.code(), ErrorCodes::NamespaceNotFound);
+}
+
+// WT verify only runs for full validation, but the verify timings are reported regardless.
+TEST_F(CollectionValidationTest, ValidateReportsVerifyMetricsWithoutFullValidation) {
+    auto opCtx = operationContext();
+    insertDataRange(opCtx, 0, 5);
+    unittest::LogCaptureGuard logs;
+    foregroundValidate(kNss,
+                       opCtx,
+                       {.valid = true, .numRecords = 5, .numInvalidDocuments = 0, .numErrors = 0},
+                       {collection_validation::ValidateMode::kForeground});
+    logs.stop();
+    const auto metrics = getLoggedMetrics(logs);
+    ASSERT_EQ(metrics.size(), 1);
+    for (auto field : {"recordStoreValidateDurationSecs",
+                       "indexValidateDurationSecs",
+                       "recordStoreTraversalDurationSecs",
+                       "indexTraversalDurationSecs"}) {
+        EXPECT_TRUE(metrics[0].hasField(field)) << field;
+    }
+}
+
+// Metrics vary between runs, so they are kept out of the validate result object.
+TEST_F(CollectionValidationTest, ValidateResultObjOmitsMetrics) {
+    auto opCtx = operationContext();
+    insertDataRange(opCtx, 0, 5);
+    auto results = foregroundValidate(
+        kNss,
+        opCtx,
+        {.valid = true, .numRecords = 5, .numInvalidDocuments = 0, .numErrors = 0},
+        {collection_validation::ValidateMode::kForegroundFull});
+    ASSERT_EQ(results.size(), 1);
+    ASSERT_TRUE(results[0].getDataSize());
+    for (bool debugging : {false, true}) {
+        BSONObjBuilder bob;
+        results[0].appendToResultObj(&bob, debugging);
+        const auto resultObj = bob.obj();
+        EXPECT_FALSE(resultObj.hasField("metrics"));
+        // The traversed bytes depend only on the data, so they belong in the result object.
+        EXPECT_EQ(resultObj["dataSize"].safeNumberLong(), *results[0].getDataSize());
+        for (const auto& [indexName, ivr] : results[0].getIndexResultsMap()) {
+            EXPECT_EQ(resultObj["indexDetails"][indexName]["keyBytes"].safeNumberLong(),
+                      ivr.getKeyBytesTraversed())
+                << indexName;
+        }
+    }
 }
 
 // Enough records that a small target per slice yields many slices, and that the RecordId stride
@@ -1315,6 +1542,21 @@ TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationBadBucketSpan) {
                        _opCtx,
                        {.valid = false, .numRecords = 1, .numErrors = 1, .numWarnings = 0},
                        {_validateMode});
+}
+
+// Validation of a time-series collection reports so in its metrics.
+TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationLogsIsTimeseries) {
+    insertDoc(getSampleDoc());
+    unittest::LogCaptureGuard logs;
+    foregroundValidate(_nss,
+                       _opCtx,
+                       {.valid = true, .numRecords = 1, .numErrors = 0, .numWarnings = 0},
+                       {_validateMode});
+    logs.stop();
+    EXPECT_EQ(logs.countBSONContainingSubset(
+                  BSON("id" << kValidationMetricsLogId << "attr"
+                            << BSON("metrics" << BSON("isTimeseries" << true)))),
+              1);
 }
 
 TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationBadControlCount) {

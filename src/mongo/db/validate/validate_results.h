@@ -10,6 +10,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/validate/size_limited_bsonobj_heap.h"
 #include "mongo/db/validate/validate_state.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/serialization_context.h"
 #include "mongo/util/uuid.h"
@@ -127,8 +128,17 @@ public:
         _isMultikey = isMultikey;
     }
 
+    int64_t getKeyBytesTraversed() const {
+        return _keyBytesTraversed;
+    }
+
+    void addKeyBytesTraversed(int64_t keyBytesTraversed) {
+        _keyBytesTraversed += keyBytesTraversed;
+    }
+
 private:
     int64_t _keysTraversed = 0;
+    int64_t _keyBytesTraversed = 0;
     int64_t _keysRemovedFromRecordStore = 0;
     BSONObj _spec = {};
     bool _hasStructuralDamage = false;
@@ -157,6 +167,10 @@ public:
 
     void setUUID(UUID uuid) {
         _uuid = std::move(uuid);
+    }
+
+    const boost::optional<UUID>& getUUID() const {
+        return _uuid;
     }
 
     const std::vector<BSONObj>& getExtraIndexEntries() const {
@@ -325,6 +339,15 @@ public:
         return _numRecords;
     }
 
+    void setDataSize(long long dataSize) {
+        _dataSize = dataSize;
+    }
+
+    // Total bytes of record data read during the record store traversal.
+    boost::optional<long long> getDataSize() const {
+        return _dataSize;
+    }
+
     const std::set<Timestamp>& getRecordTimestamps() const {
         return _recordTimestamps;
     }
@@ -423,6 +446,7 @@ private:
     boost::optional<long long> _numInvalidDocuments;
     boost::optional<long long> _numNonCompliantDocuments;
     boost::optional<long long> _numRecords;
+    boost::optional<long long> _dataSize;
 
     // Hashes computed for extended validate.
     boost::optional<SHA256Block> _collectionHash;

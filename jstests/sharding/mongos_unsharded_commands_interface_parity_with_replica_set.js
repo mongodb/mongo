@@ -106,6 +106,10 @@ function removeInconsistentFields(res) {
     if (res.hasOwnProperty("repairMode")) {
         delete res["repairMode"];
     }
+    // Not reported by shards on binaries older than this field.
+    if (res.hasOwnProperty("dataSize")) {
+        delete res["dataSize"];
+    }
 }
 
 const tests = [

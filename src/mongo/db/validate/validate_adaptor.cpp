@@ -728,6 +728,7 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
     ON_BLOCK_EXIT([&]() { _progress.finished(); });
 
     _numRecords = 0;
+    _sliceStorageStats.reset();
     int64_t dataSizeTotal{0};
     int64_t numRecords{0};
 
@@ -845,6 +846,8 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                                                                     opts,
                                                                     _progress,
                                                                     validationVersion);
+                        innerResults.storageStats = shard_role_details::getRecoveryUnit(workerOpCtx)
+                                                        ->computeOperationStatisticsSinceLastCall();
                         rsSliceResults[i].promise.emplaceValue(std::move(innerResults));
 
                     } catch (const DBException& e) {
@@ -875,6 +878,13 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                 _keyBasedIndexConsistency.merge(ir.keyStringIndexConsistency);
                 dataSizeTotal += ir.dataSizeTotal;
                 numRecords += ir.validateResults.getNumRecords().value_or(0);
+                if (ir.storageStats) {
+                    if (_sliceStorageStats) {
+                        *_sliceStorageStats += *ir.storageStats;
+                    } else {
+                        _sliceStorageStats = ir.storageStats->clone();
+                    }
+                }
             }
 
             for (const auto& ir : implResults) {
@@ -913,6 +923,7 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
     }
 
     _numRecords = numRecords;
+    validateResults.setDataSize(dataSizeTotal);
 
     if (_validateState->getFirstRecordId().isNull()) {
         // The collection-level checks below all require the totals from a real traversal, so skip

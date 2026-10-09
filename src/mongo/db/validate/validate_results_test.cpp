@@ -242,6 +242,7 @@ TEST(ValidateResultsTest, MergeIsCommutative) {
         vr.addWarning("w_common");
         vr.addWarning("w_a");
         vr.setNumRecords(10);
+        vr.setDataSize(100);
         vr.setNumInvalidDocuments(1);
         vr.setNumNonCompliantDocuments(2);
         vr.addNumRemovedCorruptRecords(3);
@@ -262,6 +263,7 @@ TEST(ValidateResultsTest, MergeIsCommutative) {
         vr.addWarning("w_common");
         vr.addWarning("w_b");
         vr.setNumRecords(20);
+        vr.setDataSize(200);
         vr.setNumInvalidDocuments(4);
         vr.setNumNonCompliantDocuments(8);
         vr.addNumRemovedCorruptRecords(7);
@@ -301,6 +303,7 @@ TEST(ValidateResultsTest, MergeIsCommutative) {
     EXPECT_TRUE(sortedCorrupt(ab) == sortedCorrupt(ba));
     EXPECT_EQ(ab.getNumRemovedCorruptRecords(), ba.getNumRemovedCorruptRecords());
     EXPECT_EQ(getLong(ab, "nrecords"), getLong(ba, "nrecords"));
+    EXPECT_EQ(getLong(ab, "dataSize"), getLong(ba, "dataSize"));
     EXPECT_EQ(getLong(ab, "nInvalidDocuments"), getLong(ba, "nInvalidDocuments"));
     EXPECT_EQ(getLong(ab, "nNonCompliantDocuments"), getLong(ba, "nNonCompliantDocuments"));
 
@@ -316,6 +319,7 @@ TEST(ValidateResultsTest, MergeIsCommutative) {
     EXPECT_EQ(ab.getErrors().size(), 3);    // e_common, e_a, e_b
     EXPECT_EQ(ab.getWarnings().size(), 3);  // w_common, w_a, w_b
     EXPECT_EQ(getLong(ab, "nrecords"), 30);
+    EXPECT_EQ(getLong(ab, "dataSize"), 300);
     EXPECT_EQ(getLong(ab, "nInvalidDocuments"), 5);
     EXPECT_EQ(getLong(ab, "nNonCompliantDocuments"), 10);
     EXPECT_EQ(ab.getNumRemovedCorruptRecords(), 10);
@@ -502,6 +506,29 @@ TEST(ValidateResultsTest, MergeThrowsAndIsAtomicOnSpecMismatch) {
     EXPECT_EQ(base.getWarnings(), preWarnings);
     EXPECT_EQ(base.getIndexResultsMap().at("idx").getKeysTraversed(), preNumRecords);
     ASSERT_BSONOBJ_EQ(base.getIndexResultsMap().at("idx").getSpec(), preSpec);
+}
+
+TEST(ValidateResultsTest, ResultObjReportsTraversedBytes) {
+    ValidateResults vr;
+    vr.setDataSize(100);
+    vr.getIndexValidateResult("a").addKeyBytesTraversed(7);
+    vr.getIndexValidateResult("b").addKeyBytesTraversed(5);
+
+    BSONObjBuilder bob;
+    vr.appendToResultObj(&bob, /*debugging=*/false);
+    const auto obj = bob.obj();
+    EXPECT_EQ(obj["dataSize"].safeNumberLong(), 100);
+    EXPECT_EQ(obj["indexDetails"]["a"]["keyBytes"].safeNumberLong(), 7);
+    EXPECT_EQ(obj["indexDetails"]["b"]["keyBytes"].safeNumberLong(), 5);
+}
+
+TEST(ValidateResultsTest, MergeSumsIndexKeyBytes) {
+    ValidateResults a;
+    a.getIndexValidateResult("idx").addKeyBytesTraversed(4);
+    ValidateResults b;
+    b.getIndexValidateResult("idx").addKeyBytesTraversed(6);
+    a.merge(b);
+    EXPECT_EQ(a.getIndexValidateResult("idx").getKeyBytesTraversed(), 10);
 }
 
 }  // namespace mongo
