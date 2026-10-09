@@ -82,14 +82,21 @@ using std::make_pair;
 static bool FLAGS_always_recurse_on_children = false;
 
 void S2EdgeIndex::Reset() {
+  std::lock_guard<std::mutex> lk(mutex_);
   minimum_s2_level_used_ = S2CellId::kMaxLevel;
-  index_computed_ = false;
-  query_count_ = 0;
+  index_computed_.store(false, std::memory_order_relaxed);
+  query_count_.store(0, std::memory_order_relaxed);
   mapping_.clear();
 }
 
 void S2EdgeIndex::ComputeIndex() {
-  DCHECK(!index_computed_);
+  // Fast path: another thread may already have built the index. The acquire-load pairs
+  // with the release-store below, so observing true here means mapping_ is fully built.
+  if (index_computed_.load(std::memory_order_acquire)) return;
+
+  std::lock_guard<std::mutex> lk(mutex_);
+  // Double-checked under the lock: we may have lost the race to build the index.
+  if (index_computed_.load(std::memory_order_relaxed)) return;
 
   for (int i = 0; i < num_edges(); ++i) {
     S2Point from, to;
@@ -103,15 +110,16 @@ void S2EdgeIndex::ComputeIndex() {
       mapping_.insert(make_pair(*it, i));
     }
   }
-  index_computed_ = true;
+  // Publish the fully built index to lock-free readers.
+  index_computed_.store(true, std::memory_order_release);
 }
 
 bool S2EdgeIndex::IsIndexComputed() const {
-  return index_computed_;
+  return index_computed_.load(std::memory_order_acquire);
 }
 
 void S2EdgeIndex::IncrementQueryCount() {
-  query_count_++;
+  query_count_.fetch_add(1, std::memory_order_relaxed);
 }
 
 
@@ -141,8 +149,8 @@ void S2EdgeIndex::IncrementQueryCount() {
 // while the marginal cost to find is 3ms.  Thus, this is a reasonable
 // thing to do.
 void S2EdgeIndex::PredictAdditionalCalls(int n) {
-  if (index_computed_) return;
-  if (num_edges() > 100 && (query_count_ + n) > 30) {
+  if (index_computed_.load(std::memory_order_acquire)) return;
+  if (num_edges() > 100 && (query_count_.load(std::memory_order_relaxed) + n) > 30) {
     ComputeIndex();
   }
 }

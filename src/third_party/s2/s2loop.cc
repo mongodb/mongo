@@ -78,7 +78,9 @@ S2Loop::S2Loop(vector<S2Point> const& vertices)
 
 void S2Loop::ResetMutableFields() {
   index_.Reset();
-  num_find_vertex_calls_ = 0;
+  std::lock_guard<std::mutex> lk(vertex_map_mutex_);
+  num_find_vertex_calls_.store(0, std::memory_order_relaxed);
+  vertex_map_computed_.store(false, std::memory_order_relaxed);
   vertex_to_index_.clear();
 }
 
@@ -274,9 +276,26 @@ S2Loop* S2Loop::Clone() const {
   return new S2Loop(this);
 }
 
+void S2Loop::ComputeVertexMap() const {
+  // Fast path: another thread may already have built the map. The acquire-load pairs with
+  // the release-store below, so observing true here means the map is fully built.
+  if (vertex_map_computed_.load(std::memory_order_acquire)) return;
+
+  std::lock_guard<std::mutex> lk(vertex_map_mutex_);
+  // Double-checked under the lock: we may have lost the race to build the map.
+  if (vertex_map_computed_.load(std::memory_order_relaxed)) return;
+
+  for (int i = num_vertices(); i > 0; --i) {
+    vertex_to_index_[vertex(i)] = i;
+  }
+  // Publish the fully populated map to lock-free readers.
+  vertex_map_computed_.store(true, std::memory_order_release);
+}
+
 int S2Loop::FindVertex(S2Point const& p) const {
-  num_find_vertex_calls_++;
-  if (num_vertices() < 10 || num_find_vertex_calls_ < 20) {
+  num_find_vertex_calls_.fetch_add(1, std::memory_order_relaxed);
+  if (num_vertices() < 10 ||
+      num_find_vertex_calls_.load(std::memory_order_relaxed) < 20) {
     // Exhaustive search
     for (int i = 1; i <= num_vertices(); ++i) {
       if (vertex(i) == p) return i;
@@ -284,11 +303,7 @@ int S2Loop::FindVertex(S2Point const& p) const {
     return -1;
   }
 
-  if (vertex_to_index_.empty()) {  // We haven't computed it yet.
-    for (int i = num_vertices(); i > 0; --i) {
-      vertex_to_index_[vertex(i)] = i;
-    }
-  }
+  ComputeVertexMap();
 
   map<S2Point, int>::const_iterator it;
   it = vertex_to_index_.find(p);
@@ -461,6 +476,9 @@ bool S2Loop::DecodeInternal(Decoder* const decoder,
                             bool within_scope) {
   unsigned char version = decoder->get8();
   if (version > kCurrentEncodingVersionNumber) return false;
+
+  // Drop any lazily built index/vertex map from a previous decode before repopulating.
+  ResetMutableFields();
 
   num_vertices_ = decoder->get32();
   if (owns_vertices_) delete[] vertices_;
