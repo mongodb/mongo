@@ -31,6 +31,10 @@ public:
         // Number of physical reads performed during a trial run. Once a storage cursor advances,
         // it counts as a single physical read.
         kNumReads,
+        // Number of intermediate results produced by join operators during a trial run.
+        kNumIntermediateRows,
+        // Number of times the plan spilled to disk during a trial run.
+        kNumSpills,
         // Must always be the last element to hold the number of elements in the enum.
         kLastElem
     };
@@ -44,8 +48,11 @@ public:
      * Callers can also pass a value of boost::none to indicate that the given metric should not
      * be tracked.
      */
-    TrialRunTracker(boost::optional<size_t> maxNumResults, boost::optional<size_t> maxNumReads)
-        : _maxMetrics{maxNumResults, maxNumReads} {}
+    TrialRunTracker(boost::optional<size_t> maxNumResults,
+                    boost::optional<size_t> maxNumReads,
+                    boost::optional<size_t> maxNumIntermediateRows,
+                    boost::optional<size_t> maxNumSpills)
+        : _maxMetrics{maxNumResults, maxNumReads, maxNumIntermediateRows, maxNumSpills} {}
 
     /**
      * Constructs a 'TrialRunTracker' that also has an '_onMetricReached' function, which gets
@@ -56,8 +63,11 @@ public:
      */
     TrialRunTracker(std::function<bool(TrialRunMetric)> onMetricReached,
                     boost::optional<size_t> maxNumResults,
-                    boost::optional<size_t> maxNumReads)
-        : _maxMetrics{maxNumResults, maxNumReads}, _onMetricReached(std::move(onMetricReached)) {}
+                    boost::optional<size_t> maxNumReads,
+                    boost::optional<size_t> maxNumIntermediateRows,
+                    boost::optional<size_t> maxNumSpills)
+        : _maxMetrics{maxNumResults, maxNumReads, maxNumIntermediateRows, maxNumSpills},
+          _onMetricReached(std::move(onMetricReached)) {}
 
     /**
      * Increments the trial run metric specified as a template parameter 'metric' by the

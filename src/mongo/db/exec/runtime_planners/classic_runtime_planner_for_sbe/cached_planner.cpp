@@ -139,8 +139,11 @@ sbe::plan_ranker::CandidatePlan collectExecutionStatsForCachedPlan(
                 MONGO_UNREACHABLE;
         }
     };
-    candidate.data.tracker = std::make_unique<TrialRunTracker>(
-        std::move(onMetricReached), maxTrialResultsFromPlanningRoot, maxTrialPeriodNumReads);
+    candidate.data.tracker = std::make_unique<TrialRunTracker>(std::move(onMetricReached),
+                                                               maxTrialResultsFromPlanningRoot,
+                                                               maxTrialPeriodNumReads,
+                                                               boost::none,
+                                                               boost::none);
     candidate.root->attachToTrialRunTracker(
         candidate.data.tracker.get(),
         candidate.data.stageData.staticData->runtimePlanningRootNodeId);

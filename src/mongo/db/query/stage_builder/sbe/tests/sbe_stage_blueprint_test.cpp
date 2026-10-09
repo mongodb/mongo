@@ -116,7 +116,8 @@ TEST_F(SbBlueprintLoweringTest, DisableTrialRunTrackingAppliesToLoweredStage) {
         return lowerSbeBlueprint(blueprint, root, *_state);
     };
 
-    auto tracker = std::make_unique<TrialRunTracker>(boost::none, boost::none);
+    auto tracker =
+        std::make_unique<TrialRunTracker>(boost::none, boost::none, boost::none, boost::none);
 
     auto enabled = build(false /* disableInner */);
     ASSERT_EQ(enabled->attachToTrialRunTracker(tracker.get(), PlanNodeId{1}),

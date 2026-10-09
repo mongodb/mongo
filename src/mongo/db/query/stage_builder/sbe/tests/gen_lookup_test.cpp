@@ -2729,7 +2729,7 @@ TEST_F(LookupStageBuilderTest, TrialRunDoesNotCountForeignReads) {
             // buildLookupSbeTree() opens the plan, and a hash join reads its whole foreign side
             // in open(). Reopen the plan with the tracker attached so that every read is tracked.
             tree.stage->close();
-            TrialRunTracker tracker(boost::none, maxReads);
+            TrialRunTracker tracker(boost::none, maxReads, boost::none, boost::none);
             tree.stage->attachToTrialRunTracker(&tracker);
             tree.stage->open(false);
             PlanState state = PlanState::ADVANCED;

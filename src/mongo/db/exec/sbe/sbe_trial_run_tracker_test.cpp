@@ -29,6 +29,7 @@
 #include "mongo/util/uuid.h"
 
 #include <cstddef>
+#include <limits>
 #include <memory>
 #include <string>
 #include <utility>
@@ -58,7 +59,8 @@ TEST_F(TrialRunTrackerTest, TrackerAttachesToStreamingStage) {
                                            /*nodeId=*/kEmptyPlanNodeId,
                                            /*scanOpenCallback=*/nullptr);
 
-    auto tracker = std::make_unique<TrialRunTracker>(boost::none, boost::none);
+    auto tracker =
+        std::make_unique<TrialRunTracker>(boost::none, boost::none, boost::none, boost::none);
     ON_BLOCK_EXIT([&]() { scanStage->detachFromTrialRunTracker(); });
 
     auto attachResult = scanStage->attachToTrialRunTracker(tracker.get());
@@ -85,7 +87,8 @@ TEST_F(TrialRunTrackerTest, TrackerAttachesToFetchStage) {
                                              kEmptyPlanNodeId,
                                              true);
 
-    auto tracker = std::make_unique<TrialRunTracker>(boost::none, boost::none);
+    auto tracker =
+        std::make_unique<TrialRunTracker>(boost::none, boost::none, boost::none, boost::none);
     ON_BLOCK_EXIT([&]() { fetchStage->detachFromTrialRunTracker(); });
 
     auto attachResult = fetchStage->attachToTrialRunTracker(tracker.get());
@@ -107,7 +110,8 @@ TEST_F(TrialRunTrackerTest, TrackerDoesNotAttachToBlockingStage) {
                          /*yieldPolicy=*/nullptr,
                          kEmptyPlanNodeId);
 
-    auto tracker = std::make_unique<TrialRunTracker>(boost::none, boost::none);
+    auto tracker =
+        std::make_unique<TrialRunTracker>(boost::none, boost::none, boost::none, boost::none);
     ON_BLOCK_EXIT([&]() { sortStage->detachFromTrialRunTracker(); });
 
     auto attachResult = sortStage->attachToTrialRunTracker(tracker.get());
@@ -143,7 +147,8 @@ TEST_F(TrialRunTrackerTest, TrackerAttachesToBothBlockingAndStreamingStages) {
                                           /*yieldPolicy=*/nullptr,
                                           kEmptyPlanNodeId);
 
-    auto tracker = std::make_unique<TrialRunTracker>(boost::none, boost::none);
+    auto tracker =
+        std::make_unique<TrialRunTracker>(boost::none, boost::none, boost::none, boost::none);
     ON_BLOCK_EXIT([&]() { rootSortStage->detachFromTrialRunTracker(); });
 
     auto attachResult = rootSortStage->attachToTrialRunTracker(tracker.get());
@@ -172,7 +177,8 @@ TEST_F(TrialRunTrackerTest, TrialRunTrackingCanBeDisabled) {
                               /*scanOpenCallback=*/nullptr);
 
     scanStage->disableTrialRunTracking();
-    auto tracker = std::make_unique<TrialRunTracker>(boost::none, boost::none);
+    auto tracker =
+        std::make_unique<TrialRunTracker>(boost::none, boost::none, boost::none, boost::none);
     auto attachResult = scanStage->attachToTrialRunTracker(tracker.get());
     ASSERT_EQ(attachResult, PlanStage::TrialRunTrackingType::NoTracking);
 }
@@ -209,7 +215,8 @@ TEST_F(TrialRunTrackerTest, DisablingTrackingForChildDoesNotInhibitTrackingForPa
                                           /*yieldPolicy=*/nullptr,
                                           kEmptyPlanNodeId);
 
-    auto tracker = std::make_unique<TrialRunTracker>(boost::none, boost::none);
+    auto tracker =
+        std::make_unique<TrialRunTracker>(boost::none, boost::none, boost::none, boost::none);
     ON_BLOCK_EXIT([&]() { rootSortStage->detachFromTrialRunTracker(); });
 
     auto attachResult = rootSortStage->attachToTrialRunTracker(tracker.get(), PlanNodeId{1});
@@ -275,7 +282,8 @@ TEST_F(TrialRunTrackerTest, DisablingTrackingForAChildStagePreventsEarlyExit) {
                          kEmptyPlanNodeId);
 
     // We expect the TrialRunTracker to attach to _only_ the left child.
-    auto tracker = std::make_unique<TrialRunTracker>(size_t{9}, boost::none);
+    auto tracker =
+        std::make_unique<TrialRunTracker>(size_t{9}, boost::none, boost::none, boost::none);
     auto attachResult = sortStage->attachToTrialRunTracker(tracker.get());
 
     // Note: A scan is a streaming stage, but the "virtual scan" used here does not attach to the
@@ -310,7 +318,8 @@ TEST_F(TrialRunTrackerTest, TrackerAttachesToPlanningRootStageAndTracksTheDocume
                          /*yieldPolicy=*/nullptr,
                          PlanNodeId{3});
 
-    auto tracker = std::make_unique<TrialRunTracker>(size_t{3}, boost::none);
+    auto tracker =
+        std::make_unique<TrialRunTracker>(size_t{3}, boost::none, boost::none, boost::none);
     auto attachResult = sortStage->attachToTrialRunTracker(tracker.get());
     ASSERT_EQ(attachResult, PlanStage::TrialRunTrackingType::NoTracking);
 
@@ -347,8 +356,8 @@ TEST_F(TrialRunTrackerTest, TrackerCanTrackMetricWithMaxMetricSetToZero) {
         return false;
     };
 
-    auto tracker =
-        std::make_unique<TrialRunTracker>(std::move(onMetricReached), size_t{0}, boost::none);
+    auto tracker = std::make_unique<TrialRunTracker>(
+        std::move(onMetricReached), size_t{0}, boost::none, boost::none, boost::none);
     auto attachResult = sortStage->attachToTrialRunTracker(tracker.get(), PlanNodeId{1});
     ASSERT_EQ(attachResult, PlanStage::TrialRunTrackingType::TrackResults);
 
@@ -359,5 +368,36 @@ TEST_F(TrialRunTrackerTest, TrackerCanTrackMetricWithMaxMetricSetToZero) {
     // 'tracker->getMetric<TrialRunTracker::kNumResults>()' becomes greater than the maximum of 0.)
     prepareTree(ctx.get(), sortStage.get(), scanSlot);
     ASSERT_EQ(tracker->getMetric<TrialRunTracker::kNumResults>(), 1);
+}
+
+TEST_F(TrialRunTrackerTest, IntermediateRowsBreachTheirOwnLimit) {
+    // maxNumIntermediateRows = 10; the trial ends once the metric exceeds it.
+    auto tracker =
+        std::make_unique<TrialRunTracker>(boost::none, boost::none, size_t{10}, boost::none);
+
+    ASSERT_FALSE(tracker->trackProgress<TrialRunTracker::kNumIntermediateRows>(10));
+    ASSERT_TRUE(tracker->trackProgress<TrialRunTracker::kNumIntermediateRows>(1));
+
+    // Once the trial has ended, further progress is reported but not recorded.
+    ASSERT_TRUE(tracker->trackProgress<TrialRunTracker::kNumIntermediateRows>(1));
+    ASSERT_EQ(tracker->getMetric<TrialRunTracker::kNumIntermediateRows>(), 11);
+}
+
+TEST_F(TrialRunTrackerTest, SpillsAreTrackedWhenUncapped) {
+    // SIZE_MAX is effectively no limit: spills are recorded but never end the trial.
+    auto tracker = std::make_unique<TrialRunTracker>(
+        boost::none, boost::none, boost::none, std::numeric_limits<size_t>::max());
+
+    ASSERT_FALSE(tracker->trackProgress<TrialRunTracker::kNumSpills>(1));
+    ASSERT_FALSE(tracker->trackProgress<TrialRunTracker::kNumSpills>(1));
+    ASSERT_EQ(tracker->getMetric<TrialRunTracker::kNumSpills>(), 2);
+}
+
+TEST_F(TrialRunTrackerTest, SpillsBreachWhenMaxIsZero) {
+    // maxNumSpills = 0: any spill ends the trial.
+    auto tracker =
+        std::make_unique<TrialRunTracker>(boost::none, boost::none, boost::none, size_t{0});
+
+    ASSERT_TRUE(tracker->trackProgress<TrialRunTracker::kNumSpills>(1));
 }
 }  // namespace mongo::sbe
