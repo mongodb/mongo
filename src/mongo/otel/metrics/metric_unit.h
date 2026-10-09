@@ -40,6 +40,9 @@ enum class MetricUnit {
 
     // Networking
     kConnections,
+
+    // Storage
+    kWiredTiger,
 };
 
 // Converts any of the above units to a string.

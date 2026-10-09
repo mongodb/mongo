@@ -26,6 +26,8 @@ std::string_view toString(MetricUnit unit) {
             return "bool";
         case MetricUnit::kRatio:
             return "ratio";
+        case MetricUnit::kWiredTiger:
+            return "wiredtiger";
 
         // Time
         case MetricUnit::kMicroseconds:

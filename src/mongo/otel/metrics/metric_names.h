@@ -13,6 +13,7 @@ namespace mongo {
 class DiskMetrics;
 class ObservableMutexMetrics;
 class SystemMountMetrics;
+class WiredTigerMetricRegistry;
 
 // Forward declarations needed for MetricName to declare Passkey friends.
 namespace disagg {
@@ -77,6 +78,9 @@ public:
         friend ::mongo::DiskMetrics;
         friend ::mongo::ObservableMutexMetrics;
         friend ::mongo::SystemMountMetrics;
+        // TODO (SERVER-136509): rename WiredTigerMetricRegistry to WiredTigerMetrics and remove the
+        // current WiredTigerMetrics
+        friend ::mongo::WiredTigerMetricRegistry;
         // This allows us to create dynamic metric names in tests
         friend ::mongo::otel::metrics::DynamicMetricNameTestPasskeyMaker;
         constexpr Passkey() = default;

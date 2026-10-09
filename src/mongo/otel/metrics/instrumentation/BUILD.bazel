@@ -257,6 +257,27 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_library(
+    name = "wiredtiger_metric_registry",
+    srcs = ["wiredtiger_metric_registry.cpp"],
+    hdrs = ["wiredtiger_metric_registry.h"],
+    deps = [
+        "//src/mongo/otel/metrics:metric_unit",
+        "//src/mongo/otel/metrics:otel_metric_name_validation",
+        "//src/mongo/otel/metrics:otel_metrics_service",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "wiredtiger_metric_registry_test",
+    srcs = ["wiredtiger_metric_registry_test.cpp"],
+    tags = ["mongo_unittest_fourth_group"],
+    deps = [
+        ":wiredtiger_metric_registry",
+        "//src/mongo/otel/metrics:otel_metric_name_validation",
+    ],
+)
+
+mongo_cc_library(
     name = "connections_metrics",
     srcs = ["connections_metrics.cpp"],
     hdrs = ["connections_metrics.h"],
