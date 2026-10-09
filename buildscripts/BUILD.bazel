@@ -893,6 +893,19 @@ py_library(
 )
 
 py_library(
+    name = "fully_disabled_feature_flag_tags_check",
+    srcs = ["fully_disabled_feature_flag_tags_check.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/resmokelib",
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+    ],
+)
+
+py_library(
     name = "generate_version_expansions",
     srcs = ["generate_version_expansions.py"],
     visibility = ["//visibility:public"],

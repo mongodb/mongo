@@ -342,6 +342,19 @@ py_test(
 )
 
 py_test(
+    name = "test_fully_disabled_feature_flag_tags_check",
+    srcs = ["test_fully_disabled_feature_flag_tags_check.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:fully_disabled_feature_flag_tags_check",
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+    ],
+)
+
+py_test(
     name = "test_feature_flags",
     srcs = ["test_feature_flags.py"],
     data = ["//buildscripts/resmokeconfig:fully_disabled_feature_flags.yml"],
