@@ -174,7 +174,7 @@ resets the foreign execution platform/toolchain and cross repository selectors, 
 execution, and marks all actions `no-cache` while retaining the gRPC cache endpoint required by
 Bazel's remote downloader. It uses the host-native `mongo_toolchain_v5` inside the host-native
 hermetic container. When the host architecture matches the config's execution architecture (the
-ARM64 s390x compile distros), there is no native IBM toolchain, so the wrapper keeps the cross
+ARM64 IBM compile distros), there is no native IBM toolchain, so the wrapper keeps the cross
 platforms, toolchains, and module overlays and runs every action, including compiles and
 execution-platform tools, locally in the host-native container, with the same remote-execution and
 cache restrictions. Both modes keep release execution logs free of remote runners and cache hits.
@@ -216,6 +216,20 @@ foreign RBE execution platform. The concrete cross configs also set `MONGO_WASI_
 `.bazelrc`, and `tools/bazel` forwards it both on the original Bazel argument vector and during the
 early `@py_host` bootstrap, before the wrapper hook has a chance to add its normal cross-RBE
 arguments.
+
+### Evergreen PPC64LE builds
+
+The RHEL 8.1, 9, and 10 PPC64LE release and shared variants use the same off-host build strategy as
+s390x. Their build-only task groups run on same-release ARM64 distros with the
+`linux-ppc64le-rhel*-cross-rbe-arm64` configs; dbtests, integration tests, unit tests, and
+server-version recording run on native PPC64LE hosts. Release builds retain the fully local
+execution and cache restrictions described above on the ARM64 compile host.
+
+Native resmoke tasks consume a separate `venv-native` artifact produced by `create_venv`, so they do
+not fetch the ARM64 Python environment uploaded by the archive tasks. The shared variants publish
+artifacts under their own `-dynamic` compile variant names. Server-version recording downloads the
+archived `mongod` and runs it on the native host, preserving the archive's release or patch version
+without rebuilding the binary.
 
 ### Default pinned toolchain composition
 

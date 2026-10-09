@@ -37,7 +37,12 @@ py_test(
 py_test(
     name = "record_mongodb_server_version_test",
     srcs = ["record_mongodb_server_version_test.py"],
-    data = ["record_mongodb_server_version.sh"],
+    data = [
+        "record_mongodb_server_version.sh",
+        "//etc:evergreen_yml_components/tasks/compile_tasks_shared.yml",
+        "//evergreen/functions:all_python_files",
+    ],
+    deps = [dependency("pyyaml")],
 )
 
 sh_binary(

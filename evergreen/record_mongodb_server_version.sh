@@ -16,7 +16,8 @@ output_file="$2"
 # MongoInstallRule's declared output remains available below bazel-bin even when the host-side
 # convenience symlink cannot be recreated after a persistent container action. Prefer that
 # declared output for this metadata-only probe instead of failing the entire debug archive task.
-if [[ ! -e "$binary" ]]; then
+# Explicit archive paths must fail if missing, rather than recording a different local build.
+if [[ "$binary" == "./bazel-bin/install/bin/mongod" && ! -e "$binary" ]]; then
     for fallback_binary in \
         "./bazel-bin/install-dist-test/bin/mongod" \
         "./bazel-bin/install-dist-test-debug/bin/mongod" \
