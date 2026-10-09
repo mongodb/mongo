@@ -81,6 +81,7 @@ public:
     ExpressionContextBuilder& view(boost::optional<ResolvedNamespace>);
     ExpressionContextBuilder& originalNs(NamespaceString);
     ExpressionContextBuilder& isHybridSearch(bool);
+    ExpressionContextBuilder& remainingQuota(int64_t);
     ExpressionContextBuilder& pathArraynessForNss(
         stdx::unordered_map<NamespaceString, std::shared_ptr<const PathArrayness>>
             pathArraynessForNss);

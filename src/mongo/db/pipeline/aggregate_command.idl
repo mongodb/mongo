@@ -399,3 +399,12 @@ commands:
                 type: QueryShapeHash
                 optional: true
                 stability: internal
+            $_remainingQuota:
+                description:
+                    "A quota (in bytes) to be enforced on data written by the $out stage of an
+                    aggregate pipeline.  If the query tries to write more data than the quota, a
+                    user assertion will be thrown"
+                cpp_name: remainingQuota
+                type: safeInt64
+                optional: true
+                stability: internal

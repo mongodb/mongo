@@ -349,6 +349,11 @@ ExpressionContextBuilder& ExpressionContextBuilder::isHybridSearch(bool isHybrid
     return *this;
 }
 
+ExpressionContextBuilder& ExpressionContextBuilder::remainingQuota(int64_t remainingQuota) {
+    params.remainingQuota = remainingQuota;
+    return *this;
+}
+
 ExpressionContextBuilder& ExpressionContextBuilder::withReplicationResolvedNamespaces() {
     ResolvedNamespaceMap resolvedNamespaces;
 
@@ -502,6 +507,7 @@ ExpressionContextBuilder& ExpressionContextBuilder::fromRequest(
     // TODO SERVER-121094: remove once the $_internalHybridSearch marker is the single
     // hybrid-search signal.
     isHybridSearch(request.getIsHybridSearch().value_or(false));
+    remainingQuota(request.getRemainingQuota().value_or(-1));
     return *this;
 }
 
@@ -626,6 +632,7 @@ boost::intrusive_ptr<ExpressionContext> makeCopyFromExpressionContext(
         .view(std::move(clonedView))
         .requiresTimeseriesExtendedRangeSupport(other->getRequiresTimeseriesExtendedRangeSupport())
         .isHybridSearch(other->isHybridSearch())
+        .remainingQuota(other->getRemainingQuota())
         .enabledCounters(other->getEnabledCounters());
 
     // TODO: SERVER-111384: When removing feature flag, we can collapse the builder into one

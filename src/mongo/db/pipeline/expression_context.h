@@ -1038,6 +1038,14 @@ public:
         return _params.isHybridSearch;
     }
 
+    void setRemainingQuota(int64_t remainingQuota) {
+        _params.remainingQuota = remainingQuota;
+    }
+
+    int64_t getRemainingQuota() const {
+        return _params.remainingQuota;
+    }
+
     // Sets or clears a flag which tells DocumentSource parsers whether any involved Collection
     // may contain extended-range dates.
     void setRequiresTimeseriesExtendedRangeSupport(bool v) {
@@ -1277,6 +1285,9 @@ protected:
         // Indicates that the pipeline is a desugared representation of a user's $rankFusion or
         // $scoreFusion pipeline.
         bool isHybridSearch = false;
+
+        // A quota (in bytes) on the data that may be written by a $out stage.
+        int64_t remainingQuota = -1;
 
         bool requiresTimeseriesExtendedRangeSupport = false;
 
