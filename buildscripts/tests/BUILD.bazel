@@ -513,6 +513,15 @@ py_test(
 )
 
 py_test(
+    name = "test_create_todo_tickets",
+    srcs = ["test_create_todo_tickets.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:create_todo_tickets",
+    ],
+)
+
+py_test(
     name = "test_todo_check",
     srcs = ["test_todo_check.py"],
     visibility = ["//visibility:public"],

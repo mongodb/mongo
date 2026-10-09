@@ -2,6 +2,18 @@ load("//bazel/uv:defs.bzl", "dependency")
 load("@rules_python//python:defs.bzl", "py_test")
 
 py_test(
+    name = "test_generate_co_jira_map",
+    srcs = [
+        "__init__.py",
+        "test_generate_co_jira_map.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/util",
+    ],
+)
+
+py_test(
     name = "test_evergreen_retry",
     srcs = [
         "__init__.py",

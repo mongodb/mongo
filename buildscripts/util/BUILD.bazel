@@ -25,6 +25,10 @@ py_library(
     visibility = ["//visibility:public"],
     deps = [
         dependency(
+            "codeowners",
+            group = "modules_poc",
+        ),
+        dependency(
             "oauthlib",
             group = "testing",
         ),

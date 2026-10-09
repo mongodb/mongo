@@ -1045,6 +1045,27 @@ py_library(
 )
 
 py_library(
+    name = "create_todo_tickets",
+    srcs = ["create_todo_tickets.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/client:jiraclient",
+        dependency(
+            "codeowners",
+            group = "modules_poc",
+        ),
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+        dependency(
+            "structlog",
+            group = "evergreen",
+        ),
+    ],
+)
+
+py_library(
     name = "todo_check",
     srcs = ["todo_check.py"],
     visibility = ["//visibility:public"],

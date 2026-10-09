@@ -17,6 +17,10 @@ py_library(
             "pydantic",
             group = "evergreen",
         ),
+        dependency(
+            "pydantic-settings",
+            group = "evergreen",
+        ),
     ],
 )
 
