@@ -795,6 +795,10 @@ bool DbChecker::_shouldRetryExtraKeysCheck(OperationContext* opCtx,
     } else if (code == ErrorCodes::ObjectIsBusy) {
         isRetryableError = true;
         msg = "stopping dbCheck extra keys batch because a resource is in use";
+    } else if (code == ErrorCodes::SnapshotUnavailable) {
+        // This is a retryable error.
+        isRetryableError = true;
+        msg = "abandoning dbCheck batch after conflict with pending catalog operation";
     } else if (code == ErrorCodes::CommandNotSupportedOnView) {
         msg =
             "abandoning dbCheck batch because collection no longer exists, but there is a view "
