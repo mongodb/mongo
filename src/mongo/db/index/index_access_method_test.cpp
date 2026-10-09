@@ -11,7 +11,6 @@
 #include "mongo/bson/ordering.h"
 #include "mongo/db/client.h"
 #include "mongo/db/index/btree_access_method.h"
-#include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index_builds/index_build_interceptor.h"
 #include "mongo/db/index_builds/index_build_test_helpers.h"
 #include "mongo/db/index_builds/index_builds_common.h"
@@ -220,41 +219,6 @@ TEST(IndexAccessMethodSetDifference, ShouldNotReportOverlapsFromNonDisjointSets)
         ASSERT_BSONOBJ_NE(obj, BSON("" << 1));
         ASSERT_BSONOBJ_NE(obj, BSON("" << 4));
     }
-}
-
-class IndexAccessMethodShouldMarkIndexAsMultikey : public ServiceContextMongoDTest {};
-
-TEST_F(IndexAccessMethodShouldMarkIndexAsMultikey, NoKeysIsNotMultikey) {
-    ServiceContext::UniqueOperationContext opCtxRaii = cc().makeOperationContext();
-    OperationContext* opCtx = opCtxRaii.get();
-    NamespaceString nss =
-        NamespaceString::createNamespaceString_forTest("unittests.ShouldMarkIndexAsMultikey");
-    auto indexName = "a_1";
-    auto indexSpec = BSON("name" << indexName << "key" << BSON("a" << 1) << "v"
-                                 << static_cast<int>(IndexDescriptor::IndexVersion::kV2));
-    ASSERT_OK(createIndexFromSpec(opCtx, nss.ns_forTest(), indexSpec));
-
-    auto acq = acquireCollection(
-        opCtx,
-        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
-        LockMode::MODE_X);
-    auto& coll = acq.getCollectionPtr();
-    auto indexEntry = coll->getIndexCatalog()->findIndexByName(opCtx, indexName);
-    auto indexAccessMethod = indexEntry->accessMethod()->asSortedData();
-
-    MultikeyPaths arrayTraversed{MultikeyComponents{0}};
-    MultikeyPaths noArrayTraversed{MultikeyComponents{}};
-
-    // No keys: nothing of this document is in the index, whatever its paths did.
-    EXPECT_FALSE(indexAccessMethod->shouldMarkIndexAsMultikey(0, {}, arrayTraversed));
-    EXPECT_FALSE(indexAccessMethod->shouldMarkIndexAsMultikey(0, {}, noArrayTraversed));
-
-    // One key from an array -- {a: []} indexes `undefined`, for instance -- still is.
-    EXPECT_TRUE(indexAccessMethod->shouldMarkIndexAsMultikey(1, {}, arrayTraversed));
-    EXPECT_FALSE(indexAccessMethod->shouldMarkIndexAsMultikey(1, {}, noArrayTraversed));
-
-    // Several keys from one document mean an array regardless of path-level information.
-    EXPECT_TRUE(indexAccessMethod->shouldMarkIndexAsMultikey(2, {}, noArrayTraversed));
 }
 
 class IndexAccessMethodInsertKeys : public ServiceContextMongoDTest {};

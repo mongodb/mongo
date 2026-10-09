@@ -241,6 +241,9 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
     // No need to take the multikeyPaths mutex if this would not change any multikey state.
     bool isMultikeyInsert = op == Op::kInsert && isMultikey;
     if (isMultikeyInsert) {
+        // SERVER-39705: It's worth noting that a document may not generate any keys, but be
+        // described as being multikey. This step must be done to maintain parity with `validate`s
+        // expectations.
         _mergeMultikeyPaths(multikeyPaths);
     }
 
