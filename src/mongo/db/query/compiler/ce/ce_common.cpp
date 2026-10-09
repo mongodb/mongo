@@ -87,8 +87,8 @@ public:
                 uasserted(
                     ErrorCodes::QueryPlanKilled,
                     str::stream()
-                        << "query plan killed :: non-array path became multikey during yield: "
-                           "path="
+                        << "query plan killed :: non-array path became multikey while the query "
+                           "was suspended: path="
                         << field.path.fullPath());
             }
             if (elt.element().eoo() && !field.isExprEq) {

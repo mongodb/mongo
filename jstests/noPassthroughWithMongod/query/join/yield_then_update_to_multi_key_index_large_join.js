@@ -111,7 +111,7 @@ function runPipeline({pipeline, localColl}) {
         });
         assert.eq(err.code, ErrorCodes.QueryPlanKilled, "expected QueryPlanKilled", {err});
         assert(
-            err.message.includes("non-array path became multikey during yield"),
+            err.message.includes("non-array path became multikey while the query was suspended"),
             "expected path arrayness kill message",
             {err},
         );

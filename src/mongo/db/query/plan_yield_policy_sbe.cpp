@@ -58,7 +58,7 @@ void PlanYieldPolicySBE::restoreState(OperationContext* opCtx,
     for (auto&& root : _yieldingPlans) {
         root->restoreState();
     }
-    uassertIfPathArraynessInvalidated();
+    checkConstraintsValid();
 }
 
 void PlanYieldPolicySBE::MultipleCollectionPathArraynessChecker::
@@ -82,7 +82,7 @@ void PlanYieldPolicySBE::setMultipleCollectionPathArraynessChecker(
     _multipleCollectionsPathArraynessChecker.emplace(std::move(checker));
 }
 
-void PlanYieldPolicySBE::uassertIfPathArraynessInvalidated() {
+void PlanYieldPolicySBE::checkConstraintsValid() {
     if (_multipleCollectionsPathArraynessChecker) {
         _multipleCollectionsPathArraynessChecker->uassertIfInvalidatedAndSyncEpoch();
     }

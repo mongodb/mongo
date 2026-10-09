@@ -70,8 +70,14 @@ public:
      */
     void setMultipleCollectionPathArraynessChecker(MultipleCollectionPathArraynessChecker checker);
 
+    /**
+     * Throws QueryPlanKilled if catalog metadata that the registered plans were built against has
+     * changed in a way that invalidates them. Must be called after every restore of the registered
+     * plans, including restores that do not go through a yield (e.g. at the start of a getMore).
+     */
+    void checkConstraintsValid();
+
 private:
-    void uassertIfPathArraynessInvalidated();
     PlanYieldPolicySBE(OperationContext* opCtx,
                        YieldPolicy policy,
                        ClockSource* clockSource,
