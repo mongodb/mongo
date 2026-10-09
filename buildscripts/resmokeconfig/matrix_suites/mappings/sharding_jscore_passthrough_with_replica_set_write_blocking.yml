@@ -1,0 +1,13 @@
+# Authenticated sharding jscore passthrough with one shard replica set write blocked.
+base_suite: sharding_jscore_passthrough_base
+overrides:
+  - "write_blocking.auth_shell_options_sharding"
+  - "write_blocking.authenticated_sharding_hooks"
+  - "write_blocking.fixture_with_auth_sharded"
+eval:
+  - "write_blocking.replica_set_write_blocking_eval"
+excludes:
+  - "write_blocking.replica_set_write_blocking_exclude_files"
+  - "write_blocking.replica_set_write_blocking_sharding_exclude_files"
+  - "write_blocking.replica_set_write_blocking_exclude_tags"
+  - "write_blocking.write_blocking_auth_exclude_tags"

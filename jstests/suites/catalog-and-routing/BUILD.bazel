@@ -346,6 +346,98 @@ resmoke_suite_test(
 )
 
 resmoke_suite_test(
+    name = "sharding_jscore_passthrough_with_user_write_blocking",
+    size = "large",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharding_jscore_passthrough_with_user_write_blocking.yml",
+    shard_count = 26,
+    tags = [
+        "common",
+        "incompatible_mac",
+        "jscore",
+        "sharding",
+        "user_write_blocking",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharded_collections_jscore_passthrough_with_replica_set_write_blocking",
+    size = "large",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharded_collections_jscore_passthrough_with_replica_set_write_blocking.yml",
+    shard_count = 16,
+    tags = [
+        "common",
+        "incompatible_mac",
+        "jscore",
+        "replica_set_write_blocking",
+        "sharding",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharded_collections_jscore_passthrough_with_user_write_blocking",
+    size = "large",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharded_collections_jscore_passthrough_with_user_write_blocking.yml",
+    shard_count = 16,
+    tags = [
+        "common",
+        "incompatible_mac",
+        "jscore",
+        "sharding",
+        "user_write_blocking",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharding_jscore_passthrough_with_replica_set_write_blocking",
+    size = "large",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharding_jscore_passthrough_with_replica_set_write_blocking.yml",
+    shard_count = 26,
+    tags = [
+        "common",
+        "incompatible_mac",
+        "jscore",
+        "replica_set_write_blocking",
+        "sharding",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
     name = "change_streams_pre_images_replica_sets_kill_secondary_jscore_passthrough",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_pre_images_replica_sets_kill_secondary_jscore_passthrough.yml",
     shard_count = 10,

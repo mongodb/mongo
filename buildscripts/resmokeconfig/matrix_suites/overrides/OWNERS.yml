@@ -79,6 +79,9 @@ filters:
   - "drop_config_cache_collections_hook.yml":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog
+  - "write_blocking.yml":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog
   - "kill_primary.yml":
     approvers:
       - 10gen/server-replication-reviewers

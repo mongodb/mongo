@@ -39,6 +39,12 @@ filters:
   - "pin_fcv_to_last_continuous.js":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog
+  - "enable_replica_set_write_blocking.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog
+  - "enable_user_write_blocking.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog
   - "implicitly_retry_on_migration_in_progress.js":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology

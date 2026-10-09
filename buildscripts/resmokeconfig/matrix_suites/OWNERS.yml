@@ -64,6 +64,9 @@ filters:
   - "generated_suites/*rate_limited.yml":
     approvers:
       - 10gen/server-workload-resilience
+  - "/generated_suites/*write_blocking*":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog
   - "generated_suites/transitioning_replica_sets_jscore_passthrough.yml":
     approvers:
       - 10gen/server-catalog-and-routing
