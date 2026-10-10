@@ -69,7 +69,7 @@ Slots: $$RESULT=s15 env: {  }
 [4] extract_field_paths inputs[s3 = Get(a)/Id, s12 = Get(joined)/Id] outputs[s13 = Get(joined)/Traverse/Get(b)/Id] 
 [3] hash_lookup_unwind inner s12 
     outer s10 
-        [3] project [s10 = 
+        [3] project [s10 = arrayToSet(
             if (isArray(s4) ?: false) 
             then 
                 if isArrayEmpty(s4) 
@@ -77,7 +77,7 @@ Slots: $$RESULT=s15 env: {  }
                 else s4 
             
             else newArray((s4 ?: null)) 
-       ] 
+       )] 
         [1] scan generic [s1 = record, s2 = recordId] [s3 = a, s4 = lkey] @"" 
     inner s11 s5 
         [3] project [s11 = arrayToSet(
@@ -210,7 +210,7 @@ Slots: $$RESULT=s19 env: {  }
 [3] project [s14 = makeObj(MakeObjSpec([joined = Set(0)], Open, NewObj, 0), s1, s13)] 
 [3] hash_lookup_unwind left s13 
     outer s11 
-        [3] project [s11 = 
+        [3] project [s11 = arrayToSet(
             if (isArray(s5) ?: false) 
             then 
                 if isArrayEmpty(s5) 
@@ -218,7 +218,7 @@ Slots: $$RESULT=s19 env: {  }
                 else s5 
             
             else newArray((s5 ?: null)) 
-       ] 
+       )] 
         [1] scan generic [s1 = record, s2 = recordId] [s3 = a, s4 = joined, s5 = lkey] @"" 
     inner s12 s6 
         [3] project [s12 = arrayToSet(
@@ -354,7 +354,7 @@ Slots: $$RESULT=s20 env: {  }
 [3] project [s15 = makeObj(MakeObjSpec([joined = Set(0), idx = Set(1)], Open, NewObj, 0), s1, s14, s6)] 
 [3] hash_lookup_unwind inner s14 s6 
     outer s12 
-        [3] project [s12 = 
+        [3] project [s12 = arrayToSet(
             if (isArray(s5) ?: false) 
             then 
                 if isArrayEmpty(s5) 
@@ -362,7 +362,7 @@ Slots: $$RESULT=s20 env: {  }
                 else s5 
             
             else newArray((s5 ?: null)) 
-       ] 
+       )] 
         [1] scan generic [s1 = record, s2 = recordId] [s3 = a, s4 = joined, s5 = lkey] @"" 
     inner s13 s7 
         [3] project [s13 = arrayToSet(
@@ -462,7 +462,7 @@ Slots: $$RESULT=s10 env: {  }
 [3] project [s10 = makeBsonObj(MakeObjSpec([a = MakeObj([b = Set(0)], Open, NewObj, 0)], Open, NewObj, 0), s1, s9)] 
 [3] hash_lookup_unwind inner s9 
     outer s7 
-        [3] project [s7 = 
+        [3] project [s7 = arrayToSet(
             if (isArray(s3) ?: false) 
             then 
                 if isArrayEmpty(s3) 
@@ -470,7 +470,7 @@ Slots: $$RESULT=s10 env: {  }
                 else s3 
             
             else newArray((s3 ?: null)) 
-       ] 
+       )] 
         [1] scan generic [s1 = record, s2 = recordId] [s3 = lkey] @"" 
     inner s8 s4 
         [3] project [s8 = arrayToSet(
@@ -533,7 +533,7 @@ Slots: $$RESULT=s12 env: {  }
 [3] project [s12 = makeObj(MakeObjSpec([a = MakeObj([b = Set(0)], Open, NewObj, 0)], Open, NewObj, 0), s1, s11)] 
 [3] hash_lookup_unwind inner s11 
     outer s9 
-        [3] project [s9 = 
+        [3] project [s9 = arrayToSet(
             if (isArray(s4) ?: false) 
             then 
                 if isArrayEmpty(s4) 
@@ -541,7 +541,7 @@ Slots: $$RESULT=s12 env: {  }
                 else s4 
             
             else newArray((s4 ?: null)) 
-       ] 
+       )] 
         [1] scan generic [s1 = record, s2 = recordId] [s3 = a, s4 = lkey] @"" 
     inner s10 s5 
         [3] project [s10 = arrayToSet(
@@ -604,7 +604,7 @@ Slots: $$RESULT=s12 env: {  }
 [3] project [s12 = makeObj(MakeObjSpec([a = MakeObj([b = Set(0)], Open, NewObj, 0)], Open, NewObj, 0), s1, s11)] 
 [3] hash_lookup_unwind inner s11 
     outer s9 
-        [3] project [s9 = 
+        [3] project [s9 = arrayToSet(
             if (isArray(s4) ?: false) 
             then 
                 if isArrayEmpty(s4) 
@@ -612,7 +612,7 @@ Slots: $$RESULT=s12 env: {  }
                 else s4 
             
             else newArray((s4 ?: null)) 
-       ] 
+       )] 
         [1] scan generic [s1 = record, s2 = recordId] [s3 = a, s4 = lkey] @"" 
     inner s10 s5 
         [3] project [s10 = arrayToSet(
@@ -715,7 +715,7 @@ Slots: $$RESULT=s12 env: {  }
 [3] project [s12 = makeObj(MakeObjSpec([a = MakeObj([b = Set(0)], Open, NewObj, 0)], Open, NewObj, 0), s1, s11)] 
 [3] hash_lookup_unwind inner s11 
     outer s9 
-        [3] project [s9 = 
+        [3] project [s9 = arrayToSet(
             if (isArray(s4) ?: false) 
             then 
                 if isArrayEmpty(s4) 
@@ -723,7 +723,7 @@ Slots: $$RESULT=s12 env: {  }
                 else s4 
             
             else newArray((s4 ?: null)) 
-       ] 
+       )] 
         [1] scan generic [s1 = record, s2 = recordId] [s3 = a, s4 = lkey] @"" 
     inner s10 s5 
         [3] project [s10 = arrayToSet(
@@ -783,7 +783,7 @@ Slots: $$RESULT=s10 env: {  }
 [3] project [s10 = makeBsonObj(MakeObjSpec([a = MakeObj([b = Set(0)], Open, NewObj, 0)], Open, NewObj, 0), s1, s9)] 
 [3] hash_lookup_unwind left s9 
     outer s7 
-        [3] project [s7 = 
+        [3] project [s7 = arrayToSet(
             if (isArray(s3) ?: false) 
             then 
                 if isArrayEmpty(s3) 
@@ -791,7 +791,7 @@ Slots: $$RESULT=s10 env: {  }
                 else s3 
             
             else newArray((s3 ?: null)) 
-       ] 
+       )] 
         [1] scan generic [s1 = record, s2 = recordId] [s3 = lkey] @"" 
     inner s8 s4 
         [3] project [s8 = arrayToSet(
@@ -858,7 +858,7 @@ Slots: $$RESULT=s12 env: {  }
 [3] project [s12 = makeObj(MakeObjSpec([a = MakeObj([b = Set(0)], Open, NewObj, 0)], Open, NewObj, 0), s1, s11)] 
 [3] hash_lookup_unwind left s11 
     outer s9 
-        [3] project [s9 = 
+        [3] project [s9 = arrayToSet(
             if (isArray(s4) ?: false) 
             then 
                 if isArrayEmpty(s4) 
@@ -866,7 +866,7 @@ Slots: $$RESULT=s12 env: {  }
                 else s4 
             
             else newArray((s4 ?: null)) 
-       ] 
+       )] 
         [1] scan generic [s1 = record, s2 = recordId] [s3 = a, s4 = lkey] @"" 
     inner s10 s5 
         [3] project [s10 = arrayToSet(
@@ -932,7 +932,7 @@ Slots: $$RESULT=s12 env: {  }
 [3] project [s12 = makeObj(MakeObjSpec([a = MakeObj([b = Set(0)], Open, NewObj, 0)], Open, NewObj, 0), s1, s11)] 
 [3] hash_lookup_unwind left s11 
     outer s9 
-        [3] project [s9 = 
+        [3] project [s9 = arrayToSet(
             if (isArray(s4) ?: false) 
             then 
                 if isArrayEmpty(s4) 
@@ -940,7 +940,7 @@ Slots: $$RESULT=s12 env: {  }
                 else s4 
             
             else newArray((s4 ?: null)) 
-       ] 
+       )] 
         [1] scan generic [s1 = record, s2 = recordId] [s3 = a, s4 = lkey] @"" 
     inner s10 s5 
         [3] project [s10 = arrayToSet(
@@ -1004,7 +1004,7 @@ Slots: $$RESULT=s12 env: {  }
 [3] project [s12 = makeObj(MakeObjSpec([a = MakeObj([b = Set(0)], Open, NewObj, 0)], Open, NewObj, 0), s1, s11)] 
 [3] hash_lookup_unwind left s11 
     outer s9 
-        [3] project [s9 = 
+        [3] project [s9 = arrayToSet(
             if (isArray(s4) ?: false) 
             then 
                 if isArrayEmpty(s4) 
@@ -1012,7 +1012,7 @@ Slots: $$RESULT=s12 env: {  }
                 else s4 
             
             else newArray((s4 ?: null)) 
-       ] 
+       )] 
         [1] scan generic [s1 = record, s2 = recordId] [s3 = a, s4 = lkey] @"" 
     inner s10 s5 
         [3] project [s10 = arrayToSet(
@@ -1079,7 +1079,7 @@ Slots: $$RESULT=s12 env: {  }
 [3] project [s12 = makeObj(MakeObjSpec([a = MakeObj([b = Set(0)], Open, NewObj, 0)], Open, NewObj, 0), s1, s11)] 
 [3] hash_lookup_unwind left s11 
     outer s9 
-        [3] project [s9 = 
+        [3] project [s9 = arrayToSet(
             if (isArray(s4) ?: false) 
             then 
                 if isArrayEmpty(s4) 
@@ -1087,7 +1087,7 @@ Slots: $$RESULT=s12 env: {  }
                 else s4 
             
             else newArray((s4 ?: null)) 
-       ] 
+       )] 
         [1] scan generic [s1 = record, s2 = recordId] [s3 = a, s4 = lkey] @"" 
     inner s10 s5 
         [3] project [s10 = arrayToSet(

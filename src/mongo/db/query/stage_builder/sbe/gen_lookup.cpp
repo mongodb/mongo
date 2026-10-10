@@ -45,15 +45,6 @@ namespace mongo::stage_builder {
  * Helpers for building $lookup.
  */
 namespace {
-
-enum class KeyType {
-    // Key is a regular array.
-    kArray,
-
-    // Key is an array whose values are deduplicated.
-    kArraySet,
-};
-
 /**
  * De-facto MQL semantics for matching local or foreign records to 'null' is complex and therefore
  * is causing complex SBE trees to implement it. This comment describes the semantics.
@@ -404,12 +395,11 @@ std::pair<SbSlot /* keyValuesSetSlot */, SbStage> buildKeySetForIndexScan(StageB
 // If the stream produces no values, that is, would result in an empty set, the empty set is
 // replaced with a set that contains a single 'null' value, so that it matches MQL semantics when
 // empty arrays and all missing are matched to 'null'.
-std::pair<SbSlot /* keyValuesSlot */, SbStage> buildKeySetForLocal(StageBuilderState& state,
-                                                                   SbStage inputStage,
-                                                                   const PlanStageSlots& slots,
-                                                                   const FieldPath& fp,
-                                                                   const PlanNodeId nodeId,
-                                                                   KeyType keyType) {
+std::pair<SbSlot /* keyValuesSetSlot */, SbStage> buildKeySetForLocal(StageBuilderState& state,
+                                                                      SbStage inputStage,
+                                                                      const PlanStageSlots& slots,
+                                                                      const FieldPath& fp,
+                                                                      const PlanNodeId nodeId) {
     SbBuilder b(state, nodeId);
 
     auto [arrayWithNullTag, arrayWithNullVal] = sbe::value::makeNewArray();
@@ -440,20 +430,12 @@ std::pair<SbSlot /* keyValuesSlot */, SbStage> buildKeySetForLocal(StageBuilderS
                           SbLocalVar{frameId, 0}),
                  b.makeFunction(sbe::EFn::kNewArray, b.makeFillEmptyNull(SbLocalVar{frameId, 0}))));
 
-    // Convert the array into an ArraySet that has no duplicate keys. This de-duplication of the
-    // outer (probe) key can be skipped on the hash-join path, because the hash lookup
-    // implementation already de-duplicates the keys while probing. Skipping the per-row ArraySet
-    // construction avoids redundant allocation churn on the $lookup hot path. Note that for
-    // 'KeyType::kArray' the resulting array may well contain duplicate values (e.g. for a local
-    // field {lkey: [1, 1, 2]}), so consumers of a 'kArray' key must not rely on the values being
-    // distinct.
-    if (keyType == KeyType::kArraySet) {
-        if (state.getCollatorSlot()) {
-            expr = b.makeFunction(
-                sbe::EFn::kCollArrayToSet, SbSlot{*state.getCollatorSlot()}, std::move(expr));
-        } else {
-            expr = b.makeFunction(sbe::EFn::kArrayToSet, std::move(expr));
-        }
+    // Convert the array into an ArraySet that has no duplicate keys.
+    if (state.getCollatorSlot()) {
+        expr = b.makeFunction(
+            sbe::EFn::kCollArrayToSet, SbSlot{*state.getCollatorSlot()}, std::move(expr));
+    } else {
+        expr = b.makeFunction(sbe::EFn::kArrayToSet, std::move(expr));
     }
 
     auto [outStage, outSlots] =
@@ -818,8 +800,8 @@ std::pair<SbSlot /* matched docs */, SbStage> buildNljLookupStage(
     }
 
     // Build the outer branch that produces the set of local key values.
-    auto [localKeySlot, outerRootStage] = buildKeySetForLocal(
-        state, std::move(localStage), slots, localFieldName, nodeId, KeyType::kArraySet);
+    auto [localKeySlot, outerRootStage] =
+        buildKeySetForLocal(state, std::move(localStage), slots, localFieldName, nodeId);
 
     auto foreignRecordSlot = foreignSlots.getResultObj();
     auto foreignFieldNameSlot = foreignSlots.get(
@@ -1106,8 +1088,8 @@ std::pair<SbSlot, SbStage> buildIndexJoinLookupStage(
     }
 
     // Build the outer branch that produces the correlated local key slot.
-    auto [localKeysSetSlot, localKeysSetStage] = buildKeySetForLocal(
-        state, std::move(localStage), slots, localFieldName, nodeId, KeyType::kArraySet);
+    auto [localKeysSetSlot, localKeysSetStage] =
+        buildKeySetForLocal(state, std::move(localStage), slots, localFieldName, nodeId);
 
     // Build the inner branch that produces the correlated foreign key slot.
     auto scanNljStage = buildIndexJoinLookupForeignSideStage(state,
@@ -1209,8 +1191,8 @@ std::pair<SbSlot, SbStage> buildDynamicIndexedLoopJoinLookupStage(
     }
 
     // Build the index Lookup branch
-    auto [localKeysSetSlot, localKeysSetStage] = buildKeySetForLocal(
-        state, std::move(localStage), slots, localFieldName, nodeId, KeyType::kArraySet);
+    auto [localKeysSetSlot, localKeysSetStage] =
+        buildKeySetForLocal(state, std::move(localStage), slots, localFieldName, nodeId);
 
     auto indexLookupBranchStage = buildIndexJoinLookupForeignSideStage(state,
                                                                        localKeysSetSlot,
@@ -1392,12 +1374,9 @@ std::pair<SbSlot /*matched docs*/, SbStage> buildHashJoinLookupStage(
         CurOp::get(state.opCtx)->debug().lookupHashLookup += 1;
     }
 
-    // Build the outer branch that produces the correlated local key slot. On the hash-join path the
-    // outer (probe) key is left as a plain array; the hash table iterator de-duplicates the matched
-    // buffer indices while probing, so pre-deduping the outer key values via arrayToSet would only
-    // be redundant work on every outer document.
-    auto [localKeysSetSlot, localKeysSetStage] = buildKeySetForLocal(
-        state, std::move(localStage), slots, localFieldName, nodeId, KeyType::kArray);
+    // Build the outer branch that produces the correlated local key slot.
+    auto [localKeysSetSlot, localKeysSetStage] =
+        buildKeySetForLocal(state, std::move(localStage), slots, localFieldName, nodeId);
 
     auto [foreignKeySlot, foreignKeyStage] = buildKeySetForForeign(
         state, std::move(foreignStage), foreignSlots, foreignFieldName, nodeId);
