@@ -1,0 +1,53 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/no_passthrough_with_mongod_qemp_ifr_no_nlm_transform.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
+##########################################################
+executor:
+  archive:
+    hooks:
+      - ValidateCollections
+  config:
+    shell_options:
+      global_vars:
+        TestData:
+          setParameters:
+            featureFlagGetExecutorDeferredEngineChoice: true
+            featureFlagSbeEqLookupUnwindDynamicIndexedLoopJoin: true
+            featureFlagSbeEqLookupUnwindHashJoin: true
+            featureFlagSbeEqLookupUnwindIndexedLoopJoin: true
+            featureFlagSbeEqLookupUnwindLocalCollscan: true
+            featureFlagSbeEqLookupUnwindLocalComplexDataAccessPlans: true
+            featureFlagSbeEqLookupUnwindLocalIxscanFetch: true
+            featureFlagSbeEqLookupUnwindNestedLoopJoin: true
+            featureFlagSbeNonLeadingMatch: false
+            featureFlagSbeTransformStages: false
+  fixture:
+    class: MongoDFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        featureFlagGetExecutorDeferredEngineChoice: true
+        featureFlagSbeEqLookupUnwindDynamicIndexedLoopJoin: true
+        featureFlagSbeEqLookupUnwindHashJoin: true
+        featureFlagSbeEqLookupUnwindIndexedLoopJoin: true
+        featureFlagSbeEqLookupUnwindLocalCollscan: true
+        featureFlagSbeEqLookupUnwindLocalComplexDataAccessPlans: true
+        featureFlagSbeEqLookupUnwindLocalIxscanFetch: true
+        featureFlagSbeEqLookupUnwindNestedLoopJoin: true
+        featureFlagSbeNonLeadingMatch: false
+        featureFlagSbeTransformStages: false
+  hooks:
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 1
+matrix_suite: true
+selector:
+  exclude_files:
+    - jstests/noPassthroughWithMongod/query/cbr/cbr_infrastructure.js
+  roots:
+    - jstests/noPassthroughWithMongod/**/*.js
+test_kind: js_test

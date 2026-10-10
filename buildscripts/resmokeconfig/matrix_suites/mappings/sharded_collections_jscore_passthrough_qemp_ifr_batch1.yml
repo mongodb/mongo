@@ -1,0 +1,5 @@
+# sharded_collections_jscore_passthrough copy with the QEMP IFR batch 1 feature flags
+base_suite: sharded_collections_jscore_passthrough_base
+overrides:
+  - "check_system_buckets_hook.sharding_jscore_passthrough_with_system_buckets_hook"
+  - "qemp_ifr_batch1.enable_qemp_ifr_batch1_feature_flags_mongod"
