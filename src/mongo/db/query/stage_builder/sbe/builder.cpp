@@ -51,6 +51,8 @@
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 #include "mongo/db/query/stage_builder/sbe/gen_index_scan.h"
 #include "mongo/db/query/stage_builder/sbe/gen_projection.h"
+#include "mongo/db/query/stage_builder/sbe/sbe_stage_blueprint.h"
+#include "mongo/db/query/stage_builder/sbe/sbe_stage_lowering.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr_helpers.h"
 #include "mongo/db/query/stage_builder/stage_builder_util.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
@@ -306,11 +308,12 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
     prepareSearchQueryParameters(data, cq);
 }  // prepareSlotBasedExecutableTree
 
-std::pair<SbStage, PlanStageData> buildSearchMetadataExecutorSBE(OperationContext* opCtx,
-                                                                 const ExpressionContext& expCtx,
-                                                                 size_t remoteCursorId,
-                                                                 RemoteCursorMap* remoteCursors,
-                                                                 PlanYieldPolicySBE* yieldPolicy) {
+std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageData> buildSearchMetadataExecutorSBE(
+    OperationContext* opCtx,
+    const ExpressionContext& expCtx,
+    size_t remoteCursorId,
+    RemoteCursorMap* remoteCursors,
+    PlanYieldPolicySBE* yieldPolicy) {
     Environment env(std::make_unique<sbe::RuntimeEnvironment>());
     std::unique_ptr<PlanStageStaticData> data(std::make_unique<PlanStageStaticData>());
     sbe::value::SlotIdGenerator slotIdGenerator;
@@ -407,7 +410,7 @@ std::pair<SbStage, PlanStageSlots> PlanStageSlots::makeMergedPlanStageSlots(
     auto resultInfoChanges =
         reqs.hasResultInfo() ? trees[0].second._data->resultInfoChanges : boost::none;
 
-    sbe::PlanStage::Vector inputStages;
+    SbStage::Vector inputStages;
     std::vector<SbSlotVector> inputSlots;
     for (auto& [stage, outputs] : trees) {
         inputStages.push_back(std::move(stage));
@@ -979,6 +982,9 @@ SlotBasedStageBuilder::PlanType SlotBasedStageBuilder::build(const QuerySolution
     _data->resultSlot = resultSlot ? boost::make_optional(resultSlot->getId()) : boost::none;
     _data->recordIdSlot = recordIdSlot ? boost::make_optional(recordIdSlot->getId()) : boost::none;
 
+    // The whole blueprint tree has been built; lower it to sbe::PlanStages.
+    auto loweredRoot = lowerSbeBlueprint(_state.blueprint(), stage.release(), _state);
+
     // Register the slots used in the dynamic index bounds in the global environment.
     for (auto& indexInfo : _data->indexBoundsEvaluationInfos) {
         if (auto singlePlan = std::get_if<ParameterizedIndexScanSlots::SingleIntervalPlan>(
@@ -994,7 +1000,7 @@ SlotBasedStageBuilder::PlanType SlotBasedStageBuilder::build(const QuerySolution
                 sbe::value::TypeTags::Nothing, 0, true, genericPlan->lowHighKeyIntervals);
         }
     }
-    return {std::move(stage), PlanStageData(std::move(_env), std::move(_data))};
+    return {std::move(loweredRoot), PlanStageData(std::move(_env), std::move(_data))};
 }
 
 std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildCollScan(
@@ -1872,7 +1878,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildSortMerge(
     auto postimageAllowedFieldSets = getPostimageAllowedFieldSets(mergeSortNode->children);
 
     // Define a lambda for creating a SortedMergeStage.
-    auto makeSortedMergeStage = [&](sbe::PlanStage::Vector inputStages,
+    auto makeSortedMergeStage = [&](SbStage::Vector inputStages,
                                     const std::vector<SbSlotVector>& inputSlots) {
         return b.makeSortedMerge(std::move(inputStages), inputSlots, keys, std::move(dirs));
     };
@@ -3086,7 +3092,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildOr(const QuerySol
     auto postimageAllowedFieldSets = getPostimageAllowedFieldSets(orn->children);
 
     // Define a lambda for creating a UnionStage.
-    auto makeUnionStage = [&](sbe::PlanStage::Vector inputStages,
+    auto makeUnionStage = [&](SbStage::Vector inputStages,
                               const std::vector<SbSlotVector>& inputSlots) {
         return b.makeUnion(std::move(inputStages), inputSlots);
     };

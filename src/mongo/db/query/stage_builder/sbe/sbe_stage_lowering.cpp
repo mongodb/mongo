@@ -114,80 +114,84 @@ struct Lowerer {
     }
 
     std::unique_ptr<sbe::PlanStage> operator()(SbBlueprintScan node) {
-        if (node.scanBounds.minRecordIdSlot || node.scanBounds.maxRecordIdSlot) {
-            return sbe::makeS<sbe::ScanStage>(node.collectionUuid,
-                                              std::move(node.dbName),
-                                              node.recordSlot,
-                                              node.recordIdSlot,
-                                              lowerSlotId(node.indexInfoSlots.snapshotIdSlot),
-                                              lowerSlotId(node.indexInfoSlots.indexIdentSlot),
-                                              lowerSlotId(node.indexInfoSlots.indexKeySlot),
-                                              lowerSlotId(node.indexInfoSlots.indexKeyPatternSlot),
-                                              std::move(node.scanFieldNames),
-                                              std::move(node.scanFieldSlots),
-                                              lowerSlotId(node.scanBounds.minRecordIdSlot),
-                                              lowerSlotId(node.scanBounds.maxRecordIdSlot),
-                                              node.forward,
-                                              _state.yieldPolicy,
-                                              node.nodeId,
-                                              std::move(node.scanOpenCallback),
-                                              /*participateInTrialRunTracking=*/true,
-                                              node.scanBounds.includeScanStartRecordId,
-                                              node.scanBounds.includeScanEndRecordId);
+        if (node.info->scanBounds.minRecordIdSlot || node.info->scanBounds.maxRecordIdSlot) {
+            return sbe::makeS<sbe::ScanStage>(
+                node.info->collectionUuid,
+                std::move(node.info->dbName),
+                node.info->recordSlot,
+                node.info->recordIdSlot,
+                lowerSlotId(node.info->indexInfoSlots.snapshotIdSlot),
+                lowerSlotId(node.info->indexInfoSlots.indexIdentSlot),
+                lowerSlotId(node.info->indexInfoSlots.indexKeySlot),
+                lowerSlotId(node.info->indexInfoSlots.indexKeyPatternSlot),
+                std::move(node.info->scanFieldNames),
+                std::move(node.info->scanFieldSlots),
+                lowerSlotId(node.info->scanBounds.minRecordIdSlot),
+                lowerSlotId(node.info->scanBounds.maxRecordIdSlot),
+                node.info->forward,
+                _state.yieldPolicy,
+                node.nodeId,
+                std::move(node.info->scanOpenCallback),
+                /*participateInTrialRunTracking=*/true,
+                node.info->scanBounds.includeScanStartRecordId,
+                node.info->scanBounds.includeScanEndRecordId);
         }
 
         return sbe::makeS<sbe::GenericScanStage>(
-            node.collectionUuid,
-            std::move(node.dbName),
-            node.recordSlot,
-            node.recordIdSlot,
-            lowerSlotId(node.indexInfoSlots.snapshotIdSlot),
-            lowerSlotId(node.indexInfoSlots.indexIdentSlot),
-            lowerSlotId(node.indexInfoSlots.indexKeySlot),
-            lowerSlotId(node.indexInfoSlots.indexKeyPatternSlot),
-            std::move(node.scanFieldNames),
-            std::move(node.scanFieldSlots),
-            node.forward,
+            node.info->collectionUuid,
+            std::move(node.info->dbName),
+            node.info->recordSlot,
+            node.info->recordIdSlot,
+            lowerSlotId(node.info->indexInfoSlots.snapshotIdSlot),
+            lowerSlotId(node.info->indexInfoSlots.indexIdentSlot),
+            lowerSlotId(node.info->indexInfoSlots.indexKeySlot),
+            lowerSlotId(node.info->indexInfoSlots.indexKeyPatternSlot),
+            std::move(node.info->scanFieldNames),
+            std::move(node.info->scanFieldSlots),
+            node.info->forward,
             _state.yieldPolicy,
             node.nodeId,
-            std::move(node.scanOpenCallback),
+            std::move(node.info->scanOpenCallback),
             /*participateInTrialRunTracking=*/true);
     }
 
     std::unique_ptr<sbe::PlanStage> operator()(SbBlueprintSimpleIndexScan node) {
         return sbe::makeS<sbe::SimpleIndexScanStage>(
-            std::move(node.collectionUuid),
-            std::move(node.dbName),
-            node.indexName,
-            node.forward,
-            lowerSlotId(node.indexInfoSlots.indexKeySlot),
-            node.recordIdSlot,
-            lowerSlotId(node.indexInfoSlots.snapshotIdSlot),
-            lowerSlotId(node.indexInfoSlots.indexIdentSlot),
-            std::move(node.indexKeysToInclude),
-            std::move(node.indexKeySlots),
-            le(node.lowKeyExpr),
-            le(node.highKeyExpr),
+            std::move(node.info->collectionUuid),
+            std::move(node.info->dbName),
+            node.info->indexName,
+            node.info->forward,
+            lowerSlotId(node.info->indexInfoSlots.indexKeySlot),
+            node.info->recordIdSlot,
+            lowerSlotId(node.info->indexInfoSlots.snapshotIdSlot),
+            lowerSlotId(node.info->indexInfoSlots.indexIdentSlot),
+            std::move(node.info->indexKeysToInclude),
+            std::move(node.info->indexKeySlots),
+            le(node.info->lowKeyExpr),
+            le(node.info->highKeyExpr),
             _state.yieldPolicy,
             node.nodeId);
     }
 
     std::unique_ptr<sbe::PlanStage> operator()(SbBlueprintGenericIndexScan node) {
-        const int direction = node.forward ? 1 : -1;
-        sbe::GenericIndexScanStageParams params{
-            le(node.boundsExpr), node.keyPattern, direction, node.version, node.ordering};
+        const int direction = node.info->forward ? 1 : -1;
+        sbe::GenericIndexScanStageParams params{le(node.info->boundsExpr),
+                                                node.info->keyPattern,
+                                                direction,
+                                                node.info->version,
+                                                node.info->ordering};
 
         return sbe::makeS<sbe::GenericIndexScanStage>(
-            std::move(node.collectionUuid),
-            std::move(node.dbName),
-            node.indexName,
+            std::move(node.info->collectionUuid),
+            std::move(node.info->dbName),
+            node.info->indexName,
             std::move(params),
-            lowerSlotId(node.indexInfoSlots.indexKeySlot),
-            node.recordIdSlot,
-            lowerSlotId(node.indexInfoSlots.snapshotIdSlot),
-            lowerSlotId(node.indexInfoSlots.indexIdentSlot),
-            std::move(node.indexKeysToInclude),
-            std::move(node.indexKeySlots),
+            lowerSlotId(node.info->indexInfoSlots.indexKeySlot),
+            node.info->recordIdSlot,
+            lowerSlotId(node.info->indexInfoSlots.snapshotIdSlot),
+            lowerSlotId(node.info->indexInfoSlots.indexIdentSlot),
+            std::move(node.info->indexKeysToInclude),
+            std::move(node.info->indexKeySlots),
             _state.yieldPolicy,
             node.nodeId);
     }
@@ -318,11 +322,11 @@ struct Lowerer {
     }
 
     std::unique_ptr<sbe::PlanStage> operator()(SbBlueprintBlockHashAgg node) {
-        auto child = lower(node.child);
+        auto child = lower(node.info->child);
 
         sbe::BlockAggExprTupleVector aggs;
-        aggs.reserve(node.aggs.size());
-        for (auto& [outSlot, sbExpr] : node.aggs) {
+        aggs.reserve(node.info->aggs.size());
+        for (auto& [outSlot, sbExpr] : node.info->aggs) {
             std::unique_ptr<sbe::EExpression> init, blockAgg, agg;
             if (sbExpr.init) {
                 init = le(sbExpr.init);
@@ -338,21 +342,21 @@ struct Lowerer {
         }
 
         // The merging expressions are lowered without type information.
-        auto mergingExprs = lowerSlotExprPair(node.mergingExprs, nullptr);
+        auto mergingExprs = lowerSlotExprPair(node.info->mergingExprs, nullptr);
 
         return sbe::makeS<sbe::BlockHashAggStage>(std::move(child),
-                                                  std::move(node.groupBySlots),
-                                                  node.selectivityBitmapSlot,
-                                                  std::move(node.blockAccArgSlots),
-                                                  std::move(node.accumulatorDataSlots),
-                                                  node.bitmapInternalSlot,
+                                                  std::move(node.info->groupBySlots),
+                                                  node.info->selectivityBitmapSlot,
+                                                  std::move(node.info->blockAccArgSlots),
+                                                  std::move(node.info->accumulatorDataSlots),
+                                                  node.info->bitmapInternalSlot,
                                                   std::move(aggs),
                                                   _state.allowDiskUse,
                                                   std::move(mergingExprs),
                                                   _state.yieldPolicy,
                                                   node.nodeId,
                                                   /*participateInTrialRunTracking=*/true,
-                                                  node.forceIncreasedSpilling);
+                                                  node.info->forceIncreasedSpilling);
     }
 
     std::unique_ptr<sbe::PlanStage> operator()(SbBlueprintAggProject node) {
@@ -380,44 +384,45 @@ struct Lowerer {
     }
 
     std::unique_ptr<sbe::PlanStage> operator()(SbBlueprintTsBucketToCellBlock node) {
-        auto child = lower(node.child);
+        auto child = lower(node.info->child);
 
         // Combine topLevel and traverse path requests and slots.
-        std::vector<sbe::value::PathRequest> allReqs = std::move(node.topLevelReqs);
-        allReqs.insert(allReqs.end(), node.traverseReqs.begin(), node.traverseReqs.end());
+        std::vector<sbe::value::PathRequest> allReqs = std::move(node.info->topLevelReqs);
+        allReqs.insert(
+            allReqs.end(), node.info->traverseReqs.begin(), node.info->traverseReqs.end());
 
-        sbe::value::SlotVector allCellSlots = std::move(node.topLevelSlots);
+        sbe::value::SlotVector allCellSlots = std::move(node.info->topLevelSlots);
         allCellSlots.insert(
-            allCellSlots.end(), node.traverseSlots.begin(), node.traverseSlots.end());
+            allCellSlots.end(), node.info->traverseSlots.begin(), node.info->traverseSlots.end());
 
         return sbe::makeS<sbe::TsBucketToCellBlockStage>(std::move(child),
-                                                         node.bucketSlot,
+                                                         node.info->bucketSlot,
                                                          std::move(allReqs),
                                                          std::move(allCellSlots),
                                                          boost::none,  // metaSlot
-                                                         node.bitmapSlot,
-                                                         node.timeField,
+                                                         node.info->bitmapSlot,
+                                                         node.info->timeField,
                                                          node.nodeId);
     }
 
     std::unique_ptr<sbe::PlanStage> operator()(SbBlueprintFetch node) {
-        auto child = lower(node.child);
+        auto child = lower(node.info->child);
 
         auto stageState = std::make_shared<sbe::FetchStageState>(
-            node.seekSlot,
-            lowerSlotId(node.indexInfoSlots.snapshotIdSlot),
-            lowerSlotId(node.indexInfoSlots.indexIdentSlot),
-            lowerSlotId(node.indexInfoSlots.indexKeySlot),
-            lowerSlotId(node.indexInfoSlots.indexKeyPatternSlot),
-            node.recordSlot,
-            node.recordIdSlot,
-            StringListSet(node.scanFieldNames),
-            std::move(node.scanFieldSlots),
-            std::move(node.scanCallbacks));
+            node.info->seekSlot,
+            lowerSlotId(node.info->indexInfoSlots.snapshotIdSlot),
+            lowerSlotId(node.info->indexInfoSlots.indexIdentSlot),
+            lowerSlotId(node.info->indexInfoSlots.indexKeySlot),
+            lowerSlotId(node.info->indexInfoSlots.indexKeyPatternSlot),
+            node.info->recordSlot,
+            node.info->recordIdSlot,
+            StringListSet(node.info->scanFieldNames),
+            std::move(node.info->scanFieldSlots),
+            std::move(node.info->scanCallbacks));
 
         return sbe::makeS<sbe::FetchStage>(std::move(child),
-                                           std::move(node.collectionUuid),
-                                           std::move(node.dbName),
+                                           std::move(node.info->collectionUuid),
+                                           std::move(node.info->dbName),
                                            std::move(stageState),
                                            _state.yieldPolicy,
                                            node.nodeId,
@@ -451,11 +456,11 @@ struct Lowerer {
     }
 
     std::unique_ptr<sbe::PlanStage> operator()(SbBlueprintSortedMerge node) {
-        return sbe::makeS<sbe::SortedMergeStage>(lowerChildren(node.children),
-                                                 std::move(node.inputKeys),
-                                                 toStdVector(node.dirs),
-                                                 std::move(node.inputVals),
-                                                 std::move(node.outputVals),
+        return sbe::makeS<sbe::SortedMergeStage>(lowerChildren(node.info->children),
+                                                 std::move(node.info->inputKeys),
+                                                 toStdVector(node.info->dirs),
+                                                 std::move(node.info->inputVals),
+                                                 std::move(node.info->outputVals),
                                                  node.nodeId);
     }
 
@@ -485,44 +490,44 @@ struct Lowerer {
     }
 
     std::unique_ptr<sbe::PlanStage> operator()(SbBlueprintHashJoin node) {
-        auto outer = lower(node.outer);
-        auto inner = lower(node.inner);
+        auto outer = lower(node.info->outer);
+        auto inner = lower(node.info->inner);
         return sbe::makeS<sbe::HashJoinStage>(std::move(outer),
                                               std::move(inner),
-                                              std::move(node.outerCondSlots),
-                                              std::move(node.outerProjectSlots),
-                                              std::move(node.innerCondSlots),
-                                              std::move(node.innerProjectSlots),
-                                              node.collatorSlot,
+                                              std::move(node.info->outerCondSlots),
+                                              std::move(node.info->outerProjectSlots),
+                                              std::move(node.info->innerCondSlots),
+                                              std::move(node.info->innerProjectSlots),
+                                              node.info->collatorSlot,
                                               _state.allowDiskUse,
                                               _state.yieldPolicy,
                                               node.nodeId,
-                                              node.estimatedBuildCardinality);
+                                              node.info->estimatedBuildCardinality);
     }
 
     std::unique_ptr<sbe::PlanStage> operator()(SbBlueprintMergeJoin node) {
-        auto outer = lower(node.outer);
-        auto inner = lower(node.inner);
+        auto outer = lower(node.info->outer);
+        auto inner = lower(node.info->inner);
         return sbe::makeS<sbe::MergeJoinStage>(std::move(outer),
                                                std::move(inner),
-                                               std::move(node.outerKeySlots),
-                                               std::move(node.outerProjectSlots),
-                                               std::move(node.innerKeySlots),
-                                               std::move(node.innerProjectSlots),
-                                               toStdVector(node.dirs),
+                                               std::move(node.info->outerKeySlots),
+                                               std::move(node.info->outerProjectSlots),
+                                               std::move(node.info->innerKeySlots),
+                                               std::move(node.info->innerProjectSlots),
+                                               toStdVector(node.info->dirs),
                                                node.nodeId);
     }
 
     std::unique_ptr<sbe::PlanStage> operator()(SbBlueprintAndHash node) {
-        auto outer = lower(node.outer);
-        auto inner = lower(node.inner);
+        auto outer = lower(node.info->outer);
+        auto inner = lower(node.info->inner);
         return sbe::makeS<sbe::AndHashStage>(std::move(outer),
                                              std::move(inner),
-                                             std::move(node.outerCondSlots),
-                                             std::move(node.outerProjectSlots),
-                                             std::move(node.innerCondSlots),
-                                             std::move(node.innerProjectSlots),
-                                             node.collatorSlot,
+                                             std::move(node.info->outerCondSlots),
+                                             std::move(node.info->outerProjectSlots),
+                                             std::move(node.info->innerCondSlots),
+                                             std::move(node.info->innerProjectSlots),
+                                             node.info->collatorSlot,
                                              _state.yieldPolicy,
                                              node.nodeId);
     }
@@ -562,10 +567,10 @@ struct Lowerer {
 
 }  // namespace
 
-SbStage lowerSbeBlueprint(SbBlueprint& blueprint,
-                          SbBlueprintNodeIdx root,
-                          StageBuilderState& state,
-                          const VariableTypes* varTypes) {
+std::unique_ptr<sbe::PlanStage> lowerSbeBlueprint(SbBlueprint& blueprint,
+                                                  SbBlueprintNodeIdx root,
+                                                  StageBuilderState& state,
+                                                  const VariableTypes* varTypes) {
     Lowerer lowerer{blueprint, state, varTypes};
     auto stage = lowerer.lower(root);
     blueprint.assertAddedNodesLowered();

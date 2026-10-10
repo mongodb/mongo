@@ -2,18 +2,17 @@
 // SPDX-License-Identifier: SSPL-1.0
 
 #include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
-#include "mongo/db/exec/sbe/util/debug_print.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/query/compiler/dependency_analysis/match_expression_dependencies.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/query/stage_builder/sbe/gen_filter.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
+#include "mongo/db/query/stage_builder/sbe/sbe_stage_blueprint.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr_helpers.h"
 #include "mongo/db/query/stage_builder/sbe/vectorizer.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 
-#include <iostream>
 #include <utility>
 #include <vector>
 
@@ -76,18 +75,6 @@ CellPathReqsRet getCellPathReqs(const UnpackTsBucketNode* unpackNode) {
 
     return ret;
 }
-
-// TODO SERVER-80243: Remove this function once the stage builder is stable.
-constexpr bool kDebugPlan = false;
-void printPlan(const sbe::PlanStage& stage) {
-    if constexpr (!kDebugPlan) {
-        return;
-    }
-
-    static sbe::DebugPrinter debugPrinter(true);
-    sbe::DebugPrintInfo debugPrintInfo{};
-    std::cout << std::endl << debugPrinter.print(stage, debugPrintInfo) << std::endl << std::endl;
-}
 }  // namespace
 
 SbStage buildBlockToRow(SbStage stage, StageBuilderState& state, PlanStageSlots& outputs) {
@@ -103,7 +90,7 @@ std::pair<SbStage, SbSlotVector> buildBlockToRow(SbStage stage,
     // kFilterCellField).
     using UnownedSlotName = PlanStageSlots::UnownedSlotName;
 
-    SbBuilder b(state, stage->getCommonStats()->nodeId);
+    SbBuilder b(state, getNodeId(state.blueprint()[stage.idx()]));
 
     SbSlotVector blockSlots;
     absl::flat_hash_map<sbe::value::SlotId, size_t> blockSlotIdToPosMap;
@@ -162,7 +149,6 @@ std::pair<SbStage, SbSlotVector> buildBlockToRow(SbStage stage,
     auto [outStage, unpackedSlots] = b.makeBlockToRow(std::move(stage), blockSlots, bitmapSlot);
     stage = std::move(outStage);
 
-    printPlan(*stage);
 
     // Update 'outputs' after the BlockToRow stage.
     for (const auto& fieldName : fieldNames) {
@@ -320,7 +306,6 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildUnpackTsBucket(
                                   traverseReqs,
                                   unpackNode->bucketSpec.timeField());
 
-    printPlan(*stage);
 
     outputs.set(PlanStageSlots::kBlockSelectivityBitmap, bitmapSlot);
 
@@ -371,7 +356,6 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildUnpackTsBucket(
                 generateFilter(_state, eventFilter, /*inputSlot=*/boost::none, outputs);
             if (!eventFilterSbExpr.isNull()) {
                 stage = b.makeFilter(std::move(stage), std::move(eventFilterSbExpr));
-                printPlan(*stage);
             }
         }
     } else {

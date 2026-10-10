@@ -9,8 +9,12 @@
 #include "mongo/db/query/stage_builder/sbe/abt/syntax/syntax.h"
 #include "mongo/db/query/stage_builder/sbe/abt_defs.h"
 #include "mongo/db/query/stage_builder/sbe/type_signature.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
+#include <cstdint>
+#include <limits>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -618,9 +622,71 @@ private:
 };
 
 /**
- * "SbStage" is short for "stage builder stage". SbStage is an alias for a unique pointer type.
+ * Index of a node within an SbBlueprint.
  */
-using SbStage = std::unique_ptr<sbe::PlanStage>;
+struct SbBlueprintNodeIdx {
+    uint32_t value{0};
+
+    bool operator==(const SbBlueprintNodeIdx&) const = default;
+};
+
+/**
+ * "SbStage" is short for "stage builder stage". An SbStage is a move-only handle to a node of the
+ * blueprint tree owned by StageBuilderState. SbBuilder methods consume the handles of a stage's
+ * children and return the handle of the new stage. The blueprint tree is lowered to
+ * sbe::PlanStages once the whole tree has been built.
+ */
+class SbStage {
+public:
+    using Vector = std::vector<SbStage>;
+
+    SbStage() = default;
+    explicit SbStage(SbBlueprintNodeIdx idx) : _idx(idx) {}
+
+    // Moving empties the source, so that a node can only be consumed through one handle.
+    SbStage(SbStage&& other) noexcept : _idx(std::exchange(other._idx, kEmpty)) {}
+    SbStage& operator=(SbStage&& other) noexcept {
+        _idx = std::exchange(other._idx, kEmpty);
+        return *this;
+    }
+
+    SbStage(const SbStage&) = delete;
+    SbStage& operator=(const SbStage&) = delete;
+
+    explicit operator bool() const {
+        return _idx != kEmpty;
+    }
+
+    /**
+     * Returns the index of the blueprint node this handle refers to. The handle must not be empty.
+     */
+    SbBlueprintNodeIdx idx() const {
+        tassert(13621600, "Expected a non-empty SbStage", *this);
+        return _idx;
+    }
+
+    /**
+     * Returns the index of the blueprint node this handle refers to and empties the handle.
+     */
+    SbBlueprintNodeIdx release() {
+        auto idx = this->idx();
+        _idx = kEmpty;
+        return idx;
+    }
+
+    template <typename... Ts>
+    static Vector makeVector(Ts&&... stages) {
+        Vector result;
+        result.reserve(sizeof...(Ts));
+        (result.emplace_back(std::move(stages)), ...);
+        return result;
+    }
+
+private:
+    static constexpr SbBlueprintNodeIdx kEmpty{std::numeric_limits<uint32_t>::max()};
+
+    SbBlueprintNodeIdx _idx{kEmpty};
+};
 
 /**
  * For a number of EExpression-related structures, we have corresponding "SbExpr" versions
