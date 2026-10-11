@@ -366,8 +366,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
                 ++conn->ckpt_write_pages;
 
                 /* Periodically log checkpoint progress. */
-                if (conn->ckpt_write_pages % (5 * WT_THOUSAND) == 0)
-                    __wt_checkpoint_progress(session, false);
+                __wt_checkpoint_progress(session, false);
             }
         }
 
