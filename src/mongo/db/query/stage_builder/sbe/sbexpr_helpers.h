@@ -555,10 +555,10 @@ public:
                                                     const SbSlotVector& blockSlots,
                                                     SbSlot bitmapSlot);
 
-    std::pair<SbStage, SbSlotVector> makeUnion(SbStage::Vector stages,
+    std::pair<SbStage, SbSlotVector> makeUnion(sbe::PlanStage::Vector stages,
                                                const std::vector<SbSlotVector>& slots);
 
-    std::pair<SbStage, SbSlotVector> makeSortedMerge(SbStage::Vector stages,
+    std::pair<SbStage, SbSlotVector> makeSortedMerge(sbe::PlanStage::Vector stages,
                                                      const std::vector<SbSlotVector>& slots,
                                                      const std::vector<SbSlotVector>& keys,
                                                      std::vector<sbe::value::SortDirection> dirs);

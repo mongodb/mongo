@@ -45,7 +45,6 @@
 #include "mongo/db/query/record_id_range_list.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/query/stage_builder/sbe/builder_data.h"
-#include "mongo/db/query/stage_builder/sbe/sbe_stage_lowering.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_mock.h"
@@ -108,10 +107,8 @@ public:
                 csn->isClustered = true;
 
                 const CollectionPtr& collection = colls.getMainCollection();
-                auto [blueprintStage, slots] =
+                auto [stage, slots] =
                     stage_builder::generateCollScan(builderState, collection, csn.get(), {});
-                auto stage = stage_builder::lowerSbeBlueprint(
-                    builderState.blueprint(), blueprintStage.release(), builderState);
 
                 // Check that single range scans use ScanStage for bounded scans and
                 // GenericScanStage for unbounded scans, whereas zero or multi-range scans use
@@ -298,10 +295,8 @@ TEST_F(GenCollScanTest, GenericScanFilterFieldsAreExposedAsSlots) {
                                                   *expCtx->getIfrContext()};
 
     // 'a' is referenced only by the filter, not by the requested fields (which are empty here).
-    auto [blueprintStage, slots] =
+    auto [stage, slots] =
         stage_builder::generateCollScan(builderState, collection, csn.get(), /*scanFieldNames=*/{});
-    auto stage = stage_builder::lowerSbeBlueprint(
-        builderState.blueprint(), blueprintStage.release(), builderState);
 
     ASSERT((dynamic_cast<FilterStage<false, false>*>(stage.get())));
     ASSERT_TRUE(

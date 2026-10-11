@@ -26,14 +26,12 @@
 #include "mongo/db/query/stage_builder/sbe/sbexpr.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr_helpers.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/overloaded_visitor.h"
 #include "mongo/util/str.h"
 
 #include <cstddef>
 #include <cstdint>
 #include <tuple>
 #include <utility>
-#include <variant>
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -550,9 +548,8 @@ std::pair<SbSlot /* resultSlot */, SbStage> buildForeignMatchedArray(SbStage inn
     auto unionInputs =
         makeVector(SbExpr::makeSV(matchedRecordsSlot), SbExpr::makeSV(emptyArraySlot));
 
-    auto [unionStage, unionOutputSlots] =
-        b.makeUnion(SbStage::makeVector(std::move(innerBranch), std::move(emptyArrayStage)),
-                    std::move(unionInputs));
+    auto [unionStage, unionOutputSlots] = b.makeUnion(
+        sbe::makeSs(std::move(innerBranch), std::move(emptyArrayStage)), std::move(unionInputs));
 
     auto unionOutputSlot = unionOutputSlots[0];
 
@@ -979,15 +976,6 @@ SbStage buildIndexSeek(StageBuilderState& state,
         std::make_pair(makeNewKeyStringCall(key_string::Discriminator::kExclusiveAfter),
                        highKeySlot));
 
-    if (!index.multikey) {
-        // Loop join the low key and high key generation with the index seek stage to produce the
-        // foreign document.
-        return b.makeLoopJoin(std::move(indexBoundKeyStage),
-                              std::move(indexStage),
-                              /*outerProjects=*/SbSlotVector{},
-                              /*outerCorrelated=*/SbExpr::makeSV(lowKeySlot, highKeySlot));
-    }
-
     // It is possible for the same record to be returned multiple times when the index is multikey
     // (contains arrays). Consider an example where local values set is '(1, 2)' and we have a
     // document with foreign field value '[1, 2]'. The same document will be returned twice:
@@ -997,44 +985,36 @@ SbStage buildIndexSeek(StageBuilderState& state,
     // UniqueStage or a UniqueRoaringStage) on top of the ixscan node; we just have to make sure
     // that the deduplication works across all the searched local keys, rather than just on top of
     // multiple matches of a single local key in the same indexed array value.
-    // Returns the child of 'node' if it is a unique stage, and null otherwise.
-    auto uniqueChild = [](SbBlueprintNode& node) {
-        return std::visit(OverloadedVisitor{[](SbBlueprintUnique& n) { return &n.child; },
-                                            [](SbBlueprintUniqueRoaring& n) { return &n.child; },
-                                            [](auto&) -> SbBlueprintNodeIdx* {
-                                                return nullptr;
-                                            }},
-                          node);
-    };
-
-    // Find the unique stage in the index seek subtree.
-    auto& blueprint = state.blueprint();
-    boost::optional<SbBlueprintNodeIdx> uniqueIdx;
-    std::vector<SbBlueprintNodeIdx> toVisit{indexStage.idx()};
-    while (!uniqueIdx && !toVisit.empty()) {
-        SbBlueprintNodeIdx cursor = toVisit.back();
-        toVisit.pop_back();
-        if (uniqueChild(blueprint[cursor])) {
-            uniqueIdx = cursor;
-        } else {
-            std::visit(
-                [&](auto& n) {
-                    n.visitChildren(
-                        [&](SbBlueprintNodeIdx& child) { toVisit.emplace_back(child); });
-                },
-                blueprint[cursor]);
+    if (index.multikey) {
+        std::vector<sbe::PlanStage*> toVisit;
+        toVisit.emplace_back(indexStage.get());
+        while (!toVisit.empty()) {
+            sbe::PlanStage* cursor = toVisit.back();
+            toVisit.pop_back();
+            if (dynamic_cast<sbe::UniqueStage*>(cursor) ||
+                dynamic_cast<sbe::UniqueRoaringStage*>(cursor)) {
+                // Loop join the low key and high key generation with the index seek stage to
+                // produce the foreign record id to fetch.
+                cursor->children()[0] =
+                    b.makeLoopJoin(std::move(indexBoundKeyStage),
+                                   std::move(cursor->children()[0]),
+                                   /*outerProjects=*/SbSlotVector{},
+                                   /*outerCorrelated=*/SbExpr::makeSV(lowKeySlot, highKeySlot));
+                return indexStage;
+            }
+            for (auto& child : cursor->children()) {
+                toVisit.emplace_back(child.get());
+            }
         }
+        tasserted(12775200, "Unable to find UniqueStage in INLJ stream");
+    } else {
+        // Loop join the low key and high key generation with the index seek stage to produce the
+        // foreign document.
+        return b.makeLoopJoin(std::move(indexBoundKeyStage),
+                              std::move(indexStage),
+                              /*outerProjects=*/SbSlotVector{},
+                              /*outerCorrelated=*/SbExpr::makeSV(lowKeySlot, highKeySlot));
     }
-    tassert(12775200, "Unable to find UniqueStage in INLJ stream", uniqueIdx);
-
-    // Loop join the low key and high key generation with the index seek stage below the unique
-    // stage, so that the deduplication applies across all the searched local keys.
-    auto join = b.makeLoopJoin(std::move(indexBoundKeyStage),
-                               SbStage{*uniqueChild(blueprint[*uniqueIdx])},
-                               /*outerProjects=*/SbSlotVector{},
-                               /*outerCorrelated=*/SbExpr::makeSV(lowKeySlot, highKeySlot));
-    *uniqueChild(blueprint[*uniqueIdx]) = join.release();
-    return indexStage;
 }  // buildIndexSeek
 
 SbStage buildIndexJoinLookupForeignSideStage(

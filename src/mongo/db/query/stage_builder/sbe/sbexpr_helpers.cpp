@@ -43,27 +43,30 @@
 namespace mongo::stage_builder {
 namespace {
 
-// Consumes the handles in 'stages' and returns the indices of the nodes they referred to.
-SbBlueprintChildVector releaseStages(SbStage::Vector& stages) {
+// Adds an already-lowered stage to the state's blueprint as a leaf, so that it can be used as the
+// child of a blueprint node.
+SbBlueprintNodeIdx addStage(StageBuilderState& state, SbStage stage) {
+    return state.blueprint().add(SbBlueprintPassthrough{std::move(stage)});
+}
+
+SbBlueprintChildVector addStages(StageBuilderState& state, sbe::PlanStage::Vector stages) {
     SbBlueprintChildVector children;
     children.reserve(stages.size());
     for (auto& stage : stages) {
-        children.push_back(stage.release());
+        children.push_back(addStage(state, std::move(stage)));
     }
     return children;
 }
 
-// Finalizes the expressions of 'blueprint' using 'varTypes', appends it to the blueprint tree
-// owned by 'state', and returns a handle to the new node.
+// Adds 'blueprint' to the state's blueprint tree and immediately lowers it along with its
+// children. Lowering leaves SbBlueprintLowered placeholders behind, so the tree only ever holds
+// nodes that are lowered or about to be.
 template <typename T>
-SbStage addBlueprint(StageBuilderState& state,
-                     T blueprint,
-                     const VariableTypes* varTypes = nullptr) {
-    blueprint.visitExprs([&](SbExpr& expr) {
-        expr.optimize(state, varTypes);
-        expr.setFinishedOptimizing();
-    });
-    return SbStage{state.blueprint().add(std::move(blueprint))};
+SbStage lowerBlueprint(StageBuilderState& state,
+                       T blueprint,
+                       const VariableTypes* varTypes = nullptr) {
+    auto root = state.blueprint().add(std::move(blueprint));
+    return lowerSbeBlueprint(state.blueprint(), root, state, varTypes);
 }
 
 inline abt::ABT extractABT(SbExpr& e) {
@@ -434,7 +437,8 @@ SbExpr SbExprBuilder::makeBooleanOpTree(abt::Operations logicOp, SbExpr lhs, SbE
 }
 
 SbStage SbBuilder::makePassthrough(std::unique_ptr<sbe::PlanStage> stage) {
-    return SbStage{_state.blueprint().add(SbBlueprintPassthrough{std::move(stage)})};
+    auto idx = _state.blueprint().add(SbBlueprintPassthrough{std::move(stage)});
+    return lowerSbeBlueprint(_state.blueprint(), idx, _state);
 }
 
 SbBuilder::MakeScanResult SbBuilder::makeScan(UUID collectionUuid,
@@ -455,11 +459,9 @@ SbBuilder::MakeScanResult SbBuilder::makeScan(UUID collectionUuid,
         scanFieldSlots.emplace_back(SbSlot{_state.slotId()});
     }
 
-    auto stage = addBlueprint(
-        _state,
-        SbBlueprintScan{.nodeId = _nodeId,
-                        .info = std::make_unique<SbBlueprintScanInfo>(
-                            SbBlueprintScanInfo{.collectionUuid = std::move(collectionUuid),
+    auto stage = lowerBlueprint(_state,
+                                SbBlueprintScan{.nodeId = _nodeId,
+                                                .collectionUuid = std::move(collectionUuid),
                                                 .dbName = std::move(dbName),
                                                 .forward = forward,
                                                 .scanFieldNames = std::move(scanFieldNames),
@@ -468,7 +470,7 @@ SbBuilder::MakeScanResult SbBuilder::makeScan(UUID collectionUuid,
                                                 .scanOpenCallback = std::move(scanOpenCallback),
                                                 .recordSlot = resultSlot.getId(),
                                                 .recordIdSlot = recordIdSlot.getId(),
-                                                .scanFieldSlots = lower(scanFieldSlots)})});
+                                                .scanFieldSlots = lower(scanFieldSlots)});
     return {std::move(stage), resultSlot, recordIdSlot, std::move(scanFieldSlots)};
 }
 
@@ -531,21 +533,19 @@ std::tuple<SbStage, SbSlot, SbSlotVector, SbIndexInfoSlots> SbBuilder::makeSimpl
 
     SbIndexInfoSlots indexInfoSlots = allocateIndexInfoSlots(indexInfoTypeMask, keyPattern);
 
-    auto stage = addBlueprint(
+    auto stage = lowerBlueprint(
         _state,
-        SbBlueprintSimpleIndexScan{
-            .nodeId = _nodeId,
-            .info = std::make_unique<SbBlueprintSimpleIndexScanInfo>(
-                SbBlueprintSimpleIndexScanInfo{.collectionUuid = std::move(collectionUuid),
-                                               .dbName = std::move(dbName),
-                                               .indexName = std::string{indexName},
-                                               .forward = forward,
-                                               .lowKeyExpr = std::move(lowKeyExpr),
-                                               .highKeyExpr = std::move(highKeyExpr),
-                                               .indexKeysToInclude = std::move(indexKeysToInclude),
-                                               .recordIdSlot = recordIdSlot.getId(),
-                                               .indexKeySlots = lower(indexKeySlots),
-                                               .indexInfoSlots = indexInfoSlots})},
+        SbBlueprintSimpleIndexScan{.nodeId = _nodeId,
+                                   .collectionUuid = std::move(collectionUuid),
+                                   .dbName = std::move(dbName),
+                                   .indexName = std::string{indexName},
+                                   .forward = forward,
+                                   .lowKeyExpr = std::move(lowKeyExpr),
+                                   .highKeyExpr = std::move(highKeyExpr),
+                                   .indexKeysToInclude = std::move(indexKeysToInclude),
+                                   .recordIdSlot = recordIdSlot.getId(),
+                                   .indexKeySlots = lower(indexKeySlots),
+                                   .indexInfoSlots = indexInfoSlots},
         &varTypes);
     return {std::move(stage), recordIdSlot, std::move(indexKeySlots), std::move(indexInfoSlots)};
 }
@@ -573,23 +573,21 @@ std::tuple<SbStage, SbSlot, SbSlotVector, SbIndexInfoSlots> SbBuilder::makeGener
 
     SbIndexInfoSlots indexInfoSlots = allocateIndexInfoSlots(indexInfoTypeMask, keyPattern);
 
-    auto stage = addBlueprint(
+    auto stage = lowerBlueprint(
         _state,
-        SbBlueprintGenericIndexScan{
-            .nodeId = _nodeId,
-            .info = std::make_unique<SbBlueprintGenericIndexScanInfo>(
-                SbBlueprintGenericIndexScanInfo{.collectionUuid = std::move(collectionUuid),
-                                                .dbName = std::move(dbName),
-                                                .indexName = std::string{indexName},
-                                                .keyPattern = keyPattern,
-                                                .forward = forward,
-                                                .boundsExpr = std::move(boundsExpr),
-                                                .version = version,
-                                                .ordering = ordering,
-                                                .indexKeysToInclude = std::move(indexKeysToInclude),
-                                                .recordIdSlot = recordIdSlot.getId(),
-                                                .indexKeySlots = lower(indexKeySlots),
-                                                .indexInfoSlots = indexInfoSlots})},
+        SbBlueprintGenericIndexScan{.nodeId = _nodeId,
+                                    .collectionUuid = std::move(collectionUuid),
+                                    .dbName = std::move(dbName),
+                                    .indexName = std::string{indexName},
+                                    .keyPattern = keyPattern,
+                                    .forward = forward,
+                                    .boundsExpr = std::move(boundsExpr),
+                                    .version = version,
+                                    .ordering = ordering,
+                                    .indexKeysToInclude = std::move(indexKeysToInclude),
+                                    .recordIdSlot = recordIdSlot.getId(),
+                                    .indexKeySlots = lower(indexKeySlots),
+                                    .indexInfoSlots = indexInfoSlots},
         &varTypes);
     return {std::move(stage), recordIdSlot, std::move(indexKeySlots), std::move(indexInfoSlots)};
 }
@@ -599,7 +597,7 @@ std::pair<SbStage, SbSlot> SbBuilder::makeVirtualScan(sbe::value::TypeTags input
     auto outSlotId = _state.slotId();
     auto outSlot = SbSlot{outSlotId};
 
-    auto stage = addBlueprint(
+    auto stage = lowerBlueprint(
         _state,
         SbBlueprintVirtualScan{.nodeId = _nodeId,
                                .outSlot = outSlotId,
@@ -608,52 +606,52 @@ std::pair<SbStage, SbSlot> SbBuilder::makeVirtualScan(sbe::value::TypeTags input
 }
 
 SbStage SbBuilder::makeCoScan() {
-    return addBlueprint(_state, SbBlueprintCoScan{.nodeId = _nodeId});
+    return lowerBlueprint(_state, SbBlueprintCoScan{.nodeId = _nodeId});
 }
 
 SbStage SbBuilder::makeLimit(const VariableTypes& varTypes, SbStage stage, SbExpr limitConstant) {
-    return addBlueprint(_state,
-                        SbBlueprintLimitSkip{.child = stage.release(),
-                                             .nodeId = _nodeId,
-                                             .limitExpr = std::move(limitConstant)},
-                        &varTypes);
+    return lowerBlueprint(_state,
+                          SbBlueprintLimitSkip{.child = addStage(_state, std::move(stage)),
+                                               .nodeId = _nodeId,
+                                               .limitExpr = std::move(limitConstant)},
+                          &varTypes);
 }
 
 SbStage SbBuilder::makeLimitSkip(const VariableTypes& varTypes,
                                  SbStage stage,
                                  SbExpr limitConstant,
                                  SbExpr skipConstant) {
-    return addBlueprint(_state,
-                        SbBlueprintLimitSkip{.child = stage.release(),
-                                             .nodeId = _nodeId,
-                                             .limitExpr = std::move(limitConstant),
-                                             .skipExpr = std::move(skipConstant)},
-                        &varTypes);
+    return lowerBlueprint(_state,
+                          SbBlueprintLimitSkip{.child = addStage(_state, std::move(stage)),
+                                               .nodeId = _nodeId,
+                                               .limitExpr = std::move(limitConstant),
+                                               .skipExpr = std::move(skipConstant)},
+                          &varTypes);
 }
 
 SbStage SbBuilder::makeLimitOneCoScanTree() {
-    auto coScan = makeCoScan();
-    return addBlueprint(_state,
-                        SbBlueprintLimitSkip{.child = coScan.release(),
-                                             .nodeId = _nodeId,
-                                             .limitExpr = makeInt64Constant(1)});
+    auto coScan = _state.blueprint().add(SbBlueprintCoScan{.nodeId = _nodeId});
+    return lowerBlueprint(_state,
+                          SbBlueprintLimitSkip{.child = coScan,
+                                               .nodeId = _nodeId,
+                                               .limitExpr = makeInt64Constant(1)});
 }
 
 SbStage SbBuilder::makeFilter(const VariableTypes& varTypes, SbStage stage, SbExpr condition) {
-    return addBlueprint(_state,
-                        SbBlueprintFilter{.child = stage.release(),
-                                          .nodeId = _nodeId,
-                                          .condition = std::move(condition)},
-                        &varTypes);
+    return lowerBlueprint(_state,
+                          SbBlueprintFilter{.child = addStage(_state, std::move(stage)),
+                                            .nodeId = _nodeId,
+                                            .condition = std::move(condition)},
+                          &varTypes);
 }
 
 SbStage SbBuilder::makeConstFilter(const VariableTypes& varTypes, SbStage stage, SbExpr condition) {
-    return addBlueprint(_state,
-                        SbBlueprintFilter{.child = stage.release(),
-                                          .nodeId = _nodeId,
-                                          .condition = std::move(condition),
-                                          .filterType = SbBlueprintFilter::FilterType::kConst},
-                        &varTypes);
+    return lowerBlueprint(_state,
+                          SbBlueprintFilter{.child = addStage(_state, std::move(stage)),
+                                            .nodeId = _nodeId,
+                                            .condition = std::move(condition),
+                                            .filterType = SbBlueprintFilter::FilterType::kConst},
+                          &varTypes);
 }
 
 std::pair<SbStage, SbSlotVector> SbBuilder::makeProject(const VariableTypes& varTypes,
@@ -683,10 +681,10 @@ std::pair<SbStage, SbSlotVector> SbBuilder::makeProject(const VariableTypes& var
     if (!slotExprPairs.empty()) {
         // The expressions were already optimized with 'varTypes' above, so they are lowered
         // without it.
-        return {addBlueprint(_state,
-                             SbBlueprintProject{.child = stage.release(),
-                                                .nodeId = _nodeId,
-                                                .projects = std::move(slotExprPairs)}),
+        return {lowerBlueprint(_state,
+                               SbBlueprintProject{.child = addStage(_state, std::move(stage)),
+                                                  .nodeId = _nodeId,
+                                                  .projects = std::move(slotExprPairs)}),
                 std::move(outSlots)};
     }
 
@@ -694,22 +692,24 @@ std::pair<SbStage, SbSlotVector> SbBuilder::makeProject(const VariableTypes& var
 }
 
 SbStage SbBuilder::makeUnique(SbStage stage, SbSlot key) {
-    return addBlueprint(_state,
-                        SbBlueprintUnique{.child = stage.release(),
-                                          .nodeId = _nodeId,
-                                          .keys = sbe::value::SlotVector{key.getId()}});
+    return lowerBlueprint(_state,
+                          SbBlueprintUnique{.child = addStage(_state, std::move(stage)),
+                                            .nodeId = _nodeId,
+                                            .keys = sbe::value::SlotVector{key.getId()}});
 }
 
 SbStage SbBuilder::makeUnique(SbStage stage, const SbSlotVector& keys) {
-    return addBlueprint(
-        _state,
-        SbBlueprintUnique{.child = stage.release(), .nodeId = _nodeId, .keys = lower(keys)});
+    return lowerBlueprint(_state,
+                          SbBlueprintUnique{.child = addStage(_state, std::move(stage)),
+                                            .nodeId = _nodeId,
+                                            .keys = lower(keys)});
 }
 
 SbStage SbBuilder::makeUniqueRoaring(SbStage stage, SbSlot key) {
-    return addBlueprint(
-        _state,
-        SbBlueprintUniqueRoaring{.child = stage.release(), .nodeId = _nodeId, .key = key.getId()});
+    return lowerBlueprint(_state,
+                          SbBlueprintUniqueRoaring{.child = addStage(_state, std::move(stage)),
+                                                   .nodeId = _nodeId,
+                                                   .key = key.getId()});
 }
 
 SbStage SbBuilder::makeSort(const VariableTypes& varTypes,
@@ -719,15 +719,15 @@ SbStage SbBuilder::makeSort(const VariableTypes& varTypes,
                             const SbSlotVector& forwardedSlots,
                             SbExpr limitExpr,
                             size_t memoryLimit) {
-    return addBlueprint(_state,
-                        SbBlueprintSort{.child = stage.release(),
-                                        .nodeId = _nodeId,
-                                        .orderBy = lower(orderBy),
-                                        .dirs = {dirs.begin(), dirs.end()},
-                                        .forwardedSlots = lower(forwardedSlots),
-                                        .limitExpr = std::move(limitExpr),
-                                        .memoryLimit = memoryLimit},
-                        &varTypes);
+    return lowerBlueprint(_state,
+                          SbBlueprintSort{.child = addStage(_state, std::move(stage)),
+                                          .nodeId = _nodeId,
+                                          .orderBy = lower(orderBy),
+                                          .dirs = {dirs.begin(), dirs.end()},
+                                          .forwardedSlots = lower(forwardedSlots),
+                                          .limitExpr = std::move(limitExpr),
+                                          .memoryLimit = memoryLimit},
+                          &varTypes);
 }
 
 std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeHashAgg(
@@ -791,14 +791,14 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeHashAgg(
                                           .implementation = std::move(implementation)});
     }
 
-    stage = addBlueprint(_state,
-                         SbBlueprintHashAgg{.child = stage.release(),
-                                            .nodeId = _nodeId,
-                                            .groupBySlots = std::move(groupBySlots),
-                                            .accumulators = std::move(accumulators),
-                                            .collatorSlot = collatorSlot,
-                                            .forceIncreasedSpilling = forceIncreasedSpilling},
-                         &varTypes);
+    stage = lowerBlueprint(_state,
+                           SbBlueprintHashAgg{.child = addStage(_state, std::move(stage)),
+                                              .nodeId = _nodeId,
+                                              .groupBySlots = std::move(groupBySlots),
+                                              .accumulators = std::move(accumulators),
+                                              .collatorSlot = collatorSlot,
+                                              .forceIncreasedSpilling = forceIncreasedSpilling},
+                           &varTypes);
 
     return {std::move(stage), std::move(groupByOutSlots), std::move(aggOutSlots)};
 }
@@ -842,27 +842,18 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeBlockHashAgg(
         _state.allowDiskUse,
         _state.expCtx->getQueryKnobConfiguration().getSbeHashAggIncreasedSpillingMode());
 
-    // The merging expressions are finalized without type information. addBlueprint() would
-    // otherwise finalize them with 'varTypes'.
-    for (auto& [expr, _] : mergingExprs) {
-        expr.optimize(_state, nullptr);
-        expr.setFinishedOptimizing();
-    }
-
-    stage = addBlueprint(
+    stage = lowerBlueprint(
         _state,
-        SbBlueprintBlockHashAgg{
-            .nodeId = _nodeId,
-            .info = std::make_unique<SbBlueprintBlockHashAggInfo>(
-                SbBlueprintBlockHashAggInfo{.child = stage.release(),
-                                            .groupBySlots = std::move(groupBySlots),
-                                            .selectivityBitmapSlot = selectivityBitmapSlot.getId(),
-                                            .blockAccArgSlots = lower(blockAccArgSbSlots),
-                                            .bitmapInternalSlot = bitmapInternalSlot.getId(),
-                                            .accumulatorDataSlots = lower(accumulatorDataSbSlots),
-                                            .aggs = std::move(aggs),
-                                            .mergingExprs = std::move(mergingExprs),
-                                            .forceIncreasedSpilling = forceIncreasedSpilling})},
+        SbBlueprintBlockHashAgg{.child = addStage(_state, std::move(stage)),
+                                .nodeId = _nodeId,
+                                .groupBySlots = std::move(groupBySlots),
+                                .selectivityBitmapSlot = selectivityBitmapSlot.getId(),
+                                .blockAccArgSlots = lower(blockAccArgSbSlots),
+                                .bitmapInternalSlot = bitmapInternalSlot.getId(),
+                                .accumulatorDataSlots = lower(accumulatorDataSbSlots),
+                                .aggs = std::move(aggs),
+                                .mergingExprs = std::move(mergingExprs),
+                                .forceIncreasedSpilling = forceIncreasedSpilling},
         &varTypes);
 
     // For BlockHashAggStage, the group by "out" slots are the same as the incoming group by slots,
@@ -892,10 +883,11 @@ std::tuple<SbStage, SbSlotVector> SbBuilder::makeAggProject(const VariableTypes&
         aggs.emplace_back(sbSlot.getId(), std::move(sbBlockAggExpr));
     }
 
-    stage = addBlueprint(
-        _state,
-        SbBlueprintAggProject{.child = stage.release(), .nodeId = _nodeId, .aggs = std::move(aggs)},
-        &varTypes);
+    stage = lowerBlueprint(_state,
+                           SbBlueprintAggProject{.child = addStage(_state, std::move(stage)),
+                                                 .nodeId = _nodeId,
+                                                 .aggs = std::move(aggs)},
+                           &varTypes);
 
     return {std::move(stage), std::move(aggOutSlots)};
 }
@@ -907,13 +899,13 @@ std::tuple<SbStage, SbSlot, SbSlot> SbBuilder::makeUnwind(SbStage stage,
     auto indexOutputSlot = SbSlot{_state.slotId()};
 
     auto result =
-        addBlueprint(_state,
-                     SbBlueprintUnwind{.child = stage.release(),
-                                       .nodeId = _nodeId,
-                                       .inSlot = inputSlot.getId(),
-                                       .outSlot = unwindOutputSlot.getId(),
-                                       .idxSlot = indexOutputSlot.getId(),
-                                       .preserveNullAndEmptyArrays = preserveNullAndEmptyArrays});
+        lowerBlueprint(_state,
+                       SbBlueprintUnwind{.child = addStage(_state, std::move(stage)),
+                                         .nodeId = _nodeId,
+                                         .inSlot = inputSlot.getId(),
+                                         .outSlot = unwindOutputSlot.getId(),
+                                         .idxSlot = indexOutputSlot.getId(),
+                                         .preserveNullAndEmptyArrays = preserveNullAndEmptyArrays});
     return {std::move(result), unwindOutputSlot, indexOutputSlot};
 }
 
@@ -947,19 +939,17 @@ std::tuple<SbStage, SbSlot, SbSlotVector, SbSlotVector> SbBuilder::makeTsBucketT
         traverseSlots.emplace_back(SbSlot{_state.slotId(), typeSig});
     }
 
-    auto result = addBlueprint(
-        _state,
-        SbBlueprintTsBucketToCellBlock{
-            .nodeId = _nodeId,
-            .info = std::make_unique<SbBlueprintTsBucketToCellBlockInfo>(
-                SbBlueprintTsBucketToCellBlockInfo{.child = stage.release(),
-                                                   .bucketSlot = bucketSlot.getId(),
-                                                   .topLevelReqs = topLevelReqs,
-                                                   .traverseReqs = traverseReqs,
-                                                   .timeField = std::string{timeField},
-                                                   .bitmapSlot = bitmapSlot.getId(),
-                                                   .topLevelSlots = lower(topLevelSlots),
-                                                   .traverseSlots = lower(traverseSlots)})});
+    auto result =
+        lowerBlueprint(_state,
+                       SbBlueprintTsBucketToCellBlock{.child = addStage(_state, std::move(stage)),
+                                                      .nodeId = _nodeId,
+                                                      .bucketSlot = bucketSlot.getId(),
+                                                      .topLevelReqs = topLevelReqs,
+                                                      .traverseReqs = traverseReqs,
+                                                      .timeField = std::string{timeField},
+                                                      .bitmapSlot = bitmapSlot.getId(),
+                                                      .topLevelSlots = lower(topLevelSlots),
+                                                      .traverseSlots = lower(traverseSlots)});
     return {std::move(result), bitmapSlot, std::move(topLevelSlots), std::move(traverseSlots)};
 }
 
@@ -980,16 +970,16 @@ std::pair<SbStage, SbSlotVector> SbBuilder::makeBlockToRow(SbStage stage,
         unpackedSlots.emplace_back(SbSlot{_state.slotId(), typeSig});
     }
 
-    auto result = addBlueprint(_state,
-                               SbBlueprintBlockToRow{.child = stage.release(),
-                                                     .nodeId = _nodeId,
-                                                     .bitmapSlot = bitmapSlot.getId(),
-                                                     .blockSlots = lower(blockSlots),
-                                                     .outputSlots = lower(unpackedSlots)});
+    auto result = lowerBlueprint(_state,
+                                 SbBlueprintBlockToRow{.child = addStage(_state, std::move(stage)),
+                                                       .nodeId = _nodeId,
+                                                       .bitmapSlot = bitmapSlot.getId(),
+                                                       .blockSlots = lower(blockSlots),
+                                                       .outputSlots = lower(unpackedSlots)});
     return {std::move(result), std::move(unpackedSlots)};
 }
 
-std::pair<SbStage, SbSlotVector> SbBuilder::makeUnion(SbStage::Vector stages,
+std::pair<SbStage, SbSlotVector> SbBuilder::makeUnion(sbe::PlanStage::Vector stages,
                                                       const std::vector<SbSlotVector>& slots) {
     tassert(9380400,
             "Expected the same number of stages and input slot vectors",
@@ -997,16 +987,16 @@ std::pair<SbStage, SbSlotVector> SbBuilder::makeUnion(SbStage::Vector stages,
 
     SbSlotVector outSlots = allocateOutSlotsForMergeStage(slots);
 
-    auto result = addBlueprint(_state,
-                               SbBlueprintUnion{.nodeId = _nodeId,
-                                                .children = releaseStages(stages),
-                                                .inputSlots = lower(slots),
-                                                .outputSlots = lower(outSlots)});
+    auto result = lowerBlueprint(_state,
+                                 SbBlueprintUnion{.nodeId = _nodeId,
+                                                  .children = addStages(_state, std::move(stages)),
+                                                  .inputSlots = lower(slots),
+                                                  .outputSlots = lower(outSlots)});
     return {std::move(result), std::move(outSlots)};
 }
 
 std::pair<SbStage, SbSlotVector> SbBuilder::makeSortedMerge(
-    SbStage::Vector stages,
+    sbe::PlanStage::Vector stages,
     const std::vector<SbSlotVector>& slots,
     const std::vector<SbSlotVector>& keys,
     std::vector<sbe::value::SortDirection> dirs) {
@@ -1016,15 +1006,14 @@ std::pair<SbStage, SbSlotVector> SbBuilder::makeSortedMerge(
 
     SbSlotVector outSlots = allocateOutSlotsForMergeStage(slots);
 
-    auto result = addBlueprint(
-        _state,
-        SbBlueprintSortedMerge{.nodeId = _nodeId,
-                               .info = std::make_unique<SbBlueprintSortedMergeInfo>(
-                                   SbBlueprintSortedMergeInfo{.children = releaseStages(stages),
-                                                              .inputKeys = lower(keys),
-                                                              .dirs = {dirs.begin(), dirs.end()},
-                                                              .inputVals = lower(slots),
-                                                              .outputVals = lower(outSlots)})});
+    auto result =
+        lowerBlueprint(_state,
+                       SbBlueprintSortedMerge{.nodeId = _nodeId,
+                                              .children = addStages(_state, std::move(stages)),
+                                              .inputKeys = lower(keys),
+                                              .dirs = {dirs.begin(), dirs.end()},
+                                              .inputVals = lower(slots),
+                                              .outputVals = lower(outSlots)});
     return {std::move(result), std::move(outSlots)};
 }
 
@@ -1035,17 +1024,15 @@ SbStage SbBuilder::makeAndHash(SbStage outerStage,
                                const SbSlotVector& innerCondSlots,
                                const SbSlotVector& innerProjectSlots,
                                boost::optional<sbe::value::SlotId> collatorSlot) {
-    return addBlueprint(
-        _state,
-        SbBlueprintAndHash{.nodeId = _nodeId,
-                           .info = std::make_unique<SbBlueprintAndHashInfo>(
-                               SbBlueprintAndHashInfo{.outer = outerStage.release(),
-                                                      .inner = innerStage.release(),
-                                                      .outerCondSlots = lower(outerCondSlots),
-                                                      .outerProjectSlots = lower(outerProjectSlots),
-                                                      .innerCondSlots = lower(innerCondSlots),
-                                                      .innerProjectSlots = lower(innerProjectSlots),
-                                                      .collatorSlot = collatorSlot})});
+    return lowerBlueprint(_state,
+                          SbBlueprintAndHash{.outer = addStage(_state, std::move(outerStage)),
+                                             .inner = addStage(_state, std::move(innerStage)),
+                                             .nodeId = _nodeId,
+                                             .outerCondSlots = lower(outerCondSlots),
+                                             .outerProjectSlots = lower(outerProjectSlots),
+                                             .innerCondSlots = lower(innerCondSlots),
+                                             .innerProjectSlots = lower(innerProjectSlots),
+                                             .collatorSlot = collatorSlot});
 }
 
 std::pair<SbStage, SbSlotVector> SbBuilder::makeBranch(const VariableTypes& varTypes,
@@ -1080,15 +1067,16 @@ std::pair<SbStage, SbSlotVector> SbBuilder::makeBranch(const VariableTypes& varT
         outSlots.emplace_back(SbSlot{_state.slotId(), unionTypeSig});
     }
 
-    auto result = addBlueprint(_state,
-                               SbBlueprintBranch{.thenChild = thenStage.release(),
-                                                 .elseChild = elseStage.release(),
-                                                 .nodeId = _nodeId,
-                                                 .conditionExpr = std::move(conditionExpr),
-                                                 .thenSlots = lower(thenSlots),
-                                                 .elseSlots = lower(elseSlots),
-                                                 .outputSlots = lower(outSlots)},
-                               &varTypes);
+    auto result =
+        lowerBlueprint(_state,
+                       SbBlueprintBranch{.thenChild = addStage(_state, std::move(thenStage)),
+                                         .elseChild = addStage(_state, std::move(elseStage)),
+                                         .nodeId = _nodeId,
+                                         .conditionExpr = std::move(conditionExpr),
+                                         .thenSlots = lower(thenSlots),
+                                         .elseSlots = lower(elseSlots),
+                                         .outputSlots = lower(outSlots)},
+                       &varTypes);
     return {std::move(result), std::move(outSlots)};
 }
 
@@ -1100,16 +1088,16 @@ SbStage SbBuilder::makeLoopJoin(const VariableTypes& varTypes,
                                 const SbSlotVector& innerProjects,
                                 SbExpr predicate,
                                 sbe::JoinType joinType) {
-    return addBlueprint(_state,
-                        SbBlueprintLoopJoin{.outer = outer.release(),
-                                            .inner = inner.release(),
-                                            .nodeId = _nodeId,
-                                            .joinType = joinType,
-                                            .outerProjects = lower(outerProjects),
-                                            .outerCorrelated = lower(outerCorrelated),
-                                            .innerProjects = lower(innerProjects),
-                                            .predicate = std::move(predicate)},
-                        &varTypes);
+    return lowerBlueprint(_state,
+                          SbBlueprintLoopJoin{.outer = addStage(_state, std::move(outer)),
+                                              .inner = addStage(_state, std::move(inner)),
+                                              .nodeId = _nodeId,
+                                              .joinType = joinType,
+                                              .outerProjects = lower(outerProjects),
+                                              .outerCorrelated = lower(outerCorrelated),
+                                              .innerProjects = lower(innerProjects),
+                                              .predicate = std::move(predicate)},
+                          &varTypes);
 }
 
 std::pair<SbStage, SbSlot> SbBuilder::makeHashLookup(
@@ -1124,17 +1112,18 @@ std::pair<SbStage, SbSlot> SbBuilder::makeHashLookup(
     boost::optional<sbe::value::SlotId> collatorSlot) {
     auto outputSlot = optOutputSlot ? *optOutputSlot : SbSlot{_state.slotId()};
 
-    auto result = addBlueprint(_state,
-                               SbBlueprintHashLookup{.localStage = localStage.release(),
-                                                     .foreignStage = foreignStage.release(),
-                                                     .nodeId = _nodeId,
-                                                     .localKeySlot = localKeySlot.getId(),
-                                                     .foreignKeySlot = foreignKeySlot.getId(),
-                                                     .foreignRecordSlot = foreignRecordSlot.getId(),
-                                                     .outSlot = outputSlot.getId(),
-                                                     .aggExpr = std::move(sbBlockAggExpr.agg),
-                                                     .collatorSlot = collatorSlot},
-                               &varTypes);
+    auto result = lowerBlueprint(
+        _state,
+        SbBlueprintHashLookup{.localStage = addStage(_state, std::move(localStage)),
+                              .foreignStage = addStage(_state, std::move(foreignStage)),
+                              .nodeId = _nodeId,
+                              .localKeySlot = localKeySlot.getId(),
+                              .foreignKeySlot = foreignKeySlot.getId(),
+                              .foreignRecordSlot = foreignRecordSlot.getId(),
+                              .outSlot = outputSlot.getId(),
+                              .aggExpr = std::move(sbBlockAggExpr.agg),
+                              .collatorSlot = collatorSlot},
+        &varTypes);
     return {std::move(result), outputSlot};
 }
 
@@ -1150,18 +1139,18 @@ std::pair<SbStage, SbSlot> SbBuilder::makeHashLookupUnwind(
     boost::optional<sbe::value::SlotId> indexSlot) {
     auto outputSlot = SbSlot{_state.slotId()};
 
-    auto result =
-        addBlueprint(_state,
-                     SbBlueprintHashLookupUnwind{.localStage = localStage.release(),
-                                                 .foreignStage = foreignStage.release(),
-                                                 .nodeId = _nodeId,
-                                                 .joinType = joinType,
-                                                 .localKeySlot = localKeySlot.getId(),
-                                                 .foreignKeySlot = foreignKeySlot.getId(),
-                                                 .foreignRecordSlot = foreignRecordSlot.getId(),
-                                                 .outSlot = outputSlot.getId(),
-                                                 .collatorSlot = collatorSlot,
-                                                 .indexSlot = indexSlot});
+    auto result = lowerBlueprint(
+        _state,
+        SbBlueprintHashLookupUnwind{.localStage = addStage(_state, std::move(localStage)),
+                                    .foreignStage = addStage(_state, std::move(foreignStage)),
+                                    .nodeId = _nodeId,
+                                    .joinType = joinType,
+                                    .localKeySlot = localKeySlot.getId(),
+                                    .foreignKeySlot = foreignKeySlot.getId(),
+                                    .foreignRecordSlot = foreignRecordSlot.getId(),
+                                    .outSlot = outputSlot.getId(),
+                                    .collatorSlot = collatorSlot,
+                                    .indexSlot = indexSlot});
     return {std::move(result), outputSlot};
 }
 
@@ -1173,19 +1162,17 @@ SbStage SbBuilder::makeHashJoin(SbStage outerStage,
                                 const SbSlotVector& innerProjectSlots,
                                 boost::optional<sbe::value::SlotId> collatorSlot,
                                 boost::optional<size_t> estimatedBuildCardinality) {
-    return addBlueprint(
+    return lowerBlueprint(
         _state,
-        SbBlueprintHashJoin{
-            .nodeId = _nodeId,
-            .info = std::make_unique<SbBlueprintHashJoinInfo>(
-                SbBlueprintHashJoinInfo{.outer = outerStage.release(),
-                                        .inner = innerStage.release(),
-                                        .outerCondSlots = lower(outerCondSlots),
-                                        .outerProjectSlots = lower(outerProjectSlots),
-                                        .innerCondSlots = lower(innerCondSlots),
-                                        .innerProjectSlots = lower(innerProjectSlots),
-                                        .collatorSlot = collatorSlot,
-                                        .estimatedBuildCardinality = estimatedBuildCardinality})});
+        SbBlueprintHashJoin{.outer = addStage(_state, std::move(outerStage)),
+                            .inner = addStage(_state, std::move(innerStage)),
+                            .nodeId = _nodeId,
+                            .outerCondSlots = lower(outerCondSlots),
+                            .outerProjectSlots = lower(outerProjectSlots),
+                            .innerCondSlots = lower(innerCondSlots),
+                            .innerProjectSlots = lower(innerProjectSlots),
+                            .collatorSlot = collatorSlot,
+                            .estimatedBuildCardinality = estimatedBuildCardinality});
 }
 
 SbStage SbBuilder::makeMergeJoin(SbStage outerStage,
@@ -1195,17 +1182,15 @@ SbStage SbBuilder::makeMergeJoin(SbStage outerStage,
                                  const SbSlotVector& innerKeySlots,
                                  const SbSlotVector& innerProjectSlots,
                                  std::vector<sbe::value::SortDirection> dirs) {
-    return addBlueprint(_state,
-                        SbBlueprintMergeJoin{.nodeId = _nodeId,
-                                             .info = std::make_unique<SbBlueprintMergeJoinInfo>(
-                                                 SbBlueprintMergeJoinInfo{
-                                                     .outer = outerStage.release(),
-                                                     .inner = innerStage.release(),
-                                                     .outerKeySlots = lower(outerKeySlots),
-                                                     .outerProjectSlots = lower(outerProjectSlots),
-                                                     .innerKeySlots = lower(innerKeySlots),
-                                                     .innerProjectSlots = lower(innerProjectSlots),
-                                                     .dirs = {dirs.begin(), dirs.end()}})});
+    return lowerBlueprint(_state,
+                          SbBlueprintMergeJoin{.outer = addStage(_state, std::move(outerStage)),
+                                               .inner = addStage(_state, std::move(innerStage)),
+                                               .nodeId = _nodeId,
+                                               .outerKeySlots = lower(outerKeySlots),
+                                               .outerProjectSlots = lower(outerProjectSlots),
+                                               .innerKeySlots = lower(innerKeySlots),
+                                               .innerProjectSlots = lower(innerProjectSlots),
+                                               .dirs = {dirs.begin(), dirs.end()}});
 }
 
 SbBuilder::FetchBuildResult SbBuilder::makeFetch(SbStage child,
@@ -1224,20 +1209,18 @@ SbBuilder::FetchBuildResult SbBuilder::makeFetch(SbStage child,
         scanFieldSlots.emplace_back(SbSlot{_state.slotId()});
     }
 
-    auto stage = addBlueprint(
-        _state,
-        SbBlueprintFetch{.nodeId = _nodeId,
-                         .info = std::make_unique<SbBlueprintFetchInfo>(
-                             SbBlueprintFetchInfo{.child = child.release(),
-                                                  .collectionUuid = std::move(collectionUuid),
-                                                  .dbName = std::move(dbName),
-                                                  .seekSlot = seekSlot.getId(),
-                                                  .indexInfoSlots = indexInfoSlots,
-                                                  .scanFieldNames = std::move(scanFieldNames),
-                                                  .scanCallbacks = std::move(scanCallbacks),
-                                                  .recordSlot = resultSlot.getId(),
-                                                  .recordIdSlot = recordIdSlot.getId(),
-                                                  .scanFieldSlots = lower(scanFieldSlots)})});
+    auto stage = lowerBlueprint(_state,
+                                SbBlueprintFetch{.child = addStage(_state, std::move(child)),
+                                                 .nodeId = _nodeId,
+                                                 .collectionUuid = std::move(collectionUuid),
+                                                 .dbName = std::move(dbName),
+                                                 .seekSlot = seekSlot.getId(),
+                                                 .indexInfoSlots = indexInfoSlots,
+                                                 .scanFieldNames = std::move(scanFieldNames),
+                                                 .scanCallbacks = std::move(scanCallbacks),
+                                                 .recordSlot = resultSlot.getId(),
+                                                 .recordIdSlot = recordIdSlot.getId(),
+                                                 .scanFieldSlots = lower(scanFieldSlots)});
     return FetchBuildResult{std::move(stage), resultSlot, recordIdSlot, std::move(scanFieldSlots)};
 }
 
@@ -1281,11 +1264,11 @@ SbStage SbBuilder::makeExtractFieldPaths(SbStage child,
                                          std::vector<sbe::PathSlot> inputs,
                                          std::vector<sbe::PathSlot> outputs,
                                          PlanNodeId nodeId) {
-    return addBlueprint(_state,
-                        SbBlueprintExtractFieldPaths{.child = child.release(),
-                                                     .nodeId = nodeId,
-                                                     .inputs = std::move(inputs),
-                                                     .outputs = std::move(outputs)});
+    return lowerBlueprint(_state,
+                          SbBlueprintExtractFieldPaths{.child = addStage(_state, std::move(child)),
+                                                       .nodeId = nodeId,
+                                                       .inputs = std::move(inputs),
+                                                       .outputs = std::move(outputs)});
 }
 
 SbSlotVector SbBuilder::allocateOutSlotsForMergeStage(const std::vector<SbSlotVector>& slots) {

@@ -64,8 +64,8 @@ struct StageBuilderState {
     StageBuilderState(const StageBuilderState& other) = delete;
 
     /**
-     * Returns the blueprint tree built so far. Every SbStage handle held by the stage builders
-     * refers to a node of this blueprint.
+     * Returns the blueprint tree of the plan under construction. SbBuilder appends the blueprint
+     * of every stage it creates to it.
      */
     SbBlueprint& blueprint() {
         return *_blueprint;

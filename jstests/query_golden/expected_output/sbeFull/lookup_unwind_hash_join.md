@@ -82,12 +82,12 @@ Slots: $$RESULT=s15 env: {  }
     inner s11 s5 
         [3] project [s11 = arrayToSet(
             let [
-                l4.0 = (s8 ?: null) 
+                l3.0 = (s8 ?: null) 
             ] 
             in 
-                if isArray(l4.0) 
-                then concatArrays(l4.0, newArray(l4.0)) 
-                else newArray(move(l4.0)) 
+                if isArray(l3.0) 
+                then concatArrays(l3.0, newArray(l3.0)) 
+                else newArray(move(l3.0)) 
        )] 
         [2] scan generic [s5 = record, s6 = recordId] [s7 = a, s8 = fkey, s9 = joined] @"" 
 ```
@@ -251,12 +251,12 @@ Slots: $$RESULT=s19 env: {  }
     inner s12 s6 
         [3] project [s12 = arrayToSet(
             let [
-                l4.0 = (s9 ?: null) 
+                l3.0 = (s9 ?: null) 
             ] 
             in 
-                if isArray(l4.0) 
-                then concatArrays(l4.0, newArray(l4.0)) 
-                else newArray(move(l4.0)) 
+                if isArray(l3.0) 
+                then concatArrays(l3.0, newArray(l3.0)) 
+                else newArray(move(l3.0)) 
        )] 
         [2] scan generic [s6 = record, s7 = recordId] [s8 = a, s9 = fkey, s10 = joined] @"" 
 ```
@@ -425,12 +425,12 @@ Slots: $$RESULT=s20 env: {  }
     inner s13 s7 
         [3] project [s13 = arrayToSet(
             let [
-                l4.0 = (s10 ?: null) 
+                l3.0 = (s10 ?: null) 
             ] 
             in 
-                if isArray(l4.0) 
-                then concatArrays(l4.0, newArray(l4.0)) 
-                else newArray(move(l4.0)) 
+                if isArray(l3.0) 
+                then concatArrays(l3.0, newArray(l3.0)) 
+                else newArray(move(l3.0)) 
        )] 
         [2] scan generic [s7 = record, s8 = recordId] [s9 = a, s10 = fkey, s11 = joined] @"" 
 ```
@@ -634,12 +634,12 @@ Slots: $$RESULT=s12 env: {  }
     inner s10 s5 
         [3] project [s10 = arrayToSet(
             let [
-                l4.0 = (s8 ?: null) 
+                l3.0 = (s8 ?: null) 
             ] 
             in 
-                if isArray(l4.0) 
-                then concatArrays(l4.0, newArray(l4.0)) 
-                else newArray(move(l4.0)) 
+                if isArray(l3.0) 
+                then concatArrays(l3.0, newArray(l3.0)) 
+                else newArray(move(l3.0)) 
        )] 
         [2] scan generic [s5 = record, s6 = recordId] [s7 = a, s8 = fkey] @"" 
 ```
@@ -705,12 +705,12 @@ Slots: $$RESULT=s12 env: {  }
     inner s10 s5 
         [3] project [s10 = arrayToSet(
             let [
-                l5.0 = (s8 ?: null) 
+                l3.0 = (s8 ?: null) 
             ] 
             in 
-                if isArray(l5.0) 
-                then concatArrays(l5.0, newArray(l5.0)) 
-                else newArray(move(l5.0)) 
+                if isArray(l3.0) 
+                then concatArrays(l3.0, newArray(l3.0)) 
+                else newArray(move(l3.0)) 
        )] 
         [2] scan generic [s5 = record, s6 = recordId] [s7 = a, s8 = fkey] @"" 
 ```
@@ -846,12 +846,12 @@ Slots: $$RESULT=s12 env: {  }
     inner s10 s5 
         [3] project [s10 = arrayToSet(
             let [
-                l7.0 = (s8 ?: null) 
+                l3.0 = (s8 ?: null) 
             ] 
             in 
-                if isArray(l7.0) 
-                then concatArrays(l7.0, newArray(l7.0)) 
-                else newArray(move(l7.0)) 
+                if isArray(l3.0) 
+                then concatArrays(l3.0, newArray(l3.0)) 
+                else newArray(move(l3.0)) 
        )] 
         [2] scan generic [s5 = record, s6 = recordId] [s7 = a, s8 = fkey] @"" 
 ```
@@ -989,12 +989,12 @@ Slots: $$RESULT=s12 env: {  }
     inner s10 s5 
         [3] project [s10 = arrayToSet(
             let [
-                l4.0 = (s8 ?: null) 
+                l3.0 = (s8 ?: null) 
             ] 
             in 
-                if isArray(l4.0) 
-                then concatArrays(l4.0, newArray(l4.0)) 
-                else newArray(move(l4.0)) 
+                if isArray(l3.0) 
+                then concatArrays(l3.0, newArray(l3.0)) 
+                else newArray(move(l3.0)) 
        )] 
         [2] scan generic [s5 = record, s6 = recordId] [s7 = a, s8 = fkey] @"" 
 ```
@@ -1063,12 +1063,12 @@ Slots: $$RESULT=s12 env: {  }
     inner s10 s5 
         [3] project [s10 = arrayToSet(
             let [
-                l5.0 = (s8 ?: null) 
+                l3.0 = (s8 ?: null) 
             ] 
             in 
-                if isArray(l5.0) 
-                then concatArrays(l5.0, newArray(l5.0)) 
-                else newArray(move(l5.0)) 
+                if isArray(l3.0) 
+                then concatArrays(l3.0, newArray(l3.0)) 
+                else newArray(move(l3.0)) 
        )] 
         [2] scan generic [s5 = record, s6 = recordId] [s7 = a, s8 = fkey] @"" 
 ```
@@ -1135,12 +1135,12 @@ Slots: $$RESULT=s12 env: {  }
     inner s10 s5 
         [3] project [s10 = arrayToSet(
             let [
-                l6.0 = (s8 ?: null) 
+                l3.0 = (s8 ?: null) 
             ] 
             in 
-                if isArray(l6.0) 
-                then concatArrays(l6.0, newArray(l6.0)) 
-                else newArray(move(l6.0)) 
+                if isArray(l3.0) 
+                then concatArrays(l3.0, newArray(l3.0)) 
+                else newArray(move(l3.0)) 
        )] 
         [2] scan generic [s5 = record, s6 = recordId] [s7 = a, s8 = fkey] @"" 
 ```
@@ -1210,12 +1210,12 @@ Slots: $$RESULT=s12 env: {  }
     inner s10 s5 
         [3] project [s10 = arrayToSet(
             let [
-                l7.0 = (s8 ?: null) 
+                l3.0 = (s8 ?: null) 
             ] 
             in 
-                if isArray(l7.0) 
-                then concatArrays(l7.0, newArray(l7.0)) 
-                else newArray(move(l7.0)) 
+                if isArray(l3.0) 
+                then concatArrays(l3.0, newArray(l3.0)) 
+                else newArray(move(l3.0)) 
        )] 
         [2] scan generic [s5 = record, s6 = recordId] [s7 = a, s8 = fkey] @"" 
 ```
