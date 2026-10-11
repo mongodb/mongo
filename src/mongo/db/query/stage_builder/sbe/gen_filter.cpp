@@ -1302,7 +1302,13 @@ SbExpr generateFilter(StageBuilderState& state,
     }
 
     MatchExpressionVisitorContext context{
-        state, rootSlot, root, &slots, isFilterOverIxscan, canUsePathArrayness};
+        state,
+        rootSlot,
+        root,
+        &slots,
+        isFilterOverIxscan,
+        canUsePathArrayness &&
+            state.expCtx->getQueryKnobConfiguration().getEnablePathArraynessTraverseFElision()};
 
     MatchExpressionPreVisitor preVisitor{&context};
     MatchExpressionInVisitor inVisitor{&context};

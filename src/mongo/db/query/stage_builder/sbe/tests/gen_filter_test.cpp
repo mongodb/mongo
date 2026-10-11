@@ -491,6 +491,24 @@ TEST_F(GoldenSbeFilterBuilderArraynessTestFixture, TestPathArraynessTraverseFEli
     }
 }
 
+TEST_F(GoldenSbeFilterBuilderArraynessTestFixture, TestPathArraynessTraverseFElisionKnobDisabled) {
+    unittest::ServerParameterGuard featureFlag{"featureFlagPathArrayness", true};
+    unittest::ServerParameterGuard knob{"internalEnablePathArraynessTraverseFElision", false};
+
+    // With the knob off, traverseF is retained even on a path known to be non-array.
+    auto root = BSON("a" << BSON("b" << 1));
+    auto rootSlotId = _env->registerSlot("root"sv,
+                                         sbe::value::TypeTags::bsonObject,
+                                         sbe::value::bitcastFrom<const char*>(root.objdata()),
+                                         false,
+                                         &_slotIdGenerator);
+    auto rootSlot = SbSlot{rootSlotId, TypeSignature::kObjectType};
+
+    EqualityMatchExpression eqExpr("a.b"sv, Value(1));
+    runTestWithPathArrayness(
+        &eqExpr, rootSlot, true /* expected */, "TraverseFRetained_KnobDisabled"sv);
+}
+
 TEST_F(GoldenSbeFilterBuilderArraynessTestFixture, TestNothingCheckWithPathArrayness) {
     unittest::ServerParameterGuard featureFlag{"featureFlagPathArrayness", true};
 

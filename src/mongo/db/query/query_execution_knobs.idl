@@ -1035,6 +1035,19 @@ server_parameters:
                 fcv:
                     min: "9.0"
 
+    internalEnablePathArraynessTraverseFElision:
+        description: >-
+            Whether or not to elide traverseF in SBE filters for paths that PathArrayness marks
+            as never being arrays. Requires internalEnablePathArrayness.
+        set_at: [startup, runtime]
+        cpp_varname: "internalEnablePathArraynessTraverseFElision"
+        cpp_vartype: Atomic<bool>
+        default: true
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: enablePathArraynessTraverseFElision
+
     internalQuerySpillingMaxWaitTimeout:
         description: >-
             Timeout in MS that the storage engine will block a spilling operation when the
