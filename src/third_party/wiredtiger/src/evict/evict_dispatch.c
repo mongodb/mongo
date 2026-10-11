@@ -499,7 +499,8 @@ __wt_evict_page_urgent(WT_SESSION_IMPL *session, WT_REF *ref)
     WT_ASSERT(session, !__wt_ref_is_root(ref));
 
     page = ref->page;
-    if (S2BT(session)->evict_disabled > 0 || F_ISSET_ATOMIC_16(page, WT_PAGE_EVICT_LRU_URGENT)) {
+    if (!__wt_btree_eviction_enabled(S2BT(session)) ||
+      F_ISSET_ATOMIC_16(page, WT_PAGE_EVICT_LRU_URGENT)) {
         WT_STAT_CONN_INCR(session, eviction_server_skip_pages_already_in_urgent_queue);
         return (false);
     }
@@ -515,7 +516,8 @@ __wt_evict_page_urgent(WT_SESSION_IMPL *session, WT_REF *ref)
     __wt_spin_lock(session, &evict->evict_queue_lock);
 
     /* Check again, in case we raced with another thread. */
-    if (S2BT(session)->evict_disabled > 0 || F_ISSET_ATOMIC_16(page, WT_PAGE_EVICT_LRU_URGENT))
+    if (!__wt_btree_eviction_enabled(S2BT(session)) ||
+      F_ISSET_ATOMIC_16(page, WT_PAGE_EVICT_LRU_URGENT))
         goto done;
 
     /*

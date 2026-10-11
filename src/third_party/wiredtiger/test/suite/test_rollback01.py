@@ -31,6 +31,9 @@ class test_rollback(wttest.WiredTigerTestCase):
     test_name = __qualname__
     uri = f"table:{test_name}.wt"
 
+    @wttest.skip_for_hook(
+        "disagg", "new tables cannot be evicted until their publication takes effect",
+        param="schema_epochs")
     def test_wt_rollback_cursor_next_no_retry(self):
         """
         Try to insert a key value pair while the cache is full, and verify cursor->next() calls

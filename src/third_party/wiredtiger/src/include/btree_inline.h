@@ -37,6 +37,17 @@ __wt_btree_disable_bulk(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __wt_btree_eviction_enabled --
+ *     Return true if page eviction is enabled for the given tree.
+ */
+static WT_INLINE bool
+__wt_btree_eviction_enabled(WT_BTREE *btree)
+{
+    return (!F_ISSET(btree, WT_BTREE_NO_EVICT) &&
+      __wt_atomic_load_int32_relaxed(&btree->evict_disabled) == 0);
+}
+
+/*
  * __wt_btree_is_outdated_disagg --
  *     Return whether the current btree belongs to an outdated disaggregated generation.
  */
@@ -86,7 +97,7 @@ __wt_evict_page_soon_check(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_sp
      * checkpointed, and no other thread can help with that. Checkpoints don't rely on this code for
      * dirty eviction: that is handled explicitly in __wt_sync_file.
      */
-    if (__wt_evict_page_is_soon_or_wont_need(page) && btree->evict_disabled == 0 &&
+    if (__wt_evict_page_is_soon_or_wont_need(page) && __wt_btree_eviction_enabled(btree) &&
       __wt_page_can_evict(session, ref, inmem_split) &&
       (!WT_SESSION_IS_CHECKPOINT(session) || __wt_page_evict_clean(page) ||
         __wt_page_evict_swap(page)))
@@ -2594,8 +2605,8 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
      *
      * Note that we are not using __wt_page_del_committed here because (a) examining the page_del
      * structure requires locking the ref, and (b) once in memory the page_del structure only
-     * remains until the next reconciliation, and nothing prevents that from occurring before the
-     * transaction commits.
+     * remains until a reconciliation writes a new image of the page, and nothing prevents that from
+     * occurring before the transaction commits.
      */
     if (mod->inst_updates != NULL) {
         WT_STAT_CONN_DSRC_INCR(session, cache_eviction_blocked_uncommitted_truncate);
@@ -2709,9 +2720,9 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 
     /*
      * If the session is configured with the release_evict_pages debug option, we will attempt to
-     * evict the pages when they are no longer needed.
+     * evict the pages when they are no longer needed, unless eviction is disabled for the tree.
      */
-    if (F_ISSET(session, WT_SESSION_DEBUG_RELEASE_EVICT)) {
+    if (F_ISSET(session, WT_SESSION_DEBUG_RELEASE_EVICT) && __wt_btree_eviction_enabled(btree)) {
         WT_TRET_BUSY_OK(__wt_page_release_evict(session, ref, flags));
         return (0);
     }
@@ -2729,8 +2740,7 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
             WT_RET_BUSY_OK(__wt_page_release_evict(session, ref, flags));
             return (0);
         }
-    } else if (!LF_ISSET(WT_READ_NO_EVICT) &&
-      __wt_atomic_load_int32_relaxed(&btree->evict_disabled) == 0 &&
+    } else if (!LF_ISSET(WT_READ_NO_EVICT) && __wt_btree_eviction_enabled(btree) &&
       !F_ISSET(session, WT_SESSION_NO_RECONCILE) && __wt_page_evict_swap(ref->page)) {
         WT_RET_BUSY_OK(__wt_page_release_evict(session, ref, flags));
         return (0);

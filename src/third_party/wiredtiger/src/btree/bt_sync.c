@@ -374,6 +374,9 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
         }
         break;
     case WT_SYNC_CHECKPOINT:
+        if (WT_SESSION_IS_CHECKPOINT(session))
+            WT_ASSERT_SPINLOCK_OWNED(session, &conn->checkpoint_lock);
+
         /*
          * If we are flushing a file at read-committed isolation, which is of particular interest
          * for flushing the metadata to make a schema-changing operation durable, get a
@@ -519,7 +522,8 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
              */
             if (!is_internal &&
               FLD_ISSET(conn->timing_stress_flags, WT_TIMING_STRESS_CHECKPOINT_EVICT_PAGE) &&
-              !tried_eviction && F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT)) {
+              !tried_eviction && F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT) &&
+              __wt_btree_eviction_enabled(btree)) {
                 ret = __wt_page_release_evict(session, walk, 0);
                 walk = NULL;
                 WT_ERR_ERROR_OK(ret, EBUSY, false);

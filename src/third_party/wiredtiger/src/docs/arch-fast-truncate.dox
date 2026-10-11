@@ -111,8 +111,9 @@ The \c instantiated flag and the \c page_del structure are retained for the bene
 parent internal page reconciliation.
 See @ref ft_internal_reconciliation below.
 
-When the page is itself reconciled, or if the transaction that deleted it rolls back, the
-\c instantiated flag is cleared and the \c page_del structure is discarded.
+When reconciliation replaces or removes the original page address, or when the truncate
+rolls back, the \c instantiated flag is cleared and the \c page_del structure is discarded.
+A reconciliation that skips the write retains both.
 
 Note that the \c page_del field of an instantiated page should not be used to make
 operational decisions.
@@ -245,8 +246,11 @@ For instantiated pages, under normal circumstances the instantiated child will b
 reconciled before its parent.
 Eviction skips parents that have in-memory children, and when checkpointing ordinarily all
 children are written out before their parents.
-In this case the instantiated flag and deletion information will have been cleared and no
-special steps are required to reconcile the parent.
+If child reconciliation replaces or removes the original address, the instantiated flag and
+deletion information will have been cleared and no special steps are required to reconcile
+the parent.
+If it skips the write, both are retained so the parent can evaluate the original deletion
+information.
 (It is possible for the truncation to be uncommitted so the update list to be non-null;
 however, this does not matter when checkpointing either the child or the parent, as the
 updates created by instantiation will be left in memory in the usual way.
@@ -278,11 +282,14 @@ locking) and it was judged not worthwhile.
 
 Eviction of instantiated pages where the truncation is committed is permitted, however,
 and checkpoint of instantiated pages is always allowed.
-The first reconciliation after instantiation clears the instantiated flag (\c
-page->modify->instantiated) and discards the \c page_del structure, as once a
-reconciliation result exists it can be used to reconcile the parent.
+The first reconciliation after instantiation that replaces or removes the original address
+clears the instantiated flag (\c page->modify->instantiated) and discards the \c page_del
+structure, as the parent no longer needs to rebuild the original deletion proxy.
 (This is true whether or not it includes the tombstones from instantiation, i.e., whether
 the truncation was committed.)
+In disaggregated storage a reconciliation may instead skip the write and keep the page's
+existing block; the flag and structure survive such a reconciliation, because the parent's
+cell may still be a proxy cell that can only be rebuilt from the \c page_del information.
 
 Note that "unresolved" includes "prepared".
 While we cannot write out a prepared truncation in the parent page's address cells, in
@@ -787,7 +794,7 @@ Write out deleted address cells when needed.}
 Set WT_PAGE_FT_UPDATE on the page header if appropriate.}
 @row{rec_write.c, Hook, in \c __rec_write_wrapup,
 Clear the instantiated flag and discard the page deletion information for instantiated
-pages.}
+pages unless reconciliation skipped the write.}
 <!--
 Also, the mechanism for keeping track of whether a page reconciled empty is mostly in
 rec_write.c.

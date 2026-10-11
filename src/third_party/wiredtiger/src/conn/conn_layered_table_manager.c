@@ -56,7 +56,7 @@ __wt_layered_table_manager_add_table(WT_SESSION_IMPL *session, uint32_t ingest_i
     WT_DECL_RET;
     WT_LAYERED_TABLE *layered;
     WT_LAYERED_TABLE_MANAGER *manager;
-    WT_LAYERED_TABLE_MANAGER_ENTRY *entry;
+    WT_LAYERED_TABLE_MANAGER_ENTRY *entry = NULL;
 
     conn = S2C(session);
     manager = &conn->layered_table_manager;
@@ -99,6 +99,9 @@ __wt_layered_table_manager_add_table(WT_SESSION_IMPL *session, uint32_t ingest_i
 
 err:
     __wt_spin_unlock(session, &manager->layered_table_lock);
+
+    if (ret != 0)
+        __wt_free(session, entry);
 
     return (ret);
 }

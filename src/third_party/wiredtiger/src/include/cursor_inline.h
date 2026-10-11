@@ -301,9 +301,10 @@ __cursor_reset(WT_CURSOR_BTREE *cbt)
      * Release any page references we're holding. This can trigger eviction (for example, forced
      * eviction of big pages), so it must happen after releasing our snapshot above. Additionally,
      * there's a debug mode where an application can force the eviction in order to test or stress
-     * the system. Clear the reference so we never try the release twice.
+     * the system, unless eviction is disabled for the tree. Clear the reference so we never try the
+     * release twice.
      */
-    if (F_ISSET(cursor, WT_CURSTD_DEBUG_RESET_EVICT))
+    if (F_ISSET(cursor, WT_CURSTD_DEBUG_RESET_EVICT) && __wt_btree_eviction_enabled(CUR2BT(cbt)))
         WT_TRET_BUSY_OK(__wt_page_release_evict(session, cbt->ref, 0));
     else
         ret = __wt_page_release(session, cbt->ref, 0);

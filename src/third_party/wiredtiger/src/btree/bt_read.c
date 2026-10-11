@@ -26,6 +26,10 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_REF *ref)
     size_t footprint;
 
     btree = S2BT(session);
+
+    if (!__wt_btree_eviction_enabled(btree))
+        return (false);
+
     page = ref->page;
 
     /* Leaf pages only. */
@@ -683,7 +687,7 @@ read:
              * making the problem better.
              */
             if (evict_skip || F_ISSET(session, WT_SESSION_RESOLVING_TXN) ||
-              LF_ISSET(WT_READ_NO_SPLIT) || btree->evict_disabled > 0)
+              LF_ISSET(WT_READ_NO_SPLIT))
                 goto skip_evict;
 
             /*

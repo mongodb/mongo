@@ -39,7 +39,7 @@ class test_eviction05(wttest.WiredTigerTestCase):
         return config
 
     @wttest.skip_for_hook(
-        "disagg", "release eviction may not write pages before deferred btree publication",
+        "disagg", "new tables cannot be evicted until their publication takes effect",
         param="schema_epochs")
     def test_eviction_page_size_stats(self):
         uri = f'table:{self.test_name}'

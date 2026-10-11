@@ -27,6 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest
+from contextlib import closing
 
 from helper_disagg import (
     DisaggSchemaEpochMixin,
@@ -37,12 +38,10 @@ from helper_disagg import (
 from prepare_util import test_prepare_preserve_prepare_base
 from wtscenario import make_scenarios
 
-# A prepared insert rolled back while its table awaits publication must not
-# leak during eviction.
+
+# Prepared insert rollback preserves state across publication and release eviction.
 @disagg_test_class
-class test_layered_schema35(
-    test_prepare_preserve_prepare_base, DisaggSchemaEpochMixin
-):
+class test_layered_schema35(test_prepare_preserve_prepare_base, DisaggSchemaEpochMixin):
     uri = f"layered:{__qualname__}"
 
     conn_config = (
@@ -51,7 +50,46 @@ class test_layered_schema35(
     )
 
     disagg_storages = gen_disagg_storages(disagg_only=True)
-    scenarios = make_scenarios(disagg_storages)
+    release_evict_modes = [
+        ("cursor_evict", dict(session_cfg="", cursor_cfg="debug=(release_evict)")),
+        ("session_evict", dict(session_cfg="debug=(release_evict_page=true)", cursor_cfg="")),
+    ]
+    scenarios = make_scenarios(disagg_storages, release_evict_modes)
+
+    def prepare_insert_and_rollback(self, prepare_ts, rollback_ts):
+        """Prepare an insert and roll it back."""
+        with wttest.open_cursor(self.session, self.uri) as cursor:
+            self.session.begin_transaction()
+            cursor[1] = "rolled-back"
+            self.session.prepare_transaction(
+                f"prepare_timestamp={self.timestamp_str(prepare_ts)},"
+                f"prepared_id={self.prepared_id_str(1)}"
+            )
+            self.session.rollback_transaction(
+                f"rollback_timestamp={self.timestamp_str(rollback_ts)}"
+            )
+
+    def release_evict(self):
+        """Search for the rolled-back key, releasing its page with eviction configured."""
+        with (
+            closing(self.conn.open_session(self.session_cfg)) as session,
+            wttest.open_cursor(session, self.uri, config=self.cursor_cfg) as cursor,
+        ):
+            cursor.set_key(1)
+            self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
+
+    def evicted_pages(self):
+        """Return the number of pages evicted from the stable file."""
+        uri = self.stable_uri(self.uri)
+        clean = self.get_stat(wiredtiger.stat.dsrc.cache_eviction_clean, uri)
+        dirty = self.get_stat(wiredtiger.stat.dsrc.cache_eviction_dirty, uri)
+        return clean + dirty
+
+    def prepared_records_written(self):
+        """Return the number of records with prepare state written to the stable file."""
+        return self.get_stat(
+            wiredtiger.stat.dsrc.rec_time_window_prepared, self.stable_uri(self.uri)
+        )
 
     def test_prepared_insert_rollback_before_publication(self):
         # Create a table that is awaiting publication.
@@ -60,37 +98,47 @@ class test_layered_schema35(
         self.publish(self.uri, 10)
 
         # Roll back a prepared insert while the table is awaiting publication.
-        with wttest.open_cursor(self.session, self.uri) as cursor:
-            self.session.begin_transaction()
-            cursor[1] = "rolled-back"
-            self.session.prepare_transaction(
-                f"prepare_timestamp={self.timestamp_str(30)},"
-                f"prepared_id={self.prepared_id_str(1)}"
-            )
-            self.session.rollback_transaction(
-                f"rollback_timestamp={self.timestamp_str(40)}"
-            )
+        self.prepare_insert_and_rollback(prepare_ts=30, rollback_ts=40)
 
         # Publish the table and checkpoint before the rollback is stable.
         self.set_stable_epoch(10)
         self.leader_checkpoint(30)
 
         # Confirm the stable file received a record with prepare state.
-        prepared_records_written = self.get_stat(
-            wiredtiger.stat.dsrc.rec_time_window_prepared,
-            self.stable_uri(self.uri),
-        )
-        self.assertGreater(prepared_records_written, 0)
+        self.assertGreater(self.prepared_records_written(), 0)
 
-        # Confirm the rolled-back key is absent during eviction.
-        with wttest.open_cursor(
-            self.session, self.uri, config="debug=(release_evict)"
-        ) as evict_cursor:
-            evict_cursor.set_key(1)
-            self.assertEqual(evict_cursor.search(), wiredtiger.WT_NOTFOUND)
+        # Confirm the rolled-back key is absent and its page is evicted.
+        evicted = self.evicted_pages()
+        self.release_evict()
+        self.assertGreater(self.evicted_pages(), evicted)
 
         # Make the rollback stable and checkpoint again.
         self.leader_checkpoint(40)
+
+    def test_prepared_insert_rollback_not_evicted_before_publication(self):
+        # Create a table that is awaiting publication.
+        self.set_stable_epoch(5)
+        self.session.create(self.uri, "key_format=i,value_format=S")
+        self.publish(self.uri, 10)
+
+        # Roll back a prepared insert while the table is awaiting publication.
+        self.prepare_insert_and_rollback(prepare_ts=30, rollback_ts=40)
+
+        # Confirm eviction does not happen before the table is published.
+        evicted = self.evicted_pages()
+        self.release_evict()
+        self.assertEqual(self.evicted_pages(), evicted)
+
+        # Publish the table and checkpoint before the rollback is stable.
+        self.set_stable_epoch(10)
+        self.leader_checkpoint(30)
+
+        # Confirm the eviction attempt did not discard the prepared state.
+        self.assertGreater(self.prepared_records_written(), 0)
+
+        # Make the rollback stable and checkpoint again.
+        self.leader_checkpoint(40)
+
 
 if __name__ == "__main__":
     wttest.run()

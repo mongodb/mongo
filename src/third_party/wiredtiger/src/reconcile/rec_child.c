@@ -308,19 +308,22 @@ __wti_rec_child_modify(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_REF *ref,
 
             /*
              * The child is potentially modified if the page's modify structure has been created. If
-             * the modify structure exists and the page has been reconciled, set that state.
+             * the modify structure exists and the page has been reconciled, set that state. A
+             * reconciliation that skipped the write left the on-disk image in place, so the child
+             * is still evaluated as it is on disk, including any fast-truncate state below.
              */
             mod = ref->page->modify;
-            if (mod != NULL && mod->rec_result != 0) {
+            if (mod != NULL && mod->rec_result != 0 &&
+              !(mod->rec_result == WT_PM_REC_REPLACE && mod->mod_replace.block_cookie == NULL)) {
                 cmsp->state = WTI_CHILD_MODIFIED;
                 goto done;
             }
 
             /*
-             * Deleted page instantiation can happen at any time during a checkpoint. If we found
-             * the instantiated page in the first checkpoint pass, it will have been reconciled and
-             * dealt with normally. However, if that didn't happen, we get here with a page that has
-             * been modified and never reconciled.
+             * Deleted page instantiation can happen at any time during a checkpoint. If the first
+             * checkpoint pass reconciled the instantiated page with a replacement address, it is
+             * handled above. Otherwise, the page was never reconciled or reconciliation skipped the
+             * write, leaving the original on-disk image in place.
              *
              * Ordinarily in that situation we'd write a reference to the original child page, and
              * in the ordinary case where the modifications were applied after the checkpoint
@@ -333,9 +336,9 @@ __wti_rec_child_modify(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_REF *ref,
              * be able to ignore the page entirely. We keep the original fast-truncate information
              * in the ref after instantiation to make the visibility check possible.
              *
-             * The key is the page-modify.instantiated flag, removed during page reconciliation. If
-             * it's set, instantiation happened after checkpoint passed the leaf page and we treat
-             * this page like a WT_REF_DELETED page, evaluating it as it was before instantiation.
+             * The instantiated flag survives a skipped write and is cleared when reconciliation
+             * replaces or removes the original address. While set, treat the child like a
+             * WT_REF_DELETED page, evaluating it as it was before instantiation.
              *
              * We need to lock the ref for it to be safe to examine the page_del structure, in case
              * the transaction in it is unresolved and tries to roll back (which discards the

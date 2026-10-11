@@ -1073,6 +1073,7 @@ __wti_rts_btree_abort_updates(
   WT_SESSION_IMPL *session, WT_REF *ref, wt_timestamp_t rollback_timestamp)
 {
     WT_PAGE *page;
+    WT_REF_STATE previous_state;
     bool dryrun, modified;
 
     dryrun = S2C(session)->rts->dryrun;
@@ -1115,5 +1116,21 @@ __wti_rts_btree_abort_updates(
     /* Mark the page as dirty to reconcile the page. */
     if (!dryrun && page->modify)
         __wt_page_modify_set(session, page);
+
+    /*
+     * A rolled-back fast truncate leaves the retained page-delete information describing nothing.
+     * Discard it together with the instantiated flag, as transaction rollback does, or a later
+     * skipped write carries it forward and the parent re-asserts the truncate. Lock the ref so the
+     * two change together for any reader of the parent.
+     */
+    if (!dryrun && page->modify != NULL && page->modify->instantiated && ref->page_del != NULL &&
+      (ref->page_del->prepare_state == WT_PREPARE_INPROGRESS ||
+        ref->page_del->pg_del_durable_ts > rollback_timestamp)) {
+        WT_REF_LOCK(session, ref, &previous_state);
+        WT_ASSERT(session, ref->page_del->committed);
+        page->modify->instantiated = false;
+        __wt_free(session, ref->page_del);
+        WT_REF_UNLOCK(ref, previous_state);
+    }
     return (0);
 }

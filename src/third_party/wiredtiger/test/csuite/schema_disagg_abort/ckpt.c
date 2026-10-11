@@ -171,23 +171,15 @@ thread_ts_run(void *arg)
 
     while (workload_active(state, STAGE_TS)) {
         /* Frontier of the fully complete operations across all workers. */
-        const uint64_t frontier_ts = frontier_advance(state);
+        uint64_t frontier_ts = frontier_advance(state);
 
-        /*
-         * Setting timestamps is a critical section: the stable frontier must not advance while a
-         * step-down is in progress.
-         */
-        __wt_atomic_store_bool(&state->ts_busy, true);
-        if (__wt_atomic_load_uint64(&state->stepdown_ts) == 0) {
-            /*
-             * The single frontier serves both schema and data operations: everything at or below it
-             * is completed.
-             */
-            const uint64_t stable_ts = query_ts(state->conn, TS_STABLE);
-            if (frontier_ts >= stable_ts)
-                workload_set_frontier(state, frontier_ts);
-        }
-        __wt_atomic_store_bool(&state->ts_busy, false);
+        /* Stable may reach the step-down timestamp but never pass it. */
+        const uint64_t stepdown_ts = __wt_atomic_load_uint64(&state->stepdown_ts);
+        if (stepdown_ts != 0)
+            frontier_ts = WT_MIN(frontier_ts, stepdown_ts);
+
+        if (frontier_ts >= query_ts(state->conn, TS_STABLE))
+            workload_set_frontier(state, frontier_ts);
 
         __wt_sleep(0, 100 * WT_THOUSAND);
     }
@@ -257,8 +249,11 @@ ckpt_take_stepdown(WORKLOAD_STATE *state, WT_SESSION *session, CKPT_CTX *ckpt)
       __wt_atomic_load_uint64(&state->stepdown_ckpt_lsn) != 0)
         return;
 
-    /* The reader pinned stable at the step-down timestamp before releasing this thread. */
+    /* Stable reaches the step-down timestamp once every reserved timestamp is used. */
     const uint64_t stepdown_ts = __wt_atomic_load_uint64(&state->stepdown_ts);
+    if (query_ts(state->conn, TS_STABLE) < stepdown_ts)
+        return;
+
     const uint64_t lsn = ckpt_take(state, session, ckpt, stepdown_ts, "step-down ");
 
     /* Zero would read as "not taken yet" to the generator waiting on it. */

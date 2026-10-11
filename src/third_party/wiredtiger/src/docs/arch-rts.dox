@@ -139,6 +139,10 @@ possible).
 
 Fast-truncate is worth mentioning briefly. If the page has a page delete structure, we can look at
 its durable timestamp, much the same as we would a normal page.
+When RTS undoes an unstable truncate on an instantiated page, it clears the retained page-delete
+information and instantiated flag as well as aborting the tombstones. A checkpointed deletion proxy
+may still be the page's address, so subsequent reconciliation must provide a replacement address
+rather than skip the write. See @ref ft_instantiated_instantiated.
 
 @section interaction-with-transaction-ids Interaction with transaction IDs
 

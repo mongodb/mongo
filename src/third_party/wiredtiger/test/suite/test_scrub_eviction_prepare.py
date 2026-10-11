@@ -56,7 +56,7 @@ class test_scrub_eviction_prepare(wttest.WiredTigerTestCase):
         cur2.close()
 
     @wttest.skip_for_hook(
-        "disagg", "release eviction may not write pages before deferred btree publication",
+        "disagg", "new tables cannot be evicted until their publication takes effect",
         param="schema_epochs")
     def test_scrub_eviction_prepare(self):
         uri = f'table:{self.test_name}'

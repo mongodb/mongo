@@ -156,6 +156,10 @@ __wt_reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage
     /* Can't do history store eviction for history store itself or for metadata. */
     WT_ASSERT(session,
       !LF_ISSET(WT_REC_HS) || (!WT_IS_HS(btree->dhandle) && !WT_IS_ANY_METADATA(btree->dhandle)));
+
+    /* Eviction stays disabled on a btree awaiting publication, and checkpoint skips it. */
+    WT_ASSERT_ALWAYS(session, !F_ISSET_ATOMIC_32(btree, WT_BTREE_AWAITS_PUBLISH),
+      "Reconciling a btree that is awaiting publication");
     /* Flag as unused for non diagnostic builds. */
     WT_UNUSED(btree);
 
@@ -431,11 +435,17 @@ __reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage, u
      * Do not return an error if we are syncing the file with eviction disabled or as part of a
      * checkpoint.
      */
-    if (ret == 0 && !(btree->evict_disabled > 0 || !F_ISSET(btree->dhandle, WT_DHANDLE_OPEN)) &&
-      F_ISSET(r, WT_REC_EVICT) && !WT_PAGE_IS_INTERNAL(page) && r->multi_next == 1 &&
-      !F_ISSET_ATOMIC_16(page, WT_PAGE_INMEM_SPLIT) && F_ISSET(r, WT_REC_CALL_URGENT) &&
+    const bool tree_evictable =
+      __wt_btree_eviction_enabled(btree) && F_ISSET(btree->dhandle, WT_DHANDLE_OPEN);
+
+    const bool forced_leaf_eviction =
+      F_ISSET(r, WT_REC_EVICT) && F_ISSET(r, WT_REC_CALL_URGENT) && !WT_PAGE_IS_INTERNAL(page);
+
+    const bool no_progress = r->multi_next == 1 && !F_ISSET_ATOMIC_16(page, WT_PAGE_INMEM_SPLIT) &&
       !r->update_used && r->cache_write_restore_invisible && !r->has_upd_chain_all_aborted &&
-      r->keys_removed_from_disk_image_count == 0) {
+      r->keys_removed_from_disk_image_count == 0;
+
+    if (ret == 0 && tree_evictable && forced_leaf_eviction && no_progress) {
         /*
          * For disaggregated btree, we should have skipped the write if this page has been
          * reconciled before except for internal pages that have built maximum number of consecutive
@@ -1135,9 +1145,9 @@ __rec_write(WT_SESSION_IMPL *session, WT_ITEM *buf, WT_PAGE_BLOCK_META *block_me
             (checkpoint && addr == NULL && addr_sizep == NULL),
           "Incorrect arguments passed to rec_write for a checkpoint call");
 
-        /* In-memory btrees, and btrees awaiting publication, shouldn't write pages. */
-        WT_ASSERT_ALWAYS(session, !__wt_btree_stays_in_memory(btree),
-          "Attempted to write page to disk when the btree must be kept in memory");
+        /* In-memory btrees shouldn't write pages. */
+        WT_ASSERT_ALWAYS(session, !F_ISSET(btree, WT_BTREE_IN_MEMORY),
+          "Attempted to write page to disk for an in-memory btree");
 
         /*
          * We're passed a table's disk image. Decompress if necessary and verify the image. Always
@@ -1418,7 +1428,7 @@ __rec_is_checkpoint(WT_SESSION_IMPL *session, WTI_RECONCILE *r)
      * checkpoint, before writing the checkpoint. In short, we don't do checkpoint writes here;
      * clear the boundary information as a reminder and create the checkpoint during wrapup.
      */
-    return (!__wt_btree_stays_in_memory(btree) && __wt_ref_is_root(r->ref));
+    return (!F_ISSET(btree, WT_BTREE_IN_MEMORY) && __wt_ref_is_root(r->ref));
 }
 
 /*
@@ -2506,6 +2516,56 @@ __rec_write_image(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_CHUNK *chu
 }
 
 /*
+ * __rec_ref_addr_is_deleted --
+ *     Return whether the reference's address is a fast-truncate proxy cell.
+ */
+static bool
+__rec_ref_addr_is_deleted(WT_SESSION_IMPL *session, WT_REF *ref)
+{
+    WT_ADDR *addr;
+    WT_PAGE *home;
+
+    WT_ASSERT_ALWAYS(session, __wt_session_gen(session, WT_GEN_SPLIT) != 0,
+      "Any thread accessing ref address must hold a valid split generation");
+
+    /*
+     * The proxy cell cannot be modified concurrently and split generations protect its lifetime, so
+     * no copy is needed; parent splits can replace the address, requiring home to be read before
+     * addr with acquire ordering.
+     */
+    home = (WT_PAGE *)__wt_atomic_load_ptr_relaxed(&ref->home);
+    addr = (WT_ADDR *)__wt_atomic_load_ptr_acquire(&ref->addr);
+    return (addr != NULL && !__wt_off_page(home, addr) &&
+      __wt_cell_type_raw((WT_CELL *)addr) == WT_CELL_ADDR_DEL);
+}
+
+/*
+ * __rec_proxy_cell_orphaned --
+ *     Return whether the page's only address is a fast-truncate proxy cell whose page-delete
+ *     information has been discarded.
+ */
+static bool
+__rec_proxy_cell_orphaned(WT_SESSION_IMPL *session, WTI_RECONCILE *r)
+{
+    WT_PAGE_MODIFY *mod;
+
+    mod = r->page->modify;
+
+    /*
+     * A committed fast truncate can be checkpointed as a proxy cell before the leaf is
+     * instantiated. If the truncate durable timestamp is newer than stable, rollback-to-stable
+     * aborts the instantiated tombstones and clears the page-delete information and instantiated
+     * flag, but leaves the parent's proxy cell as the leaf's address. A subsequent skipped write
+     * would leave no replacement address for parent reconciliation, so this leaf be forced to
+     * perform a write that provides one.
+     */
+    if (mod->instantiated ||
+      (mod->rec_result == WT_PM_REC_REPLACE && mod->mod_replace.block_cookie != NULL))
+        return (false);
+    return (__rec_ref_addr_is_deleted(session, r->ref));
+}
+
+/*
  * __rec_copy_prev_addr --
  *     Copy the address cookie of the previous written page
  */
@@ -2635,11 +2695,10 @@ __rec_split_write(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_CHUNK *chu
     if (r->supd_next != 0) {
         WT_RET(__rec_split_write_supd(session, r, chunk, multi, last_block));
 
-        /* We have an empty page. Free the multi. */
         if (chunk->entries == 0 && !F_ISSET(multi, WT_MULTI_SUPD_RESTORE)) {
             WT_ASSERT_ALWAYS(session, last_block, "Write an empty page in split.");
             WT_ASSERT(session, F_ISSET(btree, WT_BTREE_DISAGGREGATED));
-            __rec_set_updates_durable(session, multi);
+            /* No updates were written for the empty chunk, so do not mark them durable. */
             if (btree->type == BTREE_ROW)
                 __wt_free(session, multi->key.ikey);
             __wt_free(session, multi->supd);
@@ -2737,6 +2796,7 @@ __rec_split_write(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_CHUNK *chu
                   page->disagg_info->block_meta.page_id != WT_BLOCK_INVALID_PAGE_ID &&
                   WT_REC_RESULT_SINGLE_PAGE(session, r) && !r->newer_updates_than_last_rec_used &&
                   !F_ISSET_ATOMIC_16(r->page, WT_PAGE_INMEM_SPLIT)) {
+                    WT_ASSERT(session, !__rec_proxy_cell_orphaned(session, r));
                     WT_RET(__rec_copy_prev_addr(session, r));
                     F_SET(multi, WT_MULTI_SKIP_WRITE);
                     WT_STAT_CONN_DSRC_INCR(session, rec_skip_write);
@@ -2755,8 +2815,13 @@ __rec_split_write(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_CHUNK *chu
 
     if (page->disagg_info != NULL) {
         block_meta = &page->disagg_info->block_meta;
+        /*
+         * A page referenced only by a proxy cell with no page-delete information behind it must
+         * write a full image: neither a skipped write nor a delta gives the parent an address to
+         * replace that cell with.
+         */
         if (last_block && r->multi_next == 1 && block_meta->page_id != WT_BLOCK_INVALID_PAGE_ID &&
-          WT_REC_RESULT_SINGLE_PAGE((session), (r))) {
+          WT_REC_RESULT_SINGLE_PAGE((session), (r)) && !__rec_proxy_cell_orphaned(session, r)) {
             if (!r->newer_updates_than_last_rec_used && !WT_PAGE_IS_INTERNAL(page) &&
               !F_ISSET_ATOMIC_16(r->page, WT_PAGE_INMEM_SPLIT))
                 skip_write = true;
@@ -3147,6 +3212,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_RECONCILE_TIME
     bool disagg_delta_chain_end;
     bool disagg_page_free_required;
     bool disagg_page_is_valid;
+    bool skipped_write;
 
     btree = S2BT(session);
     bm = btree->bm;
@@ -3325,6 +3391,12 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_RECONCILE_TIME
     __wt_verbose_debug1(session, WT_VERB_RECONCILE, "%p reconciled into %" PRIu32 " pages",
       (void *)ref, r->multi_next);
 
+    /*
+     * Decide whether the page kept its existing block before the multi array is handed to the page:
+     * the fast-truncate state below is only discarded once a new image exists on disk.
+     */
+    skipped_write = r->multi_next == 1 && F_ISSET(r->multi, WT_MULTI_SKIP_WRITE);
+
     switch (r->multi_next) {
     case 0: /* Page delete */
         WT_STAT_CONN_DSRC_INCR(session, rec_page_delete);
@@ -3457,8 +3529,12 @@ split:
      * will wait for it; and if we are checkpointing the leaf, we can't simultaneously be
      * checkpointing the parent, and we can't be evicting the parent either because internal pages
      * can't be evicted while they have in-memory children.
+     *
+     * A reconciliation that skipped the write is the exception: the on-disk image still predates
+     * the instantiation and the parent's cell may still be a fast-truncate proxy cell, so the
+     * page-delete information stays until an image is actually written.
      */
-    if (mod->instantiated) {
+    if (mod->instantiated && !skipped_write) {
         /*
          * Unfortunately, it seems we need to lock the ref at this point. Ultimately the page_del
          * structure and the instantiated flag need to both be cleared simultaneously (otherwise

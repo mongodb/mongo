@@ -85,9 +85,7 @@ class test_layered_schema07(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
 
     def evict(self, uri, keys):
         """
-        Force the pages holding the given keys through reconciliation and out of cache. For an
-        unpublished table this exercises the in-memory reconciliation path that must keep the tree
-        in memory.
+        Attempt to force the pages holding the given keys through reconciliation and out of cache.
         """
         self.session.begin_transaction()
         evict_cursor = self.session.open_cursor(uri, None, "debug=(release_evict)")
@@ -105,9 +103,8 @@ class test_layered_schema07(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
 
     def test_commit_evicted_before_publish(self):
         """
-        A committed update on an unpublished table must survive in-memory reconciliation (eviction
-        keeps the tree in memory while it awaits publication) and then be written out and visible
-        to followers once the table is published.
+        A committed update on an unpublished table must survive an eviction attempt and then be
+        written out and visible to followers once the table is published.
         """
         self.set_stable_epoch(5)
         self.session.create(self.uri, 'key_format=i,value_format=S')
@@ -119,7 +116,7 @@ class test_layered_schema07(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
         cursor.close()
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(3))
 
-        # Force the page through in-memory reconciliation while the table is still unpublished.
+        # Try to evict the page while the table is still unpublished.
         self.evict(self.uri, [1])
 
         self.leader_checkpoint(1)
@@ -196,8 +193,7 @@ class test_layered_schema07(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
         self.session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(2))
         self.session.rollback_transaction()
 
-        # Force the page - holding the committed key alongside the rolled-back one - through
-        # in-memory reconciliation while the table is still unpublished.
+        # Try to evict the page holding both keys while the table is still unpublished.
         self.evict(self.uri, [1])
 
         # The table has no stable data yet, so a checkpoint at the deferred epoch succeeds.
@@ -274,9 +270,8 @@ class test_layered_schema07(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
 
     def test_commit_evicted_unstable_without_publish(self):
         """
-        A committed but unstable update on an unpublished table must survive in-memory
-        reconciliation (eviction keeps the tree in memory while it awaits publication), and a
-        checkpoint at a stable timestamp below the write must succeed: the table holds only
+        A committed but unstable update on an unpublished table must survive an eviction attempt,
+        and a checkpoint at a stable timestamp below the write must succeed: the table holds only
         unstable data and is skipped rather than written out. The table stays invisible to
         followers, and the committed key remains readable on the leader.
         """
@@ -289,7 +284,7 @@ class test_layered_schema07(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
         cursor.close()
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(3))
 
-        # Force the page through in-memory reconciliation while the table is still unpublished.
+        # Try to evict the page while the table is still unpublished.
         self.evict(self.uri, [1])
 
         # Checkpoint at a stable timestamp below the write: the table has only unstable data, so
@@ -316,10 +311,10 @@ class test_layered_schema07(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
 
     def test_commit_evicted_unstable_published(self):
         """
-        A committed but unstable update on a published table must survive in-memory reconciliation,
-        and a checkpoint that does not advance the stable timestamp past the write must exclude it:
-        the table is visible to followers (it was published) but contains no data, because the
-        write is above the stable timestamp. The committed key remains readable on the leader.
+        A committed but unstable update on a published table must survive an eviction attempt, and a
+        checkpoint that does not advance the stable timestamp past the write must exclude it: the
+        table is visible to followers (it was published) but contains no data, because the write is
+        above the stable timestamp. The committed key remains readable on the leader.
         """
         self.set_stable_epoch(5)
         self.session.create(self.uri, 'key_format=i,value_format=S')
@@ -335,7 +330,7 @@ class test_layered_schema07(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
         cursor.close()
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(3))
 
-        # Force the page through in-memory reconciliation.
+        # Try to evict the page.
         self.evict(self.uri, [1])
 
         # Checkpoint at a stable timestamp below the write: the write is unstable, so the stable

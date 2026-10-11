@@ -14,11 +14,18 @@ the durable state against per-operation record files.
 - In epoch mode, creates and drops have separate operation and publish events, allowing checkpoints
   and crashes to land between the two. In legacy mode each schema operation is complete without a
   publish event. Inserts are generated only after the create is complete.
-- A published drop parks the slot in REMOVED until the stable schema epoch passes the drop's epoch;
+- A published drop parks the table in REMOVED until the stable schema epoch passes the drop's epoch;
   recreating the name earlier is an API violation WiredTiger panics on.
 - Leaders write checkpoints to the shared metadata; followers pick them up.
 - Role changes are events in the event stream, so all earlier work is drained before the connection
   is reconfigured.
+- An operation applied before the step-down timestamp is set must be published at or below it. The
+  step-down event carries how many publishes are pending, and the reader reserves that many
+  timestamps at or below the step-down timestamp for them. They are published among the step-down's
+  own operations, which take timestamps above it. The step-down checkpoint is taken once stable
+  reaches the step-down timestamp.
+- During the step-down, drops wait for the step-down checkpoint: a blocked drop would hold up the
+  publishes that checkpoint waits for.
 
 ## Directory layout
 
@@ -41,7 +48,7 @@ WT_TEST.foo.SAVE/                 pre-verification copy of the home
 
 ## Generator state machine
 
-Each worker owns a pool of table slots. The generator chooses a slot and takes one valid transition
+Each worker owns a pool of tables. The generator chooses a table and takes one valid transition
 or lingers, widening the window in which a checkpoint or crash can occur. (The diagram shows epoch
 mode only.)
 
@@ -49,7 +56,7 @@ mode only.)
 stateDiagram-v2
     direction TB
 
-    state "NONE - slot free" as NONE
+    state "NONE - no table" as NONE
     state "CREATED - create publish pending" as CREATED
     state "PUBLISHED - create published" as PUBLISHED
     state "DROPPED - drop publish pending" as DROPPED
@@ -59,7 +66,7 @@ stateDiagram-v2
     NONE --> CREATED : create
     CREATED --> CREATED : linger
     CREATED --> PUBLISHED : publish create
-    CREATED --> NONE : cancel with drop
+    CREATED --> NONE : cancel with drop, unless its publish has a reserved timestamp
     PUBLISHED --> PUBLISHED : insert or linger
     PUBLISHED --> DROPPED : drop, once the peer covers the create
     DROPPED --> DROPPED : linger
@@ -74,8 +81,8 @@ Threads are created for each leader or follower phase.
 
 | Thread | Count | Responsibility |
 |---|---:|---|
-| generator | 1 for a leader or lone node | Advance the slot state machines and emit workload and role-transition events. |
-| reader | 1 | Read the self-pipe or peer pipe, demultiplex events and drain work at transition markers. |
+| generator | 1 for a leader or lone node | Advance the table state machines and emit workload and role-transition events. |
+| reader | 1 | Read the self-pipe or peer pipe, demultiplex events and drain the workers at the step-down and switch events. |
 | worker | `-T N` | Apply events, relay leader events, append records and report completed timestamps. |
 | timestamp | 1 | Advance oldest and stable timestamps, plus the stable schema epoch in epoch mode, to the completed frontier. |
 | checkpoint | 1 | Take leader checkpoint, or pick up checkpoints as follower. |
@@ -89,8 +96,8 @@ The verifier discards each node's local data and rebuilds it from the shared pag
 describe creates, drops and inserts; records newer than the recovered durable schema epoch are
 ignored. The verifier checks table presence, inserted values and the relayed event prefix.
 
-Note: Legacy (epoch-less) mode has limited verification. Slots with schema operations after the last
-checkpont cannot be verified reliably.
+Note: Legacy (epoch-less) mode has limited verification. Tables with schema operations after the last
+checkpoint cannot be verified reliably.
 
 ## Running
 

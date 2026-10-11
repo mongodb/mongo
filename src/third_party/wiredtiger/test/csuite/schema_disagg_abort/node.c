@@ -63,7 +63,7 @@ workload_counter_advance(WORKLOAD_STATE *state, uint64_t v)
 /*
  * workload_set_frontier --
  *     Set the frontier timestamps on the connection and mirror the stable schema epoch, so the
- *     generator can free slots whose published drops the epoch has covered.
+ *     generator can free tables whose published drops the epoch has covered.
  */
 void
 workload_set_frontier(WORKLOAD_STATE *state, uint64_t ts)
@@ -275,8 +275,8 @@ workload_start(WORKLOAD_STATE *state, bool as_leader)
     state->generates = as_leader || !node_peer_alive(cfg);
     state->stop_stage = STAGE_NONE;
     state->handover_received = false;
-    state->emitted = state->applied = 0;
-    state->stepdown_ts = state->stepdown_ckpt_lsn = 0;
+    state->applied = 0;
+    state->stepdown_ts = state->reserved_ts = state->stepdown_ckpt_lsn = 0;
     state->stepdown_ckpt_due = false;
 
     /* The frontier continues from the previous phase; nothing above it is completed yet. */
@@ -289,13 +289,13 @@ workload_start(WORKLOAD_STATE *state, bool as_leader)
         state->workers[i].evq.head = state->workers[i].evq.tail = 0;
         testutil_random_from_random(&state->workers[i].rnd, &cfg->opts->data_rnd);
         /*
-         * A leading phase checkpoints every slot, including inherited ingest data; a follower phase
-         * covers nothing, so the slots it inherits stay blocked.
+         * A leading phase checkpoints every table, including inherited ingest data; a follower
+         * phase covers nothing, so the tables it inherits stay blocked.
          */
         if (as_leader)
             for (uint32_t j = 0; j < cfg->pool_size; j++)
                 state->workers[i].table[j].uncovered_insert = false;
-        /* State and slot generation survive role transitioning. */
+        /* Table states survive role transitions. */
     }
 
     /* Re-seed the auxiliary stream. */
@@ -357,6 +357,7 @@ node_step_down(WORKLOAD_STATE *state, uint64_t final_ts)
 
     /* Reset transition tracking. */
     __wt_atomic_store_uint64(&state->stepdown_ts, 0);
+    __wt_atomic_store_uint64(&state->reserved_ts, 0);
     __wt_atomic_store_uint64(&state->stepdown_ckpt_lsn, 0);
     __wt_atomic_store_bool(&state->stepdown_ckpt_due, false);
 }

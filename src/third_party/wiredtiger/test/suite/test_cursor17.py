@@ -55,6 +55,9 @@ class test_cursor17(wttest.WiredTigerTestCase):
             self.ds = self.dataset(self, self.type + self.tablename, rownum, key_format=self.keyformat)
         self.ds.populate()
 
+    @wttest.skip_for_hook(
+        "disagg", "new tables cannot be evicted until their publication takes effect",
+        param="schema_epochs")
     @wttest.skip_for_hook("timestamp", "Fails assertion 99")
     def test_globally_deleted_key(self):
         self.populate(100)

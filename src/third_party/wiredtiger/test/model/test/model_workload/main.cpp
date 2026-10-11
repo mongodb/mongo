@@ -377,12 +377,12 @@ test_workload_generator(void)
     uint64_t seed = 0;
     std::string last_issue;
 
+    /* Disaggregated storage needs different config for verification; it is disabled by default. */
+    model::kv_workload_generator_spec spec;
+    testutil_assert(spec.disaggregated <= 0);
+
     while (true) {
         try {
-            model::kv_workload_generator_spec spec;
-            /* Disaggregated storage needs different config for verification; disable it for now. */
-            spec.disaggregated = 0;
-
             std::shared_ptr<model::kv_workload> workload =
               model::kv_workload_generator::generate(spec, seed);
 

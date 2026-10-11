@@ -656,6 +656,8 @@ __checkpoint_prepare_progress(WT_SESSION_IMPL *session, bool final)
 
     conn = S2C(session);
 
+    WT_ASSERT_SPINLOCK_OWNED(session, &conn->checkpoint_lock);
+
     time_diff = __checkpoint_running_time(session);
 
     if (final || (time_diff / WT_PROGRESS_MSG_PERIOD) > conn->ckpt.progress.msg_count) {
@@ -679,6 +681,8 @@ __checkpoint_progress(WT_SESSION_IMPL *session, bool closing)
     uint64_t time_diff;
 
     conn = S2C(session);
+
+    WT_ASSERT_SPINLOCK_OWNED(session, &conn->checkpoint_lock);
 
     time_diff = __checkpoint_running_time(session);
 
@@ -709,6 +713,8 @@ __checkpoint_scrub_progress(
     struct timespec now;
 
     WT_CONNECTION_IMPL *conn = S2C(session);
+    WT_ASSERT_SPINLOCK_OWNED(session, &conn->checkpoint_lock);
+
     __wt_epoch(session, &now);
     uint64_t time_diff = WT_TIMEDIFF_SEC(now, conn->ckpt.scrub.timer_start);
 
@@ -732,6 +738,9 @@ __wt_checkpoint_progress_stats(WT_SESSION_IMPL *session, uint64_t write_bytes)
     WT_CONNECTION_IMPL *conn;
 
     conn = S2C(session);
+
+    /* Progress data is only updated by the session holding the checkpoint lock. */
+    WT_ASSERT_SPINLOCK_OWNED(session, &conn->checkpoint_lock);
 
     conn->ckpt.progress.write_bytes += write_bytes;
     ++conn->ckpt.progress.write_pages;
@@ -1717,21 +1726,32 @@ __checkpoint_db_internal(WT_SESSION_IMPL *session, const char *cfg[])
     WT_STAT_CONN_SET(session, checkpoint_state, WTI_CHECKPOINT_STATE_ESTABLISH);
     WT_ASSERT_SPINLOCK_OWNED(session, &conn->checkpoint_lock);
 
-    WT_RET(__checkpoint_parse_config(session, cfg, &ckpt_cfg));
+    if ((ret = __checkpoint_parse_config(session, cfg, &ckpt_cfg)) != 0) {
+        WT_STAT_CONN_SET(session, checkpoint_state, WTI_CHECKPOINT_STATE_INACTIVE);
+        return (ret);
+    }
 
     /* Avoid doing work if possible. */
-    WT_RET(__checkpoint_can_skip(session, &ckpt_cfg));
+    if ((ret = __checkpoint_can_skip(session, &ckpt_cfg)) != 0) {
+        WT_STAT_CONN_SET(session, checkpoint_state, WTI_CHECKPOINT_STATE_INACTIVE);
+        return (ret);
+    }
     if (ckpt_cfg.can_skip) {
         WT_STAT_CONN_INCR(session, checkpoint_skipped);
-        return (0);
+        WT_STAT_CONN_SET(session, checkpoint_state, WTI_CHECKPOINT_STATE_INACTIVE);
+        return (ret);
+    }
+
+    /*
+     * Do a pass over the configuration arguments and figure out what kind of checkpoint this is. On
+     * failure, reset the checkpoint state before returning.
+     */
+    if ((ret = __checkpoint_apply_operation(session, &ckpt_cfg, NULL)) != 0) {
+        WT_STAT_CONN_SET(session, checkpoint_state, WTI_CHECKPOINT_STATE_INACTIVE);
+        return (ret);
     }
 
     F_SET(session, WT_SESSION_CHECKPOINT);
-
-    /*
-     * Do a pass over the configuration arguments and figure out what kind of checkpoint this is.
-     */
-    WT_RET(__checkpoint_apply_operation(session, &ckpt_cfg, NULL));
 
     /* Initialize checkpoint tracking and stats. */
     __checkpoint_init(session);
@@ -3341,6 +3361,8 @@ __checkpoint_tree_helper(WT_SESSION_IMPL *session, const char *cfg[])
     btree = S2BT(session);
     txn = session->txn;
 
+    WT_ASSERT_SPINLOCK_OWNED(session, &S2C(session)->checkpoint_lock);
+
     /* Add a two seconds wait to simulate checkpoint slowness for every handle. */
     tsp.tv_sec = 2;
     tsp.tv_nsec = 0;
@@ -3536,13 +3558,14 @@ __wt_checkpoint_file(WT_SESSION_IMPL *session, const char *cfg[])
       !WT_IS_METADATA(session->dhandle) ||
         FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_METADATA));
 
+    WT_RET(__wt_config_gets_def(session, cfg, "force", 0, &cval));
+    force = cval.val != 0;
+
     /* If we're already in a global checkpoint, don't get a new time. Otherwise, we need one. */
     standalone = session->ckpt.current_sec == 0;
     if (standalone)
         __checkpoint_establish_time(session);
 
-    WT_RET(__wt_config_gets_def(session, cfg, "force", 0, &cval));
-    force = cval.val != 0;
     WT_SAVE_DHANDLE(session, ret = __checkpoint_lock_dirty_tree(session, true, force, true, cfg));
     if (ret != 0 || F_ISSET_ATOMIC_32(S2BT(session), WT_BTREE_SKIP_CKPT))
         goto done;

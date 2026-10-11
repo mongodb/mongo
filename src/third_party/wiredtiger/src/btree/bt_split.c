@@ -1506,6 +1506,9 @@ __split_multi_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_MULTI *multi, WT
     uint32_t i, slot;
     bool instantiate_upd;
 
+    /* A btree awaiting publication is never reconciled, so there is nothing to re-create. */
+    WT_ASSERT(session, !F_ISSET_ATOMIC_32(S2BT(session), WT_BTREE_AWAITS_PUBLISH));
+
     /*
      * This code re-creates an in-memory page from a disk image, and adds references to any
      * unresolved update chains to the new page. We get here either because an update could not be
@@ -1537,7 +1540,7 @@ __split_multi_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_MULTI *multi, WT
      * garbage collect the history store pages at the page level since all its content has a stop
      * timestamp.
      */
-    if (instantiate_upd && !__wt_btree_stays_in_memory(S2BT(session)) &&
+    if (instantiate_upd && !F_ISSET(S2BT(session), WT_BTREE_IN_MEMORY) &&
       !WT_IS_HS(session->dhandle))
         WT_RET(__wti_page_inmem_updates(session, ref));
 
@@ -1546,13 +1549,8 @@ __split_multi_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_MULTI *multi, WT
     /*
      * Mark the page as dirty for future garbage collection through reconciliation. We only end here
      * if we have content to clean up in the future.
-     *
-     * A btree awaiting publication is reconciled in memory only, so the rebuilt page would
-     * otherwise be clean and hold its only copy in an in-memory image. Keep it dirty so the
-     * checkpoint that runs once the table is published rewrites it to shared storage.
      */
-    if (F_ISSET(S2BT(session), WT_BTREE_GARBAGE_COLLECT) ||
-      F_ISSET_ATOMIC_32(S2BT(session), WT_BTREE_AWAITS_PUBLISH)) {
+    if (F_ISSET(S2BT(session), WT_BTREE_GARBAGE_COLLECT)) {
         WT_RET(__wt_page_modify_init(session, page));
         __wt_page_modify_set(session, page);
     }
@@ -2548,9 +2546,11 @@ __wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, WT_MULTI *multi)
     WT_DECL_RET;
     WT_PAGE *page;
     WT_REF *new;
+    bool instantiated;
 
     page = ref->page;
     addr = NULL;
+    instantiated = page->modify != NULL && page->modify->instantiated;
 
     __wt_verbose(session, WT_VERB_SPLIT, "%p: split-rewrite", (void *)ref);
 
@@ -2575,6 +2575,17 @@ __wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, WT_MULTI *multi)
     F_SET(new, F_MASK(ref, WT_REF_FLAG_INTERNAL | WT_REF_FLAG_LEAF));
 
     WT_ERR(__split_multi_inmem(session, page, multi, new));
+
+    /*
+     * With no new address the parent's cell may still be a fast-truncate proxy cell: carry the
+     * instantiated flag so parent reconciliation keeps evaluating the child through the retained
+     * page-delete information. Allocation can fail, so do it before the point of no return.
+     */
+    if (instantiated) {
+        WT_ASSERT(session, multi->addr.block_cookie == NULL);
+        WT_ERR(__wt_page_modify_init(session, new->page));
+        new->page->modify->instantiated = true;
+    }
 
     /*
      * The rewrite succeeded, we can no longer fail.

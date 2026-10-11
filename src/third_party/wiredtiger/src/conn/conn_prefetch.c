@@ -243,7 +243,7 @@ __wt_conn_prefetch_queue_push(WT_SESSION_IMPL *session, WT_REF *ref)
 
     __wt_spin_lock(session, &conn->prefetch.lock);
     /* Don't queue pages for trees that have eviction disabled. */
-    if (S2BT(session)->evict_disabled > 0) {
+    if (!__wt_btree_eviction_enabled(S2BT(session))) {
         ret = EBUSY;
         goto done;
     }

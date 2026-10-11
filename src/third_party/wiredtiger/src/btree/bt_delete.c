@@ -374,8 +374,8 @@ __wt_delete_page_rollback(WT_SESSION_IMPL *session, WT_TXN_OP *op)
         }
         /*
          * Drop any page_deleted information remaining in the ref. Note that while this must have
-         * been an instantiated page, the information (and flag) is only kept until the page is
-         * reconciled for the first time after instantiation, so it might not be set now.
+         * been an instantiated page, the information (and flag) is only kept until a reconciliation
+         * after instantiation writes a new image of the page, so it might not be set now.
          */
         if (ref->page->modify->instantiated) {
             ref->page->modify->instantiated = false;
@@ -815,7 +815,7 @@ __wti_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
     /*
      * We will leave the WT_PAGE_DELETED structure in the ref; all of its information has been
      * copied to the list of WT_UPDATE structures (if any), but we may still need it for internal
-     * page reconciliation until the instantiated page is itself successfully reconciled.
+     * page reconciliation until a reconciliation of the instantiated page writes a new image.
      */
 
 err:

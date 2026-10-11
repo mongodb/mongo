@@ -47,7 +47,7 @@ __verbose_dump_cache_single(WT_SESSION_IMPL *session, uint64_t *total_bytesp,
     WT_RET(__wt_msg(session, "%s(%s%s)%s%s:", dhandle->name,
       WT_DHANDLE_IS_CHECKPOINT(dhandle) ? "checkpoint=" : "",
       WT_DHANDLE_IS_CHECKPOINT(dhandle) ? dhandle->checkpoint : "<live>",
-      btree->evict_disabled != 0 ? " eviction disabled" : "",
+      __wt_btree_eviction_enabled(btree) ? "" : " eviction disabled",
       btree->evict_disabled_open ? " at open" : ""));
 
     /*
