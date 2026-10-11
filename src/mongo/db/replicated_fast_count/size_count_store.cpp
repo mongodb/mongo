@@ -100,7 +100,8 @@ boost::optional<SizeCountStore::Entry> SizeCountStore::read(OperationContext* op
 
 boost::optional<SizeCountStore::Entry> SizeCountStore::insert(OperationContext* opCtx,
                                                               UUID uuid,
-                                                              const SizeCountStore::Entry& entry) {
+                                                              const SizeCountStore::Entry& entry,
+                                                              HashUpdateMode hashUpdateMode) {
     assertInWriteUnitOfWorkAndLocked(opCtx, "insert");
 
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
@@ -114,8 +115,10 @@ boost::optional<SizeCountStore::Entry> SizeCountStore::insert(OperationContext* 
               SizeCountStore::parseContainerValue(*previousValue))
         : boost::none;
     const auto hashToWrite = [&]() -> boost::optional<int64_t> {
-        // Check if a previous entry exists and contains a hash.
-        if (previousEntry.has_value() && !previousEntry->hash.has_value()) {
+        // Check if a previous entry exists and contains a hash. A set hash replaces an absent
+        // one.
+        if (previousEntry.has_value() && !previousEntry->hash.has_value() &&
+            hashUpdateMode == HashUpdateMode::kFold) {
             // The pre-existing entry does not already contain a hash. Do not write a hash,
             // regardless of the hash in `entry`. This accounts for collections with size/count
             // metadata created before hash validation was enabled.
@@ -193,6 +196,10 @@ void SizeCountStore::readAndIncrementReplicatedMetadata(OperationContext* opCtx,
         auto entry = parseContainerValue(*result);
         delta.metadata.sizeCount.count += entry.count;
         delta.metadata.sizeCount.size += entry.size;
+        if (delta.hashUpdateMode == HashUpdateMode::kSet) {
+            // A set hash replaces the persisted one rather than combining with it.
+            continue;
+        }
         // If either hash is boost::none, delta.metadata.hash is set to boost::none.
         delta.metadata.hash = combineValidationHashes(delta.metadata.hash, entry.hash);
     }

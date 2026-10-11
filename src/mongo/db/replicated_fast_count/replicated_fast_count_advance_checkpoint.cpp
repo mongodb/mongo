@@ -83,7 +83,8 @@ CheckpointWriteCounts persistCheckpointSnapshot(
                     SizeCountStore::Entry{.timestamp = checkpoint.validAsOf,
                                           .size = entry.metadata.sizeCount.size,
                                           .count = entry.metadata.sizeCount.count,
-                                          .hash = entry.metadata.hash});
+                                          .hash = entry.metadata.hash},
+                    entry.hashUpdateMode);
                 if (oldValue.has_value()) {
                     writeCounts.updateCount++;
                 } else {

@@ -22,6 +22,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_size_count.h"
 #include "mongo/db/rss/persistence_provider.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -548,9 +549,6 @@ ExpectedCollectionHash _expectedCollectionHash(OperationContext* opCtx,
     if (!entry) {
         return {ValidateResults::HashComparison::kNoPersistedEntry, boost::none};
     }
-    if (!entry->first.hash) {
-        return {ValidateResults::HashComparison::kNoPersistedHash, boost::none};
-    }
 
     // Seek from the store's global valid-as-of rather than the entry's own. Every persisted entry
     // is valid as of that point.
@@ -570,8 +568,20 @@ ExpectedCollectionHash _expectedCollectionHash(OperationContext* opCtx,
             *oplogCursor, seekAfterTimestamp, oplogColl->uuid(), /*isCheckpoint=*/false);
     }();
 
-    // A collection with no entries in the replayed range contributes the XOR identity.
+    // A hash set in the replayed range replaces the persisted one, including an absent one.
     const auto it = scanResult.deltas.find(uuid);
+    if (it != scanResult.deltas.end() && it->second.hashUpdateMode == HashUpdateMode::kSet) {
+        if (!it->second.metadata.hash) {
+            return {ValidateResults::HashComparison::kIncompleteDelta, boost::none};
+        }
+        return {ValidateResults::HashComparison::kComparable, it->second.metadata.hash};
+    }
+
+    if (!entry->first.hash) {
+        return {ValidateResults::HashComparison::kNoPersistedHash, boost::none};
+    }
+
+    // A collection with no entries in the replayed range contributes the XOR identity.
     const boost::optional<int64_t> delta =
         it == scanResult.deltas.end() ? boost::make_optional(int64_t{0}) : it->second.metadata.hash;
 

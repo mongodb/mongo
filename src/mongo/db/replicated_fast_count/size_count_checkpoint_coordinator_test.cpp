@@ -21,6 +21,10 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/uuid.h"
 
+#include <cstdint>
+#include <limits>
+#include <vector>
+
 namespace mongo::replicated_fast_count {
 namespace {
 
@@ -368,6 +372,19 @@ protected:
         return _sizeCountStore->read(_opCtx, uuid);
     }
 
+    // Writes a repairReplicatedMetadata no-op entry for 'coll' carrying 'metadata'.
+    void writeRepairNoop(const test_helpers::NsAndUUID& coll, BSONObj metadata) {
+        writeOplogEntry(repl::DurableOplogEntry{repl::DurableOplogEntryParams{
+            .opTime = repl::OpTime(nextTs(), 1),
+            .opType = repl::OpTypeEnum::kNoop,
+            .nss = NamespaceString(),
+            .oField = BSON("msg" << "Repairing collection's replicated metadata with diffs"),
+            .o2Field = BSON("type" << "repairReplicatedMetadata"
+                                   << "uuid" << coll.uuid << "m" << metadata),
+            .wallClockTime = Date_t::now(),
+        }});
+    }
+
     const test_helpers::NsAndUUID _collA{
         .nss = NamespaceString::createNamespaceString_forTest("coordinator_hash_test", "collA"),
         .uuid = UUID::gen(),
@@ -671,6 +688,93 @@ TEST_F(SizeCountCheckpointCoordinatorHashTest, RepairHashDiffFoldsIntoCreatedCol
     const auto entry = readSizeCount(_collA.uuid);
     ASSERT_TRUE(entry.has_value());
     EXPECT_EQ(expectedEntry, *entry);
+}
+
+// A repair noop's hash set replaces the persisted hash, absent or present, with exactly the set
+// value while its size and count diffs still apply. Later checkpoints fold into the set value.
+TEST_F(SizeCountCheckpointCoordinatorHashTest, RepairHashSetReplacesPersistedHashThenFolds) {
+    const std::vector<boost::optional<int64_t>> persistedHashes{boost::none, kHashC};
+    const std::vector<int64_t> setHashes{kEmptyCollectionValidationHash,
+                                         -1,
+                                         std::numeric_limits<int64_t>::min(),
+                                         std::numeric_limits<int64_t>::max(),
+                                         kHashA};
+
+    for (const auto& persistedHash : persistedHashes) {
+        for (const int64_t setHash : setHashes) {
+            const test_helpers::NsAndUUID coll{.nss = _collA.nss, .uuid = UUID::gen()};
+            test_helpers::insertSizeCountEntry(
+                _opCtx,
+                *_sizeCountStore,
+                coll.uuid,
+                SizeCountStore::Entry{
+                    .timestamp = nextTs(), .size = 1000, .count = 10, .hash = persistedHash});
+
+            writeRepairNoop(coll, BSON("sz" << 100 << "ct" << 5 << "hSet" << setHash));
+            const Timestamp validAsOf1 = flush();
+            {
+                const SizeCountStore::Entry expectedEntry{
+                    .timestamp = validAsOf1, .size = 1100, .count = 15, .hash = setHash};
+                const auto entry = readSizeCount(coll.uuid);
+                ASSERT_TRUE(entry.has_value());
+                EXPECT_EQ(expectedEntry, *entry);
+            }
+
+            writeCrudEntry(nextTs(), coll, repl::OpTypeEnum::kInsert, 20 /*sizeDelta=*/, kHashB);
+            const Timestamp validAsOf2 = flush();
+            const SizeCountStore::Entry expectedEntry{
+                .timestamp = validAsOf2, .size = 1120, .count = 16, .hash = setHash ^ kHashB};
+            const auto entry = readSizeCount(coll.uuid);
+            ASSERT_TRUE(entry.has_value());
+            EXPECT_EQ(expectedEntry, *entry);
+        }
+    }
+}
+
+// A set on a collection created in the same checkpoint inserts the entry with the set hash, and
+// deltas after the set fold into it, both in that checkpoint and in later ones.
+TEST_F(SizeCountCheckpointCoordinatorHashTest, RepairHashSetAfterCreateThenFolds) {
+    writeOplogEntry(test_helpers::makeCreateOplogEntry(nextTs(), _collA));
+    writeRepairNoop(_collA, BSON("hSet" << kHashA));
+    writeCrudEntry(nextTs(), _collA, repl::OpTypeEnum::kInsert, 10 /*sizeDelta=*/, kHashB);
+
+    const Timestamp validAsOf1 = flush();
+    {
+        const SizeCountStore::Entry expectedEntry{
+            .timestamp = validAsOf1, .size = 10, .count = 1, .hash = kHashA ^ kHashB};
+        const auto entry = readSizeCount(_collA.uuid);
+        ASSERT_TRUE(entry.has_value());
+        EXPECT_EQ(expectedEntry, *entry);
+    }
+
+    const int64_t repairHash = 0x0F0F0F0F0F0F0F0F;
+    writeCrudEntry(nextTs(), _collA, repl::OpTypeEnum::kInsert, 20 /*sizeDelta=*/, kHashC);
+    writeRepairNoop(_collA, BSON("h" << repairHash));
+
+    const Timestamp validAsOf2 = flush();
+    const SizeCountStore::Entry expectedEntry{.timestamp = validAsOf2,
+                                              .size = 30,
+                                              .count = 2,
+                                              .hash = kHashA ^ kHashB ^ kHashC ^ repairHash};
+    const auto entry = readSizeCount(_collA.uuid);
+    ASSERT_TRUE(entry.has_value());
+    EXPECT_EQ(expectedEntry, *entry);
+}
+
+// A set on a collection dropped later in the same checkpoint leaves no entry behind.
+TEST_F(SizeCountCheckpointCoordinatorHashTest, RepairHashSetThenDropRemovesEntry) {
+    test_helpers::insertSizeCountEntry(
+        _opCtx,
+        *_sizeCountStore,
+        _collA.uuid,
+        SizeCountStore::Entry{
+            .timestamp = nextTs(), .size = 1000, .count = 10, .hash = boost::none});
+    writeRepairNoop(_collA, BSON("hSet" << kHashA));
+    writeOplogEntry(test_helpers::makeDropOplogEntry(nextTs(), _collA));
+
+    flush();
+
+    EXPECT_FALSE(readSizeCount(_collA.uuid).has_value());
 }
 
 // A collection created with no writes persists the hash of an empty collection, which later

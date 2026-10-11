@@ -129,6 +129,21 @@ enum class [[MONGO_MOD_PUBLIC]] DDLState {
 };
 
 /**
+ * Indicates how a delta's hash applies to the collection's persisted hash.
+ */
+enum class [[MONGO_MOD_PUBLIC]] HashUpdateMode {
+    /**
+     * The hash is a contribution that combines with the persisted hash.
+     */
+    kFold,
+
+    /**
+     * The hash replaces the persisted hash, including an absent one.
+     */
+    kSet,
+};
+
+/**
  * Stores the size, count, and validation hash values for a collection along with state indicating
  * whether the collection had been created or dropped.
  */
@@ -136,6 +151,7 @@ struct [[MONGO_MOD_PUBLIC]] ReplicatedMetadataDelta {
     CollectionReplicatedMetadata metadata{.sizeCount = CollectionSizeCount{.size = 0, .count = 0},
                                           .hash = boost::none};
     DDLState state{DDLState::kNone};
+    HashUpdateMode hashUpdateMode{HashUpdateMode::kFold};
 
     bool operator==(const ReplicatedMetadataDelta&) const = default;
 
@@ -153,7 +169,10 @@ struct [[MONGO_MOD_PUBLIC]] ReplicatedMetadataDelta {
             }
             MONGO_UNREACHABLE;
         }();
-        return fmt::format("metadata: {}, state: {}", metadata.toString(), stateStr);
+        return fmt::format("metadata: {}, state: {}, hashUpdateMode: {}",
+                           metadata.toString(),
+                           stateStr,
+                           hashUpdateMode == HashUpdateMode::kSet ? "set" : "fold");
     }
 };
 

@@ -529,6 +529,127 @@ TEST_F(SizeCountStoreTest, ReadAndIncrementHashExistenceMismatch) {
     EXPECT_EQ(deltas, expectedDeltas);
 }
 
+// A set hash replaces the absent hash of a pre-existing entry.
+TEST_F(SizeCountStoreTest, WriteSetHashReplacesAbsentPersistedHash) {
+    Lock::GlobalLock writeLock(operationContext(), MODE_IX);
+    const UUID uuid = UUID::gen();
+    insertSizeCountEntry(
+        operationContext(),
+        *store,
+        uuid,
+        SizeCountStore::Entry{
+            .timestamp = Timestamp(10, 1), .size = 42, .count = 7, .hash = boost::none});
+
+    const SizeCountStore::Entry updatedEntry{
+        .timestamp = Timestamp(11, 1), .size = 40, .count = 6, .hash = makeTestHash()};
+    {
+        WriteUnitOfWork wuow(operationContext());
+        store->insert(operationContext(), uuid, updatedEntry, HashUpdateMode::kSet);
+        wuow.commit();
+    }
+
+    const auto result = store->read(operationContext(), uuid);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(updatedEntry, *result);
+}
+
+// readAndIncrementReplicatedMetadata() keeps a set hash instead of combining it with the persisted
+// one, whether or not the persisted entry has a hash.
+TEST_F(SizeCountStoreTest, ReadAndIncrementKeepsSetHash) {
+    auto opCtx = operationContext();
+
+    const UUID uuid1 = UUID::gen();
+    const UUID uuid2 = UUID::gen();
+    insertSizeCountEntry(
+        opCtx,
+        *store,
+        uuid1,
+        SizeCountStore::Entry{
+            .timestamp = Timestamp(10, 1), .size = 42, .count = 7, .hash = makeTestHash()});
+    insertSizeCountEntry(
+        opCtx,
+        *store,
+        uuid2,
+        SizeCountStore::Entry{
+            .timestamp = Timestamp(10, 1), .size = 81, .count = 5, .hash = boost::none});
+
+    const int64_t setHash = 0x0BADF00D0BADF00D;
+    ReplicatedMetadataDeltas deltas{
+        {uuid1,
+         ReplicatedMetadataDelta{
+             .metadata = {.sizeCount = {.size = 8, .count = 1}, .hash = setHash},
+             .hashUpdateMode = HashUpdateMode::kSet}},
+        {uuid2,
+         ReplicatedMetadataDelta{
+             .metadata = {.sizeCount = {.size = 29, .count = 14}, .hash = setHash},
+             .hashUpdateMode = HashUpdateMode::kSet}}};
+    Lock::GlobalLock writeLock(opCtx, MODE_IX);
+    store->readAndIncrementReplicatedMetadata(opCtx, deltas);
+
+    const ReplicatedMetadataDeltas expectedDeltas{
+        {uuid1,
+         ReplicatedMetadataDelta{
+             .metadata = {.sizeCount = {.size = 42 + 8, .count = 7 + 1}, .hash = setHash},
+             .hashUpdateMode = HashUpdateMode::kSet}},
+        {uuid2,
+         ReplicatedMetadataDelta{
+             .metadata = {.sizeCount = {.size = 81 + 29, .count = 5 + 14}, .hash = setHash},
+             .hashUpdateMode = HashUpdateMode::kSet}}};
+
+    EXPECT_EQ(deltas, expectedDeltas);
+}
+
+// After a set hash is persisted over an absent one, later fold deltas combine with it.
+TEST_F(SizeCountStoreTest, FoldAfterSetHashCombinesWithPersistedHash) {
+    auto opCtx = operationContext();
+    const UUID uuid = UUID::gen();
+    insertSizeCountEntry(
+        opCtx,
+        *store,
+        uuid,
+        SizeCountStore::Entry{
+            .timestamp = Timestamp(10, 1), .size = 42, .count = 7, .hash = boost::none});
+
+    Lock::GlobalLock writeLock(opCtx, MODE_IX);
+    const int64_t setHash = 0x0BADF00D0BADF00D;
+    {
+        WriteUnitOfWork wuow(opCtx);
+        store->insert(opCtx,
+                      uuid,
+                      SizeCountStore::Entry{
+                          .timestamp = Timestamp(11, 1), .size = 42, .count = 7, .hash = setHash},
+                      HashUpdateMode::kSet);
+        wuow.commit();
+    }
+
+    const int64_t foldHash = 0x0123456789abcdef;
+    ReplicatedMetadataDeltas deltas{
+        {uuid,
+         ReplicatedMetadataDelta{
+             .metadata = {.sizeCount = {.size = 8, .count = 1}, .hash = foldHash}}}};
+    store->readAndIncrementReplicatedMetadata(opCtx, deltas);
+    const auto& delta = deltas.at(uuid);
+    {
+        WriteUnitOfWork wuow(opCtx);
+        store->insert(opCtx,
+                      uuid,
+                      SizeCountStore::Entry{.timestamp = Timestamp(12, 1),
+                                            .size = delta.metadata.sizeCount.size,
+                                            .count = delta.metadata.sizeCount.count,
+                                            .hash = delta.metadata.hash},
+                      delta.hashUpdateMode);
+        wuow.commit();
+    }
+
+    const auto result = store->read(opCtx, uuid);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(*result,
+              (SizeCountStore::Entry{.timestamp = Timestamp(12, 1),
+                                     .size = 42 + 8,
+                                     .count = 7 + 1,
+                                     .hash = setHash ^ foldHash}));
+}
+
 TEST(ParseContainerValueTest, HashNoneWhenAbsent) {
     EXPECT_FALSE(parseDoc(makeMetadataDoc(boost::none)).hash.has_value());
 }

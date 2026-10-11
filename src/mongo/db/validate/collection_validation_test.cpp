@@ -2117,6 +2117,52 @@ protected:
                       results));
         return results;
     }
+
+    // Writes a repair that sets the hash of 'uuid' to 'hash', with a wall clock time matching 'ts'.
+    void writeHashSetRepair(Timestamp ts, const UUID& uuid, int64_t hash) {
+        replicated_fast_count::test_helpers::writeToOplog(
+            operationContext(),
+            repl::OplogEntry{repl::DurableOplogEntry{repl::DurableOplogEntryParams{
+                .opTime = repl::OpTime(ts, 1),
+                .opType = repl::OpTypeEnum::kNoop,
+                .nss = NamespaceString(),
+                .oField = BSON("msg" << "Repairing collection's replicated metadata with diffs"),
+                .o2Field = BSON("type" << "repairReplicatedMetadata"
+                                       << "uuid" << uuid << "m" << BSON("hSet" << hash)),
+                .wallClockTime = Date_t::fromDurationSinceEpoch(Seconds(ts.getSecs()))}}});
+    }
+
+    // Persists 'persistedHash', then replays a hash set followed by a later insert. The set value
+    // replaces the persisted hash and the later insert folds into it, so the comparison holds
+    // before the set is persisted.
+    void expectHashSetThenLaterWriteMatches(boost::optional<int64_t> persistedHash) {
+        createFastCountContainers();
+        const std::vector<BSONObj> beforeSet = {BSON("_id" << 1), BSON("_id" << 2)};
+        const BSONObj afterSet = BSON("_id" << 3);
+        insertDocs(beforeSet);
+        insertDocs({afterSet});
+
+        const auto uuid = collectionUuid();
+        seedPersistedHash(uuid, persistedHash);
+
+        writeHashSetRepair(Timestamp(2, 1), uuid, static_cast<int64_t>(xxh3Of(beforeSet)));
+        replicated_fast_count::test_helpers::writeToOplog(
+            operationContext(),
+            replicated_fast_count::test_helpers::makeOplogEntry(
+                Timestamp(3, 1),
+                replicated_fast_count::test_helpers::NsAndUUID{kNss, uuid},
+                repl::OpTypeEnum::kInsert,
+                /*sizeDelta=*/afterSet.objsize(),
+                repl::computeDocValidationHash(afterSet)));
+        shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+
+        const auto results = hashValidate();
+        ASSERT_TRUE(results.getHashComparison().has_value());
+        EXPECT_EQ(toString(*results.getHashComparison()), "matched");
+        ASSERT_TRUE(results.getExpectedXxh3CollectionHash().has_value());
+        EXPECT_EQ(static_cast<uint64_t>(*results.getExpectedXxh3CollectionHash()),
+                  xxh3Of({beforeSet[0], beforeSet[1], afterSet}));
+    }
 };
 
 // Probe: reports how far the comparison gets with the replicated metadata system enabled.
@@ -2221,6 +2267,39 @@ TEST_F(CollectionHashComparisonTest, ReportsNoPersistedHashWhenTheEntryCarriesNo
     const auto results = hashValidate();
     ASSERT_TRUE(results.getHashComparison().has_value());
     EXPECT_EQ(toString(*results.getHashComparison()), "noPersistedHash");
+    EXPECT_FALSE(results.getExpectedXxh3CollectionHash().has_value());
+    EXPECT_TRUE(results.getWarnings().empty());
+}
+
+TEST_F(CollectionHashComparisonTest, FoldsWritesAfterAHashSetOverAnAbsentHash) {
+    expectHashSetThenLaterWriteMatches(boost::none);
+}
+
+TEST_F(CollectionHashComparisonTest, FoldsWritesAfterAHashSetOverAPresentHash) {
+    expectHashSetThenLaterWriteMatches(0x1234);
+}
+
+TEST_F(CollectionHashComparisonTest, ReportsIncompleteWhenAWriteAfterAHashSetCarriesNoHash) {
+    createFastCountContainers();
+    const std::vector<BSONObj> docs = {BSON("_id" << 1)};
+    insertDocs(docs);
+    const auto uuid = collectionUuid();
+    seedPersistedHash(uuid, boost::none);
+
+    // The set seeds a hash, but a later write whose contribution is unknown leaves it incomplete.
+    writeHashSetRepair(Timestamp(2, 1), uuid, static_cast<int64_t>(xxh3Of(docs)));
+    replicated_fast_count::test_helpers::writeToOplog(
+        operationContext(),
+        replicated_fast_count::test_helpers::makeOplogEntry(
+            Timestamp(3, 1),
+            replicated_fast_count::test_helpers::NsAndUUID{kNss, uuid},
+            repl::OpTypeEnum::kInsert,
+            /*sizeDelta=*/16));
+    shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+
+    const auto results = hashValidate();
+    ASSERT_TRUE(results.getHashComparison().has_value());
+    EXPECT_EQ(toString(*results.getHashComparison()), "incompleteDelta");
     EXPECT_FALSE(results.getExpectedXxh3CollectionHash().has_value());
     EXPECT_TRUE(results.getWarnings().empty());
 }

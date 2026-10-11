@@ -28,6 +28,13 @@ structs:
                     hash via XOR, so it can adjust a present hash but not repair an absent one."
                 type: safeInt64
                 optional: true
+            hSet:
+                description:
+                    "Collection validation hash to set. Replaces the collection's accumulated hash,
+                    including an absent one. A repairReplicatedMetadata command may specify
+                    'h' or 'hSet', but not both."
+                type: safeInt64
+                optional: true
 
     RepairReplicatedMetadataO2:
         description: "The o2 field of a repairReplicatedMetadata no-op oplog entry."

@@ -10,8 +10,11 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
+#include <limits>
 #include <list>
+#include <string>
 #include <utility>
+#include <vector>
 
 namespace mongo::replicated_fast_count {
 namespace {
@@ -845,6 +848,179 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_NoopRepairNonNumericH_Ignore
     const Timestamp ts{1, 1};
     const auto o2 = BSON("type" << "repairReplicatedMetadata" << "uuid" << collA.uuid << "m"
                                 << BSON("sz" << 100 << "h"
+                                             << "notanumber"));
+    const auto result = runAccumulatorRaw({makeNoopWithO2Bson(ts, o2)});
+    EXPECT_TRUE(result.deltas.empty());
+    EXPECT_EQ(result.lastTimestamp, ts);
+}
+
+// A set records exactly its value, overriding a nonzero hash already in the window.
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_NoopRepairHashSet_RecordsSetHash) {
+    // Differs from every set value, so a set that folded instead would be caught.
+    const int64_t priorHash = 0x0f0f0f0f0f0f0f0f;
+    const std::vector<int64_t> setHashes{
+        // The hash of an empty collection: XOR with it is the identity, so only the nonzero prior
+        // distinguishes a set from a fold, and it must not be mistaken for an omitted field.
+        kEmptyCollectionValidationHash,
+        -1,
+        std::numeric_limits<int64_t>::min(),
+        std::numeric_limits<int64_t>::max(),
+        0x0123456789abcdef,
+    };
+    for (const int64_t setHash : setHashes) {
+        const auto result = runAccumulatorRaw(
+            {makeRawCrudBson(Timestamp(1, 1),
+                             "i"sv,
+                             collA.nss,
+                             collA.uuid,
+                             BSON("sz" << 10 << "h" << priorHash)),
+             makeNoopWithO2Bson(Timestamp(1, 2),
+                                BSON("type" << "repairReplicatedMetadata" << "uuid" << collA.uuid
+                                            << "m" << BSON("hSet" << setHash)))});
+        ASSERT_TRUE(result.deltas.contains(collA.uuid)) << setHash;
+        const auto& delta = result.deltas.at(collA.uuid);
+        EXPECT_EQ(delta.metadata.sizeCount, (CollectionSizeCount{.size = 10, .count = 1}))
+            << setHash;
+        EXPECT_EQ(delta.metadata.hash, setHash) << setHash;
+        EXPECT_EQ(delta.hashUpdateMode, HashUpdateMode::kSet) << setHash;
+        EXPECT_EQ(result.lastTimestamp, Timestamp(1, 2)) << setHash;
+    }
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest,
+       FastLane_NoopRepairHashSet_OverridesPriorThenFoldsLater) {
+    // Whatever the window accumulated before the set (nothing, an absent hash, or a present one)
+    // is overridden, and both CRUD hashes and repair diffs after it fold into the set value. Size
+    // and count add up across the whole window regardless.
+    const int64_t setHash = 0x0011223344556677;
+    const int64_t laterCrudHash = 0x7766554433221100;
+    const int64_t laterRepairHash = 0x0f0f0f0f0f0f0f0f;
+    struct PriorEntry {
+        std::string name;
+        boost::optional<BSONObj> m;
+    };
+    const std::vector<PriorEntry> priors{
+        {"none", boost::none},
+        {"absentHash", BSON("sz" << 10)},
+        {"presentHash", BSON("sz" << 10 << "h" << int64_t{0x0123456789abcdef})},
+    };
+    for (const auto& prior : priors) {
+        std::vector<BSONObj> records;
+        if (prior.m) {
+            records.push_back(
+                makeRawCrudBson(Timestamp(1, 1), "i"sv, collA.nss, collA.uuid, *prior.m));
+        }
+        records.push_back(
+            makeNoopWithO2Bson(Timestamp(1, 2),
+                               BSON("type" << "repairReplicatedMetadata" << "uuid" << collA.uuid
+                                           << "m" << BSON("sz" << 5 << "hSet" << setHash))));
+        records.push_back(makeRawCrudBson(Timestamp(1, 3),
+                                          "i"sv,
+                                          collA.nss,
+                                          collA.uuid,
+                                          BSON("sz" << 20 << "h" << laterCrudHash)));
+        records.push_back(
+            makeNoopWithO2Bson(Timestamp(1, 4), makeRepairO2(collA, 0, 0, laterRepairHash)));
+
+        const auto result = runAccumulatorRaw(records);
+        ASSERT_TRUE(result.deltas.contains(collA.uuid)) << prior.name;
+        const auto& delta = result.deltas.at(collA.uuid);
+        const int64_t priorCount = prior.m ? 1 : 0;
+        const int64_t priorSize = prior.m ? 10 : 0;
+        EXPECT_EQ(delta.metadata.sizeCount,
+                  (CollectionSizeCount{.size = priorSize + 5 + 20, .count = priorCount + 1}))
+            << prior.name;
+        EXPECT_EQ(delta.metadata.hash, setHash ^ laterCrudHash ^ laterRepairHash) << prior.name;
+        EXPECT_EQ(delta.hashUpdateMode, HashUpdateMode::kSet) << prior.name;
+        EXPECT_EQ(result.lastTimestamp, Timestamp(1, 4)) << prior.name;
+    }
+}
+
+// A later set overrides an earlier one in the same window.
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_NoopRepairHashSet_LastSetWins) {
+    const int64_t firstSet = 0x0011223344556677;
+    const int64_t betweenHash = 0x0123456789abcdef;
+    const int64_t secondSet = 0x7766554433221100;
+    const auto result = runAccumulatorRaw(
+        {makeNoopWithO2Bson(Timestamp(1, 1),
+                            BSON("type" << "repairReplicatedMetadata" << "uuid" << collA.uuid << "m"
+                                        << BSON("hSet" << firstSet))),
+         makeRawCrudBson(
+             Timestamp(1, 2), "i"sv, collA.nss, collA.uuid, BSON("sz" << 10 << "h" << betweenHash)),
+         makeNoopWithO2Bson(Timestamp(1, 3),
+                            BSON("type" << "repairReplicatedMetadata" << "uuid" << collA.uuid << "m"
+                                        << BSON("hSet" << secondSet)))});
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    const auto& delta = result.deltas.at(collA.uuid);
+    EXPECT_EQ(delta.metadata.sizeCount, (CollectionSizeCount{.size = 10, .count = 1}));
+    EXPECT_EQ(delta.metadata.hash, secondSet);
+    EXPECT_EQ(delta.hashUpdateMode, HashUpdateMode::kSet);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest,
+       FastLane_NoopRepairHashSet_LaterAbsentContributionLeavesHashAbsent) {
+    const Timestamp ts1{1, 1};
+    const Timestamp ts2{1, 2};
+    const auto o2 = BSON("type" << "repairReplicatedMetadata" << "uuid" << collA.uuid << "m"
+                                << BSON("hSet" << int64_t{0x0011223344556677}));
+    const auto result =
+        runAccumulatorRaw({makeNoopWithO2Bson(ts1, o2),
+                           makeRawCrudBson(ts2, "i"sv, collA.nss, collA.uuid, BSON("sz" << 10))});
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    const auto& delta = result.deltas.at(collA.uuid);
+    EXPECT_EQ(delta.metadata.hash, boost::none);
+    EXPECT_EQ(delta.hashUpdateMode, HashUpdateMode::kSet);
+}
+
+// A set on a collection created in the same window keeps the create, so the checkpoint still
+// inserts a fresh entry, now carrying the set hash.
+TEST_F(StreamingOplogDeltaAccumulatorTest, NoopRepairHashSet_AfterCreateKeepsCreatedState) {
+    const int64_t setHash = 0x0011223344556677;
+    const auto result = runAccumulatorRaw(
+        {test_helpers::makeCreateOplogEntry(Timestamp(1, 1), collA).getEntry().toBSON(),
+         makeNoopWithO2Bson(Timestamp(1, 2),
+                            BSON("type" << "repairReplicatedMetadata" << "uuid" << collA.uuid << "m"
+                                        << BSON("hSet" << setHash)))});
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    const auto& delta = result.deltas.at(collA.uuid);
+    EXPECT_EQ(delta.state, DDLState::kCreated);
+    EXPECT_EQ(delta.metadata.hash, setHash);
+    EXPECT_EQ(delta.hashUpdateMode, HashUpdateMode::kSet);
+}
+
+// A set does not outlive the collection it was applied to: once the collection is dropped and a
+// collection with the same UUID is imported, the new collection starts from the import's absent
+// hash and folds as usual.
+TEST_F(StreamingOplogDeltaAccumulatorTest, NoopRepairHashSet_DropThenImportResetsToFold) {
+    const auto result = runAccumulatorRaw(
+        {makeNoopWithO2Bson(Timestamp(1, 1),
+                            BSON("type" << "repairReplicatedMetadata" << "uuid" << collA.uuid << "m"
+                                        << BSON("hSet" << int64_t{0x0011223344556677}))),
+         test_helpers::makeDropOplogEntry(Timestamp(1, 2), collA).getEntry().toBSON(),
+         test_helpers::makeImportCollectionOplogEntry(
+             Timestamp(1, 3), collA, /*numRecords=*/1, /*dataSize=*/10)
+             .getEntry()
+             .toBSON()});
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    const auto& delta = result.deltas.at(collA.uuid);
+    EXPECT_EQ(delta.state, DDLState::kDroppedAndRecreated);
+    EXPECT_EQ(delta.metadata.hash, boost::none);
+    EXPECT_EQ(delta.hashUpdateMode, HashUpdateMode::kFold);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_NoopRepairHashDiffAndHashSet_Ignored) {
+    const Timestamp ts{1, 1};
+    const auto o2 = BSON("type" << "repairReplicatedMetadata" << "uuid" << collA.uuid << "m"
+                                << BSON("sz" << 100 << "h" << int64_t{1} << "hSet" << int64_t{2}));
+    const auto result = runAccumulatorRaw({makeNoopWithO2Bson(ts, o2)});
+    EXPECT_TRUE(result.deltas.empty());
+    EXPECT_EQ(result.lastTimestamp, ts);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_NoopRepairNonNumericHashSet_Ignored) {
+    const Timestamp ts{1, 1};
+    const auto o2 = BSON("type" << "repairReplicatedMetadata" << "uuid" << collA.uuid << "m"
+                                << BSON("sz" << 100 << "hSet"
                                              << "notanumber"));
     const auto result = runAccumulatorRaw({makeNoopWithO2Bson(ts, o2)});
     EXPECT_TRUE(result.deltas.empty());

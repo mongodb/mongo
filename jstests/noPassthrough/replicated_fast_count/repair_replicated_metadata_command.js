@@ -95,18 +95,52 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
     assert(!hashEntries[0].o2.m.hasOwnProperty("sz"));
     assert(!hashEntries[0].o2.m.hasOwnProperty("ct"));
 
+    // 'hSet' carries an absolute collection validation hash. This test only checks the shape of
+    // the oplog entry; that the set value is persisted and compared against is covered by
+    // src/mongo/db/modules/atlas/jstests/disagg_storage/repair_collection_hash.js, since the hash
+    // comparison only runs under a persistence provider that uses continuous internode validation.
+    assert.commandWorked(
+        primary
+            .getDB("admin")
+            .runCommand({repairReplicatedMetadata: 1, uuid: uuid, metadata: {hSet: hash}}),
+    );
+    const hashSetEntries = primary
+        .getDB("local")
+        .oplog.rs.find({
+            op: "n",
+            "o2.type": "repairReplicatedMetadata",
+            "o2.m.hSet": {$exists: true},
+        })
+        .toArray();
+    assert.eq(hashSetEntries.length, 1);
+    assert.eq(hashSetEntries[0].o2.m.hSet, hash);
+    assert(!hashSetEntries[0].o2.m.hasOwnProperty("h"));
+
+    // 'h' and 'hSet' are mutually exclusive.
+    assert.commandFailedWithCode(
+        primary
+            .getDB("admin")
+            .runCommand({repairReplicatedMetadata: 1, uuid: uuid, metadata: {h: hash, hSet: hash}}),
+        ErrorCodes.InvalidOptions,
+    );
+
     // A collection that does not exist is a true no-op and writes no oplog entry.
     assert.commandWorked(
         primary
             .getDB("admin")
             .runCommand({repairReplicatedMetadata: 1, uuid: UUID(), metadata: {sz: 100, h: hash}}),
     );
+    assert.commandWorked(
+        primary
+            .getDB("admin")
+            .runCommand({repairReplicatedMetadata: 1, uuid: UUID(), metadata: {hSet: hash}}),
+    );
     assert.eq(
         primary
             .getDB("local")
             .oplog.rs.find({op: "n", "o2.type": "repairReplicatedMetadata"})
             .toArray().length,
-        2,
+        3,
     );
 
     assert.commandFailedWithCode(
