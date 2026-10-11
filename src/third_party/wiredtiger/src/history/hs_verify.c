@@ -231,6 +231,7 @@ __hs_verify(WT_SESSION_IMPL *session, uint32_t hs_id)
         } else
             WT_ERR(__wt_open_cursor(session, uri_data, NULL, NULL, &ds_cursor));
         F_SET(ds_cursor, WT_CURSOR_RAW_OK);
+        WT_STAT_CONN_INCR(session, session_hs_verify_btrees_checked);
 
         /* Note that the following call moves the hs cursor internally. */
         WT_ERR_NOTFOUND_OK(
@@ -269,7 +270,7 @@ __wt_hs_verify(WT_SESSION_IMPL *session)
     uint32_t hs_id;
 
     /* On a disaggregated follower with no checkpoint, there is nothing to verify. */
-    if (!__wt_disagg_has_picked_up_checkpoint(session))
+    if (__wt_conn_is_disagg(session) && !__wt_disagg_has_picked_up_checkpoint(session))
         return (0);
 
     hs_id = 0;
