@@ -702,6 +702,11 @@ void OpDebug::append(OperationContext* opCtx,
     if (auto&& queryShapeHash = getQueryShapeHash()) {
         b.append("queryShapeHash", queryShapeHash->toHexString());
     }
+    // TODO: SERVER-136425 will allow to migrate to the common helper reading
+    // from lifespan decoration (like in addQuerySettingsToSlowLog)
+    if (const auto settings = getQuerySettings().toBSON(); !settings.isEmpty()) {
+        b.append("querySettings", settings);
+    }
 
     if (isChangeStreamQuery) {
         b.append("changeStreams", changeStreamMetrics.toBSON());
@@ -1146,6 +1151,11 @@ std::function<BSONObj(OpDebug::AppendArgs)> OpDebug::appendStaged(OperationConte
     addIfNeeded("queryShapeHash", [&](auto field, auto args, auto& b) {
         if (auto&& hash = args.op.getQueryShapeHash()) {
             b.append(field, hash->toHexString());
+        }
+    });
+    addIfNeeded("querySettings", [](auto field, auto args, auto& b) {
+        if (const auto settings = args.op.getQuerySettings().toBSON(); !settings.isEmpty()) {
+            b.append(field, settings);
         }
     });
 

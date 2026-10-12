@@ -757,6 +757,20 @@ TEST(CurOpTest, OptionalAdditiveMetricsNotDisplayedIfUninitialized) {
     }
 }
 
+TEST(CurOpTest, QuerySettingsAppendedToProfilerOutput) {
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+    auto& opDebug = CurOp::get(*opCtx)->debug();
+
+    query_settings::QuerySettings settings;
+    settings.setQueryFramework(QueryFrameworkControlEnum::kForceClassicEngine);
+    opDebug.setQuerySettings(opCtx.get(), settings);
+
+    BSONObjBuilder builder;
+    opDebug.append(opCtx.get(), {}, {}, {}, 0, false /*omitCommand*/, builder);
+    ASSERT_BSONOBJ_EQ(builder.obj().getObjectField("querySettings"), settings.toBSON());
+}
+
 TEST(CurOpTest, AppendReportsUserAcquisitionAndLDAPOperationStatsAsDistinctObjects) {
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
