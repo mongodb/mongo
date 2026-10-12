@@ -917,4 +917,55 @@ TEST_F(BlockStagesTest, BlockToRowNoValuesFilteredObjects) {
 
     testBlockToBitmap(blocks, {std::vector<bool>{true, true, true, true, true, true}}, *expected);
 }
+
+// Test that the BlockToRow preserves the current value on a saveState() call.
+TEST_F(BlockStagesTest, BlockToRowYieldAndReadCurrentValue) {
+    // One heap-allocated Object.
+    auto dataBlock = std::make_unique<value::HeterogeneousBlock>();
+    {
+        auto [tag, val] = value::makeNewObject();
+        value::getObjectView(val)->push_back_raw(
+            "a", value::TypeTags::NumberInt32, value::bitcastFrom<int>(0));
+        dataBlock->push_back(value::TypeTags::Object, val);
+    }
+
+    // VirtualScan data: one row of [valueBlock, bitsetBlock(true)].
+    auto [scanDataTag, scanDataVal] = value::makeNewArray();
+    auto scanData = value::getArrayView(scanDataVal);
+    {
+        auto [chunkTag, chunkVal] = value::makeNewArray();
+        auto chunk = value::getArrayView(chunkVal);
+        value::HeterogeneousBlock bitsetBlock;
+        bitsetBlock.push_back(value::TypeTags::Boolean, value::bitcastFrom<bool>(true));
+        chunk->push_back_raw(value::TypeTags::valueBlock,
+                             value::bitcastFrom<value::ValueBlock*>(dataBlock.release()));
+        chunk->push_back_raw(value::TypeTags::valueBlock,
+                             value::bitcastFrom<value::ValueBlock*>(bitsetBlock.clone().release()));
+        scanData->push_back_raw(chunkTag, chunkVal);
+    }
+
+    auto [blockSlots, scan] = generateVirtualScanMulti(2, scanDataTag, scanDataVal);
+    auto [blockToRow, outputSlots] = makeBlockToRow(std::move(scan), blockSlots, blockSlots.back());
+
+    auto ctx = makeCompileCtx();
+    prepareTree(ctx.get(), blockToRow.get());
+    auto accessor = blockToRow->getAccessor(*ctx, outputSlots[0]);
+
+    // Advances once.
+    ASSERT_EQ(blockToRow->getNext(), PlanState::ADVANCED);
+
+    // Deep-copy the current value for the after-yield assertion.
+    auto [tag, val] = accessor->getViewOfValue();
+    auto [ownedTag, ownedVal] = value::copyValue(tag, val);
+    value::ValueGuard guard(ownedTag, ownedVal);
+
+    // Save state, letting the child release the block buffer that backs the current value, while
+    // keeping slot access enabled so that the current value is expected to remain readable.
+    const bool disableSlotAccess = false;
+    blockToRow->saveState(disableSlotAccess);
+    blockToRow->restoreState();
+
+    // Current value is still there after yielding.
+    ASSERT_THAT(accessor->getViewOfValue(), ValueEq(std::pair{ownedTag, ownedVal}));
+}
 }  // namespace mongo::sbe
