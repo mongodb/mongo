@@ -347,11 +347,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
                                  std::move(opKeys));
         });
     } catch (const DBException& ex) {
-        if (ex.code() == ErrorCodes::CollectionUUIDMismatch &&
-            !ex.extraInfo<CollectionUUIDMismatchInfo>()->actualCollection() &&
-            !shardIds.count(cri.getDbPrimaryShardId())) {
-            // We received CollectionUUIDMismatch but it does not contain the actual namespace, and
-            // we did not attempt to establish a cursor on the primary shard.
+        if (ex.code() == ErrorCodes::CollectionUUIDMismatch) {
             uassertStatusOK(populateCollectionUUIDMismatch(opCtx, ex.toStatus()));
             MONGO_UNREACHABLE_TASSERT(11052364);
         }
