@@ -183,7 +183,7 @@ export function getLatestMetrics(directory) {
 
 /** Returns an attribute value as a string, no matter the underlying type. */
 function attributeValueToString(value) {
-    return value?.stringValue ?? value?.intValue;
+    return value?.stringValue ?? value?.intValue ?? value?.boolValue?.toString();
 }
 
 /**
