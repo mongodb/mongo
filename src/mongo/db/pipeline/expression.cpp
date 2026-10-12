@@ -279,15 +279,18 @@ void Expression::registerExpression(string key,
                                     Parser parser,
                                     AllowedWithApiStrict allowedWithApiStrict,
                                     AllowedWithClientType allowedWithClientType,
-                                    boost::optional<FeatureFlag> featureFlag) {
+                                    boost::optional<FeatureFlag> featureFlag,
+                                    bool shouldOmitDiagnosticInformation) {
     auto op = parserMap.find(key);
     massert(17064,
             str::stream() << "Duplicate expression (" << key << ") registered.",
             op == parserMap.end());
     parserMap[key] =
         ParserRegistration{parser, allowedWithApiStrict, allowedWithClientType, featureFlag};
-    // Add this expression to the global map of operator counters for expressions.
-    operatorCountersAggExpressions.addCounter(key);
+    if (!shouldOmitDiagnosticInformation) {
+        // Add this expression to the global map of operator counters for expressions.
+        operatorCountersAggExpressions.addCounter(key);
+    }
 }
 
 intrusive_ptr<Expression> Expression::parseExpression(ExpressionContext* const expCtx,
@@ -4126,7 +4129,7 @@ ExpressionInternalFLEEqual::ExpressionInternalFLEEqual(ExpressionContext* const 
     expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
 }
 
-REGISTER_STABLE_EXPRESSION(_internalFleEq, ExpressionInternalFLEEqual::parse);
+REGISTER_STABLE_EXPRESSION_NO_METRICS(_internalFleEq, ExpressionInternalFLEEqual::parse);
 
 intrusive_ptr<Expression> ExpressionInternalFLEEqual::parse(ExpressionContext* const expCtx,
                                                             BSONElement expr,
@@ -4194,7 +4197,7 @@ ExpressionInternalFLEBetween::ExpressionInternalFLEBetween(
     expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
 }
 
-REGISTER_STABLE_EXPRESSION(_internalFleBetween, ExpressionInternalFLEBetween::parse);
+REGISTER_STABLE_EXPRESSION_NO_METRICS(_internalFleBetween, ExpressionInternalFLEBetween::parse);
 
 intrusive_ptr<Expression> ExpressionInternalFLEBetween::parse(ExpressionContext* const expCtx,
                                                               BSONElement expr,

@@ -124,6 +124,25 @@ class DocumentSource;
     }
 
 /**
+ * Like REGISTER_STABLE_EXPRESSION, but suppresses the
+ * metrics.operatorCounters.expressions.$KEY serverStatus leaf.
+ *
+ * Currently used by $_internalFleEq and $_internalFleBetween (SERVER-114172).
+ */
+#define REGISTER_STABLE_EXPRESSION_NO_METRICS(key, parser)                          \
+    MONGO_INITIALIZER_GENERAL(addToExpressionParserMap_##key,                       \
+                              ("BeginExpressionRegistration"),                      \
+                              ("EndExpressionRegistration"))                        \
+    (InitializerContext*) {                                                         \
+        Expression::registerExpression("$" #key,                                    \
+                                       (parser),                                    \
+                                       AllowedWithApiStrict::kAlways,               \
+                                       AllowedWithClientType::kAny,                 \
+                                       boost::none,                                 \
+                                       true /* shouldOmitDiagnosticInformation */); \
+    }
+
+/**
  * Registers a Parser so it can be called from parseExpression and friends. Use this version if your
  * expression can only be persisted to a catalog data structure in a feature compatibility version
  * that enables the featureFlag.
@@ -362,7 +381,8 @@ public:
                                    Parser parser,
                                    AllowedWithApiStrict allowedWithApiStrict,
                                    AllowedWithClientType allowedWithClientType,
-                                   boost::optional<FeatureFlag> featureFlag);
+                                   boost::optional<FeatureFlag> featureFlag,
+                                   bool shouldOmitDiagnosticInformation = false);
 
     const auto& getChildren() const {
         return _children;
