@@ -4,8 +4,12 @@
 #pragma once
 
 #include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/validate/validate_options.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
+
+#include <boost/optional.hpp>
 
 [[MONGO_MOD_PUBLIC]];
 
@@ -20,6 +24,36 @@ class Status;
 class ValidateResults;
 
 namespace collection_validation {
+
+/**
+ * Timings describing the cost of each stage of a collection validation. A field is only populated
+ * if validation reached the corresponding stage. These vary between otherwise identical
+ * validations, so they are logged rather than kept in ValidateResults.
+ */
+struct [[MONGO_MOD_FILE_PRIVATE]] ValidationMetrics {
+    // Whether the collection is a time-series collection. Only known once the collection is found.
+    boost::optional<bool> isTimeseries;
+    // Wall-clock time spent in collection_validation::validate().
+    boost::optional<Microseconds> totalDuration;
+    // Time spent validating the internal structure of the record store. Only full validation runs
+    // WT_SESSION::verify, so this is much smaller otherwise.
+    boost::optional<Microseconds> recordStoreValidateDuration;
+    // Time spent validating the internal structure of all indexes. Only full validation runs
+    // WT_SESSION::verify, so this is much smaller otherwise.
+    boost::optional<Microseconds> indexValidateDuration;
+    // Time spent in the first phase of index consistency checks, which covers the record store and
+    // index traversals.
+    boost::optional<Microseconds> phase1Duration;
+    boost::optional<Microseconds> recordStoreTraversalDuration;
+    boost::optional<Microseconds> indexTraversalDuration;
+    // Time spent in the second phase, which only runs when index inconsistencies are found.
+    boost::optional<Microseconds> phase2Duration;
+
+    /**
+     * Serializes the metrics along with the bytes traversed, as recorded in 'results'.
+     */
+    BSONObj toBSON(const ValidateResults& results) const;
+};
 
 /**
  * Checks if 'hashPrefixes' contains valid hash strings. Throws if any is invalid.

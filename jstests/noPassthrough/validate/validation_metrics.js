@@ -28,14 +28,18 @@ const kTimingFields = [
     "indexTraversalDurationSecs",
 ];
 
+// Slack, in seconds, when comparing a duration against a sum of durations.
+// Durations may sum to be greater than the total due to floating point arithmetic.
+const kDurationToleranceSecs = 0.001;
+
 // Asserts 'lines' holds exactly one metrics line for our collection with its shared fields
 // populated. Returns the metrics.
 function checkCollectionMetrics(lines, expectedMode) {
     jsTest.log.info("Collected validation metrics", {lines});
-    const ours = lines.filter((attr) => attr.namespace === `${dbName}.${collName}`);
+    const ours = lines.filter((attr) => attr.uuid === collUUID);
     assert.eq(1, ours.length, "expected exactly one metrics line for the collection", {lines});
     const attr = ours[0];
-    assert.eq(collUUID, attr.uuid.uuid.$uuid, attr);
+    assert(!attr.hasOwnProperty("namespace"), attr);
     assert.eq(expectedMode, attr.mode, attr);
     assert.eq(true, attr.completed, attr);
     assert.eq(0, attr.status.code, attr);
@@ -45,11 +49,12 @@ function checkCollectionMetrics(lines, expectedMode) {
     assert.eq(false, m.isTimeseries, m);
     for (const field of kTimingFields) {
         assert(m.hasOwnProperty(field), `missing ${field}`, m);
+        assert.eq("number", typeof m[field], `${field} is not a number`, m);
         assert.gte(m[field], 0, `negative ${field}`, m);
     }
-    assert.gte(m.totalDurationSecs, m.phase1DurationSecs, m);
+    assert.gte(m.totalDurationSecs + kDurationToleranceSecs, m.phase1DurationSecs, m);
     assert.gte(
-        m.phase1DurationSecs,
+        m.phase1DurationSecs + kDurationToleranceSecs,
         m.recordStoreTraversalDurationSecs + m.indexTraversalDurationSecs,
         m,
     );

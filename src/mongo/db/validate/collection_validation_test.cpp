@@ -388,6 +388,8 @@ TEST_F(CollectionValidationTest, ValidateLogsMetrics) {
                        "recordStoreTraversalDurationSecs",
                        "indexTraversalDurationSecs"}) {
         EXPECT_TRUE(m.hasField(field)) << field;
+        EXPECT_EQ(m.getField(field).type(), BSONType::numberDouble)
+            << field << " must be floating point numeric type";
     }
     // No index inconsistencies, so the second phase never runs.
     EXPECT_FALSE(m.hasField("phase2DurationSecs"));
@@ -405,6 +407,17 @@ TEST_F(CollectionValidationTest, ValidateLogsMetrics) {
     }
     EXPECT_GT(keyBytes, 0);
     EXPECT_EQ(m["indexDataSize"].safeNumberLong(), keyBytes);
+}
+
+// Durations are serialized as fractional seconds, so sub-second durations are not rounded to zero.
+TEST(ValidationMetricsTest, ReportsDurationsAsFractionalSeconds) {
+    collection_validation::ValidationMetrics metrics;
+    metrics.totalDuration = Microseconds(500'000);
+    const auto bson = metrics.toBSON(ValidateResults());
+
+    ASSERT_EQ(bson["totalDurationSecs"].type(), BSONType::numberDouble) << bson;
+    EXPECT_NEAR(bson["totalDurationSecs"].numberDouble(), 0.5, 1e-9);
+    EXPECT_FALSE(bson.hasField("phase1DurationSecs")) << bson;
 }
 
 // Every call to validate() emits exactly one metrics log line identifying the validation.

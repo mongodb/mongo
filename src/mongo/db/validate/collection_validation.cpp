@@ -998,77 +998,43 @@ ValidationOptions parseValidateOptions(OperationContext* opCtx,
             sizeStats};
 }
 
-namespace {
-
-/**
- * Timings describing the cost of each stage of a collection validation. A field is only populated
- * if validation reached the corresponding stage. These vary between otherwise identical
- * validations, so they are logged rather than kept in ValidateResults.
- */
-struct ValidationMetrics {
-    // Whether the collection is a time-series collection. Only known once the collection is found.
-    boost::optional<bool> isTimeseries;
-    // Wall-clock time spent in collection_validation::validate().
-    boost::optional<Microseconds> totalDuration;
-    // Time spent validating the internal structure of the record store. Only full validation runs
-    // WT_SESSION::verify, so this is much smaller otherwise.
-    boost::optional<Microseconds> recordStoreValidateDuration;
-    // Time spent validating the internal structure of all indexes. Only full validation runs
-    // WT_SESSION::verify, so this is much smaller otherwise.
-    boost::optional<Microseconds> indexValidateDuration;
-    // Time spent in the first phase of index consistency checks, which covers the record store and
-    // index traversals.
-    boost::optional<Microseconds> phase1Duration;
-    boost::optional<Microseconds> recordStoreTraversalDuration;
-    boost::optional<Microseconds> indexTraversalDuration;
-    // Time spent in the second phase, which only runs when index inconsistencies are found.
-    boost::optional<Microseconds> phase2Duration;
-
-    /**
-     * Serializes the metrics along with the bytes traversed, as recorded in 'results'.
-     */
-    BSONObj toBSON(const ValidateResults& results) const {
-        BSONObjBuilder bob;
-        if (isTimeseries) {
-            bob.append("isTimeseries", *isTimeseries);
-        }
-        // Durations are reported in whole seconds, as the validations they are meant to track run
-        // for hours to days.
-        appendSeconds(bob, "totalDurationSecs", totalDuration);
-        appendSeconds(bob, "recordStoreValidateDurationSecs", recordStoreValidateDuration);
-        appendSeconds(bob, "indexValidateDurationSecs", indexValidateDuration);
-        appendSeconds(bob, "phase1DurationSecs", phase1Duration);
-        appendSeconds(bob, "recordStoreTraversalDurationSecs", recordStoreTraversalDuration);
-        appendSeconds(bob, "indexTraversalDurationSecs", indexTraversalDuration);
-        appendSeconds(bob, "phase2DurationSecs", phase2Duration);
-        // The sizes come from ValidateResults, where they are also reported in the result object.
-        // Startup validation has no command reply, so they are logged too.
-        if (const auto dataSize = results.getDataSize()) {
-            bob.appendNumber("recordStoreDataSize", *dataSize);
-        }
-        // Index key bytes are only accumulated once the index traversal has run.
-        if (indexTraversalDuration) {
-            long long indexDataSize = 0;
-            for (const auto& [_, ivr] : results.getIndexResultsMap()) {
-                indexDataSize += ivr.getKeyBytesTraversed();
-            }
-            bob.appendNumber("indexDataSize", indexDataSize);
-        }
-        return bob.obj();
+BSONObj ValidationMetrics::toBSON(const ValidateResults& results) const {
+    BSONObjBuilder bob;
+    if (isTimeseries) {
+        bob.append("isTimeseries"sv, *isTimeseries);
     }
 
-private:
-    // Appends 'duration' to 'bob' as a whole number of seconds, if it was recorded.
-    static void appendSeconds(BSONObjBuilder& bob,
-                              std::string_view fieldName,
-                              const boost::optional<Microseconds>& duration) {
+    // Appends 'duration' to 'bob' as a floating point number of seconds, if it was recorded.
+    auto appendSeconds = [](BSONObjBuilder& bob,
+                            std::string_view fieldName,
+                            const boost::optional<Microseconds>& duration) {
         if (duration) {
-            bob.append(fieldName, durationCount<Seconds>(*duration));
+            bob.append(fieldName, durationCount<Microseconds>(*duration) / 1e6);
         }
+    };
+    // Durations are reported in fractional seconds, as short validations take under a second.
+    appendSeconds(bob, "totalDurationSecs"sv, totalDuration);
+    appendSeconds(bob, "recordStoreValidateDurationSecs"sv, recordStoreValidateDuration);
+    appendSeconds(bob, "indexValidateDurationSecs"sv, indexValidateDuration);
+    appendSeconds(bob, "phase1DurationSecs"sv, phase1Duration);
+    appendSeconds(bob, "recordStoreTraversalDurationSecs"sv, recordStoreTraversalDuration);
+    appendSeconds(bob, "indexTraversalDurationSecs"sv, indexTraversalDuration);
+    appendSeconds(bob, "phase2DurationSecs"sv, phase2Duration);
+    // The sizes come from ValidateResults, where they are also reported in the result object.
+    // Startup validation has no command reply, so they are logged too.
+    if (const auto dataSize = results.getDataSize()) {
+        bob.appendNumber("recordStoreDataSize"sv, *dataSize);
     }
-};
-
-}  // namespace
+    // Index key bytes are only accumulated once the index traversal has run.
+    if (indexTraversalDuration) {
+        long long indexDataSize = 0;
+        for (const auto& [_, ivr] : results.getIndexResultsMap()) {
+            indexDataSize += ivr.getKeyBytesTraversed();
+        }
+        bob.appendNumber("indexDataSize"sv, indexDataSize);
+    }
+    return bob.obj();
+}
 
 Status validate(OperationContext* opCtx,
                 const NamespaceString& nss,
@@ -1097,10 +1063,13 @@ Status validate(OperationContext* opCtx,
         if (!status.isOK()) {
             CurOp::get(opCtx)->debug().errInfo = status;
         }
+        boost::optional<std::string> uuid;
+        if (const auto& resultsUuid = results.getUUID()) {
+            uuid = resultsUuid->toString();
+        }
         LOGV2(13618300,
               "Collection validation metrics",
-              logAttrs(nss),
-              "uuid"_attr = results.getUUID(),
+              "uuid"_attr = uuid,
               "mode"_attr = toString(mode),
               "completed"_attr = completed && status.isOK() && !threw,
               "status"_attr = status,
