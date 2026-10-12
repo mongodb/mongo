@@ -418,7 +418,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
 
     _wasResumed = resumeInfo.has_value();
     if (resumeInfo) {
-        _phase = resumeInfo->getPhase();
+        _setPhase(resumeInfo->getPhase());
     }
 
     bool forRecovery = initMode == InitMode::Recovery;
@@ -842,7 +842,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
     // If the collection is empty we can skip the collection scan and committing the bulk loader.
     // Note that this cannot use numRecords, as that's a fastcount and may be wrong.
     if (collection->getCollectionPtr()->isEmpty(opCtx)) {
-        _phase = IndexBuildPhaseEnum::kBulkLoad;
+        _setPhase(IndexBuildPhaseEnum::kBulkLoad);
         return Status::OK();
     }
 
@@ -1031,8 +1031,7 @@ void MultiIndexBlock::_doCollectionScan(OperationContext* opCtx,
               idl::serialize(_phase));
 
     // If transitioning from initialization to the scan phase, seed the index build container.
-    if (std::exchange(_phase, IndexBuildPhaseEnum::kCollectionScan) ==
-        IndexBuildPhaseEnum::kInitialized) {
+    if (_setPhase(IndexBuildPhaseEnum::kCollectionScan) == IndexBuildPhaseEnum::kInitialized) {
         _writeAllStateToContainer(opCtx);
     }
 
@@ -1282,7 +1281,7 @@ Status MultiIndexBlock::dumpInsertsFromBulk(
 
     // If the phase changed and the build has spilled, write the new phase to the index build
     // container.
-    if (std::exchange(_phase, IndexBuildPhaseEnum::kBulkLoad) != IndexBuildPhaseEnum::kBulkLoad &&
+    if (_setPhase(IndexBuildPhaseEnum::kBulkLoad) != IndexBuildPhaseEnum::kBulkLoad &&
         _anyIndexSpilled) {
         _writeIndexBuildMetadataToContainer(opCtx);
     }
@@ -1406,8 +1405,11 @@ Status MultiIndexBlock::dumpInsertsFromBulk(
                                       : IndexAccessMethod::OnNKeysLoadedFn([]() {}),
             [this, shouldThrottleContainerWrites, &bytesSinceLastYield](int64_t keysWritten,
                                                                         int64_t bytesWritten) {
-                _indexWriteStats.numKeysWrittenBulkLoad += keysWritten;
-                _indexWriteStats.numBytesWrittenBulkLoad += bytesWritten;
+                {
+                    std::lock_guard lk(_stateMutex);
+                    _indexWriteStats.numKeysWrittenBulkLoad += keysWritten;
+                    _indexWriteStats.numBytesWrittenBulkLoad += bytesWritten;
+                }
                 if (shouldThrottleContainerWrites) {
                     bytesSinceLastYield += bytesWritten;
                 }
@@ -1456,7 +1458,7 @@ Status MultiIndexBlock::drainBackgroundWrites(
                   _phase == IndexBuildPhaseEnum::kDrainWrites,
               idl::serialize(_phase));
     const bool firstDrain = _phase == IndexBuildPhaseEnum::kBulkLoad;
-    _phase = IndexBuildPhaseEnum::kDrainWrites;
+    _setPhase(IndexBuildPhaseEnum::kDrainWrites);
 
     ReadSourceScope readSourceScope(opCtx, readSource);
 
@@ -1500,6 +1502,7 @@ Status MultiIndexBlock::drainBackgroundWrites(
         const auto before = interceptor->getNumKeysAndBytesWritten();
         ON_BLOCK_EXIT([&, interceptor] {
             const auto after = interceptor->getNumKeysAndBytesWritten();
+            std::lock_guard lk(_stateMutex);
             _indexWriteStats.numKeysWrittenSideWritesDrain +=
                 after.keysWritten - before.keysWritten;
             _indexWriteStats.numBytesWrittenSideWritesDrain +=
@@ -1715,7 +1718,13 @@ bool MultiIndexBlock::isBackgroundBuilding() const {
 }
 
 void MultiIndexBlock::setIndexBuildMethod(IndexBuildMethodEnum indexBuildMethod) {
+    std::lock_guard lk(_stateMutex);
     _method = indexBuildMethod;
+}
+
+IndexBuildPhaseEnum MultiIndexBlock::_setPhase(IndexBuildPhaseEnum phase) {
+    std::lock_guard lk(_stateMutex);
+    return std::exchange(_phase, phase);
 }
 
 void MultiIndexBlock::setContainerWriteBehavior(ContainerWriteBehavior containerWriteBehavior) {
@@ -1727,6 +1736,7 @@ void MultiIndexBlock::setIsResumable(bool isResumable) {
 }
 
 void MultiIndexBlock::appendBuildInfo(BSONObjBuilder* builder) const {
+    std::lock_guard lk(_stateMutex);
     builder->append("method", idl::serialize(_method));
     builder->append("phase", static_cast<int>(_phase));
     builder->append("phaseStr", idl::serialize(_phase));

@@ -4,6 +4,7 @@
 #include "mongo/db/index_builds/multi_index_block.h"
 
 #include "mongo/base/error_codes.h"
+#include "mongo/db/client.h"
 #include "mongo/db/collection_crud/container_write.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/dbhelpers.h"
@@ -34,6 +35,9 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/otel/metrics/metric_names.h"
 #include "mongo/otel/metrics/metrics_test_util.h"
+#include "mongo/platform/atomic.h"
+#include "mongo/unittest/barrier.h"
+#include "mongo/unittest/join_thread.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -4389,6 +4393,88 @@ TEST_F(MultiIndexBlockTest, LastSpilledRecordIdIsNotPersistedDuringLoadPhase) {
     }
 
     indexer.abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
+}
+
+// appendBuildInfo() and getPhase() are called by other threads (e.g. listIndexes) while the index
+// build thread changes phase. Run with TSAN to detect unsynchronized access to the build state.
+TEST_F(MultiIndexBlockTest, ConcurrentPhaseChange) {
+    auto indexer = getIndexer();
+    auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
+    const auto indexSpec = BSON("key" << BSON("a" << 1)   //
+                                      << "name" << "a_1"  //
+                                      << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion));
+    auto indexBuildInfo = IndexBuildInfo(indexSpec, "index-1", *storageEngine);
+
+    {
+        auto acq =
+            acquireCollection(operationContext(),
+                              CollectionAcquisitionRequest::fromOpCtx(
+                                  operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                              MODE_X);
+        {
+            CollectionWriter coll(operationContext(), &acq);
+            WriteUnitOfWork wuow(operationContext());
+            ASSERT_OK(indexer
+                          ->init(operationContext(),
+                                 coll,
+                                 {indexBuildInfo},
+                                 MultiIndexBlock::kNoopOnInitFn,
+                                 MultiIndexBlock::InitMode::SteadyState,
+                                 boost::none)
+                          .getStatus());
+            wuow.commit();
+        }
+
+        WriteUnitOfWork wuow(operationContext());
+        for (int i = 0; i < 100; ++i) {
+            ASSERT_OK(Helpers::insert(
+                operationContext(), acq.getCollectionPtr(), BSON("_id" << i << "a" << i)));
+        }
+        wuow.commit();
+    }
+
+    Atomic<bool> buildFinished{false};
+    unittest::Barrier bar(2);
+    unittest::JoinThread builder([&] {
+        bar.countDownAndWait();
+        ThreadClient tc(getServiceContext()->getService());
+        auto opCtx = tc->makeOperationContext();
+        ON_BLOCK_EXIT([&] { buildFinished.store(true); });
+
+        ASSERT_OK(indexer->insertAllDocumentsInCollection(opCtx.get(), getNSS()));
+
+        auto acq = acquireCollection(opCtx.get(),
+                                     CollectionAcquisitionRequest::fromOpCtx(
+                                         opCtx.get(), getNSS(), AcquisitionPrerequisites::kWrite),
+                                     MODE_IX);
+        ASSERT_OK(
+            indexer->drainBackgroundWrites(opCtx.get(),
+                                           RecoveryUnit::ReadSource::kNoTimestamp,
+                                           IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+    });
+
+    bar.countDownAndWait();
+    while (!buildFinished.load()) {
+        BSONObjBuilder bob;
+        indexer->appendBuildInfo(&bob);
+        static_cast<void>(indexer->getPhase());
+    }
+    builder.join();
+
+    ASSERT_EQ(indexer->getPhase(), IndexBuildPhaseEnum::kDrainWrites);
+
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll(operationContext(), &acq);
+    WriteUnitOfWork wuow(operationContext());
+    ASSERT_OK(indexer->commit(operationContext(),
+                              coll.getWritableCollection(operationContext()),
+                              MultiIndexBlock::kNoopOnCreateEachFn,
+                              MultiIndexBlock::kNoopOnCommitFn));
+    wuow.commit();
 }
 
 TEST(PrimaryDrivenIndexBuildKnobs, BulkLoadThrottleRateIsUnsetByDefault) {

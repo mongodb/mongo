@@ -30,6 +30,7 @@
 
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <string_view>
 #include <vector>
 
@@ -324,6 +325,7 @@ public:
      * Returns the phase the index build is currently in.
      */
     IndexBuildPhaseEnum getPhase() const {
+        std::lock_guard lk(_stateMutex);
         return _phase;
     }
 
@@ -345,6 +347,7 @@ public:
     };
 
     IndexBuildWriteStats getIndexTableWrites() const {
+        std::lock_guard lk(_stateMutex);
         return _indexWriteStats;
     }
 
@@ -390,6 +393,9 @@ private:
      * container writes or not resumable.
      */
     void _writeIndexBuildMetadataToContainer(OperationContext* opCtx) const;
+
+    // Sets the phase and returns the previous one.
+    IndexBuildPhaseEnum _setPhase(IndexBuildPhaseEnum phase);
 
     /**
      * Writes a single IndexStateInfo to the index build container for the given index. No-op when
@@ -490,6 +496,10 @@ private:
     // The RecordId corresponding to the object most recently inserted using this MultiIndexBlock,
     // or boost::none if nothing has been inserted.
     boost::optional<RecordId> _lastRecordIdInserted;
+
+    // Protects the state that other threads observe while the build thread runs: _method, _phase
+    // and _indexWriteStats. The build thread must hold it to write them; it may read them without.
+    mutable std::mutex _stateMutex;
 
     // The current phase of the index build.
     IndexBuildPhaseEnum _phase = IndexBuildPhaseEnum::kInitialized;
