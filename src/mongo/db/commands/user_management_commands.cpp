@@ -2023,8 +2023,10 @@ DropAllRolesFromDatabaseReply CmdUMCTyped<DropAllRolesFromDatabaseCommand>::Invo
 
         try {
             // Remove this role from any user documents that include it.
-            const auto& updateUserDocsOp = buildUpdateRequest(
-                usersNSS(dbname.tenantId()), rolesMatch, BSON("$pull" << rolesMatch));
+            const auto& updateUserDocsOp =
+                buildUpdateRequest(usersNSS(dbname.tenantId()),
+                                   BSON("roles" << BSON("$elemMatch" << roleMatch)),
+                                   BSON("$pull" << rolesMatch));
             auto updateUserDocsStatus = umcTxnClient.runCRUDOp(updateUserDocsOp, {}).toStatus();
             uassertStatusOK(useDefaultCode(updateUserDocsStatus, ErrorCodes::UserModificationFailed)
                                 .withContext(str::stream() << "Failed to remove roles from  \""
@@ -2034,7 +2036,7 @@ DropAllRolesFromDatabaseReply CmdUMCTyped<DropAllRolesFromDatabaseCommand>::Invo
             // Remove this role from all other roles.
             const auto& updateRoleDocsOp =
                 buildUpdateRequest(rolesNSS(dbname.tenantId()),
-                                   BSON("roles" << BSON("roles.db" << dbname.toString())),
+                                   BSON("roles" << BSON("$elemMatch" << roleMatch)),
                                    BSON("$pull" << rolesMatch));
             auto updateRoleDocsStatus = umcTxnClient.runCRUDOp(updateRoleDocsOp, {}).toStatus();
             uassertStatusOK(useDefaultCode(updateRoleDocsStatus, ErrorCodes::RoleModificationFailed)
