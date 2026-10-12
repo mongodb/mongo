@@ -29,6 +29,10 @@
          kInternalQuerySlotBasedExecutionDisableTimeSeriesPushdownName,                   \
          internalQuerySlotBasedExecutionDisableTimeSeriesPushdown,                        \
          getSbeDisableTimeSeriesForOp)                                                    \
+    KNOB(kEnablePathArraynessTraverseFElision,                                            \
+         kInternalEnablePathArraynessTraverseFElisionName,                                \
+         internalEnablePathArraynessTraverseFElision,                                     \
+         getEnablePathArraynessTraverseFElision)                                          \
     KNOB(kMeasureQueryExecutionTimeInNanoseconds,                                         \
          kInternalMeasureQueryExecutionTimeInNanosecondsName,                             \
          internalMeasureQueryExecutionTimeInNanoseconds,                                  \
