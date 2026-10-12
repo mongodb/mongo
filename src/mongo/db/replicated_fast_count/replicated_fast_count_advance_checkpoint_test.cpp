@@ -110,7 +110,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, RepairNoopHashCombinesWithPersi
         collA.uuid,
         SizeCountStore::Entry{
             .timestamp = Timestamp(0, 1), .size = 1000, .count = 10, .hash = persistedHash});
-    writeRepairNoop(ts, collA, BSON("sz" << 100 << "ct" << 5 << "h" << repairHash));
+    writeRepairNoop(ts, collA, BSON("sz" << 100 << "ct" << 5 << "hDiff" << repairHash));
 
     EXPECT_EQ(advanceCheckpoint(opCtx, *sizeCountStore, *timestampStore), 2);
 
@@ -133,7 +133,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, RepairNoopHashLeavesAbsentPersi
             .timestamp = Timestamp(0, 1), .size = 1000, .count = 10, .hash = boost::none});
     writeRepairNoop(Timestamp(1, 1),
                     collA,
-                    BSON("sz" << 100 << "ct" << 5 << "h" << int64_t{0x0123456789abcdef}));
+                    BSON("sz" << 100 << "ct" << 5 << "hDiff" << int64_t{0x0123456789abcdef}));
 
     EXPECT_EQ(advanceCheckpoint(opCtx, *sizeCountStore, *timestampStore), 2);
 

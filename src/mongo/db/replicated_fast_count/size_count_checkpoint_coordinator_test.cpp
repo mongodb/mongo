@@ -674,7 +674,7 @@ TEST_F(SizeCountCheckpointCoordinatorHashTest, RepairHashDiffFoldsIntoCreatedCol
         .nss = NamespaceString(),
         .oField = BSON("msg" << "Repairing collection's replicated metadata with diffs"),
         .o2Field = BSON("type" << "repairReplicatedMetadata"
-                               << "uuid" << _collA.uuid << "m" << BSON("h" << kHashB)),
+                               << "uuid" << _collA.uuid << "m" << BSON("hDiff" << kHashB)),
         .wallClockTime = Date_t::now(),
     }});
 
@@ -749,7 +749,7 @@ TEST_F(SizeCountCheckpointCoordinatorHashTest, RepairHashSetAfterCreateThenFolds
 
     const int64_t repairHash = 0x0F0F0F0F0F0F0F0F;
     writeCrudEntry(nextTs(), _collA, repl::OpTypeEnum::kInsert, 20 /*sizeDelta=*/, kHashC);
-    writeRepairNoop(_collA, BSON("h" << repairHash));
+    writeRepairNoop(_collA, BSON("hDiff" << repairHash));
 
     const Timestamp validAsOf2 = flush();
     const SizeCountStore::Entry expectedEntry{.timestamp = validAsOf2,

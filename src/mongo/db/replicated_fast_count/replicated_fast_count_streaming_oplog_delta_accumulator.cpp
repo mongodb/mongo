@@ -471,7 +471,7 @@ struct NoopRepair {
 };
 
 // Extracts the collection uuid and metadata from a repairReplicatedMetadata o2 object. Returns
-// boost::none if the shape is malformed (missing/non-numeric fields, both `h` and `hSet`,
+// boost::none if the shape is malformed (missing/non-numeric fields, both `hDiff` and `hSet`,
 // unparsable uuid). Unlike CRUD's `m`, a no-op's o2 isn't otherwise validated by replication, so a
 // malformed repair entry is ignored (no delta) rather than treated as fatal.
 boost::optional<NoopRepair> tryExtractNoopRepair(const BSONObj& o2Obj) {
@@ -483,18 +483,18 @@ boost::optional<NoopRepair> tryExtractNoopRepair(const BSONObj& o2Obj) {
     const auto mObj = mElem.Obj();
     const auto szElem = mObj.getField("sz"sv);
     const auto ctElem = mObj.getField("ct"sv);
-    const auto hElem = mObj.getField("h"sv);
+    const auto hDiffElem = mObj.getField("hDiff"sv);
     const auto hSetElem = mObj.getField("hSet"sv);
-    if (szElem.eoo() && ctElem.eoo() && hElem.eoo() && hSetElem.eoo()) {
+    if (szElem.eoo() && ctElem.eoo() && hDiffElem.eoo() && hSetElem.eoo()) {
         return boost::none;
     }
-    // `sz`, `ct`, `h`, and `hSet` are each optional but a present field must be numeric; malformed
-    // input invalidates the whole entry rather than partially applying it.
+    // `sz`, `ct`, `hDiff`, and `hSet` are each optional but a present field must be numeric;
+    // malformed input invalidates the whole entry rather than partially applying it.
     const auto isMalformed = [](const BSONElement& elem) {
         return !elem.eoo() && !elem.isNumber();
     };
-    if (isMalformed(szElem) || isMalformed(ctElem) || isMalformed(hElem) || isMalformed(hSetElem) ||
-        (!hElem.eoo() && !hSetElem.eoo())) {
+    if (isMalformed(szElem) || isMalformed(ctElem) || isMalformed(hDiffElem) ||
+        isMalformed(hSetElem) || (!hDiffElem.eoo() && !hSetElem.eoo())) {
         return boost::none;
     }
     auto uuid = UUID::parse(uuidElem);
@@ -508,12 +508,13 @@ boost::optional<NoopRepair> tryExtractNoopRepair(const BSONObj& o2Obj) {
                           .metadata = {.sizeCount = sizeCount, .hash = hSetElem.safeNumberLong()},
                           .hashUpdateMode = HashUpdateMode::kSet};
     }
-    // An absent `h` folds as the XOR identity so that the window's accumulated hash is preserved.
-    return NoopRepair{
-        .uuid = uuid.getValue(),
-        .metadata = {.sizeCount = sizeCount,
-                     .hash = hElem.eoo() ? kEmptyCollectionValidationHash : hElem.safeNumberLong()},
-        .hashUpdateMode = HashUpdateMode::kFold};
+    // An absent `hDiff` folds as the XOR identity so that the window's accumulated hash is
+    // preserved.
+    return NoopRepair{.uuid = uuid.getValue(),
+                      .metadata = {.sizeCount = sizeCount,
+                                   .hash = hDiffElem.eoo() ? kEmptyCollectionValidationHash
+                                                           : hDiffElem.safeNumberLong()},
+                      .hashUpdateMode = HashUpdateMode::kFold};
 }
 
 // Layer 2: handle a no-op entry whose o2 repairs a collection's replicated metadata. A malformed

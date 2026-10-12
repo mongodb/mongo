@@ -96,8 +96,8 @@ public:
 
             const auto& metadata = request().getMetadata();
             uassert(ErrorCodes::InvalidOptions,
-                    "Cannot specify both 'h' and 'hSet' in \"repairReplicatedMetadata\"",
-                    !(metadata.getH() && metadata.getHSet()));
+                    "Cannot specify both 'hDiff' and 'hSet' in \"repairReplicatedMetadata\"",
+                    !(metadata.getHDiff() && metadata.getHSet()));
 
             // Resolve and acquire the collection by UUID so the repair serializes with drops and
             // renames. Renames preserve the UUID, so retry if the collection moved; if it no

@@ -110,12 +110,12 @@ protected:
     BSONObj makeRepairO2(const test_helpers::NsAndUUID& coll,
                          int64_t sz,
                          int64_t ct,
-                         boost::optional<int64_t> h = boost::none) {
+                         boost::optional<int64_t> hDiff = boost::none) {
         BSONObjBuilder m;
         m.append("sz", sz);
         m.append("ct", ct);
-        if (h) {
-            m.append("h", *h);
+        if (hDiff) {
+            m.append("hDiff", *hDiff);
         }
         return BSON("type" << "repairReplicatedMetadata"
                            << "uuid" << coll.uuid << "m" << m.obj());
@@ -787,7 +787,7 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_NoopRepairHashOnly_ZeroSizeC
     const Timestamp ts{1, 1};
     const int64_t hash = 0x0123456789abcdef;
     const auto o2 = BSON("type" << "repairReplicatedMetadata" << "uuid" << collA.uuid << "m"
-                                << BSON("h" << hash));
+                                << BSON("hDiff" << hash));
     const auto result = runAccumulatorRaw({makeNoopWithO2Bson(ts, o2)});
     ASSERT_TRUE(result.deltas.contains(collA.uuid));
     EXPECT_EQ(result.deltas.at(collA.uuid).metadata.sizeCount,
@@ -828,8 +828,8 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_NoopRepair_ZeroHashDiffIsIde
 TEST_F(StreamingOplogDeltaAccumulatorTest,
        FastLane_NoopRepairHashDiff_AbsentWindowHashStaysAbsent) {
     // A hash diff folds by XOR and absence absorbs: a collection whose window hash is absent
-    // (here, a CRUD entry carrying `sz` but no `h`) stays absent, so the repair's `h` cannot seed
-    // a hash on its own.
+    // (here, a CRUD entry carrying `sz` but no `h`) stays absent, so the repair's `hDiff` cannot
+    // seed a hash on its own.
     const Timestamp ts1{1, 1};
     const Timestamp ts2{1, 2};
     const int64_t repairHash = 0x0011223344556677;
@@ -843,11 +843,12 @@ TEST_F(StreamingOplogDeltaAccumulatorTest,
     EXPECT_EQ(result.lastTimestamp, ts2);
 }
 
-TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_NoopRepairNonNumericH_Ignored) {
-    // `h` is present but malformed: the whole entry is ignored, even though `sz` is well-formed.
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_NoopRepairNonNumericHashDiff_Ignored) {
+    // `hDiff` is present but malformed: the whole entry is ignored, even though `sz` is
+    // well-formed.
     const Timestamp ts{1, 1};
     const auto o2 = BSON("type" << "repairReplicatedMetadata" << "uuid" << collA.uuid << "m"
-                                << BSON("sz" << 100 << "h"
+                                << BSON("sz" << 100 << "hDiff"
                                              << "notanumber"));
     const auto result = runAccumulatorRaw({makeNoopWithO2Bson(ts, o2)});
     EXPECT_TRUE(result.deltas.empty());
@@ -1010,8 +1011,9 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, NoopRepairHashSet_DropThenImportReset
 
 TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_NoopRepairHashDiffAndHashSet_Ignored) {
     const Timestamp ts{1, 1};
-    const auto o2 = BSON("type" << "repairReplicatedMetadata" << "uuid" << collA.uuid << "m"
-                                << BSON("sz" << 100 << "h" << int64_t{1} << "hSet" << int64_t{2}));
+    const auto o2 =
+        BSON("type" << "repairReplicatedMetadata" << "uuid" << collA.uuid << "m"
+                    << BSON("sz" << 100 << "hDiff" << int64_t{1} << "hSet" << int64_t{2}));
     const auto result = runAccumulatorRaw({makeNoopWithO2Bson(ts, o2)});
     EXPECT_TRUE(result.deltas.empty());
     EXPECT_EQ(result.lastTimestamp, ts);
