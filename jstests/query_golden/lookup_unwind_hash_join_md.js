@@ -22,27 +22,6 @@ const foreignDocs = [
     {_id: 13, fkey: null, b: 40},
 ];
 
-// Data for the dotted join key $lookup section. Both sides carry scalar join keys
-// ('lkey'/'fkey') and the nested 'a.b' path, covering scalar, array, null, and missing values
-// along the dotted path.
-const dottedKeyLocalDocs = [
-    {_id: 0, lkey: 1, a: {b: 1}},
-    {_id: 1, lkey: 2, a: {b: [1, 3]}},
-    {_id: 2, lkey: 3, a: {b: null}},
-    {_id: 3, lkey: 4, a: {c: 1}},
-    {_id: 4, lkey: null},
-];
-
-const dottedKeyForeignDocs = [
-    {_id: 10, fkey: 1, b: 10, a: {b: 1}},
-    {_id: 11, fkey: 2, b: 20, a: {b: [1, 3]}},
-    {_id: 12, fkey: [2, 4], b: 30, a: {b: 2}},
-    {_id: 13, b: 40, a: {b: null}},
-    {_id: 14, fkey: 4, b: 50, a: {c: 1}},
-    {_id: 15, fkey: 3, b: 60},
-    {_id: 16, fkey: null, b: 70, a: {b: 3}},
-];
-
 const unwinds = [
     {$unwind: "$joined"},
     {$unwind: {path: "$joined", preserveNullAndEmptyArrays: true}},
@@ -55,27 +34,10 @@ const suffixStages = [
     [{$project: {_id: 0, lkey: 1, joined: 1}}],
 ];
 
-// Stages for the dotted join key section. 'a.b' there can be an array, which '$add' rejects, so
-// the $add targets the scalar 'lkey'.
-const dottedKeySuffixStages = [
-    [{$addFields: {computed: {$add: ["$lkey", "$joined.b"]}}}],
-    [{$project: {_id: 0, lkey: 1, joined: 1}}],
-];
-
 // 'allowDiskUse: true' selects the hash join strategy.
 const aggOptions = [{allowDiskUse: true}];
 
 const lookup = {$lookup: {from: "foreign", localField: "lkey", foreignField: "fkey", as: "joined"}};
-
-// $lookups joining on a dotted localField and on a dotted foreignField.
-const dottedKeyLookups = [
-    {
-        $lookup: {from: "dottedForeign", localField: "a.b", foreignField: "fkey", as: "joined"},
-    },
-    {
-        $lookup: {from: "dottedForeign", localField: "lkey", foreignField: "a.b", as: "joined"},
-    },
-];
 
 const uuidRegex = /@"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"/g;
 
@@ -121,11 +83,6 @@ db.localDotted.drop();
 db.foreignDotted.drop();
 assert.commandWorked(db.localDotted.insertMany(dottedLocalDocs));
 assert.commandWorked(db.foreignDotted.insertMany(dottedForeignDocs));
-
-db.dottedLocal.drop();
-db.dottedForeign.drop();
-assert.commandWorked(db.dottedLocal.insertMany(dottedKeyLocalDocs));
-assert.commandWorked(db.dottedForeign.insertMany(dottedKeyForeignDocs));
 
 // Pin the strategy flags so the plans depend only on the engine mode, not the build's flags.
 const strategyFlags = {
@@ -223,23 +180,6 @@ try {
             aggOptions.forEach((options) => {
                 const pipeline = [dottedLookup, unwind].concat(suffix);
                 runPipeline("localDotted", pipeline, options);
-            });
-        });
-    });
-
-    dottedKeyLookups.forEach((dottedKeyLookup) => {
-        section(`Dotted lookup: ${tojsononeline(dottedKeyLookup)}`);
-        linebreak();
-
-        unwinds.forEach((unwind) => {
-            section(`Unwind: ${tojsononeline(unwind)}`);
-            linebreak();
-
-            dottedKeySuffixStages.forEach((suffix) => {
-                aggOptions.forEach((options) => {
-                    const pipeline = [dottedKeyLookup, unwind].concat(suffix);
-                    runPipeline("dottedLocal", pipeline, options);
-                });
             });
         });
     });
