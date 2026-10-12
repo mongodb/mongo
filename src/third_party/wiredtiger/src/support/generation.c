@@ -150,6 +150,7 @@ __wt_gen_drain(WT_SESSION_IMPL *session, int which, uint64_t generation)
                         WT_VERBOSE_RESTORE(session, verbose_orig_level, WT_VERB_EVICT);
                         WT_VERBOSE_RESTORE(session, verbose_orig_level, WT_VERB_EVICTSERVER);
                         WT_VERBOSE_RESTORE(session, verbose_orig_level, WT_VERB_EVICT_STUCK);
+                        WT_VERBOSE_RESTORE(session, verbose_orig_level, WT_VERB_RECONCILE);
                     } else if (which == WT_GEN_CHECKPOINT) {
                         WT_VERBOSE_RESTORE(session, verbose_orig_level, WT_VERB_CHECKPOINT);
                         WT_VERBOSE_RESTORE(session, verbose_orig_level, WT_VERB_CHECKPOINT_CLEANUP);
@@ -202,6 +203,8 @@ __wt_gen_drain(WT_SESSION_IMPL *session, int which, uint64_t generation)
                           session, verbose_orig_level, WT_VERB_EVICTSERVER, WT_VERBOSE_DEBUG_1);
                         WT_VERBOSE_SET_AND_SAVE(
                           session, verbose_orig_level, WT_VERB_EVICT_STUCK, WT_VERBOSE_DEBUG_1);
+                        WT_VERBOSE_SET_AND_SAVE(
+                          session, verbose_orig_level, WT_VERB_RECONCILE, WT_VERBOSE_DEBUG_1);
                     } else if (which == WT_GEN_CHECKPOINT) {
                         WT_VERBOSE_SET_AND_SAVE(
                           session, verbose_orig_level, WT_VERB_CHECKPOINT, WT_VERBOSE_DEBUG_1);

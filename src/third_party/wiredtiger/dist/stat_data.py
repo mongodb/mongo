@@ -920,6 +920,7 @@ conn_dsrc_stats = [
     CacheStat('cache_inmem_splittable', 'in-memory page passed criteria to be split'),
     CacheStat('cache_obsolete_updates_removed', 'obsolete updates removed'),
     CacheStat('cache_pages_requested', 'pages requested from the cache'),
+    CacheStat('cache_pages_requested_hs', 'pages requested from the history store'),
     CacheStat('cache_read', 'pages read into cache'),
     CacheStat('cache_read_deleted', 'pages read into cache after truncate'),
     CacheStat('cache_read_deleted_prepared', 'pages read into cache after truncate in prepare state'),

@@ -28,6 +28,12 @@ __rts_btree_abort_update(WT_SESSION_IMPL *session, WT_ITEM *key, WT_UPDATE *firs
     txn_id_visible = false;
     if (stable_update_found != NULL)
         *stable_update_found = false;
+
+    /* Clear flags used by dry run. */
+    if (dryrun)
+        for (upd = first_upd; upd != NULL; upd = upd->next)
+            F_CLR(upd, WT_UPDATE_RTS_DRYRUN_ABORT);
+
     for (upd = first_upd; upd != NULL; upd = upd->next) {
         /* Skip the updates that are aborted. */
         if (upd->txnid == WT_TXN_ABORTED)
@@ -58,7 +64,9 @@ __rts_btree_abort_update(WT_SESSION_IMPL *session, WT_ITEM *key, WT_UPDATE *firs
               rollback_timestamp < upd->durable_ts ? "true" : "false",
               __wt_prepare_state_str(upd->prepare_state));
 
-            if (!dryrun)
+            if (dryrun)
+                F_SET(upd, WT_UPDATE_RTS_DRYRUN_ABORT);
+            else
                 upd->txnid = WT_TXN_ABORTED;
             WT_RTS_STAT_CONN_INCR(session, txn_rts_upd_aborted);
         } else {

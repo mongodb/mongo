@@ -264,6 +264,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
     WT_DECL_RET;
     WT_PAGE *page;
     WT_TXN *txn;
+    size_t sleep_count;
     uint64_t sleep_usecs, yield_cnt;
     uint8_t current_state;
     int force_attempts;
@@ -271,6 +272,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 
     btree = S2BT(session);
     txn = session->txn;
+    sleep_count = 0;
 
     if (F_ISSET(session, WT_SESSION_IGNORE_CACHE_SIZE))
         LF_SET(WT_READ_IGNORE_CACHE_SIZE);
@@ -279,8 +281,11 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
      * Ignore reads of pages already known to be in cache, otherwise the eviction server can
      * dominate these statistics.
      */
-    if (!LF_ISSET(WT_READ_CACHE))
+    if (!LF_ISSET(WT_READ_CACHE)) {
         WT_STAT_CONN_DATA_INCR(session, cache_pages_requested);
+        if (WT_IS_HS(session->dhandle))
+            WT_STAT_CONN_DATA_INCR(session, cache_pages_requested_hs);
+    }
 
     for (evict_skip = stalled = wont_need = false, force_attempts = 0, sleep_usecs = yield_cnt = 0;
          ;) {
@@ -489,6 +494,10 @@ skip_evict:
                 continue;
         }
         __wt_spin_backoff(&yield_cnt, &sleep_usecs);
+        ++sleep_count;
+        if (sleep_count > 10 * WT_THOUSAND && sleep_count % (10 * WT_THOUSAND) == 0)
+            __wt_verbose_warning(session, WT_VERB_READ,
+              "sleep to wait the page %p for %" WT_SIZET_FMT " times", (void *)ref, sleep_count);
         WT_STAT_CONN_INCRV(session, page_sleep, sleep_usecs);
     }
 }
