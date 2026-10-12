@@ -153,3 +153,10 @@ feature_flags:
         default: true
         version: 9.0
         fcv_gated: true
+    featureFlagConcurrentResharding:
+        mod_visibility: public
+        description: >-
+            Feature flag to enable concurrent resharding operations.
+        cpp_varname: gFeatureFlagConcurrentResharding
+        default: false
+        fcv_gated: true
