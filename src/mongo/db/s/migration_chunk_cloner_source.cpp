@@ -1463,7 +1463,7 @@ boost::optional<long long> MigrationChunkClonerSource::getSessionOplogEntriesToB
     return _sessionCatalogSource->getSessionOplogEntriesToBeMigratedSoFar();
 }
 
-MigrationChunkClonerSource::CloneStats MigrationChunkClonerSource::getCloneStats() {
+MigrationChunkClonerSource::CloneStats MigrationChunkClonerSource::getCloneStats() const {
     CloneStats stats;
     {
         std::lock_guard lk(_mutex);

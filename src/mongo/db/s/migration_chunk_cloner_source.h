@@ -417,7 +417,7 @@ public:
      */
     boost::optional<long long> getSessionOplogEntriesToBeMigratedSoFar();
 
-    CloneStats getCloneStats();
+    CloneStats getCloneStats() const;
 
 private:
     friend class LogOpForShardingHandler;

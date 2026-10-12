@@ -436,21 +436,28 @@ void MoveRangeCoordinator::MigrationAttempt::captureStats(TerminationStats* stat
 std::function<void(OperationContext*)> MoveRangeCoordinator::_timePhase(
     Phase phase, std::function<void(OperationContext*)> fn) {
     return [this, phase, fn = std::move(fn)](OperationContext* opCtx) {
-        Timer timer;
-        ScopeGuard recordGuard([&] { _recordPhaseMillis(phase, timer.millis()); });
+        _phaseInFlight = phase;
+        _phaseInFlightTimer.reset();
+        ScopeGuard recordGuard([&] { _flushInFlightPhase(); });
         fn(opCtx);
     };
 }
 
 void MoveRangeCoordinator::_recordPhaseMillis(Phase phase, long long millis) {
-    const auto phaseName = std::string{idl::serialize(phase)};
     auto& phases = _terminationStats.phasesMillis;
     auto it = std::find_if(
-        phases.begin(), phases.end(), [&](const auto& entry) { return entry.first == phaseName; });
+        phases.begin(), phases.end(), [&](const auto& entry) { return entry.first == phase; });
     if (it != phases.end()) {
         it->second += millis;
     } else {
-        phases.emplace_back(phaseName, millis);
+        phases.emplace_back(phase, millis);
+    }
+}
+
+void MoveRangeCoordinator::_flushInFlightPhase() {
+    if (_phaseInFlight) {
+        _recordPhaseMillis(*_phaseInFlight, _phaseInFlightTimer.millis());
+        _phaseInFlight = boost::none;
     }
 }
 
@@ -473,8 +480,8 @@ void MoveRangeCoordinator::_appendTerminationStats(BSONObjBuilder* builder,
 
     if (!stats.phasesMillis.empty()) {
         BSONObjBuilder phasesBuilder(lastPrimaryBuilder.subobjStart("phasesMillis"));
-        for (const auto& [phaseName, millis] : stats.phasesMillis) {
-            phasesBuilder.append(phaseName, millis);
+        for (const auto& [phase, millis] : stats.phasesMillis) {
+            phasesBuilder.append(idl::serialize(phase), millis);
         }
     }
 
@@ -784,6 +791,7 @@ void MoveRangeCoordinator::_releaseCriticalSectionAndFinalize(OperationContext* 
             infoBuilder.append("errorMsg", redact(outcome.reason()));
         }
         _captureMigrationAttemptStats();
+        _flushInFlightPhase();
         _appendTerminationStats(&infoBuilder, outcome);
         LOGV2(12960100,
               "MoveRange coordinator terminated",

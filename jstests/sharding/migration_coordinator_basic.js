@@ -158,6 +158,32 @@ function assertEventuallyDoesNotHaveRangeDeletionDoc(conn) {
     });
 }
 
+const allMoveRangeCoordinatorPhases = [
+    "migrate",
+    "enterCriticalSection",
+    "globalCatalogCommit",
+    "postGlobalCatalogCommit",
+    "shardCatalogCommit",
+    "finalizeMigration",
+];
+
+function getMigrationTerminationInfo(conn, ns) {
+    let info = null;
+    assert.soon(() => {
+        for (const line of checkLog.getGlobalLog(conn)) {
+            if (!line.includes('"id":12960100')) {
+                continue;
+            }
+            const entry = JSON.parse(line);
+            if (entry.id === 12960100 && entry.attr.namespace === ns) {
+                info = entry.attr.info;
+            }
+        }
+        return info !== null;
+    }, "Could not find the migration termination log for " + ns);
+    return info;
+}
+
 (() => {
     const [collName, ns] = getNewNs(dbName);
     jsTest.log("Test end-to-end migration when migration commit succeeds, ns is " + ns);
@@ -231,6 +257,21 @@ function assertEventuallyDoesNotHaveRangeDeletionDoc(conn) {
     assertEventuallyDoesNotHaveMigrationCoordinatorDoc(st.shard0);
     assertEventuallyDoesNotHaveRangeDeletionDoc(st.shard0);
     assertEventuallyDoesNotHaveRangeDeletionDoc(st.shard1);
+
+    if (usesMoveRangeCoordinatorPath) {
+        const info = getMigrationTerminationInfo(st.shard0, ns);
+        assert.eq("success", info.status, tojson(info));
+        assert(!info.hasOwnProperty("failedPhase"), tojson(info));
+        assert.eq(false, info.lastPrimary.recoveredFromDisk, tojson(info));
+        assert.eq(
+            allMoveRangeCoordinatorPhases,
+            Object.keys(info.lastPrimary.phasesMillis),
+            tojson(info),
+        );
+        assert.eq(numDocs, info.lastPrimary.clone.docsCloned, tojson(info));
+        assert(info.lastPrimary.hasOwnProperty("xferMods"), tojson(info));
+        assert(info.lastPrimary.hasOwnProperty("sessionOplogEntries"), tojson(info));
+    }
 })();
 
 (() => {
@@ -333,6 +374,21 @@ function assertEventuallyDoesNotHaveRangeDeletionDoc(conn) {
     assertEventuallyDoesNotHaveMigrationCoordinatorDoc(st.shard0);
     assertEventuallyDoesNotHaveRangeDeletionDoc(st.shard0);
     assertEventuallyDoesNotHaveRangeDeletionDoc(st.shard1);
+
+    if (usesMoveRangeCoordinatorPath) {
+        const info = getMigrationTerminationInfo(st.shard0, ns);
+        assert.eq("failed", info.status, tojson(info));
+        assert.eq("ConflictingOperationInProgress", info.errorCode, tojson(info));
+        assert.neq("", info.errorMsg, tojson(info));
+        assert.eq("globalCatalogCommit", info.failedPhase, tojson(info));
+        assert.eq(false, info.lastPrimary.recoveredFromDisk, tojson(info));
+        assert.eq(
+            allMoveRangeCoordinatorPhases.slice(0, 3),
+            Object.keys(info.lastPrimary.phasesMillis),
+            tojson(info),
+        );
+        assert.eq(numDocs, info.lastPrimary.clone.docsCloned, tojson(info));
+    }
 
     if (usesMoveRangeCoordinatorPath) {
         setAllowChunkOperationsOnConfigsvr(st, ns, true);

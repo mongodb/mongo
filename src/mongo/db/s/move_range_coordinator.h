@@ -122,7 +122,7 @@ private:
                                const CancellationToken& token);
 
     struct TerminationStats {
-        std::vector<std::pair<std::string, long long>> phasesMillis;
+        std::vector<std::pair<Phase, long long>> phasesMillis;
         boost::optional<long long> docsCloned;
         boost::optional<long long> bytesCloned;
         boost::optional<long long> cloneTimeMillis;
@@ -133,6 +133,8 @@ private:
                                                       std::function<void(OperationContext*)> fn);
 
     void _recordPhaseMillis(Phase phase, long long millis);
+
+    void _flushInFlightPhase();
 
     void _captureMigrationAttemptStats();
 
@@ -208,6 +210,8 @@ private:
     boost::optional<ScopedDonateChunk> _scopedDonateChunk;
     Timer _coordinatorTimer;
     TerminationStats _terminationStats;
+    boost::optional<Phase> _phaseInFlight;
+    Timer _phaseInFlightTimer;
 };
 
 }  // namespace mongo
