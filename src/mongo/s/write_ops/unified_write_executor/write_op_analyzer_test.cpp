@@ -22,11 +22,13 @@ namespace mongo {
 namespace unified_write_executor {
 namespace {
 struct WriteOpAnalyzerTestImpl : public ShardingTestFixture {
-    WriteOpAnalyzerTestImpl()
-        : ShardingTestFixture(
-              /*withMockCatalogCache=*/false,
-              std::make_unique<ScopedGlobalServiceContextForTest>(ServiceContext::make(
-                  nullptr, nullptr, std::make_unique<TickSourceMock<Nanoseconds>>()))) {}
+    WriteOpAnalyzerTestImpl() : ShardingTestFixture(/*withMockCatalogCache=*/false) {}
+
+    std::unique_ptr<ScopedGlobalServiceContextForTest> makeScopedServiceContext() override {
+        return std::make_unique<ScopedGlobalServiceContextForTest>(
+            ServiceContext::make(nullptr, nullptr, std::make_unique<TickSourceMock<Nanoseconds>>()),
+            shouldSetupTransportLayer());
+    }
 
     const ShardId shardId1 = ShardId("shard1");
     const ShardId shardId2 = ShardId("shard2");

@@ -21,11 +21,12 @@ static const NamespaceString kNss = NamespaceString::createNamespaceString_forTe
 
 class IndexScanTest : public ServiceContextMongoDTest {
 public:
-    IndexScanTest()
-        : _opCtx{makeOperationContext()},
-          _expCtx{ExpressionContextBuilder{}.opCtx(_opCtx.get()).ns(kNss).build()},
-          _ws{},
-          _client{std::make_unique<DBDirectClient>(_opCtx.get())} {
+    void setUp() override {
+        ServiceContextMongoDTest::setUp();
+        _opCtx = makeOperationContext();
+        _expCtx = ExpressionContextBuilder{}.opCtx(_opCtx.get()).ns(kNss).build();
+        _client = std::make_unique<DBDirectClient>(_opCtx.get());
+
         // Make sure we are the primary so we can create collections and indexes.
         auto replCoord = repl::ReplicationCoordinator::get(_opCtx.get());
         ASSERT(replCoord);

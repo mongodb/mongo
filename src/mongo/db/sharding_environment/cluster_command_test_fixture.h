@@ -36,11 +36,13 @@ protected:
 
     const Timestamp kAfterClusterTime = Timestamp(50, 2);
 
-    ClusterCommandTestFixture()
-        : RouterCatalogCacheTestFixture(std::make_unique<ScopedGlobalServiceContextForTest>(
-              ServiceContext::make(std::make_unique<ClockSourceMock>(),
-                                   std::make_unique<ClockSourceMock>(),
-                                   std::make_unique<TickSourceMock<Microseconds>>()))) {}
+    std::unique_ptr<ScopedGlobalServiceContextForTest> makeScopedServiceContext() override {
+        return std::make_unique<ScopedGlobalServiceContextForTest>(
+            ServiceContext::make(std::make_unique<ClockSourceMock>(),
+                                 std::make_unique<ClockSourceMock>(),
+                                 std::make_unique<TickSourceMock<Microseconds>>()),
+            shouldSetupTransportLayer());
+    }
 
     void setUp() override;
 

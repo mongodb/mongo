@@ -14,9 +14,10 @@ namespace mongo {
 namespace {
 class WindowFunctionMinMaxScalerTest : public AggregationContextFixture {
 public:
-    WindowFunctionMinMaxScalerTest()
-        : expCtx(getExpCtx()),
-          minMaxScaler(std::make_unique<WindowFunctionMinMaxScaler>(expCtx.get())) {
+    void setUp() override {
+        AggregationContextFixture::setUp();
+        expCtx = getExpCtx();
+        minMaxScaler = std::make_unique<WindowFunctionMinMaxScaler>(expCtx.get());
         auto collator = std::make_unique<CollatorInterfaceMock>(
             CollatorInterfaceMock::MockType::kToLowerString);
         expCtx->setCollator(std::move(collator));

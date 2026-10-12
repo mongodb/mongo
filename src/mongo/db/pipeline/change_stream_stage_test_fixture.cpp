@@ -76,13 +76,24 @@ ChangeStreamStageTestNoSetup::ChangeStreamStageTestNoSetup()
     : ChangeStreamStageTestNoSetup(change_stream_test_helper::nss) {}
 
 ChangeStreamStageTestNoSetup::ChangeStreamStageTestNoSetup(NamespaceString nsString)
-    : AggregationContextFixture(
-          std::move(nsString),
-          std::make_unique<ScopedGlobalServiceContextForTest>(
-              ServiceContext::make(std::make_unique<ClockSourceMock>(),
-                                   std::make_unique<ClockSourceMock>(),
-                                   std::make_unique<TickSourceMock<Microseconds>>()))) {
+    : AggregationContextFixture(std::move(nsString)) {}
+
+std::unique_ptr<ScopedGlobalServiceContextForTest>
+ChangeStreamStageTestNoSetup::makeScopedServiceContext() {
+    return std::make_unique<ScopedGlobalServiceContextForTest>(
+        ServiceContext::make(std::make_unique<ClockSourceMock>(),
+                             std::make_unique<ClockSourceMock>(),
+                             std::make_unique<TickSourceMock<Microseconds>>()));
+}
+
+void ChangeStreamStageTestNoSetup::setUp() {
+    AggregationContextFixture::setUp();
     getExpCtx()->setMongoProcessInterface(std::make_unique<ExecutableStubMongoProcessInterface>());
+
+    // Both guards reach the ServiceContext from their own constructors, so they are built here
+    // rather than as default member initializers.
+    _readerBuilder.emplace(std::make_unique<ChangeStreamReaderBuilderMock>());
+    _queryService.emplace(AllocationToShardsStatus::kNotAvailable);
 }
 
 const UUID& ChangeStreamMockMongoInterface::oplogUuid() {
@@ -135,16 +146,20 @@ boost::optional<Document> ChangeStreamMockMongoInterface::lookupSingleDocument(
 }
 
 ChangeStreamStageTest::ChangeStreamStageTest()
-    : ChangeStreamStageTest(change_stream_test_helper::nss) {
-    // Initialize the UUID on the ExpressionContext, to allow tests with a resumeToken.
-    getExpCtx()->setUUID(change_stream_test_helper::testUuid());
-}
+    : ChangeStreamStageTestNoSetup(change_stream_test_helper::nss) {}
 
 ChangeStreamStageTest::ChangeStreamStageTest(NamespaceString nsString)
-    : ChangeStreamStageTestNoSetup(nsString) {
+    : ChangeStreamStageTestNoSetup(std::move(nsString)), _initUUID(false) {}
+
+void ChangeStreamStageTest::setUp() {
+    ChangeStreamStageTestNoSetup::setUp();
     repl::ReplicationCoordinator::set(getExpCtx()->getOperationContext()->getServiceContext(),
                                       std::make_unique<repl::ReplicationCoordinatorMock>(
                                           getExpCtx()->getOperationContext()->getServiceContext()));
+    if (_initUUID) {
+        // Initialize the UUID on the ExpressionContext, to allow tests with a resumeToken.
+        getExpCtx()->setUUID(change_stream_test_helper::testUuid());
+    }
 }
 
 void ChangeStreamStageTest::checkTransformation(

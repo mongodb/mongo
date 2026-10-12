@@ -166,13 +166,14 @@ using namespace bulk_write_exec;
 
 class BulkWriteOpTest : public ServiceContextTest {
 protected:
-    BulkWriteOpTest() {
+    void setUp() override {
+        ServiceContextTest::setUp();
         _opCtxHolder = makeOperationContext();
         _opCtx = _opCtxHolder.get();
     }
 
     ServiceContext::UniqueOperationContext _opCtxHolder;
-    OperationContext* _opCtx;
+    OperationContext* _opCtx = nullptr;
 };
 
 // Test targeting a single op in a bulkWrite request.
@@ -1950,7 +1951,8 @@ TEST_F(BulkWriteOpTest, MultiAndTargetedOrderedOpsStaleConfig) {
 // more individual writes within the batch.)
 class BulkWriteOpChildBatchErrorTest : public ServiceContextTest {
 protected:
-    BulkWriteOpChildBatchErrorTest() {
+    void setUp() override {
+        ServiceContextTest::setUp();
         _opCtxHolder = makeOperationContext();
         _opCtx = _opCtxHolder.get();
         targeters.push_back(initTargeterFullRange(kNss1, kEndpoint1));
@@ -1958,7 +1960,7 @@ protected:
     }
 
     ServiceContext::UniqueOperationContext _opCtxHolder;
-    OperationContext* _opCtx;
+    OperationContext* _opCtx = nullptr;
 
     std::vector<std::unique_ptr<NSTargeter>> targeters;
 
@@ -3047,7 +3049,8 @@ TEST_F(BulkWriteOpTest, UnorderedBulkInsertGetsRepeatedOnCannotRefreshShardCache
 // does contain _id.
 class BulkWriteOpWithoutShardKeyWithIdTest : public ServiceContextTest {
 protected:
-    BulkWriteOpWithoutShardKeyWithIdTest() {
+    void setUp() override {
+        ServiceContextTest::setUp();
         _opCtxHolder = makeOperationContext();
         _opCtx = _opCtxHolder.get();
 
@@ -3067,7 +3070,7 @@ protected:
     }
 
     ServiceContext::UniqueOperationContext _opCtxHolder;
-    OperationContext* _opCtx;
+    OperationContext* _opCtx = nullptr;
     std::vector<std::unique_ptr<NSTargeter>> targeters;
 
     static const inline ShardId kShardId1 = ShardId("shard1");

@@ -55,6 +55,10 @@ namespace {
  */
 class ShardingInitializationMongoDTest : public ShardingMongoDTestFixture {
 protected:
+    boost::optional<ClusterRole> getClusterRoleOverride() const override {
+        return ClusterRole{ClusterRole::ShardServer};
+    }
+
     void setUp() override {
         ShardingMongoDTestFixture::setUp();
 
@@ -108,8 +112,6 @@ protected:
     const std::string kShardName{"TestShard"};
     const ShardIdentity kShardIdentityDoc{
         kShardName, OID::gen(), ConnectionString::forReplicaSet(kShardName, {HostAndPort("a:1")})};
-
-    service_context_test::ShardRoleOverride _shardRole;
 
     // Used to write to set up local collections before exercising server logic.
     std::unique_ptr<DBDirectClient> _dbDirectClient;

@@ -43,7 +43,8 @@ using namespace std::literals::string_view_literals;
 
 class PipelineMetadataTreeTest : public AggregationContextFixture {
 protected:
-    PipelineMetadataTreeTest() {
+    void setUp() override {
+        AggregationContextFixture::setUp();
         ShardingState::create(getServiceContext());
     }
 

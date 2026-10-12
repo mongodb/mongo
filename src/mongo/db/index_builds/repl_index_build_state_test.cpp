@@ -26,8 +26,14 @@ ReplIndexBuildState makeReplState() {
 
 class ReplIndexBuildStateTest : public ServiceContextTest {
 public:
-    ServiceContext::UniqueOperationContext opCtxHolder{makeOperationContext()};
-    OperationContext* opCtx{opCtxHolder.get()};
+    void setUp() override {
+        ServiceContextTest::setUp();
+        opCtxHolder = makeOperationContext();
+        opCtx = opCtxHolder.get();
+    }
+
+    ServiceContext::UniqueOperationContext opCtxHolder;
+    OperationContext* opCtx = nullptr;
 };
 
 TEST_F(ReplIndexBuildStateTest, GetOutcomeFutureNotReadyInitially) {

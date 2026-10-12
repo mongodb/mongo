@@ -36,6 +36,7 @@ class MockAsyncRPCRunnerTestFixture : public AsyncRPCTestFixture {
 public:
     void setUp() override {
         AsyncRPCTestFixture::setUp();
+        _opCtx = makeOperationContext();
         auto uniqueMock = std::make_unique<MockType>();
         _mock = uniqueMock.get();
         detail::AsyncRPCRunner::set(getServiceContext(), std::move(uniqueMock));
@@ -71,7 +72,7 @@ public:
 
 private:
     MockType* _mock;
-    ServiceContext::UniqueOperationContext _opCtx = makeOperationContext();
+    ServiceContext::UniqueOperationContext _opCtx;
 };
 
 auto extractUUID(const BSONElement& element) {

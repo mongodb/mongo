@@ -34,9 +34,14 @@ class [[MONGO_MOD_OPEN]] StorageEngineTest : public ServiceContextMongoDTest {
 public:
     // Storage engine tests cover spill table creation and management, requiring the spill
     // WiredTiger instance.
-    explicit StorageEngineTest(Options options = {})
-        : ServiceContextMongoDTest(std::move(options).enableSpillEngine()),
-          _storageEngine(getServiceContext()->getStorageEngine()) {}
+    Options makeServiceContextOptions() override {
+        return ServiceContextMongoDTest::makeServiceContextOptions().enableSpillEngine();
+    }
+
+    void setUp() override {
+        ServiceContextMongoDTest::setUp();
+        _storageEngine = getServiceContext()->getStorageEngine();
+    }
 
     MDBCatalog::EntryIdentifier createCollection(OperationContext* opCtx,
                                                  NamespaceString ns,
@@ -222,12 +227,17 @@ public:
         return catalog->removeEntry(opCtx, collection->getCatalogId());
     }
 
-    StorageEngine* _storageEngine;
+    StorageEngine* _storageEngine = nullptr;
 };
 
 class [[MONGO_MOD_OPEN]] StorageEngineRepairTest : public StorageEngineTest {
 public:
-    StorageEngineRepairTest() : StorageEngineTest(Options{}.enableRepair().inMemory(false)) {
+    Options makeServiceContextOptions() override {
+        return StorageEngineTest::makeServiceContextOptions().enableRepair().inMemory(false);
+    }
+
+    void setUp() override {
+        StorageEngineTest::setUp();
         repl::StorageInterface::set(getServiceContext(),
                                     std::make_unique<repl::StorageInterfaceImpl>());
     }
@@ -250,7 +260,9 @@ public:
 
 class [[MONGO_MOD_OPEN]] StorageEngineTestNotEphemeral : public StorageEngineTest {
 public:
-    StorageEngineTestNotEphemeral() : StorageEngineTest(Options{}.inMemory(false)) {}
+    Options makeServiceContextOptions() override {
+        return StorageEngineTest::makeServiceContextOptions().inMemory(false);
+    }
 };
 
 }  // namespace mongo

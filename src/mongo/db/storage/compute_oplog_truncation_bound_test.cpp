@@ -34,10 +34,11 @@ class ComputeOplogTruncationBoundTest : public CatalogTestFixture {};
 
 class ComputeOplogTruncationBoundWithReplicatedFastCountTest : public CatalogTestFixture {
 public:
-    ComputeOplogTruncationBoundWithReplicatedFastCountTest()
-        : CatalogTestFixture(Options().setPersistenceProvider(
-              std::make_unique<replicated_fast_count::test_helpers::
-                                   ReplicatedFastCountTestPersistenceProvider>())) {}
+    Options makeServiceContextOptions() override {
+        return CatalogTestFixture::makeServiceContextOptions().setPersistenceProvider(
+            std::make_unique<
+                replicated_fast_count::test_helpers::ReplicatedFastCountTestPersistenceProvider>());
+    }
 
     void setUp() override {
         CatalogTestFixture::setUp();

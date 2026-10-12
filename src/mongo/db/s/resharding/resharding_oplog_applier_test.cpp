@@ -136,9 +136,16 @@ private:
     bool _doThrow{false};
 };
 
-class ReshardingOplogApplierTest : service_context_test::WithSetupTransportLayer,
-                                   public ShardingMongoDTestFixture {
+class ReshardingOplogApplierTest : public ShardingMongoDTestFixture {
 public:
+    bool shouldSetupTransportLayer() const override {
+        return true;
+    }
+
+    boost::optional<ClusterRole> getClusterRoleOverride() const override {
+        return ClusterRole{ClusterRole::ShardServer};
+    }
+
     const HostAndPort kConfigHostAndPort{"DummyConfig", 12345};
     const std::string kOriginalShardKey = "sk";
     const BSONObj kOriginalShardKeyPattern{BSON(kOriginalShardKey << 1)};
@@ -503,8 +510,6 @@ protected:
     const std::vector<ShardType> kShardList = {ShardType(kMyShardId.toString(), "Host0:12345"),
                                                ShardType(kOtherShardId.toString(), "Host1:12345")};
     const ReshardingSourceId _sourceId{UUID::gen(), kMyShardId};
-
-    service_context_test::ShardRoleOverride _shardRole;
 
     boost::optional<ChunkManager> _cm;
 

@@ -13,7 +13,11 @@ namespace mongo {
  */
 class SpillingTestFixture : public ServiceContextMongoDTest {
 public:
-    SpillingTestFixture();
+    Options makeServiceContextOptions() override {
+        return ServiceContextMongoDTest::makeServiceContextOptions().enableSpillEngine();
+    }
+
+    void setUp() override;
 
 protected:
     ServiceContext::UniqueOperationContext _opCtx;

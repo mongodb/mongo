@@ -21,8 +21,12 @@ namespace mongo {
 namespace {
 
 // This provides access to getExpCtx(), but we'll use a different name for this test suite.
-class DocumentSourceRankFusionTest : service_context_test::WithSetupTransportLayer,
-                                     public AggregationContextFixture {
+class DocumentSourceRankFusionTest : public AggregationContextFixture {
+public:
+    bool shouldSetupTransportLayer() const override {
+        return true;
+    }
+
 protected:
     // Tests that exercise validation errors (or that just want the production LiteParsed
     // path) should funnel through this helper instead of calling createFromBson directly.

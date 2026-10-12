@@ -29,7 +29,10 @@ const static NamespaceString kNss = NamespaceString::createNamespaceString_forTe
 
 class QueuedDataStageTest : public ServiceContextMongoDTest {
 public:
-    QueuedDataStageTest() : ServiceContextMongoDTest(Options{}.useMockClock(true)) {
+    QueuedDataStageTest() : ServiceContextMongoDTest(Options{}.useMockClock(true)) {}
+
+    void setUp() override {
+        ServiceContextMongoDTest::setUp();
         _opCtx = makeOperationContext();
     }
 

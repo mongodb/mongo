@@ -18,20 +18,32 @@ TEST(TopTest, CollectionDropped) {
 
 class TopServiceContextTest : public ServiceContextTest {
 public:
-    TopServiceContextTest()
-        // Need to add a session because latencies are not recorded non-user connections.
-        : ServiceContextTest(
-              std::make_unique<ScopedGlobalServiceContextForTest>(/*shouldSetupTL=*/false),
-              transport::MockSession::create(/*tl=*/nullptr)),
-          _opCtx{makeOperationContext()} {}
+    std::unique_ptr<ScopedGlobalServiceContextForTest> makeScopedServiceContext() override {
+        return std::make_unique<ScopedGlobalServiceContextForTest>(/*shouldSetupTL=*/false);
+    }
 
-protected:
+    // Need to add a session because latencies are not recorded non-user connections.
+    std::shared_ptr<transport::Session> makeSession() override {
+        return transport::MockSession::create(/*transportLayer=*/nullptr);
+    }
+
+    void setUp() override {
+        ServiceContextTest::setUp();
+        _opCtx = makeOperationContext();
+    }
+
+    OperationContext* opCtx() {
+        invariant(_opCtx, "uninitialized");
+        return _opCtx.get();
+    }
+
+private:
     ServiceContext::UniqueOperationContext _opCtx;
 };
 
 TEST_F(TopServiceContextTest, IncludesEmptyBucketsJustForTotalTime) {
     ServiceLatencyTracker serviceLatencyTracker;
-    serviceLatencyTracker.increment(_opCtx.get(),
+    serviceLatencyTracker.increment(opCtx(),
                                     /*latency=*/Milliseconds(100),
                                     /*workingTime=*/Milliseconds(100),
                                     Command::ReadWriteType::kRead);

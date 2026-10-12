@@ -201,9 +201,10 @@ TEST(ReplicatedFastCountMetricsTest, InsertAndUpdateCountersRecordedViaRecordFlu
 
 class ReplicatedFastCountManagerMetricsTest : public CatalogTestFixture {
 public:
-    ReplicatedFastCountManagerMetricsTest()
-        : CatalogTestFixture(Options().setPersistenceProvider(
-              std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>())) {}
+    Options makeServiceContextOptions() override {
+        return CatalogTestFixture::makeServiceContextOptions().setPersistenceProvider(
+            std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>());
+    }
 
 protected:
     void setUp() override {
@@ -340,9 +341,10 @@ TEST(ReplicatedFastCountMetricsTest, OplogLagSecsUpdatesOnNewCheckpoint) {
 // the checkpoint scan counters.
 class CheckpointScanMetricsTest : public CatalogTestFixture {
 public:
-    CheckpointScanMetricsTest()
-        : CatalogTestFixture(Options().setPersistenceProvider(
-              std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>())) {}
+    Options makeServiceContextOptions() override {
+        return CatalogTestFixture::makeServiceContextOptions().setPersistenceProvider(
+            std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>());
+    }
 
 protected:
     void setUp() override {
@@ -530,9 +532,10 @@ TEST_F(CheckpointScanMetricsTest, ApplyOpsWithUserAndInternalEntriesExercisesAll
 // `onContainerUpdate`.
 class TimestampStoreMetricsTest : public CatalogTestFixture {
 public:
-    TimestampStoreMetricsTest()
-        : CatalogTestFixture(Options().setPersistenceProvider(
-              std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>())) {}
+    Options makeServiceContextOptions() override {
+        return CatalogTestFixture::makeServiceContextOptions().setPersistenceProvider(
+            std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>());
+    }
 
 protected:
     void setUp() override {
@@ -605,9 +608,10 @@ TEST_F(TimestampStoreMetricsTest, RepeatedWritesAdvanceOplogLagSecs) {
 // targets the fast-count timestamps container.
 class ContainerApplyHookTest : public CatalogTestFixture {
 public:
-    ContainerApplyHookTest()
-        : CatalogTestFixture(Options().setPersistenceProvider(
-              std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>())) {}
+    Options makeServiceContextOptions() override {
+        return CatalogTestFixture::makeServiceContextOptions().setPersistenceProvider(
+            std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>());
+    }
 
 protected:
     void setUp() override {

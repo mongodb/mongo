@@ -96,11 +96,23 @@ IndexBuildMetricsSnapshot readIndexBuildMetrics(otel::metrics::OtelMetricsCaptur
 }
 
 class IndexBuildsCoordinatorMongodTest : public CatalogTestFixture {
-private:
+public:
     void setUp() override;
     void tearDown() override;
 
-public:
+    /**
+     * By default, 'recoverFromOplogAsStandalone' stays false for the whole test: most subclasses
+     * don't exercise standalone recovery, and the flag must stay false at least until the
+     * ServiceContext and oplog are set up, since that init runs replication machinery which
+     * asserts the node isn't already recovering from the oplog as a standalone and would fail.
+     *
+     * Override to true to have the flag set right after that setup completes (before the
+     * baseline collections below are created) and left set for the rest of the test.
+     */
+    virtual bool recoverFromOplogAsStandalone() const {
+        return false;
+    }
+
     /**
      * Creates a collection with a default CollectionsOptions and the given UUID.
      */
@@ -145,10 +157,18 @@ public:
     const IndexBuildsCoordinator::IndexBuildOptions _indexBuildOptions = {
         .commitQuorum = CommitQuorumOptions(CommitQuorumOptions::kPrimarySelfVote)};
     std::unique_ptr<IndexBuildsCoordinator> _indexBuildsCoord;
+
+private:
+    boost::optional<unittest::ServerParameterGuard> _recoverAsStandalone;
 };
 
 void IndexBuildsCoordinatorMongodTest::setUp() {
     CatalogTestFixture::setUp();
+
+    if (recoverFromOplogAsStandalone()) {
+        _recoverAsStandalone.emplace("recoverFromOplogAsStandalone", true);
+    }
+
     // Create config.system.indexBuilds collection to store commit quorum value during index
     // building.
     createCollection(NamespaceString::kIndexBuildEntryNamespace, UUID::gen());
@@ -817,6 +837,10 @@ TEST_F(IndexBuildsCoordinatorMongodTest, OtelMetricsPrimaryDrivenBuildAfterAbort
 
 class IndexBuildsCoordinatorMongodStandaloneRecoveryTest : public IndexBuildsCoordinatorMongodTest {
 public:
+    bool recoverFromOplogAsStandalone() const override {
+        return true;
+    }
+
     /**
      * Writes the given indexes to the durable catalog as one unfinished two-phase build, then
      * reloads the catalog the way startup does for a replica set member in standalone mode, so
@@ -876,8 +900,6 @@ public:
         }
         return names;
     }
-
-    unittest::ServerParameterGuard _recoverAsStandalone{"recoverFromOplogAsStandalone", true};
 };
 
 TEST_F(IndexBuildsCoordinatorMongodStandaloneRecoveryTest,

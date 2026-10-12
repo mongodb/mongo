@@ -24,13 +24,10 @@ namespace {
 
 class FLEStatsTest : public ServiceContextTest {
 public:
-    FLEStatsTest() {
-        opCtxPtr = makeOperationContext();
-        opCtx = opCtxPtr.get();
-    }
-
     void setUp() final {
         ServiceContextTest::setUp();
+        opCtxPtr = makeOperationContext();
+        opCtx = opCtxPtr.get();
         oldDiagnosticsFlag = gTestingDiagnosticsEnabledAtStartup;
         tickSource = std::make_unique<TickSourceMock<Milliseconds>>();
         instance =

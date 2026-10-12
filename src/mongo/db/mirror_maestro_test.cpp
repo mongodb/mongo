@@ -23,9 +23,12 @@ namespace mongo {
 
 namespace {
 
-class MirrorMaestroTest : service_context_test::WithSetupTransportLayer,
-                          public ServiceContextMongoDTest {
+class MirrorMaestroTest : public ServiceContextMongoDTest {
 public:
+    bool shouldSetupTransportLayer() const override {
+        return true;
+    }
+
     constexpr static auto kInitialConfigVersion = 1;
     constexpr static auto kInitialTermVersion = 1;
     const BSONObj kEastTag = BSON("dc" << "east");

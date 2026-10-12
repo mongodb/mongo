@@ -54,6 +54,7 @@
 #include <vector>
 
 #include <boost/none.hpp>
+#include <boost/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
@@ -63,10 +64,15 @@ const NamespaceString kTestNss = NamespaceString::createNamespaceString_forTest(
 
 class CursorManagerTestBase : public ServiceContextTest {
 protected:
-    CursorManagerTestBase()
-        : ServiceContextTest(
-              std::make_unique<ScopedGlobalServiceContextForTest>(ServiceContext::make(
-                  std::make_unique<ClockSourceMock>(), std::make_unique<ClockSourceMock>()))) {}
+    std::unique_ptr<ScopedGlobalServiceContextForTest> makeScopedServiceContext() override {
+        return std::make_unique<ScopedGlobalServiceContextForTest>(ServiceContext::make(
+            std::make_unique<ClockSourceMock>(), std::make_unique<ClockSourceMock>()));
+    }
+
+    void setUp() override {
+        ServiceContextTest::setUp();
+        _cursorManager.emplace(getServiceContext()->getPreciseClockSource());
+    }
 
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeFakePlanExecutor(
         OperationContext* opCtx) {
@@ -98,19 +104,22 @@ protected:
     }
 
     ClientCursorPin makeCursor(OperationContext* opCtx) {
-        return _cursorManager.registerCursor(opCtx, makeParams(opCtx));
+        return _cursorManager->registerCursor(opCtx, makeParams(opCtx));
     }
 
     ClockSourceMock* useClock() {
         return static_cast<ClockSourceMock*>(getServiceContext()->getPreciseClockSource());
     }
 
-    CursorManager _cursorManager{getServiceContext()->getPreciseClockSource()};
+    boost::optional<CursorManager> _cursorManager;
 };
 
 class CursorManagerTest : public CursorManagerTestBase {
 protected:
-    CursorManagerTest() : _opCtx(getClient()->makeOperationContext()) {}
+    void setUp() override {
+        CursorManagerTestBase::setUp();
+        _opCtx = getClient()->makeOperationContext();
+    }
 
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeFakePlanExecutor() {
         return CursorManagerTestBase::makeFakePlanExecutor(_opCtx.get());
@@ -187,7 +196,7 @@ TEST_F(CursorManagerTest, KillingOneOfTwoCursorsSharingMemoryTrackerLeavesSiblin
     ASSERT_EQ(expectedUseCount, weakTracker.use_count());
 
     // Kill the cursor registered second, which under the pre-fix model owned the tracker outright.
-    ASSERT_OK(_cursorManager.killCursor(opCtx, ownerToKillId));
+    ASSERT_OK(_cursorManager->killCursor(opCtx, ownerToKillId));
 
     // The surviving cursor is now the sole owner, so writing through the stage tracker's base
     // pointer is still safe.
@@ -199,7 +208,7 @@ TEST_F(CursorManagerTest, KillingOneOfTwoCursorsSharingMemoryTrackerLeavesSiblin
     stageTracker.add(32);
     ASSERT_EQ(48, weakTracker.lock()->peakTrackedMemoryBytes());
 
-    ASSERT_OK(_cursorManager.killCursor(opCtx, survivorId));
+    ASSERT_OK(_cursorManager->killCursor(opCtx, survivorId));
 
     // With no cursor left to own it, the tracker is destroyed.
     ASSERT_TRUE(weakTracker.expired());
@@ -231,7 +240,7 @@ TEST_F(CursorManagerTest, PublishingNullTrackerDoesNotClobberLiveOperationTracke
 TEST_F(CursorManagerTest, ShouldBeAbleToKillPinnedCursor) {
     OperationContext* const pinningOpCtx = _opCtx.get();
 
-    auto cursorPin = _cursorManager.registerCursor(
+    auto cursorPin = _cursorManager->registerCursor(
         pinningOpCtx,
         {makeFakePlanExecutor(),
          kTestNss,
@@ -244,7 +253,7 @@ TEST_F(CursorManagerTest, ShouldBeAbleToKillPinnedCursor) {
          PrivilegeVector()});
 
     auto cursorId = cursorPin.getCursor()->cursorid();
-    ASSERT_OK(_cursorManager.killCursor(_opCtx.get(), cursorId));
+    ASSERT_OK(_cursorManager->killCursor(_opCtx.get(), cursorId));
 
     // The original operation should have been interrupted since the cursor was pinned.
     ASSERT_EQ(pinningOpCtx->checkForInterruptNoAssert(), ErrorCodes::CursorKilled);
@@ -257,7 +266,7 @@ TEST_F(CursorManagerTest, ShouldBeAbleToKillPinnedCursorMultiClient) {
     OperationContext* const pinningOpCtx = _opCtx.get();
 
     // Pin the cursor from one client.
-    auto cursorPin = _cursorManager.registerCursor(
+    auto cursorPin = _cursorManager->registerCursor(
         pinningOpCtx,
         {makeFakePlanExecutor(),
          kTestNss,
@@ -278,7 +287,7 @@ TEST_F(CursorManagerTest, ShouldBeAbleToKillPinnedCursorMultiClient) {
         AlternativeClientRegion acr(killCursorClient);
         auto killCursorOpCtx = acr->makeOperationContext();
         invariant(killCursorOpCtx);
-        ASSERT_OK(_cursorManager.killCursor(killCursorOpCtx.get(), cursorId));
+        ASSERT_OK(_cursorManager->killCursor(killCursorOpCtx.get(), cursorId));
     }
 
     // The original operation should have been interrupted since the cursor was pinned.
@@ -291,7 +300,7 @@ TEST_F(CursorManagerTest, ShouldBeAbleToKillPinnedCursorMultiClient) {
 TEST_F(CursorManagerTest, InactiveCursorShouldTimeout) {
     auto clock = useClock();
 
-    _cursorManager.registerCursor(
+    _cursorManager->registerCursor(
         _opCtx.get(),
         {makeFakePlanExecutor(),
          NamespaceString::createNamespaceString_forTest("test.collection"),
@@ -303,13 +312,13 @@ TEST_F(CursorManagerTest, InactiveCursorShouldTimeout) {
          BSONObj(),
          PrivilegeVector()});
 
-    ASSERT_EQ(0UL, _cursorManager.timeoutCursors(_opCtx.get(), Date_t()));
+    ASSERT_EQ(0UL, _cursorManager->timeoutCursors(_opCtx.get(), Date_t()));
 
     clock->advance(getDefaultCursorTimeoutMillis());
-    ASSERT_EQ(1UL, _cursorManager.timeoutCursors(_opCtx.get(), clock->now()));
-    ASSERT_EQ(0UL, _cursorManager.numCursors());
+    ASSERT_EQ(1UL, _cursorManager->timeoutCursors(_opCtx.get(), clock->now()));
+    ASSERT_EQ(0UL, _cursorManager->numCursors());
 
-    _cursorManager.registerCursor(
+    _cursorManager->registerCursor(
         _opCtx.get(),
         {makeFakePlanExecutor(),
          NamespaceString::createNamespaceString_forTest("test.collection"),
@@ -320,8 +329,8 @@ TEST_F(CursorManagerTest, InactiveCursorShouldTimeout) {
          ReadPreferenceSetting(ReadPreference::PrimaryOnly),
          BSONObj(),
          PrivilegeVector()});
-    ASSERT_EQ(1UL, _cursorManager.timeoutCursors(_opCtx.get(), Date_t::max()));
-    ASSERT_EQ(0UL, _cursorManager.numCursors());
+    ASSERT_EQ(1UL, _cursorManager->timeoutCursors(_opCtx.get(), Date_t::max()));
+    ASSERT_EQ(0UL, _cursorManager->numCursors());
 }
 
 TEST_F(CursorManagerTest, DisposeIdleMongotCursorsForShutdownDisposesOnlyMarkedIdleCursors) {
@@ -337,22 +346,22 @@ TEST_F(CursorManagerTest, DisposeIdleMongotCursorsForShutdownDisposesOnlyMarkedI
     const auto markedPinnedCursorId = markedPinnedCursor->cursorid();
     markedPinnedCursor->setMayHoldMongotTaskExecutor();
 
-    ASSERT_EQ(3UL, _cursorManager.numCursors());
-    ASSERT_EQ(1UL, _cursorManager.disposeIdleMongotCursorsForShutdown(_opCtx.get()));
-    ASSERT_EQ(2UL, _cursorManager.numCursors());
+    ASSERT_EQ(3UL, _cursorManager->numCursors());
+    ASSERT_EQ(1UL, _cursorManager->disposeIdleMongotCursorsForShutdown(_opCtx.get()));
+    ASSERT_EQ(2UL, _cursorManager->numCursors());
 
     // The unmarked idle cursor and marked pinned cursor are not disposed by the targeted shutdown
     // cleanup.
-    ASSERT_OK(_cursorManager.killCursor(_opCtx.get(), unmarkedIdleCursorId));
+    ASSERT_OK(_cursorManager->killCursor(_opCtx.get(), unmarkedIdleCursorId));
     markedPinnedCursor.release();
-    ASSERT_OK(_cursorManager.killCursor(_opCtx.get(), markedPinnedCursorId));
-    ASSERT_EQ(0UL, _cursorManager.numCursors());
+    ASSERT_OK(_cursorManager->killCursor(_opCtx.get(), markedPinnedCursorId));
+    ASSERT_EQ(0UL, _cursorManager->numCursors());
 }
 
 TEST_F(CursorManagerTest, DisposeIdleMongotCursorsForShutdownIsIdempotent) {
     // An empty CursorManager has nothing to dispose.
-    ASSERT_EQ(0UL, _cursorManager.disposeIdleMongotCursorsForShutdown(_opCtx.get()));
-    ASSERT_EQ(0UL, _cursorManager.numCursors());
+    ASSERT_EQ(0UL, _cursorManager->disposeIdleMongotCursorsForShutdown(_opCtx.get()));
+    ASSERT_EQ(0UL, _cursorManager->numCursors());
 
     // Disposing a marked idle cursor removes it, so a second call disposes nothing. This guards
     // against the shutdown cleanup being invoked more than once (or an accounting bug in the
@@ -361,10 +370,10 @@ TEST_F(CursorManagerTest, DisposeIdleMongotCursorsForShutdownIsIdempotent) {
     markedIdleCursor->setMayHoldMongotTaskExecutor();
     markedIdleCursor.release();
 
-    ASSERT_EQ(1UL, _cursorManager.disposeIdleMongotCursorsForShutdown(_opCtx.get()));
-    ASSERT_EQ(0UL, _cursorManager.numCursors());
-    ASSERT_EQ(0UL, _cursorManager.disposeIdleMongotCursorsForShutdown(_opCtx.get()));
-    ASSERT_EQ(0UL, _cursorManager.numCursors());
+    ASSERT_EQ(1UL, _cursorManager->disposeIdleMongotCursorsForShutdown(_opCtx.get()));
+    ASSERT_EQ(0UL, _cursorManager->numCursors());
+    ASSERT_EQ(0UL, _cursorManager->disposeIdleMongotCursorsForShutdown(_opCtx.get()));
+    ASSERT_EQ(0UL, _cursorManager->numCursors());
 }
 
 /**
@@ -373,7 +382,7 @@ TEST_F(CursorManagerTest, DisposeIdleMongotCursorsForShutdownIsIdempotent) {
 TEST_F(CursorManagerTest, InactivePinnedCursorShouldNotTimeout) {
     auto clock = useClock();
 
-    auto cursorPin = _cursorManager.registerCursor(
+    auto cursorPin = _cursorManager->registerCursor(
         _opCtx.get(),
         {makeFakePlanExecutor(),
          NamespaceString::createNamespaceString_forTest("test.collection"),
@@ -387,7 +396,7 @@ TEST_F(CursorManagerTest, InactivePinnedCursorShouldNotTimeout) {
 
     // The pin is still in scope, so it should not time out.
     clock->advance(getDefaultCursorTimeoutMillis());
-    ASSERT_EQ(0UL, _cursorManager.timeoutCursors(_opCtx.get(), clock->now()));
+    ASSERT_EQ(0UL, _cursorManager->timeoutCursors(_opCtx.get(), clock->now()));
 }
 
 /**
@@ -397,7 +406,7 @@ TEST_F(CursorManagerTest, InactivePinnedCursorShouldNotTimeout) {
  * pin.
  */
 TEST_F(CursorManagerTest, MarkedAsKilledCursorsShouldBeDeletedOnCursorPin) {
-    auto cursorPin = _cursorManager.registerCursor(
+    auto cursorPin = _cursorManager->registerCursor(
         _opCtx.get(),
         {makeFakePlanExecutor(),
          NamespaceString::createNamespaceString_forTest("test.collection"),
@@ -416,13 +425,13 @@ TEST_F(CursorManagerTest, MarkedAsKilledCursorsShouldBeDeletedOnCursorPin) {
     cursorPin.release();
 
     // The cursor should still be present in the manager.
-    ASSERT_EQ(1UL, _cursorManager.numCursors());
+    ASSERT_EQ(1UL, _cursorManager->numCursors());
 
     // Pinning the cursor should fail with the same error code that interrupted the OpCtx. The
     // cursor should no longer be present in the manager.
-    ASSERT_EQ(_cursorManager.pinCursor(_opCtx.get(), cursorId, "getMore").getStatus(),
+    ASSERT_EQ(_cursorManager->pinCursor(_opCtx.get(), cursorId, "getMore").getStatus(),
               ErrorCodes::InternalError);
-    ASSERT_EQ(0UL, _cursorManager.numCursors());
+    ASSERT_EQ(0UL, _cursorManager->numCursors());
 }
 
 /**
@@ -431,7 +440,7 @@ TEST_F(CursorManagerTest, MarkedAsKilledCursorsShouldBeDeletedOnCursorPin) {
 TEST_F(CursorManagerTest, InactiveKilledCursorsShouldTimeout) {
     auto clock = useClock();
 
-    auto cursorPin = _cursorManager.registerCursor(
+    auto cursorPin = _cursorManager->registerCursor(
         _opCtx.get(),
         {makeFakePlanExecutor(),
          NamespaceString::createNamespaceString_forTest("test.collection"),
@@ -449,12 +458,12 @@ TEST_F(CursorManagerTest, InactiveKilledCursorsShouldTimeout) {
     cursorPin.release();
 
     // The cursor should still be present in the manager.
-    ASSERT_EQ(1UL, _cursorManager.numCursors());
+    ASSERT_EQ(1UL, _cursorManager->numCursors());
 
     // Advance the clock to simulate time passing, and verify that the cursor times out.
     clock->advance(getDefaultCursorTimeoutMillis());
-    ASSERT_EQ(1UL, _cursorManager.timeoutCursors(_opCtx.get(), clock->now()));
-    ASSERT_EQ(0UL, _cursorManager.numCursors());
+    ASSERT_EQ(1UL, _cursorManager->timeoutCursors(_opCtx.get(), clock->now()));
+    ASSERT_EQ(0UL, _cursorManager->numCursors());
 }
 
 /**
@@ -464,7 +473,7 @@ TEST_F(CursorManagerTest, UsingACursorShouldUpdateTimeOfLastUse) {
     auto clock = useClock();
 
     // Register a cursor which we will look at again.
-    auto cursorPin = _cursorManager.registerCursor(
+    auto cursorPin = _cursorManager->registerCursor(
         _opCtx.get(),
         {makeFakePlanExecutor(),
          kTestNss,
@@ -480,34 +489,35 @@ TEST_F(CursorManagerTest, UsingACursorShouldUpdateTimeOfLastUse) {
 
     // Register a cursor to immediately forget about, to make sure it will time out on a normal
     // schedule.
-    _cursorManager.registerCursor(_opCtx.get(),
-                                  {makeFakePlanExecutor(),
-                                   kTestNss,
-                                   {},
-                                   APIParameters(),
-                                   {},
-                                   repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
-                                   ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                   BSONObj(),
-                                   PrivilegeVector()});
+    _cursorManager->registerCursor(
+        _opCtx.get(),
+        {makeFakePlanExecutor(),
+         kTestNss,
+         {},
+         APIParameters(),
+         {},
+         repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
+         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+         BSONObj(),
+         PrivilegeVector()});
 
     // Advance the clock to simulate time passing.
     clock->advance(Milliseconds(1));
 
     // Touch the cursor with id 'usedCursorId' to advance its time of last use.
-    _cursorManager.pinCursor(_opCtx.get(), usedCursorId, "getMore")
+    _cursorManager->pinCursor(_opCtx.get(), usedCursorId, "getMore")
         .status_with_transitional_ignore();
 
     // We should be able to time out the unused cursor, but the one we used should stay alive.
-    ASSERT_EQ(2UL, _cursorManager.numCursors());
+    ASSERT_EQ(2UL, _cursorManager->numCursors());
     clock->advance(getDefaultCursorTimeoutMillis() - Milliseconds(1));
-    ASSERT_EQ(1UL, _cursorManager.timeoutCursors(_opCtx.get(), clock->now()));
-    ASSERT_EQ(1UL, _cursorManager.numCursors());
+    ASSERT_EQ(1UL, _cursorManager->timeoutCursors(_opCtx.get(), clock->now()));
+    ASSERT_EQ(1UL, _cursorManager->numCursors());
 
     // We should be able to time out the used cursor after one more millisecond.
     clock->advance(Milliseconds(1));
-    ASSERT_EQ(1UL, _cursorManager.timeoutCursors(_opCtx.get(), clock->now()));
-    ASSERT_EQ(0UL, _cursorManager.numCursors());
+    ASSERT_EQ(1UL, _cursorManager->timeoutCursors(_opCtx.get(), clock->now()));
+    ASSERT_EQ(0UL, _cursorManager->numCursors());
 }
 
 /**
@@ -523,7 +533,7 @@ TEST_F(CursorManagerTest, CursorCanBeDisposedEvenIfTimeGoesBackwards) {
     CurOp::get(_opCtx.get())->debug().isChangeStreamQuery = true;
     auto cursorPin = makeCursor(_opCtx.get());
 
-    ASSERT_EQ(1UL, _cursorManager.numCursors());
+    ASSERT_EQ(1UL, _cursorManager->numCursors());
     ASSERT_EQ(createdDate, cursorPin.getCursor()->getCreatedDate());
 
     // Move time backwards.
@@ -535,7 +545,7 @@ TEST_F(CursorManagerTest, CursorCanBeDisposedEvenIfTimeGoesBackwards) {
     // Delete the cursor. This should not fail.
     cursorPin.deleteUnderlying();
 
-    ASSERT_EQ(0UL, _cursorManager.numCursors());
+    ASSERT_EQ(0UL, _cursorManager->numCursors());
 
     // Expect 0 massert log messages to be captured about invalid histogram values.
     ASSERT_EQ(0, logs.countBSONContainingSubset(BSON("id" << 23077)));
@@ -549,7 +559,7 @@ TEST_F(CursorManagerTest, CursorShouldNotTimeOutUntilIdleForLongEnoughAfterBeing
     auto clock = useClock();
 
     // Register a cursor which we will look at again.
-    auto cursorPin = _cursorManager.registerCursor(
+    auto cursorPin = _cursorManager->registerCursor(
         _opCtx.get(),
         {makeFakePlanExecutor(),
          kTestNss,
@@ -565,21 +575,21 @@ TEST_F(CursorManagerTest, CursorShouldNotTimeOutUntilIdleForLongEnoughAfterBeing
     clock->advance(getDefaultCursorTimeoutMillis() + Milliseconds(1));
 
     // Make sure the pinned cursor does not time out, before or after unpinning it.
-    ASSERT_EQ(1UL, _cursorManager.numCursors());
-    ASSERT_EQ(0UL, _cursorManager.timeoutCursors(_opCtx.get(), clock->now()));
-    ASSERT_EQ(1UL, _cursorManager.numCursors());
+    ASSERT_EQ(1UL, _cursorManager->numCursors());
+    ASSERT_EQ(0UL, _cursorManager->timeoutCursors(_opCtx.get(), clock->now()));
+    ASSERT_EQ(1UL, _cursorManager->numCursors());
 
     cursorPin.release();
 
-    ASSERT_EQ(1UL, _cursorManager.numCursors());
-    ASSERT_EQ(0UL, _cursorManager.timeoutCursors(_opCtx.get(), clock->now()));
-    ASSERT_EQ(1UL, _cursorManager.numCursors());
+    ASSERT_EQ(1UL, _cursorManager->numCursors());
+    ASSERT_EQ(0UL, _cursorManager->timeoutCursors(_opCtx.get(), clock->now()));
+    ASSERT_EQ(1UL, _cursorManager->numCursors());
 
     // Advance the clock to simulate more time passing, then assert that the now-inactive cursor
     // times out.
     clock->advance(getDefaultCursorTimeoutMillis() + Milliseconds(1));
-    ASSERT_EQ(1UL, _cursorManager.timeoutCursors(_opCtx.get(), clock->now()));
-    ASSERT_EQ(0UL, _cursorManager.numCursors());
+    ASSERT_EQ(1UL, _cursorManager->timeoutCursors(_opCtx.get(), clock->now()));
+    ASSERT_EQ(0UL, _cursorManager->numCursors());
 }
 
 /**
@@ -591,7 +601,7 @@ TEST_F(CursorManagerTest, CursorStoresAPIParameters) {
     apiParams.setAPIStrict(true);
     apiParams.setAPIDeprecationErrors(true);
 
-    auto cursorPin = _cursorManager.registerCursor(
+    auto cursorPin = _cursorManager->registerCursor(
         _opCtx.get(),
         {makeFakePlanExecutor(),
          kTestNss,
@@ -621,7 +631,7 @@ protected:
             CurOp::get(_opCtx.get())
                 ->setShouldOmitDiagnosticInformation(clientLock, shouldOmitDiagnosticInformation);
         }
-        return _cursorManager.registerCursor(
+        return _cursorManager->registerCursor(
             _opCtx.get(),
             {makeFakePlanExecutor(),
              kTestNss,
@@ -736,7 +746,7 @@ TEST_F(CursorManagerTestCustomOpCtx, CursorsWithoutSessions) {
 
     // Retrieve all sessions active in manager - set should be empty.
     LogicalSessionIdSet lsids;
-    _cursorManager.appendActiveSessions(&lsids);
+    _cursorManager->appendActiveSessions(&lsids);
     ASSERT(lsids.empty());
 }
 
@@ -752,25 +762,25 @@ TEST_F(CursorManagerTestCustomOpCtx, OneCursorWithASession) {
 
     // Retrieve all sessions active in manager - set should contain just lsid.
     LogicalSessionIdSet lsids;
-    _cursorManager.appendActiveSessions(&lsids);
+    _cursorManager->appendActiveSessions(&lsids);
     ASSERT_EQ(lsids.size(), size_t(1));
     ASSERT(lsids.find(lsid) != lsids.end());
 
     // Retrieve all cursors for this lsid - should be just ours.
-    auto cursors = _cursorManager.getCursorsForSession(lsid);
+    auto cursors = _cursorManager->getCursorsForSession(lsid);
     ASSERT_EQ(cursors.size(), size_t(1));
     auto cursorId = pinned.getCursor()->cursorid();
     ASSERT(cursors.find(cursorId) != cursors.end());
 
     // Remove the cursor from the manager.
     pinned.release();
-    ASSERT_OK(_cursorManager.killCursor(opCtx.get(), cursorId));
+    ASSERT_OK(_cursorManager->killCursor(opCtx.get(), cursorId));
 
     // There should be no more cursor entries by session id.
     LogicalSessionIdSet sessions;
-    _cursorManager.appendActiveSessions(&sessions);
+    _cursorManager->appendActiveSessions(&sessions);
     ASSERT(sessions.empty());
-    ASSERT(_cursorManager.getCursorsForSession(lsid).empty());
+    ASSERT(_cursorManager->getCursorsForSession(lsid).empty());
 }
 
 /**
@@ -789,28 +799,28 @@ TEST_F(CursorManagerTestCustomOpCtx, MultipleCursorsWithSameSession) {
 
     // Retrieve all sessions - set should contain just lsid.
     stdx::unordered_set<LogicalSessionId, LogicalSessionIdHash> lsids;
-    _cursorManager.appendActiveSessions(&lsids);
+    _cursorManager->appendActiveSessions(&lsids);
     ASSERT_EQ(lsids.size(), size_t(1));
     ASSERT(lsids.find(lsid) != lsids.end());
 
     // Retrieve all cursors for session - should be both cursors.
-    auto cursors = _cursorManager.getCursorsForSession(lsid);
+    auto cursors = _cursorManager->getCursorsForSession(lsid);
     ASSERT_EQ(cursors.size(), size_t(2));
     ASSERT(cursors.find(cursorId1) != cursors.end());
     ASSERT(cursors.find(cursorId2) != cursors.end());
 
     // Remove one cursor from the manager.
     pinned.release();
-    ASSERT_OK(_cursorManager.killCursor(opCtx.get(), cursorId1));
+    ASSERT_OK(_cursorManager->killCursor(opCtx.get(), cursorId1));
 
     // Should still be able to retrieve the session.
     lsids.clear();
-    _cursorManager.appendActiveSessions(&lsids);
+    _cursorManager->appendActiveSessions(&lsids);
     ASSERT_EQ(lsids.size(), size_t(1));
     ASSERT(lsids.find(lsid) != lsids.end());
 
     // Should still be able to retrieve remaining cursor by session.
-    cursors = _cursorManager.getCursorsForSession(lsid);
+    cursors = _cursorManager->getCursorsForSession(lsid);
     ASSERT_EQ(cursors.size(), size_t(1));
     ASSERT(cursors.find(cursorId2) != cursors.end());
 }
@@ -847,17 +857,17 @@ TEST_F(CursorManagerTestCustomOpCtx, MultipleCursorsMultipleSessions) {
 
     // Retrieve all sessions - should be both lsids.
     LogicalSessionIdSet lsids;
-    _cursorManager.appendActiveSessions(&lsids);
+    _cursorManager->appendActiveSessions(&lsids);
     ASSERT_EQ(lsids.size(), size_t(2));
     ASSERT(lsids.find(lsid1) != lsids.end());
     ASSERT(lsids.find(lsid2) != lsids.end());
 
     // Retrieve cursors for each session - should be just one.
-    auto cursors1 = _cursorManager.getCursorsForSession(lsid1);
+    auto cursors1 = _cursorManager->getCursorsForSession(lsid1);
     ASSERT_EQ(cursors1.size(), size_t(1));
     ASSERT(cursors1.find(cursor1) != cursors1.end());
 
-    auto cursors2 = _cursorManager.getCursorsForSession(lsid2);
+    auto cursors2 = _cursorManager->getCursorsForSession(lsid2);
     ASSERT_EQ(cursors2.size(), size_t(1));
     ASSERT(cursors2.find(cursor2) != cursors2.end());
 }
@@ -874,15 +884,15 @@ TEST_F(CursorManagerTestCustomOpCtx, OneCursorWithAnOperationKey) {
     opCtx->setOperationKey(opKey);
     auto pinned = makeCursor(opCtx.get());
 
-    auto cursors = _cursorManager.getCursorsForOpKeys({opKey});
+    auto cursors = _cursorManager->getCursorsForOpKeys({opKey});
     ASSERT_EQ(cursors.size(), size_t(1));
     auto cursorId = pinned.getCursor()->cursorid();
     ASSERT(cursors.find(cursorId) != cursors.end());
 
     // Remove the cursor from the manager and verify that we can't retrieve it.
     pinned.release();
-    ASSERT_OK(_cursorManager.killCursor(opCtx.get(), cursorId));
-    ASSERT(_cursorManager.getCursorsForOpKeys({opKey}).empty());
+    ASSERT_OK(_cursorManager->killCursor(opCtx.get(), cursorId));
+    ASSERT(_cursorManager->getCursorsForOpKeys({opKey}).empty());
 }
 
 TEST_F(CursorManagerTestCustomOpCtx, MultipleCursorsMultipleOperationKeys) {
@@ -913,16 +923,16 @@ TEST_F(CursorManagerTestCustomOpCtx, MultipleCursorsMultipleOperationKeys) {
     }
 
     // Retrieve cursors for each operation key - should be one for each.
-    auto cursors1 = _cursorManager.getCursorsForOpKeys({opKey1});
+    auto cursors1 = _cursorManager->getCursorsForOpKeys({opKey1});
     ASSERT_EQ(cursors1.size(), size_t(1));
     ASSERT(cursors1.find(cursor1) != cursors1.end());
 
-    auto cursors2 = _cursorManager.getCursorsForOpKeys({opKey2});
+    auto cursors2 = _cursorManager->getCursorsForOpKeys({opKey2});
     ASSERT_EQ(cursors2.size(), size_t(1));
     ASSERT(cursors2.find(cursor2) != cursors2.end());
 
     // Retrieve cursors for both operation keys.
-    auto cursors = _cursorManager.getCursorsForOpKeys({opKey1, opKey2});
+    auto cursors = _cursorManager->getCursorsForOpKeys({opKey1, opKey2});
     ASSERT_EQ(cursors.size(), size_t(2));
     ASSERT(cursors.find(cursor1) != cursors.end());
     ASSERT(cursors.find(cursor2) != cursors.end());
@@ -937,21 +947,21 @@ TEST_F(CursorManagerTestCustomOpCtx, MultipleCursorsSameOperationKey) {
     auto cursor2 = makeCursor(opCtx.get()).getCursor()->cursorid();
 
     // Retrieve cursors for operation key - should be both cursors.
-    auto cursors = _cursorManager.getCursorsForOpKeys({opKey});
+    auto cursors = _cursorManager->getCursorsForOpKeys({opKey});
     ASSERT_EQ(cursors.size(), size_t(2));
     ASSERT(cursors.find(cursor1) != cursors.end());
     ASSERT(cursors.find(cursor2) != cursors.end());
 
     // Now delete first one. The other should remain.
-    ASSERT_OK(_cursorManager.killCursor(opCtx.get(), cursor1));
-    cursors = _cursorManager.getCursorsForOpKeys({opKey});
+    ASSERT_OK(_cursorManager->killCursor(opCtx.get(), cursor1));
+    cursors = _cursorManager->getCursorsForOpKeys({opKey});
     ASSERT_EQ(cursors.size(), size_t(1));
     ASSERT(cursors.find(cursor1) == cursors.end());
     ASSERT(cursors.find(cursor2) != cursors.end());
 
     // Now delete the other. None should remain.
-    ASSERT_OK(_cursorManager.killCursor(opCtx.get(), cursor2));
-    cursors = _cursorManager.getCursorsForOpKeys({opKey});
+    ASSERT_OK(_cursorManager->killCursor(opCtx.get(), cursor2));
+    cursors = _cursorManager->getCursorsForOpKeys({opKey});
     ASSERT_EQ(cursors.size(), size_t(0));
 }
 
@@ -963,17 +973,17 @@ TEST_F(CursorManagerTestCustomOpCtx, TimedOutCursorShouldNotBeReturnedForOpKeyLo
 
     auto cursor = makeCursor(opCtx.get());
 
-    ASSERT_EQ(1UL, _cursorManager.numCursors());
-    ASSERT_EQ(0UL, _cursorManager.timeoutCursors(opCtx.get(), Date_t()));
+    ASSERT_EQ(1UL, _cursorManager->numCursors());
+    ASSERT_EQ(0UL, _cursorManager->timeoutCursors(opCtx.get(), Date_t()));
 
     // Advance the clock and verify that the cursor times out.
     cursor.release();
     clock->advance(getDefaultCursorTimeoutMillis() + Milliseconds(1));
-    ASSERT_EQ(1UL, _cursorManager.timeoutCursors(opCtx.get(), clock->now()));
-    ASSERT_EQ(0UL, _cursorManager.numCursors());
+    ASSERT_EQ(1UL, _cursorManager->timeoutCursors(opCtx.get(), clock->now()));
+    ASSERT_EQ(0UL, _cursorManager->numCursors());
 
     // Verify that the timed out cursor is not returned when looking up by OperationKey.
-    auto cursors = _cursorManager.getCursorsForOpKeys({opKey});
+    auto cursors = _cursorManager->getCursorsForOpKeys({opKey});
     ASSERT_EQ(cursors.size(), size_t(0));
 }
 
@@ -994,10 +1004,10 @@ TEST_F(CursorManagerTestCustomOpCtx, CursorsMarkedAsKilledAreReturnedForOpKeyLoo
     cursor.release();
 
     // The cursor should still be present in the manager.
-    ASSERT_EQ(1UL, _cursorManager.numCursors());
+    ASSERT_EQ(1UL, _cursorManager->numCursors());
 
     // Verify that the killed cursor is still returned when looking up by OperationKey.
-    auto cursors = _cursorManager.getCursorsForOpKeys({opKey});
+    auto cursors = _cursorManager->getCursorsForOpKeys({opKey});
     ASSERT_EQ(cursors.size(), size_t(1));
 }
 
@@ -1006,7 +1016,7 @@ TEST_F(CursorManagerTestCustomOpCtx,
     auto opCtx = makeOperationContext();
     auto pinned = makeCursor(opCtx.get());
     auto cursorId = pinned.getCursor()->cursorid();
-    auto cursorsForNamespace = _cursorManager.getCursorIdsForNamespace(kTestNss);
+    auto cursorsForNamespace = _cursorManager->getCursorIdsForNamespace(kTestNss);
     ASSERT_EQUALS(cursorsForNamespace.size(), 1ull);
     ASSERT_EQUALS(cursorsForNamespace[0], cursorId);
 }
@@ -1018,7 +1028,7 @@ TEST_F(CursorManagerTestCustomOpCtx,
     auto pinned2 = makeCursor(opCtx.get());
     auto cursorId1 = pinned1.getCursor()->cursorid();
     auto cursorId2 = pinned2.getCursor()->cursorid();
-    auto cursorsForNamespace = _cursorManager.getCursorIdsForNamespace(kTestNss);
+    auto cursorsForNamespace = _cursorManager->getCursorIdsForNamespace(kTestNss);
     ASSERT_EQUALS(cursorsForNamespace.size(), 2ull);
     // The results for cursorsForNamespace won't necessarily be the same as the order of insertion.
     std::set<CursorId> cursorsForNamespaceSet(cursorsForNamespace.begin(),
@@ -1034,7 +1044,7 @@ TEST_F(CursorManagerTestCustomOpCtx,
     // Add a cursor for kTestNss.
     auto pinned = makeCursor(opCtx.get());
     // Get cursors for a different NamespaceString.
-    auto cursorsForNamespace = _cursorManager.getCursorIdsForNamespace(
+    auto cursorsForNamespace = _cursorManager->getCursorIdsForNamespace(
         NamespaceString::createNamespaceString_forTest("somerandom.nss"));
     ASSERT_EQUALS(cursorsForNamespace.size(), 0ull);
 }
@@ -1083,7 +1093,7 @@ TEST_F(CursorManagerTestBase, CursorLifespanHistogramCorrectlyUpdated) {
 TEST_F(CursorManagerTest, KillCursorWithPassingAuthCheckSucceeds) {
     OperationContext* const pinningOpCtx = _opCtx.get();
 
-    auto cursorPin = _cursorManager.registerCursor(
+    auto cursorPin = _cursorManager->registerCursor(
         pinningOpCtx,
         {makeFakePlanExecutor(),
          kTestNss,
@@ -1101,7 +1111,7 @@ TEST_F(CursorManagerTest, KillCursorWithPassingAuthCheckSucceeds) {
     auto pinCheck = [&](const ClientCursor& cc) {
         uassertStatusOK(Status::OK());
     };
-    ASSERT_OK(_cursorManager.killCursorWithAuthCheck(_opCtx.get(), cursorId, pinCheck));
+    ASSERT_OK(_cursorManager->killCursorWithAuthCheck(_opCtx.get(), cursorId, pinCheck));
 }
 
 /**
@@ -1110,7 +1120,7 @@ TEST_F(CursorManagerTest, KillCursorWithPassingAuthCheckSucceeds) {
 TEST_F(CursorManagerTest, KillCursorWithFailingAuthCheckFails) {
     OperationContext* const pinningOpCtx = _opCtx.get();
 
-    auto cursorPin = _cursorManager.registerCursor(
+    auto cursorPin = _cursorManager->registerCursor(
         pinningOpCtx,
         {makeFakePlanExecutor(),
          kTestNss,
@@ -1128,7 +1138,7 @@ TEST_F(CursorManagerTest, KillCursorWithFailingAuthCheckFails) {
     auto pinCheck = [&](const ClientCursor& cc) {
         uassertStatusOK(Status(ErrorCodes::Unauthorized, "Unauthorized"));
     };
-    ASSERT_THROWS_CODE(_cursorManager.killCursorWithAuthCheck(_opCtx.get(), cursorId, pinCheck),
+    ASSERT_THROWS_CODE(_cursorManager->killCursorWithAuthCheck(_opCtx.get(), cursorId, pinCheck),
                        DBException,
                        ErrorCodes::Unauthorized);
 }
@@ -1184,7 +1194,7 @@ TEST_F(CursorManagerTest, ChangeStreamCursorMetricsTrackTotalOpenedAndLifespan) 
     useClock()->advance(lifespanMs);
 
     // Killing the cursor records its lifespan in the histogram; total_opened remains at 1.
-    ASSERT_OK(_cursorManager.killCursor(_opCtx.get(), cursorId));
+    ASSERT_OK(_cursorManager->killCursor(_opCtx.get(), cursorId));
     ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorsTotalOpened), 1);
 
     auto hist1 = capturer.readInt64Histogram(MetricNames::kChangeStreamCursorsLifespan);
@@ -1200,7 +1210,7 @@ TEST_F(CursorManagerTest, ChangeStreamCursorMetricsTrackTotalOpenedAndLifespan) 
     const Milliseconds lifespan2Ms{400};
     useClock()->advance(lifespan2Ms);
 
-    ASSERT_OK(_cursorManager.killCursor(_opCtx.get(), cursorId2));
+    ASSERT_OK(_cursorManager->killCursor(_opCtx.get(), cursorId2));
     ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorsTotalOpened), 2);
 
     auto hist2 = capturer.readInt64Histogram(MetricNames::kChangeStreamCursorsLifespan);
@@ -1230,7 +1240,7 @@ TEST_F(CursorManagerTest, RegularCursorDoesNotAffectChangeStreamMetrics) {
     pin.release();
 
     useClock()->advance(Milliseconds{100});
-    ASSERT_OK(_cursorManager.killCursor(_opCtx.get(), cursorId));
+    ASSERT_OK(_cursorManager->killCursor(_opCtx.get(), cursorId));
 
     ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorsTotalOpened), 0);
     // No change stream cursor was disposed, so the lifespan histogram has no data.
@@ -1265,7 +1275,7 @@ TEST_F(CursorManagerTest, ChangeStreamCursorMetricsTrackCursorOpenAndPin) {
     ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorsOpenPinned), 0);
 
     // Killing the cursor removes it entirely: total drops to 0.
-    ASSERT_OK(_cursorManager.killCursor(_opCtx.get(), cursorId));
+    ASSERT_OK(_cursorManager->killCursor(_opCtx.get(), cursorId));
 
     ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorsOpenTotal), 0);
     ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorsOpenPinned), 0);

@@ -92,9 +92,12 @@ void seedMaxKeyOrphanScanStateDoc(OperationContext* opCtx,
     client.insert(NamespaceString::kConfigMaxKeyOrphanScanStateNamespace, docBob.obj());
 }
 
-class MaxKeyOrphanDetectionFixture : service_context_test::WithSetupTransportLayer,
-                                     public ShardServerTestFixture {
+class MaxKeyOrphanDetectionFixture : public ShardServerTestFixture {
 public:
+    bool shouldSetupTransportLayer() const override {
+        return true;
+    }
+
     void setUp() override {
         ShardServerTestFixture::setUp();
         // The detector only persists once the node is a writable primary. ShardServerTestFixture

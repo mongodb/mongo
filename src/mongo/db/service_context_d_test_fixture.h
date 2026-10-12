@@ -218,13 +218,13 @@ class [[MONGO_MOD_OPEN]] ServiceContextMongoDTest : public ServiceContextTest {
 public:
     using Options = MongoDScopedGlobalServiceContextForTest::Options;
 
-    ServiceContextMongoDTest() : ServiceContextMongoDTest{Options{}} {}
-    explicit ServiceContextMongoDTest(
-        std::unique_ptr<MongoDScopedGlobalServiceContextForTest> scopedServiceContext)
-        : ServiceContextTest(std::move(scopedServiceContext)) {}
-    explicit ServiceContextMongoDTest(Options options)
-        : ServiceContextTest(std::make_unique<MongoDScopedGlobalServiceContextForTest>(
-              std::move(options), shouldSetupTL)) {}
+    ServiceContextMongoDTest() : ServiceContextMongoDTest(Options{}) {}
+    explicit ServiceContextMongoDTest(Options options) : _ctorOptions{std::move(options)} {}
+
+    /** Consumes a stashed options value, and can only be called once. */
+    virtual Options makeServiceContextOptions() {
+        return std::move(std::exchange(_ctorOptions, {}).value());
+    }
 
     JournalListener* journalListener() const {
         return mongoDscopedServiceContext()->journalListener();
@@ -234,10 +234,18 @@ public:
         return mongoDscopedServiceContext()->opObserverRegistry();
     }
 
+protected:
+    std::unique_ptr<ScopedGlobalServiceContextForTest> makeScopedServiceContext() override {
+        return std::make_unique<MongoDScopedGlobalServiceContextForTest>(
+            makeServiceContextOptions(), shouldSetupTransportLayer());
+    }
+
 private:
     MongoDScopedGlobalServiceContextForTest* mongoDscopedServiceContext() const {
         return checked_cast<MongoDScopedGlobalServiceContextForTest*>(scopedServiceContext());
     }
+
+    boost::optional<Options> _ctorOptions;
 };
 
 }  // namespace mongo

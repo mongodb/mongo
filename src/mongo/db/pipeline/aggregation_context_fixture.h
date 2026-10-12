@@ -39,21 +39,14 @@ public:
         bool requiresTimeseriesExtendedRangeSupport = false;
     };
 
-    AggregationContextFixture(std::unique_ptr<ScopedGlobalServiceContextForTest>
-                                  scopedGlobalServiceContextForTest = nullptr)
-        : AggregationContextFixture(
-              NamespaceString::createNamespaceString_forTest(boost::none, "test", "pipeline_test"),
-              std::move(scopedGlobalServiceContextForTest)) {}
+    AggregationContextFixture() = default;
 
-    explicit AggregationContextFixture(NamespaceString nss,
-                                       std::unique_ptr<ScopedGlobalServiceContextForTest>
-                                           scopedGlobalServiceContextForTest = nullptr)
-        : ServiceContextTest(
-              scopedGlobalServiceContextForTest
-                  ? std::move(scopedGlobalServiceContextForTest)
-                  : std::make_unique<ScopedGlobalServiceContextForTest>(shouldSetupTL)) {
+    explicit AggregationContextFixture(NamespaceString nss) : _nss(std::move(nss)) {}
+
+    void setUp() override {
+        ServiceContextTest::setUp();
         _opCtx = makeOperationContext();
-        _expCtx = make_intrusive<ExpressionContextForTest>(_opCtx.get(), nss);
+        _expCtx = make_intrusive<ExpressionContextForTest>(_opCtx.get(), _nss);
         _expCtx->setTempDir(_tempDir.path());
         _expCtx->setChangeStreamSpec(DocumentSourceChangeStreamSpec());
     }
@@ -242,6 +235,8 @@ public:
 private:
     const unittest::TempDir _tempDir{"AggregationContextFixture"};
 
+    NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "pipeline_test");
     ServiceContext::UniqueOperationContext _opCtx;
     boost::intrusive_ptr<ExpressionContextForTest> _expCtx;
 };

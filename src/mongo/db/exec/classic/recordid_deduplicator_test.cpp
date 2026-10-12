@@ -286,8 +286,6 @@ TEST_F(RecordIdDeduplicatorTest, memoryConsumptionTest) {
  */
 class RecordIdDeduplicatorCatalogTest : public CatalogTestFixture {
 public:
-    RecordIdDeduplicatorCatalogTest() : CatalogTestFixture(Options{}) {}
-
     void setUp() override {
         CatalogTestFixture::setUp();
         _expCtx = new ExpressionContextForTest(operationContext(), kNss);

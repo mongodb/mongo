@@ -49,12 +49,15 @@ private:
     SharedPromise<void> _ongoingQueries;
 };
 
-class RangeDeleterServiceTest : service_context_test::WithSetupTransportLayer,
-                                public ShardServerTestFixture {
+class RangeDeleterServiceTest : public ShardServerTestFixture {
 public:
     using Options = ShardServerTestFixture::Options;
 
     RangeDeleterServiceTest() : ShardServerTestFixture() {}
+
+    bool shouldSetupTransportLayer() const override {
+        return true;
+    }
 
     void setUp() override;
     void tearDown() override;

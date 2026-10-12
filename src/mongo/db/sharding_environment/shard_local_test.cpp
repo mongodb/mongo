@@ -43,12 +43,10 @@ namespace {
 
 class ShardLocalTest : public ServiceContextMongoDTest {
 protected:
-    ShardLocalTest() : ServiceContextMongoDTest(Options{}.useReplSettings(true)) {
-        serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
-    }
+    ShardLocalTest() : ServiceContextMongoDTest(Options{}.useReplSettings(true)) {}
 
-    ~ShardLocalTest() override {
-        serverGlobalParams.clusterRole = ClusterRole::None;
+    boost::optional<ClusterRole> getClusterRoleOverride() const override {
+        return ClusterRole{ClusterRole::ShardServer, ClusterRole::ConfigServer};
     }
 
     void setUp() override {
@@ -165,8 +163,6 @@ protected:
 
         return cursorResponse.getValue().getBatch();
     }
-
-    service_context_test::ShardRoleOverride _shardRole;
 
     ServiceContext::UniqueOperationContext _opCtx;
     std::unique_ptr<ShardLocal> _shardLocal;

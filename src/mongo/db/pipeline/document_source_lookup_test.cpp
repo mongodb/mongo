@@ -56,7 +56,8 @@ using namespace test;
 
 class DocumentSourceLookUpTest : public AggregationContextFixture {
 protected:
-    DocumentSourceLookUpTest() {
+    void setUp() override {
+        AggregationContextFixture::setUp();
         ShardingState::create(getServiceContext());
         // By default, make a mock mongo interface without any results from the foreign collection.
         // Individual tests will make their own interface if they need mock results.

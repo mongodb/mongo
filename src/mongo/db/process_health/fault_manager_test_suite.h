@@ -109,10 +109,16 @@ private:
 /**
  * Test suite for fault manager.
  */
-class [[MONGO_MOD_PUBLIC]] FaultManagerTest : service_context_test::WithSetupTransportLayer,
-                                              service_context_test::RouterRoleOverride,
-                                              public ClockSourceMockServiceContextTest {
+class [[MONGO_MOD_PUBLIC]] FaultManagerTest : public ClockSourceMockServiceContextTest {
 public:
+    bool shouldSetupTransportLayer() const override {
+        return true;
+    }
+
+    boost::optional<ClusterRole> getClusterRoleOverride() const override {
+        return ClusterRole{ClusterRole::RouterServer};
+    }
+
     void setUp() override {
         ClockSourceMockServiceContextTest::setUp();
 

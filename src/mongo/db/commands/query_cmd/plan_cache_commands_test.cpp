@@ -28,6 +28,7 @@ class PlanCacheCommandsTest : public ServiceContextTest {
 public:
     void setUp() override {
         ServiceContextTest::setUp();
+        _opCtx = makeOperationContext();
         auto catalog = CollectionCatalog::get(_opCtx.get());
         std::shared_ptr<Collection> coll = std::make_shared<CollectionMock>(nss);
         catalog->onCreateCollection(_opCtx.get(), coll);
@@ -52,7 +53,7 @@ public:
 
 
 private:
-    ServiceContext::UniqueOperationContext _opCtx{makeOperationContext()};
+    ServiceContext::UniqueOperationContext _opCtx;
     std::unique_ptr<CollectionAcquisition> _collectionAcq;
 };
 

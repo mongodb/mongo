@@ -324,7 +324,10 @@ private:
 
 class CheckResumeTokenTest : public AggregationContextFixture {
 public:
-    CheckResumeTokenTest() : _mock(make_intrusive<ChangeStreamMockStage>(getExpCtx())) {}
+    void setUp() override {
+        AggregationContextFixture::setUp();
+        _mock = make_intrusive<ChangeStreamMockStage>(getExpCtx());
+    }
 
 protected:
     /**

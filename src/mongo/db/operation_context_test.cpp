@@ -246,19 +246,13 @@ TEST_F(OperationContextTest, CancellationTokenIsCancelableAtFirst) {
 }
 
 class OperationTestWithMockClock : public OperationContextTest {
-    // This constructor lets us give a variable name to mockClock so we can copy the same
-    // shared_ptr into SharedClockSourceAdapters we give to ServiceContext::make and the
-    // mockClock member variable.
-    explicit OperationTestWithMockClock(std::shared_ptr<ClockSourceMock> mockClock)
-        : OperationContextTest(std::make_unique<ScopedGlobalServiceContextForTest>(
-              ServiceContext::make(std::make_unique<SharedClockSourceAdapter>(mockClock),
-                                   std::make_unique<SharedClockSourceAdapter>(mockClock),
-                                   std::make_unique<TickSourceMock<>>()))),
-          mockClock(std::move(mockClock)) {}
-
 public:
-    OperationTestWithMockClock()
-        : OperationTestWithMockClock(std::make_shared<ClockSourceMock>()) {}
+    std::unique_ptr<ScopedGlobalServiceContextForTest> makeScopedServiceContext() override {
+        return std::make_unique<ScopedGlobalServiceContextForTest>(
+            ServiceContext::make(std::make_unique<SharedClockSourceAdapter>(mockClock),
+                                 std::make_unique<SharedClockSourceAdapter>(mockClock),
+                                 std::make_unique<TickSourceMock<>>()));
+    }
 
     void setUp() override {
         OperationContextTest::setUp();
@@ -276,7 +270,7 @@ public:
         opCtx->waitForConditionOrInterrupt(cv, lk, [] { return false; });
     }
 
-    const std::shared_ptr<ClockSourceMock> mockClock;
+    const std::shared_ptr<ClockSourceMock> mockClock = std::make_shared<ClockSourceMock>();
     ServiceContext::UniqueClient client;
 };
 using OperationDeadlineTests = OperationTestWithMockClock;

@@ -143,8 +143,10 @@ private:
     ReadWriteConcernDefaultsLookupMock _lookupMock;
 };
 
-class ServerStatusServersRoleShardTest : public virtual service_context_test::ShardRoleOverride,
-                                         public ServerStatusServersRoleTestFixture {
+class ServerStatusServersRoleShardTest : public ServerStatusServersRoleTestFixture {
+    boost::optional<ClusterRole> getClusterRoleOverride() const override {
+        return ClusterRole{ClusterRole::ShardServer};
+    }
 
     void setUp() override {
         ServerStatusServersRoleTestFixture::setUp();
@@ -181,8 +183,11 @@ TEST_F(ServerStatusServersRoleShardTest, MergesNoneAndShardMetricTreesExcludesRo
     ASSERT_FALSE(section.hasField("routerMetricShard")) << section.toString();
 }
 
-class ServerStatusServersRoleRouterTest : public virtual service_context_test::RouterRoleOverride,
-                                          public ServerStatusServersRoleTestFixture {
+class ServerStatusServersRoleRouterTest : public ServerStatusServersRoleTestFixture {
+    boost::optional<ClusterRole> getClusterRoleOverride() const override {
+        return ClusterRole{ClusterRole::RouterServer};
+    }
+
     void setUp() override {
         ServerStatusServersRoleTestFixture::setUp();
         // Initialize the serviceEntryPoint so that DBDirectClient can function.

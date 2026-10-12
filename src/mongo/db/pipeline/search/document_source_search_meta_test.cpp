@@ -49,8 +49,12 @@ static const std::vector<std::pair<std::string, std::string>> kInternalSearchMet
     {"docsNeededBounds", R"({$searchMeta: {docsNeededBounds: {minBounds: 1, maxBounds: 100}}})"},
 };
 
-class SearchMetaTest : service_context_test::WithSetupTransportLayer,
-                       public AggregationContextFixture {};
+class SearchMetaTest : public AggregationContextFixture {
+public:
+    bool shouldSetupTransportLayer() const override {
+        return true;
+    }
+};
 
 struct MockMongoInterface final : public StubMongoProcessInterface {
     bool inShardedEnvironment(OperationContext* opCtx) const override {

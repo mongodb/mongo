@@ -64,9 +64,7 @@ WriteConcernOptions TestCmdSupportsWriteConcern::expectedWriteConcern;
 
 void ServiceEntryPointTestFixture::setUp() {
     ServiceContextTest::setUp();
-    // Minimal set up necessary for ServiceEntryPoint.
-    auto service = getGlobalServiceContext();
-    service->setStorageEngine(std::make_unique<StorageEngineMock>());
+    getServiceContext()->setStorageEngine(std::make_unique<StorageEngineMock>());
 }
 
 WriteConcernOptions ServiceEntryPointTestFixture::makeWriteConcernOptions(BSONObj wc) {

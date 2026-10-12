@@ -40,6 +40,10 @@ const std::string kShardName("TestShard");
  */
 class ShardingInitializationOpObserverTest : public ShardingMongoDTestFixture {
 protected:
+    boost::optional<ClusterRole> getClusterRoleOverride() const override {
+        return ClusterRole{ClusterRole::ShardServer};
+    }
+
     void setUp() override {
         ShardingMongoDTestFixture::setUp();
 
@@ -57,8 +61,6 @@ protected:
     }
 
 private:
-    service_context_test::ShardRoleOverride _shardRole;
-
     int _initCallCount = 0;
 };
 

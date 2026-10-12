@@ -21,9 +21,12 @@ bool requestOsiMatches(const write_ops::UpdateCommandRequest& cmd,
         args.getTxnNumber() == expected.getTxnNumber();
 }
 
-class ParticipantCausalityBarrierTest : public service_context_test::WithSetupTransportLayer,
-                                        public ShardServerTestFixture {
+class ParticipantCausalityBarrierTest : public ShardServerTestFixture {
 public:
+    bool shouldSetupTransportLayer() const override {
+        return true;
+    }
+
     void setUp() override {
         ShardServerTestFixture::setUp();
         addRemoteShards({{kShardId, HostAndPort("shard0", 1234)}});

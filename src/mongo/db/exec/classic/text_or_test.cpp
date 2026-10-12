@@ -71,10 +71,12 @@ static const std::vector<BSONObj> kMovieDocs = {
 
 class TextOrStageTest : public ServiceContextMongoDTest {
 public:
-    TextOrStageTest()
-        : ServiceContextMongoDTest(Options{}.useMockClock(true)),
-          _opCtx(makeOperationContext()),
-          _expCtx(ExpressionContextBuilder{}.opCtx(_opCtx.get()).ns(kNss).build()) {
+    TextOrStageTest() : ServiceContextMongoDTest(Options{}.useMockClock(true)) {}
+
+    void setUp() override {
+        ServiceContextMongoDTest::setUp();
+        _opCtx = makeOperationContext();
+        _expCtx = ExpressionContextBuilder{}.opCtx(_opCtx.get()).ns(kNss).build();
         _setUpCollectionAndIdx(/*indexName=*/kIndexName,
                                /*indexKeys=*/BSON("quote" << "text"),
                                /*docsToInsert=*/kMovieDocs);

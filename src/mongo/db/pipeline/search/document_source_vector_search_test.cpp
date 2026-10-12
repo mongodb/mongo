@@ -26,8 +26,12 @@
 namespace mongo {
 namespace {
 
-class DocumentSourceVectorSearchTest : service_context_test::WithSetupTransportLayer,
-                                       public AggregationContextFixture {};
+class DocumentSourceVectorSearchTest : public AggregationContextFixture {
+public:
+    bool shouldSetupTransportLayer() const override {
+        return true;
+    }
+};
 
 TEST_F(DocumentSourceVectorSearchTest, NotAllowedInTransaction) {
     auto expCtx = getExpCtx();

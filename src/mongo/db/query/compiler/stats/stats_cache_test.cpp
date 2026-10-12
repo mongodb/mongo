@@ -29,6 +29,12 @@ namespace {
  */
 class StatsCacheTest : public ServiceContextTest {
 protected:
+    void setUp() override {
+        ServiceContextTest::setUp();
+        _opCtxHolder = makeOperationContext();
+        _opCtx = _opCtxHolder.get();
+    }
+
     // Extends StatsCache and automatically provides it with a thread  pool, which will be
     // shutdown and joined before the StatsCache is destroyed (which is part of the  contract of
     // ReadThroughCache)
@@ -51,8 +57,8 @@ protected:
         }()};
     };
 
-    const ServiceContext::UniqueOperationContext _opCtxHolder{makeOperationContext()};
-    OperationContext* const _opCtx{_opCtxHolder.get()};
+    ServiceContext::UniqueOperationContext _opCtxHolder;
+    OperationContext* _opCtx = nullptr;
 };
 
 TEST(SimpleStatsCacheTest, StandaloneValueHandle) {

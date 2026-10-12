@@ -24,7 +24,8 @@ using namespace std::literals::string_view_literals;
 
 class QuerySettingsValidationTestFixture : public ServiceContextTest {
 protected:
-    QuerySettingsValidationTestFixture() {
+    void setUp() override {
+        ServiceContextTest::setUp();
         ShardingState::create(getServiceContext());
         expCtx = make_intrusive<ExpressionContextForTest>();
         query_settings::QuerySettingsService::initializeForTest(getServiceContext());

@@ -29,10 +29,11 @@ constexpr int32_t kCacheSizeMB = 50;
 
 class SpillTableTest : public StorageEngineTest {
 protected:
-    SpillTableTest()
-        : StorageEngineTest(StorageEngineTest::Options{}
-                                .setParameter("spillWiredTigerCacheSizeMinMB", kCacheSizeMB)
-                                .setParameter("spillWiredTigerCacheSizeMaxMB", kCacheSizeMB)) {}
+    Options makeServiceContextOptions() override {
+        return StorageEngineTest::makeServiceContextOptions()
+            .setParameter("spillWiredTigerCacheSizeMinMB", kCacheSizeMB)
+            .setParameter("spillWiredTigerCacheSizeMaxMB", kCacheSizeMB);
+    }
 };
 
 TEST_F(SpillTableTest, InsertRecords) {

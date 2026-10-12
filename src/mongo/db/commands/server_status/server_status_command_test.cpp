@@ -132,6 +132,8 @@ public:
 
     void setUp() override {
         ServiceContextMongoDTest::setUp();
+        _uniqueOpCtx = makeOperationContext();
+        opCtx = _uniqueOpCtx.get();
         const auto service = getServiceContext();
         auto replCoord =
             std::make_unique<repl::ReplicationCoordinatorMock>(service, repl::ReplSettings{});
@@ -147,8 +149,8 @@ public:
         return result;
     }
 
-    ServiceContext::UniqueOperationContext _uniqueOpCtx{makeOperationContext()};
-    OperationContext* opCtx{_uniqueOpCtx.get()};
+    ServiceContext::UniqueOperationContext _uniqueOpCtx;
+    OperationContext* opCtx{nullptr};
 };
 
 TEST_F(ServerStatusSlowTimingTest, TimingBreakdownSumsToTotal) {

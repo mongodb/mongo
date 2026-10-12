@@ -116,6 +116,12 @@ private:
  */
 class ReadThroughCacheTest : public ServiceContextTest {
 protected:
+    void setUp() override {
+        ServiceContextTest::setUp();
+        _opCtxHolder = makeOperationContext();
+        _opCtx = _opCtxHolder.get();
+    }
+
     // Extends any of Cache/CausallyConsistentCache and automatically provides it with a thread
     // pool, which will be shutdown and joined before the Cache is destroyed (which is part of the
     // contract of ReadThroughCache)
@@ -137,8 +143,8 @@ protected:
         }()};
     };
 
-    const ServiceContext::UniqueOperationContext _opCtxHolder{makeOperationContext()};
-    OperationContext* const _opCtx{_opCtxHolder.get()};
+    ServiceContext::UniqueOperationContext _opCtxHolder;
+    OperationContext* _opCtx = nullptr;
 };
 
 TEST(SimpleReadThroughCacheTest, StandaloneValueHandle) {

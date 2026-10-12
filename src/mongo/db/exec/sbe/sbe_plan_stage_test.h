@@ -118,20 +118,26 @@ class PlanStageTestFixture : public CatalogTestFixture {
 public:
     // SBE plan stages such as HashAgg and Sort may spill to disk, requiring the spill WiredTiger
     // instance.
-    PlanStageTestFixture(bool enableYield = true)
-        : CatalogTestFixture(Options{}.enableSpillEngine()), _enableYield(enableYield) {};
+    Options makeServiceContextOptions() override {
+        return CatalogTestFixture::makeServiceContextOptions().enableSpillEngine();
+    }
 
     void setUp() override {
         CatalogTestFixture::setUp();
-        _yieldPolicy = _enableYield ? makeYieldPolicy() : nullptr;
-        _slotIdGenerator.reset(new value::SlotIdGenerator());
-        _spoolIdGenerator.reset(new value::SpoolIdGenerator());
+        auto&& opCtx = operationContext();
+        _yieldPolicy = PlanYieldPolicySBE::make(opCtx,
+                                                PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                                opCtx->getServiceContext()->getFastClockSource(),
+                                                0,
+                                                Milliseconds::zero());
+        _slotIdGenerator = std::make_unique<value::SlotIdGenerator>();
+        _spoolIdGenerator = std::make_unique<value::SpoolIdGenerator>();
     }
 
     void tearDown() override {
-        _spoolIdGenerator.reset(nullptr);
-        _slotIdGenerator.reset(nullptr);
-        _yieldPolicy.reset(nullptr);
+        _spoolIdGenerator = nullptr;
+        _slotIdGenerator = nullptr;
+        _yieldPolicy = nullptr;
         CatalogTestFixture::tearDown();
     }
 
@@ -339,27 +345,7 @@ public:
         return _slotIdGenerator.get();
     }
 
-protected:
-    std::unique_ptr<PlanYieldPolicySBE> makeYieldPolicy() {
-        return PlanYieldPolicySBE::make(
-            operationContext(),
-            PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-            operationContext()->getServiceContext()->getFastClockSource(),
-            0,
-            Milliseconds::zero());
-    }
-
 private:
-    class MockYieldable : public Yieldable {
-        bool yieldable() const override {
-            return true;
-        }
-        void yield() const override {}
-        void restore() const override {}
-    };
-
-    MockYieldable _yieldable;
-    bool _enableYield;
     std::unique_ptr<PlanYieldPolicySBE> _yieldPolicy;
     std::unique_ptr<value::SlotIdGenerator> _slotIdGenerator;
     std::unique_ptr<value::SpoolIdGenerator> _spoolIdGenerator;

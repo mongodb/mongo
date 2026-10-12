@@ -33,8 +33,12 @@ using namespace std::literals::string_view_literals;
  * This class is declared as a friend of OperationMemoryUsageTracker so it can access private
  * fields. As a result, it needs to be in the mongo namespace.
  */
-class RunAggregateTest : service_context_test::WithSetupTransportLayer,
-                         public DBCommandTestFixture {
+class RunAggregateTest : public DBCommandTestFixture {
+public:
+    bool shouldSetupTransportLayer() const override {
+        return true;
+    }
+
 protected:
     void setUp() override {
         DBCommandTestFixture::setUp();

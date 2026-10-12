@@ -179,10 +179,12 @@ public:
 
 class MechanismRegistryTest : public ServiceContextTest {
 public:
-    MechanismRegistryTest()
-        : opCtx(makeOperationContext()),
-          // By default the registry is initialized with all mechanisms enabled.
-          registry(opCtx->getService(), {"FOO", "BAR", "InternalAuth"}) {
+    void setUp() override {
+        ServiceContextTest::setUp();
+        opCtx = makeOperationContext();
+        // By default the registry is initialized with all mechanisms enabled.
+        registry.emplace(opCtx->getService(),
+                         std::vector<std::string>{"FOO", "BAR", "InternalAuth"});
 
         auto globalAuthzManagerFactory = std::make_unique<AuthorizationManagerFactoryMock>();
         AuthorizationManager::set(getService(),
@@ -234,54 +236,55 @@ public:
 
     BSONObj getMechsFor(const UserName user) {
         BSONObjBuilder builder;
-        registry.advertiseMechanismNamesForUser(opCtx.get(), user, &builder);
+        registry->advertiseMechanismNamesForUser(opCtx.get(), user, &builder);
         return builder.obj();
     }
 
     ServiceContext::UniqueOperationContext opCtx;
-    auth::AuthorizationBackendMock* authzBackend;
+    auth::AuthorizationBackendMock* authzBackend = nullptr;
 
-    SASLServerMechanismRegistry registry;
+    // Needs the Service, so it cannot be built before setUp() has run.
+    boost::optional<SASLServerMechanismRegistry> registry;
 
     const UserName internalSajack = {"sajack"sv, "test"sv};
     const UserName externalSajack = {"sajack"sv, DatabaseName::kExternal.db(omitTenant)};
 };
 
 TEST_F(MechanismRegistryTest, acquireInternalMechanism) {
-    registry.registerFactory<FooMechanismFactory<true>>(
+    registry->registerFactory<FooMechanismFactory<true>>(
         SASLServerMechanismRegistry::kNoValidateGlobalMechanisms);
 
-    auto swMechanism = registry.getServerMechanism(FooPolicy::getName(), "test");
+    auto swMechanism = registry->getServerMechanism(FooPolicy::getName(), "test");
     ASSERT_OK(swMechanism.getStatus());
 }
 
 TEST_F(MechanismRegistryTest, cantAcquireInternalMechanismOnExternal) {
-    registry.registerFactory<FooMechanismFactory<true>>(
+    registry->registerFactory<FooMechanismFactory<true>>(
         SASLServerMechanismRegistry::kNoValidateGlobalMechanisms);
 
-    auto swMechanism = registry.getServerMechanism(FooPolicy::getName(), "$external");
+    auto swMechanism = registry->getServerMechanism(FooPolicy::getName(), "$external");
     ASSERT_NOT_OK(swMechanism.getStatus());
 }
 
 TEST_F(MechanismRegistryTest, acquireExternalMechanism) {
-    registry.registerFactory<FooMechanismFactory<false>>(
+    registry->registerFactory<FooMechanismFactory<false>>(
         SASLServerMechanismRegistry::kNoValidateGlobalMechanisms);
 
-    auto swMechanism = registry.getServerMechanism(FooPolicy::getName(), "$external");
+    auto swMechanism = registry->getServerMechanism(FooPolicy::getName(), "$external");
     ASSERT_OK(swMechanism.getStatus());
 }
 
 TEST_F(MechanismRegistryTest, cantAcquireExternalMechanismOnInternal) {
-    registry.registerFactory<FooMechanismFactory<false>>(
+    registry->registerFactory<FooMechanismFactory<false>>(
         SASLServerMechanismRegistry::kNoValidateGlobalMechanisms);
 
-    auto swMechanism = registry.getServerMechanism(FooPolicy::getName(), "test");
+    auto swMechanism = registry->getServerMechanism(FooPolicy::getName(), "test");
     ASSERT_NOT_OK(swMechanism.getStatus());
 }
 
 
 TEST_F(MechanismRegistryTest, invalidUserCantAdvertiseMechs) {
-    registry.registerFactory<FooMechanismFactory<true>>(
+    registry->registerFactory<FooMechanismFactory<true>>(
         SASLServerMechanismRegistry::kNoValidateGlobalMechanisms);
 
     // Unknown users now return the server's enabled mechanisms so the client can select one
@@ -292,9 +295,9 @@ TEST_F(MechanismRegistryTest, invalidUserCantAdvertiseMechs) {
 }
 
 TEST_F(MechanismRegistryTest, strongMechCanAdvertise) {
-    registry.registerFactory<BarMechanismFactory<true>>(
+    registry->registerFactory<BarMechanismFactory<true>>(
         SASLServerMechanismRegistry::kNoValidateGlobalMechanisms);
-    registry.registerFactory<BarMechanismFactory<false>>(
+    registry->registerFactory<BarMechanismFactory<false>>(
         SASLServerMechanismRegistry::kNoValidateGlobalMechanisms);
 
     ASSERT_BSONOBJ_EQ(BSON("saslSupportedMechs" << BSON_ARRAY("BAR")), getMechsFor(internalSajack));
@@ -302,48 +305,48 @@ TEST_F(MechanismRegistryTest, strongMechCanAdvertise) {
 }
 
 TEST_F(MechanismRegistryTest, weakMechCannotAdvertiseOnInternal) {
-    registry.registerFactory<FooMechanismFactory<true>>(
+    registry->registerFactory<FooMechanismFactory<true>>(
         SASLServerMechanismRegistry::kNoValidateGlobalMechanisms);
 
     ASSERT_BSONOBJ_EQ(BSON("saslSupportedMechs" << BSONArray()), getMechsFor(internalSajack));
 }
 
 TEST_F(MechanismRegistryTest, weakMechCanAdvertiseOnExternal) {
-    registry.registerFactory<FooMechanismFactory<false>>(
+    registry->registerFactory<FooMechanismFactory<false>>(
         SASLServerMechanismRegistry::kNoValidateGlobalMechanisms);
 
     ASSERT_BSONOBJ_EQ(BSON("saslSupportedMechs" << BSON_ARRAY("FOO")), getMechsFor(externalSajack));
 }
 
 TEST_F(MechanismRegistryTest, internalAuth) {
-    registry.setEnabledMechanisms({"BAR"});
+    registry->setEnabledMechanisms({"BAR"});
 
-    registry.registerFactory<BarMechanismFactory<true>>(
+    registry->registerFactory<BarMechanismFactory<true>>(
         SASLServerMechanismRegistry::kValidateGlobalMechanisms);
-    registry.registerFactory<InternalAuthMechanismFactory>(
+    registry->registerFactory<InternalAuthMechanismFactory>(
         SASLServerMechanismRegistry::kValidateGlobalMechanisms);
 
     ASSERT_BSONOBJ_EQ(BSON("saslSupportedMechs" << BSON_ARRAY("BAR")), getMechsFor(internalSajack));
     ASSERT_BSONOBJ_EQ(BSON("saslSupportedMechs" << BSON_ARRAY("InternalAuth" << "BAR")),
                       getMechsFor((*internalSecurity.getUser())->getName()));
 
-    registry.setEnabledMechanisms({"BAR", "InternalAuth"});
+    registry->setEnabledMechanisms({"BAR", "InternalAuth"});
     ASSERT_BSONOBJ_EQ(BSON("saslSupportedMechs" << BSON_ARRAY("InternalAuth" << "BAR")),
                       getMechsFor(internalSajack));
 }
 
 TEST_F(MechanismRegistryTest, internalAuthMechRegisteredEvenWhenExcludedFromConfig) {
-    registry.setEnabledMechanisms({"BAR"});
+    registry->setEnabledMechanisms({"BAR"});
 
-    registry.registerFactory<InternalAuthMechanismFactory>(
+    registry->registerFactory<InternalAuthMechanismFactory>(
         SASLServerMechanismRegistry::kValidateGlobalMechanisms);
 
-    ASSERT_OK(registry.getServerMechanism(InternalAuthPolicy::getName(), "test").getStatus());
+    ASSERT_OK(registry->getServerMechanism(InternalAuthPolicy::getName(), "test").getStatus());
 
-    registry.registerFactory<FooMechanismFactory<true>>(
+    registry->registerFactory<FooMechanismFactory<true>>(
         SASLServerMechanismRegistry::kValidateGlobalMechanisms);
     ASSERT_EQ(ErrorCodes::MechanismUnavailable,
-              registry.getServerMechanism(FooPolicy::getName(), "test").getStatus().code());
+              registry->getServerMechanism(FooPolicy::getName(), "test").getStatus().code());
 }
 
 }  // namespace

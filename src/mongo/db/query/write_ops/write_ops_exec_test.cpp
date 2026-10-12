@@ -665,8 +665,11 @@ public:
 
 class WriteOpsExecOplogTest : public CatalogTestFixture {
 public:
-    explicit WriteOpsExecOplogTest(Options options = {})
-        : CatalogTestFixture(options.useReplSettings(true)) {}
+    explicit WriteOpsExecOplogTest(Options options = {}) : _options(std::move(options)) {}
+
+    Options makeServiceContextOptions() override {
+        return std::move(_options).useReplSettings(true);
+    }
 
 protected:
     void setUp() override {
@@ -678,6 +681,7 @@ protected:
         opObserverRegistry->addObserver(std::move(opObserverMock));
     }
 
+    Options _options;
     OpObserverMock* _opObserverMock;
 };
 

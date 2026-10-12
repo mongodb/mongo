@@ -58,7 +58,8 @@ public:
 
 class DocumentSourceOutTest : public AggregationContextFixture {
 public:
-    DocumentSourceOutTest() : AggregationContextFixture() {
+    void setUp() override {
+        AggregationContextFixture::setUp();
         getExpCtx()->setMongoProcessInterface(std::make_shared<MongoProcessInterfaceForTest>());
     }
 

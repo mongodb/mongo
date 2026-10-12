@@ -75,6 +75,10 @@ namespace {
 
 class ReshardingOplogSessionApplicationTest : public ServiceContextMongoDTest {
 public:
+    boost::optional<ClusterRole> getClusterRoleOverride() const override {
+        return ClusterRole{ClusterRole::ShardServer};
+    }
+
     void setUp() override {
         ServiceContextMongoDTest::setUp();
 
@@ -431,8 +435,6 @@ private:
     const ShardId _donorShardId{"donor-0"};
     const NamespaceString _oplogBufferNss = NamespaceString::createNamespaceString_forTest(
         std::string(NamespaceString::kReshardingLocalOplogBufferPrefix) + _donorShardId.toString());
-
-    service_context_test::ShardRoleOverride _shardRole;
 };
 
 TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteForNewSession) {

@@ -62,8 +62,7 @@ namespace mongo {
 /**
  * Test fixture which is useful to both the tests for AsyncResultsMerger and BlockingResultsMerger.
  */
-class ResultsMergerTestFixture : public virtual service_context_test::RouterRoleOverride,
-                                 public ShardingTestFixture {
+class ResultsMergerTestFixture : public ShardingTestFixture {
 public:
     static const HostAndPort kTestConfigShardHost;
     static const std::vector<ShardId> kTestShardIds;
@@ -72,6 +71,10 @@ public:
     static const NamespaceString kTestNss;
 
     ResultsMergerTestFixture() = default;
+
+    boost::optional<ClusterRole> getClusterRoleOverride() const override {
+        return ClusterRole{ClusterRole::RouterServer};
+    }
 
     void setUp() override;
 

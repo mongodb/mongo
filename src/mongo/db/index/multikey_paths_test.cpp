@@ -54,11 +54,10 @@ const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
  */
 class MultikeyPathsTest : public ServiceContextMongoDTest {
 public:
-    MultikeyPathsTest()
-        : _nss(NamespaceString::createNamespaceString_forTest("unittests.multikey_paths")) {}
-
     void setUp() final {
         ServiceContextMongoDTest::setUp();
+        _opCtx = cc().makeOperationContext();
+
         AutoGetCollection autoColl(_opCtx.get(), _nss, MODE_IX);
         auto db = autoColl.ensureDbExists(_opCtx.get());
 
@@ -111,8 +110,9 @@ public:
     }
 
 protected:
-    const ServiceContext::UniqueOperationContext _opCtx = cc().makeOperationContext();
-    const NamespaceString _nss;
+    ServiceContext::UniqueOperationContext _opCtx;
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest("unittests.multikey_paths");
 
 private:
     std::string dumpMultikeyPaths(const MultikeyPaths& multikeyPaths) {

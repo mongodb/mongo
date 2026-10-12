@@ -74,8 +74,10 @@ class PlanExecutorImplOplogScanNoCollectionTest : public ServiceContextMongoDTes
 // always reports a time well past the configured 1ms timeout by the time the yield callback runs.
 class PlanExecutorImplOplogScanWithCollectionTest : public CatalogTestFixture {
 public:
-    PlanExecutorImplOplogScanWithCollectionTest()
-        : CatalogTestFixture(Options{}.useMockClock(true, Milliseconds{5000})) {}
+    Options makeServiceContextOptions() override {
+        return CatalogTestFixture::makeServiceContextOptions().useMockClock(true,
+                                                                            Milliseconds{5000});
+    }
 
     void setUp() override {
         CatalogTestFixture::setUp();
@@ -314,8 +316,10 @@ TEST_F(PlanExecutorImplOplogScanWithCollectionTest,
 // response deadline type checks.
 class PlanExecutorImplOplogScanLogInfoTest : public CatalogTestFixture {
 public:
-    PlanExecutorImplOplogScanLogInfoTest()
-        : CatalogTestFixture(Options{}.useMockClock(true, Milliseconds{100000})) {}
+    Options makeServiceContextOptions() override {
+        return CatalogTestFixture::makeServiceContextOptions().useMockClock(true,
+                                                                            Milliseconds{100000});
+    }
 
     void setUp() override {
         CatalogTestFixture::setUp();

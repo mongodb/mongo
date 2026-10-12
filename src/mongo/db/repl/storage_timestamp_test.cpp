@@ -248,9 +248,13 @@ public:
     repl::ReplicationCoordinatorMock* _coordinatorMock;
     repl::ReplicationConsistencyMarkers* _consistencyMarkers;
 
-    StorageTimestampTest()
-        : ServiceContextMongoDTest(Options{}.useReplSettings(true).useMockClock(true)) {
-        // Set up mongod.
+    Options makeServiceContextOptions() override {
+        return ServiceContextMongoDTest::makeServiceContextOptions()
+            .useReplSettings(true)
+            .useMockClock(true);
+    }
+
+    void setUp() override {
         ServiceContextMongoDTest::setUp();
 
         _opCtxRaii = cc().makeOperationContext();
@@ -2636,119 +2640,105 @@ TEST_F(StorageTimestampTest, SetMinValidAppliedThrough) {
  * timestamping `dropDatabase` side-effects no longer applies. The purpose of this test is to
  * exercise the `StorageEngine::dropDatabase` method.
  */
-class KVDropDatabase : public StorageTimestampTest {
-private:
-    void TestBody() override {
-        // Not actually called.
-    }
+class KVDropDatabaseTest : public StorageTimestampTest, public testing::WithParamInterface<bool> {};
 
-public:
-    void run(bool simulatePrimary) {
-        auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
-        auto mdbCatalog = storageEngine->getMDBCatalog();
 
-        // Declare the database to be in a "synced" state, i.e: in steady-state replication.
-        Timestamp syncTime = _clock->tickClusterTime(1).asTimestamp();
-        invariant(!syncTime.isNull());
-        storageEngine->setInitialDataTimestamp(syncTime);
+TEST_P(KVDropDatabaseTest, Primary) {
+    bool simulatePrimary = GetParam();
+    auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
+    auto mdbCatalog = storageEngine->getMDBCatalog();
 
-        // This test drops collections piece-wise instead of having the "drop database" algorithm
-        // perform this walk. Defensively operate on a separate DB from the other tests to ensure
-        // no leftover collections carry-over.
-        const NamespaceString nss =
-            NamespaceString::createNamespaceString_forTest("unittestsDropDB.kvDropDatabase");
-        const NamespaceString sysProfile =
-            NamespaceString::createNamespaceString_forTest("unittestsDropDB.system.profile");
+    // Declare the database to be in a "synced" state, i.e: in steady-state replication.
+    Timestamp syncTime = _clock->tickClusterTime(1).asTimestamp();
+    invariant(!syncTime.isNull());
+    storageEngine->setInitialDataTimestamp(syncTime);
 
-        std::string collIdent;
-        std::string indexIdent;
-        std::string sysProfileIdent;
-        // `*.system.profile` does not have an `_id` index. Just create it to abide by the API. This
-        // value will be the empty string. Helper methods accommodate this.
-        std::string sysProfileIndexIdent;
-        for (auto& tuple : {std::tie(nss, collIdent, indexIdent),
-                            std::tie(sysProfile, sysProfileIdent, sysProfileIndexIdent)}) {
-            auto collAcq = acquireCollection(_opCtx,
-                                             CollectionAcquisitionRequest::fromOpCtx(
-                                                 _opCtx, nss, AcquisitionPrerequisites::kWrite),
-                                             MODE_X);
-            ;
+    // This test drops collections piece-wise instead of having the "drop database" algorithm
+    // perform this walk. Defensively operate on a separate DB from the other tests to ensure
+    // no leftover collections carry-over.
+    const NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest("unittestsDropDB.kvDropDatabase");
+    const NamespaceString sysProfile =
+        NamespaceString::createNamespaceString_forTest("unittestsDropDB.system.profile");
 
-            // Save the pre-state idents so we can capture the specific idents related to collection
-            // creation.
-            std::vector<std::string> origIdents = mdbCatalog->getAllIdents(_opCtx);
-            const auto& nss = std::get<0>(tuple);
+    std::string collIdent;
+    std::string indexIdent;
+    std::string sysProfileIdent;
+    // `*.system.profile` does not have an `_id` index. Just create it to abide by the API. This
+    // value will be the empty string. Helper methods accommodate this.
+    std::string sysProfileIndexIdent;
+    for (auto& tuple : {std::tie(nss, collIdent, indexIdent),
+                        std::tie(sysProfile, sysProfileIdent, sysProfileIndexIdent)}) {
+        auto collAcq = acquireCollection(
+            _opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_X);
+        ;
 
-            // Non-replicated namespaces are wrapped in an unreplicated writes block. This has the
-            // side-effect of not timestamping the collection creation.
-            repl::UnreplicatedWritesBlock notReplicated(_opCtx);
-            if (nss.isReplicated()) {
-                TimestampBlock tsBlock(_opCtx, _clock->tickClusterTime(1).asTimestamp());
-                create(nss);
-            } else {
-                create(nss);
-            }
+        // Save the pre-state idents so we can capture the specific idents related to collection
+        // creation.
+        std::vector<std::string> origIdents = mdbCatalog->getAllIdents(_opCtx);
+        const auto& nss = std::get<0>(tuple);
 
-            // Bind the local values to the variables in the parent scope.
-            auto& collIdent = std::get<1>(tuple);
-            auto& indexIdent = std::get<2>(tuple);
-            std::tie(collIdent, indexIdent) = getNewCollectionIndexIdent(mdbCatalog, origIdents);
-        }
-
-        {
-            // Drop/rename `kvDropDatabase`. `system.profile` does not get dropped/renamed.
-            auto coll = acquireCollection(_opCtx,
-                                          CollectionAcquisitionRequest::fromOpCtx(
-                                              _opCtx, nss, AcquisitionPrerequisites::kWrite),
-                                          LockMode::MODE_X);
-            WriteUnitOfWork wuow(_opCtx);
-            Database* db = DatabaseHolder::get(_opCtx)->getDb(_opCtx, nss.dbName());
-            ASSERT_OK(db->dropCollection(_opCtx, nss));
-            wuow.commit();
-        }
-
-        // Reserve a tick, this represents a time after the rename in which the `kvDropDatabase`
-        // ident for `kvDropDatabase` still exists.
-        const Timestamp postRenameTime = _clock->tickClusterTime(1).asTimestamp();
-
-        // Because the storage engine is managing drops internally, the ident should not be visible
-        // after a drop.
-        assertIdentsMissingAtTimestamp(mdbCatalog, collIdent, indexIdent, postRenameTime);
-
-        const Timestamp dropTime = _clock->tickClusterTime(1).asTimestamp();
-        if (simulatePrimary) {
-            ASSERT_OK(dropDatabaseForApplyOps(_opCtx, nss.dbName()));
+        // Non-replicated namespaces are wrapped in an unreplicated writes block. This has the
+        // side-effect of not timestamping the collection creation.
+        repl::UnreplicatedWritesBlock notReplicated(_opCtx);
+        if (nss.isReplicated()) {
+            TimestampBlock tsBlock(_opCtx, _clock->tickClusterTime(1).asTimestamp());
+            create(nss);
         } else {
-            repl::UnreplicatedWritesBlock uwb(_opCtx);
-            TimestampBlock ts(_opCtx, dropTime);
-            ASSERT_OK(dropDatabaseForApplyOps(_opCtx, nss.dbName()));
+            create(nss);
         }
 
-        // Assert that the idents do not exist.
-        assertIdentsMissingAtTimestamp(
-            mdbCatalog, sysProfileIdent, sysProfileIndexIdent, Timestamp::max());
-        assertIdentsMissingAtTimestamp(mdbCatalog, collIdent, indexIdent, Timestamp::max());
-
-        // dropDatabase must not timestamp the final write. The collection and index should seem
-        // to have never existed.
-        assertIdentsMissingAtTimestamp(mdbCatalog, collIdent, indexIdent, syncTime);
-
-        // Reset initial data timestamp to avoid unintended storage engine timestamp side effects.
-        storageEngine->setInitialDataTimestamp(Timestamp(0, 0));
+        // Bind the local values to the variables in the parent scope.
+        auto& collIdent = std::get<1>(tuple);
+        auto& indexIdent = std::get<2>(tuple);
+        std::tie(collIdent, indexIdent) = getNewCollectionIndexIdent(mdbCatalog, origIdents);
     }
-};
 
-TEST(SimpleStorageTimestampTest, KVDropDatabasePrimary) {
     {
-        KVDropDatabase test;
-        test.run(true);
+        // Drop/rename `kvDropDatabase`. `system.profile` does not get dropped/renamed.
+        auto coll = acquireCollection(
+            _opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
+            LockMode::MODE_X);
+        WriteUnitOfWork wuow(_opCtx);
+        Database* db = DatabaseHolder::get(_opCtx)->getDb(_opCtx, nss.dbName());
+        ASSERT_OK(db->dropCollection(_opCtx, nss));
+        wuow.commit();
     }
-    // Reconstruct the datafiles from scratch across tests.
-    {
-        KVDropDatabase test;
-        test.run(false);
+
+    // Reserve a tick, this represents a time after the rename in which the `kvDropDatabase`
+    // ident for `kvDropDatabase` still exists.
+    const Timestamp postRenameTime = _clock->tickClusterTime(1).asTimestamp();
+
+    // Because the storage engine is managing drops internally, the ident should not be visible
+    // after a drop.
+    assertIdentsMissingAtTimestamp(mdbCatalog, collIdent, indexIdent, postRenameTime);
+
+    const Timestamp dropTime = _clock->tickClusterTime(1).asTimestamp();
+    if (simulatePrimary) {
+        ASSERT_OK(dropDatabaseForApplyOps(_opCtx, nss.dbName()));
+    } else {
+        repl::UnreplicatedWritesBlock uwb(_opCtx);
+        TimestampBlock ts(_opCtx, dropTime);
+        ASSERT_OK(dropDatabaseForApplyOps(_opCtx, nss.dbName()));
     }
+
+    // Assert that the idents do not exist.
+    assertIdentsMissingAtTimestamp(
+        mdbCatalog, sysProfileIdent, sysProfileIndexIdent, Timestamp::max());
+    assertIdentsMissingAtTimestamp(mdbCatalog, collIdent, indexIdent, Timestamp::max());
+
+    // dropDatabase must not timestamp the final write. The collection and index should seem
+    // to have never existed.
+    assertIdentsMissingAtTimestamp(mdbCatalog, collIdent, indexIdent, syncTime);
+
+    // Reset initial data timestamp to avoid unintended storage engine timestamp side effects.
+    storageEngine->setInitialDataTimestamp(Timestamp(0, 0));
 }
+
+INSTANTIATE_TEST_SUITE_P(, KVDropDatabaseTest, testing::Bool());
 
 /**
  * This test asserts that the catalog updates that represent the beginning and end of an index
@@ -3952,7 +3942,11 @@ public:
 
     RetryableFindAndModifyTest()
         : nss(NamespaceString::createNamespaceString_forTest(dbName,
-                                                             "retryableFindAndModifyTest")) {
+                                                             "retryableFindAndModifyTest")) {}
+
+    void setUp() override {
+        StorageTimestampTest::setUp();
+
         auto service = _opCtx->getServiceContext();
         auto sessionCatalog = SessionCatalog::get(service);
         sessionCatalog->reset_forTest();
@@ -4188,7 +4182,11 @@ public:
 
     MultiDocumentTransactionTest()
         : nss(NamespaceString::createNamespaceString_forTest(dbName,
-                                                             "multiDocumentTransactionTest")) {
+                                                             "multiDocumentTransactionTest")) {}
+
+    void setUp() override {
+        StorageTimestampTest::setUp();
+
         auto service = _opCtx->getServiceContext();
         auto sessionCatalog = SessionCatalog::get(service);
         sessionCatalog->reset_forTest();
@@ -4961,7 +4959,11 @@ public:
 class GetOldestActiveTimestampTest : public StorageTimestampTest {
 public:
     GetOldestActiveTimestampTest()
-        : configTxnsNss(NamespaceString::kSessionTransactionsTableNamespace) {
+        : configTxnsNss(NamespaceString::kSessionTransactionsTableNamespace) {}
+
+    void setUp() override {
+        StorageTimestampTest::setUp();
+
         // Create config.transactions collection
         ASSERT_OK(repl::StorageInterface::get(_opCtx)->dropCollection(_opCtx, configTxnsNss));
         ASSERT_OK(createCollection(

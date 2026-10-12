@@ -113,13 +113,14 @@ void addWCError(BatchedCommandResponse* response) {
 
 class WriteOpTestFixture : public ServiceContextTest {
 protected:
-    WriteOpTestFixture() {
+    void setUp() override {
+        ServiceContextTest::setUp();
         _opCtxHolder = makeOperationContext();
         _opCtx = _opCtxHolder.get();
     }
 
     ServiceContext::UniqueOperationContext _opCtxHolder;
-    OperationContext* _opCtx;
+    OperationContext* _opCtx = nullptr;
 };
 
 using BatchWriteOpTest = WriteOpTestFixture;

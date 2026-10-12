@@ -41,6 +41,11 @@ const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test
 
 class QueryPlannerParamsTest : public ServiceContextTest {
 protected:
+    void setUp() override {
+        ServiceContextTest::setUp();
+        _opCtx = makeOperationContext();
+    }
+
     /**
      * Utility functions to create a CanonicalQuery
      */
@@ -102,7 +107,7 @@ protected:
         }
     }
 
-    ServiceContext::UniqueOperationContext _opCtx{makeOperationContext()};
+    ServiceContext::UniqueOperationContext _opCtx;
 };
 
 /**

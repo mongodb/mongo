@@ -31,17 +31,13 @@ PseudoRandom _random{SecureRandom().nextInt64()};
 
 class TimeseriesCatalogHelperTest : public CatalogTestFixture {
 public:
-    TimeseriesCatalogHelperTest() : CatalogTestFixture(Options{}.forceDisableTableLogging()) {
+    TimeseriesCatalogHelperTest() {
         _tsOptions.setTimeField("timeField");
         _tsOptions.setMetaField(boost::make_optional<std::string>("metaField"));
     }
 
-    void setUp() override {
-        CatalogTestFixture::setUp();
-    }
-
-    void tearDown() override {
-        CatalogTestFixture::tearDown();
+    Options makeServiceContextOptions() override {
+        return CatalogTestFixture::makeServiceContextOptions().forceDisableTableLogging();
     }
 
     NamespaceString _mainNss = NamespaceString::createNamespaceString_forTest("db1", "coll");

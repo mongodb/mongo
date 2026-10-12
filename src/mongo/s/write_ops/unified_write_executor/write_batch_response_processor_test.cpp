@@ -34,13 +34,14 @@ public:
     using RemoteCommandResponse = executor::RemoteCommandResponse;
     using Response = ShardResponse;
 
-    WriteBatchResponseProcessorTest() {
+    void setUp() override {
+        ServiceContextTest::setUp();
         opCtxHolder = makeOperationContext();
         opCtx = opCtxHolder.get();
     }
 
     ServiceContext::UniqueOperationContext opCtxHolder;
-    OperationContext* opCtx;
+    OperationContext* opCtx = nullptr;
 
     const NamespaceString nss1 = NamespaceString::createNamespaceString_forTest("test", "coll");
     const NamespaceString nss2 = NamespaceString::createNamespaceString_forTest("test", "coll2");

@@ -22,8 +22,11 @@ namespace {
 
 class WindowFunctionIntegralTest : public AggregationContextFixture {
 public:
-    WindowFunctionIntegralTest()
-        : expCtx(getExpCtx()), integral(std::make_unique<WindowFunctionIntegral>(expCtx.get())) {}
+    void setUp() override {
+        AggregationContextFixture::setUp();
+        expCtx = getExpCtx();
+        integral = std::make_unique<WindowFunctionIntegral>(expCtx.get());
+    }
 
     void addValuesToWindow(const std::vector<Value>& values) {
         for (const auto& val : values)

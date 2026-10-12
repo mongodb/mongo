@@ -400,8 +400,13 @@ void assertTxnMetadata(BSONObj obj,
     }
 }
 
-class TxnAPITest : service_context_test::WithSetupTransportLayer,
-                   public SharedClockSourceAdapterServiceContextTest {
+class TxnAPITest : public SharedClockSourceAdapterServiceContextTest {
+public:
+    bool shouldSetupTransportLayer() const override {
+        return true;
+    }
+
+private:
     explicit TxnAPITest(std::shared_ptr<ClockSourceMock> mockClock)
         : SharedClockSourceAdapterServiceContextTest(mockClock), _mockClock(std::move(mockClock)) {}
 

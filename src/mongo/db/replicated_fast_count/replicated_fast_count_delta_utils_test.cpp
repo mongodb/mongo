@@ -36,9 +36,10 @@ using namespace std::literals::string_view_literals;
 
 class ReadAndIncrementSizeCountsTest : public CatalogTestFixture {
 public:
-    ReadAndIncrementSizeCountsTest()
-        : CatalogTestFixture(Options().setPersistenceProvider(
-              std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>())) {}
+    Options makeServiceContextOptions() override {
+        return CatalogTestFixture::makeServiceContextOptions().setPersistenceProvider(
+            std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>());
+    }
 
 protected:
     void setUp() override {
@@ -733,9 +734,10 @@ TEST_F(ExtractReplicatedMetadataTest, ExtractSizeCountDeltaOnNonEligibleNssWitho
 
 class ExtractSizeCountDeltaForApplyOpsTest : public CatalogTestFixture {
 public:
-    ExtractSizeCountDeltaForApplyOpsTest()
-        : CatalogTestFixture(Options().setPersistenceProvider(
-              std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>())) {}
+    Options makeServiceContextOptions() override {
+        return CatalogTestFixture::makeServiceContextOptions().setPersistenceProvider(
+            std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>());
+    }
 
 protected:
     void setUp() override {

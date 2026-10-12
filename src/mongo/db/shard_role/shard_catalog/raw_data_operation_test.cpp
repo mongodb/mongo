@@ -11,8 +11,14 @@ namespace {
 
 class RawDataOperationTest : public ServiceContextTest {
 public:
-    ServiceContext::UniqueOperationContext opCtxHolder{makeOperationContext()};
-    OperationContext* opCtx{opCtxHolder.get()};
+    void setUp() override {
+        ServiceContextTest::setUp();
+        opCtxHolder = makeOperationContext();
+        opCtx = opCtxHolder.get();
+    }
+
+    ServiceContext::UniqueOperationContext opCtxHolder;
+    OperationContext* opCtx = nullptr;
 };
 
 TEST_F(RawDataOperationTest, ScopedGuardSetsAndRestoresValue) {

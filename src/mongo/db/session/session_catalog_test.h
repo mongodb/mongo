@@ -37,8 +37,14 @@ protected:
 
 class SessionCatalogTestWithDefaultOpCtx : public SessionCatalogTest {
 protected:
-    const ServiceContext::UniqueOperationContext _uniqueOpCtx = makeOperationContext();
-    OperationContext* const _opCtx = _uniqueOpCtx.get();
+    void setUp() override {
+        SessionCatalogTest::setUp();
+        _uniqueOpCtx = makeOperationContext();
+        _opCtx = _uniqueOpCtx.get();
+    }
+
+    ServiceContext::UniqueOperationContext _uniqueOpCtx;
+    OperationContext* _opCtx = nullptr;
 };
 
 // When this class is in scope, makes the system behave as if we're in a DBDirectClient

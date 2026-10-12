@@ -150,6 +150,10 @@ protected:
         }
     }
 
+    bool catalogClientUsesNetworkForGetAllShards() const override {
+        return false;
+    }
+
     std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient() override {
 
         class StaticCatalogClient final : public ShardingCatalogClientMock {
@@ -161,10 +165,12 @@ protected:
                                                                   BSONObj filter) override {
                 std::vector<ShardType> shardTypes;
                 for (const auto& shardId : _shardIds) {
-                    const ConnectionString cs = ConnectionString::forReplicaSet(
-                        shardId.toString(), {makeHostAndPort(shardId)});
+                    // Standalone (not replica-set) connection string, to match the plain
+                    // HostAndPort targeters that addRemoteShards() configures for these same
+                    // shardIds via RemoteCommandTargeterMock.
+                    const ConnectionString cs = ConnectionString(makeHostAndPort(shardId));
                     ShardType sType;
-                    sType.setName(cs.getSetName());
+                    sType.setName(shardId.toString());
                     sType.setHost(cs.toString());
                     shardTypes.push_back(std::move(sType));
                 };

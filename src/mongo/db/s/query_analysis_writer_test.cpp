@@ -187,8 +187,11 @@ struct SampledDiff {
     BSONObj diff;
 };
 
-struct QueryAnalysisWriterTest : service_context_test::WithSetupTransportLayer,
-                                 public ShardServerTestFixture {
+struct QueryAnalysisWriterTest : public ShardServerTestFixture {
+    bool shouldSetupTransportLayer() const override {
+        return true;
+    }
+
 public:
     void setUp() override {
         ShardServerTestFixture::setUp();
@@ -2037,10 +2040,6 @@ protected:
         _installTicketingSystem();
         ASSERT_OK(admission::execution_control::TicketingSystem::get(getServiceContext())
                       ->setDeprioritizationGate(true));
-    }
-
-    void tearDown() override {
-        QueryAnalysisWriterTest::tearDown();
     }
 
     int64_t getLowPriorityWriteNewAdmissions() const {

@@ -1353,9 +1353,12 @@ TEST_F(CollectionShardingRuntimeTestWithMockedLoader, CriticalSectionMetricsRepo
 /**
  * Fixture for when range deletion functionality is required in CollectionShardingRuntime tests.
  */
-class CollectionShardingRuntimeWithRangeDeleterTest : service_context_test::WithSetupTransportLayer,
-                                                      public CollectionShardingRuntimeTest {
+class CollectionShardingRuntimeWithRangeDeleterTest : public CollectionShardingRuntimeTest {
 public:
+    bool shouldSetupTransportLayer() const override {
+        return true;
+    }
+
     void setUp() override {
         CollectionShardingRuntimeTest::setUp();
         WaitForMajorityService::get(getServiceContext()).startup(getServiceContext());
@@ -1592,10 +1595,6 @@ TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,
 class CollectionShardingRuntimeWithCatalogTest
     : public CollectionShardingRuntimeWithRangeDeleterTest {
 public:
-    void setUp() override {
-        CollectionShardingRuntimeWithRangeDeleterTest::setUp();
-    }
-
     void tearDown() override {
         OpObserver::Times::get(operationContext()).reservedOpTimes.clear();
         CollectionShardingRuntimeWithRangeDeleterTest::tearDown();

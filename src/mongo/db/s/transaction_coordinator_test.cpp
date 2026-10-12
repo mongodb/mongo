@@ -255,10 +255,6 @@ protected:
         _aws.emplace(getServiceContext());
     }
 
-    void tearDown() override {
-        TransactionCoordinatorTestBase::tearDown();
-    }
-
     boost::optional<txn::AsyncWorkScheduler> _aws;
 };
 
@@ -1619,9 +1615,9 @@ protected:
               Options{}.useMockClock(true).useMockTickSource<Microseconds>(true)) {}
 
     void setUp() override {
-        tickSource()->reset(1);
-
         TransactionCoordinatorTestBase::setUp();
+
+        tickSource()->reset(1);
     }
 
     ServerTransactionCoordinatorsMetrics* metrics() {

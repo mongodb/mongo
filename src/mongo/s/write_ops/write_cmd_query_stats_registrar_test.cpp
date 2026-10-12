@@ -30,7 +30,8 @@ public:
     const NamespaceString nss1 = NamespaceString::createNamespaceString_forTest("test", "coll1");
     const std::set<NamespaceString> nssIsViewfulTimeseries{nss1};
 
-    WriteCmdQueryStatsRegistrarTest() {
+    void setUp() override {
+        ServiceContextTest::setUp();
         opCtxHolder = makeOperationContext();
         opCtx = opCtxHolder.get();
 
@@ -51,7 +52,7 @@ public:
     }
 
     ServiceContext::UniqueOperationContext opCtxHolder;
-    OperationContext* opCtx;
+    OperationContext* opCtx = nullptr;
 };
 
 /**

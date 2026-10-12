@@ -39,9 +39,7 @@ namespace mongo {
 
 using executor::NetworkTestEnv;
 
-ShardingTestFixtureCommon::ShardingTestFixtureCommon(
-    std::unique_ptr<ScopedGlobalServiceContextForTest> scopedGlobalContext)
-    : ServiceContextTest(std::move(scopedGlobalContext)) {}
+ShardingTestFixtureCommon::ShardingTestFixtureCommon() {}
 
 ShardingTestFixtureCommon::~ShardingTestFixtureCommon() {
     invariant(!_opCtxHolder,
@@ -210,36 +208,43 @@ void ShardingTestFixtureCommon::addRemoteShards(
 
     auto future = launchAsync([this] { shardRegistry()->reload(operationContext()); });
 
-    onFindWithMetadataCommand([this, &shards](const executor::RemoteCommandRequest& request) {
-        const NamespaceString nss = NamespaceString::createNamespaceString_forTest(
-            request.dbname, request.cmdObj.firstElement().String());
-        ASSERT_EQ(nss, NamespaceString::kConfigsvrShardsNamespace);
+    // shardRegistry()->reload() only goes over the (mocked) network if this fixture's
+    // ShardingCatalogClient does; fixtures that override makeShardingCatalogClient() to answer
+    // getAllShards() synchronously in-process (as e.g. AppendRawResponsesTest does) never issue a
+    // "find" command at all, and the reload resolves on its own.
+    if (catalogClientUsesNetworkForGetAllShards()) {
+        onFindWithMetadataCommand([this, &shards](const executor::RemoteCommandRequest& request) {
+            const NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+                request.dbname, request.cmdObj.firstElement().String());
+            ASSERT_EQ(nss, NamespaceString::kConfigsvrShardsNamespace);
 
-        // If there is no '$db', append it.
-        auto cmd = static_cast<OpMsgRequest>(request).body;
-        auto query = query_request_helper::makeFromFindCommandForTests(cmd, nss);
+            // If there is no '$db', append it.
+            auto cmd = static_cast<OpMsgRequest>(request).body;
+            auto query = query_request_helper::makeFromFindCommandForTests(cmd, nss);
 
-        ASSERT_EQ(query->getNamespaceOrUUID().nss(), NamespaceString::kConfigsvrShardsNamespace);
-        ASSERT_BSONOBJ_EQ(query->getFilter(), BSONObj());
-        ASSERT_BSONOBJ_EQ(query->getSort(), BSONObj());
-        ASSERT_FALSE(query->getLimit().has_value());
+            ASSERT_EQ(query->getNamespaceOrUUID().nss(),
+                      NamespaceString::kConfigsvrShardsNamespace);
+            ASSERT_BSONOBJ_EQ(query->getFilter(), BSONObj());
+            ASSERT_BSONOBJ_EQ(query->getSort(), BSONObj());
+            ASSERT_FALSE(query->getLimit().has_value());
 
-        std::vector<BSONObj> shardsToReturn;
+            std::vector<BSONObj> shardsToReturn;
 
-        Timestamp maxTopologyTime;
-        std::transform(shards.begin(),
-                       shards.end(),
-                       std::back_inserter(shardsToReturn),
-                       [&maxTopologyTime](const ShardType& shard) {
-                           maxTopologyTime = std::max(shard.getTopologyTime(), maxTopologyTime);
-                           return shard.toBSON();
-                       });
+            Timestamp maxTopologyTime;
+            std::transform(shards.begin(),
+                           shards.end(),
+                           std::back_inserter(shardsToReturn),
+                           [&maxTopologyTime](const ShardType& shard) {
+                               maxTopologyTime = std::max(shard.getTopologyTime(), maxTopologyTime);
+                               return shard.toBSON();
+                           });
 
-        BSONObjBuilder bob;
-        bob.append(VectorClock::kTopologyTimeFieldName, maxTopologyTime);
+            BSONObjBuilder bob;
+            bob.append(VectorClock::kTopologyTimeFieldName, maxTopologyTime);
 
-        return std::make_tuple(shardsToReturn, bob.obj());
-    });
+            return std::make_tuple(shardsToReturn, bob.obj());
+        });
+    }
 
     future.default_timed_get();
 }

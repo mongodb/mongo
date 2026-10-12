@@ -204,9 +204,12 @@ BSONObj expectInsertsReturnCannotRefreshErrorsBase(const NamespaceString& nss,
  * Mimics a single shard backend for a particular collection which can be initialized with a
  * set of write command results to return.
  */
-class BatchWriteExecTest : public virtual service_context_test::RouterRoleOverride,
-                           public ShardingTestFixture {
+class BatchWriteExecTest : public ShardingTestFixture {
 public:
+    boost::optional<ClusterRole> getClusterRoleOverride() const override {
+        return ClusterRole{ClusterRole::RouterServer};
+    }
+
     BatchWriteExecTest() = default;
     ~BatchWriteExecTest() override = default;
 

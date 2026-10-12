@@ -20,10 +20,11 @@ class IsReplicatedFastCountEnabledTest : public CatalogTestFixture {};
 
 class IsReplicatedFastCountEnabledWithProviderTest : public CatalogTestFixture {
 public:
-    IsReplicatedFastCountEnabledWithProviderTest()
-        : CatalogTestFixture(Options().setPersistenceProvider(
-              std::make_unique<replicated_fast_count::test_helpers::
-                                   ReplicatedFastCountTestPersistenceProvider>())) {}
+    Options makeServiceContextOptions() override {
+        return CatalogTestFixture::makeServiceContextOptions().setPersistenceProvider(
+            std::make_unique<
+                replicated_fast_count::test_helpers::ReplicatedFastCountTestPersistenceProvider>());
+    }
 };
 
 TEST_F(IsReplicatedFastCountEnabledTest, DisabledWhenFeatureFlagOff) {
@@ -178,13 +179,15 @@ class ShouldReadFromReplicatedFastCountTestWithParams
     : public CatalogTestFixture,
       public ::testing::WithParamInterface<ShouldReadFromReplicatedFastCountParams> {
 public:
-    ShouldReadFromReplicatedFastCountTestWithParams()
-        : CatalogTestFixture(
-              GetParam().hasProvider
-                  ? Options().setPersistenceProvider(
-                        std::make_unique<replicated_fast_count::test_helpers::
-                                             ReplicatedFastCountTestPersistenceProvider>())
-                  : Options()) {}
+    Options makeServiceContextOptions() override {
+        auto options = CatalogTestFixture::makeServiceContextOptions();
+        if (GetParam().hasProvider) {
+            return std::move(options).setPersistenceProvider(
+                std::make_unique<replicated_fast_count::test_helpers::
+                                     ReplicatedFastCountTestPersistenceProvider>());
+        }
+        return options;
+    }
 };
 
 TEST_P(ShouldReadFromReplicatedFastCountTestWithParams, ShouldReadFromReplicatedFastCount) {
@@ -290,10 +293,11 @@ INSTANTIATE_TEST_SUITE_P(
 
 class ShouldReadFromReplicatedFastCountOfflineValidateTest : public CatalogTestFixture {
 public:
-    ShouldReadFromReplicatedFastCountOfflineValidateTest()
-        : CatalogTestFixture(Options().setPersistenceProvider(
-              std::make_unique<replicated_fast_count::test_helpers::
-                                   ReplicatedFastCountTestPersistenceProvider>())) {}
+    Options makeServiceContextOptions() override {
+        return CatalogTestFixture::makeServiceContextOptions().setPersistenceProvider(
+            std::make_unique<
+                replicated_fast_count::test_helpers::ReplicatedFastCountTestPersistenceProvider>());
+    }
 
     void setUp() override {
         CatalogTestFixture::setUp();

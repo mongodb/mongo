@@ -46,8 +46,12 @@
 namespace mongo {
 
 // Must exist in the mongo namespace to be a friend class of the TTLMonitor.
-class TTLTest : public service_context_test::WithSetupTransportLayer,
-                public ServiceContextMongoDTest {
+class TTLTest : public ServiceContextMongoDTest {
+public:
+    bool shouldSetupTransportLayer() const override {
+        return true;
+    }
+
 protected:
     void setUp() override {
         ServiceContextMongoDTest::setUp();
@@ -71,10 +75,6 @@ protected:
         ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
 
         indexbuildentryhelpers::ensureIndexBuildEntriesNamespaceExists(_opCtx.get());
-    }
-
-    void tearDown() override {
-        ServiceContextMongoDTest::tearDown();
     }
 
     OperationContext* opCtx() {

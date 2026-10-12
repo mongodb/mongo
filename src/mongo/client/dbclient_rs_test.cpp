@@ -59,8 +59,12 @@ BSONObj makeMetadata(ReadPreference rp, TagSet tagSet) {
 /**
  * Ensures a global ServiceContext exists.
  */
-class DBClientRSTest : service_context_test::WithSetupTransportLayer, public ServiceContextTest {
+class DBClientRSTest : public ServiceContextTest {
 public:
+    bool shouldSetupTransportLayer() const override {
+        return true;
+    }
+
     ClockSource* clock() {
         return _clkSource.get();
     }

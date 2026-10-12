@@ -47,8 +47,7 @@ public:
     static constexpr Microseconds kExecutorPoolDrainTimeout = Seconds{30};
 
 protected:
-    explicit ShardingTestFixtureCommon(
-        std::unique_ptr<ScopedGlobalServiceContextForTest> scopedGlobalContext);
+    ShardingTestFixtureCommon();
     ~ShardingTestFixtureCommon() override;
 
     void setUp() override;
@@ -117,6 +116,17 @@ protected:
 
     virtual std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient() {
         return nullptr;
+    }
+
+    /**
+     * Whether the ShardingCatalogClient returned by makeShardingCatalogClient() answers
+     * getAllShards() by issuing a (mocked) network request, as the real implementation does.
+     * Override to return false if makeShardingCatalogClient() returns a fake/static client that
+     * answers synchronously in-process instead, so addRemoteShards() knows not to wait for a
+     * network request that will never arrive.
+     */
+    virtual bool catalogClientUsesNetworkForGetAllShards() const {
+        return true;
     }
 
     /**

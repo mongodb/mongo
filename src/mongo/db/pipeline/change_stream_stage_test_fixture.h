@@ -43,14 +43,19 @@ public:
     ChangeStreamStageTestNoSetup();
     explicit ChangeStreamStageTestNoSetup(NamespaceString nsString);
 
+    std::unique_ptr<ScopedGlobalServiceContextForTest> makeScopedServiceContext() override;
+
+    void setUp() override;
+
 private:
     // Register v2 reader prerequisites that drive '_determineChangeStreamReaderVersion' to v1
     // (kNotAvailable mirrors the production fallback when shard placement info is missing). Tests
     // that exercise v2 override these via their own scoped guards.
-    ScopedChangeStreamReaderBuilderMock _readerBuilder{
-        std::make_unique<ChangeStreamReaderBuilderMock>()};
-    ScopedDataToShardsAllocationQueryServiceMock _queryService{
-        AllocationToShardsStatus::kNotAvailable};
+    //
+    // Both guards reach the ServiceContext from their own constructors, so they are built in
+    // setUp() rather than as default member initializers.
+    boost::optional<ScopedChangeStreamReaderBuilderMock> _readerBuilder;
+    boost::optional<ScopedDataToShardsAllocationQueryServiceMock> _queryService;
 };
 
 struct ChangeStreamMockMongoInterface final : public ExecutableStubMongoProcessInterface {
@@ -95,6 +100,8 @@ public:
     ChangeStreamStageTest();
 
     explicit ChangeStreamStageTest(NamespaceString nsString);
+
+    void setUp() override;
 
     void checkTransformation(const repl::OplogEntry& entry,
                              const boost::optional<Document>& expectedDoc,
@@ -188,6 +195,11 @@ public:
      */
     void assertStagesNameOrder(std::unique_ptr<Pipeline> pipeline,
                                const std::vector<std::string>& expectedStages);
+
+private:
+    // Only the default constructor wants the UUID initialized on the ExpressionContext; the
+    // explicit-namespace overload does not.
+    bool _initUUID = true;
 };
 
 }  // namespace mongo

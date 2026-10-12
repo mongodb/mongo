@@ -31,8 +31,11 @@ const int64_t kDefaultMaxBatchTimeMillis = 1000;
 class DbCheckTest : public CatalogTestFixture {
 public:
     DbCheckTest(Options options = {}, CollectionOptions collectionOptions = {})
-        : CatalogTestFixture(std::move(options)),
-          _collectionOptions(std::move(collectionOptions)) {}
+        : _options(std::move(options)), _collectionOptions(std::move(collectionOptions)) {}
+
+    Options makeServiceContextOptions() override {
+        return std::move(_options);
+    }
 
     void setUp() override;
 
@@ -123,6 +126,7 @@ public:
     int getNumDocsFoundInHealthLog(OperationContext* opCtx, const BSONObj& query);
 
 protected:
+    Options _options;
     CollectionOptions _collectionOptions;
 };
 

@@ -31,6 +31,10 @@ protected:
 
     void setUp() override;
 
+    boost::optional<ClusterRole> getClusterRoleOverride() const override {
+        return ClusterRole{ClusterRole::ShardServer};
+    }
+
     std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient() override;
 
     /**
@@ -50,6 +54,11 @@ protected:
      */
     void setCatalogCache(std::unique_ptr<CatalogCache> cache);
 
+    virtual std::unique_ptr<CatalogCache> makeCatalogCache(
+        ServiceContext* service, std::shared_ptr<ConfigServerCatalogCacheLoader> loader) {
+        return std::make_unique<CatalogCache>(service, std::move(loader));
+    }
+
     /**
      * Returns the mock targeter for the config server. Useful to use like so,
      *
@@ -63,8 +72,6 @@ protected:
 
     const HostAndPort kConfigHostAndPort{"dummy", 123};
     ShardId kMyShardName{"myShardName"};
-
-    service_context_test::ShardRoleOverride _shardRole;
 
     std::shared_ptr<ConfigServerCatalogCacheLoader> _configServerCatalogCacheLoader;
     std::shared_ptr<ShardServerCatalogCacheLoader> _shardServerCatalogCacheLoader;
@@ -80,6 +87,8 @@ public:
 
 protected:
     void setUp() override;
+    std::unique_ptr<CatalogCache> makeCatalogCache(
+        ServiceContext* service, std::shared_ptr<ConfigServerCatalogCacheLoader> loader) override;
     CatalogCacheMock* getCatalogCacheMock();
     std::shared_ptr<ConfigServerCatalogCacheLoaderMock> getConfigServerCatalogCacheLoaderMock();
 };

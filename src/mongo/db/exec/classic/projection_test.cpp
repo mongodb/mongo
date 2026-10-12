@@ -95,9 +95,11 @@ REGISTER_TEST_EXPRESSION(_testProjectionTrackerObserver,
 
 class ProjectionStageTest : public ServiceContextMongoDTest {
 public:
-    ProjectionStageTest()
-        : _opCtx{makeOperationContext()},
-          _expCtx{ExpressionContextBuilder{}.opCtx(_opCtx.get()).ns(kNss).build()} {}
+    void setUp() override {
+        ServiceContextMongoDTest::setUp();
+        _opCtx = makeOperationContext();
+        _expCtx = ExpressionContextBuilder{}.opCtx(_opCtx.get()).ns(kNss).build();
+    }
 
     /**
      * Builds a ProjectionStageDefault for 'projSpec' over a single input document, runs it to EOF,

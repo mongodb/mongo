@@ -33,6 +33,8 @@ class DBDirectClientTest : public ServiceContextMongoDTest {
 protected:
     void setUp() override {
         ServiceContextMongoDTest::setUp();
+        _uniqueOpCtx = makeOperationContext();
+        _opCtx = _uniqueOpCtx.get();
         const auto service = getServiceContext();
         auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(service);
         ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
@@ -41,8 +43,8 @@ protected:
         repl::createOplog(_opCtx);
     }
 
-    ServiceContext::UniqueOperationContext _uniqueOpCtx{makeOperationContext()};
-    OperationContext* _opCtx{_uniqueOpCtx.get()};
+    ServiceContext::UniqueOperationContext _uniqueOpCtx;
+    OperationContext* _opCtx{nullptr};
 };
 
 // Test that DBDirectClient is prevented from auth

@@ -114,7 +114,10 @@ protected:
 
 class ProduceUpsertDocumentTest : public ServiceContextTest {
 protected:
-    ProduceUpsertDocumentTest() = default;
+    void setUp() override {
+        ServiceContextTest::setUp();
+        _opCtx = makeOperationContext();
+    }
 
     NamespaceString ns() const {
         return NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
@@ -124,7 +127,7 @@ protected:
         return _opCtx.get();
     }
 
-    ServiceContext::UniqueOperationContext _opCtx{makeOperationContext()};
+    ServiceContext::UniqueOperationContext _opCtx;
 
 private:
     NamespaceString _ns = NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");

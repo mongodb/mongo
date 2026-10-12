@@ -112,12 +112,19 @@
 namespace mongo {
 namespace {
 
-class ReshardingOplogBatchApplierTest : service_context_test::WithSetupTransportLayer,
-                                        public ServiceContextMongoDTest {
+class ReshardingOplogBatchApplierTest : public ServiceContextMongoDTest {
 public:
     ReshardingOplogBatchApplierTest()
         : ServiceContextMongoDTest(
               Options{}.useMockClock(true).useMockTickSource<Milliseconds>(true)) {}
+
+    bool shouldSetupTransportLayer() const override {
+        return true;
+    }
+
+    boost::optional<ClusterRole> getClusterRoleOverride() const override {
+        return ClusterRole{ClusterRole::ShardServer};
+    }
 
     void setUp() override {
         ServiceContextMongoDTest::setUp();
@@ -525,8 +532,6 @@ private:
         resharding::getLocalConflictStashNamespace(_sourceUUID, _otherDonorId);
     const NamespaceString _myOplogBufferNss =
         resharding::getLocalOplogBufferNamespace(_sourceUUID, _myDonorId);
-
-    service_context_test::ShardRoleOverride _shardRole;
 
     std::unique_ptr<ReshardingMetrics> _metrics;
     std::unique_ptr<ReshardingOplogApplierMetrics> _applierMetrics;

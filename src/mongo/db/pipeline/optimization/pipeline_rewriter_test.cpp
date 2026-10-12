@@ -21,7 +21,8 @@ namespace {
 
 class PipelineRewriteEngineTest : public AggregationContextFixture {
 public:
-    PipelineRewriteEngineTest() {
+    void setUp() override {
+        AggregationContextFixture::setUp();
         registration_detail::clearRulesForTest(getServiceContext());
     }
 };

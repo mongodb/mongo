@@ -26,10 +26,15 @@ class TicketingSystemTest : public ServiceContextTest,
 protected:
     static constexpr int kTickets = 10;
 
-    TicketingSystemTest()
-        : ServiceContextTest(
-              std::make_unique<ScopedGlobalServiceContextForTest>(ServiceContext::make(
-                  nullptr, nullptr, std::make_unique<TickSourceMock<Microseconds>>()))) {
+
+    std::unique_ptr<ScopedGlobalServiceContextForTest> makeScopedServiceContext() override {
+        return std::make_unique<ScopedGlobalServiceContextForTest>(ServiceContext::make(
+            nullptr, nullptr, std::make_unique<TickSourceMock<Microseconds>>()));
+    }
+
+    void setUp() override {
+        ServiceContextTest::setUp();
+        _svcCtx = getServiceContext();
         _svcCtx->setPeriodicRunner(std::make_unique<MockPeriodicRunner>());
         _installTicketingSystem();
     }
@@ -93,7 +98,9 @@ protected:
         }
     }
 
-    ServiceContext* _svcCtx{getServiceContext()};
+    // Assigned in setUp(): a default member initializer would run before the
+    // ServiceContext exists on the deferred-setup path.
+    ServiceContext* _svcCtx = nullptr;
     TicketHolder* _normalRead = nullptr;
     TicketHolder* _normalWrite = nullptr;
     TicketHolder* _lowRead = nullptr;

@@ -32,7 +32,8 @@ static const std::string kCurrentOpDescFieldValue{"query analyzer"};
 
 class QueryAnalysisSampleTrackerTest : public ServiceContextTest {
 protected:
-    QueryAnalysisSampleTrackerTest() {
+    void setUp() override {
+        ServiceContextTest::setUp();
         _opCtxHolder = makeOperationContext();
     }
 

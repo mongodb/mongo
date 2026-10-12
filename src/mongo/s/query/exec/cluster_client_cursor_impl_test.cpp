@@ -80,7 +80,8 @@ private:
 
 class ClusterClientCursorImplTest : public ClockSourceMockServiceContextTest {
 protected:
-    ClusterClientCursorImplTest() {
+    void setUp() override {
+        ClockSourceMockServiceContextTest::setUp();
         _opCtx = makeOperationContext();
     }
 

@@ -422,7 +422,8 @@ namespace index_spec_collation_validate_test {
 
 class IndexSpecCollationValidateTest : public ServiceContextMongoDTest {
 protected:
-    IndexSpecCollationValidateTest() {
+    void setUp() override {
+        ServiceContextMongoDTest::setUp();
         CollatorFactoryInterface::set(getServiceContext(), std::make_unique<CollatorFactoryMock>());
     }
 };

@@ -41,7 +41,10 @@ class SortStageDefaultTest : public ServiceContextMongoDTest {
 public:
     static constexpr uint64_t kMaxMemoryUsageBytes = 1024u * 1024u;
 
-    SortStageDefaultTest() : ServiceContextMongoDTest(Options{}.useMockClock(true)) {
+    SortStageDefaultTest() : ServiceContextMongoDTest(Options{}.useMockClock(true)) {}
+
+    void setUp() override {
+        ServiceContextMongoDTest::setUp();
         _opCtx = makeOperationContext();
         CollatorFactoryInterface::set(getServiceContext(), std::make_unique<CollatorFactoryMock>());
     }

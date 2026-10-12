@@ -53,9 +53,10 @@ SizeCountStore::Entry parseDoc(const BSONObj& doc) {
 
 class SizeCountStoreTest : public CatalogTestFixture {
 public:
-    SizeCountStoreTest()
-        : CatalogTestFixture(Options().setPersistenceProvider(
-              std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>())) {}
+    Options makeServiceContextOptions() override {
+        return CatalogTestFixture::makeServiceContextOptions().setPersistenceProvider(
+            std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>());
+    }
 
 protected:
     void setUp() override {

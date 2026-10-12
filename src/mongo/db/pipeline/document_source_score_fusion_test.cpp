@@ -23,10 +23,13 @@ namespace {
  * This test fixture will provide tests with an ExpressionContext (among other things like
  * OperationContext, etc.) and configure the common feature flags that we need.
  */
-class DocumentSourceScoreFusionTest : service_context_test::WithSetupTransportLayer,
-                                      public AggregationContextFixture {
+class DocumentSourceScoreFusionTest : public AggregationContextFixture {
 public:
     DocumentSourceScoreFusionTest() {}
+
+    bool shouldSetupTransportLayer() const override {
+        return true;
+    }
 
 protected:
     // Mirrors the production code path: lite-parse validation runs before createFromBson.

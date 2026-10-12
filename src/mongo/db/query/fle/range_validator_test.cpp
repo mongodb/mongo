@@ -34,10 +34,6 @@
 namespace mongo::fle {
 class RangeValidatorTest : public ServiceContextTest {
 public:
-    void setUp() override {}
-
-    void tearDown() override {}
-
     RangeValidatorTest() : _expCtx(new ExpressionContextForTest()) {}
 
     boost::intrusive_ptr<ExpressionContextForTest> _expCtx;

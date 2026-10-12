@@ -54,8 +54,12 @@ std::unique_ptr<LiteParsedRankFusion> parseRankFusion(const NamespaceString& nss
     return std::unique_ptr<LiteParsedRankFusion>(rfPtr);
 }
 
-class LiteParsedRankFusionDesugarerTest : public service_context_test::WithSetupTransportLayer,
-                                          public AggregationContextFixture {
+class LiteParsedRankFusionDesugarerTest : public AggregationContextFixture {
+public:
+    bool shouldSetupTransportLayer() const override {
+        return true;
+    }
+
 protected:
     BSONObj desugar(const BSONObj& rankFusionSpecObj) {
         const NamespaceString& nss = getExpCtx()->getNamespaceString();

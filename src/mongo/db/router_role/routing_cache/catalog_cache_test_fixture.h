@@ -35,14 +35,7 @@ namespace mongo {
  */
 class [[MONGO_MOD_NEEDS_REPLACEMENT]] CoreCatalogCacheTestFixture : public ShardingTestFixture {
 protected:
-    CoreCatalogCacheTestFixture()
-        : ShardingTestFixture(false,  // No mock catalog cache
-                              std::make_unique<ScopedGlobalServiceContextForTest>(shouldSetupTL)) {}
-
-    explicit CoreCatalogCacheTestFixture(
-        std::unique_ptr<ScopedGlobalServiceContextForTest> scopedServiceContext)
-        : ShardingTestFixture(false,  // No mock catalog cache
-                              std::move(scopedServiceContext)) {}
+    CoreCatalogCacheTestFixture() : ShardingTestFixture(false /* no mock catalog cache */) {}
 
     void setUp() override;
 
@@ -157,16 +150,20 @@ protected:
     const HostAndPort kConfigHostAndPort{"DummyConfig", 1234};
 };
 
-class [[MONGO_MOD_OPEN]] RouterCatalogCacheTestFixture
-    : public virtual service_context_test::RouterRoleOverride,
-      public CoreCatalogCacheTestFixture {
+class [[MONGO_MOD_OPEN]] RouterCatalogCacheTestFixture : public CoreCatalogCacheTestFixture {
     using CoreCatalogCacheTestFixture::CoreCatalogCacheTestFixture;
+
+    boost::optional<ClusterRole> getClusterRoleOverride() const override {
+        return ClusterRole{ClusterRole::RouterServer};
+    }
 };
 
-class [[MONGO_MOD_OPEN]] ShardCatalogCacheTestFixture
-    : public virtual service_context_test::ShardRoleOverride,
-      public CoreCatalogCacheTestFixture {
+class [[MONGO_MOD_OPEN]] ShardCatalogCacheTestFixture : public CoreCatalogCacheTestFixture {
     using CoreCatalogCacheTestFixture::CoreCatalogCacheTestFixture;
+
+    boost::optional<ClusterRole> getClusterRoleOverride() const override {
+        return ClusterRole{ClusterRole::ShardServer};
+    }
 };
 
 }  // namespace mongo

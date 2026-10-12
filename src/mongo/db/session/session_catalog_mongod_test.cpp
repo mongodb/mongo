@@ -56,6 +56,8 @@ protected:
 
     void setUp() override {
         ServiceContextMongoDTest::setUp();
+        _uniqueOpCtx = makeOperationContext();
+        _opCtx = _uniqueOpCtx.get();
         const auto service = getServiceContext();
         auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(service);
         ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
@@ -68,8 +70,8 @@ protected:
         return dynamic_cast<ClockSourceMock*>(getServiceContext()->getFastClockSource());
     }
 
-    ServiceContext::UniqueOperationContext _uniqueOpCtx{makeOperationContext()};
-    OperationContext* _opCtx{_uniqueOpCtx.get()};
+    ServiceContext::UniqueOperationContext _uniqueOpCtx;
+    OperationContext* _opCtx{nullptr};
 
     std::shared_ptr<MockSessionsCollectionImpl> _collectionMock{
         std::make_shared<MockSessionsCollectionImpl>()};

@@ -238,9 +238,10 @@ using test_helpers::getOplogEntriesMatching;
 
 class CheckpointOplogParsingTest : public CatalogTestFixture {
 public:
-    CheckpointOplogParsingTest()
-        : CatalogTestFixture(Options().setPersistenceProvider(
-              std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>())) {}
+    Options makeServiceContextOptions() override {
+        return CatalogTestFixture::makeServiceContextOptions().setPersistenceProvider(
+            std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>());
+    }
 
 protected:
     void setUp() override {

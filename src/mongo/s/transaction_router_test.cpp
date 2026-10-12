@@ -105,8 +105,12 @@ const BSONObj kNoSuchTransactionResponse =
 const BSONObj kInternalErrorResponse = BSON("ok" << 0 << "code" << ErrorCodes::InternalError);
 const BSONObj kDummyFindCmd = BSON("find" << "dummy");
 
-class TransactionRouterTest : public virtual service_context_test::RouterRoleOverride,
-                              public ShardingTestFixture {
+class TransactionRouterTest : public ShardingTestFixture {
+public:
+    boost::optional<ClusterRole> getClusterRoleOverride() const override {
+        return ClusterRole{ClusterRole::RouterServer};
+    }
+
 protected:
     const LogicalTime kInMemoryLogicalTime = LogicalTime(Timestamp(3, 1));
 
@@ -153,13 +157,15 @@ protected:
         StaleConfigInfo(kViewNss, ShardVersion::UNTRACKED(), boost::none, shard1),
         "The metadata for the collection is not loaded"};
 
-    TransactionRouterTest()
-        : ShardingTestFixture(
-              /*withMockCatalogCache=*/false,
-              std::make_unique<ScopedGlobalServiceContextForTest>(
-                  ServiceContext::make(std::make_unique<ClockSourceMock>(),
-                                       std::make_unique<ClockSourceMock>(),
-                                       std::make_unique<TickSourceMock<Microseconds>>()))) {}
+    TransactionRouterTest() : ShardingTestFixture(/*withMockCatalogCache=*/false) {}
+
+    std::unique_ptr<ScopedGlobalServiceContextForTest> makeScopedServiceContext() override {
+        return std::make_unique<ScopedGlobalServiceContextForTest>(
+            ServiceContext::make(std::make_unique<ClockSourceMock>(),
+                                 std::make_unique<ClockSourceMock>(),
+                                 std::make_unique<TickSourceMock<Microseconds>>()),
+            shouldSetupTransportLayer());
+    }
 
     void setUp() override {
         ShardingTestFixture::setUp();

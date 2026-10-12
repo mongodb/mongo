@@ -51,9 +51,11 @@ using SessionList = std::list<LogicalSessionId>;
  */
 class LogicalSessionCacheTest : public ServiceContextTest {
 public:
-    LogicalSessionCacheTest()
-        : _service(std::make_shared<MockServiceLiaisonImpl>()),
-          _sessions(std::make_shared<MockSessionsCollectionImpl>()) {
+    void setUp() override {
+        ServiceContextTest::setUp();
+
+        _service = std::make_shared<MockServiceLiaisonImpl>();
+        _sessions = std::make_shared<MockSessionsCollectionImpl>();
 
         // Re-initialize the client after setting the AuthorizationManager to get an
         // AuthorizationSession.
@@ -517,9 +519,11 @@ TEST_F(LogicalSessionCacheTest, SessionFailedWithMaxTimeMSIsRetriedWhenJobTimeou
  */
 class LogicalSessionCacheReapTest : public ServiceContextTest {
 public:
-    LogicalSessionCacheReapTest()
-        : _service(std::make_shared<MockServiceLiaisonImpl>()),
-          _sessions(std::make_shared<MockSessionsCollectionImpl>()) {
+    void setUp() override {
+        ServiceContextTest::setUp();
+
+        _service = std::make_shared<MockServiceLiaisonImpl>();
+        _sessions = std::make_shared<MockSessionsCollectionImpl>();
 
         Client::releaseCurrent();
         Client::initThread(getThreadName(), getGlobalServiceContext()->getService());

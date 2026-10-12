@@ -94,6 +94,10 @@ using namespace std::literals::string_view_literals;
 
 class ReshardingOplogCrudApplicationTest : public ServiceContextMongoDTest {
 public:
+    boost::optional<ClusterRole> getClusterRoleOverride() const override {
+        return ClusterRole{ClusterRole::ShardServer};
+    }
+
     void setUp() override {
         ServiceContextMongoDTest::setUp();
 
@@ -398,8 +402,6 @@ private:
         resharding::getLocalConflictStashNamespace(_sourceUUID, _myDonorId);
     const NamespaceString _otherStashNss =
         resharding::getLocalConflictStashNamespace(_sourceUUID, _otherDonorId);
-
-    service_context_test::ShardRoleOverride _shardRole;
 
     std::unique_ptr<ReshardingOplogApplicationRules> _applier;
     std::unique_ptr<ReshardingMetrics> _metrics;

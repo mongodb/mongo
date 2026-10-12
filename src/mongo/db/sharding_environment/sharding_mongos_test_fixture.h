@@ -21,9 +21,11 @@
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source_mock.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/tick_source_mock.h"
 
 #include <memory>
 #include <tuple>
@@ -39,13 +41,21 @@ namespace mongo {
  */
 class ShardingTestFixture : public ShardingTestFixtureCommon {
 protected:
-    ShardingTestFixture();
+    ShardingTestFixture() : ShardingTestFixture(false) {}
     explicit ShardingTestFixture(bool withMockCatalogCache)
-        : ShardingTestFixture{withMockCatalogCache, nullptr} {}
-    ShardingTestFixture(bool withMockCatalogCache,
-                        std::unique_ptr<ScopedGlobalServiceContextForTest> scopedGlobalContext);
+        : _withMockCatalogCache(withMockCatalogCache) {}
 
     ~ShardingTestFixture() override;
+
+    std::unique_ptr<ScopedGlobalServiceContextForTest> makeScopedServiceContext() override {
+        return std::make_unique<ScopedGlobalServiceContextForTest>(
+            ServiceContext::make(std::make_unique<ClockSourceMock>(),
+                                 std::make_unique<ClockSourceMock>(),
+                                 std::make_unique<TickSourceMock<>>()),
+            shouldSetupTransportLayer());
+    }
+
+    void setUp() override;
 
     /**
      * Returns the mock targeter for the config server. Useful to use like so,
@@ -159,6 +169,8 @@ private:
 
     // For the Grid's arbitrary executor in its executorPool.
     std::unique_ptr<executor::NetworkTestEnv> _networkTestEnvForPool;
+
+    bool _withMockCatalogCache;
 };
 
 class ShardingTestFixtureWithMockCatalogCache : public ShardingTestFixture {

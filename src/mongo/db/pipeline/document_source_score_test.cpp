@@ -28,8 +28,12 @@ namespace {
  * This test fixture will provide tests with an ExpressionContext (among other things like
  * OperationContext, etc.) and configure the common feature flags that we need.
  */
-class DocumentSourceScoreTest : service_context_test::WithSetupTransportLayer,
-                                public AggregationContextFixture {};
+class DocumentSourceScoreTest : public AggregationContextFixture {
+public:
+    bool shouldSetupTransportLayer() const override {
+        return true;
+    }
+};
 
 TEST_F(DocumentSourceScoreTest, ErrorsIfNoScoreField) {
     auto spec = fromjson(R"({

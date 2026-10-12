@@ -85,8 +85,16 @@ CollectionAcquisition acquireCollectionForRead(OperationContext* opCtx,
 
 class DurableCatalogTest : public CatalogTestFixture {
 public:
-    explicit DurableCatalogTest(Options options = {}) : CatalogTestFixture(std::move(options)) {}
+    explicit DurableCatalogTest(Options options = {}) : _options(std::move(options)) {}
 
+    Options makeServiceContextOptions() override {
+        return std::move(_options);
+    }
+
+private:
+    Options _options;
+
+public:
     void setUp() override {
         CatalogTestFixture::setUp();
 

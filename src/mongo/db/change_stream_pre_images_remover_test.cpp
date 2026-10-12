@@ -57,7 +57,8 @@ using namespace change_stream_pre_image_test_helper;
 
 class ChangeStreamPreImageExpirationPolicyTest : public ServiceContextTest {
 public:
-    ChangeStreamPreImageExpirationPolicyTest() {
+    void setUp() override {
+        ServiceContextTest::setUp();
         ChangeStreamOptionsManager::create(getServiceContext());
     }
 };
@@ -109,11 +110,8 @@ protected:
     const CollectionTruncateMarkers::MarkersCreationMethod kArbitraryMarkerCreationMethod{
         CollectionTruncateMarkers::MarkersCreationMethod::Scanning};
 
-    PreImagesRemoverTest() : CatalogTestFixture(Options{}.useMockClock(true)) {
-        // Advance the clock to generate valid Timestamp objects. Timestamp objects in this test are
-        // generated with the walltime, and Timestamp uses the higher 32 bits of a Date_t as the
-        // secs part. Timestamps which have secs == 0 are considered null.
-        clockSource()->advance(Milliseconds{int64_t(1) << 32});
+    Options makeServiceContextOptions() override {
+        return CatalogTestFixture::makeServiceContextOptions().useMockClock(true);
     }
 
     ChangeStreamPreImage generatePreImage(
@@ -235,6 +233,12 @@ protected:
 
     void setUp() override {
         CatalogTestFixture::setUp();
+
+        // Advance the clock to generate valid Timestamp objects. Timestamp objects in this test
+        // are generated with the walltime, and Timestamp uses the higher 32 bits of a Date_t as
+        // the secs part. Timestamps which have secs == 0 are considered null.
+        clockSource()->advance(Milliseconds{int64_t(1) << 32});
+
         ChangeStreamOptionsManager::create(getServiceContext());
 
         // Set up OpObserver so that the test will append actual oplog entries to the oplog using
@@ -599,8 +603,12 @@ TEST_F(PreImagesRemoverTest, TruncatesAreOnlyAfterAllDurableLocalTruncates) {
  * Tests the conditions under which the ChangeStreamExpiredPreImagesRemoverService starts
  * periodic pre-image removal.
  */
-class PreImagesRemoverServiceTest : service_context_test::WithSetupTransportLayer,
-                                    public CatalogTestFixture {
+class PreImagesRemoverServiceTest : public CatalogTestFixture {
+public:
+    bool shouldSetupTransportLayer() const override {
+        return true;
+    }
+
 protected:
     void setUp() override {
         CatalogTestFixture::setUp();

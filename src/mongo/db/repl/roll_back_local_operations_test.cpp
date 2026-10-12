@@ -33,6 +33,7 @@
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
 #include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
@@ -60,18 +61,15 @@ OplogInterfaceMock::Operation makeOpAndRecordId(long long seconds,
 }
 
 class RollBackLocalOperationsTest : public ServiceContextMongoDTest {
-protected:
-    const bool shouldCreateRollbackFiles = true;
-    RemoveSaver removeSaver{"rollback", "local.oplog.rs", "removed"};
-
-private:
+public:
     void setUp() override {
         ServiceContextMongoDTest::setUp();
+        removeSaver.emplace("rollback", "local.oplog.rs", "removed");
     }
 
-    void tearDown() override {
-        ServiceContextMongoDTest::tearDown();
-    }
+protected:
+    static const bool shouldCreateRollbackFiles = true;
+    boost::optional<RemoveSaver> removeSaver;
 };
 
 TEST(SimpleRollBackLocalOperationsTest, InvalidLocalOplogIterator) {
@@ -107,7 +105,7 @@ TEST(SimpleRollBackLocalOperationsTest, InvalidRollbackOperationFunction) {
 TEST_F(RollBackLocalOperationsTest, EmptyLocalOplog) {
     OplogInterfaceMock localOplog;
     RollBackLocalOperations finder(localOplog, [](const BSONObj&) { return Status::OK(); });
-    auto result = finder.onRemoteOperation(makeOp(1), removeSaver, shouldCreateRollbackFiles);
+    auto result = finder.onRemoteOperation(makeOp(1), *removeSaver, shouldCreateRollbackFiles);
     ASSERT_EQUALS(ErrorCodes::OplogStartMissing, result.getStatus().code());
 }
 
@@ -129,7 +127,7 @@ TEST_F(RollBackLocalOperationsTest, RollbackMultipleLocalOperations) {
     };
     RollBackLocalOperations finder(localOplog, rollbackOperation);
     auto result =
-        finder.onRemoteOperation(commonOperation.first, removeSaver, shouldCreateRollbackFiles);
+        finder.onRemoteOperation(commonOperation.first, *removeSaver, shouldCreateRollbackFiles);
     ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(OpTime::parseFromOplogEntry(commonOperation.first),
                   result.getValue().getOpTime());
@@ -152,7 +150,7 @@ TEST_F(RollBackLocalOperationsTest, RollbackOperationFailed) {
     };
     RollBackLocalOperations finder(localOplog, rollbackOperation);
     auto result =
-        finder.onRemoteOperation(commonOperation.first, removeSaver, shouldCreateRollbackFiles);
+        finder.onRemoteOperation(commonOperation.first, *removeSaver, shouldCreateRollbackFiles);
     ASSERT_EQUALS(ErrorCodes::OperationFailed, result.getStatus().code());
 }
 TEST_F(RollBackLocalOperationsTest, EndOfLocalOplog) {
@@ -163,7 +161,7 @@ TEST_F(RollBackLocalOperationsTest, EndOfLocalOplog) {
     OplogInterfaceMock localOplog(localOperations);
     RollBackLocalOperations finder(localOplog, [](const BSONObj&) { return Status::OK(); });
     auto result =
-        finder.onRemoteOperation(commonOperation.first, removeSaver, shouldCreateRollbackFiles);
+        finder.onRemoteOperation(commonOperation.first, *removeSaver, shouldCreateRollbackFiles);
     ASSERT_EQUALS(ErrorCodes::NoMatchingDocument, result.getStatus().code());
 }
 
@@ -184,17 +182,17 @@ TEST_F(RollBackLocalOperationsTest, SkipRemoteOperations) {
     };
     RollBackLocalOperations finder(localOplog, rollbackOperation);
     {
-        auto result = finder.onRemoteOperation(makeOp(6), removeSaver, shouldCreateRollbackFiles);
+        auto result = finder.onRemoteOperation(makeOp(6), *removeSaver, shouldCreateRollbackFiles);
         ASSERT_EQUALS(ErrorCodes::NoSuchKey, result.getStatus().code());
         ASSERT_TRUE(i == localOperations.cbegin());
     }
     {
-        auto result = finder.onRemoteOperation(makeOp(3), removeSaver, shouldCreateRollbackFiles);
+        auto result = finder.onRemoteOperation(makeOp(3), *removeSaver, shouldCreateRollbackFiles);
         ASSERT_EQUALS(ErrorCodes::NoSuchKey, result.getStatus().code());
         ASSERT_TRUE(std::distance(localOperations.cbegin(), i) == 2);
     }
     auto result =
-        finder.onRemoteOperation(commonOperation.first, removeSaver, shouldCreateRollbackFiles);
+        finder.onRemoteOperation(commonOperation.first, *removeSaver, shouldCreateRollbackFiles);
     ASSERT_OK(result.getStatus());
     ASSERT_EQUALS(OpTime::parseFromOplogEntry(commonOperation.first),
                   result.getValue().getOpTime());
@@ -216,7 +214,7 @@ TEST_F(RollBackLocalOperationsTest, SameTimestampDifferentTermsRollbackNoSuchKey
         return Status(ErrorCodes::OperationFailed, "");
     };
     RollBackLocalOperations finder(localOplog, rollbackOperation);
-    auto result = finder.onRemoteOperation(makeOp(2, 2), removeSaver, shouldCreateRollbackFiles);
+    auto result = finder.onRemoteOperation(makeOp(2, 2), *removeSaver, shouldCreateRollbackFiles);
     ASSERT_EQUALS(ErrorCodes::NoSuchKey, result.getStatus().code());
 }
 

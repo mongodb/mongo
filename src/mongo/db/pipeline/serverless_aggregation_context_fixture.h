@@ -12,6 +12,8 @@ class ServerlessAggregationContextFixture : public AggregationContextFixture {
 protected:
     ServerlessAggregationContextFixture();
 
+    void setUp() override;
+
     const std::string _targetDb = "test";
     const std::string _targetColl = "target_collection";
 };

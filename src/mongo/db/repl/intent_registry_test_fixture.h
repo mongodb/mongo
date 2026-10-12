@@ -19,13 +19,13 @@ namespace mongo::rss::consensus {
  */
 class IntentRegistryTest : public ServiceContextMongoDTest {
 public:
-    IntentRegistryTest();
-
+    void setUp() override;
     void tearDown() override;
 
 protected:
-    IntentRegistry& _intentRegistry;
     bool containsToken(IntentRegistry::IntentToken token) const;
     size_t getMapSize(IntentRegistry::Intent intent) const;
+
+    IntentRegistry* _intentRegistry = nullptr;
 };
 }  // namespace mongo::rss::consensus

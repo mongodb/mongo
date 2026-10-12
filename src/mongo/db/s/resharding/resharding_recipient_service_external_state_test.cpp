@@ -62,13 +62,14 @@ using namespace std::literals::string_view_literals;
 
 class RecipientServiceExternalStateTest : public ShardCatalogCacheTestFixture {
 protected:
-    RecipientServiceExternalStateTest()
-        : ShardCatalogCacheTestFixture(std::make_unique<MongoDScopedGlobalServiceContextForTest>(
-              MongoDScopedGlobalServiceContextForTest::Options{}
-                  .setCreateShardingState(false)
-                  .useMockClock(true)
-                  .useMockTickSource(true),
-              shouldSetupTL)) {}
+    std::unique_ptr<ScopedGlobalServiceContextForTest> makeScopedServiceContext() override {
+        return std::make_unique<MongoDScopedGlobalServiceContextForTest>(
+            MongoDScopedGlobalServiceContextForTest::Options{}
+                .setCreateShardingState(false)
+                .useMockClock(true)
+                .useMockTickSource(true),
+            shouldSetupTransportLayer());
+    }
 
     void setUp() override {
         ShardCatalogCacheTestFixture::setUp();
@@ -90,10 +91,6 @@ protected:
                 std::make_unique<MongoDSessionCatalogTransactionInterfaceImpl>()));
         auto mongoDSessionCatalog = MongoDSessionCatalog::get(operationContext());
         mongoDSessionCatalog->onStepUp(operationContext());
-    }
-
-    void tearDown() override {
-        ShardCatalogCacheTestFixture::tearDown();
     }
 
     void expectListCollections(const NamespaceString& nss,

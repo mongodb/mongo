@@ -23,13 +23,15 @@ using namespace std::literals::string_view_literals;
  */
 class ServiceLatencyTrackerOtelTest : public ServiceContextTest {
 public:
-    ServiceLatencyTrackerOtelTest()
-        : ServiceContextTest(
-              std::make_unique<ScopedGlobalServiceContextForTest>(/*shouldSetupTL=*/false),
-              transport::MockSession::create(/*tl=*/nullptr)),
-          _opCtx{makeOperationContext()} {}
+    std::shared_ptr<transport::Session> makeSession() override {
+        return transport::MockSession::create(/*transportLayer=*/nullptr);
+    }
 
-    void SetUp() override {
+    // Overriding setUp() rather than gtest's SetUp(): the latter replaces the hook that invokes
+    // setUp(), which is what builds the ServiceContext.
+    void setUp() override {
+        ServiceContextTest::setUp();
+        _opCtx = makeOperationContext();
         if (!_capturer.canReadMetrics())
             GTEST_SKIP() << "OTel metrics reader unavailable";
     }
@@ -132,9 +134,9 @@ TEST_F(ServiceLatencyTrackerOtelTest, DirectClientSkipsRecord) {
  */
 class ServiceLatencyTrackerOtelNonUserTest : public ServiceContextTest {
 public:
-    ServiceLatencyTrackerOtelNonUserTest() : ServiceContextTest(), _opCtx{makeOperationContext()} {}
-
-    void SetUp() override {
+    void setUp() override {
+        ServiceContextTest::setUp();
+        _opCtx = makeOperationContext();
         if (!_capturer.canReadMetrics())
             GTEST_SKIP() << "OTel metrics reader unavailable";
     }

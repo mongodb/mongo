@@ -7,6 +7,7 @@
 #include "mongo/db/auth/authorization_backend_interface.h"
 #include "mongo/db/auth/authorization_manager_factory_mock.h"
 #include "mongo/db/query/query_settings/query_settings_service.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/transport/transport_layer_manager_impl.h"
 #include "mongo/unittest/test_locker_observer.h"
@@ -75,31 +76,51 @@ Service* ScopedGlobalServiceContextForTest::getService() const {
     return getServiceContext()->getService();
 }
 
-ServiceContextTest::ServiceContextTest()
-    : _scopedServiceContext(std::make_unique<ScopedGlobalServiceContextForTest>(shouldSetupTL)),
-      _threadClient(_scopedServiceContext->getService(), nullptr) {}
+ServiceContextTest::ServiceContextTest() = default;
 
-ServiceContextTest::ServiceContextTest(
-    std::unique_ptr<ScopedGlobalServiceContextForTest> scopedServiceContext,
-    std::shared_ptr<transport::Session> session)
-    : _scopedServiceContext(std::move(scopedServiceContext)),
-      _threadClient(_scopedServiceContext->getService(), session) {}
+ServiceContextTest::~ServiceContextTest() {
+    _threadClient.reset();
+    _scopedServiceContext.reset();
+    if (_savedClusterRole) {
+        serverGlobalParams.clusterRole = *_savedClusterRole;
+    }
+}
 
-ServiceContextTest::~ServiceContextTest() = default;
+std::unique_ptr<ScopedGlobalServiceContextForTest> ServiceContextTest::makeScopedServiceContext() {
+    return std::make_unique<ScopedGlobalServiceContextForTest>(shouldSetupTransportLayer());
+}
 
-ClockSourceMockServiceContextTest::ClockSourceMockServiceContextTest()
-    : ServiceContextTest(std::make_unique<ScopedGlobalServiceContextForTest>(
-          ServiceContext::make(std::make_unique<ClockSourceMock>(),
-                               std::make_unique<ClockSourceMock>(),
-                               std::make_unique<TickSourceMock<Milliseconds>>()),
-          shouldSetupTL)) {}
+void ServiceContextTest::setUp() {
+    invariant(!_scopedServiceContext, "ServiceContextTest::setUp() called twice");
+    if (auto role = getClusterRoleOverride()) {
+        _savedClusterRole = std::exchange(serverGlobalParams.clusterRole, *role);
+    }
+    _scopedServiceContext = makeScopedServiceContext();
+    _threadClient.emplace(_scopedServiceContext->getService(), makeSession());
+}
+
+ClockSourceMockServiceContextTest::ClockSourceMockServiceContextTest() = default;
+
+std::unique_ptr<ScopedGlobalServiceContextForTest>
+ClockSourceMockServiceContextTest::makeScopedServiceContext() {
+    return std::make_unique<ScopedGlobalServiceContextForTest>(
+        ServiceContext::make(std::make_unique<ClockSourceMock>(),
+                             std::make_unique<ClockSourceMock>(),
+                             std::make_unique<TickSourceMock<Milliseconds>>()),
+        shouldSetupTransportLayer());
+}
 
 SharedClockSourceAdapterServiceContextTest::SharedClockSourceAdapterServiceContextTest(
     std::shared_ptr<ClockSource> clock)
-    : ServiceContextTest(std::make_unique<ScopedGlobalServiceContextForTest>(
-          ServiceContext::make(std::make_unique<SharedClockSourceAdapter>(clock),
-                               std::make_unique<SharedClockSourceAdapter>(clock),
-                               std::make_unique<TickSourceMock<>>()),
-          shouldSetupTL)) {}
+    : _clock(std::move(clock)) {}
+
+std::unique_ptr<ScopedGlobalServiceContextForTest>
+SharedClockSourceAdapterServiceContextTest::makeScopedServiceContext() {
+    return std::make_unique<ScopedGlobalServiceContextForTest>(
+        ServiceContext::make(std::make_unique<SharedClockSourceAdapter>(_clock),
+                             std::make_unique<SharedClockSourceAdapter>(_clock),
+                             std::make_unique<TickSourceMock<>>()),
+        shouldSetupTransportLayer());
+}
 
 }  // namespace mongo

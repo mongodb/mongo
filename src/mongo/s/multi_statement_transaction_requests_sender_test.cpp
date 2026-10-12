@@ -45,10 +45,12 @@ const HostAndPort kTestRemoteHostAndPort1 = HostAndPort("FakeShard1Host", 12345)
 const ShardId kTestRemoteShardId2 = ShardId("FakeShard2");
 const HostAndPort kTestRemoteHostAndPort2 = HostAndPort("FakeShard2Host", 12345);
 
-class RouterMultiStatementTransactionRequestsSenderTest
-    : public virtual service_context_test::RouterRoleOverride,
-      public ShardingTestFixture {
+class RouterMultiStatementTransactionRequestsSenderTest : public ShardingTestFixture {
 public:
+    boost::optional<ClusterRole> getClusterRoleOverride() const override {
+        return ClusterRole{ClusterRole::RouterServer};
+    }
+
     RouterMultiStatementTransactionRequestsSenderTest() {}
 
     void setUp() override {

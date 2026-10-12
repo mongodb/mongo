@@ -23,10 +23,11 @@ static const NamespaceString kNss = NamespaceString::createNamespaceString_forTe
 
 class OrTest : public ServiceContextMongoDTest {
 public:
-    OrTest()
-        : _opCtx{makeOperationContext()},
-          _expCtx{ExpressionContextBuilder{}.opCtx(_opCtx.get()).ns(kNss).build()},
-          _ws{} {}
+    void setUp() override {
+        ServiceContextMongoDTest::setUp();
+        _opCtx = makeOperationContext();
+        _expCtx = ExpressionContextBuilder{}.opCtx(_opCtx.get()).ns(kNss).build();
+    }
 
     /**
      * Helper to create a QueuedDataStage with the given documents.

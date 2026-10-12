@@ -219,8 +219,11 @@ void ServiceEntryPointShardRoleTest::testCommandMaxTimeMSOpOnly() {
     }
 }
 
-class ServiceEntryPointShardServerTest : public virtual service_context_test::ShardRoleOverride,
-                                         public ServiceEntryPointShardRoleTest {};
+class ServiceEntryPointShardServerTest : public ServiceEntryPointShardRoleTest {
+    boost::optional<ClusterRole> getClusterRoleOverride() const override {
+        return ClusterRole{ClusterRole::ShardServer};
+    }
+};
 
 TEST_F(ServiceEntryPointShardServerTest, TestCommandSucceeds) {
     testCommandSucceeds();
@@ -556,8 +559,11 @@ TEST_F(ServiceEntryPointShardServerTest, IngressSpanHasConsumerKindForMoreToCome
     testIngressSpanHasConsumerKindForMoreToCome();
 }
 
-class ServiceEntryPointReplicaSetTest : public virtual service_context_test::ReplicaSetRoleOverride,
-                                        public ServiceEntryPointShardRoleTest {};
+class ServiceEntryPointReplicaSetTest : public ServiceEntryPointShardRoleTest {
+    boost::optional<ClusterRole> getClusterRoleOverride() const override {
+        return ClusterRole{ClusterRole::None};
+    }
+};
 
 TEST_F(ServiceEntryPointReplicaSetTest, TestCommandSucceeds) {
     testCommandSucceeds();

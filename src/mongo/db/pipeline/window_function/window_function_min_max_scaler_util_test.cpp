@@ -17,7 +17,9 @@ namespace {
 
 class WindowFunctionMinMaxScalerUtilTest : public AggregationContextFixture {
 public:
-    WindowFunctionMinMaxScalerUtilTest() : expCtx(getExpCtx()) {
+    void setUp() override {
+        AggregationContextFixture::setUp();
+        expCtx = getExpCtx();
         auto collator = std::make_unique<CollatorInterfaceMock>(
             CollatorInterfaceMock::MockType::kToLowerString);
         expCtx->setCollator(std::move(collator));

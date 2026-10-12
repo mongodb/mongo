@@ -50,7 +50,12 @@ BSONObj makeCursorResponseObj(CursorId cursorId,
 
 class StorePossibleCursorTest : public ServiceContextTest {
 protected:
-    StorePossibleCursorTest() : _opCtx(makeOperationContext()), _manager(&_clockSourceMock) {}
+    StorePossibleCursorTest() : _manager(&_clockSourceMock) {}
+
+    void setUp() override {
+        ServiceContextTest::setUp();
+        _opCtx = makeOperationContext();
+    }
 
     OperationContext* opCtx() const {
         return _opCtx.get();

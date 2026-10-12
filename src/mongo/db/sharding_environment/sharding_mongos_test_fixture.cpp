@@ -89,18 +89,9 @@ std::shared_ptr<executor::ShardingTaskExecutor> makeShardingTestExecutor(
 
 }  // namespace
 
-ShardingTestFixture::ShardingTestFixture() : ShardingTestFixture(false) {}
+void ShardingTestFixture::setUp() {
+    ShardingTestFixtureCommon::setUp();
 
-ShardingTestFixture::ShardingTestFixture(
-    bool withMockCatalogCache,
-    std::unique_ptr<ScopedGlobalServiceContextForTest> scopedServiceContext)
-    : ShardingTestFixtureCommon(
-          scopedServiceContext ? std::move(scopedServiceContext)
-                               : std::make_unique<ScopedGlobalServiceContextForTest>(
-                                     ServiceContext::make(std::make_unique<ClockSourceMock>(),
-                                                          std::make_unique<ClockSourceMock>(),
-                                                          std::make_unique<TickSourceMock<>>()),
-                                     shouldSetupTL)) {
     const auto service = getServiceContext();
 
     CollatorFactoryInterface::set(service, std::make_unique<CollatorFactoryMock>());
@@ -164,7 +155,7 @@ ShardingTestFixture::ShardingTestFixture(
     executorPool->startup();
 
     auto catalogCache = [&]() -> std::unique_ptr<CatalogCache> {
-        if (withMockCatalogCache) {
+        if (_withMockCatalogCache) {
             return std::make_unique<CatalogCacheMock>(
                 service, std::make_shared<ConfigServerCatalogCacheLoaderMock>());
         } else {
@@ -175,8 +166,7 @@ ShardingTestFixture::ShardingTestFixture(
 
     // For now initialize the global grid object. All sharding objects will be accessible from there
     // until we get rid of it.
-    auto uniqueOpCtx = makeOperationContext();
-    auto const grid = Grid::get(uniqueOpCtx.get());
+    auto const grid = Grid::get(operationContext());
     grid->init(makeShardingCatalogClient(),
                std::move(catalogCache),
                std::move(shardRegistry),
@@ -187,6 +177,9 @@ ShardingTestFixture::ShardingTestFixture(
 }
 
 ShardingTestFixture::~ShardingTestFixture() {
+    if (!hasServiceContext()) {
+        return;
+    }
     if (auto grid = Grid::get(getServiceContext())) {
         shutdownExecutorPool();
         if (grid->shardRegistry()) {

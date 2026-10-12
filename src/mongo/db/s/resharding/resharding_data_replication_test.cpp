@@ -55,9 +55,12 @@
 namespace mongo {
 namespace {
 
-class ReshardingDataReplicationTest : service_context_test::WithSetupTransportLayer,
-                                      public ServiceContextMongoDTest {
+class ReshardingDataReplicationTest : public ServiceContextMongoDTest {
 public:
+    bool shouldSetupTransportLayer() const override {
+        return true;
+    }
+
     void setUp() override {
         ServiceContextMongoDTest::setUp();
 

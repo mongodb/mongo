@@ -25,11 +25,17 @@ using namespace std::literals::string_view_literals;
 
 class RetryStrategyTest : public ServiceContextTest {
 public:
-    RetryStrategyTest()
-        : ServiceContextTest{std::make_unique<ScopedGlobalServiceContextForTest>(
-              ServiceContext::make(std::make_unique<ClockSourceMock>()))},
-          _retryBudget{kReturnRate, kBudgetCapacity},
-          _opCtx{makeOperationContext()} {}
+    RetryStrategyTest() : _retryBudget{kReturnRate, kBudgetCapacity} {}
+
+    std::unique_ptr<ScopedGlobalServiceContextForTest> makeScopedServiceContext() override {
+        return std::make_unique<ScopedGlobalServiceContextForTest>(
+            ServiceContext::make(std::make_unique<ClockSourceMock>()));
+    }
+
+    void setUp() override {
+        ServiceContextTest::setUp();
+        _opCtx = makeOperationContext();
+    }
 
     ClockSourceMock* getClockSource() {
         return static_cast<ClockSourceMock*>(getServiceContext()->getFastClockSource());

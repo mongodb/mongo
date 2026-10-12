@@ -37,7 +37,10 @@ constexpr bool memLeakAllowed = true;
 #endif
 class SpillWiredTigerKVEngineTest : public ServiceContextTest {
 protected:
-    SpillWiredTigerKVEngineTest() : _dbpath("wt_test"), _opCtx(makeOperationContext()) {}
+    void setUp() override {
+        ServiceContextTest::setUp();
+        _opCtx = makeOperationContext();
+    }
 
     std::unique_ptr<SpillWiredTigerKVEngine> makeKvEngine() {
         WiredTigerKVEngineBase::WiredTigerConfig wtConfig =
@@ -60,7 +63,7 @@ protected:
         return kvEngine;
     }
 
-    unittest::TempDir _dbpath;
+    unittest::TempDir _dbpath{"wt_test"};
     ClockSourceMock _clockSource;
     ServiceContext::UniqueOperationContext _opCtx;
 };

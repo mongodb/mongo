@@ -42,10 +42,11 @@ using GraphLookUpTest = AggregationContextFixture;
  */
 class DocumentSourceGraphLookUpSpillingTest : public GraphLookUpTest {
 public:
-    DocumentSourceGraphLookUpSpillingTest()
-        : AggregationContextFixture(std::make_unique<MongoDScopedGlobalServiceContextForTest>(
-              MongoDScopedGlobalServiceContextForTest::Options{}.enableSpillEngine(),
-              shouldSetupTL)) {}
+    std::unique_ptr<ScopedGlobalServiceContextForTest> makeScopedServiceContext() override {
+        return std::make_unique<MongoDScopedGlobalServiceContextForTest>(
+            MongoDScopedGlobalServiceContextForTest::Options{}.enableSpillEngine(),
+            shouldSetupTransportLayer());
+    }
 };
 
 //

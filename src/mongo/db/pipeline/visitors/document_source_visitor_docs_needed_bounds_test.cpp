@@ -30,7 +30,8 @@ namespace mongo {
 using namespace std::literals::string_view_literals;
 class VisitorDocsNeededBoundsTest : public AggregationContextFixture {
 protected:
-    VisitorDocsNeededBoundsTest() {
+    void setUp() override {
+        AggregationContextFixture::setUp();
         // Need to intialize the sharding state so that any pipelines that use $lookup pass pipeline
         // validation.
         ShardingState::create(getServiceContext());

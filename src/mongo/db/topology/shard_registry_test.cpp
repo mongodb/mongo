@@ -9,9 +9,12 @@
 
 namespace mongo {
 
-class ShardRegistryTest : service_context_test::WithSetupTransportLayer,
-                          public ShardingTestFixture {
+class ShardRegistryTest : public ShardingTestFixture {
 protected:
+    bool shouldSetupTransportLayer() const override {
+        return true;
+    }
+
     void setUp() override {
         // Setting the role is important for topologyTime gossiping.
         serverGlobalParams.clusterRole = {ClusterRole::RouterServer};

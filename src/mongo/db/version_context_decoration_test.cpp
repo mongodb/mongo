@@ -16,8 +16,14 @@ static const VersionContext kLastLTSVersionContext{multiversion::GenericFCV::kLa
 
 class VersionContextDecorationTest : public ServiceContextTest {
 public:
-    ServiceContext::UniqueOperationContext opCtxHolder{makeOperationContext()};
-    OperationContext* opCtx{opCtxHolder.get()};
+    void setUp() override {
+        ServiceContextTest::setUp();
+        opCtxHolder = makeOperationContext();
+        opCtx = opCtxHolder.get();
+    }
+
+    ServiceContext::UniqueOperationContext opCtxHolder;
+    OperationContext* opCtx = nullptr;
 };
 
 TEST_F(VersionContextDecorationTest, GetDecorationDefault) {
@@ -163,7 +169,9 @@ public:
         return {std::move(client), std::move(opCtx)};
     }
 
-    VersionContextDrainTest() : _client(makeClient("VersionContextDrainTest")) {
+    void setUp() override {
+        ServiceContextTest::setUp();
+        _client = makeClient("VersionContextDrainTest");
         _uniqueOpCtx = _client->makeOperationContext();
     }
 

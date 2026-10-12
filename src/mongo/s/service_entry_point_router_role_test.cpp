@@ -25,9 +25,27 @@ namespace {
 
 using namespace admission;
 
-class ServiceEntryPointRouterRoleTest : public virtual service_context_test::RouterRoleOverride,
-                                        public ServiceEntryPointTestFixture {
+class TestCmdRouterIngressSubject final : public TestCmdBase {
 public:
+    static constexpr auto kCommandName = "testRouterIngressSubject";
+    TestCmdRouterIngressSubject() : TestCmdBase(kCommandName) {}
+
+    bool isSubjectToIngressAdmissionControl() const override {
+        return true;
+    }
+
+    bool runWithBuilderOnly(BSONObjBuilder&) override {
+        return true;
+    }
+};
+MONGO_REGISTER_COMMAND(TestCmdRouterIngressSubject).testOnly().forRouter();
+
+class ServiceEntryPointRouterRoleTest : public ServiceEntryPointTestFixture {
+public:
+    boost::optional<ClusterRole> getClusterRoleOverride() const override {
+        return ClusterRole{ClusterRole::RouterServer};
+    }
+
     void setUp() override {
         ServiceEntryPointTestFixture::setUp();
         auto routerService = getGlobalServiceContext()->getService();

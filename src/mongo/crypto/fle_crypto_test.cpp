@@ -5357,20 +5357,18 @@ TEST_F(EdgeTestFixture, getEdgesLengthDate) {
     }
 }
 
-class AnchorPaddingFixture : public ServiceContextTest {
-public:
+class AnchorPaddingTest : public ServiceContextTest {};
+
+TEST_F(AnchorPaddingTest, GeneratePaddingDocument) {
     static constexpr auto kAnchorPaddingRootHex =
         "4312890F621FE3CA7497C3405DFD8AAF46A578C77F7404D28C12BA853A4D3327"sv;
+    const AnchorPaddingRootToken rootToken{decodePrf(kAnchorPaddingRootHex)};
+    auto keyToken = AnchorPaddingKeyToken::deriveFrom(rootToken);
+    auto valueToken = AnchorPaddingValueToken::deriveFrom(rootToken);
 
-    const AnchorPaddingRootToken _rootToken{decodePrf(kAnchorPaddingRootHex)};
-    const AnchorPaddingKeyToken _keyToken = AnchorPaddingKeyToken::deriveFrom(_rootToken);
-    const AnchorPaddingValueToken _valueToken = AnchorPaddingValueToken::deriveFrom(_rootToken);
-};
-
-TEST_F(AnchorPaddingFixture, generatePaddingDocument) {
-    constexpr std::uint64_t kId = 42;
+    static constexpr uint64_t kId = 42;
     auto doc =
-        ESCCollectionAnchorPadding::generatePaddingDocument(&hmacCtx, _keyToken, _valueToken, kId);
+        ESCCollectionAnchorPadding::generatePaddingDocument(&hmacCtx, keyToken, valueToken, kId);
     ASSERT_EQ(doc.nFields(), 2UL);
 
     // _id := F_k(bot || id)
@@ -5399,7 +5397,7 @@ TEST_F(AnchorPaddingFixture, generatePaddingDocument) {
         ASSERT_EQ(valueElem.binDataType(), BinDataGeneral);
         int len = 0;
         const char* value = valueElem.binData(len);
-        auto swDecrypt = FLEUtil::decryptData(_valueToken.toCDR(), ConstDataRange(value, len));
+        auto swDecrypt = FLEUtil::decryptData(valueToken.toCDR(), ConstDataRange(value, len));
         ASSERT_OK(swDecrypt.getStatus());
         auto dec = std::move(swDecrypt.getValue());
         ASSERT_TRUE(std::all_of(dec.begin(), dec.end(), [](auto b) { return b == 0; }));

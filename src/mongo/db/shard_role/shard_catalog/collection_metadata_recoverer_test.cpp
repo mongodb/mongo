@@ -32,6 +32,12 @@ const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("tes
 
 class IsRecoveredShardVersionSufficientTest : public ServiceContextTest {
 public:
+    void setUp() override {
+        ServiceContextTest::setUp();
+        opCtxHolder = makeOperationContext();
+        opCtx = opCtxHolder.get();
+    }
+
     bool isSufficient(const ChunkVersion& installedShardVersion,
                       const boost::optional<ChunkVersion>& receivedShardVersion,
                       bool isUnowned = false) {
@@ -39,8 +45,8 @@ public:
             opCtx, kNss, installedShardVersion, isUnowned, receivedShardVersion);
     }
 
-    ServiceContext::UniqueOperationContext opCtxHolder{makeOperationContext()};
-    OperationContext* opCtx{opCtxHolder.get()};
+    ServiceContext::UniqueOperationContext opCtxHolder;
+    OperationContext* opCtx{nullptr};
 
     const OID epoch{OID::gen()};
     const Timestamp timestamp{1, 0};

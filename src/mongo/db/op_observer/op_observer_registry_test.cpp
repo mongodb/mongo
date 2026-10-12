@@ -103,8 +103,14 @@ struct OpObserverRegistryTest : public ServiceContextTest {
     TestObserver* observer2 = unique2.get();
     OpObserverRegistry registry;
 
-    ServiceContext::UniqueOperationContext opCtxHolder{makeOperationContext()};
-    OperationContext* opCtx{opCtxHolder.get()};
+    ServiceContext::UniqueOperationContext opCtxHolder;
+    OperationContext* opCtx = nullptr;
+
+    void setUp() override {
+        ServiceContextTest::setUp();
+        opCtxHolder = makeOperationContext();
+        opCtx = opCtxHolder.get();
+    }
 
     /**
      * The 'op' function calls an observer method on the registry that returns an OpTime.

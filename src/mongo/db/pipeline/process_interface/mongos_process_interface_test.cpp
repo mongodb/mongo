@@ -31,7 +31,8 @@ public:
 
 class MongosProcessInterfaceTest : public AggregationContextFixture {
 public:
-    MongosProcessInterfaceTest() {
+    void setUp() override {
+        AggregationContextFixture::setUp();
         getExpCtx()->setInRouter(true);
         _processInterface = std::make_shared<MongosProcessInterfaceForTest>(nullptr);
         // Set the process interface on expCtx so isExpectedToExecuteQueries() returns true.

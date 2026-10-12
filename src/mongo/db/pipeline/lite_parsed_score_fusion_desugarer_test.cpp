@@ -53,8 +53,12 @@ std::unique_ptr<LiteParsedScoreFusion> parseScoreFusion(const NamespaceString& n
     return std::unique_ptr<LiteParsedScoreFusion>(sfPtr);
 }
 
-class LiteParsedScoreFusionDesugarerTest : public service_context_test::WithSetupTransportLayer,
-                                           public AggregationContextFixture {
+class LiteParsedScoreFusionDesugarerTest : public AggregationContextFixture {
+public:
+    bool shouldSetupTransportLayer() const override {
+        return true;
+    }
+
 protected:
     BSONObj desugarScore(const BSONObj& scoreFusionSpecObj) {
         const NamespaceString& nss = getExpCtx()->getNamespaceString();

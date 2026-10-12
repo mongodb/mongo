@@ -39,9 +39,10 @@ using test_helpers::registerOpObserverForTest;
 
 class ReplicatedFastCountManagerTest : public CatalogTestFixture {
 public:
-    ReplicatedFastCountManagerTest()
-        : CatalogTestFixture(Options().setPersistenceProvider(
-              std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>())) {}
+    Options makeServiceContextOptions() override {
+        return CatalogTestFixture::makeServiceContextOptions().setPersistenceProvider(
+            std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>());
+    }
 
 protected:
     void setUp() override {
@@ -131,9 +132,10 @@ TEST_F(ReplicatedFastCountManagerIdempotenceTest, IdempotentStartupAndShutdown) 
 // initializeContainerStores() calls.
 class ReplicatedFastCountManagerRebindContainerTest : public CatalogTestFixture {
 public:
-    ReplicatedFastCountManagerRebindContainerTest()
-        : CatalogTestFixture(Options().setPersistenceProvider(
-              std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>())) {}
+    Options makeServiceContextOptions() override {
+        return CatalogTestFixture::makeServiceContextOptions().setPersistenceProvider(
+            std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>());
+    }
 
 protected:
     void setUp() override {
@@ -450,9 +452,10 @@ TEST_F(ReplicatedFastCountManagerNoCollectionsTest, InitializeMetadataDoesNothin
 
 class ReplicatedFastCountManagerInitializeMetadataTest : public CatalogTestFixture {
 public:
-    ReplicatedFastCountManagerInitializeMetadataTest()
-        : CatalogTestFixture(Options().setPersistenceProvider(
-              std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>())) {}
+    Options makeServiceContextOptions() override {
+        return CatalogTestFixture::makeServiceContextOptions().setPersistenceProvider(
+            std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>());
+    }
 
 protected:
     void setUp() override {
@@ -774,9 +777,10 @@ TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, InitializeMetadataTrack
 // finalizeMetadataFromInitialSync must read through the bound stores rather than reopen the ident.
 class ReplicatedFastCountManagerFinalizeContainerTest : public CatalogTestFixture {
 public:
-    ReplicatedFastCountManagerFinalizeContainerTest()
-        : CatalogTestFixture(Options().setPersistenceProvider(
-              std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>())) {}
+    Options makeServiceContextOptions() override {
+        return CatalogTestFixture::makeServiceContextOptions().setPersistenceProvider(
+            std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>());
+    }
 
 protected:
     void setUp() override {
@@ -1105,9 +1109,10 @@ TEST_F(ReplicatedFastCountManagerFindPersistedTimestampStoreTsTest, ReturnsPersi
  */
 class ReplicatedFastCountManagerColdBootTest : public CatalogTestFixture {
 public:
-    ReplicatedFastCountManagerColdBootTest()
-        : CatalogTestFixture(Options().setPersistenceProvider(
-              std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>())) {}
+    Options makeServiceContextOptions() override {
+        return CatalogTestFixture::makeServiceContextOptions().setPersistenceProvider(
+            std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>());
+    }
 
 protected:
     void setUp() override {
@@ -1335,9 +1340,10 @@ TEST_F(ReplicatedFastCountManagerInitializeMetadataTest,
 
 class ReplicatedFastCountManagerPopulateFromInitialSyncTest : public CatalogTestFixture {
 public:
-    ReplicatedFastCountManagerPopulateFromInitialSyncTest()
-        : CatalogTestFixture(Options().setPersistenceProvider(
-              std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>())) {}
+    Options makeServiceContextOptions() override {
+        return CatalogTestFixture::makeServiceContextOptions().setPersistenceProvider(
+            std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>());
+    }
 
 protected:
     void setUp() override {

@@ -18,8 +18,12 @@
 namespace mongo {
 namespace {
 
-class LiteParsedScoreFusionTest : public service_context_test::WithSetupTransportLayer,
-                                  public AggregationContextFixture {
+class LiteParsedScoreFusionTest : public AggregationContextFixture {
+public:
+    bool shouldSetupTransportLayer() const override {
+        return true;
+    }
+
 protected:
     std::unique_ptr<Pipeline> makePipelineFromStages(const std::vector<BSONObj>& pipeline) {
         return pipeline_factory::makePipeline(

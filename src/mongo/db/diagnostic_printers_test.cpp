@@ -53,7 +53,8 @@ public:
 
 class DiagnosticPrinterTest : public ServiceContextTest {
 public:
-    DiagnosticPrinterTest() {
+    void setUp() override {
+        ServiceContextTest::setUp();
         _nss = NamespaceString::createNamespaceString_forTest("myDB.myColl");
         _opCtxHolder = makeOperationContext();
         _cmdBson = BSON(kCmdName << kCmdValue << kSensitiveFieldName << kSensitiveValue);

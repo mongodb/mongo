@@ -11,6 +11,7 @@
 
 #include <string_view>
 
+#include <boost/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
@@ -19,106 +20,119 @@ using namespace std::literals::string_view_literals;
 
 class WindowFunctionMinMaxTest : public AggregationContextFixture {
 public:
-    WindowFunctionMinMaxTest() : expCtx(getExpCtx()), min(expCtx.get()), max(expCtx.get()) {
+    void setUp() override {
+        AggregationContextFixture::setUp();
+        expCtx = getExpCtx();
+        _min.emplace(expCtx.get());
+        _max.emplace(expCtx.get());
         auto collator = std::make_unique<CollatorInterfaceMock>(
             CollatorInterfaceMock::MockType::kToLowerString);
         expCtx->setCollator(std::move(collator));
     }
 
+    WindowFunctionMin& min() {
+        return *_min;
+    }
+
+    WindowFunctionMax& max() {
+        return *_max;
+    }
 
     boost::intrusive_ptr<ExpressionContext> expCtx;
-    WindowFunctionMin min;
-    WindowFunctionMax max;
+
+private:
+    boost::optional<WindowFunctionMin> _min;
+    boost::optional<WindowFunctionMax> _max;
 };
 
 TEST_F(WindowFunctionMinMaxTest, EmptyWindow) {
-    ASSERT_VALUE_EQ(min.getValue(), Value{BSONNULL});
+    ASSERT_VALUE_EQ(min().getValue(), Value{BSONNULL});
 
-    ASSERT_VALUE_EQ(max.getValue(), Value{BSONNULL});
+    ASSERT_VALUE_EQ(max().getValue(), Value{BSONNULL});
 }
 
 TEST_F(WindowFunctionMinMaxTest, SingletonWindow) {
-    min.add(Value{5});
-    ASSERT_VALUE_EQ(min.getValue(), Value{5});
+    min().add(Value{5});
+    ASSERT_VALUE_EQ(min().getValue(), Value{5});
 
-    max.add(Value{7});
-    ASSERT_VALUE_EQ(max.getValue(), Value{7});
+    max().add(Value{7});
+    ASSERT_VALUE_EQ(max().getValue(), Value{7});
 }
 
 TEST_F(WindowFunctionMinMaxTest, SmallWindow) {
-    min.add(Value{5});
-    min.add(Value{2});
-    min.add(Value{10});
-    min.add(Value{3});
-    ASSERT_VALUE_EQ(min.getValue(), Value{2});
+    min().add(Value{5});
+    min().add(Value{2});
+    min().add(Value{10});
+    min().add(Value{3});
+    ASSERT_VALUE_EQ(min().getValue(), Value{2});
 
-    max.add(Value{7});
-    max.add(Value{1});
-    max.add(Value{8});
-    max.add(Value{4});
-    ASSERT_VALUE_EQ(max.getValue(), Value{8});
+    max().add(Value{7});
+    max().add(Value{1});
+    max().add(Value{8});
+    max().add(Value{4});
+    ASSERT_VALUE_EQ(max().getValue(), Value{8});
 }
 
 TEST_F(WindowFunctionMinMaxTest, NullsAndMissing) {
-    min.add(Value{2});
+    min().add(Value{2});
 
     // Nulls should be ignored.
-    min.add(Value{BSONNULL});
-    ASSERT_VALUE_EQ(min.getValue(), Value{2});
+    min().add(Value{BSONNULL});
+    ASSERT_VALUE_EQ(min().getValue(), Value{2});
 
     // Missing values should be ignored.
-    min.add(Value());
-    ASSERT_VALUE_EQ(min.getValue(), Value{2});
+    min().add(Value());
+    ASSERT_VALUE_EQ(min().getValue(), Value{2});
 
     // Removal of null/missing values is a no-op.
-    min.remove(Value{BSONNULL});
-    min.remove(Value());
-    ASSERT_VALUE_EQ(min.getValue(), Value{2});
+    min().remove(Value{BSONNULL});
+    min().remove(Value());
+    ASSERT_VALUE_EQ(min().getValue(), Value{2});
 
-    max.add(Value{BSONNULL});
-    max.add(Value{8});
+    max().add(Value{BSONNULL});
+    max().add(Value{8});
 
     // Nulls should be ignored.
-    ASSERT_VALUE_EQ(max.getValue(), Value{8});
+    ASSERT_VALUE_EQ(max().getValue(), Value{8});
 
     // Missing values should be ignored.
-    max.add(Value());
-    ASSERT_VALUE_EQ(max.getValue(), Value{8});
+    max().add(Value());
+    ASSERT_VALUE_EQ(max().getValue(), Value{8});
 
     // Removal of null/missing values is a no-op.
-    max.remove(Value{BSONNULL});
-    max.remove(Value());
-    ASSERT_VALUE_EQ(max.getValue(), Value{8});
+    max().remove(Value{BSONNULL});
+    max().remove(Value());
+    ASSERT_VALUE_EQ(max().getValue(), Value{8});
 }
 
 TEST_F(WindowFunctionMinMaxTest, Removal) {
-    min.add(Value{5});
-    min.add(Value{2});
-    min.add(Value{10});
-    min.add(Value{3});
-    ASSERT_VALUE_EQ(min.getValue(), Value{2});
+    min().add(Value{5});
+    min().add(Value{2});
+    min().add(Value{10});
+    min().add(Value{3});
+    ASSERT_VALUE_EQ(min().getValue(), Value{2});
 
-    min.remove(Value{5});
-    ASSERT_VALUE_EQ(min.getValue(), Value{2});
+    min().remove(Value{5});
+    ASSERT_VALUE_EQ(min().getValue(), Value{2});
 
-    min.remove(Value{2});
-    ASSERT_VALUE_EQ(min.getValue(), Value{3});
+    min().remove(Value{2});
+    ASSERT_VALUE_EQ(min().getValue(), Value{3});
 }
 
 TEST_F(WindowFunctionMinMaxTest, Duplicates) {
-    min.add(Value{2});
-    min.add(Value{2});
-    min.add(Value{99});
-    min.add(Value{77});
-    ASSERT_VALUE_EQ(min.getValue(), Value{2});
+    min().add(Value{2});
+    min().add(Value{2});
+    min().add(Value{99});
+    min().add(Value{77});
+    ASSERT_VALUE_EQ(min().getValue(), Value{2});
 
     // Removing one instance of the min isn't enough.
-    min.remove(Value{2});
-    ASSERT_VALUE_EQ(min.getValue(), Value{2});
+    min().remove(Value{2});
+    ASSERT_VALUE_EQ(min().getValue(), Value{2});
 
     // The min changes only once all instances are removed.
-    min.remove(Value{2});
-    ASSERT_VALUE_EQ(min.getValue(), Value{77});
+    min().remove(Value{2});
+    ASSERT_VALUE_EQ(min().getValue(), Value{77});
 }
 
 TEST_F(WindowFunctionMinMaxTest, Ties) {
@@ -133,33 +147,33 @@ TEST_F(WindowFunctionMinMaxTest, Ties) {
     // but they compare equal according to the ordering.
     ASSERT(expCtx->getValueComparator().evaluate(x == y));
 
-    min.add(x);
-    min.add(y);
-    min.remove(x);
-    ASSERT_VALUE_EQ(min.getValue(), y);
+    min().add(x);
+    min().add(y);
+    min().remove(x);
+    ASSERT_VALUE_EQ(min().getValue(), y);
 
-    max.add(x);
-    max.add(y);
-    max.remove(x);
-    ASSERT_VALUE_EQ(max.getValue(), y);
+    max().add(x);
+    max().add(y);
+    max().remove(x);
+    ASSERT_VALUE_EQ(max().getValue(), y);
 }
 
 TEST_F(WindowFunctionMinMaxTest, TracksMemoryUsageOnAddAndRemove) {
     size_t trackingSize = sizeof(WindowFunctionMin);
-    ASSERT_EQ(min.getApproximateSize(), trackingSize);
+    ASSERT_EQ(min().getApproximateSize(), trackingSize);
 
     auto largeStr = Value{"this is quite a long string"sv};
-    min.add(largeStr);
+    min().add(largeStr);
     trackingSize += largeStr.getApproximateSize();
-    ASSERT_EQ(min.getApproximateSize(), trackingSize);
+    ASSERT_EQ(min().getApproximateSize(), trackingSize);
 
-    min.add(largeStr);
+    min().add(largeStr);
     trackingSize += largeStr.getApproximateSize();
-    ASSERT_EQ(min.getApproximateSize(), trackingSize);
+    ASSERT_EQ(min().getApproximateSize(), trackingSize);
 
-    min.remove(largeStr);
+    min().remove(largeStr);
     trackingSize -= largeStr.getApproximateSize();
-    ASSERT_EQ(min.getApproximateSize(), trackingSize);
+    ASSERT_EQ(min().getApproximateSize(), trackingSize);
 }
 
 }  // namespace

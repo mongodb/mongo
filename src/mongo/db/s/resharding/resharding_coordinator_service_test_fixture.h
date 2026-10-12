@@ -479,9 +479,12 @@ private:
 /**
  * Provenance-agnostic base fixture for reshardingCoordinator tests.
  */
-class ReshardingCoordinatorServiceTestCommon : public service_context_test::WithSetupTransportLayer,
-                                               public ConfigServerTestFixture {
+class ReshardingCoordinatorServiceTestCommon : public ConfigServerTestFixture {
 public:
+    bool shouldSetupTransportLayer() const override {
+        return true;
+    }
+
     using CoordinatorStateTransitionController =
         resharding_service_test_helpers::StateTransitionController<CoordinatorStateEnum>;
     using OpObserverForTest = resharding_service_test_helpers::

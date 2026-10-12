@@ -102,7 +102,10 @@ TEST(IsTransientTransactionErrorTest,
 
 class ErrorLabelBuilderTest : public ServiceContextTest {
 public:
-    ErrorLabelBuilderTest() : _opCtx(makeOperationContext()) {}
+    void setUp() override {
+        ServiceContextTest::setUp();
+        _opCtx = makeOperationContext();
+    }
 
     void setCommand(BSONObj cmdObj) const {
         std::lock_guard<Client> clientLock(*opCtx()->getClient());

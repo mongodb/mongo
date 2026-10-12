@@ -7297,7 +7297,8 @@ TEST_F(PipelineRenameTracking, CanHandleBackAndForthRename) {
 
 class InvolvedNamespacesTest : public AggregationContextFixture {
 protected:
-    InvolvedNamespacesTest() {
+    void setUp() override {
+        AggregationContextFixture::setUp();
         ShardingState::create(getServiceContext());
     }
 };

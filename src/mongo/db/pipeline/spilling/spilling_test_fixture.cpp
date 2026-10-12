@@ -9,12 +9,12 @@
 namespace mongo {
 
 // This fixture tests spilling behavior directly, requiring the spill WiredTiger instance.
-SpillingTestFixture::SpillingTestFixture()
-    : ServiceContextMongoDTest(Options{}.enableSpillEngine()),
-      _opCtx(makeOperationContext()),
-      _expCtx(new ExpressionContextForTest(_opCtx.get(),
-                                           NamespaceString::createNamespaceString_forTest(
-                                               "SpillingTestFixture.SpillingTestFixture"))) {
+void SpillingTestFixture::setUp() {
+    ServiceContextMongoDTest::setUp();
+    _opCtx = makeOperationContext();
+    _expCtx = new ExpressionContextForTest(
+        _opCtx.get(),
+        NamespaceString::createNamespaceString_forTest("SpillingTestFixture.SpillingTestFixture"));
     _expCtx->setMongoProcessInterface(std::make_shared<StandaloneProcessInterface>(nullptr));
 }
 

@@ -13,8 +13,13 @@
 namespace mongo {
 namespace {
 
-class InternalSearchMongotRemoteTest : service_context_test::WithSetupTransportLayer,
-                                       public AggregationContextFixture {
+class InternalSearchMongotRemoteTest : public AggregationContextFixture {
+public:
+    bool shouldSetupTransportLayer() const override {
+        return true;
+    }
+
+private:
     void setUp() override {
         AggregationContextFixture::setUp();
         executor::startupSearchExecutorsIfNeeded(getServiceContext());

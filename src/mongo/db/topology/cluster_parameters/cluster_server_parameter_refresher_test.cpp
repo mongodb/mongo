@@ -20,9 +20,12 @@
 namespace mongo {
 namespace {
 
-class ClusterServerParameterRefresherTest : public virtual service_context_test::RouterRoleOverride,
-                                            public ShardingTestFixture {
+class ClusterServerParameterRefresherTest : public ShardingTestFixture {
 protected:
+    boost::optional<ClusterRole> getClusterRoleOverride() const override {
+        return ClusterRole{ClusterRole::RouterServer};
+    }
+
     void setUp() override {
         ShardingTestFixture::setUp();
         _refresher = std::make_unique<ClusterServerParameterRefresher>();

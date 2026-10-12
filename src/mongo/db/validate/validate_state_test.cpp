@@ -33,10 +33,11 @@ class ValidateStateTest : public CatalogTestFixture {};
 
 class ValidateStateWithoutSizeStorerTest : public CatalogTestFixture {
 public:
-    ValidateStateWithoutSizeStorerTest()
-        : CatalogTestFixture(Options().setPersistenceProvider(
-              std::make_unique<replicated_fast_count::test_helpers::
-                                   ReplicatedFastCountTestPersistenceProvider>())) {}
+    Options makeServiceContextOptions() override {
+        return CatalogTestFixture::makeServiceContextOptions().setPersistenceProvider(
+            std::make_unique<
+                replicated_fast_count::test_helpers::ReplicatedFastCountTestPersistenceProvider>());
+    }
 };
 
 // Creates the replicated fast count backing stores as container idents.
@@ -183,13 +184,15 @@ class ShouldEnforceFastCountAndSizeTest
     : public CatalogTestFixture,
       public ::testing::WithParamInterface<ShouldEnforceFastCountAndSizeParams> {
 public:
-    ShouldEnforceFastCountAndSizeTest()
-        : CatalogTestFixture(
-              GetParam().hasSizeStorer
-                  ? Options()
-                  : Options().setPersistenceProvider(
-                        std::make_unique<replicated_fast_count::test_helpers::
-                                             ReplicatedFastCountTestPersistenceProvider>())) {}
+    Options makeServiceContextOptions() override {
+        auto options = CatalogTestFixture::makeServiceContextOptions();
+        if (GetParam().hasSizeStorer) {
+            return options;
+        }
+        return std::move(options).setPersistenceProvider(
+            std::make_unique<
+                replicated_fast_count::test_helpers::ReplicatedFastCountTestPersistenceProvider>());
+    }
 };
 
 TEST_P(ShouldEnforceFastCountAndSizeTest, ShouldEnforceFastCountAndSize) {

@@ -192,22 +192,27 @@ TEST_F(SessionManagerCommonTest, DisconnectShutdownAwareInterruptibleWakesOnShut
     });
 }
 
-/** A MockSession that runs onClientConnect. Additionally, has a stable clock source for
- * monotonicity */
+/** Tests with a MockSession that runs onClientConnect. */
 class ReplicationPeerIdTest : public ClockSourceMockServiceContextTest {
 public:
-    auto makeClient(std::shared_ptr<Session> session) {
-        return getServiceContext()->getService()->makeClient("test", std::move(session));
-    }
-    /** Packages a client and a session together */
     struct Peer {
         std::shared_ptr<Session> session;
         ServiceContext::UniqueClient client;
     };
+
+    void setUp() override {
+        ClockSourceMockServiceContextTest::setUp();
+        _sm.emplace(getServiceContext());
+    }
+
+    auto makeClient(std::shared_ptr<Session> session) {
+        return getServiceContext()->getService()->makeClient("test", std::move(session));
+    }
+
     Peer connect() {
         auto session = MockSession::create(&_tl);
         auto client = makeClient(session);
-        _sm.onClientConnect(client.get());
+        sessionManager().onClientConnect(client.get());
         return {std::move(session), std::move(client)};
     }
 
@@ -224,13 +229,19 @@ public:
         std::vector<Peer> peers;
         for (size_t i = 0; i < repl::ReplSetConfig::kMaxMembers; i++) {
             peers.push_back(connect());
-            _sm.markReplicationSession(peers.back().client.get());
+            sessionManager().markReplicationSession(peers.back().client.get());
         }
         return peers;
     }
 
+    MockSessionManagerCommon& sessionManager() {
+        invariant(_sm);
+        return *_sm;
+    }
+
+private:
     TransportLayerMock _tl;
-    MockSessionManagerCommon _sm{getServiceContext()};
+    boost::optional<MockSessionManagerCommon> _sm;
 };
 
 TEST_F(ReplicationPeerIdTest, UnmarkedSessionHasDefaultPurpose) {
@@ -241,7 +252,7 @@ TEST_F(ReplicationPeerIdTest, UnmarkedSessionHasDefaultPurpose) {
 
 TEST_F(ReplicationPeerIdTest, MarkedSessionHasCorrectPurposeAndId) {
     auto [session, client] = connect();
-    _sm.markReplicationSession(client.get());
+    sessionManager().markReplicationSession(client.get());
     EXPECT_EQ(getConnectionPurpose(session.get()), ConnectionPurpose::kReplication);
     EXPECT_NE(getReplicationId(session.get()), boost::none);
 }
@@ -249,16 +260,16 @@ TEST_F(ReplicationPeerIdTest, MarkedSessionHasCorrectPurposeAndId) {
 TEST_F(ReplicationPeerIdTest, ConnectAndDisconnectSlots) {
     auto a = connect();
     auto b = connect();
-    _sm.markReplicationSession(a.client.get());
-    _sm.markReplicationSession(b.client.get());
+    sessionManager().markReplicationSession(a.client.get());
+    sessionManager().markReplicationSession(b.client.get());
     EXPECT_NE(peerId(a), boost::none);
     EXPECT_NE(peerId(b), boost::none);
     EXPECT_NE(peerId(a), peerId(b));
 
-    _sm.onClientDisconnect(a.client.get());
+    sessionManager().onClientDisconnect(a.client.get());
 
     auto c = connect();
-    _sm.markReplicationSession(c.client.get());
+    sessionManager().markReplicationSession(c.client.get());
     EXPECT_NE(peerId(c), boost::none);
 }
 
@@ -266,7 +277,7 @@ TEST_F(ReplicationPeerIdTest, OverflowUnmarksSession) {
     std::vector<Peer> peers = fillAllSlots();
 
     auto overflow = connect();
-    _sm.markReplicationSession(overflow.client.get());
+    sessionManager().markReplicationSession(overflow.client.get());
 
     EXPECT_EQ(getConnectionPurpose(overflow.session.get()), ConnectionPurpose::kDefault);
     EXPECT_EQ(peerId(overflow), boost::none);
@@ -281,13 +292,13 @@ TEST_F(ReplicationPeerIdTest, OverflowDisconnectNoop) {
     std::vector<Peer> peers = fillAllSlots();
 
     auto overflow = connect();
-    _sm.markReplicationSession(overflow.client.get());
+    sessionManager().markReplicationSession(overflow.client.get());
 
     // Should be a no-op
-    _sm.onClientDisconnect(overflow.client.get());
+    sessionManager().onClientDisconnect(overflow.client.get());
 
     auto next = connect();
-    _sm.markReplicationSession(next.client.get());
+    sessionManager().markReplicationSession(next.client.get());
     EXPECT_EQ(peerId(next), boost::none);
 }
 
@@ -295,12 +306,12 @@ TEST_F(ReplicationPeerIdTest, OverflowRetryAssignment) {
     std::vector<Peer> peers = fillAllSlots();
 
     auto overflow = connect();
-    _sm.markReplicationSession(overflow.client.get());
+    sessionManager().markReplicationSession(overflow.client.get());
     EXPECT_EQ(getConnectionPurpose(overflow.session.get()), ConnectionPurpose::kDefault);
 
-    _sm.onClientDisconnect(peers[0].client.get());
+    sessionManager().onClientDisconnect(peers[0].client.get());
 
-    _sm.markReplicationSession(overflow.client.get());
+    sessionManager().markReplicationSession(overflow.client.get());
     EXPECT_EQ(getConnectionPurpose(overflow.session.get()), ConnectionPurpose::kReplication);
     EXPECT_NE(peerId(overflow), boost::none);
 }
@@ -313,18 +324,18 @@ TEST_F(ReplicationPeerIdTest, GaugeTimeAssignment) {
 
     auto a = connect();
     auto aConnectTime = getServiceContext()->getFastClockSource()->now();
-    _sm.markReplicationSession(a.client.get());
+    sessionManager().markReplicationSession(a.client.get());
     EXPECT_NE(peerId(a), boost::none);
     EXPECT_EQ(
         capturer.readInt64Gauge(otel::metrics::MetricNames::kReplicationPrimaryPeerEstablishedTime,
                                 std::make_tuple(static_cast<int64_t>(0))),
         aConnectTime.toMillisSinceEpoch());
 
-    _sm.onClientDisconnect(a.client.get());
+    sessionManager().onClientDisconnect(a.client.get());
     advanceClock(Seconds(1));
     auto b = connect();
     auto bConnectTime = aConnectTime + Seconds(1);
-    _sm.markReplicationSession(b.client.get());
+    sessionManager().markReplicationSession(b.client.get());
     EXPECT_NE(peerId(b), boost::none);
     EXPECT_EQ(
         capturer.readInt64Gauge(otel::metrics::MetricNames::kReplicationPrimaryPeerEstablishedTime,

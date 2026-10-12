@@ -41,6 +41,11 @@ protected:
     ShardingMongoDTestFixture(Options options = {}, bool allowMajorityReads = true);
     ~ShardingMongoDTestFixture() override;
 
+    std::unique_ptr<ScopedGlobalServiceContextForTest> makeScopedServiceContext() override {
+        return std::make_unique<MongoDScopedGlobalServiceContextForTest>(
+            std::move(_ctorOptions), shouldSetupTransportLayer());
+    }
+
     void setUp() override;
     void tearDown() override;
 
@@ -135,6 +140,8 @@ private:
         HostAndPort("node1:12345"), HostAndPort("node2:12345"), HostAndPort("node3:12345")};
 
     repl::ReplicationCoordinatorMock* _replCoord = nullptr;
+
+    Options _ctorOptions;
 
     // Whether the test fixture should set a committed snapshot during setup so that tests can
     // perform majority reads without doing any writes.

@@ -54,10 +54,12 @@ public:
     void dropConnections(const Status&) override {
         ++dropAllCount;
     }
+
     void dropConnections(const HostAndPort& host, const Status& status) override {
         droppedHosts.push_back(host);
         lastStatus = status;
     }
+
     void setKeepOpen(const HostAndPort&, bool) override {}
 
     std::vector<HostAndPort> droppedHosts;
@@ -65,9 +67,12 @@ public:
     Status lastStatus = Status::OK();
 };
 
-class OnServerHeartbeatFailureEventTest : service_context_test::WithSetupTransportLayer,
-                                          public ServiceContextTest {
+class OnServerHeartbeatFailureEventTest : public ServiceContextTest {
 public:
+    bool shouldSetupTransportLayer() const override {
+        return true;
+    }
+
     void setUp() override {
         ServiceContextTest::setUp();
 

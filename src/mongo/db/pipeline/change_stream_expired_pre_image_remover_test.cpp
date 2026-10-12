@@ -44,9 +44,8 @@ private:
 
 class ChangeStreamExpiredPreImageRemoverTest : public ServiceContextTest {
 public:
-    ChangeStreamExpiredPreImageRemoverTest()
-        : ServiceContextTest(
-              std::make_unique<ScopedGlobalServiceContextForTest>(/*shouldSetupTL=*/false)) {
+    void setUp() override {
+        ServiceContextTest::setUp();
 
         getServiceContext()->setPeriodicRunner(std::make_unique<MockPeriodicRunner>());
 

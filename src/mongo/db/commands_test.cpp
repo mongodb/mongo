@@ -61,9 +61,6 @@ namespace {
 using namespace std::literals::string_view_literals;
 
 
-using service_context_test::RoleOverride;
-using service_context_test::ServerRoleIndex;
-
 TEST(Commands, CommandNameAtom) {
     CommandNameAtom foo("foo"sv), bar("bar"sv), baz("baz"sv), foo2("foo"sv), baz2("baz"sv),
         bar2("bar"sv);
@@ -183,9 +180,14 @@ TEST(ParseNamespaceFromCommand, OtherTypes) {
 
 class ParseNsOrUUID : public ServiceContextTest {
 public:
-    ParseNsOrUUID() : opCtxPtr(makeOperationContext()), opCtx(opCtxPtr.get()) {}
+    void setUp() override {
+        ServiceContextTest::setUp();
+        opCtxPtr = makeOperationContext();
+        opCtx = opCtxPtr.get();
+    }
+
     ServiceContext::UniqueOperationContext opCtxPtr;
-    OperationContext* opCtx;
+    OperationContext* opCtx = nullptr;
 };
 
 TEST_F(ParseNsOrUUID, FailWrongType) {
@@ -643,21 +645,19 @@ public:
     }
 };
 
-/**
- * Because ServiceContextTestSetup is a virtual base, its constructor happens
- * before an ordinary generated test class constructor can intervene.
- * To get ahead of it, we virtually inherit a `RoleOverride` to run first.
- */
-template <ServerRoleIndex roleIndex>
-class CommandRegistryTest : public virtual RoleOverride<roleIndex>,
-                            public BasicCommandRegistryTest {
+template <ClusterRole::Value role>
+class CommandRegistryTest : public BasicCommandRegistryTest {
 public:
     ClusterRole serverRole() const override {
-        return getClusterRole(roleIndex);
+        return role;
+    }
+
+    boost::optional<ClusterRole> getClusterRoleOverride() const override {
+        return ClusterRole{role};
     }
 };
 
-using RouterCommandRegistryTest = CommandRegistryTest<ServerRoleIndex::router>;
+using RouterCommandRegistryTest = CommandRegistryTest<ClusterRole::RouterServer>;
 
 TEST_F(RouterCommandRegistryTest, ServicesInit) {
     auto sc = getGlobalServiceContext();
@@ -696,7 +696,7 @@ TEST(Commands, AllRouterCommandsSampledByDefault) {
     ASSERT_GT(checkedCommands.size(), 0u);
 }
 
-using ShardCommandRegistryTest = CommandRegistryTest<ServerRoleIndex::shard>;
+using ShardCommandRegistryTest = CommandRegistryTest<ClusterRole::ShardServer>;
 
 TEST_F(ShardCommandRegistryTest, ServicesInit) {
     auto sc = getGlobalServiceContext();

@@ -39,7 +39,10 @@ public:
 
 class UnifiedWriteExecutorBatcherTest : public ServiceContextTest {
 public:
-    UnifiedWriteExecutorBatcherTest() : _opCtx(makeOperationContext()) {}
+    void setUp() override {
+        ServiceContextTest::setUp();
+        _opCtx = makeOperationContext();
+    }
 
     const NamespaceString nss0 = NamespaceString::createNamespaceString_forTest("test", "coll0");
     const NamespaceString nss1 = NamespaceString::createNamespaceString_forTest("test", "coll1");
@@ -2207,7 +2210,10 @@ TEST_F(UnorderedUnifiedWriteExecutorBatcherTest,
 
 class UnifiedWriteExecutorSizeEstimatorTest : public ServiceContextTest {
 public:
-    UnifiedWriteExecutorSizeEstimatorTest() : _opCtx(makeOperationContext()) {}
+    void setUp() override {
+        ServiceContextTest::setUp();
+        _opCtx = makeOperationContext();
+    }
 
     const NamespaceString nss0 = NamespaceString::createNamespaceString_forTest("test", "coll0");
     const NamespaceString nss1 = NamespaceString::createNamespaceString_forTest("test", "coll1");

@@ -74,8 +74,14 @@ private:
 // Test fixture that injects PreciseClockSourceSpy as the ServiceContext's precise clock.
 class RateLimiterWithPreciseClockSpyTest : public ServiceContextTest {
 public:
-    RateLimiterWithPreciseClockSpyTest()
-        : ServiceContextTest(_initContext(&_clockSpy, &_tickSource)) {}
+    std::unique_ptr<ScopedGlobalServiceContextForTest> makeScopedServiceContext() override {
+        auto spy = std::make_unique<PreciseClockSourceSpy>();
+        _clockSpy = spy.get();
+        auto tick = std::make_unique<TickSourceMock<Milliseconds>>();
+        _tickSource = tick.get();
+        return std::make_unique<ScopedGlobalServiceContextForTest>(ServiceContext::make(
+            std::make_unique<ClockSourceMock>(), std::move(spy), std::move(tick)));
+    }
 
     void setUp() override {
         ServiceContextTest::setUp();
@@ -100,19 +106,8 @@ public:
     }
 
 private:
-    // Written by _initContext before ServiceContextTest base is constructed (safe for raw ptrs).
-    PreciseClockSourceSpy* _clockSpy;
-    TickSourceMock<Milliseconds>* _tickSource;
-
-    static std::unique_ptr<ScopedGlobalServiceContextForTest> _initContext(
-        PreciseClockSourceSpy** spyOut, TickSourceMock<Milliseconds>** tickOut) {
-        auto spy = std::make_unique<PreciseClockSourceSpy>();
-        *spyOut = spy.get();
-        auto tick = std::make_unique<TickSourceMock<Milliseconds>>();
-        *tickOut = tick.get();
-        return std::make_unique<ScopedGlobalServiceContextForTest>(ServiceContext::make(
-            std::make_unique<ClockSourceMock>(), std::move(spy), std::move(tick)));
-    }
+    PreciseClockSourceSpy* _clockSpy = nullptr;
+    TickSourceMock<Milliseconds>* _tickSource = nullptr;
 
     unittest::MinimumLoggedSeverityGuard logSeverityGuard{logv2::LogComponent::kDefault,
                                                           logv2::LogSeverity::Debug(4)};

@@ -67,6 +67,10 @@ public:
         return session;
     }
 
+    // Un-hide ServiceContextWithClockSourceMockTest::makeSession(), which the template overloads
+    // below would otherwise shadow.
+    using ServiceContextWithClockSourceMockTest::makeSession;
+
     template <class SessionType>
     auto makeSession(UUID clientId) {
         if constexpr (std::is_same<SessionType, IngressSession>::value) {

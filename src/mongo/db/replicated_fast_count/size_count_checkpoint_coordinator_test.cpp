@@ -35,9 +35,10 @@ using test_helpers::waitForFlushFailpoint;
 
 class SizeCountCheckpointCoordinatorTest : public CatalogTestFixture {
 public:
-    SizeCountCheckpointCoordinatorTest()
-        : CatalogTestFixture(Options().setPersistenceProvider(
-              std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>())) {}
+    Options makeServiceContextOptions() override {
+        return CatalogTestFixture::makeServiceContextOptions().setPersistenceProvider(
+            std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>());
+    }
 
 protected:
     void setUp() override {
@@ -276,9 +277,10 @@ TEST_F(SizeCountCheckpointCoordinatorTest, ConcurrentRequestFlushAndDestructorNe
  */
 class SizeCountCheckpointCoordinatorHashTest : public CatalogTestFixture {
 public:
-    SizeCountCheckpointCoordinatorHashTest()
-        : CatalogTestFixture(Options().setPersistenceProvider(
-              std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>())) {}
+    Options makeServiceContextOptions() override {
+        return CatalogTestFixture::makeServiceContextOptions().setPersistenceProvider(
+            std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>());
+    }
 
 protected:
     // The three hashes overlap in their set bits, so an expectation written as an XOR of them does

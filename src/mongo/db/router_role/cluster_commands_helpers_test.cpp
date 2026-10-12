@@ -39,8 +39,7 @@ const ShardId kTestRemoteShardId2 = ShardId("FakeShard2");
 const HostAndPort kTestRemoteHostAndPort2 = HostAndPort("FakeShard2Host", 12345);
 const ShardId kTestRemoteShardId3 = ShardId("FakeShard3");
 
-class GatherResponsesTest : public virtual service_context_test::RouterRoleOverride,
-                            public ShardingTestFixture {
+class GatherResponsesTest : public ShardingTestFixture {
 public:
     void setUp() override {
         ShardingTestFixture::setUp();
@@ -58,6 +57,10 @@ public:
     void tearDown() override {
         _routerOperationContextSession.reset();
         ShardingTestFixture::tearDown();
+    }
+
+    boost::optional<ClusterRole> getClusterRoleOverride() const override {
+        return ClusterRole{ClusterRole::RouterServer};
     }
 
 protected:

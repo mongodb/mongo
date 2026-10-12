@@ -19,9 +19,8 @@ using GetControlEventTypesFunction = Mock::GetControlEventTypesFunction;
 
 class ChangeStreamReaderBuilderTest : public ServiceContextTest {
 public:
-    ChangeStreamReaderBuilderTest()
-        : ServiceContextTest(
-              std::make_unique<ScopedGlobalServiceContextForTest>(/*shouldSetupTL=*/false)) {
+    void setUp() override {
+        ServiceContextTest::setUp();
         _opCtx = makeOperationContext();
     }
 

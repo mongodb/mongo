@@ -65,8 +65,8 @@ public:
     const NamespaceString kSecondaryNssOtherDb2 =
         NamespaceString::createNamespaceString_forTest("test2", "secondaryColl2");
     const Milliseconds timeoutMs = Seconds(1);
-    const ClientAndCtx client1 = makeClientWithLocker("client1");
-    const ClientAndCtx client2 = makeClientWithLocker("client2");
+    ClientAndCtx client1;
+    ClientAndCtx client2;
 
 private:
     void setUp() override;
@@ -75,6 +75,8 @@ private:
 
 void CatalogRAIITestFixture::setUp() {
     ServiceContextTest::setUp();
+    client1 = makeClientWithLocker("client1");
+    client2 = makeClientWithLocker("client2");
     DatabaseShardingStateFactory::set(getServiceContext(),
                                       std::make_unique<DatabaseShardingStateFactoryMock>());
     DatabaseHolder::set(getServiceContext(), std::make_unique<DatabaseHolderMock>());

@@ -31,7 +31,8 @@ namespace {
 
 class ShardKeyPatternTest : public ServiceContextTest {
 protected:
-    ShardKeyPatternTest() {
+    void setUp() override {
+        ServiceContextTest::setUp();
         _opCtxHolder = makeOperationContext();
         _opCtx = _opCtxHolder.get();
     }

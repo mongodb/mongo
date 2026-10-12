@@ -73,7 +73,11 @@ const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("tes
 
 class CollectionValidationTest : public CatalogTestFixture {
 protected:
-    CollectionValidationTest(Options options = {}) : CatalogTestFixture(std::move(options)) {}
+    CollectionValidationTest(Options options = {}) : _scOptions(std::move(options)) {}
+
+    Options makeServiceContextOptions() override {
+        return std::move(_scOptions);
+    }
 
 private:
     void setUp() override {
@@ -84,6 +88,8 @@ private:
         ASSERT_OK(storageInterface()->createCollection(
             operationContext(), kNss, defaultCollectionOptions));
     };
+
+    Options _scOptions;
 };
 
 // Calling verify() is not possible on an in-memory instance.
@@ -1174,13 +1180,15 @@ class CollectionValidationSchemaViolationTest
       public ::testing::WithParamInterface<CollectionValidationSchemaViolationParams> {
 protected:
     CollectionValidationSchemaViolationTest(Options options = {})
-        : CatalogTestFixture(std::move(options)) {}
+        : _scOptions(std::move(options)) {}
+
+    Options makeServiceContextOptions() override {
+        return std::move(_scOptions);
+    }
 
 private:
+    Options _scOptions;
     OperationContext* _opCtx{nullptr};
-    void setUp() override {
-        CatalogTestFixture::setUp();
-    }
 };
 
 TEST_P(CollectionValidationSchemaViolationTest, SchemaViolation) {
@@ -1286,9 +1294,13 @@ BSONObj removeNestedField(const BSONObj& bson, std::span<const std::string_view>
 class TimeseriesCollectionValidationTest : public CatalogTestFixture {
 public:
     TimeseriesCollectionValidationTest(Options options = {})
-        : CatalogTestFixture(std::move(options)),
+        : _scOptions(std::move(options)),
           _allowCorruptTimeseriesBuckets("timeseriesDisableStrictBucketValidator", true) {
         _nss = NamespaceString::createNamespaceString_forTest("test.system.buckets.ts");
+    }
+
+    Options makeServiceContextOptions() override {
+        return std::move(_scOptions);
     }
 
     static BSONObj getSampleDoc() {
@@ -1469,6 +1481,7 @@ public:
         return replaceNestedField(origBson, nested, bcb.finalize());
     }
 
+    Options _scOptions;
     NamespaceString _nss;
     OperationContext* _opCtx{nullptr};
     CollectionOptions _options;

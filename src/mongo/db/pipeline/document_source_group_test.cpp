@@ -954,13 +954,16 @@ enum class GroupStageType { Default, Streaming };
 class Base : public ServiceContextTest {
 public:
     Base(GroupStageType groupStageType = GroupStageType::Default)
-        : _opCtx(makeOperationContext()),
-          _ctx(new ExpressionContextForTest(
-              _opCtx.get(),
-              AggregateCommandRequest(NamespaceString::createNamespaceString_forTest(ns),
-                                      std::vector<mongo::BSONObj>()))),
-          _tempDir("DocumentSourceGroupTest"),
-          _groupStageType(groupStageType) {}
+        : _tempDir("DocumentSourceGroupTest"), _groupStageType(groupStageType) {}
+
+    void setUp() override {
+        ServiceContextTest::setUp();
+        _opCtx = makeOperationContext();
+        _ctx = new ExpressionContextForTest(
+            _opCtx.get(),
+            AggregateCommandRequest(NamespaceString::createNamespaceString_forTest(ns),
+                                    std::vector<mongo::BSONObj>()));
+    }
 
 protected:
     std::string_view getStageName() const {

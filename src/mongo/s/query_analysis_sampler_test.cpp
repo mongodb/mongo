@@ -54,13 +54,9 @@ using QuerySamplingOptions = OperationContext::QuerySamplingOptions;
 
 class QueryAnalysisSamplerRateLimiterTest : public ServiceContextTest {
 public:
-    QueryAnalysisSamplerRateLimiterTest()
-        : ServiceContextTest(
-              std::make_unique<ScopedGlobalServiceContextForTest>(ServiceContext::make(
-                  nullptr, nullptr, std::make_unique<TickSourceMock<Nanoseconds>>()))) {}
-
-    void setUp() override {
-        ServiceContextTest::setUp();
+    std::unique_ptr<ScopedGlobalServiceContextForTest> makeScopedServiceContext() override {
+        return std::make_unique<ScopedGlobalServiceContextForTest>(ServiceContext::make(
+            nullptr, nullptr, std::make_unique<TickSourceMock<Nanoseconds>>()));
     }
 
 protected:
@@ -395,11 +391,13 @@ TEST_F(QueryAnalysisSamplerRateLimiterTest, NanosecondsResolution) {
 
 class QueryAnalysisSamplerTest : public ShardingTestFixture {
 public:
-    QueryAnalysisSamplerTest()
-        : ShardingTestFixture(
-              /*withMockCatalogCache=*/false,
-              std::make_unique<ScopedGlobalServiceContextForTest>(ServiceContext::make(
-                  nullptr, nullptr, std::make_unique<TickSourceMock<Nanoseconds>>()))) {}
+    QueryAnalysisSamplerTest() : ShardingTestFixture(/*withMockCatalogCache=*/false) {}
+
+    std::unique_ptr<ScopedGlobalServiceContextForTest> makeScopedServiceContext() override {
+        return std::make_unique<ScopedGlobalServiceContextForTest>(
+            ServiceContext::make(nullptr, nullptr, std::make_unique<TickSourceMock<Nanoseconds>>()),
+            shouldSetupTransportLayer());
+    }
 
     void setUp() override {
         ShardingTestFixture::setUp();

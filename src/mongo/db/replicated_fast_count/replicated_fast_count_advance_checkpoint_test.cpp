@@ -30,9 +30,10 @@ UUID getOplogUuid(OperationContext* opCtx) {
 
 class ReplicatedFastCountAdvanceCheckpointTest : public CatalogTestFixture {
 public:
-    ReplicatedFastCountAdvanceCheckpointTest()
-        : CatalogTestFixture(Options().setPersistenceProvider(
-              std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>())) {}
+    Options makeServiceContextOptions() override {
+        return CatalogTestFixture::makeServiceContextOptions().setPersistenceProvider(
+            std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>());
+    }
 
 protected:
     static constexpr std::string_view kDbName = "advance_checkpoint_test"sv;
@@ -991,9 +992,10 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest,
 
 class ReplicatedFastCountPersistCheckpointSnapshotTest : public CatalogTestFixture {
 public:
-    ReplicatedFastCountPersistCheckpointSnapshotTest()
-        : CatalogTestFixture(Options().setPersistenceProvider(
-              std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>())) {}
+    Options makeServiceContextOptions() override {
+        return CatalogTestFixture::makeServiceContextOptions().setPersistenceProvider(
+            std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>());
+    }
 
 protected:
     void setUp() override {

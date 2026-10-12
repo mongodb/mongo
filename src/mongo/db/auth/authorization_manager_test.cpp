@@ -93,7 +93,8 @@ class RecoveryUnitMock : public RecoveryUnitNoop {
 
 class AuthorizationManagerTest : public ServiceContextTest {
 public:
-    AuthorizationManagerTest() {
+    void setUp() override {
+        ServiceContextTest::setUp();
         // Initialize the serviceEntryPoint so that DBDirectClient can function.
         getService()->setServiceEntryPoint(std::make_unique<ServiceEntryPointShardRole>());
 

@@ -103,10 +103,12 @@ std::unique_ptr<QuerySolution> createQuerySolution() {
 
 class QueryStageMultiPlanTest : public ServiceContextMongoDTest {
 public:
-    QueryStageMultiPlanTest()
-        : opCtx{makeOperationContext()},
-          expCtx{ExpressionContextBuilder{}.opCtx(opCtx.get()).ns(nss).build()},
-          client{std::make_unique<DBDirectClient>(opCtx.get())} {
+    void setUp() override {
+        ServiceContextMongoDTest::setUp();
+        opCtx = makeOperationContext();
+        expCtx = ExpressionContextBuilder{}.opCtx(opCtx.get()).ns(nss).build();
+        client = std::make_unique<DBDirectClient>(opCtx.get());
+
         // Make sure we are the primary so we can create collections and indexes.
         auto replCoord = repl::ReplicationCoordinator::get(opCtx.get());
         ASSERT(replCoord);

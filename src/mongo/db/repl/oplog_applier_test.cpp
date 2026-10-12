@@ -674,17 +674,12 @@ TEST_F(OplogApplierTest, GetNextApplierBatchProcessesTruncateRangeIndividuallyDu
 }
 
 class OplogApplierDelayTest : public OplogApplierTest {
-    // This constructor lets us give a variable name to mockClock so we can copy the same
-    // shared_ptr into SharedClockSourceAdapters we give to ServiceContext::make and the
-    // _mockClock member variable.
-    explicit OplogApplierDelayTest(std::shared_ptr<ClockSourceMock> mockClock)
-        : OplogApplierTest(std::make_unique<ScopedGlobalServiceContextForTest>(
-              ServiceContext::make(std::make_unique<SharedClockSourceAdapter>(mockClock),
-                                   std::make_unique<SharedClockSourceAdapter>(mockClock)))),
-          _mockClock(std::move(mockClock)) {}
-
 public:
-    OplogApplierDelayTest() : OplogApplierDelayTest(std::make_shared<ClockSourceMock>()) {}
+    std::unique_ptr<ScopedGlobalServiceContextForTest> makeScopedServiceContext() override {
+        return std::make_unique<ScopedGlobalServiceContextForTest>(
+            ServiceContext::make(std::make_unique<SharedClockSourceAdapter>(_mockClock),
+                                 std::make_unique<SharedClockSourceAdapter>(_mockClock)));
+    }
 
     void setUp() override {
         OplogApplierTest::setUp();
@@ -713,7 +708,7 @@ public:
     }
 
 protected:
-    std::shared_ptr<ClockSourceMock> _mockClock;
+    std::shared_ptr<ClockSourceMock> _mockClock = std::make_shared<ClockSourceMock>();
     ServiceContext::UniqueOperationContext _opCtxHolder;
     Atomic<bool> _failWaits{false};
 

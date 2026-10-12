@@ -655,8 +655,12 @@ TEST(MongoURI, InvalidURIs) {
     }
 }
 
-class URIConnectionTest : service_context_test::WithSetupTransportLayer,
-                          public ServiceContextTest {};
+class URIConnectionTest : public ServiceContextTest {
+public:
+    bool shouldSetupTransportLayer() const override {
+        return true;
+    }
+};
 
 TEST_F(URIConnectionTest, ValidButBadURIsFailToConnect) {
     // "invalid" is a TLD that cannot exit on the public internet (see rfc2606). It should always

@@ -24,9 +24,12 @@ namespace mongo {
 namespace resharding {
 namespace {
 
-class ReshardingCoordinatorServiceExternalStateTest : service_context_test::WithSetupTransportLayer,
-                                                      public ConfigServerTestFixture {
+class ReshardingCoordinatorServiceExternalStateTest : public ConfigServerTestFixture {
 public:
+    bool shouldSetupTransportLayer() const override {
+        return true;
+    }
+
     void setUp() override {
         ConfigServerTestFixture::setUp();
 

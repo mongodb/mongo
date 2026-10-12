@@ -125,13 +125,14 @@ protected:
         return {std::move(writeOp), std::move(targeted)};
     }
 
-    WriteOpTest() {
+    void setUp() override {
+        ServiceContextTest::setUp();
         _opCtxHolder = makeOperationContext();
         _opCtx = _opCtxHolder.get();
     }
 
     ServiceContext::UniqueOperationContext _opCtxHolder;
-    OperationContext* _opCtx;
+    OperationContext* _opCtx = nullptr;
 };
 
 // Test of basic error-setting on write op
@@ -485,11 +486,15 @@ TEST_F(WriteOpTest, RetrySingleOp) {
 }
 
 class WriteOpTransactionTest : public WriteOpTest {
-private:
-    RouterOperationContextSession _routerOpCtxSession{[this] {
+public:
+    void setUp() override {
+        WriteOpTest::setUp();
         _opCtx->setLogicalSessionId(makeLogicalSessionIdForTest());
-        return _opCtx;
-    }()};
+        _routerOpCtxSession.emplace(_opCtx);
+    }
+
+private:
+    boost::optional<RouterOperationContextSession> _routerOpCtxSession;
 };
 
 TEST_F(WriteOpTransactionTest, TargetMultiDoesNotTargetAllShards) {

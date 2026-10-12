@@ -35,7 +35,8 @@ const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test
 
 class ClusterCursorManagerTest : public ServiceContextTest {
 protected:
-    ClusterCursorManagerTest() {
+    void setUp() override {
+        ServiceContextTest::setUp();
         _opCtx = makeOperationContext();
         LogicalSessionCache::set(getServiceContext(), std::make_unique<LogicalSessionCacheNoop>());
     }

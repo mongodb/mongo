@@ -29,13 +29,17 @@ namespace [[MONGO_MOD_PUBLIC]] mongo {
 
 class [[MONGO_MOD_OPEN]] ServiceEntryPointTestFixture : public ServiceContextTest {
 public:
-    ServiceEntryPointTestFixture()
-        : ServiceContextTest(std::make_unique<ScopedGlobalServiceContextForTest>(
-                                 ServiceContext::make(std::make_unique<ClockSourceMock>(),
-                                                      std::make_unique<ClockSourceMock>(),
-                                                      std::make_unique<TickSourceMock<>>()),
-                                 shouldSetupTL),
-                             std::make_shared<transport::MockSession>(nullptr)) {}
+    std::unique_ptr<ScopedGlobalServiceContextForTest> makeScopedServiceContext() override {
+        return std::make_unique<ScopedGlobalServiceContextForTest>(
+            ServiceContext::make(std::make_unique<ClockSourceMock>(),
+                                 std::make_unique<ClockSourceMock>(),
+                                 std::make_unique<TickSourceMock<>>()),
+            shouldSetupTransportLayer());
+    }
+
+    std::shared_ptr<transport::Session> makeSession() override {
+        return std::make_shared<transport::MockSession>(nullptr);
+    }
 
     void setUp() override;
 

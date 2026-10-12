@@ -29,7 +29,10 @@ using boost::intrusive_ptr;
 
 class SampleBasics : public AggregationContextFixture {
 public:
-    SampleBasics() : _mock(exec::agg::MockStage::createForTest({}, getExpCtx())) {}
+    void setUp() override {
+        AggregationContextFixture::setUp();
+        _mock = exec::agg::MockStage::createForTest({}, getExpCtx());
+    }
 
 protected:
     virtual void createSample(long long size) {

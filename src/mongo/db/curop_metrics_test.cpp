@@ -13,10 +13,10 @@ namespace {
 
 class CurOpMetricsTest : public ServiceContextTest {
 protected:
-    CurOpMetricsTest()
-        : ServiceContextTest(
-              std::make_unique<ScopedGlobalServiceContextForTest>(ServiceContext::make(
-                  nullptr, nullptr, std::make_unique<TickSourceMock<Milliseconds>>()))) {}
+    std::unique_ptr<ScopedGlobalServiceContextForTest> makeScopedServiceContext() override {
+        return std::make_unique<ScopedGlobalServiceContextForTest>(ServiceContext::make(
+            nullptr, nullptr, std::make_unique<TickSourceMock<Milliseconds>>()));
+    }
 
     TickSourceMock<Milliseconds>* tickSource() {
         return checked_cast<TickSourceMock<Milliseconds>*>(getServiceContext()->getTickSource());

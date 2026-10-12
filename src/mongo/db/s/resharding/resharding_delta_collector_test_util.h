@@ -255,9 +255,12 @@ private:
     bool _destroyed = false;
 };
 
-class PostCloningDeltaCollectorTestBase : public service_context_test::WithSetupTransportLayer,
-                                          public ServiceContextTest {
+class PostCloningDeltaCollectorTestBase : public ServiceContextTest {
 public:
+    bool shouldSetupTransportLayer() const override {
+        return true;
+    }
+
     void setUp() override {
         ServiceContextTest::setUp();
 

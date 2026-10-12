@@ -21,7 +21,8 @@ namespace {
 
 class AuthenticationSessionTestFixture : public ServiceContextTest {
 public:
-    AuthenticationSessionTestFixture() {
+    void setUp() override {
+        ServiceContextTest::setUp();
         Client::releaseCurrent();
         Client::initThread(getThreadName(), getGlobalServiceContext()->getService(), session);
         opCtx = cc().makeOperationContext();

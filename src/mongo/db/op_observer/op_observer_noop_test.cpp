@@ -79,6 +79,11 @@ public:
 
 class OpObserverNoopTest : public ServiceContextTest {
 protected:
+    void setUp() override {
+        ServiceContextTest::setUp();
+        _opCtxHolder = makeOperationContext();
+    }
+
     OperationContext* opCtx() {
         return _opCtxHolder.get();
     }
@@ -86,7 +91,7 @@ protected:
     static constexpr auto kIdent = "testIdent"sv;
 
 private:
-    ServiceContext::UniqueOperationContext _opCtxHolder{makeOperationContext()};
+    ServiceContext::UniqueOperationContext _opCtxHolder;
 };
 
 // A contiguous range insert fans out into one scalar insert per value, with keys derived as

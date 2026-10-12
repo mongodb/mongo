@@ -38,13 +38,10 @@ Date_t getNextDeadline() {
 
 class TicketHolderTest : public ServiceContextTest {
 public:
-    TicketHolderTest()
-        : ServiceContextTest(
-              std::make_unique<ScopedGlobalServiceContextForTest>(ServiceContext::make(
-                  nullptr, nullptr, std::make_unique<TickSourceMock<Microseconds>>()))) {}
-
-    TicketHolderTest(std::unique_ptr<ScopedGlobalServiceContextForTest> scopedGlobalServiceCtx)
-        : ServiceContextTest{std::move(scopedGlobalServiceCtx)} {}
+    std::unique_ptr<ScopedGlobalServiceContextForTest> makeScopedServiceContext() override {
+        return std::make_unique<ScopedGlobalServiceContextForTest>(ServiceContext::make(
+            nullptr, nullptr, std::make_unique<TickSourceMock<Microseconds>>()));
+    }
 
     static inline const Milliseconds kSleepTime{1};
 
@@ -1012,9 +1009,10 @@ TEST_F(TicketHolderImmediateResizeTest, WaitQueueMaxChange) {
 // For the following test, we need a real source of tick
 class TicketHolderTestTick : public TicketHolderTest {
 public:
-    TicketHolderTestTick()
-        : TicketHolderTest{std::make_unique<ScopedGlobalServiceContextForTest>(
-              ServiceContext::make(nullptr, nullptr, makeSystemTickSource()))} {}
+    std::unique_ptr<ScopedGlobalServiceContextForTest> makeScopedServiceContext() override {
+        return std::make_unique<ScopedGlobalServiceContextForTest>(
+            ServiceContext::make(nullptr, nullptr, makeSystemTickSource()));
+    }
 };
 
 TEST_F(TicketHolderTestTick, TotalTimeQueueMicrosAccumulated) {

@@ -32,9 +32,8 @@ DocumentSourceChangeStreamSpec buildChangeStreamSpec(Timestamp ts) {
 
 class ChangeStreamShardTargeterTest : public ServiceContextTest {
 public:
-    ChangeStreamShardTargeterTest()
-        : ServiceContextTest(
-              std::make_unique<ScopedGlobalServiceContextForTest>(/*shouldSetupTL=*/false)) {
+    void setUp() override {
+        ServiceContextTest::setUp();
         _opCtx = makeOperationContext();
         _expCtx = make_intrusive<ExpressionContextForTest>(_opCtx.get());
     }

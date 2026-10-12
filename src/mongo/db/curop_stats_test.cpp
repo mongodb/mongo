@@ -23,10 +23,10 @@ namespace {
 
 class CurOpStatsTest : public ServiceContextTest {
 protected:
-    CurOpStatsTest()
-        : ServiceContextTest(
-              std::make_unique<ScopedGlobalServiceContextForTest>(ServiceContext::make(
-                  nullptr, nullptr, std::make_unique<TickSourceMock<Microseconds>>()))) {}
+    std::unique_ptr<ScopedGlobalServiceContextForTest> makeScopedServiceContext() override {
+        return std::make_unique<ScopedGlobalServiceContextForTest>(ServiceContext::make(
+            nullptr, nullptr, std::make_unique<TickSourceMock<Microseconds>>()));
+    }
 
     void advanceTime(Microseconds amount) {
         tickSource()->advance(amount);

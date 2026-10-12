@@ -26,8 +26,6 @@ namespace mongo {
 
 class CollectionMarkersTest : public StorageEngineTest {
 public:
-    explicit CollectionMarkersTest(Options options = {}) : StorageEngineTest(std::move(options)) {}
-
     struct RecordIdAndWall {
         RecordId recordId;
         Date_t wallTime;

@@ -12,6 +12,7 @@
 
 #include <string>
 
+#include <boost/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
@@ -19,47 +20,51 @@ namespace {
 
 class WindowFunctionAddToSetTest : public AggregationContextFixture {
 public:
-    WindowFunctionAddToSetTest() : expCtx(getExpCtx()), addToSet(expCtx.get()) {}
+    void setUp() override {
+        AggregationContextFixture::setUp();
+        expCtx = getExpCtx();
+        addToSet.emplace(expCtx.get());
+    }
 
     void addValuesToWindow(const std::vector<Value>& values) {
         for (const auto& val : values)
-            addToSet.add(val);
+            addToSet->add(val);
     }
 
     boost::intrusive_ptr<ExpressionContext> expCtx;
-    WindowFunctionAddToSet addToSet;
+    boost::optional<WindowFunctionAddToSet> addToSet;
 };
 
 TEST_F(WindowFunctionAddToSetTest, EmptyWindowReturnsDefault) {
-    ASSERT_VALUE_EQ(addToSet.getValue(), Value{std::vector<Value>()});
+    ASSERT_VALUE_EQ(addToSet->getValue(), Value{std::vector<Value>()});
 
-    addToSet.add(Value{1});
-    addToSet.remove(Value{1});
-    ASSERT_VALUE_EQ(addToSet.getValue(), Value{std::vector<Value>()});
+    addToSet->add(Value{1});
+    addToSet->remove(Value{1});
+    ASSERT_VALUE_EQ(addToSet->getValue(), Value{std::vector<Value>()});
 }
 
 TEST_F(WindowFunctionAddToSetTest, SingletonWindowShouldReturnAVector) {
-    addToSet.add(Value{5});
-    ASSERT_VALUE_EQ(addToSet.getValue(), Value{std::vector<Value>{Value{5}}});
+    addToSet->add(Value{5});
+    ASSERT_VALUE_EQ(addToSet->getValue(), Value{std::vector<Value>{Value{5}}});
 
-    addToSet.reset();
-    addToSet.add(Value{std::string("str")});
-    ASSERT_VALUE_EQ(addToSet.getValue(), Value{std::vector<Value>{Value{std::string("str")}}});
+    addToSet->reset();
+    addToSet->add(Value{std::string("str")});
+    ASSERT_VALUE_EQ(addToSet->getValue(), Value{std::vector<Value>{Value{std::string("str")}}});
 }
 
 TEST_F(WindowFunctionAddToSetTest, ComplexWindow) {
     addValuesToWindow({Value{2}, Value{5}, Value{std::string("str")}, Value{BSONObj()}});
 
     std::vector<Value> expected = {Value{2}, Value{5}, Value{std::string("str")}, Value{BSONObj()}};
-    ASSERT_VALUE_EQ(addToSet.getValue(), Value{expected});
+    ASSERT_VALUE_EQ(addToSet->getValue(), Value{expected});
 }
 
 TEST_F(WindowFunctionAddToSetTest, Removal) {
     addValuesToWindow({Value{1}, Value{2}});
-    addToSet.remove(Value{1});
+    addToSet->remove(Value{1});
 
     std::vector<Value> expected = {Value{2}};
-    ASSERT_VALUE_EQ(addToSet.getValue(), Value{expected});
+    ASSERT_VALUE_EQ(addToSet->getValue(), Value{expected});
 }
 
 TEST_F(WindowFunctionAddToSetTest, NotAllowDuplicates) {
@@ -67,15 +72,15 @@ TEST_F(WindowFunctionAddToSetTest, NotAllowDuplicates) {
 
     // $addToSet window function returns a vector of values that are in a set excluding duplicates.
     std::vector<Value> expected = {Value{1}, Value{2}, Value{3}};
-    ASSERT_VALUE_EQ(addToSet.getValue(), Value{expected});
+    ASSERT_VALUE_EQ(addToSet->getValue(), Value{expected});
 
-    addToSet.remove(Value{1});
+    addToSet->remove(Value{1});
     // Have to remove element '1' twice to remove it from the set.
-    ASSERT_VALUE_EQ(addToSet.getValue(), Value{expected});
+    ASSERT_VALUE_EQ(addToSet->getValue(), Value{expected});
 
-    addToSet.remove(Value{1});
+    addToSet->remove(Value{1});
     expected = {Value{2}, Value{3}};
-    ASSERT_VALUE_EQ(addToSet.getValue(), Value{expected});
+    ASSERT_VALUE_EQ(addToSet->getValue(), Value{expected});
 }
 
 TEST_F(WindowFunctionAddToSetTest, NestedArraysShouldReturnNestedArrays) {
@@ -83,7 +88,7 @@ TEST_F(WindowFunctionAddToSetTest, NestedArraysShouldReturnNestedArrays) {
     addValuesToWindow({vecValue, vecValue, vecValue});
 
     std::vector<Value> expected = {vecValue};
-    ASSERT_VALUE_EQ(addToSet.getValue(), Value{expected});
+    ASSERT_VALUE_EQ(addToSet->getValue(), Value{expected});
 }
 
 TEST_F(WindowFunctionAddToSetTest, IdenticalDocsAndDocsWithDifferentFieldsOrder) {
@@ -95,14 +100,14 @@ TEST_F(WindowFunctionAddToSetTest, IdenticalDocsAndDocsWithDifferentFieldsOrder)
     addValuesToWindow({doc1, doc2, doc3, doc4});
 
     std::vector<Value> expected = {doc1, doc2, doc4};  // doc1 and doc3 are identical.
-    ASSERT_VALUE_EQ(addToSet.getValue(), Value{expected});
+    ASSERT_VALUE_EQ(addToSet->getValue(), Value{expected});
 
-    addToSet.remove(doc1);
-    ASSERT_VALUE_EQ(addToSet.getValue(), Value{expected});
+    addToSet->remove(doc1);
+    ASSERT_VALUE_EQ(addToSet->getValue(), Value{expected});
 
-    addToSet.remove(doc2);
+    addToSet->remove(doc2);
     expected = {doc1, doc4};
-    ASSERT_VALUE_EQ(addToSet.getValue(), Value{expected});
+    ASSERT_VALUE_EQ(addToSet->getValue(), Value{expected});
 }
 
 }  // namespace

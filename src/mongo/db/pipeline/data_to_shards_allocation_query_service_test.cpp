@@ -16,9 +16,8 @@ namespace mongo {
 
 class DataToShardsAllocationQueryServiceTest : public ServiceContextTest {
 public:
-    DataToShardsAllocationQueryServiceTest()
-        : ServiceContextTest(
-              std::make_unique<ScopedGlobalServiceContextForTest>(/*shouldSetupTL=*/false)) {
+    void setUp() override {
+        ServiceContextTest::setUp();
         _opCtx = makeOperationContext();
     }
 

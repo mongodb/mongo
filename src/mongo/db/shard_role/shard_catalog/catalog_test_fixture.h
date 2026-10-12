@@ -29,11 +29,14 @@ class [[MONGO_MOD_OPEN]] CatalogTestFixture : public ServiceContextTest {
 public:
     using Options = MongoDScopedGlobalServiceContextForTest::Options;
 
-    CatalogTestFixture() : CatalogTestFixture(Options{}) {}
+    virtual Options makeServiceContextOptions() {
+        return Options{};
+    }
 
-    explicit CatalogTestFixture(Options options)
-        : ServiceContextTest(std::make_unique<CatalogScopedGlobalServiceContextForTest>(
-              std::move(options), shouldSetupTL)) {}
+    std::unique_ptr<ScopedGlobalServiceContextForTest> makeScopedServiceContext() override {
+        return std::make_unique<CatalogScopedGlobalServiceContextForTest>(
+            makeServiceContextOptions(), shouldSetupTransportLayer());
+    }
 
     OperationContext* operationContext() const;
 

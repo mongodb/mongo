@@ -25,9 +25,8 @@ repl::OplogEntry buildInsertOplogEntry(const NamespaceString& nss, BSONObj o) {
 
 class ChangeStreamReaderBuilderImplTest : public ServiceContextTest {
 public:
-    ChangeStreamReaderBuilderImplTest()
-        : ServiceContextTest(
-              std::make_unique<ScopedGlobalServiceContextForTest>(/*shouldSetupTL=*/false)) {
+    void setUp() override {
+        ServiceContextTest::setUp();
         _opCtx = makeOperationContext();
         _expCtx = boost::intrusive_ptr<ExpressionContextForTest>(new ExpressionContextForTest());
     }

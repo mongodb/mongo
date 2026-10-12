@@ -72,7 +72,12 @@ public:
     boost::optional<OrderedPathSet> shardKeys;
 };
 
-class SearchTest : service_context_test::WithSetupTransportLayer, public AggregationContextFixture {
+class SearchTest : public AggregationContextFixture {
+public:
+    bool shouldSetupTransportLayer() const override {
+        return true;
+    }
+
 protected:
     // Builds a DistributedPlanContext whose suffix is the given pipeline. The prefix is empty.
     auto makePlanCtx(std::string_view pipelineJson) {
