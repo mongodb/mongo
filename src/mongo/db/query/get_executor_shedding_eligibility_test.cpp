@@ -97,37 +97,16 @@ protected:
 // -- a second loop iteration would pass trivially.
 
 // An _id point query takes the express path, so it is left ineligible even though the command is
-// find. Eligibility is never set here, so both paths can be exercised on one operation.
+// find.
 TEST_F(GetExecutorSheddingEligibilityTest, ExpressQueryIsNotMarkedEligible) {
     setCurOpCommand("find");
-    for (bool deferredEnabled : {false, true}) {
-        unittest::ServerParameterGuard deferredEngineChoice{
-            "featureFlagGetExecutorDeferredEngineChoice", deferredEnabled};
-
-        const auto summary = planFind(BSON("_id" << 7));
-        ASSERT_STRING_CONTAINS(summary, "EXPRESS");
-        ASSERT_FALSE(isOperationQueryMemorySheddingEligible(operationContext()))
-            << "deferredEngineChoice=" << deferredEnabled;
-    }
-}
-
-// A query that misses the express path is marked eligible when running under the find command.
-TEST_F(GetExecutorSheddingEligibilityTest, NonExpressQueryIsMarkedEligibleLegacyPath) {
-    setCurOpCommand("find");
-    unittest::ServerParameterGuard deferredEngineChoice{
-        "featureFlagGetExecutorDeferredEngineChoice", false};
-
+    const auto summary = planFind(BSON("_id" << 7));
+    ASSERT_STRING_CONTAINS(summary, "EXPRESS");
     ASSERT_FALSE(isOperationQueryMemorySheddingEligible(operationContext()));
-    const auto summary = planFind(BSON("a" << BSON("$gt" << 5)));
-    ASSERT_STRING_OMITS(summary, "EXPRESS");
-    ASSERT_TRUE(isOperationQueryMemorySheddingEligible(operationContext()));
 }
 
 TEST_F(GetExecutorSheddingEligibilityTest, NonExpressQueryIsMarkedEligibleDeferredPath) {
     setCurOpCommand("find");
-    unittest::ServerParameterGuard deferredEngineChoice{
-        "featureFlagGetExecutorDeferredEngineChoice", true};
-
     ASSERT_FALSE(isOperationQueryMemorySheddingEligible(operationContext()));
     const auto summary = planFind(BSON("a" << BSON("$gt" << 5)));
     ASSERT_STRING_OMITS(summary, "EXPRESS");
@@ -140,16 +119,10 @@ TEST_F(GetExecutorSheddingEligibilityTest, NonExpressQueryIsMarkedEligibleDeferr
 TEST_F(GetExecutorSheddingEligibilityTest, CallerWithoutFindCommandIsNeverMarkedEligible) {
     for (const char* commandName : {static_cast<const char*>(nullptr), "insert"}) {
         setCurOpCommand(commandName);
-        for (bool deferredEnabled : {false, true}) {
-            unittest::ServerParameterGuard deferredEngineChoice{
-                "featureFlagGetExecutorDeferredEngineChoice", deferredEnabled};
-
-            const auto summary = planFind(BSON("a" << BSON("$gt" << 5)));
-            ASSERT_STRING_OMITS(summary, "EXPRESS");
-            ASSERT_FALSE(isOperationQueryMemorySheddingEligible(operationContext()))
-                << "command=" << (commandName ? commandName : "<none>")
-                << " deferredEngineChoice=" << deferredEnabled;
-        }
+        const auto summary = planFind(BSON("a" << BSON("$gt" << 5)));
+        ASSERT_STRING_OMITS(summary, "EXPRESS");
+        ASSERT_FALSE(isOperationQueryMemorySheddingEligible(operationContext()))
+            << "command=" << (commandName ? commandName : "<none>");
     }
 }
 

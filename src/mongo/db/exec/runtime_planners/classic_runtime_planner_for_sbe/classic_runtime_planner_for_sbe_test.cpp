@@ -618,30 +618,16 @@ TEST_F(ClassicRuntimePlannerForSbeTest, ClassicCachedPlannerReplansOnFailureMemo
                 std::make_unique<sbe::MockExceededMemoryLimitStage>(0), std::move(planStageData));
         }
 
-        const bool deferredEnabled =
-            feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice.checkEnabled();
-        if (deferredEnabled) {
-            // With the deferred executor, the cached planner signals replanning by throwing
-            // ReplanningRequired rather than replanning inline.
-            ASSERT_THROWS_WITH_CHECK(
-                plannerGenerator->makePlanner(),
-                ExceptionFor<ErrorCodes::ReplanningRequired>,
-                ([](const ExceptionFor<ErrorCodes::ReplanningRequired>& ex) {
-                    ASSERT_STRING_SEARCH_REGEX(ex.reason(), "cached plan returned: ");
-                    ASSERT_EQ(ex.extraInfo<ReplanningRequiredInfo>()->getCacheMode(),
-                              plan_cache_util::CacheMode::NeverCache);
-                }));
-        } else {
-            std::unique_ptr<PlannerInterface> cachedPlanner = plannerGenerator->makePlanner();
-            auto cachedExec = cachedPlanner->makeExecutor(std::move(cq));
-            PlanSummaryStats stats;
-            cachedExec->getPlanExplainer().getSummaryStats(&stats);
-            ASSERT_TRUE(stats.replanReason)
-                << "CachedPlanner should replan upon hitting a memory exceeds error.";
-            ASSERT_STRING_SEARCH_REGEX(*stats.replanReason, "cached plan returned: ");
-            assertPlanExecutorReturnsCorrectSums(expectedSums, cachedExec.get());
-        }
-
+        // With the deferred executor, the cached planner signals replanning by throwing
+        // ReplanningRequired rather than replanning inline.
+        ASSERT_THROWS_WITH_CHECK(
+            plannerGenerator->makePlanner(),
+            ExceptionFor<ErrorCodes::ReplanningRequired>,
+            ([](const ExceptionFor<ErrorCodes::ReplanningRequired>& ex) {
+                ASSERT_STRING_SEARCH_REGEX(ex.reason(), "cached plan returned: ");
+                ASSERT_EQ(ex.extraInfo<ReplanningRequiredInfo>()->getCacheMode(),
+                          plan_cache_util::CacheMode::NeverCache);
+            }));
         ASSERT(getClassicPlanCache().getCacheEntryIfActive(classicCacheKey));
     }
 }
@@ -669,7 +655,6 @@ TEST_F(ClassicRuntimePlannerForSbeTest, ClassicCachedPlannerReplansOnHittingMaxN
     }
 
     {  // Run CachedPlanner to execute the cached plan.
-        std::unique_ptr<PlannerInterface> cachedPlanner;
         auto [cq, plannerData] = createPlannerData();
         auto [classicCacheKey, plannerGenerator] =
             makePlannerGeneratorFromClassicCache(cq.get(),
@@ -689,34 +674,18 @@ TEST_F(ClassicRuntimePlannerForSbeTest, ClassicCachedPlannerReplansOnHittingMaxN
                 std::make_unique<sbe::MockExceededMaxReadsStage>(0), std::move(planStageData));
         }
 
-
-        const bool deferredEnabled =
-            feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice.checkEnabled();
-        if (deferredEnabled) {
-            // With the deferred executor the cached planner deactivates the cache entry and then
-            // signals replanning via ReplanningRequired (re-caching happens at the retry level).
-            ASSERT_THROWS_WITH_CHECK(
-                plannerGenerator->makePlanner(),
-                ExceptionFor<ErrorCodes::ReplanningRequired>,
-                ([](const ExceptionFor<ErrorCodes::ReplanningRequired>& ex) {
-                    ASSERT_STRING_SEARCH_REGEX(ex.reason(),
-                                               "cached plan was less efficient than expected");
-                    ASSERT_EQ(ex.extraInfo<ReplanningRequiredInfo>()->getCacheMode(),
-                              plan_cache_util::CacheMode::AlwaysCache);
-                }));
-            ASSERT_TRUE(getClassicPlanCache().getCacheEntryIfActive(classicCacheKey));
-        } else {
-            cachedPlanner = plannerGenerator->makePlanner();
-            auto cachedExec = cachedPlanner->makeExecutor(std::move(cq));
-            PlanSummaryStats stats;
-            cachedExec->getPlanExplainer().getSummaryStats(&stats);
-            ASSERT_TRUE(stats.replanReason)
-                << "CachedPlanner should replan upon hitting max number of reads allowed.";
-            ASSERT_STRING_SEARCH_REGEX(*stats.replanReason,
-                                       "cached plan was less efficient than expected");
-            assertPlanExecutorReturnsCorrectSums(expectedSums, cachedExec.get());
-            ASSERT_TRUE(getClassicPlanCache().getCacheEntryIfActive(classicCacheKey));
-        }
+        // With the deferred executor the cached planner deactivates the cache entry and then
+        // signals replanning via ReplanningRequired (re-caching happens at the retry level).
+        ASSERT_THROWS_WITH_CHECK(
+            plannerGenerator->makePlanner(),
+            ExceptionFor<ErrorCodes::ReplanningRequired>,
+            ([](const ExceptionFor<ErrorCodes::ReplanningRequired>& ex) {
+                ASSERT_STRING_SEARCH_REGEX(ex.reason(),
+                                           "cached plan was less efficient than expected");
+                ASSERT_EQ(ex.extraInfo<ReplanningRequiredInfo>()->getCacheMode(),
+                          plan_cache_util::CacheMode::AlwaysCache);
+            }));
+        ASSERT_TRUE(getClassicPlanCache().getCacheEntryIfActive(classicCacheKey));
     }
 }
 

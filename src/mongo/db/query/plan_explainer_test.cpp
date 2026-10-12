@@ -657,11 +657,9 @@ TEST_F(PlanExplainerTest, GetPlanEntriesV3SBEMultiPlanner) {
     }
 }
 
-TEST_F(PlanExplainerTest, V3SbeQueryWithDeferredEngineChoiceDisabled) {
+TEST_F(PlanExplainerTest, V3SbeQueryReportsMultiPlannerReason) {
     // A multi-planned SBE query explained at a V3 verbosity must report why the deciding ranker was
-    // chosen, even with the deferred engine feature disabled.
-    unittest::ServerParameterGuard deferredEngineChoiceOff(
-        "featureFlagGetExecutorDeferredEngineChoice", false);
+    // chosen.
     unittest::ServerParameterGuard sbeFullController("featureFlagSbeFull", true);
 
     expCtx->setExplain(ExplainOptions::Verbosity::kPlannerStats);
@@ -700,8 +698,7 @@ TEST_F(PlanExplainerTest, V3SbeQueryWithDeferredEngineChoiceDisabled) {
     auto rankerChoice = explained["queryPlanner"]["rankerChoice"];
     ASSERT(rankerChoice.isABSONObj()) << explained;
     ASSERT_EQ(rankerChoice["chosenRanker"].String(), "multiPlanning") << explained;
-    // TODO SERVER-134550 Populate the reason field for SBE + deferred engine off.
-    ASSERT(!rankerChoice.Obj().hasField("reason")) << explained;
+    ASSERT(rankerChoice.Obj().hasField("reason")) << explained;
 }
 
 TEST_F(PlanExplainerTest, GetPlanEntriesV3SBEPlannerChoiceIsStructureOnly) {

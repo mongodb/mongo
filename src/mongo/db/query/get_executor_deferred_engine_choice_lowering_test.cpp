@@ -173,9 +173,6 @@ protected:
     }
 
 private:
-    unittest::ServerParameterGuard sbeFullController{"featureFlagGetExecutorDeferredEngineChoice",
-                                                     true};
-
     boost::intrusive_ptr<ExpressionContext> _expCtx;
     boost::optional<MultipleCollectionAccessor> _collections;
 };
