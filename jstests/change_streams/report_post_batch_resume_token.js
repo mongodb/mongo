@@ -2,6 +2,9 @@
  * Tests that an aggregate with a $changeStream stage reports the latest postBatchResumeToken. This
  * test verifies postBatchResumeToken semantics that are common to sharded and unsharded streams.
  * @tags: [
+ *   # Replicated fast counts can insert unrelated events into the oplog, which can
+ *   # advance a change stream's resume token.
+ *   featureFlagReplicatedFastCount_incompatible,
  *   uses_transactions,
  * ]
  */
@@ -16,11 +19,18 @@ const otherCollection = assertDropAndRecreateCollection(db, "unrelated_" + collN
 const adminDB = db.getSiblingDB("admin");
 
 // Helper function which swallows an assertion if we are running on a sharded cluster.
-assert.eqIfNotMongos = function (val1, val2, errMsg) {
+const assertEqIfNotMongos = function (val1, val2) {
     if (!FixtureHelpers.isMongos(db)) {
-        assert.eq(val1, val2, errMsg);
+        assert.eq(val1, val2, "expecting resume tokens to be equal");
     }
 };
+
+// Assert that the postBatchResumeToken is at the resume token of the last event returned
+// in the batch.
+function assertPbrtMatchesLastEvent(pbrt, eventResumeToken) {
+    const cmp = bsonWoCompare(pbrt, eventResumeToken);
+    assertEqIfNotMongos(cmp, 0);
+}
 
 let docId = 0; // Tracks _id of documents inserted to ensure that we do not duplicate.
 const batchSize = 2;
@@ -72,7 +82,7 @@ let resumeTokenFromDoc = csCursor.next()._id;
 getMorePBRT = csCursor.getResumeToken();
 // When running in a sharded passthrough, we cannot guarantee that the retrieved event was the last
 // item in the oplog, and so we cannot assert that the PBRT is equal to the event's resume token.
-assert.eqIfNotMongos(bsonWoCompare(getMorePBRT, resumeTokenFromDoc), 0);
+assertPbrtMatchesLastEvent(getMorePBRT, resumeTokenFromDoc);
 assert.gt(bsonWoCompare(getMorePBRT, initialAggPBRT), 0);
 
 // Now seed the collection with enough documents to fit in two batches.
@@ -101,7 +111,7 @@ while (csCursor.objsLeftInBatch()) {
 getMorePBRT = csCursor.getResumeToken();
 // When running in a sharded passthrough, we cannot guarantee that the retrieved event was the last
 // item in the oplog, and so we cannot assert that the PBRT is equal to the event's resume token.
-assert.eqIfNotMongos(bsonWoCompare(resumeTokenFromDoc, getMorePBRT), 0);
+assertPbrtMatchesLastEvent(getMorePBRT, resumeTokenFromDoc);
 assert.gt(bsonWoCompare(getMorePBRT, initialAggPBRT), 0);
 
 // Test that postBatchResumeToken advances with writes to an unrelated collection. First make
@@ -207,7 +217,7 @@ const txnClusterTime = txnEvent1.clusterTime;
 // each shard will all have the same clusterTime, but the clusterTimes may differ between shards.
 // Therefore, we cannot guarantee that the clusterTime of txnEvent2 is always the same as the
 // clusterTime of txnEvent1, since the events may have occurred on different shards.
-assert.eqIfNotMongos(txnEvent2.clusterTime, txnClusterTime);
+assertEqIfNotMongos(txnEvent2.clusterTime, txnClusterTime);
 assert.gt(bsonWoCompare(txnEvent1._id, previousGetMorePBRT), 0);
 assert.gt(bsonWoCompare(txnEvent2._id, txnEvent1._id), 0);
 
@@ -226,7 +236,7 @@ assert.eq(csCursor.objsLeftInBatch(), 1);
 const txnEvent3 = csCursor.next();
 // As before, we cannot guarantee that the clusterTime of txnEvent3 is always the same as that of
 // txnEvent1 when running in a sharded cluster. However, the PBRT should advance in any deployment.
-assert.eqIfNotMongos(txnEvent3.clusterTime, txnClusterTime);
+assertEqIfNotMongos(txnEvent3.clusterTime, txnClusterTime);
 assert.gt(bsonWoCompare(txnEvent3._id, previousGetMorePBRT), 0);
 
 // Because we wrote to the unrelated collection, the final event in the transaction does not
