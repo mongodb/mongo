@@ -181,6 +181,10 @@ bool _mongocrypt_key_parse_owned(const bson_t *bson, _mongocrypt_key_doc_t *out,
         }
 
         if (0 == strcmp("masterKey", field)) {
+            if (has_master_key) {
+                CLIENT_ERR("duplicate field 'masterKey' in key document");
+                return false;
+            }
             has_master_key = true;
             if (!_parse_masterkey(&iter, out, status)) {
                 return false;

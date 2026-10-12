@@ -171,18 +171,25 @@ bool _mongocrypt_kek_parse_owned(const bson_t *bson, _mongocrypt_kek_t *kek, mon
     BSON_ASSERT_PARAM(bson);
     BSON_ASSERT_PARAM(kek);
 
+    /* Parse into a scratch KEK and only commit to `kek` once the whole
+     * definition is valid. Writing the provider tag before the union payload is
+     * populated would leave `kek` in a state where the tag and the union
+     * disagree, which _mongocrypt_kek_cleanup would act on. */
+    _mongocrypt_kek_t parsed;
+    memset(&parsed, 0, sizeof(parsed));
+
     if (!_mongocrypt_parse_required_utf8(bson, "provider", &kms_provider, status)) {
         goto done;
     }
 
-    kek->kmsid = bson_strdup(kms_provider);
+    parsed.kmsid = bson_strdup(kms_provider);
 
     _mongocrypt_kms_provider_t type;
-    if (!mc_kmsid_parse(kek->kmsid, &type, &kek->kmsid_name, status)) {
+    if (!mc_kmsid_parse(parsed.kmsid, &type, &parsed.kmsid_name, status)) {
         goto done;
     }
 
-    kek->kms_provider = type;
+    parsed.kms_provider = type;
     switch (type) {
     default:
     case MONGOCRYPT_KMS_PROVIDER_NONE: {
@@ -190,7 +197,7 @@ bool _mongocrypt_kek_parse_owned(const bson_t *bson, _mongocrypt_kek_t *kek, mon
         goto done;
     }
     case MONGOCRYPT_KMS_PROVIDER_AWS: {
-        if (!_mongocrypt_aws_kek_parse(&kek->provider.aws, kek->kmsid, bson, status)) {
+        if (!_mongocrypt_aws_kek_parse(&parsed.provider.aws, parsed.kmsid, bson, status)) {
             goto done;
         }
         break;
@@ -202,27 +209,32 @@ bool _mongocrypt_kek_parse_owned(const bson_t *bson, _mongocrypt_kek_t *kek, mon
         break;
     }
     case MONGOCRYPT_KMS_PROVIDER_AZURE: {
-        if (!_mongocrypt_azure_kek_parse(&kek->provider.azure, kek->kmsid, bson, status)) {
+        if (!_mongocrypt_azure_kek_parse(&parsed.provider.azure, parsed.kmsid, bson, status)) {
             goto done;
         }
         break;
     }
     case MONGOCRYPT_KMS_PROVIDER_GCP: {
-        if (!_mongocrypt_gcp_kek_parse(&kek->provider.gcp, kek->kmsid, bson, status)) {
+        if (!_mongocrypt_gcp_kek_parse(&parsed.provider.gcp, parsed.kmsid, bson, status)) {
             goto done;
         }
         break;
     }
     case MONGOCRYPT_KMS_PROVIDER_KMIP: {
-        if (!_mongocrypt_kmip_kek_parse(&kek->provider.kmip, kek->kmsid, bson, status)) {
+        if (!_mongocrypt_kmip_kek_parse(&parsed.provider.kmip, parsed.kmsid, bson, status)) {
             goto done;
         }
         break;
     }
     }
 
+    /* Success: replace any prior contents of `kek` and take ownership. */
+    _mongocrypt_kek_cleanup(kek);
+    *kek = parsed;
+    memset(&parsed, 0, sizeof(parsed));
     ret = true;
 done:
+    _mongocrypt_kek_cleanup(&parsed);
     bson_free(kms_provider);
     return ret;
 }

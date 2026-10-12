@@ -443,9 +443,9 @@ static uint32_t _mongocrypt_calculate_plaintext_len(uint32_t inlen,
                                                     _mongocrypt_hmac_type_t hmac,
                                                     mongocrypt_status_t *status) {
     const uint32_t hmaclen = (hmac == HMAC_NONE) ? 0 : MONGOCRYPT_HMAC_LEN;
-    const uint32_t mincipher = (mode == MODE_CTR) ? 0 : MONGOCRYPT_BLOCK_SIZE;
+    const uint32_t mincipher = (mode == MODE_CTR) ? 1 : MONGOCRYPT_BLOCK_SIZE;
     if (inlen < (MONGOCRYPT_IV_LEN + mincipher + hmaclen)) {
-        CLIENT_ERR("input ciphertext too small. Must be at least %" PRIu32 " bytes",
+        CLIENT_ERR("input ciphertext too small. Must be more than %" PRIu32 " bytes",
                    MONGOCRYPT_IV_LEN + mincipher + hmaclen);
         return 0;
     }
@@ -1346,7 +1346,11 @@ bool _mongocrypt_unwrap_key(_mongocrypt_crypto_t *crypto,
 
     // _mongocrypt_wrap_key() uses FLE1 algorithm parameters.
     _mongocrypt_buffer_init(dek);
-    _mongocrypt_buffer_resize(dek, fle1alg->get_plaintext_len(encrypted_dek->len, status));
+    const uint32_t plaintext_len = fle1alg->get_plaintext_len(encrypted_dek->len, status);
+    if (!mongocrypt_status_ok(status)) {
+        return false;
+    }
+    _mongocrypt_buffer_resize(dek, plaintext_len);
 
     if (!fle1alg->do_decrypt(crypto, NULL /* associated data. */, kek, encrypted_dek, dek, &bytes_written, status)) {
         return false;

@@ -2303,7 +2303,11 @@ static bool _check_cmd_for_auto_encrypt_bulkWrite(mongocrypt_binary_t *cmd,
         return false;
     }
 
-    const char *target_ns = bson_iter_utf8(&ns_iter, NULL /* length */);
+    uint32_t target_ns_len;
+    const char *target_ns = bson_iter_utf8(&ns_iter, &target_ns_len);
+    if (!_mongocrypt_check_no_embedded_nul(target_ns, target_ns_len, "namespace in `bulkWrite` command", status)) {
+        return false;
+    }
     // Parse `target_ns` into "<db>.<coll>"
     const char *dot = strstr(target_ns, ".");
     if (!dot) {
@@ -2375,7 +2379,12 @@ _check_cmd_for_auto_encrypt(mongocrypt_binary_t *cmd, bool *bypass, char **targe
     }
 
     if (BSON_ITER_HOLDS_UTF8(&target_coll_iter)) {
-        *target_coll = bson_strdup(bson_iter_utf8(&target_coll_iter, NULL));
+        uint32_t target_coll_len;
+        const char *target_coll_str = bson_iter_utf8(&target_coll_iter, &target_coll_len);
+        if (!_mongocrypt_check_no_embedded_nul(target_coll_str, target_coll_len, "collection name", status)) {
+            return false;
+        }
+        *target_coll = bson_strdup(target_coll_str);
     } else {
         *target_coll = NULL;
     }
@@ -2572,7 +2581,11 @@ static bool find_collections_in_pipeline(mc_schema_broker_t *sb,
                                    stage_key);
                         return false;
                     }
-                    const char *from = bson_iter_utf8(&lookup_iter, NULL);
+                    uint32_t from_len;
+                    const char *from = bson_iter_utf8(&lookup_iter, &from_len);
+                    if (!_mongocrypt_check_no_embedded_nul(from, from_len, "'from' collection name", status)) {
+                        return false;
+                    }
                     if (!mc_schema_broker_request(sb, db, from, status)) {
                         return false;
                     }
@@ -2631,7 +2644,11 @@ static bool find_collections_in_pipeline(mc_schema_broker_t *sb,
                                    stage_key);
                         return false;
                     }
-                    const char *coll = bson_iter_utf8(&unionWith_iter, NULL);
+                    uint32_t coll_len;
+                    const char *coll = bson_iter_utf8(&unionWith_iter, &coll_len);
+                    if (!_mongocrypt_check_no_embedded_nul(coll, coll_len, "'coll' collection name", status)) {
+                        return false;
+                    }
                     if (!mc_schema_broker_request(sb, db, coll, status)) {
                         return false;
                     }
@@ -2720,6 +2737,10 @@ bool mongocrypt_ctx_encrypt_init(mongocrypt_ctx_t *ctx, const char *db, int32_t 
 
     if (!_mongocrypt_validate_and_copy_string(db, db_len, &ectx->cmd_db) || 0 == strlen(ectx->cmd_db)) {
         return _mongocrypt_ctx_fail_w_msg(ctx, "invalid db");
+    }
+
+    if (strchr(ectx->cmd_db, '.')) {
+        return _mongocrypt_ctx_fail_w_msg(ctx, "invalid db: must not contain a dot");
     }
 
     if (0 == strcmp(ectx->cmd_name, "bulkWrite")) {

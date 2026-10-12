@@ -252,7 +252,12 @@ const _mongocrypt_buffer_t *mc_FLE2InsertUpdatePayload_decrypt(_mongocrypt_crypt
         return NULL;
     }
 
-    _mongocrypt_buffer_resize(&iup->plaintext, fle2aead->get_plaintext_len(ciphertext.len, status));
+    const uint32_t plaintext_len = fle2aead->get_plaintext_len(ciphertext.len, status);
+    if (!mongocrypt_status_ok(status)) {
+        return NULL;
+    }
+
+    _mongocrypt_buffer_resize(&iup->plaintext, plaintext_len);
     uint32_t bytes_written; /* ignored */
 
     if (!fle2aead

@@ -984,6 +984,10 @@ bool _mongocrypt_parse_kms_providers(mongocrypt_binary_t *kms_providers_definiti
         } else if (0 == strcmp(field_name, "kmip") && bson_empty(&field_bson)) {
             kms_providers->need_credentials |= MONGOCRYPT_KMS_PROVIDER_KMIP;
         } else if (0 == strcmp(field_name, "kmip")) {
+            if (0 != (kms_providers->configured_providers & MONGOCRYPT_KMS_PROVIDER_KMIP)) {
+                CLIENT_ERR("kmip KMS provider already set");
+                return false;
+            }
             if (!_mongocrypt_opts_kms_provider_kmip_parse(&kms_providers->kmip_mut, field_name, &field_bson, status)) {
                 return false;
             }
