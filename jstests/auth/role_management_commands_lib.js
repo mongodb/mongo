@@ -310,6 +310,19 @@ export function runAllRoleManagementCommandsTests(conn, writeConcern) {
         assert.commandWorked(db.foo.insert({a: 1}));
         assert.eq(8, db.foo.count());
 
+        assert.gt(
+            adminUserAdmin.system.users.countDocuments({"roles.role": "testRole2"}),
+            0,
+            "testRole2 should be assigned to users before calling dropRole in order to test that references are cleaned up correctly",
+        );
+        assert.gt(
+            adminUserAdmin.system.roles.countDocuments({"roles.role": "testRole2"}),
+            0,
+            "testRole2 should be referenced by at least one other role before calling dropRole in order to test that references are cleaned up correctly",
+        );
+        assert.eq(1, adminUserAdmin.system.users.countDocuments({"roles.role": "testRole4"}));
+        assert.eq(1, adminUserAdmin.system.roles.countDocuments({"roles.role": "testRole1"}));
+
         testUserAdmin.dropRole('testRole2', writeConcern);
 
         assert.doesNotThrow(function() {
@@ -319,6 +332,26 @@ export function runAllRoleManagementCommandsTests(conn, writeConcern) {
         assert.eq(8, db.foo.count());
 
         assert.eq(3, testUserAdmin.getRoles().length);
+        assert.eq(
+            adminUserAdmin.system.users.countDocuments({"roles.role": "testRole2"}),
+            0,
+            "dropRole should clean up all role references in system.users",
+        );
+        assert.eq(
+            adminUserAdmin.system.roles.countDocuments({"roles.role": "testRole2"}),
+            0,
+            "dropRole should clean up all role references in system.roles",
+        );
+        assert.eq(
+            1,
+            adminUserAdmin.system.users.countDocuments({"roles.role": "testRole4"}),
+            "dropRole should not remove references to other roles in system.users",
+        );
+        assert.eq(
+            1,
+            adminUserAdmin.system.roles.countDocuments({"roles.role": "testRole1"}),
+            "dropRole should not remove references to other roles in system.roles",
+        );
     })();
 
     (function testDropAllRolesFromDatabase() {
@@ -328,6 +361,50 @@ export function runAllRoleManagementCommandsTests(conn, writeConcern) {
             db.foo.findOne();
         });
         assert.eq(3, testUserAdmin.getRoles().length);
+        assert.gt(
+            adminUserAdmin.system.users.countDocuments({"roles.db": "test"}),
+            0,
+            "Some roles should be assigned to users before calling dropAllRoles in order to test that references are cleaned up correctly",
+        );
+
+        // Create a role with db = "admin" so it will not get dropped by db.dropAllRoles().
+        // The role contains a reference to a role on the "test" db which should be cleaned up by db.dropAllRoles().
+        adminUserAdmin.createRole(
+            {
+                role: "testNestedRoleReference",
+                roles: [
+                    {role: "testRole1", db: "test"},
+                    {role: "adminRole", db: "admin"},
+                ],
+                privileges: [{resource: {cluster: true}, actions: ["connPoolSync"]}],
+            },
+            writeConcern,
+        );
+        adminUserAdmin.createUser(
+            {
+                user: "testMixedRolesUser",
+                pwd: "pwd",
+                roles: [
+                    {role: "testRole1", db: "test"},
+                    {role: "adminRole", db: "admin"},
+                ],
+            },
+            writeConcern,
+        );
+        assert.eq(1, adminUserAdmin.system.roles.countDocuments({"roles.role": "adminRole"}));
+        assert.eq(1, adminUserAdmin.system.users.countDocuments({"roles.role": "adminRole"}));
+        assert.eq(
+            1,
+            adminUserAdmin.system.users.countDocuments({"roles.role": "userAdminAnyDatabase"}),
+        );
+        assert.gt(
+            adminUserAdmin.system.roles.countDocuments({
+                "roles.db": "test",
+                db: {$ne: "test"},
+            }),
+            0,
+            'Some "test" roles should be referenced by other non-"test" roles before calling dropAllRoles in order to verify that references are cleaned up correctly',
+        );
 
         testUserAdmin.dropAllRoles(writeConcern);
 
@@ -335,5 +412,33 @@ export function runAllRoleManagementCommandsTests(conn, writeConcern) {
             db.foo.findOne();
         });
         assert.eq(0, testUserAdmin.getRoles().length);
+        assert.eq(
+            adminUserAdmin.system.roles.countDocuments({
+                "roles.db": "test",
+                db: {$ne: "test"},
+            }),
+            0,
+            "dropAllRoles should clean up all role references in system.roles",
+        );
+        assert.eq(
+            adminUserAdmin.system.users.countDocuments({"roles.db": "test"}),
+            0,
+            "dropAllRoles should clean up all role references in system.users",
+        );
+        assert.eq(
+            1,
+            adminUserAdmin.system.roles.countDocuments({"roles.role": "adminRole"}),
+            "dropAllRoles should not remove references to roles on other dbs in system.roles",
+        );
+        assert.eq(
+            1,
+            adminUserAdmin.system.users.countDocuments({"roles.role": "adminRole"}),
+            "dropAllRoles should not remove references to roles on other dbs in system.users",
+        );
+        assert.eq(
+            1,
+            adminUserAdmin.system.users.countDocuments({"roles.role": "userAdminAnyDatabase"}),
+            "dropAllRoles should not modify users that do not reference its roles",
+        );
     })();
 }
