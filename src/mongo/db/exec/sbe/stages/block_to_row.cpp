@@ -201,8 +201,10 @@ PlanState BlockToRowStage::getNext() {
     // blocks from our child.
     while (true) {
         // We're about to call getNext() on our child and replace any state we hold in
-        // _deblockedValueRuns. If we happen to yield during this call, don't bother copying our
-        // current state since we're going to replace it in prepareDeblock() anyway.
+        // _deblockedValueRuns, so our output slots no longer hold anything meaningful. Our child
+        // releases its block buffer before it advances, so the views in _deblockedValueRuns may
+        // dangle from here on and doSaveState() must not copy the current value while slot access
+        // is disabled.
         disableSlotAccess();
         auto state = _children[0]->getNext();
         if (state == PlanState::IS_EOF) {
@@ -231,24 +233,34 @@ void BlockToRowStage::close() {
 }
 
 void BlockToRowStage::doSaveState(bool relinquishCursor) {
-    // Copy the values no matter whether the slotsAccessible() returns true or not. We do this
-    // because, even if the slot is not accessible, it is not clear whether we'll need the remaining
-    // values in our input block or not. We make local copies of all unprocessed values, plus the
-    // current one to be conservative. Note that copying the current value is not strictly necessary
-    // when slotsAccessible() is false, but we do it anyway since it's a negligible fixed cost per
-    // save/restore.
-    if (!_deblockedOwned) {
-        for (auto& run : _deblockedValueRuns) {
-            // Copy the values which have not yet been returned, starting at _curIdx.
-            for (size_t i = _curIdx; i < run.size(); ++i) {
-                auto [t, v] = run[i];
-                run[i - _curIdx] = value::copyValue(t, v);
-            }
-            run.resize(run.size() - _curIdx);
-        }
-        _deblockedOwned = true;
-        _curIdx = 0;
+    if (_deblockedOwned) {
+        return;
     }
+
+    // Copy the values which have not yet been returned, starting at '_curIdx'. If our slots are
+    // accessible, also keep the current value at '_curIdx - 1', since our consumer may read our
+    // output slots again after the yield. If they are not, we are inside getNext() on our child
+    // and nothing it has returned may be touched.
+    const bool keepCurrent = slotsAccessible() && _curIdx > 0;
+    const size_t firstIdx = keepCurrent ? _curIdx - 1 : _curIdx;
+
+    for (size_t runIdx = 0; runIdx < _deblockedValueRuns.size(); ++runIdx) {
+        auto& run = _deblockedValueRuns[runIdx];
+        for (size_t i = firstIdx; i < run.size(); ++i) {
+            auto [t, v] = run[i];
+            run[i - firstIdx] = value::copyValue(t, v);
+        }
+        run.resize(run.size() - firstIdx);
+
+        // '_valsOutAccessors' holds its own view of the block's buffer, not of 'run', so re-point
+        // it at our owned copy of the current value.
+        if (keepCurrent) {
+            auto [t, v] = run.front();
+            _valsOutAccessors[runIdx].reset(t, v);
+        }
+    }
+    _deblockedOwned = true;
+    _curIdx -= firstIdx;
 }
 
 std::unique_ptr<PlanStageStats> BlockToRowStage::getStats(bool includeDebugInfo) const {
