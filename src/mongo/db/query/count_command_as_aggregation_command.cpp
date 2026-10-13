@@ -70,9 +70,13 @@ StatusWith<BSONObj> countCommandAsAggregationCommand(const CountCommandRequest& 
     }
 
     if (auto limit = cmd.getLimit()) {
-        BSONObjBuilder limitBuilder(pipelineBuilder.subobjStart());
-        limitBuilder.append("$limit", limit.value());
-        limitBuilder.doneFast();
+        // The count command treats {limit: 0} as unlimited, but pipelines treat it
+        // as invalid, so don't add a $limit stage if the limit value is 0.
+        if (limit.value() != 0) {
+            BSONObjBuilder limitBuilder(pipelineBuilder.subobjStart());
+            limitBuilder.append("$limit", limit.value());
+            limitBuilder.doneFast();
+        }
     }
 
     BSONObjBuilder countBuilder(pipelineBuilder.subobjStart());
