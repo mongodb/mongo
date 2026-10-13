@@ -1900,6 +1900,12 @@ export class ReplSetTest {
         // awaits secondaries before waiting on step-up writes.
         this.awaitSecondaryNodes(this.timeoutMS, null /* secondaries */, 25 /* retryIntervalMS */);
 
+        // A secondary can report SECONDARY before it has learned who the primary is (the primary is
+        // only elected after the initial election timeout, and secondaries learn about it via
+        // heartbeats). Without this, secondary-side paths that forward to the primary fail with
+        // PrimarySteppedDown "No primary exists currently" (e.g. analyzeShardKey on a secondary).
+        this.awaitNodesAgreeOnPrimary(this.timeoutMS);
+
         // TODO(SERVER-57924): cleanup asCluster() to avoid checking here.
         if (this._notX509Auth(primary) || primary.isTLS()) {
             asCluster(this, primary, () => this.waitForStepUpWrites(primary));
