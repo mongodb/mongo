@@ -156,8 +156,6 @@ last-continuous:
       ticket: SERVER-130677
     - test_file: jstests/core/query/bson_size_limit_agg.js
       ticket: SERVER-135206
-    - test_file: jstests/core/query/doc_validation/doc_validation_invalid_validators.js
-      ticket: SERVER-131412
     - test_file: jstests/core/query/query_settings/query_settings_raw_data.js
       ticket: SERVER-112940
     - test_file: jstests/core/query/sbe/sbe_prepare_for_decimal123_invalidation.js
@@ -178,8 +176,6 @@ last-continuous:
       ticket: SERVER-131540
     - test_file: jstests/noPassthrough/index_builds/index_build_stepup_abandoned_before_writable.js
       ticket: SERVER-136502
-    - test_file: jstests/noPassthrough/query/profile/profile_filter.js
-      ticket: SERVER-131412
     - test_file: jstests/noPassthrough/query/query-optimization/runtime_constants_user_roles_auth_bypass.js
       ticket: SERVER-128433
     - test_file: jstests/replsets/arbiter_afterClusterTime_read_concern.js
@@ -319,8 +315,6 @@ last-lts:
       ticket: SERVER-130677
     - test_file: jstests/core/query/bson_size_limit_agg.js
       ticket: SERVER-135206
-    - test_file: jstests/core/query/doc_validation/doc_validation_invalid_validators.js
-      ticket: SERVER-131412
     - test_file: jstests/core/query/query_settings/query_settings_raw_data.js
       ticket: SERVER-112940
     - test_file: jstests/core/query/sbe/sbe_prepare_for_decimal123_invalidation.js
@@ -341,8 +335,6 @@ last-lts:
       ticket: SERVER-131540
     - test_file: jstests/noPassthrough/index_builds/index_build_stepup_abandoned_before_writable.js
       ticket: SERVER-136502
-    - test_file: jstests/noPassthrough/query/profile/profile_filter.js
-      ticket: SERVER-131412
     - test_file: jstests/noPassthrough/query/query-optimization/runtime_constants_user_roles_auth_bypass.js
       ticket: SERVER-128433
     - test_file: jstests/replsets/arbiter_afterClusterTime_read_concern.js
