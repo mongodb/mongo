@@ -1,7 +1,6 @@
 """The libfuzzertest.TestCase for C++ libfuzzer tests."""
 
 import datetime
-import glob
 import os
 from typing import Optional
 
@@ -67,26 +66,42 @@ class CPPLibfuzzerTestCase(interface.ProcessTestCase):
             )
             raise
 
-        # Centipede's corpus database stores known-reproducible crashes (deduped
-        # by signature) under <corpus>/<binary>/<test>/crashing/. It self-prunes
-        # entries that no longer reproduce on the next run, so a non-empty
-        # directory after the fuzzer exits means there are still-reproducible
-        # crashes that this build is responsible for.
-        crash_files = glob.glob(
-            os.path.join(
-                self.corpus_directory,
-                self.short_name(),
-                "LLVMFuzzer.TestOneInput",
-                "crashing",
-                "*",
-            )
-        )
-        crash_files = [f for f in crash_files if os.path.isfile(f)]
+        # Centipede stores findings under <corpus>/<binary>/<test>/crashing/.
+        # Check every named FuzzTest as well as LLVMFuzzer.TestOneInput. Retained
+        # findings do not necessarily reproduce during an interrupted run or
+        # originate in the current build.
+        crash_files = self._get_crash_files()
         if crash_files:
             self.return_code = 1
-            msg = f"{self.short_description()} has {len(crash_files)} reproducible crash(es) in the corpus database: {crash_files}"
+            msg = (
+                f"{self.short_description()} has {len(crash_files)} retained crash(es) "
+                f"in the corpus database: {', '.join(crash_files)}"
+            )
             self.logger.error(msg)
             raise self.failureException(msg)
+
+    def _get_crash_files(self) -> list[str]:
+        """Find retained inputs for this binary, without suppressing corpus access errors."""
+        binary_corpus = os.path.join(self.corpus_directory, self.short_name())
+        try:
+            tests = os.scandir(binary_corpus)
+        except FileNotFoundError:
+            return []
+
+        crash_files: list[str] = []
+        with tests:
+            for test in tests:
+                if not test.is_dir():
+                    continue
+
+                try:
+                    crashes = os.scandir(os.path.join(test.path, "crashing"))
+                except FileNotFoundError:
+                    continue
+
+                with crashes:
+                    crash_files.extend(crash.path for crash in crashes if crash.is_file())
+        return sorted(crash_files)
 
     def _make_process(self):
         default_args = [
