@@ -1,13 +1,13 @@
 # This file is intended to track tests that should be denylisted from multiversion testing due to
-# changes that have not yet been backported to the last-lts or last-continuous development
-# branches.
+# changes that have not yet been backported to the last-lts, last-continuous or last-patch
+# development branches.
 #
 # Usage:
 # Add the server ticket number and the path to the test file for the test you intend to denylist
 # under the appropriate multiversion branch. Any test in a (ticket, test_file) pair that appears in this file but
-# not in the last-lts or last-continuous branch version of this file indicates that a commit has
-# not yet been backported to the last-lts or last-continuous branch and will be excluded from the
-# multiversion suite corresponding to the root level suite key.
+# not in the last-lts, last-continuous or last-patch branch version of this file indicates that a
+# commit has not yet been backported to the last-lts, last-continuous or last-patch branch and will
+# be excluded from the multiversion suite corresponding to the root level suite key.
 #
 # Example: To prevent 'my_test_file.js' from running with the last-continuous binary
 # last-continuous:
@@ -19,6 +19,10 @@
 # last-continuous branch until this file has been updated with the same
 # (ticket, test_file) pair on the last-continuous branch.
 #
+last-patch:
+  all: []
+  suites: {}
+
 last-continuous:
   all:
     - test_file: jstests/core/query/doc_validation/doc_validation_invalid_validators.js
