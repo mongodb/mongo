@@ -1097,6 +1097,12 @@ void Command::snipForLogging(mutablebson::Document* cmdObj) const {
     }
 }
 
+BSONObj snipCommandForLogging(const Command* command, const BSONObj& cmdObj) {
+    mutablebson::Document cmdToLog(cmdObj, mutablebson::Document::kInPlaceDisabled);
+    command->snipForLogging(&cmdToLog);
+    return cmdToLog.getObject();
+}
+
 
 std::unique_ptr<CommandInvocation> BasicCommandWithReplyBuilderInterface::parse(
     OperationContext* opCtx, const OpMsgRequest& request) {
