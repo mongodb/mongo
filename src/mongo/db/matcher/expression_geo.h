@@ -41,7 +41,8 @@ namespace mongo {
 struct PointWithCRS;
 class GeometryContainer;
 
-// This represents either a $within or a $geoIntersects.
+// This represents either a $within or a $geoIntersects. The parsed geometry is owned via shared_ptr
+// and may be evaluated concurrently; see GeometryContainer for the thread-safety contract.
 class GeoExpression {
     GeoExpression(const GeoExpression&) = delete;
     GeoExpression& operator=(const GeoExpression&) = delete;

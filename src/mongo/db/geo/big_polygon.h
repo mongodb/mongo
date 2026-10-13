@@ -112,11 +112,11 @@ private:
     // with the border polygon, otherwise, the border polygon is its complement.
     bool _isNormalized;
 
-    // _borderPoly and _borderLine are lazily initialized caches used for spatial queries
-    // against S2Polygon and S2Polyline respectively. Both the initialization and all S2
-    // operations on these objects must be performed under _borderMu, because S2's internal
-    // edge index (S2EdgeIndex) mutates shared state (query_count_) on every spatial query.
-    // _borderMu also guards mutations of _loop and _isNormalized in Invert().
+    // _borderPoly and _borderLine are lazily initialized caches used for spatial queries against
+    // S2Polygon and S2Polyline respectively. Initializing and using these caches must be performed
+    // under _borderMu so that concurrent queries do not race to construct them. _borderMu also
+    // guards the _loop and _isNormalized mutations in Invert() and Init(); the const methods that
+    // read _loop without it (e.g. Contains(S2Point)) assume Invert()/Init() never run concurrently.
     mutable Mutex _borderMu;
     mutable std::unique_ptr<S2Polyline> _borderLine;
     mutable std::unique_ptr<S2Polygon> _borderPoly;
