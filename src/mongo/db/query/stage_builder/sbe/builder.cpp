@@ -1329,9 +1329,10 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildFetch(const Query
                            resultSlot,
                            outputs,
                            /*isFilterOverIxscan=*/false,
-
-                           /*canUsePathArrayness=*/
-                           _state.expCtx->getQueryKnobConfiguration().getEnablePathArrayness());
+                           /*pathArraynessNss=*/
+                           _state.expCtx->getQueryKnobConfiguration().getEnablePathArrayness()
+                               ? boost::make_optional(fn->nss)
+                               : boost::none);
         if (!filterExpr.isNull()) {
             stage = b.makeFilter(std::move(stage), std::move(filterExpr));
         }

@@ -66,7 +66,7 @@ public:
                                      rootSlot,
                                      slots,
                                      /*isFilterOverIxscan=*/false,
-                                     /*canUsePathArrayness=*/true);
+                                     /*pathArraynessNss=*/_expCtx->getNamespaceString());
 
         sbe::value::TagValueOwned expectedValue =
             sbe::value::TagValueOwned::fromRaw(sbe::value::makeValue(Value(expected)));
@@ -431,7 +431,7 @@ public:
         _expCtx->setPathArraynessForNss(_expCtx->getNamespaceString(), std::move(pathArrayness));
     }
 
-    // Parses 'filter' and runs it against 'doc' with canUsePathArrayness=true.
+    // Parses 'filter' and runs it against 'doc' with path arrayness enabled.
     void runParsedFilter(std::string_view filter,
                          const BSONObj& doc,
                          bool expected,

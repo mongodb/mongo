@@ -26,11 +26,10 @@ class PlanStageSlots;
  * correspond to the full paths needed by the filter. Typically 'isFilterOverIxscan' is false unless
  * we are generating a filter over an index scan.
  *
- * The 'canUsePathArrayness' parameter indicates that the filter runs over raw documents from the
- * ExpressionContext's main namespace, so PathArrayness info for that namespace may be used to
- * elide traverseF. Only the fetch residual filter sets this to true; filters that run on
- * computed/intermediate documents (e.g. non-leading $match after $group/$addFields) must leave
- * it false.
+ * The 'pathArraynessNss' parameter opt-in enables consulting PathArrayness metadata to elide
+ * traverseF; it must name the collection whose raw documents the filter runs over, which is not
+ * necessarily the ExpressionContext's main namespace (e.g. a foreign scan under join
+ * optimization). Filters over computed/intermediate documents must pass boost::none.
  *
  * This function returns an SbExpr. If 'root' is an AND with no children, this function will
  * return a null SbExpr to indicate that there is no filter condition.
@@ -40,7 +39,7 @@ SbExpr generateFilter(StageBuilderState& state,
                       boost::optional<SbSlot> inputSlot,
                       const PlanStageSlots& slots,
                       bool isFilterOverIxscan = false,
-                      bool canUsePathArrayness = false);
+                      const boost::optional<NamespaceString>& pathArraynessNss = boost::none);
 
 /**
  * Converts the list of bit positions inside of any of the bit-test match expressions

@@ -153,6 +153,10 @@ std::pair<SbStage, PlanStageSlots> generateCollScan(StageBuilderState& state,
 
     tassert(9884961, "resumeScanPoint not supported in SBE", !csn->resumeScanPoint);
 
+    tassert(13625900,
+            "expected CollectionScanNode namespace to match CollectionPtr",
+            collection->ns() == csn->nss);
+
     SbBuilder b(state, csn->nodeId());
 
     // Empty range list (∅) — nothing can match, return an empty limit stage.
@@ -200,14 +204,18 @@ std::pair<SbStage, PlanStageSlots> generateCollScan(StageBuilderState& state,
     }
 
     if (csn->filter) {
+        // The filter runs over raw documents from 'collection', which may differ from the main
+        // namespace (e.g. a foreign collection scan under join optimization).
         SbExpr filterExpr =
             generateFilter(state,
                            csn->filter.get(),
                            resultSlot,
                            outputs,
                            /*isFilterOverIxscan=*/false,
-                           /*canUsePathArrayness=*/
-                           state.expCtx->getQueryKnobConfiguration().getEnablePathArrayness());
+                           /*pathArraynessNss=*/
+                           state.expCtx->getQueryKnobConfiguration().getEnablePathArrayness()
+                               ? boost::make_optional(csn->nss)
+                               : boost::none);
         if (!filterExpr.isNull()) {
             stage = b.makeFilter(std::move(stage), std::move(filterExpr));
         }

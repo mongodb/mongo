@@ -130,12 +130,12 @@ struct MatchExpressionVisitorContext {
                                   const MatchExpression* root,
                                   const PlanStageSlots* slots,
                                   bool isFilterOverIxscan,
-                                  bool canUsePathArrayness)
+                                  boost::optional<NamespaceString> pathArraynessNss)
         : state{state},
           rootSlot{rootSlot},
           slots{slots},
           isFilterOverIxscan{isFilterOverIxscan},
-          canUsePathArrayness{canUsePathArrayness} {
+          pathArraynessNss{std::move(pathArraynessNss)} {
         tassert(
             7097201, "Expected 'rootSlot' or 'slots' to be defined", rootSlot || slots != nullptr);
 
@@ -187,9 +187,9 @@ struct MatchExpressionVisitorContext {
     boost::optional<SbSlot> rootSlot;
     const PlanStageSlots* slots = nullptr;
     bool isFilterOverIxscan = false;
-    // When true, the filter runs over raw documents from expCtx->getNamespaceString(), so
-    // PathArrayness data for that namespace may be consulted to elide traverseF.
-    bool canUsePathArrayness = false;
+    // When set, the filter runs over raw documents from this namespace, whose PathArrayness
+    // metadata may be consulted to elide traverseF.
+    boost::optional<NamespaceString> pathArraynessNss;
 };
 
 enum class LeafTraversalMode {
@@ -423,12 +423,11 @@ void generatePredicate(MatchExpressionVisitorContext* context,
             !frame.inputExpr.isNull() || topLevelFieldSlot.has_value());
 
     // $elemMatch object expressions push a frame before visiting the child.
-    const bool canPathBeArray = !isFieldPathOnRootDoc || !context->canUsePathArrayness ||
-        context->state.expCtx->canPathBeArrayForNss(path,
-                                                    context->state.expCtx->getNamespaceString());
+    const bool canPathBeArray = !isFieldPathOnRootDoc || !context->pathArraynessNss.has_value() ||
+        context->state.expCtx->canPathBeArrayForNss(path, *context->pathArraynessNss);
 
     // Update metrics.
-    if (context->canUsePathArrayness) {
+    if (context->pathArraynessNss.has_value()) {
         auto& opDebug = CurOp::get(context->state.opCtx)->debug();
         opDebug.pathArraynessLeadingFilter = true;
     }
@@ -1294,21 +1293,22 @@ SbExpr generateFilter(StageBuilderState& state,
                       boost::optional<SbSlot> rootSlot,
                       const PlanStageSlots& slots,
                       bool isFilterOverIxscan,
-                      bool canUsePathArrayness) {
+                      const boost::optional<NamespaceString>& pathArraynessNss) {
     // The planner adds an $and expression without the operands if the query was empty. We can bail
     // out early without generating the filter plan stage if this is the case.
     if (root->matchType() == MatchExpression::AND && root->numChildren() == 0) {
         return SbExpr{};
     }
 
-    MatchExpressionVisitorContext context{
-        state,
-        rootSlot,
-        root,
-        &slots,
-        isFilterOverIxscan,
-        canUsePathArrayness &&
-            state.expCtx->getQueryKnobConfiguration().getEnablePathArraynessTraverseFElision()};
+    const bool canUsePathArrayness = pathArraynessNss.has_value() &&
+        state.expCtx->getQueryKnobConfiguration().getEnablePathArraynessTraverseFElision();
+
+    MatchExpressionVisitorContext context{state,
+                                          rootSlot,
+                                          root,
+                                          &slots,
+                                          isFilterOverIxscan,
+                                          canUsePathArrayness ? pathArraynessNss : boost::none};
 
     MatchExpressionPreVisitor preVisitor{&context};
     MatchExpressionInVisitor inVisitor{&context};
