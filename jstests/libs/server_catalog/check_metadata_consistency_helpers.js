@@ -77,7 +77,8 @@ export var MetadataConsistencyChecker = (function () {
 
             // Since bucket collections are not created atomically with their view, it may happen
             // that checkMetadataConsistency interleaves with the creation steps in case of stepdown
-            const isStepdownSuite = Boolean(jsTest.options().runningWithShardStepdowns);
+            const isStepdownSuite =
+                Boolean(TestData.runningWithShardStepdowns) || Boolean(TestData.runningWithStepdowns);
             if (isStepdownSuite) {
                 for (let i = inconsistencies.length - 1; i >= 0; i--) {
                     if (inconsistencies[i].type == "MalformedTimeseriesBucketsCollection") {
@@ -102,8 +103,6 @@ export var MetadataConsistencyChecker = (function () {
 
             // Temporary workaround: tolerate these inconsistencies until linked tickets are fixed.
             const knownInconsistencyTempWorkaround = [
-                // TODO(SERVER-130694): Fix false positives and remove inconsistency type
-                "MalformedTimeseriesBucketsCollection",
                 // TODO(SERVER-131327): Fix false positives and remove inconsistency type
                 "MissingShardKeyIndex",
             ];

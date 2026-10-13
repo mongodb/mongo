@@ -71,6 +71,10 @@ executor:
     - class: CheckReplOplogs
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground
+      shell_options:
+        global_vars:
+          TestData:
+            runningWithStepdowns: true
     - class: RunQueryStats
     - class: ValidateCollections
       shell_options:
