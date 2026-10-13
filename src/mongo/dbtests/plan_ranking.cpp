@@ -362,11 +362,14 @@ public:
         auto soln = pickBestPlan(cq.get());
         ASSERT(QueryPlannerTestLib::solutionMatches(expectedMPPlan, soln->root()).isOK());
 
-        // 'b > 1' matches nothing, so the plans scanning {b: 1} (alone or intersected) see a zero
-        // input estimate (ZeroCEEstimate). CBR defers its ranking to the multi-planner along with
-        // the only estimable plan, the one scanning {a: 1}.
+        // 'b > 1' matches nothing, so the plan scanning {b: 1} alone sees a zero input estimate
+        // (ZeroCEEstimate). CBR hands it to the multi-planner along with the best estimable plan.
+        // Plans with index intersection are always estimated, so that is the intersection plan.
         assertCBRDefersInestimablePlans(
-            cq.get(), N, std::string{"{fetch: {node: {ixscan: {pattern: {a: 1}}}}}"});
+            cq.get(),
+            N,
+            std::string{"{fetch: {node: {andHash: {nodes: ["
+                        "{ixscan: {pattern: {b: 1}}}, {ixscan: {pattern: {a: 1}}}]}}}}"});
 
         // Confirm that a backup plan is available.
         ASSERT(hasBackupPlan());
@@ -515,11 +518,14 @@ public:
         const std::string bestPlan("{fetch: {filter: {b:1}, node: {ixscan: {pattern: {a: 1}}}}}");
         auto soln = pickBestPlan(cq.get());
         ASSERT(QueryPlannerTestLib::solutionMatches(bestPlan, soln->root()).isOK());
-        // 'a = N+1' matches nothing, so the plans scanning {a: 1} (alone or intersected) see a
-        // zero input estimate (ZeroCEEstimate). CBR hands them to the multi-planner along with the
-        // only estimable plan, the one scanning {b: 1}.
+        // 'a = N+1' matches nothing, so the plan scanning {a: 1} alone sees a zero input estimate
+        // (ZeroCEEstimate). CBR hands it to the multi-planner along with the best estimable plan.
+        // Plans with index intersection are always estimated, so that is the intersection plan.
         assertCBRDefersInestimablePlans(
-            cq.get(), N, std::string{"{fetch: {node: {ixscan: {pattern: {b: 1}}}}}"});
+            cq.get(),
+            N,
+            std::string{"{fetch: {node: {andHash: {nodes: ["
+                        "{ixscan: {pattern: {b: 1}}}, {ixscan: {pattern: {a: 1}}}]}}}}"});
     }
 };
 
@@ -555,11 +561,14 @@ public:
         const std::string bestPlan("{fetch: {filter: {b:1}, node: {ixscan: {pattern: {a: 1}}}}}");
         auto soln = pickBestPlan(cq.get());
         ASSERT(QueryPlannerTestLib::solutionMatches(bestPlan, soln->root()).isOK());
-        // 'a >= N+1' matches nothing, so the plans scanning {a: 1} (alone or intersected) see a
-        // zero input estimate (ZeroCEEstimate). CBR hands them to the multi-planner along with the
-        // only estimable plan, the one scanning {b: 1}.
+        // 'a >= N+1' matches nothing, so the plan scanning {a: 1} alone sees a zero input estimate
+        // (ZeroCEEstimate). CBR hands it to the multi-planner along with the best estimable plan.
+        // Plans with index intersection are always estimated, so that is the intersection plan.
         assertCBRDefersInestimablePlans(
-            cq.get(), N, std::string{"{fetch: {node: {ixscan: {pattern: {b: 1}}}}}"});
+            cq.get(),
+            N,
+            std::string{"{fetch: {node: {andHash: {nodes: ["
+                        "{ixscan: {pattern: {b: 1}}}, {ixscan: {pattern: {a: 1}}}]}}}}"});
     }
 };
 

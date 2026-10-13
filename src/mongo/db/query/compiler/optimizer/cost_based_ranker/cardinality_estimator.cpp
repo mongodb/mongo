@@ -12,6 +12,7 @@
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/scopeguard.h"
 
 #include <algorithm>
 #include <string_view>
@@ -33,6 +34,32 @@ size_t totalIntervalCount(const IndexBounds& bounds) {
         total += oil.intervals.size();
     }
     return total;
+}
+
+
+/**
+ * Returns true for stages whose presence in a plan disables the zero-CE fallback to the
+ * multi-planner for every index scan below them, because the multi-planner ranks such plans worse
+ * than CBR:
+ * - a blocking sort: CBR costs the sort, while the multi-planner may exhaust its works budget
+ *   without results and break the tie with heuristics;
+ * - index intersection;
+ * - an OR (index union): the multi-planner favors the plan whose left-most branch is the most
+ *   productive, which is not necessarily the best plan. A query whose root is an $or is subplanned
+ *   and never reaches CBR as a whole, so any OR here is non-top-level.
+ */
+bool disablesZeroCEFallback(StageType type) {
+    switch (type) {
+        case STAGE_SORT_DEFAULT:
+        case STAGE_SORT_SIMPLE:
+        case STAGE_SORT_MERGE:
+        case STAGE_AND_HASH:
+        case STAGE_AND_SORTED:
+        case STAGE_OR:
+            return true;
+        default:
+            return false;
+    }
 }
 
 }  // namespace
@@ -146,6 +173,15 @@ CEResult CardinalityEstimator::estimate(const QuerySolutionNode* node) {
                   str::stream{} << "Encountered " << nodeType
                                 << " stage in CardinalityEstimator which should be unreachable");
     }
+
+    // Index scans below a node that disables the zero-CE fallback are estimated as if the caller
+    // had asked for zero estimates to be costed; the flag is restored once the subtree is done.
+    const bool considerZeroCENonEstimable = _considerZeroCESampledIXScanNonEstimable;
+    if (disablesZeroCEFallback(nodeType)) {
+        _considerZeroCESampledIXScanNonEstimable = false;
+    }
+    ScopeGuard restoreZeroCEFlag(
+        [&] { _considerZeroCESampledIXScanNonEstimable = considerZeroCENonEstimable; });
 
     switch (nodeType) {
         case STAGE_COLLSCAN:
@@ -720,26 +756,30 @@ CEResult CardinalityEstimator::estimate(const IndexScanNode* node) {
             }
         }
 
-        if (_considerZeroCESampledIXScanNonEstimable && est.inCE.has_value() &&
-            est.inCE.value() == zeroCE) {
-            LOGV2_DEBUG(13336200,
-                        2,
-                        "Aborting CBR plan estimation: an index scan's input cardinality estimate "
-                        "is zero. The plan will be ranked by the multi-planner instead",
-                        "stage"_attr = nodeStageTypeToString(node),
-                        "ceSource"_attr = toStringData(est.inCE->source()));
-            return Status(ErrorCodes::ZeroCEEstimate,
-                          str::stream() << "Node " << nodeStageTypeToString(node)
-                                        << " has a zero input cardinality estimate");
-        }
-
         auto seekCE = estimateIndexSeeks(node->bounds, node->index.multikey);
         if (seekCE.isOK()) {
             est.indexSeekCE = seekCE.getValue();
         }
 
+        // Record the scan's estimates before deciding whether the plan is estimable, so that
+        // explain shows the scan's estimates even when the plan falls back to the multi-planner.
+        const bool zeroInputEstimate =
+            _considerZeroCESampledIXScanNonEstimable && *est.inCE == zeroCE;
+        const auto inCESource = est.inCE->source();
         CardinalityEstimate outCE{est.outCE};
         _qsnEstimates.emplace(node, std::make_unique<QSNEstimate>(std::move(est)));
+
+        if (zeroInputEstimate) {
+            LOGV2_DEBUG(13336200,
+                        2,
+                        "Aborting CBR plan estimation: an index scan's input cardinality estimate "
+                        "is zero. The plan will be ranked by the multi-planner instead",
+                        "stage"_attr = nodeStageTypeToString(node),
+                        "ceSource"_attr = toStringData(inCESource));
+            return Status(ErrorCodes::ZeroCEEstimate,
+                          str::stream() << "Node " << nodeStageTypeToString(node)
+                                        << " has a zero input cardinality estimate");
+        }
         return outCE;
     }
 

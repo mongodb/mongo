@@ -255,8 +255,9 @@ protected:
     const QueryCBRCEModeEnum _ceMode;
 
     // Whether, under sampling CE, a plan with an index scan estimated to scan zero keys is
-    // non-estimable, reported with ErrorCodes::ZeroCEEstimate.
-    const bool _considerZeroCESampledIXScanNonEstimable;
+    // non-estimable, reported with ErrorCodes::ZeroCEEstimate. Set by the constructor; cleared
+    // while estimating the subtree of a node for which disablesZeroCEFallback() is true.
+    bool _considerZeroCESampledIXScanNonEstimable;
 
     // Set with the paths we know are multikey which is deduced from the catalog. Note that a field
     // may be multikey but not reflected in this set because there may not be an index over the

@@ -2057,5 +2057,77 @@ TEST(CardinalityEstimator, ZeroEstimateOnNonIndexScanNodeIsEstimable) {
     ASSERT_OK(estimator.estimatePlan(*collScanPlan));
 }
 
+
+// Fixture for the plans below: a sample of the whole collection, so that estimates are exact, and
+// an index scan whose bounds no document matches, so that its input estimate is zero. Such a scan
+// makes a plain plan non-estimable (see ZeroInputSampledIndexScanFailsEstimation); the tests check
+// that the plans whose multi-planner ranking is worse than CBR's are costed anyway.
+class ZeroInputIndexScanPlanTest : public ce::SamplingEstimatorTest {
+protected:
+    void setUp() override {
+        ce::SamplingEstimatorTest::setUp();
+        _samplingEstimator.emplace(
+            createSamplingEstimatorForTesting(kCollCard, kCollCard, ce::NoProjection{}));
+        _collInfo = buildCollectionInfo({}, makeCollStatsWithHistograms({}, kCollCard));
+        _estimator.emplace(
+            *_collInfo, &*_samplingEstimator, _estimates, QueryCBRCEModeEnum::kSamplingCE);
+    }
+
+    // No document has 'a' equal to 5000.
+    std::unique_ptr<QuerySolutionNode> zeroScan() {
+        return makeIndexScan(_nss, makePointIntervalBounds(5000.0, _fields[0]), _fields);
+    }
+
+    static std::unique_ptr<QuerySolution> planWithRoot(std::unique_ptr<QuerySolutionNode> root) {
+        auto plan = std::make_unique<QuerySolution>();
+        plan->setRoot(std::move(root));
+        return plan;
+    }
+
+    CEResult estimatePlan(const QuerySolution& plan) {
+        return _estimator->estimatePlan(plan);
+    }
+
+    const NamespaceString _nss = NamespaceString::createNamespaceString_forTest("testdb.coll");
+
+private:
+    static constexpr size_t kCollCard = 1000;
+    const std::vector<std::string> _fields = {"a"};
+    boost::optional<ce::SamplingEstimatorForTesting> _samplingEstimator;
+    boost::optional<CollectionInfo> _collInfo;
+    EstimateMap _estimates;
+    boost::optional<CardinalityEstimator> _estimator;
+};
+
+TEST_F(ZeroInputIndexScanPlanTest, SortPlanIsEstimable) {
+    auto plan = planWithRoot(
+        std::make_unique<SortNodeDefault>(std::make_unique<FetchNode>(zeroScan(), _nss),
+                                          BSON("b" << 1),
+                                          0,
+                                          LimitSkipParameterization::Disabled,
+                                          0));
+    ASSERT_OK(estimatePlan(*plan));
+}
+
+TEST_F(ZeroInputIndexScanPlanTest, IndexIntersectionPlanIsEstimable) {
+    auto andNode = std::make_unique<AndHashNode>();
+    andNode->children.push_back(zeroScan());
+    andNode->children.push_back(zeroScan());
+    auto plan = planWithRoot(std::make_unique<FetchNode>(std::move(andNode), _nss));
+    ASSERT_OK(estimatePlan(*plan));
+}
+
+TEST_F(ZeroInputIndexScanPlanTest, NestedOrPlanIsEstimable) {
+    // An OR below a fetch with a filter, as for {x: 1, $or: [...]}.
+    auto orNode = std::make_unique<OrNode>();
+    orNode->children.push_back(zeroScan());
+    orNode->children.push_back(zeroScan());
+    auto fetch = std::make_unique<FetchNode>(std::move(orNode), _nss);
+    BSONObj fetchCond = fromjson("{x: 1}");
+    fetch->filter = parse(fetchCond);
+    auto plan = planWithRoot(std::move(fetch));
+    ASSERT_OK(estimatePlan(*plan));
+}
+
 }  // unnamed namespace
 }  // namespace mongo::cost_based_ranker
