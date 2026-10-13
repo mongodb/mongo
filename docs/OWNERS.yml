@@ -54,3 +54,6 @@ filters:
   - "uv_execution.md":
     approvers:
       - 10gen/devprod-build
+  - "baton.md":
+    approvers:
+      - 10gen/server-networking-and-observability

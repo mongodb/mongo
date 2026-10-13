@@ -31,7 +31,7 @@ using BatonHandle [[MONGO_MOD_PUBLIC]] = std::shared_ptr<Baton>;
 /**
  * A Baton is lightweight executor, with parallel forward progress guarantees.  Rather than
  * asynchronously running tasks through one, the baton records the intent of those tasks and defers
- * waiting and execution to a later call to run().
+ * waiting and execution to a later call to run(). A baton may only be run by one thread at a time.
  *
  * Note: This occurs automatically when opCtx waiting on a condition variable.
  */

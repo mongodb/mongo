@@ -14,6 +14,7 @@
 
 #include <algorithm>
 #include <mutex>
+#include <thread>
 #include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
@@ -92,10 +93,12 @@ void DefaultBaton::notify() noexcept {
 
 Waitable::TimeoutState DefaultBaton::run_until(ClockSource* clkSource,
                                                Date_t oldDeadline) noexcept {
-    // We'll fulfill promises and run jobs on the way out, ensuring we don't hold any locks
-    const ScopeGuard guard([&] {
-        std::unique_lock<std::mutex> lk(_mutex);
+    std::unique_lock<std::mutex> lk(_mutex);
 
+    auto singleThreadGuard = _ste.start();
+
+    // We'll fulfill promises and run jobs on the way out, ensuring we don't hold any locks
+    const ScopeGuard guard = [&] {
         // Fire expired timers
         std::vector<Timer> expiredTimers;
         const auto now = clkSource->now();
@@ -121,9 +124,7 @@ Waitable::TimeoutState DefaultBaton::run_until(ClockSource* clkSource,
             }
             lk.lock();
         }
-    });
-
-    std::unique_lock<std::mutex> lk(_mutex);
+    };
 
     // If anything was scheduled, run it now.
     if (_scheduled.size()) {

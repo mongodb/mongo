@@ -1,8 +1,8 @@
 # Server-Internal Baton Pattern
 
-Batons are lightweight job queues in _mongod_ and _mongos_ processes that allow recording the intent
+Batons are lightweight job queues in `mongod` and `mongos` processes that allow recording the intent
 to execute a task (e.g., polling on a network socket) and deferring its execution to a later time.
-Batons, often by reusing `Client` threads and through the _Waitable_ interface, move the execution
+Batons, often by reusing `Client` threads and through the `Waitable` interface, move the execution
 of scheduled tasks out of the line, potentially hiding the execution cost from the critical path. A
 total of four baton classes are available today:
 
@@ -13,24 +13,25 @@ total of four baton classes are available today:
 
 ## Baton Basics
 
-All baton implementations extend _Baton_. They are tightly associated with an `OperationContext` and
-its `Client` thread. An `OperationContext` that belongs to a `ServiceContext` with a
-`TransportLayer` uses an `AsioNetworkingBaton`, else a `DefaultBaton`. The baton is accessed through
-the `OperationContext` with a call to `OperationContext::getBaton()`.
+All baton implementations extend `Baton`. They are tightly associated with an `OperationContext` and
+its `Client` thread. An `OperationContext` that belongs to a `ServiceContext` whose default egress
+layer is the `AsioTransportLayer` will use an `AsioNetworkingBaton` on linux only, else a
+`DefaultBaton`. The baton is accessed through the `OperationContext` with a call to
+`OperationContext::getBaton()`.
 
 Each baton implementation exposes an interface to allow scheduling tasks on the baton, to demand the
-awakening of the baton on client socket disconnect, and to create a _SubBaton_. A _SubBaton_, for
+awakening of the baton on client socket disconnect, and to create a `SubBaton`. A `SubBaton`, for
 any of the baton types, is essentially a handle to a local object that proxies scheduling requests
 to its underlying baton until it is detached (e.g., through destruction of its handle).
 
-Additionally, a _NetworkingBaton_ enables consumers of a transport layer to execute I/O themselves,
+Additionally, a `NetworkingBaton` enables consumers of a transport layer to execute I/O themselves,
 rather than delegating it to other threads. They are special batons that are able to poll network
 sockets, which is not feasible through other baton types. This is essential for minimizing context
 switches and improving the readability of stack traces.
 
 A baton runs automatically when blocking on its associated `OperationContext` with a call to
 `OperationContext::waitForConditionOrInterrupt()`. Many different apis that take in or use an
-_Interruptible_ will eventually call into this method (e.g. `Future::get(...)`,
+`Interruptible` will eventually call into this method (e.g. `Future::get(...)`,
 `OperationContext::sleepUntil(...)`, etc.).
 
 ### DefaultBaton
@@ -40,13 +41,18 @@ tasks while a client thread awaits an event or a timeout, essentially paving the
 utilizing idle cycles of client threads for useful work. Tasks can be scheduled on this baton
 through its associated `OperationContext` and using `OperationContext::getBaton()::schedule(...)`.
 
-Note that because _Baton_ extends an _OutOfLineExecutor_, it can be used as the executor to run work
+Note that because `Baton` extends an `OutOfLineExecutor`, it can be used as the executor to run work
 on an `ExecutorFuture`.
+
+A baton may only be run by one thread at a time: the thread that owns its associated
+`OperationContext`. Other threads may schedule tasks on or notify a baton, but a second thread
+attempting to run a baton while a runner is active is a programming error. Re-entrant `run_until()`
+calls from the runner thread itself (e.g., from a scheduled task) are permitted.
 
 ### AsioNetworkingBaton
 
-The AsioNetworkingBaton can schedule and run tasks similarly to the _DefaultBaton_, but it also
-implements the _NetworkingBaton_ interface to provide a networking reactor. It can register sessions
+The AsioNetworkingBaton can schedule and run tasks similarly to the `DefaultBaton`, but it also
+implements the `NetworkingBaton` interface to provide a networking reactor. It can register sessions
 to monitor and will utilize `poll(2)` and `eventfd(2)` to wait until I/O can be performed on the
 socket or until interrupted.
 

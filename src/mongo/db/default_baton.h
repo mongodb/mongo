@@ -14,6 +14,7 @@
 #include "mongo/util/waitable.h"
 
 #include <mutex>
+#include <thread>
 #include <vector>
 
 namespace mongo {
@@ -44,6 +45,41 @@ private:
         size_t id;
         Promise<void> promise;
     };
+
+    /**
+     * Detects and fails if two threads run the tracked resource concurrently. Re-entrancy from the
+     * same thread is allowed.
+     */
+    class SingleThreadEnforcer {
+    public:
+        struct Guard {
+            ~Guard() {
+                enforcer->end();
+            }
+
+            SingleThreadEnforcer* enforcer;
+        };
+
+        [[nodiscard]] Guard start() {
+            const auto id = std::this_thread::get_id();
+            invariant(!_runDepth || _id == id, "Detected concurrent runners");
+            _id = id;
+            ++_runDepth;
+            return Guard{.enforcer = this};
+        }
+
+        void end() {
+            if (--_runDepth != 0) {
+                return;
+            }
+            _id = std::thread::id{};
+        }
+
+    private:
+        std::thread::id _id;
+        int _runDepth = 0;
+    };
+
     void detachImpl() override;
 
     using Job = unique_function<void(std::unique_lock<std::mutex>)>;
@@ -69,6 +105,8 @@ private:
     stdx::condition_variable _cv;
     bool _notified = false;
     bool _sleeping = false;
+
+    SingleThreadEnforcer _ste;
 
     OperationContext* _opCtx;
 
