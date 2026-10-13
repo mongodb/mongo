@@ -498,7 +498,7 @@ private:
     boost::optional<RecordId> _lastRecordIdInserted;
 
     // Protects the state that other threads observe while the build thread runs: _method, _phase
-    // and _indexWriteStats. The build thread must hold it to write them; it may read them without.
+    // and _indexWriteStats.
     mutable std::mutex _stateMutex;
 
     // The current phase of the index build.
