@@ -331,10 +331,10 @@ bool isMongotLookupSubpipeline(const std::shared_ptr<IncrementalFeatureRolloutCo
 // An empty user subpipeline has no such stage, so the prefix must be kept. Discarding it would both
 // run the join against the backing collection instead of the view, and leave the join $match index
 // pointing past the end of an empty resolved pipeline.
-bool shouldDiscardViewPrefix(bool fromNsIsAView,
-                             const std::vector<BSONObj>& pipeline,
-                             FirstStageViewApplicationPolicy subpipelineViewPolicy,
-                             const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+bool subpipelineAppliesView(bool fromNsIsAView,
+                            const std::vector<BSONObj>& pipeline,
+                            FirstStageViewApplicationPolicy subpipelineViewPolicy,
+                            const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     if (!fromNsIsAView || pipeline.empty()) {
         return false;
     }
@@ -366,47 +366,35 @@ size_t foreignViewSourceGeneratorPrefixLength(
 }
 }  // namespace
 
-// Process and copy the given `pipeline` to the `_sharedState->resolvedPipeline` attribute and
-// compute where the $match stage is going to be placed, indicated through the
-// `_fieldMatchPipelineIdx` variable.
-void DocumentSourceLookUp::resolvedPipelineHelper(
-    NamespaceString fromNs,
-    std::vector<BSONObj> pipeline,
-    boost::optional<std::pair<std::string, std::string>> localForeignFields,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    FirstStageViewApplicationPolicy subpipelineViewPolicy) {
-    if (shouldDiscardViewPrefix(_fromNsIsAView, pipeline, subpipelineViewPolicy, expCtx)) {
-        // The materialized view prefix is discarded in this path, so execution-time binding starts
-        // at the beginning of the user pipeline.
-        _sharedState->viewBindingStart = 0;
-        if (search_helper_bson_obj::isMongotPipeline(expCtx->getIfrContext(), pipeline)) {
-            // The user pipeline is a legacy mongot pipeline so we assume the view is a
-            // mongot-indexed view. Stash the view on the subpipeline's ExpressionContext so the
-            // legacy stage's createFromBson can attach it: idLookup applies the view transforms
-            // as part of its subpipeline.
-            _fromExpCtx->setView(boost::make_optional(ResolvedNamespace::makeForView(
-                fromNs, _resolvedNs, _sharedState->resolvedPipeline)));
-        }
-        _sharedState->resolvedPipeline = pipeline;
-        // The join $match belongs immediately after the mongot prefix. For an unparsed pipeline
-        // (a single $search/$searchMeta/$vectorSearch stage) the prefix is one stage, so index 1.
-        // If the pipeline already arrived desugared (e.g. DRM + idLookup, or a storedSource
-        // $replaceRoot), the prefix spans multiple stages and the $match must go after all of them.
-        const size_t prefixLen = prefixEndIdx(pipeline);
-        _fieldMatchPipelineIdx = prefixLen == 0 ? 1 : prefixLen;
-        if (localForeignFields != boost::none) {
-            std::tie(_localField, _foreignField) = *localForeignFields;
-        }
-        return;
+void DocumentSourceLookUp::handleSelfApplyingViewStage(
+    const std::vector<BSONObj>& pipeline, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    // The materialized view prefix is discarded in this path, so execution-time binding starts
+    // at the beginning of the user pipeline.
+    _sharedState->viewBindingStart = 0;
+    if (search_helper_bson_obj::isMongotPipeline(expCtx->getIfrContext(), pipeline)) {
+        // The user pipeline is a legacy mongot pipeline so we assume the view is a
+        // mongot-indexed view. Stash the view on the subpipeline's ExpressionContext so the
+        // legacy stage's createFromBson can attach it: idLookup applies the view transforms
+        // as part of its subpipeline.
+        _fromExpCtx->setView(boost::make_optional(
+            ResolvedNamespace::makeForView(_fromNs, _resolvedNs, _sharedState->resolvedPipeline)));
     }
+    _sharedState->resolvedPipeline = pipeline;
+    // The join $match belongs immediately after the mongot prefix. For an unparsed pipeline
+    // (a single $search/$searchMeta/$vectorSearch stage) the prefix is one stage, so index 1.
+    // If the pipeline already arrived desugared (e.g. DRM + idLookup, or a storedSource
+    // $replaceRoot), the prefix spans multiple stages and the $match must go after all of them.
+    const size_t prefixLen = prefixEndIdx(pipeline);
+    _fieldMatchPipelineIdx = prefixLen == 0 ? 1 : prefixLen;
+}
 
+void DocumentSourceLookUp::handlePrependedViewPipeline(
+    const std::vector<BSONObj>& pipeline, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     if (_fromNsIsAView) {
-        _sharedState->viewBindingStart = foreignViewSourceGeneratorPrefixLength(fromNs, expCtx);
+        _sharedState->viewBindingStart = foreignViewSourceGeneratorPrefixLength(_fromNs, expCtx);
     }
 
-    if (localForeignFields != boost::none) {
-        std::tie(_localField, _foreignField) = *localForeignFields;
-
+    if (_localField.has_value()) {
         // The $match stage should come after $documents if present.
         auto sourceStages = extractSourceStage(pipeline);
         _sharedState->resolvedPipeline.insert(
@@ -424,7 +412,6 @@ void DocumentSourceLookUp::resolvedPipelineHelper(
         _sharedState->resolvedPipeline.insert(_sharedState->resolvedPipeline.end(),
                                               pipeline.begin() + sourceStages.size(),
                                               pipeline.end());
-
     } else {
         // Add the user pipeline to '_sharedState->resolvedPipeline' after any potential view prefix
         // and $match.
@@ -432,6 +419,23 @@ void DocumentSourceLookUp::resolvedPipelineHelper(
             _sharedState->resolvedPipeline.end(), pipeline.begin(), pipeline.end());
     }
 }
+
+void DocumentSourceLookUp::resolvedPipelineHelper(
+    const std::vector<BSONObj>& pipeline,
+    boost::optional<std::pair<std::string, std::string>> localForeignFields,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    FirstStageViewApplicationPolicy subpipelineViewPolicy) {
+    if (localForeignFields.has_value()) {
+        std::tie(_localField, _foreignField) = *localForeignFields;
+    }
+
+    if (subpipelineAppliesView(_fromNsIsAView, pipeline, subpipelineViewPolicy, expCtx)) {
+        handleSelfApplyingViewStage(pipeline, expCtx);
+    } else {
+        handlePrependedViewPipeline(pipeline, expCtx);
+    }
+}
+
 DocumentSourceLookUp::DocumentSourceLookUp(
     NamespaceString fromNs,
     std::string as,
@@ -444,7 +448,7 @@ DocumentSourceLookUp::DocumentSourceLookUp(
     // within this constructor's initializer list. It will be populated with view pipeline prefix if
     // 'fromNs' represents a view. We will then append stages to ensure any view prefix is not
     // overwritten.
-    resolvedPipelineHelper(fromNs, pipeline, localForeignFields, expCtx);
+    resolvedPipelineHelper(pipeline, localForeignFields, expCtx);
 
     _userPipeline = std::move(pipeline);
 
@@ -475,8 +479,7 @@ DocumentSourceLookUp::DocumentSourceLookUp(
     FirstStageViewApplicationPolicy subpipelineViewPolicy,
     size_t subpipelineViewPrefixLen)
     : DocumentSourceLookUp(fromNs, as, pExpCtx) {
-    resolvedPipelineHelper(
-        fromNs, userPipeline, localForeignFields, pExpCtx, subpipelineViewPolicy);
+    resolvedPipelineHelper(userPipeline, localForeignFields, pExpCtx, subpipelineViewPolicy);
 
     parseAndDefineLetVariables(letVariables, pExpCtx);
     _variables.copyToExpCtx(_variablesParseState, _fromExpCtx.get());

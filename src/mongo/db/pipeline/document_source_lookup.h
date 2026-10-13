@@ -188,14 +188,6 @@ public:
         const std::vector<BSONObj>& rawPipeline,
         const NamespaceString& fromNss);
 
-    void resolvedPipelineHelper(
-        NamespaceString fromNs,
-        std::vector<BSONObj> pipeline,
-        boost::optional<std::pair<std::string, std::string>> localForeignFields,
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        FirstStageViewApplicationPolicy subpipelineViewPolicy =
-            FirstStageViewApplicationPolicy::kDefaultPrepend);
-
     /**
      * Builds the BSONObj used to query the foreign collection and wraps it in a $match.
      */
@@ -488,6 +480,42 @@ private:
      * Returns true if we are not in a transaction.
      */
     bool foreignShardedLookupAllowed() const;
+
+    /**
+     * Folds the user-supplied $lookup subpipeline and records
+     * where the automatically-generated join $match belongs.
+     *
+     * This method only positions the join $match; the caller is still responsible for building the
+     * introspection pipeline and inserting the actual $match placeholder.
+     *
+     * This helper is meant only to be called from the DocumentSourceLookUp constructors.
+     */
+    void resolvedPipelineHelper(
+        const std::vector<BSONObj>& pipeline,
+        boost::optional<std::pair<std::string, std::string>> localForeignFields,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        FirstStageViewApplicationPolicy subpipelineViewPolicy =
+            FirstStageViewApplicationPolicy::kDefaultPrepend);
+
+    /**
+     * Handles a subpipeline that applies the foreign view itself, so the view's stages are not
+     * prepended and the subpipeline is used as-is. Positions the join $match after the
+     * subpipeline's own view-applying stage.
+     *
+     * This is meant only to be called from 'resolvedPipelineHelper'.
+     */
+    void handleSelfApplyingViewStage(const std::vector<BSONObj>& pipeline,
+                                     const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+    /**
+     * Builds the resolved pipeline for the standard case where the materialized view prefix is kept
+     * and the user subpipeline is appended after it. When localField/foreignField are used, ensures
+     * the join $match precedes the user stages.
+     *
+     * This is meant only to be called from 'resolvedPipelineHelper'.
+     */
+    void handlePrependedViewPipeline(const std::vector<BSONObj>& pipeline,
+                                     const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     NamespaceString _fromNs;
     NamespaceString _resolvedNs;
