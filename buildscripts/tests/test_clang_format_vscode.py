@@ -16,7 +16,9 @@ class TestClangFormatVSCode(unittest.TestCase):
     def setUp(self) -> None:
         self.tempdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.tempdir.cleanup)
-        self.root = Path(self.tempdir.name)
+        # macOS temporary directories can contain symlinks; a new shell reports
+        # the physical working directory in PWD.
+        self.root = Path(self.tempdir.name).resolve()
         self.workspace = self.root / "workspace with spaces"
         scripts = self.workspace / "buildscripts"
         scripts.mkdir(parents=True)
@@ -87,6 +89,19 @@ exit "$FORMATTER_STATUS"
             capture_output=True,
             check=False,
         )
+
+    def test_wrapper_syntax(self) -> None:
+        # Bash 3.2 can report a command-substitution parse error but still exit
+        # successfully when the wrapper runs. Check parsing separately.
+        result = subprocess.run(
+            ["bash", "-n", str(self.wrapper)],
+            env=self.env,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stderr, "")
 
     def test_fetches_missing_toolchain_and_preserves_editor_io(self) -> None:
         self.assertFalse(self.repo.exists())

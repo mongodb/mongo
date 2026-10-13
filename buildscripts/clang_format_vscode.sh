@@ -8,9 +8,10 @@ REPO_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 # Keep Bazel's setup diagnostics for failures without hiding formatter diagnostics.
 BAZEL_STDERR="$(mktemp)"
 trap 'rm -f -- "$BAZEL_STDERR"' EXIT
+# Query fetches the repository if needed. Keep the editor's stdin for clang-format.
+# Keep comments outside command substitutions: Bash 3.2 misparses apostrophes in them.
 if LOCATION="$(
     cd -- "$REPO_ROOT" || exit
-    # Query fetches the repository if needed. Keep the editor's stdin for clang-format.
     bazel query --noshow_progress --bes_backend= --bes_results_url= \
         --output=location @mongo_toolchain_v5//:clang_format </dev/null 2>"$BAZEL_STDERR"
 )"; then
