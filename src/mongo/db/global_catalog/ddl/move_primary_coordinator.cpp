@@ -76,6 +76,7 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
@@ -100,6 +101,7 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(hangBeforeCloningData);
 MONGO_FAIL_POINT_DEFINE(hangBeforeMovePrimaryCriticalSection);
 MONGO_FAIL_POINT_DEFINE(hangAfterMovePrimaryCriticalSection);
+MONGO_FAIL_POINT_DEFINE(hangBeforeMovePrimaryClean);
 MONGO_FAIL_POINT_DEFINE(movePrimaryFailIfNeedToCloneMovableCollections);
 
 /**
@@ -188,7 +190,6 @@ ExecutorFuture<void> MovePrimaryCoordinator::_runImpl(
         .then([this, token, executor, anchor = shared_from_this()] {
             const auto opCtxHolder = makeOperationContext();
             auto* opCtx = opCtxHolder.get();
-
             const auto& toShardId = _doc.getToShardId();
 
             if (toShardId == ShardingState::get(opCtx)->shardId()) {
@@ -196,8 +197,8 @@ ExecutorFuture<void> MovePrimaryCoordinator::_runImpl(
                       "Database already on requested primary shard",
                       logAttrs(_dbName),
                       "to"_attr = toShardId);
-
-                return ExecutorFuture<void>(**executor);
+                uasserted(ErrorCodes::RequestAlreadyFulfilled,
+                          "Database already on requested primary shard");
             }
 
             const auto toShardEntry = [&] {
@@ -219,18 +220,12 @@ ExecutorFuture<void> MovePrimaryCoordinator::_runImpl(
                 return uassertStatusOK(ShardType::fromBSON(findResponse.docs.front()));
             }();
 
-            uassert(ErrorCodes::ShardNotFound,
-                    fmt::format("Requested primary shard {} is draining", toShardId.toString()),
-                    !toShardEntry.getDraining());
-
-            return runMovePrimaryWorkflow(executor, token);
-        });
-}
-
-ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
-    std::shared_ptr<executor::ScopedTaskExecutor> executor,
-    const CancellationToken& token) noexcept {
-    return ExecutorFuture<void>(**executor)
+            if (_doc.getPhase() < Phase::kCommit) {
+                uassert(ErrorCodes::ShardNotFound,
+                        fmt::format("Requested primary shard {} is draining", toShardId.toString()),
+                        !toShardEntry.getDraining());
+            }
+        })
         .then(_buildPhaseHandler(  //
             Phase::kClone,
             [this, anchor = shared_from_this()](auto* opCtx) {
@@ -338,9 +333,14 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
 
                 logChange(opCtx, "commit");
             }))
-        .then(_buildPhaseHandler(
-            Phase::kClean,
-            [this, anchor = shared_from_this()](auto* opCtx) { dropStaleDataOnDonor(opCtx); }))
+        .then(_buildPhaseHandler(Phase::kClean,
+                                 [this, anchor = shared_from_this()](auto* opCtx) {
+                                     if (MONGO_unlikely(hangBeforeMovePrimaryClean.shouldFail())) {
+                                         LOGV2(13443800, "Hit hangBeforeMovePrimaryClean");
+                                         hangBeforeMovePrimaryClean.pauseWhileSet(opCtx);
+                                     }
+                                     dropStaleDataOnDonor(opCtx);
+                                 }))
         .then(_buildPhaseHandler(Phase::kExitCriticalSection,
                                  [this, token, executor, anchor = shared_from_this()](auto* opCtx) {
                                      if (!_firstExecution) {
@@ -363,11 +363,17 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
                                      logChange(opCtx, "end");
                                  }))
         .onError([this, anchor = shared_from_this()](const Status& status) {
+            if (status == ErrorCodes::RequestAlreadyFulfilled) {
+                return Status::OK();
+            }
+
             const auto opCtxHolder = makeOperationContext();
             auto* opCtx = opCtxHolder.get();
 
             const auto& failedPhase = _doc.getPhase();
-            if (failedPhase == Phase::kClone || status == ErrorCodes::ShardNotFound) {
+            if (failedPhase == Phase::kClone ||
+                (status == ErrorCodes::ShardNotFound && failedPhase > Phase::kUnset &&
+                 failedPhase < Phase::kCommit)) {
                 LOGV2_DEBUG(7392900,
                             1,
                             "Triggering movePrimary cleanup",

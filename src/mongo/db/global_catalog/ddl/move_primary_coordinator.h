@@ -85,10 +85,6 @@ private:
                                          const CancellationToken& token,
                                          const Status& status) noexcept override;
 
-    ExecutorFuture<void> runMovePrimaryWorkflow(
-        std::shared_ptr<executor::ScopedTaskExecutor> executor,
-        const CancellationToken& token) noexcept;
-
     /**
      * Clone data to the recipient shard.
      */
