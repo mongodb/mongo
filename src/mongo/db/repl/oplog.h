@@ -214,6 +214,7 @@ public:
     static void checkOnOplogFailureForRecovery(OperationContext* opCtx,
                                                const mongo::NamespaceString& nss,
                                                const mongo::BSONObj& oplogEntry,
+                                               const OpTime& opTime,
                                                const std::string& errorMsg);
 };
 

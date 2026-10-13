@@ -1495,7 +1495,7 @@ void InitialSyncer::_lastOplogEntryFetcherCallbackForStopTimestamp(
                     2,
                     "Inserting oplog seed document: {oplogSeedDocument}",
                     "Inserting oplog seed document",
-                    "oplogSeedDocument"_attr = oplogSeedDoc);
+                    "oplogSeedDocument"_attr = redact(oplogSeedDoc));
 
         auto opCtx = makeOpCtx();
         // StorageInterface::insertDocument() has to be called outside the lock because we may
