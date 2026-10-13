@@ -314,6 +314,9 @@ selector:
 
   exclude_with_any_tags:
   - does_not_support_stepdowns
+  # FsyncLock prevents stepdown from acquiring the RSTL lock, blocking stepdown and preventing
+  # that node from being unlocked.
+  - requires_fsync
 
 executor:
   config:
