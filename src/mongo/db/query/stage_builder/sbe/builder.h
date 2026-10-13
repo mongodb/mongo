@@ -149,12 +149,6 @@ public:
     static constexpr UnownedSlotName kIndexKey{kMeta, "indexKey"};
     static constexpr UnownedSlotName kIndexKeyPattern{kMeta, "indexKeyPattern"};
     static constexpr UnownedSlotName kPrefetchedResult{kMeta, "prefetchedResult"};
-    static constexpr UnownedSlotName kMetadataSearchScore{kMeta, "metadataSearchScore"};
-    static constexpr UnownedSlotName kMetadataSearchHighlights{kMeta, "metadataSearchHighlights"};
-    static constexpr UnownedSlotName kMetadataSearchDetails{kMeta, "metadataSearchDetails"};
-    static constexpr UnownedSlotName kMetadataSearchSortValues{kMeta, "metadataSearchSortValues"};
-    static constexpr UnownedSlotName kMetadataSearchSequenceToken{kMeta,
-                                                                  "metadataSearchSequenceToken"};
     static constexpr UnownedSlotName kBlockSelectivityBitmap{kMeta, "bitmap"};
 
     struct Data {
@@ -836,12 +830,6 @@ public:
     static constexpr auto kIndexKey = PlanStageSlots::kIndexKey;
     static constexpr auto kIndexKeyPattern = PlanStageSlots::kIndexKeyPattern;
     static constexpr auto kPrefetchedResult = PlanStageSlots::kPrefetchedResult;
-    static constexpr auto kMetadataSearchScore = PlanStageSlots::kMetadataSearchScore;
-    static constexpr auto kMetadataSearchHighlights = PlanStageSlots::kMetadataSearchHighlights;
-    static constexpr auto kMetadataSearchDetails = PlanStageSlots::kMetadataSearchDetails;
-    static constexpr auto kMetadataSearchSortValues = PlanStageSlots::kMetadataSearchSortValues;
-    static constexpr auto kMetadataSearchSequenceToken =
-        PlanStageSlots::kMetadataSearchSequenceToken;
 
     SlotBasedStageBuilder(OperationContext* opCtx,
                           const MultipleCollectionAccessor& collections,
