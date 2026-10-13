@@ -100,6 +100,19 @@ private:
                             std::vector<std::vector<ApplierOperation>>* writerVectors,
                             std::vector<std::vector<OplogEntry>>* derivedOps) noexcept;
 
+    /**
+     * Allocates the buffers where replicated metadata deltas are accumulated by worker threads
+     * during oplog application and merged during validation.
+     *
+     * This function must be called before oplog application begins because the buffers are used
+     * during oplog application.
+     *
+     * If continuous internode validation is enabled, returns a vector with size `nWorkers`.
+     * Otherwise, returns `boost::none`.
+     */
+    boost::optional<replicated_fast_count::ValidatorBuffers> _initValidatorBuffers(
+        OperationContext* opCtx, size_t nWorkers);
+
     // Not owned by us.
     ReplicationCoordinator* const _replCoord;
 

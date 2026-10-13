@@ -791,6 +791,16 @@ server_parameters:
         default: false
         redact: false
 
+    enableContinuousInternodePerCollectionValidation:
+        description: >-
+            When true, a replicated metadata mismatch detected during per-collection continuous
+            internode validation crashes the node. When false, no validation is run.
+        set_at: [startup, runtime]
+        cpp_vartype: Atomic<bool>
+        cpp_varname: enableContinuousInternodePerCollectionValidation
+        default: false
+        redact: false
+
 feature_flags:
     featureFlagSecondaryIndexChecksInDbCheck:
         description: When enabled, dbCheck runs document and secondary index consistency checks in addition to replica set data consistency checks.

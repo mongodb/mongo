@@ -18,6 +18,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/initial_sync/initial_syncer.h"
+#include "mongo/db/repl/internode_validation_hash_utils.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog_applier_batcher.h"
 #include "mongo/db/repl/oplog_applier_utils.h"
@@ -29,6 +30,7 @@
 #include "mongo/db/repl/transaction_oplog_application.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_delta_utils.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
+#include "mongo/db/replicated_fast_count/size_count_checkpoint_validator.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
@@ -755,6 +757,9 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
     const size_t nWorkers = _workerPool->getStats().options.maxThreads;
     LOGV2_DEBUG(11280004, 2, "Number of workers for oplog application", "nWorkers"_attr = nWorkers);
     std::vector<WorkerMultikeyPathInfo> multikeyVector(nWorkers);
+
+    boost::optional<replicated_fast_count::ValidatorBuffers> validatorBuffers =
+        _initValidatorBuffers(opCtx, nWorkers);
     {
         // Each node records cumulative batch application stats for itself using this timer.
         Timer timer;
@@ -843,7 +848,9 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
                                        &writer = writerVectors[i],
                                        &status = statusVector[i],
                                        &multikeyVector = multikeyVector[i],
-                                       isDataConsistent = isDataConsistent](Status scheduleStatus) {
+                                       isDataConsistent = isDataConsistent,
+                                       &validatorBuffers,
+                                       i](Status scheduleStatus) {
                     const auto dispatched = Date_t::now();
                     const auto dispatchLatency = dispatched - scheduled;
                     if (MONGO_unlikely(dispatchLatency > Seconds{10})) {
@@ -859,6 +866,10 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
 
                     invariant(scheduleStatus);
                     auto opCtx = cc().makeOperationContext();
+
+                    const replicated_fast_count::SizeCountCheckpointValidator::ScopedThreadBuffer
+                        scopedValidatorBuffer(
+                            validatorBuffers.has_value() ? &validatorBuffers.value()[i] : nullptr);
 
                     status = opCtx->runWithoutInterruptionExceptAtGlobalShutdown([&] {
                         return applyOplogBatchPerWorker(
@@ -896,6 +907,10 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
                         "error"_attr = redact(status));
                     return status;
                 }
+            }
+
+            if (validatorBuffers.has_value()) {
+                _checkpointValidator.mergeAndValidate(validatorBuffers.value());
             }
         }
 
@@ -979,6 +994,9 @@ void OplogApplierImpl::_deriveOpsAndFillWriterVectors(
     std::vector<std::vector<OplogEntry>>* derivedOps,
     SessionUpdateTracker* sessionUpdateTracker) noexcept {
 
+    const bool validateCheckpoints = getOptions().mode == OplogApplication::Mode::kSecondary &&
+        isContinuousInternodeValidationPerDocumentEnabled(opCtx);
+
     // Caches partial transaction operations. Each map entry contains a cumulative list
     // of operations seen in this batch so far.
     stdx::unordered_map<OpTime, std::vector<OplogEntry*>, OpTime::Hasher> partialTxnOps;
@@ -1012,6 +1030,10 @@ void OplogApplierImpl::_deriveOpsAndFillWriterVectors(
         // to apply it, so don't include it in writerVectors.
         if (op.getOpTime() <= getOptions().beginApplyingOpTime) {
             continue;
+        }
+
+        if (validateCheckpoints) {
+            _checkpointValidator.preprocessOplogEntry(op);
         }
 
         auto addSessionUpdateOps =
@@ -1197,6 +1219,16 @@ void OplogApplierImpl::_fillWriterVectors(
         _deriveOpsAndFillWriterVectors(
             opCtx, &derivedOps->back(), writerVectors, derivedOps, nullptr);
     }
+}
+
+boost::optional<replicated_fast_count::ValidatorBuffers> OplogApplierImpl::_initValidatorBuffers(
+    OperationContext* opCtx, size_t nWorkers) {
+    const bool validateCheckpoints = getOptions().mode == OplogApplication::Mode::kSecondary &&
+        isContinuousInternodeValidationPerDocumentEnabled(opCtx);
+    if (!validateCheckpoints) {
+        return boost::none;
+    }
+    return replicated_fast_count::ValidatorBuffers(nWorkers);
 }
 
 void OplogApplierImpl::fillWriterVectors_forTest(

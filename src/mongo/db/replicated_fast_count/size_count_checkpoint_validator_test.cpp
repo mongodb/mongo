@@ -19,6 +19,7 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/log_capture.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/uuid.h"
 
@@ -442,6 +443,209 @@ DEATH_TEST(ParseCheckpointDeathTest, TimestampContainerDeleteTasserts, "13647901
     }};
 
     isCheckpointApplyOpsEntry(checkpointEntry);
+}
+
+const Timestamp kT0{Seconds(100), 0};
+const Timestamp kT1{Seconds(200), 0};
+const Timestamp kT2{Seconds(250), 0};
+const Timestamp kT3{Seconds(300), 0};
+const Timestamp kEnd{Seconds(1000), 0};
+
+using test_helpers::makeCheckpointEntry;
+using test_helpers::makeWatermarkEntry;
+
+class SizeCountCheckpointValidatorTest : public unittest::Test {
+protected:
+    /**
+     * Performs preprocessing on the provided `ops`, then records each delta in `records`, then
+     * validates the deltas against the watermark(s)/checkpoint(s) in `ops`.
+     */
+    void applyBatch(SizeCountCheckpointValidator& validator,
+                    const std::vector<repl::OplogEntry>& ops,
+                    const std::vector<ValidatorDeltaRecord>& records) {
+        for (const auto& entry : ops) {
+            validator.preprocessOplogEntry(entry);
+        }
+        std::vector<ValidatorDeltaRecord> buffer;
+        {
+            SizeCountCheckpointValidator::ScopedThreadBuffer scopedBuffer(&buffer);
+            for (const auto& record : records) {
+                SizeCountCheckpointValidator::recordDelta(record.uuid, record.ts, record.delta);
+            }
+        }
+        validator.mergeAndValidate({buffer});
+    }
+
+    SizeCountCheckpointValidator validator;
+
+    unittest::ServerParameterGuard enableContinuousInternodePerCollectionValidation{
+        "enableContinuousInternodePerCollectionValidation", true};
+};
+
+TEST_F(SizeCountCheckpointValidatorTest, NoWatermarkNoCheckpointPasses) {
+    const UUID uuid = UUID::gen();
+    applyBatch(validator,
+               /*ops=*/{},
+               std::vector<ValidatorDeltaRecord>{
+                   {.ts = kT1,
+                    .uuid = uuid,
+                    .delta = ReplicatedMetadataDelta{
+                        .metadata = {.sizeCount = CollectionSizeCount{.size = 10, .count = 1}}}}});
+}
+
+TEST_F(SizeCountCheckpointValidatorTest, WatermarkThenCheckpointAcrossBatches) {
+    const UUID uuid = UUID::gen();
+    applyBatch(validator,
+               /*ops=*/{},
+               std::vector<ValidatorDeltaRecord>{
+                   {.ts = kT1,
+                    .uuid = uuid,
+                    .delta = ReplicatedMetadataDelta{
+                        .metadata = {.sizeCount = CollectionSizeCount{.size = 10, .count = 1}}}}});
+    const std::vector<repl::OplogEntry> ops{
+        makeWatermarkEntry(kT1),
+        makeCheckpointEntry(kT1,
+                            {{uuid,
+                              CollectionReplicatedMetadata{
+                                  .sizeCount = CollectionSizeCount{.size = 10, .count = 1}}}})};
+    applyBatch(validator, ops, {});
+}
+
+TEST_F(SizeCountCheckpointValidatorTest, TwoWatermarksTwoCheckpoints) {
+    const UUID uuid = UUID::gen();
+    const std::vector<repl::OplogEntry> ops{
+        makeWatermarkEntry(kT1),
+        makeCheckpointEntry(kT1,
+                            {{uuid,
+                              CollectionReplicatedMetadata{
+                                  .sizeCount = CollectionSizeCount{.size = 50, .count = 5}}}}),
+        makeWatermarkEntry(kT3),
+        makeCheckpointEntry(kT3,
+                            {{uuid,
+                              CollectionReplicatedMetadata{
+                                  .sizeCount = CollectionSizeCount{.size = 60, .count = 6}}}})};
+    applyBatch(
+        validator,
+        ops,
+        std::vector<ValidatorDeltaRecord>{
+            {.ts = kT0,
+             .uuid = uuid,
+             .delta =
+                 ReplicatedMetadataDelta{
+                     .metadata = {.sizeCount = CollectionSizeCount{.size = 50, .count = 5}}}},
+            {.ts = kT2,
+             .uuid = uuid,
+             .delta = ReplicatedMetadataDelta{
+                 .metadata = {.sizeCount = CollectionSizeCount{.size = 10, .count = 1}}}}});
+}
+
+TEST_F(SizeCountCheckpointValidatorTest, TwoWatermarksCheckpointForSecondOnly) {
+    const UUID uuidA = UUID::gen();
+    const UUID uuidB = UUID::gen();
+    const std::vector<repl::OplogEntry> ops{
+        makeWatermarkEntry(kT1),
+        makeWatermarkEntry(kT3),
+        makeCheckpointEntry(kT3,
+                            {{uuidA,
+                              CollectionReplicatedMetadata{
+                                  .sizeCount = CollectionSizeCount{.size = 10, .count = 1}}},
+                             {uuidB,
+                              CollectionReplicatedMetadata{
+                                  .sizeCount = CollectionSizeCount{.size = 20, .count = 2}}}})};
+    applyBatch(
+        validator,
+        ops,
+        std::vector<ValidatorDeltaRecord>{
+            {.ts = kT0,
+             .uuid = uuidA,
+             .delta =
+                 ReplicatedMetadataDelta{
+                     .metadata = {.sizeCount = CollectionSizeCount{.size = 10, .count = 1}}}},
+            {.ts = kT2,
+             .uuid = uuidB,
+             .delta = ReplicatedMetadataDelta{
+                 .metadata = {.sizeCount = CollectionSizeCount{.size = 20, .count = 2}}}}});
+}
+
+TEST_F(SizeCountCheckpointValidatorTest, DeltasPastNewestWatermarkStayOutOfCheckpoint) {
+    const UUID uuid = UUID::gen();
+    const UUID tailUuid = UUID::gen();
+    const std::vector<repl::OplogEntry> ops{
+        makeWatermarkEntry(kT1),
+        makeCheckpointEntry(kT1,
+                            {{uuid,
+                              CollectionReplicatedMetadata{
+                                  .sizeCount = CollectionSizeCount{.size = 10, .count = 1}}}})};
+    applyBatch(
+        validator,
+        ops,
+        std::vector<ValidatorDeltaRecord>{
+            {.ts = kT0,
+             .uuid = uuid,
+             .delta =
+                 ReplicatedMetadataDelta{
+                     .metadata = {.sizeCount = CollectionSizeCount{.size = 10, .count = 1}}}},
+            {.ts = kT3,
+             .uuid = tailUuid,
+             .delta = ReplicatedMetadataDelta{
+                 .metadata = {.sizeCount = CollectionSizeCount{.size = 30, .count = 3}}}}});
+}
+
+class SizeCountCheckpointValidatorDeathTest : public SizeCountCheckpointValidatorTest {};
+
+DEATH_TEST_F(SizeCountCheckpointValidatorDeathTest, WrongSizeInCheckpointFasserts, "13626005") {
+    const UUID uuid = UUID::gen();
+    const std::vector<repl::OplogEntry> ops{
+        makeWatermarkEntry(kT1),
+        makeCheckpointEntry(kT1,
+                            {{uuid,
+                              CollectionReplicatedMetadata{
+                                  .sizeCount = CollectionSizeCount{.size = 999, .count = 5}}}})};
+    applyBatch(validator,
+               ops,
+               std::vector<ValidatorDeltaRecord>{
+                   {.ts = kT0,
+                    .uuid = uuid,
+                    .delta = ReplicatedMetadataDelta{
+                        .metadata = {.sizeCount = CollectionSizeCount{.size = 50, .count = 5}}}}});
+}
+
+DEATH_TEST_F(SizeCountCheckpointValidatorDeathTest, WrongCountInCheckpointFasserts, "13626005") {
+    const UUID uuid = UUID::gen();
+    const std::vector<repl::OplogEntry> ops{
+        makeWatermarkEntry(kT1),
+        makeCheckpointEntry(kT1,
+                            {{uuid,
+                              CollectionReplicatedMetadata{
+                                  .sizeCount = CollectionSizeCount{.size = 50, .count = 999}}}})};
+    applyBatch(validator,
+               ops,
+               std::vector<ValidatorDeltaRecord>{
+                   {.ts = kT0,
+                    .uuid = uuid,
+                    .delta = ReplicatedMetadataDelta{
+                        .metadata = {.sizeCount = CollectionSizeCount{.size = 50, .count = 5}}}}});
+}
+
+DEATH_TEST_F(SizeCountCheckpointValidatorDeathTest,
+             WatermarkTimestampIsMonotonicallyIncreasing,
+             "Watermark timestamps should be monotonically increasing") {
+    const std::vector<repl::OplogEntry> ops{makeWatermarkEntry(kT1), makeWatermarkEntry(kT1)};
+    applyBatch(validator, ops, {});
+}
+
+DEATH_TEST_F(SizeCountCheckpointValidatorDeathTest,
+             WatermarkTimestampIsNotUnique,
+             "Timestamp of a replicated metadata delta") {
+    const UUID uuid = UUID::gen();
+    const std::vector<repl::OplogEntry> ops{makeWatermarkEntry(kT1)};
+    applyBatch(validator,
+               ops,
+               std::vector<ValidatorDeltaRecord>{
+                   {.ts = kT1,
+                    .uuid = uuid,
+                    .delta = ReplicatedMetadataDelta{
+                        .metadata = {.sizeCount = CollectionSizeCount{.size = 50, .count = 5}}}}});
 }
 
 }  // namespace

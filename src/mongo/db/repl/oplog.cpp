@@ -71,6 +71,7 @@
 #include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_op_observer.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_uncommitted_changes.h"
+#include "mongo/db/replicated_fast_count/size_count_checkpoint_validator.h"
 #include "mongo/db/rss/persistence_provider.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -247,6 +248,31 @@ boost::optional<CreateCollCatalogIdentifier> extractReplicatedCatalogIdentifier(
 
     return CreateCollCatalogIdentifier{
         .catalogId = catalogId, .ident = ident, .idIndexIdent = idIndexIdent};
+}
+
+void recordSingleInsertDelta(UUID uuid, const OplogEntry& op, const BSONObj& o) {
+    const auto& insertSizeMeta = op.getDurableReplOperation().getSizeMetadata();
+    if (insertSizeMeta) {
+        if (const auto* singleOpMeta = std::get_if<SingleOpSizeMetadata>(&insertSizeMeta.value());
+            singleOpMeta && singleOpMeta->getSz().has_value()) {
+            // TODO(SERVER-136298): Record hash.
+            replicated_fast_count::SizeCountCheckpointValidator::recordDelta(
+                uuid,
+                op.getOpTime().getTimestamp(),
+                ReplicatedMetadataDelta{
+                    .metadata = {.sizeCount = CollectionSizeCount{.size = o.objsize(), .count = 1},
+                                 .hash = boost::none},
+                    .state = DDLState::kNone});
+        }
+    }
+}
+
+void recordGroupedInsertDelta(UUID uuid,
+                              const std::vector<InsertStatement>& insertObjs,
+                              const std::vector<ApplierOperation>& insertOps) {
+    for (size_t i = 0; i < insertObjs.size(); ++i) {
+        recordSingleInsertDelta(uuid, *insertOps[i], insertObjs[i].doc);
+    }
 }
 }  // namespace
 
@@ -2108,6 +2134,20 @@ UpdateResult updateObjectByRid(OperationContext* opCtx,
                                 op.getOpTime().toString(),
                                 redact(op.toBSONForLogging()).toString()),
                     actualDelta == oplogSz);
+
+                shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+                    [uuid = collPtr->uuid(), ts = op.getOpTime().getTimestamp(), actualDelta](
+                        OperationContext*, boost::optional<Timestamp>) {
+                        // TODO(SERVER-136298): Record hash.
+                        replicated_fast_count::SizeCountCheckpointValidator::recordDelta(
+                            uuid,
+                            ts,
+                            ReplicatedMetadataDelta{
+                                .metadata = {.sizeCount = CollectionSizeCount{.size = actualDelta,
+                                                                              .count = 0},
+                                             .hash = boost::none},
+                                .state = DDLState::kNone});
+                    });
             }
         }
     }
@@ -2301,6 +2341,20 @@ DeleteResult deleteObjectByRid(OperationContext* opCtx,
                                 op.getOpTime().toString(),
                                 redact(op.toBSONForLogging()).toString()),
                     actualDelta == oplogSz);
+
+                shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+                    [uuid = collPtr->uuid(), ts = op.getOpTime().getTimestamp(), actualDelta](
+                        OperationContext*, boost::optional<Timestamp>) {
+                        // TODO(SERVER-136298): Record hash.
+                        replicated_fast_count::SizeCountCheckpointValidator::recordDelta(
+                            uuid,
+                            ts,
+                            ReplicatedMetadataDelta{
+                                .metadata = {.sizeCount = CollectionSizeCount{.size = actualDelta,
+                                                                              .count = -1},
+                                             .hash = boost::none},
+                                .state = DDLState::kNone});
+                    });
             }
         }
     }
@@ -2689,6 +2743,14 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     }
                 }
 
+                if (mode == repl::OplogApplication::Mode::kSecondary) {
+                    shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+                        [uuid = collection->uuid(), insertObjs, insertOps](
+                            OperationContext*, boost::optional<Timestamp>) {
+                            recordGroupedInsertDelta(uuid, insertObjs, insertOps);
+                        });
+                }
+
                 wuow.commit();
                 for (size_t i = 0; i < insertObjs.size(); i++) {
                     opCountersToUse->gotInsert();
@@ -2798,6 +2860,13 @@ Status applyOperation_inlock(OperationContext* opCtx,
                                                  o,
                                                  computeDocValidationHash(o),
                                                  op);
+                        }
+                        if (mode == OplogApplication::Mode::kSecondary) {
+                            shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+                                [uuid = collection->uuid(), op, o](OperationContext*,
+                                                                   boost::optional<Timestamp>) {
+                                    recordSingleInsertDelta(uuid, op, o);
+                                });
                         }
                         wuow.commit();
                     } else if (status == ErrorCodes::DuplicateKey) {

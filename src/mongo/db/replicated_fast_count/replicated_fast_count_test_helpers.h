@@ -477,6 +477,32 @@ struct ContainerFastCountStores {
  */
 ContainerFastCountStores createContainerFastCountStores(OperationContext* opCtx);
 
+struct CheckpointWriteSpec {
+    UUID uuid;
+    boost::optional<CollectionReplicatedMetadata> metadata;
+};
+
+/**
+ * Returns a no-op watermark oplog entry with the provided timestamp.
+ */
+repl::OplogEntry makeWatermarkEntry(Timestamp ts);
+
+/**
+ * Generates the oplog entry for a replicated fast count checkpoint.
+ *
+ * The returned value is an applyOps entry with one or more container writes to
+ * `kFastCountMetadataStore` and one container write to `kFastCountMetadataStoreTimestamps`.
+ *
+ * The `validAsOf` timestamp is written to all the container writes.
+ *
+ * Each `CheckpointWriteSpec` in `writes` is converted to a container write to
+ * `kFastCountMetadataStore`. If `CheckPointWriteSpec::metadata` is `boost::none`, a `cd` (container
+ * delete) entry is generated. Otherwise, a `ci` (container insert) entry is generated using the
+ * `CheckpointWriteSpec::metadata`.
+ */
+repl::OplogEntry makeCheckpointEntry(Timestamp validAsOf,
+                                     const std::vector<CheckpointWriteSpec>& writes);
+
 /**
  * Registers an OpObserver so oplog writes are actually written to the oplog.
  *

@@ -14,6 +14,7 @@
 #include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/container_oplog_entry_gen.h"
+#include "mongo/db/repl/container_oplog_entry_serialization.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_interface_local.h"
@@ -870,5 +871,68 @@ void waitForFlushFailpoint(FailPointEnableBlock& fp, std::function<void()> reque
     fp.waitForOneNewEntry();
     stop.store(true);
     driver.join();
+}
+
+repl::OplogEntry makeWatermarkEntry(Timestamp ts) {
+    return repl::OplogEntry(BSON("ts" << ts << "t" << -1 << "v" << 2 << "wall" << Date_t() << "op"
+                                      << "n"
+                                      << "ns" << ""
+                                      << "o" << BSON("msg" << std::string(kWatermarkMsg))));
+}
+
+repl::OplogEntry makeCheckpointEntry(Timestamp validAsOf,
+                                     const std::vector<CheckpointWriteSpec>& writes) {
+    std::vector<BSONObj> innerOps;
+    for (const auto& spec : writes) {
+        const auto keyBytes = SizeCountStore::uuidToContainerKey(spec.uuid);
+        const std::string keyStorage(keyBytes.data(), keyBytes.size());
+        const repl::ContainerKey key(std::span<const char>(keyStorage.data(), keyStorage.size()));
+
+        BSONObjBuilder oBuilder;
+        key.serialize("k", &oBuilder);
+        if (spec.metadata.has_value()) {
+            const BSONObj value =
+                BSON("valid-as-of" << validAsOf << "meta"
+                                   << BSON("ct" << spec.metadata->sizeCount.count << "sz"
+                                                << spec.metadata->sizeCount.size));
+            const repl::ContainerVal valueView(
+                std::span<const char>(value.objdata(), value.objsize()));
+            valueView.serialize("v", &oBuilder);
+            BSONObjBuilder innerBuilder;
+            innerBuilder.append("op", "ci");
+            innerBuilder.append("ns", "admin.$cmd");
+            innerBuilder.append("container", std::string(ident::kFastCountMetadataStore));
+            innerBuilder.append("o", oBuilder.obj());
+            innerOps.push_back(innerBuilder.obj());
+        } else {
+            BSONObjBuilder innerBuilder;
+            innerBuilder.append("op", "cd");
+            innerBuilder.append("ns", "admin.$cmd");
+            innerBuilder.append("container", std::string(ident::kFastCountMetadataStore));
+            innerBuilder.append("o", oBuilder.obj());
+            innerOps.push_back(innerBuilder.obj());
+        }
+    }
+
+    const BSONObj tsValue = BSON("valid-as-of" << validAsOf);
+    const repl::ContainerVal tsValueView(
+        std::span<const char>(tsValue.objdata(), tsValue.objsize()));
+    BSONObjBuilder tsOBuilder;
+    tsOBuilder.append("$v",
+                      static_cast<int64_t>(container::UpdateOplogEntryVersion::kFullReplacementV1));
+    repl::ContainerKey(1).serialize("k", &tsOBuilder);
+    tsValueView.serialize("v", &tsOBuilder);
+    BSONObjBuilder cuBuilder;
+    cuBuilder.append("op", "cu");
+    cuBuilder.append("ns", "admin.$cmd");
+    cuBuilder.append("container", std::string(ident::kFastCountMetadataStoreTimestamps));
+    cuBuilder.append("o", tsOBuilder.obj());
+    innerOps.push_back(cuBuilder.obj());
+
+    return repl::OplogEntry(BSON("ts" << validAsOf << "t" << -1 << "v" << 2 << "wall" << Date_t()
+                                      << "op" << "c"
+                                      << "ns" << "admin.$cmd"
+                                      << "o" << BSON("applyOps" << innerOps))
+                                .getOwned());
 }
 }  // namespace mongo::replicated_fast_count::test_helpers

@@ -292,9 +292,11 @@ mongo_cc_library(
     ],
     deps = [
         "size_count_store",
+        "size_count_timestamp_store_oplog",
         "//src/mongo:base",
         "//src/mongo/db/repl:apply_ops_command_info",
         "//src/mongo/db/repl:oplog_entry",
+        "//src/mongo/db/repl:repl_server_parameters",
         "//src/mongo/db/storage:ident",
         "//src/mongo/idl:idl_parser",
     ],
@@ -510,6 +512,7 @@ mongo_cc_library(
     deps = [
         "replicated_fast_count_delta_utils",
         "replicated_fast_count_manager",
+        "size_count_checkpoint_validator",
         "size_count_store",
         "size_count_timestamp_store",
         "//src/mongo/db:import_collection_oplog_entry",
@@ -745,6 +748,20 @@ mongo_cc_unit_test(
         "//src/mongo/db/commands:test_commands_enabled",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
         "//src/mongo/db/storage:storage_options",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "oplog_applier_checkpoint_validation_test",
+    srcs = [
+        "oplog_applier_checkpoint_validation_test.cpp",
+    ],
+    tags = ["mongo_unittest_seventh_group"],
+    deps = [
+        "replicated_fast_count_init",
+        "replicated_fast_count_test_helpers",
+        "//src/mongo/db/repl:oplog_applier_impl_test_fixture",
+        "//src/mongo/unittest",
     ],
 )
 

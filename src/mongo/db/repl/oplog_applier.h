@@ -11,6 +11,7 @@
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/replicated_fast_count/size_count_checkpoint_validator.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
@@ -210,6 +211,8 @@ private:
 protected:
     // Handles consuming oplog entries from the OplogBuffer for oplog application.
     std::unique_ptr<OplogApplierBatcher> _oplogBatcher;
+
+    replicated_fast_count::SizeCountCheckpointValidator _checkpointValidator;
 };
 
 /**
