@@ -424,6 +424,11 @@ def mongo_shell_program(
     if config.OTEL_COLLECTOR_DIR and _should_enable_otel(test_data, bin_version):
         test_data["otelTraceDirectory"] = config.OTEL_COLLECTOR_DIR
 
+    if config.SKIP_EXTENSIONS_SIGNATURE_VERIFICATION:
+        # Lets jstests distinguish "resmoke deliberately skipped injecting the extension
+        # signature public key path" from "the key path is missing by mistake".
+        test_data["skipExtensionsSignatureVerification"] = True
+
     global_vars["TestData"] = test_data
 
     if test_data.get("enableOTELTracing", True) and "traceCtx" not in test_data:

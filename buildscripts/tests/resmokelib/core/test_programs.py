@@ -6,6 +6,8 @@ import tempfile
 import unittest
 from unittest import mock
 
+from buildscripts.resmokelib import config
+from buildscripts.resmokelib.core import programs
 from buildscripts.resmokelib.core.programs import (
     _format_shell_vars,
     get_binary_version,
@@ -112,6 +114,51 @@ class ResmokeProgramsTestCase(unittest.TestCase):
             'dummy_key["a"]["b"] = "c"',
         ]
         self.assertEqual(string_builder, expected)
+
+
+class MongoShellProgramSkipExtensionsSignatureVerificationTestCase(unittest.TestCase):
+    """TestData.skipExtensionsSignatureVerification mirrors resmoke's
+    --skipExtensionsSignatureVerification flag, so jstests can distinguish a deliberate
+    skip from a mistakenly missing key-path injection."""
+
+    def setUp(self):
+        # configure_resmoke installs the DEFAULTS as module-level attributes at resmoke startup.
+        # Tests must install them explicitly. Some defaults are raw argparse types (e.g. lists) that
+        # configure_resmoke normalizes via _merge_set_params. Mirror the normalized "unset" values
+        # for the attributes mongo_shell_program consumes.
+        for key, value in config.DEFAULTS.items():
+            setattr(config, key.upper(), value)
+        for attr in (
+            "MONGOD_SET_PARAMETERS",
+            "MONGOS_SET_PARAMETERS",
+            "MONGOCRYPTD_SET_PARAMETERS",
+            "MONGO_SET_PARAMETERS",
+            "ENABLED_FEATURE_FLAGS",
+            "DISABLED_FEATURE_FLAGS",
+            "IFR_FEATURE_FLAGS",
+            "CONFIG_FUZZER_ENCRYPTION_OPTS",
+        ):
+            setattr(config, attr, None)
+
+    def _shell_eval_string(self):
+        with mock.patch.object(programs, "get_binary_version", return_value="8.0.0"):
+            proc = programs.mongo_shell_program(
+                mock.Mock(),
+                "test_name",
+                executable="/usr/bin/false",
+                connection_string="mongodb://localhost:27017",
+                filenames=["jstests/dummy.js"],
+            )
+        return proc.args[proc.args.index("--eval") + 1]
+
+    def test_marker_set_when_skipping(self):
+        config.SKIP_EXTENSIONS_SIGNATURE_VERIFICATION = True
+        self.assertIn(
+            'TestData["skipExtensionsSignatureVerification"] = true', self._shell_eval_string()
+        )
+
+    def test_marker_absent_by_default(self):
+        self.assertNotIn("skipExtensionsSignatureVerification", self._shell_eval_string())
 
 
 if __name__ == "__main__":
