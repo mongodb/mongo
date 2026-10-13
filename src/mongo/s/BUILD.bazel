@@ -859,6 +859,7 @@ resmoke_suite_test(
         "misc_js",
         "non_live_record",
         "non_read_maj",
+        "release_critical",
     ],
     deps = [
         "//src/mongo/s:mongos",
