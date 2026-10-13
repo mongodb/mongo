@@ -34,6 +34,13 @@
 #include "mongo/unittest/unittest.h"
 
 #include <numeric>
+#include <set>
+#include <string>
+#include <string_view>
+#include <tuple>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo::timeseries::bucket_catalog {
 namespace {
@@ -301,6 +308,135 @@ TEST(MinMax, DuplicateFieldNamesWithLookupMap) {
     found = obj.search(obj.begin(), "x");
     ASSERT(found != obj.end());
     ASSERT_EQ(found->fieldName(), "x");
+}
+
+TEST(MinMax, ArraySlotReuseDoesNotCorruptLookupMap) {
+    // Regression test for a use-after-free reachable from strict time-series bucket validation.
+    //
+    // FlatBSONStore keeps array element entries (which share one reserved field name) in the
+    // same positional child list as named object fields. When an object field was merged onto an
+    // array placeholder entry after the parent's fast lookup map had been built, the entry was
+    // renamed without updating the map. The map then missed the new name, a later insert created
+    // a duplicate entry with that name, and the insert offset fixup counted the shared name
+    // twice, so the map slot drifted onto a different entry. From then on, lookups for that name
+    // returned the wrong entry, and with enough drift an out-of-subtree position whose "value"
+    // the bucket validator could be driven into resizing and freeing under another entry.
+    //
+    // This replays the minimal sequence through the public API and asserts on the observable
+    // misrouting: 'x' must resolve to a single entry holding the minimum of its own values, and
+    // 'z' must keep its own minimum.
+    MinMax minMaxObj;
+    const auto* strCmp = &SimpleStringDataComparator::kInstance;
+
+    auto wideObj = [](int value) {
+        BSONObjBuilder builder;
+        for (int i = 0; i <= 12; ++i) {
+            builder.append("f" + std::to_string(i), value);
+        }
+        return builder.obj();
+    };
+
+    // Thirteen fields, more than the linear search limit, so that the deep search miss below
+    // builds the lookup map.
+    minMaxObj.update(BSON("m" << wideObj(0)), boost::none, strCmp);
+    // The array makes 'm' an array on the max side and appends an array placeholder entry that
+    // shares the child run with the named fields.
+    minMaxObj.update(
+        BSON("m" << BSON_ARRAY(0 << 0 << 0 << 0 << 0 << 0 << 0 << 0 << 0 << 0 << 0 << 0 << 0 << 0)),
+        boost::none,
+        strCmp);
+    // Searching for 'z' misses past the linear search limit and builds the lookup map, then 'z'
+    // is inserted at the front.
+    minMaxObj.update(BSON("m" << BSON("z" << 1)), boost::none, strCmp);
+    // The lock-step walk lands on the placeholder exactly when processing 'x' and claims it,
+    // leaving the lookup map stale on affected builds.
+    minMaxObj.update(BSON("m" <<
+                          [&] {
+                              BSONObjBuilder builder;
+                              builder.append("z", 1);
+                              builder.appendElements(wideObj(0));
+                              builder.append("x", 5);
+                              return builder.obj();
+                          }()),
+                     boost::none,
+                     strCmp);
+    // The stale map has no key for 'x', so this inserts a duplicate 'x' entry and the insert
+    // fixup counts the shared 'x' name twice, leaving the map slot for 'x' pointing at 'z'.
+    minMaxObj.update(BSON("m" << BSON("x" << 7)), boost::none, strCmp);
+    // A consistent map resolves 'x' to its own entry and lowers its minimum to 0. The stale map
+    // resolves 'x' to the 'z' entry and clobbers z's minimum instead.
+    minMaxObj.update(BSON("m" << BSON("z" << 5 << "x" << 0)), boost::none, strCmp);
+
+    BSONObj minObj = minMaxObj.min();
+    BSONObj minM = minObj.getObjectField("m");
+    int xCount = 0;
+    for (auto&& elem : minM) {
+        if (elem.fieldNameStringData() == "x") {
+            ++xCount;
+        }
+    }
+    ASSERT_EQ(xCount, 1);
+    ASSERT_EQ(minM.getIntField("x"), 0);
+    ASSERT_EQ(minM.getIntField("z"), 1);
+
+    // The max side keeps the array shape from the second update, since objects sort below
+    // arrays in canonical order and no later object update can win the max.
+    BSONObj maxObj = minMaxObj.max();
+    ASSERT_BSONOBJ_EQ(
+        BSON("m" << BSON_ARRAY(0 << 0 << 0 << 0 << 0 << 0 << 0 << 0 << 0 << 0 << 0 << 0 << 0 << 0)),
+        maxObj);
+}
+
+TEST(MinMax, ClaimBeforeLookupMapCreationStaysConsistent) {
+    // Companion to ArraySlotReuseDoesNotCorruptLookupMap for the second case: the placeholder
+    // claim happens while no fast lookup map exists yet. The map is created later from the
+    // names the entries have at that point, so it starts out consistent.
+    MinMax minMaxObj;
+    const auto* strCmp = &SimpleStringDataComparator::kInstance;
+
+    // Five array placeholder entries.
+    minMaxObj.update(BSON("m" << BSON_ARRAY(0 << 0 << 0 << 0 << 0)), boost::none, strCmp);
+    // Claims three of them. Five children is below the linear search limit, so no map exists.
+    minMaxObj.update(BSON("m" << BSON("a" << 1 << "b" << 2 << "c" << 3)), boost::none, strCmp);
+    // Claims the remaining two placeholders and appends nine named fields, still with no map.
+    minMaxObj.update(BSON("m" <<
+                          [] {
+                              BSONObjBuilder builder;
+                              builder.append("a", 1);
+                              builder.append("b", 2);
+                              builder.append("c", 3);
+                              for (int i = 0; i <= 9; ++i) {
+                                  builder.append("d" + std::to_string(i), 0);
+                              }
+                              builder.append("d10", 42);
+                              return builder.obj();
+                          }()),
+                     boost::none,
+                     strCmp);
+    // A miss over 14 named children exhausts the linear search limit and builds the map from
+    // the current, post-rename names.
+    minMaxObj.update(BSON("m" << BSON("zz" << 9)), boost::none, strCmp);
+    // This lookup resolves through the map. If the map were out of sync with the entries, the
+    // update would land on the wrong field.
+    minMaxObj.update(BSON("m" << BSON("d10" << 0)), boost::none, strCmp);
+
+    BSONObj minObj = minMaxObj.min();
+    BSONObj minM = minObj.getObjectField("m");
+    std::set<std::string> names;
+    for (auto&& elem : minM) {
+        ASSERT(names.insert(std::string{elem.fieldNameStringData()}).second);
+    }
+    ASSERT_EQ(names.size(), 15);
+    ASSERT_EQ(minM.getIntField("a"), 1);
+    ASSERT_EQ(minM.getIntField("b"), 2);
+    ASSERT_EQ(minM.getIntField("c"), 3);
+    ASSERT_EQ(minM.getIntField("zz"), 9);
+    ASSERT_EQ(minM.getIntField("d10"), 0);
+
+    // The max side keeps the array shape: the five claimed entries carry the array values and
+    // the named entries appended by object updates have no max value and are skipped.
+    BSONObj maxObj = minMaxObj.max();
+    ASSERT_BSONOBJ_EQ(BSON("m" << BSON_ARRAY(0 << 0 << 0 << 0 << 0)), maxObj);
 }
 
 }  // namespace
