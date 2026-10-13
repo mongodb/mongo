@@ -9615,6 +9615,182 @@ TEST_F(BSONColumnTest, TestCollector) {
     ASSERT_EQ(std::monostate(), std::get<std::monostate>(collection.back()));
 }
 
+TEST_F(BSONColumnTest, MinMaxValues) {
+    boost::intrusive_ptr allocator{new ElementStorage()};
+
+    // Dense column [5, 7, 3]: min is 3; max is 7.
+    {
+        BSONColumnBuilder<> col;
+        col.append(createElementInt32(5));
+        col.append(createElementInt32(7));
+        col.append(createElementInt32(3));
+        auto bin = col.finalize();
+
+        auto minResult = min<BSONElementMaterializer>(bin, allocator);
+        ASSERT_FALSE(minResult.eoo());
+        ASSERT_EQ(minResult.Int(), 3);
+
+        auto maxResult = max<BSONElementMaterializer>(bin, allocator);
+        ASSERT_FALSE(maxResult.eoo());
+        ASSERT_EQ(maxResult.Int(), 7);
+    }
+
+    // Sparse column [10, skip, skip, 4]: missing slots are ignored, so min is 4.
+    {
+        BSONColumnBuilder<> col;
+        col.append(createElementInt32(10));
+        col.skip();
+        col.skip();
+        col.append(createElementInt32(4));
+        auto bin = col.finalize();
+
+        auto minResult = min<BSONElementMaterializer>(bin, allocator);
+        ASSERT_FALSE(minResult.eoo());
+        ASSERT_EQ(minResult.Int(), 4);
+    }
+
+    // Single element [42].
+    {
+        BSONColumnBuilder<> col;
+        col.append(createElementInt32(42));
+        auto bin = col.finalize();
+
+        auto minResult = min<BSONElementMaterializer>(bin, allocator);
+        ASSERT_FALSE(minResult.eoo());
+        ASSERT_EQ(minResult.Int(), 42);
+    }
+
+    // Type transition [int32(50), string("abc"), int32(10)]: canonical type ordering puts numerics
+    // before strings, so min is int32(10). Exercises correctness across a type change in the
+    // BSONElement-template append path.
+    {
+        BSONColumnBuilder<> col;
+        col.append(createElementInt32(50));
+        col.append(createElementString("abc"));
+        col.append(createElementInt32(10));
+        auto bin = col.finalize();
+
+        auto minResult = min<BSONElementMaterializer>(bin, allocator);
+        ASSERT_FALSE(minResult.eoo());
+        ASSERT_EQ(minResult.Int(), 10);
+    }
+
+    // All-missing column: min/max return eoo element.
+    {
+        BSONColumnBuilder<> col;
+        col.skip();
+        col.skip();
+        col.skip();
+        auto bin = col.finalize();
+
+        ASSERT_TRUE(min<BSONElementMaterializer>(bin, allocator).eoo());
+        ASSERT_TRUE(max<BSONElementMaterializer>(bin, allocator).eoo());
+    }
+
+    // Empty column: min/max return eoo element.
+    {
+        BSONColumnBuilder<> col;
+        auto bin = col.finalize();
+
+        ASSERT_TRUE(min<BSONElementMaterializer>(bin, allocator).eoo());
+        ASSERT_TRUE(max<BSONElementMaterializer>(bin, allocator).eoo());
+    }
+
+    // Leading skips before the only value.
+    {
+        BSONColumnBuilder<> col;
+        col.skip();
+        col.skip();
+        col.append(createElementInt32(7));
+        auto bin = col.finalize();
+
+        auto minResult = min<BSONElementMaterializer>(bin, allocator);
+        ASSERT_FALSE(minResult.eoo());
+        ASSERT_EQ(minResult.Int(), 7);
+    }
+
+    // Trailing skips after the values.
+    {
+        BSONColumnBuilder<> col;
+        col.append(createElementInt32(9));
+        col.append(createElementInt32(2));
+        col.skip();
+        col.skip();
+        auto bin = col.finalize();
+
+        auto minResult = min<BSONElementMaterializer>(bin, allocator);
+        ASSERT_FALSE(minResult.eoo());
+        ASSERT_EQ(minResult.Int(), 2);
+    }
+
+    // Skips on both sides of the extremes.
+    {
+        BSONColumnBuilder<> col;
+        col.skip();
+        col.append(createElementInt32(5));
+        col.skip();
+        col.append(createElementInt32(3));
+        col.skip();
+        auto bin = col.finalize();
+
+        auto minResult = min<BSONElementMaterializer>(bin, allocator);
+        ASSERT_FALSE(minResult.eoo());
+        ASSERT_EQ(minResult.Int(), 3);
+
+        auto maxResult = max<BSONElementMaterializer>(bin, allocator);
+        ASSERT_FALSE(maxResult.eoo());
+        ASSERT_EQ(maxResult.Int(), 5);
+    }
+
+    // Ties: repeated minimum still returns that value.
+    {
+        BSONColumnBuilder<> col;
+        col.append(createElementInt32(8));
+        col.append(createElementInt32(3));
+        col.append(createElementInt32(5));
+        col.append(createElementInt32(3));
+        auto bin = col.finalize();
+
+        auto minResult = min<BSONElementMaterializer>(bin, allocator);
+        ASSERT_FALSE(minResult.eoo());
+        ASSERT_EQ(minResult.Int(), 3);
+    }
+}
+
+// Regression test for a discrepancy between the materializing decompress path and the min/max
+// (CompareCollector / MinMaxCollector) path. After interleaved mode ends, the interleaved
+// decompressor calls setLast<BSONElement>(BSONElement()) to mark the last value missing, so that
+// the trailing simple8b blocks are handled by decompressAllMissing() instead of
+// decompressAllLiteral() (which asserts that post-literal delta blocks only contain skip or 0).
+// The min/max collectors previously hardcoded isLastMissing() to false and ignored setLast(), so
+// they took the decompressAllLiteral() branch and threw uassert 8609800 on inputs that the
+// iterator and block-based APIs accepted. This uncaught throw crashed the
+// bsoncolumn_decompress_fuzzer.
+//
+// The bytes below are a fuzzer-found reproducer. We only assert that the min/max expressions no
+// longer throw (the crash being regressed); we do not compare returned values, because these bytes
+// decode to elements the expectedMinMax() test helper cannot canonicalize.
+TEST_F(BSONColumnTest, MinMaxInterleavedTrailingBlocksDoNotThrow) {
+    const uint8_t bytes[] = {
+        0xf0, 0x08, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x0b, 0x00, 0x00, 0x00, 0x07, 0x00,
+        0xff, 0x27, 0x00, 0x12, 0x00, 0x00, 0x80, 0x81, 0x81, 0x81, 0xff, 0x00, 0x80, 0x67, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0xfc, 0xff, 0x00, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81,
+        0x81, 0x81, 0x81, 0x81, 0x81, 0x81, 0xff, 0x81, 0x25, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81,
+        0x81, 0x81, 0x81, 0x81, 0xff, 0xff, 0xff, 0xff, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81,
+        0x81, 0xff, 0xff, 0xff, 0xff, 0x0b, 0x00, 0x00, 0xff, 0x00, 0x00, 0xff, 0x00, 0x00};
+    const char* data = reinterpret_cast<const char*>(bytes);
+    const size_t size = sizeof(bytes);
+
+    // The reproducer ends with an interleaved section followed by trailing simple8b blocks, which
+    // is the shape that exercises the isLastMissing() branch.
+    boost::intrusive_ptr allocator{new ElementStorage()};
+
+    // Prior to the fix these calls threw uassert 8609800 ("Post literal delta blocks should only
+    // contain skip or 0") and aborted the fuzzer. They must now succeed without throwing.
+    ASSERT_DOES_NOT_THROW(min<BSONElementMaterializer>(data, size, allocator));
+    ASSERT_DOES_NOT_THROW(max<BSONElementMaterializer>(data, size, allocator));
+    ASSERT_DOES_NOT_THROW(minmax<BSONElementMaterializer>(data, size, allocator));
+}
 
 }  // namespace
 }  // namespace mongo::bsoncolumn

@@ -170,6 +170,9 @@ public:
     // a type change.
     template <typename T>
     void append(const BSONElement& val) {
+        // An uncompressed literal is a real (non-missing) value, so record that the last value is
+        // not missing. This governs whether following simple8b blocks are treated as skips.
+        _lastMissing = false;
         // This if-else block handles when there were no type change.
         if constexpr (std::is_same_v<T, double>) {
             if (_type == NumberDouble) {
@@ -267,16 +270,19 @@ public:
         _storeValue();
         _working = CMaterializer::materializePreallocated(val);
         _type = val.type();
+        _lastMissing = false;
     }
 
     // We do not need to keep track of missing or last as that will not affect comparison
     void appendMissing() {}
     void appendLast() {}
     bool isLastMissing() {
-        return false;
+        return _lastMissing;
     }
     template <typename T>
-    void setLast(const BSONElement& val) {}
+    void setLast(const BSONElement& val) {
+        _lastMissing = val.eoo();
+    }
 
     // Position info is not supported
     void appendPositionInfo(int32_t n) {}
@@ -324,6 +330,9 @@ private:
     Element _working = _value;
     BSONType _type = EOO;
     const StringDataComparator* _comparator;
+    // Tracks whether the last appended value was missing, mirroring the materializing collector's
+    // _last. Initialized to true since no value has been appended yet.
+    bool _lastMissing = true;
 };
 
 /*
@@ -544,6 +553,9 @@ public:
 
     template <typename T>
     void append(const BSONElement& val) {
+        // An uncompressed literal is a real (non-missing) value, so record that the last value is
+        // not missing. This governs whether following simple8b blocks are treated as skips.
+        _lastMissing = false;
         if constexpr (std::is_same_v<T, double>) {
             if (_type == NumberDouble) {
                 append(BSONElementValue(val.value()).Double());
@@ -683,6 +695,7 @@ public:
         _minForType = CMaterializer::materializePreallocated(val);
         _maxForType = _minForType;
         _type = val.type();
+        _lastMissing = false;
     }
 
     // Does not update _last, should not be repeated by appendLast()
@@ -691,15 +704,20 @@ public:
     // Appends last value that was not Missing
     void appendLast() {}
 
+    // We must track whether the last value is missing (mirroring the materializing collector's
+    // isLastMissing()) so that decompressAllLiteral() takes the same branch and applies the same
+    // validation. appendMissing() intentionally does not update _lastMissing.
     bool isLastMissing() {
-        return false;
+        return _lastMissing;
     }
 
     // Sets the last value without appending anything. This should be called to update _last to be
     // the element in the reference object, and for missing top-level objects. Otherwise the append
     // methods will take care of updating _last as needed.
     template <typename T>
-    void setLast(const BSONElement& val) {}
+    void setLast(const BSONElement& val) {
+        _lastMissing = val.eoo();
+    }
 
     void appendPositionInfo(int32_t n) {}
 
@@ -729,6 +747,9 @@ private:
     Element _maxForType = _min;
     BSONType _type = EOO;
     const StringDataComparator* _comparator;
+    // Tracks whether the last appended value was missing, mirroring the materializing collector's
+    // _last. Initialized to true since no value has been appended yet.
+    bool _lastMissing = true;
 };
 
 template <class CMaterializer>
