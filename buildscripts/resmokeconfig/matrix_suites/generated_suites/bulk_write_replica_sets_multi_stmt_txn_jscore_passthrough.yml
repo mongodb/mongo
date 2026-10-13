@@ -199,6 +199,7 @@ selector:
     - jstests/core/query/explain/explain_uuid.js
     - jstests/core/query/explain/explain_includes_command.js
     - jstests/core/query/distinct/distinct_collator.js
+    - jstests/core/query/bson_size_limit_agg.js
     - jstests/libs/txns/txn_passthrough_runner_selftest.js
   exclude_with_any_tags:
     - assumes_standalone_mongod
