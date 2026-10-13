@@ -18,8 +18,10 @@ namespace {
 
 class OplogVisibilityManagerTest : public ServiceContextMongoDTest {
 public:
-    OplogVisibilityManagerTest(Options options = {})
-        : ServiceContextMongoDTest(options.useReplSettings(true)) {}
+    Options makeServiceContextOptions() override {
+        return ServiceContextMongoDTest::makeServiceContextOptions().useReplSettings(true);
+    }
+
     void setUp() override;
     void tearDown() override;
     OplogVisibilityManager::const_iterator trackTimestamps(

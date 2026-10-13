@@ -323,7 +323,9 @@ public:
     }
 
 protected:
-    TypedCommandTest() : ServiceContextMongoDTest(Options{}.useMockClock(true)) {}
+    Options makeServiceContextOptions() override {
+        return ServiceContextMongoDTest::makeServiceContextOptions().useMockClock(true);
+    }
 
     ClockSourceMock* clockSource() {
         return static_cast<ClockSourceMock*>(getServiceContext()->getFastClockSource());

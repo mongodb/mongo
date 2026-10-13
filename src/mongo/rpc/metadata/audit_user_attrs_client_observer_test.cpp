@@ -15,11 +15,7 @@ namespace mongo::audit {
 namespace {
 using namespace std::literals::string_view_literals;
 
-class AuditDecorationsTest : public AuthorizationSessionTestFixture {
-protected:
-    explicit AuditDecorationsTest(Options options = Options{})
-        : AuthorizationSessionTestFixture(std::move(options)) {}
-};
+class AuditDecorationsTest : public AuthorizationSessionTestFixture {};
 
 const UserName kUser1Test("user1"sv, "test"sv);
 const std::unique_ptr<UserRequest> kUser1TestRequest =

@@ -127,8 +127,10 @@ DEATH_TEST_REGEX_F(
  */
 class ServerStatusSlowTimingTest : public ServiceContextMongoDTest {
 public:
-    ServerStatusSlowTimingTest()
-        : ServiceContextMongoDTest(Options{}.useMockClock(true, Milliseconds{50})) {}
+    Options makeServiceContextOptions() override {
+        return ServiceContextMongoDTest::makeServiceContextOptions().useMockClock(true,
+                                                                                  Milliseconds{50});
+    }
 
     void setUp() override {
         ServiceContextMongoDTest::setUp();

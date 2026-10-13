@@ -993,12 +993,9 @@ private:
 class CollectionCatalogTimestampTest : public ServiceContextMongoDTest {
 public:
     // Disable table logging. When table logging is enabled, timestamps are discarded by WiredTiger.
-    CollectionCatalogTimestampTest()
-        : ServiceContextMongoDTest(Options{}.forceDisableTableLogging()) {}
-
-    // Special constructor to _disable_ timestamping. Not to be used directly.
-    struct DisableTimestampingTag {};
-    CollectionCatalogTimestampTest(DisableTimestampingTag) : ServiceContextMongoDTest() {}
+    Options makeServiceContextOptions() override {
+        return ServiceContextMongoDTest::makeServiceContextOptions().forceDisableTableLogging();
+    }
 
     void setUp() override {
         ServiceContextMongoDTest::setUp();
@@ -1814,13 +1811,6 @@ private:
         if (verifyStateCallback) {
             verifyStateCallback();
         }
-    }
-};
-
-class CollectionCatalogNoTimestampTest : public CollectionCatalogTimestampTest {
-public:
-    CollectionCatalogNoTimestampTest()
-        : CollectionCatalogTimestampTest(CollectionCatalogTimestampTest::DisableTimestampingTag{}) {
     }
 };
 

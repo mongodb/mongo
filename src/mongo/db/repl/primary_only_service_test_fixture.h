@@ -37,10 +37,6 @@ public:
     void tearDown() override;
 
 protected:
-    PrimaryOnlyServiceMongoDTest() : ServiceContextMongoDTest(Options{}) {}
-    explicit PrimaryOnlyServiceMongoDTest(Options options)
-        : ServiceContextMongoDTest(std::move(options)) {}
-
     bool shouldSetupTransportLayer() const override {
         return true;
     }

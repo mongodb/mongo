@@ -34,7 +34,9 @@ constexpr int kWriteBlockEnabled = 2;
 
 class ReplicationInfoServerStatusTest : public ServiceContextMongoDTest {
 public:
-    ReplicationInfoServerStatusTest() : ServiceContextMongoDTest(Options{}.useReplSettings(true)) {}
+    Options makeServiceContextOptions() override {
+        return ServiceContextMongoDTest::makeServiceContextOptions().useReplSettings(true);
+    }
 
     void setUp() override {
         ServiceContextMongoDTest::setUp();

@@ -226,8 +226,6 @@ repl::OpTime reserveOpTimeInSideTransaction(OperationContext* opCtx) {
 
 class OpObserverTest : public ServiceContextMongoDTest {
 protected:
-    explicit OpObserverTest(Options options = {}) : ServiceContextMongoDTest(std::move(options)) {}
-
     OpObserverImpl& opObserver() {
         return *_opObserver;
     }

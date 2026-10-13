@@ -64,9 +64,11 @@ private:
 
 class OplogWriterImplTest : public ServiceContextMongoDTest {
 protected:
-    explicit OplogWriterImplTest(Options options = {})
-        : ServiceContextMongoDTest(options.useReplSettings(true).useJournalListener(
-              std::make_unique<JournalListenerMock>())) {}
+    Options makeServiceContextOptions() override {
+        return ServiceContextMongoDTest::makeServiceContextOptions()
+            .useReplSettings(true)
+            .useJournalListener(std::make_unique<JournalListenerMock>());
+    }
 
     void setUp() override;
     void tearDown() override;

@@ -377,9 +377,6 @@ protected:
     void setUp() override;
     void tearDown() override;
 
-    explicit RenameCollectionTest(Options options = {})
-        : ServiceContextMongoDTest(std::move(options)) {}
-
     ServiceContext::UniqueOperationContext _opCtx;
     repl::ReplicationCoordinatorMock* _replCoord = nullptr;
     OpObserverMock* _opObserver = nullptr;

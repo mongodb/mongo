@@ -755,9 +755,9 @@ public:
     using RecipientStateMachine = ReshardingRecipientService::RecipientStateMachine;
     using enum ExternalStateForTestImpl::ExternalFunction;
 
-    ReshardingRecipientServiceTest()
-        : repl::PrimaryOnlyServiceMongoDTest(
-              Options{}.useIndexBuildsCoordinator(std::make_unique<IndexBuildsCoordinatorMock>())) {
+    Options makeServiceContextOptions() override {
+        return repl::PrimaryOnlyServiceMongoDTest::makeServiceContextOptions()
+            .useIndexBuildsCoordinator(std::make_unique<IndexBuildsCoordinatorMock>());
     }
 
     std::unique_ptr<repl::PrimaryOnlyService> makeService(ServiceContext* serviceContext) override {

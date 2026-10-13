@@ -71,7 +71,9 @@ private:
 class ExternalDataSourceCommandsTest : public DBCommandTestFixture {
 public:
     // External data source commands use $group aggregation which may spill to disk.
-    ExternalDataSourceCommandsTest() : DBCommandTestFixture(Options{}.enableSpillEngine()) {}
+    Options makeServiceContextOptions() override {
+        return DBCommandTestFixture::makeServiceContextOptions().enableSpillEngine();
+    }
 
 protected:
     void setUp() override {

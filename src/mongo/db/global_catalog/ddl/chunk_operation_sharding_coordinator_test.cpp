@@ -41,10 +41,10 @@ public:
     static inline const ShardId kTestShardId{"test-shard"};
     static inline const KeyPattern kTestKeyPattern{BSON("x" << 1)};
 
-    ChunkOperationShardingCoordinatorTest()
-        : repl::PrimaryOnlyServiceMongoDTest(
-              Options{}.addClientObserver(std::make_unique<ClientObserver>())),
-          _externalState(std::make_shared<ShardingCoordinatorExternalStateForTest>()) {}
+    Options makeServiceContextOptions() override {
+        return repl::PrimaryOnlyServiceMongoDTest::makeServiceContextOptions().addClientObserver(
+            std::make_unique<ClientObserver>());
+    }
 
     std::unique_ptr<repl::PrimaryOnlyService> makeService(ServiceContext* serviceContext) override {
         auto externalStateFactory =
@@ -96,7 +96,8 @@ protected:
     executor::NetworkInterfaceMock* _network;
     std::shared_ptr<executor::ThreadPoolTaskExecutor> _executor;
     std::shared_ptr<executor::ScopedTaskExecutor> _scopedExecutor;
-    std::shared_ptr<ShardingCoordinatorExternalStateForTest> _externalState;
+    std::shared_ptr<ShardingCoordinatorExternalStateForTest> _externalState =
+        std::make_shared<ShardingCoordinatorExternalStateForTest>();
     ServiceContext::UniqueOperationContext _opCtxHolder;
     OperationContext* _opCtx;
 

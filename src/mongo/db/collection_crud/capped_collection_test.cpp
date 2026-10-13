@@ -41,7 +41,9 @@ namespace {
 
 class CappedCollectionTest : public ServiceContextMongoDTest {
 public:
-    CappedCollectionTest() : ServiceContextMongoDTest(Options().engine("wiredTiger")) {}
+    Options makeServiceContextOptions() override {
+        return ServiceContextMongoDTest::makeServiceContextOptions().engine("wiredTiger");
+    }
 
 protected:
     void setUp() override {

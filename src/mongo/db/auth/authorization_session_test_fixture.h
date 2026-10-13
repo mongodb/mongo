@@ -52,15 +52,11 @@ public:
                                         const BSONArray& pipeline,
                                         bool bypassDocValidation);
 
-private:
-    static Options createServiceContextOptions(Options options) {
-        options = options.setAuthObjects(true);
-        return options.useMockClock(true);
+    Options makeServiceContextOptions() override {
+        return ServiceContextMongoDTest::makeServiceContextOptions()
+            .setAuthObjects(true)
+            .useMockClock(true);
     }
-
-protected:
-    explicit AuthorizationSessionTestFixture(Options options = Options{})
-        : ServiceContextMongoDTest(createServiceContextOptions(std::move(options))) {}
 
     ClockSourceMock* clockSource() {
         return static_cast<ClockSourceMock*>(getServiceContext()->getFastClockSource());

@@ -123,8 +123,7 @@ MongoDScopedGlobalServiceContextForTest::MongoDScopedGlobalServiceContextForTest
         std::exchange(storageGlobalParams.engine, std::move(options._engine));
     _stashedStorageParams.engineSetByUser =
         std::exchange(storageGlobalParams.engineSetByUser, true);
-    _stashedStorageParams.repair =
-        std::exchange(storageGlobalParams.repair, (options._repair == RepairAction::kRepair));
+    _stashedStorageParams.repair = std::exchange(storageGlobalParams.repair, options._repair);
 
     serviceContext->getService()->setServiceEntryPoint(
         std::make_unique<ServiceEntryPointShardRole>());

@@ -84,8 +84,12 @@ public:
     }
 
 protected:
-    explicit ReplCoordTest(Options options = Options{}.useMockClock(true));
+    ReplCoordTest();
     ~ReplCoordTest() override;
+
+    Options makeServiceContextOptions() override {
+        return ServiceContextMongoDTest::makeServiceContextOptions().useMockClock(true);
+    }
 
     /**
      * Asserts that calling start(configDoc, selfHost) successfully initiates the

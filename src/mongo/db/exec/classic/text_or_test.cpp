@@ -71,7 +71,9 @@ static const std::vector<BSONObj> kMovieDocs = {
 
 class TextOrStageTest : public ServiceContextMongoDTest {
 public:
-    TextOrStageTest() : ServiceContextMongoDTest(Options{}.useMockClock(true)) {}
+    Options makeServiceContextOptions() override {
+        return ServiceContextMongoDTest::makeServiceContextOptions().useMockClock(true);
+    }
 
     void setUp() override {
         ServiceContextMongoDTest::setUp();

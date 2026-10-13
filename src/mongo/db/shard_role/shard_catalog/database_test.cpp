@@ -85,8 +85,6 @@ private:
     void tearDown() override;
 
 protected:
-    explicit DatabaseTest(Options options = {}) : ServiceContextMongoDTest(std::move(options)) {}
-
     ServiceContext::UniqueOperationContext _opCtx;
     NamespaceString _nss;
     OpObserverRegistry* _opObserverRegistry;

@@ -224,8 +224,9 @@ public:
 
 class [[MONGO_MOD_OPEN]] OplogApplierImplTest : public ServiceContextMongoDTest {
 protected:
-    explicit OplogApplierImplTest(Options options = {})
-        : ServiceContextMongoDTest(options.useReplSettings(true)) {}
+    Options makeServiceContextOptions() override {
+        return ServiceContextMongoDTest::makeServiceContextOptions().useReplSettings(true);
+    }
 
     void _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::Error expectedError,
                                                            const OplogEntry& op,
@@ -281,16 +282,18 @@ protected:
 
 class OplogApplierImplWithFastAutoAdvancingClockTest : public OplogApplierImplTest {
 protected:
-    OplogApplierImplWithFastAutoAdvancingClockTest()
-        : OplogApplierImplTest(
-              Options{}.useMockClock(true, Milliseconds{serverGlobalParams.slowMS.load() * 10})) {}
+    Options makeServiceContextOptions() override {
+        return OplogApplierImplTest::makeServiceContextOptions().useMockClock(
+            true, Milliseconds{serverGlobalParams.slowMS.load() * 10});
+    }
 };
 
 class OplogApplierImplWithSlowAutoAdvancingClockTest : public OplogApplierImplTest {
 protected:
-    OplogApplierImplWithSlowAutoAdvancingClockTest()
-        : OplogApplierImplTest(
-              Options{}.useMockClock(true, Milliseconds{serverGlobalParams.slowMS.load() / 10})) {}
+    Options makeServiceContextOptions() override {
+        return OplogApplierImplTest::makeServiceContextOptions().useMockClock(
+            true, Milliseconds{serverGlobalParams.slowMS.load() / 10});
+    }
 };
 
 // Utility class to allow easily scanning a collection.  Scans in forward order, returns

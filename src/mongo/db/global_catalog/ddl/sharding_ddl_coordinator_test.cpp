@@ -52,8 +52,6 @@ class ShardingDDLCoordinatorTest : public repl::PrimaryOnlyServiceMongoDTest {
 public:
     static inline const ShardId kTestShardId{"test-shard"};
 
-    ShardingDDLCoordinatorTest() : repl::PrimaryOnlyServiceMongoDTest(makeOptions()) {}
-
     std::unique_ptr<repl::PrimaryOnlyService> makeService(ServiceContext* serviceContext) override {
         return std::make_unique<ShardingCoordinatorService>(
             serviceContext, std::make_unique<ShardingCoordinatorExternalStateFactoryForTest>());
@@ -158,10 +156,11 @@ protected:
         }
 
         void onDestroyOperationContext(OperationContext*) override {}
-    };  // namespace mongo
+    };
 
-    static Options makeOptions() {
-        return Options{}.addClientObserver(std::make_unique<ClientObserver>());
+    Options makeServiceContextOptions() override {
+        return repl::PrimaryOnlyServiceMongoDTest::makeServiceContextOptions().addClientObserver(
+            std::make_unique<ClientObserver>());
     }
 };
 

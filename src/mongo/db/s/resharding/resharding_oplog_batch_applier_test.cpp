@@ -114,9 +114,11 @@ namespace {
 
 class ReshardingOplogBatchApplierTest : public ServiceContextMongoDTest {
 public:
-    ReshardingOplogBatchApplierTest()
-        : ServiceContextMongoDTest(
-              Options{}.useMockClock(true).useMockTickSource<Milliseconds>(true)) {}
+    Options makeServiceContextOptions() override {
+        return ServiceContextMongoDTest::makeServiceContextOptions()
+            .useMockClock(true)
+            .useMockTickSource<Milliseconds>(true);
+    }
 
     bool shouldSetupTransportLayer() const override {
         return true;

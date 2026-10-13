@@ -830,7 +830,9 @@ DEATH_TEST_F(ApplyOpsDeathTest, SteadyStateRidOnNonRridCollection, "11454701") {
  */
 class ApplyOpsUUIDAuthTest : public ServiceContextMongoDTest {
 protected:
-    ApplyOpsUUIDAuthTest() : ServiceContextMongoDTest(Options{}.setAuthObjects(true)) {}
+    Options makeServiceContextOptions() override {
+        return ServiceContextMongoDTest::makeServiceContextOptions().setAuthObjects(true);
+    }
 
     void setUp() override {
         ServiceContextMongoDTest::setUp();

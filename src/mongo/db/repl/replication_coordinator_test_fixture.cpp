@@ -75,7 +75,7 @@ BSONObj ReplCoordTest::addProtocolVersion(const BSONObj& configDoc, int protocol
     return builder.obj();
 }
 
-ReplCoordTest::ReplCoordTest(Options options) : ServiceContextMongoDTest(std::move(options)) {
+ReplCoordTest::ReplCoordTest() {
     _settings.setReplSetString("mySet/node1:12345,node2:54321");
 }
 

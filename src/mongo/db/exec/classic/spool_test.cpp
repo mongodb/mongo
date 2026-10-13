@@ -35,7 +35,11 @@ static const NamespaceString kNss = NamespaceString::createNamespaceString_forTe
 class SpoolStageTest : public ServiceContextMongoDTest {
 public:
     // The spool stage spills buffered results to disk, requiring the spill WiredTiger instance.
-    SpoolStageTest() : ServiceContextMongoDTest(Options{}.useMockClock(true).enableSpillEngine()) {}
+    Options makeServiceContextOptions() override {
+        return ServiceContextMongoDTest::makeServiceContextOptions()
+            .useMockClock(true)
+            .enableSpillEngine();
+    }
 
     void setUp() override {
         ServiceContextMongoDTest::setUp();

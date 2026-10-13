@@ -103,8 +103,6 @@ auto makePrimaryHeartbeatResponseFrom(const ReplSetConfig& rsConfig,
 
 class ReplCoordHBV1Test : public ReplCoordTest {
 protected:
-    explicit ReplCoordHBV1Test() : ReplCoordTest(Options{}.useMockClock(true)) {}
-
     void assertMemberState(MemberState expected, std::string msg = "");
     ReplSetHeartbeatResponse receiveHeartbeatFrom(
         const ReplSetConfig& rsConfig,

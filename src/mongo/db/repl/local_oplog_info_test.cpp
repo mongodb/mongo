@@ -21,7 +21,9 @@ namespace {
 
 class LocalOplogInfoTest : public ServiceContextMongoDTest {
 protected:
-    LocalOplogInfoTest() : ServiceContextMongoDTest(Options{}.useReplSettings(true)) {}
+    Options makeServiceContextOptions() override {
+        return ServiceContextMongoDTest::makeServiceContextOptions().useReplSettings(true);
+    }
 
     void setUp() override {
         ServiceContextMongoDTest::setUp();

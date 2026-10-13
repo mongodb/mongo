@@ -39,8 +39,9 @@ using test_helpers::checkUncommittedSizeCount;
  */
 class ReplicatedFastCountTxnFixture : public MockReplCoordServerFixture {
 public:
-    explicit ReplicatedFastCountTxnFixture(Options options = {})
-        : MockReplCoordServerFixture(options.useReplSettings(true)) {}
+    Options makeServiceContextOptions() override {
+        return MockReplCoordServerFixture::makeServiceContextOptions().useReplSettings(true);
+    }
 
 protected:
     void setUp() override {
@@ -196,9 +197,10 @@ protected:
 
 class ReplicatedFastCountTxnTest : public ReplicatedFastCountTxnFixture {
 public:
-    ReplicatedFastCountTxnTest()
-        : ReplicatedFastCountTxnFixture(Options().setPersistenceProvider(
-              std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>())) {}
+    Options makeServiceContextOptions() override {
+        return Options().setPersistenceProvider(
+            std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>());
+    }
 };
 
 TEST_F(ReplicatedFastCountTxnTest,
@@ -486,8 +488,10 @@ TEST_F(ReplicatedFastCountTxnTest, ApplyOpsOplogEntryContainsSizeDeltaMetadata) 
  */
 class PreparedSizeMetadataTest : public ReplicatedFastCountTxnFixture {
 protected:
-    PreparedSizeMetadataTest(Options options = {})
-        : ReplicatedFastCountTxnFixture(options.useReplSettings(true)) {}
+    Options makeServiceContextOptions() override {
+        return ReplicatedFastCountTxnFixture::makeServiceContextOptions().useReplSettings(true);
+    }
+
     void setUp() override {
         ReplicatedFastCountTxnFixture::setUp();
         setGlobalFailPoint("skipCommitTxnCheckPrepareMajorityCommitted",

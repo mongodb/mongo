@@ -624,8 +624,9 @@ TEST_F(PreImagesPerNsUUIDRefreshHighestTrackedRecord, RefreshAfterRollbackOfTrac
 class PreImageTruncateMarkerExpiryTestFixture : public ServiceContextMongoDTest,
                                                 public ChangeStreamPreImageTestConstants {
 public:
-    PreImageTruncateMarkerExpiryTestFixture()
-        : ServiceContextMongoDTest(Options{}.useMockClock(true)) {}
+    Options makeServiceContextOptions() override {
+        return ServiceContextMongoDTest::makeServiceContextOptions().useMockClock(true);
+    }
 
     void setUp() override {
         ServiceContextMongoDTest::setUp();

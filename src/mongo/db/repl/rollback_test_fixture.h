@@ -53,8 +53,6 @@ namespace repl {
 
 class RollbackTest : public ServiceContextMongoDTest {
 public:
-    explicit RollbackTest(Options options = {}) : ServiceContextMongoDTest(std::move(options)) {}
-
     /**
      * Initializes the service context and task executor.
      */

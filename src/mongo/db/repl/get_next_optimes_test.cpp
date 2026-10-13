@@ -12,9 +12,6 @@ namespace mongo {
 namespace {
 class GetNextOpTimesTest : public ServiceContextMongoDTest {
 protected:
-    explicit GetNextOpTimesTest(Options options = {})
-        : ServiceContextMongoDTest(std::move(options)) {}
-
     void setUp() override {
         // Set up mongod.
         ServiceContextMongoDTest::setUp();

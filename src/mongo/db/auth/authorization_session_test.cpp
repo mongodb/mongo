@@ -67,8 +67,6 @@ using namespace std::literals::string_view_literals;
 
 class AuthorizationSessionTest : public AuthorizationSessionTestFixture {
 public:
-    using AuthorizationSessionTestFixture::AuthorizationSessionTestFixture;
-
     void testInvalidateUser();
 
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeFakePlanExecutor(
@@ -89,8 +87,9 @@ public:
 
 class AuthorizationSessionTestWithoutAuth : public AuthorizationSessionTest {
 public:
-    AuthorizationSessionTestWithoutAuth()
-        : AuthorizationSessionTest(Options{}.setAuthEnabled(false)) {}
+    Options makeServiceContextOptions() override {
+        return AuthorizationSessionTest::makeServiceContextOptions().setAuthEnabled(false);
+    }
 };
 
 const TenantId kTenantId1(OID("12345678901234567890aaaa"));

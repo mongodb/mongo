@@ -75,8 +75,9 @@ const std::size_t kOpSize = makeNoopOplogEntry(0).objsize();
 
 class OplogBufferBlockingQueueTest : public ServiceContextMongoDTest {
 public:
-    explicit OplogBufferBlockingQueueTest(Options options = {})
-        : ServiceContextMongoDTest(options.useReplSettings(true)) {}
+    Options makeServiceContextOptions() override {
+        return ServiceContextMongoDTest::makeServiceContextOptions().useReplSettings(true);
+    }
 
     void setUp() override;
     void tearDown() override;

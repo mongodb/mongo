@@ -53,7 +53,9 @@ public:
     // the spill WiredTiger instance during concurrent unit test runs. This test exercises the
     // serverStatus command, which includes a SpillWiredTigerServerStatusSection that requires
     // the spill engine to be initialized.
-    ServerStatusServersTest() : DBCommandTestFixture(Options{}.enableSpillEngine()) {}
+    Options makeServiceContextOptions() override {
+        return DBCommandTestFixture::makeServiceContextOptions().enableSpillEngine();
+    }
 };
 
 TEST_F(ServerStatusServersTest, IncludeUnderMetricsSection) {

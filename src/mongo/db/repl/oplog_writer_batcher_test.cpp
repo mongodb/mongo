@@ -150,8 +150,9 @@ BSONObj makeNoopOplogEntry(Seconds seconds) {
 
 class OplogWriterBatcherTest : public ServiceContextMongoDTest {
 public:
-    explicit OplogWriterBatcherTest(Options options = {})
-        : ServiceContextMongoDTest(options.useReplSettings(true)) {}
+    Options makeServiceContextOptions() override {
+        return ServiceContextMongoDTest::makeServiceContextOptions().useReplSettings(true);
+    }
 
     void setUp() override;
     void tearDown() override;

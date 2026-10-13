@@ -20,9 +20,6 @@ namespace mongo::stats {
  */
 class StatsCacheLoaderTestFixture : public ServiceContextMongoDTest {
 public:
-    explicit StatsCacheLoaderTestFixture(Options options = {})
-        : ServiceContextMongoDTest(std::move(options)) {}
-
     OperationContext* operationContext();
     repl::StorageInterface* storageInterface();
 

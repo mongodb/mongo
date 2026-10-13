@@ -36,10 +36,6 @@ public:
 
     OperationContext* opCtx();
 
-protected:
-    explicit MockReplCoordServerFixture(Options options = {})
-        : ServiceContextMongoDTest(std::move(options)) {}
-
 private:
     ServiceContext::UniqueOperationContext _opCtx;
     repl::StorageInterfaceMock* _storageInterface;

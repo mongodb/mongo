@@ -118,8 +118,6 @@ TEST(CollModOptionTest, makeDryRunRequest) {
 
 class CollModTest : public ServiceContextMongoDTest {
 protected:
-    explicit CollModTest(Options options = {}) : ServiceContextMongoDTest(std::move(options)) {}
-
     void setUp() override {
         // Set up mongod.
         ServiceContextMongoDTest::setUp();
@@ -321,7 +319,9 @@ TEST_F(CollModTest, CollModTimeseriesMixedSchemaData) {
 class CollModTimestampedTest : public CollModTest {
 public:
     // Disable table logging. When table logging is enabled, timestamps are discarded by WiredTiger.
-    CollModTimestampedTest() : CollModTest(Options{}.forceDisableTableLogging()) {}
+    Options makeServiceContextOptions() override {
+        return CollModTest::makeServiceContextOptions().forceDisableTableLogging();
+    }
 };
 
 // Regression test for SERVER-104640. Test that the MixedSchema timeseries flag can be read at a

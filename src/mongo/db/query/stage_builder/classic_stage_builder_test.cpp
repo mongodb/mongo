@@ -41,7 +41,9 @@ const static NamespaceString kNss = NamespaceString::createNamespaceString_forTe
 
 class ClassicStageBuilderTest : public ServiceContextMongoDTest {
 public:
-    ClassicStageBuilderTest() : ServiceContextMongoDTest(Options{}.useMockClock(true)) {}
+    Options makeServiceContextOptions() override {
+        return ServiceContextMongoDTest::makeServiceContextOptions().useMockClock(true);
+    }
 
     void setUp() override {
         ServiceContextMongoDTest::setUp();

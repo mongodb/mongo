@@ -484,7 +484,9 @@ private:
 
 class ExhaustHeartbeatTest : public ServiceContextMongoDTest {
 public:
-    ExhaustHeartbeatTest() : ServiceContextMongoDTest(Options{}.useMockClock(true)) {}
+    Options makeServiceContextOptions() override {
+        return ServiceContextMongoDTest::makeServiceContextOptions().useMockClock(true);
+    }
 
     void setUp() override {
         ServiceContextMongoDTest::setUp();

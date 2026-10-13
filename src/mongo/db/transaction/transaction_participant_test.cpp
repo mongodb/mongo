@@ -290,8 +290,9 @@ private:
 
 class TxnParticipantTest : public MockReplCoordServerFixture {
 public:
-    TxnParticipantTest(Options options = {})
-        : MockReplCoordServerFixture(options.useReplSettings(true)) {}
+    Options makeServiceContextOptions() override {
+        return MockReplCoordServerFixture::makeServiceContextOptions().useReplSettings(true);
+    }
 
     void setUp() override {
         repl::ReplSettings replSettings;
@@ -2846,8 +2847,9 @@ TEST_F(ShardTxnParticipantTest, StartOrContinueTxnWithEmptyReadConcernShouldCont
  */
 class TransactionsMetricsTest : public TxnParticipantTest {
 protected:
-    TransactionsMetricsTest()
-        : TxnParticipantTest(Options{}.useMockClock(true).useMockTickSource<Microseconds>(true)) {}
+    Options makeServiceContextOptions() override {
+        return Options{}.useMockClock(true).useMockTickSource<Microseconds>(true);
+    }
 
     void setUp() override {
         TxnParticipantTest::setUp();

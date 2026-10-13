@@ -17,8 +17,9 @@ const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("foo
 
 class NamespaceMetadataChangeNotificationsTest : public ServiceContextMongoDTest {
 protected:
-    NamespaceMetadataChangeNotificationsTest()
-        : ServiceContextMongoDTest(Options{}.useMockTickSource(true)) {}
+    Options makeServiceContextOptions() override {
+        return ServiceContextMongoDTest::makeServiceContextOptions().useMockTickSource(true);
+    }
 };
 
 TEST_F(NamespaceMetadataChangeNotificationsTest, WaitForNotify) {

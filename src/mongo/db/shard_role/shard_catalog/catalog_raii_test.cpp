@@ -362,7 +362,9 @@ TEST_F(CatalogRAIITestFixture, AutoGetDBWithTenantHitsDeadline) {
 
 class AutoGetOplogFastPathTest : public ServiceContextMongoDTest {
 public:
-    AutoGetOplogFastPathTest() : ServiceContextMongoDTest(Options{}.useReplSettings(true)) {}
+    Options makeServiceContextOptions() override {
+        return ServiceContextMongoDTest::makeServiceContextOptions().useReplSettings(true);
+    }
 
     void setUp() override {
         ServiceContextMongoDTest::setUp();

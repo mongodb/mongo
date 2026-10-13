@@ -32,21 +32,14 @@ public:
     constexpr static StorageEngineInitFlags kDefaultStorageEngineInitFlags =
         StorageEngineInitFlags::kSkipMetadataFile;
 
-    enum class RepairAction { kNoRepair, kRepair };
-
     class Options {
     public:
-        Options() = default;
-
-        Options(Options&&) = default;
-        Options& operator=(Options&&) = default;
-
         Options engine(std::string engine) {
             _engine = std::move(engine);
             return std::move(*this);
         }
         Options enableRepair() {
-            _repair = RepairAction::kRepair;
+            _repair = true;
             return std::move(*this);
         }
         Options initFlags(StorageEngineInitFlags initFlags) {
@@ -159,7 +152,7 @@ public:
         // We use in-memory instances by default to advise Storage Engines (in particular
         // WiredTiger) not to perform Disk I/O.
         bool _inMemory = true;
-        RepairAction _repair = RepairAction::kNoRepair;
+        bool _repair = false;
         StorageEngineInitFlags _initFlags = kDefaultStorageEngineInitFlags;
         bool _useReplSettings = false;
         bool _useMockClock = false;
@@ -195,6 +188,12 @@ public:
     }
 
 private:
+    struct StashedStorageParams {
+        std::string engine;
+        bool engineSetByUser;
+        bool repair;
+    };
+
     static ServiceContext::UniqueServiceContext makeServiceContext(
         bool useMockClock,
         Milliseconds autoAdvancingMockClockIncrement,
@@ -205,11 +204,7 @@ private:
 
     OpObserverRegistry* _opObserverRegistry;
 
-    struct {
-        std::string engine;
-        bool engineSetByUser;
-        bool repair;
-    } _stashedStorageParams;
+    StashedStorageParams _stashedStorageParams;
 
     unittest::TempDir _tempDir{"service_context_d_test_fixture"};
 };
@@ -218,12 +213,8 @@ class [[MONGO_MOD_OPEN]] ServiceContextMongoDTest : public ServiceContextTest {
 public:
     using Options = MongoDScopedGlobalServiceContextForTest::Options;
 
-    ServiceContextMongoDTest() : ServiceContextMongoDTest(Options{}) {}
-    explicit ServiceContextMongoDTest(Options options) : _ctorOptions{std::move(options)} {}
-
-    /** Consumes a stashed options value, and can only be called once. */
     virtual Options makeServiceContextOptions() {
-        return std::move(std::exchange(_ctorOptions, {}).value());
+        return Options{};
     }
 
     JournalListener* journalListener() const {
@@ -244,8 +235,6 @@ private:
     MongoDScopedGlobalServiceContextForTest* mongoDscopedServiceContext() const {
         return checked_cast<MongoDScopedGlobalServiceContextForTest*>(scopedServiceContext());
     }
-
-    boost::optional<Options> _ctorOptions;
 };
 
 }  // namespace mongo

@@ -41,7 +41,9 @@ class SortStageDefaultTest : public ServiceContextMongoDTest {
 public:
     static constexpr uint64_t kMaxMemoryUsageBytes = 1024u * 1024u;
 
-    SortStageDefaultTest() : ServiceContextMongoDTest(Options{}.useMockClock(true)) {}
+    Options makeServiceContextOptions() override {
+        return ServiceContextMongoDTest::makeServiceContextOptions().useMockClock(true);
+    }
 
     void setUp() override {
         ServiceContextMongoDTest::setUp();

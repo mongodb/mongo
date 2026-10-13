@@ -176,7 +176,9 @@ public:
 
 class ReplicationRecoveryTest : public ServiceContextMongoDTest {
 protected:
-    ReplicationRecoveryTest() : ServiceContextMongoDTest(Options{}.useReplSettings(true)) {}
+    Options makeServiceContextOptions() override {
+        return ServiceContextMongoDTest::makeServiceContextOptions().useReplSettings(true);
+    }
 
     OperationContext* getOperationContext() {
         return _opCtx.get();

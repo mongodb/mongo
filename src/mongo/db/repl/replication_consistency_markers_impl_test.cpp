@@ -71,9 +71,10 @@ public:
 
 class ReplicationConsistencyMarkersTest : public ServiceContextMongoDTest {
 protected:
-    ReplicationConsistencyMarkersTest()
-        : ServiceContextMongoDTest(Options{}.useJournalListener(
-              std::make_unique<JournalListenerWithDurabilityTracking>())) {}
+    Options makeServiceContextOptions() override {
+        return ServiceContextMongoDTest::makeServiceContextOptions().useJournalListener(
+            std::make_unique<JournalListenerWithDurabilityTracking>());
+    }
 
     OperationContext* getOperationContext() {
         return _opCtx.get();

@@ -76,20 +76,5 @@ TEST(ServiceContextTestClusterRoleOverrideTest, RestoresThePriorClusterRoleAfter
     ASSERT_TRUE(serverGlobalParams.clusterRole.hasExclusively(original));
 }
 
-class OptionsConstructorTest : public ServiceContextMongoDTest {
-public:
-    OptionsConstructorTest() : ServiceContextMongoDTest(Options{}.forceDisableTableLogging()) {}
-
-    void setUp() override {
-        ServiceContextMongoDTest::setUp();
-        ASSERT(getServiceContext());
-    }
-};
-
-TEST_F(OptionsConstructorTest, ConstructorOptionsReachTheServiceContext) {
-    ASSERT(getServiceContext());
-    ASSERT_TRUE(storageGlobalParams.forceDisableTableLogging);
-}
-
 }  // namespace
 }  // namespace mongo

@@ -43,7 +43,9 @@ namespace {
 
 class ShardLocalTest : public ServiceContextMongoDTest {
 protected:
-    ShardLocalTest() : ServiceContextMongoDTest(Options{}.useReplSettings(true)) {}
+    Options makeServiceContextOptions() override {
+        return ServiceContextMongoDTest::makeServiceContextOptions().useReplSettings(true);
+    }
 
     boost::optional<ClusterRole> getClusterRoleOverride() const override {
         return ClusterRole{ClusterRole::ShardServer, ClusterRole::ConfigServer};
