@@ -49,3 +49,9 @@ structs:
                 type: ChunkVersion
                 description: "Latest data placement of the shard."
                 optional: true
+            skipCSRelease:
+                type: bool
+                description: --
+                    Releasing the critical section in the last step should be skipped. Used when the
+                    coordinator skips to the end without acquiring the CS first.
+                default: false

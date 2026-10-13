@@ -12,15 +12,12 @@
 #include "mongo/db/global_catalog/ddl/sharding_recovery_service.h"
 #include "mongo/db/global_catalog/type_chunk_range.h"
 #include "mongo/db/persistent_task_store.h"
-#include "mongo/db/router_role/routing_cache/catalog_cache.h"
-#include "mongo/db/s/chunk_operation_precondition_checks.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
-#include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/future_util.h"
 #include "mongo/util/str.h"
@@ -43,27 +40,6 @@ BSONObj makeCriticalSectionReason(const NamespaceString& nss) {
         "command" << "mergeAllChunksOnShard"
                   << "ns"
                   << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
-}
-
-void checkPreconditions(OperationContext* opCtx, const NamespaceString& nss) {
-    const bool allowChunkOps =
-        CollectionShardingRuntime::acquireShared(opCtx, nss)->allowChunkOperations();
-
-    auto cm = uassertStatusOK(
-        Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(opCtx, nss));
-    const CollectionMetadata metadata(std::move(cm), ShardingState::get(opCtx)->shardId());
-
-    uassert(ErrorCodes::NamespaceNotSharded,
-            str::stream() << "Collection " << nss.toStringForErrorMsg() << " is not sharded",
-            metadata.isSharded());
-
-    uassert(
-        ErrorCodes::ConflictingOperationInProgress,
-        str::stream() << "Can't execute mergeAllChunksOnShard because chunk operations for this "
-                         "collection are disallowed. 'allowChunkOperations' flag is "
-                      << allowChunkOps << "; 'allowMigrations' flag is "
-                      << metadata.allowMigrations(),
-        allowChunkOps && metadata.allowMigrations());
 }
 
 void acquireCriticalSection(OperationContext* opCtx,
@@ -245,6 +221,46 @@ void MergeAllChunksCoordinator::_releaseLocks(OperationContext* opCtx) {
     _scopedSplitMergeChunk.reset();
 }
 
+// Checks for preconditions (the collection exists, is sharded and chunk operations are allowed),
+// throwing if they are not met. Returns true if the collection is sharded but the shard owns no
+// data, false otherwise.
+bool MergeAllChunksCoordinator::_checkPreconditions(OperationContext* opCtx) {
+    auto [metadata, allowChunkOps] = _getCollectionMetadata(opCtx);
+
+    uassert(
+        ErrorCodes::ConflictingOperationInProgress,
+        str::stream() << "Can't execute mergeAllChunksOnShard because chunk operations for this "
+                         "collection are disallowed. 'allowChunkOperations' flag is "
+                      << allowChunkOps << "; 'allowMigrations' flag is "
+                      << metadata.allowMigrations(),
+        allowChunkOps && metadata.allowMigrations());
+
+    // isSharded() from the CSR could return false if this shard does not own chunks for the given
+    // collection, even if it is actually sharded. The semantics of mergeAllChunksOnShard on a shard
+    // that does not own chunks (but the collection exists in the cluster and is sharded) is no-op
+    // without error. For that reason, we need to confirm from the global catalog before throwing
+    // NamespaceNotSharded.
+    if (!metadata.isSharded()) {
+        auto cm = uassertStatusOK(
+            Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(opCtx, nss()));
+        const CollectionMetadata csrsMetadata(std::move(cm), ShardingState::get(opCtx)->shardId());
+        uassert(ErrorCodes::NamespaceNotSharded,
+                str::stream() << "Collection " << nss().toStringForErrorMsg() << " is not sharded",
+                csrsMetadata.isSharded());
+        return true;
+    }
+
+    return false;
+}
+
+void MergeAllChunksCoordinator::_skipToFinalPhase() {
+    _doc.setNumMergedChunks(0);
+    // The chunkVersion is unused in this case, it's ok to return an empty version.
+    _doc.setShardVersion(ChunkVersion{});
+    _doc.setSkipCSRelease(true);
+    _enterPhase(Phase::kReleaseCriticalSection);
+}
+
 ExecutorFuture<void> MergeAllChunksCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
@@ -269,7 +285,17 @@ ExecutorFuture<void> MergeAllChunksCoordinator::_runImpl(
 
                 _registerChunkOperationStarted(opCtx);
 
-                checkPreconditions(opCtx, nss());
+                // A collection could be sharded while not having local metadata if the current
+                // shard does not own any chunks for the collection. If the shard does not own data,
+                // we can skip to the end of the coordinator and return. This is not only an
+                // optimization but also a correctness requirement: we decided that the collection
+                // is sharded after asking the global catalog, which introduces a race condition
+                // with create and rename. In this situation, we must end the coordinator without
+                // attempting to acquire or release the critical section.
+                const bool isUnownedShardedCollection = _checkPreconditions(opCtx);
+                if (isUnownedShardedCollection) {
+                    _skipToFinalPhase();
+                }
             }))
         .then(_buildPhaseHandler(
             Phase::kPrecomputeChunkList,
@@ -285,9 +311,7 @@ ExecutorFuture<void> MergeAllChunksCoordinator::_runImpl(
                           "Collection not found in local shard catalog, nothing to merge",
                           logAttrs(nss()),
                           "shard"_attr = _request.getShard());
-                    _doc.setNumMergedChunks(0);
-                    _doc.setShardVersion(ChunkVersion{});
-                    _enterPhase(Phase::kReleaseCriticalSection);
+                    _skipToFinalPhase();
                     return;
                 }
 
@@ -311,10 +335,7 @@ ExecutorFuture<void> MergeAllChunksCoordinator::_runImpl(
                           "shard"_attr = _request.getShard());
                     // There are no chunks to merge, so we can short-circuit and avoid taking the
                     // critical section.
-                    _doc.setNumMergedChunks(numMergedChunks);
-                    // The chunkVersion is unused in this case, it's ok to return an empty version.
-                    _doc.setShardVersion(ChunkVersion{});
-                    _enterPhase(Phase::kReleaseCriticalSection);
+                    _skipToFinalPhase();
                     return;
                 }
 
@@ -410,13 +431,14 @@ ExecutorFuture<void> MergeAllChunksCoordinator::_runImpl(
         .then(_buildPhaseHandler(
             Phase::kReleaseCriticalSection,
             [this, anchor = shared_from_this()](auto* opCtx) {
-                LOGV2(12578608,
-                      "Releasing critical section for merge all chunks on shard "
-                      "operation",
-                      logAttrs(nss()),
-                      "shard"_attr = _request.getShard());
+                if (!_doc.getSkipCSRelease()) {
+                    LOGV2(12578608,
+                          "Releasing critical section for merge all chunks on shard operation",
+                          logAttrs(nss()),
+                          "shard"_attr = _request.getShard());
 
-                releaseCriticalSection(opCtx, nss(), _critSecReason);
+                    releaseCriticalSection(opCtx, nss(), _critSecReason);
+                }
 
                 tassert(12834403,
                         fmt::format("Expected response fields to be set: {} {}",

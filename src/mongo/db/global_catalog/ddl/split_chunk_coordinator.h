@@ -41,6 +41,8 @@ private:
                                          const CancellationToken& token,
                                          const Status& status) noexcept override;
 
+    bool _checkPreconditions(OperationContext* opCtx);
+
     const ShardsvrSplitChunkRequest _request;
     boost::optional<ScopedSplitMergeChunk> _scopedSplitMergeChunk;
 

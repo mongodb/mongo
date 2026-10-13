@@ -7,18 +7,15 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/global_catalog/ddl/merge_chunk_request_gen.h"
-#include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/global_catalog/ddl/sharding_recovery_service.h"
 #include "mongo/db/global_catalog/type_chunk.h"
-#include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/s/chunk_operation_precondition_checks.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
-#include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/future_util.h"
 #include "mongo/util/str.h"
@@ -40,62 +37,6 @@ BSONObj makeCriticalSectionReason(const NamespaceString& nss) {
         "command" << "mergeChunks"
                   << "ns"
                   << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
-}
-
-// Validates that the merge request can proceed and reports whether it is an idempotent no-op.
-// Returns true iff the request is an idempotent no-op; false otherwise.
-bool checkPreconditions(OperationContext* opCtx,
-                        const NamespaceString& nss,
-                        const ShardsvrMergeChunksRequest& request) {
-    // Validate the request bounds
-    auto bounds = request.getBounds();
-    uassertStatusOK(ChunkRange::validate(bounds));
-    const ChunkRange chunkRange(bounds[0], bounds[1]);
-
-    // Read the CSR's allowChunkOperations flag up front.
-    // We snapshot the CSR before fetching CollectionMetadata so the metadata checks run against
-    // a stable view.
-    // The actual validation happens only after the idempotency check below, so this early read is
-    // intentional and separate from the later assertion.
-    const bool allowChunkOps =
-        CollectionShardingRuntime::acquireShared(opCtx, nss)->allowChunkOperations();
-
-    // Obtain the cluster-wide chunk layout by forcing a refresh from the global
-    // catalog.
-    auto cm = uassertStatusOK(
-        Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(opCtx, nss));
-    const CollectionMetadata metadata(std::move(cm), ShardingState::get(opCtx)->shardId());
-
-    // Validate that the collection is sharded and that its identity (epoch / timestamp) still
-    // matches the request.
-    checkCollectionIdentity(opCtx, nss, request.getEpoch(), request.getTimestamp(), metadata);
-
-    // Validate structural correctness: shard-key pattern of the bounds, and that the requested
-    // range exists is owned by this shard.
-    checkShardKeyPattern(opCtx, nss, metadata, chunkRange);
-    checkRangeOwnership(opCtx, nss, metadata, chunkRange);
-
-    // Detect an idempotent no-op: if the requested boundaries lie on a single chunk boundary on
-    // this shard, a previous successful commit has already created the target chunk. In that case,
-    // return true.
-    //
-    // This check must happen before checking the allowChunkOperations flag, because the public
-    // idempotency contract requires retries to succeed even if chunk operations were disallowed
-    // after the original command completed successfully.
-    ChunkType existingChunk;
-    if (metadata.getNextChunk(chunkRange.getMin(), &existingChunk) &&
-        existingChunk.getMin().woCompare(chunkRange.getMin()) == 0 &&
-        existingChunk.getMax().woCompare(chunkRange.getMax()) == 0) {
-        return true;
-    }
-
-    uassert(ErrorCodes::ConflictingOperationInProgress,
-            str::stream() << "Can't execute mergeChunks because chunk operations for this "
-                             "collection are disallowed. 'allowChunkOperations' flag is "
-                          << allowChunkOps << "; 'allowMigrations' flag is "
-                          << metadata.allowMigrations(),
-            allowChunkOps && metadata.allowMigrations());
-    return false;
 }
 
 void acquireCriticalSection(OperationContext* opCtx,
@@ -258,6 +199,49 @@ void MergeChunksCoordinator::_releaseLocks(OperationContext* opCtx) {
     _scopedSplitMergeChunk.reset();
 }
 
+// Validates that the merge request can proceed and reports whether it is an idempotent no-op.
+// Returns true iff the request is an idempotent no-op; false otherwise.
+bool MergeChunksCoordinator::_checkPreconditions(OperationContext* opCtx) {
+    // Validate the request bounds
+    const auto& nss = this->nss();
+    auto bounds = _request.getBounds();
+    uassertStatusOK(ChunkRange::validate(bounds));
+    const ChunkRange chunkRange(bounds[0], bounds[1]);
+
+    auto [metadata, allowChunkOps] = _getCollectionMetadata(opCtx);
+
+    // Validate that the collection is sharded and that its identity (epoch / timestamp) still
+    // matches the request.
+    checkCollectionIdentity(opCtx, nss, _request.getEpoch(), _request.getTimestamp(), metadata);
+
+    // Validate structural correctness: shard-key pattern of the bounds, and that the requested
+    // range exists is owned by this shard.
+    checkShardKeyPattern(opCtx, nss, metadata, chunkRange);
+    checkRangeOwnership(opCtx, nss, metadata, chunkRange);
+
+    // Detect an idempotent no-op: if the requested boundaries lie on a single chunk boundary on
+    // this shard, a previous successful commit has already created the target chunk. In that case,
+    // return true.
+    //
+    // This check must happen before checking the allowChunkOperations flag, because the public
+    // idempotency contract requires retries to succeed even if chunk operations were disallowed
+    // after the original command completed successfully.
+    ChunkType existingChunk;
+    if (metadata.getNextChunk(chunkRange.getMin(), &existingChunk) &&
+        existingChunk.getMin().woCompare(chunkRange.getMin()) == 0 &&
+        existingChunk.getMax().woCompare(chunkRange.getMax()) == 0) {
+        return true;
+    }
+
+    uassert(ErrorCodes::ConflictingOperationInProgress,
+            str::stream() << "Can't execute mergeChunks because chunk operations for this "
+                             "collection are disallowed. 'allowChunkOperations' flag is "
+                          << allowChunkOps << "; 'allowMigrations' flag is "
+                          << metadata.allowMigrations(),
+            allowChunkOps && metadata.allowMigrations());
+    return false;
+}
+
 ExecutorFuture<void> MergeChunksCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
@@ -284,7 +268,8 @@ ExecutorFuture<void> MergeChunksCoordinator::_runImpl(
 
                 _registerChunkOperationStarted(opCtx);
 
-                _alreadyCommitted = checkPreconditions(opCtx, nss(), _request);
+                _alreadyCommitted = _checkPreconditions(opCtx);
+
 
                 // Capture and persist the shard's placement version before the first commit
                 // attempt. The configsvr commit is idempotent on this version, so it must remain

@@ -12,7 +12,6 @@
 #include "mongo/db/global_catalog/ddl/sharding_recovery_service.h"
 #include "mongo/db/global_catalog/ddl/split_chunk.h"
 #include "mongo/db/global_catalog/type_chunk.h"
-#include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/s/chunk_operation_precondition_checks.h"
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/grid.h"
@@ -44,97 +43,6 @@ BSONObj makeCriticalSectionReason(const NamespaceString& nss) {
         "command" << "splitChunk"
                   << "ns"
                   << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
-}
-
-// Validates that the split request can proceed and reports whether it is an idempotent
-// no-op.
-// Returns true iff the request is an idempotent no-op; false otherwise.
-bool checkPreconditions(OperationContext* opCtx,
-                        const NamespaceString& nss,
-                        const ShardsvrSplitChunkRequest& request) {
-    // Validate the request bounds and split points
-    const ChunkRange chunkRange(request.getMin(), request.getMax());
-    uassertStatusOK(ChunkRange::validate(chunkRange));
-    uassert(
-        ErrorCodes::InvalidOptions, "No split points provided", !request.getSplitKeys().empty());
-    const std::vector<BSONObj> splitKeys(request.getSplitKeys().begin(),
-                                         request.getSplitKeys().end());
-
-    // Anticipate any BSONTooLarge error that might occur after committing on the config server.
-    // Once the config server commit succeeds, the operation cannot be rolled back, so we must
-    // avoid failing with a non-retryable error.
-    //
-    // Assume the worst case: each split point is stored three times in the coordinator document:
-    // once in the list of split points, and once each as the min and max bounds of the updated
-    // chunks.
-    long long estimatedMetadataSize = chunkRange.getMin().objsize() + chunkRange.getMax().objsize();
-    for (const auto& splitKey : splitKeys) {
-        estimatedMetadataSize += 3 * splitKey.objsize();
-    }
-    estimatedMetadataSize = 2 * estimatedMetadataSize;
-
-    uassert(ErrorCodes::BSONObjectTooLarge,
-            str::stream() << "Refusing to split chunk " << chunkRange.toString()
-                          << ": estimated resulting chunk metadata (~" << estimatedMetadataSize
-                          << " bytes) would exceed the maximum BSON object size ("
-                          << BSONObjMaxUserSize << " bytes)",
-            estimatedMetadataSize < BSONObjMaxUserSize);
-
-    // Read the CSR's allowChunkOperations flag up front.
-    // We snapshot the CSR before fetching CollectionMetadata so the metadata checks run against
-    // a stable view.
-    // The actual validation happens only after the idempotency check below, so this early read is
-    // intentional and separate from the later assertion.
-    const bool allowChunkOps =
-        CollectionShardingRuntime::acquireShared(opCtx, nss)->allowChunkOperations();
-
-    // Obtain the cluster-wide chunk layout by forcing a refresh from the global
-    // catalog.
-    auto cm = uassertStatusOK(
-        Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(opCtx, nss));
-    const CollectionMetadata metadata(std::move(cm), ShardingState::get(opCtx)->shardId());
-
-    // Validate that the collection is sharded and that its identity (epoch / timestamp) still
-    // matches the request.
-    checkCollectionIdentity(opCtx, nss, request.getEpoch(), request.getTimestamp(), metadata);
-
-    // Validate structural correctness: shard-key pattern of the bounds, that the requested range
-    // exists as a single chunk on this shard, and that the split points are valid.
-    checkShardKeyPattern(opCtx, nss, metadata, chunkRange);
-    checkChunkMatchesRange(opCtx, nss, metadata, chunkRange);
-    validateSplitPoints(opCtx, nss, metadata, chunkRange, splitKeys);
-
-    // Detect an idempotent no-op: if every requested split point already lies on a chunk boundary
-    // on this shard, a previous successful commit has already created the target chunks. In that
-    // case, return true.
-    //
-    // This check must happen before checking the allowChunkOperations flag, because the public
-    // idempotency contract requires retries to succeed even if chunk operations were disallowed
-    // after the original command completed successfully.
-    bool isAlreadyCommitted = true;
-    BSONObj cursor = chunkRange.getMin();
-    for (const auto& splitKey : splitKeys) {
-        ChunkType existingChunk;
-        if (!metadata.getNextChunk(cursor, &existingChunk) ||
-            existingChunk.getMin().woCompare(cursor) != 0 ||
-            existingChunk.getMax().woCompare(splitKey) != 0) {
-            isAlreadyCommitted = false;
-            break;
-        }
-        cursor = splitKey;
-    }
-    if (isAlreadyCommitted) {
-        return true;
-    }
-
-    uassert(ErrorCodes::ConflictingOperationInProgress,
-            str::stream() << "Can't execute splitChunks because chunk operations for this "
-                             "collection are disallowed. 'allowChunkOperations' flag is "
-                          << allowChunkOps << "; 'allowMigrations' flag is "
-                          << metadata.allowMigrations(),
-            allowChunkOps && metadata.allowMigrations());
-
-    return false;
 }
 
 void acquireCriticalSection(OperationContext* opCtx,
@@ -298,6 +206,82 @@ void SplitChunkCoordinator::_releaseLocks(OperationContext* opCtx) {
     _scopedSplitMergeChunk.reset();
 }
 
+// Validates that the split request can proceed and reports whether it is an idempotent
+// no-op. Returns true iff the request is an idempotent no-op; false otherwise.
+bool SplitChunkCoordinator::_checkPreconditions(OperationContext* opCtx) {
+    const auto& nss = this->nss();
+    // Validate the request bounds and split points
+    const ChunkRange chunkRange(_request.getMin(), _request.getMax());
+    uassertStatusOK(ChunkRange::validate(chunkRange));
+    uassert(
+        ErrorCodes::InvalidOptions, "No split points provided", !_request.getSplitKeys().empty());
+    const std::vector<BSONObj> splitKeys(_request.getSplitKeys().begin(),
+                                         _request.getSplitKeys().end());
+
+    // Anticipate any BSONTooLarge error that might occur after committing on the config server.
+    // Once the config server commit succeeds, the operation cannot be rolled back, so we must
+    // avoid failing with a non-retryable error.
+    //
+    // Assume the worst case: each split point is stored three times in the coordinator document:
+    // once in the list of split points, and once each as the min and max bounds of the updated
+    // chunks.
+    long long estimatedMetadataSize = chunkRange.getMin().objsize() + chunkRange.getMax().objsize();
+    for (const auto& splitKey : splitKeys) {
+        estimatedMetadataSize += 3 * splitKey.objsize();
+    }
+    estimatedMetadataSize = 2 * estimatedMetadataSize;
+
+    uassert(ErrorCodes::BSONObjectTooLarge,
+            str::stream() << "Refusing to split chunk " << chunkRange.toString()
+                          << ": estimated resulting chunk metadata (~" << estimatedMetadataSize
+                          << " bytes) would exceed the maximum BSON object size ("
+                          << BSONObjMaxUserSize << " bytes)",
+            estimatedMetadataSize < BSONObjMaxUserSize);
+
+    auto [metadata, allowChunkOps] = _getCollectionMetadata(opCtx);
+    // Validate that the collection is sharded and that its identity (epoch / timestamp) still
+    // matches the request.
+    checkCollectionIdentity(opCtx, nss, _request.getEpoch(), _request.getTimestamp(), metadata);
+
+    // Validate structural correctness: shard-key pattern of the bounds, that the requested range
+    // exists as a single chunk on this shard, and that the split points are valid.
+    checkShardKeyPattern(opCtx, nss, metadata, chunkRange);
+    checkChunkMatchesRange(opCtx, nss, metadata, chunkRange);
+    validateSplitPoints(opCtx, nss, metadata, chunkRange, splitKeys);
+
+    // Detect an idempotent no-op: if every requested split point already lies on a chunk boundary
+    // on this shard, a previous successful commit has already created the target chunks. In that
+    // case, return true.
+    //
+    // This check must happen before checking the allowChunkOperations flag, because the public
+    // idempotency contract requires retries to succeed even if chunk operations were disallowed
+    // after the original command completed successfully.
+    bool isAlreadyCommitted = true;
+    BSONObj cursor = chunkRange.getMin();
+    for (const auto& splitKey : splitKeys) {
+        ChunkType existingChunk;
+        if (!metadata.getNextChunk(cursor, &existingChunk) ||
+            existingChunk.getMin().woCompare(cursor) != 0 ||
+            existingChunk.getMax().woCompare(splitKey) != 0) {
+            isAlreadyCommitted = false;
+            break;
+        }
+        cursor = splitKey;
+    }
+    if (isAlreadyCommitted) {
+        return true;
+    }
+
+    uassert(ErrorCodes::ConflictingOperationInProgress,
+            str::stream() << "Can't execute splitChunks because chunk operations for this "
+                             "collection are disallowed. 'allowChunkOperations' flag is "
+                          << allowChunkOps << "; 'allowMigrations' flag is "
+                          << metadata.allowMigrations(),
+            allowChunkOps && metadata.allowMigrations());
+
+    return false;
+}
+
 ExecutorFuture<void> SplitChunkCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
@@ -323,7 +307,7 @@ ExecutorFuture<void> SplitChunkCoordinator::_runImpl(
 
                 _registerChunkOperationStarted(opCtx);
 
-                _alreadyCommitted = checkPreconditions(opCtx, nss(), _request);
+                _alreadyCommitted = _checkPreconditions(opCtx);
 
                 // Capture and persist the shard's placement version before the first commit
                 // attempt. The configsvr commit is idempotent on this version, so it must remain

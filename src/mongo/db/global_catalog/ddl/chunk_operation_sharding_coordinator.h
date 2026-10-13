@@ -5,6 +5,7 @@
 
 #include "mongo/db/global_catalog/ddl/sharding_coordinator.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
+#include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/topology/sharding_state.h"
@@ -52,6 +53,26 @@ protected:
         if (this->_firstExecution) {
             ShardingStatistics::get(opCtx).chunkOperationsStatistics.registerStarted(
                 chunkOperationMetricType());
+        }
+    }
+
+    /**
+     * Returns the CollectionMetadata and allowChunkOperations flag from the local CSR, refreshing
+     * if necessary.
+     */
+    std::pair<CollectionMetadata, bool> _getCollectionMetadata(OperationContext* opCtx) {
+        const auto& nss = this->nss();
+        while (true) {
+            {
+                const auto scopedCsr = CollectionShardingRuntime::acquireShared(opCtx, nss);
+                if (auto metadata = scopedCsr->getCurrentMetadataIfKnown()) {
+                    return std::make_pair(std::move(*metadata), scopedCsr->allowChunkOperations());
+                }
+            }
+
+            // Recover from disk if the collection metadata was unknown and try again.
+            uassertStatusOK(FilteringMetadataCache::get(opCtx)->onShardVersionMismatch(
+                opCtx, nss, boost::none));
         }
     }
 

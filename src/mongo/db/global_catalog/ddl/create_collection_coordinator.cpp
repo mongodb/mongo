@@ -124,6 +124,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 MONGO_FAIL_POINT_DEFINE(failAtCommitCreateCollectionCoordinator);
 MONGO_FAIL_POINT_DEFINE(hangBeforeCommitOnShardingCatalog);
+MONGO_FAIL_POINT_DEFINE(hangAfterCommitOnGlobalCatalog);
 MONGO_FAIL_POINT_DEFINE(createCollectionHangBeforeExitCriticalSection);
 
 namespace mongo {
@@ -1604,6 +1605,10 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
             Phase::kCommitOnShardingCatalog,
             [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
                 _commitOnGlobalCatalog(opCtx, executor, token);
+                if (MONGO_unlikely(hangAfterCommitOnGlobalCatalog.shouldFail())) {
+                    LOGV2(13612900, "Hanging due to hangAfterCommitOnGlobalCatalog fail point");
+                    hangAfterCommitOnGlobalCatalog.pauseWhileSet();
+                }
                 _commitOnShardCatalog(opCtx, executor, token);
             }))
         .then(_buildPhaseHandler(

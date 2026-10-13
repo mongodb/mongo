@@ -60,7 +60,12 @@ private:
                                          const CancellationToken& token,
                                          const Status& status) noexcept override;
 
+
     void _onCleanup(OperationContext* opCtx) override;
+
+    void _skipToFinalPhase();
+
+    bool _checkPreconditions(OperationContext* opCtx);
 
     const ShardsvrMergeAllChunksOnShardRequest _request;
     boost::optional<MergeAllChunksOnShardResponse> _response;
