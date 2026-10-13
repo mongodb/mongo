@@ -50,6 +50,7 @@
 #include "mongo/db/multitenancy.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/storage/backup_cursor_hooks.h"
 #include "mongo/db/storage/deferred_drop_record_store.h"
 #include "mongo/db/storage/durable_catalog_impl.h"
 #include "mongo/db/storage/durable_history_pin.h"
@@ -1317,6 +1318,12 @@ void StorageEngineImpl::TimestampMonitor::_startup() {
             try {
                 auto uniqueOpCtx = client->makeOperationContext();
                 auto opCtx = uniqueOpCtx.get();
+
+                auto backupCursorHooks = BackupCursorHooks::get(opCtx->getServiceContext());
+                if (backupCursorHooks->isBackupCursorOpen()) {
+                    LOGV2_DEBUG(9810500, 1, "Backup in progress, skipping table drops.");
+                    return;
+                }
 
                 // The TimestampMonitor is an important background cleanup task for the storage
                 // engine and needs to be able to make progress to free up resources.
