@@ -21,7 +21,9 @@
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/pipeline/change_stream_pre_and_post_images_options_gen.h"
 #include "mongo/db/profile_settings.h"
+#include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -1023,6 +1025,12 @@ Status _collModInternal(OperationContext* opCtx,
                                                    cmrNew.collValidator,
                                                    cmrNew.prepareConstraintValidationLevel),
                 "Failed to set validation options");
+            auto& collectionQueryInfo = CollectionQueryInfo::get(writableColl);
+            if (feature_flags::gFeatureFlagQueryTypeInference.checkEnabled()) {
+                collectionQueryInfo.rebuildSchemaTypeInfo(opCtx, writableColl);
+            } else {
+                collectionQueryInfo.invalidateSchemaTypeInfo();
+            }
         }
 
         if (cmrNew.changeStreamPreAndPostImagesOptions.has_value() &&

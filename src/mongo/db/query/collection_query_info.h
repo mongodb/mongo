@@ -125,9 +125,17 @@ public:
      *
      * When this runs:
      * - At collection init/registration (see 'init').
-     * - Whenever the collection's validator is created or updated (e.g. via collMod).
+     * - Whenever the collection's validator is created or updated (e.g. via collMod) and query type
+     * inference is enabled.
      */
     void rebuildSchemaTypeInfo(OperationContext* opCtx, const Collection* coll);
+
+    /**
+     * Publishes an unconstrained SchemaTypeInfo and advances its epoch. Used instead of
+     * 'rebuildSchemaTypeInfo' when query type inference is disabled, so that a stale snapshot is
+     * never observed if it is enabled again.
+     */
+    void invalidateSchemaTypeInfo();
 
     std::shared_ptr<const SchemaTypeInfo> getSchemaTypeInfo() const;
 

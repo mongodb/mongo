@@ -277,6 +277,10 @@ void CollectionQueryInfo::rebuildSchemaTypeInfo(OperationContext* opCtx, const C
     _schemaTypeInfoState.publish(inferred.getRootType());
 }
 
+void CollectionQueryInfo::invalidateSchemaTypeInfo() {
+    _schemaTypeInfoState.publish(pipeline::type_system::Type::anyObject());
+}
+
 std::shared_ptr<const SchemaTypeInfo> CollectionQueryInfo::getSchemaTypeInfo() const {
     return _schemaTypeInfoState.snapshot();
 }

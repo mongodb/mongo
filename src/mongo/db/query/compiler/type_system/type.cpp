@@ -493,6 +493,10 @@ Type Type::getField(std::string_view fieldName) const {
 }
 
 bool Type::canPathBeArray(const FieldRef& path) const {
+    if (path.numParts() == 0) {
+        return false;
+    }
+
     Type current = *this;
     for (size_t i = 0; i < path.numParts(); ++i) {
         if (current.hasType(BSONType::array)) {
@@ -503,11 +507,8 @@ bool Type::canPathBeArray(const FieldRef& path) const {
         }
 
         current = current.getField(path.getPart(i));
-        if (current.hasType(BSONType::array)) {
-            return true;
-        }
     }
-    return false;
+    return current.hasType(BSONType::array);
 }
 
 void Type::setField(std::string_view fieldName, Type fieldType) {
