@@ -33,6 +33,12 @@ del "%VT_SCRIPT%" >nul 2>&1
 
 set REPO_ROOT=%~dp0..
 
+rem RC defaults and aliases require Python validation; only explicit local fallback is safe.
+set "wrapper_fallback_allowed=0"
+if "%MONGO_BAZEL_WRAPPER_FALLBACK%"=="1" if not defined CI if not defined task_id if not defined EVG_TASK_ID if not defined distro_id (
+    set "wrapper_fallback_allowed=1"
+)
+
 echo common --//bazel/config:running_through_bazelisk > .bazelrc.bazelisk
 
 REM Write a compressed execution log to a file for EngFlow to pick up for more detailed analysis.
@@ -110,29 +116,29 @@ if exist "%REPO_ROOT%\bazel-%cur_dir%" (
 )
 
 if not defined python (
+    set "bootstrap_exit=0"
     (
         echo python prereq missing, using bazel to install python...
         "%BAZEL_REAL%" build --bes_backend= --bes_results_url= --workspace_status_command= @py_host//:all
-        if !ERRORLEVEL! NEQ 0 (
+        set "bootstrap_exit=!ERRORLEVEL!"
+        if !bootstrap_exit! NEQ 0 (
             "%BAZEL_REAL%" build --config=local --workspace_status_command= @py_host//:all
-            if !ERRORLEVEL! NEQ 0 (
-                if "%CI%"=="" if "%MONGO_BAZEL_WRAPPER_FALLBACK%"=="" (
-                    call :cleanup_logfile
-                    exit /b !ERRORLEVEL!
-                )
-                echo wrapper script failed to install python! falling back to normal bazel call...
-                "%BAZEL_REAL%" %*
-                set "fallback_exit=!ERRORLEVEL!"
-                call :cleanup_logfile
-                exit /b !fallback_exit!
-            )
+            set "bootstrap_exit=!ERRORLEVEL!"
         )
     ) > "%LOGFILE%" 2>&1
-    if !ERRORLEVEL! NEQ 0 (
+    if !bootstrap_exit! NEQ 0 (
         echo %ESC%[1;31mERROR:%ESC%[0m Python installation failed:
         type "%LOGFILE%"
+        if !wrapper_fallback_allowed! EQU 1 (
+            echo wrapper script failed to install python! falling back to normal bazel call... 1>&2
+            "%BAZEL_REAL%" %*
+            set "fallback_exit=!ERRORLEVEL!"
+            call :cleanup_logfile
+            exit /b !fallback_exit!
+        )
+        echo Refusing unchecked bazel invocation. 1>&2
         call :cleanup_logfile
-        exit /b !ERRORLEVEL!
+        exit /b !bootstrap_exit!
     )
 )
 
@@ -158,14 +164,9 @@ echo %ESC%[0;32mINFO:%ESC%[0m running wrapper hook... 1>&2
 (
     "%python%" %REPO_ROOT%/bazel/wrapper_hook/wrapper_hook.py "%BAZEL_REAL%" %*
 ) >> "%LOGFILE%" 2>&1
-if !ERRORLEVEL! NEQ 0 (
-    echo %ESC%[1;31mERROR:%ESC%[0m Python installation failed:
-    type "%LOGFILE%"
-    call :cleanup_logfile
-    exit /b !ERRORLEVEL!
-)
-
 set "exit_code=%ERRORLEVEL%"
+
+if %exit_code% EQU 0 goto :wrapper_hook_succeeded
 
 rem Linter fails preempt bazel run (exit code 3)
 if %exit_code% EQU 3 (
@@ -173,10 +174,28 @@ if %exit_code% EQU 3 (
     echo %ESC%[0;32mINFO:%ESC%[0m Run the following to try to auto-fix the errors: 1>&2
     echo. 1>&2
     echo bazel run lint --fix 1>&2
-    call :cleanup_logfile
-    exit /b %exit_code%
+    goto :wrapper_hook_failed
 )
 
+rem Release policy rejection must never fall back to an unchecked Bazel invocation.
+echo %ESC%[1;31mERROR:%ESC%[0m wrapper hook failed: 1>&2
+type "%LOGFILE%" 1>&2
+if %exit_code% EQU 4 goto :wrapper_hook_failed
+if %wrapper_fallback_allowed% EQU 0 (
+    echo Refusing unchecked bazel invocation. 1>&2
+    goto :wrapper_hook_failed
+)
+
+echo wrapper script failed! falling back to normal bazel call... 1>&2
+"%BAZEL_REAL%" %*
+set "exit_code=%ERRORLEVEL%"
+
+:wrapper_hook_failed
+rem Return outside a parenthesized block so cleanup cannot replace the failure status.
+call :cleanup_logfile
+exit /b %exit_code%
+
+:wrapper_hook_succeeded
 rem Calculate duration for summary (equivalent to bash print_summary)
 set ENDTIME=%TIME%
 FOR /F "tokens=1-4 delims=:.," %%a IN ("%STARTTIME%") DO (
@@ -191,21 +210,6 @@ IF %hh% lss 10 SET hh=0%hh%
 IF %mm% lss 10 SET mm=0%mm%
 IF %ss% lss 10 SET ss=0%ss%
 IF %cc% lss 10 SET cc=0%cc%
-
-if %exit_code% NEQ 0 (  
-    echo %ESC%[1;31mERROR:%ESC%[0m wrapper hook failed: 1>&2
-    type "%LOGFILE%" 1>&2
-    
-    if "%CI%"=="" if "%MONGO_BAZEL_WRAPPER_FALLBACK%"=="" (
-        call :cleanup_logfile
-        exit /b %exit_code%
-    )
-    echo wrapper script failed! falling back to normal bazel call... 1>&2  
-    "%BAZEL_REAL%" %*  
-    set "fallback_exit=%ERRORLEVEL%"
-    call :cleanup_logfile
-    exit /b %fallback_exit%
-)
 
 rem === Read new args back in ===
 set "new_args="

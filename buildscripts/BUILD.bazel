@@ -808,6 +808,7 @@ py_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
+        "//bazel/wrapper_hook:release_distro",
         dependency(
             "protobuf",
             group = "testing",

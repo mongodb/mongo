@@ -266,7 +266,7 @@ ignore = [
 "buildscripts/package_test_internal.py" = ["UP"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["buildscripts", "buildscripts/idl", "evergreen", "tools"]
+known-first-party = ["bazel", "buildscripts", "buildscripts/idl", "evergreen", "tools"]
 
 [tool.pyright]
 include = [

@@ -19,6 +19,14 @@ assert_eq() {
     fi
 }
 
+assert_contains() {
+    [[ "$1" == *"$2"* ]] || fail "$3: '$1' does not contain '$2'"
+}
+
+assert_not_contains() {
+    [[ "$1" != *"$2"* ]] || fail "$3: '$1' contains '$2'"
+}
+
 new_tmpdir() {
     mktemp -d "${TEST_TMPDIR}/bazel_evergreen_shutils.XXXXXX"
 }
@@ -146,4 +154,67 @@ test_retry_bazel_cmd_primes_output_base_before_running_bazel() {
 
 test_cache_bazel_output_base_uses_plain_info_once
 test_provenance_build_invocation_file_selection
+test_maybe_release_flag_classifies_patch_test_and_release_tasks() {
+    local output
+    local project="mongodb-mongo-master-nightly"
+
+    output="$({
+        MONGO_VERSION_OVERRIDE=""
+        is_patch="true"
+        release_rbe="false"
+        push_bucket="downloads.example.invalid"
+        compiling_for_test="false"
+        bazel_evergreen_shutils::maybe_release_flag "--config=evg"
+    })"
+    assert_not_contains "$output" "public-release" "patch builds should not select a release config"
+
+    output="$({
+        MONGO_VERSION_OVERRIDE=""
+        is_patch="false"
+        release_rbe="false"
+        push_bucket="downloads.example.invalid"
+        compiling_for_test="true"
+        bazel_evergreen_shutils::maybe_release_flag "--config=evg"
+    })"
+    assert_not_contains "$output" "public-release" "test tasks should not select a release config"
+
+    output="$({
+        MONGO_VERSION_OVERRIDE=""
+        is_patch="false"
+        release_rbe="true"
+        push_bucket="downloads.example.invalid"
+        compiling_for_test="true"
+        bazel_evergreen_shutils::maybe_release_flag "--config=evg"
+    })"
+    assert_not_contains "$output" "public-release" "test tasks should not select the automatic release RBE config"
+
+    output="$({
+        MONGO_VERSION_OVERRIDE="9.0.0"
+        compiling_for_test="true"
+        bazel_evergreen_shutils::maybe_release_flag "--config=evg"
+    })"
+    assert_contains "$output" "--config=public-release" "explicit release versions should remain enforced"
+
+    output="$({
+        MONGO_VERSION_OVERRIDE=""
+        is_patch="false"
+        release_rbe="false"
+        push_bucket="downloads.example.invalid"
+        compiling_for_test="false"
+        bazel_evergreen_shutils::maybe_release_flag "--config=evg"
+    })"
+    assert_contains "$output" "--config=public-release-local" "release artifacts should use local release mode"
+
+    output="$({
+        MONGO_VERSION_OVERRIDE=""
+        is_patch="false"
+        release_rbe="true"
+        push_bucket="downloads.example.invalid"
+        compiling_for_test="false"
+        bazel_evergreen_shutils::maybe_release_flag "--config=evg"
+    })"
+    assert_contains "$output" "--config=public-release-rbe" "explicit release RBE should remain enabled"
+}
+
+test_maybe_release_flag_classifies_patch_test_and_release_tasks
 test_retry_bazel_cmd_primes_output_base_before_running_bazel
