@@ -7308,7 +7308,7 @@ TEST_F(TxnParticipantTest, CommitSplitPreparedTransaction) {
         auto swStableTimestamp =
             opCtx->getServiceContext()->getStorageEngine()->recoverToStableTimestamp(opCtx);
         ASSERT_OK(swStableTimestamp);
-        catalog::openCatalog(opCtx, state, swStableTimestamp.getValue());
+        catalog::openCatalogAfterRollbackToStable(opCtx, state, swStableTimestamp.getValue());
     }
     opCtx->setLogicalSessionId(lsid);
     opCtx->setTxnNumber(txnNum);
