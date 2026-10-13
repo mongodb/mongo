@@ -22,17 +22,17 @@ for (let i = 0; i < 8; ++i) {
 
 assert.commandWorked(localColl.insert({local: 1}));
 
+const lookupStage = {
+    $lookup: {
+        from: foreignCollName,
+        localField: "local",
+        foreignField: "foreign",
+        as: "result",
+    },
+};
+
 for (let preventProjectPushdown of [false, true]) {
-    const pipeline = [
-        {
-            $lookup: {
-                from: foreignCollName,
-                localField: "local",
-                foreignField: "foreign",
-                as: "result",
-            },
-        },
-    ];
+    const pipeline = [lookupStage];
     if (preventProjectPushdown) {
         pipeline.push({$_internalInhibitOptimization: {}});
     }
@@ -45,3 +45,28 @@ for (let preventProjectPushdown of [false, true]) {
         "Pipeline:\n" + tojson(pipeline) + "Actual results:\n" + tojson(results),
     );
 }
+
+// When the oversized $lookup result is returned to the client, the query must fail, regardless
+// of which engine is used.
+foreignColl.drop();
+for (let i = 0; i < 2; ++i) {
+    assert.commandWorked(foreignColl.insert({foreign: 1, largeField: largeString}));
+}
+
+assert.throwsWithCode(
+    () => localColl.aggregate([lookupStage]).toArray(),
+    ErrorCodes.BSONObjectTooLarge,
+);
+
+assert.throwsWithCode(
+    () =>
+        localColl
+            .aggregate([
+                lookupStage,
+                // Prevents the entire pipeline from being executed in SBE, so we test the
+                // SBE -> document source translation.
+                {$_internalInhibitOptimization: {}},
+            ])
+            .toArray(),
+    ErrorCodes.BSONObjectTooLarge,
+);

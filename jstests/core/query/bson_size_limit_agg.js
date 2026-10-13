@@ -26,7 +26,10 @@
  */
 
 import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
-import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
+import {
+    checkSbeFullyEnabled,
+    checkSbeRestrictedOrFullyEnabled,
+} from "jstests/libs/query/sbe_util.js";
 import {it} from "jstests/libs/mochalite.js";
 
 const collName = jsTestName();
@@ -210,6 +213,30 @@ function testSbeToClassicSplit() {
     }
 }
 
+function testGroupPushSbeToClassicSplit() {
+    // $group can be pushed down to SBE, while $_internalInhibitOptimization always stays in document sources.
+    // The $group result is the final result returned to the user, so it must still be checked
+    // against the size limit after it crosses from SBE into classic.
+    const pipeline = [
+        {$group: {_id: null, all: {$push: "$$ROOT"}}},
+        {$_internalInhibitOptimization: {}},
+    ];
+
+    // Size limit: does not trigger.
+    assertAggSucceedsWithInternalRangeBSON(
+        collExactPlusOne,
+        pipeline,
+        "$group + $push across SBE->doc source split with result just over 16 MB in internal range should succeed",
+    );
+
+    // Size limit: triggers.
+    assertAggFailsBSONTooLarge(
+        collMany,
+        pipeline,
+        "$group + $push across SBE->doc source split with ~20 MB final result should fail",
+    );
+}
+
 function testTrialRun() {
     const coll = db[collName + "_trial_run"];
     coll.drop();
@@ -283,5 +310,6 @@ it("$group + $push (non-last stage)", testGroupPushNonLastStage);
 it("$addFields", testAddFields);
 it("$project", testProject);
 it("SBE to classic split", testSbeToClassicSplit);
+it("$group + $push (SBE to document source split)", testGroupPushSbeToClassicSplit);
 it("Plan cache trial run", testTrialRun);
 it("$convert (non-last stage)", testConvertIntermediaryDocument);

@@ -92,6 +92,7 @@ selector:
     - jstests/core/query/release_memory/graph_lookup.js
     - jstests/core/query/release_memory/sort.js
     - jstests/core/query/single_batch.js
+    - jstests/core/query/bson_size_limit_agg.js
 
     # renameCollection creates an unanalyzed namespace; subsequent queries fail the "unanalyzed
     # namespace must be empty" check.
