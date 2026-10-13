@@ -7,8 +7,8 @@
  * Stage Builder Blueprint Lowering Pass
  *
  * lowerSbeBlueprint() walks a blueprint subtree bottom-up and produces a concrete sbe::PlanStage
- * tree. This is the analogue of SbExpr::lower() one level up the AST. SbBuilder currently invokes
- * it while constructing stages; it can also lower a completed blueprint tree from its root.
+ * tree. This is the analogue of SbExpr::lower() one level up the AST.
+ * SlotBasedStageBuilder::build() calls it once, on the root of the completed blueprint tree.
  */
 
 #include "mongo/db/query/stage_builder/sbe/builder_state.h"
@@ -23,15 +23,13 @@ namespace mongo::stage_builder {
  * 'blueprint' that is not already lowered must be reachable from 'root' and is reached exactly
  * once.
  *
- * Today SbBuilder::make*() operations call this as each node is created, so it lowers one new
- * node at a time.
- *
- * 'varTypes' is passed to SbExpr::lower() for the expressions within the subtree, enabling
- * type-based optimizations (e.g. traverseF elimination).
+ * 'varTypes' is passed to SbExpr::lower() for the expressions within the subtree. Expressions
+ * added through SbBuilder have already been finalized with the caller's VariableTypes, so for
+ * them this parameter has no effect.
  */
-SbStage lowerSbeBlueprint(SbBlueprint& blueprint,
-                          SbBlueprintNodeIdx root,
-                          StageBuilderState& state,
-                          const VariableTypes* varTypes = nullptr);
+std::unique_ptr<sbe::PlanStage> lowerSbeBlueprint(SbBlueprint& blueprint,
+                                                  SbBlueprintNodeIdx root,
+                                                  StageBuilderState& state,
+                                                  const VariableTypes* varTypes = nullptr);
 
 }  // namespace mongo::stage_builder

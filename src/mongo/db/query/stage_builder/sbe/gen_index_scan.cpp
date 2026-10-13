@@ -1047,7 +1047,7 @@ std::pair<SbStage, PlanStageSlots> generateIndexScanWithDynamicBoundsImpl(
         stagesAndSlots.emplace_back(std::move(optimizedStage), std::move(optimizedOutputs));
 
         // Define a lambda for creating a BranchStage.
-        auto makeBranchStage = [&](sbe::PlanStage::Vector inputStages,
+        auto makeBranchStage = [&](SbStage::Vector inputStages,
                                    std::vector<SbSlotVector> inputSlots) {
             return b.makeBranch(std::move(inputStages[0]),
                                 std::move(inputStages[1]),
