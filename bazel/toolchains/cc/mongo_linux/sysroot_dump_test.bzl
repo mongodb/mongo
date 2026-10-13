@@ -60,6 +60,16 @@ def _cross_sysroot_test_impl(ctx):
 
         # The cross sysroot is required even without the optional native flag.
         asserts.equals(env, None, sysroot_dump_disabled_reason(_context(selector, "0"), cross = True))
+    for distro in ["rhel8", "rhel9", "rhel10"]:
+        for arch in ["s390x", "ppc64le"]:
+            selector = "{}_{}_on_{}_aarch64".format(distro, arch, distro)
+            asserts.equals(env, None, sysroot_dump_disabled_reason(_context(selector, "0"), cross = True, target_arch = arch))
+            other_arch = "s390x" if arch == "ppc64le" else "ppc64le"
+            asserts.equals(
+                env,
+                "cross selector targets {}, not {}".format(arch, other_arch),
+                sysroot_dump_disabled_reason(_context(selector, "0"), cross = True, target_arch = other_arch),
+            )
     asserts.equals(
         env,
         "MONGO_LINUX_CROSS_TOOLCHAIN is not set",

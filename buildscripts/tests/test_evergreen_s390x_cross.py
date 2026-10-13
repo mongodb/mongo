@@ -58,6 +58,12 @@ def _dependencies(dependencies: list[str | dict[str, Any]]) -> list[dict[str, An
 
 
 class S390xCrossSchedulingTest(unittest.TestCase):
+    STATIC_VARIANTS = STATIC_VARIANTS
+    ARM_DISTROS = ARM_DISTROS
+    SMOKE_TASK = "s390x_cross_toolchain_smoke"
+    CROSS_PACKAGE_GROUP = "compile_s390x_cross_and_package_TG"
+    INTEGRATION_GROUP = "compile_integration_and_test_parallel_stream_TG"
+
     @classmethod
     def setUpClass(cls) -> None:
         cls.tasks: dict[str, Any] = {}
@@ -124,7 +130,7 @@ class S390xCrossSchedulingTest(unittest.TestCase):
         return shlex.split(result.stdout)
 
     def test_critical_selectors_preserve_task_dependencies(self) -> None:
-        for variant_name in STATIC_VARIANTS:
+        for variant_name in self.STATIC_VARIANTS:
             variant = self.variants[variant_name]
             all_selected_tasks = set()
             for entry in variant["tasks"]:
@@ -142,7 +148,7 @@ class S390xCrossSchedulingTest(unittest.TestCase):
             self.assertTrue(all_selected_tasks, variant_name)
 
     def test_all_native_venv_consumers_wait_for_the_native_producer(self) -> None:
-        for variant_name in STATIC_VARIANTS:
+        for variant_name in self.STATIC_VARIANTS:
             variant = self.variants[variant_name]
             checked_consumers = set()
             for entry in variant["tasks"]:
@@ -160,7 +166,7 @@ class S390xCrossSchedulingTest(unittest.TestCase):
     def test_hang_analyzer_preserves_dependencies_and_waits_for_native_venv(self) -> None:
         task_name = "unittest_shell_hang_analyzer_gen"
         task = self.tasks[task_name]
-        for variant_name in STATIC_VARIANTS:
+        for variant_name in self.STATIC_VARIANTS:
             entry = next(
                 entry
                 for entry in self.variants[variant_name]["tasks"]
@@ -180,7 +186,7 @@ class S390xCrossSchedulingTest(unittest.TestCase):
             "stitch_support_create_lib",
             "stitch_support_install_and_run_tests",
         }
-        for variant_name, large_distro in STATIC_VARIANTS.items():
+        for variant_name, large_distro in self.STATIC_VARIANTS.items():
             variant = self.variants[variant_name]
             for task_name in task_names:
                 entry = next(entry for entry in variant["tasks"] if entry["name"] == task_name)
@@ -191,13 +197,15 @@ class S390xCrossSchedulingTest(unittest.TestCase):
         expected = {
             "compile_integration_test",
             "integration_tests_standalone",
-            "integration_tests_standalone_audit",
-            "integration_tests_standalone_grpc",
             "integration_tests_replset",
             "integration_tests_replset_ssl_auth",
             "integration_tests_sharded",
         }
-        for variant_name, large_distro in STATIC_VARIANTS.items():
+        if self.INTEGRATION_GROUP == "compile_integration_and_test_parallel_stream_TG":
+            expected.update(
+                {"integration_tests_standalone_audit", "integration_tests_standalone_grpc"}
+            )
+        for variant_name, large_distro in self.STATIC_VARIANTS.items():
             variant = self.variants[variant_name]
             scheduled = {
                 task_name: entry.get("distros", variant["run_on"])
@@ -211,19 +219,19 @@ class S390xCrossSchedulingTest(unittest.TestCase):
     def test_smoke_build_waits_for_version_expansions(self) -> None:
         self.assertIn(
             {"name": "version_expansions_gen", "variant": "generate-tasks-for-version"},
-            self.tasks["s390x_cross_toolchain_smoke"].get("depends_on", []),
+            self.tasks[self.SMOKE_TASK].get("depends_on", []),
         )
 
     def test_smoke_build_is_only_for_testing(self) -> None:
         compile_command = next(
             command
-            for command in self.tasks["s390x_cross_toolchain_smoke"]["commands"]
+            for command in self.tasks[self.SMOKE_TASK]["commands"]
             if command.get("func") == "bazel compile"
         )
         self.assertTrue(compile_command["vars"].get("compiling_for_test"))
 
     def test_only_distributable_cross_builds_use_release_distros(self) -> None:
-        for static_name, arm_distro in ARM_DISTROS.items():
+        for static_name, arm_distro in self.ARM_DISTROS.items():
             static_variant = self.variants[static_name]
             dynamic_variant = self.variants[static_name + "-dynamic"]
             with self.subTest(variant=dynamic_variant["name"]):
@@ -231,7 +239,7 @@ class S390xCrossSchedulingTest(unittest.TestCase):
                 self.assertTrue(dynamic_variant["expansions"].get("release_binary_only"))
                 self.assertFalse(dynamic_variant["expansions"].get("release_rbe"))
                 for group_name in (
-                    "s390x_cross_toolchain_smoke_TG",
+                    self.SMOKE_TASK + "_TG",
                     "compile_and_archive_dist_test_TG",
                 ):
                     entry = next(
@@ -243,12 +251,12 @@ class S390xCrossSchedulingTest(unittest.TestCase):
                 entry = next(
                     entry
                     for entry in static_variant["tasks"]
-                    if entry["name"] == "compile_s390x_cross_and_package_TG"
+                    if entry["name"] == self.CROSS_PACKAGE_GROUP
                 )
                 self.assertEqual(["release-" + arm_distro], entry["distros"])
 
     def test_dynamic_server_builds_preserve_release_binary_flags_on_waterfall(self) -> None:
-        for static_name in STATIC_VARIANTS:
+        for static_name in self.STATIC_VARIANTS:
             for task_name in (
                 "archive_dist_test",
                 "archive_dist_test_debug",
@@ -270,9 +278,9 @@ class S390xCrossSchedulingTest(unittest.TestCase):
                     )
 
     def test_test_only_tasks_do_not_gain_release_binary_flags(self) -> None:
-        for static_name in STATIC_VARIANTS:
+        for static_name in self.STATIC_VARIANTS:
             for variant_name in (static_name, static_name + "-dynamic"):
-                for task_name in ("s390x_cross_toolchain_smoke", "compile_libraries_for_unittests"):
+                for task_name in (self.SMOKE_TASK, "compile_libraries_for_unittests"):
                     with self.subTest(variant=variant_name, task=task_name):
                         self.assertEqual(
                             ["--config=evg"],

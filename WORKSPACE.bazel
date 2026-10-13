@@ -27,9 +27,11 @@ http_file(
 
 setup_sysroot_dump()
 
-load("//bazel/toolchains/cc/mongo_linux_cross:mongo_linux_cross_toolchain.bzl", "setup_s390x_cross_toolchains")
+load("//bazel/toolchains/cc/mongo_linux_cross:mongo_linux_cross_toolchain.bzl", "setup_ppc64le_cross_toolchains", "setup_s390x_cross_toolchains")
 
 setup_s390x_cross_toolchains()
+
+setup_ppc64le_cross_toolchains()
 
 http_archive(
     name = "windows_sasl",
