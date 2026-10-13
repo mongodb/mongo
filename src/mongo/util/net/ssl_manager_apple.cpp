@@ -1657,14 +1657,8 @@ Future<SSLPeerInfo> SSLManagerApple::parseAndValidatePeerCertificate(
         }
     }
 
-    bool ipv6 = false;
-
-    // We want run the hostname through CIDR to standardize the
-    // IP Address notation, making direct comparison possible.
+    // Canonicalize the remote host's IP notation for comparison against the cert SANs below.
     auto swCIDRRemoteHost = CIDR::parse(remoteHost);
-    if (swCIDRRemoteHost.isOK() && remoteHost.find(':') != std::string::npos) {
-        ipv6 = true;
-    }
 
     ::SecTrustSetPolicies(cftrust.get(),
                           CreateSecTrustPolicies(remoteHost, _allowInvalidCertificates).get());
@@ -1672,12 +1666,9 @@ Future<SSLPeerInfo> SSLManagerApple::parseAndValidatePeerCertificate(
     auto result = ::kSecTrustResultInvalid;
     uassertOSStatusOK(::SecTrustEvaluate(cftrust.get(), &result), ErrorCodes::SSLHandshakeFailed);
 
-    // ipv6 addresses ignore the results of this check because we
-    // cant guarantee the format of the address apple will return from
-    // comparison between the remote host and the certificate, but
-    // we anyways check the addresses again after they are canonicalized.
-    if ((result != ::kSecTrustResultProceed) && (result != ::kSecTrustResultUnspecified) &&
-        (!ipv6)) {
+    // Enforce chain-of-trust. CreateSecTrustPolicies uses a nullptr hostname, so this only
+    // validates the chain, not the host; SAN/IP matching is done separately below.
+    if ((result != ::kSecTrustResultProceed) && (result != ::kSecTrustResultUnspecified)) {
         return badCert(explainTrustFailure(cftrust.get(), result), _allowInvalidCertificates);
     }
 
