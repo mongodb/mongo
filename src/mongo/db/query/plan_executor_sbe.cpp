@@ -276,7 +276,11 @@ PlanExecutor::ExecState PlanExecutorSBE::getNextImpl(ObjectType* out, RecordId* 
     if (!_stash.empty()) {
         auto&& [doc, recordId] = _stash.front();
         if constexpr (isBson) {
+            // Stashed objects may be overlarge (e.g. the SBE trial executor relaxes the
+            // size restriction and stores the returned objects on the stash), so we validate
+            // the size of those objects before returning them to the user.
             *out = std::move(doc);
+            uassertStatusOK(out->validateBSONObjSize(BSONObj::DefaultSizeTrait::MaxSize));
         } else {
             *out = Document{doc};
         }
@@ -705,6 +709,7 @@ sbe::PlanState fetchNextImpl(sbe::PlanStage* root,
                 BSONObjBuilder bb;
                 sbe::bson::convertToBsonObj(bb, sbe::value::getObjectView(val));
                 *out = bb.obj<BSONTraits>();
+                uassertStatusOK(out->validateBSONObjSize(BSONTraits::MaxSize));
             } else {
                 *out = convertToDocument(*sbe::value::getObjectView(val));
             }
@@ -724,6 +729,10 @@ sbe::PlanState fetchNextImpl(sbe::PlanStage* root,
             }
 
             if constexpr (isBson) {
+                // We allow BSONObjs inside the pipeline to exceed BSONObjMaxInternalSize (16MB +
+                // 16KB), but once they reach this point we have to make sure they won't be returned
+                // to the user.
+                uassertStatusOK(result.validateBSONObjSize(BSONTraits::MaxSize));
                 *out = std::move(result);
             } else {
                 *out = Document{result};
@@ -737,6 +746,8 @@ sbe::PlanState fetchNextImpl(sbe::PlanStage* root,
                 *out = metadata->appendToDocument(std::move(*out));
             } else {
                 *out = metadata->appendToBson<BSONTraits>(std::move(*out));
+                // Validate that the BSON + the enveloping metadata won't cross the BSON size limit.
+                uassertStatusOK(out->validateBSONObjSize(BSONTraits::MaxSize));
             }
         }
     }
