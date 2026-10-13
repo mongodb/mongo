@@ -834,6 +834,7 @@ mongo_cc_library(
         "//src/mongo/db/s:transaction_coordinator_worker_curop_repository.cpp",
     ],
     deps = [
+        ":commands",
         "//src/mongo/db:server_base",
         "//src/mongo/db:server_feature_flags",
         "//src/mongo/db:shard_role_api_stor_ex",
