@@ -13,6 +13,8 @@
 
 #include <jscustomallocator.h>
 
+#include "mozilla/RefPtr.h"
+#include "mozilla/StringBuffer.h"
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
 #include <fmt/format.h>
@@ -298,6 +300,71 @@ TEST_F(JSCustomAllocatorTest, MmapTrackingToggle) {
     mongo::sm::reset(0, false);
     mongo::sm::record_mmap_alloc(2048);
     ASSERT_EQUALS(mongo::sm::get_mmap_bytes(), 0);
+}
+
+// Allocating a StringBuffer from a JS arena counts against malloc_bytes; releasing it returns the
+// counter to zero.
+TEST_F(JSCustomAllocatorTest, StringBufferArenaAllocIsBalancedOnRelease) {
+    mongo::sm::reset(10 * 1024 * 1024, true);
+
+    {
+        RefPtr<mozilla::StringBuffer> buffer =
+            mozilla::StringBuffer::Alloc(1024, mozilla::Some(js::StringBufferArena));
+        ASSERT_TRUE(buffer);
+        ASSERT_GREATER_THAN(mongo::sm::get_malloc_bytes(), 0);
+    }
+
+    ASSERT_EQUALS(mongo::sm::get_malloc_bytes(), 0);
+    ASSERT_EQUALS(mongo::sm::get_total_bytes(), 0);
+}
+
+// Reallocating an arena-backed StringBuffer and releasing it returns the counter to zero.
+TEST_F(JSCustomAllocatorTest, StringBufferArenaReallocIsBalancedOnRelease) {
+    mongo::sm::reset(10 * 1024 * 1024, true);
+
+    mozilla::StringBuffer* buffer =
+        mozilla::StringBuffer::Alloc(1024, mozilla::Some(js::StringBufferArena)).take();
+    ASSERT_TRUE(buffer);
+
+    buffer = mozilla::StringBuffer::Realloc(buffer, 4096, mozilla::Some(js::StringBufferArena));
+    ASSERT_TRUE(buffer);
+
+    buffer->Release();
+
+    ASSERT_EQUALS(mongo::sm::get_malloc_bytes(), 0);
+    ASSERT_EQUALS(mongo::sm::get_total_bytes(), 0);
+}
+
+// A StringBuffer allocated without an arena uses plain malloc and is not counted; releasing it
+// leaves the counter at zero.
+TEST_F(JSCustomAllocatorTest, StringBufferPlainAllocIsBalancedOnRelease) {
+    mongo::sm::reset(10 * 1024 * 1024, true);
+
+    {
+        RefPtr<mozilla::StringBuffer> buffer = mozilla::StringBuffer::Alloc(1024);
+        ASSERT_TRUE(buffer);
+        ASSERT_EQUALS(mongo::sm::get_malloc_bytes(), 0);
+    }
+
+    ASSERT_EQUALS(mongo::sm::get_malloc_bytes(), 0);
+    ASSERT_EQUALS(mongo::sm::get_total_bytes(), 0);
+}
+
+// Reallocating a plain-malloc StringBuffer with plain realloc and releasing it leaves the counter
+// at zero.
+TEST_F(JSCustomAllocatorTest, StringBufferPlainReallocIsBalancedOnRelease) {
+    mongo::sm::reset(10 * 1024 * 1024, true);
+
+    mozilla::StringBuffer* buffer = mozilla::StringBuffer::Alloc(1024).take();
+    ASSERT_TRUE(buffer);
+
+    buffer = mozilla::StringBuffer::Realloc(buffer, 4096, mozilla::Nothing());
+    ASSERT_TRUE(buffer);
+
+    buffer->Release();
+
+    ASSERT_EQUALS(mongo::sm::get_malloc_bytes(), 0);
+    ASSERT_EQUALS(mongo::sm::get_total_bytes(), 0);
 }
 
 }  // namespace mozjs

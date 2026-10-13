@@ -35,6 +35,14 @@ class StringBuffer {
  private:
   std::atomic<uint32_t> mRefCount;
   uint32_t mStorageSize;
+  // MONGODB MODIFICATION (SERVER-134946): Track whether the header and data
+  // were allocated with a JS arena allocator. Those allocations are counted by
+  // the custom allocator's malloc_bytes counter, so Release() must free them
+  // with js_free (which decrements the counter) instead of plain free. Buffers
+  // allocated with plain malloc/realloc are not counted and must use free. This
+  // field is immutable after construction except in Realloc, which requires
+  // exclusive ownership.
+  bool mFromArenaAllocator;
 
  public:
   MOZ_DECLARE_REFCOUNTED_TYPENAME(StringBuffer)
@@ -65,11 +73,12 @@ class StringBuffer {
 
     size_t bytes = sizeof(StringBuffer) + aSize;
     //MONGODB Modification: We must use our custom arena_malloc function instead of the mozJS one.
-    void* hdr = aArena ? js_arena_malloc(*aArena, bytes) : malloc(bytes);
+    bool fromArena = aArena.isSome();
+    void* hdr = fromArena ? js_arena_malloc(*aArena, bytes) : malloc(bytes);
     if (!hdr) {
       return nullptr;
     }
-    return ConstructInPlace(hdr, aSize);
+    return ConstructInPlace(hdr, aSize, fromArena);
   }
 
   /**
@@ -83,13 +92,19 @@ class StringBuffer {
    *
    * @return the new StringBuffer header.
    */
-  static already_AddRefed<StringBuffer> ConstructInPlace(void* aBuffer,
-                                                         size_t aStorageSize) {
+  // MONGODB MODIFICATION (SERVER-134946): aFromArenaAllocator records whether
+  // aBuffer was allocated with a JS arena allocator so that Release() can
+  // balance the allocation. Callers passing an arena-allocated buffer must pass
+  // true. There is intentionally no default: provenance cannot be inferred
+  // here, and guessing wrong breaks the allocator's accounting silently.
+  static already_AddRefed<StringBuffer> ConstructInPlace(
+      void* aBuffer, size_t aStorageSize, bool aFromArenaAllocator) {
     MOZ_ASSERT(aBuffer, "must have a valid buffer");
     MOZ_ASSERT(aStorageSize != 0, "zero capacity StringBuffer not allowed");
     auto* hdr = new (aBuffer) StringBuffer();
     hdr->mRefCount = 1;
     hdr->mStorageSize = aStorageSize;
+    hdr->mFromArenaAllocator = aFromArenaAllocator;
     detail::RefCountLogger::logAddRef(hdr, 1);
     return already_AddRefed(hdr);
   }
@@ -156,11 +171,23 @@ class StringBuffer {
 
     size_t bytes = sizeof(StringBuffer) + aSize;
     //MONGODB Modification: We must use our custom arena_realloc function instead of the mozJS one.
-    aHdr = aArena ? (StringBuffer*)js_arena_realloc(*aArena, aHdr, bytes)
-                  : (StringBuffer*)realloc(aHdr, bytes);
+    bool fromArena = aArena.isSome();
+    // MONGODB MODIFICATION (SERVER-134946): A buffer's provenance selects its release
+    // path, and the two are not interchangeable within the allocator's accounting; a
+    // transition would leave malloc_bytes unbalanced (over-count for arena->plain,
+    // under-count for plain->arena). This is a diagnostic assert rather than a release
+    // assert: a mismatch would corrupt accounting, not memory safety, so it should be
+    // loud in debug/diagnostic builds without crashing production.
+    MOZ_DIAGNOSTIC_ASSERT(aHdr->mFromArenaAllocator == fromArena,
+                          "StringBuffer::Realloc cannot change allocation provenance");
+    aHdr = fromArena ? (StringBuffer*)js_arena_realloc(*aArena, aHdr, bytes)
+                     : (StringBuffer*)realloc(aHdr, bytes);
     if (aHdr) {
       detail::RefCountLogger::logAddRef(aHdr, 1);
       aHdr->mStorageSize = aSize;
+      // MONGODB MODIFICATION (SERVER-134946): keep the free path in sync with
+      // the (re)allocation path.
+      aHdr->mFromArenaAllocator = fromArena;
     }
 
     return aHdr;
@@ -192,7 +219,14 @@ class StringBuffer {
       // on other threads, that is, to ensure that writes prior to that release
       // are now visible on this thread.
       count = mRefCount.load(std::memory_order_acquire);
-      free(this);  // We were allocated with malloc.
+      // MONGODB MODIFICATION (SERVER-134946): arena allocations are counted by
+      // the custom allocator, so they must be released through js_free (which
+      // decrements the counter); plain malloc allocations use free.
+      if (mFromArenaAllocator) {
+        js_free(this);
+      } else {
+        free(this);  // We were allocated with malloc.
+      }
     }
   }
 
