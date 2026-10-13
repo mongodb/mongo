@@ -235,6 +235,10 @@ conn_stats = [
     ##########################################
     # Block cache statistics
     ##########################################
+    # FIXME-WT-18764: seven of the stats below describe the disaggregated victim cache, not the
+    # block cache: app_thread_put_time, app_thread_puts, cold_not_cached, put_failures, put_time,
+    # put_time_max and puts. Eviction increments them on the page log cache path. That ticket moves
+    # them to the disagg group as disagg_victim_cache_*.
     BlockCacheStat('block_cache_app_thread_put_time', 'time application threads spent adding pages to the disaggregated victim cache (usecs)'),
     BlockCacheStat('block_cache_app_thread_puts', 'pages added to the disaggregated victim cache by application threads'),
     BlockCacheStat('block_cache_blocks', 'total blocks'),
@@ -1556,8 +1560,12 @@ conn_dsrc_stats = [
     RecStat('rec_page_delta_rejected_non_single_page', 'page deltas rejected due to non-single page in previous reconciliation'),
     RecStat('rec_page_delta_rejected_size_threshold', 'page deltas rejected due to size threshold'),
     RecStat('rec_page_delta_rejected_zero_entries', 'page deltas rejected due to zero entries'),
+    RecStat('rec_page_delta_shared_hs_internal', 'internal page deltas written for the shared history store'),
+    RecStat('rec_page_delta_shared_hs_leaf', 'leaf page deltas written for the shared history store'),
     RecStat('rec_page_full_image_internal', 'full internal pages written instead of a page delta'),
     RecStat('rec_page_full_image_leaf', 'full leaf pages written instead of a page delta'),
+    RecStat('rec_page_full_image_shared_hs_internal', 'full internal pages written instead of a page delta for the shared history store'),
+    RecStat('rec_page_full_image_shared_hs_leaf', 'full leaf pages written instead of a page delta for the shared history store'),
     RecStat('rec_page_mods_gt500', 'changes since prior reconciliation (bucket 8) greater than 500'),
     RecStat('rec_page_mods_le10', 'changes since prior reconciliation (bucket 2) between 6 and 10'),
     RecStat('rec_page_mods_le100', 'changes since prior reconciliation (bucket 5) between 51 and 100'),

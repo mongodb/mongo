@@ -553,6 +553,28 @@ cursor_statistics(WT_SESSION *session)
     scan_end_check(ret == WT_NOTFOUND);
     error_check(cursor->close(cursor));
     /*! [Statistics cursor ignore column] */
+
+    /*! [Statistics cursor counters] */
+    error_check(session->open_cursor(
+      session, "statistics:", NULL, "statistics=(fast,otel_counters)", &cursor));
+    while ((ret = cursor->next(cursor)) == 0) {
+        error_check(cursor->get_key(cursor, &stat_key));
+        error_check(cursor->get_value(cursor, NULL, NULL, &stat_value));
+    }
+    scan_end_check(ret == WT_NOTFOUND);
+    error_check(cursor->close(cursor));
+    /*! [Statistics cursor counters] */
+
+    /*! [Statistics cursor OTel none] */
+    error_check(
+      session->open_cursor(session, "statistics:", NULL, "statistics=(otel_none)", &cursor));
+    while ((ret = cursor->next(cursor)) == 0) {
+        error_check(cursor->get_key(cursor, &stat_key));
+        error_check(cursor->get_value(cursor, NULL, NULL, &stat_value));
+    }
+    scan_end_check(ret == WT_NOTFOUND);
+    error_check(cursor->close(cursor));
+    /*! [Statistics cursor OTel none] */
 }
 
 static void

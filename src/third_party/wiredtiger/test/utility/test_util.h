@@ -76,7 +76,8 @@ extern "C" {
 #define TESTUTIL_ENV_CONFIG_DISAGG_EXT                                                   \
     "\"%s/ext/page_log/%s/libwiredtiger_%s.so\"=("                                       \
     "config=(home=\"%s\",delay_ms=%" PRIu64 ",error_ms=%" PRIu64 ",force_delay=%" PRIu64 \
-    ",force_error=%" PRIu64 ",cache_size_mb=%" PRIu64 ",verbose=%" PRIu32 "))"
+    ",force_error=%" PRIu64 ",cache_size_mb=%" PRIu64 ",victim_cache_size_mb=%" PRIu64   \
+    ",verbose=%" PRIu32 "))"
 #define TESTUTIL_ENV_CONFIG_KEY_PROVIDER_EXT                        \
     ",\"%s/ext/test/key_provider/libwiredtiger_key_provider.so\"=(" \
     "early_load=true,config=(version=%d,key_expires=60,verbose=-1))"
@@ -88,7 +89,7 @@ extern "C" {
 
 #define TESTUTIL_DISAGG_INIT(_opts, _is_enabled, _key_provider, _internal_page_delta,        \
   _leaf_page_delta, _mode, _page_log, _page_log_home, _drain_threads, _page_log_map_size_mb, \
-  _page_log_verbose)                                                                         \
+  _page_log_verbose, _victim_cache_size_mb)                                                  \
     do {                                                                                     \
         (_opts)->disagg.is_enabled = (_is_enabled);                                          \
         (_opts)->disagg.key_provider = (_key_provider);                                      \
@@ -100,6 +101,7 @@ extern "C" {
         (_opts)->disagg.drain_threads = (_drain_threads);                                    \
         (_opts)->disagg.page_log_map_size_mb = (_page_log_map_size_mb);                      \
         (_opts)->disagg.page_log_verbose = (_page_log_verbose);                              \
+        (_opts)->disagg.victim_cache_size_mb = (_victim_cache_size_mb);                      \
     } while (0)
 
 /* Generic option parsing structure shared by all test cases. */
@@ -167,6 +169,9 @@ typedef struct {
         uint64_t drain_threads;        /* Number of drain threads for disaggregated storage*/
         uint64_t page_log_map_size_mb; /* Megabytes of map size for page log local database */
         uint32_t page_log_verbose;     /* Page log verbosity; see WT_VERBOSE_LEVEL */
+
+        /* Victim cache megabytes; zero leaves the cache unavailable. */
+        uint64_t victim_cache_size_mb;
     } disagg;
 
     /*

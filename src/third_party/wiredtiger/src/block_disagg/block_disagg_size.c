@@ -52,7 +52,7 @@ __wti_block_disagg_decrease_size(
 
     if (orig < size)
         /* FIXME-WT-18039: Replace this and the WT_ASSERT below with a WT_ASSERT_ALWAYS. */
-        __wt_verbose_warning(session, WT_VERB_DISAGGREGATED_STORAGE,
+        __wt_verbose_level_id(session, 1888100, WT_VERB_DISAGGREGATED_STORAGE, WT_VERBOSE_WARNING,
           "disaggregated block size underflow: decrementing %" PRIu64 " from %" PRIu64
           ", clamped to 0",
           size, orig);

@@ -38,6 +38,7 @@ static void config_compact(void);
 static void config_compression(TABLE *, const char *);
 static void config_disagg_key_provider(void);
 static void config_disagg_storage(void);
+static void config_disagg_victim_cache(void);
 static void config_encryption(void);
 static bool config_explicit(TABLE *, const char *);
 static const char *config_file_type(u_int);
@@ -518,6 +519,9 @@ config_run(void)
     /* Configure the cache last, cache size depends on everything else. */
     config_cache();
 
+    /* The budget is scaled from the cache size, so this follows config_cache(). */
+    config_disagg_victim_cache();
+
     /* Adjust run length if needed. */
     config_run_length();
 
@@ -680,6 +684,8 @@ config_backward_compatible(void)
 
     BC_CHECK("disk.mmap_all", DISK_MMAP_ALL);
     BC_CHECK("block_cache", BLOCK_CACHE);
+    BC_CHECK("disagg.victim_cache", DISAGG_VICTIM_CACHE);
+    BC_CHECK("disagg.victim_cache.size", DISAGG_VICTIM_CACHE_SIZE);
     BC_CHECK("stress.hs_checkpoint_delay", STRESS_HS_CHECKPOINT_DELAY);
     BC_CHECK("stress.hs_search", STRESS_HS_SEARCH);
     BC_CHECK("stress.hs_sweep", STRESS_HS_SWEEP);
@@ -1515,6 +1521,64 @@ config_disagg_storage(void)
     /* Compaction is not supported for disaggregated storage. */
     config_off(NULL, "ops.compaction");
     config_off(NULL, "background_compact");
+}
+
+/*
+ * Memory the victim cache may use, per run, per node. Enough that re-reads hit retained pages and
+ * the budget forces evictions during a run.
+ */
+#define VICTIM_CACHE_BUDGET_MB 128
+
+/*
+ * config_disagg_victim_cache --
+ *     Page log victim cache configuration.
+ */
+static void
+config_disagg_victim_cache(void)
+{
+    uint64_t size_mb;
+    char buf[64];
+
+    /* A size the user set is the switch: non-zero turns the cache on, zero turns it off. */
+    if (config_explicit(NULL, "disagg.victim_cache.size") &&
+      !config_explicit(NULL, "disagg.victim_cache")) {
+        if (GV(DISAGG_VICTIM_CACHE_SIZE) != 0)
+            config_single(NULL, "disagg.victim_cache=1", true);
+        else
+            config_off(NULL, "disagg.victim_cache");
+    }
+
+    /* The victim cache lives in the page log, so a run without one has nowhere to put pages. */
+    if (!g.disagg_storage_config) {
+        if (config_explicit(NULL, "disagg.victim_cache"))
+            WARN("%s", "turning off disagg.victim_cache, the run has no page log");
+        config_off(NULL, "disagg.victim_cache");
+    }
+
+    /* Of the page logs, only PALite implements the caching hooks. */
+    else if (strcmp(GVS(DISAGG_PAGE_LOG), "palite") != 0) {
+        if (config_explicit(NULL, "disagg.victim_cache"))
+            WARN("turning off disagg.victim_cache, the %s page log implements no victim cache",
+              GVS(DISAGG_PAGE_LOG));
+        config_off(NULL, "disagg.victim_cache");
+    }
+
+    /* An in-memory connection never offers pages to the victim cache, so the knob is pointless. */
+    else if (GV(RUNS_IN_MEMORY)) {
+        if (config_explicit(NULL, "disagg.victim_cache"))
+            WARN("%s", "turning off disagg.victim_cache to work with runs.in_memory");
+        config_off(NULL, "disagg.victim_cache");
+    }
+
+    if (GV(DISAGG_VICTIM_CACHE) && !config_explicit(NULL, "disagg.victim_cache.size")) {
+        /* A fifth of the cache, capped. The memory is extra, not taken from the cache. */
+        size_mb = (uint64_t)WT_MIN(VICTIM_CACHE_BUDGET_MB, (GV(CACHE) + 4) / 5);
+        testutil_snprintf(buf, sizeof(buf), "disagg.victim_cache.size=%" PRIu64, size_mb);
+        config_single(NULL, buf, false);
+    }
+
+    if (!GV(DISAGG_VICTIM_CACHE))
+        config_off(NULL, "disagg.victim_cache.size");
 }
 
 /*

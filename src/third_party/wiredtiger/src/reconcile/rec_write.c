@@ -2359,12 +2359,14 @@ static int
 __rec_write_delta(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_CHUNK *chunk, uint8_t *addr,
   size_t *addr_sizep, size_t *compressed_sizep)
 {
+    WT_BTREE *btree;
     WT_CONNECTION_IMPL *conn;
     WT_MULTI *multi;
     WT_PAGE_BLOCK_META *block_meta;
     uint64_t delta_pct;
     uint64_t _write_start = 0;
 
+    btree = S2BT(session);
     conn = S2C(session);
     multi = &r->multi[r->multi_next - 1];
     block_meta = &r->ref->page->disagg_info->block_meta;
@@ -2405,6 +2407,8 @@ __rec_write_delta(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_CHUNK *chu
               r->count_internal_page_delta_key_updated);
 
         WT_STAT_CONN_DSRC_INCR(session, rec_page_delta_internal);
+        if (WT_IS_SHARED_HS(btree))
+            WT_STAT_CONN_DSRC_INCR(session, rec_page_delta_shared_hs_internal);
 
         /*
          * If we decide to write the delta we packed, track the number of bytes saved by avoiding
@@ -2438,6 +2442,8 @@ __rec_write_delta(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_CHUNK *chu
               &conn->page_delta.max_internal_delta_count, multi->block_meta->delta_count);
     } else if (F_ISSET(r->ref, WT_REF_FLAG_LEAF)) {
         WT_STAT_CONN_DSRC_INCR(session, rec_page_delta_leaf);
+        if (WT_IS_SHARED_HS(btree))
+            WT_STAT_CONN_DSRC_INCR(session, rec_page_delta_shared_hs_leaf);
         WT_STAT_CONN_INCRV(
           session, block_byte_write_saved_delta_leaf, chunk->image.size - r->delta.size);
         WT_STAT_DSRC_INCRV(
@@ -2477,10 +2483,12 @@ static int
 __rec_write_image(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_CHUNK *chunk, uint8_t *addr,
   size_t *addr_sizep, size_t *compressed_sizep, bool last_block)
 {
+    WT_BTREE *btree;
     WT_MULTI *multi;
     WT_PAGE *page;
     WT_PAGE_BLOCK_META *block_meta;
 
+    btree = S2BT(session);
     page = r->page;
     multi = &r->multi[r->multi_next - 1];
 
@@ -2507,10 +2515,15 @@ __rec_write_image(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_CHUNK *chu
     WT_RET(__rec_write(session, &chunk->image, multi->block_meta, addr, addr_sizep,
       compressed_sizep, false, F_ISSET(r, WT_REC_CHECKPOINT), false));
 
-    if (F_ISSET(r->ref, WT_REF_FLAG_INTERNAL))
+    if (F_ISSET(r->ref, WT_REF_FLAG_INTERNAL)) {
         WT_STAT_CONN_DSRC_INCR(session, rec_page_full_image_internal);
-    else if (F_ISSET(r->ref, WT_REF_FLAG_LEAF))
+        if (WT_IS_SHARED_HS(btree))
+            WT_STAT_CONN_DSRC_INCR(session, rec_page_full_image_shared_hs_internal);
+    } else if (F_ISSET(r->ref, WT_REF_FLAG_LEAF)) {
         WT_STAT_CONN_DSRC_INCR(session, rec_page_full_image_leaf);
+        if (WT_IS_SHARED_HS(btree))
+            WT_STAT_CONN_DSRC_INCR(session, rec_page_full_image_shared_hs_leaf);
+    }
 
     return (0);
 }

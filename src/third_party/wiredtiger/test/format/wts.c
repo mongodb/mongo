@@ -354,7 +354,9 @@ configure_disagg_storage(const char *home, char **p, size_t max, char *ext_cfg, 
       /* page_log_home        */ disagg_is_multi_node() ? g.home_page_log : (char *)home,
       /* drain_threads        */ GV(DISAGG_DRAIN_THREADS),
       /* page_log_map_size_mb */ 2048, /* 2 Gigabytes for storage memory map */
-      /* page_log_verbose     */ GV(DISAGG_PAGE_LOG_VERBOSE));
+      /* page_log_verbose     */ GV(DISAGG_PAGE_LOG_VERBOSE),
+      /* victim_cache_size_mb */
+      GV(DISAGG_VICTIM_CACHE) ? GV(DISAGG_VICTIM_CACHE_SIZE) : 0);
 
     testutil_disagg_storage_configuration(
       &opts, home, disagg_cfg, sizeof(disagg_cfg), ext_cfg, ext_cfg_size);
@@ -927,6 +929,75 @@ stats_data_source(TABLE *table, void *arg)
 }
 
 /*
+ * stats_conn_value --
+ *     Return a single connection statistic's value.
+ */
+static int64_t
+stats_conn_value(WT_CURSOR *cursor, int stat_key)
+{
+    int64_t v;
+
+    cursor->set_key(cursor, stat_key);
+    testutil_check(cursor->search(cursor));
+    testutil_check(cursor->get_value(cursor, NULL, NULL, &v));
+    return (v);
+}
+
+/*
+ * stats_victim_cache_print --
+ *     Report what the page log's victim cache did over the run.
+ *
+ * Zero counts are legitimate: a run can enable the cache and never populate it.
+ */
+static void
+stats_victim_cache_print(WT_SESSION *session, FILE *fp)
+{
+    WT_CURSOR *cursor;
+    int64_t app_puts, cold_skipped, put_failures, put_time, puts;
+
+    testutil_assert(fprintf(fp, "\n\n====== Victim cache:\n") >= 0);
+
+    if (!GV(DISAGG_VICTIM_CACHE)) {
+        testutil_assert(fprintf(fp, "disabled\n") >= 0);
+        return;
+    }
+
+    /*
+     * The BLOCK_CACHE names are historical: eviction increments all of these on the page log cache
+     * path, never on the block cache.
+     *
+     * FIXME-WT-18764: read the disagg_victim_cache_* names once the statistics are renamed.
+     */
+    wt_wrap_open_cursor(session, "statistics:", NULL, &cursor);
+    puts = stats_conn_value(cursor, WT_STAT_CONN_BLOCK_CACHE_PUTS);
+    app_puts = stats_conn_value(cursor, WT_STAT_CONN_BLOCK_CACHE_APP_THREAD_PUTS);
+    cold_skipped = stats_conn_value(cursor, WT_STAT_CONN_BLOCK_CACHE_COLD_NOT_CACHED);
+    put_failures = stats_conn_value(cursor, WT_STAT_CONN_BLOCK_CACHE_PUT_FAILURES);
+    put_time = stats_conn_value(cursor, WT_STAT_CONN_BLOCK_CACHE_PUT_TIME);
+    testutil_check(cursor->close(cursor));
+
+    testutil_assert(fprintf(fp,
+                      "enabled, %" PRIu32 "MB\n"
+                      "pages cached=%" PRId64 "\n"
+                      "pages cached by application threads=%" PRId64 "\n"
+                      "cold pages not cached=%" PRId64 "\n"
+                      "failed page inserts=%" PRId64 "\n"
+                      "time spent adding pages=%" PRId64 "us\n"
+                      "average per page=%" PRId64 "us\n",
+                      GV(DISAGG_VICTIM_CACHE_SIZE), puts, app_puts, cold_skipped, put_failures,
+                      put_time, puts == 0 ? 0 : put_time / puts) >= 0);
+
+    if (GV(QUIET))
+        return;
+
+    printf("--- victim cache: %" PRIu32 "MB, %" PRId64 " pages cached (%" PRId64
+           " by application threads), %" PRId64 " failed ---\n",
+      GV(DISAGG_VICTIM_CACHE_SIZE), puts, app_puts, put_failures);
+    if (puts == 0)
+        printf("--- victim cache: enabled but nothing was cached ---\n");
+}
+
+/*
  * wts_stats --
  *     Dump the run's statistics.
  */
@@ -949,6 +1020,9 @@ wts_stats(void)
     memset(&sap, 0, sizeof(sap));
     wt_wrap_open_session(conn, &sap, NULL, NULL, &session);
     stats_data_print(session, "statistics:", fp);
+
+    if (g.disagg_storage_config)
+        stats_victim_cache_print(session, fp);
 
     args.fp = fp;
     args.session = session;

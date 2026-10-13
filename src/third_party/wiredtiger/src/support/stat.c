@@ -412,16 +412,21 @@ static const char *const __stats_dsrc_desc[] = {
   "reconciliation: fast-path pages deleted",
   "reconciliation: free page ID due to failed page replacement reconciliation in disagg",
   "reconciliation: full internal pages written instead of a page delta",
+  "reconciliation: full internal pages written instead of a page delta for the shared history "
+  "store",
   "reconciliation: full leaf pages written instead of a page delta",
+  "reconciliation: full leaf pages written instead of a page delta for the shared history store",
   "reconciliation: ingest btree reconciliation keeps the aborted prepare updates",
   "reconciliation: internal page delta keys deleted",
   "reconciliation: internal page delta keys updated/inserted",
   "reconciliation: internal page deltas written",
+  "reconciliation: internal page deltas written for the shared history store",
   "reconciliation: internal page key bytes discarded using suffix compression",
   "reconciliation: internal page multi-block writes",
   "reconciliation: leaf delta page key bytes discarded using prefix compression",
   "reconciliation: leaf full page key bytes discarded using prefix compression",
   "reconciliation: leaf page deltas written",
+  "reconciliation: leaf page deltas written for the shared history store",
   "reconciliation: leaf page multi-block writes",
   "reconciliation: leaf-page overflow keys",
   "reconciliation: max deltas seen on internal page during reconciliation",
@@ -929,16 +934,20 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
     stats->rec_page_delete_fast = 0;
     stats->rec_free_page_id_due_to_failed_replacement_reconciliation = 0;
     stats->rec_page_full_image_internal = 0;
+    stats->rec_page_full_image_shared_hs_internal = 0;
     stats->rec_page_full_image_leaf = 0;
+    stats->rec_page_full_image_shared_hs_leaf = 0;
     stats->rec_ingest_keep_prepare_rollback = 0;
     stats->rec_page_delta_internal_key_deleted = 0;
     stats->rec_page_delta_internal_key_updated = 0;
     stats->rec_page_delta_internal = 0;
+    stats->rec_page_delta_shared_hs_internal = 0;
     stats->rec_suffix_compression = 0;
     stats->rec_multiblock_internal = 0;
     stats->rec_prefix_compression_delta = 0;
     stats->rec_prefix_compression_full = 0;
     stats->rec_page_delta_leaf = 0;
+    stats->rec_page_delta_shared_hs_leaf = 0;
     stats->rec_multiblock_leaf = 0;
     stats->rec_overflow_key_leaf = 0;
     stats->rec_max_internal_page_deltas = 0;
@@ -1462,16 +1471,20 @@ __wt_stat_dsrc_aggregate_single(WT_DSRC_STATS *from, WT_DSRC_STATS *to)
     to->rec_free_page_id_due_to_failed_replacement_reconciliation +=
       from->rec_free_page_id_due_to_failed_replacement_reconciliation;
     to->rec_page_full_image_internal += from->rec_page_full_image_internal;
+    to->rec_page_full_image_shared_hs_internal += from->rec_page_full_image_shared_hs_internal;
     to->rec_page_full_image_leaf += from->rec_page_full_image_leaf;
+    to->rec_page_full_image_shared_hs_leaf += from->rec_page_full_image_shared_hs_leaf;
     to->rec_ingest_keep_prepare_rollback += from->rec_ingest_keep_prepare_rollback;
     to->rec_page_delta_internal_key_deleted += from->rec_page_delta_internal_key_deleted;
     to->rec_page_delta_internal_key_updated += from->rec_page_delta_internal_key_updated;
     to->rec_page_delta_internal += from->rec_page_delta_internal;
+    to->rec_page_delta_shared_hs_internal += from->rec_page_delta_shared_hs_internal;
     to->rec_suffix_compression += from->rec_suffix_compression;
     to->rec_multiblock_internal += from->rec_multiblock_internal;
     to->rec_prefix_compression_delta += from->rec_prefix_compression_delta;
     to->rec_prefix_compression_full += from->rec_prefix_compression_full;
     to->rec_page_delta_leaf += from->rec_page_delta_leaf;
+    to->rec_page_delta_shared_hs_leaf += from->rec_page_delta_shared_hs_leaf;
     to->rec_multiblock_leaf += from->rec_multiblock_leaf;
     to->rec_overflow_key_leaf += from->rec_overflow_key_leaf;
     to->rec_max_internal_page_deltas += from->rec_max_internal_page_deltas;
@@ -2057,7 +2070,11 @@ __wt_stat_dsrc_aggregate(WT_DSRC_STATS **from, WT_DSRC_STATS *to)
     to->rec_free_page_id_due_to_failed_replacement_reconciliation +=
       WT_STAT_DSRC_READ(from, rec_free_page_id_due_to_failed_replacement_reconciliation);
     to->rec_page_full_image_internal += WT_STAT_DSRC_READ(from, rec_page_full_image_internal);
+    to->rec_page_full_image_shared_hs_internal +=
+      WT_STAT_DSRC_READ(from, rec_page_full_image_shared_hs_internal);
     to->rec_page_full_image_leaf += WT_STAT_DSRC_READ(from, rec_page_full_image_leaf);
+    to->rec_page_full_image_shared_hs_leaf +=
+      WT_STAT_DSRC_READ(from, rec_page_full_image_shared_hs_leaf);
     to->rec_ingest_keep_prepare_rollback +=
       WT_STAT_DSRC_READ(from, rec_ingest_keep_prepare_rollback);
     to->rec_page_delta_internal_key_deleted +=
@@ -2065,11 +2082,14 @@ __wt_stat_dsrc_aggregate(WT_DSRC_STATS **from, WT_DSRC_STATS *to)
     to->rec_page_delta_internal_key_updated +=
       WT_STAT_DSRC_READ(from, rec_page_delta_internal_key_updated);
     to->rec_page_delta_internal += WT_STAT_DSRC_READ(from, rec_page_delta_internal);
+    to->rec_page_delta_shared_hs_internal +=
+      WT_STAT_DSRC_READ(from, rec_page_delta_shared_hs_internal);
     to->rec_suffix_compression += WT_STAT_DSRC_READ(from, rec_suffix_compression);
     to->rec_multiblock_internal += WT_STAT_DSRC_READ(from, rec_multiblock_internal);
     to->rec_prefix_compression_delta += WT_STAT_DSRC_READ(from, rec_prefix_compression_delta);
     to->rec_prefix_compression_full += WT_STAT_DSRC_READ(from, rec_prefix_compression_full);
     to->rec_page_delta_leaf += WT_STAT_DSRC_READ(from, rec_page_delta_leaf);
+    to->rec_page_delta_shared_hs_leaf += WT_STAT_DSRC_READ(from, rec_page_delta_shared_hs_leaf);
     to->rec_multiblock_leaf += WT_STAT_DSRC_READ(from, rec_multiblock_leaf);
     to->rec_overflow_key_leaf += WT_STAT_DSRC_READ(from, rec_overflow_key_leaf);
     to->rec_max_internal_page_deltas += WT_STAT_DSRC_READ(from, rec_max_internal_page_deltas);
@@ -3119,13 +3139,18 @@ static const char *const __stats_connection_desc[] = {
   "reconciliation: fast-path pages deleted",
   "reconciliation: free page ID due to failed page replacement reconciliation in disagg",
   "reconciliation: full internal pages written instead of a page delta",
+  "reconciliation: full internal pages written instead of a page delta for the shared history "
+  "store",
   "reconciliation: full leaf pages written instead of a page delta",
+  "reconciliation: full leaf pages written instead of a page delta for the shared history store",
   "reconciliation: ingest btree reconciliation keeps the aborted prepare updates",
   "reconciliation: internal page delta keys deleted",
   "reconciliation: internal page delta keys updated/inserted",
   "reconciliation: internal page deltas written",
+  "reconciliation: internal page deltas written for the shared history store",
   "reconciliation: internal page multi-block writes",
   "reconciliation: leaf page deltas written",
+  "reconciliation: leaf page deltas written for the shared history store",
   "reconciliation: leaf page multi-block writes",
   "reconciliation: leaf-page overflow keys",
   "reconciliation: max deltas seen on internal page during reconciliation",
@@ -4269,13 +4294,17 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->rec_page_delete_fast = 0;
     stats->rec_free_page_id_due_to_failed_replacement_reconciliation = 0;
     stats->rec_page_full_image_internal = 0;
+    stats->rec_page_full_image_shared_hs_internal = 0;
     stats->rec_page_full_image_leaf = 0;
+    stats->rec_page_full_image_shared_hs_leaf = 0;
     stats->rec_ingest_keep_prepare_rollback = 0;
     stats->rec_page_delta_internal_key_deleted = 0;
     stats->rec_page_delta_internal_key_updated = 0;
     stats->rec_page_delta_internal = 0;
+    stats->rec_page_delta_shared_hs_internal = 0;
     stats->rec_multiblock_internal = 0;
     stats->rec_page_delta_leaf = 0;
+    stats->rec_page_delta_shared_hs_leaf = 0;
     stats->rec_multiblock_leaf = 0;
     stats->rec_overflow_key_leaf = 0;
     stats->rec_max_internal_page_deltas = 0;
@@ -5667,7 +5696,11 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->rec_free_page_id_due_to_failed_replacement_reconciliation +=
       WT_STAT_CONN_READ(from, rec_free_page_id_due_to_failed_replacement_reconciliation);
     to->rec_page_full_image_internal += WT_STAT_CONN_READ(from, rec_page_full_image_internal);
+    to->rec_page_full_image_shared_hs_internal +=
+      WT_STAT_CONN_READ(from, rec_page_full_image_shared_hs_internal);
     to->rec_page_full_image_leaf += WT_STAT_CONN_READ(from, rec_page_full_image_leaf);
+    to->rec_page_full_image_shared_hs_leaf +=
+      WT_STAT_CONN_READ(from, rec_page_full_image_shared_hs_leaf);
     to->rec_ingest_keep_prepare_rollback +=
       WT_STAT_CONN_READ(from, rec_ingest_keep_prepare_rollback);
     to->rec_page_delta_internal_key_deleted +=
@@ -5675,8 +5708,11 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->rec_page_delta_internal_key_updated +=
       WT_STAT_CONN_READ(from, rec_page_delta_internal_key_updated);
     to->rec_page_delta_internal += WT_STAT_CONN_READ(from, rec_page_delta_internal);
+    to->rec_page_delta_shared_hs_internal +=
+      WT_STAT_CONN_READ(from, rec_page_delta_shared_hs_internal);
     to->rec_multiblock_internal += WT_STAT_CONN_READ(from, rec_multiblock_internal);
     to->rec_page_delta_leaf += WT_STAT_CONN_READ(from, rec_page_delta_leaf);
+    to->rec_page_delta_shared_hs_leaf += WT_STAT_CONN_READ(from, rec_page_delta_shared_hs_leaf);
     to->rec_multiblock_leaf += WT_STAT_CONN_READ(from, rec_multiblock_leaf);
     to->rec_overflow_key_leaf += WT_STAT_CONN_READ(from, rec_overflow_key_leaf);
     to->rec_max_internal_page_deltas += WT_STAT_CONN_READ(from, rec_max_internal_page_deltas);

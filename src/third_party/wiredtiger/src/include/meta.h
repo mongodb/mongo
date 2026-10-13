@@ -93,6 +93,10 @@
  */
 #define WT_IS_HS(dh) F_ISSET(dh, WT_DHANDLE_HS)
 
+/* The shared history store is the history store instance used by disaggregated storage. */
+#define WT_IS_SHARED_HS(btree) \
+    (WT_IS_HS((btree)->dhandle) && F_ISSET((btree), WT_BTREE_DISAGGREGATED))
+
 #define WT_METAFILE_ID 0 /* Metadata file ID */
 
 #define WT_METADATA_COMPAT "Compatibility version"

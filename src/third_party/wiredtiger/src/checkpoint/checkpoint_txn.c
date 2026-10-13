@@ -921,7 +921,8 @@ __checkpoint_update_disagg_database_size(
             WT_ASSERT(session, db >= sub && db - sub >= WT_DISAGG_CHECKPOINT_SIZE_BUFFER);
             /* FIXME-WT-18039: Replace this clamp and the assert above with WT_ASSERT_ALWAYS. */
             if (db < sub || db - sub < WT_DISAGG_CHECKPOINT_SIZE_BUFFER) {
-                __wt_verbose_error(session, WT_VERB_DISAGGREGATED_STORAGE,
+                __wt_verbose_level_id(session, 1888101, WT_VERB_DISAGGREGATED_STORAGE,
+                  WT_VERBOSE_ERROR,
                   "disaggregated database size would fall below the checkpoint buffer: "
                   "decrementing %" PRIu64 " from %" PRIu64
                   ", clamped to the checkpoint size buffer %" PRIu64,

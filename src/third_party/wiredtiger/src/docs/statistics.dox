@@ -92,6 +92,47 @@ that will not be needed:
 
 @snippet ex_all.c Statistics cursor ignore column
 
+@section statistics_otel OpenTelemetry (OTel) statistic types
+
+Every statistic has exactly one OTel type: \c otel_counters, \c otel_gauges,
+\c otel_histograms, or \c otel_none. The type is a tag on the statistic, not a
+separate set of statistics. A statistic tagged with an OTel type is still an
+ordinary statistic: it is exposed by statistics cursors like
+any other. \c otel_none is the type of statistics that are not used for OTel.
+Because every statistic has exactly one type, the four types partition the
+statistics, and their union is all statistics.
+
+The statistics configuration values control two independent things:
+
+- <b>Which values are gathered</b>: \c all, \c fast, \c tree_walk, \c cache_walk
+  and \c size. These select how much work is done to compute statistic values.
+  A statistic that is not gathered is still exposed by the cursor, with a value
+  of 0.
+- <b>Which keys are exposed</b>: the \c otel_* values. These select which
+  statistics the cursor iterates over, based on each statistic's OTel type.
+
+Since the two are independent, any combination is valid. Configuring more than one
+otel_* value for a statistic is an error, because a statistic can be of only one type.
+
+The following example opens a cursor that exposes only \c otel_counters
+statistics, gathering only the relatively inexpensive ones:
+
+@snippet ex_all.c Statistics cursor counters
+
+Configuring \c otel_none excludes every statistic that has an actual OTel type, exposing
+only those tagged with \c otel_none.
+
+The following example opens a cursor that exposes only statistics that do not have an OTel type:
+
+@snippet ex_all.c Statistics cursor OTel none
+
+If no \c otel_* value is configured, no filtering by OTel type takes place and
+all statistics are exposed.
+
+As with other statistics configuration values, the ::wiredtiger_open function
+sets the default for all statistics cursors, which the configuration passed to
+WT_SESSION::open_cursor then extends.
+
 @section statistics_log Statistics logging
 
 WiredTiger will optionally log database statistics into files when the
