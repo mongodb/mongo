@@ -999,6 +999,8 @@ last-continuous:
     ticket: SERVER-134872
   - test_file: jstests/fle2/create_encrypted_collection.js
     ticket: SERVER-130498
+  - test_file: jstests/core/query/elemmatch/elemmatch_empty_path.js
+    ticket: SERVER-121207
   suites: null
 last-lts:
   all:
@@ -2060,4 +2062,6 @@ last-lts:
     ticket: SERVER-134872
   - test_file: jstests/fle2/create_encrypted_collection.js
     ticket: SERVER-130498
+  - test_file: jstests/core/query/elemmatch/elemmatch_empty_path.js
+    ticket: SERVER-121207
   suites: null
