@@ -1430,5 +1430,93 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
     }
 }
 
+TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
+       OptimizeMapsEmptyMetaFieldSubpathPredicateOntoBucketMetaField) {
+    auto pipeline = pipeline_factory::makePipeline(
+        makeVector(fromjson("{$_internalUnpackBucket: {exclude: [], timeField: "
+                            "'time', metaField: '', bucketMaxSpanSeconds: 3600}}"),
+                   fromjson("{$match: {'.a': {$eq: 1}}}")),
+        getExpCtx(),
+        pipeline_factory::kOptionsMinimal);
+    auto& container = pipeline->getSources();
+
+    ASSERT_EQ(container.size(), 2U);
+
+    auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
+    auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
+                         ->createPredicatesOnBucketLevelField(original->getMatchExpression());
+
+    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(), fromjson("{'meta.a': {$eq: 1}}"));
+    ASSERT_BSONOBJ_EQ(predicate.tightPredicate->serialize(), fromjson("{'meta.a': {$eq: 1}}"));
+}
+
+TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
+       OptimizeMapsEmptyMetaFieldNestedEmptySubpathPredicateOntoBucketMetaField) {
+    // A metaField of '' whose value is itself an object with an empty-string field name produces
+    // the user-facing path '..a', which must map onto 'meta..a'.
+    auto pipeline = pipeline_factory::makePipeline(
+        makeVector(fromjson("{$_internalUnpackBucket: {exclude: [], timeField: "
+                            "'time', metaField: '', bucketMaxSpanSeconds: 3600}}"),
+                   fromjson("{$match: {'..a': {$eq: 7}}}")),
+        getExpCtx(),
+        pipeline_factory::kOptionsMinimal);
+    auto& container = pipeline->getSources();
+
+    ASSERT_EQ(container.size(), 2U);
+
+    auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
+    auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
+                         ->createPredicatesOnBucketLevelField(original->getMatchExpression());
+
+    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(), fromjson("{'meta..a': {$eq: 7}}"));
+    ASSERT_BSONOBJ_EQ(predicate.tightPredicate->serialize(), fromjson("{'meta..a': {$eq: 7}}"));
+}
+
+TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
+       OptimizeMapsEmptyMetaFieldExactPredicateOntoBucketMetaField) {
+    auto pipeline = pipeline_factory::makePipeline(
+        makeVector(fromjson("{$_internalUnpackBucket: {exclude: [], timeField: "
+                            "'time', metaField: '', bucketMaxSpanSeconds: 3600}}"),
+                   fromjson("{$match: {'': {$eq: 1}}}")),
+        getExpCtx(),
+        pipeline_factory::kOptionsMinimal);
+    auto& container = pipeline->getSources();
+
+    ASSERT_EQ(container.size(), 2U);
+
+    auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
+    auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
+                         ->createPredicatesOnBucketLevelField(original->getMatchExpression());
+
+    ASSERT_BSONOBJ_EQ(predicate.loosePredicate->serialize(), fromjson("{meta: {$eq: 1}}"));
+    ASSERT_BSONOBJ_EQ(predicate.tightPredicate->serialize(), fromjson("{meta: {$eq: 1}}"));
+}
+
+TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
+       OptimizeMapsEmptyMetaFieldSubpathInAndAlongsideMeasurementPredicate) {
+    auto pipeline = pipeline_factory::makePipeline(
+        makeVector(fromjson("{$_internalUnpackBucket: {exclude: [], timeField: "
+                            "'time', metaField: '', bucketMaxSpanSeconds: 3600, "
+                            "assumeNoMixedSchemaData: true}}"),
+                   fromjson("{$match: {$and: [{'.a': {$eq: 1}}, {b: {$gt: 5}}]}}")),
+        getExpCtx(),
+        pipeline_factory::kOptionsMinimal);
+    auto& container = pipeline->getSources();
+
+    ASSERT_EQ(container.size(), 2U);
+
+    auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
+    auto predicate = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
+                         ->createPredicatesOnBucketLevelField(original->getMatchExpression());
+
+    // The meta subpath conjunct must be renamed, while the measurement conjunct still maps onto
+    // the control block.
+    ASSERT_BSONOBJ_EQ(
+        predicate.loosePredicate->serialize(),
+        fromjson("{$and: [{'meta.a': {$eq: 1}}, {'control.max.b': {$_internalExprGt: 5}}]}"));
+    // No tight predicate for measurement fields.
+    ASSERT_FALSE(predicate.tightPredicate);
+}
+
 }  // namespace
 }  // namespace mongo

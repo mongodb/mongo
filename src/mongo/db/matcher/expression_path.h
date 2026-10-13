@@ -147,6 +147,18 @@ public:
 
             FieldRef prefixToRename(src);
             const auto& currFieldPathRef = _elementPath->fieldRef();
+            if (src.empty()) {
+                // An empty 'src' denotes an empty-named field, which FieldRef("") can't handle.
+                // Handle its subpaths here.
+                if (currFieldPathRef.numParts() >= 2 && currFieldPathRef.getPart(0).empty()) {
+                    rewrittenPathRef.parse(dst);
+                    for (size_t it = 1; it < currFieldPathRef.numParts(); it++) {
+                        rewrittenPathRef.appendPart(currFieldPathRef.getPart(it));
+                    }
+                    ++renamesFound;
+                }
+                continue;
+            }
             if (prefixToRename.isPrefixOf(currFieldPathRef)) {
                 // Perform a partial prefix rewrite. 'src' is a prefix for the current field path
                 // and we should substitute it with 'dst'.

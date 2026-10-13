@@ -1132,6 +1132,86 @@ TEST(SplitMatchExpression, ShouldMoveIndependentLeafPredicateAcrossRename) {
     ASSERT_FALSE(splitExpr.second.get());
 }
 
+TEST(SplitMatchExpression, ShouldMovePredicateAcrossRenameWithEmptySrcComponent) {
+    BSONObj matchPredicate = fromjson("{'.a': 2}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+    ASSERT_OK(matcher.getStatus());
+
+    StringMap<std::string> renames{{"", "meta"}};
+    std::pair<std::unique_ptr<MatchExpression>, std::unique_ptr<MatchExpression>> splitExpr =
+        expression::splitMatchExpressionBy(std::move(matcher.getValue()), {}, renames);
+
+    ASSERT_TRUE(splitExpr.first.get());
+    ASSERT_BSONOBJ_EQ(splitExpr.first->serialize(), fromjson("{'meta.a': {$eq: 2}}"));
+
+    ASSERT_FALSE(splitExpr.second.get());
+}
+
+TEST(SplitMatchExpression, ShouldMovePredicateOnDeeperPathAcrossRenameWithEmptySrcComponent) {
+    BSONObj matchPredicate = fromjson("{'.a.b': 2}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+    ASSERT_OK(matcher.getStatus());
+
+    StringMap<std::string> renames{{"", "meta"}};
+    std::pair<std::unique_ptr<MatchExpression>, std::unique_ptr<MatchExpression>> splitExpr =
+        expression::splitMatchExpressionBy(std::move(matcher.getValue()), {}, renames);
+
+    ASSERT_TRUE(splitExpr.first.get());
+    ASSERT_BSONOBJ_EQ(splitExpr.first->serialize(), fromjson("{'meta.a.b': {$eq: 2}}"));
+
+    ASSERT_FALSE(splitExpr.second.get());
+}
+
+TEST(SplitMatchExpression, ShouldMovePredicateWithNestedEmptyComponentAcrossRenameWithEmptySrc) {
+    BSONObj matchPredicate = fromjson("{'..a': 7}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+    ASSERT_OK(matcher.getStatus());
+
+    StringMap<std::string> renames{{"", "meta"}};
+    std::pair<std::unique_ptr<MatchExpression>, std::unique_ptr<MatchExpression>> splitExpr =
+        expression::splitMatchExpressionBy(std::move(matcher.getValue()), {}, renames);
+
+    ASSERT_TRUE(splitExpr.first.get());
+    ASSERT_BSONOBJ_EQ(splitExpr.first->serialize(), fromjson("{'meta..a': {$eq: 7}}"));
+
+    ASSERT_FALSE(splitExpr.second.get());
+}
+
+TEST(SplitMatchExpression, ShouldMovePredicateOnExactEmptyPathAcrossRename) {
+    BSONObj matchPredicate = fromjson("{'': 1}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+    ASSERT_OK(matcher.getStatus());
+
+    StringMap<std::string> renames{{"", "meta"}};
+    std::pair<std::unique_ptr<MatchExpression>, std::unique_ptr<MatchExpression>> splitExpr =
+        expression::splitMatchExpressionBy(std::move(matcher.getValue()), {}, renames);
+
+    ASSERT_TRUE(splitExpr.first.get());
+    ASSERT_BSONOBJ_EQ(splitExpr.first->serialize(), fromjson("{meta: {$eq: 1}}"));
+
+    ASSERT_FALSE(splitExpr.second.get());
+}
+
+TEST(SplitMatchExpression, ShouldApplyMultiEmptyComponentRenameAsPrefix) {
+    BSONObj matchPredicate = fromjson("{'...': 2}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+    ASSERT_OK(matcher.getStatus());
+
+    StringMap<std::string> renames{{"..", "a"}};
+    std::pair<std::unique_ptr<MatchExpression>, std::unique_ptr<MatchExpression>> splitExpr =
+        expression::splitMatchExpressionBy(std::move(matcher.getValue()), {}, renames);
+
+    ASSERT_TRUE(splitExpr.first.get());
+    ASSERT_BSONOBJ_EQ(splitExpr.first->serialize(), fromjson("{'a.': {$eq: 2}}"));
+
+    ASSERT_FALSE(splitExpr.second.get());
+}
+
 TEST(SplitMatchExpression, ShouldMoveIndependentAndPredicateAcrossRename) {
     BSONObj matchPredicate = fromjson("{$and: [{a: 1}, {b: 2}]}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
