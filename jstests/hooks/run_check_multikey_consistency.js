@@ -143,7 +143,10 @@ async function checkMultikeyConsistencyForReplicaSet(hosts) {
         try {
             sampleDoc = members[0].getDB(dbName).getCollection(collName).findOne({}, {_id: 0});
         } catch (e) {
-            if (e.code === ErrorCodes.NamespaceNotFound) return;
+            // QueryPlanKilled: the collection was dropped while this read was running.
+            if (e.code === ErrorCodes.NamespaceNotFound || e.code === ErrorCodes.QueryPlanKilled) {
+                return;
+            }
             throw e;
         }
         if (!sampleDoc) return;
