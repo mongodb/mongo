@@ -227,6 +227,7 @@ common --flag_alias=all_headers=//bazel/config:all_headers
 common --flag_alias=evg=//bazel/config:evg
 common --flag_alias=extensions_signature_verification_secure=//bazel/config:extensions_signature_verification_secure
 common --flag_alias=use_rbe_sysroot=//bazel/config:use_rbe_sysroot
+common --flag_alias=optimize_test_binaries=//bazel/config:optimize_test_binaries
 
 #############################################################################################################################
 # BUILD 'PROFILES' - this is the area to set up configurations of flags to be used by developers.

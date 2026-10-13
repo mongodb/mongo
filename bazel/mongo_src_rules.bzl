@@ -50,6 +50,7 @@ load("//bazel:test_exec_properties.bzl", "test_exec_properties")
 load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
 load("@rules_cc//cc/common:cc_shared_library_info.bzl", "CcSharedLibraryInfo")
 load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
+load("//bazel:transitions.bzl", "optimize_test_binary")
 
 COMPILEDB_TAG = "mongo_compiledb"
 
@@ -881,6 +882,66 @@ def mongo_cc_binary(
         _program_type = "binary",
         bolt_profile = bolt_profile,
         **kwargs
+    )
+
+def mongo_test_only_cc_binary(
+        name,
+        srcs = [],
+        deps = [],
+        private_hdrs = [],
+        testonly = False,
+        visibility = None,
+        data = [],
+        tags = [],
+        copts = [],
+        linkopts = [],
+        includes = [],
+        linkstatic = False,
+        local_defines = [],
+        target_compatible_with = [],
+        defines = [],
+        additional_linker_inputs = [],
+        features = [],
+        exec_properties = {},
+        skip_global_deps = [],
+        env = {},
+        **kwargs):
+    """Like mongo_cc_binary but with optimize_test_binaries_transition applied.
+
+    Builds the binary under the configuration produced by optimize_test_binaries_transition
+    (e.g. opt=on, no sanitizers, linkstatic=True when //bazel/config:optimize_test_binaries
+    is set), so test binaries can be compiled optimized even in a debug build.
+    """
+    _mongo_cc_binary_and_test(
+        name + "_inner",
+        srcs,
+        deps,
+        private_hdrs,
+        testonly,
+        visibility,
+        data,
+        tags,
+        copts,
+        linkopts,
+        includes,
+        linkstatic,
+        local_defines,
+        target_compatible_with,
+        defines,
+        additional_linker_inputs,
+        features,
+        exec_properties,
+        skip_global_deps,
+        env,
+        _program_type = "binary",
+        **kwargs
+    )
+    optimize_test_binary(
+        name = name,
+        binary = [":" + name + "_inner"],
+        testonly = testonly,
+        visibility = visibility,
+        tags = tags + ["mongo_binary"],
     )
 
 def mongo_cc_test(

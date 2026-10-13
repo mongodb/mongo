@@ -220,7 +220,6 @@ class ResmokeCoreAnalysisTaskGenerator(CoreAnalysisTaskGenerator):
         )
 
     def get_core_analysis_task_dependencies(self, compile_variant: str) -> set[TaskDependency]:
-        # TODO SERVER-92571 add archive_jstestshell_debug dep for variants that have it.
         return {TaskDependency("archive_dist_test_debug", compile_variant)}
 
     def find_cores(self) -> list[CoreInfo]:

@@ -3601,6 +3601,15 @@ config_setting(
 )
 
 # ==========
+# optimize_test_binaries
+# ==========
+
+bool_flag(
+    name = "optimize_test_binaries",
+    build_setting_default = False,
+)
+
+# ==========
 # Extension variants
 # ==========
 
