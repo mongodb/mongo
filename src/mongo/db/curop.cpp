@@ -25,6 +25,7 @@
 #include "mongo/db/profile_filter.h"
 #include "mongo/db/profile_settings.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
+#include "mongo/db/query/util/deferred.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id_gen.h"
@@ -499,7 +500,7 @@ void CurOp::_fetchStorageStatsIfNecessary(Date_t deadline, bool isFinal) {
     }
 }
 
-void CurOp::_setEndOfOpMetrics(OpDebug::AdditiveMetrics& metrics) {
+void CurOp::_setEndOfOpMetrics(OpDebug::AdditiveMetrics& metrics, Nanoseconds cpuTime) {
     auto elapsed = elapsedTimeExcludingPauses();
     // We don't strictly need to record executionTime unless keyHash is non-none, but there's
     // no harm in recording it since we've already computed the value.
@@ -509,8 +510,7 @@ void CurOp::_setEndOfOpMetrics(OpDebug::AdditiveMetrics& metrics) {
     metrics.clusterWorkingTime = metrics.clusterWorkingTime.value_or(Milliseconds(0)) +
         std::max(Milliseconds(0), workingMillis);
 
-    calculateCpuTime();
-    metrics.cpuNanos = metrics.cpuNanos.value_or(Nanoseconds(0)) + _debug.cpuTime;
+    metrics.cpuNanos = metrics.cpuNanos.value_or(Nanoseconds(0)) + cpuTime;
 
     if (const auto& admCtx = ExecutionAdmissionContext::get(opCtx());
         !opCtx()->inMultiDocumentTransaction() && !parent()) {
@@ -607,15 +607,17 @@ void CurOp::setEndOfOpMetrics(long long nreturned) {
     // completeAndLogOperation.
     const auto& info = _debug.getQueryStatsInfo();
     if (info.keyHash || info.metricsRequested) {
-        _setEndOfOpMetrics(_debug.getAdditiveMetrics());
+        _setEndOfOpMetrics(_debug.getAdditiveMetrics(), calculateCpuTime());
     }
 }
 
 void CurOp::setEndOfOpMetricsForBatchWrites() {
     if (_debug.hasBatchWriteMetrics()) {
+        // Read the CPU timer once for the whole batch rather than once per write for performance.
+        const auto cpuTime = calculateCpuTime();
         _debug.forEachQueryStatsInfoForBatchWrites(
             [&](size_t opIndex, OpDebug::QueryStatsInfo& qsi) {
-                _setEndOfOpMetrics(qsi.additiveMetrics);
+                _setEndOfOpMetrics(qsi.additiveMetrics, cpuTime);
             });
     }
 }
@@ -733,10 +735,11 @@ void CurOp::done() {
     _end = _tickSource->getTicks();
 }
 
-void CurOp::calculateCpuTime() {
-    if (_cpuTimer && _debug.cpuTime < Nanoseconds::zero()) {
+Nanoseconds CurOp::calculateCpuTime() {
+    if (_cpuTimer) {
         _debug.cpuTime = _cpuTimer->getElapsed();
     }
+    return _debug.cpuTime;
 }
 
 Microseconds CurOp::computeElapsedTimeTotal(TickSource::Tick startTime,
@@ -824,12 +827,12 @@ void CurOp::_updateExecutionTimers() {
 CurOp::ShouldProfileQuery CurOp::_shouldProfileAtLevel1AndLogSlowQuery(
     const logv2::LogOptions& logOptions,
     Milliseconds slowms,
-    std::shared_ptr<const ProfileFilter> filter) {
+    std::shared_ptr<const ProfileFilter> filter,
+    function_ref<Nanoseconds()> getCpuTime) {
     if (filter) {
-        // Calculate this operation's CPU time before deciding whether logging/profiling is
-        // necessary only if it is needed for filtering.
+        // Populate this operation's CPU time before matching in case the filter depends on it.
         if (filter->dependsOn("cpuNanos")) {
-            calculateCpuTime();
+            getCpuTime();
         }
 
         const bool passesFilter = filter->matches(opCtx(), _debug, *this);
@@ -898,19 +901,23 @@ bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
 
     _updateExecutionTimers();
 
+    // Calculating 'cpuNanos' is relatively expensive, only calculate it once in this function.
+    Deferred getCpuTime{[this] {
+        return calculateCpuTime();
+    }};
+
     // Record execution and delinquency stats for the top-level operation only. We don't want to
     // double count stats from child operations (e.g., bulk writes, sub-operations in aggregations)
     // that share the same ExecutionAdmissionContext.
     if (!parent()) {
         if (auto ticketingSystem =
                 admission::execution_control::TicketingSystem::get(opCtx->getServiceContext())) {
-            calculateCpuTime();
             auto start = _start.load();
             auto end = _end.load();
             ticketingSystem->finalizeOperationStats(
                 opCtx,
                 start != 0 ? durationCount<Microseconds>(computeElapsedTimeTotal(start, end)) : 0,
-                durationCount<Microseconds>(_debug.cpuTime));
+                durationCount<Microseconds>(getCpuTime()));
         }
     }
 
@@ -933,13 +940,13 @@ bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
     const auto [shouldProfileAtLevel1, shouldLogSlowOp] = _shouldProfileAtLevel1AndLogSlowQuery(
         logOptions,
         Milliseconds(slowMsOverride.value_or(serverGlobalParams.slowMS.load())),
-        std::move(filter));
+        std::move(filter),
+        getCpuTime);
 
-    // Defer calculating the CPU time until we know that we actually are going to write it to
-    // the logs or profiler. The CPU time may have been determined earlier if it was a
-    // dependency of 'filter' in which case this is a no-op.
+    // Calculate or read the cached value of CPU time only if we actually  are going to write it to
+    // the logs or profiler.
     if (forceLog || shouldLogSlowOp || _dbprofile >= 2) {
-        calculateCpuTime();
+        getCpuTime();
     }
 
     if (forceLog || shouldLogSlowOp) {
@@ -974,17 +981,24 @@ void CurOp::logLongRunningOperationIfNeeded() {
 
     _updateExecutionTimers();
 
+    // Calculating 'cpuNanos' is relatively expensive, only calculate it once in this function.
+    Deferred getCpuTime{[this] {
+        return calculateCpuTime();
+    }};
+
     auto profileSettings = DatabaseProfileSettings::get(opCtx()->getServiceContext())
                                .getDatabaseProfileSettings(getNSS().dbName());
     const bool shouldLogSlowOp =
-        _shouldProfileAtLevel1AndLogSlowQuery(
-            kLogOptions, profileSettings.slowOpInProgressThreshold, profileSettings.filter)
+        _shouldProfileAtLevel1AndLogSlowQuery(kLogOptions,
+                                              profileSettings.slowOpInProgressThreshold,
+                                              profileSettings.filter,
+                                              getCpuTime)
             .shouldLogSlowQuery;
     if (!shouldLogSlowOp) {
         return;
     }
 
-    calculateCpuTime();
+    getCpuTime();
     Date_t deadline = opCtx()->getDeadline();
     logv2::DynamicAttributes attr = _reportDebugAndStats(kLogOptions, &deadline, false);
     LOGV2_OPTIONS(1794200, kLogOptions, "Slow in-progress query", attr);

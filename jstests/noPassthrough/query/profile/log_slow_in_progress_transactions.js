@@ -6,7 +6,10 @@
  * ]
  */
 
-import {findSlowInProgressQueryLogLine} from "jstests/libs/log.js";
+import {
+    assertSlowInProgressQueryReportsFinalCpuNanos,
+    findSlowInProgressQueryLogLine,
+} from "jstests/libs/log.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 function assertSlowInProgressTransactionLogged(db, comment) {
@@ -179,6 +182,34 @@ try {
 elapsed = Date.now() - startTime;
 print(`Transaction Update Index Scan took ${elapsed}ms`);
 assertSlowInProgressTransactionLogged(db, "Transaction Update Index Scan");
+
+// Validate cpuNanos is updated for every slow query or slow in-progress query log outputted.
+assert.commandWorked(db.setProfilingLevel(0, {slowinprogms: 0, slowms: 0}));
+startTime = Date.now();
+session.startTransaction();
+try {
+    assert.eq(
+        kDocCount,
+        sessionColl
+            .find({
+                a: {$gte: 0},
+                $where: function () {
+                    sleep(1);
+                    return true;
+                },
+            })
+            .batchSize(kDocCount)
+            .comment("Transaction Scan Reports Final CpuNanos")
+            .itcount(),
+    );
+    session.commitTransaction();
+} catch (e) {
+    session.abortTransaction();
+    throw e;
+}
+elapsed = Date.now() - startTime;
+print(`Transaction Scan Reports Final CpuNanos took ${elapsed}ms`);
+assertSlowInProgressQueryReportsFinalCpuNanos(db, "Transaction Scan Reports Final CpuNanos");
 
 session.endSession();
 

@@ -6,7 +6,10 @@
  * ]
  */
 
-import {findSlowInProgressQueryLogLine} from "jstests/libs/log.js";
+import {
+    assertSlowInProgressQueryReportsFinalCpuNanos,
+    findSlowInProgressQueryLogLine,
+} from "jstests/libs/log.js";
 
 function assertSlowInProgressQueryLogged(db, comment, expectedPlanSummary) {
     const logLine = findSlowInProgressQueryLogLine(db, comment);
@@ -133,5 +136,17 @@ assert.eq(
     findSlowInProgressQueryLogLine(db, "Agg Index Scan With Profiler Filter"),
     findSlowInProgressQueryLogLine(db, "Agg Index Scan With Profiler Filter"),
 );
+
+// Validate cpuNanos is updated for every slow query or slow in-progress query log outputted.
+assert.commandWorked(db.setProfilingLevel(0, {slowinprogms: 0, slowms: 0}));
+
+assert.eq(
+    kDocCount,
+    coll
+        .find({a: {$gte: 0}})
+        .comment("Collection Scan Reports Final CpuNanos")
+        .itcount(),
+);
+assertSlowInProgressQueryReportsFinalCpuNanos(db, "Collection Scan Reports Final CpuNanos");
 
 MongoRunner.stopMongod(conn);

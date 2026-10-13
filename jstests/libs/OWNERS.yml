@@ -120,3 +120,6 @@ filters:
   - "assertions_core.js":
     approvers:
       - 10gen/devprod-test-infrastructure
+  - "log.js":
+    approvers:
+      - 10gen/query-integration-observability

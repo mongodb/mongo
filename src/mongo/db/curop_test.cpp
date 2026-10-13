@@ -14,6 +14,7 @@
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/namespace_string_util.h"
 #include "mongo/db/operation_context_options_gen.h"
+#include "mongo/db/operation_cpu_timer.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_stats/mock_key.h"
@@ -2051,6 +2052,35 @@ TEST(CurOpTest, SetEndOfOpMetricsForBatchWritesPopulatesAllMetrics) {
     ASSERT_GT(*metrics1.overdueInterruptApproxMax, Milliseconds(0));
     ASSERT_EQ(metrics1.overdueInterruptApproxMax, metrics2.overdueInterruptApproxMax);
 }
+
+#if defined(__linux__)
+void burnCpu(OperationContext* opCtx, Nanoseconds cpuTime) {
+    auto timer = OperationCPUTimers::get(opCtx)->makeTimer();
+    timer.start();
+    while (timer.getElapsed() < cpuTime) {
+        // Busy wait.
+    }
+}
+
+TEST(CurOpTest, CalculateCpuTimeRecalculatesOnEveryCall) {
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+    CurOp* curOp = CurOp::get(*opCtx);
+    curOp->ensureStarted();
+
+    const auto firstCpuTime = curOp->calculateCpuTime();
+    ASSERT_GTE(firstCpuTime, Nanoseconds(0));
+    ASSERT_EQ(curOp->debug().cpuTime, firstCpuTime);
+
+    burnCpu(opCtx.get(), Microseconds(1));
+
+    // A later call must observe the CPU time spent since the first call, rather than returning
+    // the previously calculated value.
+    const auto secondCpuTime = curOp->calculateCpuTime();
+    ASSERT_GTE(secondCpuTime, firstCpuTime + Microseconds(1));
+    ASSERT_EQ(curOp->debug().cpuTime, secondCpuTime);
+}
+#endif  // defined(__linux__)
 
 /**
  * Verify that setEndOfOpMetricsForBatchWrites is a no-op when there are no batch write entries.

@@ -35,6 +35,7 @@
 #include "mongo/rpc/message.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/functional.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/progress_meter.h"
 #include "mongo/util/serialization_context.h"
@@ -498,10 +499,11 @@ public:
     }
 
     /**
-     * If the platform supports the CPU timer, and we haven't collected this operation's CPU time
-     * already, then calculates this operation's CPU time and stores it on the 'OpDebug'.
+     * If the platform supports the CPU timer, then calculates this operation's CPU time and stores
+     * it on the 'OpDebug'. This recalculates the CPU timer on every call. Returns the CPU time
+     * stored on the 'OpDebug', which is negative if the platform doesn't support the CPU timer.
      */
-    void calculateCpuTime();
+    Nanoseconds calculateCpuTime();
 
     /**
      * 'opDescription' must be either an owned BSONObj or guaranteed to outlive the OperationContext
@@ -823,7 +825,8 @@ private:
     ShouldProfileQuery _shouldProfileAtLevel1AndLogSlowQuery(
         const logv2::LogOptions& logOptions,
         Milliseconds slowms,
-        std::shared_ptr<const ProfileFilter> filter);
+        std::shared_ptr<const ProfileFilter> filter,
+        function_ref<Nanoseconds()> getCpuTime);
 
     logv2::DynamicAttributes _reportDebugAndStats(const logv2::LogOptions& logOptions,
                                                   const Date_t* opreationDeadline,
@@ -844,8 +847,9 @@ private:
 
     /**
      * A helper function that collects end of op metrics into the provided AdditiveMetrics struct.
+     * 'cpuTime' is this operation's CPU time, as returned by calculateCpuTime().
      */
-    void _setEndOfOpMetrics(OpDebug::AdditiveMetrics& metrics);
+    void _setEndOfOpMetrics(OpDebug::AdditiveMetrics& metrics, Nanoseconds cpuTime);
 
     /*
      * Checks if the current operation is eligible for long-running query logging and, if so,
