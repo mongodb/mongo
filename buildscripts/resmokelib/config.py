@@ -37,10 +37,16 @@ MONGO_RUNNER_SUBDIR = "mongorunner"
 
 # We default to search for executables in the current working directory or in /data/multiversion
 # which are both part of the PATH.
+# Plain binary base names. Unlike DEFAULT_MONGO*_EXECUTABLE (which may be resolved to an
+# absolute executable path), these always stay the bare names and are used when constructing
+# multiversion binary names such as "mongod-8.0".
+MONGOD_BIN_NAME = "mongod"
+MONGOS_BIN_NAME = "mongos"
+
 DEFAULT_DBTEST_EXECUTABLE = os.path.join(os.curdir, "dbtest")
 DEFAULT_MONGO_EXECUTABLE = "mongo"
-DEFAULT_MONGOD_EXECUTABLE = "mongod"
-DEFAULT_MONGOS_EXECUTABLE = "mongos"
+DEFAULT_MONGOD_EXECUTABLE = MONGOD_BIN_NAME
+DEFAULT_MONGOS_EXECUTABLE = MONGOS_BIN_NAME
 DEFAULT_MONGOT_EXECUTABLE = "mongot-localdev/mongot"
 
 DEFAULT_BENCHMARK_REPETITIONS = 3
@@ -305,12 +311,13 @@ class MultiversionOptions(object):
 
     LAST_LTS = "last_lts"
     LAST_CONTINUOUS = "last_continuous"
+    LAST_PATCH = "last_patch"
 
     @classmethod
     def all_options(cls):
         """Return available version options for multiversion."""
 
-        return [cls.LAST_LTS, cls.LAST_CONTINUOUS]
+        return [cls.LAST_LTS, cls.LAST_CONTINUOUS, cls.LAST_PATCH]
 
 
 ##

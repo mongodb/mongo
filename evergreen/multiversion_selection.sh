@@ -29,6 +29,29 @@ if [[ -n "${multiversion_last_continuous_variant}" ]]; then
   last_continuous_arg=""
 fi
 
+# Include the last-patch version when this branch has last-patch coverage. This branch has
+# no disagg suites, so there is exactly one way in:
+#
+#  - resmoke reporting last_patch as a default peer, which is true exactly when the branch's
+#    series has already shipped a release.
+#
+# Both checks sit inside the `if` so that `set -o errexit` cannot abort the whole selection
+# step: failing to answer the question means "no last-patch", never a lost
+# last-lts/last-continuous download.
+last_patch_arg=""
+if $python buildscripts/resmoke.py multiversion-config \
+  --config-file-output multiversion-config.yml \
+  && $python -c "
+import sys, yaml
+
+with open('multiversion-config.yml') as handle:
+    config = yaml.safe_load(handle) or {}
+sys.exit(0 if 'last_patch' in (config.get('last_versions') or []) else 1)
+"; then
+  export MULTIVERSION_LAST_PATCH_FINAL_ONLY=1
+  last_patch_arg="last-patch"
+fi
+
 base_command="db-contrib-tool setup-repro-env"
 
 if [ ! -z "${multiversion_platform_50_or_later}" ]; then
@@ -42,7 +65,8 @@ evergreen_args=" -sb \
 local_args="--edition $edition \
   --debug \
   ${last_lts_arg} \
-  ${last_continuous_arg} 8.0.16"
+  ${last_continuous_arg} \
+  ${last_patch_arg} 8.0.16"
 
 remote_invocation="${base_command} ${evergreen_args} ${local_args}"
 eval "${remote_invocation}"

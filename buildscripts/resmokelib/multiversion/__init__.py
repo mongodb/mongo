@@ -6,7 +6,7 @@ from typing import List, Optional
 import yaml
 from pydantic import BaseModel
 
-from buildscripts.resmokelib import configure_resmoke
+from buildscripts.resmokelib import config, configure_resmoke
 from buildscripts.resmokelib.multiversion.multiversion_service import (
     MongoReleases,
     MongoVersion,
@@ -28,6 +28,11 @@ class MultiversionConfig(BaseModel):
       mode.
     * last_lts_fcv: LTS version that should be tested against.
     * last_continuous_fcv: Continuous version that should be tested against.
+    * last_patch_version: Newest published release of the current series, bounded by the
+      newest release tag reachable from HEAD (e.g. '8.0.29'). Omitted when the series has
+      nothing to upgrade from.
+    * last_patch_fcv: FCV derived from the last patch release (e.g. '8.0').
+      Omitted when the series has nothing to upgrade from.
     """
 
     last_versions: List[str]
@@ -36,6 +41,8 @@ class MultiversionConfig(BaseModel):
     requires_fcv_tag_continuous: str
     last_lts_fcv: str
     last_continuous_fcv: str
+    last_patch_version: Optional[str] = None
+    last_patch_fcv: Optional[str] = None
 
 
 class MultiversionConfigSubcommand(Subcommand):
@@ -43,11 +50,12 @@ class MultiversionConfigSubcommand(Subcommand):
 
     def __init__(self, options: argparse.Namespace) -> None:
         self.config_file_output = options.config_file_output
+        self.include_last_patch = getattr(options, "include_last_patch", False)
 
     def execute(self):
         """Execute the subcommand."""
-        mv_config = self.determine_multiversion_config()
-        yaml_output = yaml.safe_dump(mv_config.dict())
+        mv_config = self.determine_multiversion_config(include_last_patch=self.include_last_patch)
+        yaml_output = yaml.safe_dump(mv_config.dict(exclude_none=True))
         print(yaml_output)
 
         if self.config_file_output:
@@ -55,8 +63,13 @@ class MultiversionConfigSubcommand(Subcommand):
                 file.write(yaml_output)
 
     @staticmethod
-    def determine_multiversion_config() -> MultiversionConfig:
-        """Discover the current multiversion configuration."""
+    def determine_multiversion_config(include_last_patch: bool = False) -> MultiversionConfig:
+        """Discover the current multiversion configuration.
+
+        :param include_last_patch: When True, resolve and include the last patch
+          release fields (last_patch_version, last_patch_fcv). When False, those
+          fields are left unset and omitted from the output.
+        """
         from buildscripts.resmokelib import multiversionconstants
 
         multiversion_service = MultiversionService(
@@ -64,13 +77,25 @@ class MultiversionConfigSubcommand(Subcommand):
             mongo_releases=MongoReleases.from_yaml_file(multiversionconstants.RELEASES_YAML),
         )
         version_constants = multiversion_service.calculate_version_constants()
+        last_patch_version = (
+            multiversion_service.get_last_patch_version() if include_last_patch else None
+        )
+        last_patch_fcv = multiversion_service.get_last_patch_fcv() if include_last_patch else None
+        # Offer last-patch by default only where the series has a published release to
+        # upgrade from, so a new series turns it on by itself with no config change.
+        last_versions = multiversion_service.get_last_versions()
+        if multiversion_service.has_released_patch_version():
+            last_versions.append(config.MultiversionOptions.LAST_PATCH)
+
         return MultiversionConfig(
-            last_versions=multiversionconstants.OLD_VERSIONS,
+            last_versions=last_versions,
             requires_fcv_tag=version_constants.get_fcv_tag_list(),
             requires_fcv_tag_lts=version_constants.get_lts_fcv_tag_list(),
             requires_fcv_tag_continuous=version_constants.get_continuous_fcv_tag_list(),
             last_lts_fcv=version_constants.get_last_lts_fcv(),
             last_continuous_fcv=version_constants.get_last_continuous_fcv(),
+            last_patch_version=last_patch_version,
+            last_patch_fcv=last_patch_fcv,
         )
 
 
@@ -95,6 +120,16 @@ class MultiversionPlugin(PluginInterface):
             type=str,
             default=None,
             help="File to write the multiversion config to.",
+        )
+
+        parser.add_argument(
+            "--include-last-patch",
+            action="store_true",
+            default=False,
+            help=(
+                "Resolve and include the last patch release version "
+                "(adds last_patch_version and last_patch_fcv to the output)."
+            ),
         )
 
     def parse(

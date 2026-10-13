@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 import re
 from bisect import bisect_left, bisect_right
-from typing import List, NamedTuple, Optional
+from typing import Callable, List, NamedTuple, Optional
 
 import structlog
 import yaml
@@ -13,6 +13,9 @@ from packaging.version import Version
 from pydantic import BaseModel, Field
 
 import buildscripts.resmokelib.config as _config
+from buildscripts.resmokelib.multiversion.previous_release_tag import (
+    find_previous_release_tag,
+)
 
 # These values must match the include paths for artifacts.tgz in evergreen.yml.
 # We use RESMOKE_ROOT so these files are always in the repo root, even when running
@@ -20,6 +23,16 @@ import buildscripts.resmokelib.config as _config
 MONGO_VERSION_YAML = os.path.join(_config.RESMOKE_ROOT, ".resmoke_mongo_version.yml")
 RELEASES_YAML = os.path.join(_config.RESMOKE_ROOT, ".resmoke_mongo_release_values.yml")
 VERSION_RE = re.compile(r"^[0-9]+\.[0-9]+")
+# A release tag: `r8.0.29`, or a pre-release such as `r8.0.30-rc0`.
+RELEASE_TAG_RE = re.compile(r"^r\d+\.\d+\.\d+(?:-.+)?$")
+# Same, but final (GA) only: `r8.0.29`, not `r8.0.30-rc0` or `r8.0.13-s8-0`.
+FINAL_RELEASE_TAG_RE = re.compile(r"^r\d+\.\d+\.\d+$")
+
+# Set by evergreen/multiversion_selection.sh for the general last-patch suites, which
+# must upgrade from a released version. Unset means the permissive behaviour the
+# disagg/DSC suites rely on: they test against Atlas release candidates, which are never
+# final releases.
+LAST_PATCH_FINAL_ONLY_ENV_VAR = "MULTIVERSION_LAST_PATCH_FINAL_ONLY"
 LOGGER = structlog.getLogger(__name__)
 
 
@@ -199,18 +212,48 @@ class MongoReleases(BaseModel):
         return [Version(eol) for eol in self.eol_versions]  # pylint: disable=not-an-iterable
 
 
+_UNRESOLVED = object()
+
+
 class MultiversionService:
     """A service for working with multiversion information."""
 
-    def __init__(self, mongo_version: MongoVersion, mongo_releases: MongoReleases) -> None:
+    def __init__(
+        self,
+        mongo_version: MongoVersion,
+        mongo_releases: MongoReleases,
+        last_patch_resolver: Optional[Callable[[str], Optional[str]]] = None,
+    ) -> None:
         """
         Initialize the service.
 
         :param mongo_version: Contents of the Mongo Version file.
         :param mongo_releases: Contents of the Mongo Releases file.
+        :param last_patch_resolver: Callable taking a tag glob pattern and a
+          ``final_only`` flag, returning the last patch release tag or None. Defaults to
+          ``find_previous_release_tag`` targeting HEAD. Tests can inject a fake to
+          avoid invoking git.
         """
         self.mongo_version = mongo_version
         self.mongo_releases = mongo_releases
+        self.last_patch_resolver = last_patch_resolver or (
+            lambda tag_pattern, final_only=False: find_previous_release_tag(
+                "HEAD", tag_pattern=tag_pattern, final_only=final_only
+            )
+        )
+        self._last_patch_cache: object = _UNRESOLVED
+        self._version_constants: Optional[VersionConstantValues] = None
+
+    def get_version_constants(self) -> VersionConstantValues:
+        """Get the multiversion constants, computing them once on first call.
+
+        get_binary_name_for_version() is called per fixture build, so the constants are
+        memoized rather than recomputed each time. calculate_version_constants() remains
+        available for callers that want a fresh computation.
+        """
+        if self._version_constants is None:
+            self._version_constants = self.calculate_version_constants()
+        return self._version_constants
 
     def calculate_version_constants(self) -> VersionConstantValues:
         """Calculate multiversion constants from data files."""
@@ -241,3 +284,151 @@ class MultiversionService:
             fcvs_less_than_latest=fcvs_less_than_latest,
             eols=eols,
         )
+
+    def get_last_patch_version(self) -> Optional[str]:
+        """Get the version to use for last-patch testing (e.g. '8.0.29').
+
+        This is the newest *published* release of the current series, bounded by
+        the newest release tag reachable from HEAD so that a build is never
+        tested against a release newer than itself.
+
+        Resolved lazily on first call, then memoized for the lifetime of the
+        service. Returns ``None`` when the series has nothing to upgrade from --
+        which callers treat as "skip last-patch testing".
+        """
+        # Cached `None` is a valid resolved value, so we use a sentinel to
+        # distinguish it from "not computed yet".
+        if self._last_patch_cache is _UNRESOLVED:
+            self._last_patch_cache = self._resolve_last_patch()
+        return self._last_patch_cache  # type: ignore[return-value]
+
+    def get_last_patch_fcv(self) -> Optional[str]:
+        """Get the FCV derived from the last patch tag (e.g. '8.3')."""
+        last_patch = self.get_last_patch_version()
+        if last_patch is None:
+            return None
+        major, minor, _ = last_patch.split(".", 2)
+        return f"{major}.{minor}"
+
+    def _current_series_tag_pattern(self) -> str:
+        """Return a git tag glob matching every tag in the current release series."""
+        latest = self.mongo_version.get_version()
+        return f"r{latest.major}.{latest.minor}.*"
+
+    def _resolve_last_patch_tag(self, final_only: bool) -> Optional[str]:
+        """Return the newest release tag of this series before HEAD, without its 'r'.
+
+        `find_previous_release_tag` never returns a tag at or descending from HEAD, so
+        the result is always an earlier release -- the build under test can never be
+        compared against itself. That is also what makes a freshly cut branch skip: on a
+        v9.0 whose HEAD is still `r9.0.0`, the tag is not *before* HEAD, so nothing
+        resolves. Once commits land past it, `r9.0.0` becomes the version to test
+        against, which is exactly right: HEAD is the code that will become 9.0.1.
+        """
+        tag_pattern = self._current_series_tag_pattern()
+        try:
+            last_patch_tag = self.last_patch_resolver(tag_pattern, final_only=final_only)
+        except Exception as exc:
+            LOGGER.info("Failed to resolve last patch tag", tag_pattern=tag_pattern, error=exc)
+            return None
+        if not last_patch_tag:
+            # No release tag of this series precedes HEAD. Either the series has never
+            # released (master, whose only in-series tag is an alpha) or the branch was
+            # just cut and HEAD is still the release tag itself. Skip rather than fail:
+            # last-lts and last-continuous share the same selection task and must not be
+            # taken down with it.
+            LOGGER.info(
+                "No release tag of this series precedes HEAD; skipping last-patch",
+                tag_pattern=tag_pattern,
+                final_only=final_only,
+            )
+            return None
+        expected = FINAL_RELEASE_TAG_RE if final_only else RELEASE_TAG_RE
+        if not expected.match(last_patch_tag):
+            LOGGER.info(
+                "Unrecognized format for last patch tag",
+                tag=last_patch_tag,
+                pattern=tag_pattern,
+                final_only=final_only,
+            )
+            return None
+        return last_patch_tag[1:]
+
+    def _resolve_last_patch(self) -> Optional[str]:
+        """Resolve the version to hand to db-contrib-tool for last-patch.
+
+        The newest *final* release tag of this series before HEAD, unless the caller
+        opted into the permissive behaviour the disagg/DSC suites need (see
+        :data:`LAST_PATCH_FINAL_ONLY_ENV_VAR`). Those deliberately test against Atlas
+        release candidates, so restricting them to GA tags would leave them nothing.
+
+        Restricting the general suites to final tags does two things. It keeps master
+        out, since `r9.1.0-alpha0` is not a release anyone runs. And once a release
+        candidate for the *next* patch is cut, it stops that rc -- which is nearer HEAD
+        than the last actual release -- from being preferred over it.
+
+        The resolved tag may not be published yet; that is deliberate. db-contrib-tool
+        resolves it to that commit's Evergreen build, and steps down through published
+        releases at or below it when that build is missing. Determining publication here
+        would mean a second implementation of that policy on the other side of one
+        interface.
+        """
+        return self._resolve_last_patch_tag(final_only=self._final_only())
+
+    def _final_only(self) -> bool:
+        """Return whether last-patch must resolve to a final (GA) release tag.
+
+        Off by default, which is the permissive behaviour the disagg/DSC suites rely on.
+        The general suites opt in from evergreen/multiversion_selection.sh, because
+        db-contrib-tool builds the `multiversion-config` command line itself and cannot
+        be told to pass a flag.
+        """
+        return bool(os.environ.get(LAST_PATCH_FINAL_ONLY_ENV_VAR, "").strip())
+
+    def has_released_patch_version(self) -> bool:
+        """Return whether there is a last-patch version to offer as a default peer.
+
+        Deliberately strict and independent of the environment: this decides whether
+        LAST_PATCH joins `last_versions` for every suite that declares it, and it runs
+        during task generation, where the general suites' opt-in is not set. A variant
+        that wants last-patch on a series with no GA release overrides `last_versions`
+        directly, which is how the disagg suites run on a pre-release series.
+        """
+        return self._resolve_last_patch_tag(final_only=True) is not None
+
+    def get_binary_name_for_version(self, version: str, base_name: str) -> str:
+        """Return the old binary name (e.g. 'mongod-8.0') for a multiversion option.
+
+        :param version: One of the config.MultiversionOptions constants (LAST_LTS,
+            LAST_CONTINUOUS, LAST_PATCH).
+        :param base_name: The binary base name, e.g. 'mongod' or 'mongos'.
+        """
+        version_constants = self.get_version_constants()
+        fcv_for_option = {
+            _config.MultiversionOptions.LAST_LTS: version_constants.get_last_lts_fcv,
+            _config.MultiversionOptions.LAST_CONTINUOUS: version_constants.get_last_continuous_fcv,
+            _config.MultiversionOptions.LAST_PATCH: self.get_last_patch_fcv,
+        }
+        if version not in fcv_for_option:
+            raise ValueError(f"Unknown multiversion option: {version}")
+        return f"{base_name}-{fcv_for_option[version]()}"
+
+    def get_last_versions(self) -> list[str]:
+        """Return the last release version names to use in multiversion testing.
+
+        These are the latest release versions from which an upgrade to the current release is
+        supported. Returns ``[LAST_LTS]`` when last-continuous equals last-LTS or is EOL'd,
+        otherwise ``[LAST_LTS, LAST_CONTINUOUS]``.
+        """
+        version_constants = self.get_version_constants()
+        last_lts_fcv = version_constants.get_last_lts_fcv()
+        last_continuous_fcv = version_constants.get_last_continuous_fcv()
+        if (
+            last_continuous_fcv == last_lts_fcv
+            or last_continuous_fcv in version_constants.get_eols()
+        ):
+            return [_config.MultiversionOptions.LAST_LTS]
+        return [
+            _config.MultiversionOptions.LAST_LTS,
+            _config.MultiversionOptions.LAST_CONTINUOUS,
+        ]

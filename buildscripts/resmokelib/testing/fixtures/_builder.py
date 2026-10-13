@@ -310,10 +310,11 @@ class ReplSetBuilder(FixtureBuilder):
         if mixed_bin_versions is not None:
             from buildscripts.resmokelib import multiversionconstants
 
-            old_mongod_version = {
-                config.MultiversionOptions.LAST_LTS: multiversionconstants.LAST_LTS_MONGOD_BINARY,
-                config.MultiversionOptions.LAST_CONTINUOUS: multiversionconstants.LAST_CONTINUOUS_MONGOD_BINARY,
-            }[old_bin_version]
+            old_mongod_version = (
+                multiversionconstants.multiversion_service.get_binary_name_for_version(
+                    old_bin_version, config.MONGOD_BIN_NAME
+                )
+            )
 
             executables[BinVersionEnum.OLD] = old_mongod_version
             binary_versions = [x for x in mixed_bin_versions]
@@ -335,6 +336,7 @@ class ReplSetBuilder(FixtureBuilder):
             fcv = {
                 config.MultiversionOptions.LAST_LTS: multiversionconstants.LAST_LTS_FCV,
                 config.MultiversionOptions.LAST_CONTINUOUS: multiversionconstants.LAST_CONTINUOUS_FCV,
+                config.MultiversionOptions.LAST_PATCH: multiversionconstants.multiversion_service.get_last_patch_fcv(),
             }[old_bin_version]
 
         return fcv
@@ -626,10 +628,11 @@ class ShardedClusterBuilder(FixtureBuilder):
         if mixed_bin_versions is not None:
             from buildscripts.resmokelib import multiversionconstants
 
-            old_mongos_version = {
-                config.MultiversionOptions.LAST_LTS: multiversionconstants.LAST_LTS_MONGOS_BINARY,
-                config.MultiversionOptions.LAST_CONTINUOUS: multiversionconstants.LAST_CONTINUOUS_MONGOS_BINARY,
-            }[old_bin_version]
+            old_mongos_version = (
+                multiversionconstants.multiversion_service.get_binary_name_for_version(
+                    old_bin_version, config.MONGOS_BIN_NAME
+                )
+            )
 
             executables[BinVersionEnum.OLD] = old_mongos_version
         return _class, executables

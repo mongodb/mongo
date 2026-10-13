@@ -1,13 +1,13 @@
 # This file is intended to track tests that should be denylisted from multiversion testing due to
-# changes that have not yet been backported to the last-lts or last-continuous development
-# branches.
+# changes that have not yet been backported to the last-lts, last-continuous or last-patch
+# development branches.
 #
 # Usage:
 # Add the server ticket number and the path to the test file for the test you intend to denylist
 # under the appropriate multiversion branch. Any test in a (ticket, test_file) pair that appears in this file but
-# not in the last-lts or last-continuous branch version of this file indicates that a commit has
-# not yet been backported to the last-lts or last-continuous branch and will be excluded from the
-# multiversion suite corresponding to the root level suite key.
+# not in the last-lts, last-continuous or last-patch branch version of this file indicates that a
+# commit has not yet been backported to the last-lts, last-continuous or last-patch branch and will
+# be excluded from the multiversion suite corresponding to the root level suite key.
 #
 # Example: To prevent 'my_test_file.js' from running with the last-continuous binary
 # last-continuous:
@@ -19,6 +19,24 @@
 # last-continuous branch until this file has been updated with the same
 # (ticket, test_file) pair on the last-continuous branch.
 #
+last-patch:
+  all:
+    # Changes that landed on this branch after the last patch release shipped, so the
+    # old binary lacks the fix. These drop off by themselves once a v8.0 patch release
+    # contains the same entry -- the exclusion is computed by diffing this file against
+    # the old binary's copy of it.
+    - test_file: jstests/replsets/configurable_fetcher_timeout.js
+      ticket: SERVER-106165
+    - test_file: jstests/replsets/arbiter_afterClusterTime_read_concern.js
+      ticket: SERVER-130759
+    - test_file: jstests/sharding/change_stream_update_lookup_sharded_insert_update.js
+      ticket: SERVER-131202
+    - test_file: jstests/sharding/internal_txns/retryable_writes_oplog_entries.js
+      ticket: SERVER-131326
+    - test_file: jstests/core/doc_validation/doc_validation_options.js
+      ticket: SERVER-124538
+  suites: {}
+
 last-continuous:
   all:
   - test_file: jstests/aggregation/expressions/regex_backslash_c.js
