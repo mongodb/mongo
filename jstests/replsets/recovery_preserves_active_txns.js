@@ -14,11 +14,23 @@ import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {getOldestRequiredTimestampForCrashRecovery} from "jstests/libs/storage_engine/storage_helpers.js";
 
+// Older binaries used in multiversion tests do not have this failpoint.
+const isMultiversion =
+    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
+    Boolean(TestData.multiversionBinVersion);
+
 // A new replica set for both the commit and abort tests to ensure the same clean state.
 function doTest(commitOrAbort) {
+    const setParameter = {logComponentVerbosity: tojson({storage: 1})};
+    if (!isMultiversion) {
+        // Force off replicated fast count so the test exercises the legacy size/count tracking
+        // path.
+        setParameter["failpoint.disableReplicatedFastCount"] = tojson({mode: "alwaysOn"});
+    }
+
     const replSet = new ReplSetTest({
         // Oplog can be truncated each "sync" cycle. Increase its frequency to once per second.
-        nodeOptions: {syncdelay: 1, setParameter: {logComponentVerbosity: tojson({storage: 1})}},
+        nodeOptions: {syncdelay: 1, setParameter},
         nodes: [{}, {rsConfig: {priority: 0, votes: 0}}],
     });
 

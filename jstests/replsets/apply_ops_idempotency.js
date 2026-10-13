@@ -253,7 +253,9 @@ function testIdempotency(primary, testFun, testName) {
     // TODO(SERVER-107069): Once initial sync replicates idents we may want to reevaluate this. We
     // could instead wait for pending drops to complete, but that significantly slows down this test (20s -> 200s).
     for (let op of ops) {
-        if (op.op == "c") {
+        // initReplicatedFastCount commands require o2 to identify the fast count containers to
+        // create, so it must not be stripped.
+        if (op.op == "c" && !op.o.initReplicatedFastCount) {
             delete op.o2;
         }
     }

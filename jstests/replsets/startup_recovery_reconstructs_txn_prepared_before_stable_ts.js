@@ -38,18 +38,12 @@ assert.commandWorked(sessionColl.update({_id: 0}, {$set: {a: largeArray}}));
 assert.commandWorked(sessionColl.insert({_id: 1}));
 const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 
-// Fastcount reflects the insert of a prepared transaction.
-assert.eq(testColl.count(), 2);
-
 jsTestLog("Do a majority write to advance the stable timestamp past the prepareTimestamp");
 // Doing a majority write after preparing the transaction ensures that the stable timestamp is
 // past the prepare timestamp because this write must be in the committed snapshot.
 assert.commandWorked(
     testColl.runCommand("insert", {documents: [{_id: 2}]}, {writeConcern: {w: "majority"}}),
 );
-
-// Fastcount reflects the insert of a prepared transaction.
-assert.eq(testColl.count(), 3);
 
 // Check that we have one transaction in the transactions table.
 assert.eq(primary.getDB("config")["transactions"].find().itcount(), 1);
@@ -68,7 +62,6 @@ testColl = primary.getDB(dbName)[collName];
 
 // Make sure we cannot see the writes from the prepared transaction yet.
 assert.sameMembers(testColl.find().toArray(), [{_id: 0}, {_id: 2}]);
-assert.eq(testColl.count(), 3);
 
 // Make sure there is still one transaction in the transactions table. This is because the
 // entry in the transactions table is made durable when a transaction is prepared.

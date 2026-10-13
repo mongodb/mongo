@@ -310,7 +310,6 @@ resmoke_suite_test(
         "execution_control_with_prioritization",
         "incompatible_debug_mode",
         "replica_sets",
-        "requires_replicated_fast_count_recovery",
         "san",
     ],
     deps = [

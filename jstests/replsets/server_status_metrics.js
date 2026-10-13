@@ -153,7 +153,15 @@ let rt = new ReplSetTest({
     oplogSize: 100,
     // Set a smaller periodicNoopIntervalSecs to aid sync source selection later in the test. Only
     // enable periodic noop writes when we actually need it to avoid races in other metrics tests.
-    nodeOptions: {setParameter: {writePeriodicNoops: false, periodicNoopIntervalSecs: 2}},
+    nodeOptions: {
+        setParameter: {
+            writePeriodicNoops: false,
+            periodicNoopIntervalSecs: 2,
+            // Force off replicated fast count so the test exercises the legacy size/count tracking
+            // path.
+            "failpoint.disableReplicatedFastCount": tojson({mode: "alwaysOn"}),
+        },
+    },
     settings: {
         // Set the heartbeat interval to a low value to reduce the amount of time spent waiting for
         // a heartbeat from sync source candidates.

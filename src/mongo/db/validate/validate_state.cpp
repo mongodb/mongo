@@ -249,6 +249,10 @@ FastCountType ValidateState::getExpectedFastCountType(OperationContext* opCtx) c
         return FastCountType::replicated;
     }
 
+    if (isReplicatedFastCountDisabledForTest(opCtx)) {
+        return FastCountType::legacySizeStorer;
+    }
+
     return (featureFlagEnabled && isOplogPresent) ? FastCountType::both
                                                   : FastCountType::legacySizeStorer;
 }

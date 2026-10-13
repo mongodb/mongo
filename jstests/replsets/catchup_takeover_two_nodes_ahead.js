@@ -17,7 +17,22 @@ import {
 } from "jstests/replsets/libs/election_metrics.js";
 
 let name = "catchup_takeover_two_nodes_ahead";
-let replSet = new ReplSetTest({name: name, nodes: 5});
+
+// Older binaries used in multiversion tests do not have this failpoint.
+const isMultiversion =
+    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
+    Boolean(TestData.multiversionBinVersion);
+
+const replSetOptions = {name: name, nodes: 5};
+if (!isMultiversion) {
+    // Force off replicated fast count so the test exercises the legacy size/count tracking path.
+    replSetOptions.nodeOptions = {
+        setParameter: {
+            "failpoint.disableReplicatedFastCount": tojson({mode: "alwaysOn"}),
+        },
+    };
+}
+let replSet = new ReplSetTest(replSetOptions);
 let nodes = replSet.startSet();
 let config = replSet.getReplSetConfig();
 // Prevent nodes from syncing from other secondaries.

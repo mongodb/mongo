@@ -53,7 +53,22 @@ const testCases = {
 
 // Set up a set and grab things for later.
 let name = "read_committed";
-let replTest = new ReplSetTest({name: name, nodes: 3});
+
+// Older binaries used in multiversion tests do not have this failpoint.
+const isMultiversion =
+    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
+    Boolean(TestData.multiversionBinVersion);
+
+const replTestOptions = {name: name, nodes: 3};
+if (!isMultiversion) {
+    // Force off replicated fast count so the test exercises the legacy size/count tracking path.
+    replTestOptions.nodeOptions = {
+        setParameter: {
+            "failpoint.disableReplicatedFastCount": tojson({mode: "alwaysOn"}),
+        },
+    };
+}
+let replTest = new ReplSetTest(replTestOptions);
 
 replTest.startSet();
 let nodes = replTest.nodeList();

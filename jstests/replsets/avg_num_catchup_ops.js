@@ -11,12 +11,27 @@ import {restartServerReplication} from "jstests/libs/write_concern_util.js";
 import {stopReplicationAndEnforceNewPrimaryToCatchUp} from "jstests/replsets/rslib.js";
 
 const name = jsTestName();
-const rst = new ReplSetTest({
+
+// Older binaries used in multiversion tests do not have this failpoint.
+const isMultiversion =
+    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
+    Boolean(TestData.multiversionBinVersion);
+
+const rstOptions = {
     name: name,
     nodes: 3,
     useBridge: true,
     settings: {catchUpTimeoutMillis: 4 * 60 * 1000},
-});
+};
+if (!isMultiversion) {
+    // Force off replicated fast count so the test exercises the legacy size/count tracking path.
+    rstOptions.nodeOptions = {
+        setParameter: {
+            "failpoint.disableReplicatedFastCount": tojson({mode: "alwaysOn"}),
+        },
+    };
+}
+const rst = new ReplSetTest(rstOptions);
 
 rst.startSet();
 rst.initiate();

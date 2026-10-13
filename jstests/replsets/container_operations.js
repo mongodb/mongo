@@ -2,7 +2,7 @@
  * Tests that container insert, update, and delete operations on integer and string keyed containers
  * appear on disk.
  *
- * @tags: [requires_replication, requires_wiredtiger]
+ * @tags: [requires_replication, requires_wiredtiger, featureFlagPrimaryDrivenIndexBuilds]
  */
 import {
     createWtTable,

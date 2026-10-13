@@ -7,7 +7,22 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {restartReplSetReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 const name = jsTestName();
-const rst = new ReplSetTest({name: name, nodes: 3});
+
+// Older binaries used in multiversion tests do not have this failpoint.
+const isMultiversion =
+    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
+    Boolean(TestData.multiversionBinVersion);
+
+const rstOptions = {name: name, nodes: 3};
+if (!isMultiversion) {
+    // Force off replicated fast count so the test exercises the legacy size/count tracking path.
+    rstOptions.nodeOptions = {
+        setParameter: {
+            "failpoint.disableReplicatedFastCount": tojson({mode: "alwaysOn"}),
+        },
+    };
+}
+const rst = new ReplSetTest(rstOptions);
 
 rst.startSet();
 rst.initiate();

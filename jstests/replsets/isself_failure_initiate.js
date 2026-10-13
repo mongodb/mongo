@@ -10,7 +10,16 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {waitForState} from "jstests/replsets/rslib.js";
 
-const rst = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0, votes: 0}}]});
+const rst = new ReplSetTest({
+    nodes: [{}, {rsConfig: {priority: 0, votes: 0}}],
+    nodeOptions: {
+        setParameter: {
+            // Force off replicated fast count so the test exercises the legacy size/count tracking
+            // path.
+            "failpoint.disableReplicatedFastCount": tojson({mode: "alwaysOn"}),
+        },
+    },
+});
 const nodes = rst.startSet();
 // Node 1 will fail to find itself in the config.
 const failPoint = configureFailPoint(nodes[1], "failIsSelfCheck");
