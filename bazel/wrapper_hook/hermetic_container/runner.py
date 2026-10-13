@@ -14,6 +14,7 @@ import sys
 import tempfile
 from collections.abc import Callable, Iterator, Mapping, Sequence
 
+from . import container_actions
 from .bazelrc import (
     _bazel_output_base,
     _config_requested,
@@ -51,8 +52,6 @@ from .cross.linux import (
     LINUX_HOST_CONTAINER_COMMANDS,
     NATIVE_TOOLCHAIN_CONFIG,
     _ensure_linux_action_container,
-    _ensure_linux_container_image,
-    _linux_container_actions_lock,
     _linux_cross_local_container_env,
     _linux_cross_local_process_env,
     _linux_cross_module_override_args,
@@ -587,7 +586,9 @@ def run_hermetic_container(
                 local_container_env,
                 container_command=container_command,
             )
-            if not _ensure_linux_container_image(container_command, container_config["image"]):
+            if not container_actions.ensure_container_image(
+                container_command, container_config["image"]
+            ):
                 _info(
                     f"could not pull build container image {container_config['image']}; "
                     "refusing to run the cross link locally"
@@ -595,7 +596,7 @@ def run_hermetic_container(
                 return 1
 
             output_base = _bazel_output_base(args, env)
-            with _linux_container_actions_lock(output_base):
+            with container_actions.lock(output_base):
                 # The runtime selected above may be the real Podman executable even when
                 # ``docker`` is installed as Podman's compatibility shim. Preserve that
                 # selection in the persistent-container config; otherwise the wrapper falls
@@ -708,7 +709,9 @@ def run_hermetic_container(
             env,
             container_command=container_command,
         )
-        if not _ensure_linux_container_image(container_command, container_config["image"]):
+        if not container_actions.ensure_container_image(
+            container_command, container_config["image"]
+        ):
             _warn_native_fallback(
                 f"the build container image {container_config['image']} could not be pulled"
             )
@@ -719,7 +722,7 @@ def run_hermetic_container(
         # Publish the atomic action config and establish the container mount under the
         # output-base lock. The config and container are then stable for this invocation;
         # do not hold the lock while Bazel runs or nested Bazel invocations can deadlock.
-        with _linux_container_actions_lock(output_base):
+        with container_actions.lock(output_base):
             config_path, container_config = _write_linux_container_actions_config_unlocked(
                 args,
                 {**env, "HERMETIC_CONTAINER_DOCKER_COMMAND": container_command},

@@ -6,13 +6,24 @@ import importlib.util
 import json
 import os
 import pathlib
+import platform
+import shutil
 import tempfile
 import unittest
 from contextlib import redirect_stdout
 from io import StringIO
 from unittest import mock
 
-from bazel.wrapper_hook import hermetic_container_integration
+from bazel.wrapper_hook.hermetic_container import config as config_module
+from bazel.wrapper_hook.hermetic_container import (
+    constants,
+    container_actions,
+    podman_common,
+    runner,
+)
+from bazel.wrapper_hook.hermetic_container import distro as distro_module
+from bazel.wrapper_hook.hermetic_container.cross import linux as cross_linux
+from bazel.wrapper_hook.hermetic_container.cross import windows as cross_windows
 
 HERMETIC_CONTAINER_PATH = (
     pathlib.Path(__file__).parents[3] / "hermetic_container" / "hermetic_container.py"
@@ -28,10 +39,8 @@ HERMETIC_CONTAINER_SPEC.loader.exec_module(hermetic_container)
 
 class WindowsCrossSysrootTest(unittest.TestCase):
     def test_run_hermetic_container_dry_run_plans_windows_cross_host_run(self):
-        image = hermetic_container_integration.parse_docker_image(
-            "quay.io/mongodb/rbe@sha256:abc123"
-        )
-        config = hermetic_container_integration.HermeticContainerConfig(
+        image = distro_module.parse_docker_image("quay.io/mongodb/rbe@sha256:abc123")
+        config = config_module.HermeticContainerConfig(
             distro="amazon_linux_2023",
             docker_image=image,
             instance_name="test",
@@ -48,17 +57,15 @@ class WindowsCrossSysrootTest(unittest.TestCase):
 
         stdout = StringIO()
         with (
+            mock.patch.object(platform, "system", return_value="Windows"),
             mock.patch.object(
-                hermetic_container_integration.platform, "system", return_value="Windows"
-            ),
-            mock.patch.object(
-                hermetic_container_integration,
+                runner,
                 "build_hermetic_container_config",
                 return_value=config,
             ),
             redirect_stdout(stdout),
         ):
-            rc = hermetic_container_integration.run_hermetic_container(
+            rc = runner.run_hermetic_container(
                 "C:/bazel.exe",
                 ["run", "//src/mongo/stdx:stdx_test", "--", "--fileNameFilter", "stdx"],
                 env={
@@ -75,7 +82,7 @@ class WindowsCrossSysrootTest(unittest.TestCase):
         self.assertIn("windows_cross_host_wrapper_run", dry_run)
         self.assertEqual(dry_run["windows_cross_host_wrapper_run"]["build_args"][0], "build")
         self.assertIn(
-            f"--config={hermetic_container_integration.WINDOWS_CROSS_CONFIG}",
+            f"--config={cross_windows.WINDOWS_CROSS_CONFIG}",
             dry_run["windows_cross_host_wrapper_run"]["build_args"],
         )
         self.assertIn(
@@ -106,7 +113,7 @@ class WindowsCrossSysrootTest(unittest.TestCase):
         )
 
     def test_plans_windows_cross_host_wrapper_action_args(self):
-        args = hermetic_container_integration._windows_cross_host_wrapper_action_args(
+        args = cross_windows._windows_cross_host_wrapper_action_args(
             [
                 "build",
                 "--config=windows-cross-x86_64",
@@ -177,7 +184,7 @@ class WindowsCrossSysrootTest(unittest.TestCase):
         )
 
     def test_plans_linux_s390x_cross_rbe_host_args(self):
-        args = hermetic_container_integration._linux_cross_rbe_host_args(
+        args = cross_linux._linux_cross_rbe_host_args(
             [
                 "test",
                 "--config=linux-s390x-cross-rbe",
@@ -251,7 +258,7 @@ class WindowsCrossSysrootTest(unittest.TestCase):
         )
 
     def test_plans_linux_s390x_cross_rbe_remote_link_host_args(self):
-        args = hermetic_container_integration._linux_cross_rbe_host_args(
+        args = cross_linux._linux_cross_rbe_host_args(
             [
                 "build",
                 "--config=linux-s390x-cross-rbe",
@@ -270,8 +277,8 @@ class WindowsCrossSysrootTest(unittest.TestCase):
         self.assertNotIn("--strategy=CppLink=remote", args)
 
     def test_linux_cross_rbe_local_output_actions_use_host_container(self):
-        args = hermetic_container_integration._linux_host_container_action_args(
-            hermetic_container_integration._linux_cross_rbe_host_args(
+        args = cross_linux._linux_host_container_action_args(
+            cross_linux._linux_cross_rbe_host_args(
                 [
                     "build",
                     "--config=linux-s390x-cross-rbe",
@@ -307,7 +314,7 @@ class WindowsCrossSysrootTest(unittest.TestCase):
             "RustcMetadata",
             *(
                 mnemonic
-                for mnemonic in hermetic_container_integration.LINUX_CROSS_REMOTE_COMPILE_MNEMONICS
+                for mnemonic in cross_linux.LINUX_CROSS_REMOTE_COMPILE_MNEMONICS
                 if mnemonic not in ("Genrule", "WasmAotCompile")
             ),
         ):
@@ -327,8 +334,8 @@ class WindowsCrossSysrootTest(unittest.TestCase):
         self.assertIn(r"--strategy_regexp=.*Linking .*\.wasm.*=remote", args)
 
     def test_linux_cross_rbe_runs_wasm_aot_and_remote_generators(self):
-        args = hermetic_container_integration._linux_host_container_action_args(
-            hermetic_container_integration._linux_cross_rbe_host_args(
+        args = cross_linux._linux_host_container_action_args(
+            cross_linux._linux_cross_rbe_host_args(
                 [
                     "build",
                     "--config=linux-s390x-cross-rbe",
@@ -355,11 +362,9 @@ class WindowsCrossSysrootTest(unittest.TestCase):
         self.assertIn(r"--strategy_regexp=.*Linking .*\.wasm.*=remote", args)
 
     def test_linux_cross_rbe_native_host_runs_wasm_aot_remotely(self):
-        with mock.patch.object(
-            hermetic_container_integration._cross_linux, "normalize_arch", return_value="s390x"
-        ):
-            args = hermetic_container_integration._linux_host_container_action_args(
-                hermetic_container_integration._linux_cross_rbe_host_args(
+        with mock.patch.object(cross_linux, "normalize_arch", return_value="s390x"):
+            args = cross_linux._linux_host_container_action_args(
+                cross_linux._linux_cross_rbe_host_args(
                     [
                         "build",
                         "--config=linux-s390x-cross-rbe",
@@ -377,7 +382,7 @@ class WindowsCrossSysrootTest(unittest.TestCase):
         self.assertIn("--strategy=WasmAotCompile=remote,persistent-container,local", args)
 
     def test_linux_cross_rbe_local_test_strategy_overrides_remote_test_config(self):
-        args = hermetic_container_integration._linux_cross_rbe_host_args(
+        args = cross_linux._linux_cross_rbe_host_args(
             [
                 "test",
                 "--config=linux-s390x-cross-rbe",
@@ -394,7 +399,7 @@ class WindowsCrossSysrootTest(unittest.TestCase):
         )
 
     def test_linux_cross_rbe_coverage_uses_local_test_strategy(self):
-        args = hermetic_container_integration._linux_cross_rbe_host_args(
+        args = cross_linux._linux_cross_rbe_host_args(
             [
                 "coverage",
                 "--config=linux-ppc64le-cross-rbe",
@@ -417,8 +422,8 @@ class WindowsCrossSysrootTest(unittest.TestCase):
             "--config=remote_test",
             "install-dist-test",
         ]
-        host_args = hermetic_container_integration._linux_host_container_action_args(
-            hermetic_container_integration._linux_cross_rbe_host_args(
+        host_args = cross_linux._linux_host_container_action_args(
+            cross_linux._linux_cross_rbe_host_args(
                 args,
                 {},
                 containers={"rhel10": {"container-url": "docker://example.invalid/rbe@sha256:123"}},
@@ -433,7 +438,7 @@ class WindowsCrossSysrootTest(unittest.TestCase):
             "RustcMetadata",
             *(
                 mnemonic
-                for mnemonic in hermetic_container_integration.LINUX_CROSS_REMOTE_COMPILE_MNEMONICS
+                for mnemonic in cross_linux.LINUX_CROSS_REMOTE_COMPILE_MNEMONICS
                 if mnemonic not in ("Genrule", "WasmAotCompile")
             ),
         ):
@@ -517,14 +522,14 @@ class WindowsCrossSysrootTest(unittest.TestCase):
                     f"--config={config_name}",
                     "--config=public-release-local",
                     "install-dist-test",
-                    *hermetic_container_integration.RELEASE_LOCAL_SAFETY_SUFFIX,
+                    *constants.RELEASE_LOCAL_SAFETY_SUFFIX,
                 ]
-                config = hermetic_container_integration._linux_cross_rbe_config(
-                    args, env={}, repo_root=hermetic_container_integration.REPO_ROOT
+                config = cross_linux._linux_cross_rbe_config(
+                    args, env={}, repo_root=constants.REPO_ROOT
                 )
                 self.assertIsNotNone(config)
-                host_args = hermetic_container_integration._linux_host_container_action_args(
-                    hermetic_container_integration._linux_cross_rbe_local_host_args(args, config),
+                host_args = cross_linux._linux_host_container_action_args(
+                    cross_linux._linux_cross_rbe_local_host_args(args, config),
                     {},
                     force_local=True,
                 )
@@ -555,16 +560,12 @@ class WindowsCrossSysrootTest(unittest.TestCase):
                         )
                         self.assertNotIn(f"--strategy={mnemonic}=remote", host_args)
                 self.assertEqual(
-                    tuple(
-                        host_args[
-                            -len(hermetic_container_integration.RELEASE_LOCAL_SAFETY_SUFFIX) :
-                        ]
-                    ),
-                    hermetic_container_integration.RELEASE_LOCAL_SAFETY_SUFFIX,
+                    tuple(host_args[-len(constants.RELEASE_LOCAL_SAFETY_SUFFIX) :]),
+                    constants.RELEASE_LOCAL_SAFETY_SUFFIX,
                 )
 
     def test_linux_cross_local_release_clears_cross_process_environment(self):
-        process_env = hermetic_container_integration._linux_cross_local_process_env(
+        process_env = cross_linux._linux_cross_local_process_env(
             {
                 "MONGO_LINUX_CROSS_TOOLCHAIN": "rhel9_s390x_on_rhel9_x86_64",
                 "MONGO_WASI_SDK_EXEC_ARCH": "x86_64",
@@ -573,12 +574,12 @@ class WindowsCrossSysrootTest(unittest.TestCase):
             }
         )
 
-        for name in hermetic_container_integration.LINUX_CROSS_LOCAL_RELEASE_ENV_VARS:
+        for name in cross_linux.LINUX_CROSS_LOCAL_RELEASE_ENV_VARS:
             with self.subTest(name=name):
                 self.assertNotIn(name, process_env)
 
     def test_linux_cross_local_release_does_not_reuse_cross_container_image(self):
-        local_env = hermetic_container_integration._linux_cross_local_container_env(
+        local_env = cross_linux._linux_cross_local_container_env(
             {"MONGO_LINUX_CROSS_RBE_CONTAINER_IMAGE": "quay.io/example/foreign@sha256:abc"},
         )
 
@@ -594,17 +595,17 @@ class WindowsCrossSysrootTest(unittest.TestCase):
 
             with (
                 mock.patch.object(
-                    hermetic_container_integration,
+                    cross_linux,
                     "_podman_task_root",
                     return_value=task_root,
                 ),
                 mock.patch.object(
-                    hermetic_container_integration.shutil,
+                    shutil,
                     "which",
                     side_effect=which,
                 ),
             ):
-                args = hermetic_container_integration._linux_cross_rbe_host_args(
+                args = cross_linux._linux_cross_rbe_host_args(
                     [
                         "build",
                         "--config=linux-ppc64le-rhel9-cross-rbe",
@@ -616,12 +617,10 @@ class WindowsCrossSysrootTest(unittest.TestCase):
                     },
                 )
 
-            runtime_dir = task_root / (
-                f"{hermetic_container_integration.PODMAN_RUNTIME_DIR_PREFIX}{os.getuid()}"
-            )
+            runtime_dir = task_root / (f"{podman_common.PODMAN_RUNTIME_DIR_PREFIX}{os.getuid()}")
             storage_config = (
                 task_root
-                / f"{hermetic_container_integration.PODMAN_STORAGE_DIR_PREFIX}{os.getuid()}"
+                / f"{podman_common.PODMAN_STORAGE_DIR_PREFIX}{os.getuid()}"
                 / "storage.conf"
             )
             self.assertIn(
@@ -643,24 +642,24 @@ class WindowsCrossSysrootTest(unittest.TestCase):
 
             with (
                 mock.patch.object(
-                    hermetic_container_integration,
+                    cross_linux,
                     "_podman_task_root",
                     return_value=task_root,
                 ),
                 mock.patch.object(
-                    hermetic_container_integration.shutil,
+                    shutil,
                     "which",
                     side_effect=which,
                 ),
                 mock.patch.object(
-                    hermetic_container_integration,
+                    cross_linux,
                     "_is_podman_docker_shim",
                     side_effect=AssertionError(
                         "Docker must not be inspected when Podman is required"
                     ),
                 ) as is_shim,
             ):
-                args = hermetic_container_integration._linux_cross_rbe_host_args(
+                args = cross_linux._linux_cross_rbe_host_args(
                     ["build", "--config=linux-s390x-rhel9-cross-rbe", "install-dist-test"],
                     {
                         "MONGO_PODMAN_REQUIRED": "true",
@@ -677,7 +676,7 @@ class WindowsCrossSysrootTest(unittest.TestCase):
         is_shim.assert_not_called()
 
     def test_linux_cross_rbe_podman_task_id_does_not_override_container_opt_out(self):
-        args = hermetic_container_integration._linux_cross_rbe_host_args(
+        args = cross_linux._linux_cross_rbe_host_args(
             [
                 "build",
                 "--config=linux-ppc64le-rhel9-cross-rbe",
@@ -694,7 +693,7 @@ class WindowsCrossSysrootTest(unittest.TestCase):
         self.assertFalse(any(arg.startswith("--repo_env=XDG_RUNTIME_DIR=") for arg in args))
 
     def test_linux_cross_rbe_preserves_explicit_podman_repo_env(self):
-        args = hermetic_container_integration._linux_cross_rbe_host_args(
+        args = cross_linux._linux_cross_rbe_host_args(
             [
                 "build",
                 "--config=linux-s390x-rhel9-cross-rbe",
@@ -717,7 +716,7 @@ class WindowsCrossSysrootTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             auth_file = pathlib.Path(temp_dir) / "auth.json"
             auth_file.write_text("{}", encoding="utf-8")
-            args = hermetic_container_integration._linux_cross_rbe_host_args(
+            args = cross_linux._linux_cross_rbe_host_args(
                 [
                     "build",
                     "--config=linux-s390x-rhel9-cross-rbe",
@@ -730,7 +729,7 @@ class WindowsCrossSysrootTest(unittest.TestCase):
         self.assertIn(f"--repo_env=REGISTRY_AUTH_FILE={auth_file}", args)
 
     def test_plans_linux_ppc64le_cross_rbe_arm_host_args(self):
-        args = hermetic_container_integration._linux_cross_rbe_host_args(
+        args = cross_linux._linux_cross_rbe_host_args(
             [
                 "build",
                 "--config=linux-ppc64le-rhel8-cross-rbe-arm64",
@@ -746,7 +745,7 @@ class WindowsCrossSysrootTest(unittest.TestCase):
         self.assertIn("--repo_env=MONGO_WASI_SDK_EXEC_ARCH=aarch64", args)
 
     def test_plans_linux_s390x_rhel10_cross_rbe_host_args(self):
-        args = hermetic_container_integration._linux_cross_rbe_host_args(
+        args = cross_linux._linux_cross_rbe_host_args(
             [
                 "build",
                 "--config=linux-s390x-rhel10-cross-rbe",
@@ -762,10 +761,10 @@ class WindowsCrossSysrootTest(unittest.TestCase):
     def test_linux_cross_rbe_uses_matching_target_rhel_release(self):
         for distro in ("rhel8", "rhel9", "rhel10"):
             with self.subTest(distro=distro):
-                config = hermetic_container_integration._linux_cross_rbe_config(
+                config = cross_linux._linux_cross_rbe_config(
                     ["build", f"--config=linux-s390x-{distro}-cross-rbe"],
                     env={},
-                    repo_root=hermetic_container_integration.REPO_ROOT,
+                    repo_root=constants.REPO_ROOT,
                 )
 
                 self.assertIsNotNone(config)
@@ -773,14 +772,14 @@ class WindowsCrossSysrootTest(unittest.TestCase):
                 self.assertEqual(config.exec_distro, distro)
 
     def test_linux_cross_rbe_process_env_uses_execution_platform(self):
-        config = hermetic_container_integration.LinuxCrossRBEConfig(
+        config = cross_linux.LinuxCrossRBEConfig(
             target_arch="s390x",
             target_distro="rhel10",
             exec_arch="x86_64",
             exec_distro="rhel10",
         )
 
-        process_env = hermetic_container_integration._linux_cross_rbe_process_env(
+        process_env = cross_linux._linux_cross_rbe_process_env(
             config,
             {
                 "MONGO_LINUX_CROSS_TOOLCHAIN": "stale_s390x_on_s390x",
@@ -795,7 +794,7 @@ class WindowsCrossSysrootTest(unittest.TestCase):
         self.assertEqual(process_env["MONGO_WASI_SDK_EXEC_ARCH"], "x86_64")
 
     def test_linux_cross_rbe_process_env_forwards_task_scoped_podman_state(self):
-        config = hermetic_container_integration.LinuxCrossRBEConfig(
+        config = cross_linux.LinuxCrossRBEConfig(
             target_arch="ppc64le",
             target_distro="rhel9",
             exec_arch="x86_64",
@@ -804,26 +803,24 @@ class WindowsCrossSysrootTest(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as temp_dir:
             task_root = pathlib.Path(temp_dir) / "mongo-linux-podman-task-task_123"
-            runtime_dir = task_root / (
-                f"{hermetic_container_integration.PODMAN_RUNTIME_DIR_PREFIX}{os.getuid()}"
-            )
+            runtime_dir = task_root / (f"{podman_common.PODMAN_RUNTIME_DIR_PREFIX}{os.getuid()}")
 
             def which(command: str) -> str | None:
                 return "/usr/bin/podman" if command == "podman" else None
 
             with (
                 mock.patch.object(
-                    hermetic_container_integration,
+                    cross_linux,
                     "_podman_task_root",
                     return_value=task_root,
                 ),
                 mock.patch.object(
-                    hermetic_container_integration.shutil,
+                    shutil,
                     "which",
                     side_effect=which,
                 ),
                 mock.patch.dict(
-                    hermetic_container_integration.os.environ,
+                    os.environ,
                     {
                         "TMPDIR": str(runtime_dir),
                         "TMP": str(runtime_dir),
@@ -831,15 +828,13 @@ class WindowsCrossSysrootTest(unittest.TestCase):
                     },
                 ),
             ):
-                process_env = hermetic_container_integration._linux_cross_rbe_process_env(
+                process_env = cross_linux._linux_cross_rbe_process_env(
                     config,
                     {"MONGO_PODMAN_TASK_ID": "task_123"},
                 )
 
         storage_config = (
-            task_root
-            / f"{hermetic_container_integration.PODMAN_STORAGE_DIR_PREFIX}{os.getuid()}"
-            / "storage.conf"
+            task_root / f"{podman_common.PODMAN_STORAGE_DIR_PREFIX}{os.getuid()}" / "storage.conf"
         )
         self.assertEqual(process_env["CONTAINERS_STORAGE_CONF"], str(storage_config))
         self.assertEqual(process_env["CONTAINERS_CONF"], str(runtime_dir / "containers.conf"))
@@ -857,22 +852,16 @@ class WindowsCrossSysrootTest(unittest.TestCase):
         containers = {"rhel9": {"container-url": "docker://quay.io/mongodb/rbe@sha256:abc123"}}
 
         with (
+            mock.patch.object(platform, "system", return_value="Linux"),
             mock.patch.object(
-                hermetic_container_integration.platform, "system", return_value="Linux"
-            ),
-            mock.patch.object(
-                hermetic_container_integration,
+                cross_linux,
                 "load_remote_execution_containers",
                 return_value=containers,
             ),
-            mock.patch.object(
-                hermetic_container_integration, "_docker_daemon_status"
-            ) as docker_status,
-            mock.patch.object(
-                hermetic_container_integration, "_run_direct", return_value=0
-            ) as run_direct,
+            mock.patch.object(runner, "_docker_daemon_status") as docker_status,
+            mock.patch.object(runner, "_run_direct", return_value=0) as run_direct,
         ):
-            rc = hermetic_container_integration.run_hermetic_container(
+            rc = runner.run_hermetic_container(
                 "/usr/bin/bazel",
                 [
                     "query",
@@ -898,22 +887,20 @@ class WindowsCrossSysrootTest(unittest.TestCase):
         stdout = StringIO()
 
         with (
+            mock.patch.object(platform, "system", return_value="Linux"),
             mock.patch.object(
-                hermetic_container_integration.platform, "system", return_value="Linux"
-            ),
-            mock.patch.object(
-                hermetic_container_integration._cross_linux,
+                cross_linux,
                 "normalize_arch",
                 return_value="s390x",
             ),
             mock.patch.object(
-                hermetic_container_integration,
+                cross_linux,
                 "load_remote_execution_containers",
                 return_value=containers,
             ),
             redirect_stdout(stdout),
         ):
-            rc = hermetic_container_integration.run_hermetic_container(
+            rc = runner.run_hermetic_container(
                 "/usr/bin/bazel",
                 [
                     "build",
@@ -949,22 +936,25 @@ class WindowsCrossSysrootTest(unittest.TestCase):
         stdout = StringIO()
 
         with (
+            mock.patch.object(platform, "system", return_value="Linux"),
             mock.patch.object(
-                hermetic_container_integration.platform, "system", return_value="Linux"
-            ),
-            mock.patch.object(
-                hermetic_container_integration._cross_linux,
+                cross_linux,
                 "normalize_arch",
                 return_value="aarch64",
             ),
             mock.patch.object(
-                hermetic_container_integration,
+                cross_linux,
                 "load_remote_execution_containers",
                 return_value=containers,
             ),
+            mock.patch.object(
+                cross_linux,
+                "_linux_cross_module_override_args",
+                return_value=["--override_module=protobuf=/tmp/protobuf-overlay"],
+            ),
             redirect_stdout(stdout),
         ):
-            rc = hermetic_container_integration.run_hermetic_container(
+            rc = runner.run_hermetic_container(
                 "/usr/bin/bazel",
                 [
                     "build",
@@ -975,7 +965,7 @@ class WindowsCrossSysrootTest(unittest.TestCase):
                     # builds must not win over the cross selection.
                     "--repo_env=MONGO_WASI_SDK_EXEC_ARCH=",
                     "--repo_env=MONGO_LINUX_CROSS_TOOLCHAIN=",
-                    *hermetic_container_integration.RELEASE_LOCAL_SAFETY_SUFFIX,
+                    *constants.RELEASE_LOCAL_SAFETY_SUFFIX,
                 ],
                 env={
                     "MONGO_HERMETIC_CONTAINER_DRY_RUN": "1",
@@ -1001,7 +991,7 @@ class WindowsCrossSysrootTest(unittest.TestCase):
         self.assertEqual(last_value("--repo_env=MONGO_WASI_SDK_EXEC_ARCH="), "aarch64")
         self.assertEqual(last_value("--repo_env=MONGO_BAZEL_CROSS_LINUX_PYTHON_ARCH="), "aarch64")
         self.assertEqual(last_value("--define=MONGO_IBM_CROSS="), "1")
-        self.assertTrue(any(arg.startswith("--override_module=protobuf=") for arg in host_args))
+        self.assertIn("--override_module=protobuf=/tmp/protobuf-overlay", host_args)
         self.assertEqual(last_value("--remote_executor="), "")
         self.assertEqual(last_value("--spawn_strategy="), "local")
         self.assertEqual(last_value("--remote_download_outputs="), "all")
@@ -1014,8 +1004,8 @@ class WindowsCrossSysrootTest(unittest.TestCase):
                 )
         self.assertFalse(any(arg.startswith("--strategy_regexp=") for arg in host_args))
         self.assertEqual(
-            tuple(host_args[-len(hermetic_container_integration.RELEASE_LOCAL_SAFETY_SUFFIX) :]),
-            hermetic_container_integration.RELEASE_LOCAL_SAFETY_SUFFIX,
+            tuple(host_args[-len(constants.RELEASE_LOCAL_SAFETY_SUFFIX) :]),
+            constants.RELEASE_LOCAL_SAFETY_SUFFIX,
         )
 
     def test_run_hermetic_container_uses_native_container_for_linux_cross_link(self):
@@ -1027,41 +1017,47 @@ class WindowsCrossSysrootTest(unittest.TestCase):
 
         with (
             tempfile.TemporaryDirectory() as temp_dir,
+            mock.patch.object(platform, "system", return_value="Linux"),
             mock.patch.object(
-                hermetic_container_integration.platform, "system", return_value="Linux"
-            ),
-            mock.patch.object(
-                hermetic_container_integration._cross_linux,
+                cross_linux,
                 "normalize_arch",
                 return_value="s390x",
             ),
             mock.patch.object(
-                hermetic_container_integration,
+                cross_linux,
                 "load_remote_execution_containers",
                 return_value=containers,
             ),
             mock.patch.object(
-                hermetic_container_integration,
+                runner,
+                "_linux_cross_module_override_args",
+                return_value=[
+                    "--override_module=protobuf=/tmp/protobuf-overlay",
+                    "--override_module=grpc=/tmp/grpc-overlay",
+                ],
+            ),
+            mock.patch.object(
+                runner,
                 "_select_linux_container_runtime",
                 return_value=("/usr/bin/podman", ""),
             ) as select_runtime,
             mock.patch.object(
-                hermetic_container_integration,
+                runner,
                 "_linux_host_container_config",
                 return_value=container_config,
             ),
             mock.patch.object(
-                hermetic_container_integration,
-                "_ensure_linux_container_image",
+                container_actions,
+                "ensure_container_image",
                 return_value=True,
             ) as ensure_image,
             mock.patch.object(
-                hermetic_container_integration,
+                runner,
                 "_bazel_output_base",
                 return_value=pathlib.Path(temp_dir) / "output-base",
             ),
             mock.patch.object(
-                hermetic_container_integration,
+                runner,
                 "_write_linux_container_actions_config_unlocked",
                 return_value=(
                     pathlib.Path(temp_dir) / "output-base" / "config.json",
@@ -1069,17 +1065,17 @@ class WindowsCrossSysrootTest(unittest.TestCase):
                 ),
             ) as write_config,
             mock.patch.object(
-                hermetic_container_integration,
+                runner,
                 "_ensure_linux_action_container",
                 return_value=(True, ""),
             ) as ensure_container,
             mock.patch.object(
-                hermetic_container_integration,
+                runner,
                 "_run_direct",
                 return_value=0,
             ) as run_direct,
         ):
-            rc = hermetic_container_integration.run_hermetic_container(
+            rc = runner.run_hermetic_container(
                 "/usr/bin/bazel",
                 ["build", "--config=linux-s390x-cross-rbe", "install-dist-test"],
                 env={
@@ -1104,8 +1100,8 @@ class WindowsCrossSysrootTest(unittest.TestCase):
         run_direct.assert_called_once()
         host_args = run_direct.call_args.args[1]
         self.assertIn("--strategy=CppCompile=remote", host_args)
-        self.assertTrue(any(arg.startswith("--override_module=protobuf=") for arg in host_args))
-        self.assertTrue(any(arg.startswith("--override_module=grpc=") for arg in host_args))
+        self.assertIn("--override_module=protobuf=/tmp/protobuf-overlay", host_args)
+        self.assertIn("--override_module=grpc=/tmp/grpc-overlay", host_args)
         self.assertIn("--strategy=CppLink=persistent-container,local", host_args)
         self.assertNotIn("--strategy=CppLink=remote", host_args)
         self.assertIn("--remote_upload_local_results=false", host_args)
@@ -1141,22 +1137,16 @@ class WindowsCrossSysrootTest(unittest.TestCase):
         }
 
         with (
+            mock.patch.object(platform, "system", return_value="Windows"),
             mock.patch.object(
-                hermetic_container_integration.platform, "system", return_value="Windows"
-            ),
-            mock.patch.object(
-                hermetic_container_integration,
+                cross_windows,
                 "load_remote_execution_containers",
                 return_value=containers,
             ),
-            mock.patch.object(
-                hermetic_container_integration, "_docker_daemon_status"
-            ) as docker_status,
-            mock.patch.object(
-                hermetic_container_integration, "_run_direct", return_value=0
-            ) as run_direct,
+            mock.patch.object(runner, "_docker_daemon_status") as docker_status,
+            mock.patch.object(runner, "_run_direct", return_value=0) as run_direct,
         ):
-            rc = hermetic_container_integration.run_hermetic_container(
+            rc = runner.run_hermetic_container(
                 "C:/bazel.exe",
                 ["build", "install-dist-test"],
                 env={
@@ -1173,7 +1163,7 @@ class WindowsCrossSysrootTest(unittest.TestCase):
         self.assertEqual(run_direct.call_args.args[0], "C:/bazel.exe")
         host_args = run_direct.call_args.args[1]
         self.assertEqual(host_args[0], "build")
-        self.assertIn(f"--config={hermetic_container_integration.WINDOWS_CROSS_CONFIG}", host_args)
+        self.assertIn(f"--config={cross_windows.WINDOWS_CROSS_CONFIG}", host_args)
         self.assertIn("install-dist-test", host_args)
         self.assertIn("--remote_executor=grpcs://sodalite.cluster.engflow.com", host_args)
         self.assertIn("--strategy=CppCompile=remote", host_args)
@@ -1191,7 +1181,7 @@ class WindowsCrossSysrootTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            values = hermetic_container_integration._windows_cross_repo_env_values(
+            values = cross_windows._windows_cross_repo_env_values(
                 [
                     "build",
                     "--config=windows-cross-x86_64",
@@ -1218,12 +1208,12 @@ class WindowsCrossSysrootTest(unittest.TestCase):
                 "BAZEL_WINSDK_FULL_VERSION": sdk_version,
                 "MONGO_WINDOWS_CROSS_WINSDK_ROOT": str(sdk_root),
             }
-            spec = hermetic_container_integration._windows_cross_sysroot_spec(env)
+            spec = cross_windows._windows_cross_sysroot_spec(env)
             for relative, source in spec.sources.items():
                 source.mkdir(parents=True)
                 source.joinpath("sentinel.txt").write_text(relative, encoding="utf-8")
 
-            prepared = hermetic_container_integration._prepare_windows_cross_env(
+            prepared = cross_windows._prepare_windows_cross_env(
                 ["build", "--config=windows-cross-x86_64", "install-dist-test"],
                 env,
                 repo_root,
@@ -1249,8 +1239,8 @@ class WindowsCrossSysrootTest(unittest.TestCase):
                 "MONGO_WINDOWS_CROSS_SYSROOT_PATH": str(sysroot_path),
             }
 
-            prepared = hermetic_container_integration._prepare_windows_cross_env(
-                ["build", f"--config={hermetic_container_integration.WINDOWS_CROSS_CONFIG}"],
+            prepared = cross_windows._prepare_windows_cross_env(
+                ["build", f"--config={cross_windows.WINDOWS_CROSS_CONFIG}"],
                 env,
                 repo_root,
                 "Windows",
@@ -1265,7 +1255,7 @@ class WindowsCrossSysrootTest(unittest.TestCase):
             sysroot_path.mkdir()
             env = {"MONGO_WINDOWS_CROSS_SYSROOT_PATH": str(sysroot_path)}
 
-            prepared = hermetic_container_integration._prepare_windows_cross_env(
+            prepared = cross_windows._prepare_windows_cross_env(
                 ["build", "--config=windows-cross-x86_64"],
                 env,
                 repo_root,
@@ -1282,8 +1272,8 @@ class WindowsCrossSysrootTest(unittest.TestCase):
                 "MONGO_WINDOWS_CROSS_SYSROOT_SHA256": "abc123",
             }
 
-            prepared = hermetic_container_integration._prepare_windows_cross_env(
-                ["build", f"--config={hermetic_container_integration.WINDOWS_CROSS_CONFIG}"],
+            prepared = cross_windows._prepare_windows_cross_env(
+                ["build", f"--config={cross_windows.WINDOWS_CROSS_CONFIG}"],
                 env,
                 repo_root,
                 "Windows",
@@ -1295,10 +1285,10 @@ class WindowsCrossSysrootTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = pathlib.Path(temp_dir)
 
-            prepared = hermetic_container_integration._prepare_windows_cross_env(
+            prepared = cross_windows._prepare_windows_cross_env(
                 [
                     "build",
-                    f"--config={hermetic_container_integration.WINDOWS_CROSS_CONFIG}",
+                    f"--config={cross_windows.WINDOWS_CROSS_CONFIG}",
                     "--repo_env=MONGO_WINDOWS_CROSS_SYSROOT_URL=https://example.invalid/sysroot.tar.xz",
                     "--repo_env=MONGO_WINDOWS_CROSS_SYSROOT_SHA256=abc123",
                 ],
@@ -1320,8 +1310,8 @@ class WindowsCrossSysrootTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            prepared = hermetic_container_integration._prepare_windows_cross_env(
-                ["build", f"--config={hermetic_container_integration.WINDOWS_CROSS_CONFIG}"],
+            prepared = cross_windows._prepare_windows_cross_env(
+                ["build", f"--config={cross_windows.WINDOWS_CROSS_CONFIG}"],
                 {},
                 repo_root,
                 "Windows",

@@ -39,6 +39,7 @@ py_library(
         "git_age_check.py",
         "hermetic_container/cleanup.py",
         "hermetic_container/config.py",
+        "hermetic_container/container_actions.py",
         "hermetic_container/cross/common.py",
         "hermetic_container/cross/linux.py",
         "hermetic_container/cross/macos.py",
@@ -123,6 +124,13 @@ py_test(
     deps = [
         ":wrapper_hook",
     ],
+)
+
+py_test(
+    name = "container_actions_test",
+    srcs = ["hermetic_container/container_actions_test.py"],
+    main = "hermetic_container/container_actions_test.py",
+    deps = [":wrapper_hook"],
 )
 
 py_test(

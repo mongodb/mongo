@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
+import dataclasses
 import importlib.util
+import os
 import pathlib
+import platform
 import subprocess
 import tempfile
 import unittest
 from unittest import mock
 
-from bazel.wrapper_hook import hermetic_container_integration
+from bazel.wrapper_hook.hermetic_container import config as config_module
+from bazel.wrapper_hook.hermetic_container import constants, engflow, fsutil, runner, volumes
+from bazel.wrapper_hook.hermetic_container import distro as distro_module
 
 HERMETIC_CONTAINER_PATH = (
     pathlib.Path(__file__).parents[2] / "hermetic_container" / "hermetic_container.py"
@@ -26,9 +31,7 @@ HERMETIC_CONTAINER_SPEC.loader.exec_module(hermetic_container)
 class HermeticContainerConfigTest(unittest.TestCase):
     def test_windows_path_converts_to_container_path(self):
         self.assertEqual(
-            hermetic_container_integration._container_path(
-                r"C:\work\mongo\.tmp\hermetic_container", "Windows"
-            ),
+            volumes._container_path(r"C:\work\mongo\.tmp\hermetic_container", "Windows"),
             "/C/work/mongo/.tmp/hermetic_container",
         )
 
@@ -49,7 +52,7 @@ class HermeticContainerConfigTest(unittest.TestCase):
                 "HERMETIC_CONTAINER_BAZEL_USER_OUTPUT_ROOT": str(output_root),
             }
 
-            config = hermetic_container_integration.build_hermetic_container_config(
+            config = config_module.build_hermetic_container_config(
                 str(bazel_real),
                 env=env,
                 repo_root=repo_root,
@@ -81,7 +84,7 @@ class HermeticContainerConfigTest(unittest.TestCase):
             bazel_real = repo_root / "bazel-real"
             bazel_real.write_text("#!/bin/sh\n", encoding="utf-8")
 
-            config = hermetic_container_integration.build_hermetic_container_config(
+            config = config_module.build_hermetic_container_config(
                 str(bazel_real),
                 env=env,
                 repo_root=repo_root,
@@ -107,10 +110,8 @@ class HermeticContainerConfigTest(unittest.TestCase):
             bazel_real = repo_root / "bazel-real"
             bazel_real.write_text("#!/bin/sh\n", encoding="utf-8")
 
-            with mock.patch.object(
-                hermetic_container_integration.platform, "machine", return_value="s390x"
-            ):
-                config = hermetic_container_integration.build_hermetic_container_config(
+            with mock.patch.object(platform, "machine", return_value="s390x"):
+                config = config_module.build_hermetic_container_config(
                     str(bazel_real),
                     env={"MONGO_HERMETIC_CONTAINER_DISTRO": "amazon_linux_2023"},
                     repo_root=repo_root,
@@ -141,7 +142,7 @@ class HermeticContainerConfigTest(unittest.TestCase):
                 "MONGO_WINDOWS_CROSS_LLVM_PATH": str(llvm_path),
             }
 
-            config = hermetic_container_integration.build_hermetic_container_config(
+            config = config_module.build_hermetic_container_config(
                 str(bazel_real),
                 env=env,
                 repo_root=repo_root,
@@ -152,9 +153,7 @@ class HermeticContainerConfigTest(unittest.TestCase):
             self.assertEqual(config.bazel_command, "/opt/mongodbtoolchain/bazel/bin/bazel")
             self.assertEqual(config.user, "")
             self.assertIn("MONGO_BAZEL_IN_HERMETIC_CONTAINER=1", config.env_vars)
-            llvm_container_path = hermetic_container_integration._container_path(
-                llvm_path, "Windows"
-            )
+            llvm_container_path = volumes._container_path(llvm_path, "Windows")
             self.assertIn(
                 f"MONGO_WINDOWS_CROSS_LLVM_PATH={llvm_container_path}",
                 config.env_vars,
@@ -188,7 +187,7 @@ class HermeticContainerConfigTest(unittest.TestCase):
                 "SDKROOT": "/Applications/Xcode.app/SDKs/MacOSX.sdk",
             }
 
-            config = hermetic_container_integration.build_hermetic_container_config(
+            config = config_module.build_hermetic_container_config(
                 str(bazel_real),
                 env=env,
                 repo_root=repo_root,
@@ -238,7 +237,7 @@ class HermeticContainerConfigTest(unittest.TestCase):
                 "MONGO_HERMETIC_CONTAINER_DRY_RUN": "1",
             }
 
-            config = hermetic_container_integration.build_hermetic_container_config(
+            config = config_module.build_hermetic_container_config(
                 str(bazel_real),
                 env=env,
                 repo_root=repo_root,
@@ -253,8 +252,8 @@ class HermeticContainerConfigTest(unittest.TestCase):
                     / ".tmp"
                     / "hermetic_container"
                     / "bazel-output-case-sensitive"
-                    / hermetic_container_integration.HERMETIC_CONTAINER_OUTPUT_ROOT_VERSION
-                    / f"_bazel_{hermetic_container_integration._current_user()}"
+                    / constants.HERMETIC_CONTAINER_OUTPUT_ROOT_VERSION
+                    / f"_bazel_{fsutil._current_user()}"
                 ),
             )
             self.assertIn(
@@ -265,11 +264,9 @@ class HermeticContainerConfigTest(unittest.TestCase):
     def test_macos_case_sensitive_bazel_output_root_can_be_disabled(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = pathlib.Path(temp_dir)
-            env = {
-                hermetic_container_integration.HERMETIC_CONTAINER_MACOS_CASE_SENSITIVE_OUTPUT_ENV: "0"
-            }
+            env = {constants.HERMETIC_CONTAINER_MACOS_CASE_SENSITIVE_OUTPUT_ENV: "0"}
 
-            output_root = hermetic_container_integration._hermetic_container_bazel_user_output_root(
+            output_root = fsutil._hermetic_container_bazel_user_output_root(
                 env,
                 repo_root,
                 system="Darwin",
@@ -282,8 +279,8 @@ class HermeticContainerConfigTest(unittest.TestCase):
                     / ".tmp"
                     / "hermetic_container"
                     / "bazel-output"
-                    / hermetic_container_integration.HERMETIC_CONTAINER_OUTPUT_ROOT_VERSION
-                    / f"_bazel_{hermetic_container_integration._current_user()}"
+                    / constants.HERMETIC_CONTAINER_OUTPUT_ROOT_VERSION
+                    / f"_bazel_{fsutil._current_user()}"
                 ),
             )
 
@@ -293,17 +290,13 @@ class HermeticContainerConfigTest(unittest.TestCase):
 
             with (
                 mock.patch.object(
-                    hermetic_container_integration,
+                    fsutil,
                     "_path_is_case_sensitive",
                     side_effect=[False, True],
                 ),
-                mock.patch.object(
-                    hermetic_container_integration, "_run_host_command"
-                ) as run_host_command,
+                mock.patch.object(fsutil, "_run_host_command") as run_host_command,
             ):
-                output_dir = hermetic_container_integration._macos_case_sensitive_output_dir(
-                    repo_root, {}
-                )
+                output_dir = fsutil._macos_case_sensitive_output_dir(repo_root, {})
 
             image = (
                 repo_root
@@ -342,7 +335,7 @@ class HermeticContainerConfigTest(unittest.TestCase):
                 "MONGO_HERMETIC_CONTAINER_GIT_LAYER": "0",
             }
 
-            config = hermetic_container_integration.build_hermetic_container_config(
+            config = config_module.build_hermetic_container_config(
                 str(bazel_real),
                 env=env,
                 repo_root=repo_root,
@@ -382,7 +375,7 @@ class HermeticContainerConfigTest(unittest.TestCase):
                 "MONGO_HERMETIC_CONTAINER_DRY_RUN": "1",
             }
 
-            config = hermetic_container_integration.build_hermetic_container_config(
+            config = config_module.build_hermetic_container_config(
                 str(bazel_real),
                 env=env,
                 repo_root=repo_root,
@@ -419,9 +412,9 @@ class HermeticContainerConfigTest(unittest.TestCase):
                 stderr=b"",
             )
             with (
-                mock.patch.object(hermetic_container_integration.os, "access", return_value=True),
+                mock.patch.object(os, "access", return_value=True),
                 mock.patch.object(
-                    hermetic_container_integration.subprocess,
+                    subprocess,
                     "run",
                     side_effect=[completed_export, completed_import],
                 ) as run,
@@ -437,9 +430,7 @@ class HermeticContainerConfigTest(unittest.TestCase):
                 )
                 macos_token.parent.mkdir(parents=True)
                 macos_token.write_text('{"access_token": "value"}', encoding="utf-8")
-                hermetic_container_integration._sync_engflow_file_token(
-                    repo_root, {}, repo_root / "home"
-                )
+                engflow._sync_engflow_file_token(repo_root, {}, repo_root / "home")
 
             self.assertEqual(run.call_count, 2)
             self.assertEqual(
@@ -483,7 +474,7 @@ class HermeticContainerConfigTest(unittest.TestCase):
                 "MONGO_HERMETIC_CONTAINER_CA_BUNDLE": str(ca_bundle),
             }
 
-            config = hermetic_container_integration.build_hermetic_container_config(
+            config = config_module.build_hermetic_container_config(
                 str(bazel_real),
                 env=env,
                 repo_root=repo_root,
@@ -491,7 +482,7 @@ class HermeticContainerConfigTest(unittest.TestCase):
                 system="Linux",
             )
 
-            container_ca_bundle = hermetic_container_integration.DEFAULT_CONTAINER_CA_BUNDLE
+            container_ca_bundle = constants.DEFAULT_CONTAINER_CA_BUNDLE
             grpc_roots_dir = repo_root / ".tmp" / "hermetic_container" / "grpc_roots"
             self.assertIn(f"{ca_bundle}:{container_ca_bundle}:ro", config.volumes)
             self.assertIn(f"{grpc_roots_dir}:/usr/share/grpc:ro", config.volumes)
@@ -521,7 +512,7 @@ class HermeticContainerConfigTest(unittest.TestCase):
             }
 
             with mock.patch.object(pathlib.Path, "home", side_effect=RuntimeError("no home")):
-                config = hermetic_container_integration.build_hermetic_container_config(
+                config = config_module.build_hermetic_container_config(
                     str(bazel_real),
                     env=env,
                     repo_root=repo_root,
@@ -532,10 +523,10 @@ class HermeticContainerConfigTest(unittest.TestCase):
             self.assertIn(f"HOME={repo_root / '.tmp' / 'hermetic_container'}", config.env_vars)
 
     def test_config_fingerprint_changes_with_env_vars(self):
-        image = hermetic_container_integration.parse_docker_image(
+        image = distro_module.parse_docker_image(
             "docker://quay.io/mongodb/bazel-remote-execution@sha256:abc123"
         )
-        base = hermetic_container_integration.HermeticContainerConfig(
+        base = config_module.HermeticContainerConfig(
             distro="amazon_linux_2023",
             docker_image=image,
             instance_name="test",
@@ -549,11 +540,11 @@ class HermeticContainerConfigTest(unittest.TestCase):
             platform="",
             privileged=False,
         )
-        changed = hermetic_container_integration.dataclasses.replace(base, env_vars=["A=2"])
+        changed = dataclasses.replace(base, env_vars=["A=2"])
 
         self.assertNotEqual(
-            hermetic_container_integration._config_fingerprint(base),
-            hermetic_container_integration._config_fingerprint(changed),
+            config_module._config_fingerprint(base),
+            config_module._config_fingerprint(changed),
         )
 
     def test_injects_cert_env_into_bazel_test_args(self):
@@ -562,12 +553,12 @@ class HermeticContainerConfigTest(unittest.TestCase):
             ca_bundle.write_text("certs\n", encoding="utf-8")
             env = {"MONGO_HERMETIC_CONTAINER_CA_BUNDLE": str(ca_bundle)}
 
-            args = hermetic_container_integration._bazel_args_with_hermetic_container_env(
+            args = runner._bazel_args_with_hermetic_container_env(
                 ["test", "//src/..."],
                 env,
             )
 
-            container_ca_bundle = hermetic_container_integration.DEFAULT_CONTAINER_CA_BUNDLE
+            container_ca_bundle = constants.DEFAULT_CONTAINER_CA_BUNDLE
             self.assertEqual(args[0], "test")
             self.assertIn(
                 f"--action_env=GRPC_DEFAULT_SSL_ROOTS_FILE_PATH={container_ca_bundle}",
@@ -580,59 +571,59 @@ class HermeticContainerConfigTest(unittest.TestCase):
             self.assertEqual(args[-1], "//src/...")
 
     def test_injects_container_repo_path_into_bazel_args(self):
-        args = hermetic_container_integration._bazel_args_with_hermetic_container_env(
+        args = runner._bazel_args_with_hermetic_container_env(
             ["build", "//src:mongo"],
             {},
         )
 
         self.assertIn(
-            f"--repo_env=PATH={hermetic_container_integration.HERMETIC_CONTAINER_REPOSITORY_PATH}",
+            f"--repo_env=PATH={constants.HERMETIC_CONTAINER_REPOSITORY_PATH}",
             args,
         )
 
     def test_injects_container_workspace_status_command_into_bazel_args(self):
-        args = hermetic_container_integration._bazel_args_with_hermetic_container_env(
+        args = runner._bazel_args_with_hermetic_container_env(
             ["build", "//src:mongo"],
             {},
-            workspace_status_command=hermetic_container_integration.HERMETIC_CONTAINER_WORKSPACE_STATUS_COMMAND,
+            workspace_status_command=constants.HERMETIC_CONTAINER_WORKSPACE_STATUS_COMMAND,
         )
 
         self.assertIn(
-            f"--workspace_status_command={hermetic_container_integration.HERMETIC_CONTAINER_WORKSPACE_STATUS_COMMAND}",
+            f"--workspace_status_command={constants.HERMETIC_CONTAINER_WORKSPACE_STATUS_COMMAND}",
             args,
         )
 
     def test_preserves_user_repo_path_override(self):
-        args = hermetic_container_integration._bazel_args_with_hermetic_container_env(
+        args = runner._bazel_args_with_hermetic_container_env(
             ["build", "--repo_env=PATH=/custom/bin", "//src:mongo"],
             {},
         )
 
         self.assertIn("--repo_env=PATH=/custom/bin", args)
         self.assertNotIn(
-            f"--repo_env=PATH={hermetic_container_integration.HERMETIC_CONTAINER_REPOSITORY_PATH}",
+            f"--repo_env=PATH={constants.HERMETIC_CONTAINER_REPOSITORY_PATH}",
             args,
         )
 
     def test_preserves_user_workspace_status_command_override(self):
-        args = hermetic_container_integration._bazel_args_with_hermetic_container_env(
+        args = runner._bazel_args_with_hermetic_container_env(
             [
                 "build",
                 "--workspace_status_command=/custom/python workspace_status.py",
                 "//src:mongo",
             ],
             {},
-            workspace_status_command=hermetic_container_integration.HERMETIC_CONTAINER_WORKSPACE_STATUS_COMMAND,
+            workspace_status_command=constants.HERMETIC_CONTAINER_WORKSPACE_STATUS_COMMAND,
         )
 
         self.assertIn("--workspace_status_command=/custom/python workspace_status.py", args)
         self.assertNotIn(
-            f"--workspace_status_command={hermetic_container_integration.HERMETIC_CONTAINER_WORKSPACE_STATUS_COMMAND}",
+            f"--workspace_status_command={constants.HERMETIC_CONTAINER_WORKSPACE_STATUS_COMMAND}",
             args,
         )
 
     def test_injects_container_engflow_auth_helper_into_bazel_args(self):
-        args = hermetic_container_integration._bazel_args_with_hermetic_container_env(
+        args = runner._bazel_args_with_hermetic_container_env(
             ["build", "//src:mongo"],
             {},
             credential_helper="/tmp/engflow_auth",
@@ -644,7 +635,7 @@ class HermeticContainerConfigTest(unittest.TestCase):
         )
 
     def test_preserves_user_credential_helper_override(self):
-        args = hermetic_container_integration._bazel_args_with_hermetic_container_env(
+        args = runner._bazel_args_with_hermetic_container_env(
             [
                 "build",
                 "--credential_helper=sodalite.cluster.engflow.com=/custom/engflow_auth",
@@ -664,7 +655,7 @@ class HermeticContainerConfigTest(unittest.TestCase):
         )
 
     def test_windows_cross_config_downloads_top_level_outputs(self):
-        args = hermetic_container_integration._bazel_args_with_hermetic_container_env(
+        args = runner._bazel_args_with_hermetic_container_env(
             ["build", "--config=windows-cross-x86_64", "install-dist-test"],
             {},
         )
@@ -673,7 +664,7 @@ class HermeticContainerConfigTest(unittest.TestCase):
         self.assertIn("--remote_download_outputs=toplevel", args)
 
     def test_macos_cross_config_downloads_top_level_outputs(self):
-        args = hermetic_container_integration._bazel_args_with_hermetic_container_env(
+        args = runner._bazel_args_with_hermetic_container_env(
             ["build", "--config=macos-cross-arm64", "install-dist-test"],
             {},
         )
@@ -682,7 +673,7 @@ class HermeticContainerConfigTest(unittest.TestCase):
         self.assertIn("--remote_download_outputs=toplevel", args)
 
     def test_startup_args_preserved_when_injecting_hermetic_container_env(self):
-        args = hermetic_container_integration._bazel_args_with_hermetic_container_env(
+        args = runner._bazel_args_with_hermetic_container_env(
             [
                 "--output_base=/tmp/custom-output-base",
                 "build",
@@ -697,26 +688,24 @@ class HermeticContainerConfigTest(unittest.TestCase):
         self.assertIn("--remote_download_outputs=toplevel", args[2:])
 
     def test_prepare_wsl_docker_process_env_sets_host_side_hermetic_container_env(self):
-        with mock.patch.dict(hermetic_container_integration.os.environ, {}, clear=True):
-            hermetic_container_integration._prepare_hermetic_container_process_env(
+        with mock.patch.dict(os.environ, {}, clear=True):
+            runner._prepare_hermetic_container_process_env(
                 {"MONGO_HERMETIC_CONTAINER_DOCKER_HOST_MODE": "wsl"}
             )
 
             self.assertEqual(
-                hermetic_container_integration.os.environ["HERMETIC_CONTAINER_VOLUME_SOURCE_MODE"],
+                os.environ["HERMETIC_CONTAINER_VOLUME_SOURCE_MODE"],
                 "wsl",
             )
             self.assertEqual(
-                hermetic_container_integration.os.environ["DOCKER_HOST"],
+                os.environ["DOCKER_HOST"],
                 "tcp://127.0.0.1:2375",
             )
-            self.assertEqual(
-                hermetic_container_integration.os.environ["DOCKER_API_VERSION"], "1.52"
-            )
+            self.assertEqual(os.environ["DOCKER_API_VERSION"], "1.52")
 
     def test_prepare_wsl_docker_process_env_respects_docker_host_override(self):
-        with mock.patch.dict(hermetic_container_integration.os.environ, {}, clear=True):
-            hermetic_container_integration._prepare_hermetic_container_process_env(
+        with mock.patch.dict(os.environ, {}, clear=True):
+            runner._prepare_hermetic_container_process_env(
                 {
                     "MONGO_HERMETIC_CONTAINER_DOCKER_HOST_MODE": "wsl",
                     "DOCKER_HOST": "tcp://127.0.0.1:2376",
@@ -725,12 +714,10 @@ class HermeticContainerConfigTest(unittest.TestCase):
             )
 
             self.assertEqual(
-                hermetic_container_integration.os.environ["DOCKER_HOST"],
+                os.environ["DOCKER_HOST"],
                 "tcp://127.0.0.1:2376",
             )
-            self.assertEqual(
-                hermetic_container_integration.os.environ["DOCKER_API_VERSION"], "1.51"
-            )
+            self.assertEqual(os.environ["DOCKER_API_VERSION"], "1.51")
 
 
 if __name__ == "__main__":

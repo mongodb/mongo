@@ -7,7 +7,7 @@ import pathlib
 import tempfile
 import unittest
 
-from bazel.wrapper_hook import hermetic_container_integration
+from bazel.wrapper_hook.hermetic_container import env as env_module
 
 HERMETIC_CONTAINER_PATH = (
     pathlib.Path(__file__).parents[2] / "hermetic_container" / "hermetic_container.py"
@@ -30,7 +30,7 @@ class ContainerDetectionTest(unittest.TestCase):
 
             marker.touch()
             self.assertTrue(
-                hermetic_container_integration._is_running_in_container(
+                env_module._is_running_in_container(
                     env={}, container_marker_paths=(marker,), cgroup_path=root / "missing"
                 )
             )
@@ -38,14 +38,14 @@ class ContainerDetectionTest(unittest.TestCase):
             marker.unlink()
             cgroup.write_text("0::/kubepods.slice/kubepods-burstable.slice\n", encoding="utf-8")
             self.assertTrue(
-                hermetic_container_integration._is_running_in_container(
+                env_module._is_running_in_container(
                     env={}, container_marker_paths=(marker,), cgroup_path=cgroup
                 )
             )
 
     def test_detects_container_environment_variable(self):
         self.assertTrue(
-            hermetic_container_integration._is_running_in_container(
+            env_module._is_running_in_container(
                 env={"container": "podman"},
                 container_marker_paths=(),
                 cgroup_path=pathlib.Path("/definitely-not-a-container-cgroup"),
@@ -58,12 +58,12 @@ class ContainerDetectionTest(unittest.TestCase):
             cgroup.write_text("0::/\n", encoding="utf-8")
 
             self.assertFalse(
-                hermetic_container_integration._is_running_in_container(
+                env_module._is_running_in_container(
                     env={}, container_marker_paths=(), cgroup_path=cgroup
                 )
             )
             self.assertTrue(
-                hermetic_container_integration._is_running_in_container(
+                env_module._is_running_in_container(
                     env={"KUBERNETES_SERVICE_HOST": "10.0.0.1"},
                     container_marker_paths=(),
                     cgroup_path=cgroup,

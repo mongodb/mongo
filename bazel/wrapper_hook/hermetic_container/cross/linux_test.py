@@ -8,15 +8,30 @@ import importlib.util
 import json
 import os
 import pathlib
+import platform
 import shutil
 import subprocess
 import tempfile
+import time
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 from unittest import mock
 
-from bazel.wrapper_hook import hermetic_container_integration
+from bazel.wrapper_hook.hermetic_container import (
+    bazelrc,
+    container_actions,
+    fsutil,
+    podman,
+    podman_common,
+    runner,
+    symlinks,
+)
+from bazel.wrapper_hook.hermetic_container import config as config_module
+from bazel.wrapper_hook.hermetic_container import distro as distro_module
+from bazel.wrapper_hook.hermetic_container import docker as docker_module
+from bazel.wrapper_hook.hermetic_container import env as env_module
+from bazel.wrapper_hook.hermetic_container.cross import linux as cross_linux
 
 HERMETIC_CONTAINER_PATH = (
     pathlib.Path(__file__).parents[3] / "hermetic_container" / "hermetic_container.py"
@@ -32,7 +47,7 @@ HERMETIC_CONTAINER_SPEC.loader.exec_module(hermetic_container)
 
 class LinuxHostContainerTest(unittest.TestCase):
     def _mode(self, env=None, args=(), machine="x86_64", docker=True):
-        return hermetic_container_integration.select_integration_mode(
+        return runner.select_integration_mode(
             env=env or {},
             system="Linux",
             docker_exists=lambda: docker,
@@ -41,7 +56,7 @@ class LinuxHostContainerTest(unittest.TestCase):
         )
 
     def test_injected_command_options_precede_user_options(self):
-        args = hermetic_container_integration._append_bazel_command_options(
+        args = env_module._append_bazel_command_options(
             [
                 "build",
                 "//src/mongo:target",
@@ -71,7 +86,7 @@ class LinuxHostContainerTest(unittest.TestCase):
         )
 
     def test_mandatory_command_options_follow_user_options_and_precede_run_args(self):
-        args = hermetic_container_integration._append_bazel_command_options_last(
+        args = env_module._append_bazel_command_options_last(
             [
                 "test",
                 "//src/mongo:target",
@@ -105,20 +120,19 @@ class LinuxHostContainerTest(unittest.TestCase):
                         },
                         args=["build", "install-dist-test"],
                     ),
-                    hermetic_container_integration.IntegrationMode.DIRECT,
+                    config_module.IntegrationMode.DIRECT,
                 )
 
     def test_undetectable_distro_builds_like_normal(self):
         stderr = StringIO()
         with (
-            mock.patch.object(
-                hermetic_container_integration, "detect_host_distro", return_value=None
-            ),
+            mock.patch.object(runner, "detect_host_distro", return_value=None),
+            mock.patch.object(distro_module, "detect_host_distro", return_value=None),
             redirect_stderr(stderr),
         ):
             self.assertEqual(
                 self._mode(args=["build", "install-dist-test"]),
-                hermetic_container_integration.IntegrationMode.DIRECT,
+                config_module.IntegrationMode.DIRECT,
             )
         self.assertIn("WARNING:", stderr.getvalue())
         self.assertIn("host distro could not be detected", stderr.getvalue())
@@ -134,7 +148,7 @@ class LinuxHostContainerTest(unittest.TestCase):
             )
         self.assertEqual(
             mode,
-            hermetic_container_integration.IntegrationMode.DIRECT,
+            config_module.IntegrationMode.DIRECT,
         )
         self.assertIn("WARNING:", stderr.getvalue())
         self.assertIn("ubuntu24", stderr.getvalue())
@@ -150,18 +164,16 @@ class LinuxHostContainerTest(unittest.TestCase):
             )
         self.assertEqual(
             mode,
-            hermetic_container_integration.IntegrationMode.DIRECT,
+            config_module.IntegrationMode.DIRECT,
         )
         self.assertIn("WARNING:", stderr.getvalue())
         self.assertIn("mips64", stderr.getvalue())
 
     def test_detected_distro_enables_host_container_mode(self):
-        with mock.patch.object(
-            hermetic_container_integration, "detect_host_distro", return_value="rhel9"
-        ):
+        with mock.patch.object(runner, "detect_host_distro", return_value="rhel9"):
             self.assertEqual(
                 self._mode(args=["test", "+stdx_test"]),
-                hermetic_container_integration.IntegrationMode.LINUX_HOST_CONTAINER,
+                config_module.IntegrationMode.LINUX_HOST_CONTAINER,
             )
 
     def test_clean_runs_directly_without_native_fallback_warning(self):
@@ -172,7 +184,7 @@ class LinuxHostContainerTest(unittest.TestCase):
                 args=["clean"],
             )
 
-        self.assertEqual(mode, hermetic_container_integration.IntegrationMode.DIRECT)
+        self.assertEqual(mode, config_module.IntegrationMode.DIRECT)
         self.assertNotIn("WARNING:", stderr.getvalue())
 
     def test_query_uses_host_container_mode(self):
@@ -181,7 +193,7 @@ class LinuxHostContainerTest(unittest.TestCase):
                 env={"MONGO_HERMETIC_CONTAINER_DISTRO": "rhel9"},
                 args=["query", "//src/mongo/..."],
             ),
-            hermetic_container_integration.IntegrationMode.LINUX_HOST_CONTAINER,
+            config_module.IntegrationMode.LINUX_HOST_CONTAINER,
         )
 
     def test_macos_cross_config_uses_normal_setup_on_linux(self):
@@ -191,7 +203,7 @@ class LinuxHostContainerTest(unittest.TestCase):
                 args=["build", "--config=macos-cross-arm64", "install-devcore"],
                 machine="aarch64",
             ),
-            hermetic_container_integration.IntegrationMode.DIRECT,
+            config_module.IntegrationMode.DIRECT,
         )
 
     def test_non_build_commands_run_directly(self):
@@ -202,7 +214,7 @@ class LinuxHostContainerTest(unittest.TestCase):
                         env={"MONGO_HERMETIC_CONTAINER_DISTRO": "rhel9"},
                         args=[command],
                     ),
-                    hermetic_container_integration.IntegrationMode.DIRECT,
+                    config_module.IntegrationMode.DIRECT,
                 )
 
     def test_missing_docker_still_selects_container_mode_for_runtime_fallback(self):
@@ -212,13 +224,11 @@ class LinuxHostContainerTest(unittest.TestCase):
                 args=["build", "install-dist-test"],
                 docker=False,
             ),
-            hermetic_container_integration.IntegrationMode.LINUX_HOST_CONTAINER,
+            config_module.IntegrationMode.LINUX_HOST_CONTAINER,
         )
 
     def test_action_args_enable_dynamic_scheduling_with_remote_execution(self):
-        args = hermetic_container_integration._linux_host_container_action_args(
-            ["build", "install-dist-test"], env={}
-        )
+        args = cross_linux._linux_host_container_action_args(["build", "install-dist-test"], env={})
         self.assertEqual(args[0], "build")
         self.assertTrue(any(arg.startswith("--sandbox_base=") for arg in args))
         self.assertIn("--experimental_enable_persistent_container_sandbox", args)
@@ -267,7 +277,7 @@ class LinuxHostContainerTest(unittest.TestCase):
         self.assertIn("install-dist-test", args)
 
     def test_action_args_dynamic_scheduling_can_be_disabled(self):
-        args = hermetic_container_integration._linux_host_container_action_args(
+        args = cross_linux._linux_host_container_action_args(
             ["build", "install-dist-test"],
             env={"MONGO_LINUX_DYNAMIC_SCHEDULING": "0"},
         )
@@ -286,7 +296,7 @@ class LinuxHostContainerTest(unittest.TestCase):
         self.assertIn("--strategy=HistoricRuntime=persistent-container,local", args)
 
     def test_action_args_preserve_user_local_resource_settings(self):
-        args = hermetic_container_integration._linux_host_container_action_args(
+        args = cross_linux._linux_host_container_action_args(
             ["build", "--local_resources=cpu=HOST_CPUS*.5", "install-dist-test"], env={}
         )
 
@@ -296,7 +306,7 @@ class LinuxHostContainerTest(unittest.TestCase):
         )
 
     def test_action_args_local_config_sandboxes_containerized_build_tools(self):
-        args = hermetic_container_integration._linux_host_container_action_args(
+        args = cross_linux._linux_host_container_action_args(
             ["build", "--config=local", "install-dist-test"],
             env={},
         )
@@ -323,11 +333,11 @@ class LinuxHostContainerTest(unittest.TestCase):
         self.assertNotIn("--internal_spawn_scheduler", args)
 
     def test_action_args_leave_local_output_actions_remote_for_remote_link(self):
-        args = hermetic_container_integration._linux_host_container_action_args(
+        args = cross_linux._linux_host_container_action_args(
             ["build", "--config=remote_link", "install-dist-test"], env={}
         )
 
-        for mnemonic in hermetic_container_integration.LINUX_LOCAL_OUTPUT_CONTAINER_MNEMONICS:
+        for mnemonic in cross_linux.LINUX_LOCAL_OUTPUT_CONTAINER_MNEMONICS:
             with self.subTest(mnemonic=mnemonic):
                 self.assertNotIn(
                     f"--strategy={mnemonic}=persistent-container,local",
@@ -342,7 +352,7 @@ class LinuxHostContainerTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            args = hermetic_container_integration._linux_host_container_action_args(
+            args = cross_linux._linux_host_container_action_args(
                 ["build", "install-dist-test"],
                 env={},
                 repo_root=repo_root,
@@ -379,7 +389,7 @@ class LinuxHostContainerTest(unittest.TestCase):
                     args.insert(1, "--noworkspace_rc")
                     args.insert(1, f"--bazelrc={custom_rc}")
 
-                args = hermetic_container_integration._linux_host_container_action_args(
+                args = cross_linux._linux_host_container_action_args(
                     args,
                     env=env,
                     repo_root=repo_root,
@@ -396,7 +406,7 @@ class LinuxHostContainerTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            args = hermetic_container_integration._linux_host_container_action_args(
+            args = cross_linux._linux_host_container_action_args(
                 [
                     "build",
                     "--remote_executor=grpcs://sodalite.cluster.engflow.com",
@@ -417,11 +427,11 @@ class LinuxHostContainerTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = pathlib.Path(temp_dir)
             with mock.patch.object(
-                hermetic_container_integration.shutil,
+                shutil,
                 "which",
                 return_value="/usr/bin/docker",
             ):
-                config = hermetic_container_integration._linux_host_container_config(
+                config = cross_linux._linux_host_container_config(
                     env={
                         "MONGO_HERMETIC_CONTAINER_DISTRO": "rhel9",
                         "MONGO_PODMAN_TASK_ID": "task/123",
@@ -437,7 +447,7 @@ class LinuxHostContainerTest(unittest.TestCase):
         self.assertEqual(config["state_dir"], str(repo_root / ".tmp" / "linux_container_actions"))
         self.assertEqual(
             config["container_layout_version"],
-            hermetic_container_integration.LINUX_CONTAINER_ACTIONS_LAYOUT_VERSION,
+            cross_linux.LINUX_CONTAINER_ACTIONS_LAYOUT_VERSION,
         )
         self.assertEqual(
             config["home"], str(repo_root / ".tmp" / "linux_container_actions" / "home")
@@ -454,7 +464,7 @@ class LinuxHostContainerTest(unittest.TestCase):
             auth_file = root / "runtime" / "containers" / "auth.json"
             auth_file.parent.mkdir(parents=True)
             auth_file.write_text("{}\n", encoding="utf-8")
-            config = hermetic_container_integration._linux_host_container_config(
+            config = cross_linux._linux_host_container_config(
                 env={
                     "MONGO_HERMETIC_CONTAINER_DISTRO": "rhel9",
                     "MONGO_PODMAN_TASK_ID": "task/123",
@@ -475,7 +485,7 @@ class LinuxHostContainerTest(unittest.TestCase):
             RuntimeError,
             "MONGO_HERMETIC_CONTAINER_IMAGE must use an immutable",
         ):
-            hermetic_container_integration._linux_host_container_config(
+            cross_linux._linux_host_container_config(
                 env={
                     "MONGO_HERMETIC_CONTAINER_DISTRO": "rhel9",
                     "MONGO_HERMETIC_CONTAINER_IMAGE": "docker://example.com/custom:latest",
@@ -490,7 +500,7 @@ class LinuxHostContainerTest(unittest.TestCase):
         }
         image = "docker://example.com/custom@sha256:" + "a" * 64
         with tempfile.TemporaryDirectory() as temp_dir:
-            config = hermetic_container_integration._linux_host_container_config(
+            config = cross_linux._linux_host_container_config(
                 env={
                     "MONGO_HERMETIC_CONTAINER_DISTRO": "rhel9",
                     "MONGO_HERMETIC_CONTAINER_IMAGE": image,
@@ -506,14 +516,14 @@ class LinuxHostContainerTest(unittest.TestCase):
             return "/usr/bin/podman" if command == "podman" else None
 
         with (
-            mock.patch.object(hermetic_container_integration.shutil, "which", side_effect=which),
+            mock.patch.object(shutil, "which", side_effect=which),
             mock.patch.object(
-                hermetic_container_integration,
+                docker_module,
                 "_docker_daemon_status",
                 return_value=(True, ""),
             ) as daemon_status,
         ):
-            command, detail = hermetic_container_integration._select_linux_container_runtime({})
+            command, detail = docker_module._select_linux_container_runtime({})
 
         self.assertEqual(command, "/usr/bin/podman")
         self.assertEqual(detail, "")
@@ -524,19 +534,19 @@ class LinuxHostContainerTest(unittest.TestCase):
             return {"docker": "/usr/bin/docker", "podman": "/usr/bin/podman"}.get(command)
 
         with (
-            mock.patch.object(hermetic_container_integration.shutil, "which", side_effect=which),
+            mock.patch.object(shutil, "which", side_effect=which),
             mock.patch.object(
-                hermetic_container_integration,
+                docker_module,
                 "_is_podman_docker_shim",
                 return_value=True,
             ) as is_shim,
             mock.patch.object(
-                hermetic_container_integration,
+                docker_module,
                 "_docker_daemon_status",
                 return_value=(True, ""),
             ) as daemon_status,
         ):
-            command, detail = hermetic_container_integration._select_linux_container_runtime({})
+            command, detail = docker_module._select_linux_container_runtime({})
 
         self.assertEqual(command, "/usr/bin/podman")
         self.assertEqual(detail, "")
@@ -548,19 +558,19 @@ class LinuxHostContainerTest(unittest.TestCase):
             return {"docker": "/usr/bin/docker", "podman": "/usr/bin/podman"}.get(command)
 
         with (
-            mock.patch.object(hermetic_container_integration.shutil, "which", side_effect=which),
+            mock.patch.object(shutil, "which", side_effect=which),
             mock.patch.object(
-                hermetic_container_integration,
+                docker_module,
                 "_is_podman_docker_shim",
                 side_effect=AssertionError("Docker must not be inspected when Podman is required"),
             ) as is_shim,
             mock.patch.object(
-                hermetic_container_integration,
+                docker_module,
                 "_docker_daemon_status",
                 return_value=(True, ""),
             ) as daemon_status,
         ):
-            command, detail = hermetic_container_integration._select_linux_container_runtime(
+            command, detail = docker_module._select_linux_container_runtime(
                 {"MONGO_PODMAN_REQUIRED": "true"}
             )
 
@@ -576,10 +586,8 @@ class LinuxHostContainerTest(unittest.TestCase):
             stdout="podman version 5.1.2\n",
             stderr="Emulate Docker CLI using podman. Create /etc/containers/nodocker to quiet msg.\n",
         )
-        with mock.patch.object(
-            hermetic_container_integration.subprocess, "run", return_value=result
-        ) as run:
-            is_shim = hermetic_container_integration._is_podman_docker_shim("/usr/bin/docker")
+        with mock.patch.object(subprocess, "run", return_value=result) as run:
+            is_shim = podman_common.is_podman_docker_shim("/usr/bin/docker")
 
         self.assertTrue(is_shim)
         self.assertEqual(["/usr/bin/docker", "--version"], run.call_args.args[0])
@@ -589,7 +597,7 @@ class LinuxHostContainerTest(unittest.TestCase):
             runtime_dir = pathlib.Path(temp_dir) / "runtime"
             with (
                 mock.patch.dict(
-                    hermetic_container_integration.os.environ,
+                    os.environ,
                     {
                         "TMPDIR": "/data/mci/task/tmp",
                         "XDG_RUNTIME_DIR": "/data/mci/task/runtime",
@@ -598,19 +606,17 @@ class LinuxHostContainerTest(unittest.TestCase):
                     clear=True,
                 ),
                 mock.patch.object(
-                    hermetic_container_integration,
+                    podman,
                     "_podman_runtime_dir",
                     return_value=runtime_dir,
                 ),
                 mock.patch.object(
-                    hermetic_container_integration.subprocess,
+                    subprocess,
                     "run",
                     return_value=subprocess.CompletedProcess([], 0),
                 ) as run,
             ):
-                ready, detail = hermetic_container_integration._docker_daemon_status(
-                    "/usr/bin/podman"
-                )
+                ready, detail = docker_module._docker_daemon_status("/usr/bin/podman")
 
             self.assertTrue(ready)
             self.assertEqual("", detail)
@@ -637,7 +643,7 @@ class LinuxHostContainerTest(unittest.TestCase):
             runtime_dir = pathlib.Path(temp_dir) / "runtime"
             with (
                 mock.patch.dict(
-                    hermetic_container_integration.os.environ,
+                    os.environ,
                     {
                         "TMPDIR": "/data/mci/task/tmp",
                         "XDG_RUNTIME_DIR": "/data/mci/task/runtime",
@@ -645,19 +651,17 @@ class LinuxHostContainerTest(unittest.TestCase):
                     clear=True,
                 ),
                 mock.patch.object(
-                    hermetic_container_integration,
+                    podman,
                     "_podman_runtime_dir",
                     return_value=runtime_dir,
                 ),
                 mock.patch.object(
-                    hermetic_container_integration.subprocess,
+                    subprocess,
                     "run",
                     return_value=subprocess.CompletedProcess([], 0),
                 ) as run,
             ):
-                ready, detail = hermetic_container_integration._docker_daemon_status(
-                    "/usr/bin/podman"
-                )
+                ready, detail = docker_module._docker_daemon_status("/usr/bin/podman")
 
             self.assertTrue(ready)
             self.assertEqual("", detail)
@@ -671,7 +675,7 @@ class LinuxHostContainerTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             path = pathlib.Path(temp_dir) / "task-root"
             path.mkdir(mode=0o755)
-            hermetic_container_integration._ensure_owned_podman_directory(path, os.getuid())
+            podman._ensure_owned_podman_directory(path, os.getuid())
             self.assertEqual(path.stat().st_mode & 0o777, 0o700)
 
     def test_ensure_owned_podman_directory_rejects_foreign_owner(self):
@@ -681,7 +685,7 @@ class LinuxHostContainerTest(unittest.TestCase):
             path = pathlib.Path(temp_dir) / "task-root"
             path.mkdir(mode=0o700)
             with self.assertRaises(OSError):
-                hermetic_container_integration._ensure_owned_podman_directory(path, os.getuid() + 1)
+                podman._ensure_owned_podman_directory(path, os.getuid() + 1)
 
     def test_ensure_owned_podman_directory_rejects_symlink(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -690,14 +694,14 @@ class LinuxHostContainerTest(unittest.TestCase):
             link = pathlib.Path(temp_dir) / "task-root"
             link.symlink_to(target, target_is_directory=True)
             with self.assertRaises(OSError):
-                hermetic_container_integration._ensure_owned_podman_directory(link, os.getuid())
+                podman._ensure_owned_podman_directory(link, os.getuid())
 
     def test_ensure_owned_podman_directory_rejects_regular_file(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             path = pathlib.Path(temp_dir) / "task-root"
             path.write_text("not a directory\n", encoding="utf-8")
             with self.assertRaises(OSError):
-                hermetic_container_integration._ensure_owned_podman_directory(path, os.getuid())
+                podman._ensure_owned_podman_directory(path, os.getuid())
 
     def test_podman_daemon_status_migrates_idle_stale_runtime(self):
         stale_error = (
@@ -714,12 +718,12 @@ class LinuxHostContainerTest(unittest.TestCase):
             runtime_dir = pathlib.Path(temp_dir)
             with (
                 mock.patch.object(
-                    hermetic_container_integration,
+                    podman,
                     "_podman_runtime_dir",
                     return_value=runtime_dir,
                 ),
                 mock.patch.object(
-                    hermetic_container_integration.subprocess,
+                    subprocess,
                     "run",
                     side_effect=[
                         stale_result,
@@ -745,9 +749,7 @@ class LinuxHostContainerTest(unittest.TestCase):
                     ],
                 ) as run,
             ):
-                ready, detail = hermetic_container_integration._docker_daemon_status(
-                    "/usr/bin/podman"
-                )
+                ready, detail = docker_module._docker_daemon_status("/usr/bin/podman")
 
             self.assertTrue(ready)
             self.assertEqual("", detail)
@@ -782,12 +784,12 @@ class LinuxHostContainerTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             with (
                 mock.patch.object(
-                    hermetic_container_integration,
+                    podman,
                     "_podman_runtime_dir",
                     return_value=pathlib.Path(temp_dir),
                 ),
                 mock.patch.object(
-                    hermetic_container_integration.subprocess,
+                    subprocess,
                     "run",
                     side_effect=[
                         stale_result,
@@ -801,9 +803,7 @@ class LinuxHostContainerTest(unittest.TestCase):
                     ],
                 ) as run,
             ):
-                ready, detail = hermetic_container_integration._docker_daemon_status(
-                    "/usr/bin/podman"
-                )
+                ready, detail = docker_module._docker_daemon_status("/usr/bin/podman")
 
         self.assertFalse(ready)
         self.assertIn("stops the containers currently running", detail)
@@ -830,7 +830,7 @@ class LinuxHostContainerTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             with (
                 mock.patch.dict(
-                    hermetic_container_integration.os.environ,
+                    os.environ,
                     {
                         "MONGO_PODMAN_TASK_ID": "",
                         "MONGO_BAZEL_PODMAN_AUTO_MIGRATE": "1",
@@ -838,12 +838,12 @@ class LinuxHostContainerTest(unittest.TestCase):
                     },
                 ),
                 mock.patch.object(
-                    hermetic_container_integration,
+                    podman,
                     "_podman_runtime_dir",
                     return_value=pathlib.Path(temp_dir),
                 ),
                 mock.patch.object(
-                    hermetic_container_integration.subprocess,
+                    subprocess,
                     "run",
                     side_effect=[
                         stale_result,
@@ -857,9 +857,7 @@ class LinuxHostContainerTest(unittest.TestCase):
                     ],
                 ) as run,
             ):
-                ready, detail = hermetic_container_integration._docker_daemon_status(
-                    "/usr/bin/podman"
-                )
+                ready, detail = docker_module._docker_daemon_status("/usr/bin/podman")
 
         self.assertFalse(ready)
         self.assertIn("could not determine whether this user has running containers", detail)
@@ -891,7 +889,7 @@ class LinuxHostContainerTest(unittest.TestCase):
             runtime_dir.mkdir(parents=True)
             with (
                 mock.patch.dict(
-                    hermetic_container_integration.os.environ,
+                    os.environ,
                     {
                         "MONGO_PODMAN_TASK_ID": "mongodb_mongo_master_task-0",
                         "MONGO_BAZEL_PODMAN_AUTO_MIGRATE": "1",
@@ -899,17 +897,17 @@ class LinuxHostContainerTest(unittest.TestCase):
                     },
                 ),
                 mock.patch.object(
-                    hermetic_container_integration,
+                    podman,
                     "_podman_task_root",
                     return_value=task_root,
                 ),
                 mock.patch.object(
-                    hermetic_container_integration,
+                    podman,
                     "_podman_runtime_dir",
                     return_value=runtime_dir,
                 ),
                 mock.patch.object(
-                    hermetic_container_integration.subprocess,
+                    subprocess,
                     "run",
                     side_effect=[
                         stale_result,
@@ -935,9 +933,7 @@ class LinuxHostContainerTest(unittest.TestCase):
                     ],
                 ) as run,
             ):
-                ready, detail = hermetic_container_integration._docker_daemon_status(
-                    "/usr/bin/podman"
-                )
+                ready, detail = docker_module._docker_daemon_status("/usr/bin/podman")
 
         self.assertTrue(ready)
         self.assertEqual("", detail)
@@ -969,7 +965,7 @@ class LinuxHostContainerTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             with (
                 mock.patch.dict(
-                    hermetic_container_integration.os.environ,
+                    os.environ,
                     {
                         "MONGO_PODMAN_TASK_ID": "mongodb_mongo_master_task-0",
                         "MONGO_BAZEL_PODMAN_AUTO_MIGRATE": "1",
@@ -977,12 +973,12 @@ class LinuxHostContainerTest(unittest.TestCase):
                     },
                 ),
                 mock.patch.object(
-                    hermetic_container_integration,
+                    podman,
                     "_podman_runtime_dir",
                     return_value=pathlib.Path(temp_dir),
                 ),
                 mock.patch.object(
-                    hermetic_container_integration.subprocess,
+                    subprocess,
                     "run",
                     side_effect=[
                         stale_result,
@@ -1009,9 +1005,7 @@ class LinuxHostContainerTest(unittest.TestCase):
                     ],
                 ) as run,
             ):
-                ready, detail = hermetic_container_integration._docker_daemon_status(
-                    "/usr/bin/podman"
-                )
+                ready, detail = docker_module._docker_daemon_status("/usr/bin/podman")
 
         self.assertFalse(ready)
         self.assertIn("could not determine whether this user has running containers", detail)
@@ -1039,16 +1033,16 @@ class LinuxHostContainerTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             with (
                 mock.patch.dict(
-                    hermetic_container_integration.os.environ,
+                    os.environ,
                     {"MONGO_BAZEL_PODMAN_AUTO_MIGRATE_FORCE": "1"},
                 ),
                 mock.patch.object(
-                    hermetic_container_integration,
+                    podman,
                     "_podman_runtime_dir",
                     return_value=pathlib.Path(temp_dir),
                 ),
                 mock.patch.object(
-                    hermetic_container_integration.subprocess,
+                    subprocess,
                     "run",
                     side_effect=[
                         stale_result,
@@ -1074,9 +1068,7 @@ class LinuxHostContainerTest(unittest.TestCase):
                     ],
                 ) as run,
             ):
-                ready, detail = hermetic_container_integration._docker_daemon_status(
-                    "/usr/bin/podman"
-                )
+                ready, detail = docker_module._docker_daemon_status("/usr/bin/podman")
 
         self.assertTrue(ready)
         self.assertEqual("", detail)
@@ -1105,12 +1097,12 @@ class LinuxHostContainerTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             with (
                 mock.patch.object(
-                    hermetic_container_integration,
+                    podman,
                     "_podman_runtime_dir",
                     return_value=pathlib.Path(temp_dir),
                 ),
                 mock.patch.object(
-                    hermetic_container_integration.subprocess,
+                    subprocess,
                     "run",
                     side_effect=[
                         stale_result,
@@ -1130,9 +1122,7 @@ class LinuxHostContainerTest(unittest.TestCase):
                     ],
                 ) as run,
             ):
-                ready, detail = hermetic_container_integration._docker_daemon_status(
-                    "/usr/bin/podman"
-                )
+                ready, detail = docker_module._docker_daemon_status("/usr/bin/podman")
 
         self.assertFalse(ready)
         self.assertIn("`podman system migrate` failed", detail)
@@ -1148,6 +1138,7 @@ class LinuxHostContainerTest(unittest.TestCase):
         )
 
     def test_task_scoped_podman_panic_is_recovered_with_reset(self):
+        uid = os.getuid()
         stale_error = "invalid internal status"
         stale_result = subprocess.CompletedProcess(
             args=["/usr/bin/podman", "info"],
@@ -1157,26 +1148,26 @@ class LinuxHostContainerTest(unittest.TestCase):
         )
         with tempfile.TemporaryDirectory() as temp_dir:
             task_root = pathlib.Path(temp_dir) / "mongo-linux-podman-task-task_123"
-            runtime_dir = task_root / "mongo-linux-podman-runtime-1000"
+            runtime_dir = task_root / f"mongo-linux-podman-runtime-{uid}"
             runtime_dir.mkdir(parents=True)
             with (
                 mock.patch.dict(
-                    hermetic_container_integration.os.environ,
+                    os.environ,
                     {"MONGO_PODMAN_TASK_ID": "task/123"},
                     clear=True,
                 ),
                 mock.patch.object(
-                    hermetic_container_integration,
+                    podman,
                     "_podman_task_root",
                     return_value=task_root,
                 ),
                 mock.patch.object(
-                    hermetic_container_integration,
+                    podman,
                     "_podman_runtime_dir",
                     return_value=runtime_dir,
                 ),
                 mock.patch.object(
-                    hermetic_container_integration.subprocess,
+                    subprocess,
                     "run",
                     side_effect=[
                         stale_result,
@@ -1214,9 +1205,7 @@ class LinuxHostContainerTest(unittest.TestCase):
                     ],
                 ) as run,
             ):
-                ready, detail = hermetic_container_integration._docker_daemon_status(
-                    "/usr/bin/podman"
-                )
+                ready, detail = docker_module._docker_daemon_status("/usr/bin/podman")
 
         self.assertTrue(ready)
         self.assertEqual("", detail)
@@ -1234,7 +1223,7 @@ class LinuxHostContainerTest(unittest.TestCase):
                     "-l",
                     str(
                         task_root
-                        / "mongo-linux-podman-storage-1000"
+                        / f"mongo-linux-podman-storage-{uid}"
                         / "graphroot"
                         / "overlay-containers"
                     ),
@@ -1259,16 +1248,16 @@ class LinuxHostContainerTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             with (
                 mock.patch.dict(
-                    hermetic_container_integration.os.environ,
+                    os.environ,
                     {"MONGO_BAZEL_PODMAN_AUTO_MIGRATE": "0"},
                 ),
                 mock.patch.object(
-                    hermetic_container_integration,
+                    podman,
                     "_podman_runtime_dir",
                     return_value=pathlib.Path(temp_dir),
                 ),
                 mock.patch.object(
-                    hermetic_container_integration.subprocess,
+                    subprocess,
                     "run",
                     side_effect=[
                         stale_result,
@@ -1276,9 +1265,7 @@ class LinuxHostContainerTest(unittest.TestCase):
                     ],
                 ) as run,
             ):
-                ready, detail = hermetic_container_integration._docker_daemon_status(
-                    "/usr/bin/podman"
-                )
+                ready, detail = docker_module._docker_daemon_status("/usr/bin/podman")
 
         self.assertFalse(ready)
         self.assertIn("MONGO_BAZEL_PODMAN_AUTO_MIGRATE", detail)
@@ -1304,12 +1291,12 @@ class LinuxHostContainerTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             with (
                 mock.patch.object(
-                    hermetic_container_integration,
+                    podman,
                     "_podman_runtime_dir",
                     return_value=pathlib.Path(temp_dir),
                 ),
                 mock.patch.object(
-                    hermetic_container_integration.subprocess,
+                    subprocess,
                     "run",
                     side_effect=[
                         stale_result,
@@ -1320,9 +1307,7 @@ class LinuxHostContainerTest(unittest.TestCase):
                     ],
                 ) as run,
             ):
-                ready, detail = hermetic_container_integration._docker_daemon_status(
-                    "/usr/bin/podman"
-                )
+                ready, detail = docker_module._docker_daemon_status("/usr/bin/podman")
 
         self.assertTrue(ready)
         self.assertEqual("", detail)
@@ -1339,18 +1324,18 @@ class LinuxHostContainerTest(unittest.TestCase):
             runtime_dir = pathlib.Path(temp_dir) / "runtime"
             with (
                 mock.patch.object(
-                    hermetic_container_integration,
+                    podman,
                     "_podman_runtime_dir",
                     return_value=runtime_dir,
                 ),
                 mock.patch.object(
-                    hermetic_container_integration.subprocess,
+                    subprocess,
                     "run",
                     return_value=subprocess.CompletedProcess([], 0),
                 ) as run,
             ):
                 self.assertTrue(
-                    hermetic_container_integration._ensure_linux_container_image(
+                    container_actions.ensure_container_image(
                         "/usr/bin/podman", "quay.io/mongodb/rbe@sha256:abc123"
                     )
                 )
@@ -1369,16 +1354,10 @@ class LinuxHostContainerTest(unittest.TestCase):
             subprocess.CompletedProcess([], 0),
         ]
         with (
-            mock.patch.object(
-                hermetic_container_integration.subprocess, "run", side_effect=completed
-            ) as run,
-            mock.patch.object(hermetic_container_integration.time, "sleep") as sleep,
+            mock.patch.object(subprocess, "run", side_effect=completed) as run,
+            mock.patch.object(time, "sleep") as sleep,
         ):
-            self.assertTrue(
-                hermetic_container_integration._ensure_linux_container_image(
-                    "/usr/bin/podman", image
-                )
-            )
+            self.assertTrue(container_actions.ensure_container_image("/usr/bin/podman", image))
 
         self.assertEqual(
             [call.args[0] for call in run.call_args_list],
@@ -1389,9 +1368,7 @@ class LinuxHostContainerTest(unittest.TestCase):
                 ["/usr/bin/podman", "image", "inspect", image],
             ],
         )
-        sleep.assert_called_once_with(
-            hermetic_container_integration.CONTAINER_NETWORK_RETRY_DELAY_SECONDS
-        )
+        sleep.assert_called_once_with(fsutil.CONTAINER_NETWORK_RETRY_DELAY_SECONDS)
 
     def test_image_pull_retries_without_rejected_podman_credentials(self):
         image = "quay.io/mongodb/rbe@sha256:abc123"
@@ -1416,12 +1393,12 @@ class LinuxHostContainerTest(unittest.TestCase):
                     clear=False,
                 ),
                 mock.patch.object(
-                    hermetic_container_integration,
+                    podman,
                     "_podman_runtime_dir",
                     return_value=runtime_dir,
                 ),
                 mock.patch.object(
-                    hermetic_container_integration.subprocess,
+                    subprocess,
                     "run",
                     side_effect=[
                         subprocess.CompletedProcess([], 1),
@@ -1429,16 +1406,12 @@ class LinuxHostContainerTest(unittest.TestCase):
                     ],
                 ) as run,
                 mock.patch.object(
-                    hermetic_container_integration,
+                    container_actions,
                     "_run_container_network_command",
                     side_effect=[rejected, pulled],
                 ) as network_command,
             ):
-                self.assertTrue(
-                    hermetic_container_integration._ensure_linux_container_image(
-                        "/usr/bin/podman", image
-                    )
-                )
+                self.assertTrue(container_actions.ensure_container_image("/usr/bin/podman", image))
 
         self.assertEqual(2, network_command.call_count)
         first_env = network_command.call_args_list[0].kwargs["env"]
@@ -1471,12 +1444,12 @@ class LinuxHostContainerTest(unittest.TestCase):
                     clear=False,
                 ),
                 mock.patch.object(
-                    hermetic_container_integration,
+                    podman,
                     "_podman_runtime_dir",
                     return_value=runtime_dir,
                 ),
                 mock.patch.object(
-                    hermetic_container_integration.subprocess,
+                    subprocess,
                     "run",
                     side_effect=[
                         subprocess.CompletedProcess([], 1),
@@ -1484,16 +1457,12 @@ class LinuxHostContainerTest(unittest.TestCase):
                     ],
                 ),
                 mock.patch.object(
-                    hermetic_container_integration,
+                    container_actions,
                     "_run_container_network_command",
                     side_effect=[rejected, pulled],
                 ) as network_command,
             ):
-                self.assertTrue(
-                    hermetic_container_integration._ensure_linux_container_image(
-                        "/usr/bin/podman", image
-                    )
-                )
+                self.assertTrue(container_actions.ensure_container_image("/usr/bin/podman", image))
 
         self.assertEqual(2, network_command.call_count)
 
@@ -1521,12 +1490,12 @@ class LinuxHostContainerTest(unittest.TestCase):
                     clear=False,
                 ),
                 mock.patch.object(
-                    hermetic_container_integration,
+                    podman,
                     "_podman_runtime_dir",
                     return_value=runtime_dir,
                 ),
                 mock.patch.object(
-                    hermetic_container_integration.subprocess,
+                    subprocess,
                     "run",
                     side_effect=[
                         subprocess.CompletedProcess([], 1),
@@ -1534,26 +1503,22 @@ class LinuxHostContainerTest(unittest.TestCase):
                     ],
                 ),
                 mock.patch.object(
-                    hermetic_container_integration,
+                    container_actions,
                     "_run_container_network_command",
                     side_effect=[rejected, pulled],
                 ) as network_command,
             ):
-                self.assertTrue(
-                    hermetic_container_integration._ensure_linux_container_image(
-                        "/usr/bin/podman", image
-                    )
-                )
+                self.assertTrue(container_actions.ensure_container_image("/usr/bin/podman", image))
 
         self.assertEqual(2, network_command.call_count)
 
     def test_explicit_container_command_does_not_fall_back(self):
         with mock.patch.object(
-            hermetic_container_integration,
+            docker_module,
             "_docker_daemon_status",
             return_value=(False, "explicit runtime failed"),
         ) as daemon_status:
-            command, detail = hermetic_container_integration._select_linux_container_runtime(
+            command, detail = docker_module._select_linux_container_runtime(
                 {"HERMETIC_CONTAINER_DOCKER_COMMAND": "/custom/runtime"}
             )
 
@@ -1568,17 +1533,11 @@ class LinuxHostContainerTest(unittest.TestCase):
         }
         stdout = StringIO()
         with (
-            mock.patch.object(
-                hermetic_container_integration.platform, "system", return_value="Linux"
-            ),
-            mock.patch.object(
-                hermetic_container_integration.platform, "machine", return_value="x86_64"
-            ),
+            mock.patch.object(platform, "system", return_value="Linux"),
+            mock.patch.object(platform, "machine", return_value="x86_64"),
             redirect_stdout(stdout),
         ):
-            rc = hermetic_container_integration.run_hermetic_container(
-                "/bin/true", ["build", "install-dist-test"], env=env
-            )
+            rc = runner.run_hermetic_container("/bin/true", ["build", "install-dist-test"], env=env)
         self.assertEqual(rc, 0)
         payload = json.loads(stdout.getvalue())
         plan = payload["linux_host_container"]
@@ -1593,20 +1552,16 @@ class LinuxHostContainerTest(unittest.TestCase):
     def test_linux_clean_removes_shared_install_tree(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             output_base = pathlib.Path(temp_dir) / "output-base"
-            shared_install_dir = hermetic_container_integration._linux_shared_install_dir(
-                output_base
-            )
+            shared_install_dir = fsutil._linux_shared_install_dir(output_base)
             shared_install_dir.mkdir()
             stale_file = shared_install_dir / "stale-binary"
             stale_file.write_text("stale", encoding="utf-8")
             with mock.patch.object(
-                hermetic_container_integration.tempfile,
+                tempfile,
                 "gettempdir",
                 return_value=str(pathlib.Path(temp_dir) / "system-temp"),
             ):
-                legacy_shared_install_dir = (
-                    hermetic_container_integration._host_temp_shared_install_dir(output_base)
-                )
+                legacy_shared_install_dir = fsutil._host_temp_shared_install_dir(output_base)
             legacy_shared_install_dir.mkdir(parents=True)
             legacy_stale_file = legacy_shared_install_dir / "stale-binary"
             legacy_stale_file.write_text("stale", encoding="utf-8")
@@ -1620,27 +1575,23 @@ class LinuxHostContainerTest(unittest.TestCase):
             recorded_stale_file.write_text("stale", encoding="utf-8")
 
             with (
+                mock.patch.object(platform, "system", return_value="Linux"),
+                mock.patch.object(runner, "_run_direct", return_value=0) as run_direct,
                 mock.patch.object(
-                    hermetic_container_integration.platform, "system", return_value="Linux"
-                ),
-                mock.patch.object(
-                    hermetic_container_integration, "_run_direct", return_value=0
-                ) as run_direct,
-                mock.patch.object(
-                    hermetic_container_integration.tempfile,
+                    tempfile,
                     "gettempdir",
                     return_value=str(pathlib.Path(temp_dir) / "system-temp"),
                 ),
                 mock.patch.object(
-                    hermetic_container_integration,
+                    fsutil,
                     "_shared_install_record_path",
                     return_value=pathlib.Path(temp_dir) / "shared-install-record.json",
                 ),
             ):
-                hermetic_container_integration._record_shared_install_dir(
+                fsutil._record_shared_install_dir(
                     pathlib.Path(temp_dir) / "repo", recorded_shared_install_dir
                 )
-                rc = hermetic_container_integration.run_hermetic_container(
+                rc = runner.run_hermetic_container(
                     "/usr/bin/bazel",
                     [f"--output_base={output_base}", "clean"],
                     env={},
@@ -1657,20 +1608,14 @@ class LinuxHostContainerTest(unittest.TestCase):
     def test_linux_clean_keeps_shared_install_tree_for_combined_build(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             output_base = pathlib.Path(temp_dir) / "output-base"
-            shared_install_dir = hermetic_container_integration._linux_shared_install_dir(
-                output_base
-            )
+            shared_install_dir = fsutil._linux_shared_install_dir(output_base)
             shared_install_dir.mkdir()
 
             with (
-                mock.patch.object(
-                    hermetic_container_integration.platform, "system", return_value="Linux"
-                ),
-                mock.patch.object(
-                    hermetic_container_integration, "_run_direct", return_value=0
-                ) as run_direct,
+                mock.patch.object(platform, "system", return_value="Linux"),
+                mock.patch.object(runner, "_run_direct", return_value=0) as run_direct,
             ):
-                rc = hermetic_container_integration.run_hermetic_container(
+                rc = runner.run_hermetic_container(
                     "/usr/bin/bazel",
                     [f"--output_base={output_base}", "clean", "build", "//..."],
                     env={},
@@ -1687,15 +1632,13 @@ class LinuxHostContainerTest(unittest.TestCase):
 
     def test_linux_direct_publish_honors_shared_install_override(self):
         with (
+            mock.patch.object(platform, "system", return_value="Linux"),
+            mock.patch.object(runner, "_run_direct", return_value=0),
             mock.patch.object(
-                hermetic_container_integration.platform, "system", return_value="Linux"
-            ),
-            mock.patch.object(hermetic_container_integration, "_run_direct", return_value=0),
-            mock.patch.object(
-                hermetic_container_integration, "_publish_linux_shared_install_symlink"
+                runner, "_publish_linux_shared_install_symlink"
             ) as publish_shared_install,
         ):
-            rc = hermetic_container_integration.run_hermetic_container(
+            rc = runner.run_hermetic_container(
                 "/usr/bin/bazel",
                 ["--output_base=/tmp/output", "build", "install-dist-test"],
                 env={
@@ -1715,54 +1658,44 @@ class LinuxHostContainerTest(unittest.TestCase):
             record_path = pathlib.Path(temp_dir) / "record.json"
             derived = pathlib.Path("/tmp/output-mongo-shared-install")
             with mock.patch.object(
-                hermetic_container_integration,
+                fsutil,
                 "_shared_install_record_path",
                 return_value=record_path,
             ):
                 # A caller-owned override is never recorded, so cleanup cannot delete it.
-                hermetic_container_integration._record_published_shared_install_dir(
+                runner._record_published_shared_install_dir(
                     ["--output_base=/tmp/output", "build"],
                     {"MONGO_BAZEL_SHARED_INSTALL_DIR": str(derived.parent / "custom")},
                     derived.parent / "custom",
                 )
-                self.assertIsNone(
-                    hermetic_container_integration._recorded_shared_install_dir(
-                        pathlib.Path(temp_dir)
-                    )
-                )
+                self.assertIsNone(fsutil._recorded_shared_install_dir(pathlib.Path(temp_dir)))
 
                 # The derived sibling is recorded so a drifted clean can still remove it.
-                hermetic_container_integration._record_published_shared_install_dir(
+                runner._record_published_shared_install_dir(
                     ["--output_base=/tmp/output", "build"],
                     {},
                     derived,
                 )
                 self.assertEqual(
                     derived,
-                    hermetic_container_integration._recorded_shared_install_dir(
-                        pathlib.Path(temp_dir)
-                    ),
+                    fsutil._recorded_shared_install_dir(pathlib.Path(temp_dir)),
                 )
 
     def test_linux_direct_build_keeps_install_actions_out_of_sandboxes(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             with (
+                mock.patch.object(platform, "system", return_value="Linux"),
+                mock.patch.object(runner, "_run_direct", return_value=0) as run_direct,
                 mock.patch.object(
-                    hermetic_container_integration.platform, "system", return_value="Linux"
-                ),
-                mock.patch.object(
-                    hermetic_container_integration, "_run_direct", return_value=0
-                ) as run_direct,
-                mock.patch.object(
-                    hermetic_container_integration, "_publish_linux_shared_install_symlink"
+                    runner, "_publish_linux_shared_install_symlink"
                 ) as publish_shared_install,
                 mock.patch.object(
-                    hermetic_container_integration,
+                    fsutil,
                     "_shared_install_record_path",
                     return_value=pathlib.Path(temp_dir) / "shared-install-record.json",
                 ),
             ):
-                rc = hermetic_container_integration.run_hermetic_container(
+                rc = runner.run_hermetic_container(
                     "/usr/bin/bazel",
                     ["--output_base=/tmp/output", "build", "install-dist-test"],
                     env={"MONGO_LINUX_CONTAINER_ACTIONS": "0"},
@@ -1802,55 +1735,51 @@ class LinuxHostContainerTest(unittest.TestCase):
             return RecordingLock()
 
         with (
+            mock.patch.object(platform, "system", return_value="Linux"),
+            mock.patch.object(platform, "machine", return_value="x86_64"),
             mock.patch.object(
-                hermetic_container_integration.platform, "system", return_value="Linux"
-            ),
-            mock.patch.object(
-                hermetic_container_integration.platform, "machine", return_value="x86_64"
-            ),
-            mock.patch.object(
-                hermetic_container_integration,
+                runner,
                 "_docker_daemon_status",
                 return_value=(True, ""),
             ),
             mock.patch.object(
-                hermetic_container_integration,
+                runner,
                 "_select_linux_container_runtime",
                 return_value=("/usr/bin/docker", ""),
             ),
             mock.patch.object(
-                hermetic_container_integration,
+                runner,
                 "_linux_host_container_config",
                 return_value=container_config,
             ),
             mock.patch.object(
-                hermetic_container_integration,
-                "_ensure_linux_container_image",
+                container_actions,
+                "ensure_container_image",
                 return_value=True,
             ),
             mock.patch.object(
-                hermetic_container_integration,
+                runner,
                 "_write_linux_container_actions_config_unlocked",
                 return_value=(pathlib.Path("/output-base/config.json"), container_config),
             ),
             mock.patch.object(
-                hermetic_container_integration,
-                "_linux_container_actions_lock",
+                container_actions,
+                "lock",
                 side_effect=record_lock,
             ),
             mock.patch.object(
-                hermetic_container_integration,
+                runner,
                 "_ensure_linux_action_container",
                 return_value=(True, ""),
             ) as ensure_container,
             mock.patch.object(
-                hermetic_container_integration,
+                runner,
                 "_run_direct",
                 side_effect=lambda *_args: lock_events.append("run") or 0,
             ) as run_direct,
             redirect_stderr(stderr),
         ):
-            rc = hermetic_container_integration.run_hermetic_container(
+            rc = runner.run_hermetic_container(
                 "/usr/bin/bazel",
                 ["build", "install-dist-test"],
                 env={"MONGO_HERMETIC_CONTAINER_DISTRO": "rhel9"},
@@ -1873,6 +1802,11 @@ class LinuxHostContainerTest(unittest.TestCase):
             run_direct.call_args.args[1],
         )
 
+    @mock.patch.object(
+        runner,
+        "_publish_linux_shared_install_symlink",
+        new=lambda *args, **kwargs: None,
+    )
     def test_container_start_failure_falls_back_to_native_build(self):
         container_config = {
             "image": "quay.io/mongodb/rbe@sha256:abc123",
@@ -1893,50 +1827,46 @@ class LinuxHostContainerTest(unittest.TestCase):
 
         stderr = StringIO()
         with (
+            mock.patch.object(platform, "system", return_value="Linux"),
+            mock.patch.object(platform, "machine", return_value="x86_64"),
             mock.patch.object(
-                hermetic_container_integration.platform, "system", return_value="Linux"
-            ),
-            mock.patch.object(
-                hermetic_container_integration.platform, "machine", return_value="x86_64"
-            ),
-            mock.patch.object(
-                hermetic_container_integration,
+                runner,
                 "_select_linux_container_runtime",
                 return_value=("/usr/bin/docker", ""),
             ),
             mock.patch.object(
-                hermetic_container_integration,
+                runner,
                 "_linux_host_container_config",
                 return_value=container_config,
             ),
             mock.patch.object(
-                hermetic_container_integration,
-                "_ensure_linux_container_image",
+                container_actions,
+                "ensure_container_image",
                 return_value=True,
             ),
             mock.patch.object(
-                hermetic_container_integration,
+                runner,
                 "_write_linux_container_actions_config_unlocked",
                 return_value=(pathlib.Path("/output-base/config.json"), container_config),
             ),
             mock.patch.object(
-                hermetic_container_integration,
-                "_linux_container_actions_lock",
+                container_actions,
+                "lock",
                 side_effect=record_lock,
             ),
             mock.patch.object(
-                hermetic_container_integration,
+                runner,
                 "_ensure_linux_action_container",
                 return_value=(False, "newuidmap: Operation not permitted"),
             ),
             mock.patch.object(
-                hermetic_container_integration,
+                runner,
                 "_run_direct",
                 side_effect=lambda *_args: lock_events.append("run") or 0,
             ) as run_direct,
             redirect_stderr(stderr),
         ):
-            rc = hermetic_container_integration.run_hermetic_container(
+            rc = runner.run_hermetic_container(
                 "/usr/bin/bazel",
                 ["build", "install-dist-test"],
                 env={"MONGO_HERMETIC_CONTAINER_DISTRO": "rhel9"},
@@ -1958,26 +1888,25 @@ class LinuxHostContainerTest(unittest.TestCase):
             ],
         )
 
+    @mock.patch.object(
+        runner,
+        "_publish_linux_shared_install_symlink",
+        new=lambda *args, **kwargs: None,
+    )
     def test_missing_docker_falls_back_to_native_build(self):
         stderr = StringIO()
         with (
+            mock.patch.object(platform, "system", return_value="Linux"),
+            mock.patch.object(platform, "machine", return_value="x86_64"),
             mock.patch.object(
-                hermetic_container_integration.platform, "system", return_value="Linux"
-            ),
-            mock.patch.object(
-                hermetic_container_integration.platform, "machine", return_value="x86_64"
-            ),
-            mock.patch.object(
-                hermetic_container_integration,
+                docker_module,
                 "_docker_daemon_status",
                 return_value=(False, "Docker command not found: docker"),
             ),
-            mock.patch.object(
-                hermetic_container_integration, "_run_direct", return_value=0
-            ) as run_direct,
+            mock.patch.object(runner, "_run_direct", return_value=0) as run_direct,
             redirect_stderr(stderr),
         ):
-            rc = hermetic_container_integration.run_hermetic_container(
+            rc = runner.run_hermetic_container(
                 "/usr/bin/bazel",
                 ["build", "install-dist-test"],
                 env={"MONGO_HERMETIC_CONTAINER_DISTRO": "rhel9"},
@@ -1998,31 +1927,30 @@ class LinuxHostContainerTest(unittest.TestCase):
             ],
         )
 
+    @mock.patch.object(
+        runner,
+        "_publish_linux_shared_install_symlink",
+        new=lambda *args, **kwargs: None,
+    )
     def test_image_pull_failure_falls_back_to_native_build(self):
         stderr = StringIO()
         with (
+            mock.patch.object(platform, "system", return_value="Linux"),
+            mock.patch.object(platform, "machine", return_value="x86_64"),
             mock.patch.object(
-                hermetic_container_integration.platform, "system", return_value="Linux"
-            ),
-            mock.patch.object(
-                hermetic_container_integration.platform, "machine", return_value="x86_64"
-            ),
-            mock.patch.object(
-                hermetic_container_integration,
+                docker_module,
                 "_docker_daemon_status",
                 return_value=(True, ""),
             ),
             mock.patch.object(
-                hermetic_container_integration,
-                "_ensure_linux_container_image",
+                container_actions,
+                "ensure_container_image",
                 return_value=False,
             ),
-            mock.patch.object(
-                hermetic_container_integration, "_run_direct", return_value=0
-            ) as run_direct,
+            mock.patch.object(runner, "_run_direct", return_value=0) as run_direct,
             redirect_stderr(stderr),
         ):
-            rc = hermetic_container_integration.run_hermetic_container(
+            rc = runner.run_hermetic_container(
                 "/usr/bin/bazel",
                 ["build", "install-dist-test"],
                 env={"MONGO_HERMETIC_CONTAINER_DISTRO": "rhel9"},
@@ -2042,19 +1970,18 @@ class LinuxHostContainerTest(unittest.TestCase):
             ],
         )
 
+    @mock.patch.object(
+        runner,
+        "_publish_linux_shared_install_symlink",
+        new=lambda *args, **kwargs: None,
+    )
     def test_explicit_native_opt_out_does_not_check_docker(self):
         with (
-            mock.patch.object(
-                hermetic_container_integration.platform, "system", return_value="Linux"
-            ),
-            mock.patch.object(
-                hermetic_container_integration, "_docker_daemon_status"
-            ) as docker_status,
-            mock.patch.object(
-                hermetic_container_integration, "_run_direct", return_value=0
-            ) as run_direct,
+            mock.patch.object(platform, "system", return_value="Linux"),
+            mock.patch.object(runner, "_docker_daemon_status") as docker_status,
+            mock.patch.object(runner, "_run_direct", return_value=0) as run_direct,
         ):
-            rc = hermetic_container_integration.run_hermetic_container(
+            rc = runner.run_hermetic_container(
                 "/usr/bin/bazel",
                 ["build", "install-dist-test"],
                 env={
@@ -2075,50 +2002,50 @@ class LinuxHostContainerTest(unittest.TestCase):
             with self.subTest(command=command):
                 with (
                     mock.patch.object(
-                        hermetic_container_integration.platform,
+                        platform,
                         "system",
                         return_value="Linux",
                     ),
                     mock.patch.object(
-                        hermetic_container_integration.platform,
+                        platform,
                         "machine",
                         return_value="x86_64",
                     ),
                     mock.patch.object(
-                        hermetic_container_integration,
+                        runner,
                         "_select_linux_container_runtime",
                     ) as select_runtime,
                     mock.patch.object(
-                        hermetic_container_integration,
+                        runner,
                         "_linux_host_container_config",
                     ) as container_config,
                     mock.patch.object(
-                        hermetic_container_integration,
-                        "_ensure_linux_container_image",
+                        container_actions,
+                        "ensure_container_image",
                     ) as ensure_image,
                     mock.patch.object(
-                        hermetic_container_integration,
+                        fsutil,
                         "_ensure_linux_action_sandbox_base",
                     ) as ensure_sandbox,
                     mock.patch.object(
-                        hermetic_container_integration,
+                        runner,
                         "_write_linux_container_actions_config_unlocked",
                     ) as write_config,
                     mock.patch.object(
-                        hermetic_container_integration,
+                        runner,
                         "_ensure_linux_action_container",
                     ) as ensure_container,
                     mock.patch.object(
-                        hermetic_container_integration,
+                        runner,
                         "_publish_linux_host_convenience_symlinks",
                     ),
                     mock.patch.object(
-                        hermetic_container_integration,
+                        runner,
                         "_run_direct",
                         return_value=0,
                     ) as run_direct,
                 ):
-                    rc = hermetic_container_integration.run_hermetic_container(
+                    rc = runner.run_hermetic_container(
                         "/usr/bin/bazel",
                         [command, "//src/mongo:some_target"],
                         env={"MONGO_HERMETIC_CONTAINER_DISTRO": "rhel9"},
@@ -2142,7 +2069,7 @@ class LinuxHostContainerOutputBaseTest(unittest.TestCase):
     def test_action_sandbox_base_is_a_non_overlapping_output_base_sibling(self):
         output_base = pathlib.Path("/cache/output-base")
 
-        sandbox_base = hermetic_container_integration._linux_action_sandbox_base(output_base)
+        sandbox_base = fsutil._linux_action_sandbox_base(output_base)
 
         self.assertEqual(pathlib.Path("/cache/output-base-mongo-action-sandbox"), sandbox_base)
         self.assertNotEqual(output_base, sandbox_base)
@@ -2152,16 +2079,14 @@ class LinuxHostContainerOutputBaseTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             output_base = pathlib.Path(temp_dir) / "output-base"
 
-            sandbox_base = hermetic_container_integration._ensure_linux_action_sandbox_base(
-                output_base
-            )
+            sandbox_base = fsutil._ensure_linux_action_sandbox_base(output_base)
 
             self.assertTrue(sandbox_base.is_dir())
 
     def test_shared_install_dir_is_a_non_overlapping_output_base_sibling(self):
         output_base = pathlib.Path("/cache/output-base")
 
-        shared_install_dir = hermetic_container_integration._linux_shared_install_dir(output_base)
+        shared_install_dir = fsutil._linux_shared_install_dir(output_base)
 
         self.assertEqual(
             pathlib.Path("/cache/output-base-mongo-shared-install"), shared_install_dir
@@ -2179,24 +2104,24 @@ class LinuxHostContainerOutputBaseTest(unittest.TestCase):
             (repo_root / "bazel-bin").symlink_to(bin_dir, target_is_directory=True)
 
             with mock.patch.object(
-                hermetic_container_integration.tempfile,
+                tempfile,
                 "gettempdir",
                 return_value=str(root / "system-temp"),
             ):
-                hermetic_container_integration._publish_macos_shared_install_symlink(
+                symlinks._publish_macos_shared_install_symlink(
                     [f"--output_base={output_base}", "build"], {}, repo_root=repo_root
                 )
 
             install_link = repo_root / "bazel-bin" / "install"
             expected = root / "system-temp" / "output-base-mongo-shared-install" / "k8-opt"
             self.assertTrue(install_link.is_symlink())
-            self.assertEqual(expected, install_link.resolve())
+            self.assertEqual(expected.resolve(), install_link.resolve())
 
     def test_explicit_output_base_startup_option(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = pathlib.Path(temp_dir)
             self.assertEqual(
-                hermetic_container_integration._bazel_output_base(
+                bazelrc._bazel_output_base(
                     ["--output_base=/some/output/base", "build", "+t"],
                     env={},
                     repo_root=repo_root,
@@ -2215,7 +2140,7 @@ class LinuxHostContainerOutputBaseTest(unittest.TestCase):
             expected.mkdir(parents=True)
 
             self.assertEqual(
-                hermetic_container_integration._bazel_output_base(
+                bazelrc._bazel_output_base(
                     [
                         "--nosystem_rc",
                         "--nohome_rc",
@@ -2244,7 +2169,7 @@ class LinuxHostContainerOutputBaseTest(unittest.TestCase):
             )
 
             self.assertEqual(
-                hermetic_container_integration._bazel_output_base(
+                bazelrc._bazel_output_base(
                     [
                         "--nosystem_rc",
                         "--nohome_rc",
@@ -2269,12 +2194,12 @@ class LinuxHostContainerOutputBaseTest(unittest.TestCase):
             ).hexdigest()
 
             self.assertEqual(
-                hermetic_container_integration._bazel_output_base(
+                bazelrc._bazel_output_base(
                     ["--nosystem_rc", "--nohome_rc", "--noworkspace_rc", "build"],
                     env={"TEST_TMPDIR": str(test_tmpdir)},
                     repo_root=repo_root,
                 ),
-                test_tmpdir / f"_bazel_{hermetic_container_integration._current_user()}" / digest,
+                test_tmpdir / f"_bazel_{fsutil._current_user()}" / digest,
             )
 
     def test_symlinked_workspace_prefers_resolved_output_base(self):
@@ -2301,7 +2226,7 @@ class LinuxHostContainerOutputBaseTest(unittest.TestCase):
             stale_base.mkdir(parents=True)
 
             self.assertEqual(
-                hermetic_container_integration._bazel_output_base(
+                bazelrc._bazel_output_base(
                     [
                         "--nosystem_rc",
                         "--nohome_rc",
@@ -2324,7 +2249,7 @@ class LinuxHostContainerOutputBaseTest(unittest.TestCase):
             )
 
             self.assertEqual(
-                hermetic_container_integration._bazel_output_base(
+                bazelrc._bazel_output_base(
                     [f"@{argfile}", "build", "+t"],
                     env={},
                     repo_root=pathlib.Path(temp_dir) / "repo",
@@ -2349,7 +2274,7 @@ class LinuxHostContainerOutputBaseTest(unittest.TestCase):
             expected.mkdir(parents=True)
 
             self.assertEqual(
-                hermetic_container_integration._bazel_output_base(
+                bazelrc._bazel_output_base(
                     ["--nosystem_rc", "--nohome_rc", "build"],
                     env={},
                     repo_root=repo_root,
@@ -2370,7 +2295,7 @@ class LinuxHostContainerOutputBaseTest(unittest.TestCase):
             )
 
             self.assertEqual(
-                hermetic_container_integration._bazel_output_base(
+                bazelrc._bazel_output_base(
                     ["--nosystem_rc", "--noworkspace_rc", "build"],
                     env={"HOME": str(home)},
                     repo_root=repo_root,
@@ -2390,22 +2315,18 @@ class LinuxHostContainerOutputBaseTest(unittest.TestCase):
             imported_rc.write_text(f"startup --output_base={output_base}\n", encoding="utf-8")
 
             self.assertEqual(
-                hermetic_container_integration._bazel_output_base(
+                bazelrc._bazel_output_base(
                     ["--ignore_all_rc_files", f"--bazelrc={custom_rc}", "build"],
                     env={},
                     repo_root=repo_root,
                 ),
                 # --ignore_all_rc_files intentionally suppresses explicit rc files too.
-                pathlib.Path(
-                    hermetic_container_integration._default_bazel_user_output_root(
-                        {}, system="Linux"
-                    )
-                )
+                pathlib.Path(fsutil._default_bazel_user_output_root({}, system="Linux"))
                 / hashlib.md5(str(repo_root.resolve()).encode(), usedforsecurity=False).hexdigest(),
             )
 
             self.assertEqual(
-                hermetic_container_integration._bazel_output_base(
+                bazelrc._bazel_output_base(
                     [
                         "--nosystem_rc",
                         "--nohome_rc",
@@ -2421,7 +2342,7 @@ class LinuxHostContainerOutputBaseTest(unittest.TestCase):
 
     def test_replace_output_base_startup_option(self):
         self.assertEqual(
-            hermetic_container_integration._replace_bazel_startup_option(
+            bazelrc._replace_bazel_startup_option(
                 ["--output_base", "/old", "--batch", "build", "//:target"],
                 "--output_base",
                 "/new",
@@ -2437,11 +2358,11 @@ class LinuxHostContainerOutputBaseTest(unittest.TestCase):
             output_base = temp / "output_base"
 
             with mock.patch.object(
-                hermetic_container_integration.tempfile,
+                tempfile,
                 "gettempdir",
                 return_value=str(temp / "system-temp"),
             ):
-                path, config = hermetic_container_integration._write_linux_container_actions_config(
+                path, config = cross_linux._write_linux_container_actions_config(
                     [f"--output_base={output_base}", "build"],
                     env={"MONGO_HERMETIC_CONTAINER_DISTRO": "rhel9"},
                     repo_root=repo_root,
@@ -2450,8 +2371,7 @@ class LinuxHostContainerOutputBaseTest(unittest.TestCase):
 
             self.assertEqual(
                 path,
-                output_base
-                / hermetic_container_integration.LINUX_CONTAINER_ACTIONS_CONFIG_FILENAME,
+                output_base / container_actions.CONTAINER_ACTIONS_CONFIG_FILENAME,
             )
             on_disk = json.loads(path.read_text(encoding="utf-8"))
             self.assertEqual(on_disk, config)
@@ -2478,11 +2398,11 @@ class LinuxHostContainerOutputBaseTest(unittest.TestCase):
             output_base = temp / "output_base"
 
             with mock.patch.object(
-                hermetic_container_integration.os,
+                os,
                 "replace",
                 wraps=os.replace,
             ) as replace:
-                path, _ = hermetic_container_integration._write_linux_container_actions_config(
+                path, _ = cross_linux._write_linux_container_actions_config(
                     [f"--output_base={output_base}", "build"],
                     env={"MONGO_HERMETIC_CONTAINER_DISTRO": "rhel9"},
                     repo_root=repo_root,
@@ -2502,24 +2422,20 @@ class LinuxHostContainerOutputBaseTest(unittest.TestCase):
             repo_root.mkdir()
             output_base = temp / "output_base"
             with mock.patch.object(
-                hermetic_container_integration.tempfile,
+                tempfile,
                 "gettempdir",
                 return_value=str(temp / "system-temp"),
             ):
-                shared_install_dir = hermetic_container_integration._linux_shared_install_dir(
-                    output_base
-                )
+                shared_install_dir = fsutil._linux_shared_install_dir(output_base)
                 shared_install_dir.mkdir(parents=True)
                 stale_file = shared_install_dir / "stale-binary"
                 stale_file.write_text("stale", encoding="utf-8")
-                legacy_shared_install_dir = (
-                    hermetic_container_integration._host_temp_shared_install_dir(output_base)
-                )
+                legacy_shared_install_dir = fsutil._host_temp_shared_install_dir(output_base)
                 legacy_shared_install_dir.mkdir(parents=True)
                 legacy_stale_file = legacy_shared_install_dir / "legacy-stale-binary"
                 legacy_stale_file.write_text("stale", encoding="utf-8")
 
-                hermetic_container_integration._write_linux_container_actions_config(
+                cross_linux._write_linux_container_actions_config(
                     [f"--output_base={output_base}", "build"],
                     env={"MONGO_HERMETIC_CONTAINER_DISTRO": "rhel9"},
                     repo_root=repo_root,
@@ -2539,11 +2455,11 @@ class LinuxHostContainerOutputBaseTest(unittest.TestCase):
             repo_root.mkdir()
             output_base = repo_root / "output-base"
             with mock.patch.object(
-                hermetic_container_integration.tempfile,
+                tempfile,
                 "gettempdir",
                 return_value=str(temp / "system-temp"),
             ):
-                _, config = hermetic_container_integration._write_linux_container_actions_config(
+                _, config = cross_linux._write_linux_container_actions_config(
                     [f"--output_base={output_base}", "build"],
                     env={"MONGO_HERMETIC_CONTAINER_DISTRO": "rhel9"},
                     repo_root=repo_root,
@@ -2562,7 +2478,7 @@ class LinuxHostContainerOutputBaseTest(unittest.TestCase):
             repo_root.mkdir()
             output_base = temp / "output_base"
 
-            _, config = hermetic_container_integration._write_linux_container_actions_config(
+            _, config = cross_linux._write_linux_container_actions_config(
                 [f"--output_base={output_base}", "build"],
                 env={
                     "MONGO_HERMETIC_CONTAINER_DISTRO": "rhel9",
@@ -2575,7 +2491,7 @@ class LinuxHostContainerOutputBaseTest(unittest.TestCase):
 
             # A caller-owned override is honored even when it nests inside the workspace; the
             # layout consequences belong to the caller who chose the path.
-            _, nested_config = hermetic_container_integration._write_linux_container_actions_config(
+            _, nested_config = cross_linux._write_linux_container_actions_config(
                 [f"--output_base={repo_root / 'output-base'}", "build"],
                 env={
                     "MONGO_HERMETIC_CONTAINER_DISTRO": "rhel9",
@@ -2601,19 +2517,13 @@ class LinuxHostContainerOutputBaseTest(unittest.TestCase):
                 "machine": "x86_64",
             }
 
-            _, first = hermetic_container_integration._write_linux_container_actions_config(
-                args, **kwargs
-            )
-            _, second = hermetic_container_integration._write_linux_container_actions_config(
-                args, **kwargs
-            )
+            _, first = cross_linux._write_linux_container_actions_config(args, **kwargs)
+            _, second = cross_linux._write_linux_container_actions_config(args, **kwargs)
             self.assertEqual(first["output_base_generation"], second["output_base_generation"])
             self.assertEqual(first["container_name"], second["container_name"])
 
             output_base.rename(temp / "stale_output_base")
-            _, replacement = hermetic_container_integration._write_linux_container_actions_config(
-                args, **kwargs
-            )
+            _, replacement = cross_linux._write_linux_container_actions_config(args, **kwargs)
             self.assertNotEqual(
                 first["output_base_generation"], replacement["output_base_generation"]
             )
@@ -2645,20 +2555,20 @@ index 7e2f4c1..0d5b8bc 100644
 
             with (
                 mock.patch.object(
-                    hermetic_container_integration,
+                    cross_linux,
                     "LINUX_CROSS_MODULE_OVERRIDES",
                     overrides,
                 ),
                 mock.patch.object(
-                    hermetic_container_integration,
+                    cross_linux,
                     "_bazel_output_base",
                     return_value=output_base,
                 ),
             ):
-                args = hermetic_container_integration._linux_cross_module_override_args(
+                args = cross_linux._linux_cross_module_override_args(
                     ["build", "//:target"], {}, repo_root=repo_root
                 )
-                second_args = hermetic_container_integration._linux_cross_module_override_args(
+                second_args = cross_linux._linux_cross_module_override_args(
                     ["build", "//:target"], {}, repo_root=repo_root
                 )
 
@@ -2677,12 +2587,12 @@ index 7e2f4c1..0d5b8bc 100644
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = pathlib.Path(temp_dir)
             with mock.patch.object(
-                hermetic_container_integration,
+                cross_linux,
                 "_bazel_output_base",
                 side_effect=AssertionError("output base should not be queried"),
             ):
                 self.assertEqual(
-                    hermetic_container_integration._linux_cross_module_override_args(
+                    cross_linux._linux_cross_module_override_args(
                         ["query", "//:target"], {}, repo_root=repo_root
                     ),
                     [],
@@ -2721,18 +2631,18 @@ index 7e2f4c1..0d5b8bc 100644
 
             with (
                 mock.patch.object(
-                    hermetic_container_integration,
+                    cross_linux,
                     "LINUX_CROSS_MODULE_OVERRIDES",
                     overrides,
                 ),
                 mock.patch.object(
-                    hermetic_container_integration,
+                    cross_linux,
                     "_bazel_output_base",
                     return_value=output_base,
                 ),
                 mock.patch("os.rename", side_effect=concurrent_materialization_rename),
             ):
-                args = hermetic_container_integration._linux_cross_module_override_args(
+                args = cross_linux._linux_cross_module_override_args(
                     ["build", "//:target"], {}, repo_root=repo_root
                 )
 
@@ -2768,12 +2678,12 @@ index 7e2f4c1..0d5b8bc 100644
 
             with (
                 mock.patch.object(
-                    hermetic_container_integration,
+                    cross_linux,
                     "LINUX_CROSS_MODULE_OVERRIDES",
                     overrides,
                 ),
                 mock.patch.object(
-                    hermetic_container_integration,
+                    cross_linux,
                     "_bazel_output_base",
                     return_value=output_base,
                 ),
@@ -2783,7 +2693,7 @@ index 7e2f4c1..0d5b8bc 100644
                 ),
                 self.assertRaises(OSError),
             ):
-                hermetic_container_integration._linux_cross_module_override_args(
+                cross_linux._linux_cross_module_override_args(
                     ["build", "//:target"], {}, repo_root=repo_root
                 )
 

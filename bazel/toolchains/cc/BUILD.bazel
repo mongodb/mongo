@@ -1,0 +1,14 @@
+load("@rules_python//python:defs.bzl", "py_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(["container_action.py"])
+
+py_test(
+    name = "container_action_test",
+    srcs = [
+        "container_action.py",
+        "container_action_test.py",
+    ],
+    main = "container_action_test.py",
+)

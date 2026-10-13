@@ -7,10 +7,12 @@ import importlib.util
 import pathlib
 import subprocess
 import tempfile
+import time
 import unittest
 from unittest import mock
 
-from bazel.wrapper_hook import hermetic_container_integration
+from bazel.wrapper_hook.hermetic_container import distro as distro_module
+from bazel.wrapper_hook.hermetic_container import fsutil, volumes
 
 HERMETIC_CONTAINER_PATH = (
     pathlib.Path(__file__).parents[2] / "hermetic_container" / "hermetic_container.py"
@@ -34,7 +36,7 @@ class DistroSelectionTest(unittest.TestCase):
             )
 
             self.assertEqual(
-                hermetic_container_integration.detect_host_distro(os_release),
+                distro_module.detect_host_distro(os_release),
                 "ubuntu22",
             )
 
@@ -47,7 +49,7 @@ class DistroSelectionTest(unittest.TestCase):
             )
 
             self.assertEqual(
-                hermetic_container_integration.detect_host_distro(os_release),
+                distro_module.detect_host_distro(os_release),
                 "ubuntu26",
             )
 
@@ -66,7 +68,7 @@ class DistroSelectionTest(unittest.TestCase):
             )
 
             self.assertEqual(
-                hermetic_container_integration.detect_host_distro(os_release, system_release),
+                distro_module.detect_host_distro(os_release, system_release),
                 "amazon_linux_2023_3",
             )
 
@@ -85,7 +87,7 @@ class DistroSelectionTest(unittest.TestCase):
             )
 
             self.assertEqual(
-                hermetic_container_integration.detect_host_distro(os_release, system_release),
+                distro_module.detect_host_distro(os_release, system_release),
                 "amazon_linux_2023",
             )
 
@@ -95,7 +97,7 @@ class DistroSelectionTest(unittest.TestCase):
             "amazon_linux_2023": {"container-url": "docker://quay.io/mongodb/rbe@sha256:2"},
         }
 
-        selected = hermetic_container_integration.select_distro(
+        selected = distro_module.select_distro(
             containers,
             env={},
             detected_distro="ubuntu22",
@@ -111,7 +113,7 @@ class DistroSelectionTest(unittest.TestCase):
             "amazon_linux_2023": {"container-url": "docker://quay.io/mongodb/rbe@sha256:2"},
         }
 
-        selected = hermetic_container_integration.select_distro(
+        selected = distro_module.select_distro(
             containers,
             env={},
             detected_distro="ubuntu22",
@@ -123,7 +125,7 @@ class DistroSelectionTest(unittest.TestCase):
 
     def test_override_must_be_known_container(self):
         with self.assertRaisesRegex(RuntimeError, "not a known RBE container"):
-            hermetic_container_integration.select_distro(
+            distro_module.select_distro(
                 {"amazon_linux_2023": {}},
                 env={"MONGO_HERMETIC_CONTAINER_DISTRO": "not_real"},
             )
@@ -131,7 +133,7 @@ class DistroSelectionTest(unittest.TestCase):
 
 class DockerImageTest(unittest.TestCase):
     def test_parses_digest_image(self):
-        image = hermetic_container_integration.parse_docker_image(
+        image = distro_module.parse_docker_image(
             "docker://quay.io/mongodb/bazel-remote-execution@sha256:abc123"
         )
 
@@ -141,16 +143,14 @@ class DockerImageTest(unittest.TestCase):
         self.assertEqual(image.digest_or_tag, "abc123")
 
     def test_parses_tag_image(self):
-        image = hermetic_container_integration.parse_docker_image("quay.io/mongodb/rbe:ubuntu22")
+        image = distro_module.parse_docker_image("quay.io/mongodb/rbe:ubuntu22")
 
         self.assertEqual(image.repository, "quay.io/mongodb")
         self.assertEqual(image.image_name, "rbe:ubuntu22")
         self.assertEqual(image.digest_or_tag, "ubuntu22")
 
     def test_derived_image_tag_includes_built_image_identity(self):
-        base_image = hermetic_container_integration.parse_docker_image(
-            "quay.io/mongodb/rbe@sha256:abc123"
-        )
+        base_image = distro_module.parse_docker_image("quay.io/mongodb/rbe@sha256:abc123")
         image_id = "sha256:" + "a" * 64
         with tempfile.TemporaryDirectory() as temp_dir:
             completed = [
@@ -160,14 +160,12 @@ class DockerImageTest(unittest.TestCase):
                 subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr=""),
             ]
             with mock.patch.object(
-                hermetic_container_integration.subprocess,
+                subprocess,
                 "run",
                 side_effect=completed,
             ) as run:
-                image, dockerfile = (
-                    hermetic_container_integration._hermetic_container_image_with_git_layer(
-                        pathlib.Path(temp_dir), base_image, docker_command="docker"
-                    )
+                image, dockerfile = volumes._hermetic_container_image_with_git_layer(
+                    pathlib.Path(temp_dir), base_image, docker_command="docker"
                 )
                 self.assertEqual(
                     image.full_name,
@@ -186,9 +184,7 @@ class DockerImageTest(unittest.TestCase):
                 )
 
     def test_derived_image_build_retries_transient_network_failures(self):
-        base_image = hermetic_container_integration.parse_docker_image(
-            "quay.io/mongodb/rbe@sha256:abc123"
-        )
+        base_image = distro_module.parse_docker_image("quay.io/mongodb/rbe@sha256:abc123")
         image_id = "sha256:" + "a" * 64
         with tempfile.TemporaryDirectory() as temp_dir:
             completed = [
@@ -199,12 +195,10 @@ class DockerImageTest(unittest.TestCase):
                 subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr=""),
             ]
             with (
-                mock.patch.object(
-                    hermetic_container_integration.subprocess, "run", side_effect=completed
-                ) as run,
-                mock.patch.object(hermetic_container_integration.time, "sleep") as sleep,
+                mock.patch.object(subprocess, "run", side_effect=completed) as run,
+                mock.patch.object(time, "sleep") as sleep,
             ):
-                hermetic_container_integration._hermetic_container_image_with_git_layer(
+                volumes._hermetic_container_image_with_git_layer(
                     pathlib.Path(temp_dir), base_image, docker_command="docker"
                 )
 
@@ -212,9 +206,7 @@ class DockerImageTest(unittest.TestCase):
             [call.args[0][1] for call in run.call_args_list[1:3]],
             ["build", "build"],
         )
-        sleep.assert_called_once_with(
-            hermetic_container_integration.CONTAINER_NETWORK_RETRY_DELAY_SECONDS
-        )
+        sleep.assert_called_once_with(fsutil.CONTAINER_NETWORK_RETRY_DELAY_SECONDS)
 
 
 if __name__ == "__main__":

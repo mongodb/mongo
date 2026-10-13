@@ -6,6 +6,7 @@ import importlib.util
 import json
 import os
 import pathlib
+import platform
 import subprocess
 import tempfile
 import unittest
@@ -13,7 +14,12 @@ from contextlib import redirect_stdout
 from io import StringIO
 from unittest import mock
 
-from bazel.wrapper_hook import hermetic_container_integration
+from bazel.wrapper_hook.hermetic_container import config as config_module
+from bazel.wrapper_hook.hermetic_container import distro as distro_module
+from bazel.wrapper_hook.hermetic_container import runner
+from bazel.wrapper_hook.hermetic_container.cross import common as cross_common
+from bazel.wrapper_hook.hermetic_container.cross import macos as cross_macos
+from bazel.wrapper_hook.hermetic_container.cross import windows as cross_windows
 
 HERMETIC_CONTAINER_PATH = (
     pathlib.Path(__file__).parents[3] / "hermetic_container" / "hermetic_container.py"
@@ -152,7 +158,7 @@ class MacOSCrossHostTestTest(unittest.TestCase):
     def test_writes_host_paths_to_runtime_manifest_not_action_env(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             output_base = pathlib.Path(temp_dir) / "output-base"
-            path = hermetic_container_integration._write_cross_host_action_config(
+            path = cross_common._write_cross_host_action_config(
                 [f"--output_base={output_base}", "build"],
                 {
                     "HERMETIC_CONTAINER_DOCKER_COMMAND": "/usr/local/bin/docker",
@@ -175,35 +181,35 @@ class MacOSCrossHostTestTest(unittest.TestCase):
 
     def test_detects_macos_cross_host_bazel_test_mode(self):
         self.assertTrue(
-            hermetic_container_integration._macos_cross_host_bazel_test_requested(
+            cross_macos._macos_cross_host_bazel_test_requested(
                 ["test", "--config=macos-cross-arm64", "--config=remote_link", "//src:mongo_test"],
                 {},
                 "Darwin",
             )
         )
         self.assertFalse(
-            hermetic_container_integration._macos_cross_host_bazel_test_requested(
+            cross_macos._macos_cross_host_bazel_test_requested(
                 ["test", "--config=macos-cross-arm64", "--config=remote_link", "//src:mongo_test"],
                 {"MONGO_MACOS_CROSS_TEST_RUNNER": "0"},
                 "Darwin",
             )
         )
         self.assertFalse(
-            hermetic_container_integration._macos_cross_host_bazel_test_requested(
+            cross_macos._macos_cross_host_bazel_test_requested(
                 ["test", "--config=macos-cross-arm64", "//src:mongo_test"],
                 {},
                 "Darwin",
             )
         )
         self.assertTrue(
-            hermetic_container_integration._macos_cross_host_bazel_test_requested(
+            cross_macos._macos_cross_host_bazel_test_requested(
                 ["test", "--config=macos-cross-arm64", "--config=remote_link", "//src:mongo_test"],
                 {"MONGO_BAZEL_USE_HERMETIC_CONTAINER": "1"},
                 "Darwin",
             )
         )
         self.assertFalse(
-            hermetic_container_integration._macos_cross_host_bazel_test_requested(
+            cross_macos._macos_cross_host_bazel_test_requested(
                 ["test", "--config=macos-cross-arm64", "--config=remote_link", "//src:mongo_test"],
                 {},
                 "Linux",
@@ -212,35 +218,35 @@ class MacOSCrossHostTestTest(unittest.TestCase):
 
     def test_detects_macos_cross_split_host_test_mode(self):
         self.assertFalse(
-            hermetic_container_integration._macos_cross_host_test_requested(
+            cross_macos._macos_cross_host_test_requested(
                 ["test", "--config=macos-cross-arm64", "//src:mongo_test"],
                 {},
                 "Darwin",
             )
         )
         self.assertTrue(
-            hermetic_container_integration._macos_cross_host_test_requested(
+            cross_macos._macos_cross_host_test_requested(
                 ["test", "--config=macos-cross-arm64", "//src:mongo_test"],
                 {"MONGO_MACOS_CROSS_SPLIT_TEST_RUNNER": "1"},
                 "Darwin",
             )
         )
         self.assertFalse(
-            hermetic_container_integration._macos_cross_host_test_requested(
+            cross_macos._macos_cross_host_test_requested(
                 ["test", "--config=macos-cross-arm64", "--config=remote_link", "//src:mongo_test"],
                 {},
                 "Darwin",
             )
         )
         self.assertTrue(
-            hermetic_container_integration._macos_cross_host_test_requested(
+            cross_macos._macos_cross_host_test_requested(
                 ["test", "--config=macos-cross-arm64", "--config=remote_link", "//src:mongo_test"],
                 {"MONGO_MACOS_CROSS_SPLIT_TEST_RUNNER": "1"},
                 "Darwin",
             )
         )
         self.assertFalse(
-            hermetic_container_integration._macos_cross_host_test_requested(
+            cross_macos._macos_cross_host_test_requested(
                 ["test", "--config=macos-cross-arm64", "//src:mongo_test"],
                 {
                     "MONGO_MACOS_CROSS_SPLIT_TEST_RUNNER": "1",
@@ -250,7 +256,7 @@ class MacOSCrossHostTestTest(unittest.TestCase):
             )
         )
         self.assertFalse(
-            hermetic_container_integration._macos_cross_host_test_requested(
+            cross_macos._macos_cross_host_test_requested(
                 ["test", "--config=macos-cross-arm64", "//src:mongo_test"],
                 {},
                 "Linux",
@@ -259,21 +265,21 @@ class MacOSCrossHostTestTest(unittest.TestCase):
 
     def test_detects_macos_cross_host_run_mode(self):
         self.assertTrue(
-            hermetic_container_integration._macos_cross_host_run_requested(
+            cross_macos._macos_cross_host_run_requested(
                 ["run", "--config=macos-cross-arm64", "//src:mongo_test"],
                 {},
                 "Darwin",
             )
         )
         self.assertFalse(
-            hermetic_container_integration._macos_cross_host_run_requested(
+            cross_macos._macos_cross_host_run_requested(
                 ["run", "--config=macos-cross-arm64", "//src:mongo_test"],
                 {"MONGO_MACOS_CROSS_TEST_RUNNER": "0"},
                 "Darwin",
             )
         )
         self.assertFalse(
-            hermetic_container_integration._macos_cross_host_run_requested(
+            cross_macos._macos_cross_host_run_requested(
                 ["run", "--config=macos-cross-arm64", "//src:mongo_test"],
                 {},
                 "Linux",
@@ -281,7 +287,7 @@ class MacOSCrossHostTestTest(unittest.TestCase):
         )
 
     def test_plans_macos_cross_host_bazel_test_args(self):
-        args = hermetic_container_integration._macos_cross_host_bazel_test_args(
+        args = cross_macos._macos_cross_host_bazel_test_args(
             [
                 "test",
                 "--config=macos-cross-arm64",
@@ -322,7 +328,7 @@ class MacOSCrossHostTestTest(unittest.TestCase):
         )
 
     def test_plans_macos_cross_local_container_action_args(self):
-        args = hermetic_container_integration._macos_cross_local_container_action_args(
+        args = cross_macos._macos_cross_local_container_action_args(
             [
                 "test",
                 "--config=macos-cross-arm64",
@@ -395,7 +401,7 @@ class MacOSCrossHostTestTest(unittest.TestCase):
         )
 
     def test_plans_macos_cross_local_container_action_args_with_remote_link(self):
-        args = hermetic_container_integration._macos_cross_local_container_action_args(
+        args = cross_macos._macos_cross_local_container_action_args(
             [
                 "test",
                 "--config=macos-cross-arm64",
@@ -428,7 +434,7 @@ class MacOSCrossHostTestTest(unittest.TestCase):
         self.assertNotIn("--strategy=CppLink=local", args)
 
     def test_plans_macos_cross_local_resource_overrides(self):
-        args = hermetic_container_integration._macos_cross_local_container_action_args(
+        args = cross_macos._macos_cross_local_container_action_args(
             [
                 "test",
                 "--config=macos-cross-arm64",
@@ -450,7 +456,7 @@ class MacOSCrossHostTestTest(unittest.TestCase):
         self.assertNotIn("--local_test_jobs=HOST_CPUS", args)
 
     def test_plans_macos_cross_local_container_action_args_when_remote_execution_disabled(self):
-        args = hermetic_container_integration._macos_cross_local_container_action_args(
+        args = cross_macos._macos_cross_local_container_action_args(
             [
                 "test",
                 "--config=macos-cross-arm64",
@@ -480,7 +486,7 @@ class MacOSCrossHostTestTest(unittest.TestCase):
         self.assertIn("--strategy=TestRunner=standalone", args)
 
     def test_macos_cross_host_bazel_test_args_respect_rbe_overrides(self):
-        args = hermetic_container_integration._macos_cross_host_bazel_test_args(
+        args = cross_macos._macos_cross_host_bazel_test_args(
             ["test", "--config=macos-cross-arm64", "//src/mongo:some_test"],
             {
                 "MONGO_MACOS_CROSS_RBE_CONTAINER_IMAGE": "docker://example.com/custom:latest",
@@ -501,25 +507,17 @@ class MacOSCrossHostTestTest(unittest.TestCase):
         }
 
         with (
+            mock.patch.object(platform, "system", return_value="Darwin"),
+            mock.patch.object(platform, "machine", return_value="arm64"),
             mock.patch.object(
-                hermetic_container_integration.platform, "system", return_value="Darwin"
-            ),
-            mock.patch.object(
-                hermetic_container_integration.platform, "machine", return_value="arm64"
-            ),
-            mock.patch.object(
-                hermetic_container_integration,
+                cross_macos,
                 "load_remote_execution_containers",
                 return_value=containers,
             ),
-            mock.patch.object(
-                hermetic_container_integration, "_docker_daemon_status"
-            ) as docker_status,
-            mock.patch.object(
-                hermetic_container_integration, "_run_direct", return_value=0
-            ) as run_direct,
+            mock.patch.object(runner, "_docker_daemon_status") as docker_status,
+            mock.patch.object(runner, "_run_direct", return_value=0) as run_direct,
         ):
-            rc = hermetic_container_integration.run_hermetic_container(
+            rc = runner.run_hermetic_container(
                 "/tmp/bazel-darwin",
                 ["test", "--config=remote_link", "//src/mongo:some_test"],
                 env={"MONGO_MACOS_CROSS_DEFAULT_CONFIG": "1"},
@@ -558,25 +556,19 @@ class MacOSCrossHostTestTest(unittest.TestCase):
         }
 
         with (
+            mock.patch.object(platform, "system", return_value="Darwin"),
+            mock.patch.object(platform, "machine", return_value="arm64"),
             mock.patch.object(
-                hermetic_container_integration.platform, "system", return_value="Darwin"
-            ),
-            mock.patch.object(
-                hermetic_container_integration.platform, "machine", return_value="arm64"
-            ),
-            mock.patch.object(
-                hermetic_container_integration,
+                cross_macos,
                 "load_remote_execution_containers",
                 return_value=containers,
             ),
             mock.patch.object(
-                hermetic_container_integration, "_docker_daemon_status", return_value=(True, "")
+                runner, "_docker_daemon_status", return_value=(True, "")
             ) as docker_status,
-            mock.patch.object(
-                hermetic_container_integration, "_run_direct", return_value=0
-            ) as run_direct,
+            mock.patch.object(runner, "_run_direct", return_value=0) as run_direct,
         ):
-            rc = hermetic_container_integration.run_hermetic_container(
+            rc = runner.run_hermetic_container(
                 "/tmp/bazel-darwin",
                 ["test", "//src/mongo:some_test"],
                 env={
@@ -623,25 +615,19 @@ class MacOSCrossHostTestTest(unittest.TestCase):
         }
 
         with (
+            mock.patch.object(platform, "system", return_value="Darwin"),
+            mock.patch.object(platform, "machine", return_value="arm64"),
             mock.patch.object(
-                hermetic_container_integration.platform, "system", return_value="Darwin"
-            ),
-            mock.patch.object(
-                hermetic_container_integration.platform, "machine", return_value="arm64"
-            ),
-            mock.patch.object(
-                hermetic_container_integration,
+                cross_macos,
                 "load_remote_execution_containers",
                 return_value=containers,
             ),
             mock.patch.object(
-                hermetic_container_integration, "_docker_daemon_status", return_value=(True, "")
+                runner, "_docker_daemon_status", return_value=(True, "")
             ) as docker_status,
-            mock.patch.object(
-                hermetic_container_integration, "_run_direct", return_value=0
-            ) as run_direct,
+            mock.patch.object(runner, "_run_direct", return_value=0) as run_direct,
         ):
-            rc = hermetic_container_integration.run_hermetic_container(
+            rc = runner.run_hermetic_container(
                 "/tmp/bazel-darwin",
                 ["test", "--config=local", "//src/mongo:some_test"],
                 env={
@@ -660,10 +646,8 @@ class MacOSCrossHostTestTest(unittest.TestCase):
     def test_run_hermetic_container_uses_split_host_test_runner_for_local_link_macos_cross_test(
         self,
     ):
-        image = hermetic_container_integration.parse_docker_image(
-            "quay.io/mongodb/rbe@sha256:abc123"
-        )
-        config = hermetic_container_integration.HermeticContainerConfig(
+        image = distro_module.parse_docker_image("quay.io/mongodb/rbe@sha256:abc123")
+        config = config_module.HermeticContainerConfig(
             distro="amazon_linux_2023",
             docker_image=image,
             instance_name="test",
@@ -680,20 +664,16 @@ class MacOSCrossHostTestTest(unittest.TestCase):
 
         stdout = StringIO()
         with (
+            mock.patch.object(platform, "system", return_value="Darwin"),
+            mock.patch.object(platform, "machine", return_value="arm64"),
             mock.patch.object(
-                hermetic_container_integration.platform, "system", return_value="Darwin"
-            ),
-            mock.patch.object(
-                hermetic_container_integration.platform, "machine", return_value="arm64"
-            ),
-            mock.patch.object(
-                hermetic_container_integration,
+                runner,
                 "build_hermetic_container_config",
                 return_value=config,
             ),
             redirect_stdout(stdout),
         ):
-            rc = hermetic_container_integration.run_hermetic_container(
+            rc = runner.run_hermetic_container(
                 "/tmp/bazel-darwin",
                 ["test", "//src/mongo:some_test"],
                 env={
@@ -720,7 +700,7 @@ class MacOSCrossHostTestTest(unittest.TestCase):
         )
 
     def test_plans_hermetic_container_build_and_host_test_args(self):
-        plan = hermetic_container_integration._macos_cross_host_test_plan(
+        plan = cross_macos._macos_cross_host_test_plan(
             [
                 "test",
                 "--config=macos-cross-arm64",
@@ -780,7 +760,7 @@ class MacOSCrossHostTestTest(unittest.TestCase):
         self.assertEqual(plan.test_tag_filters, ["mongo_unittest", "-requires_large_host"])
 
     def test_plans_no_build_without_host_test_execution(self):
-        plan = hermetic_container_integration._macos_cross_host_test_plan(
+        plan = cross_macos._macos_cross_host_test_plan(
             [
                 "test",
                 "--config=macos-cross-arm64",
@@ -810,7 +790,7 @@ class MacOSCrossHostTestTest(unittest.TestCase):
                 with self.assertRaisesRegex(
                     RuntimeError, f"macOS cross host run does not support {option}"
                 ):
-                    hermetic_container_integration._macos_cross_host_run_plan(
+                    cross_macos._macos_cross_host_run_plan(
                         [
                             "run",
                             "--config=macos-cross-arm64",
@@ -823,7 +803,7 @@ class MacOSCrossHostTestTest(unittest.TestCase):
                 with self.assertRaisesRegex(
                     RuntimeError, f"macOS cross host run does not support {option}"
                 ):
-                    hermetic_container_integration._macos_cross_host_run_plan(
+                    cross_macos._macos_cross_host_run_plan(
                         [
                             "run",
                             "--config=macos-cross-arm64",
@@ -833,7 +813,7 @@ class MacOSCrossHostTestTest(unittest.TestCase):
                     )
 
     def test_plans_hermetic_container_build_and_host_run_args(self):
-        plan = hermetic_container_integration._macos_cross_host_run_plan(
+        plan = cross_macos._macos_cross_host_run_plan(
             [
                 "run",
                 "--config=macos-cross-arm64",
@@ -856,7 +836,7 @@ class MacOSCrossHostTestTest(unittest.TestCase):
         self.assertEqual(plan.run_args, ["--fileNameFilter", "some_test"])
 
     def test_cross_host_run_passes_unlisted_equals_form_option(self):
-        plan = hermetic_container_integration._macos_cross_host_run_plan(
+        plan = cross_macos._macos_cross_host_run_plan(
             [
                 "run",
                 "--remote_download_outputs=minimal",
@@ -875,10 +855,10 @@ class MacOSCrossHostTestTest(unittest.TestCase):
         self.assertEqual(plan.target, "//src/mongo:some_test")
 
     def test_plans_windows_cross_host_run_args(self):
-        plan = hermetic_container_integration._windows_cross_host_run_plan(
+        plan = cross_windows._windows_cross_host_run_plan(
             [
                 "run",
-                f"--config={hermetic_container_integration.WINDOWS_CROSS_CONFIG}",
+                f"--config={cross_windows.WINDOWS_CROSS_CONFIG}",
                 "//src/mongo:some_test",
                 "--",
                 "--fileNameFilter",
@@ -890,7 +870,7 @@ class MacOSCrossHostTestTest(unittest.TestCase):
             plan.build_args,
             [
                 "build",
-                f"--config={hermetic_container_integration.WINDOWS_CROSS_CONFIG}",
+                f"--config={cross_windows.WINDOWS_CROSS_CONFIG}",
                 "//src/mongo:some_test",
             ],
         )
@@ -898,7 +878,7 @@ class MacOSCrossHostTestTest(unittest.TestCase):
         self.assertEqual(plan.run_args, ["--fileNameFilter", "some_test"])
 
     def test_expands_host_test_labels_with_query(self):
-        plan = hermetic_container_integration.MacOSCrossHostTestPlan(
+        plan = cross_common.MacOSCrossHostTestPlan(
             build_args=["build", "//src/..."],
             startup_args=[],
             host_test_options=[],
@@ -912,7 +892,7 @@ class MacOSCrossHostTestTest(unittest.TestCase):
         )
 
         with mock.patch.object(
-            hermetic_container_integration.subprocess,
+            subprocess,
             "run",
             return_value=subprocess.CompletedProcess(
                 args=[],
@@ -921,7 +901,7 @@ class MacOSCrossHostTestTest(unittest.TestCase):
                 stderr="",
             ),
         ):
-            labels = hermetic_container_integration._expand_host_test_labels("/tmp/bazel", plan, {})
+            labels = cross_common._expand_host_test_labels("/tmp/bazel", plan, {})
 
         self.assertEqual(labels, ["//src/mongo:one_test", "//src/mongo:two_test"])
 
@@ -996,7 +976,7 @@ class MacOSCrossHostTestTest(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            plan = hermetic_container_integration.MacOSCrossHostTestPlan(
+            plan = cross_common.MacOSCrossHostTestPlan(
                 build_args=["build", "//..."],
                 startup_args=[],
                 host_test_options=[],
@@ -1009,8 +989,8 @@ class MacOSCrossHostTestTest(unittest.TestCase):
                 run_host_tests=True,
             )
 
-            with mock.patch.object(hermetic_container_integration.subprocess, "run") as run:
-                labels = hermetic_container_integration._expand_host_test_labels(
+            with mock.patch.object(subprocess, "run") as run:
+                labels = cross_common._expand_host_test_labels(
                     "/tmp/bazel",
                     plan,
                     {},
@@ -1021,7 +1001,7 @@ class MacOSCrossHostTestTest(unittest.TestCase):
         run.assert_not_called()
 
     def test_host_test_query_expression_applies_exact_tag_filters(self):
-        expression = hermetic_container_integration._host_test_query_expression(
+        expression = cross_common._host_test_query_expression(
             ["//src/mongo/bson/util/..."],
             ["mongo_unittest", "-requires_large_host"],
         )
@@ -1039,20 +1019,18 @@ class MacOSCrossHostTestTest(unittest.TestCase):
 
     def test_label_to_host_executable(self):
         self.assertEqual(
-            hermetic_container_integration._label_to_host_executable(
+            cross_common._label_to_host_executable(
                 "//src/mongo/base:status_test",
                 pathlib.Path("/repo"),
             ),
             pathlib.Path("/repo/bazel-bin/src/mongo/base/status_test"),
         )
         self.assertEqual(
-            hermetic_container_integration._label_to_host_executable(
-                "//:root_test", pathlib.Path("/repo")
-            ),
+            cross_common._label_to_host_executable("//:root_test", pathlib.Path("/repo")),
             pathlib.Path("/repo/bazel-bin/root_test"),
         )
         self.assertEqual(
-            hermetic_container_integration._label_to_host_executable(
+            cross_common._label_to_host_executable(
                 "//src/mongo/base:status_test",
                 pathlib.Path("/repo"),
                 executable_suffix=".exe",
@@ -1062,7 +1040,7 @@ class MacOSCrossHostTestTest(unittest.TestCase):
 
     def test_resmoke_deps_path_file(self):
         self.assertEqual(
-            hermetic_container_integration._resmoke_deps_path_file(
+            cross_common._resmoke_deps_path_file(
                 "//buildscripts/bazel_testbuilds:jstest_timeout",
                 pathlib.Path("/repo"),
             ),
@@ -1087,7 +1065,7 @@ class MacOSCrossHostTestTest(unittest.TestCase):
                 encoding="utf-8",
             )
             executable.chmod(0o755)
-            plan = hermetic_container_integration.MacOSCrossHostTestPlan(
+            plan = cross_common.MacOSCrossHostTestPlan(
                 build_args=["build", "//src/mongo:ok_test"],
                 startup_args=[],
                 host_test_options=[],
@@ -1101,11 +1079,11 @@ class MacOSCrossHostTestTest(unittest.TestCase):
             )
 
             with mock.patch.object(
-                hermetic_container_integration,
+                cross_macos,
                 "_expand_host_test_labels",
                 return_value=["//src/mongo:ok_test"],
             ):
-                rc = hermetic_container_integration._run_macos_cross_host_tests(
+                rc = cross_macos._run_macos_cross_host_tests(
                     "/tmp/bazel",
                     plan,
                     {},
@@ -1123,16 +1101,14 @@ class MacOSCrossHostTestTest(unittest.TestCase):
             cross_bin_root = repo_root / "cross-bin"
             cross_bin_root.mkdir()
             (repo_root / "bazel-bin").symlink_to(cross_bin_root, target_is_directory=True)
-            deps_file = hermetic_container_integration._resmoke_deps_path_file(
-                label, repo_root, cross_bin_root
-            )
+            deps_file = cross_common._resmoke_deps_path_file(label, repo_root, cross_bin_root)
             deps_file.parent.mkdir(parents=True)
             deps_file.write_text(
                 "bazel-out/aarch64-fastbuild/bin/src/mongo/shell/mongo\n"
                 "bazel-out/aarch64-fastbuild/bin/src/mongo/db/mongod\n",
                 encoding="utf-8",
             )
-            second_deps_file = hermetic_container_integration._resmoke_deps_path_file(
+            second_deps_file = cross_common._resmoke_deps_path_file(
                 second_label, repo_root, cross_bin_root
             )
             second_deps_file.parent.mkdir(parents=True)
@@ -1141,7 +1117,7 @@ class MacOSCrossHostTestTest(unittest.TestCase):
                 "bazel-out/aarch64-fastbuild/bin/src/mongo/db/mongos\n",
                 encoding="utf-8",
             )
-            plan = hermetic_container_integration.MacOSCrossHostTestPlan(
+            plan = cross_common.MacOSCrossHostTestPlan(
                 build_args=["build", label],
                 startup_args=["--output_base=/tmp/host-bazel"],
                 host_test_options=["--test_arg=jstests/core/smoke.js"],
@@ -1157,17 +1133,17 @@ class MacOSCrossHostTestTest(unittest.TestCase):
             completed = subprocess.CompletedProcess(args=[], returncode=0)
             with (
                 mock.patch.object(
-                    hermetic_container_integration,
+                    cross_macos,
                     "_expand_host_test_labels",
                     return_value=[label, second_label],
                 ),
                 mock.patch.object(
-                    hermetic_container_integration.subprocess,
+                    subprocess,
                     "run",
                     return_value=completed,
                 ) as run,
             ):
-                rc = hermetic_container_integration._run_macos_cross_host_tests(
+                rc = cross_macos._run_macos_cross_host_tests(
                     "/tmp/bazel",
                     plan,
                     {
@@ -1227,13 +1203,13 @@ class MacOSCrossHostTestTest(unittest.TestCase):
                 encoding="utf-8",
             )
             executable.chmod(0o755)
-            plan = hermetic_container_integration.MacOSCrossHostRunPlan(
+            plan = cross_common.MacOSCrossHostRunPlan(
                 build_args=[],
                 target="//src/mongo:ok_test",
                 run_args=["1", "2"],
             )
 
-            rc = hermetic_container_integration._run_macos_cross_host_binary(plan, repo_root)
+            rc = cross_macos._run_macos_cross_host_binary(plan, repo_root)
             output = (repo_root / "out.txt").read_text(encoding="utf-8")
 
         self.assertEqual(rc, 0)
@@ -1246,7 +1222,7 @@ class MacOSCrossHostTestTest(unittest.TestCase):
             executable.parent.mkdir(parents=True)
             executable.write_text("#!/bin/sh\nexit 42\n", encoding="utf-8")
             executable.chmod(0o755)
-            plan = hermetic_container_integration.MacOSCrossHostTestPlan(
+            plan = cross_common.MacOSCrossHostTestPlan(
                 build_args=["build", "//src/mongo:bad_test"],
                 startup_args=[],
                 host_test_options=[],
@@ -1260,11 +1236,11 @@ class MacOSCrossHostTestTest(unittest.TestCase):
             )
 
             with mock.patch.object(
-                hermetic_container_integration,
+                cross_macos,
                 "_expand_host_test_labels",
                 return_value=["//src/mongo:bad_test"],
             ):
-                rc = hermetic_container_integration._run_macos_cross_host_tests(
+                rc = cross_macos._run_macos_cross_host_tests(
                     "/tmp/bazel",
                     plan,
                     {},
@@ -1279,20 +1255,18 @@ class MacOSCrossHostTestTest(unittest.TestCase):
             executable = repo_root / "bazel-bin" / "src" / "mongo" / "ok_test.exe"
             executable.parent.mkdir(parents=True)
             executable.write_text("", encoding="utf-8")
-            plan = hermetic_container_integration.MacOSCrossHostRunPlan(
+            plan = cross_common.MacOSCrossHostRunPlan(
                 build_args=["build", "//src/mongo:ok_test"],
                 target="//src/mongo:ok_test",
                 run_args=["--fileNameFilter", "ok_test"],
             )
 
             with mock.patch.object(
-                hermetic_container_integration.subprocess,
+                subprocess,
                 "run",
                 return_value=subprocess.CompletedProcess(args=[], returncode=0),
             ) as run:
-                rc = hermetic_container_integration._run_windows_cross_host_binary(
-                    plan, repo_root=repo_root
-                )
+                rc = cross_windows._run_windows_cross_host_binary(plan, repo_root=repo_root)
 
         self.assertEqual(rc, 0)
         run.assert_called_once()

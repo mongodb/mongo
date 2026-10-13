@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-import contextlib
 import dataclasses
 import errno
 import hashlib
-import json
 import os
 import pathlib
 import re
@@ -14,11 +12,10 @@ import shlex
 import shutil
 import stat
 import subprocess
-import sys
-import tempfile
 import uuid
 from collections.abc import Mapping, Sequence
 
+from .. import container_actions
 from ..bazelrc import (
     _bazel_output_base,
     _effective_config_values,
@@ -45,7 +42,6 @@ from ..env import (
     _bazel_command,
     _env_is_false,
     _env_is_true,
-    _info,
     _warning,
 )
 from ..fsutil import (
@@ -55,7 +51,6 @@ from ..fsutil import (
     _is_relative_to,
     _linux_action_sandbox_base,
     _linux_shared_install_dir,
-    _run_container_network_command,
     _sha256_file,
 )
 from ..podman import (
@@ -64,17 +59,11 @@ from ..podman import (
     PODMAN_REPOSITORY_ENV_VARS,
     PODMAN_RUNTIME_DIR_PREFIX,
     PODMAN_TASK_ID_ENV,
-    _compact_runtime_detail,
-    _container_runtime_env,
     _ensure_owned_podman_directory,
-    _is_podman_command,
-    _podman_anonymous_runtime_env,
     _podman_auth_file,
-    _podman_authentication_failure,
     _podman_containers_config,
     _podman_storage_config,
     _podman_task_root,
-    _print_container_command_output,
 )
 from ..podman_common import (
     PODMAN_REQUIRED_ENV,
@@ -94,15 +83,6 @@ NATIVE_TOOLCHAIN_CONFIG = "native_toolchain"
 
 
 LINUX_DYNAMIC_LOCAL_LOAD_FACTOR = "0.125"
-
-
-LINUX_CONTAINER_ACTIONS_CONFIG_FILENAME = "mongo_linux_container_actions.json"
-
-
-LINUX_CONTAINER_ACTIONS_LOCK_FILENAME = "mongo_linux_container_actions.lock"
-
-
-LINUX_CONTAINER_ACTIONS_GENERATION_FILENAME = "mongo_linux_output_base_generation"
 
 
 # Keep this in lockstep with the action wrapper.  The layout version is included
@@ -807,10 +787,6 @@ def _linux_cross_rbe_host_args(
     return host_args
 
 
-def _linux_host_container_state_dir(repo_root: pathlib.Path = REPO_ROOT) -> pathlib.Path:
-    return repo_root / ".tmp" / "linux_container_actions"
-
-
 def _linux_host_container_config(
     env: Mapping[str, str],
     machine: str | None = None,
@@ -839,7 +815,7 @@ def _linux_host_container_config(
     container_url = image_override or containers[distro]["container-url"]
     image = container_url.removeprefix("docker://")
     image_hash = hashlib.sha256(image.encode()).hexdigest()[:12]
-    state_dir = _linux_host_container_state_dir(repo_root)
+    state_dir = container_actions.state_dir(repo_root)
     docker_command = container_command or env.get("HERMETIC_CONTAINER_DOCKER_COMMAND")
     if not docker_command:
         docker_command = shutil.which("docker") or shutil.which("podman") or "docker"
@@ -983,21 +959,6 @@ def _linux_cross_module_override_args(
     return override_args
 
 
-@contextlib.contextmanager
-def _linux_container_actions_lock(output_base: pathlib.Path):
-    """Serializes action-config publication and container preflight for one output base."""
-    import fcntl
-
-    output_base.mkdir(parents=True, exist_ok=True)
-    lock_path = output_base.resolve() / LINUX_CONTAINER_ACTIONS_LOCK_FILENAME
-    with lock_path.open("a", encoding="utf-8") as lock_file:
-        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
-        try:
-            yield
-        finally:
-            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
-
-
 def _write_linux_container_actions_config_unlocked(
     args: Sequence[str],
     env: Mapping[str, str],
@@ -1030,27 +991,7 @@ def _write_linux_container_actions_config_unlocked(
     # action-private install tree even when Bazel could not create its workspace convenience
     # symlinks (for example, when a persistent container leaves a dangling bazel-bin link).
     config["output_base"] = str(output_base)
-    output_base.mkdir(parents=True, exist_ok=True)
-    generation_path = output_base / LINUX_CONTAINER_ACTIONS_GENERATION_FILENAME
-    new_generation = False
-    try:
-        generation = generation_path.read_text(encoding="utf-8").strip()
-    except FileNotFoundError:
-        new_generation = True
-        generation = os.urandom(16).hex()
-        temporary = generation_path.with_name(f".{generation_path.name}.{os.getpid()}.{generation}")
-        temporary.write_text(generation + "\n", encoding="utf-8")
-        try:
-            # A hard link publishes a completely written token without replacing a
-            # generation concurrently created by another wrapper process.
-            os.link(temporary, generation_path)
-        except FileExistsError:
-            pass
-        finally:
-            temporary.unlink(missing_ok=True)
-        generation = generation_path.read_text(encoding="utf-8").strip()
-    if not re.fullmatch(r"[0-9a-f]{32}", generation):
-        raise RuntimeError(f"Invalid Linux action container generation: {generation_path}")
+    generation, new_generation = container_actions.output_base_generation(output_base)
     if new_generation:
         # The output-base sibling is live across generations: native fallbacks and container
         # actions publish into it concurrently, synchronized only by its own per-configuration
@@ -1062,39 +1003,9 @@ def _write_linux_container_actions_config_unlocked(
         elif stale_shared_install_dir.exists() or stale_shared_install_dir.is_symlink():
             stale_shared_install_dir.unlink()
     shared_install_dir.mkdir(parents=True, exist_ok=True)
-    config["output_base_generation"] = generation
-    prefix = config.get("container_prefix", "mongo_linux_action")
-    digest = hashlib.sha256(
-        (
-            f"{config['repo_root']}|{output_base}|{config['image']}|"
-            f"{config['container_layout_version']}|{generation}"
-        ).encode()
-    ).hexdigest()[:12]
-    config["container_name"] = _safe_name(f"{prefix}_{digest}")[:120]
-    path = output_base / LINUX_CONTAINER_ACTIONS_CONFIG_FILENAME
-    content = json.dumps(config, indent=2, sort_keys=True) + "\n"
-    try:
-        if path.read_text(encoding="utf-8") == content:
-            return path, config
-    except OSError:
-        pass
-
-    descriptor, temporary_name = tempfile.mkstemp(
-        dir=path.parent,
-        prefix=f".{path.name}.",
-        suffix=".tmp",
-        text=True,
+    return container_actions.publish_container_actions_config(
+        config, output_base, generation, "mongo_linux_action"
     )
-    temporary_path = pathlib.Path(temporary_name)
-    try:
-        with os.fdopen(descriptor, "w", encoding="utf-8") as temporary:
-            temporary.write(content)
-            temporary.flush()
-            os.fsync(temporary.fileno())
-        os.replace(temporary_path, path)
-    finally:
-        temporary_path.unlink(missing_ok=True)
-    return path, config
 
 
 def _write_linux_container_actions_config(
@@ -1105,7 +1016,7 @@ def _write_linux_container_actions_config(
 ) -> tuple[pathlib.Path, dict[str, str]]:
     """Publishes the container action config atomically under the output-base lock."""
     output_base = _bazel_output_base(args, env, repo_root=repo_root)
-    with _linux_container_actions_lock(output_base):
+    with container_actions.lock(output_base):
         return _write_linux_container_actions_config_unlocked(
             args,
             env,
@@ -1114,105 +1025,14 @@ def _write_linux_container_actions_config(
         )
 
 
-def _ensure_linux_container_image(docker_command: str, image: str) -> bool:
-    """Pulls the build container image up front so racing actions never pull it.
-
-    Dozens of dynamically scheduled local branches can start simultaneously; letting each
-    `docker run` trigger an implicit pull of the same image is slow and has corrupted
-    Docker layer stores in practice. Pull once, before Bazel starts.
-    """
-    docker = shlex.split(docker_command)
-    try:
-        runtime_env = _container_runtime_env(docker)
-    except OSError as exc:
-        _info(f"could not prepare Podman runtime directory: {exc}")
-        return False
-    inspect = subprocess.run(
-        [*docker, "image", "inspect", image],
-        check=False,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        env=runtime_env,
-    )
-    if inspect.returncode == 0:
-        return True
-
-    _info(f"pulling build container image {image}")
-    # Keep stdout clean: commands like aquery/compiledb parse this process's stdout.
-    pull = _run_container_network_command(
-        [*docker, "pull", image],
-        check=False,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        env=runtime_env,
-        description=f"pulling build container image {image}",
-    )
-    _print_container_command_output(pull)
-    if (
-        pull.returncode
-        and _is_podman_command(docker)
-        and _podman_authentication_failure(pull)
-        and runtime_env is not None
-    ):
-        # Quay's public build images should remain usable when an Evergreen host has
-        # an expired robot login. Retry anonymously without mutating the host auth
-        # file; private images still fail normally after this second attempt.
-        anonymous_env = _podman_anonymous_runtime_env(runtime_env)
-        _info(
-            f"registry credentials were rejected while pulling {image}; "
-            "retrying without host credentials"
-        )
-        pull = _run_container_network_command(
-            [*docker, "pull", image],
-            check=False,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            env=anonymous_env,
-            description=f"anonymous pull of build container image {image}",
-        )
-        _print_container_command_output(pull)
-        runtime_env = anonymous_env
-    if pull.returncode:
-        return False
-
-    inspect = subprocess.run(
-        [*docker, "image", "inspect", image],
-        check=False,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        env=runtime_env,
-    )
-    return inspect.returncode == 0
-
-
 def _ensure_linux_action_container(config_path: pathlib.Path) -> tuple[bool, str]:
     """Start and execute a smoke check in the persistent action container."""
-    command = [
-        sys.executable,
-        str(LINUX_CONTAINER_ACTION_WRAPPER_SCRIPT),
-        "--ensure-container",
-        str(config_path),
-    ]
-    try:
-        result = subprocess.run(
-            command,
-            check=False,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            timeout=DOCKER_DAEMON_CHECK_TIMEOUT_SECONDS,
-        )
-    except subprocess.TimeoutExpired:
-        return (
-            False,
-            f"container start/exec preflight timed out after "
-            f"{DOCKER_DAEMON_CHECK_TIMEOUT_SECONDS}s",
-        )
-
-    detail = _compact_runtime_detail(result.stderr or result.stdout)
-    return result.returncode == 0, detail
+    return container_actions.preflight_container_runner(
+        LINUX_CONTAINER_ACTION_WRAPPER_SCRIPT,
+        config_path,
+        timeout=DOCKER_DAEMON_CHECK_TIMEOUT_SECONDS,
+        timeout_description="container start/exec preflight",
+    )
 
 
 def _linux_host_container_action_args(
@@ -1234,16 +1054,10 @@ def _linux_host_container_action_args(
         else _remote_link_requested(args, env=env, repo_root=repo_root)
     )
     output_base = _bazel_output_base(args, env, repo_root=repo_root)
-    sandbox_base = _linux_action_sandbox_base(output_base)
-    worker_dir = sandbox_base / "persistent-workers"
-    config_path = output_base / LINUX_CONTAINER_ACTIONS_CONFIG_FILENAME
     options = [
-        "--experimental_enable_persistent_container_sandbox",
-        f"--experimental_persistent_container_python={sys.executable}",
-        f"--experimental_persistent_container_runner={LINUX_CONTAINER_ACTION_WRAPPER_SCRIPT}",
-        f"--experimental_persistent_container_config={config_path}",
-        f"--experimental_persistent_container_worker_dir={worker_dir}",
-        f"--sandbox_base={sandbox_base}",
+        *container_actions.persistent_container_options(
+            output_base, LINUX_CONTAINER_ACTION_WRAPPER_SCRIPT
+        ),
         "--strategy=MongoInstallRule=persistent-container,local",
         *[f"--strategy={mnemonic}=local" for mnemonic in LINUX_LOCAL_JAVA_MNEMONICS],
         *[

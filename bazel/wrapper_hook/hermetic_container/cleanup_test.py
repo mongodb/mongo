@@ -7,7 +7,9 @@ import pathlib
 import tempfile
 import unittest
 
-from bazel.wrapper_hook import hermetic_container_integration
+from bazel.wrapper_hook.hermetic_container import cleanup, constants
+from bazel.wrapper_hook.hermetic_container import config as config_module
+from bazel.wrapper_hook.hermetic_container import distro as distro_module
 
 HERMETIC_CONTAINER_PATH = (
     pathlib.Path(__file__).parents[2] / "hermetic_container" / "hermetic_container.py"
@@ -55,7 +57,7 @@ class HermeticContainerCleanTest(unittest.TestCase):
                 output_base / "action_cache",
                 output_base / "execroot",
                 output_base / "external",
-                output_base / hermetic_container_integration.REPO_ROOT.name,
+                output_base / constants.REPO_ROOT.name,
             ]
             for preserved_dir in preserved_dirs:
                 stale_file = preserved_dir / "stale"
@@ -69,10 +71,8 @@ class HermeticContainerCleanTest(unittest.TestCase):
             stale_install.write_text("stale", encoding="utf-8")
             run_file = root / "container.run"
             run_file.write_text("running", encoding="utf-8")
-            image = hermetic_container_integration.parse_docker_image(
-                "quay.io/mongodb/rbe@sha256:abc123"
-            )
-            config = hermetic_container_integration.HermeticContainerConfig(
+            image = distro_module.parse_docker_image("quay.io/mongodb/rbe@sha256:abc123")
+            config = config_module.HermeticContainerConfig(
                 distro="amazon_linux_2023",
                 docker_image=image,
                 instance_name="mongo_hermetic_container_test",
@@ -88,7 +88,7 @@ class HermeticContainerCleanTest(unittest.TestCase):
             )
             instance = FakeDockerInstance()
 
-            rc = hermetic_container_integration._clean_hermetic_container_outputs(instance, config)
+            rc = cleanup._clean_hermetic_container_outputs(instance, config)
 
             self.assertEqual(rc, 0)
             self.assertEqual(instance.sent_commands, [["shutdown"]])
@@ -124,10 +124,8 @@ class HermeticContainerCleanTest(unittest.TestCase):
             output_file.write_text("stale", encoding="utf-8")
             run_file = root / "container.run"
             run_file.write_text("running", encoding="utf-8")
-            image = hermetic_container_integration.parse_docker_image(
-                "quay.io/mongodb/rbe@sha256:abc123"
-            )
-            config = hermetic_container_integration.HermeticContainerConfig(
+            image = distro_module.parse_docker_image("quay.io/mongodb/rbe@sha256:abc123")
+            config = config_module.HermeticContainerConfig(
                 distro="amazon_linux_2023",
                 docker_image=image,
                 instance_name="mongo_hermetic_container_test",
@@ -143,9 +141,7 @@ class HermeticContainerCleanTest(unittest.TestCase):
             )
             instance = FakeDockerInstance()
 
-            rc = hermetic_container_integration._expunge_hermetic_container_outputs(
-                instance, config
-            )
+            rc = cleanup._expunge_hermetic_container_outputs(instance, config)
 
             self.assertEqual(rc, 0)
             self.assertEqual(

@@ -4,13 +4,20 @@ from __future__ import annotations
 
 import hashlib
 import importlib.util
+import os
 import pathlib
+import platform
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest import mock
 
-from bazel.wrapper_hook import hermetic_container_integration
+from bazel.wrapper_hook.hermetic_container import config as config_module
+from bazel.wrapper_hook.hermetic_container import distro as distro_module
+from bazel.wrapper_hook.hermetic_container import runner
+from bazel.wrapper_hook.hermetic_container.cross import macos as cross_macos
+from bazel.wrapper_hook.hermetic_container.cross import windows as cross_windows
 
 HERMETIC_CONTAINER_PATH = (
     pathlib.Path(__file__).parents[2] / "hermetic_container" / "hermetic_container.py"
@@ -22,6 +29,32 @@ assert HERMETIC_CONTAINER_SPEC is not None
 hermetic_container = importlib.util.module_from_spec(HERMETIC_CONTAINER_SPEC)
 assert HERMETIC_CONTAINER_SPEC.loader is not None
 HERMETIC_CONTAINER_SPEC.loader.exec_module(hermetic_container)
+
+
+class HermeticContainerEntryPointTest(unittest.TestCase):
+    @unittest.skipUnless(os.name == "posix", "uses a shell as the fake Bazel executable")
+    def test_script_runs_from_outside_workspace_and_propagates_bazel_exit(self) -> None:
+        entry_point = (
+            pathlib.Path(__file__).absolute().parents[1] / "hermetic_container_integration.py"
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result = subprocess.run(
+                [sys.executable, str(entry_point), "/bin/sh", "-c", "exit 37"],
+                cwd=temp_dir,
+                env={**os.environ, "MONGO_BAZEL_USE_HERMETIC_CONTAINER": "0"},
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+        self.assertEqual(result.returncode, 37, result.stderr)
+
+    def test_main_passes_bazel_arguments_to_runner(self) -> None:
+        args = ["--output_base=/tmp/output with spaces", "build", "//:target"]
+        with mock.patch.object(runner, "run_hermetic_container", return_value=37) as run:
+            self.assertEqual(runner.main(["/tmp/bazel", *args]), 37)
+
+        run.assert_called_once_with("/tmp/bazel", args)
 
 
 class HermeticContainerWorkspaceDiscoveryTest(unittest.TestCase):
@@ -224,7 +257,7 @@ class HermeticContainerCommandTest(unittest.TestCase):
 class HermeticContainerEnablementTest(unittest.TestCase):
     def setUp(self):
         self.container_detection = mock.patch.object(
-            hermetic_container_integration, "_is_running_in_container", return_value=False
+            runner, "_is_running_in_container", return_value=False
         )
         self.container_detection.start()
         self.addCleanup(self.container_detection.stop)
@@ -233,7 +266,7 @@ class HermeticContainerEnablementTest(unittest.TestCase):
         for machine in ["x86_64", "aarch64"]:
             with self.subTest(machine=machine):
                 self.assertTrue(
-                    hermetic_container_integration.should_use_hermetic_container(
+                    runner.should_use_hermetic_container(
                         env={"MONGO_HERMETIC_CONTAINER_DISTRO": "rhel9"},
                         system="Linux",
                         docker_exists=lambda: True,
@@ -241,21 +274,21 @@ class HermeticContainerEnablementTest(unittest.TestCase):
                     )
                 )
                 self.assertEqual(
-                    hermetic_container_integration.select_integration_mode(
+                    runner.select_integration_mode(
                         env={"MONGO_HERMETIC_CONTAINER_DISTRO": "rhel9"},
                         system="Linux",
                         docker_exists=lambda: True,
                         args=["build", "install-dist-test"],
                         machine=machine,
                     ),
-                    hermetic_container_integration.IntegrationMode.LINUX_HOST_CONTAINER,
+                    config_module.IntegrationMode.LINUX_HOST_CONTAINER,
                 )
 
     def test_linux_s390x_and_ppc64le_use_host_container_for_local_builds(self):
         for machine in ["s390x", "ppc64le"]:
             with self.subTest(machine=machine):
                 self.assertTrue(
-                    hermetic_container_integration.should_use_hermetic_container(
+                    runner.should_use_hermetic_container(
                         env={"MONGO_HERMETIC_CONTAINER_DISTRO": "rhel9"},
                         system="Linux",
                         docker_exists=lambda: True,
@@ -263,7 +296,7 @@ class HermeticContainerEnablementTest(unittest.TestCase):
                     )
                 )
                 self.assertEqual(
-                    hermetic_container_integration.select_integration_mode(
+                    runner.select_integration_mode(
                         env={
                             "MONGO_HERMETIC_CONTAINER_DRY_RUN": "1",
                             "MONGO_HERMETIC_CONTAINER_DISTRO": "rhel9",
@@ -273,7 +306,7 @@ class HermeticContainerEnablementTest(unittest.TestCase):
                         args=["build", "install-dist-test"],
                         machine=machine,
                     ),
-                    hermetic_container_integration.IntegrationMode.LINUX_HOST_CONTAINER,
+                    config_module.IntegrationMode.LINUX_HOST_CONTAINER,
                 )
 
     def test_linux_s390x_and_ppc64le_cross_rbe_uses_host_bazel(self):
@@ -283,38 +316,38 @@ class HermeticContainerEnablementTest(unittest.TestCase):
         ]:
             with self.subTest(config=config, machine=machine):
                 self.assertEqual(
-                    hermetic_container_integration.select_integration_mode(
+                    runner.select_integration_mode(
                         env={},
                         system="Linux",
                         docker_exists=lambda: True,
                         args=["build", f"--config={config}", "install-dist-test"],
                         machine=machine,
                     ),
-                    hermetic_container_integration.IntegrationMode.LINUX_CROSS_HOST_RBE,
+                    config_module.IntegrationMode.LINUX_CROSS_HOST_RBE,
                 )
 
     def test_linux_cross_rbe_can_be_disabled(self):
         self.assertEqual(
-            hermetic_container_integration.select_integration_mode(
+            runner.select_integration_mode(
                 env={"MONGO_BAZEL_USE_HERMETIC_CONTAINER": "0"},
                 system="Linux",
                 docker_exists=lambda: True,
                 args=["build", "--config=linux-s390x-cross-rbe", "install-dist-test"],
                 machine="s390x",
             ),
-            hermetic_container_integration.IntegrationMode.DIRECT,
+            config_module.IntegrationMode.DIRECT,
         )
 
     def test_native_toolchain_disables_linux_host_container(self):
         self.assertEqual(
-            hermetic_container_integration.select_integration_mode(
+            runner.select_integration_mode(
                 env={"MONGO_HERMETIC_CONTAINER_DISTRO": "rhel9"},
                 system="Linux",
                 docker_exists=lambda: True,
                 args=["build", "--config=native_toolchain", "install-dist-test"],
                 machine="aarch64",
             ),
-            hermetic_container_integration.IntegrationMode.DIRECT,
+            config_module.IntegrationMode.DIRECT,
         )
 
     def test_native_toolchain_config_aliases_are_loaded_from_workspace_rc(self):
@@ -328,7 +361,7 @@ class HermeticContainerEnablementTest(unittest.TestCase):
                 "common:host-native --config=native_toolchain\n", encoding="utf-8"
             )
 
-            mode = hermetic_container_integration.select_integration_mode(
+            mode = runner.select_integration_mode(
                 env={"MONGO_HERMETIC_CONTAINER_DISTRO": "rhel9"},
                 system="Linux",
                 docker_exists=lambda: True,
@@ -337,7 +370,7 @@ class HermeticContainerEnablementTest(unittest.TestCase):
                 repo_root=repo_root,
             )
 
-        self.assertEqual(mode, hermetic_container_integration.IntegrationMode.DIRECT)
+        self.assertEqual(mode, config_module.IntegrationMode.DIRECT)
 
     def test_native_toolchain_config_alias_is_loaded_from_home_rc(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -349,7 +382,7 @@ class HermeticContainerEnablementTest(unittest.TestCase):
                 "common:host-native --config=native_toolchain\n", encoding="utf-8"
             )
 
-            mode = hermetic_container_integration.select_integration_mode(
+            mode = runner.select_integration_mode(
                 env={
                     "HOME": str(home),
                     "MONGO_HERMETIC_CONTAINER_DISTRO": "rhel9",
@@ -361,11 +394,11 @@ class HermeticContainerEnablementTest(unittest.TestCase):
                 repo_root=repo_root,
             )
 
-        self.assertEqual(mode, hermetic_container_integration.IntegrationMode.DIRECT)
+        self.assertEqual(mode, config_module.IntegrationMode.DIRECT)
 
     def test_windows_build_defaults_to_native_toolchain(self):
         self.assertFalse(
-            hermetic_container_integration.should_use_hermetic_container(
+            runner.should_use_hermetic_container(
                 env={},
                 system="Windows",
                 docker_exists=lambda: True,
@@ -373,7 +406,7 @@ class HermeticContainerEnablementTest(unittest.TestCase):
             )
         )
         self.assertFalse(
-            hermetic_container_integration.should_use_hermetic_container(
+            runner.should_use_hermetic_container(
                 env={"MONGO_BAZEL_USE_HERMETIC_CONTAINER": "1"},
                 system="Windows",
                 docker_exists=lambda: True,
@@ -381,7 +414,7 @@ class HermeticContainerEnablementTest(unittest.TestCase):
             )
         )
         self.assertFalse(
-            hermetic_container_integration.should_use_hermetic_container(
+            runner.should_use_hermetic_container(
                 env={},
                 system="Windows",
                 docker_exists=lambda: False,
@@ -391,7 +424,7 @@ class HermeticContainerEnablementTest(unittest.TestCase):
 
     def test_windows_build_can_opt_in_to_cross_hermetic_container(self):
         self.assertTrue(
-            hermetic_container_integration.should_use_hermetic_container(
+            runner.should_use_hermetic_container(
                 env={"MONGO_WINDOWS_CROSS_DEFAULT_CONFIG": "1"},
                 system="Windows",
                 docker_exists=lambda: True,
@@ -401,7 +434,7 @@ class HermeticContainerEnablementTest(unittest.TestCase):
 
     def test_windows_non_cross_commands_stay_local(self):
         self.assertFalse(
-            hermetic_container_integration.should_use_hermetic_container(
+            runner.should_use_hermetic_container(
                 env={},
                 system="Windows",
                 docker_exists=lambda: True,
@@ -409,7 +442,7 @@ class HermeticContainerEnablementTest(unittest.TestCase):
             )
         )
         self.assertFalse(
-            hermetic_container_integration.should_use_hermetic_container(
+            runner.should_use_hermetic_container(
                 env={"MONGO_BAZEL_USE_HERMETIC_CONTAINER": "1"},
                 system="Windows",
                 docker_exists=lambda: True,
@@ -419,7 +452,7 @@ class HermeticContainerEnablementTest(unittest.TestCase):
 
     def test_windows_run_defaults_to_native_toolchain_for_test_targets(self):
         self.assertFalse(
-            hermetic_container_integration.should_use_hermetic_container(
+            runner.should_use_hermetic_container(
                 env={},
                 system="Windows",
                 docker_exists=lambda: True,
@@ -427,7 +460,7 @@ class HermeticContainerEnablementTest(unittest.TestCase):
             )
         )
         self.assertTrue(
-            hermetic_container_integration.should_use_hermetic_container(
+            runner.should_use_hermetic_container(
                 env={"MONGO_WINDOWS_CROSS_DEFAULT_CONFIG": "1"},
                 system="Windows",
                 docker_exists=lambda: True,
@@ -435,7 +468,7 @@ class HermeticContainerEnablementTest(unittest.TestCase):
             )
         )
         self.assertFalse(
-            hermetic_container_integration.should_use_hermetic_container(
+            runner.should_use_hermetic_container(
                 env={},
                 system="Windows",
                 docker_exists=lambda: True,
@@ -445,7 +478,7 @@ class HermeticContainerEnablementTest(unittest.TestCase):
 
     def test_windows_test_does_not_default_to_cross_hermetic_container(self):
         self.assertFalse(
-            hermetic_container_integration.should_use_hermetic_container(
+            runner.should_use_hermetic_container(
                 env={},
                 system="Windows",
                 docker_exists=lambda: True,
@@ -454,7 +487,7 @@ class HermeticContainerEnablementTest(unittest.TestCase):
         )
 
     def test_windows_cross_default_config_requires_opt_in(self):
-        args = hermetic_container_integration._bazel_args_with_default_windows_cross_config(
+        args = cross_windows._bazel_args_with_default_windows_cross_config(
             ["build", "install-dist-test"],
             {},
             system="Windows",
@@ -462,7 +495,7 @@ class HermeticContainerEnablementTest(unittest.TestCase):
 
         self.assertEqual(args, ["build", "install-dist-test"])
         self.assertFalse(
-            hermetic_container_integration.should_use_hermetic_container(
+            runner.should_use_hermetic_container(
                 env={},
                 system="Windows",
                 docker_exists=lambda: True,
@@ -470,20 +503,20 @@ class HermeticContainerEnablementTest(unittest.TestCase):
             )
         )
         self.assertTrue(
-            hermetic_container_integration.should_use_hermetic_container(
+            runner.should_use_hermetic_container(
                 env={},
                 system="Windows",
                 docker_exists=lambda: True,
                 args=[
                     "run",
-                    f"--config={hermetic_container_integration.WINDOWS_CROSS_CONFIG}",
+                    f"--config={cross_windows.WINDOWS_CROSS_CONFIG}",
                     "+stdx_test",
                 ],
             )
         )
 
     def test_windows_cross_default_config_preserves_explicit_platforms(self):
-        args = hermetic_container_integration._bazel_args_with_default_windows_cross_config(
+        args = cross_windows._bazel_args_with_default_windows_cross_config(
             ["build", "--platforms=//bazel/platforms:windows_amd64", "install-dist-test"],
             {"MONGO_WINDOWS_CROSS_DEFAULT_CONFIG": "1"},
             system="Windows",
@@ -495,7 +528,7 @@ class HermeticContainerEnablementTest(unittest.TestCase):
         )
 
     def test_windows_cross_default_config_injects_after_command(self):
-        args = hermetic_container_integration._bazel_args_with_default_windows_cross_config(
+        args = cross_windows._bazel_args_with_default_windows_cross_config(
             ["--output_base=C:/tmp/bazel", "build", "install-dist-test"],
             {"MONGO_WINDOWS_CROSS_DEFAULT_CONFIG": "1"},
             system="Windows",
@@ -506,14 +539,14 @@ class HermeticContainerEnablementTest(unittest.TestCase):
             [
                 "--output_base=C:/tmp/bazel",
                 "build",
-                f"--config={hermetic_container_integration.WINDOWS_CROSS_CONFIG}",
+                f"--config={cross_windows.WINDOWS_CROSS_CONFIG}",
                 "install-dist-test",
             ],
         )
 
     def test_macos_uses_hermetic_container_for_cross_config_or_explicit_enablement(self):
         self.assertFalse(
-            hermetic_container_integration.should_use_hermetic_container(
+            runner.should_use_hermetic_container(
                 env={},
                 system="Darwin",
                 docker_exists=lambda: True,
@@ -521,7 +554,7 @@ class HermeticContainerEnablementTest(unittest.TestCase):
             )
         )
         self.assertTrue(
-            hermetic_container_integration.should_use_hermetic_container(
+            runner.should_use_hermetic_container(
                 env={},
                 system="Darwin",
                 docker_exists=lambda: True,
@@ -529,7 +562,7 @@ class HermeticContainerEnablementTest(unittest.TestCase):
             )
         )
         self.assertTrue(
-            hermetic_container_integration.should_use_hermetic_container(
+            runner.should_use_hermetic_container(
                 env={"MONGO_BAZEL_USE_HERMETIC_CONTAINER": "1"},
                 system="Darwin",
                 docker_exists=lambda: True,
@@ -537,7 +570,7 @@ class HermeticContainerEnablementTest(unittest.TestCase):
             )
         )
         self.assertFalse(
-            hermetic_container_integration.should_use_hermetic_container(
+            runner.should_use_hermetic_container(
                 env={},
                 system="Darwin",
                 docker_exists=lambda: True,
@@ -545,7 +578,7 @@ class HermeticContainerEnablementTest(unittest.TestCase):
             )
         )
         self.assertFalse(
-            hermetic_container_integration.should_use_hermetic_container(
+            runner.should_use_hermetic_container(
                 env={},
                 system="Darwin",
                 docker_exists=lambda: True,
@@ -555,7 +588,7 @@ class HermeticContainerEnablementTest(unittest.TestCase):
 
     def test_macos_cross_test_routes_through_integration_without_docker(self):
         self.assertTrue(
-            hermetic_container_integration.should_use_hermetic_container(
+            runner.should_use_hermetic_container(
                 env={},
                 system="Darwin",
                 docker_exists=lambda: False,
@@ -568,7 +601,7 @@ class HermeticContainerEnablementTest(unittest.TestCase):
             )
         )
         self.assertFalse(
-            hermetic_container_integration.should_use_hermetic_container(
+            runner.should_use_hermetic_container(
                 env={},
                 system="Darwin",
                 docker_exists=lambda: False,
@@ -576,7 +609,7 @@ class HermeticContainerEnablementTest(unittest.TestCase):
             )
         )
         self.assertTrue(
-            hermetic_container_integration.should_use_hermetic_container(
+            runner.should_use_hermetic_container(
                 env={},
                 system="Darwin",
                 docker_exists=lambda: False,
@@ -586,7 +619,7 @@ class HermeticContainerEnablementTest(unittest.TestCase):
 
     def test_macos_cross_default_config_uses_host_arch(self):
         self.assertEqual(
-            hermetic_container_integration._bazel_args_with_default_macos_cross_config(
+            cross_macos._bazel_args_with_default_macos_cross_config(
                 ["test", "+some_test"],
                 {"MONGO_MACOS_CROSS_DEFAULT_CONFIG": "1"},
                 system="Darwin",
@@ -595,7 +628,7 @@ class HermeticContainerEnablementTest(unittest.TestCase):
             ["test", "--config=macos-cross-arm64", "+some_test"],
         )
         self.assertEqual(
-            hermetic_container_integration._bazel_args_with_default_macos_cross_config(
+            cross_macos._bazel_args_with_default_macos_cross_config(
                 ["build", "install-dist-test"],
                 {"MONGO_MACOS_CROSS_DEFAULT_CONFIG": "1"},
                 system="Darwin",
@@ -604,7 +637,7 @@ class HermeticContainerEnablementTest(unittest.TestCase):
             ["build", "--config=macos-cross-x86_64", "install-dist-test"],
         )
         self.assertEqual(
-            hermetic_container_integration._bazel_args_with_default_macos_cross_config(
+            cross_macos._bazel_args_with_default_macos_cross_config(
                 ["run", "format"],
                 {},
                 system="Darwin",
@@ -613,7 +646,7 @@ class HermeticContainerEnablementTest(unittest.TestCase):
             ["run", "format"],
         )
         self.assertEqual(
-            hermetic_container_integration._bazel_args_with_default_macos_cross_config(
+            cross_macos._bazel_args_with_default_macos_cross_config(
                 ["clean"],
                 {},
                 system="Darwin",
@@ -622,7 +655,7 @@ class HermeticContainerEnablementTest(unittest.TestCase):
             ["clean"],
         )
         self.assertEqual(
-            hermetic_container_integration._bazel_args_with_default_macos_cross_config(
+            cross_macos._bazel_args_with_default_macos_cross_config(
                 ["run", "//src/mongo/stdx:stdx_test", "--", "--fileNameFilter", "stdx_test"],
                 {"MONGO_MACOS_CROSS_DEFAULT_CONFIG": "1"},
                 system="Darwin",
@@ -639,7 +672,7 @@ class HermeticContainerEnablementTest(unittest.TestCase):
         )
 
     def test_macos_cross_default_config_requires_opt_in(self):
-        args = hermetic_container_integration._bazel_args_with_default_macos_cross_config(
+        args = cross_macos._bazel_args_with_default_macos_cross_config(
             ["test", "+some_test"],
             {},
             system="Darwin",
@@ -648,7 +681,7 @@ class HermeticContainerEnablementTest(unittest.TestCase):
 
         self.assertEqual(args, ["test", "+some_test"])
         self.assertFalse(
-            hermetic_container_integration.should_use_hermetic_container(
+            runner.should_use_hermetic_container(
                 env={},
                 system="Darwin",
                 docker_exists=lambda: True,
@@ -656,7 +689,7 @@ class HermeticContainerEnablementTest(unittest.TestCase):
             )
         )
         self.assertFalse(
-            hermetic_container_integration.should_use_hermetic_container(
+            runner.should_use_hermetic_container(
                 env={},
                 system="Darwin",
                 docker_exists=lambda: True,
@@ -666,14 +699,14 @@ class HermeticContainerEnablementTest(unittest.TestCase):
 
     def test_env_can_disable_hermetic_container(self):
         self.assertFalse(
-            hermetic_container_integration.should_use_hermetic_container(
+            runner.should_use_hermetic_container(
                 env={"MONGO_BAZEL_USE_HERMETIC_CONTAINER": "0"},
                 system="Linux",
                 docker_exists=lambda: True,
             )
         )
         self.assertFalse(
-            hermetic_container_integration.should_use_hermetic_container(
+            runner.should_use_hermetic_container(
                 env={"MONGO_BAZEL_USE_HERMETIC_CONTAINER": "0"},
                 system="Darwin",
                 docker_exists=lambda: True,
@@ -682,7 +715,7 @@ class HermeticContainerEnablementTest(unittest.TestCase):
 
     def test_skips_inside_hermetic_container(self):
         self.assertFalse(
-            hermetic_container_integration.should_use_hermetic_container(
+            runner.should_use_hermetic_container(
                 env={"MONGO_BAZEL_IN_HERMETIC_CONTAINER": "1"},
                 system="Linux",
                 docker_exists=lambda: True,
@@ -690,26 +723,22 @@ class HermeticContainerEnablementTest(unittest.TestCase):
         )
 
     def test_defaults_to_native_when_already_in_a_container(self):
-        with mock.patch.object(
-            hermetic_container_integration, "_is_running_in_container", return_value=True
-        ):
+        with mock.patch.object(runner, "_is_running_in_container", return_value=True):
             self.assertEqual(
-                hermetic_container_integration.select_integration_mode(
+                runner.select_integration_mode(
                     env={"MONGO_HERMETIC_CONTAINER_DISTRO": "rhel9"},
                     system="Linux",
                     docker_exists=lambda: True,
                     args=["build", "install-dist-test"],
                     machine="x86_64",
                 ),
-                hermetic_container_integration.IntegrationMode.DIRECT,
+                config_module.IntegrationMode.DIRECT,
             )
 
     def test_can_explicitly_enable_nested_container(self):
-        with mock.patch.object(
-            hermetic_container_integration, "_is_running_in_container", return_value=True
-        ):
+        with mock.patch.object(runner, "_is_running_in_container", return_value=True):
             self.assertEqual(
-                hermetic_container_integration.select_integration_mode(
+                runner.select_integration_mode(
                     env={
                         "MONGO_BAZEL_USE_HERMETIC_CONTAINER": "1",
                         "MONGO_HERMETIC_CONTAINER_DISTRO": "rhel9",
@@ -719,7 +748,7 @@ class HermeticContainerEnablementTest(unittest.TestCase):
                     args=["build", "install-dist-test"],
                     machine="x86_64",
                 ),
-                hermetic_container_integration.IntegrationMode.LINUX_HOST_CONTAINER,
+                config_module.IntegrationMode.LINUX_HOST_CONTAINER,
             )
 
     def test_ci_uses_default_linux_container_mode(self):
@@ -730,7 +759,7 @@ class HermeticContainerEnablementTest(unittest.TestCase):
             with self.subTest(distro=distro, machine=machine):
                 env = {"CI": "1", "MONGO_HERMETIC_CONTAINER_DISTRO": distro}
                 self.assertTrue(
-                    hermetic_container_integration.should_use_hermetic_container(
+                    runner.should_use_hermetic_container(
                         env=env,
                         system="Linux",
                         docker_exists=lambda: True,
@@ -738,19 +767,19 @@ class HermeticContainerEnablementTest(unittest.TestCase):
                     )
                 )
                 self.assertEqual(
-                    hermetic_container_integration.select_integration_mode(
+                    runner.select_integration_mode(
                         env=env,
                         system="Linux",
                         docker_exists=lambda: True,
                         args=["build", "install-dist-test"],
                         machine=machine,
                     ),
-                    hermetic_container_integration.IntegrationMode.LINUX_HOST_CONTAINER,
+                    config_module.IntegrationMode.LINUX_HOST_CONTAINER,
                 )
 
     def test_dry_run_does_not_require_docker(self):
         self.assertTrue(
-            hermetic_container_integration.should_use_hermetic_container(
+            runner.should_use_hermetic_container(
                 env={
                     "MONGO_HERMETIC_CONTAINER_DRY_RUN": "1",
                     "MONGO_HERMETIC_CONTAINER_DISTRO": "rhel9",
@@ -764,14 +793,12 @@ class HermeticContainerEnablementTest(unittest.TestCase):
 
 class HermeticContainerRunTest(unittest.TestCase):
     def test_full_container_lock_covers_start_and_exec(self):
-        image = hermetic_container_integration.parse_docker_image(
-            "quay.io/mongodb/rbe@sha256:abc123"
-        )
+        image = distro_module.parse_docker_image("quay.io/mongodb/rbe@sha256:abc123")
 
         with tempfile.TemporaryDirectory() as temp_dir:
             root = pathlib.Path(temp_dir)
             run_file = root / "container.run"
-            config = hermetic_container_integration.HermeticContainerConfig(
+            config = config_module.HermeticContainerConfig(
                 distro="amazon_linux_2023",
                 docker_image=image,
                 instance_name="mongo_hermetic_container_test",
@@ -786,7 +813,7 @@ class HermeticContainerRunTest(unittest.TestCase):
                 privileged=False,
             )
             run_file.write_text(
-                hermetic_container_integration._config_fingerprint(config) + "\n",
+                config_module._config_fingerprint(config) + "\n",
                 encoding="utf-8",
             )
             events = []
@@ -815,44 +842,42 @@ class HermeticContainerRunTest(unittest.TestCase):
             container_module.DockerInstance.return_value = docker_instance
 
             with (
+                mock.patch.object(platform, "system", return_value="Darwin"),
                 mock.patch.object(
-                    hermetic_container_integration.platform, "system", return_value="Darwin"
-                ),
-                mock.patch.object(
-                    hermetic_container_integration,
+                    runner,
                     "_prepare_hermetic_container_process_env",
                 ),
                 mock.patch.object(
-                    hermetic_container_integration,
+                    runner,
                     "_docker_daemon_status",
                     return_value=(True, ""),
                 ),
                 mock.patch.object(
-                    hermetic_container_integration,
+                    runner,
                     "build_hermetic_container_config",
                     return_value=config,
                 ),
                 mock.patch.object(
-                    hermetic_container_integration,
+                    runner,
                     "_load_hermetic_container_module",
                     return_value=container_module,
                 ),
                 mock.patch.object(
-                    hermetic_container_integration,
+                    runner,
                     "_macos_cross_host_test_requested",
                     return_value=False,
                 ),
                 mock.patch.object(
-                    hermetic_container_integration,
+                    runner,
                     "_hermetic_container_lock",
                     side_effect=record_lock,
                 ),
                 mock.patch.object(
-                    hermetic_container_integration,
+                    runner,
                     "_publish_hermetic_container_convenience_symlinks",
                 ),
             ):
-                rc = hermetic_container_integration.run_hermetic_container(
+                rc = runner.run_hermetic_container(
                     "/tmp/bazel-darwin",
                     ["test", "--config=macos-cross-arm64", "//src/mongo:target_test"],
                     env={

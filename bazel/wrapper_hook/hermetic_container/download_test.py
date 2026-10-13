@@ -7,10 +7,11 @@ import importlib.util
 import pathlib
 import tempfile
 import unittest
+import urllib.request
 from io import BytesIO
 from unittest import mock
 
-from bazel.wrapper_hook import hermetic_container_integration
+from bazel.wrapper_hook.hermetic_container import download, fsutil
 
 HERMETIC_CONTAINER_PATH = (
     pathlib.Path(__file__).parents[2] / "hermetic_container" / "hermetic_container.py"
@@ -34,11 +35,11 @@ class LinuxBazelDownloadTest(unittest.TestCase):
             destination.write_bytes(b"previous Linux Bazel")
 
             with mock.patch.object(
-                hermetic_container_integration.urllib.request,
+                urllib.request,
                 "urlopen",
                 return_value=BytesIO(payload),
             ):
-                hermetic_container_integration._download_file(
+                download._download_file(
                     "https://example.invalid/bazel",
                     destination,
                     expected_sha256,
@@ -46,12 +47,10 @@ class LinuxBazelDownloadTest(unittest.TestCase):
 
             self.assertEqual(destination.read_bytes(), payload)
             self.assertEqual(
-                hermetic_container_integration._linux_bazel_checksum_file(destination).read_text(
-                    encoding="utf-8"
-                ),
+                download._linux_bazel_checksum_file(destination).read_text(encoding="utf-8"),
                 f"{expected_sha256}\n",
             )
-            self.assertTrue(hermetic_container_integration._linux_bazel_cache_is_valid(destination))
+            self.assertTrue(download._linux_bazel_cache_is_valid(destination))
 
     def test_checksum_mismatch_leaves_the_existing_cache_untouched(self):
         expected_sha256 = hashlib.sha256(b"expected Linux Bazel").hexdigest()
@@ -63,22 +62,20 @@ class LinuxBazelDownloadTest(unittest.TestCase):
 
             with (
                 mock.patch.object(
-                    hermetic_container_integration.urllib.request,
+                    urllib.request,
                     "urlopen",
                     return_value=BytesIO(b"corrupt Linux Bazel"),
                 ),
                 self.assertRaisesRegex(RuntimeError, "does not match the expected SHA-256"),
             ):
-                hermetic_container_integration._download_file(
+                download._download_file(
                     "https://example.invalid/bazel",
                     destination,
                     expected_sha256,
                 )
 
             self.assertEqual(destination.read_bytes(), old_contents)
-            self.assertFalse(
-                hermetic_container_integration._linux_bazel_checksum_file(destination).exists()
-            )
+            self.assertFalse(download._linux_bazel_checksum_file(destination).exists())
             self.assertEqual(list(destination.parent.glob(".bazel.*.tmp")), [])
 
     def test_resolve_container_bazel_reuses_only_a_verified_cache_entry(self):
@@ -88,7 +85,7 @@ class LinuxBazelDownloadTest(unittest.TestCase):
             repo_root = pathlib.Path(temp_dir)
             repo_root.joinpath(".bazelversion").write_text("7.5.0\n", encoding="utf-8")
             destination = (
-                hermetic_container_integration._hermetic_container_state_dir(repo_root)
+                fsutil._hermetic_container_state_dir(repo_root)
                 / "bazel"
                 / "bazel-7.5.0-linux-x86_64"
                 / "bin"
@@ -96,16 +93,16 @@ class LinuxBazelDownloadTest(unittest.TestCase):
             )
             destination.parent.mkdir(parents=True)
             destination.write_bytes(payload)
-            hermetic_container_integration._linux_bazel_checksum_file(destination).write_text(
+            download._linux_bazel_checksum_file(destination).write_text(
                 f"{expected_sha256}\n",
                 encoding="utf-8",
             )
 
             with mock.patch.object(
-                hermetic_container_integration.urllib.request,
+                urllib.request,
                 "urlopen",
             ) as urlopen:
-                command, mounted_binary = hermetic_container_integration._resolve_container_bazel(
+                command, mounted_binary = download._resolve_container_bazel(
                     pathlib.Path("/usr/bin/bazel"),
                     {"MONGO_HERMETIC_CONTAINER_CONTAINER_ARCH": "x86_64"},
                     repo_root,

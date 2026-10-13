@@ -3,14 +3,20 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 import pathlib
+import platform
+import shutil
 import subprocess
 import unittest
 from contextlib import redirect_stderr
 from io import StringIO
 from unittest import mock
 
-from bazel.wrapper_hook import hermetic_container_integration
+from bazel.wrapper_hook.hermetic_container import config as config_module
+from bazel.wrapper_hook.hermetic_container import distro as distro_module
+from bazel.wrapper_hook.hermetic_container import docker as docker_module
+from bazel.wrapper_hook.hermetic_container import runner
 
 HERMETIC_CONTAINER_PATH = (
     pathlib.Path(__file__).parents[2] / "hermetic_container" / "hermetic_container.py"
@@ -27,7 +33,7 @@ HERMETIC_CONTAINER_SPEC.loader.exec_module(hermetic_container)
 class DockerDaemonCheckTest(unittest.TestCase):
     def test_docker_daemon_status_reports_unreachable_daemon(self):
         with mock.patch.object(
-            hermetic_container_integration.subprocess,
+            subprocess,
             "run",
             return_value=subprocess.CompletedProcess(
                 args=["docker", "info"],
@@ -36,18 +42,18 @@ class DockerDaemonCheckTest(unittest.TestCase):
                 stderr="Cannot connect to the Docker daemon",
             ),
         ):
-            ok, detail = hermetic_container_integration._docker_daemon_status("docker")
+            ok, detail = docker_module._docker_daemon_status("docker")
 
         self.assertFalse(ok)
         self.assertIn("Cannot connect to the Docker daemon", detail)
 
     def test_docker_daemon_status_reports_timeout(self):
         with mock.patch.object(
-            hermetic_container_integration.subprocess,
+            subprocess,
             "run",
             side_effect=subprocess.TimeoutExpired(["docker", "info"], timeout=10),
         ):
-            ok, detail = hermetic_container_integration._docker_daemon_status("docker")
+            ok, detail = docker_module._docker_daemon_status("docker")
 
         self.assertFalse(ok)
         self.assertIn("timed out after", detail)
@@ -72,18 +78,14 @@ class DockerDaemonCheckTest(unittest.TestCase):
             )
 
         with (
-            mock.patch.dict(hermetic_container_integration.os.environ, {}, clear=True),
-            mock.patch.object(
-                hermetic_container_integration.subprocess, "run", side_effect=fake_run
-            ),
+            mock.patch.dict(os.environ, {}, clear=True),
+            mock.patch.object(subprocess, "run", side_effect=fake_run),
         ):
-            ok, detail = hermetic_container_integration._docker_daemon_status("docker")
+            ok, detail = docker_module._docker_daemon_status("docker")
 
             self.assertTrue(ok)
             self.assertEqual(detail, "")
-            self.assertEqual(
-                hermetic_container_integration.os.environ["DOCKER_API_VERSION"], "1.52"
-            )
+            self.assertEqual(os.environ["DOCKER_API_VERSION"], "1.52")
 
         self.assertIsNone(calls[0])
         self.assertEqual(calls[1]["DOCKER_API_VERSION"], "1.52")
@@ -91,10 +93,8 @@ class DockerDaemonCheckTest(unittest.TestCase):
     def test_run_hermetic_container_reports_docker_daemon_error_without_loading_hermetic_container(
         self,
     ):
-        image = hermetic_container_integration.parse_docker_image(
-            "quay.io/mongodb/rbe@sha256:abc123"
-        )
-        config = hermetic_container_integration.HermeticContainerConfig(
+        image = distro_module.parse_docker_image("quay.io/mongodb/rbe@sha256:abc123")
+        config = config_module.HermeticContainerConfig(
             distro="amazon_linux_2023",
             docker_image=image,
             instance_name="test",
@@ -111,28 +111,22 @@ class DockerDaemonCheckTest(unittest.TestCase):
 
         stderr = StringIO()
         with (
+            mock.patch.object(platform, "system", return_value="Darwin"),
+            mock.patch.object(shutil, "which", return_value="/usr/bin/docker"),
             mock.patch.object(
-                hermetic_container_integration.platform, "system", return_value="Darwin"
-            ),
-            mock.patch.object(
-                hermetic_container_integration.shutil, "which", return_value="/usr/bin/docker"
-            ),
-            mock.patch.object(
-                hermetic_container_integration,
+                runner,
                 "build_hermetic_container_config",
                 return_value=config,
             ),
             mock.patch.object(
-                hermetic_container_integration,
+                runner,
                 "_docker_daemon_status",
                 return_value=(False, "Cannot connect to the Docker daemon"),
             ),
-            mock.patch.object(
-                hermetic_container_integration, "_load_hermetic_container_module"
-            ) as load_hermetic_container,
+            mock.patch.object(runner, "_load_hermetic_container_module") as load_hermetic_container,
             redirect_stderr(stderr),
         ):
-            rc = hermetic_container_integration.run_hermetic_container(
+            rc = runner.run_hermetic_container(
                 "/tmp/bazel-darwin",
                 ["build", "install-dist-test"],
                 env={"MONGO_BAZEL_USE_HERMETIC_CONTAINER": "1"},

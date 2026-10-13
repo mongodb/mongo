@@ -7,7 +7,9 @@ import pathlib
 import tempfile
 import unittest
 
-from bazel.wrapper_hook import hermetic_container_integration
+from bazel.wrapper_hook.hermetic_container import config as config_module
+from bazel.wrapper_hook.hermetic_container import constants, runner, symlinks
+from bazel.wrapper_hook.hermetic_container import distro as distro_module
 
 HERMETIC_CONTAINER_PATH = (
     pathlib.Path(__file__).parents[2] / "hermetic_container" / "hermetic_container.py"
@@ -36,7 +38,7 @@ class HermeticContainerConvenienceSymlinkTest(unittest.TestCase):
             legacy_install.mkdir()
             (legacy_install / "old-binary").write_text("old", encoding="utf-8")
 
-            hermetic_container_integration._publish_linux_shared_install_symlink(
+            symlinks._publish_linux_shared_install_symlink(
                 {"shared_install_dir": str(shared_install_root)},
                 repo_root=repo_root,
             )
@@ -61,7 +63,7 @@ class HermeticContainerConvenienceSymlinkTest(unittest.TestCase):
                 target_is_directory=True,
             )
 
-            hermetic_container_integration._publish_linux_shared_install_symlink(
+            symlinks._publish_linux_shared_install_symlink(
                 {"shared_install_dir": str(shared_install_root)},
                 repo_root=repo_root,
             )
@@ -81,7 +83,7 @@ class HermeticContainerConvenienceSymlinkTest(unittest.TestCase):
             install_dir.mkdir(parents=True)
             (install_dir / "mongod").write_text("binary", encoding="utf-8")
 
-            hermetic_container_integration._publish_linux_shared_install_symlink(
+            symlinks._publish_linux_shared_install_symlink(
                 {"shared_install_dir": str(shared_install_root)},
                 repo_root=repo_root,
             )
@@ -104,7 +106,7 @@ class HermeticContainerConvenienceSymlinkTest(unittest.TestCase):
             (private_install_dir / "mongod").write_text("binary", encoding="utf-8")
             (repo_root / "bazel-bin").symlink_to(bin_dir, target_is_directory=True)
 
-            hermetic_container_integration._publish_linux_shared_install_symlink(
+            symlinks._publish_linux_shared_install_symlink(
                 {"shared_install_dir": str(shared_install_root)},
                 repo_root=repo_root,
             )
@@ -127,7 +129,7 @@ class HermeticContainerConvenienceSymlinkTest(unittest.TestCase):
             (private_install_dir / "dbtest").write_text("binary", encoding="utf-8")
             (repo_root / "bazel-bin").symlink_to(bin_dir, target_is_directory=True)
 
-            hermetic_container_integration._publish_linux_shared_install_symlink(
+            symlinks._publish_linux_shared_install_symlink(
                 {"shared_install_dir": str(shared_install_root)},
                 repo_root=repo_root,
             )
@@ -153,7 +155,7 @@ class HermeticContainerConvenienceSymlinkTest(unittest.TestCase):
             (dist_install_dir / "mongod").write_text("binary", encoding="utf-8")
             (repo_root / "bazel-bin").symlink_to(bin_dir, target_is_directory=True)
 
-            hermetic_container_integration._publish_linux_shared_install_symlink(
+            symlinks._publish_linux_shared_install_symlink(
                 {
                     "shared_install_dir": str(shared_install_root),
                     "preferred_install_target": "install-dbtest",
@@ -182,7 +184,7 @@ class HermeticContainerConvenienceSymlinkTest(unittest.TestCase):
             )
             (repo_root / "bazel-bin").symlink_to(bin_dir, target_is_directory=True)
 
-            hermetic_container_integration._publish_linux_shared_install_symlink(
+            symlinks._publish_linux_shared_install_symlink(
                 {"shared_install_dir": str(shared_install_root)},
                 repo_root=repo_root,
             )
@@ -209,7 +211,7 @@ class HermeticContainerConvenienceSymlinkTest(unittest.TestCase):
                 target_is_directory=True,
             )
 
-            hermetic_container_integration._publish_linux_shared_install_symlink(
+            symlinks._publish_linux_shared_install_symlink(
                 {
                     "shared_install_dir": str(shared_install_root),
                     "output_base": str(output_base),
@@ -225,7 +227,7 @@ class HermeticContainerConvenienceSymlinkTest(unittest.TestCase):
 
     def test_adds_standard_convenience_symlink_prefix(self):
         self.assertEqual(
-            hermetic_container_integration._bazel_args_with_hermetic_container_symlink_prefix(
+            symlinks._bazel_args_with_hermetic_container_symlink_prefix(
                 ["--output_base=/tmp/output", "build", "//src/mongo:mongo"]
             ),
             [
@@ -240,7 +242,7 @@ class HermeticContainerConvenienceSymlinkTest(unittest.TestCase):
         args = ["build", "--symlink_prefix=custom/bazel-", "//src/mongo:mongo"]
 
         self.assertEqual(
-            hermetic_container_integration._bazel_args_with_hermetic_container_symlink_prefix(args),
+            symlinks._bazel_args_with_hermetic_container_symlink_prefix(args),
             args,
         )
 
@@ -253,7 +255,7 @@ class HermeticContainerConvenienceSymlinkTest(unittest.TestCase):
             )
             bazelrc.write_text(host_contents, encoding="utf-8")
 
-            with hermetic_container_integration._temporary_hermetic_container_engflow_bazelrc(
+            with runner._temporary_hermetic_container_engflow_bazelrc(
                 "/container/engflow_auth",
                 repo_root,
             ) as dedicated_bazelrc:
@@ -295,10 +297,8 @@ class HermeticContainerConvenienceSymlinkTest(unittest.TestCase):
             (convenience_dir / "bazel-out").symlink_to(bazel_out, target_is_directory=True)
             (convenience_dir / "bazel-testlogs").symlink_to(testlogs_dir, target_is_directory=True)
 
-            image = hermetic_container_integration.parse_docker_image(
-                "quay.io/mongodb/rbe@sha256:abc123"
-            )
-            config = hermetic_container_integration.HermeticContainerConfig(
+            image = distro_module.parse_docker_image("quay.io/mongodb/rbe@sha256:abc123")
+            config = config_module.HermeticContainerConfig(
                 distro="amazon_linux_2023",
                 docker_image=image,
                 instance_name="mongo_hermetic_container_test",
@@ -314,25 +314,17 @@ class HermeticContainerConvenienceSymlinkTest(unittest.TestCase):
             )
             marker = root / "symlinks.json"
 
-            hermetic_container_integration._publish_hermetic_container_convenience_symlinks(
+            symlinks._publish_hermetic_container_convenience_symlinks(
                 config,
                 FakeDockerInstance(),
-                {
-                    hermetic_container_integration.HERMETIC_CONTAINER_CONVENIENCE_SYMLINKS_ENV: str(
-                        marker
-                    )
-                },
+                {constants.HERMETIC_CONTAINER_CONVENIENCE_SYMLINKS_ENV: str(marker)},
                 repo_root=repo_root,
             )
             (repo_root / "bazel-bin").unlink()
             (repo_root / "bazel-bin").symlink_to(host_bin, target_is_directory=True)
 
-            hermetic_container_integration.restore_hermetic_container_convenience_symlinks_from_env(
-                {
-                    hermetic_container_integration.HERMETIC_CONTAINER_CONVENIENCE_SYMLINKS_ENV: str(
-                        marker
-                    )
-                }
+            symlinks.restore_hermetic_container_convenience_symlinks_from_env(
+                {constants.HERMETIC_CONTAINER_CONVENIENCE_SYMLINKS_ENV: str(marker)}
             )
 
             self.assertEqual((repo_root / "bazel-bin").resolve(), bin_dir.resolve())
