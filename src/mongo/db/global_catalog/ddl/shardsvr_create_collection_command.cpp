@@ -249,7 +249,9 @@ public:
                             (*optFixedFcvRegion)->acquireFCVSnapshot()) &&
                         request().getRegisterExistingCollectionInGlobalCatalog();
 
-                    if (!mustTrackOnMoveCollection && !isFromCreateUnsplittableCommand) {
+                    if (!mustTrackOnMoveCollection && !isFromCreateUnsplittableCommand &&
+                        (!request().getDataShard().has_value() ||
+                         request().getDataShard() == ShardingState::get(opCtx)->shardId())) {
                         optFixedFcvRegion.reset();
                         return _createUntrackedCollection(opCtx);
                     }

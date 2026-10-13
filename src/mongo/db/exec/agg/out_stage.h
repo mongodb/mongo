@@ -60,12 +60,10 @@ public:
     OutStage(StringData stageName,
              const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
              NamespaceString outputNs,
-             const std::shared_ptr<TimeseriesOptions>& timeseries,
-             boost::optional<ShardId> mergeShardId)
+             const std::shared_ptr<TimeseriesOptions>& timeseries)
         : WriterStage<BSONObj>(stageName.data(), pExpCtx, std::move(outputNs)),
           _writeConcern(pExpCtx->getOperationContext()->getWriteConcern()),
-          _timeseries(timeseries),
-          _mergeShardId(std::move(mergeShardId)) {
+          _timeseries(timeseries) {
         // TODO(SERVER-112816): The viewless timeseries feature flag should not be checked here,
         // since $out has no FCV stability guarantee (and we can't acquire an Operation FCV,
         // because it does not support long-running operations yet.)
@@ -165,8 +163,6 @@ private:
     // changed during execution, which can cause incomplete results. This can happen if the primary
     // steps down during execution.
     boost::optional<UUID> _tempNsUUID = boost::none;
-
-    boost::optional<ShardId> _mergeShardId;
 
     // TODO SERVER-111600: Remove this variable and all references to it.
     // Set if CreateViewlessTimseriesCollections feature flag is enabled
