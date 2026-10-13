@@ -3296,8 +3296,8 @@ err:
                  */
                 if (F_ISSET(ckpt_temp, WT_CKPT_DELETE) && ckpt_temp->raw.data)
                     WT_TRET_MSG(session,
-                      bm->free(bm, session, ckpt_temp->raw.data, ckpt_temp->raw.size, true), "%s",
-                      "Checkpoint root page discard failed");
+                      __wt_btree_block_free_root(session, ckpt_temp->raw.data, ckpt_temp->raw.size),
+                      "%s", "Checkpoint root page discard failed");
             }
         }
     }

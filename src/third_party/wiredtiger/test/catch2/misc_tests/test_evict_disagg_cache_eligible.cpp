@@ -310,6 +310,40 @@ TEST_CASE("Victim cache eligibility: a replacement that retained no image is rej
     REQUIRE(disk_image == nullptr);
 }
 
+TEST_CASE(
+  "Victim cache eligibility: the image must match the backing generation", "[evict][disagg_cache]")
+{
+    eligibility_fixture f;
+    f.dsk->write_gen = 10;
+    f.set_rec_result(0);
+    f.modify.rec_write_gen = 20;
+
+    WT_PAGE_HEADER replacement{};
+    replacement.write_gen = 20;
+    const WT_PAGE_HEADER *disk_image = f.dsk;
+
+    SECTION("The original image predates a write")
+    {
+        REQUIRE(f.check(&disk_image) == WTI_EVICT_VICTIM_NO_IMAGE);
+        REQUIRE(disk_image == nullptr);
+    }
+    SECTION("A retained replacement matches the write")
+    {
+        f.modify.rec_result = WT_PM_REC_REPLACE;
+        f.modify.mod_disk_image = &replacement;
+        REQUIRE(f.check(&disk_image) == WTI_EVICT_VICTIM_OK);
+        REQUIRE(disk_image == &replacement);
+    }
+    SECTION("A retained replacement has an orphaned generation")
+    {
+        replacement.write_gen = 30;
+        f.modify.rec_result = WT_PM_REC_REPLACE;
+        f.modify.mod_disk_image = &replacement;
+        REQUIRE(f.check(&disk_image) == WTI_EVICT_VICTIM_NO_IMAGE);
+        REQUIRE(disk_image == nullptr);
+    }
+}
+
 TEST_CASE("Victim cache eligibility: rejecting a cold page is counted", "[evict][disagg_cache]")
 {
     /* The rejection is only visible to an operator through this statistic. */

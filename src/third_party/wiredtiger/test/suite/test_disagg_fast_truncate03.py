@@ -86,7 +86,9 @@ class test_disagg_fast_truncate03(test_cc_base):
         ) as stat_cursor:
             return stat_cursor[stat_key][2]
 
-    def retry_for_stat_increase(self, action, stat_key, baseline, msg, timeout=30, guard=None):
+    def retry_for_stat_increase(
+        self, action, stat_key, baseline, msg, timeout=30, guard=None, additional_stat_key=None
+    ):
         """
         Repeat an action until a counter it drives rises above baseline.
 
@@ -98,6 +100,8 @@ class test_disagg_fast_truncate03(test_cc_base):
         while True:
             action()
             value = self.read_stat(stat_key)
+            if additional_stat_key is not None:
+                value += self.read_stat(additional_stat_key)
             if value > baseline:
                 return value
             if guard is not None:
@@ -138,7 +142,7 @@ class test_disagg_fast_truncate03(test_cc_base):
         before = after
         self.retry_for_stat_increase(
             lambda: self.assertEqual(self.scan_table(), expected_count),
-            stat.dsrc.cursor_tree_walk_del_internal_page_skip,
+            stat.dsrc.cursor_tree_walk_ondisk_del_internal_page_skip,
             before["internal_skip"],
             f"step {step}: the cleanup-read internal page was not clean-evicted",
             guard=(
@@ -179,7 +183,10 @@ class test_disagg_fast_truncate03(test_cc_base):
             "internal_evicted": self.read_stat(stat.dsrc.cache_eviction_internal),
             "internal_read": self.read_stat(stat.dsrc.cache_read_internal),
             "leaf_read": self.read_stat(stat.dsrc.cache_read_leaf),
-            "internal_skip": self.read_stat(stat.dsrc.cursor_tree_walk_del_internal_page_skip),
+            "internal_skip": self.read_stat(stat.dsrc.cursor_tree_walk_ondisk_del_internal_page_skip),
+            "inmem_internal_skip": self.read_stat(
+                stat.dsrc.cursor_tree_walk_read_only_del_internal_page_skip
+            ),
             "not_visible_all": self.read_stat(
                 stat.dsrc.checkpoint_cleanup_pages_deleted_not_visible_all
             ),
@@ -294,18 +301,18 @@ class test_disagg_fast_truncate03(test_cc_base):
         self.conn.set_timestamp("stable_timestamp=" + self.timestamp_str(self.truncate_ts))
         self.session.checkpoint()
 
-        # Step 4 -- the page is clean and still marked for eviction, so the walk queues it for
-        # urgent eviction. An attempt the walk's own hazard pointer blocks drops the queue entry
-        # rather than re-queueing it, so the walk has to be repeated until an eviction lands.
-        # The reference and the on-disk page survive as WT_REF_DISK.
+        # Step 4 -- the page is clean, so the walk can use its reconciliation aggregate to skip it
+        # while it is still in memory rather than waiting for eviction.
         self.retry_for_stat_increase(
             lambda: self.assertEqual(self.scan_table(), surviving),
-            stat.dsrc.cache_eviction_internal, before["internal_evicted"],
-            "step 4: the clean emptied internal page was not evicted",
+            stat.dsrc.cursor_tree_walk_ondisk_del_internal_page_skip,
+            before["internal_skip"] + before["inmem_internal_skip"],
+            "step 4: the clean emptied internal page was not skipped",
+            additional_stat_key=stat.dsrc.cursor_tree_walk_read_only_del_internal_page_skip,
         )
 
-        # Step 5 -- the reference survives, but its address aggregate shows that the subtree is
-        # deleted. A subsequent walk skips the subtree without reading and re-dirtying the page.
+        # Step 5 -- whether the page remains in memory or is later evicted, a subsequent walk skips
+        # the subtree without reading or re-dirtying it.
         with (
             wttest.open_cursor(self.session, self.uri) as cursor,
             self.transaction(commit_timestamp=self.read_ts - 1),
@@ -313,28 +320,25 @@ class test_disagg_fast_truncate03(test_cc_base):
             cursor[self.nrows + 1] = self.value
 
         before = self.snapshot_stats()
-        # Rarely, an emptied page still resident in memory is evicted between the walk's
-        # skip check (which only evaluates on-disk pages) and the page swap, and the swap
-        # reads it back. The read-back is benign but leaves the page dirty; reconcile and
-        # re-evict it, then measure again.
+        # Rarely, an emptied page that is not yet skipped is evicted between the walk's skip check
+        # and the page swap, and the swap reads it back. The read-back is benign but leaves the
+        # page dirty; reconcile it and measure again.
         deadline = time.time() + 30
         while True:
             self.assertEqual(self.scan_table(), surviving + 1)
             after = self.snapshot_stats()
-            skipped_internal = after["internal_skip"] - before["internal_skip"]
+            skipped_internal = (
+                after["internal_skip"] - before["internal_skip"]
+                + after["inmem_internal_skip"] - before["inmem_internal_skip"]
+            )
             if (after["internal_read"] == before["internal_read"] and
                 after["evict_blocked"] == before["evict_blocked"]):
                 break
             self.assertLess(
                 time.time(), deadline,
-                "step 5: the evicted internal page keeps being read back",
+                "step 5: the internal page keeps being read back or re-dirtied",
             )
             self.session.checkpoint()
-            self.retry_for_stat_increase(
-                lambda: self.assertEqual(self.scan_table(), surviving + 1),
-                stat.dsrc.cache_eviction_internal, after["internal_evicted"],
-                "step 5: the read-back internal page was not re-evicted",
-            )
             before = self.snapshot_stats()
         self.assertGreater(
             skipped_internal, 0,
@@ -423,10 +427,8 @@ class test_disagg_fast_truncate03(test_cc_base):
             after["evict_blocked"], before["evict_blocked"],
             "exit: the loop should stop once checkpoint cleanup reclaims the subtree",
         )
-        self.assertEqual(
-            after["internal_skip"], before["internal_skip"],
-            "exit: a deleted internal page was still present after reclamation",
-        )
+        # An emptied internal page can stay in memory after reclamation and be skipped, so the
+        # skip counters are not compared; what must hold is that nothing is read or re-dirtied.
         self.assertEqual(
             after["internal_read"], before["internal_read"],
             "exit: a reclaimed internal page was read back",

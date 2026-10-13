@@ -36,16 +36,20 @@
 #   Note that none of the known customers ever pass the exact 0x14 0x14 value to WT, so this is more
 #   of a theoretical scenario.
 
+import os
+import signal
 import wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
+from suite_subprocess import suite_subprocess
 from wtscenario import make_scenarios
 
 @disagg_test_class
-class test_layered_tombstone_legacy(wttest.WiredTigerTestCase):
+class test_layered_tombstone_legacy(wttest.WiredTigerTestCase, suite_subprocess):
     table = __qualname__
     conn_base_config = ',create,statistics=(all),'
     uri = f'layered:{table}'
     stable_uri = f'file:{table}.wt_stable'
+    ingest_uri = f'file:{table}.wt_ingest'
 
     disagg_storages = gen_disagg_storages(disagg_only=True)
     scenarios = make_scenarios(disagg_storages)
@@ -53,6 +57,53 @@ class test_layered_tombstone_legacy(wttest.WiredTigerTestCase):
     def conn_config(self):
         return self.extensionsConfig() + self.conn_base_config + \
             'disaggregated=(legacy_tombstone_encoding_break_glass=true,role="leader")'
+
+    def test_stable_non_tombstone_trailing_byte_assert(self):
+        self.assert_trailing_byte_decode_aborts(test_case=self.subprocess_stable_trailing_byte)
+
+    def test_ingest_non_tombstone_trailing_byte_assert(self):
+        self.assert_trailing_byte_decode_aborts(test_case=self.subprocess_ingest_trailing_byte)
+
+    def assert_trailing_byte_decode_aborts(self, test_case):
+        test_case_name = f"{test_case.__module__}.{test_case.__qualname__}"
+        home = self.crash_in_subprocess(test_case_name, test_case_name, signal.SIGABRT)
+        stderr_path = os.path.join(home, "stderr.txt")
+        self.check_file_contains(
+            stderr_path, "layered tombstone decode found a non-tombstone trailing byte")
+
+    def subprocess_stable_trailing_byte(self):
+        self.ignoreStdoutPattern("stable table value in the tombstone namespace")
+        self.session.create(self.uri, "key_format=S,value_format=u")
+
+        # Write malformed legacy tombstone bytes directly to stable, bypassing the layered encoder.
+        c = self.session.open_cursor(self.stable_uri)
+        self.session.begin_transaction()
+        c["k"] = b"\x14\x14x"
+        self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(10))
+        c.close()
+
+        # Reading it back through the layered cursor trips the decode assertion.
+        c = self.session.open_cursor(self.uri)
+        c.set_key("k")
+        c.search()
+
+    def subprocess_ingest_trailing_byte(self):
+        self.ignoreStdoutPattern("stable table value in the tombstone namespace")
+        self.session.create(self.uri, "key_format=S,value_format=u")
+
+        # Write malformed tombstone bytes directly to ingest, bypassing the layered encoder.
+        c = self.session.open_cursor(self.ingest_uri)
+        self.session.begin_transaction()
+        c["k"] = b"\x14\x14x"
+        self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(10))
+        c.close()
+
+        self.conn.reconfigure('disaggregated=(role="follower")')
+
+        # Reading it back through the layered cursor trips the decode assertion.
+        c = self.session.open_cursor(self.uri)
+        c.set_key("k")
+        c.search()
 
     def test_legacy_verbatim_tombstone_value(self):
         # A raw tombstone value on the stable table logs a warning; that is expected here.

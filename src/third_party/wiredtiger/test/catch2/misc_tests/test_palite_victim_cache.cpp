@@ -16,8 +16,11 @@
 #include <catch2/catch.hpp>
 
 #include "wiredtiger.h"
+#include "wt_internal.h"
+#include "src/cursor/cur_layered_private.h"
 #include "../utils.h"
 #include "../wrappers/connection_wrapper.h"
+#include "layered_disagg_utils.h"
 
 static std::string
 palite_conn_cfg(const char *palite_opts)
@@ -483,6 +486,162 @@ TEST_CASE("Palite victim cache drops the old copy when the replacement is too la
 
     REQUIRE(handle->plh_close(handle, session) == 0);
     REQUIRE(page_log->terminate(page_log, session) == 0);
+}
+
+static int64_t
+victim_cache_stat(WT_SESSION *session, int stat)
+{
+    WT_CURSOR *cursor;
+    const char *description, *printable;
+    int64_t value;
+
+    REQUIRE(session->open_cursor(session, "statistics:", nullptr, nullptr, &cursor) == 0);
+    cursor->set_key(cursor, stat);
+    REQUIRE(cursor->search(cursor) == 0);
+    REQUIRE(cursor->get_value(cursor, &description, &printable, &value) == 0);
+    REQUIRE(cursor->close(cursor) == 0);
+    return value;
+}
+
+static uint64_t
+victim_cache_durable_write_gen(
+  WT_SESSION *session, WT_PAGE_LOG_HANDLE *handle, const WT_PAGE_BLOCK_META &meta)
+{
+    WT_ITEM results[WT_DELTA_LIMIT + 1]{};
+    WT_PAGE_LOG_GET_ARGS args{};
+    args.lsn = meta.disagg_lsn;
+    F_SET(&args, WT_PAGE_LOG_CACHE_BYPASS);
+    uint32_t count = WT_DELTA_LIMIT + 1;
+    int ret = handle->plh_get(handle, session, meta.page_id, 0, &args, results, &count);
+    bool valid = ret == 0 && count > 0 && count <= WT_DELTA_LIMIT + 1 &&
+      results[count - 1].data != nullptr && results[count - 1].size >= WT_PAGE_HEADER_SIZE;
+    WT_PAGE_HEADER header{};
+    /* The newest delta carries the backing block's generation. */
+    if (valid) {
+        std::memcpy(&header, results[count - 1].data, WT_PAGE_HEADER_SIZE);
+        __wt_page_header_byteswap(&header);
+    }
+    free_results(results, WT_DELTA_LIMIT + 1);
+    REQUIRE(ret == 0);
+    REQUIRE(valid);
+    REQUIRE(args.lsn == meta.disagg_lsn);
+    return header.write_gen;
+}
+
+TEST_CASE("Layered skip-write retains the backing generation in the victim cache",
+  "[palite_victim_cache][layered_victim_cache_skip_write_gen]")
+{
+    std::string cfg = palite_conn_cfg("victim_cache_max_entries=10000");
+    cfg += ",cache_size=2GB,precise_checkpoint=true,checkpoint_threads=1,";
+    cfg += "page_delta=(delta_pct=1000,leaf_page_delta=true)";
+    const char *home = DB_HOME "_victim_cache_skip_write_gen";
+    testutil_recreate_dir(home);
+    connection_wrapper conn(home, cfg.c_str());
+    WT_CONNECTION *wt_conn = conn.get_wt_connection();
+    WT_SESSION *session = &conn.create_session("cache_cursors=false")->iface;
+    WT_SESSION *read_session = &conn.create_session("cache_cursors=false")->iface;
+    const char *uri = "layered:victim_cache_skip_write_gen";
+    const std::string initial_value(1024, 'A'), final_value(1024, 'B');
+
+    auto write_rows = [&](const char *timestamp, const std::string &value) {
+        WT_CURSOR *cursor;
+        REQUIRE(session->begin_transaction(session, nullptr) == 0);
+        REQUIRE(session->open_cursor(session, uri, nullptr, nullptr, &cursor) == 0);
+        for (unsigned i = 0; i < 10; ++i) {
+            std::string row_key = std::to_string(i);
+            cursor->set_key(cursor, row_key.c_str());
+            cursor->set_value(cursor, value.c_str());
+            REQUIRE(cursor->insert(cursor) == 0);
+        }
+        REQUIRE(cursor->close(cursor) == 0);
+        REQUIRE(session->commit_transaction(session, timestamp) == 0);
+    };
+    auto stable_cursor = [](WT_CURSOR *cursor) {
+        auto *layered = reinterpret_cast<WTI_CURSOR_LAYERED *>(cursor);
+        REQUIRE(layered->stable_cursor != nullptr);
+        REQUIRE(layered->current_cursor == layered->stable_cursor);
+        auto *cbt = reinterpret_cast<WT_CURSOR_BTREE *>(layered->stable_cursor);
+        REQUIRE(cbt->ref != nullptr);
+        REQUIRE(F_ISSET(cbt->ref, WT_REF_FLAG_LEAF));
+        REQUIRE(cbt->ref->page != nullptr);
+        REQUIRE(cbt->ref->page->disagg_info != nullptr);
+        return cbt;
+    };
+
+    REQUIRE(wt_conn->set_timestamp(wt_conn, "oldest_timestamp=1,stable_timestamp=1") == 0);
+    REQUIRE(session->create(session, uri, "key_format=S,value_format=S,leaf_page_max=16KB") == 0);
+    write_rows("commit_timestamp=a", initial_value);
+    layered_disagg_leader_checkpoint(wt_conn, session, 10);
+
+    WT_CURSOR *cursor;
+    REQUIRE(
+      read_session->open_cursor(read_session, uri, nullptr, "debug=(release_evict)", &cursor) == 0);
+    cursor->set_key(cursor, "0");
+    REQUIRE(cursor->search(cursor) == 0);
+    REQUIRE(cursor->reset(cursor) == 0);
+    cursor->set_key(cursor, "0");
+    REQUIRE(cursor->search(cursor) == 0);
+    WT_CURSOR_BTREE *cbt = stable_cursor(cursor);
+    WT_PAGE *page = cbt->ref->page;
+    REQUIRE(page->dsk != nullptr);
+    REQUIRE(page->disagg_info->block_meta.delta_count == 0);
+    uint64_t original_gen = page->dsk->write_gen;
+
+    /* Keep the original image resident while checkpoint writes the first delta. */
+    write_rows("commit_timestamp=14", final_value);
+    layered_disagg_leader_checkpoint(wt_conn, session, 20);
+    REQUIRE(cbt->ref->page == page);
+    const WT_PAGE_BLOCK_META previous = page->disagg_info->block_meta;
+    REQUIRE(previous.delta_count == 1);
+    auto *block_disagg = reinterpret_cast<WT_BLOCK_DISAGG *>(CUR2BT(cbt)->bm->block);
+    uint64_t durable_gen =
+      victim_cache_durable_write_gen(read_session, block_disagg->plhandle, previous);
+    REQUIRE(page->dsk->write_gen == original_gen);
+    REQUIRE(original_gen < durable_gen);
+    REQUIRE(page->modify != nullptr);
+    REQUIRE(page->modify->rec_write_gen == durable_gen);
+    REQUIRE_FALSE(__wt_page_is_modified(page));
+
+    /* Dirty the stable leaf without introducing any new content to persist. */
+    WT_SESSION_IMPL *cursor_session = CUR2S(cbt);
+    int ret;
+    WT_WITH_BTREE(cursor_session, CUR2BT(cbt), {
+        ret = __wt_page_modify_init(cursor_session, page);
+        if (ret == 0)
+            __wt_page_modify_set(cursor_session, page);
+    });
+    REQUIRE(ret == 0);
+    REQUIRE(__wt_page_is_modified(page));
+    int64_t skips_before = victim_cache_stat(session, WT_STAT_CONN_REC_SKIP_WRITE);
+    int64_t puts_before = victim_cache_stat(session, WT_STAT_CONN_BLOCK_CACHE_PUTS);
+    REQUIRE(cursor->reset(cursor) == 0);
+    REQUIRE(victim_cache_stat(session, WT_STAT_CONN_REC_SKIP_WRITE) > skips_before);
+
+    /* Check the retained image before the clean eviction publishes it to the victim cache. */
+    for (bool cached : {false, true}) {
+        cursor->set_key(cursor, "0");
+        REQUIRE(cursor->search(cursor) == 0);
+        const char *value;
+        REQUIRE(cursor->get_value(cursor, &value) == 0);
+        REQUIRE(std::string(value) == final_value);
+        cbt = stable_cursor(cursor);
+        page = cbt->ref->page;
+        REQUIRE(page->dsk != nullptr);
+        const WT_PAGE_BLOCK_META &meta = page->disagg_info->block_meta;
+        REQUIRE(meta.page_id == previous.page_id);
+        REQUIRE(meta.disagg_lsn == previous.disagg_lsn);
+        CAPTURE(cached, meta.page_id, meta.disagg_lsn, durable_gen, page->dsk->write_gen);
+        REQUIRE(page->dsk->write_gen ==
+          victim_cache_durable_write_gen(read_session, block_disagg->plhandle, meta));
+        if (cached) {
+            const auto *blk =
+              static_cast<const WT_BLOCK_DISAGG_HEADER *>(WT_BLOCK_HEADER_REF(page->dsk));
+            REQUIRE(F_ISSET(blk, WT_BLOCK_DISAGG_MODIFIED));
+        } else
+            REQUIRE(cursor->reset(cursor) == 0);
+    }
+    REQUIRE(victim_cache_stat(session, WT_STAT_CONN_BLOCK_CACHE_PUTS) > puts_before);
+    REQUIRE(cursor->close(cursor) == 0);
 }
 
 #endif

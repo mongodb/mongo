@@ -2896,6 +2896,13 @@ __rec_split_write(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_CHUNK *chu
     __rec_page_time_stats(session, r, build_delta);
 
 copy_image:
+    if (F_ISSET(multi, WT_MULTI_SKIP_WRITE)) {
+        /* A skipped write reuses the backing block, so the image carries its write generation. */
+        uint64_t write_gen = __wt_page_write_gen(page);
+        WT_ASSERT_ALWAYS(
+          session, write_gen != 0, "A skipped write must have a previous write generation");
+        ((WT_PAGE_HEADER *)chunk->image.mem)->write_gen = write_gen;
+    }
 #ifdef HAVE_DIAGNOSTIC
     /*
      * The I/O routines verify all disk images we write, but there are paths in reconciliation that
@@ -3427,6 +3434,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_RECONCILE_TIME
          * again.
          */
         mod->rec_result = WT_PM_REC_EMPTY;
+        mod->rec_write_gen = 0;
         break;
     case 1: /* 1-for-1 page swap */
         /*
@@ -3440,8 +3448,15 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_RECONCILE_TIME
          * splits can.
          */
         if (F_ISSET(r, WT_REC_IN_MEMORY) || F_ISSET(r->multi, WT_MULTI_SUPD_RESTORE)) {
-            if (page->disagg_info != NULL)
+            if (page->disagg_info != NULL) {
                 page->disagg_info->block_meta = *r->multi->block_meta;
+                if (!F_ISSET(r, WT_REC_IN_MEMORY) && !F_ISSET(r->multi, WT_MULTI_SKIP_WRITE)) {
+                    mod->rec_write_gen = ((WT_PAGE_HEADER *)r->cur_ptr->image.mem)->write_gen;
+                    WT_ASSERT(session,
+                      page->disagg_info->block_meta.delta_count == 0 ||
+                        mod->rec_write_gen == ((WT_PAGE_HEADER *)r->delta.data)->write_gen);
+                }
+            }
             WT_ASSERT_ALWAYS(session,
               F_ISSET(r, WT_REC_IN_MEMORY) ||
                 (F_ISSET(r, WT_REC_EVICT) && r->leave_dirty && r->multi->supd_entries != 0),
@@ -3488,6 +3503,17 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_RECONCILE_TIME
             WT_TIME_AGGREGATE_MERGE_OBSOLETE_VISIBLE(session, &stop_ta, &r->multi->addr.ta);
         }
 
+        /*
+         * The full image's write generation describes the backing block even when a delta was
+         * written: the delta header copies the full image's generation, and reading the page back
+         * takes its generation from the newest delta. Both must stay in sync with this assignment.
+         */
+        if (page->disagg_info != NULL && !F_ISSET(r->multi, WT_MULTI_SKIP_WRITE)) {
+            mod->rec_write_gen = ((WT_PAGE_HEADER *)r->cur_ptr->image.mem)->write_gen;
+            WT_ASSERT(session,
+              page->disagg_info->block_meta.delta_count == 0 ||
+                mod->rec_write_gen == ((WT_PAGE_HEADER *)r->delta.data)->write_gen);
+        }
         mod->rec_result = WT_PM_REC_REPLACE;
         break;
     default: /* Page split */
@@ -3499,6 +3525,9 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_RECONCILE_TIME
         /* Optionally display the actual split keys in verbose mode. */
         if (WT_VERBOSE_LEVEL_ISSET(session, WT_VERB_SPLIT, WT_VERBOSE_DEBUG_2))
             WT_RET(__rec_split_dump_keys(session, r));
+
+        /* The page no longer has a single backing block. */
+        mod->rec_write_gen = 0;
 
 split:
         mod->mod_multi = r->multi;

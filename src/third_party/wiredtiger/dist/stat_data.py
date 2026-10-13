@@ -696,10 +696,6 @@ conn_stats = [
     ##########################################
     LayeredStat('layered_table_manager_checkpoints_disagg_pick_up_follower', 'number of checkpoints picked up by a follower'),
     LayeredStat('layered_table_manager_tables', 'the number of tables the layered table manager has open'),
-    LayeredStat('layered_truncate_list_gc_entries_removed', 'the number of truncate list entries removed by garbage collection'),
-    LayeredStat('layered_truncate_list_gc_runs', 'the number of times truncate list garbage collection ran with a valid prune timestamp'),
-    LayeredStat('layered_truncate_list_search_calls', 'the number of times the truncate list was searched'),
-    LayeredStat('layered_truncate_list_search_entries_walked', 'the number of truncate list entries walked during search'),
 
     ##########################################
     # Live Restore statistics
@@ -750,6 +746,10 @@ conn_stats = [
     LockStat('lock_table_wait_application', 'table lock application thread time waiting for the table lock (usecs)'),
     LockStat('lock_table_wait_internal', 'table lock internal thread time waiting for the table lock (usecs)'),
     LockStat('lock_table_write_count', 'table write lock acquisitions'),
+    LockStat('lock_truncate_list_read_count', 'truncate list read lock acquisitions'),
+    LockStat('lock_truncate_list_wait_application', 'truncate list lock application thread wait time (usecs)'),
+    LockStat('lock_truncate_list_wait_internal', 'truncate list lock internal thread wait time (usecs)'),
+    LockStat('lock_truncate_list_write_count', 'truncate list write lock acquisitions'),
     LockStat('lock_txn_global_read_count', 'txn global read lock acquisitions'),
     LockStat('lock_txn_global_wait_application', 'txn global lock application thread time waiting (usecs)'),
     LockStat('lock_txn_global_wait_internal', 'txn global lock internal thread time waiting (usecs)'),
@@ -1426,10 +1426,11 @@ conn_dsrc_stats = [
     CursorStat('cursor_reposition_failed', 'Total number of times cursor fails to temporarily release pinned page to encourage eviction of hot or large page'),
     CursorStat('cursor_search_near_prefix_fast_paths', 'Total number of times a search near has exited due to prefix config'),
     CursorStat('cursor_skip_hs_cur_position', 'Total number of entries skipped to position the history store cursor'),
-    CursorStat('cursor_tree_walk_del_internal_page_skip', 'Total number of deleted internal pages skipped during tree walk'),
     CursorStat('cursor_tree_walk_del_leaf_page_skip', 'Total number of deleted leaf pages skipped during tree walk'),
     CursorStat('cursor_tree_walk_inmem_del_page_skip', 'Total number of in-memory deleted pages skipped during tree walk'),
+    CursorStat('cursor_tree_walk_ondisk_del_internal_page_skip', 'Total number of on-disk deleted internal pages skipped during tree walk'),
     CursorStat('cursor_tree_walk_ondisk_del_page_skip', 'Total number of on-disk deleted pages skipped during tree walk'),
+    CursorStat('cursor_tree_walk_read_only_del_internal_page_skip', 'Total number of in-memory deleted internal pages of a read-only btree skipped during tree walk'),
     CursorStat('cursor_tree_walk_skip_lock_contended', 'Total number of times a tree walk waited for the page lock during the page skip check'),
 
     ##########################################
@@ -1509,6 +1510,19 @@ conn_dsrc_stats = [
     LayeredStat('layered_table_manager_logops_applied', 'how many log applications the layered table manager applied on this tree'),
     LayeredStat('layered_table_manager_logops_skipped', 'how many log applications the layered table manager skipped on this tree'),
     LayeredStat('layered_table_manager_skip_lsn', 'how many previously-applied LSNs the layered table manager skipped on this tree'),
+
+    LayeredStat('layered_truncate_ingest_tombstones_written', 'follower truncate ingest tombstones written'),
+    LayeredStat('layered_truncate_list_clear_entries_removed', 'truncate list entries removed by clearing'),
+    LayeredStat('layered_truncate_list_entries_inserted', 'truncate list entries inserted'),
+    LayeredStat('layered_truncate_list_gc_entries_examined', 'truncate list entries examined by garbage collection'),
+    LayeredStat('layered_truncate_list_gc_entries_removed', 'the number of truncate list entries removed by garbage collection'),
+    LayeredStat('layered_truncate_list_gc_runs', 'the number of times truncate list garbage collection ran with a valid prune timestamp'),
+    LayeredStat('layered_truncate_list_rollback_entries_removed', 'truncate list entries removed by transaction rollback'),
+    LayeredStat('layered_truncate_list_search_calls', 'the number of times the truncate list was searched'),
+    LayeredStat('layered_truncate_list_search_entries_walked', 'the number of truncate list entries walked during search'),
+    LayeredStat('layered_truncate_list_search_hits', 'truncate list searches that completed with a matching range'),
+    LayeredStat('layered_truncate_list_search_misses', 'truncate list searches that completed without a matching range'),
+    LayeredStat('layered_truncate_list_write_conflicts', 'truncate list write conflicts'),
 
     ##########################################
     # Reconciliation statistics

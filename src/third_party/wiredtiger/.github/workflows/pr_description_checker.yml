@@ -1,0 +1,27 @@
+name: PR description
+
+on:
+  pull_request:
+    types:
+      - opened
+      - edited
+      - synchronize
+      - reopened
+
+permissions:
+  contents: read
+
+jobs:
+  placeholder-text:
+    name: Ensure placeholder text is removed
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for placeholder text
+        shell: bash
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          if grep --quiet --ignore-case "Summarize the reason behind this change" <<< "$PR_BODY"; then
+            echo "::error::Replace the placeholder with a description of your change."
+            exit 1
+          fi

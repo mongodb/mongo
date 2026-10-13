@@ -166,7 +166,9 @@ __clayered_deleted_decode(WT_SESSION_IMPL *session, WT_ITEM *value, bool from_st
 
     if (__clayered_value_in_tombstone_namespace(value, false /* decode */)) {
         /* Encoding only ever appends the tombstone byte, so that is the byte being stripped. */
-        /* FIXME-WT-18154: assert the byte being stripped is the tombstone byte. */
+        WT_ASSERT_ALWAYS(session,
+          ((const uint8_t *)value->data)[value->size - 1] == *(const uint8_t *)__wt_tombstone.data,
+          "layered tombstone decode found a non-tombstone trailing byte");
         --value->size;
     }
 }
@@ -1568,6 +1570,7 @@ __clayered_range_truncate_ingest(
 {
     WT_DECL_RET;
     WT_CURSOR *cursor = start;
+    uint64_t tombstones_written = 0;
     int cmp;
 
     /* Early return if stop key is strictly less than start key, nothing to truncate. */
@@ -1577,23 +1580,29 @@ __clayered_range_truncate_ingest(
 
     do {
         /* Check the current position relative to the truncate end. */
-        WT_RET(cursor->compare(cursor, stop, &cmp));
+        WT_ERR(cursor->compare(cursor, stop, &cmp));
 
         /* Avoid stacking consecutive tombstones on the update chain. */
         if (!__wt_clayered_deleted(&cursor->value)) {
             WT_ITEM key;
-            WT_RET(__wt_cursor_get_raw_key(cursor, &key));
-            WT_RET(__wt_layered_table_truncate_detect_write_conflict(
+            WT_ERR(__wt_cursor_get_raw_key(cursor, &key));
+            WT_ERR(__wt_layered_table_truncate_detect_write_conflict(
               session, &layered->truncate_list, layered->collator, &key));
             cursor->set_value(cursor, &__wt_tombstone);
-            WT_RET(cursor->update(cursor));
+            WT_ERR(cursor->update(cursor));
+            ++tombstones_written;
         }
 
         ret = cursor->next(cursor);
     } while (cmp < 0 && ret == 0);
 
-    WT_RET_NOTFOUND_OK(ret);
-    return (0);
+    if (ret == WT_NOTFOUND)
+        ret = 0;
+err:
+    /* Batch statistics updates to avoid atomic increments for each tombstone. */
+    WT_STAT_CONN_DSRC_INCRV(
+      session, layered_truncate_ingest_tombstones_written, tombstones_written);
+    return (ret);
 }
 
 /*

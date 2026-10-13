@@ -9,6 +9,19 @@
 #include "wt_internal.h"
 
 /*
+ * __layered_table_manager_slot --
+ *     Map an ingest btree ID to its array slot.
+ */
+static WT_INLINE uint32_t
+__layered_table_manager_slot(WT_SESSION_IMPL *session, uint32_t ingest_id)
+{
+    WT_ASSERT_ALWAYS(session, WT_BTREE_ID_NAMESPACE_ID(ingest_id) == WT_BTREE_ID_NAMESPACE_LOCAL,
+      "Ingest btree ID is not in the LOCAL namespace");
+
+    return (WT_BTREE_ID_UNNAMESPACED(ingest_id));
+}
+
+/*
  * __wti_layered_table_manager_init --
  *     Start the layered table manager thread
  */
@@ -57,6 +70,7 @@ __wt_layered_table_manager_add_table(WT_SESSION_IMPL *session, uint32_t ingest_i
     WT_LAYERED_TABLE *layered;
     WT_LAYERED_TABLE_MANAGER *manager;
     WT_LAYERED_TABLE_MANAGER_ENTRY *entry = NULL;
+    uint32_t slot;
 
     conn = S2C(session);
     manager = &conn->layered_table_manager;
@@ -80,14 +94,17 @@ __wt_layered_table_manager_add_table(WT_SESSION_IMPL *session, uint32_t ingest_i
 
     __wt_spin_lock(session, &manager->layered_table_lock);
     WT_ASSERT(session, manager->open_layered_table_count > 0);
-    if (ingest_id >= manager->open_layered_table_count) {
+
+    slot = __layered_table_manager_slot(session, ingest_id);
+    if (slot >= manager->open_layered_table_count) {
+        uint32_t new_count = slot + 1;
         WT_ERR(__wt_realloc_def(
-          session, &manager->entries_allocated_bytes, ingest_id * 2, &manager->entries));
-        manager->open_layered_table_count = ingest_id * 2;
+          session, &manager->entries_allocated_bytes, new_count, &manager->entries));
+        manager->open_layered_table_count = new_count;
     }
 
     /* Diagnostic sanity check - don't keep adding the same table */
-    if (manager->entries[ingest_id] != NULL)
+    if (manager->entries[slot] != NULL)
         WT_IGNORE_RET(__wt_panic(session, WT_PANIC,
           "Internal server error: opening the same layered table multiple times"));
 
@@ -95,7 +112,7 @@ __wt_layered_table_manager_add_table(WT_SESSION_IMPL *session, uint32_t ingest_i
     __wt_verbose_level(session, WT_VERB_LAYERED, WT_VERBOSE_DEBUG_5,
       "__wt_layered_table_manager_add_table uri=%s ingest=%" PRIu32 " name=%s", entry->stable_uri,
       ingest_id, session->dhandle->name);
-    manager->entries[ingest_id] = entry;
+    manager->entries[slot] = entry;
 
 err:
     __wt_spin_unlock(session, &manager->layered_table_lock);
@@ -111,21 +128,21 @@ err:
  *     Internal table remove implementation.
  */
 static void
-__layered_table_manager_remove_table_inlock(WT_SESSION_IMPL *session, uint32_t ingest_id)
+__layered_table_manager_remove_table_inlock(WT_SESSION_IMPL *session, uint32_t slot)
 {
     WT_LAYERED_TABLE_MANAGER *manager;
     WT_LAYERED_TABLE_MANAGER_ENTRY *entry;
 
     manager = &S2C(session)->layered_table_manager;
 
-    if ((entry = manager->entries[ingest_id]) != NULL) {
+    if ((entry = manager->entries[slot]) != NULL) {
         WT_STAT_CONN_DECR(session, layered_table_manager_tables);
         __wt_verbose_level(session, WT_VERB_LAYERED, WT_VERBOSE_DEBUG_5,
           "__wt_layered_table_manager_remove_table stable_uri=%s ingest_id=%" PRIu32,
-          entry->stable_uri, ingest_id);
+          entry->stable_uri, entry->ingest_id);
 
         __wt_free(session, entry);
-        manager->entries[ingest_id] = NULL;
+        manager->entries[slot] = NULL;
     }
 }
 
@@ -149,7 +166,10 @@ __wt_layered_table_manager_remove_table(WT_SESSION_IMPL *session, uint32_t inges
         return;
 
     __wt_spin_lock(session, &manager->layered_table_lock);
-    __layered_table_manager_remove_table_inlock(session, ingest_id);
+
+    uint32_t slot = __layered_table_manager_slot(session, ingest_id);
+    WT_ASSERT(session, slot < manager->open_layered_table_count);
+    __layered_table_manager_remove_table_inlock(session, slot);
 
     __wt_spin_unlock(session, &manager->layered_table_lock);
 }

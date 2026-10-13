@@ -39,7 +39,8 @@ class test_layered_fast_truncate17(LayeredFastTruncateConfigMixin, wttest.WiredT
 
     conn_config = 'disaggregated=(role="leader")'
     uri = 'layered:test_layered_ft_replay'
-    table_config = 'key_format=i,value_format=S,leaf_page_max=4096'
+    table_config = ('key_format=i,value_format=S,allocation_size=512,leaf_page_max=512,'
+        'internal_page_max=512,memory_page_max=4096')
     nitems = 5000
 
     disagg_storages = gen_disagg_storages(disagg_only=True)
@@ -88,12 +89,39 @@ class test_layered_fast_truncate17(LayeredFastTruncateConfigMixin, wttest.WiredT
         after = self.get_stat(stat.conn.rec_page_delete_fast, conn=self.conn_follow)
         self.assertGreater(after, before, msg)
 
+    def assert_replayed_subtree_not_skipped(self, ts):
+        self.conn_follow.set_timestamp('stable_timestamp=' + self.timestamp_str(ts) +
+                                       ',oldest_timestamp=' + self.timestamp_str(1))
+        self.session_follow.checkpoint()
+
+        # After step-up the stable table is writable, so an in-memory internal page is not skipped.
+        inmem_before = self.get_stat(
+            stat.conn.cursor_tree_walk_read_only_del_internal_page_skip, conn=self.conn_follow)
+
+        count = 0
+        self.session_follow.begin_transaction(
+            'read_timestamp=' + self.timestamp_str(ts + 10))
+        cursor = self.session_follow.open_cursor(self.uri)
+        while cursor.next() == 0:
+            count += 1
+        cursor.close()
+        self.session_follow.rollback_transaction()
+
+        inmem_after = self.get_stat(
+            stat.conn.cursor_tree_walk_read_only_del_internal_page_skip, conn=self.conn_follow)
+        self.assertEqual(inmem_after, inmem_before,
+            'replay-created in-memory deleted stable subtree was skipped after step-up')
+        return count
+
     def test_fast_truncate_fires_during_replay(self):
         self.setup_follower()
         # Leave boundary pages untouched so interior pages are eligible for fast-delete.
         trunc_start, trunc_stop = 200, self.nitems - 200 - 1
         self.truncate_range(trunc_start, trunc_stop, ts=20)
         self.assert_fast_truncate_fired("Fast truncate did not happen.")
+        self.assertEqual(
+            self.assert_replayed_subtree_not_skipped(20),
+            self.nitems - (trunc_stop - trunc_start + 1))
         self.assert_ranges_deleted([(trunc_start, trunc_stop)], ts=30)
 
     def test_fast_truncate_multiple_ranges(self):

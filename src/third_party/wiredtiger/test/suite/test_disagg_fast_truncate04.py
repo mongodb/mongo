@@ -169,10 +169,11 @@ class test_disagg_fast_truncate04(wttest.WiredTigerTestCase):
             inserter.join()
         self.assertEqual(errors, [])
 
-        # The skip path engages once the emptied internal pages cycle through eviction;
-        # the eviction server owns that timing, so poll for it.
+        # The skip path engages while the emptied internal pages are in memory or after they cycle
+        # through eviction; the eviction server owns that timing, so poll for it.
         deadline = time.time() + 30
-        while self.read_stat(stat.dsrc.cursor_tree_walk_del_internal_page_skip) == 0:
+        while (self.read_stat(stat.dsrc.cursor_tree_walk_read_only_del_internal_page_skip) +
+          self.read_stat(stat.dsrc.cursor_tree_walk_ondisk_del_internal_page_skip)) == 0:
             self.assertEqual(self.scan_keys(), surviving)
             self.assertLess(
                 time.time(), deadline, "no deleted internal page was skipped")

@@ -409,6 +409,14 @@ struct __wt_page_modify {
     wt_timestamp_t rec_max_timestamp;
 
     /*
+     * Write generation of the disaggregated backing block written by the last single-block
+     * reconciliation, needed because the page keeps its old disk image while it stays in memory.
+     * Zero means no such block was written and the disk image's write generation applies. Cleared
+     * when reconciliation deletes the page or splits it into multiple blocks.
+     */
+    uint64_t rec_write_gen;
+
+    /*
      * Track the pinned stable timestamp used for the most recent reconciliation. It's useful to
      * avoid duplicating work when precise checkpoints are enabled, so we don't re-reconcile pages
      * when no new content could be written.
@@ -904,9 +912,10 @@ struct __wt_page {
  *	Statistics to track how many deleted pages are skipped as part of the tree walk.
  */
 struct __wt_page_walk_skip_stats {
-    size_t total_del_internal_pages_skipped;
+    size_t total_ondisk_del_internal_pages_skipped;
     size_t total_del_leaf_pages_skipped;
     size_t total_inmem_del_pages_skipped;
+    size_t total_read_only_del_internal_pages_skipped;
     uint64_t total_skip_lock_contended;
 };
 

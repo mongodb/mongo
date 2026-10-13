@@ -649,9 +649,10 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, bool truncating)
     key_out_of_bounds = need_walk = newpage = repositioned = false;
     session = CUR2S(cbt);
     total_skipped = 0;
-    walk_skip_stats.total_del_internal_pages_skipped = 0;
+    walk_skip_stats.total_ondisk_del_internal_pages_skipped = 0;
     walk_skip_stats.total_del_leaf_pages_skipped = 0;
     walk_skip_stats.total_inmem_del_pages_skipped = 0;
+    walk_skip_stats.total_read_only_del_internal_pages_skipped = 0;
     walk_skip_stats.total_skip_lock_contended = 0;
     WT_NOT_READ(time_start, 0);
 
@@ -817,15 +818,18 @@ err:
     }
 
     WT_STAT_CONN_DSRC_INCRV(session, cursor_next_skip_total, total_skipped);
-    if (walk_skip_stats.total_del_internal_pages_skipped != 0)
-        WT_STAT_CONN_DSRC_INCRV(session, cursor_tree_walk_del_internal_page_skip,
-          walk_skip_stats.total_del_internal_pages_skipped);
+    if (walk_skip_stats.total_ondisk_del_internal_pages_skipped != 0)
+        WT_STAT_CONN_DSRC_INCRV(session, cursor_tree_walk_ondisk_del_internal_page_skip,
+          walk_skip_stats.total_ondisk_del_internal_pages_skipped);
     if (walk_skip_stats.total_del_leaf_pages_skipped != 0)
         WT_STAT_CONN_DSRC_INCRV(session, cursor_tree_walk_del_leaf_page_skip,
           walk_skip_stats.total_del_leaf_pages_skipped);
     if (walk_skip_stats.total_inmem_del_pages_skipped != 0)
         WT_STAT_CONN_DSRC_INCRV(session, cursor_tree_walk_inmem_del_page_skip,
           walk_skip_stats.total_inmem_del_pages_skipped);
+    if (walk_skip_stats.total_read_only_del_internal_pages_skipped != 0)
+        WT_STAT_CONN_DSRC_INCRV(session, cursor_tree_walk_read_only_del_internal_page_skip,
+          walk_skip_stats.total_read_only_del_internal_pages_skipped);
     if (walk_skip_stats.total_skip_lock_contended != 0)
         WT_STAT_CONN_DSRC_INCRV(
           session, cursor_tree_walk_skip_lock_contended, walk_skip_stats.total_skip_lock_contended);
