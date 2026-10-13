@@ -136,5 +136,75 @@ class TestRequestSsdlcReview(unittest.TestCase):
             sbom_files_pr.request_ssdlc_review(pull_request)
 
 
+class TestNormalizeForDiff(unittest.TestCase):
+    """normalize_for_diff() must treat CycloneDX's run-to-run nondeterminism (array order,
+    Endor Labs tool version bumps, metadata.timestamp) as equivalent, while still detecting
+    real content changes.
+    """
+
+    def test_reordered_arrays_are_equivalent(self):
+        # evidence.occurrences (and any other array) carries no order meaning per the
+        # CycloneDX spec, so a pure reorder must not register as a change.
+        original = """{"components": [{"bom-ref": "pkg:a", "evidence": {"occurrences": [
+            {"location": "src/mongo/shell/linenoise.h"},
+            {"location": "src/mongo/shell/linenoise.cpp"}
+        ]}}]}"""
+        reordered = """{"components": [{"bom-ref": "pkg:a", "evidence": {"occurrences": [
+            {"location": "src/mongo/shell/linenoise.cpp"},
+            {"location": "src/mongo/shell/linenoise.h"}
+        ]}}]}"""
+        self.assertEqual(
+            sbom_files_pr.normalize_for_diff("sbom.json", original),
+            sbom_files_pr.normalize_for_diff("sbom.json", reordered),
+        )
+
+    def test_endor_tool_version_bump_is_equivalent(self):
+        original = '{"metadata": {"tools": [{"name": "Endor Labs Inc", "version": "v1.7.1177"}]}}'
+        bumped = '{"metadata": {"tools": [{"name": "Endor Labs Inc", "version": "v1.7.1184"}]}}'
+        self.assertEqual(
+            sbom_files_pr.normalize_for_diff("sbom.json", original),
+            sbom_files_pr.normalize_for_diff("sbom.json", bumped),
+        )
+
+    def test_timestamp_bump_is_equivalent(self):
+        original = '{"metadata": {"timestamp": "2026-09-11T08:00:00Z"}}'
+        bumped = '{"metadata": {"timestamp": "2026-09-14T08:00:00Z"}}'
+        self.assertEqual(
+            sbom_files_pr.normalize_for_diff("sbom.json", original),
+            sbom_files_pr.normalize_for_diff("sbom.json", bumped),
+        )
+
+    def test_real_component_change_is_detected(self):
+        original = '{"components": [{"bom-ref": "pkg:a", "version": "1.0"}]}'
+        changed = '{"components": [{"bom-ref": "pkg:a", "version": "2.0"}]}'
+        self.assertNotEqual(
+            sbom_files_pr.normalize_for_diff("sbom.json", original),
+            sbom_files_pr.normalize_for_diff("sbom.json", changed),
+        )
+
+    def test_new_file_placeholder_differs_from_real_content(self):
+        self.assertNotEqual(
+            sbom_files_pr.normalize_for_diff("sbom.json", ""),
+            sbom_files_pr.normalize_for_diff("sbom.json", '{"components": []}'),
+        )
+
+    def test_non_json_file_falls_back_to_whitespace_insensitive_text_compare(self):
+        self.assertEqual(
+            sbom_files_pr.normalize_for_diff("README.third_party.md", "a  b\nc"),
+            sbom_files_pr.normalize_for_diff("README.third_party.md", "a b c"),
+        )
+        self.assertNotEqual(
+            sbom_files_pr.normalize_for_diff("README.third_party.md", "a b c"),
+            sbom_files_pr.normalize_for_diff("README.third_party.md", "a b d"),
+        )
+
+    def test_invalid_json_falls_back_to_text_compare(self):
+        # Shouldn't happen for real SBOM files, but must not raise.
+        self.assertEqual(
+            sbom_files_pr.normalize_for_diff("sbom.json", "not json"),
+            sbom_files_pr.normalize_for_diff("sbom.json", "not json"),
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
