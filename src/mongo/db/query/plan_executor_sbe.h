@@ -51,16 +51,8 @@ public:
 
         // Whether or not any metadata accessor are initialized.
         bool anyAccessorsInitialized() const {
-            return metadataSearchScore || metadataSearchHighlights || metadataSearchDetails ||
-                metadataSearchSortValues || metadataSearchSequenceToken || sortKey;
+            return sortKey;
         }
-
-        // Only for $search queries, holds the metadata returned from mongot.
-        sbe::value::SlotAccessor* metadataSearchScore{nullptr};
-        sbe::value::SlotAccessor* metadataSearchHighlights{nullptr};
-        sbe::value::SlotAccessor* metadataSearchDetails{nullptr};
-        sbe::value::SlotAccessor* metadataSearchSortValues{nullptr};
-        sbe::value::SlotAccessor* metadataSearchSequenceToken{nullptr};
 
         sbe::value::SlotAccessor* sortKey{nullptr};
         bool isSingleSortKey{true};

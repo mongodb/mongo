@@ -2205,38 +2205,7 @@ public:
         unsupportedExpression("$map");
     }
     void visit(const ExpressionMeta* expr) final {
-        auto pushMetadataExpr = [&](boost::optional<sbe::value::SlotId> slot, uint32_t typeMask) {
-            if (slot) {
-                pushExpr(_b.makeIf(
-                    _b.makeFillEmptyTrue(_b.makeFunction(
-                        sbe::EFn::kTypeMatch, SbVar{*slot}, _b.makeInt32Constant(typeMask))),
-                    SbVar{*slot},
-                    _b.makeFail(ErrorCodes::Error{8107800}, "Unexpected metadata type")));
-            } else {
-                pushExpr(_b.makeNothingConstant());
-            }
-        };
-        switch (expr->getMetaType()) {
-            case DocumentMetadataFields::MetaType::kSearchScore:
-                pushMetadataExpr(_context->state.data->metadataSlots.searchScoreSlot,
-                                 getBSONTypeMask(BSONType::numberDouble) |
-                                     getBSONTypeMask(BSONType::numberLong));
-                break;
-            case DocumentMetadataFields::MetaType::kSearchHighlights:
-                pushMetadataExpr(_context->state.data->metadataSlots.searchHighlightsSlot,
-                                 getBSONTypeMask(BSONType::array));
-                break;
-            case DocumentMetadataFields::MetaType::kSearchScoreDetails:
-                pushMetadataExpr(_context->state.data->metadataSlots.searchDetailsSlot,
-                                 getBSONTypeMask(BSONType::object));
-                break;
-            case DocumentMetadataFields::MetaType::kSearchSequenceToken:
-                pushMetadataExpr(_context->state.data->metadataSlots.searchSequenceToken,
-                                 getBSONTypeMask(BSONType::string));
-                break;
-            default:
-                unsupportedExpression("$meta");
-        }
+        unsupportedExpression("$meta");
     }
     void visit(const ExpressionMod* expr) final {
         auto rhs = popExpr();
