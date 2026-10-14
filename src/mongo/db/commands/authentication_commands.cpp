@@ -272,13 +272,16 @@ void _authenticateX509(OperationContext* opCtx, AuthenticationSession* session) 
             if (gEnforceUserClusterSeparation && sslConfiguration.isClusterExtensionSet()) {
                 auto* am = AuthorizationManager::get(opCtx->getService());
                 BSONObj ignored;
-                const bool userExists =
-                    am->getUserDescription(opCtx, request.name, &ignored).isOK();
+                auto status = am->getUserDescription(opCtx, request.name, &ignored);
+                // Any error other than UserNotFound means the lookup failed; fail closed.
+                if (status != ErrorCodes::UserNotFound) {
+                    uassertStatusOK(status);
+                }
                 uassert(ErrorCodes::AuthenticationFailed,
                         "The provided certificate represents both a cluster member and an "
                         "explicit user which exists in the authzn database. "
                         "Prohibiting authentication due to enforceUserClusterSeparation setting.",
-                        !userExists);
+                        status.code() == ErrorCodes::UserNotFound);
             }
 
             session->setAsClusterMember();
