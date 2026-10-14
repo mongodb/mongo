@@ -9,6 +9,7 @@
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/global_catalog/ddl/sharding_util.h"
 #include "mongo/db/shard_role/shard_catalog/participant_block_gen.h"
+#include "mongo/db/topology/user_write_block/global_user_write_block_state.h"
 #include "mongo/executor/async_rpc.h"
 
 namespace mongo {
@@ -45,6 +46,29 @@ void refreshDatabaseCache(OperationContext* opCtx,
     create_database_util::refreshDbVersionOnPrimaryShard(opCtx, dbNameStr, primaryShard);
 }
 }  // namespace
+
+void CreateDatabaseCoordinator::checkIfOptionsConflict(const BSONObj& stateDoc) const {
+    if (!GlobalUserWriteBlockState::get(getGlobalServiceContext())
+             ->isUserShardedDDLBlockingEnabled()) {
+        return;
+    }
+
+    const auto incomingMetadata = extractShardingCoordinatorMetadata(stateDoc);
+    const auto& incomingForwardableMetadata = incomingMetadata.getForwardableOpMetadata();
+    const auto& currentForwardableMetadata = metadata().getForwardableOpMetadata();
+
+    const auto getEffectiveBypass = [](const auto& forwardableMetadata) {
+        return forwardableMetadata
+            ? forwardableMetadata->getMayBypassWriteBlocking().value_or(false)
+            : false;
+    };
+
+    uassert(ErrorCodes::ConflictingOperationInProgress,
+            "Another createDatabase operation with different write-block bypass metadata is "
+            "already running",
+            getEffectiveBypass(currentForwardableMetadata) ==
+                getEffectiveBypass(incomingForwardableMetadata));
+}
 
 void CreateDatabaseCoordinator::_checkPreconditions() {
     auto opCtxHolder = makeOperationContext();

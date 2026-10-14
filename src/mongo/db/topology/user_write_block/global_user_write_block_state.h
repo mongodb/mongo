@@ -59,6 +59,11 @@ public:
     void disableUserShardedDDLBlocking(OperationContext* opCtx);
 
     /**
+     * Returns whether starting new user sharded DDL operations is blocked.
+     */
+    bool isUserShardedDDLBlockingEnabled() const;
+
+    /**
      * Checks that new sharded DDL operations are allowed to start. Throws UserWritesBlocked if
      * starting new sharded DDL operations is disallowed.
      */

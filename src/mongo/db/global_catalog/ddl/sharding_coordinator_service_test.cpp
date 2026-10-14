@@ -5,6 +5,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/client.h"
+#include "mongo/db/global_catalog/ddl/create_database_coordinator.h"
 #include "mongo/db/global_catalog/ddl/migration_blocking_operation_coordinator.h"
 #include "mongo/db/global_catalog/ddl/sharding_coordinator_external_state_for_test.h"
 #include "mongo/db/global_catalog/ddl/sharding_coordinator_test_grid.h"
@@ -13,6 +14,8 @@
 #include "mongo/db/shard_role/ddl/ddl_lock_manager.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/topology/user_write_block/global_user_write_block_state.h"
+#include "mongo/db/topology/user_write_block/user_write_block_bypass.h"
 #include "mongo/db/version_context.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor.h"
@@ -198,6 +201,13 @@ protected:
         return doc;
     }
 
+    CreateDatabaseCoordinatorDocument createDatabaseDoc(const NamespaceString& nss) {
+        CreateDatabaseCoordinatorDocument doc;
+        doc.setShardingCoordinatorMetadata({{nss, CoordinatorTypeEnum::kCreateDatabase}});
+        doc.setUserSelectedPrimary(false);
+        return doc;
+    }
+
     std::shared_ptr<MigrationBlockingOperationCoordinator>
     spawnMigrationBlockingOperationCoordinator(OperationContext* opCtx,
                                                NamespaceString nss,
@@ -368,6 +378,119 @@ TEST_F(ShardingCoordinatorServiceTest, CoordinatorCreationMustFailOnSecondaries)
 
     ASSERT_THROWS_CODE(
         ddlService()->waitForRecovery(opCtx.get()), DBException, ErrorCodes::NotWritablePrimary);
+}
+
+TEST_F(ShardingCoordinatorServiceTest,
+       CreateDatabaseBypassMetadataDoesNotAffectJoinWhenUserShardedDDLIsAllowed) {
+    auto opCtx = makeOperationContext();
+    ddlService()->waitForRecovery(opCtx.get());
+
+    auto hangBeforeRunningInstance =
+        globalFailPointRegistry().find("PrimaryOnlyServiceHangBeforeRunningInstance");
+    const auto timesEntered = hangBeforeRunningInstance->setMode(FailPoint::alwaysOn);
+    const auto coordinatorDoc =
+        createDatabaseDoc(NamespaceString::createNamespaceString_forTest("testDB"));
+    auto coordinator =
+        checked_pointer_cast<CreateDatabaseCoordinator>(ddlService()->getOrCreateInstance(
+            opCtx.get(), coordinatorDoc.toBSON(), FixedFCVRegion{opCtx.get()}));
+    hangBeforeRunningInstance->waitForTimesEntered(timesEntered + 1);
+
+    auto matchingCoordinator =
+        checked_pointer_cast<CreateDatabaseCoordinator>(ddlService()->getOrCreateInstance(
+            opCtx.get(), coordinatorDoc.toBSON(), FixedFCVRegion{opCtx.get()}));
+    ASSERT_EQ(coordinator, matchingCoordinator);
+
+    WriteBlockBypass::get(opCtx.get()).set(true);
+    auto coordinatorWithDifferentBypass =
+        checked_pointer_cast<CreateDatabaseCoordinator>(ddlService()->getOrCreateInstance(
+            opCtx.get(), coordinatorDoc.toBSON(), FixedFCVRegion{opCtx.get()}));
+    ASSERT_EQ(coordinator, coordinatorWithDifferentBypass);
+
+    stepDown();
+    hangBeforeRunningInstance->setMode(FailPoint::off);
+    ASSERT_NOT_OK(coordinator->getCompletionFuture().getNoThrow());
+}
+
+TEST_F(ShardingCoordinatorServiceTest,
+       CreateDatabaseBypassMetadataMustMatchWhenUserShardedDDLIsBlocked) {
+    auto opCtx = makeOperationContext();
+    ddlService()->waitForRecovery(opCtx.get());
+
+    auto hangBeforeRunningInstance =
+        globalFailPointRegistry().find("PrimaryOnlyServiceHangBeforeRunningInstance");
+    const auto timesEntered = hangBeforeRunningInstance->setMode(FailPoint::alwaysOn);
+    const auto coordinatorDoc =
+        createDatabaseDoc(NamespaceString::createNamespaceString_forTest("testDB"));
+    auto coordinator =
+        checked_pointer_cast<CreateDatabaseCoordinator>(ddlService()->getOrCreateInstance(
+            opCtx.get(), coordinatorDoc.toBSON(), FixedFCVRegion{opCtx.get()}));
+    hangBeforeRunningInstance->waitForTimesEntered(timesEntered + 1);
+
+    GlobalUserWriteBlockState::get(opCtx.get())->enableUserShardedDDLBlocking(opCtx.get());
+
+    ASSERT_DOES_NOT_THROW(coordinator->checkIfOptionsConflict(coordinatorDoc.toBSON()));
+    auto matchingCoordinatorWhileBlocked =
+        checked_pointer_cast<CreateDatabaseCoordinator>(ddlService()->getOrCreateInstance(
+            opCtx.get(), coordinatorDoc.toBSON(), FixedFCVRegion{opCtx.get()}));
+    ASSERT_EQ(coordinator, matchingCoordinatorWhileBlocked);
+
+    WriteBlockBypass::get(opCtx.get()).set(true);
+    ASSERT_THROWS_WITH_CHECK(ddlService()->getOrCreateInstance(
+                                 opCtx.get(), coordinatorDoc.toBSON(), FixedFCVRegion{opCtx.get()}),
+                             DBException,
+                             [](const DBException& ex) {
+                                 ASSERT_EQ(ex.code(), ErrorCodes::ConflictingOperationInProgress);
+                                 ASSERT_STRING_CONTAINS(ex.reason(),
+                                                        "different write-block bypass metadata");
+                             });
+
+    GlobalUserWriteBlockState::get(opCtx.get())->disableUserShardedDDLBlocking(opCtx.get());
+
+    stepDown();
+    hangBeforeRunningInstance->setMode(FailPoint::off);
+    ASSERT_NOT_OK(coordinator->getCompletionFuture().getNoThrow());
+}
+
+TEST_F(ShardingCoordinatorServiceTest,
+       CreateDatabaseNonBypassMetadataConflictsWithBypassWhenUserShardedDDLIsBlocked) {
+    auto opCtx = makeOperationContext();
+    ddlService()->waitForRecovery(opCtx.get());
+
+    auto hangBeforeRunningInstance =
+        globalFailPointRegistry().find("PrimaryOnlyServiceHangBeforeRunningInstance");
+    const auto timesEntered = hangBeforeRunningInstance->setMode(FailPoint::alwaysOn);
+    WriteBlockBypass::get(opCtx.get()).set(true);
+    const auto coordinatorDoc =
+        createDatabaseDoc(NamespaceString::createNamespaceString_forTest("testDB"));
+    auto coordinator =
+        checked_pointer_cast<CreateDatabaseCoordinator>(ddlService()->getOrCreateInstance(
+            opCtx.get(), coordinatorDoc.toBSON(), FixedFCVRegion{opCtx.get()}));
+    hangBeforeRunningInstance->waitForTimesEntered(timesEntered + 1);
+
+    GlobalUserWriteBlockState::get(opCtx.get())->enableUserShardedDDLBlocking(opCtx.get());
+
+    auto matchingBypassCoordinator =
+        checked_pointer_cast<CreateDatabaseCoordinator>(ddlService()->getOrCreateInstance(
+            opCtx.get(), coordinatorDoc.toBSON(), FixedFCVRegion{opCtx.get()}));
+    ASSERT_EQ(coordinator, matchingBypassCoordinator);
+
+    ASSERT_THROWS_WITH_CHECK(coordinator->checkIfOptionsConflict(coordinatorDoc.toBSON()),
+                             DBException,
+                             [](const DBException& ex) {
+                                 ASSERT_EQ(ex.code(), ErrorCodes::ConflictingOperationInProgress);
+                             });
+
+    WriteBlockBypass::get(opCtx.get()).set(false);
+    ASSERT_THROWS_CODE(ddlService()->getOrCreateInstance(
+                           opCtx.get(), coordinatorDoc.toBSON(), FixedFCVRegion{opCtx.get()}),
+                       DBException,
+                       ErrorCodes::ConflictingOperationInProgress);
+
+    GlobalUserWriteBlockState::get(opCtx.get())->disableUserShardedDDLBlocking(opCtx.get());
+
+    stepDown();
+    hangBeforeRunningInstance->setMode(FailPoint::off);
+    ASSERT_NOT_OK(coordinator->getCompletionFuture().getNoThrow());
 }
 
 TEST_F(ShardingCoordinatorServiceTest, StepdownDuringServiceRebuilding) {

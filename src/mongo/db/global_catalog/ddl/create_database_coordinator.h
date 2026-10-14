@@ -21,7 +21,7 @@ public:
 
     ~CreateDatabaseCoordinator() override = default;
 
-    void checkIfOptionsConflict(const BSONObj& stateDoc) const override {}
+    void checkIfOptionsConflict(const BSONObj& stateDoc) const override;
 
     ConfigsvrCreateDatabaseResponse getResult(OperationContext* opCtx);
 
