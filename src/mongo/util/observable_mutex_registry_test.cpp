@@ -112,11 +112,6 @@ private:
                 ASSERT_EQ(statObj.getIntField(ObservableMutexRegistry::kTotalWaitCyclesFieldName),
                           expected.waitCycles)
                     << "for tag " << tag;
-                ASSERT_TRUE(statObj.hasField(ObservableMutexRegistry::kTotalWaitMicrosFieldName))
-                    << "for tag " << tag;
-                ASSERT_EQ(statObj.getIntField(ObservableMutexRegistry::kTotalWaitMicrosFieldName),
-                          waitCyclesToMicros(expected.waitCycles))
-                    << "for tag " << tag;
             };
 
         const std::size_t expectedSize = options.skipInternalMutexes

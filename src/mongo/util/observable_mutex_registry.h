@@ -24,7 +24,6 @@ public:
     static constexpr auto kTotalAcquisitionsFieldName = "total"sv;
     static constexpr auto kTotalContentionsFieldName = "contentions"sv;
     static constexpr auto kTotalWaitCyclesFieldName = "waitCycles"sv;
-    static constexpr auto kTotalWaitMicrosFieldName = "waitMicros"sv;
     static constexpr auto kExclusiveFieldName = "exclusive"sv;
     static constexpr auto kSharedFieldName = "shared"sv;
     static constexpr auto kMutexFieldName = "mutexes"sv;
@@ -94,13 +93,11 @@ public:
      *             "total": "0",
      *             "contentions": "0",
      *             "waitCycles": "0",
-     *             "waitMicros": "0",
      *         },
      *         "shared": {
      *             "total": "0",
      *             "contentions": "0",
      *             "waitCycles": "0",
-     *             "waitMicros": "0",
      *         },
      *         "mutexes" : [    // Only emitted if listAll == true.
      *             {
