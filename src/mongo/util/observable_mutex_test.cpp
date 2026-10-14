@@ -256,7 +256,12 @@ TEST_F(ObservableMutexTest, AcquisitionMetricsNotUpdatedWhenSharedAcquisitionThr
     verifyMutexStats(fetchedTokenStats, expected);
 }
 
-#ifndef _WIN32
+// TODO(SERVER-136951): This linux and architecture check is necessary because the waitCycles metric
+// will always be 0 on all other platforms. This is a temporary workaround for a performance issue.
+// Once a permanent solution is implemented, these checks should be removed. Additionally, these two
+// tests were previously excluded on Windows so we should verify if the permanent solution needs the
+// same exclusion.
+#if defined(__linux__) && (defined(__x86_64__) || defined(__aarch64__))
 TEST_F(ObservableMutexTest, AcquisitionMetricsCorrectlyUpdated) {
     ObservableExclusiveMutex m;
     statsTest(m, ExclusiveLocker{});

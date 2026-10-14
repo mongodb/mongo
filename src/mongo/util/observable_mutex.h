@@ -58,7 +58,7 @@ struct Timer {
         asm volatile("mrs %0, cntvct_el0" : "=r"(tsc));
         return tsc;
 #else
-        return std::clock();
+        return 0;
 #endif
     }
 };
