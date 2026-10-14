@@ -126,8 +126,11 @@ public:
     /**
      * Merges the provided `threadRecords`. For each recorded checkpoint, computes the expected
      * `CheckpointContents` and then validates it.
+     *
+     * This function does not validate the primary's checkpoint entry for the oplog's replicated
+     * metadata. The `oplogUuid` must be the same on the primary as the standby.
      */
-    void mergeAndValidate(const ValidatorBuffers& threadRecords);
+    void mergeAndValidate(const ValidatorBuffers& threadRecords, UUID oplogUuid);
 
 private:
     /**

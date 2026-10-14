@@ -473,10 +473,11 @@ protected:
                 SizeCountCheckpointValidator::recordDelta(record.uuid, record.ts, record.delta);
             }
         }
-        validator.mergeAndValidate({buffer});
+        validator.mergeAndValidate({buffer}, oplogUuid);
     }
 
     SizeCountCheckpointValidator validator;
+    const UUID oplogUuid = UUID::gen();
 
     unittest::ServerParameterGuard enableContinuousInternodePerCollectionValidation{
         "enableContinuousInternodePerCollectionValidation", true};
@@ -589,6 +590,25 @@ TEST_F(SizeCountCheckpointValidatorTest, DeltasPastNewestWatermarkStayOutOfCheck
              .uuid = tailUuid,
              .delta = ReplicatedMetadataDelta{
                  .metadata = {.sizeCount = CollectionSizeCount{.size = 30, .count = 3}}}}});
+}
+
+TEST_F(SizeCountCheckpointValidatorTest, ExcludesOplogUuidFromCheckpointPayloads) {
+    const UUID collB = UUID::gen();
+    const std::vector<repl::OplogEntry> ops{
+        makeWatermarkEntry(kT1),
+        makeCheckpointEntry(kT1,
+                            {{oplogUuid,
+                              CollectionReplicatedMetadata{
+                                  .sizeCount = CollectionSizeCount{.size = 5, .count = 1}}},
+                             {collB,
+                              CollectionReplicatedMetadata{
+                                  .sizeCount = CollectionSizeCount{.size = 10, .count = 1}}}})};
+    applyBatch(validator,
+               ops,
+               {{.ts = kT0,
+                 .uuid = collB,
+                 .delta = ReplicatedMetadataDelta{
+                     .metadata = {.sizeCount = CollectionSizeCount{.size = 10, .count = 1}}}}});
 }
 
 class SizeCountCheckpointValidatorDeathTest : public SizeCountCheckpointValidatorTest {};

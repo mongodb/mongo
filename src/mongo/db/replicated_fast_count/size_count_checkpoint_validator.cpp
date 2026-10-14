@@ -268,7 +268,8 @@ SizeCountCheckpointValidator::ScopedThreadBuffer::~ScopedThreadBuffer() {
     tValidatorBuffer = nullptr;
 }
 
-void SizeCountCheckpointValidator::mergeAndValidate(const ValidatorBuffers& threadRecords) {
+void SizeCountCheckpointValidator::mergeAndValidate(const ValidatorBuffers& threadRecords,
+                                                    UUID oplogUuid) {
     merge(threadRecords);
 
     for (const auto& entry : _checkpoints) {
@@ -290,7 +291,13 @@ void SizeCountCheckpointValidator::mergeAndValidate(const ValidatorBuffers& thre
         }
 
         const CheckpointContents standby = computeExpectedCheckpoint(validAsOf);
-        const CheckpointContents primary = parseCheckpoint(entry);
+        CheckpointContents primary = parseCheckpoint(entry);
+        // The primary's checkpoint includes replicated metadata for the oplog, but the standby's
+        // checkpoint does not. This is because the primary _derives_ oplog replicated metadata
+        // while tailing the oplog; the oplog's replicated metadata is not explicitly replicated
+        // through the m (metadata) field. Remove the entry from primary's checkpoint so we do not
+        // validate it.
+        primary.erase(oplogUuid);
 
         // TODO(SERVER-136296): Validate with logging when the server parameter is off. We don't
         // validate/log for now because it will be noisy.

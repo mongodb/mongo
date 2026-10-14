@@ -128,6 +128,9 @@ private:
     // on both the primary and secondary.
     bool _disableTransactionUpdateCoalescing;
 
+    // Used for replicated metadata checkpoint validation. Initialized on the first validated batch.
+    boost::optional<UUID> _oplogUuid;
+
 protected:
     // Marked as protected for use in unit tests.
     /**
