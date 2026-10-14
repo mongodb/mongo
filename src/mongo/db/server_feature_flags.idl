@@ -62,6 +62,13 @@ feature_flags:
         cpp_varname: gFeatureFlagElegantStepDownForDisagg
         default: true
         fcv_gated: false
+    featureFlagPaliORPFallback:
+        description: >-
+            Enable standby startup oplog recovery from the Object Read Proxy
+            when the required logs have been truncated from the Log Service.
+        cpp_varname: gFeatureFlagPaliORPFallback
+        default: false
+        fcv_gated: false
     featureFlagEndOfTransactionChangeEvent:
         description: "Feature flag to enable endOfTransaction oplog entry and change stream event"
         cpp_varname: feature_flags::gFeatureFlagEndOfTransactionChangeEvent
