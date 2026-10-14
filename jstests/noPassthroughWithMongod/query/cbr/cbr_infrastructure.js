@@ -79,17 +79,37 @@ coll.createIndexes([
     {bool_field: 1},
 ]);
 
-assert.commandWorked(coll.runCommand({analyze: collName, key: "a", numberBuckets: 10}));
-assert.commandWorked(coll.runCommand({analyze: collName, key: "b", numberBuckets: 10}));
-assert.commandWorked(coll.runCommand({analyze: collName, key: "c", numberBuckets: 10}));
 assert.commandWorked(
-    coll.runCommand({analyze: collName, key: "missing_90_percent", numberBuckets: 10}),
+    coll.runCommand({analyze: collName, mode: "histograms", key: "a", numberBuckets: 10}),
 );
 assert.commandWorked(
-    coll.runCommand({analyze: collName, key: "missing_10_percent", numberBuckets: 10}),
+    coll.runCommand({analyze: collName, mode: "histograms", key: "b", numberBuckets: 10}),
 );
-assert.commandWorked(coll.runCommand({analyze: collName, key: "mixed", numberBuckets: 10}));
-assert.commandWorked(coll.runCommand({analyze: collName, key: "bool_field", numberBuckets: 10}));
+assert.commandWorked(
+    coll.runCommand({analyze: collName, mode: "histograms", key: "c", numberBuckets: 10}),
+);
+assert.commandWorked(
+    coll.runCommand({
+        analyze: collName,
+        mode: "histograms",
+        key: "missing_90_percent",
+        numberBuckets: 10,
+    }),
+);
+assert.commandWorked(
+    coll.runCommand({
+        analyze: collName,
+        mode: "histograms",
+        key: "missing_10_percent",
+        numberBuckets: 10,
+    }),
+);
+assert.commandWorked(
+    coll.runCommand({analyze: collName, mode: "histograms", key: "mixed", numberBuckets: 10}),
+);
+assert.commandWorked(
+    coll.runCommand({analyze: collName, mode: "histograms", key: "bool_field", numberBuckets: 10}),
+);
 
 // Test queries
 const queries = [
@@ -457,7 +477,7 @@ try {
     assert.throwsWithCode(() => coll1.find({a: 1}).explain(), ErrorCodes.HistogramCEFailure);
 
     // Create a histogram on field "b".
-    assert.commandWorked(coll1.runCommand({analyze: collName, key: "b"}));
+    assert.commandWorked(coll1.runCommand({analyze: collName, mode: "histograms", key: "b"}));
 
     // Request histogam CE on a field that doesn't have a histogram
     assert.throwsWithCode(() => coll1.find({a: 1}).explain(), ErrorCodes.HistogramCEFailure);

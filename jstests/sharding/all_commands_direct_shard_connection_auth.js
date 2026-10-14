@@ -247,7 +247,7 @@ const allCommands = {
         setUp: function (mongoS) {
             assert.commandWorked(mongoS.getDB(dbName).runCommand({create: collName}));
         },
-        command: {analyze: collName},
+        command: {analyze: collName, mode: "histograms", key: "a"},
         shouldFail: true,
         teardown: function (mongoS) {
             assert.commandWorked(mongoS.getDB(dbName).runCommand({drop: collName}));

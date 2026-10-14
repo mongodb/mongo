@@ -92,7 +92,9 @@ export function runCommandOverride(conn, dbName, _cmdName, cmdObj, clientFunctio
         );
         // Create histogram for each path
         indexedPaths.forEach((path) =>
-            assert.commandWorked(db.runCommand({analyze: collectionName, key: path})),
+            assert.commandWorked(
+                db.runCommand({analyze: collectionName, mode: "histograms", key: path}),
+            ),
         );
     }
 

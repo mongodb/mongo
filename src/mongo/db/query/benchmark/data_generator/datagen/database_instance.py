@@ -109,7 +109,12 @@ class DatabaseInstance:
         Analyze is currently not persisted across restarts, or when dumping or restoring.
         """
         await self.database.command(
-            {"analyze": collection_name, "key": field, "numberBuckets": number_buckets}
+            {
+                "analyze": collection_name,
+                "mode": "histograms",
+                "key": field,
+                "numberBuckets": number_buckets,
+            }
         )
 
     async def set_parameter(self, name: str, value: any) -> None:

@@ -65,7 +65,12 @@ function runOneTest({dataset, indexes, analyze, numberBuckets = 1000}) {
         }
 
         for (const analyze_key of analyze ? analyze : ["a"]) {
-            let analyze_cmd = {analyze: collName, key: analyze_key, numberBuckets: numberBuckets};
+            let analyze_cmd = {
+                analyze: collName,
+                mode: "histograms",
+                key: analyze_key,
+                numberBuckets: numberBuckets,
+            };
 
             assert.commandWorked(coll.runCommand(analyze_cmd));
         }

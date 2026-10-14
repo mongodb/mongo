@@ -42,7 +42,7 @@ coll.insert(docs);
 
 for (const key of ["unique1", "b", "c", "d", "constant", "unique2"]) {
     coll.createIndex({[key]: 1});
-    coll.runCommand({analyze: collName, key: key, numberBuckets: 1000});
+    coll.runCommand({analyze: collName, mode: "histograms", key: key, numberBuckets: 1000});
 }
 
 // Additional compound (multi-field) indexes

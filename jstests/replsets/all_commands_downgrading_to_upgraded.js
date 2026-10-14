@@ -313,7 +313,8 @@ const allCommands = {
         setUp: function (conn) {
             assert.commandWorked(conn.getDB(dbName).runCommand({create: collName}));
         },
-        command: {analyze: collName},
+        // TODO SERVER-124374: add testing for sample mode
+        command: {analyze: collName, mode: "histograms", key: "a"},
         teardown: function (conn) {
             assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
         },

@@ -15,11 +15,13 @@ for (let i = 0; i < 10000; i++) {
 
 assert.commandWorked(coll.insertMany(data));
 
-assert.commandWorked(db.runCommand({analyze: coll.getName(), key: "x"}));
+assert.commandWorked(db.runCommand({analyze: coll.getName(), mode: "histograms", key: "x"}));
 const fullStats = statscoll.find({_id: "x"}).toArray()[0];
 const fullBounds = fullStats.statistics.scalarHistogram.bounds;
 
-assert.commandWorked(db.runCommand({analyze: coll.getName(), key: "x", sampleRate: 0.01}));
+assert.commandWorked(
+    db.runCommand({analyze: coll.getName(), mode: "histograms", key: "x", sampleRate: 0.01}),
+);
 const sampleStats = statscoll.find({_id: "x"}).toArray()[0];
 const sampleBounds = sampleStats.statistics.scalarHistogram.bounds;
 
@@ -32,17 +34,25 @@ assert.eq(0.01, sampleStats.statistics.sampleRate);
 assert.betweenIn(50, sampleStats.statistics.documents, 150);
 
 // Test sampleSize
-assert.commandWorked(db.runCommand({analyze: coll.getName(), key: "x", sampleSize: 1000}));
+assert.commandWorked(
+    db.runCommand({analyze: coll.getName(), mode: "histograms", key: "x", sampleSize: 1000}),
+);
 const sampleSizeStats = statscoll.find({_id: "x"}).toArray()[0];
 assert.eq(0.1, sampleSizeStats.statistics.sampleRate);
 
-assert.commandWorked(db.runCommand({analyze: coll.getName(), key: "x", sampleSize: 100000000}));
+assert.commandWorked(
+    db.runCommand({analyze: coll.getName(), mode: "histograms", key: "x", sampleSize: 100000000}),
+);
 const sampleSizeFullStats = statscoll.find({_id: "x"}).toArray()[0];
 assert.eq(1.0, sampleSizeFullStats.statistics.sampleRate);
 
 // Test sampling on empty collection
 assert.commandWorked(coll.deleteMany({}));
-assert.commandWorked(db.runCommand({analyze: coll.getName(), key: "x", sampleRate: 0.5}));
-assert.commandWorked(db.runCommand({analyze: coll.getName(), key: "x", sampleSize: 1000}));
+assert.commandWorked(
+    db.runCommand({analyze: coll.getName(), mode: "histograms", key: "x", sampleRate: 0.5}),
+);
+assert.commandWorked(
+    db.runCommand({analyze: coll.getName(), mode: "histograms", key: "x", sampleSize: 1000}),
+);
 
 MongoRunner.stopMongod(conn);

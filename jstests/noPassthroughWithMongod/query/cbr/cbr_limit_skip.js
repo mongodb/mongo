@@ -28,8 +28,8 @@ for (let i = 0; i < 1000; i++) {
 assert.commandWorked(coll.insert(docs));
 
 coll.createIndexes([{a: 1}]);
-assert.commandWorked(coll.runCommand({analyze: collName, key: "a"}));
-assert.commandWorked(coll.runCommand({analyze: collName, key: "b"}));
+assert.commandWorked(coll.runCommand({analyze: collName, mode: "histograms", key: "a"}));
+assert.commandWorked(coll.runCommand({analyze: collName, mode: "histograms", key: "b"}));
 
 function runTest({query, sort, skip, limit, expectedCard}) {
     assert.commandWorked(
@@ -98,7 +98,7 @@ try {
     });
     assert.commandWorked(coll.insert(docs));
     coll.createIndexes([{a: 1}]);
-    assert.commandWorked(coll.runCommand({analyze: collName, key: "a"}));
+    assert.commandWorked(coll.runCommand({analyze: collName, mode: "histograms", key: "a"}));
 
     assert.commandWorked(
         db.adminCommand({
@@ -121,7 +121,7 @@ try {
 
     // Add more docs to the collection and update histogram
     assert.commandWorked(coll.insert(docs));
-    assert.commandWorked(coll.runCommand({analyze: collName, key: "a"}));
+    assert.commandWorked(coll.runCommand({analyze: collName, mode: "histograms", key: "a"}));
 
     // Get the cost of the skip stage
     const largeCardSkipExplain = coll.find(query).skip(skip).explain();

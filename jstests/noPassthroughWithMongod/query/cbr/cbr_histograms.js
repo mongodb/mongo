@@ -40,9 +40,11 @@ assert.commandWorked(coll.insertMany(docs));
 coll.createIndex({a: 1});
 
 // Generate histograms for field 'a' and 'b'
-assert.commandWorked(coll.runCommand({analyze: collName, key: "a", numberBuckets: 10}));
-assert.commandWorked(coll.runCommand({analyze: collName, key: "b"}));
-assert.commandWorked(coll.runCommand({analyze: collName, key: "c"}));
+assert.commandWorked(
+    coll.runCommand({analyze: collName, mode: "histograms", key: "a", numberBuckets: 10}),
+);
+assert.commandWorked(coll.runCommand({analyze: collName, mode: "histograms", key: "b"}));
+assert.commandWorked(coll.runCommand({analyze: collName, mode: "histograms", key: "c"}));
 
 // Run a find command with the given filter and verify that every plan uses a histogram estimate.
 function assertQueryUsesHistograms({query, expectedCE}) {
@@ -126,8 +128,12 @@ try {
             {a: null, b: 9},
         ]),
     );
-    assert.commandWorked(coll.runCommand({analyze: collName, key: "a", numberBuckets: 10}));
-    assert.commandWorked(coll.runCommand({analyze: collName, key: "b", numberBuckets: 10}));
+    assert.commandWorked(
+        coll.runCommand({analyze: collName, mode: "histograms", key: "a", numberBuckets: 10}),
+    );
+    assert.commandWorked(
+        coll.runCommand({analyze: collName, mode: "histograms", key: "b", numberBuckets: 10}),
+    );
     assert.commandWorked(
         db.adminCommand({
             setParameter: 1,
@@ -158,7 +164,9 @@ try {
     // Create index so the catalog has multikey metadata, but the queries we run hint a collection
     // scan so we can test CE of MatchExpressions using histogram.
     assert.commandWorked(coll.createIndex({a: 1}));
-    assert.commandWorked(coll.runCommand({analyze: collName, key: "a", numberBuckets: 10}));
+    assert.commandWorked(
+        coll.runCommand({analyze: collName, mode: "histograms", key: "a", numberBuckets: 10}),
+    );
     assert.commandWorked(
         db.adminCommand({
             setParameter: 1,
@@ -206,8 +214,12 @@ try {
             {a: 1, b: 1, c: 1},
         ]),
     );
-    assert.commandWorked(coll.runCommand({analyze: collName, key: "a", numberBuckets: 10}));
-    assert.commandWorked(coll.runCommand({analyze: collName, key: "b", numberBuckets: 10}));
+    assert.commandWorked(
+        coll.runCommand({analyze: collName, mode: "histograms", key: "a", numberBuckets: 10}),
+    );
+    assert.commandWorked(
+        coll.runCommand({analyze: collName, mode: "histograms", key: "b", numberBuckets: 10}),
+    );
     assert.commandWorked(
         db.adminCommand({
             setParameter: 1,

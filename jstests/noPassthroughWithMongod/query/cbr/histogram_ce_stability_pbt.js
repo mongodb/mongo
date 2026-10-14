@@ -46,6 +46,7 @@ function histogramPlanStabilityProperty(getQuery, testHelpers, {numberBuckets}) 
         assert.commandWorked(
             experimentColl.runCommand({
                 analyze: experimentColl.getName(),
+                mode: "histograms",
                 key: analyzeKey,
                 numberBuckets,
             }),

@@ -31,7 +31,7 @@ assert.commandWorked(coll.insert(docs));
 function testElemMatchWithDifferentSelectivities() {
     coll.dropIndexes();
 
-    assert.commandWorked(coll.runCommand({analyze: collName, key: "a"}));
+    assert.commandWorked(coll.runCommand({analyze: collName, mode: "histograms", key: "a"}));
     // No index on 'a' forces a collection scan plan.
 
     const moreDocsPlan = getWinningPlanFromExplain(
@@ -48,7 +48,7 @@ function testElemMatchWithDifferentSelectivities() {
 
 function testIndexDoesNotAffectEstimate() {
     coll.dropIndexes();
-    assert.commandWorked(coll.runCommand({analyze: collName, key: "a"}));
+    assert.commandWorked(coll.runCommand({analyze: collName, mode: "histograms", key: "a"}));
 
     const query = {a: {$elemMatch: {$gt: 5, $lt: 20}}};
     const noIndexPlan = getWinningPlanFromExplain(coll.find(query).explain());

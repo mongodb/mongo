@@ -23,10 +23,7 @@ try {
 
     assert.commandWorked(coll.insertMany([{a: 1}, {a: 2}, {a: 3}]));
 
-    let res = db.runCommand({analyze: coll.getName(), key: "a", mode: "histograms"});
-    assert.commandFailedWithCode(res, ErrorCodes.CommandNotSupported);
-
-    res = db.runCommand({analyze: coll.getName(), key: "a"});
+    const res = db.runCommand({analyze: coll.getName(), key: "a", mode: "histograms"});
     assert.commandFailedWithCode(res, ErrorCodes.CommandNotSupported);
 
     coll.drop();

@@ -690,7 +690,7 @@ export const authCommandsLib = {
         },
         {
             testname: "analyze",
-            command: {analyze: "x"},
+            command: {analyze: "x", mode: "histograms", key: "a"},
             setup: function (db) {
                 assert.commandWorked(db.x.insert({}));
             },

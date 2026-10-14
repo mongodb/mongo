@@ -86,6 +86,15 @@ TEST(AnalyzeCommandParseTest, ModeRejectsUnknownValue) {
                        ErrorCodes::BadValue);
 }
 
+TEST(AnalyzeCommandParseTest, ModeIsRequired) {
+    auto cmd = BSON("analyze" << "myColl"
+                              << "$db" << "test"
+                              << "key" << "a.b");
+    ASSERT_THROWS_CODE(AnalyzeCommandRequest::parse(cmd, IDLParserContext("analyze")),
+                       DBException,
+                       ErrorCodes::IDLFailedToParse);
+}
+
 TEST(AnalyzeCommandParseTest, NdvModeParses) {
     auto cmd = BSON("analyze" << "myColl"
                               << "$db" << "test"

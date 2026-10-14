@@ -39,19 +39,19 @@ coll.createIndex({b: 1});
 coll.createIndex({a: 1, b: 1});
 coll.createIndex({b: 1, a: 1});
 for (let fieldName of ["a", "a_multikey", "b", "c", "d", "e"]) {
-    db.coll.runCommand({analyze: collName, key: fieldName});
+    db.coll.runCommand({analyze: collName, mode: "histograms", key: fieldName});
 }
 
 const collOneRowName = collName + "_one_row";
 const collOneRow = db[collOneRowName];
 collOneRow.insert({a: 1, b: 1});
-collOneRow.runCommand({analyze: collOneRowName, key: "a"});
+collOneRow.runCommand({analyze: collOneRowName, mode: "histograms", key: "a"});
 collOneRow.createIndex({a: 1});
 
 const collZeroRowsName = collName + "_zero_rows";
 const collZeroRows = db[collZeroRowsName];
 collZeroRows.createIndex({a: 1});
-collZeroRows.runCommand({analyze: collZeroRows, key: "a"});
+collZeroRows.runCommand({analyze: collZeroRows, mode: "histograms", key: "a"});
 
 // Collection used to test NDV-based seek estimation for skip-scan index scans.
 // field 'unique' has 2000 distinct values; 'binary' has 2 values (0 or 1, half each).

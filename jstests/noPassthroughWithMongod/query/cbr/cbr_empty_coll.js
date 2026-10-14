@@ -89,7 +89,7 @@ function testEmptyColl() {
 function createHistogram(field) {
     // Creating a histogram requires at least one document
     assert.commandWorked(coll.insert({_id: 1, [field]: 1}));
-    assert.commandWorked(coll.runCommand({analyze: collName, key: field}));
+    assert.commandWorked(coll.runCommand({analyze: collName, mode: "histograms", key: field}));
     // Delete the document to get an empty collection
     assert.commandWorked(coll.deleteOne({_id: 1}));
 }

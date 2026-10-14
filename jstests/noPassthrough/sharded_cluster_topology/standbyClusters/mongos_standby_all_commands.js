@@ -56,7 +56,7 @@ const allCommands = {
         isAdminCommand: true,
     },
     aggregate: {command: {aggregate: collName, pipeline: [{$match: {}}], cursor: {}}},
-    analyze: {command: {analyze: collName}},
+    analyze: {command: {analyze: collName, mode: "histograms", key: "a"}},
     analyzeShardKey: {command: {analyzeShardKey: fullNs, key: {x: 1}}, isAdminCommand: true},
     appendOplogNote: {
         command: {appendOplogNote: 1, data: {a: 1}},

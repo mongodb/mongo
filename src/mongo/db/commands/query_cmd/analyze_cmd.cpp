@@ -612,18 +612,13 @@ void runSampleMode(OperationContext* opCtx,
 
 void runHistogramsMode(OperationContext* opCtx,
                        const NamespaceString& nss,
-                       bool explicitHistogramsMode,
                        boost::optional<std::string_view> key,
                        boost::optional<double> sampleRate,
                        boost::optional<int> sampleSize,
                        boost::optional<int> numberBuckets) {
     uassert(ErrorCodes::CommandNotSupported, "no such command: analyze", getTestCommandsEnabled());
 
-    // Without an explicit mode this is the legacy default flow, where a missing key merely
-    // validates the collection.
-    if (explicitHistogramsMode) {
-        uassert(9820001, "Histograms mode requires a key to be specified", key);
-    }
+    uassert(9820001, "Histograms mode requires a key to be specified", key);
 
     // Sample rate and sample size can't both be present
     uassert(6799705,
@@ -663,41 +658,34 @@ void runHistogramsMode(OperationContext* opCtx,
     }
 
     // Validate key
-    if (key) {
-        validateKeyPath(*key);
+    validateKeyPath(*key);
 
-        // We need to perform this operation with internal permissions.
-        const bool wasInternalClient = isInternalClient(opCtx->getClient());
-        if (!wasInternalClient) {
-            opCtx->getClient()->setIsInternalClient(true);
-        }
-
-        DBDirectClient client(opCtx);
-
-        // Run Aggregate
-        BSONObj analyzeResult;
-        client.runCommand(nss.dbName(),
-                          analyzeCommandAsAggregationCommand(
-                              opCtx, nss.coll(), std::string{*key}, sampleRate, numberBuckets)
-                              .getValue(),
-                          analyzeResult);
-
-        // We must reset the internal flag.
-        if (!wasInternalClient) {
-            opCtx->getClient()->setIsInternalClient(false);
-        }
-
-        uassertStatusOK(getStatusFromCommandResult(analyzeResult));
-
-        // Invalidate statistics in the cache for the analyzed path
-        stats::StatsCatalog& statsCatalog = stats::StatsCatalog::get(opCtx);
-        uassertStatusOK(statsCatalog.invalidatePath(nss, std::string{*key}));
-    } else if (sampleSize || sampleRate) {
-        uassert(6799706,
-                "It is illegal to pass sampleRate or sampleSize without a key in "
-                "histograms mode",
-                key);
+    // We need to perform this operation with internal permissions.
+    const bool wasInternalClient = isInternalClient(opCtx->getClient());
+    if (!wasInternalClient) {
+        opCtx->getClient()->setIsInternalClient(true);
     }
+
+    DBDirectClient client(opCtx);
+
+    // Run Aggregate
+    BSONObj analyzeResult;
+    client.runCommand(nss.dbName(),
+                      analyzeCommandAsAggregationCommand(
+                          opCtx, nss.coll(), std::string{*key}, sampleRate, numberBuckets)
+                          .getValue(),
+                      analyzeResult);
+
+    // We must reset the internal flag.
+    if (!wasInternalClient) {
+        opCtx->getClient()->setIsInternalClient(false);
+    }
+
+    uassertStatusOK(getStatusFromCommandResult(analyzeResult));
+
+    // Invalidate statistics in the cache for the analyzed path
+    stats::StatsCatalog& statsCatalog = stats::StatsCatalog::get(opCtx);
+    uassertStatusOK(statsCatalog.invalidatePath(nss, std::string{*key}));
 }
 
 class CmdAnalyze final : public TypedCommand<CmdAnalyze> {
@@ -732,7 +720,6 @@ public:
             const auto& cmd = request();
             const NamespaceString& nss = ns();
 
-            // TODO SERVER-127476: Make sample mode the default
             // TODO SERVER-133120: Model the analyze command as an abstract class with one
             // implementation per mode instead of dispatching here.
             const auto mode = cmd.getMode();
@@ -741,28 +728,36 @@ public:
             uassert(13176200,
                     "an array of key paths is only supported with mode: \"ndv\"",
                     !key || std::holds_alternative<std::string>(*key) ||
-                        (mode && *mode == AnalyzeModeEnum::kNdv));
-            if (mode && *mode == AnalyzeModeEnum::kSample) {
-                runSampleMode(
-                    opCtx, nss, cmd.getSampleSize(), cmd.getSamplingMethod(), cmd.getNumChunks());
-            } else if (mode && *mode == AnalyzeModeEnum::kNdv) {
-                uassert(13175800, "ndv mode requires a key to be specified", key);
-                uassert(13175801,
-                        "sampleRate, sampleSize, numberBuckets, samplingMethod and numChunks "
-                        "are not supported with ndv mode",
-                        !cmd.getSampleRate() && !cmd.getSampleSize() && !cmd.getNumberBuckets() &&
-                            !cmd.getSamplingMethod() && !cmd.getNumChunks());
-                runNdvMode(opCtx, nss, *key);
-            } else {
-                runHistogramsMode(
-                    opCtx,
-                    nss,
-                    /*explicitHistogramsMode=*/mode.has_value(),
-                    key ? boost::optional<std::string_view>(std::get<std::string>(*key))
-                        : boost::none,
-                    cmd.getSampleRate(),
-                    cmd.getSampleSize(),
-                    cmd.getNumberBuckets());
+                        mode == AnalyzeModeEnum::kNdv);
+
+            switch (mode) {
+                case AnalyzeModeEnum::kSample:
+                    runSampleMode(opCtx,
+                                  nss,
+                                  cmd.getSampleSize(),
+                                  cmd.getSamplingMethod(),
+                                  cmd.getNumChunks());
+                    break;
+                case AnalyzeModeEnum::kNdv:
+                    uassert(13175800, "ndv mode requires a key to be specified", key);
+                    uassert(13175801,
+                            "sampleRate, sampleSize, numberBuckets, samplingMethod and numChunks "
+                            "are not supported with ndv mode",
+                            !cmd.getSampleRate() && !cmd.getSampleSize() &&
+                                !cmd.getNumberBuckets() && !cmd.getSamplingMethod() &&
+                                !cmd.getNumChunks());
+                    runNdvMode(opCtx, nss, *key);
+                    break;
+                case AnalyzeModeEnum::kHistograms:
+                    runHistogramsMode(
+                        opCtx,
+                        nss,
+                        key ? boost::optional<std::string_view>(std::get<std::string>(*key))
+                            : boost::none,
+                        cmd.getSampleRate(),
+                        cmd.getSampleSize(),
+                        cmd.getNumberBuckets());
+                    break;
             }
         }
 

@@ -227,7 +227,6 @@ describe("analyze mode: ndv", function () {
     });
 
     it("rejects the array key form outside ndv mode", function () {
-        assert.commandFailedWithCode(this.analyze({key: ["a", "other"]}), 13176200);
         assert.commandFailedWithCode(
             this.analyze({mode: "histograms", key: ["a", "other"]}),
             13176200,

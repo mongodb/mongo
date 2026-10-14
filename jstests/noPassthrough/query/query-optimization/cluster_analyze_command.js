@@ -19,13 +19,24 @@ assert.commandWorked(
 
 assert.commandWorked(coll.insert({a: 1, b: 2}));
 
-let res = db.runCommand({analyze: coll.getName()});
+let res = db.runCommand({analyze: coll.getName(), mode: "histograms", key: "a"});
 assert.commandWorked(res);
 
-res = db.runCommand({analyze: coll.getName(), apiVersion: "1", apiStrict: true});
+res = db.runCommand({
+    analyze: coll.getName(),
+    mode: "histograms",
+    key: "a",
+    apiVersion: "1",
+    apiStrict: true,
+});
 assert.commandFailedWithCode(res, ErrorCodes.APIStrictError);
 
-res = db.runCommand({analyze: coll.getName(), writeConcern: {w: 1}});
+res = db.runCommand({
+    analyze: coll.getName(),
+    mode: "histograms",
+    key: "a",
+    writeConcern: {w: 1},
+});
 assert.commandWorked(res);
 
 st.stop();

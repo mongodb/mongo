@@ -68,7 +68,6 @@ commands:
                     Whether to collect a persistent sample, build histograms, or collect
                     number of distinct values (NDV) statistics.
                 type: AnalyzeMode
-                optional: true
             samplingMethod:
                 description: >-
                     The sampling method to use when mode is 'sample'. Defaults to the
