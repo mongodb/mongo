@@ -321,14 +321,11 @@ BSONObj createCommandForMergingShard(Document serializedCommand,
                 // TODO SERVER-79159: Once all unsharded collections are tracked in the sharding
                 // catalog, this 'else' block can be deleted.
 
-                // We should only be contacting the primary shard if the only shard that we are
-                // targeting is the primary shard and a stage has designated a specific merging
-                // shard.
+                // The database primary must be the sole targeted shard for this lookup.
                 tassert(8596500,
                         "Contacting primary shard for collation in unexpected case",
                         targetedShards.size() == 1 &&
-                            *targetedShards.begin() == cri->getDbPrimaryShardId() &&
-                            hasSpecificMergeShard);
+                            *targetedShards.begin() == cri->getDbPrimaryShardId());
 
                 if (auto untrackedDefaultCollation =
                         getUntrackedCollectionCollation(mergeCtx->getOperationContext(), nss);

@@ -91,6 +91,8 @@ last-patch:
       ticket: SERVER-127745
     - test_file: jstests/sharding/migration_coordinator_basic.js
       ticket: SERVER-136722
+    - test_file: jstests/sharding/query/agg/agg_all_hosts_targeting.js
+      ticket: SERVER-136520
     - test_file: jstests/sharding/query/change_streams/change_stream_update_lookup_uncataloged_db.js
       ticket: SERVER-134952
     - test_file: jstests/sharding/query/change_streams/express_id_lookup_missing_index_race.js
@@ -198,6 +200,8 @@ last-continuous:
       ticket: SERVER-131386
     - test_file: jstests/sharding/migration_coordinator_basic.js
       ticket: SERVER-136722
+    - test_file: jstests/sharding/query/agg/agg_all_hosts_targeting.js
+      ticket: SERVER-136520
     - test_file: jstests/sharding/query/change_streams/change_stream_all_databases_v2_white_box.js
       ticket: SERVER-135656
     - test_file: jstests/sharding/query/change_streams/change_stream_collection_v2_ignore_removed_shards_smoke.js
@@ -359,6 +363,8 @@ last-lts:
       ticket: SERVER-131386
     - test_file: jstests/sharding/migration_coordinator_basic.js
       ticket: SERVER-136722
+    - test_file: jstests/sharding/query/agg/agg_all_hosts_targeting.js
+      ticket: SERVER-136520
     - test_file: jstests/sharding/query/change_streams/change_stream_all_databases_v2_white_box.js
       ticket: SERVER-135656
     - test_file: jstests/sharding/query/change_streams/change_stream_collection_v2_ignore_removed_shards_smoke.js
