@@ -3171,6 +3171,55 @@ TEST_F(RetryableAtomicBatchBoundaryTest, MultiEntryBatchDoesNotWalkIntoTruncated
     ASSERT_BSONOBJ_EQ(BSON("_id" << 2), applied[1]);
 }
 
+TEST_F(RetryableAtomicBatchBoundaryTest, NonTerminalEntryDoesNotUpdateSessionRecord) {
+    // A non-terminal entry of a retryable atomic batch is buffered, not applied, so it must not
+    // write or advance the session's config.transactions record. Otherwise a chain that is only
+    // partially present would leave a session record pointing at operations that were never
+    // applied, and a retry could be treated as already executed.
+    const OpTime prevStatement({Timestamp(Seconds(1), 1), 1LL});
+    auto stmt1First = makeAtomicBatchEntry(Timestamp(Seconds(1), 2),
+                                           _nss1,
+                                           *_uuid1,
+                                           1 /* docId */,
+                                           {StmtId(1)} /* the stmtId op sits in the first entry */,
+                                           prevStatement,
+                                           true /* partial */);
+    auto stmt1Terminal = makeAtomicBatchEntry(Timestamp(Seconds(1), 3),
+                                              _nss2,
+                                              *_uuid2,
+                                              2 /* docId */,
+                                              {},
+                                              stmt1First.getOpTime(),
+                                              false /* partial */,
+                                              2 /* count: two ops across the batch */);
+
+    NoopOplogApplierObserver observer;
+    auto oplogApplier = makeApplier(&observer);
+
+    ASSERT_OK(oplogApplier->applyOplogBatch(_opCtx.get(), {stmt1First}));
+    ASSERT_EQ(0U, takeApplied().size());
+    {
+        DBDirectClient client(_opCtx.get());
+        auto result = client.findOne(NamespaceString::kSessionTransactionsTableNamespace,
+                                     BSON(SessionTxnRecord::kSessionIdFieldName << _lsid.toBSON()));
+        ASSERT_TRUE(result.isEmpty())
+            << "non-terminal entry must not write a config.transactions record: " << result;
+    }
+
+    // The terminal entry applies the whole batch and records the session at its own optime.
+    ASSERT_OK(oplogApplier->applyOplogBatch(_opCtx.get(), {stmt1Terminal}));
+    auto applied = takeApplied();
+    ASSERT_EQ(2U, applied.size());
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1), applied[0]);
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 2), applied[1]);
+    checkTxnTable(_lsid,
+                  _txnNum,
+                  stmt1Terminal.getOpTime(),
+                  stmt1Terminal.getWallClockTime(),
+                  boost::none,
+                  boost::none);
+}
+
 class MultiOplogEntryOplogApplierImplTestMultitenant : public OplogApplierImplTest {
 public:
     MultiOplogEntryOplogApplierImplTestMultitenant()

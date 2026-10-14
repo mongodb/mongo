@@ -158,6 +158,13 @@ boost::optional<std::vector<OplogEntry>> SessionUpdateTracker::_updateSessionInf
     const auto& lsid = sessionInfo.getSessionId();
     invariant(lsid);
 
+    // A non-terminal (partialTxn) entry is not applied on its own; its operations are applied
+    // together with the terminal entry. Only the terminal entry should advance the session's
+    // lastWriteOpTime.
+    if (entry.isPartialTransaction()) {
+        return {};
+    }
+
     // Ignore pre/post image no-op oplog entries. These entries will not have an o2 field.
     if (entry.getOpType() == OpTypeEnum::kNoop) {
         if (!entry.getFromMigrate() || !*entry.getFromMigrate()) {
