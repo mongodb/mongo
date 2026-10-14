@@ -3,6 +3,8 @@ load("//bazel/platforms:platform_util.bzl", "setup_platform")
 
 package(default_visibility = ["//visibility:public"])
 
+exports_files(["platform_util.bzl"])
+
 constraint_setting(name = "mongo_toolchain")
 
 constraint_value(

@@ -5,9 +5,20 @@ x86_64. It is intentionally separate from the native Windows/MSVC toolchain so
 Windows developer builds keep their current host-local Visual Studio behavior.
 """
 
-_LLVM_URL = ""
-_LLVM_SHA256 = ""
-_LLVM_STRIP_PREFIX = ""
+# LLVM archive for Windows cross-compilation. The binaries execute in the
+# x86_64 Linux RBE action container and target Windows PE/COFF through clang-cl.
+#
+# The x86_64 archive is a repackaged subset of the official release
+# (https://github.com/llvm/llvm-project/releases/download/llvmorg-19.1.7/LLVM-19.1.7-Linux-X64.tar.xz,
+# sha256 4a5ec53951a584ed36f80240f6fbf8fdd46b4cf6c7ee87cc2d5018dc37caf679) made by
+# package_minimal_llvm.py: 76MB instead of 1.6GB compressed, 420MB instead of 8.2GB unpacked.
+# It holds only regular files; the multicall tools are stored under their real names
+# (clang-19, lld, llvm-ar) and reached through _LLVM_TOOL_FALLBACKS.
+
+_LLVM_X64_URL = "https://mdb-build-public.s3.us-east-1.amazonaws.com/toolchains/llvm-19.1.7-windows-cross-x86_64-linux.tar.xz"
+_LLVM_X64_SHA256 = "95ff64067798030ee3cd16e2cb4e26c1bfbecc0591210b17b98f6164f1853b4d"
+_LLVM_X64_STRIP_PREFIX = "llvm-19.1.7-windows-cross-x86_64-linux"
+
 _SYSROOT_URL = ""
 _SYSROOT_SHA256 = ""
 _SYSROOT_STRIP_PREFIX = ""
@@ -25,10 +36,33 @@ _LLVM_TOOLS = [
     "llvm-rc",
 ]
 
+# Tools to symbolize Windows binaries offline: both read PDBs natively, so they work on Linux
+# and do not depend on dbghelp. Linked when present; local LLVM trees may not have them.
+_OPTIONAL_LLVM_TOOLS = [
+    "llvm-symbolizer",
+    "llvm-pdbutil",
+]
+
 _LLVM_TOOL_FALLBACKS = {
-    "clang": ["clang-21", "clang-20", "clang-19", "clang-18"],
-    "clang++": ["clang-21", "clang-20", "clang-19", "clang-18"],
-    "clang-cl": ["clang-21", "clang-20", "clang-19", "clang-18"],
+    "clang": ["clang-19", "clang-20", "clang-21", "clang-22", "clang-18"],
+    "clang++": ["clang-19", "clang-20", "clang-21", "clang-22", "clang-18"],
+    # The official Linux LLVM archive does not ship a separate clang-cl
+    # executable. Clang selects CL driver mode when invoked through a
+    # clang-cl-named symlink, so fall back to clang itself; the minimal
+    # archive has no clang symlink, only the versioned binary.
+    "clang-cl": [
+        "clang-cl-19",
+        "clang-cl-20",
+        "clang-cl-21",
+        "clang-cl-22",
+        "clang-cl-18",
+        "clang",
+        "clang-19",
+        "clang-20",
+        "clang-21",
+        "clang-22",
+        "clang-18",
+    ],
     "lld-link": ["lld"],
     "llvm-lib": ["llvm-ar"],
 }
@@ -45,6 +79,22 @@ _WRAPPED_TOOL_PATHS = {
     "objdump": "clang-cl",
     "strip": "clang-cl",
 }
+
+_RC_CLANG_WRAPPER_TEMPLATE = """#!/bin/bash
+set -euo pipefail
+this_path="${BASH_SOURCE[0]}"
+this_dir="${this_path%/*}"
+if [[ "${this_dir}" == "${this_path}" ]]; then
+  this_dir="."
+fi
+
+# llvm-rc runs clang as a subprocess. Windows SDK header names are resolved
+# case-insensitively on Windows, but the RBE worker filesystem is Linux.
+exec "${this_dir}/clang-real" \\
+  -Xclang -ivfsoverlay \\
+  -Xclang "${this_dir}/../case_insensitive_vfs.yaml" \\
+  "$@"
+"""
 
 _WRAPPER_TEMPLATE = """#!/bin/bash
 set -euo pipefail
@@ -65,6 +115,27 @@ fi
 wrapper="${{MONGO_WINDOWS_CROSS_ACTION_WRAPPER_SCRIPT:-bazel/toolchains/cc/mongo_windows_cross/windows_cross_action_wrapper.py}}"
 python="${{MONGO_WINDOWS_CROSS_ACTION_PYTHON:-python3}}"
 exec "${{python}}" "${{wrapper}}" "${{real_tool}}" "$@"
+"""
+
+# Bazel uses the same host-wrapper toolchain for local Windows actions and for
+# actions sent to Linux RBE workers. A POSIX shell script cannot be started by
+# Windows CreateProcessW, while a Windows-only batch file cannot be executed by
+# the Linux worker. The first line is a POSIX command when run through execvp's
+# ENOEXEC shell fallback and a batch-file label on Windows, so the same file
+# works in both environments.
+_WINDOWS_WRAPPER_TEMPLATE = """:; this_path="$0"; this_dir="${{this_path%/*}}"; if [ "$this_dir" = "$this_path" ]; then this_dir="."; fi; toolchain_root="$this_dir/.."; export LD_LIBRARY_PATH="$toolchain_root/runtime_libs:$toolchain_root/llvm/libexec:$toolchain_root/llvm/lib:${{LD_LIBRARY_PATH:-}}"; exec "$toolchain_root/tools/{real_tool}" "$@"
+@echo off
+setlocal
+set "this_dir=%~dp0"
+set "real_tool=%this_dir%..\\tools\\{real_tool}"
+set "wrapper=%MONGO_WINDOWS_CROSS_ACTION_WRAPPER_SCRIPT%"
+if not defined wrapper set "wrapper=bazel\\toolchains\\cc\\mongo_windows_cross\\windows_cross_action_wrapper.py"
+set "python=%MONGO_WINDOWS_CROSS_ACTION_PYTHON%"
+rem The action PATH intentionally excludes Windows system directories, so do not use where.exe.
+if not defined python set "python=python.exe"
+:run_wrapper
+"%python%" "%wrapper%" "%real_tool%" %*
+exit /b %ERRORLEVEL%
 """
 
 _SYSROOT_DIRS = [
@@ -94,6 +165,20 @@ _SYSROOT_INCLUDE_DIRS = [
 def get_supported_windows_cross_archs():
     return _CROSS_COMPILE_ARCHS
 
+_EXEC_ARCH_ENV = "MONGO_WINDOWS_CROSS_EXEC_ARCH"
+_EXEC_ARCH_ENVS = [_EXEC_ARCH_ENV, "MONGO_WINDOWS_CROSS_RBE_POOL"]
+
+def _execution_arch(repository_ctx):
+    """Validates x86_64 execution for the LLVM archive and toolchain constraints."""
+    env = repository_ctx.os.environ
+    value = env.get(_EXEC_ARCH_ENV, "x86_64").lower()
+    if value not in ["x86_64", "amd64"]:
+        fail("Windows cross toolchains require " + _EXEC_ARCH_ENV + "=x86_64")
+    pool = env.get("MONGO_WINDOWS_CROSS_RBE_POOL", "").lower()
+    if pool in ["arm64", "aarch64", "default"]:
+        fail("Windows cross RBE pool " + pool + " is incompatible with x86_64 execution")
+    return "x86_64"
+
 def _windows_cross_toolchain_registration_impl(repository_ctx):
     os_name = repository_ctx.os.name.lower()
     if "linux" not in os_name and "windows" not in os_name:
@@ -103,17 +188,19 @@ def _windows_cross_toolchain_registration_impl(repository_ctx):
         )
         return
 
+    exec_arch = _execution_arch(repository_ctx)
     entries = [
         'package(default_visibility = ["//visibility:public"])\n',
     ]
     for arch, cpu in _CROSS_COMPILE_ARCHS.items():
-        if "linux" in os_name:
-            entries.append("""
+        # The repository runs on the Bazel client, not the execution worker.
+        # Windows clients also need this toolchain for their Linux RBE actions.
+        entries.append("""
 toolchain(
     name = "mongo_windows_cross_{arch}_toolchain",
     exec_compatible_with = [
         "@platforms//os:linux",
-        "@platforms//cpu:x86_64",
+        "@platforms//cpu:{exec_arch}",
     ],
     target_compatible_with = [
         "@platforms//os:windows",
@@ -123,7 +210,7 @@ toolchain(
     toolchain = "@mongo_windows_cross_toolchain_files//:cc-compiler-{arch}",
     toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",
 )
-""".format(arch = arch, cpu = cpu))
+""".format(arch = arch, cpu = cpu, exec_arch = exec_arch))
         if "windows" in os_name:
             entries.append("""
 toolchain(
@@ -146,11 +233,16 @@ toolchain(
 
 mongo_windows_cross_toolchain_config = repository_rule(
     implementation = _windows_cross_toolchain_registration_impl,
+    environ = _EXEC_ARCH_ENVS,
     configure = True,
 )
 
 def _archive_value(repository_ctx, env_name, default_value):
     return repository_ctx.os.environ.get(env_name, default_value)
+
+def _default_llvm_archive(repository_ctx):
+    _execution_arch(repository_ctx)
+    return _LLVM_X64_URL, _LLVM_X64_SHA256, _LLVM_X64_STRIP_PREFIX
 
 def _copy_tree(repository_ctx, source, output):
     if "windows" in repository_ctx.os.name.lower():
@@ -224,16 +316,17 @@ The sysroot tree must use the layout documented in bazel/docs/windows_hermetic_c
         )
     return str(repository_ctx.path(output))
 
-def _tool(repository_ctx, root, name):
+def _tool(repository_ctx, root, name, output_name = None):
+    output_name = output_name or name
     path = root + "/bin/" + name
     if repository_ctx.path(path).exists:
-        repository_ctx.symlink(path, "tools/" + name)
+        repository_ctx.symlink(path, "tools/" + output_name)
         return
 
     for fallback_name in _LLVM_TOOL_FALLBACKS.get(name, []):
         fallback_path = root + "/bin/" + fallback_name
         if repository_ctx.path(fallback_path).exists:
-            repository_ctx.symlink(fallback_path, "tools/" + name)
+            repository_ctx.symlink(fallback_path, "tools/" + output_name)
             return
 
     if not repository_ctx.path(path).exists:
@@ -283,17 +376,32 @@ def _clang_version(repository_ctx, llvm_path):
 
 def _symlink_toolchain_files(repository_ctx, llvm_path):
     for tool in _LLVM_TOOLS:
-        _tool(repository_ctx, llvm_path, tool)
+        _tool(
+            repository_ctx,
+            llvm_path,
+            tool,
+            output_name = "clang-real" if tool == "clang" else None,
+        )
+    for tool in _OPTIONAL_LLVM_TOOLS:
+        path = llvm_path + "/bin/" + tool
+        if repository_ctx.path(path).exists:
+            repository_ctx.symlink(path, "tools/" + tool)
 
     clang_major = _clang_version(repository_ctx, llvm_path)
     clang_include = llvm_path + "/lib/clang/" + clang_major + "/include"
     if not repository_ctx.path(clang_include).exists:
         fail("Clang builtin headers not found: " + clang_include)
-    repository_ctx.symlink(clang_include, "include/clang")
+
+    # -resource-dir requires an include/ child. Stage it explicitly: the original
+    # LLVM tree is not part of compiler_files and is absent on RBE workers.
+    # Keep a single copy: Clang's MSVC shim headers use include_next, which must
+    # reach the SDK rather than another copy of the same guarded shim.
+    repository_ctx.symlink(clang_include, "resource_dir/include")
 
     clang_windows_lib = llvm_path + "/lib/clang/" + clang_major + "/lib/windows"
     if repository_ctx.path(clang_windows_lib).exists:
         repository_ctx.symlink(clang_windows_lib, "lib/clang/windows")
+    return clang_major
 
 def _write_host_wrapper_scripts(repository_ctx):
     wrapper_names = []
@@ -307,9 +415,22 @@ def _write_host_wrapper_scripts(repository_ctx):
             _WRAPPER_TEMPLATE.format(real_tool = wrapper_name),
             executable = True,
         )
+        repository_ctx.file(
+            "wrappers/" + wrapper_name + ".cmd",
+            _WINDOWS_WRAPPER_TEMPLATE.format(real_tool = wrapper_name),
+            executable = True,
+        )
 
-def _write_runtime_libs(repository_ctx):
+def _write_runtime_libs(repository_ctx, default_llvm_url, default_llvm_sha256):
     if "windows" not in repository_ctx.os.name.lower():
+        return
+
+    # The pinned minimal x64 archive uses only the execution image's system libraries.
+    # Local trees and full archives still need their bundled shared libraries staged.
+    llvm_url = _archive_value(repository_ctx, "MONGO_WINDOWS_CROSS_LLVM_URL", default_llvm_url)
+    llvm_sha256 = _archive_value(repository_ctx, "MONGO_WINDOWS_CROSS_LLVM_SHA256", default_llvm_sha256)
+    if (not repository_ctx.os.environ.get("MONGO_WINDOWS_CROSS_LLVM_PATH", "") and
+        llvm_url == _LLVM_X64_URL and llvm_sha256 == _LLVM_X64_SHA256):
         return
 
     repository_ctx.file(
@@ -356,97 +477,20 @@ foreach ($relativeDir in @('llvm/libexec', 'llvm/lib')) {
         fail("Failed to copy Windows cross runtime libs:\n" + result.stderr)
 
 def _write_case_insensitive_lib_aliases(repository_ctx):
-    lib_dirs = [
-        "msvc/lib/x64",
-        "msvc/atlmfc/lib/x64",
-        "winsdk/lib/ucrt/x64",
-        "winsdk/lib/um/x64",
-    ]
+    python = repository_ctx.which("python3")
+    if python == None:
+        python = repository_ctx.which("python")
+    if python == None:
+        fail("Could not find Python 3 to generate Windows cross library aliases")
 
-    if "windows" in repository_ctx.os.name.lower():
-        repository_ctx.file(
-            "copy_lib_aliases.ps1",
-            """
-$ErrorActionPreference = 'Stop'
-$repo = (Get-Location).Path
-$libDirs = @(%s)
-Remove-Item -LiteralPath (Join-Path $repo 'lib_aliases') -Recurse -Force -ErrorAction SilentlyContinue
-function Copy-LibAlias($sourceFile, $relativeDir, $variantDir, $aliasName) {
-    if ($aliasName -ceq $sourceFile.Name) {
-        return
-    }
-    $outputDir = Join-Path $repo ("lib_aliases/" + $variantDir + "/" + $relativeDir)
-    New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
-    Copy-Item -LiteralPath $sourceFile.FullName -Destination (Join-Path $outputDir $aliasName) -Force
-}
-foreach ($relativeDir in $libDirs) {
-    $sourceDir = Join-Path $repo ("sysroot/" + $relativeDir)
-    if (!(Test-Path $sourceDir)) {
-        continue
-    }
-    Get-ChildItem -Path $sourceDir -File -Filter '*.lib' | ForEach-Object {
-        $sourceFile = $_
-        $lowerName = $_.Name.ToLowerInvariant()
-        $firstLetterUpperLowerRestName = $_.Name.Substring(0, 1).ToUpperInvariant() + $lowerName.Substring(1)
-        $originalBaseLowerExtensionName = [System.IO.Path]::GetFileNameWithoutExtension($_.Name) + ".lib"
-        Copy-LibAlias $sourceFile $relativeDir "lower" $lowerName
-        Copy-LibAlias $sourceFile $relativeDir "first_upper_lower_rest" $firstLetterUpperLowerRestName
-        Copy-LibAlias $sourceFile $relativeDir "original_base_lower_extension" $originalBaseLowerExtensionName
-    }
-}
-""" % ", ".join(['"' + lib_dir + '"' for lib_dir in lib_dirs]),
-        )
-        result = repository_ctx.execute(
-            [
-                "powershell.exe",
-                "-NoProfile",
-                "-ExecutionPolicy",
-                "Bypass",
-                "-File",
-                str(repository_ctx.path("copy_lib_aliases.ps1")),
-            ],
-            quiet = True,
-        )
-    else:
-        repository_ctx.file(
-            "copy_lib_aliases.sh",
-            """
-set -euo pipefail
-repo="$PWD"
-rm -rf "$repo/lib_aliases"
-for relative_dir in %s; do
-  source_dir="$repo/sysroot/$relative_dir"
-  if [[ ! -d "$source_dir" ]]; then
-    continue
-  fi
-  while IFS= read -r -d '' file; do
-    name="${file##*/}"
-    lower_name="$(printf '%%s' "$name" | tr '[:upper:]' '[:lower:]')"
-    first_letter="$(printf '%%s' "${lower_name:0:1}" | tr '[:lower:]' '[:upper:]')"
-    first_letter_upper_lower_rest_name="${first_letter}${lower_name:1}"
-    original_base_lower_extension_name="${name%.*}.lib"
-    lower_output_dir="$repo/lib_aliases/lower/$relative_dir"
-    first_upper_output_dir="$repo/lib_aliases/first_upper_lower_rest/$relative_dir"
-    original_base_lower_extension_output_dir="$repo/lib_aliases/original_base_lower_extension/$relative_dir"
-    mkdir -p "$lower_output_dir" "$first_upper_output_dir" "$original_base_lower_extension_output_dir"
-    if [[ "$lower_name" != "$name" && ! -e "$lower_output_dir/$lower_name" ]]; then
-      cp -f "$file" "$lower_output_dir/$lower_name"
-    fi
-    if [[ "$first_letter_upper_lower_rest_name" != "$name" && ! -e "$first_upper_output_dir/$first_letter_upper_lower_rest_name" ]]; then
-      cp -f "$file" "$first_upper_output_dir/$first_letter_upper_lower_rest_name"
-    fi
-    if [[ "$original_base_lower_extension_name" != "$name" && ! -e "$original_base_lower_extension_output_dir/$original_base_lower_extension_name" ]]; then
-      cp -f "$file" "$original_base_lower_extension_output_dir/$original_base_lower_extension_name"
-    fi
-  done < <(find "$source_dir" -maxdepth 1 -type f -iname '*.lib' -print0)
-done
-""" % " ".join(['"' + lib_dir + '"' for lib_dir in lib_dirs]),
-            executable = True,
-        )
-        result = repository_ctx.execute(
-            ["bash", str(repository_ctx.path("copy_lib_aliases.sh"))],
-            quiet = True,
-        )
+    result = repository_ctx.execute([
+        str(python),
+        str(repository_ctx.path(Label(
+            "@//bazel/toolchains/cc/mongo_windows_cross:windows_cross_lib_aliases.py",
+        ))),
+        "--repo",
+        str(repository_ctx.path(".")),
+    ], quiet = True)
 
     if result.return_code != 0:
         fail("Failed to copy Windows cross import library aliases:\n" + result.stderr)
@@ -476,6 +520,13 @@ def _write_case_insensitive_vfs_overlay(repository_ctx, execroot_prefix):
     if result.return_code != 0:
         fail("Failed to generate Windows cross VFS overlay:\n" + result.stderr)
 
+def _write_rc_clang_wrapper(repository_ctx):
+    repository_ctx.file(
+        "tools/clang",
+        _RC_CLANG_WRAPPER_TEMPLATE,
+        executable = True,
+    )
+
 def _windows_cross_toolchain_files_impl(repository_ctx):
     os_name = repository_ctx.os.name.lower()
     if "linux" not in os_name and "windows" not in os_name:
@@ -485,6 +536,7 @@ def _windows_cross_toolchain_files_impl(repository_ctx):
         )
         return
 
+    llvm_url, llvm_sha256, llvm_strip_prefix = _default_llvm_archive(repository_ctx)
     llvm_path = _download_archive(
         repository_ctx,
         "MONGO_WINDOWS_CROSS_LLVM",
@@ -492,9 +544,9 @@ def _windows_cross_toolchain_files_impl(repository_ctx):
         "MONGO_WINDOWS_CROSS_LLVM_URL",
         "MONGO_WINDOWS_CROSS_LLVM_SHA256",
         "MONGO_WINDOWS_CROSS_LLVM_STRIP_PREFIX",
-        _LLVM_URL,
-        _LLVM_SHA256,
-        _LLVM_STRIP_PREFIX,
+        llvm_url,
+        llvm_sha256,
+        llvm_strip_prefix,
     )
     sysroot_path = _download_archive(
         repository_ctx,
@@ -510,13 +562,14 @@ def _windows_cross_toolchain_files_impl(repository_ctx):
     _validate_sysroot(repository_ctx, sysroot_path)
     _symlink_toolchain_files(repository_ctx, llvm_path)
     _write_host_wrapper_scripts(repository_ctx)
-    _write_runtime_libs(repository_ctx)
+    _write_runtime_libs(repository_ctx, llvm_url, llvm_sha256)
     _write_case_insensitive_lib_aliases(repository_ctx)
 
     prefix = "external/" + repository_ctx.name
     _write_case_insensitive_vfs_overlay(repository_ctx, prefix)
+    _write_rc_clang_wrapper(repository_ctx)
     include_dirs = [
-        prefix + "/include/clang",
+        prefix + "/resource_dir/include",
         prefix + "/sysroot/msvc/include",
         prefix + "/sysroot/msvc/atlmfc/include",
         prefix + "/sysroot/winsdk/include/ucrt",
@@ -535,6 +588,10 @@ def _windows_cross_toolchain_files_impl(repository_ctx):
         prefix + "/lib_aliases/first_upper_lower_rest/msvc/atlmfc/lib/x64",
         prefix + "/lib_aliases/first_upper_lower_rest/winsdk/lib/ucrt/x64",
         prefix + "/lib_aliases/first_upper_lower_rest/winsdk/lib/um/x64",
+        prefix + "/lib_aliases/upper_base_lower_extension/msvc/lib/x64",
+        prefix + "/lib_aliases/upper_base_lower_extension/msvc/atlmfc/lib/x64",
+        prefix + "/lib_aliases/upper_base_lower_extension/winsdk/lib/ucrt/x64",
+        prefix + "/lib_aliases/upper_base_lower_extension/winsdk/lib/um/x64",
         prefix + "/lib_aliases/lower/msvc/lib/x64",
         prefix + "/lib_aliases/lower/msvc/atlmfc/lib/x64",
         prefix + "/lib_aliases/lower/winsdk/lib/ucrt/x64",
@@ -546,6 +603,14 @@ def _windows_cross_toolchain_files_impl(repository_ctx):
     ]
     lib_path_flags = ["/LIBPATH:" + path for path in lib_dirs]
 
+    host_python_files = []
+    host_msvc_env_path = prefix + "/wrappers;" + prefix + "/tools"
+    if "windows" in os_name:
+        host_python = repository_ctx.path(Label("@py_host//:dist/python.exe"))
+        host_python_repo = host_python.dirname.dirname.basename
+        host_python_files = ["@py_host//:files"]
+        host_msvc_env_path += ";external/" + host_python_repo + "/dist"
+
     repository_ctx.template(
         "BUILD.bazel",
         Label("@//bazel/toolchains/cc/mongo_windows_cross:BUILD.tmpl"),
@@ -555,11 +620,14 @@ def _windows_cross_toolchain_files_impl(repository_ctx):
             "%{lib_dirs}": repr(lib_dirs),
             "%{lib_env}": ";".join(lib_dirs),
             "%{lib_path_flags}": repr(lib_path_flags),
+            "%{host_msvc_env_path}": host_msvc_env_path,
+            "%{host_python_files}": repr(host_python_files),
+            "%{clang_resource_dir}": prefix + "/resource_dir",
         },
     )
 
 mongo_windows_cross_toolchain_files_config = repository_rule(
-    environ = [
+    environ = _EXEC_ARCH_ENVS + [
         "BAZEL_VS",
         "BAZEL_VC",
         "BAZEL_VC_FULL_VERSION",

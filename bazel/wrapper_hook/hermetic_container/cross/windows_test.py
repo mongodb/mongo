@@ -38,6 +38,97 @@ HERMETIC_CONTAINER_SPEC.loader.exec_module(hermetic_container)
 
 
 class WindowsCrossSysrootTest(unittest.TestCase):
+    def test_default_windows_cross_image_supports_pinned_llvm_runtime(self):
+        from bazel.wrapper_hook.hermetic_container.cross import windows
+
+        containers = hermetic_container_integration.load_remote_execution_containers()
+        image = containers["ubuntu24"]["container-url"]
+        args = windows._windows_cross_host_wrapper_action_args(
+            ["build", "//target"], {}, containers
+        )
+
+        self.assertIn(f"--remote_default_exec_properties=container-image={image}", args)
+        self.assertIn(
+            f"--action_env=MONGO_WINDOWS_CROSS_ACTION_IMAGE={windows.parse_docker_image(image).full_name}",
+            args,
+        )
+
+    def test_windows_cross_command_line_overrides_exported_execution_settings(self):
+        from bazel.wrapper_hook.hermetic_container.cross import windows
+
+        containers = {
+            "ubuntu18": {"container-url": "docker://example.com/old@sha256:123"},
+            "ubuntu24": {"container-url": "docker://example.com/image@sha256:abc"},
+        }
+        command = [
+            "build",
+            "//target",
+            "--repo_env=MONGO_WINDOWS_CROSS_EXEC_ARCH=amd64",
+            "--repo_env=MONGO_WINDOWS_CROSS_RBE_POOL=custom-x64-pool",
+        ]
+        for env in (
+            {"MONGO_WINDOWS_CROSS_EXEC_ARCH": "arm64"},
+            {"MONGO_WINDOWS_CROSS_RBE_POOL": "default"},
+            {"MONGO_WINDOWS_CROSS_EXEC_ARCH": "arm64", "MONGO_WINDOWS_CROSS_RBE_POOL": "default"},
+        ):
+            with self.subTest(env=env):
+                args = windows._windows_cross_host_wrapper_action_args(command, env, containers)
+                self.assertIn("--repo_env=MONGO_WINDOWS_CROSS_EXEC_ARCH=x86_64", args)
+                self.assertIn("--remote_default_exec_properties=Pool=custom-x64-pool", args)
+                self.assertTrue(
+                    any(
+                        arg.startswith("--action_env=MONGO_WINDOWS_CROSS_ACTION_CONTAINER_PREFIX=")
+                        and "_x86_64_" in arg
+                        for arg in args
+                    )
+                )
+
+    def test_windows_cross_command_line_image_override_applies_to_local_and_remote_actions(self):
+        from bazel.wrapper_hook.hermetic_container.cross import windows
+
+        containers = {
+            "ubuntu18": {"container-url": "docker://example.com/old@sha256:123"},
+            "ubuntu24": {"container-url": "docker://example.com/default@sha256:abc"},
+        }
+        image = "docker://example.com/override@sha256:def"
+        args = windows._windows_cross_host_wrapper_action_args(
+            ["build", "//target", f"--repo_env=MONGO_WINDOWS_CROSS_RBE_CONTAINER_IMAGE={image}"],
+            {"MONGO_WINDOWS_CROSS_RBE_CONTAINER_IMAGE": "docker://example.com/exported@sha256:123"},
+            containers,
+        )
+
+        self.assertIn(f"--remote_default_exec_properties=container-image={image}", args)
+        self.assertIn(
+            "--action_env=MONGO_WINDOWS_CROSS_ACTION_IMAGE=example.com/override@sha256:def", args
+        )
+
+    def test_windows_host_execution_arch_and_pool_are_consistent(self):
+        from bazel.wrapper_hook.hermetic_container.cross import windows
+
+        containers = {"ubuntu24": {"container-url": "docker://example.com/image@sha256:abc"}}
+        for env in (
+            {},
+            {
+                "MONGO_WINDOWS_CROSS_EXEC_ARCH": "amd64",
+                "MONGO_WINDOWS_CROSS_RBE_POOL": "custom-x64-pool",
+            },
+        ):
+            args = windows._windows_cross_host_wrapper_action_args(
+                ["build", "//target"], env, containers
+            )
+            self.assertIn("--repo_env=MONGO_WINDOWS_CROSS_EXEC_ARCH=x86_64", args)
+            pool = env.get("MONGO_WINDOWS_CROSS_RBE_POOL", "x86_64")
+            self.assertIn(f"--repo_env=MONGO_WINDOWS_CROSS_RBE_POOL={pool}", args)
+            self.assertIn(f"--remote_default_exec_properties=Pool={pool}", args)
+        for args, env in (
+            (["build"], {"MONGO_WINDOWS_CROSS_RBE_POOL": "default"}),
+            (["build"], {"MONGO_WINDOWS_CROSS_EXEC_ARCH": "arm64"}),
+            (["build", "--repo_env=MONGO_WINDOWS_CROSS_EXEC_ARCH=arm64"], {}),
+            (["build", "--repo_env=MONGO_WINDOWS_CROSS_RBE_POOL=arm64"], {}),
+        ):
+            with self.subTest(args=args, env=env), self.assertRaises(RuntimeError):
+                windows._windows_cross_host_wrapper_action_args(args, env, containers)
+
     def test_run_hermetic_container_dry_run_plans_windows_cross_host_run(self):
         image = distro_module.parse_docker_image("quay.io/mongodb/rbe@sha256:abc123")
         config = config_module.HermeticContainerConfig(

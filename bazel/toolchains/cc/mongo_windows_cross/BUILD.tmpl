@@ -72,13 +72,13 @@ DEFAULT_LINK_FLAGS = [
 filegroup(
     name = "compiler_files",
     srcs = glob([
-        "include/**",
+        "resource_dir/**",
         "case_insensitive_vfs.yaml",
         "runtime_libs/**",
         "sysroot/msvc/include/**",
         "sysroot/msvc/atlmfc/include/**",
         "sysroot/winsdk/include/**",
-        "tools/clang",
+        "tools/clang-real",
         "tools/clang++",
         "tools/clang-cl",
     ]),
@@ -107,6 +107,24 @@ filegroup(
 )
 
 filegroup(
+    name = "rc_tools",
+    srcs = [
+        "case_insensitive_vfs.yaml",
+        "tools/clang",
+        "tools/clang-real",
+    ],
+)
+
+filegroup(
+    name = "rc_sysroot_files",
+    srcs = glob([
+        "sysroot/msvc/include/**",
+        "sysroot/msvc/atlmfc/include/**",
+        "sysroot/winsdk/include/**",
+    ]),
+)
+
+filegroup(
     name = "all_files",
     srcs = [
         ":ar_files",
@@ -122,10 +140,16 @@ filegroup(
 )
 
 filegroup(
+    name = "host_wrapper_files",
+    srcs = %{host_python_files},
+)
+
+filegroup(
     name = "all_files_with_wrappers",
     srcs = [
         ":all_files",
         ":wrapper_files",
+        ":host_wrapper_files",
     ],
 )
 
@@ -134,6 +158,18 @@ exports_files(["tools/llvm-rc"])
 alias(
     name = "rc",
     actual = "tools/llvm-rc",
+)
+
+# Offline symbolization of Windows binaries against their PDBs, without dbghelp. Present only
+# when the LLVM tree ships them (the default archive does).
+alias(
+    name = "llvm_symbolizer",
+    actual = "tools/llvm-symbolizer",
+)
+
+alias(
+    name = "llvm_pdbutil",
+    actual = "tools/llvm-pdbutil",
 )
 
 mongo_windows_cc_toolchain_config(
@@ -150,11 +186,23 @@ mongo_windows_cc_toolchain_config(
         "-ivfsoverlay",
         "-Xclang",
         "%{execroot_prefix}/case_insensitive_vfs.yaml",
+        # Pin the resource dir to a clean execroot-relative path. Without it, clang
+        # auto-detects it by realpathing its own location through the sandbox
+        # symlinks, and /showIncludes then reports absolute paths that bazel's
+        # builtin-include check rejects on the remote workers.
+        "-resource-dir",
+        "%{clang_resource_dir}",
         "-Wno-unused-command-line-argument",
         "-Wno-unused-local-typedef",
         "-Wno-unused-function",
+        "-Wno-defaulted-function-deleted",
+        "-Wno-unused-const-variable",
         "/clang:-Wno-unused-local-typedef",
         "/clang:-Wno-unused-function",
+        "/clang:-Wno-defaulted-function-deleted",
+        "/clang:-Wno-unused-const-variable",
+        "/clang:-mssse3",
+        "/clang:-msse4.2",
     ],
     default_link_flags = DEFAULT_LINK_FLAGS,
     fastbuild_mode_debug_flag = "/DEBUG",
@@ -208,23 +256,35 @@ mongo_windows_cc_toolchain_config(
         "-ivfsoverlay",
         "-Xclang",
         "%{execroot_prefix}/case_insensitive_vfs.yaml",
+        # Pin the resource dir to a clean execroot-relative path. Without it, clang
+        # auto-detects it by realpathing its own location through the sandbox
+        # symlinks, and /showIncludes then reports absolute paths that bazel's
+        # builtin-include check rejects on the remote workers.
+        "-resource-dir",
+        "%{clang_resource_dir}",
         "-Wno-unused-command-line-argument",
         "-Wno-unused-local-typedef",
         "-Wno-unused-function",
+        "-Wno-defaulted-function-deleted",
+        "-Wno-unused-const-variable",
         "/clang:-Wno-unused-local-typedef",
         "/clang:-Wno-unused-function",
+        "/clang:-Wno-defaulted-function-deleted",
+        "/clang:-Wno-unused-const-variable",
+        "/clang:-mssse3",
+        "/clang:-msse4.2",
     ],
     default_link_flags = DEFAULT_LINK_FLAGS,
     fastbuild_mode_debug_flag = "/DEBUG",
     host_system_name = "windows",
-    msvc_cl_path = "wrappers/clang-cl",
+    msvc_cl_path = "wrappers/clang-cl.cmd",
     msvc_env_include = ";".join(%{include_dirs}),
     msvc_env_lib = "%{lib_env}",
-    msvc_env_path = "%{execroot_prefix}/wrappers;%{execroot_prefix}/tools",
+    msvc_env_path = "%{host_msvc_env_path}",
     msvc_env_tmp = "/tmp",
-    msvc_lib_path = "wrappers/llvm-lib",
-    msvc_link_path = "wrappers/lld-link",
-    msvc_ml_path = "wrappers/clang-cl",
+    msvc_lib_path = "wrappers/llvm-lib.cmd",
+    msvc_link_path = "wrappers/lld-link.cmd",
+    msvc_ml_path = "wrappers/clang-cl.cmd",
     opt_debug = OPT_DEBUG,
     opt_off = OPT_OFF,
     opt_on = OPT_ON,
@@ -237,16 +297,16 @@ mongo_windows_cc_toolchain_config(
     target_libc = "msvcrt",
     target_system_name = "windows",
     tool_paths = {
-        "ar": "wrappers/llvm-lib",
-        "cpp": "wrappers/clang-cl",
-        "gcc": "wrappers/clang-cl",
-        "gcov": "wrappers/clang-cl",
-        "ld": "wrappers/lld-link",
-        "ml": "wrappers/clang-cl",
-        "nm": "wrappers/clang-cl",
-        "objcopy": "wrappers/clang-cl",
-        "objdump": "wrappers/clang-cl",
-        "strip": "wrappers/clang-cl",
+        "ar": "wrappers/llvm-lib.cmd",
+        "cpp": "wrappers/clang-cl.cmd",
+        "gcc": "wrappers/clang-cl.cmd",
+        "gcov": "wrappers/clang-cl.cmd",
+        "ld": "wrappers/lld-link.cmd",
+        "ml": "wrappers/clang-cl.cmd",
+        "nm": "wrappers/clang-cl.cmd",
+        "objcopy": "wrappers/clang-cl.cmd",
+        "objdump": "wrappers/clang-cl.cmd",
+        "strip": "wrappers/clang-cl.cmd",
     },
     toolchain_identifier = "windows_cross_clang_host_wrapper_x86_64",
     warnings_as_errors_enabled = WARNINGS_AS_ERRORS_ENABLED,

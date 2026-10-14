@@ -5,6 +5,16 @@ execution. Local actions are routed into the persistent container by Bazel's spa
 strategy, so the toolchain itself does not need wrapper stubs.
 """
 
+def windows_builtin_include_aliases(include_dirs, unix_root):
+    """Paths produced by Bazel's Windows DependencySet parser for Linux headers.
+
+    These aliases are only used for dependency validation. Compiler include flags
+    keep their Linux paths, and -MD still records non-builtin system headers.
+    """
+    if not unix_root:
+        return []
+    return [unix_root + path for path in include_dirs if path.startswith("/")]
+
 def get_mongo_toolchain_tool_paths(version, compiler):
     """Returns the tool_paths mapping for a mongo_linux toolchain configuration.
 

@@ -6,6 +6,7 @@ load("@//bazel/toolchains/cc/mongo_linux:mongo_mold.bzl", "MOLD_MAP")
 load(
     "@//bazel/toolchains/cc/mongo_linux:mongo_toolchain_tool_paths.bzl",
     "get_mongo_toolchain_tool_paths",
+    "windows_builtin_include_aliases",
 )
 load(":mongo_toolchain_flags.bzl",
     "CLANG_INCLUDE_DIRS",
@@ -309,7 +310,7 @@ mongo_linux_cc_toolchain_config(
     distro = "{distro}",
     cpu = "{bazel_toolchain_cpu}",
     builtin_sysroot = BUILTIN_SYSROOT,
-    cxx_builtin_include_directories = EFFECTIVE_BUILTIN_INCLUDE_DIRS,
+    cxx_builtin_include_directories = EFFECTIVE_BUILTIN_INCLUDE_DIRS + windows_builtin_include_aliases(COMMON_BUILTIN_INCLUDE_DIRECTORIES, {windows_unix_root}),
     extra_ldflags = LINK_FLAGS,
     linker_bin_dirs = {host_linker_bin_dirs},
     linker_resource_dir = {host_linker_resource_dir},
@@ -368,7 +369,7 @@ mongo_linux_cc_toolchain_config(
     cpu = "{bazel_toolchain_cpu}",
     builtin_sysroot = BUILTIN_SYSROOT,
     clang_resource_dir = clang_resource_dir("{toolchain_repo_dir}"),
-    cxx_builtin_include_directories = EFFECTIVE_BUILTIN_INCLUDE_DIRS,
+    cxx_builtin_include_directories = EFFECTIVE_BUILTIN_INCLUDE_DIRS + windows_builtin_include_aliases(COMMON_BUILTIN_INCLUDE_DIRECTORIES, {windows_unix_root}),
     extra_ldflags = LINK_FLAGS,
     linker_bin_dirs = {host_linker_bin_dirs},
     linker_resource_dir = {host_linker_resource_dir},

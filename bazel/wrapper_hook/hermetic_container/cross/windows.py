@@ -73,6 +73,10 @@ WINDOWS_CROSS_REMOTE_EXECUTOR = "grpcs://sodalite.cluster.engflow.com"
 WINDOWS_CROSS_RBE_POOL = "x86_64"
 
 
+# The pinned LLVM archive requires GLIBC_2.34 and GLIBCXX_3.4.30.
+WINDOWS_CROSS_DEFAULT_EXEC_DISTRO = "ubuntu24"
+
+
 WINDOWS_CROSS_DEFAULT_COMMANDS = frozenset(
     [
         "aquery",
@@ -505,16 +509,30 @@ def _windows_cross_host_run_requested(
     )
 
 
+def _windows_cross_execution_arch(env: Mapping[str, str]) -> str:
+    arch = env.get("MONGO_WINDOWS_CROSS_EXEC_ARCH", "x86_64").lower()
+    if arch not in {"x86_64", "amd64"}:
+        raise RuntimeError(
+            "Windows host cross actions require MONGO_WINDOWS_CROSS_EXEC_ARCH=x86_64"
+        )
+    pool = env.get(WINDOWS_CROSS_RBE_POOL_ENV, WINDOWS_CROSS_RBE_POOL)
+    if pool.lower() in {"arm64", "aarch64", "default"}:
+        raise RuntimeError(f"Windows cross RBE pool {pool} is incompatible with x86_64 execution")
+    return "x86_64"
+
+
 def _windows_cross_rbe_exec_properties(
     env: Mapping[str, str],
     containers: Mapping[str, Mapping[str, str]] | None = None,
 ) -> list[str]:
+    _windows_cross_execution_arch(env)
     image = env.get(WINDOWS_CROSS_RBE_CONTAINER_IMAGE_ENV)
     if not image:
         containers = containers or load_remote_execution_containers()
         distro = (
-            "ubuntu18"
-            if not env.get("MONGO_HERMETIC_CONTAINER_DISTRO") and "ubuntu18" in containers
+            WINDOWS_CROSS_DEFAULT_EXEC_DISTRO
+            if not env.get("MONGO_HERMETIC_CONTAINER_DISTRO")
+            and WINDOWS_CROSS_DEFAULT_EXEC_DISTRO in containers
             else select_distro(containers, env=env, arch="x86_64")
         )
         image = containers[distro]["container-url"]
@@ -531,10 +549,11 @@ def _windows_cross_action_container_env_options(
     containers: Mapping[str, Mapping[str, str]] | None = None,
 ) -> list[str]:
     containers = containers or load_remote_execution_containers()
-    arch = "x86_64"
+    arch = _windows_cross_execution_arch(env)
     distro = (
-        "ubuntu18"
-        if not env.get("MONGO_HERMETIC_CONTAINER_DISTRO") and "ubuntu18" in containers
+        WINDOWS_CROSS_DEFAULT_EXEC_DISTRO
+        if not env.get("MONGO_HERMETIC_CONTAINER_DISTRO")
+        and WINDOWS_CROSS_DEFAULT_EXEC_DISTRO in containers
         else select_distro(containers, env=env, arch=arch)
     )
     image_override = env.get(WINDOWS_CROSS_RBE_CONTAINER_IMAGE_ENV) or env.get(
@@ -574,14 +593,18 @@ def _windows_cross_host_wrapper_action_args(
     env: Mapping[str, str],
     containers: Mapping[str, Mapping[str, str]] | None = None,
 ) -> list[str]:
-    exec_properties = _windows_cross_rbe_exec_properties(env, containers=containers)
+    selection_env = {**env, **_repo_env_overrides_from_args(args)}
+    arch = _windows_cross_execution_arch(selection_env)
+    exec_properties = _windows_cross_rbe_exec_properties(selection_env, containers=containers)
     return _append_bazel_command_options(
         args,
         [
             "--//bazel/config:windows_cross_local_container_actions=True",
             "--//bazel/config:idl_use_linux_python=True",
             "--//bazel/config:disable_warnings_as_errors=True",
-            *_macos_cross_linux_python_options("x86_64"),
+            *_macos_cross_linux_python_options(arch),
+            f"--repo_env=MONGO_WINDOWS_CROSS_EXEC_ARCH={arch}",
+            f"--repo_env=MONGO_WINDOWS_CROSS_RBE_POOL={selection_env.get(WINDOWS_CROSS_RBE_POOL_ENV, WINDOWS_CROSS_RBE_POOL)}",
             *[
                 f"--repo_env={var_name}={env[var_name]}"
                 for var_name in sorted(WINDOWS_CROSS_PASSTHROUGH_ENVS)
@@ -613,7 +636,7 @@ def _windows_cross_host_wrapper_action_args(
             "--features=-thin_archive",
             "--test_strategy=standalone",
             "--strategy=TestRunner=standalone",
-            *_windows_cross_action_container_env_options(env, containers=containers),
+            *_windows_cross_action_container_env_options(selection_env, containers=containers),
         ],
     )
 

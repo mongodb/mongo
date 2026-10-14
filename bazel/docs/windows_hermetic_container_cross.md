@@ -49,6 +49,18 @@ the target and run the downloaded `.exe` from PowerShell.
 The cross toolchain is hermetic: Bazel actions must see the same declared Linux LLVM, Windows SDK,
 and MSVC-compatible headers/import libraries locally and remotely.
 
+Windows host cross actions default to the pinned Ubuntu 24 execution image, locally and on RBE. The
+pinned LLVM archive requires glibc 2.34 and `GLIBCXX_3.4.30`; any custom execution image must
+provide these runtime versions or newer. Command-line `--repo_env` overrides for the execution CPU,
+pool, and image take precedence over exported environment variables for both local and remote
+actions.
+
+Windows cross toolchains require x86_64 Linux execution on both Windows and Linux clients.
+`MONGO_WINDOWS_CROSS_EXEC_ARCH` defaults to `x86_64` and also accepts `amd64`, independently of the
+client CPU and `BAZEL_ENGFLOW_POOL`. The Windows wrapper passes that repo input together with
+`MONGO_WINDOWS_CROSS_RBE_POOL`; ARM/default pools are rejected. Custom pool names must identify
+x86_64 workers.
+
 LLVM must be executable inside the Linux RBE/action container. Provide it as an archive or an
 unpacked directory:
 

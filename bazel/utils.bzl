@@ -1,6 +1,15 @@
 # General starlark utility functions
 load("//bazel/platforms:normalize.bzl", "ARCH_NORMALIZE_MAP")
 
+# Environment overrides that let a Bazel client running on one OS generate the
+# repository toolchain for another execution platform. Windows cross builds set
+# them (via --repo_env) to the Linux platform their remote and container actions
+# execute on; see get_toolchain_subs.
+_TOOLCHAIN_OS_ENV = "MONGO_BAZEL_TOOLCHAIN_OS"
+_TOOLCHAIN_ARCH_ENV = "MONGO_BAZEL_TOOLCHAIN_ARCH"
+_TOOLCHAIN_DISTRO_ENV = "MONGO_BAZEL_TOOLCHAIN_DISTRO"
+TOOLCHAIN_OVERRIDE_ENVS = [_TOOLCHAIN_OS_ENV, _TOOLCHAIN_ARCH_ENV, _TOOLCHAIN_DISTRO_ENV]
+
 def write_target_impl(ctx):
     out = ctx.actions.declare_file(ctx.label.name + ".gen_source_list")
     ctx.actions.write(
@@ -222,21 +231,26 @@ noop_cc_toolchain_config(
     )
 
 def get_toolchain_subs(ctx):
+    # Cross builds whose execution platform is Linux but whose Bazel client runs on
+    # another OS (Windows cross builds) override the host OS/arch/distro so the repo
+    # generates the Linux toolchain their remote and container actions need, instead
+    # of a noop toolchain for the client platform. Declared in the repository rules'
+    # `environ` so changes repaint the repos.
     if ctx.attr.os:
         os = ctx.attr.os
     else:
-        os = ctx.os.name
+        os = ctx.os.environ.get(_TOOLCHAIN_OS_ENV, "") or ctx.os.name
 
     if ctx.attr.arch:
         arch = ctx.attr.arch
     else:
-        arch = ctx.os.arch
+        arch = ctx.os.environ.get(_TOOLCHAIN_ARCH_ENV, "") or ctx.os.arch
 
     arch = ARCH_NORMALIZE_MAP[arch]
 
     version = ctx.attr.version
 
-    distro = get_host_distro_major_version(ctx)
+    distro = ctx.os.environ.get(_TOOLCHAIN_DISTRO_ENV, "") or get_host_distro_major_version(ctx)
 
     def _toolchain_substitutions(platforms_arch, bazel_toolchain_cpu, arch, distro):
         return {

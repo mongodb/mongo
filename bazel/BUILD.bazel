@@ -8,6 +8,7 @@ package(default_visibility = ["//visibility:public"])
 
 # Expose script for external usage through bazel.
 exports_files([
+    "utils.bzl",
     "hermetic_container/hermetic_container.py",
     "install_rules.py",
     "run_under_working_dir.sh",

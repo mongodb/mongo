@@ -1,7 +1,7 @@
 """Repository rule for MongoDB's GDB wrapper/toolchain."""
 
 load("//bazel/toolchains/cc/mongo_linux:mongo_gdb_version_v5.bzl", "TOOLCHAIN_MAP_V5")
-load("//bazel:utils.bzl", "generate_noop_toolchain", "get_toolchain_subs", "retry_download_and_extract", "write_python_pyc_cache_prefix_customization")
+load("//bazel:utils.bzl", "TOOLCHAIN_OVERRIDE_ENVS", "generate_noop_toolchain", "get_toolchain_subs", "retry_download_and_extract", "write_python_pyc_cache_prefix_customization")
 
 def _gdb_download(ctx):
     distro, arch, substitutions = get_toolchain_subs(ctx)
@@ -486,6 +486,7 @@ fi
 
 gdb_v5_download = repository_rule(
     implementation = _gdb_download,
+    environ = TOOLCHAIN_OVERRIDE_ENVS,
     attrs = {
         "os": attr.string(
             values = ["macos", "linux", "windows"],

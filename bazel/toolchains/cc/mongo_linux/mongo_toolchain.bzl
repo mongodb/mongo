@@ -1,6 +1,6 @@
 """Repository rule for MongoDB's C/C++ toolchain."""
 
-load("//bazel:utils.bzl", "generate_noop_toolchain", "get_toolchain_subs", "retry_download_and_extract")
+load("//bazel:utils.bzl", "TOOLCHAIN_OVERRIDE_ENVS", "generate_noop_toolchain", "get_toolchain_subs", "retry_download_and_extract")
 load("//bazel/toolchains/cc/mongo_linux:mongo_toolchain_version.bzl", "TOOLCHAIN_MAP")
 load("//bazel/toolchains/cc/mongo_linux:mongo_mold.bzl", "MOLD_MAP")
 load(
@@ -92,6 +92,7 @@ def _sysroot_substitutions(ctx):
 def _toolchain_download(ctx):
     distro, arch, substitutions = get_toolchain_subs(ctx)
     substitutions.update(_sysroot_substitutions(ctx))
+    substitutions.update(_windows_host_substitutions(ctx))
 
     # Builds that must link against a system OpenSSL installed outside the toolchain
     # (for example custom builds) can set MONGO_OPENSSL_ROOT in the environment to the
@@ -161,17 +162,24 @@ def _toolchain_download(ctx):
 
     return None
 
+def _windows_host_substitutions(ctx):
+    is_windows = "windows" in ctx.os.name.lower()
+    return {
+        "{windows_unix_root}": repr(ctx.os.environ.get("MONGO_BAZEL_WINDOWS_UNIX_ROOT", "") if is_windows else ""),
+    }
+
 toolchain_download = repository_rule(
     implementation = _toolchain_download,
     # Changes to these environment variables must re-run the repository rule so the
     # generated toolchain picks up the new values.
-    environ = [
+    environ = TOOLCHAIN_OVERRIDE_ENVS + [
         SKIP_TOOLCHAIN_ENVIRONMENT_VARIABLE,
         # The generated BUILD file's sysroot fragments depend on whether the
         # RBE sysroot dump is enabled, which is keyed on this variable.
         SYSROOT_ENV_VAR,
         LINUX_CROSS_TOOLCHAIN_ENV_VAR,
         "MONGO_OPENSSL_ROOT",
+        "MONGO_BAZEL_WINDOWS_UNIX_ROOT",
     ],
     attrs = {
         "os": attr.string(

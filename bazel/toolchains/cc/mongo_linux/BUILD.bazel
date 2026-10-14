@@ -43,3 +43,15 @@ py_binary(
 )
 
 mongo_toolchain_flags_test_suite(name = "mongo_toolchain_flags_test")
+
+py_test(
+    name = "windows_host_toolchain_test",
+    srcs = ["windows_host_toolchain_test.py"],
+    data = [
+        "mongo_gdb.bzl",
+        "mongo_toolchain.BUILD.tmpl",
+        "mongo_toolchain.bzl",
+        "mongo_toolchain_tool_paths.bzl",
+        "//bazel:utils.bzl",
+    ],
+)
