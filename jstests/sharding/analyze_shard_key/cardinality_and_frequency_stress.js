@@ -2,7 +2,7 @@
  * Tests that the analyzeShardKey command still works correctly when the shard key values exceeds
  * the memory limit for aggregation.
  *
- * @tags: [requires_fcv_70]
+ * @tags: [requires_fcv_70, requires_profiling]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";

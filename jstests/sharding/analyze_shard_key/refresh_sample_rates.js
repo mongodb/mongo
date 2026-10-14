@@ -336,9 +336,14 @@ function runTest(createConnFn, rst, samplerNames) {
             s2: {setParameter: setParameterOpts},
         },
         shards: 1,
-        config: 3,
+        config: TestData.defaultReplSetNumNodes ?? 3,
         rs: {nodes: 1, setParameter: setParameterOpts},
         other: {
+            // TODO: SERVER-122925 remove once we stop setting priority to 0 in dsc.
+            // The disaggregated storage suite override defaults non-first members to priority 0;
+            // make the config RS secondary electable so it can take over. This is a no-op for the
+            // default (ASC) topology, where it already defaults to priority 1.
+            c1: {rsConfig: {priority: 1}},
             configOptions: {setParameter: setParameterOpts},
         },
         // By default, our test infrastructure sets the election timeout to a very high value (24
@@ -386,7 +391,15 @@ function runTest(createConnFn, rst, samplerNames) {
 
 if (!jsTestOptions().useAutoBootstrapProcedure) {
     // TODO: SERVER-80318 Remove block
-    const rst = new ReplSetTest({nodes: 3, nodeOptions: {setParameter: setParameterOpts}});
+    // This RS also serves as the sampler set (`samplerNames` below is derived from `rst.nodes`), and
+    // the test asserts there are 3 samplers, so it cannot be reduced to 2 members. Instead, make
+    // the first secondary electable so runTest()'s stepdown has a takeover target. This is a no-op
+    // for the default (ASC) topology, but is required under the disaggregated storage suite
+    // override, which defaults non-first members to priority 0.
+    const rst = new ReplSetTest({
+        nodes: [{}, {rsConfig: {priority: 1}}, {}],
+        nodeOptions: {setParameter: setParameterOpts},
+    });
     rst.startSet();
     rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
     const samplerNames = rst.nodes.map((node) => node.host);
