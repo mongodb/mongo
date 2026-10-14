@@ -239,6 +239,13 @@ public:
     }
 
     /**
+     * Returns true if the pipeline has a stage backed by mongot.
+     */
+    bool hasMongotStage() const {
+        return hasSearchStage() || hasHybridSearchStage() || hasExtensionVectorSearchStage();
+    }
+
+    /**
      * Returns true if the pipeline starts with a $currentOp stage.
      */
     bool startsWithCurrentOpStage() const {

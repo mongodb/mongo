@@ -53,6 +53,23 @@ ViewInfo createTestViewInfo(std::vector<BSONObj> viewPipeline) {
     return ViewInfo(kViewNss, kResolvedNss, std::move(viewPipeline));
 }
 
+TEST(LiteParsedPipelineTest, HasMongotStageDetectsLegacySearchStages) {
+    for (const auto* stageName : {"$search", "$searchMeta", "$vectorSearch"}) {
+        std::vector<BSONObj> stages = {BSON(stageName << BSONObj())};
+        LiteParsedPipeline pipeline(kTestNss, stages);
+        ASSERT_TRUE(pipeline.hasMongotStage());
+    }
+}
+
+TEST(LiteParsedPipelineTest, HasMongotStageDoesNotMarkOrdinaryPipelines) {
+    LiteParsedPipeline emptyPipeline(kTestNss, std::vector<BSONObj>{});
+    ASSERT_FALSE(emptyPipeline.hasMongotStage());
+
+    std::vector<BSONObj> stages = {BSON("$match" << BSON("x" << 1)), BSON("$limit" << 10)};
+    LiteParsedPipeline pipeline(kTestNss, stages);
+    ASSERT_FALSE(pipeline.hasMongotStage());
+}
+
 TEST(LiteParsedPipelineTest, HandleViewStitchesViewBeforeUserPipe) {
     std::vector<BSONObj> userStages = {BSON("$group" << BSON("_id" << "$field")),
                                        BSON("$sort" << BSON("_id" << 1))};

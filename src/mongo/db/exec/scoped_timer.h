@@ -119,6 +119,7 @@ private:
     X(shutDownLogicalSessionCache)              \
     X(shutDownQueryAnalysisSampler)             \
     X(shutDownGlobalConnectionPool)             \
+    X(disposeIdleMongotCursors)                 \
     X(shutDownSearchTaskExecutors)              \
     X(shutDownFlowControlTicketHolder)          \
     X(shutDownReplicaSetNodeExecutor)           \

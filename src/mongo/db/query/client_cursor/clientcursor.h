@@ -128,6 +128,13 @@ struct ClientCursorParams {
     TailableModeEnum tailableMode;
     BSONObj originatingCommandObj;
     PrivilegeVector originatingPrivileges;
+
+    // True if this cursor may hold execution state backed by the mongot task executor. Such idle
+    // cursors must be disposed before shutting down the mongot task executor, otherwise their
+    // shared_ptr references can keep the executor alive. Note this is inferred from the pipeline
+    // structure (and from whether a mongot cursor was established), so it may over- or
+    // under-approximate the executor's actual ownership.
+    bool mayHoldMongotTaskExecutor = false;
 };
 
 /**
@@ -188,6 +195,14 @@ public:
     }
     bool getQueryStatsWillNeverExhaust() const {
         return _queryStatsWillNeverExhaust;
+    }
+
+    bool mayHoldMongotTaskExecutor() const {
+        return _mayHoldMongotTaskExecutor;
+    }
+
+    void setMayHoldMongotTaskExecutor() {
+        _mayHoldMongotTaskExecutor = true;
     }
 
     std::unique_ptr<query_stats::Key> takeKey() {
@@ -513,6 +528,9 @@ private:
 
     // Flag indicating that a client has requested to kill the cursor.
     bool _killPending = false;
+
+    // True if this cursor may hold execution state backed by the mongot task executor.
+    bool _mayHoldMongotTaskExecutor = false;
 
     // The execution time collected from the initial operation prior to any getMore requests.
     boost::optional<Microseconds> _firstResponseExecutionTime;
