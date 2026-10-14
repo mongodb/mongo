@@ -186,3 +186,26 @@ py_binary(
     srcs = ["remote_execution_containers_generator.py"],
     visibility = ["//visibility:public"],
 )
+
+# Cross target toolchains must not compete with native C++ toolchains.
+constraint_value(
+    name = "use_mongo_s390x_cross_toolchain",
+    constraint_setting = ":mongo_toolchain",
+)
+
+[
+    platform(
+        name = distro + "_s390x_cross",
+        constraint_values = [
+            "@platforms//cpu:s390x",
+            "@platforms//os:linux",
+            ":use_mongo_s390x_cross_toolchain",
+            ":" + distro,
+        ],
+    )
+    for distro in [
+        "rhel8",
+        "rhel9",
+        "rhel10",
+    ]
+]

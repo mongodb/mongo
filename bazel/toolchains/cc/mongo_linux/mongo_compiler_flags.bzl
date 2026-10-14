@@ -11,7 +11,10 @@ load(
 )
 
 # Flags listed in this file is only visible to the bazel build system.
-visibility("//bazel/toolchains/cc")
+visibility([
+    "//bazel/toolchains/cc",
+    "//bazel/toolchains/cc/mongo_linux_cross",
+])
 
 # SERVER-9761: Ensure early detection of missing symbols in dependent libraries
 # at program startup. For non-release dynamic builds we disable this behavior in
@@ -228,6 +231,11 @@ DEBUG_TYPES_SECTION_FLAGS = select({
 })
 
 COMPRESS_DEBUG_COPTS = select({
+    # ARM64-hosted v4 gold cannot decompress s390x SHF_COMPRESSED sections.
+    # GNU-style zlib compression works across the two byte orders.
+    "//bazel/config:compress_debug_compile_s390x_cross_v4_gold": [
+        "-Wa,--compress-debug-sections=zlib-gnu",
+    ],
     # Debug compression significantly reduces .o, .dwo, and .a sizes
     "//bazel/config:compress_debug_compile_enabled": [
         "-Wa,--compress-debug-sections",

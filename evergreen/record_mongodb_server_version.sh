@@ -11,4 +11,8 @@ if [ -n "${build_patch_id}" ]; then
   exit 0
 fi
 
+if [[ -n "${mongo_s390x_cross_config:-}" && "$(uname -m)" == "aarch64" ]]; then
+  exit 0
+fi
+
 "$1" --version > "$2"

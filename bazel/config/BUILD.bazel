@@ -2710,6 +2710,19 @@ config_setting(
 )
 
 config_setting(
+    name = "compress_debug_compile_s390x_cross_v4_gold",
+    constraint_values = [
+        "//bazel/platforms:use_mongo_s390x_cross_toolchain",
+    ],
+    flag_values = {
+        "//bazel/config:compress_debug_compile": "True",
+        "//bazel/config:compiler_type": "gcc",
+        "//bazel/config:linker": "gold",
+        "//bazel/config:mongo_toolchain_version": "v4",
+    },
+)
+
+config_setting(
     name = "compress_debug_compile_disabled",
     flag_values = {
         "//bazel/config:compress_debug_compile": "False",
@@ -2829,4 +2842,13 @@ config_setting(
     flag_values = {
         "//bazel/config:local_build": "False",
     },
+)
+
+py_test(
+    name = "mongo_config_header_test",
+    srcs = [
+        "//src/mongo:mongo_config_header.py",
+        "//src/mongo:mongo_config_header_test.py",
+    ],
+    main = "//src/mongo:mongo_config_header_test.py",
 )

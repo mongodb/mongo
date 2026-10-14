@@ -76,3 +76,8 @@ echo "common --test_output=summary" >> .bazelrc.evergreen
 # Disable remote execution in evergreen only since it runs on every PR, but we still
 # want it to be fast on workstations
 echo "coverage --config=no-remote-exec" >> .bazelrc.evergreen
+
+# Apply cross flags only on ARM64 build hosts; tests retain native GCC.
+if [[ -n "${mongo_s390x_cross_config:-}" && "$(uname -m)" == "aarch64" ]]; then
+  echo "build --config=${mongo_s390x_cross_config}" >> .bazelrc.evergreen
+fi

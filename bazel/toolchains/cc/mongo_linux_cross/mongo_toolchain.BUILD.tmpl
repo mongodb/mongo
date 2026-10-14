@@ -1,0 +1,185 @@
+# This file exists to describe "mongo_toolchain", the http_archive defined in WORKSPACE.bazel
+
+load("@//bazel/toolchains/cc/mongo_linux:mongo_linux_cc_toolchain_config.bzl", "mongo_linux_cc_toolchain_config")
+load(":mongo_toolchain_flags.bzl",
+    "CLANG_INCLUDE_DIRS",
+    "COMMON_BINDIRS",
+    "COMMON_BUILTIN_INCLUDE_DIRECTORIES",
+    "COMMON_INCLUDE_DIRECTORIES",
+    "COMMON_LINK_FLAGS",
+    "GCC_INCLUDE_DIRS",
+)
+load(
+    "@//bazel/toolchains/cc:mongo_custom_features.bzl",
+    "FEATURES_ATTR_NAMES",
+    "get_common_features_attrs")
+
+load("@s390x_cross_sysroot//:sysroot_info.bzl", "SYSROOT_PATH")
+
+package(default_visibility = ["//visibility:public"])
+
+# Helper target for the toolchain (see below):
+filegroup(
+    name = "all_files",
+    srcs = glob(["**/*"]) + ["@s390x_cross_sysroot//:sysroot_files"],
+)
+
+# Export headers used for clang-tidy checks.
+cc_library(
+    name = "llvm_headers",
+    hdrs = glob([
+        "stow/llvm-{version}/include/**/*.h",
+        "stow/llvm-{version}/include/**/*.inc",
+        "stow/llvm-{version}/include/**/*.def",
+    ]),
+    visibility = ["//visibility:public"],
+)
+
+# A note on toolchains: this is complicated! Bazel requires multiple layers of indirection.
+#
+# In this case, we have:
+# cc_gcc_toolchain_config (of type cc_toolchain_config)
+# referenced by: cc_mongo_toolchain (of type cc_toolchain)
+# referenced by: mongo_toolchain (of type toolchain)
+# referenced by: toolchain_suite (of type cc_toolchain_suite)
+
+# Preserve native s390x's gold linker using v4's ARM64-hosted multi-target gold.
+CHOSEN_LINKER = "gold"
+LINKER_LINKFLAGS = [
+    "-fuse-ld=gold",
+    "-B./external/{toolchain_repo_name}/stow/gcc-v4/bin/",
+]
+
+LINKSTATIC_ENABLED = select({
+    "@//bazel/config:linkstatic_enabled": True,
+    "@//conditions:default": False,
+})
+
+SHARED_ARCHIVE_ENABLED = select({
+    "@//bazel/config:shared_archive_enabled": True,
+    "@//conditions:default": False,
+})
+
+DWARF_VERSION = select({
+    "@//bazel/config:dwarf_version_4_linux": 4,
+    "@//bazel/config:dwarf_version_5_linux": 5,
+    "@//conditions:default": None,
+})
+
+FISSION_ENABLED = select({
+    "@//bazel/config:fission_enabled": True,
+    "@//conditions:default": False,
+})
+
+DEBUG_LEVEL = select({
+    "@//bazel/config:gcc_or_clang_dbg_level_0": 0,
+    "@//bazel/config:gcc_or_clang_dbg_level_1": 1,
+    "@//bazel/config:gcc_or_clang_dbg_level_2": 2,
+    "@//bazel/config:gcc_or_clang_dbg_level_3": 3,
+})
+
+DISABLE_DEBUG_SYMBOLS = select({
+    "@//bazel/config:debug_symbols_disabled": True,
+    "@//conditions:default": False,
+})
+
+LINK_FLAGS = ["-L" + flag for flag in COMMON_LINK_FLAGS] + LINKER_LINKFLAGS
+
+feature_attrs = get_common_features_attrs()
+
+mongo_linux_cc_toolchain_config(
+    name = "cc_gcc_toolchain_config",
+    bin_dirs = COMMON_BINDIRS,
+    compiler = "gcc",
+    linker = CHOSEN_LINKER,
+    distro = "{distro}",
+    cpu = "{bazel_toolchain_cpu}",
+    builtin_sysroot = SYSROOT_PATH,
+    cxx_builtin_include_directories = COMMON_BUILTIN_INCLUDE_DIRECTORIES + GCC_INCLUDE_DIRS + COMMON_INCLUDE_DIRECTORIES,
+    extra_ldflags = LINK_FLAGS,
+    includes = GCC_INCLUDE_DIRS + COMMON_INCLUDE_DIRECTORIES + COMMON_BUILTIN_INCLUDE_DIRECTORIES,
+    tool_paths = {
+        # Note: You might assume that the specification of `compiler_name` (above) would be sufficient to make Bazel
+        # use the correct binary. This is incorrect; Bazel appears to unconditionally use the `gcc` tool_path. As a result,
+        # we have to conditionally set the value pointed to by `gcc`.
+        "gcc": "stow/gcc-v4/bin/s390x-mongodb-linux-gcc",
+        "g++": "stow/gcc-v4/bin/s390x-mongodb-linux-g++",
+        "cpp": "stow/gcc-v4/bin/s390x-mongodb-linux-cpp",
+        "ar": "stow/gcc-v4/bin/s390x-mongodb-linux-ar",
+        "nm": "stow/gcc-v4/bin/s390x-mongodb-linux-nm",
+        "ld": "stow/gcc-v4/bin/ld.gold",
+        "as": "stow/gcc-v4/bin/s390x-mongodb-linux-as",
+        "dwp": "{version}/bin/dwp",
+        "objcopy": "stow/gcc-v4/bin/s390x-mongodb-linux-objcopy",
+        "objdump": "stow/gcc-v4/bin/s390x-mongodb-linux-objdump",
+        "strip": "stow/gcc-v4/bin/s390x-mongodb-linux-strip",
+        "gcov": "stow/gcc-v4/bin/s390x-mongodb-linux-gcov",
+        "llvm-cov": "/bin/false",  # /bin/false = we're not using llvm-cov
+    },
+    toolchain_identifier = "gcc_toolchain",
+    verbose = True,
+    linkstatic = LINKSTATIC_ENABLED,
+    shared_archive = SHARED_ARCHIVE_ENABLED,
+    dwarf_version = DWARF_VERSION,
+    fission = FISSION_ENABLED,
+    debug_level = DEBUG_LEVEL,
+    disable_debug_symbols = DISABLE_DEBUG_SYMBOLS,
+    optimization_level = feature_attrs[FEATURES_ATTR_NAMES.OPT_LEVEL],
+)
+
+cc_toolchain(
+    name = "cc_mongo_toolchain",
+    all_files = ":all_files",
+    ar_files = ":all_files",
+    compiler_files = ":all_files",
+    dwp_files = ":all_files",
+    linker_files = ":all_files",
+    objcopy_files = ":all_files",
+    strip_files = ":all_files",
+    toolchain_config = ":cc_gcc_toolchain_config",
+)
+
+toolchain(
+    name = "mongo_toolchain",
+    exec_compatible_with = [
+        "@platforms//os:linux",
+        "@platforms//cpu:arm64",
+        "@//bazel/platforms:use_mongo_toolchain",
+    ],
+    target_compatible_with = [
+        "@platforms//os:linux",
+        "@platforms//cpu:{bazel_toolchain_cpu}",
+        "@//bazel/platforms:use_mongo_s390x_cross_toolchain",
+        "@//bazel/platforms:{distro}",
+    ],
+    target_settings = [
+        "@//bazel/config:mongo_toolchain_{version}",
+        "@//bazel/config:compiler_type_gcc",
+    ],
+    toolchain = ":cc_mongo_toolchain",
+    toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",
+)
+
+
+# This file group makes it possible to set the clang-tidy configuration setting:
+#   --@bazel_clang_tidy//:clang_tidy_executable=@mongo_toolchain//:clang_tidy
+filegroup(
+    name = "clang_tidy",
+    srcs = [
+        "{version}/bin/clang-tidy",
+    ],
+)
+
+filegroup(
+    name = "llvm_symbolizer",
+    srcs = [
+        "{version}/bin/llvm-symbolizer",
+    ],
+)
+
+filegroup(
+    name = "clang_format",
+    srcs = [
+        "{version}/bin/clang-format",
+    ],
+)

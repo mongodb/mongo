@@ -175,3 +175,21 @@ def get_host_distro_major_version(repository_ctx):
         elif distro_str == distro_pattern:
             return simplified_name
     return None
+
+def retry_execute(ctx, tries, arguments, **kwargs):
+    """Runs a command with ctx.execute, retrying with exponential backoff.
+
+    Returns the exec_result of the last attempt; the caller is responsible
+    for checking return_code and failing with a useful message.
+    """
+    sleep_time = 1
+    result = None
+    for attempt in range(tries):
+        result = ctx.execute(arguments, **kwargs)
+        if result.return_code == 0:
+            return result
+        if attempt + 1 < tries:
+            print("Command %s failed (Attempt #%s), sleeping for %s seconds then retrying..." % (arguments[0], attempt + 1, sleep_time))
+            ctx.execute(["sleep", str(sleep_time)])
+            sleep_time *= 2
+    return result

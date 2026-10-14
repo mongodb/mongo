@@ -3,3 +3,9 @@ py_binary(
     srcs = ["mongo_toolchain_version_generator.py"],
     visibility = ["//visibility:public"],
 )
+
+load(":sysroot_dump_test.bzl", "cross_sysroot_test", "native_sysroot_test")
+
+native_sysroot_test(name = "native_sysroot_test")
+
+cross_sysroot_test(name = "cross_sysroot_test")

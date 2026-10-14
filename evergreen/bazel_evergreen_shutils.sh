@@ -141,6 +141,8 @@ bazel_evergreen_shutils::maybe_release_flag() {
     echo "--config=public-release"
   elif [[ "${is_patch:-}" == "true" || -z "${push_bucket:-}" || "${compiling_for_test:-}" == "true" ]]; then
     echo "" # non-release
+  elif [[ "${release_binary_only:-}" == "true" ]]; then
+    echo "--config=release-binary"
   else
     echo "--config=public-release"
   fi

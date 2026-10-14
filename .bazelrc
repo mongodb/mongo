@@ -466,9 +466,8 @@ common:public-release --remote_instance_name=release
 common:public-release --bes_instance_name=release
 common:public-release --remote_upload_local_results=false
 common:public-release --modify_execution_info=.*=+no-cache
-common:public-release --//bazel/config:release=True
+common:public-release --config=release-binary
 common:public-release --//bazel/config:local_build=True
-common:public-release --stamp
 
 # Experimental flag to collect system network usage metrics during build
 common --experimental_collect_system_network_usage
@@ -515,3 +514,33 @@ try-import %workspace%/.bazelrc.target_mongo_version
 try-import %workspace%/.bazelrc.git
 
 common --flag_alias=use_diagnostic_latches=//bazel/config:use_diagnostic_latches
+
+# Shared binary settings for releases and dynamic tests of release binaries.
+common:release-binary --//bazel/config:release=True
+common:release-binary --stamp
+
+# GCC cross compilation executes compilation, linking and host tools on ARM64.
+# Target tests must be scheduled on native s390x machines.
+build:linux-s390x-cross-gcc --compiler_type=gcc
+build:linux-s390x-cross-gcc --linker=gold
+build:linux-s390x-cross-gcc --mongo_toolchain_version=v4
+build:linux-s390x-cross-gcc --remote_executor=
+build:linux-s390x-cross-gcc --strategy=TestRunner=local
+
+build:linux-s390x-rhel8-cross-gcc-arm64 --config=linux-s390x-cross-gcc
+build:linux-s390x-rhel8-cross-gcc-arm64 --platforms=//bazel/platforms:rhel8_s390x_cross
+build:linux-s390x-rhel8-cross-gcc-arm64 --host_platform=//bazel/platforms:rhel8_arm64
+build:linux-s390x-rhel8-cross-gcc-arm64 --extra_execution_platforms=//bazel/platforms:rhel8_arm64
+build:linux-s390x-rhel8-cross-gcc-arm64 --repo_env=MONGO_LINUX_CROSS_TOOLCHAIN=rhel8_s390x_on_rhel8_aarch64
+
+build:linux-s390x-rhel9-cross-gcc-arm64 --config=linux-s390x-cross-gcc
+build:linux-s390x-rhel9-cross-gcc-arm64 --platforms=//bazel/platforms:rhel9_s390x_cross
+build:linux-s390x-rhel9-cross-gcc-arm64 --host_platform=//bazel/platforms:rhel9_arm64
+build:linux-s390x-rhel9-cross-gcc-arm64 --extra_execution_platforms=//bazel/platforms:rhel9_arm64
+build:linux-s390x-rhel9-cross-gcc-arm64 --repo_env=MONGO_LINUX_CROSS_TOOLCHAIN=rhel9_s390x_on_rhel9_aarch64
+
+build:linux-s390x-rhel10-cross-gcc-arm64 --config=linux-s390x-cross-gcc
+build:linux-s390x-rhel10-cross-gcc-arm64 --platforms=//bazel/platforms:rhel10_s390x_cross
+build:linux-s390x-rhel10-cross-gcc-arm64 --host_platform=//bazel/platforms:rhel10_arm64
+build:linux-s390x-rhel10-cross-gcc-arm64 --extra_execution_platforms=//bazel/platforms:rhel10_arm64
+build:linux-s390x-rhel10-cross-gcc-arm64 --repo_env=MONGO_LINUX_CROSS_TOOLCHAIN=rhel10_s390x_on_rhel10_aarch64

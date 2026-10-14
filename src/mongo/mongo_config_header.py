@@ -260,7 +260,7 @@ def execinfo_backtrace_present_flag() -> list[HeaderDefinition]:
         return []
 
 
-def extended_alignment_flag() -> list[HeaderDefinition]:
+def extended_alignment_flag(target_arch: str | None = None) -> list[HeaderDefinition]:
     def check_extended_alignment(size: int) -> bool:
         log_check(
             f"[MONGO_CONFIG_MAX_EXTENDED_ALIGNMENT] Checking for extended alignment {size} for concurrency types..."
@@ -314,8 +314,13 @@ def extended_alignment_flag() -> list[HeaderDefinition]:
         "s390x": [256, 128, 64, 32],
     }
 
+    target_arch = (target_arch or platform.machine()).lower()
+    # MongoDB's native ppc64le Bazel toolchain reports its CPU as "ppc".
+    if target_arch == "ppc":
+        target_arch = "ppc64le"
+
     for size in extended_alignment_search_sequence.get(
-        platform.machine().lower(), default_alignment_search_sequence
+        target_arch, default_alignment_search_sequence
     ):
         if check_extended_alignment(size):
             return [HeaderDefinition("MONGO_CONFIG_MAX_EXTENDED_ALIGNMENT", size)]
@@ -485,7 +490,7 @@ def generate_config_header(
         definitions += ssl_ec_key_new_present_flag()
     definitions += posix_monotonic_clock_present_flag()
     definitions += execinfo_backtrace_present_flag()
-    definitions += extended_alignment_flag()
+    definitions += extended_alignment_flag(extra_definitions_dict.get("TARGET_ARCH"))
     definitions += altivec_vbpermq_output_flag()
     definitions += usdt_provider_flags()
     # New checks can be added here

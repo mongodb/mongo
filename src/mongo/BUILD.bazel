@@ -272,3 +272,5 @@ mongo_cc_library(
         "//conditions:default": [],
     }),
 )
+
+exports_files(["mongo_config_header_test.py"])

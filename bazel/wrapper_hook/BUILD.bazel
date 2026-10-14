@@ -16,3 +16,9 @@ py_library(
     ],
     visibility = ["//visibility:public"],
 )
+
+py_test(
+    name = "install_modules_test",
+    srcs = ["install_modules_test.py"],
+    deps = [":wrapper_hook"],
+)

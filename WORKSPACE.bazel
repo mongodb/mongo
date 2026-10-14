@@ -16,6 +16,16 @@ gdb_download(
     version = "v5",
 )
 
+load("//bazel/toolchains/cc/mongo_linux:sysroot_dump.bzl", "sysroot_dump")
+load("//bazel/toolchains/cc/mongo_linux_cross:mongo_linux_cross_toolchain.bzl", "setup_s390x_cross_toolchains")
+
+sysroot_dump(
+    name = "s390x_cross_sysroot",
+    cross = True,
+)
+
+setup_s390x_cross_toolchains()
+
 http_archive(
     name = "windows_sasl",
     build_file_content = """

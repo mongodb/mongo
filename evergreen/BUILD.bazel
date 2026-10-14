@@ -1,5 +1,10 @@
 load("@poetry//:dependencies.bzl", "dependency")
 
+exports_files(
+    ["bazel_evergreen_shutils.sh"],
+    visibility = ["//visibility:public"],
+)
+
 py_library(
     name = "all_python_files",
     srcs = glob(["*.py"]),

@@ -35,7 +35,6 @@ py_runtime_pair(
 toolchain(
     name = "python_toolchain",
     exec_compatible_with = [{constraints}],
-    target_compatible_with = [{constraints}],
     toolchain = ":py_runtime_pair",
     toolchain_type = "@bazel_tools//tools/python:toolchain_type",
 )

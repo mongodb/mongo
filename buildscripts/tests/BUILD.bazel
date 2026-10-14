@@ -27,3 +27,17 @@ py_library(
     srcs = glob(["*.py"]),
     visibility = ["//visibility:public"],
 )
+
+py_test(
+    name = "test_evergreen_s390x_cross",
+    srcs = ["test_evergreen_s390x_cross.py"],
+    data = [
+        "//:.bazelrc",
+        "//etc:evergreen_s390x_cross_test_data",
+        "//evergreen:bazel_evergreen_shutils.sh",
+    ],
+    deps = [dependency(
+        "pyyaml",
+        group = "core",
+    )],
+)
