@@ -40,6 +40,13 @@ filegroup(
 )
 
 filegroup(
+    name = "evergreen_release_variant_test_data",
+    srcs = glob(["evergreen_yml_components/variants/*/test_release*.yml"]) + [
+        "evergreen_yml_components/tasks/compile_tasks_shared.yml",
+    ],
+)
+
+filegroup(
     name = "evergreen_s390x_cross_test_data",
     srcs = glob(["evergreen_yml_components/tasks/**/*.yml"]) + [
         "evergreen_yml_components/definitions.yml",

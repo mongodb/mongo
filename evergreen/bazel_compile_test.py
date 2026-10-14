@@ -1,6 +1,7 @@
 """Exercise release distro checks with the real Evergreen compile wrapper."""
 
 import os
+import re
 import shlex
 import shutil
 import subprocess
@@ -62,7 +63,12 @@ class BazelCompileTest(unittest.TestCase):
             )
             log = src / "build.log"
             if result.returncode == 0:
-                captured_distro = src / ".bazel_provenance_build_invocation.distro_id"
+                invocation_file = (
+                    ".bazel_crypt_build_invocation"
+                    if env["task_name"] == "crypt_create_lib"
+                    else ".bazel_provenance_build_invocation"
+                )
+                captured_distro = src / f"{invocation_file}.distro_id"
                 self.assertEqual(f"{distro}\n", captured_distro.read_text())
             return result, log.read_text() if log.exists() else ""
 
@@ -208,6 +214,75 @@ class BazelCompileTest(unittest.TestCase):
                         )
                         self.assertEqual(0, result.returncode, result.stderr)
                         self.assertEqual("info\nbuild\n", log)
+
+    def test_crypt_release_variant_assignments_in_patch_and_waterfall(self) -> None:
+        paths = sorted(
+            (REPO_ROOT / "etc/evergreen_yml_components/variants").glob("*/test_release*.yml")
+        )
+        paths.append(REPO_ROOT / "src/mongo/db/modules/atlas/atlas_release.yml")
+        shared_tasks = yaml.safe_load(
+            (REPO_ROOT / "etc/evergreen_yml_components/tasks/compile_tasks_shared.yml").read_text()
+        )["tasks"]
+        crypt_task = next(task for task in shared_tasks if task["name"] == "crypt_create_lib")
+        compile_vars = next(
+            command["vars"]
+            for command in crypt_task["commands"]
+            if command.get("func") == "bazel compile"
+        )
+        checked_variants = set()
+
+        def selects_crypt(selector: str) -> bool:
+            for token in selector.split():
+                negative = token.startswith("!")
+                token = token.removeprefix("!")
+                matches = (
+                    token[1:] in crypt_task["tags"]
+                    if token.startswith(".")
+                    else re.fullmatch(token, "crypt_create_lib") is not None
+                )
+                if matches == negative:
+                    return False
+            return True
+
+        for path in paths:
+            for variant in yaml.safe_load(path.read_text())["buildvariants"]:
+                expansions = variant.get("expansions", {})
+                if expansions.get("has_packages") is False or not expansions.get("push_bucket"):
+                    continue
+                if expansions.get("release_binary_only") or expansions.get("compiling_for_test"):
+                    continue
+                selected_tasks = [task for task in variant["tasks"] if selects_crypt(task["name"])]
+                if not selected_tasks:
+                    continue
+                with self.subTest(variant=variant["name"]):
+                    entries = [
+                        task for task in variant["tasks"] if task["name"] == "crypt_create_lib"
+                    ]
+                    self.assertEqual(1, len(entries))
+                    self.assertEqual(entries, selected_tasks)
+                    entry = entries[0]
+                    self.assertTrue(all(d.startswith("release-") for d in entry["distros"]))
+                    checked_variants.add(variant["name"])
+                    for is_patch in ("true", "false"):
+                        result, log = self.run_compile(
+                            distro=entry["distros"][0],
+                            project="mongodb-mongo-v8.3-staging",
+                            bazel_compile_flags=expansions.get("bazel_compile_flags", ""),
+                            push_bucket=expansions["push_bucket"],
+                            is_patch=is_patch,
+                            task_name="crypt_create_lib",
+                            **{key: str(value) for key, value in compile_vars.items()},
+                        )
+                        self.assertEqual(0, result.returncode, result.stderr)
+                        self.assertEqual("info\nbuild\n", log)
+        self.assertTrue(
+            {
+                "enterprise-amazon2",
+                "enterprise-amazon2-arm64",
+                "enterprise-ubuntu2004-64",
+                "enterprise-ubuntu2004-arm64",
+            }.issubset(checked_variants)
+        )
 
     def test_development_libraries_do_not_select_release_profiles(self) -> None:
         config = yaml.safe_load(

@@ -23,8 +23,10 @@ py_test(
     data = [
         "bazel_compile.sh",
         "bazel_evergreen_shutils.sh",
+        "//etc:evergreen_release_variant_test_data",
         "//etc:evergreen_yml_components/tasks/compile_tasks.yml",
         "//etc:evergreen_yml_components/variants/ibm/test_release_master_and_lts_branches_only.yml",
+        "//src/mongo/db/modules/atlas:atlas_release.yml",
     ],
     deps = [
         "//bazel/wrapper_hook:release_distro",
