@@ -315,6 +315,7 @@ mongo_cc_unit_test(
         "sbe_numeric_convert_test.cpp",
         "sbe_pattern_value_cmp_test.cpp",
         "sbe_plan_size_test.cpp",
+        "sbe_project_test.cpp",
         "sbe_scan_test.cpp",
         "sbe_search_cursor_test.cpp",
         "sbe_sort_test.cpp",
