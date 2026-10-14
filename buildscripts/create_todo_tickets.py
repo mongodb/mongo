@@ -40,6 +40,10 @@ CO_JIRA_MAP_FILE = REPO_ROOT / "buildscripts" / "util" / "co_jira_map.yml"
 # rejects the team we resolved.
 FALLBACK_TEAM = "Server Triage"
 
+# Files whose TODOs are test fixtures rather than real work. Scanning them would file tickets
+# against whatever real issues the fixture keys happen to match.
+EXCLUDED_FILES = frozenset({"buildscripts/tests/test_create_todo_tickets.py"})
+
 ISSUE_KEY_RE = re.compile(
     "(BUILD|SERVER|WT|SPM|TOOLS|TIG|PERF|BF|REP|BACKPORT|WRITING|STAR|SLS)-[0-9]+",
     re.IGNORECASE,
@@ -153,9 +157,12 @@ def collect_todos(path: str) -> dict[str, list[TodoOccurrence]]:
             dirs.remove(".git")
         for file_name in files:
             full_path = os.path.join(root, file_name)
+            relative_path = repo_relative_path(full_path)
+            if relative_path in EXCLUDED_FILES:
+                continue
             try:
                 with open(full_path, "r") as search_file:
-                    occurrences = find_todos(search_file, repo_relative_path(full_path))
+                    occurrences = find_todos(search_file, relative_path)
             except (UnicodeDecodeError, OSError):
                 continue
             for occurrence in occurrences:

@@ -1,7 +1,9 @@
 """Unit tests for create_todo_tickets.py."""
 
+import tempfile
 import textwrap
 import unittest
+from pathlib import Path
 from unittest import mock
 
 from jira import JIRAError
@@ -147,6 +149,22 @@ class TestFindTodos(unittest.TestCase):
     def test_get_issue_key_from_line_is_case_insensitive(self):
         self.assertEqual(under_test.get_issue_key_from_line("// todo wt-17958"), "WT-17958")
         self.assertIsNone(under_test.get_issue_key_from_line("// todo nothing here"))
+
+
+class TestCollectTodos(unittest.TestCase):
+    def test_excluded_files_are_not_collected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            (root / "included.py").write_text("# TODO SERVER-1\n")
+            (root / "excluded.py").write_text("# TODO SERVER-2\n")
+
+            with (
+                mock.patch.object(under_test, "REPO_ROOT", root),
+                mock.patch.object(under_test, "EXCLUDED_FILES", frozenset({"excluded.py"})),
+            ):
+                todos = under_test.collect_todos(str(root))
+
+        self.assertEqual(list(todos), ["SERVER-1"])
 
 
 class TestConstructDescription(unittest.TestCase):
