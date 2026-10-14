@@ -39,7 +39,7 @@ void JoinExtraEstimateInfo::serialize(BSONObjBuilder& bob) const {
                        NamespaceStringUtil::serialize(est.assumedPkSide,
                                                       SerializationContext::stateDefault()));
             sub.append("ndv", est.ndv.toDouble());
-            sub.append("ndvSource", toStringData(est.source));
+            sub.append("ndvSource", toStringData(est.ndv.source()));
             sub.append("selectivity", est.selectivity.toDouble());
         }
     }

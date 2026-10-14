@@ -152,19 +152,15 @@ JoinEdgeSelectivityEstimate JoinCardinalityEstimator::joinPredicateSel(
     bool ndvFieldsAreUnique = ctx.uniqueFieldInfo.contains(primaryKeyNode.collectionName) &&
         fieldsAreUnique(fieldNames, ctx.uniqueFieldInfo.at(primaryKeyNode.collectionName));
 
-    JoinNdvEstimateSource source = JoinNdvEstimateSource::kSampling;
-    CardinalityEstimate ndv =
-        [&samplingEstimator, &fields, &ndvFieldsAreUnique, &metrics, &source]() {
-            if (ndvFieldsAreUnique) {
-                source = JoinNdvEstimateSource::kUniqueIndex;
-                ++metrics.numUniqueIndexesUsedForNDV;
-                return CardinalityEstimate(samplingEstimator->getCollCard().cardinality(),
-                                           EstimationSource::Metadata);
-            }
+    CardinalityEstimate ndv = [&samplingEstimator, &fields, &ndvFieldsAreUnique, &metrics]() {
+        if (ndvFieldsAreUnique) {
+            ++metrics.numUniqueIndexesUsedForNDV;
+            return CardinalityEstimate(samplingEstimator->getCollCard().cardinality(),
+                                       EstimationSource::Metadata);
+        }
 
-            // TODO SERVER-135494: report HLL when used/available.
-            return samplingEstimator->estimateNDV(fields);
-        }();
+        return samplingEstimator->estimateNDV(fields);
+    }();
 
     cost_based_ranker::SelectivityEstimate sel{cost_based_ranker::oneSel};
     // Ensure we don't accidentally produce a selectivity > 1
@@ -182,13 +178,9 @@ JoinEdgeSelectivityEstimate JoinCardinalityEstimator::joinPredicateSel(
                 "fields"_attr = fields,
                 "ndvEstimate"_attr = ndv,
                 "ndvFieldsAreUnique"_attr = ndvFieldsAreUnique,
-                "selectivityEstimate"_attr = sel,
-                "source"_attr = toStringData(source));
+                "selectivityEstimate"_attr = sel);
 
-    return {.assumedPkSide = primaryKeyNode.collectionName,
-            .ndv = ndv,
-            .selectivity = sel,
-            .source = source};
+    return {.assumedPkSide = primaryKeyNode.collectionName, .ndv = ndv, .selectivity = sel};
 }
 
 cost_based_ranker::CardinalityEstimate JoinCardinalityEstimator::getOrEstimateSubsetCardinality(

@@ -366,7 +366,7 @@ TEST_F(JoinPredicateEstimatorFixture, JoinPredicateSelUsesUniqueFields) {
         ASSERT_EQ(0, ceMetrics.numUniqueIndexesUsedForNDV);
         // The recorded estimate captures the sampled NDV and its provenance.
         ASSERT_EQ(5.0, ndvEstimate.ndv.toDouble());
-        ASSERT_EQ(JoinNdvEstimateSource::kSampling, ndvEstimate.source);
+        ASSERT_EQ(EstimationSource::Sampling, ndvEstimate.ndv.source());
     }
     // Selectivity test with persisted statistics.
     {
@@ -374,19 +374,18 @@ TEST_F(JoinPredicateEstimatorFixture, JoinPredicateSelUsesUniqueFields) {
             CardinalityEstimate{CardinalityType{10}, EstimationSource::Sampling});
         persistedEstimator->addFakeNDVEstimate(
             {FieldPath("foo")},
-            CardinalityEstimate{CardinalityType{5}, EstimationSource::Sampling});
+            CardinalityEstimate{CardinalityType{5}, EstimationSource::HyperLogLog});
         // Simulate the estimator having served "foo" from persisted statistics.
         persistedEstimator->addPersistedNDVStats({"foo"});
         samplingEstimators[aNss] = std::move(persistedEstimator);
 
         auto ndvEstimate = JoinCardinalityEstimator::joinPredicateSel(
             jCtx, samplingEstimators, jCtx.joinGraph.getEdge(0), ceMetrics);
-        auto expectedSel = SelectivityEstimate{SelectivityType{0.2}, EstimationSource::Sampling};
+        auto expectedSel = SelectivityEstimate{SelectivityType{0.2}, EstimationSource::HyperLogLog};
         ASSERT_EQ(expectedSel, ndvEstimate.selectivity);
         // The recorded estimate captures the persisted-statistics provenance rather than sampling.
         ASSERT_EQ(5.0, ndvEstimate.ndv.toDouble());
-        // TODO SERVER-135494: actually report this.
-        ASSERT_EQ(JoinNdvEstimateSource::kSampling, ndvEstimate.source);
+        ASSERT_EQ(EstimationSource::HyperLogLog, ndvEstimate.ndv.source());
     }
     // Selectivity test with unique information. Tell the context that "foo" is a unique field. This
     // should change our estimate for NDV(a.foo) to |a| = 10, giving a new selectivity of 0.1.
@@ -403,7 +402,6 @@ TEST_F(JoinPredicateEstimatorFixture, JoinPredicateSelUsesUniqueFields) {
         ASSERT_EQ(1, ceMetrics.numUniqueIndexesUsedForNDV);
         // The recorded estimate captures the unique-index NDV shortcut.
         ASSERT_EQ(10.0, ndvEstimate.ndv.toDouble());
-        ASSERT_EQ(JoinNdvEstimateSource::kUniqueIndex, ndvEstimate.source);
     }
 }
 
@@ -445,7 +443,7 @@ TEST_F(JoinPredicateEstimatorFixture, JoinPredicateSelUsesUniqueFieldsCompoundJo
         // The recorded estimate captures the sampled NDV and its provenance. The field paths are
         // reported in canonical sorted order.
         ASSERT_EQ(5.0, ndvEstimate.ndv.toDouble());
-        ASSERT_EQ(JoinNdvEstimateSource::kSampling, ndvEstimate.source);
+        ASSERT_EQ(EstimationSource::Sampling, ndvEstimate.ndv.source());
     }
     // Selectivity test with unique information. Tell the context that {"foo", "bar"} are unique.
     // This should change our NDV estimate to 10, giving a new selectivity of 0.1.
@@ -459,7 +457,6 @@ TEST_F(JoinPredicateEstimatorFixture, JoinPredicateSelUsesUniqueFieldsCompoundJo
         ASSERT_EQ(1, ceMetrics.numUniqueIndexesUsedForNDV);
         // The recorded estimate captures the unique-index NDV shortcut.
         ASSERT_EQ(10.0, ndvEstimate.ndv.toDouble());
-        ASSERT_EQ(JoinNdvEstimateSource::kUniqueIndex, ndvEstimate.source);
     }
 }
 

@@ -334,7 +334,7 @@ runTest(pipeline, true /* expectRejected */);
         validateJoinCostComponents(
             explain,
             100 /* expectedCardinalityRHSBeforeJoinPred */,
-            "sampling" /* expectedNdvSource */,
+            "Sampling" /* expectedNdvSource */,
         );
     }
 
@@ -349,7 +349,7 @@ runTest(pipeline, true /* expectRejected */);
         validateJoinCostComponents(
             explain,
             100 /* expectedCardinalityRHSBeforeJoinPred */,
-            "sampling" /* expectedNdvSource */,
+            "Sampling" /* expectedNdvSource */,
         );
 
         // Verify the semantics of 'cardinalityRHSBeforeJoinPred' with a selective RHS predicate:
@@ -373,7 +373,7 @@ runTest(pipeline, true /* expectRejected */);
             validateJoinCostComponents(
                 explain,
                 50 /* expectedCardinalityRHSBeforeJoinPred */,
-                "sampling" /* expectedNdvSource */,
+                "Sampling" /* expectedNdvSource */,
             );
         }
     }
@@ -386,8 +386,7 @@ runTest(pipeline, true /* expectRejected */);
         validateJoinCostComponents(
             explain,
             100 /* expectedCardinalityRHSBeforeJoinPred */,
-            // TODO SERVER-135494: this should be hyperLogLog.
-            "sampling" /* expectedNdvSource */,
+            "HyperLogLog" /* expectedNdvSource */,
         );
     }
 
@@ -399,7 +398,7 @@ runTest(pipeline, true /* expectRejected */);
         validateJoinCostComponents(
             explain,
             100 /* expectedCardinalityRHSBeforeJoinPred */,
-            "uniqueIndex" /* expectedNdvSource */,
+            "Metadata" /* expectedNdvSource */,
         );
     }
 
