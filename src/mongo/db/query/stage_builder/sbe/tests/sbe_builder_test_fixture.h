@@ -54,6 +54,8 @@ public:
         boost::optional<int64_t> skip;
         mongo::OptionalBool tailable;
 
+        std::vector<boost::intrusive_ptr<DocumentSource>> cqPipeline;
+
         std::unique_ptr<FindCommandRequest> makeFindCmdReq(NamespaceString nss) {
             auto findCommand = std::make_unique<FindCommandRequest>(nss);
             findCommand->setLimit(limit);
@@ -106,6 +108,9 @@ public:
 protected:
     void insertDocuments(const NamespaceString& nss, const std::vector<BSONObj>& docs);
 
+    MultipleCollectionAccessor acquireCollections(const NamespaceString& main,
+                                                  const std::vector<NamespaceString>& secondaries);
+
     /**
      * Returns an IndexEntry populated with the real IndexCatalogEntry shared_ptr so ident-based
      * catalog lookups work in the stage builder.
@@ -135,6 +140,19 @@ protected:
                  const mongo::BSONArray& expectedValue,
                  BuildPlanStageParam param = {});
 
+    struct PlanRun {
+        std::string explain;
+        sbe::value::TagValueOwned results;
+    };
+
+    PlanRun runPlan(std::unique_ptr<QuerySolution> querySolution, BuildPlanStageParam param = {});
+
+    static sbe::value::TagValueOwned sortArray(sbe::value::TagValueView array);
+
+    void createSecondaryCollection(const NamespaceString& nss,
+                                   const std::vector<BSONObj>& docs,
+                                   const std::vector<BSONObj>& indexSpecs = {});
+
     IndexEntry makeIndexEntry(BSONObj keyPattern) {
         ASSERT_TRUE(_collInitialized) << "collection must be initialized before looking up index";
         return SbeStageBuilderTestFixture::makeIndexEntry(_nss, keyPattern);
@@ -142,6 +160,7 @@ protected:
 
     std::unique_ptr<unittest::GoldenTestContext> _gctx;
     bool _collInitialized = false;
+    std::vector<NamespaceString> _secondaryNamespaces;
 };
 
 class GoldenSbeExprBuilderTestFixture : public GoldenSbeStageBuilderTestFixture {

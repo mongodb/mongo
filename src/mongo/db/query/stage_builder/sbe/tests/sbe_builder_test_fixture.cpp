@@ -26,6 +26,20 @@
 namespace mongo {
 using namespace std::literals::string_view_literals;
 
+sbe::value::TagValueOwned GoldenSbeStageBuilderTestFixture::sortArray(
+    sbe::value::TagValueView array) {
+    sbe::value::ArrayMultiSet sorted{/*collator=*/nullptr};
+    for (sbe::value::ArrayEnumerator it{array.tag, array.value}; !it.atEnd(); it.advance()) {
+        auto [tag, val] = it.getViewOfValue();
+        sorted.push_back_raw(sbe::value::copyValue(tag, val));
+    }
+    auto result = sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewArray());
+    for (auto [tag, val] : sorted.values()) {
+        sbe::value::getArrayView(result.value())->push_back_raw(sbe::value::copyValue(tag, val));
+    }
+    return result;
+}
+
 unittest::GoldenTestConfig goldenTestConfigSbe{"src/mongo/db/test_output/query/stage_builder/sbe"};
 
 std::unique_ptr<QuerySolution> SbeStageBuilderTestFixture::makeQuerySolution(
@@ -51,6 +65,9 @@ SbeStageBuilderTestFixture::buildPlanStage(std::unique_ptr<QuerySolution> queryS
 
     auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
         .expCtx = expCtx, .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
+    if (!param.cqPipeline.empty()) {
+        cq->setCqPipeline(std::move(param.cqPipeline), /*containsEntirePipeline=*/true);
+    }
     if (hasRecordId) {
         // Force the builder to generate the RecordId output even if it isn't needed by the plan.
         cq->setForceGenerateRecordId(true);
@@ -111,6 +128,22 @@ void SbeStageBuilderTestFixture::insertDocuments(const NamespaceString& nss,
     wuow.commit();
 }
 
+MultipleCollectionAccessor SbeStageBuilderTestFixture::acquireCollections(
+    const NamespaceString& main, const std::vector<NamespaceString>& secondaries) {
+    CollectionOrViewAcquisitionRequests requests;
+    for (const auto& nss : secondaries) {
+        requests.emplace_back(CollectionOrViewAcquisitionRequest::fromOpCtx(
+            operationContext(), nss, AcquisitionPrerequisites::kRead));
+    }
+    requests.emplace_back(CollectionOrViewAcquisitionRequest::fromOpCtx(
+        operationContext(), main, AcquisitionPrerequisites::kRead));
+    auto acquisitions =
+        makeAcquisitionMap(acquireCollectionsOrViewsMaybeLockFree(operationContext(), requests));
+    auto mainAcquisition = acquisitions.extract(main).mapped();
+    return MultipleCollectionAccessor(
+        mainAcquisition, acquisitions, /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
+}
+
 void GoldenSbeStageBuilderTestFixture::createCollection(const std::vector<BSONObj>& docs,
                                                         boost::optional<BSONObj> indexKeyPattern,
                                                         CollectionOptions options) {
@@ -126,6 +159,19 @@ void GoldenSbeStageBuilderTestFixture::createCollection(const std::vector<BSONOb
                       << *indexKeyPattern)}));
     }
     insertDocuments(_nss, docs);
+}
+
+void GoldenSbeStageBuilderTestFixture::createSecondaryCollection(
+    const NamespaceString& nss,
+    const std::vector<BSONObj>& docs,
+    const std::vector<BSONObj>& indexSpecs) {
+    ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, CollectionOptions()));
+    if (!indexSpecs.empty()) {
+        ASSERT_OK(storageInterface()->createIndexesOnEmptyCollection(
+            operationContext(), nss, indexSpecs));
+    }
+    insertDocuments(nss, docs);
+    _secondaryNamespaces.push_back(nss);
 }
 
 IndexEntry SbeStageBuilderTestFixture::makeIndexEntry(const NamespaceString& nss,
@@ -161,19 +207,29 @@ IndexEntry SbeStageBuilderTestFixture::makeIndexEntry(const NamespaceString& nss
 void GoldenSbeStageBuilderTestFixture::runTest(std::unique_ptr<QuerySolutionNode> root,
                                                const mongo::BSONArray& expectedValue,
                                                BuildPlanStageParam param) {
-    auto querySolution = makeQuerySolution(std::move(root));
+    auto [explain, results] = runPlan(makeQuerySolution(std::move(root)), std::move(param));
 
+    // Print the stage explain output and verify.
+    _gctx->printTestHeader(unittest::GoldenTestContext::HeaderFormat::Text);
+    _gctx->outStream() << explain;
+    _gctx->outStream() << std::endl;
+    _gctx->verifyOutput();
+
+    // Execute the plan to verify explain output is correct.
+    sbe::value::TagValueOwned expectedResult =
+        sbe::value::TagValueOwned::fromRaw(stage_builder::makeValue(expectedValue));
+
+    ASSERT_SBE_VALUE_EQ(
+        results.tag(), results.value(), expectedResult.tag(), expectedResult.value());
+}
+
+GoldenSbeStageBuilderTestFixture::PlanRun GoldenSbeStageBuilderTestFixture::runPlan(
+    std::unique_ptr<QuerySolution> querySolution, BuildPlanStageParam param) {
     // Translate the QuerySolution tree to an sbe::PlanStage.
-    boost::optional<CollectionOrViewAcquisition> localColl;
-    MultipleCollectionAccessor colls;
-    if (_collInitialized) {
-        localColl.emplace(
-            acquireCollectionOrView(operationContext(),
-                                    CollectionOrViewAcquisitionRequest::fromOpCtx(
-                                        operationContext(), _nss, AcquisitionPrerequisites::kRead),
-                                    MODE_IS));
-        colls = MultipleCollectionAccessor(*localColl);
-    }
+    auto colls = _collInitialized ? acquireCollections(_nss, _secondaryNamespaces)
+                                  : MultipleCollectionAccessor();
+    std::vector<UUID> uuids;
+    colls.forEach([&](const CollectionPtr& coll) { uuids.push_back(coll->uuid()); });
     attachCollectionAcquisition(colls);
 
     auto [resultSlots, stage, data, _] =
@@ -181,24 +237,13 @@ void GoldenSbeStageBuilderTestFixture::runTest(std::unique_ptr<QuerySolutionNode
     auto resultAccessors = prepareTree(&data.env.ctx, stage.get(), resultSlots);
     ASSERT_EQ(resultAccessors.size(), 1u);
 
-    // Print the stage explain output and verify.
-    _gctx->printTestHeader(unittest::GoldenTestContext::HeaderFormat::Text);
     sbe::DebugPrintInfo debugPrintInfo{};
-    auto explain = sbe::DebugPrinter().print(*stage.get(), debugPrintInfo);
-    _gctx->outStream() << (localColl ? replaceUuid(explain, localColl->getCollection().uuid())
-                                     : explain);
-    _gctx->outStream() << std::endl;
-    _gctx->verifyOutput();
-
-    // Execute the plan to verify explain output is correct.
-    sbe::value::TagValueOwned results =
-        sbe::value::TagValueOwned::fromRaw(getAllResults(stage.get(), resultAccessors[0]));
-
-    sbe::value::TagValueOwned expectedResult =
-        sbe::value::TagValueOwned::fromRaw(stage_builder::makeValue(expectedValue));
-
-    ASSERT_SBE_VALUE_EQ(
-        results.tag(), results.value(), expectedResult.tag(), expectedResult.value());
+    std::string explain = sbe::DebugPrinter().print(*stage.get(), debugPrintInfo);
+    for (const auto& uuid : uuids) {
+        explain = replaceUuid(std::move(explain), uuid);
+    }
+    return {std::move(explain),
+            sbe::value::TagValueOwned::fromRaw(getAllResults(stage.get(), resultAccessors[0]))};
 }
 
 std::string GoldenSbeStageBuilderTestFixture::replaceUuid(std::string input, UUID uuid) {

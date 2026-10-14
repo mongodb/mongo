@@ -1,0 +1,16 @@
+# Golden test output of LookupUnwindStrategyGoldenTest/DottedNoPreserveNoIndexMatchDeeper
+{ $lookup: { from: "<strategy>", localField: "lkey", foreignField: "fkey", as: "a.b" } }
+{ $unwind: { path: "$a.b" } }
+{ $match: { a.b.c: { $gt: 150 } } }
+
+## HashJoin
+Pipeline is not entirely pushed down to SBE.
+
+## NestedLoopJoin
+Pipeline is not entirely pushed down to SBE.
+
+## IndexedLoopJoin
+Pipeline is not entirely pushed down to SBE.
+
+## DynamicIndexedLoopJoin
+Pipeline is not entirely pushed down to SBE.

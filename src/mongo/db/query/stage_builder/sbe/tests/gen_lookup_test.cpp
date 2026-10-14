@@ -135,24 +135,7 @@ public:
                       << std::endl;
         }
 
-        CollectionOrViewAcquisitionMap secondaryAcquisitions;
-        CollectionOrViewAcquisitionRequests acquisitionRequests;
-        // Emplace the main acquisition request.
-        acquisitionRequests.emplace_back(CollectionOrViewAcquisitionRequest::fromOpCtx(
-            operationContext(), _nss, AcquisitionPrerequisites::kRead));
-
-        // Emplace a request for every secondary nss.
-        acquisitionRequests.emplace_back(CollectionOrViewAcquisitionRequest::fromOpCtx(
-            operationContext(), _foreignNss, AcquisitionPrerequisites::kRead));
-
-        // Acquire all the collection and extract the main acquisition
-        secondaryAcquisitions = makeAcquisitionMap(
-            acquireCollectionsOrViewsMaybeLockFree(operationContext(), acquisitionRequests));
-        auto localColl = secondaryAcquisitions.extract(_nss).mapped();
-
-        MultipleCollectionAccessor colls(localColl,
-                                         secondaryAcquisitions,
-                                         /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
+        auto colls = acquireCollections(_nss, {_foreignNss});
 
         auto tree = buildLookupSbeTree(strategy, colls, localKey, foreignKey, asKey);
         auto& stage = tree.stage;
@@ -1167,25 +1150,7 @@ protected:
                                       std::vector<NamespaceString> secondaryCollectionNames,
                                       std::unique_ptr<QuerySolution> solution,
                                       boost::intrusive_ptr<ExpressionContext> expCtx) {
-        CollectionOrViewAcquisitionRequests acquisitionRequests;
-
-        // Create requests for all collections.
-        acquisitionRequests.emplace_back(CollectionOrViewAcquisitionRequest::fromOpCtx(
-            operationContext(), mainCollectionName, AcquisitionPrerequisites::kRead));
-        for (auto collectionName : secondaryCollectionNames) {
-            acquisitionRequests.emplace_back(CollectionOrViewAcquisitionRequest::fromOpCtx(
-                operationContext(), std::move(collectionName), AcquisitionPrerequisites::kRead));
-        }
-
-        // Acquire all requested collections and then move the acquired main collection from the
-        // resulting 'secondaryAcquisitions' map into its own standalone acquisition.
-        auto secondaryAcquisitions = makeAcquisitionMap(
-            acquireCollectionsOrViewsMaybeLockFree(operationContext(), acquisitionRequests));
-        auto mainAcquisition = secondaryAcquisitions.extract(mainCollectionName).mapped();
-
-        MultipleCollectionAccessor colls(mainAcquisition,
-                                         secondaryAcquisitions,
-                                         /*isAnySecondaryNamespaceAViewOrNotFullyLocal=*/false);
+        auto colls = acquireCollections(mainCollectionName, secondaryCollectionNames);
 
         BuildPlanStageParam params;
         params.expCtx = expCtx;
@@ -2682,17 +2647,7 @@ TEST_F(LookupStageBuilderTest, TrialRunDoesNotCountForeignReads) {
     };
     insertDocuments(ldocs, fdocs);
 
-    CollectionOrViewAcquisitionMap secondaryAcquisitions;
-    CollectionOrViewAcquisitionRequests acquisitionRequests;
-    acquisitionRequests.emplace_back(CollectionOrViewAcquisitionRequest::fromOpCtx(
-        operationContext(), _nss, AcquisitionPrerequisites::kRead));
-    acquisitionRequests.emplace_back(CollectionOrViewAcquisitionRequest::fromOpCtx(
-        operationContext(), _foreignNss, AcquisitionPrerequisites::kRead));
-    secondaryAcquisitions = makeAcquisitionMap(
-        acquireCollectionsOrViewsMaybeLockFree(operationContext(), acquisitionRequests));
-    auto localColl = secondaryAcquisitions.extract(_nss).mapped();
-    MultipleCollectionAccessor colls(
-        localColl, secondaryAcquisitions, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+    auto colls = acquireCollections(_nss, {_foreignNss});
 
     for (auto strategy : strategies) {
         auto runWithReadCap = [&](size_t maxReads) {
