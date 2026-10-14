@@ -9695,6 +9695,7 @@ buildvariants:
   - name: .stitch
   - name: save_waterfall_artifacts_binaries
   - name: save_waterfall_artifacts_linux_packages
+  - name: save_waterfall_artifacts_cryptd
   - name: .publish
 
 - name: enterprise-ubuntu1804-arm64
@@ -9936,6 +9937,7 @@ buildvariants:
   - name: save_waterfall_artifacts_binaries
   - name: save_waterfall_artifacts_linux_packages
   - name: save_waterfall_artifacts_cryptd
+  - name: save_waterfall_artifacts_mh
   - name: .publish
 
 - name: enterprise-ubuntu2004-arm64
@@ -11480,6 +11482,7 @@ buildvariants:
   - name: save_waterfall_artifacts_binaries
   - name: save_waterfall_artifacts_linux_packages
   - name: save_waterfall_artifacts_cryptd
+  - name: save_waterfall_artifacts_mh
   - name: .publish
 
 - name: enterprise-rhel-82-arm64
@@ -12423,6 +12426,7 @@ buildvariants:
   - name: save_waterfall_artifacts_binaries
   - name: save_waterfall_artifacts_linux_packages
   - name: save_waterfall_artifacts_cryptd
+  - name: save_waterfall_artifacts_mh
   - name: .publish
 
 - name: debian10
