@@ -2369,6 +2369,254 @@ class TestBranchFunctions(CopybaraTestCase):
             self.fail(f"{test_name}: FAIL!")
 
 
+class TestS3LockTokenRefresh(CopybaraTestCase):
+    def setUp(self):
+        self.initial_tokens = {
+            sync_repo_with_copybara.SOURCE_REPO_URL: "initial-source-token",
+            sync_repo_with_copybara.PUBLIC_GITHUB_APP_REPO_URL: "initial-public-token",
+        }
+        self.fresh_tokens = {
+            sync_repo_with_copybara.SOURCE_REPO_URL: "fresh-source-token",
+            sync_repo_with_copybara.PUBLIC_GITHUB_APP_REPO_URL: "fresh-public-token",
+        }
+        self.sync = replace(
+            TestBranchFunctions.make_branch_sync(
+                sync_repo_with_copybara.auth_github_url(
+                    sync_repo_with_copybara.SOURCE_REPO_URL,
+                    self.initial_tokens[sync_repo_with_copybara.SOURCE_REPO_URL],
+                ),
+                sync_repo_with_copybara.auth_github_url(
+                    sync_repo_with_copybara.PUBLIC_GITHUB_APP_REPO_URL,
+                    self.initial_tokens[sync_repo_with_copybara.PUBLIC_GITHUB_APP_REPO_URL],
+                ),
+                "commit1",
+            ),
+            last_rev="base",
+            expansions={"version_id": "task-version"},
+            s3_lock_config=sync_repo_with_copybara.CopybaraS3LockConfig(bucket="test-bucket"),
+        )
+        module = "buildscripts.copybara.sync_repo_with_copybara."
+        self.mocks = {}
+        for name in (
+            "try_acquire_s3_commit_lock",
+            "clone_destination_repo_for_commit_lookup",
+            "refresh_destination_repo_for_commit_lookup",
+            "find_destination_branch_match_for_source_commit",
+            "fast_forward_destination_branch_to_matching_commit",
+            "get_copybara_tokens",
+            "rewrite_copybara_config",
+            "time.sleep",
+        ):
+            self.mocks[name] = self.enterContext(patch(module + name))
+        self.mocks["try_acquire_s3_commit_lock"].return_value = None
+        self.mocks["get_copybara_tokens"].return_value = self.fresh_tokens
+        self.match = sync_repo_with_copybara.MatchingCommit("commit1", "public1")
+        self.mocks["find_destination_branch_match_for_source_commit"].return_value = self.match
+        self.s3_client = FakeS3Client()
+        key = sync_repo_with_copybara.build_s3_commit_lock_key(self.sync, "commit1")
+        record = sync_repo_with_copybara.make_s3_commit_lock_record(
+            self.sync, "commit1", state="active", owner_id="other-task"
+        )
+        self.s3_client.objects[(self.sync.s3_lock_config.bucket, key)] = {
+            "body": json.dumps(record),
+            "etag": '"active-etag"',
+        }
+        self.enterContext(patch(module + "get_s3_client", return_value=self.s3_client))
+
+    @staticmethod
+    def auth_error():
+        return subprocess.CalledProcessError(
+            128, "git push", output="remote: Invalid username or token."
+        )
+
+    def assert_fresh_sync(self, sync):
+        self.assertEqual(
+            sync.copybara_config.destination.git_url,
+            sync_repo_with_copybara.auth_github_url(
+                sync_repo_with_copybara.PUBLIC_GITHUB_APP_REPO_URL,
+                self.fresh_tokens[sync_repo_with_copybara.PUBLIC_GITHUB_APP_REPO_URL],
+            ),
+        )
+
+    def test_refreshes_tokens_and_reclones_after_git_auth_failure(self):
+        for operation in (
+            "clone_destination_repo_for_commit_lookup",
+            "refresh_destination_repo_for_commit_lookup",
+            "fast_forward_destination_branch_to_matching_commit",
+        ):
+            with self.subTest(operation=operation):
+                for mock in self.mocks.values():
+                    mock.reset_mock(side_effect=True)
+                self.mocks[operation].side_effect = [self.auth_error(), None]
+                lookup = self.mocks["find_destination_branch_match_for_source_commit"]
+                lookup.side_effect = (
+                    [None, self.match] if operation.startswith("refresh_") else None
+                )
+                callback = MagicMock()
+
+                result = sync_repo_with_copybara.acquire_s3_commit_lock_or_skip(
+                    self.sync, "commit1", on_auth_refresh=callback
+                )
+
+                self.assertIsNone(result)
+                self.mocks["get_copybara_tokens"].assert_called_once_with(self.sync.expansions)
+                callback.assert_called_once_with(self.fresh_tokens)
+                clone_calls = self.mocks["clone_destination_repo_for_commit_lookup"].call_args_list
+                self.assertEqual(len(clone_calls), 2)
+                self.assertNotEqual(clone_calls[0].args[1], clone_calls[1].args[1])
+                self.assert_fresh_sync(clone_calls[1].args[0])
+                push = self.mocks["fast_forward_destination_branch_to_matching_commit"]
+                self.assert_fresh_sync(push.call_args.args[0])
+                self.assertEqual(push.call_args.args[2], self.match)
+
+    def test_auth_retry_is_bounded(self):
+        push = self.mocks["fast_forward_destination_branch_to_matching_commit"]
+        push.side_effect = self.auth_error()
+        with self.assertRaises(sync_repo_with_copybara.BranchSyncError) as raised:
+            sync_repo_with_copybara.acquire_s3_commit_lock_or_skip(self.sync, "commit1")
+        self.assertEqual(raised.exception.stage, "s3 lock")
+        self.assertIn("Invalid username or token", raised.exception.output_logs)
+        self.assertEqual(push.call_count, sync_repo_with_copybara.MAX_COPYBARA_AUTH_RETRIES + 1)
+        self.assertEqual(
+            self.mocks["get_copybara_tokens"].call_count,
+            sync_repo_with_copybara.MAX_COPYBARA_AUTH_RETRIES,
+        )
+
+    def test_does_not_retry_non_auth_failure_or_without_expansions(self):
+        for sync, error in (
+            (self.sync, subprocess.CalledProcessError(128, "git push", output="connection reset")),
+            (replace(self.sync, expansions=None), self.auth_error()),
+        ):
+            with self.subTest(expansions=sync.expansions, output=error.output):
+                push = self.mocks["fast_forward_destination_branch_to_matching_commit"]
+                push.reset_mock()
+                push.side_effect = error
+                with self.assertRaises(sync_repo_with_copybara.BranchSyncError):
+                    sync_repo_with_copybara.acquire_s3_commit_lock_or_skip(sync, "commit1")
+                push.assert_called_once()
+                self.mocks["get_copybara_tokens"].assert_not_called()
+
+    def test_refreshes_tokens_during_prolonged_lock_wait(self):
+        elapsed = 0.0
+
+        def wait(_seconds):
+            nonlocal elapsed
+            elapsed += sync_repo_with_copybara.COPYBARA_TOKEN_REFRESH_INTERVAL_SECONDS
+
+        self.enterContext(
+            patch(
+                "buildscripts.copybara.sync_repo_with_copybara.time.monotonic",
+                side_effect=lambda: elapsed,
+            )
+        )
+        self.mocks["time.sleep"].side_effect = wait
+        self.mocks["find_destination_branch_match_for_source_commit"].side_effect = [
+            None,
+            self.match,
+        ]
+        callback = MagicMock()
+
+        self.assertIsNone(
+            sync_repo_with_copybara.acquire_s3_commit_lock_or_skip(
+                self.sync, "commit1", on_auth_refresh=callback
+            )
+        )
+
+        callback.assert_called_once_with(self.fresh_tokens)
+        clone = self.mocks["clone_destination_repo_for_commit_lookup"]
+        self.assertEqual(clone.call_count, 2)
+        self.assert_fresh_sync(clone.call_args.args[0])
+
+    def test_lock_wait_preserves_the_callers_token_age(self):
+        elapsed = float(sync_repo_with_copybara.COPYBARA_TOKEN_REFRESH_INTERVAL_SECONDS)
+        self.enterContext(
+            patch(
+                "buildscripts.copybara.sync_repo_with_copybara.time.monotonic", return_value=elapsed
+            )
+        )
+        callback = MagicMock()
+
+        self.assertIsNone(
+            sync_repo_with_copybara.acquire_s3_commit_lock_or_skip(
+                self.sync, "commit1", on_auth_refresh=callback, tokens_refreshed_at=0.0
+            )
+        )
+
+        callback.assert_called_once_with(self.fresh_tokens)
+        clone = self.mocks["clone_destination_repo_for_commit_lookup"]
+        clone.assert_called_once()
+        self.assert_fresh_sync(clone.call_args.args[0])
+
+    def test_commit_loop_reuses_tokens_when_lock_acquired_after_refresh(self):
+        module = "buildscripts.copybara.sync_repo_with_copybara."
+        self.enterContext(patch(module + "prepare_local_source_mirror", return_value=self.sync))
+        self.enterContext(
+            patch(
+                module + "list_pending_source_commits", return_value=[make_source_commit("commit1")]
+            )
+        )
+        self.enterContext(patch(module + "reset_preview_dir"))
+        dry_run = self.enterContext(
+            patch(
+                module + "run_branch_dry_run",
+                return_value=sync_repo_with_copybara.BranchDryRunResult(
+                    branch=self.sync.branch, noop=True
+                ),
+            )
+        )
+        lock = MagicMock(spec=sync_repo_with_copybara.HeldS3CommitLock)
+
+        def acquire(sync, commit, on_auth_refresh=None, **_kwargs):
+            self.assertEqual(commit, "commit1")
+            on_auth_refresh(self.fresh_tokens)
+            return lock
+
+        self.enterContext(patch(module + "acquire_s3_commit_lock_or_skip", side_effect=acquire))
+        release = self.enterContext(patch(module + "release_s3_commit_lock"))
+
+        result = sync_repo_with_copybara.run_branch_commit_sync(self.sync, self.initial_tokens)
+
+        self.assertEqual(result.noop_commits, 1)
+        self.assert_fresh_sync(dry_run.call_args.args[0])
+        release.assert_called_once_with(lock, "noop")
+
+    def test_commit_loop_reuses_tokens_refreshed_while_skipping_commit(self):
+        module = "buildscripts.copybara.sync_repo_with_copybara."
+        self.enterContext(patch(module + "prepare_local_source_mirror", return_value=self.sync))
+        self.enterContext(
+            patch(
+                module + "list_pending_source_commits",
+                return_value=[make_source_commit("commit1"), make_source_commit("commit2")],
+            )
+        )
+        self.enterContext(patch(module + "reset_preview_dir"))
+        dry_run = self.enterContext(
+            patch(
+                module + "run_branch_dry_run",
+                return_value=sync_repo_with_copybara.BranchDryRunResult(
+                    branch=self.sync.branch, noop=True
+                ),
+            )
+        )
+        lock = MagicMock(spec=sync_repo_with_copybara.HeldS3CommitLock)
+
+        def acquire(sync, commit, on_auth_refresh=None, **_kwargs):
+            if commit == "commit1":
+                on_auth_refresh(self.fresh_tokens)
+                return None
+            self.assert_fresh_sync(sync)
+            return lock
+
+        self.enterContext(patch(module + "acquire_s3_commit_lock_or_skip", side_effect=acquire))
+        release = self.enterContext(patch(module + "release_s3_commit_lock"))
+
+        result = sync_repo_with_copybara.run_branch_commit_sync(self.sync, self.initial_tokens)
+
+        self.assertEqual(result.noop_commits, 2)
+        self.assert_fresh_sync(dry_run.call_args.args[0])
+        release.assert_called_once_with(lock, "noop")
+
+
 class TestReleaseTagHelpers(CopybaraTestCase):
     def test_parse_release_tag_request_maps_public_branch(self):
         self.assertEqual(
