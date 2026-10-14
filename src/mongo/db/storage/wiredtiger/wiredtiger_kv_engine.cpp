@@ -380,7 +380,8 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
     ss << "create,";
     ss << "cache_size=" << cacheSizeMB << "M,";
     ss << "session_max=33000,";
-    ss << "eviction=(threads_min=4,threads_max=4),";
+    ss << "eviction=(threads_min=" << gWiredTigerEvictionThreadsMin.load()
+       << ",threads_max=" << gWiredTigerEvictionThreadsMax.load() << "),";
 
     if (gWiredTigerEvictionDirtyTargetGB)
         ss << "eviction_dirty_target="
@@ -2210,6 +2211,7 @@ boost::optional<boost::filesystem::path> WiredTigerKVEngine::getDataFilePathForI
 }
 
 int WiredTigerKVEngine::reconfigure(const char* str) {
+    LOGV2_DEBUG(10724800, 1, "Reconfiguring", "params"_attr = str);
     return _conn->reconfigure(_conn, str);
 }
 
@@ -2917,6 +2919,36 @@ Status WiredTigerKVEngine::autoCompact(OperationContext* opCtx, const AutoCompac
                     "config"_attr = config.str(),
                     "error"_attr = status);
     return status;
+}
+
+Status WiredTigerKVEngine::updateEvictionThreadsMax(const int32_t& threadsMax) {
+    if (hasGlobalServiceContext()) {
+        ServiceContext* serviceContext = getGlobalServiceContext();
+
+        WiredTigerKVEngine* kvEngine =
+            static_cast<WiredTigerKVEngine*>(serviceContext->getStorageEngine()->getEngine());
+
+        std::stringstream ss;
+        ss << "eviction=(threads_max=" << threadsMax << ")";
+        uassertStatusOK(wtRCToStatus(kvEngine->reconfigure(ss.str().c_str()), nullptr));
+    }
+
+    return Status::OK();
+}
+
+Status WiredTigerKVEngine::updateEvictionThreadsMin(const int32_t& threadsMin) {
+    if (hasGlobalServiceContext()) {
+        ServiceContext* serviceContext = getGlobalServiceContext();
+
+        WiredTigerKVEngine* kvEngine =
+            static_cast<WiredTigerKVEngine*>(serviceContext->getStorageEngine()->getEngine());
+
+        std::stringstream ss;
+        ss << "eviction=(threads_min=" << threadsMin << ")";
+        uassertStatusOK(wtRCToStatus(kvEngine->reconfigure(ss.str().c_str()), nullptr));
+    }
+
+    return Status::OK();
 }
 
 }  // namespace mongo

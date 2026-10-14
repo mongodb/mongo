@@ -594,6 +594,10 @@ public:
         _eventHandler.releaseSectionActivityPermit();
     }
 
+    static Status updateEvictionThreadsMax(const int32_t& threadsMax);
+
+    static Status updateEvictionThreadsMin(const int32_t& threadsMin);
+
 private:
     class WiredTigerSessionSweeper;
 
