@@ -181,13 +181,17 @@ public:
     }
 
     /*
-     * Uses the results assigned from 'addFakeNDVEstimate()'. If an estimate for a particular
-     * 'fieldNames' is not set, this function will throw an exception.
+     * Like the real estimator, prefers the results assigned from 'addFakePersistedNDVEstimate()',
+     * then uses those from 'addFakeNDVEstimate()'. If neither is set for a particular 'fieldNames',
+     * this function will throw an exception.
      */
     CardinalityEstimate estimateNDV(
         const std::vector<ce::FieldPathAndEqSemantics>& fields,
         boost::optional<std::span<const OrderedIntervalList>> bounds) const override {
         ASSERT_FALSE(bounds.has_value()) << "FakeNdvEstimator doesn't handle bounds";
+        if (auto persisted = tryEstimateNDVFromPersistentStats(fields)) {
+            return *persisted;
+        }
         std::vector<FieldPath> fieldPaths;
         for (auto&& field : fields) {
             fieldPaths.push_back(field.path);
@@ -200,6 +204,27 @@ public:
         boost::optional<std::span<const OrderedIntervalList>> bounds) const override {
         // Not yet required in these tests.
         MONGO_UNIMPLEMENTED;
+    }
+
+    /*
+     * Add a fake response to 'tryEstimateNDVFromPersistentStats()' for the given 'fields'. Without
+     * one, the fake reports that no persisted statistics exist for those fields.
+     */
+    void addFakePersistedNDVEstimate(std::vector<FieldPath> fields, CardinalityEstimate estimate) {
+        _fakePersistedEstimates.insert_or_assign(std::move(fields), estimate);
+    }
+
+    boost::optional<CardinalityEstimate> tryEstimateNDVFromPersistentStats(
+        const std::vector<ce::FieldPathAndEqSemantics>& fields) const override {
+        std::vector<FieldPath> fieldPaths;
+        for (auto&& field : fields) {
+            fieldPaths.push_back(field.path);
+        }
+        if (auto it = _fakePersistedEstimates.find(fieldPaths);
+            it != _fakePersistedEstimates.end()) {
+            return it->second;
+        }
+        return boost::none;
     }
 
     CardinalityEstimate getCollCard() const override {
@@ -231,6 +256,7 @@ public:
 private:
     CardinalityEstimate _collCard;
     stdx::unordered_map<std::vector<FieldPath>, CardinalityEstimate> _fakeEstimates;
+    stdx::unordered_map<std::vector<FieldPath>, CardinalityEstimate> _fakePersistedEstimates;
     std::vector<ce::PersistedNDVEntry> _persistedNDVMetadata;
     // Incremented by 'estimateNDV()' when the estimate is served from a persisted statistic added
     // via 'addPersistedNDVStats()'. 'estimateNDV' is const, hence mutable.

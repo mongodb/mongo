@@ -1299,12 +1299,8 @@ boost::optional<PersistedNDVEntry> SamplingEstimatorImpl::loadPersistedNDVStats(
 }
 
 boost::optional<CardinalityEstimate> SamplingEstimatorImpl::tryEstimateNDVFromPersistentStats(
-    const std::vector<FieldPathAndEqSemantics>& fields,
-    boost::optional<std::span<const OrderedIntervalList>> bounds) const {
-    // Bounded NDV stays sample-only by design: a whole-domain sketch cannot answer how many
-    // distinct values fall within a range.
-    if (fields.empty() || fields.size() > ce::kNdvMaxFields || bounds.has_value() ||
-        !persistentNDVStatsEnabled()) {
+    const std::vector<FieldPathAndEqSemantics>& fields) const {
+    if (fields.empty() || fields.size() > ce::kNdvMaxFields || !persistentNDVStatsEnabled()) {
         return boost::none;
     }
 
@@ -1392,8 +1388,12 @@ CardinalityEstimate SamplingEstimatorImpl::estimateNDV(
     boost::optional<std::span<const OrderedIntervalList>> bounds) const {
     tassert(11158504, "Sample must be generated before calling estimateNDV()", _isSampleGenerated);
 
-    if (auto persisted = tryEstimateNDVFromPersistentStats(fields, bounds)) {
-        return *persisted;
+    // Bounded NDV stays sample-only by design: a whole-domain sketch cannot answer how many
+    // distinct values fall within a range.
+    if (!bounds) {
+        if (auto persisted = tryEstimateNDVFromPersistentStats(fields)) {
+            return *persisted;
+        }
     }
 
     // Only the sample-based path below reads the field out of the sample, so this precondition is

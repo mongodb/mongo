@@ -257,6 +257,19 @@ TEST_F(PersistentNDVTest, ServesPersistedNDV) {
     });
 }
 
+TEST_F(PersistentNDVTest, TryEstimateServesPersistedStatsWithoutSampleFallback) {
+    persistNDV(kPersistedNDV);
+    withEstimator([&](SamplingEstimatorForTesting& estimator) {
+        const auto served = estimator.tryEstimateNDVFromPersistentStats({{.path = "a"}});
+        ASSERT_TRUE(served.has_value());
+        ASSERT_EQ(served->toDouble(), kPersistedNDV);
+
+        // Field "b" has no persisted statistic; unlike estimateNDV(), this must report a miss
+        // rather than fall back to the sample.
+        ASSERT_FALSE(estimator.tryEstimateNDVFromPersistentStats({{.path = "b"}}).has_value());
+    });
+}
+
 TEST_F(PersistentNDVTest, FallsBackWhenDisabled) {
     persistNDV(kPersistedNDV);
 

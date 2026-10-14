@@ -163,6 +163,130 @@ TEST_F(JoinPredicateEstimatorFixture, NDVCompoundJoinKey) {
     ASSERT_EQ(0, ceMetrics.numUniqueIndexesUsedForNDV);
 }
 
+// Join graph: A -- B with edge A.foo = B.bar, where 'A' is much smaller than 'B' but is the
+// foreign key side (mirroring TPC-E exchange -- address). Persisted NDV statistics are available
+// on both sides, so the selectivity must come from the larger NDV: 1 / NDV(B.bar).
+TEST_F(JoinPredicateEstimatorFixture, NDVMaxOfBothSidesFromPersistedStats) {
+    MutableJoinGraph mgraph;
+    auto aNss = NamespaceString::createNamespaceString_forTest("a");
+    auto bNss = NamespaceString::createNamespaceString_forTest("b");
+    auto aNodeId = *mgraph.addNode(aNss, makeCanonicalQuery(aNss), boost::none);
+    auto bNodeId = *mgraph.addNode(bNss, makeCanonicalQuery(bNss), FieldPath{"b"});
+
+    std::vector<ResolvedPath> paths;
+    paths.push_back(ResolvedPath{.nodeId = aNodeId, .underlyingFieldPath = "foo"});
+    paths.push_back(ResolvedPath{.nodeId = bNodeId, .underlyingFieldPath = "bar"});
+    mgraph.addSimpleEqualityEdge(aNodeId, bNodeId, 0, 1);
+
+    // No fake sample-based estimates are registered, so the test fails if either sample is
+    // consulted.
+    SamplingEstimatorMap samplingEstimators;
+    auto aSamplingEstimator = std::make_unique<FakeNdvEstimator>(
+        CardinalityEstimate{CardinalityType{4}, EstimationSource::Sampling});
+    aSamplingEstimator->addFakePersistedNDVEstimate(
+        {FieldPath("foo")}, CardinalityEstimate{CardinalityType{4}, EstimationSource::HyperLogLog});
+    samplingEstimators[aNss] = std::move(aSamplingEstimator);
+    auto bSamplingEstimator = std::make_unique<FakeNdvEstimator>(
+        CardinalityEstimate{CardinalityType{7504}, EstimationSource::Sampling});
+    bSamplingEstimator->addFakePersistedNDVEstimate(
+        {FieldPath("bar")},
+        CardinalityEstimate{CardinalityType{7504}, EstimationSource::HyperLogLog});
+    samplingEstimators[bNss] = std::move(bSamplingEstimator);
+
+    JoinGraph graph(std::move(mgraph));
+    JoinReorderingContext ctx{graph, paths, {} /* singleTableAccess */, kNoIndexes};
+    OpDebug::JoinOptimizationMetrics::PlanEnumerationMetrics ceMetrics;
+    auto selEst = JoinCardinalityEstimator::joinPredicateSel(
+        ctx, samplingEstimators, graph.getEdge(0), ceMetrics);
+    // The selectivity estimate comes from 1 / max(NDV(A.foo), NDV(B.bar)) = 1 / 7504.
+    auto expectedSel = SelectivityEstimate{SelectivityType{1.0 / 7504}, EstimationSource::Sampling};
+    ASSERT_EQ(expectedSel, selEst.selectivity);
+    ASSERT_EQ(bNss, selEst.assumedPkSide);
+    ASSERT_EQ(EstimationSource::HyperLogLog, selEst.ndv.source());
+    ASSERT_EQ(0, ceMetrics.numUniqueIndexesUsedForNDV);
+}
+
+// Join graph: A -- B with edge A.foo = B.bar. The smaller collection 'A' has no persisted NDV
+// statistics, so its NDV comes from the sample, but the larger NDV of 'B' still wins.
+TEST_F(JoinPredicateEstimatorFixture, NDVMaxOfSampledAndPersistedStats) {
+    MutableJoinGraph mgraph;
+    auto aNss = NamespaceString::createNamespaceString_forTest("a");
+    auto bNss = NamespaceString::createNamespaceString_forTest("b");
+    auto aNodeId = *mgraph.addNode(aNss, makeCanonicalQuery(aNss), boost::none);
+    auto bNodeId = *mgraph.addNode(bNss, makeCanonicalQuery(bNss), FieldPath{"b"});
+
+    std::vector<ResolvedPath> paths;
+    paths.push_back(ResolvedPath{.nodeId = aNodeId, .underlyingFieldPath = "foo"});
+    paths.push_back(ResolvedPath{.nodeId = bNodeId, .underlyingFieldPath = "bar"});
+    mgraph.addSimpleEqualityEdge(aNodeId, bNodeId, 0, 1);
+
+    SamplingEstimatorMap samplingEstimators;
+    auto aSamplingEstimator = std::make_unique<FakeNdvEstimator>(
+        CardinalityEstimate{CardinalityType{10}, EstimationSource::Sampling});
+    aSamplingEstimator->addFakeNDVEstimate(
+        {FieldPath("foo")}, CardinalityEstimate{CardinalityType{5}, EstimationSource::Sampling});
+    samplingEstimators[aNss] = std::move(aSamplingEstimator);
+    auto bSamplingEstimator = std::make_unique<FakeNdvEstimator>(
+        CardinalityEstimate{CardinalityType{7504}, EstimationSource::Sampling});
+    bSamplingEstimator->addFakePersistedNDVEstimate(
+        {FieldPath("bar")},
+        CardinalityEstimate{CardinalityType{7504}, EstimationSource::HyperLogLog});
+    samplingEstimators[bNss] = std::move(bSamplingEstimator);
+
+    JoinGraph graph(std::move(mgraph));
+    JoinReorderingContext ctx{graph, paths, {} /* singleTableAccess */, kNoIndexes};
+    OpDebug::JoinOptimizationMetrics::PlanEnumerationMetrics ceMetrics;
+    auto selEst = JoinCardinalityEstimator::joinPredicateSel(
+        ctx, samplingEstimators, graph.getEdge(0), ceMetrics);
+    // The selectivity estimate comes from 1 / max(NDV(A.foo), NDV(B.bar)) = 1 / 7504.
+    auto expectedSel = SelectivityEstimate{SelectivityType{1.0 / 7504}, EstimationSource::Sampling};
+    ASSERT_EQ(expectedSel, selEst.selectivity);
+    ASSERT_EQ(bNss, selEst.assumedPkSide);
+    ASSERT_EQ(EstimationSource::HyperLogLog, selEst.ndv.source());
+}
+
+// Join graph: A -- B with compound edge A.foo = B.baz && A.bar = B.qux. Persisted NDV statistics
+// cover the tuple join key on both sides, so the selectivity comes from the larger tuple NDV:
+// 1 / max(NDV(A.foo, A.bar), NDV(B.baz, B.qux)).
+TEST_F(JoinPredicateEstimatorFixture, NDVMaxOfBothSidesCompoundJoinKey) {
+    MutableJoinGraph mgraph;
+    auto aNss = NamespaceString::createNamespaceString_forTest("a");
+    auto bNss = NamespaceString::createNamespaceString_forTest("b");
+    auto aNodeId = *mgraph.addNode(aNss, makeCanonicalQuery(aNss), boost::none);
+    auto bNodeId = *mgraph.addNode(bNss, makeCanonicalQuery(bNss), FieldPath{"b"});
+
+    std::vector<ResolvedPath> paths;
+    paths.push_back(ResolvedPath{.nodeId = aNodeId, .underlyingFieldPath = "foo"});  // 0
+    paths.push_back(ResolvedPath{.nodeId = aNodeId, .underlyingFieldPath = "bar"});  // 1
+    paths.push_back(ResolvedPath{.nodeId = bNodeId, .underlyingFieldPath = "baz"});  // 2
+    paths.push_back(ResolvedPath{.nodeId = bNodeId, .underlyingFieldPath = "qux"});  // 3
+    mgraph.addSimpleEqualityEdge(aNodeId, bNodeId, 0, 2);
+    mgraph.addSimpleEqualityEdge(aNodeId, bNodeId, 1, 3);
+
+    SamplingEstimatorMap samplingEstimators;
+    auto aSamplingEstimator = std::make_unique<FakeNdvEstimator>(
+        CardinalityEstimate{CardinalityType{10}, EstimationSource::Sampling});
+    aSamplingEstimator->addFakePersistedNDVEstimate(
+        {FieldPath("foo"), FieldPath("bar")},
+        CardinalityEstimate{CardinalityType{5}, EstimationSource::HyperLogLog});
+    samplingEstimators[aNss] = std::move(aSamplingEstimator);
+    auto bSamplingEstimator = std::make_unique<FakeNdvEstimator>(
+        CardinalityEstimate{CardinalityType{20}, EstimationSource::Sampling});
+    bSamplingEstimator->addFakePersistedNDVEstimate(
+        {FieldPath("baz"), FieldPath("qux")},
+        CardinalityEstimate{CardinalityType{8}, EstimationSource::HyperLogLog});
+    samplingEstimators[bNss] = std::move(bSamplingEstimator);
+
+    JoinGraph graph(std::move(mgraph));
+    JoinReorderingContext ctx{graph, paths, {} /* singleTableAccess */, kNoIndexes};
+    OpDebug::JoinOptimizationMetrics::PlanEnumerationMetrics ceMetrics;
+    auto selEst = JoinCardinalityEstimator::joinPredicateSel(
+        ctx, samplingEstimators, graph.getEdge(0), ceMetrics);
+    // The selectivity estimate comes from 1 / max(5, 8) = 1 / 8.
+    auto expectedSel = SelectivityEstimate{SelectivityType{1.0 / 8}, EstimationSource::Sampling};
+    ASSERT_EQ(expectedSel, selEst.selectivity);
+}
+
 namespace {
 void pushNNodes(MutableJoinGraph& graph, size_t n) {
     for (size_t i = 0; i < n; i++) {
@@ -372,7 +496,7 @@ TEST_F(JoinPredicateEstimatorFixture, JoinPredicateSelUsesUniqueFields) {
     {
         auto persistedEstimator = std::make_unique<FakeNdvEstimator>(
             CardinalityEstimate{CardinalityType{10}, EstimationSource::Sampling});
-        persistedEstimator->addFakeNDVEstimate(
+        persistedEstimator->addFakePersistedNDVEstimate(
             {FieldPath("foo")},
             CardinalityEstimate{CardinalityType{5}, EstimationSource::HyperLogLog});
         // Simulate the estimator having served "foo" from persisted statistics.
@@ -458,6 +582,42 @@ TEST_F(JoinPredicateEstimatorFixture, JoinPredicateSelUsesUniqueFieldsCompoundJo
         // The recorded estimate captures the unique-index NDV shortcut.
         ASSERT_EQ(10.0, ndvEstimate.ndv.toDouble());
     }
+}
+
+// Join graph: a -- b with edge a.foo = b.bar. 'a' is smaller and has a unique index on 'foo'
+// (NDV = |a| = 10), 'b' has persisted NDV statistics with NDV(b.bar) = 15. Both NDVs are cheap to
+// obtain, so the selectivity comes from the larger one: 1 / 15.
+TEST_F(JoinPredicateEstimatorFixture, NDVMaxOfUniqueIndexAndPersistedStats) {
+    auto aNss = NamespaceString::createNamespaceString_forTest("a");
+    auto bNss = NamespaceString::createNamespaceString_forTest("b");
+    auto aNodeId = *graph.addNode(aNss, nullptr, boost::none);
+    auto bNodeId = *graph.addNode(bNss, nullptr, FieldPath{"b"});
+
+    resolvedPaths.push_back(ResolvedPath{.nodeId = aNodeId, .underlyingFieldPath = "foo"});
+    resolvedPaths.push_back(ResolvedPath{.nodeId = bNodeId, .underlyingFieldPath = "bar"});
+    graph.addSimpleEqualityEdge(aNodeId, bNodeId, 0, 1);
+
+    SamplingEstimatorMap samplingEstimators;
+    samplingEstimators[aNss] = std::make_unique<FakeNdvEstimator>(
+        CardinalityEstimate{CardinalityType{10}, EstimationSource::Sampling});
+    auto bSamplingEstimator = std::make_unique<FakeNdvEstimator>(
+        CardinalityEstimate{CardinalityType{20}, EstimationSource::Sampling});
+    bSamplingEstimator->addFakePersistedNDVEstimate(
+        {FieldPath("bar")},
+        CardinalityEstimate{CardinalityType{15}, EstimationSource::HyperLogLog});
+    samplingEstimators[bNss] = std::move(bSamplingEstimator);
+
+    auto jCtx = makeContext();
+    jCtx.uniqueFieldInfo.emplace(aNss, buildUniqueFieldInfo({fromjson("{foo: 1}")}));
+    OpDebug::JoinOptimizationMetrics::PlanEnumerationMetrics ceMetrics;
+    auto selEst = JoinCardinalityEstimator::joinPredicateSel(
+        jCtx, samplingEstimators, jCtx.joinGraph.getEdge(0), ceMetrics);
+    auto expectedSel = SelectivityEstimate{SelectivityType{1.0 / 15}, EstimationSource::Sampling};
+    ASSERT_EQ(expectedSel, selEst.selectivity);
+    ASSERT_EQ(bNss, selEst.assumedPkSide);
+    ASSERT_EQ(EstimationSource::HyperLogLog, selEst.ndv.source());
+    // The unique index on 'a' is counted even though it did not serve the winning NDV.
+    ASSERT_EQ(1, ceMetrics.numUniqueIndexesUsedForNDV);
 }
 
 }  // namespace mongo::join_ordering

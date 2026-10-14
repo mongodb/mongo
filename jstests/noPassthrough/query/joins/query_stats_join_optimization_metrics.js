@@ -312,7 +312,7 @@ assert.eq(orders.aggregate(pipeline).itcount(), 1000);
 }
 
 {
-    // Validate that we count the join edges whose NDV came from index uniqueness metadata. Run the
+    // Validate that we count the join key NDVs that came from index uniqueness metadata. Run the
     // same pipeline as above, but recreate one of the join key indexes as unique so that the optimizer can
     // derive NDV from that metadata.
     assert.commandWorked(
@@ -328,11 +328,11 @@ assert.eq(orders.aggregate(pipeline).itcount(), 1000);
     // histograms that cover only the run below.
     resetQueryStatsStore(conn, "10MB");
 
-    // Update expected metrics to reflect this: only the 'orders.a = customers.a' edge has a unique
-    // index covering its join key.
+    // Update expected metrics to reflect this: only the 'orders.a = customers.a' edge has unique
+    // indexes covering its join key, one on each side.
     kPerQueryMetrics.numSuffixSourcesPushedToSbe = 0;
     kPerQueryMetrics.numResidualClassicSources = 0;
-    kPerEnumerationExpectedMetrics.numUniqueIndexesUsedForNDV = 1;
+    kPerEnumerationExpectedMetrics.numUniqueIndexesUsedForNDV = 2;
 
     assert.eq(orders.aggregate(pipeline).itcount(), 1000);
 
@@ -351,8 +351,8 @@ assert.eq(orders.aggregate(pipeline).itcount(), 1000);
 
     // Validate that we count join edges served from persisted NDV statistics (analyze mode
     // "ndv"). The unique index from the previous block still covers the 'a' edge, so only the
-    // 'b' edge requests an NDV estimate; persist statistics for both of its sides so the
-    // request is served regardless of which side the optimizer picks as the "primary key".
+    // 'b' edge requests NDV estimates; persist statistics for both of its sides so that both are
+    // served.
     assert.commandWorked(
         db.adminCommand({setParameter: 1, internalQueryEnablePersistentNDVStats: true}),
     );
@@ -364,7 +364,7 @@ assert.eq(orders.aggregate(pipeline).itcount(), 1000);
     // reads and would otherwise fail the reads below.
     resetQueryStatsStore(conn, "10MB");
 
-    kPerEnumerationExpectedMetrics.numPersistentNDVStatsUsed = 1;
+    kPerEnumerationExpectedMetrics.numPersistentNDVStatsUsed = 2;
 
     assert.eq(orders.aggregate(pipeline).itcount(), 1000);
 

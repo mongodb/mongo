@@ -101,6 +101,16 @@ public:
     }
 
     /**
+     * Like estimateNDV(), but only serves the estimate from persisted NDV statistics (analyze mode
+     * "ndv") and never falls back to the sample. Returns boost::none if no persisted statistics
+     * cover the given fields.
+     */
+    virtual boost::optional<CardinalityEstimate> tryEstimateNDVFromPersistentStats(
+        const std::vector<FieldPathAndEqSemantics>& fields) const {
+        return boost::none;
+    }
+
+    /**
      * Estimates the number of distinct values of tuples of the given field names
      * a multikey index over the provided fields would contain, from the values
      * present in the sample.

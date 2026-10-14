@@ -741,7 +741,11 @@ describe("join optimization serverStatus metrics", function () {
         this.runNdvJoinQuery(products);
         const after = this.persistentNdvMetrics();
 
-        assert.eq(after.misses, before.misses + 1, "expected one miss", {before, after});
+        // Both products and orders are probed for statistics.
+        assert.eq(after.misses, before.misses + 2, "expected a miss for each side", {
+            before,
+            after,
+        });
         assert.eq(after.hits, before.hits, "expected no hit", {before, after});
     });
 
@@ -758,7 +762,11 @@ describe("join optimization serverStatus metrics", function () {
         const joinOptAfter = this.metrics();
 
         assert.eq(after.hits, before.hits + 1, "expected one hit", {before, after});
-        assert.eq(after.misses, before.misses, "expected no miss", {before, after});
+        // The other side is probed too, but orders has no stats.
+        assert.eq(after.misses, before.misses + 1, "expected a miss for the side without stats", {
+            before,
+            after,
+        });
         // The same use aggregates into this section's counter as well.
         assert.eq(
             counterDelta(joinOptBefore, joinOptAfter, "numPersistentNDVStatsUsed"),

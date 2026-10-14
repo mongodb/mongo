@@ -99,8 +99,8 @@ Close enough?: yes
 db.many_rows.aggregate([{"$lookup":{"from":"many_rows","localField":"d_idx","foreignField":"i_idx_unique","as":"right"}},{"$unwind":"$right"},{"$match":{}}])
 ```
 Actual cardinality: 1000  
-Estimated cardinality: 100000  
-Close enough?: NO
+Estimated cardinality: 1000  
+Close enough?: yes
 
 ```js
 db.many_rows.aggregate([{"$lookup":{"from":"many_rows","as":"right","let":{"localField":"$i_idx_unique"},"pipeline":[{"$match":{"$and":[{"$expr":{"$eq":["$$localField","$d_idx"]}},{}]}}]}},{"$unwind":"$right"},{"$match":{}}])
@@ -113,8 +113,8 @@ Close enough?: yes
 db.many_rows.aggregate([{"$lookup":{"from":"many_rows","as":"right","let":{"localField":"$d_idx"},"pipeline":[{"$match":{"$and":[{"$expr":{"$eq":["$$localField","$i_idx_unique"]}},{}]}}]}},{"$unwind":"$right"},{"$match":{}}])
 ```
 Actual cardinality: 1000  
-Estimated cardinality: 100000  
-Close enough?: NO
+Estimated cardinality: 1000  
+Close enough?: yes
 
 # Join where there is an index only on one side
 ```js
@@ -531,5 +531,5 @@ Estimated cardinality: 1
 Close enough?: yes
 
 # Summary
-Good estimations: 58  
-Bad estimations: 14  
+Good estimations: 60  
+Bad estimations: 12  

@@ -26,6 +26,58 @@ using namespace cost_based_ranker;
 // query, since only estimates that are not served from the memo are charged to 'ceTimeMicros'.
 MONGO_FAIL_POINT_DEFINE(sleepWhileEstimatingJoinCardinality);
 
+namespace {
+// Returns the join key fields of 'edge' on the side of 'nodeId'. Note that we track $expr
+// predicates as their NDV computation is slightly different due to $expr equality semantics.
+std::vector<ce::FieldPathAndEqSemantics> joinKeyFields(const JoinReorderingContext& ctx,
+                                                       const JoinEdge& edge,
+                                                       NodeId nodeId) {
+    std::vector<ce::FieldPathAndEqSemantics> fields;
+    for (auto&& joinPred : edge.predicates) {
+        tassert(11352502,
+                "join predicate selectivity estimation only supported for equality",
+                joinPred.isEquality());
+        auto pathId = nodeId == edge.left ? joinPred.left : joinPred.right;
+        fields.push_back({.path = ctx.resolvedPaths[pathId].underlyingFieldPath,
+                          .isExprEq = joinPred.op == JoinPredicate::Operator::ExprEq});
+    }
+    return fields;
+}
+
+// Estimates the NDV of the join key of 'edge' on the side of 'nodeId'. Returns boost::none if that
+// requires sampling and 'allowSampling' is false.
+boost::optional<CardinalityEstimate> joinKeyNdv(
+    const JoinReorderingContext& ctx,
+    const SamplingEstimatorMap& samplingEstimators,
+    const JoinEdge& edge,
+    NodeId nodeId,
+    bool allowSampling,
+    OpDebug::JoinOptimizationMetrics::PlanEnumerationMetrics& metrics) {
+    auto& nss = ctx.joinGraph.getNode(nodeId).collectionName;
+    auto fields = joinKeyFields(ctx, edge, nodeId);
+    std::set<FieldPath> fieldNames;
+    for (auto&& field : fields) {
+        fieldNames.emplace(field.path);
+    }
+
+    auto& samplingEstimator = samplingEstimators.at(nss);
+
+    // We are able to optimize NDV estimation if we know that the join key fields represent unique
+    // data. In that case, the NDV is simply the collection cardinality.
+    if (ctx.uniqueFieldInfo.contains(nss) &&
+        fieldsAreUnique(fieldNames, ctx.uniqueFieldInfo.at(nss))) {
+        ++metrics.numUniqueIndexesUsedForNDV;
+        return CardinalityEstimate(samplingEstimator->getCollCard().cardinality(),
+                                   EstimationSource::Metadata);
+    }
+    if (allowSampling) {
+        // Will use persisted NDV stats if available and use the sample otherwise.
+        return samplingEstimator->estimateNDV(fields);
+    }
+    return samplingEstimator->tryEstimateNDVFromPersistentStats(fields);
+}
+}  // namespace
+
 JoinCardinalityEstimator::JoinCardinalityEstimator(const JoinReorderingContext& ctx,
                                                    EdgeSelectivities edgeSelectivities)
     : _ctx(ctx),
@@ -109,6 +161,12 @@ EdgeSelectivities JoinCardinalityEstimator::estimateEdgeSelectivities(
 //
 // If we are in case (2), we again can estimate Card(P) via NDV(FK) on either side, since we assume
 // both sides reference the primary key. Again, we use the side with the smaller CE for simplicity.
+//
+// The smaller-CE assumption fails when the foreign table is smaller than the primary table it
+// references, in which case NDV(FK) < Card(P) and we overestimate the selectivity. By the principle
+// of inclusion NDV(FK) <= NDV(PK) = Card(P), so max(NDV(left), NDV(right)) estimates Card(P)
+// whichever side is the primary key. We only consider the other side's NDV when it is cheap to
+// obtain (unique index metadata or persisted NDV statistics).
 JoinEdgeSelectivityEstimate JoinCardinalityEstimator::joinPredicateSel(
     const JoinReorderingContext& ctx,
     const SamplingEstimatorMap& samplingEstimators,
@@ -124,43 +182,24 @@ JoinEdgeSelectivityEstimate JoinCardinalityEstimator::joinPredicateSel(
     auto rightCard = samplingEstimators.at(rightNode.collectionName)->getCollCard();
 
     // For the purposes of estimation, we assume that this edge represents a "primary key" to
-    // "foreign key" join, despite these concepts not existing in MongoDB. We also assume that the
-    // node with the small CE is the primary key side.
-    bool smallerCardIsLeft = cost_based_ranker::exactLtEq(leftCard, rightCard);
-    auto& primaryKeyNode = smallerCardIsLeft ? leftNode : rightNode;
+    // "foreign key" join, despite these concepts not existing in MongoDB. We start by assuming that
+    // the node with the smaller CE is the primary key side.
+    auto primaryKeyNodeId =
+        cost_based_ranker::exactLtEq(leftCard, rightCard) ? edge.left : edge.right;
+    auto otherNodeId = primaryKeyNodeId == edge.left ? edge.right : edge.left;
 
-    // Accumulate the field names of the "primary key" of the join edge. Note that we track $expr
-    // predicates as their NDV computation is slightly different due to $expr equality semantics.
-    std::vector<ce::FieldPathAndEqSemantics> fields;
-    std::set<FieldPath> fieldNames;
-    for (auto&& joinPred : edge.predicates) {
-        tassert(11352502,
-                "join predicate selectivity estimation only supported for equality",
-                joinPred.isEquality());
-        auto pathId = smallerCardIsLeft ? joinPred.left : joinPred.right;
-        fields.push_back({.path = ctx.resolvedPaths[pathId].underlyingFieldPath,
-                          .isExprEq = joinPred.op == JoinPredicate::Operator::ExprEq});
-        fieldNames.emplace(ctx.resolvedPaths[pathId].underlyingFieldPath);
+    auto ndv = *joinKeyNdv(
+        ctx, samplingEstimators, edge, primaryKeyNodeId, /*allowSampling=*/true, metrics);
+
+    // If we can cheaply get the NDV of the other side, we pick the max of the two since it better
+    // estimates Card(P).
+    auto otherNdv =
+        joinKeyNdv(ctx, samplingEstimators, edge, otherNodeId, /*allowSampling=*/false, metrics);
+    if (otherNdv && cost_based_ranker::exactGt(*otherNdv, ndv)) {
+        ndv = *otherNdv;
+        primaryKeyNodeId = otherNodeId;
     }
-
-    // Get sampling estimator for the "primary key" collection
-    auto& samplingEstimator = samplingEstimators.at(primaryKeyNode.collectionName);
-
-    // We are able to optimize NDV estimation if we know that the join key fields represent unique
-    // data. In that case, the NDV is simply the collection cardinality. Otherwise, we invoke NDV
-    // estimation for the "primary key".
-    bool ndvFieldsAreUnique = ctx.uniqueFieldInfo.contains(primaryKeyNode.collectionName) &&
-        fieldsAreUnique(fieldNames, ctx.uniqueFieldInfo.at(primaryKeyNode.collectionName));
-
-    CardinalityEstimate ndv = [&samplingEstimator, &fields, &ndvFieldsAreUnique, &metrics]() {
-        if (ndvFieldsAreUnique) {
-            ++metrics.numUniqueIndexesUsedForNDV;
-            return CardinalityEstimate(samplingEstimator->getCollCard().cardinality(),
-                                       EstimationSource::Metadata);
-        }
-
-        return samplingEstimator->estimateNDV(fields);
-    }();
+    auto& primaryKeyNode = ctx.joinGraph.getNode(primaryKeyNodeId);
 
     cost_based_ranker::SelectivityEstimate sel{cost_based_ranker::oneSel};
     // Ensure we don't accidentally produce a selectivity > 1
@@ -173,11 +212,9 @@ JoinEdgeSelectivityEstimate JoinCardinalityEstimator::joinPredicateSel(
                 "Performed estimation of selectivity of join edge",
                 "leftNss"_attr = leftNode.collectionName,
                 "rightNs"_attr = rightNode.collectionName,
-                "smallerColl"_attr =
-                    smallerCardIsLeft ? leftNode.collectionName : rightNode.collectionName,
-                "fields"_attr = fields,
+                "assumedPkSide"_attr = primaryKeyNode.collectionName,
+                "fields"_attr = joinKeyFields(ctx, edge, primaryKeyNodeId),
                 "ndvEstimate"_attr = ndv,
-                "ndvFieldsAreUnique"_attr = ndvFieldsAreUnique,
                 "selectivityEstimate"_attr = sel);
 
     return {.assumedPkSide = primaryKeyNode.collectionName, .ndv = ndv, .selectivity = sel};

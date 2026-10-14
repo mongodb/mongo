@@ -56,7 +56,7 @@ describe("persistedNdv in join explain", function () {
         MongoRunner.stopMongod(this.conn);
     });
 
-    it("surfaces persistedNdv for the namespace served from persisted statistics", function () {
+    it("surfaces persistedNdv for the namespaces served from persisted statistics", function () {
         assert.commandWorked(
             this.db.runCommand({analyze: this.orders.getName(), mode: "ndv", key: "productId"}),
         );
@@ -80,15 +80,19 @@ describe("persistedNdv in join explain", function () {
             const fieldStatsMetadata = queryPlanner.fieldStatsMetadata;
             assert(fieldStatsMetadata, "expected fieldStatsMetadata", {queryPlanner});
 
-            // The join optimizer currently requests the NDV only for the "primary key" side
-            // of the edge (the smaller collection), so only products is asserted; orders'
-            // statistics exist but are not consulted. Only served statistics may appear.
+            // Both sides of the edge have persisted statistics, so the join optimizer consults
+            // both for the two-sided NDV estimate and both namespaces surface their served
+            // statistics.
             assert.eq(
-                Object.keys(fieldStatsMetadata),
-                [this.products.getFullName()],
-                "only served statistics may appear",
+                Object.keys(fieldStatsMetadata).sort(),
+                [this.orders.getFullName(), this.products.getFullName()].sort(),
+                "expected served statistics from both sides of the join edge",
                 {fieldStatsMetadata},
             );
+            const ordersNdv = fieldStatsMetadata[this.orders.getFullName()].ndv;
+            assert(ordersNdv, "expected ndv metadata for orders", {fieldStatsMetadata});
+            assert.eq(ordersNdv.length, 1, "expected one served entry", {ordersNdv});
+            assert.eq(ordersNdv[0].fieldPaths, ["productId"], "unexpected fieldPaths", {ordersNdv});
             const productsNdv = fieldStatsMetadata[this.products.getFullName()].ndv;
             assert(productsNdv, "expected ndv metadata for products", {fieldStatsMetadata});
             assert.eq(productsNdv.length, 1, "expected one served entry", {productsNdv});

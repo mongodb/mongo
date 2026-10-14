@@ -219,6 +219,16 @@ public:
     using SamplingEstimator::estimateNDV;
 
     /**
+     * Serves the NDV from persisted field statistics (built by analyze mode "ndv") when
+     * eligible: 'persistentNDVStatsEnabled()' and at most 'kNdvMaxFields' fields. The request's
+     * equality semantics select the persisted folding variant; composite requests folding
+     * several fields have none and are ineligible. Loaded documents are cached per sorted path
+     * set and results, including misses, are memoized per path set and variant.
+     */
+    boost::optional<CardinalityEstimate> tryEstimateNDVFromPersistentStats(
+        const std::vector<FieldPathAndEqSemantics>& fields) const override;
+
+    /**
      * Estimates the number of distinct values of tuples of the given field names
      * a multikey index over the provided fields would contain, from the values
      * present in the sample.
@@ -431,19 +441,6 @@ protected:
     SamplingCEMethodEnum _samplingStyle;
 
 private:
-    /**
-     * Serves the NDV from persisted field statistics (built by analyze mode "ndv") when
-     * eligible: feature flag and knob enabled, at most kNdvMaxFields fields and no bounds.
-     * The request's equality semantics select the persisted folding variant; composite requests
-     * folding several fields have none and are ineligible. Returns boost::none when ineligible
-     * or when no usable statistics exist; the caller then falls back to the sample-based
-     * estimate. Loaded documents are cached per sorted path set and results, including misses,
-     * are memoized per path set and variant.
-     */
-    boost::optional<CardinalityEstimate> tryEstimateNDVFromPersistentStats(
-        const std::vector<FieldPathAndEqSemantics>& fields,
-        boost::optional<std::span<const OrderedIntervalList>> bounds) const;
-
     /**
      * Whether persisted NDV statistics may be served, i.e. featureFlagPersistentStats and the
      * internalQueryEnablePersistentNDVStats knob are both enabled. Computed once per instance.
