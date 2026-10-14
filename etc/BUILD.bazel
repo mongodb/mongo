@@ -3,6 +3,8 @@ load("//bazel:mongo_src_rules.bzl", "symlink")
 package(default_visibility = ["//visibility:public"])
 
 exports_files([
+    "evergreen_yml_components/tasks/compile_tasks.yml",
+    "evergreen_yml_components/variants/ibm/test_release_master_and_lts_branches_only.yml",
     "lsan.suppressions",
     "tsan.suppressions",
     "burn_in_tests.yml",

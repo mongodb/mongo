@@ -256,7 +256,7 @@ ignore = [
 "buildscripts/bazel_spawn_pb2.py" = ["ALL"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["buildscripts", "buildscripts/idl", "evergreen", "tools"]
+known-first-party = ["bazel", "buildscripts", "buildscripts/idl", "evergreen", "tools"]
 
 [tool.pyright]
 include = [

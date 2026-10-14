@@ -12,6 +12,7 @@ sys.path.append(str(REPO_ROOT))
 sys.stdout = sys.stderr
 
 from bazel.wrapper_hook.install_modules import install_modules
+from bazel.wrapper_hook.release_distro import ReleaseDistroError, check_evergreen_release_distro
 from bazel.wrapper_hook.wrapper_debug import wrapper_debug
 from bazel.wrapper_hook.wrapper_util import get_terminal_stream
 
@@ -63,7 +64,16 @@ def run_with_terminal_output(func, *args, **kwargs):
         sys.stderr = old_stderr
 
 
+def _check_release_distro(args: list[str]) -> None:
+    try:
+        check_evergreen_release_distro(args, repo_root=REPO_ROOT)
+    except ReleaseDistroError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        sys.exit(4)
+
+
 def main():
+    _check_release_distro(sys.argv[2:])
     install_modules(sys.argv[1], sys.argv[1:])
 
     from bazel.auto_header.auto_header import gen_auto_headers
@@ -124,6 +134,7 @@ def main():
         engflow_auth(args)
         write_workstation_bazelrc(args)
         write_wrapper_hook_bazelrc(args)
+        _check_release_distro(args[2:])
         # Disable git age check for now, to avoid issues wth merge commits
         # git_age_check()
         check_resource()

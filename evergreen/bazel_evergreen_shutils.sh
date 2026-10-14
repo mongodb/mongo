@@ -146,9 +146,13 @@ bazel_evergreen_shutils::maybe_release_flag() {
     local local_arg="$1"
     if [[ -n "${MONGO_VERSION_OVERRIDE:-}" ]]; then
         echo "$local_arg --config=public-release"
+    elif [[ "${compiling_for_test:-}" == "true" ]]; then
+        echo "$local_arg"
+    elif [[ "${project:-}" == "mongodb-mongo-master" && "${is_release:-false}" != "true" ]]; then
+        echo "$local_arg"
     elif [[ "${release_rbe:-}" == "true" ]]; then
         echo "$local_arg --config=public-release-rbe" # release with RBE (Remote Build Execution)
-    elif [[ "${is_patch:-}" == "true" || -z "${push_bucket:-}" || "${compiling_for_test:-}" == "true" ]]; then
+    elif [[ "${is_patch:-}" == "true" || -z "${push_bucket:-}" ]]; then
         echo "$local_arg" # non-release
     elif [[ "${release_binary_only:-}" == "true" ]]; then
         # Preserve release binary settings for test archives without release execution/cache settings.
@@ -159,6 +163,13 @@ bazel_evergreen_shutils::maybe_release_flag() {
 }
 
 # --- Timeouts --------------------------------------------------------------
+
+# Use the wrapper's RC resolver so imported/default configurations and aliases
+# obey the same policy as explicit flags. prelude.sh loads expansions into shell
+# variables, so pass the executing distro explicitly to the Python helper.
+bazel_evergreen_shutils::check_release_distro() {
+    distro_id="${distro_id:-}" "${python}" -m bazel.wrapper_hook.release_distro --evergreen -- "$@"
+}
 
 # Timeout helper: returns a "timeout <secs>" prefix or empty string.
 # Prints a one-time warning to stderr if a timeout was requested but no

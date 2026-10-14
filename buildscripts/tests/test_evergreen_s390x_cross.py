@@ -185,7 +185,12 @@ class S390xCrossSchedulingTest(unittest.TestCase):
             for task_name in task_names:
                 entry = next(entry for entry in variant["tasks"] if entry["name"] == task_name)
                 with self.subTest(variant=variant_name, task=task_name):
-                    self.assertEqual([large_distro], entry.get("distros", variant["run_on"]))
+                    expected = (
+                        f"release-{large_distro}"
+                        if task_name == "crypt_create_lib"
+                        else large_distro
+                    )
+                    self.assertEqual([expected], entry.get("distros", variant["run_on"]))
 
     def test_static_variants_retain_native_integration_coverage(self) -> None:
         expected = {
