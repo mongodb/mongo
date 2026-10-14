@@ -92,6 +92,7 @@ class ManifestTest(unittest.TestCase):
         self.assertIn("format.formatters", ids)
         self.assertIn("bazel.server", ids)
         self.assertIn("lint.target-coverage", ids)
+        self.assertIn("lint.clang-format-version", ids)
         self.assertIn("lint.module-lockfile", ids)
         self.assertIn("lint.copybara-forbidden-text", ids)
         self.assertIn("lint.rules-lint", ids)
@@ -236,6 +237,14 @@ class SelectionTest(unittest.TestCase):
         self.assertIn("lint.quickmongolint", selected_ids)
         server = next(check for check in selected.checks if check.spec.check_id == "bazel.server")
         self.assertEqual(server.spec.phase, CheckPhase.PREFLIGHT_SERIAL)
+
+    def test_lint_always_checks_formatter_version_pin(self):
+        selected = select_checks(
+            (CandidateFile("README.md", ChangeStatus.MODIFIED),), groups=["lint"]
+        )
+        self.assertIn(
+            "lint.clang-format-version", {check.spec.check_id for check in selected.checks}
+        )
 
 
 class CandidateDiscoveryTest(unittest.TestCase):
@@ -557,6 +566,33 @@ class ProgressTest(unittest.TestCase):
 
 
 class AdapterTest(unittest.TestCase):
+    @mock.patch.object(adapters.platform, "system", return_value="Linux")
+    @mock.patch.object(adapters, "run_subprocess", return_value=RunOutcome(0))
+    def test_formatter_version_pin_is_checked_and_fixable(self, run, _system):
+        with tempfile.TemporaryDirectory() as temp:
+            context = _context(Path(temp), ())
+            context.bazel_real = "/opt/bazel"
+            context.bazel_startup_options = ("--output_base=/tmp/bazel",)
+            for fix in (False, True):
+                with self.subTest(fix=fix):
+                    context.fix = fix
+                    adapters.run_clang_format_version(context, ())
+                    command = run.call_args.args[0]
+                    self.assertEqual(command[:3], ["/opt/bazel", "--output_base=/tmp/bazel", "run"])
+                    self.assertIn("//buildscripts:clang_format_version", command)
+                    self.assertEqual("--check" in command, not fix)
+
+    def test_formatter_version_pin_skips_unsupported_hosts(self):
+        for system in ("Darwin", "Windows"):
+            with (
+                self.subTest(system=system),
+                mock.patch.object(adapters.platform, "system", return_value=system),
+                mock.patch.object(adapters, "run_subprocess") as run,
+            ):
+                outcome = adapters.run_clang_format_version(_context(Path("."), ()), ())
+            self.assertIsNotNone(outcome.skipped_reason)
+            run.assert_not_called()
+
     def test_progress_stream_is_not_captured_with_in_process_tool_output(self):
         with tempfile.TemporaryFile(mode="w+", encoding="utf-8") as terminal:
             saved_stderr_fd = os.dup(2)

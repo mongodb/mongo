@@ -110,6 +110,18 @@ CHECKS: tuple[RegisteredCheck, ...] = (
     ),
     RegisteredCheck(
         CheckSpec(
+            "lint.clang-format-version",
+            "Editor clang-format version pin",
+            "lint",
+            CheckPhase.MUTATING_SERIAL,
+            dependencies=_BAZEL_SERVER_DEPENDENCY,
+            supports_fix=True,
+        ),
+        _any_file,
+        adapters.run_clang_format_version,
+    ),
+    RegisteredCheck(
+        CheckSpec(
             "lint.clang-tidy-config",
             "Clang-tidy configuration coverage",
             "lint",

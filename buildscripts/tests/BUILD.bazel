@@ -59,6 +59,13 @@ py_test(
 )
 
 py_test(
+    name = "test_clang_format_version",
+    srcs = ["test_clang_format_version.py"],
+    visibility = ["//visibility:public"],
+    deps = ["//buildscripts:clang_format_version_lib"],
+)
+
+py_test(
     name = "test_mongo_toolchain",
     srcs = ["test_mongo_toolchain.py"],
     data = ["//bazel:bazelisk"],

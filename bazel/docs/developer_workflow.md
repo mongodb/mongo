@@ -100,10 +100,17 @@ Configure the clang-format extension to use the repository's wrapper:
 
 Use `${workspaceRoot}` because the `xaver.clang-format` extension expands this placeholder.
 
-The wrapper queries Bazel for the pinned v5 toolchain repository, fetching it if necessary, then
-runs clang-format with the editor's arguments and input. Bazel must be on the editor's PATH. The
-first invocation can take longer while Bazel downloads the toolchain. Each invocation resolves the
-current repository so a branch change or toolchain update uses the current pin.
+The wrapper checks a local binary against `buildscripts/clang_format_version.txt` and runs it
+directly, so format-on-save does not wait for concurrent Bazel builds. It caches the resolved path
+in `.cache/clang-format-vscode` and checks the binary's version on each save, including after a
+branch change. It also looks for toolchains already downloaded by a build.
+
+If no matching binary is available, the wrapper queries Bazel to fetch and locate the pinned v5
+toolchain. Bazel must be on the editor's PATH for this initial setup. The query fails immediately if
+Bazel is busy; run `bazel run lint` after the build finishes to prepare the formatter.
+`bazel run lint` checks that the editor's version pin matches Bazel's binary, and
+`bazel run lint --fix` updates the pin when the toolchain changes. The pin check runs on Linux,
+where Bazel provides the native formatter toolchain.
 
 ## Running clang-tidy via Bazel
 

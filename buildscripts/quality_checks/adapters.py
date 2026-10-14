@@ -464,6 +464,17 @@ def _run_validator(
     return run_python_tool(lambda: callback(**kwargs))
 
 
+def run_clang_format_version(context: CheckContext, _matched: tuple[str, ...]) -> RunOutcome:
+    if platform.system() != "Linux":
+        return RunOutcome(0, skipped_reason="Bazel's native clang-format toolchain requires Linux")
+    return run_subprocess(
+        _bazel_run_command(
+            context, "//buildscripts:clang_format_version", [] if context.fix else ["--check"]
+        ),
+        cwd=context.repo_root,
+    )
+
+
 def run_clang_tidy_config(context: CheckContext, _matched: tuple[str, ...]) -> RunOutcome:
     from buildscripts.bazel_custom_formatter import validate_clang_tidy_configs
 

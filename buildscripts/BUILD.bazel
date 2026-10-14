@@ -8,6 +8,7 @@ exports_files([
     "candle_wrapper.py",
     "cheetah_source_generator.py",
     "clang_format_vscode.sh",
+    "clang_format_version.txt",
     "clang_tidy_config_gen.py",
     "jstoh.py",
     "msitrim.py",
@@ -15,6 +16,23 @@ exports_files([
     "symbols.orderfile",
     "symbols-al2023.orderfile",
 ])
+
+py_library(
+    name = "clang_format_version_lib",
+    srcs = ["clang_format_version.py"],
+    visibility = ["//visibility:public"],
+)
+
+py_binary(
+    name = "clang_format_version",
+    srcs = ["clang_format_version.py"],
+    args = [
+        "--clang-format",
+        "$(location @mongo_toolchain_v5//:clang_format)",
+    ],
+    data = ["@mongo_toolchain_v5//:clang_format"],
+    visibility = ["//visibility:public"],
+)
 
 py_library(
     name = "msitrim_deps",
