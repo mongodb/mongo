@@ -1532,6 +1532,9 @@ CursorMetrics OpDebug::getCursorMetrics(size_t opIndex) const {
     if (auto val = additiveMetrics.cardinalityEstimationMethods.getCode(); val && *val > 0) {
         ceMethods.setCode(*val);
     }
+    if (auto val = additiveMetrics.cardinalityEstimationMethods.getHyperLogLog(); val && *val > 0) {
+        ceMethods.setHyperLogLog(*val);
+    }
     metrics.setCardinalityEstimationMethods(ceMethods);
 
     metrics.setNDocsSampled(additiveMetrics.nDocsSampled.value_or(0));
@@ -1741,6 +1744,9 @@ void OpDebug::AdditiveMetrics::add(const AdditiveMetrics& otherMetrics) {
     cardinalityEstimationMethods.setCode(
         cardinalityEstimationMethods.getCode().value_or(0) +
         otherMetrics.cardinalityEstimationMethods.getCode().value_or(0));
+    cardinalityEstimationMethods.setHyperLogLog(
+        cardinalityEstimationMethods.getHyperLogLog().value_or(0) +
+        otherMetrics.cardinalityEstimationMethods.getHyperLogLog().value_or(0));
     nDocsSampled = addOptionals(nDocsSampled, otherMetrics.nDocsSampled);
     peakTrackedMemBytes = maxOptionals(peakTrackedMemBytes, otherMetrics.peakTrackedMemBytes);
     clusterPeakTrackedMemBytes =
@@ -1817,6 +1823,9 @@ void OpDebug::AdditiveMetrics::aggregateDataBearingNodeMetrics(
     cardinalityEstimationMethods.setCode(
         cardinalityEstimationMethods.getCode().value_or(0) +
         metrics.cardinalityEstimationMethods.getCode().value_or(0));
+    cardinalityEstimationMethods.setHyperLogLog(
+        cardinalityEstimationMethods.getHyperLogLog().value_or(0) +
+        metrics.cardinalityEstimationMethods.getHyperLogLog().value_or(0));
     nDocsSampled = nDocsSampled.value_or(0) + metrics.nDocsSampled;
     planShapeCounts.add(metrics.planShapeCounts);
     clusterPeakTrackedMemBytes =

@@ -143,6 +143,8 @@ CardinalityEstimate CardinalityEstimator::clampZeroEstimate(CardinalityEstimate 
             return CardinalityEstimate{CardinalityType{kMinCE}, ce.source()};
         case EstimationSource::Metadata:
         case EstimationSource::Code:
+        // A HyperLogLog sketch only estimates zero when it has seen no values.
+        case EstimationSource::HyperLogLog:
             return ce;
         case EstimationSource::Unknown:
             tasserted(12307002, "Encountered a CE with unknown source during clamping");

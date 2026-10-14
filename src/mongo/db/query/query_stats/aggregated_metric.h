@@ -191,6 +191,8 @@ struct AggregatedCardinalityEstimationMethods {
         counts.setMixed(counts.getMixed().value_or(0) + other.getMixed().value_or(0));
         counts.setMetadata(counts.getMetadata().value_or(0) + other.getMetadata().value_or(0));
         counts.setCode(counts.getCode().value_or(0) + other.getCode().value_or(0));
+        counts.setHyperLogLog(counts.getHyperLogLog().value_or(0) +
+                              other.getHyperLogLog().value_or(0));
     }
 
     /**

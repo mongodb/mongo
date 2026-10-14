@@ -117,6 +117,9 @@ struct [[MONGO_MOD_PUBLIC]] DataBearingNodeMetrics {
         cardinalityEstimationMethods.setCode(
             cardinalityEstimationMethods.getCode().value_or(0) +
             other.cardinalityEstimationMethods.getCode().value_or(0));
+        cardinalityEstimationMethods.setHyperLogLog(
+            cardinalityEstimationMethods.getHyperLogLog().value_or(0) +
+            other.cardinalityEstimationMethods.getHyperLogLog().value_or(0));
         nDocsSampled += other.nDocsSampled;
         planShapeCounts.add(other.planShapeCounts);
         clusterPeakTrackedMemBytes += other.clusterPeakTrackedMemBytes;
@@ -181,6 +184,9 @@ struct [[MONGO_MOD_PUBLIC]] DataBearingNodeMetrics {
             cardinalityEstimationMethods.getMetadata().value_or(0) + ce.getMetadata().value_or(0));
         cardinalityEstimationMethods.setCode(cardinalityEstimationMethods.getCode().value_or(0) +
                                              ce.getCode().value_or(0));
+        cardinalityEstimationMethods.setHyperLogLog(
+            cardinalityEstimationMethods.getHyperLogLog().value_or(0) +
+            ce.getHyperLogLog().value_or(0));
         nDocsSampled += metrics.getNDocsSampled();
         if (const auto& psc = metrics.getPlanShapeCounts()) {
             planShapeCounts.add(*psc);

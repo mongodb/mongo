@@ -1356,15 +1356,13 @@ boost::optional<CardinalityEstimate> SamplingEstimatorImpl::tryEstimateNDVFromPe
             return boost::none;
         }
 
-        // EstimationSource::Sampling keeps downstream ranking behavior identical to the
-        // sample-based estimate; explain surfaces the persisted origin via
-        // fieldStatsMetadata instead.
         CardinalityEstimate persistedEstimate{CardinalityType{static_cast<double>(ndv)},
-                                              EstimationSource::Sampling};
+                                              EstimationSource::HyperLogLog};
         // The statistics may predate writes; never serve more than the current collection
-        // cardinality (the sample-based path below clamps the same way).
+        // cardinality (the sample-based path below clamps the same way). The capped value keeps
+        // its HyperLogLog source: callers can use the source to tell how the NDV was obtained.
         if (cost_based_ranker::exactGt(persistedEstimate, _collectionCard)) {
-            persistedEstimate = _collectionCard;
+            persistedEstimate = {_collectionCard.cardinality(), EstimationSource::HyperLogLog};
         }
         // Surfaced in explain as queryPlanner.fieldStatsMetadata.<ns>.ndv, one entry per
         // statistics document, however many of its variants were served.
@@ -1429,7 +1427,7 @@ CardinalityEstimate SamplingEstimatorImpl::estimateNDV(
                     "uniqueDocCount"_attr = *_uniqueDocCount,
                     "sampleSize"_attr = _sampleSize,
                     "collectionCard"_attr = _collectionCard);
-        return _collectionCard;
+        return {_collectionCard.cardinality(), EstimationSource::Sampling};
     }
 
     tassert(12237901,
@@ -1458,7 +1456,7 @@ CardinalityEstimate SamplingEstimatorImpl::estimateNDV(
                     "sampleNDV"_attr = sampleNDV,
                     "estimate"_attr = estimate,
                     "collectionCard"_attr = _collectionCard);
-        estimate = _collectionCard;
+        estimate = {_collectionCard.cardinality(), EstimationSource::Sampling};
     }
     return estimate;
 }

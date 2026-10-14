@@ -174,6 +174,7 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
                     Mixed: NumberLong(0),
                     Metadata: NumberLong(0),
                     Code: NumberLong(0),
+                    HyperLogLog: NumberLong(0),
                 },
                 `cardinalityEstimationMethods should be all zeros when CBR not used: ${tojson(cbrSection)}`,
             );
@@ -254,6 +255,7 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
                         Mixed: NumberLong(0),
                         Metadata: NumberLong(0),
                         Code: NumberLong(0),
+                        HyperLogLog: NumberLong(0),
                     },
                     `cardinalityEstimationMethods should be all zeros when CBR not used: ${tojson(cbrSection)}`,
                 );
@@ -419,6 +421,7 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
                         Mixed: NumberLong(0),
                         Metadata: NumberLong(0),
                         Code: NumberLong(0),
+                        HyperLogLog: NumberLong(0),
                     });
                 } else {
                     // 'coll' has 100 documents, which is smaller than the default sample size
@@ -433,6 +436,7 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
                         Mixed: NumberLong(0),
                         Metadata: NumberLong(0),
                         Code: NumberLong(1),
+                        HyperLogLog: NumberLong(0),
                     });
                 }
             } finally {
@@ -491,6 +495,7 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
                         Mixed: NumberLong(0),
                         Metadata: NumberLong(0),
                         Code: NumberLong(0),
+                        HyperLogLog: NumberLong(0),
                     });
                 } else {
                     // 'multiSolnColl' has 200 documents, which is smaller than the default
@@ -503,6 +508,7 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
                         Mixed: NumberLong(0),
                         Metadata: NumberLong(0),
                         Code: NumberLong(1),
+                        HyperLogLog: NumberLong(0),
                     });
                     assert.gt(
                         cbrSection.nDocsSampled.sum,
@@ -564,6 +570,7 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
                         Mixed: NumberLong(0),
                         Metadata: NumberLong(0),
                         Code: NumberLong(0),
+                        HyperLogLog: NumberLong(0),
                     },
                     `cardinalityEstimationMethods should be all zeros when CBR not used: ${tojson(cbrSection)}`,
                 );
@@ -627,6 +634,7 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
                         Mixed: NumberLong(0),
                         Metadata: NumberLong(0),
                         Code: NumberLong(0),
+                        HyperLogLog: NumberLong(0),
                     });
                     assert.eq(cbrSection.nDocsSampled.sum, 0);
                 } else {
@@ -637,6 +645,7 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
                         Mixed: NumberLong(0),
                         Metadata: NumberLong(0),
                         Code: NumberLong(0),
+                        HyperLogLog: NumberLong(0),
                     });
                     assert.gt(
                         cbrSection.nDocsSampled.sum,
@@ -713,6 +722,7 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
                         Mixed: NumberLong(0),
                         Metadata: NumberLong(0),
                         Code: NumberLong(0),
+                        HyperLogLog: NumberLong(0),
                     },
                     `cardinalityEstimationMethods should be all zeros when CBR falls back to MP: ${tojson(cbrSection)}`,
                 );
@@ -785,6 +795,7 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
                     Mixed: NumberLong(0),
                     Metadata: NumberLong(0),
                     Code: NumberLong(0),
+                    HyperLogLog: NumberLong(0),
                 });
                 assert.eq(cbrSection.nDocsSampled.sum, 0);
 
@@ -811,6 +822,7 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
                         Mixed: NumberLong(0),
                         Metadata: NumberLong(0),
                         Code: NumberLong(0),
+                        HyperLogLog: NumberLong(0),
                     });
                     assert.eq(cbrSection.nDocsSampled.sum, 0);
                 } else {
@@ -821,6 +833,7 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
                         Mixed: NumberLong(0),
                         Metadata: NumberLong(0),
                         Code: NumberLong(0),
+                        HyperLogLog: NumberLong(0),
                     });
                     assert.gt(
                         cbrSection.nDocsSampled.sum,

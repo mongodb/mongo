@@ -425,6 +425,7 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
     CardinalityEstimationMethods ceMethods1;
     ceMethods1.setHistogram(1);
     ceMethods1.setSampling(1);
+    ceMethods1.setHyperLogLog(2);
     cursorMetrics.setCardinalityEstimationMethods(ceMethods1);
     cursorMetrics.setDelinquentAcquisitions(3);
     cursorMetrics.setTotalAcquisitionDelinquencyMillis(400);
@@ -488,6 +489,7 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
     ASSERT_EQ(additiveMetrics.cardinalityEstimationMethods.getMixed().value_or(0), 0);
     ASSERT_EQ(additiveMetrics.cardinalityEstimationMethods.getMetadata().value_or(0), 0);
     ASSERT_EQ(additiveMetrics.cardinalityEstimationMethods.getCode().value_or(0), 0);
+    ASSERT_EQ(additiveMetrics.cardinalityEstimationMethods.getHyperLogLog().value_or(0), 2);
     ASSERT_EQ(*additiveMetrics.nDocsSampled, 25);
     ASSERT_EQ(
         additiveMetrics.planShapeCounts.getCount(plan_shape_counters::PlanShapeCounter::kCollscan),
@@ -590,6 +592,7 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateDataBearingNodeMetrics) {
     additiveMetrics.overdueInterruptApproxMax = Milliseconds(100);
     additiveMetrics.planningTime = Microseconds(100);
     additiveMetrics.cardinalityEstimationMethods.setHeuristics(2);
+    additiveMetrics.cardinalityEstimationMethods.setHyperLogLog(1);
     additiveMetrics.nDocsSampled = 10;
     additiveMetrics.clusterPeakTrackedMemBytes = 1000;
 
@@ -614,6 +617,7 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateDataBearingNodeMetrics) {
     remoteMetrics.cardinalityEstimationMethods.setHeuristics(1);
     remoteMetrics.cardinalityEstimationMethods.setHistogram(1);
     remoteMetrics.cardinalityEstimationMethods.setSampling(1);
+    remoteMetrics.cardinalityEstimationMethods.setHyperLogLog(2);
     remoteMetrics.nDocsSampled = 15;
     remoteMetrics.clusterPeakTrackedMemBytes = 2048;
 
@@ -642,6 +646,7 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateDataBearingNodeMetrics) {
     ASSERT_EQ(additiveMetrics.cardinalityEstimationMethods.getMixed().value_or(0), 0);
     ASSERT_EQ(additiveMetrics.cardinalityEstimationMethods.getMetadata().value_or(0), 0);
     ASSERT_EQ(additiveMetrics.cardinalityEstimationMethods.getCode().value_or(0), 0);
+    ASSERT_EQ(additiveMetrics.cardinalityEstimationMethods.getHyperLogLog().value_or(0), 3);
     ASSERT_EQ(*additiveMetrics.nDocsSampled, 25);
     ASSERT_EQ(*additiveMetrics.clusterPeakTrackedMemBytes, 3048);
 }

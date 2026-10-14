@@ -2166,6 +2166,7 @@ TEST_F(SamplingEstimatorTest, EstimateNDVReturnsCollCardWhenDuplicateDocsFromSam
 
     auto ndv = estimator.estimateNDV({{.path = "a"}});
     ASSERT_EQ(ndv.toDouble(), static_cast<double>(card));
+    ASSERT_EQ(ndv.source(), cost_based_ranker::EstimationSource::Sampling);
 }
 
 TEST_F(SamplingEstimatorTest, EstimateNDVUsesNRWhenFieldGenuinelyNonUnique) {

@@ -1904,6 +1904,7 @@ void verifyQueryStatsBSON(QueryStatsEntry& qse, const QueryStatsBSONParams& para
         ceMethods.setMixed(params.cardinalityEstimationMethods.getMixed().value_or(0));
         ceMethods.setMetadata(params.cardinalityEstimationMethods.getMetadata().value_or(0));
         ceMethods.setCode(params.cardinalityEstimationMethods.getCode().value_or(0));
+        ceMethods.setHyperLogLog(params.cardinalityEstimationMethods.getHyperLogLog().value_or(0));
         ceMethods.serialize(&methodsBuilder);
         methodsBuilder.done();
 

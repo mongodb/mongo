@@ -89,6 +89,11 @@ structs:
                 type: long
                 optional: true
                 stability: unstable
+            HyperLogLog:
+                description: "Count of estimates computed by HyperLogLog NDV statistics."
+                type: long
+                optional: true
+                stability: unstable
 
     CursorMetrics:
         description: "A struct representing all of the metrics a cursor response can return."

@@ -269,6 +269,9 @@ void captureCardinalityEstimationMethodForQueryStats(
                 case cost_based_ranker::EstimationSource::Code:
                     ceMethods.setCode(ceMethods.getCode().value_or(0) + 1);
                     break;
+                case cost_based_ranker::EstimationSource::HyperLogLog:
+                    ceMethods.setHyperLogLog(ceMethods.getHyperLogLog().value_or(0) + 1);
+                    break;
                 default:
                     MONGO_UNREACHABLE_TASSERT(11560601);
                     break;

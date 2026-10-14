@@ -123,7 +123,7 @@ protected:
      *
      * Policy:
      *   - Sampling, Histogram, Heuristics, Mixed -> kMinCE ("at least one row")
-     *   - Metadata, Code -> untouched (authoritative zeros)
+     *   - Metadata, Code, HyperLogLog -> untouched (authoritative zeros)
      *
      * Authoritative zeros are deliberately preserved; the 'CostEstimator' handles them via an
      * additive per-stage minimum so structurally different plans still receive distinct costs.
@@ -133,7 +133,7 @@ protected:
     /**
      * Apply the "at least one row" floor to a single estimate: zero-valued approximate-source
      * (Sampling / Histogram / Heuristics / Mixed) estimates become 'kMinCE'; authoritative
-     * (Metadata / Code) zeros are returned untouched.
+     * (Metadata / Code / HyperLogLog) zeros are returned untouched.
      */
     CardinalityEstimate clampZeroEstimate(CardinalityEstimate ce);
 

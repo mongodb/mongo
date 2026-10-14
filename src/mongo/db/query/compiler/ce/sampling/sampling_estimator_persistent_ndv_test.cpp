@@ -250,7 +250,11 @@ TEST_F(PersistentNDVTest, MetadataEmptyWithoutServedEstimates) {
 
 TEST_F(PersistentNDVTest, ServesPersistedNDV) {
     persistNDV(kPersistedNDV);
-    ASSERT_EQ(estimateForA(), kPersistedNDV);
+    withEstimator([&](SamplingEstimatorForTesting& estimator) {
+        const auto estimate = estimator.estimateNDV({{.path = "a"}});
+        ASSERT_EQ(estimate.toDouble(), kPersistedNDV);
+        ASSERT_EQ(estimate.source(), cost_based_ranker::EstimationSource::HyperLogLog);
+    });
 }
 
 TEST_F(PersistentNDVTest, FallsBackWhenDisabled) {
@@ -314,7 +318,11 @@ TEST_F(PersistentNDVTest, FallsBackForDifferentCollectionUuid) {
 
 TEST_F(PersistentNDVTest, ClampsToCollectionCardinality) {
     persistNDV(10 * kCollCard);
-    ASSERT_EQ(estimateForA(), kCollCard);
+    withEstimator([&](SamplingEstimatorForTesting& estimator) {
+        const auto estimate = estimator.estimateNDV({{.path = "a"}});
+        ASSERT_EQ(estimate.toDouble(), kCollCard);
+        ASSERT_EQ(estimate.source(), cost_based_ranker::EstimationSource::HyperLogLog);
+    });
 }
 
 TEST_F(PersistentNDVTest, ZeroSketchesFallsBack) {

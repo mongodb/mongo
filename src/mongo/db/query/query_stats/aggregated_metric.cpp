@@ -28,6 +28,7 @@ void AggregatedCardinalityEstimationMethods::appendTo(BSONObjBuilder& builder,
         .append("Heuristics", static_cast<long long>(counts.getHeuristics().value_or(0)))
         .append("Mixed", static_cast<long long>(counts.getMixed().value_or(0)))
         .append("Metadata", static_cast<long long>(counts.getMetadata().value_or(0)))
-        .append("Code", static_cast<long long>(counts.getCode().value_or(0)));
+        .append("Code", static_cast<long long>(counts.getCode().value_or(0)))
+        .append("HyperLogLog", static_cast<long long>(counts.getHyperLogLog().value_or(0)));
 }
 }  // namespace mongo::query_stats

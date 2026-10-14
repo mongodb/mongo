@@ -53,6 +53,7 @@ void EstimateBase::mergeSources(const EstimateBase& other) {
                     case EstimationSource::Sampling:
                     case EstimationSource::Heuristics:
                     case EstimationSource::Mixed:
+                    case EstimationSource::HyperLogLog:
                         return EstimationSource::Mixed;
                     case EstimationSource::Metadata:
                     case EstimationSource::Code:
@@ -64,7 +65,7 @@ void EstimateBase::mergeSources(const EstimateBase& other) {
                 switch (b) {
                     case EstimationSource::Mixed:
                     case EstimationSource::Heuristics:
-                        return EstimationSource::Mixed;
+                    case EstimationSource::HyperLogLog:
                         return EstimationSource::Mixed;
                     case EstimationSource::Metadata:
                     case EstimationSource::Code:
@@ -75,6 +76,7 @@ void EstimateBase::mergeSources(const EstimateBase& other) {
             case EstimationSource::Heuristics:
                 switch (b) {
                     case EstimationSource::Mixed:
+                    case EstimationSource::HyperLogLog:
                         return EstimationSource::Mixed;
                     case EstimationSource::Metadata:
                     case EstimationSource::Code:
@@ -86,6 +88,7 @@ void EstimateBase::mergeSources(const EstimateBase& other) {
                 switch (b) {
                     case EstimationSource::Metadata:
                     case EstimationSource::Code:
+                    case EstimationSource::HyperLogLog:
                         return EstimationSource::Mixed;
                     default:
                         MONGO_UNREACHABLE_TASSERT(9695204);
@@ -94,8 +97,17 @@ void EstimateBase::mergeSources(const EstimateBase& other) {
                 switch (b) {
                     case EstimationSource::Code:
                         return EstimationSource::Metadata;
+                    case EstimationSource::HyperLogLog:
+                        return EstimationSource::HyperLogLog;
                     default:
                         MONGO_UNREACHABLE_TASSERT(9695203);
+                }
+            case EstimationSource::Code:
+                switch (b) {
+                    case EstimationSource::HyperLogLog:
+                        return EstimationSource::HyperLogLog;
+                    default:
+                        MONGO_UNREACHABLE_TASSERT(13366901);
                 }
             default:
                 MONGO_UNREACHABLE_TASSERT(9695201);

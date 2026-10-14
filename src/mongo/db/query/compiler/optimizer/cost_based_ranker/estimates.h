@@ -66,6 +66,7 @@ QUERY_UTIL_NAMED_ENUM_DEFINE(EstimationUnit, ESTIMATION_UNITS_NAMES);
  * Metadata - the estimate comes from database metadata like collection cardinality
  * Code - the estimate is computed directly in C++, for instance a constant, expression, or
  *         computation via exactCE. Most often used for internal testing.
+ * HyperLogLog - the estimate is based on HyperLogLog NDV statistics.
  */
 #define ESTIMATION_SOURCE_NAMES(F) \
     F(Histogram)                   \
@@ -74,6 +75,7 @@ QUERY_UTIL_NAMED_ENUM_DEFINE(EstimationUnit, ESTIMATION_UNITS_NAMES);
     F(Mixed)                       \
     F(Metadata)                    \
     F(Code)                        \
+    F(HyperLogLog)                 \
     F(Unknown)
 QUERY_UTIL_NAMED_ENUM_DEFINE(EstimationSource, ESTIMATION_SOURCE_NAMES);
 #undef ESTIMATION_SOURCE_NAMES
@@ -274,15 +276,16 @@ public:
      * - The combination of any other two different types of sources results in the Mixed type.
      *
      * These rules result in the following state table:
-     * --------------------------------------------------------------------
-     *            | Histogram  Sampling Heuristics Mixed  Metadata   Code
-     * --------------------------------------------------------------------
-     * Histogram  | Histogram  Mixed    Mixed      Mixed  Histogram  Histogram
-     * Sampling   |            Sampling Mixed      Mixed  Sampling   Sampling
-     * Heuristics |                     Heuristics Mixed  Heuristics Heuristics
-     * Mixed      |                                Mixed  Mixed      Mixed
-     * Metadata   |                                       Metadata   Metadata
-     * Code       |                                                  Code
+     * ----------------------------------------------------------------------------------------
+     *             | Histogram Sampling Heuristics Mixed Metadata   Code       HyperLogLog
+     * ----------------------------------------------------------------------------------------
+     * Histogram   | Histogram Mixed    Mixed      Mixed Histogram  Histogram  Mixed
+     * Sampling    |           Sampling Mixed      Mixed Sampling   Sampling   Mixed
+     * Heuristics  |                    Heuristics Mixed Heuristics Heuristics Mixed
+     * Mixed       |                               Mixed Mixed      Mixed      Mixed
+     * Metadata    |                                     Metadata   Metadata   HyperLogLog
+     * Code        |                                                Code       HyperLogLog
+     * HyperLogLog |                                                           HyperLogLog
      */
     void mergeSources(const EstimateBase& other);
 
