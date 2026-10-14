@@ -3,17 +3,16 @@
 
 #pragma once
 
-#include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/compiler/ce/ce_common.h"
 #include "mongo/db/query/compiler/ce/sampling/ce_multikey_dotted_path_support.h"
 #include "mongo/db/query/compiler/ce/sampling/persistent_sample_gen.h"
+#include "mongo/db/query/compiler/ce/sampling/sample.h"
+#include "mongo/db/query/compiler/ce/sampling/sample_spec.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
-#include "mongo/db/query/plan_yield_policy_sbe.h"
-#include "mongo/db/query/query_knobs/query_knob_configuration.h"
+#include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
-#include "mongo/db/query/stage_builder/sbe/builder_data.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
@@ -149,12 +148,12 @@ public:
         const NamespaceString& nss,
         PlanYieldPolicy::YieldPolicy yieldPolicy,
         size_t sampleSize,
-        SamplingCEMethodEnum samplingStyle,
+        SamplingCEMethodEnum onTheFlySamplingMethod,
         boost::optional<int> numChunks,
         CardinalityEstimate collectionCard,
         boost::intrusive_ptr<const ExpressionContext> customerQueryExpCtx,
         SamplingSourceEnum samplingSource = SamplingSourceEnum::kPersistentSample,
-        SamplingCEMethodEnum persistentSampleMethod = PersistentSampleCEMethod::kDataDefault);
+        SamplingCEMethodEnum persistentSamplingMethod = PersistentSampleCEMethod::kDataDefault);
 
     /*
      * Convenience constructor that accepts a raw record count instead of a CardinalityEstimate,
@@ -166,7 +165,7 @@ public:
         const NamespaceString& nss,
         PlanYieldPolicy::YieldPolicy yieldPolicy,
         size_t sampleSize,
-        SamplingCEMethodEnum samplingStyle,
+        SamplingCEMethodEnum onTheFlySamplingMethod,
         boost::optional<int> numChunks,
         long long numRecords,
         boost::intrusive_ptr<const ExpressionContext> customerQueryExpCtx,
@@ -255,14 +254,15 @@ public:
      * Returns the sample size calculated by SamplingEstimator.
      */
     inline size_t getSampleSize() const final {
-        return _sampleSize;
+        return _spec.sampleSize;
     }
 
     /**
      * Returns the collected sample documents.
      */
     const std::vector<BSONObj>& getSample() const {
-        return _sample;
+        tassert(13097204, "getSample() called before sample was generated", _sample.has_value());
+        return _sample->docs();
     }
 
     /*
@@ -355,43 +355,7 @@ public:
         return _collectionCard;
     }
 
-    /*
-     * Returns the sample size as set by the relevant knobs. Unless overridden, calculated from
-     * confidence interval and margin of error:
-     * n = Z^2 / W^2
-     * where Z is the z-score for the confidence interval
-     * and W is the width of the confidence interval, W = 2 * MoE.
-     */
-    static size_t calculateSampleSize(const QueryKnobConfiguration& qkc);
-
-    /**
-     * TODO SERVER-129240: Remove this helper once types are unified
-     * Converts a SamplingCEMethodEnum value into its equivalent SamplingTechniqueEnum value.
-     */
-    static ce::SamplingTechniqueEnum samplingMethodToTechnique(
-        SamplingCEMethodEnum samplingMethod) {
-        switch (samplingMethod) {
-            case SamplingCEMethodEnum::kRandom:
-                return ce::SamplingTechniqueEnum::kRandom;
-            case SamplingCEMethodEnum::kChunk:
-                return ce::SamplingTechniqueEnum::kChunk;
-            default:
-                MONGO_UNREACHABLE;
-        }
-    }
-
 protected:
-    /*
-     * This helper creates a CanonicalQuery for the sampling plan. This CanonicalQuery is "empty"
-     * because its sole purpose is to be passed to 'prepareSlotBasedExecutableTree()' as part of
-     * preparing the sampling plan for execution in SBE. That function uses the CanonicalQuery to
-     * bind input parameters, but this is a no-op for sampling CE.
-     */
-    static std::unique_ptr<CanonicalQuery> makeEmptyCanonicalQuery(
-        const NamespaceString& nss,
-        OperationContext* opCtx,
-        boost::intrusive_ptr<const ExpressionContext> customerQueryExpCtx);
-
     /**
      * This helper calls the given callback for each document
      * in a given vector that matches the given bounds.
@@ -418,11 +382,10 @@ protected:
     }
 
     // The sample is stored in memory for estimating the cardinality of all predicates of one query
-    // request. The sample will be freed on destruction of the SamplingEstimator instance or when a
-    // re-sample is requested. A new sample will replace this.
-    std::vector<BSONObj> _sample;
-    size_t _sampleSize;
-    bool _isSampleGenerated = false;
+    // request. It is unset until generateSample() loads it. The sample will be freed on destruction
+    // of the SamplingEstimator instance or when a re-sample is requested. A new sample will replace
+    // this.
+    boost::optional<Sample> _sample;
     // Lazily computed on the first estimateNDV() call. Counts the number of documents with
     // distinct _id values in the sample to detect duplicates from sampling with replacement.
     mutable boost::optional<size_t> _uniqueDocCount;
@@ -434,11 +397,10 @@ protected:
     // Field paths whose NDV was served from persisted statistics; surfaced in explain via
     // getSamplingMetadata().
     mutable std::vector<PersistedNDVEntry> _persistedNDVStatsUsed;
-    // Set to true when tryLoadPersistentSample() successfully loads sample from stats collection.
-    bool _wasSamplePersisted = false;
-    SamplingCEMethodEnum _persistentSampleMethod;
-    // On-the-fly sampling technique used when no persisted sample is loaded.
-    SamplingCEMethodEnum _samplingStyle;
+    // Specification of the sample requested by this estimator.
+    SampleSpec _spec;
+    // Cardinality of the collection the sample is drawn from.
+    CardinalityEstimate _collectionCard;
 
 private:
     /**
@@ -463,68 +425,6 @@ private:
     boost::optional<PersistedNDVEntry> loadPersistedNDVStats(const SortedFieldPaths& sortedPaths,
                                                              size_t numFields) const;
 
-    /**
-     * Constructs a sampling SBE plan using the random-walk method.
-     * The SBE plan consists of a sbe::ScanStage which uses a random cursor to read documents
-     * randomly from the collection and a sbe::LimitSkipStage on the top of the scan stage to limit
-     * '_sampleSize' of the documents for the sample.
-     */
-    std::pair<std::unique_ptr<sbe::PlanStage>, mongo::stage_builder::PlanStageData>
-    generateRandomSamplingPlan(PlanYieldPolicySBE* sbeYieldPolicy);
-
-    /**
-     * Constructs a sampling SBE plan using the chunk-based method.
-     */
-    std::pair<std::unique_ptr<sbe::PlanStage>, mongo::stage_builder::PlanStageData>
-    generateChunkSamplingPlan(PlanYieldPolicySBE* sbeYieldPolicy);
-
-    /**
-     * Generates a sample by doing a full "CollScan" against the target collection. This sample is
-     * generated when the collection size is smaller than the required sample size.
-     */
-    void generateFullCollScanSample();
-
-    /**
-     * Builds and runs an on-the-fly sampling plan for 'technique'.
-     */
-    void generateSampleForTechnique(SamplingTechniqueEnum technique);
-
-    /**
-     * This function executes the sampling query and generates the sample from the documents
-     * produced by the query.
-     */
-    void executeSamplingQueryAndSample(
-        std::pair<std::unique_ptr<sbe::PlanStage>, mongo::stage_builder::PlanStageData>& plan,
-        std::unique_ptr<CanonicalQuery> cq,
-        std::unique_ptr<PlanYieldPolicySBE> sbeYieldPolicy);
-
-    /**
-     * Generates a repeatable sample for testing using one of the deterministic scan-based
-     * techniques:
-     *   - kSeqScan: sequentially scan from the start of the collection and take the first
-     *     '_sampleSize' documents.
-     *   - kStrides: sequentially scan and keep documents whose _id satisfies
-     *     shardHash(_id) % M == 0, where M = max(1, collCard / sampleSize). shardHash uses
-     *     BSONElementHasher, which is stable across process restarts. The result is capped at
-     *     '_sampleSize' documents.
-     */
-    void generateSampleForTesting(SamplingTechniqueEnum technique);
-
-    /**
-     * Helper to get SamplingTechnique from test-only knobs
-     */
-    boost::optional<SamplingTechniqueEnum> getTestOnlySamplingModeIfSet();
-
-    /**
-     * If '_samplingSource' is kPersistentSample, attempts to load a previously persisted sample
-     * for the given method + size from `<db>.system.stats.samples` using a DBDirectClient point
-     * lookup. Returns Status::OK() and populates '_sample' and '_sampleSize' on hit. Returns a
-     * non-OK status otherwise: NoSuchKey for a clean miss or misconfiguration, another code for
-     * a malformed doc. The caller is responsible for logging non-NoSuchKey failures and falling
-     * back to SBE sampling.
-     */
-    Status tryLoadPersistentSample(SamplingTechniqueEnum method);
-
     OperationContext* _opCtx;
     // The collection the sampling plan runs against and is the one accessed by the query being
     // optimized.
@@ -532,33 +432,6 @@ private:
     boost::intrusive_ptr<const ExpressionContext> _customerQueryExpCtx;
     NamespaceString _nss;
     PlanYieldPolicy::YieldPolicy _yieldPolicy;
-    // The set of top level fields that we want to include in the sampled documents.
-    StringSet _topLevelSampleFieldNames;
-
-    boost::optional<int> _numChunks;
-
-    CardinalityEstimate _collectionCard;
-
-    // Controls whether persistent samples are consulted before falling back to SBE sampling.
-    // 'analyze' constructs its estimator with kOnTheFlySample so it always collects a fresh sample
-    // (otherwise a refresh would just re-read the sample it's about to replace).
-    SamplingSourceEnum _samplingSource;
-
-    // The timestamp when the sample was created. For persisted samples this is read from the
-    // stored document; for on-the-fly samples it is set to Date_t::now() at the end of
-    // generateSample(). Always valid after generateSample() completes.
-    boost::optional<Date_t> _sampleCreatedAt;
-    // The number of documents requested when generateSample() was called. May differ from the
-    // actual sample size (_sampleSize) in the following cases:
-    //   1. The collection is smaller than the requested sample size (full collection scan used).
-    //   2. Chunk-based sampling: if a random cursor lands on the last document in the collection,
-    //      no full chunk can be collected for that cursor, so the actual sample is smaller.
-    size_t _requestedSampleSize = 0;
-    // The actual sampling strategy used. Set by generateSample() before dispatch.
-    boost::optional<SamplingTechniqueEnum> _usedSamplingTechnique;
-
-    // Only set when tryLoadPersistentSample() successfully loads a persisted sample.
-    boost::optional<size_t> _numPages;
 };
 
 }  // namespace mongo::ce

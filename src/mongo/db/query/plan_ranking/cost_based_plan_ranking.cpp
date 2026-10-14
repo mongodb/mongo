@@ -7,6 +7,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/runtime_planners/classic_runtime_planner/planner_interface.h"
 #include "mongo/db/exec/runtime_planners/planner_interface.h"
+#include "mongo/db/query/compiler/ce/sampling/sample_spec.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 #include "mongo/db/query/plan_ranking/cbr_plan_ranking.h"
@@ -30,7 +31,7 @@ using namespace cost_based_ranker;
 CostEstimate estimateCBRCost(const CanonicalQuery& query,
                              const std::vector<std::unique_ptr<QuerySolution>>& solutions) {
     const auto& qkc = query.getExpCtx()->getQueryKnobConfiguration();
-    auto sampleSize = ce::SamplingEstimatorImpl::calculateSampleSize(qkc);
+    auto sampleSize = ce::calculateSampleSize(qkc);
 
     const auto randomSampleInc = makeCostCoefficient(nsec(1400));
     const auto matchExprInc = makeCostCoefficient(nsec(160));

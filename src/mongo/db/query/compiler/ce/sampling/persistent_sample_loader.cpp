@@ -8,20 +8,27 @@
 #include "mongo/db/commands/server_status/histogram_server_status_metric.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/exec/collection_scan_common.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/namespace_string_util.h"
 #include "mongo/db/query/compiler/ce/sampling/persistent_sample_gen.h"
+#include "mongo/db/query/compiler/ce/sampling/sample_spec.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/record_id_bound.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/stats/counters.h"
+#include "mongo/db/version_context.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/str.h"
 
 #include <algorithm>
@@ -34,26 +41,9 @@
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQueryCE
-
 namespace mongo::ce {
 
 namespace {
-/**
- * Maximum overhead a single object element could add to an open BSON array:
- *  - 1 byte for the element type
- *  - 1 byte for the field name's NUL terminator
- *  - 1 byte per digit of the max possible array index.
- */
-const int kArrayElementMaxOverheadBytes =
-    2 + static_cast<int>(std::to_string(BSONObjMaxUserSize / BSONObj::kMinBSONLength).length());
-
-/**
- * Trailing bytes required close a page's open `docs` array and its enclosing object.
- * 1 EOO byte per open scope.
- */
-constexpr int kBytesToClosePage = 2;
-
 /**
  * Separator between the parts of a persistent sample `_id`. Must sort strictly greater than every
  * digit so that a sample whose identity prefix is a numeric prefix of another's (e.g. sampleSize
@@ -112,31 +102,55 @@ std::string makePersistentSampleIdPrefix(const UUID& collectionUuid,
 }
 
 /**
- * Appends every field of a sample page document except the `docs` array, leaving `builder` ready
- * for the caller to append that array.
+ * Scans the persistent samples collection for every page of the sample within the
+ * provided range (inclusive)
  */
-void appendSamplePageMetadata(BSONObjBuilder& builder,
-                              const UUID& collectionUuid,
-                              SamplingTechniqueEnum method,
-                              size_t sampleSize,
-                              boost::optional<int> numChunks,
-                              int pageNo,
-                              Date_t createdAt) {
-    const std::string id =
-        makePersistentSampleId(collectionUuid, method, sampleSize, numChunks, pageNo);
+StatusWith<std::vector<BSONObj>> findPersistentSamplePages(OperationContext* opCtx,
+                                                           const NamespaceString& samplesNss,
+                                                           std::string_view minId,
+                                                           std::string_view maxId) {
+    std::vector<BSONObj> pages;
+    try {
+        const auto collection = acquireCollectionMaybeLockFree(
+            opCtx,
+            CollectionAcquisitionRequest(samplesNss,
+                                         PlacementConcern::kPretendUnsharded,
+                                         repl::ReadConcernArgs::get(opCtx),
+                                         AcquisitionPrerequisites::kRead));
+        if (!collection.exists()) {
+            return Status(ErrorCodes::NoSuchKey, "samples collection does not exist");
+        }
 
-    builder.append(PersistentSampleDoc::k_idFieldName, id);
-    builder.append(PersistentSampleDoc::kPageNoFieldName, pageNo);
-    builder.append(PersistentSampleDoc::kCollectionUuidFieldName, collectionUuid.toString());
-    builder.append(PersistentSampleDoc::kSchemaVersionFieldName, kPersistentSampleSchemaVersion);
-    builder.appendDate(PersistentSampleDoc::kCreatedAtFieldName, createdAt);
-    builder.append(PersistentSampleDoc::kSampleSizeFieldName, static_cast<long long>(sampleSize));
-    builder.append(PersistentSampleDoc::kSamplingMethodFieldName, idlSerialize(method));
-    if (method == SamplingTechniqueEnum::kChunk) {
-        builder.append(PersistentSampleDoc::kNumChunksFieldName, *numChunks);
+        if (!collection.getCollectionPtr()->isClustered()) {
+            // TODO SERVER-131864 consider if this should tassert instead
+            return Status(ErrorCodes::UnsupportedFormat,
+                          "samples collection is not clustered on _id");
+        }
+
+        const auto recordIdForId = [](std::string_view id) {
+            return RecordIdBound(
+                record_id_helpers::keyForObj(BSON(PersistentSampleDoc::k_idFieldName << id)));
+        };
+
+        auto exec = InternalPlanner::collectionScan(
+            opCtx,
+            collection,
+            PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+            InternalPlanner::FORWARD,
+            /*resumeAfterRecordId=*/boost::none,
+            recordIdForId(minId),
+            recordIdForId(maxId),
+            CollectionScanParams::ScanBoundInclusion::kIncludeBothStartAndEndRecords);
+
+        BSONObj pageDoc;
+        while (exec->getNext(&pageDoc, nullptr) == PlanExecutor::ADVANCED) {
+            pages.push_back(pageDoc.getOwned());
+        }
+    } catch (const DBException& ex) {
+        return ex.toStatus();
     }
+    return pages;
 }
-
 
 }  // namespace
 
@@ -172,113 +186,6 @@ std::pair<std::string, std::string> makePersistentSampleIdRange(const UUID& coll
     minId.append(width, '0');
     maxId.append(width, '9');
     return {std::move(minId), std::move(maxId)};
-}
-
-std::vector<BSONObj> makePersistentSamplePageDocs(const UUID& collectionUuid,
-                                                  SamplingTechniqueEnum method,
-                                                  size_t sampleSize,
-                                                  boost::optional<int> numChunks,
-                                                  const std::vector<BSONObj>& sample,
-                                                  Date_t createdAt) {
-    // The `numDocsDiscarded` field needs to be the same across all pages and we can't determine it
-    // until after we've looped through the entire sample. So we store all the builders in a vector
-    // so that we can keep them open until we're ready to append `numDocsDiscarded` to the page.
-    // Then we can close them.
-    std::vector<BSONObjBuilder> builders;
-    size_t docIdx = 0;
-    int pageNo = 0;
-    size_t numDiscarded = 0;
-
-    const double maxDiscardFraction = internalQueryMaxPersistentSampleDiscardFraction.load();
-    do {
-        builders.emplace_back();
-        auto& builder = builders.back();
-        appendSamplePageMetadata(
-            builder, collectionUuid, method, sampleSize, numChunks, pageNo, createdAt);
-        BSONArrayBuilder docsArr(builder.subarrayStart(PersistentSampleDoc::kDocsFieldName));
-
-        // Size of this page with its metadata but no documents.
-        const int emptyPageLenBytes = builder.len();
-
-        int docsOnPage = 0;
-        while (docIdx < sample.size()) {
-            const BSONObj& doc = sample[docIdx];
-
-            // Calculate the maximum number of bytes this document would add to a page.
-            const int docSizeWithOverheadBytes = doc.objsize() + kArrayElementMaxOverheadBytes +
-                kBytesToClosePage + kNumDocsDiscardedFieldBytes;
-
-            // Calculate the maximum size the page could be after adding this document.
-            const int projectedPageSize = builder.len() + docSizeWithOverheadBytes;
-
-            if (emptyPageLenBytes + docSizeWithOverheadBytes > BSONObjMaxUserSize) {
-                // A document that cannot fit on an otherwise empty page can never be persisted.
-                // Discard it and continue filling the current page, unless too much of the full
-                // sample has been discarded already.
-                ++numDiscarded;
-                ++docIdx;
-                LOGV2_WARNING(13106001,
-                              "Discarding sampled document that exceeds the maximum persistable "
-                              "size",
-                              "collectionUuid"_attr = collectionUuid,
-                              "docSizeBytes"_attr = doc.objsize(),
-                              "numDiscarded"_attr = numDiscarded,
-                              "sampleSize"_attr = sample.size());
-                uassert(13106000,
-                        str::stream() << "Sampled documents discarded due to exceeding the maximum "
-                                         "persistable size ("
-                                      << numDiscarded << " of " << sample.size()
-                                      << ") exceed the maximum discardable fraction of the sample ("
-                                      << maxDiscardFraction * 100 << "%)",
-                        static_cast<double>(numDiscarded) <=
-                            maxDiscardFraction * static_cast<double>(sample.size()));
-                continue;
-            } else if (projectedPageSize > BSONObjMaxUserSize) {
-                // This doc doesn't fit on the current page but might fit on a fresh one. Leave
-                // it for the next page.
-                break;
-            }
-            docsArr.append(doc);
-            ++docsOnPage;
-            ++docIdx;
-        }
-
-
-        docsArr.done();
-
-        // Every doc left for this page turned out to be too large to persist, so the page would be
-        // empty. Don't persist an empty page unless it is the only page of an empty sample.
-        if (docsOnPage == 0 && pageNo > 0) {
-            builders.pop_back();
-            break;
-        }
-
-        ++pageNo;
-    } while (docIdx < sample.size());
-
-    std::vector<BSONObj> pages;
-    pages.reserve(builders.size());
-    for (auto& builder : builders) {
-        builder.append(PersistentSampleDoc::kNumDocsDiscardedFieldName,
-                       static_cast<long long>(numDiscarded));
-        BSONObj page = builder.obj();
-        tassert(13044800,
-                str::stream() << "Assembled sample page of " << page.objsize()
-                              << " bytes exceeds the maximum BSON size of " << BSONObjMaxUserSize
-                              << " bytes",
-                page.objsize() <= BSONObjMaxUserSize);
-        pages.push_back(std::move(page));
-    }
-    return pages;
-}
-
-BSONObj makePersistentSampleAllPagesLookupFilter(const UUID& collectionUuid,
-                                                 SamplingTechniqueEnum method,
-                                                 size_t sampleSize,
-                                                 boost::optional<int> numChunks) {
-    const auto [minId, maxId] =
-        makePersistentSampleIdRange(collectionUuid, method, sampleSize, numChunks);
-    return BSON(PersistentSampleDoc::k_idFieldName << BSON("$gte" << minId << "$lte" << maxId));
 }
 
 StatusWith<PersistentSampleDoc> parsePersistentSample(const BSONObj& doc) {
@@ -415,6 +322,21 @@ StatusWith<PersistentSampleDoc> reassemblePersistentSample(std::vector<BSONObj> 
 }
 
 namespace {
+auto& persistentSampleHits = *MetricBuilder<Counter64>{"query.sampling.persistentSample.hits"};
+auto& persistentSampleMisses = *MetricBuilder<Counter64>{"query.sampling.persistentSample.misses"};
+
+// Latency of successfully loading a persistent sample
+auto& persistentSampleLoadMicros =
+    *MetricBuilder<DurationCounter64<Microseconds>>{"query.sampling.persistentSample.loadMicros"};
+// Histogram produces a vector bounds from 0.256 ms to 268000 ms (268 s)
+auto& persistentSampleLoadMicrosHistogram =
+    *MetricBuilder<HistogramServerStatusMetric>{
+        "query.sampling.persistentSample.histograms.loadMicros"}
+         .bind(HistogramServerStatusMetric::pow(11, 256, 4));
+
+auto& persistentSampleDocsLoaded =
+    *MetricBuilder<Counter64>{"query.sampling.persistentSample.docsLoaded"};
+
 // Histogram of pages read to reassemble a loaded persistent sample. Bounds are 1 to 32 pages.
 auto& persistentSamplePagesReadHistogram =
     *MetricBuilder<HistogramServerStatusMetric>{
@@ -426,76 +348,99 @@ auto& persistentSampleAgeAtReadHistogram =
     *MetricBuilder<HistogramServerStatusMetric>{
         "query.sampling.persistentSample.histograms.sampleAgeAtReadMillis"}
          .bind(HistogramServerStatusMetric::pow(26, 1000, 2));
+
+// Only cases where a sample wasn't found are counted as misses, not cases of malformed
+// content/samples collection.
+void recordPersistentSampleFailure(const Status& status) {
+    if (status.code() == ErrorCodes::NoSuchKey) {
+        persistentSampleMisses.incrementRelaxed();
+    }
+}
+
+// Records the metrics for a sample that was loaded successfully.
+void recordPersistentSampleSuccess(TickSource* tickSource,
+                                   TickSource::Tick startTicks,
+                                   const Sample& sample,
+                                   size_t pagesRead) {
+    auto loadMicros = tickSource->ticksTo<Microseconds>(tickSource->getTicks() - startTicks);
+    persistentSampleLoadMicros.increment(loadMicros);
+    persistentSampleLoadMicrosHistogram.increment(durationCount<Microseconds>(loadMicros));
+    persistentSampleHits.incrementRelaxed();
+    persistentSamplePagesReadHistogram.increment(pagesRead);
+    const Date_t now = Date_t::now();
+    const Date_t createdAt = sample.createdAt();
+    // A sample stamped in the future normalized to 0 rather than a negative value.
+    const Milliseconds age = now > createdAt ? now - createdAt : Milliseconds(0);
+    persistentSampleAgeAtReadHistogram.increment(durationCount<Milliseconds>(age));
+    persistentSampleDocsLoaded.incrementRelaxed(sample.size());
+}
 }  // namespace
 
-StatusWith<LoadedPersistentSample> PersistentSampleLoader::tryLoad(
+std::unique_ptr<PersistentSampleLoader> makePersistentSampleLoader(
     OperationContext* opCtx,
-    const DatabaseName& dbName,
-    const UUID& collectionUuid,
-    SamplingTechniqueEnum method,
-    size_t sampleSize,
-    boost::optional<int> numChunks) const {
-    const NamespaceString nss = NamespaceStringUtil::deserialize(dbName, kSamplesCollectionName);
+    const MultipleCollectionAccessor& collections,
+    PlanYieldPolicy::YieldPolicy yieldPolicy,
+    boost::intrusive_ptr<const ExpressionContext> customerQueryExpCtx) {
+    return std::make_unique<PersistentSampleLoader>(
+        opCtx, collections, yieldPolicy, std::move(customerQueryExpCtx));
+}
+
+StatusWith<Sample> PersistentSampleLoader::tryLoad(const SampleSpec& spec) {
+    if (!feature_flags::gFeatureFlagPersistentStats.isEnabled(
+            VersionContext::getDecoration(_opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        return Status(ErrorCodes::NoSuchKey, "featureFlagPersistentStats is not enabled");
+    }
+    // TODO SERVER-131864: this should be a tassert rather than a status.
+    if (spec.samplingSource != SamplingSourceEnum::kPersistentSample) {
+        return Status(ErrorCodes::NoSuchKey, "sampling source is kOnTheFlySample");
+    }
+
+    const CollectionPtr& sourceCollection = _collections.lookupCollection(spec.nss);
+    if (!sourceCollection) {
+        return Status(ErrorCodes::NoSuchKey, "collection not found");
+    }
+
+    const SamplingTechniqueEnum method =
+        resolveSamplingTechnique(spec, static_cast<size_t>(sourceCollection->numRecords(_opCtx)));
+    const UUID collectionUuid = sourceCollection->uuid();
+    const boost::optional<int> numChunks =
+        (method == SamplingTechniqueEnum::kChunk) ? spec.numChunks : boost::none;
+
+    const NamespaceString samplesNss =
+        NamespaceStringUtil::deserialize(spec.nss.dbName(), kSamplesCollectionName);
+
+    auto* tickSource = _opCtx->getServiceContext()->getTickSource();
+    auto startTicks = tickSource->getTicks();
 
     // Perform a bounded range scan on the clustered samples collection to retrieve all pages in a
     // sample ordered by pageNo.
     const auto [minId, maxId] =
-        makePersistentSampleIdRange(collectionUuid, method, sampleSize, numChunks);
+        makePersistentSampleIdRange(collectionUuid, method, spec.sampleSize, numChunks);
 
-    const auto recordIdForId = [](std::string_view id) {
-        return RecordIdBound(
-            record_id_helpers::keyForObj(BSON(PersistentSampleDoc::k_idFieldName << id)));
-    };
+    auto scanStatus = findPersistentSamplePages(_opCtx, samplesNss, minId, maxId);
 
-    std::vector<BSONObj> pages;
-    try {
-        const auto collection = acquireCollectionMaybeLockFree(
-            opCtx,
-            CollectionAcquisitionRequest(nss,
-                                         PlacementConcern::kPretendUnsharded,
-                                         repl::ReadConcernArgs::get(opCtx),
-                                         AcquisitionPrerequisites::kRead));
-        if (!collection.exists()) {
-            return Status(ErrorCodes::NoSuchKey, "samples collection does not exist");
-        }
-
-        if (!collection.getCollectionPtr()->isClustered()) {
-            return Status(ErrorCodes::NoSuchKey, "samples collection is not clustered on _id");
-        }
-
-        auto exec = InternalPlanner::collectionScan(
-            opCtx,
-            collection,
-            PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
-            InternalPlanner::FORWARD,
-            /*resumeAfterRecordId=*/boost::none,
-            recordIdForId(minId),
-            recordIdForId(maxId),
-            CollectionScanParams::ScanBoundInclusion::kIncludeBothStartAndEndRecords);
-
-        BSONObj pageDoc;
-        while (exec->getNext(&pageDoc, nullptr) == PlanExecutor::ADVANCED) {
-            pages.push_back(pageDoc.getOwned());
-        }
-    } catch (const DBException& ex) {
-        return ex.toStatus();
+    if (!scanStatus.isOK()) {
+        recordPersistentSampleFailure(scanStatus.getStatus());
+        return scanStatus.getStatus();
     }
 
-    const size_t pagesRead = pages.size();
-    auto reassembled = reassemblePersistentSample(std::move(pages));
+    const size_t pagesRead = scanStatus.getValue().size();
+    auto reassembled = reassemblePersistentSample(std::move(scanStatus.getValue()));
+
     if (!reassembled.isOK()) {
+        recordPersistentSampleFailure(reassembled.getStatus());
         return reassembled.getStatus();
     }
 
-    // Metrics are recorded on success.
-    persistentSamplePagesReadHistogram.increment(pagesRead);
-    const Date_t now = Date_t::now();
-    const Date_t createdAt = reassembled.getValue().getCreatedAt();
-    // A sample stamped in the future normalized to 0 rather than a negative value.
-    const Milliseconds age = now > createdAt ? now - createdAt : Milliseconds(0);
-    persistentSampleAgeAtReadHistogram.increment(durationCount<Milliseconds>(age));
+    auto sample = Sample::makePersisted(reassembled.getValue().getDocs(),
+                                        technique(spec),
+                                        reassembled.getValue().getCreatedAt(),
+                                        pagesRead);
 
-    return LoadedPersistentSample{std::move(reassembled.getValue()), pagesRead};
+    recordPersistentSampleSuccess(tickSource, startTicks, sample, pagesRead);
+
+    return sample;
 }
 
 }  // namespace mongo::ce

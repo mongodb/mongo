@@ -12,6 +12,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/namespace_string_util.h"
 #include "mongo/db/query/compiler/ce/sampling/persistent_sample_loader.h"
+#include "mongo/db/query/compiler/ce/sampling/sample_spec.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_test_utils.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/cbr_test_utils.h"
@@ -646,8 +647,8 @@ TEST_F(SamplingEstimatorTest, SampleSizeRespectsSampleSizeParamState) {
     // When 'internalSamplingSizeOverride' is not set and no query settings are applied, the sample
     // size is derived from default confidence interval and margin of error values
     // (k95, 5.0 -> 384).
-    const size_t defaultSampleSize = SamplingEstimatorImpl::calculateSampleSize(
-        QueryKnobConfiguration{query_settings::QuerySettings{}});
+    const size_t defaultSampleSize =
+        ce::calculateSampleSize(QueryKnobConfiguration{query_settings::QuerySettings{}});
 
     auto cq =
         createCanonicalQueryFromMatchExpression(*this, std::make_unique<AndMatchExpression>());
@@ -2206,7 +2207,7 @@ TEST_F(SamplingEstimatorTest, EstimateNDVUsesNRWhenFieldGenuinelyNonUnique) {
 }
 
 TEST_F(SamplingEstimatorTest, EstimateKeysScannedEmptySampleReturnsZero) {
-    // An empty sample must not divide by '_sampleSize' (== 0). estimateKeysScanned should report
+    // An empty sample must not divide by its size (== 0). estimateKeysScanned should report
     // zero keys scanned (mirroring estimateCardinality's empty-sample handling) rather than
     // producing NaN/inf and tripping assertValid().
     auto coll = acquireCollection(operationContext(), kTestNss);
@@ -2316,7 +2317,12 @@ TEST_F(SamplingEstimatorTest, SamplingEstimatorLoadsMultiPageSample) {
 TEST_F(SamplingEstimatorTest, TryLoadReportsPagesReadAndBsonBytes) {
     // TODO SERVER-135439: Remove once featureFlagPersistentStats is enabled by default.
     unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
-    const UUID uuid = UUID::gen();
+    insertDocuments(kTestNss, {BSON("_id" << 1 << "tag" << "not_persisted")});
+
+    const UUID uuid = [&] {
+        auto srcColl = acquireCollection(operationContext(), kTestNss);
+        return srcColl.getCollectionPtr()->uuid();
+    }();
     // 3 docs across 2 pages, so a `pagesRead` taken from the doc count would report 3, not 2.
     std::vector<BSONObj> persistedDocs{BSON("_id" << 1), BSON("_id" << 2), BSON("_id" << 3)};
     const BSONObj pageZero = buildPersistentSampleDoc(uuid,
@@ -2341,21 +2347,30 @@ TEST_F(SamplingEstimatorTest, TryLoadReportsPagesReadAndBsonBytes) {
         {pageZero, pageOne},
         /*clustered=*/true);
 
-    PersistentSampleLoader loader;
-    auto result = loader.tryLoad(operationContext(),
-                                 kTestNss.dbName(),
-                                 uuid,
-                                 SamplingTechniqueEnum::kRandom,
-                                 persistedDocs.size(),
-                                 /*numChunks=*/boost::none);
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(coll, {}, false);
+    const ce::SampleSpec spec{
+        .nss = kTestNss,
+        .sampleSize = persistedDocs.size(),
+        .onTheFlySamplingMethod = SamplingCEMethodEnum::kRandom,
+        .persistentSamplingMethod = SamplingCEMethodEnum::kRandom,
+        .numChunks = boost::none,
+        .samplingSource = SamplingSourceEnum::kPersistentSample,
+        .topLevelSampleFieldNames = {},
+    };
+    PersistentSampleLoader loader(operationContext(),
+                                  colls,
+                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                  nullptr /*customerQueryExpCtx*/);
+    auto result = loader.tryLoad(spec);
     ASSERT_OK(result.getStatus());
-    const auto& loaded = result.getValue();
+    const auto& sample = result.getValue();
 
-    ASSERT_EQUALS(loaded.pagesRead, 2u);
-    ASSERT_EQUALS(loaded.sample.getDocs().size(), 3u);
-    ASSERT_BSONOBJ_EQ(loaded.sample.getDocs()[0], persistedDocs[0]);
-    ASSERT_BSONOBJ_EQ(loaded.sample.getDocs()[1], persistedDocs[1]);
-    ASSERT_BSONOBJ_EQ(loaded.sample.getDocs()[2], persistedDocs[2]);
+    ASSERT_EQUALS(sample.numPages().value_or(0), 2u);
+    ASSERT_EQUALS(sample.size(), 3u);
+    ASSERT_BSONOBJ_EQ(sample.docs()[0], persistedDocs[0]);
+    ASSERT_BSONOBJ_EQ(sample.docs()[1], persistedDocs[1]);
+    ASSERT_BSONOBJ_EQ(sample.docs()[2], persistedDocs[2]);
 }
 
 TEST_F(SamplingEstimatorTest, RandomSamplingLoadsPersistentSample) {
@@ -2525,7 +2540,7 @@ TEST_F(SamplingEstimatorTest, ChunkSamplingLoadsPersistentSample) {
                                           testNumChunks,
                                           makeCardinalityEstimate(100),
                                           /*customerQueryExpCtx=*/nullptr);
-    estimator.setPersistentSampleMethodForTesting(SamplingCEMethodEnum::kChunk);
+    estimator.setPersistentSamplingMethodForTesting(SamplingCEMethodEnum::kChunk);
     estimator.generateSample(ce::NoProjection{});
 
     const auto& sample = estimator.getSample();
@@ -2535,11 +2550,15 @@ TEST_F(SamplingEstimatorTest, ChunkSamplingLoadsPersistentSample) {
     }
 }
 
-TEST_F(SamplingEstimatorTest, PersistedLoadFollowsPersistentSampleMethodNotSamplingStyle) {
+TEST_F(SamplingEstimatorTest,
+       PersistedLoadFollowsPersistentSamplingMethodNotOnTheFlySamplingMethod) {
     // TODO SERVER-135439: Remove once featureFlagPersistentStats is enabled by default.
     unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
-    // Persisted-sample method (kRandom) is independent of samplingStyle (kChunk).
-    insertDocuments(kTestNss, {BSON("_id" << 1 << "tag" << "not_persisted")});
+    insertDocuments(kTestNss,
+                    {BSON("_id" << 1 << "tag" << "not_persisted"),
+                     BSON("_id" << 2 << "tag" << "not_persisted"),
+                     BSON("_id" << 3 << "tag" << "not_persisted"),
+                     BSON("_id" << 4 << "tag" << "not_persisted")});
     const UUID uuid = [&] {
         auto srcColl = acquireCollection(operationContext(), kTestNss);
         return srcColl.getCollectionPtr()->uuid();
@@ -2566,7 +2585,7 @@ TEST_F(SamplingEstimatorTest, PersistedLoadFollowsPersistentSampleMethodNotSampl
                                           testNumChunks,
                                           makeCardinalityEstimate(100),
                                           /*customerQueryExpCtx=*/nullptr);
-    estimator.setPersistentSampleMethodForTesting(SamplingCEMethodEnum::kRandom);
+    estimator.setPersistentSamplingMethodForTesting(SamplingCEMethodEnum::kRandom);
     estimator.generateSample(ce::NoProjection{});
 
     const auto& sample = estimator.getSample();
@@ -2582,7 +2601,7 @@ TEST_F(SamplingEstimatorTest, PersistedLoadFollowsPersistentSampleMethodNotSampl
     ASSERT_EQUALS(meta.numPages.value(), 1u);
 }
 
-TEST_F(SamplingEstimatorTest, PersistedMissFallsBackToOnTheFlyUsingSamplingStyle) {
+TEST_F(SamplingEstimatorTest, PersistedMissFallsBackToOnTheFlySamplingMethod) {
     // TODO SERVER-135439: Remove once featureFlagPersistentStats is enabled by default.
     unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
     // Persisted-sample method is kRandom, so the persisted kChunk sample below is a miss.
@@ -2622,7 +2641,7 @@ TEST_F(SamplingEstimatorTest, PersistedMissFallsBackToOnTheFlyUsingSamplingStyle
                                           testNumChunks,
                                           makeCardinalityEstimate(sourceDocs.size()),
                                           /*customerQueryExpCtx=*/nullptr);
-    estimator.setPersistentSampleMethodForTesting(SamplingCEMethodEnum::kRandom);
+    estimator.setPersistentSamplingMethodForTesting(SamplingCEMethodEnum::kRandom);
     estimator.generateSample(ce::NoProjection{});
 
     // Fell back to on-the-fly chunk sampling from the source collection.

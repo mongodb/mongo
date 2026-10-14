@@ -170,12 +170,12 @@ assert.commandWorked(db.createCollection(collName));
     });
 }
 
-// Non-existent collection: analyze with sample mode fails with the "collection not found" uassert.
+// Non-existent collection: analyze with sample mode fails with a "collection not found" uassert
 cleanup();
 assert.commandFailedWithCode(
     db.runCommand({analyze: "no_such_coll", mode: "sample", samplingMethod: "random"}),
-    12433000,
-    "analyze on a non-existent collection should fail with 12433000",
+    13097202,
+    "analyze on a non-existent collection should fail with 13097202",
 );
 
 // =============================================================================
@@ -471,8 +471,8 @@ db[tsCollName].drop();
 assert.commandWorked(db.createCollection(tsCollName, {timeseries: {timeField: "timestamp"}}));
 assert.commandFailedWithCode(
     db.runCommand({analyze: tsCollName, mode: "sample", sampleSize: 10, samplingMethod: "random"}),
-    ErrorCodes.CommandNotSupported,
-    "analyze on a timeseries collection should fail with CommandNotSupported",
+    ErrorCodes.IllegalOperation,
+    "analyze on a timeseries collection should fail with IllegalOperation",
 );
 db[tsCollName].drop();
 

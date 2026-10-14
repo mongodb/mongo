@@ -12,7 +12,6 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
-#include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status/histogram_server_status_metric.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
@@ -21,7 +20,6 @@
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/namespace_string_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/profile_settings.h"
@@ -29,30 +27,20 @@
 #include "mongo/db/query/analyze_command_gen.h"
 #include "mongo/db/query/compiler/ce/ndv/field_stats.h"
 #include "mongo/db/query/compiler/ce/ndv/ndv_sketch_gen.h"
-#include "mongo/db/query/compiler/ce/sampling/persistent_sample_loader.h"
-#include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
-#include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
+#include "mongo/db/query/compiler/ce/sampling/sample_manager.h"
 #include "mongo/db/query/compiler/stats/scalar_histogram.h"
 #include "mongo/db/query/compiler/stats/stats_catalog.h"
 #include "mongo/db/query/compiler/stats/stats_for_histograms_gen.h"
-#include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
-#include "mongo/db/query/write_ops/delete.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/shard_role/lock_manager/exception_util.h"
-#include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
-#include "mongo/db/shard_role/shard_catalog/collection_options.h"
-#include "mongo/db/shard_role/shard_catalog/create_collection.h"
 #include "mongo/db/shard_role/shard_catalog/db_raii.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/stats/counters.h"
-#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/version_context.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/op_msg.h"
@@ -108,6 +96,32 @@ auto& analyzeBytesPersistedHistogram =
     *MetricBuilder<HistogramServerStatusMetric>{"query.analyze.sample.histograms.bytesPersisted"}
          .bind(HistogramServerStatusMetric::pow(11, 256, 4));
 
+/**
+ * Records server status metrics for a sample persisted by analyze's sample mode.
+ */
+void recordPersistedSampleMetrics(const ce::PersistedSampleSummary& summary) {
+    analyzeDocsPersisted.incrementRelaxed(summary.docsPersisted);
+    switch (summary.samplingMethod) {
+        case ce::SamplingTechniqueEnum::kChunk:
+            analyzeByMethodChunk.incrementRelaxed();
+            break;
+        case ce::SamplingTechniqueEnum::kFullCollScan:
+            analyzeByMethodFullCollScan.incrementRelaxed();
+            break;
+        case ce::SamplingTechniqueEnum::kRandom:
+            analyzeByMethodRandom.incrementRelaxed();
+            break;
+        case ce::SamplingTechniqueEnum::kSeqScan:
+        case ce::SamplingTechniqueEnum::kStrides:
+            // Since kSeqScan and kStrides are test-only sampling techniques we do
+            // not keep track/update in server metrics since count will always be 0.
+            break;
+    }
+
+    analyzePagesHistogram.increment(summary.pagesPersisted);
+    analyzeTotalBytesPersisted.incrementRelaxed(summary.bytesPersisted);
+    analyzeBytesPersistedHistogram.increment(summary.bytesPersisted);
+}
 
 /**
  * Validates a user-provided key path. Shared by the histograms and ndv modes.
@@ -442,172 +456,38 @@ void runSampleMode(OperationContext* opCtx,
     const SamplingCEMethodEnum requestedSamplingMethod = requestedSamplingMethodOpt.value_or(
         qkc.getInternalQuerySamplingCEMethodForPersistentSamples());
 
-    boost::optional<ce::SamplingTechniqueEnum> actualSamplingMethod;
-    boost::optional<UUID> collUUID;
-    std::vector<BSONObj> docsArr;
-    size_t sampleSize;
-    // Tracks the actual number of docs persisted for server status metric on successful upsert.
-    size_t docsPersistedCount = 0;
+    const size_t sampleSize = sampleSizeOpt ? sampleSizeOpt.value() : ce::calculateSampleSize(qkc);
 
-    {
-        // Acquire the collection to read metadata and run the sampling estimator. The acquisition
-        // must remain live for the duration of sampling.
-        auto coll = acquireAndValidateCollection(opCtx, nss, 12433000);
-        const auto& collectionPtr = coll.getCollectionPtr();
-
-        collUUID = collectionPtr->uuid();
-        long long numRecords = collectionPtr->numRecords(opCtx);
-
-        if (sampleSizeOpt) {
-            sampleSize = *sampleSizeOpt;
-        } else {
-            sampleSize = ce::SamplingEstimatorImpl::calculateSampleSize(qkc);
-        }
-
-        if (requestedSamplingMethod == SamplingCEMethodEnum::kChunk && !numChunksOpt) {
-            numChunksOpt = internalQueryNumChunksForChunkBasedSampling.load();
-        }
-
-        tassert(12433003,
-                "numChunks must be set for chunk-based sampling",
-                !(requestedSamplingMethod == SamplingCEMethodEnum::kChunk && !numChunksOpt));
-
-        MultipleCollectionAccessor collections(coll);
-
-        // Use kOnTheFlySample to force collection of a new sample rather than attempting to
-        // read an existing one.
-        // TODO SERVER-127210: Investigate if this is the right yield policy to ensure we sample
-        // from a consistent snapshot.
-        ce::SamplingEstimatorImpl estimator(opCtx,
-                                            collections,
-                                            nss,
-                                            PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
-                                            sampleSize,
-                                            requestedSamplingMethod,
-                                            numChunksOpt,
-                                            numRecords,
-                                            /*customerQueryExpCtx=*/nullptr,
-                                            SamplingSourceEnum::kOnTheFlySample);
-        estimator.generateSample(ce::NoProjection{});
-
-        // Copy the sample so it outlives the estimator and can be persisted.
-        docsArr = estimator.getSample();
-
-        // Store the sampling method that was actually used (which may differ from
-        // requestedSamplingMethod when test-only knobs like
-        // internalQuerySamplingBySequentialScan are enabled).
-        actualSamplingMethod = estimator.getSamplingMetadata().technique;
+    if (requestedSamplingMethod == SamplingCEMethodEnum::kChunk && !numChunksOpt) {
+        numChunksOpt = internalQueryNumChunksForChunkBasedSampling.load();
     }
 
-    tassert(12433002, "collUUID must be initialized by end of sampling block", collUUID);
-    tassert(12873101,
-            "actualSamplingMethod must be initialized by end of sampling block",
-            actualSamplingMethod);
+    tassert(12433003,
+            "numChunks must be set for chunk-based sampling",
+            !(requestedSamplingMethod == SamplingCEMethodEnum::kChunk && !numChunksOpt));
 
-    // A full collection scan is performed whenever sample size is >= collection size regardless
-    // of requested sampling method, so the value persisted in the sample doc should still
-    // reflect the requested method in this case. Otherwise it should reflect the actual method
-    // used.
-    ce::SamplingTechniqueEnum samplingMethodToPersist =
-        *actualSamplingMethod == ce::SamplingTechniqueEnum::kFullCollScan
-        ? ce::SamplingEstimatorImpl::samplingMethodToTechnique(requestedSamplingMethod)
-        : *actualSamplingMethod;
+    // Use kOnTheFlySample to force collection of a new sample rather than attempting to
+    // read an existing one.
+    const ce::SampleSpec spec{
+        .nss = nss,
+        .sampleSize = sampleSize,
+        .onTheFlySamplingMethod = requestedSamplingMethod,
+        .persistentSamplingMethod = requestedSamplingMethod,
+        .numChunks = numChunksOpt,
+        .samplingSource = SamplingSourceEnum::kOnTheFlySample,
+        .topLevelSampleFieldNames = {},
+    };
 
-    if (samplingMethodToPersist != ce::SamplingTechniqueEnum::kChunk) {
-        numChunksOpt = boost::none;
-    }
+    // TODO SERVER-127210: Investigate if this is the right yield policy to ensure we sample
+    // from a consistent snapshot.
+    ce::SampleManager sampleManager(
+        opCtx, PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY, nullptr /*customerQueryExpCtx*/);
+    const auto summary = uassertStatusOK(sampleManager.refresh(spec));
+    recordPersistedSampleMetrics(summary);
 
-    const Date_t createdAt = Date_t::now();
-
-    // Create a clustered collection for persistent sample.
-    const NamespaceString samplesNss = NamespaceStringUtil::deserialize(
-        nss.dbName(), NamespaceString::kStatsSamplesCollectionName);
-    auto createCollectionStatus = repl::StorageInterface::get(opCtx)->createCollection(
-        opCtx,
-        samplesNss,
-        CollectionOptions{.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex()});
-    // Samples collection may already exist, in which case the createCollection command
-    // was a no-op.
-    if (createCollectionStatus != ErrorCodes::NamespaceExists) {
-        uassertStatusOK(createCollectionStatus);
-    }
-
-    // Serialize the sample into one or more page documents
-    std::vector<BSONObj> pageDocs = ce::makePersistentSamplePageDocs(
-        *collUUID, samplingMethodToPersist, sampleSize, numChunksOpt, docsArr, createdAt);
-    const size_t pagesPersisted = pageDocs.size();
-    size_t totalBytesPersisted = 0;
-    std::vector<InsertStatement> inserts;
-    inserts.reserve(pageDocs.size());
-    for (auto& pageDoc : pageDocs) {
-        totalBytesPersisted += pageDoc.objsize();
-        const BSONElement docsField = pageDoc.getField(ce::PersistentSampleDoc::kDocsFieldName);
-        tassert(13106002,
-                str::stream() << "Expected " << ce::PersistentSampleDoc::kDocsFieldName
-                              << " to be an array, but found " << typeName(docsField.type()),
-                docsField.type() == BSONType::array);
-        // kDocsFieldName is an array and nFields return its size
-        docsPersistedCount += static_cast<size_t>(docsField.Obj().nFields());
-        inserts.emplace_back(std::move(pageDoc));
-    }
-
-    const BSONObj existingSampleLookupFilter = ce::makePersistentSampleAllPagesLookupFilter(
-        *collUUID, samplingMethodToPersist, sampleSize, numChunksOpt);
-
-    // Atomically insert the sample docs/replace the existing sample if one exists.
-    writeConflictRetry(opCtx, "analyzePersistSample", samplesNss, [&] {
-        const auto collection =
-            acquireCollection(opCtx,
-                              CollectionAcquisitionRequest::fromOpCtx(
-                                  opCtx, samplesNss, AcquisitionPrerequisites::kWrite),
-                              MODE_IX);
-        uassert(12844400,
-                str::stream() << "Sample collection " << samplesNss.toStringForErrorMsg()
-                              << " does not exist",
-                collection.exists());
-
-        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::atomicGroup);
-
-        // Remove all existing pages of any prior sample.
-        deleteObjects(
-            opCtx, collection, existingSampleLookupFilter, /*justOne=*/false, /*god=*/true);
-
-        // Insert the new sample.
-        uassertStatusOK(collection_internal::insertDocuments(opCtx,
-                                                             collection.getCollectionPtr(),
-                                                             inserts.begin(),
-                                                             inserts.end(),
-                                                             /*opDebug=*/nullptr));
-
-        wuow.commit();
-    });
-
-    // Increment metrics
     auto durationMicros = tickSource->ticksTo<Microseconds>(tickSource->getTicks() - startTicks);
     analyzeMicros.increment(durationMicros);
     analyzeMicrosHistogram.increment(durationCount<Microseconds>(durationMicros));
-
-    analyzeDocsPersisted.incrementRelaxed(docsPersistedCount);
-    switch (actualSamplingMethod.value()) {
-        case ce::SamplingTechniqueEnum::kChunk:
-            analyzeByMethodChunk.incrementRelaxed();
-            break;
-        case ce::SamplingTechniqueEnum::kFullCollScan:
-            analyzeByMethodFullCollScan.incrementRelaxed();
-            break;
-        case ce::SamplingTechniqueEnum::kRandom:
-            analyzeByMethodRandom.incrementRelaxed();
-            break;
-        case ce::SamplingTechniqueEnum::kSeqScan:
-        case ce::SamplingTechniqueEnum::kStrides:
-            // Since kSeqScan and kStrides are test-only sampling techniques we do
-            // not keep track/update in server metrics since count will always be 0.
-            break;
-    }
-
-    analyzePagesHistogram.increment(pagesPersisted);
-    analyzeTotalBytesPersisted.incrementRelaxed(totalBytesPersisted);
-    analyzeBytesPersistedHistogram.increment(totalBytesPersisted);
 }
 
 void runHistogramsMode(OperationContext* opCtx,

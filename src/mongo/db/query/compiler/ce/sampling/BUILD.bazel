@@ -101,6 +101,7 @@ mongo_cc_library(
 mongo_cc_unit_test(
     name = "sampling_estimator_test",
     srcs = [
+        "sample_manager_test.cpp",
         "sampling_estimator_persistent_ndv_test.cpp",
         "sampling_estimator_test.cpp",
     ],
@@ -138,7 +139,6 @@ mongo_cc_unit_test(
     deps = [
         ":persistent_samples",
         ":sampling_test_utils",
-        "//src/mongo/unittest:server_parameter_guard",
     ],
 )
 

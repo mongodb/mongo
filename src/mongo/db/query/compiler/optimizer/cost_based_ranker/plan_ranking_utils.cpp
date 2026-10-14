@@ -95,7 +95,7 @@ std::vector<std::unique_ptr<QuerySolution>> cbrRankPlans(
     OperationContext& opCtx,
     int sampleSize,
     NamespaceString nss,
-    SamplingCEMethodEnum samplingStyle,
+    SamplingCEMethodEnum onTheFlySamplingMethod,
     boost::optional<int> numChunks,
     boost::optional<PlanningTimeProfile&> timeProfile,
     boost::optional<std::vector<size_t>&> originalPlanHashes) {
@@ -116,7 +116,7 @@ std::vector<std::unique_ptr<QuerySolution>> cbrRankPlans(
                                                     nss,
                                                     PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                     static_cast<size_t>(sampleSize),
-                                                    samplingStyle,
+                                                    onTheFlySamplingMethod,
                                                     numChunks,
                                                     collCard,
                                                     /*customerQueryExpCtx=*/nullptr);

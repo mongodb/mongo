@@ -68,15 +68,16 @@ std::vector<std::unique_ptr<QuerySolution>> cbrRankPlans(
  * finds an optimal plan. In this case the method returns a pointer to that
  * optimal plan.
  */
-const QuerySolution* bestCBRPlan(CanonicalQuery* cq,
-                                 size_t numDocs,
-                                 OperationContext& opCtx,
-                                 int sampleSize,
-                                 std::vector<std::unique_ptr<QuerySolution>>& bestCBRPlan,
-                                 NamespaceString nss,
-                                 SamplingCEMethodEnum samplingStyle = SamplingCEMethodEnum::kRandom,
-                                 boost::optional<int> numChunks = boost::none,
-                                 boost::optional<PlanningTimeProfile&> times = boost::none);
+const QuerySolution* bestCBRPlan(
+    CanonicalQuery* cq,
+    size_t numDocs,
+    OperationContext& opCtx,
+    int sampleSize,
+    std::vector<std::unique_ptr<QuerySolution>>& bestCBRPlan,
+    NamespaceString nss,
+    SamplingCEMethodEnum onTheFlySamplingMethod = SamplingCEMethodEnum::kRandom,
+    boost::optional<int> numChunks = boost::none,
+    boost::optional<PlanningTimeProfile&> times = boost::none);
 
 }  // namespace plan_ranking_tests
 }  // namespace mongo

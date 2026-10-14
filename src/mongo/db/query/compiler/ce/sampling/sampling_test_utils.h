@@ -28,7 +28,7 @@ public:
     using SamplingEstimatorImpl::SamplingEstimatorImpl;
 
     const std::vector<BSONObj>& getSample() {
-        return _sample;
+        return _sample->docs();
     }
 
     boost::optional<size_t> getUniqueDocCountForTesting() const {
@@ -44,19 +44,26 @@ public:
      * specific samples (including duplicate documents that simulate sampling with replacement)
      * without needing a real collection.
      */
-    void setSampleForTesting(std::vector<BSONObj> sample, bool wasPersisted = false) {
-        _sample = std::move(sample);
-        _sampleSize = _sample.size();
+    void setSampleForTesting(std::vector<BSONObj> sample,
+                             bool wasPersisted = false,
+                             boost::optional<SamplingTechniqueEnum> technique = boost::none) {
+        // Keep whatever technique the sample already carries unless the caller names one. Before
+        // any sample is set, default to kRandom.
+        const SamplingTechniqueEnum sampleTechnique = technique.value_or(
+            _sample.has_value() ? _sample->technique() : SamplingTechniqueEnum::kRandom);
+        _sample = wasPersisted ? Sample::makePersisted(std::move(sample),
+                                                       sampleTechnique,
+                                                       Date_t::now(),
+                                                       /*numPages=*/1)
+                               : Sample::makeOnTheFly(std::move(sample), sampleTechnique);
         _uniqueDocCount = boost::none;
-        _isSampleGenerated = true;
-        _wasSamplePersisted = wasPersisted;
     }
 
     /**
      * Overrides the persisted-sample method independently of the on-the-fly sampling style.
      */
-    void setPersistentSampleMethodForTesting(SamplingCEMethodEnum method) {
-        _persistentSampleMethod = method;
+    void setPersistentSamplingMethodForTesting(SamplingCEMethodEnum method) {
+        _spec.persistentSamplingMethod = method;
     }
 
     static bool matches(const OrderedIntervalList& oil, BSONElement val) {
@@ -329,6 +336,18 @@ BSONObj buildPersistentSampleDoc(const UUID& collUuid,
                                  BSONObj overrides = BSONObj(),
                                  int pageNo = 0,
                                  size_t numDocsDiscarded = 0);
+
+/**
+ * Builds a single page document for `pageNo` of a logical sample. All pages of a sample share the
+ * same identity fields and differ only in page number and the docs they contain.
+ */
+BSONObj buildPage(const UUID& uuid,
+                  SamplingTechniqueEnum method,
+                  size_t sampleSize,
+                  const std::vector<BSONObj>& docs,
+                  int pageNo,
+                  boost::optional<int> numChunks = boost::none,
+                  size_t numDocsDiscarded = 0);
 
 /**
  * Build a BSON document of size `sizeBytes`, or at minimum the size of the BSON overhead of the

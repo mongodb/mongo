@@ -7,6 +7,7 @@
 #include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/compiler/ce/sampling/persistent_sample_gen.h"
+#include "mongo/db/query/compiler/ce/sampling/sample_spec.h"
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
@@ -144,8 +145,7 @@ size_t sampleSizeForKnobs(SamplingConfidenceIntervalEnum ci,
     unittest::ServerParameterGuard marginOfErrorGuard{"samplingMarginOfError", marginOfError};
     unittest::ServerParameterGuard sampleSizeOverrideGuard{"internalSamplingSizeOverride",
                                                            sampleSizeOverride};
-    return SamplingEstimatorImpl::calculateSampleSize(
-        QueryKnobConfiguration{query_settings::QuerySettings{}});
+    return ce::calculateSampleSize(QueryKnobConfiguration{query_settings::QuerySettings{}});
 }
 
 size_t translateSampleDefToActualSampleSize(SampleSizeDef sampleSizeDef) {
@@ -647,6 +647,24 @@ BSONObj buildPersistentSampleDoc(const UUID& collUuid,
     }
     merged.appendElements(overrides);
     return merged.obj();
+}
+
+BSONObj buildPage(const UUID& uuid,
+                  SamplingTechniqueEnum method,
+                  size_t sampleSize,
+                  const std::vector<BSONObj>& docs,
+                  int pageNo,
+                  boost::optional<int> numChunks,
+                  size_t numDocsDiscarded) {
+    return buildPersistentSampleDoc(uuid,
+                                    method,
+                                    sampleSize,
+                                    docs,
+                                    numChunks,
+                                    /*schemaVersion=*/kPersistentSampleSchemaVersion,
+                                    /*overrides=*/BSONObj{},
+                                    pageNo,
+                                    numDocsDiscarded);
 }
 
 BSONObj makeSizedDoc(int id, size_t sizeBytes) {

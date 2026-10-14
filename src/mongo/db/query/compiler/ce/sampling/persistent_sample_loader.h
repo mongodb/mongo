@@ -7,10 +7,15 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/compiler/ce/sampling/persistent_sample_gen.h"
+#include "mongo/db/query/compiler/ce/sampling/sample_loader.h"
+#include "mongo/db/query/multiple_collection_accessor.h"
+#include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
+#include <memory>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -23,21 +28,6 @@ using namespace std::literals::string_view_literals;
 
 inline constexpr std::string_view kSamplesCollectionName = "system.stats.samples"sv;
 inline constexpr int kPersistentSampleSchemaVersion = 1;
-
-/**
- * Serializes a sample into the minimum number of page documents such that each page stays under the
- * BSON size limit.
- *
- * Always returns at least one page (empty if `sample` is empty). Any single document too large to
- * fit on a page on its own is discarded. Errors if the discarded documents exceed the maximum
- * discardable fraction of the sample.
- */
-std::vector<BSONObj> makePersistentSamplePageDocs(const UUID& collectionUuid,
-                                                  SamplingTechniqueEnum method,
-                                                  size_t sampleSize,
-                                                  boost::optional<int> numChunks,
-                                                  const std::vector<BSONObj>& sample,
-                                                  Date_t createdAt);
 
 /**
  * Builds the `_id` string for a persisted sample page document:
@@ -65,14 +55,6 @@ std::pair<std::string, std::string> makePersistentSampleIdRange(const UUID& coll
                                                                 size_t sampleSize,
                                                                 boost::optional<int> numChunks);
 
-/**
- * Builds a filter matching all pages of a persisted sample with the given identity values.
- */
-BSONObj makePersistentSampleAllPagesLookupFilter(const UUID& collectionUuid,
-                                                 SamplingTechniqueEnum method,
-                                                 size_t sampleSize,
-                                                 boost::optional<int> numChunks);
-
 StatusWith<PersistentSampleDoc> parsePersistentSample(const BSONObj& doc);
 
 /**
@@ -85,32 +67,39 @@ StatusWith<PersistentSampleDoc> parsePersistentSample(const BSONObj& doc);
 StatusWith<PersistentSampleDoc> reassemblePersistentSample(std::vector<BSONObj> pages);
 
 /**
- * A loaded persistent sample, together with facts about the load that produced it.
+ * Loads a previously persisted sample matching the provided spec.
  */
-struct LoadedPersistentSample {
-    PersistentSampleDoc sample;
-    // Number of page documents scanned to reassemble `sample`.
-    size_t pagesRead = 0;
-};
-
-/**
- * This class coordinates the loading of persisted samples.
- */
-class PersistentSampleLoader {
+class PersistentSampleLoader : public SampleLoader {
 public:
+    using SampleLoader::SampleLoader;
+
     /**
-     * Looks up the persistent sample matching the given identity fields.
+     * Loads the persisted sample matching the spec.
      *
      * Possible error codes:
-     * - `NoSuchKey` if no document matches
-     * - `UnsupportedFormat` if the document is found but malformed.
+     * - `NoSuchKey` if persistent samples are not usable (the feature flag is disabled, the spec
+     *   forces on-the-fly sampling, the collection does not exist) or no document matches.
+     * - `UnsupportedFormat` if the samples collection or the documents found in it are malformed.
      */
-    StatusWith<LoadedPersistentSample> tryLoad(OperationContext* opCtx,
-                                               const DatabaseName& dbName,
-                                               const UUID& collectionUuid,
-                                               SamplingTechniqueEnum method,
-                                               size_t sampleSize,
-                                               boost::optional<int> numChunks) const;
+    StatusWith<Sample> tryLoad(const SampleSpec& spec) override;
+
+protected:
+    /**
+     * Reports the sampling technique used.
+     */
+    SamplingTechniqueEnum technique(const SampleSpec& spec) const override {
+        // TODO SERVER-136539
+        const size_t collectionCard =
+            static_cast<size_t>(_collections.lookupCollection(spec.nss)->numRecords(_opCtx));
+        return spec.sampleSize >= collectionCard ? SamplingTechniqueEnum::kFullCollScan
+                                                 : resolveSamplingTechnique(spec, collectionCard);
+    }
 };
+
+std::unique_ptr<PersistentSampleLoader> makePersistentSampleLoader(
+    OperationContext* opCtx,
+    const MultipleCollectionAccessor& collections,
+    PlanYieldPolicy::YieldPolicy yieldPolicy,
+    boost::intrusive_ptr<const ExpressionContext> customerQueryExpCtx);
 
 }  // namespace mongo::ce
