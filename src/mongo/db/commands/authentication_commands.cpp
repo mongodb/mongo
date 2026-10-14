@@ -257,12 +257,16 @@ void _authenticateX509(OperationContext* opCtx, AuthenticationSession* session) 
                 // The UserRequest here should represent the X.509 subject DN, NOT local.__system.
                 // This ensures that we are checking for the presence of a user matching the X.509
                 // subject rather than __system (which should always exist).
-                bool userExists = am->acquireUser(opCtx, request->clone()).isOK();
+                auto status = am->acquireUser(opCtx, request->clone()).getStatus();
+                // Any error other than UserNotFound means the lookup failed; fail closed.
+                if (status != ErrorCodes::UserNotFound) {
+                    uassertStatusOK(status);
+                }
                 uassert(ErrorCodes::AuthenticationFailed,
                         "The provided certificate represents both a cluster member and an "
                         "explicit user which exists in the authzn database. "
                         "Prohibiting authentication due to enforceUserClusterSeparation setting.",
-                        !userExists);
+                        status.code() == ErrorCodes::UserNotFound);
             }
 
             session->setAsClusterMember();
