@@ -223,13 +223,15 @@ public:
      *
      * postInterruptionCallback, if provided, is invoked on the async drain thread after active
      * conflicting operations are killed, before waiting for the drain to complete.
+     *
+     * Nolint note: forced to use std::future as it is a std::async handle.
      */
-    std::future<ReplicationStateTransitionGuard> killConflictingOperations(
-        InterruptionType interruption,
-        OperationContext* opCtx,
-        std::function<void()> postInterruptionCallback = nullptr,
-        boost::optional<uint32_t> timeout_sec = boost::none,
-        bool orderedByGlobalLock = false);
+    std::future<ReplicationStateTransitionGuard>  // NOLINT(mongo-banned-names-check)
+    killConflictingOperations(InterruptionType interruption,
+                              OperationContext* opCtx,
+                              std::function<void()> postInterruptionCallback = nullptr,
+                              boost::optional<uint32_t> timeout_sec = boost::none,
+                              bool orderedByGlobalLock = false);
 
     /**
      * Updates metrics around user ops when a state transition that kills operations occurs (i.e.

@@ -32,6 +32,10 @@ using ::testing::Property;
 using ::testing::SizeIs;
 using ::testing::UnorderedElementsAre;
 
+MATCHER(OptionalHasValue, "has a value") {
+    return arg.has_value();
+}
+
 /** Creates a capturer and skips the test if Otel is not configured. */
 class OtelTracesCapturerTest : public ::testing::Test {
 public:
@@ -153,7 +157,8 @@ TEST_F(OtelTracesCapturerTest, ParentChildLinksWired) {
 
     auto parents = capturer.getSpans(span_names::kTest1);
     auto children = capturer.getSpans(span_names::kTest2);
-    EXPECT_THAT(parents, ElementsAre(Property("parent", &CapturedSpan::parent, Eq(std::nullopt))));
+    EXPECT_THAT(parents,
+                ElementsAre(Property("parent", &CapturedSpan::parent, Not(OptionalHasValue()))));
     EXPECT_THAT(
         children,
         ElementsAre(Property(
@@ -328,7 +333,7 @@ TEST_F(OtelTracesCapturerTest, SpanFromRemoteContextHasCorrectTraceAndParentSpan
     EXPECT_THAT(
         spans,
         ElementsAre(AllOf(
-            Property("parent", &CapturedSpan::parent, Eq(std::nullopt)),
+            Property("parent", &CapturedSpan::parent, Not(OptionalHasValue())),
             Property("parentSpanIdHex", &CapturedSpan::parentSpanIdHex, "2222222222222222"),
             Property(
                 "traceIdHex", &CapturedSpan::traceIdHex, "11111111111111111111111111111111"))));

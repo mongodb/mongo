@@ -6,8 +6,9 @@
 #include "mongo/util/timer.h"
 
 #include <mutex>
-#include <optional>
 #include <utility>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -60,11 +61,14 @@ public:
         }
     }
 
-    /** Finish timing and return the duration on first call, or std::nullopt for a repeated call. */
-    std::optional<Microseconds> finish() {
+    /**
+     * Finishes timing and returns the duration on first call, or a disengaged
+     * optional for a repeated call.
+     */
+    boost::optional<Microseconds> finish() {
         std::lock_guard lock(_mutex);
         if (std::exchange(_finished, true)) {
-            return std::nullopt;
+            return {};
         }
         return _timer.elapsed();
     }

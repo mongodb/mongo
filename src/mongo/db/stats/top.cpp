@@ -17,11 +17,12 @@
 #include <algorithm>
 #include <cstddef>
 #include <iterator>
-#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {
@@ -51,10 +52,13 @@ otel::metrics::Histogram<int64_t, std::string_view>& operationLatencyHistogram =
         {.explicitBucketBoundaries =
              operation_latency_histogram_details::makeOperationLatencyBucketBoundaries()});
 
-// Returns the op_type attribute string for OTel recording, or nullopt for op types excluded from
-// this histogram. kTransaction is tracked separately via incrementForTransaction and is
-// intentionally excluded here; if it should appear in future, add it in incrementForTransaction.
-std::optional<std::string_view> opTypeString(Command::ReadWriteType rwType) {
+/**
+ * Returns the op_type attribute string for OTel recording, or a disengaged optional for op
+ * types excluded from this histogram. kTransaction is tracked separately via
+ * incrementForTransaction and is intentionally excluded here; if it should appear in future,
+ * add it in incrementForTransaction.
+ */
+boost::optional<std::string_view> opTypeString(Command::ReadWriteType rwType) {
     switch (rwType) {
         case Command::ReadWriteType::kRead:
             return "read"sv;
@@ -63,7 +67,7 @@ std::optional<std::string_view> opTypeString(Command::ReadWriteType rwType) {
         case Command::ReadWriteType::kCommand:
             return "command"sv;
         case Command::ReadWriteType::kTransaction:
-            return std::nullopt;
+            return {};
         default:
             MONGO_UNREACHABLE_TASSERT(12445300);
     }

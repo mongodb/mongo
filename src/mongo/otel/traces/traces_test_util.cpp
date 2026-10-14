@@ -115,12 +115,12 @@ std::string CapturedSpan::traceIdHex() const {
     return {};
 }
 
-std::optional<CapturedSpan> CapturedSpan::parent() const {
+boost::optional<CapturedSpan> CapturedSpan::parent() const {
 #ifdef MONGO_CONFIG_OTEL
     if (_data && _data->parent)
         return CapturedSpan(_data->parent);
 #endif
-    return std::nullopt;
+    return {};
 }
 
 std::vector<CapturedSpan> CapturedSpan::children() const {

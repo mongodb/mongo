@@ -294,6 +294,9 @@ class MongoTidyTests(unittest.TestCase):
                 "Consider using boost::optional instead.",
             ),
             ("using std::optional", "Consider using boost::optional instead."),
+            ("std::optional<int>", "Consider using boost::optional instead."),
+            ("std::optional<long>", "Consider using boost::optional instead."),
+            ("std::optional<char>", "Consider using boost::optional instead."),
         ]
 
         self.run_clang_tidy(

@@ -11,6 +11,7 @@ namespace {
 
 using testing::Eq;
 using testing::Ge;
+using testing::Not;
 using testing::Optional;
 
 class RpcLocalTimingTest : public unittest::Test {
@@ -18,6 +19,10 @@ protected:
     TickSourceMock<Microseconds> clock;
     RpcLocalTiming timing{&clock};
 };
+
+MATCHER(OptionalHasValue, "has a value") {
+    return arg.has_value();
+}
 
 TEST_F(RpcLocalTimingTest, ExcludesResponseWait) {
     clock.advance(Microseconds{3000});
@@ -31,7 +36,7 @@ TEST_F(RpcLocalTimingTest, ExcludesResponseWait) {
 TEST_F(RpcLocalTimingTest, FinishIsIdempotent) {
     clock.advance(Microseconds{25});
     EXPECT_THAT(timing.finish(), Optional(Microseconds{25}));
-    EXPECT_THAT(timing.finish(), Eq(std::nullopt));
+    EXPECT_THAT(timing.finish(), Not(OptionalHasValue()));
 }
 
 TEST_F(RpcLocalTimingTest, RepeatedBeginResponseWaitIsNoOp) {
@@ -56,7 +61,7 @@ TEST_F(RpcLocalTimingTest, WaitsAfterFinishAreNoOps) {
     EXPECT_THAT(timing.finish(), Optional(Microseconds{10}));
     timing.beginResponseWait();
     timing.endResponseWait();
-    EXPECT_THAT(timing.finish(), Eq(std::nullopt));
+    EXPECT_THAT(timing.finish(), Not(OptionalHasValue()));
 }
 
 TEST_F(RpcLocalTimingTest, DefaultConstructorUsesSystemTickSource) {

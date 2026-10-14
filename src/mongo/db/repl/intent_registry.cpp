@@ -333,12 +333,12 @@ bool IntentRegistry::canDeclareIntent(Intent intent, OperationContext* opCtx) {
     return true;
 }
 
-std::future<ReplicationStateTransitionGuard> IntentRegistry::killConflictingOperations(
-    IntentRegistry::InterruptionType interrupt,
-    OperationContext* opCtx,
-    std::function<void()> postInterruptionCallback,
-    boost::optional<uint32_t> timeout_sec,
-    bool orderedByGlobalLock) {
+std::future<ReplicationStateTransitionGuard>  // NOLINT(mongo-banned-names-check)
+IntentRegistry::killConflictingOperations(IntentRegistry::InterruptionType interrupt,
+                                          OperationContext* opCtx,
+                                          std::function<void()> postInterruptionCallback,
+                                          boost::optional<uint32_t> timeout_sec,
+                                          bool orderedByGlobalLock) {
     LOGV2(9945003, "Intent Registry killConflictingOperations", "interrupt"_attr = interrupt);
     _pendingStateChange.fetchAndAdd(1);
     auto timeOutSec = std::chrono::seconds(

@@ -127,7 +127,7 @@ SingleTablePredicate pipelineExpression, matchExpression;
  * Expressions or all MatchExpressions.
  */
 template <typename ExprCombinator, typename MatchCombinator>
-std::optional<SingleTablePredicate> combineChildren(
+boost::optional<SingleTablePredicate> combineChildren(
     std::vector<SingleTablePredicate> children,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
 
@@ -155,7 +155,7 @@ std::optional<SingleTablePredicate> combineChildren(
         return SingleTablePredicate{std::move(combined)};
     }
 
-    return std::nullopt;
+    return {};
 }
 
 /*
@@ -171,13 +171,13 @@ std::optional<SingleTablePredicate> combineChildren(
  * MatchExpression or PipelineExpression. Later on, finalizeSTPForTargetNode() will take care of
  * converting PipelineExpressions to MatchExpressions.
  */
-std::optional<SingleTablePredicate> getSingleTablePredicateForField(
+boost::optional<SingleTablePredicate> getSingleTablePredicateForField(
     const MatchExpression* expr,
     const FieldPath& fieldPath,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
 
     if (!expr) {
-        return std::nullopt;
+        return {};
     }
 
     if (ComparisonMatchExpressionBase::isEquality(expr->matchType())) {
@@ -186,7 +186,7 @@ std::optional<SingleTablePredicate> getSingleTablePredicateForField(
         // class).
         const auto* cmp = dynamic_cast<const ComparisonMatchExpressionBase*>(expr);
         if (cmp->path() != fieldPath.fullPath()) {
-            return std::nullopt;
+            return {};
         }
 
         // Preserve $eq vs $expr semantics.
@@ -205,20 +205,20 @@ std::optional<SingleTablePredicate> getSingleTablePredicateForField(
             auto constExpr = ExpressionConstant::create(expCtx.get(), Value(value));
             auto eqExpr = ExpressionCompare::create(
                 expCtx.get(), ExpressionCompare::CmpOp::EQ, fieldExpr, constExpr);
-            return eqExpr;
+            return SingleTablePredicate{eqExpr};
         }
         // This is an $eq MatchExpression. To preserve $eq semantics, we just return a copy
         // untouched.
-        return expr->clone();
+        return SingleTablePredicate{expr->clone()};
     }
 
     if (expr->matchType() == MatchExpression::MATCH_IN) {
         const auto* inExpr = checked_cast<const InMatchExpression*>(expr);
         if (inExpr->path() != fieldPath.fullPath()) {
-            return std::nullopt;
+            return {};
         }
 
-        return inExpr->clone();
+        return SingleTablePredicate{inExpr->clone()};
     }
 
     if (expr->matchType() == MatchExpression::AND) {
@@ -231,7 +231,7 @@ std::optional<SingleTablePredicate> getSingleTablePredicateForField(
         }
 
         if (children.empty()) {
-            return std::nullopt;
+            return {};
         }
 
         if (children.size() == 1) {
@@ -245,7 +245,7 @@ std::optional<SingleTablePredicate> getSingleTablePredicateForField(
     }
 
     // Do not support $or, $nor, $not
-    return std::nullopt;
+    return {};
 }
 
 /*

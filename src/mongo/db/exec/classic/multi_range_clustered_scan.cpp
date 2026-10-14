@@ -16,8 +16,9 @@
 #include "mongo/util/overloaded_visitor.h"
 
 #include <memory>
-#include <optional>
 #include <utility>
+
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -141,18 +142,18 @@ PlanStage::StageState MultiRangeClusteredScan::doWork(WorkingSetID* out) {
 
     auto earlyReturn = std::visit(
         OverloadedVisitor{
-            [&](const RecordIdRangeList::SeekBeyondAllRanges&) -> std::optional<StageState> {
+            [&](const RecordIdRangeList::SeekBeyondAllRanges&) -> boost::optional<StageState> {
                 _commonStats.isEOF = true;
                 return IS_EOF;
             },
-            [&](const RecordIdRangeList::SeekBeforeRange& r) -> std::optional<StageState> {
+            [&](const RecordIdRangeList::SeekBeforeRange& r) -> boost::optional<StageState> {
                 _currentRangeIdx = r.idx;
                 _pendingSeek = true;
                 return NEED_TIME;
             },
-            [&](const RecordIdRangeList::SeekInRange& r) -> std::optional<StageState> {
+            [&](const RecordIdRangeList::SeekInRange& r) -> boost::optional<StageState> {
                 _currentRangeIdx = r.idx;
-                return std::nullopt;
+                return {};
             },
         },
         seekRes);

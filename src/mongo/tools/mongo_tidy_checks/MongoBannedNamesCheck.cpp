@@ -148,11 +148,14 @@ void MongoBannedNamesCheck::registerMatchers(ast_matchers::MatchFinder* Finder) 
                                        hasParent(enumDecl(hasAnyName(getNames(baseEnumInfos)))))))
                            .bind("enumConstants"),
                        this);
-    // The type matcher matches against DeclaratorDecl nodes, which means return types and
-    // references will not be matched here. Matching against only declarations should be
-    // sufficient and will not generate extra noise when developers decide to use a banned type.
+    // The type matcher matches against DeclaratorDecl nodes, which means references will not be
+    // matched here. Function return types are matched separately below.
     Finder->addMatcher(
         declaratorDecl(hasType(namedDecl(hasAnyName(getNames(baseTypeInfos))))).bind("typeNames"),
+        this);
+    Finder->addMatcher(
+        functionDecl(returns(hasDeclaration(namedDecl(hasAnyName(getNames(baseTypeInfos))))))
+            .bind("returnTypes"),
         this);
     Finder->addMatcher(
         usingDecl(hasAnyUsingShadowDecl(hasTargetDecl(anyOf(hasAnyName(getNames(baseTypeInfos)),
@@ -224,5 +227,20 @@ void MongoBannedNamesCheck::check(const ast_matchers::MatchFinder::MatchResult& 
           {
               "usingNames",
           });
+    // Only look at the spelled return type, not the whole function (which includes the body).
+    if (auto fn = Result.Nodes.getNodeAs<FunctionDecl>("returnTypes")) {
+        if (auto* tsi = fn->getTypeSourceInfo()) {
+            // Go through the TypeLoc so trailing return types are covered.
+            if (auto ftl = tsi->getTypeLoc().getAs<FunctionTypeLoc>()) {
+                const SourceRange range = ftl.getReturnLoc().getSourceRange();
+                if (range.isValid()) {
+                    checkNamespace(range.getBegin(),
+                                   Lexer::getSourceText(CharSourceRange::getTokenRange(range),
+                                                        Result.Context->getSourceManager(),
+                                                        Result.Context->getLangOpts()));
+                }
+            }
+        }
+    }
 }
 }  // namespace mongo::tidy

@@ -18,10 +18,11 @@
 #endif
 
 #include <memory>
-#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
+
+#include <boost/optional/optional.hpp>
 
 [[MONGO_MOD_PUBLIC]];
 
@@ -76,7 +77,7 @@ public:
     bool isError() const;
     SpanKind kind() const;
 
-    std::optional<CapturedSpan> parent() const;
+    boost::optional<CapturedSpan> parent() const;
     std::vector<CapturedSpan> children() const;
 
     /**

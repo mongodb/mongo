@@ -30,4 +30,18 @@ template <typename T>
 std::optional<T> templateDecl;
 
 using std::optional;
+
+std::optional<int> optionalReturn() {
+    return {};
+}
+
+auto trailingOptionalReturn() -> std::optional<long> {
+    return {};
+}
+
+void lambdaOptionalReturn() {
+    auto lambda = []() -> std::optional<char> {
+        return {};
+    };
+}
 }  // namespace mongo
