@@ -180,9 +180,6 @@ private:
     template <typename ObjectType>
     ExecState getNextImpl(ObjectType* out, RecordId* dlOut);
 
-    void initializeAccessors(MetaDataAccessor& accessor,
-                             const stage_builder::PlanStageMetadataSlots& metadataSlots);
-
     enum class State { kClosed, kOpened };
 
     static std::string_view serializeState(State state);

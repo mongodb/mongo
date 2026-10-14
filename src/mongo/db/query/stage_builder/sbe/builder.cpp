@@ -171,10 +171,6 @@ SbSlotVector getSlotsToForward(StageBuilderState& state,
     SbSlotVector slots;
     auto requiredNamedSlots = outputs.getRequiredSlotsUnique(reqs);
 
-    for (auto slotId : state.data->metadataSlots.getSlotVector()) {
-        slots.emplace_back(SbSlot{slotId});
-    }
-
     if (exclude.empty()) {
         for (const SbSlot& slot : requiredNamedSlots) {
             if (!state.env->isSlotRegistered(slot.getId())) {
@@ -3836,11 +3832,6 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::build(const QuerySolut
         if (!outputs.hasResultInfo()) {
             outputs.setResultInfoBaseObj(outputs.getResultObj());
         }
-    }
-
-    if (root->metadataExhausted()) {
-        // Metadata is exhausted by current node, later nodes/stages won't see metadata from input.
-        _data->metadataSlots.reset();
     }
 
     outputs.clearNonRequiredSlots(reqsIn, /*saveResultObj=*/false);

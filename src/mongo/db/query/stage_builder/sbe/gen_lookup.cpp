@@ -303,18 +303,9 @@ SbExpr generateForeignKeyStream(SbVar inputSlot,
                               SbLocalVar{getFieldFrameId, 1}));
 }
 
-// Returns the vector of local slots to be used in lookup join, including the record slot and
-// metadata slots produced by local side.
+// Returns the vector of local slots to be used in lookup join.
 SbSlotVector buildLocalSlots(StageBuilderState& state, SbSlot localRecordSlot) {
-    auto metadataSlotIds = state.data->metadataSlots.getSlotVector();
-
     SbSlotVector slots;
-    slots.reserve(metadataSlotIds.size() + 1);
-
-    for (auto slotId : metadataSlotIds) {
-        slots.push_back(SbSlot{slotId});
-    }
-
     slots.push_back(localRecordSlot);
 
     return slots;

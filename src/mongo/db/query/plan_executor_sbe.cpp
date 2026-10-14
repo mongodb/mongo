@@ -88,11 +88,6 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
         uassert(4822866, "Query does not have recordId slot.", _resultRecordId);
     }
 
-    if (_cq) {
-        initializeAccessors(_metadataAccessors, _rootData.staticData->metadataSlots);
-        _useMetadataAccessors = _metadataAccessors.anyAccessorsInitialized();
-    }
-
     if (!_stash.empty()) {
         // The PlanExecutor keeps an extra reference to the last object pulled out of the PlanStage
         // tree. This is because we want to ensure that the caller of PlanExecutor::getNext() does
@@ -499,24 +494,6 @@ Document convertToDocument(const sbe::value::Object& obj) {
 }
 
 }  // namespace
-
-void PlanExecutorSBE::initializeAccessors(
-    MetaDataAccessor& accessor, const stage_builder::PlanStageMetadataSlots& metadataSlots) {
-    if (auto slot = metadataSlots.sortKeySlot) {
-        accessor.sortKey = _root->getAccessor(_rootData.env.ctx, *slot);
-        if (auto sortSpecSlot = _rootData.env->getSlotIfExists("searchSortSpec"sv)) {
-            auto [sortSpecTag, sortSpecVal] =
-                _root->getAccessor(_rootData.env.ctx, *sortSpecSlot)->getViewOfValue();
-            if (sortSpecTag != sbe::value::TypeTags::Nothing) {
-                tassert(7856004,
-                        "Incorrect search sort spec type.",
-                        sortSpecTag == sbe::value::TypeTags::sortSpec);
-                auto sortSpec = sbe::value::bitcastTo<sbe::SortSpec*>(sortSpecVal);
-                accessor.isSingleSortKey = sortSpec->getSortPattern().isSingleElementKey();
-            }
-        }
-    }
-}
 
 template <typename BSONTraits>
 BSONObj PlanExecutorSBE::MetaDataAccessor::appendToBson(BSONObj doc) const {
