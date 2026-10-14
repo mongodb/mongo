@@ -22,7 +22,7 @@
  * SBE tracker factories (e.g. SBE $group's hash_agg) that classic-only coverage misses.
  *
  * @tags: [
- *   requires_fcv_82,
+ *   requires_fcv_90,
  *   assumes_against_mongod_not_mongos,
  * ]
  */

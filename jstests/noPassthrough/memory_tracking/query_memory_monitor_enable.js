@@ -4,7 +4,7 @@
  * which the subsystem publishes real RSS samples.
  *
  * @tags: [
- *   requires_fcv_82,
+ *   requires_fcv_90,
  *   assumes_against_mongod_not_mongos,
  * ]
  */

@@ -8,7 +8,7 @@
  * shards still run it.
  *
  * @tags: [
- *   requires_fcv_82,
+ *   requires_fcv_90,
  *   requires_sharding,
  * ]
  */
