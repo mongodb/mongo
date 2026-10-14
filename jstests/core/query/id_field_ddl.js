@@ -13,7 +13,9 @@
  *   # Test does not survive cluster disruptions
  *   does_not_support_stepdowns,
  *   # Fails in change_streams_pre_images_replica_sets_kill_secondary_jscore_passthrough
- *   incompatible_with_preimages_by_default
+ *   incompatible_with_preimages_by_default,
+ *   # Drops the default database, which would destroy data written by other tests.
+ *   drops_default_database,
  * ]
  */
 

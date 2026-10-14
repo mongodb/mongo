@@ -26,6 +26,8 @@
  *   does_not_support_retryable_writes,
  *   # Test does not survive cluster disruptions
  *   does_not_support_stepdowns,
+ *   # Drops the default database, which would destroy data written by other tests.
+ *   drops_default_database,
  * ]
  */
 

@@ -11,6 +11,8 @@
  *  # rename only works across databases with same primary shard
  *  # TODO SERVER-90096: change this tag with a more specific one
  *  assumes_balancer_off,
+ *  # Drops the default database, which would destroy data written by other tests.
+ *  drops_default_database,
  * ]
  */
 

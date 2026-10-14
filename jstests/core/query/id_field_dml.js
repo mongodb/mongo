@@ -5,7 +5,9 @@
  *   # Test uses commands that cannot be blindly retried.
  *   requires_non_retryable_commands,
  *   requires_non_retryable_writes,
- *   does_not_support_retryable_writes
+ *   does_not_support_retryable_writes,
+ *   # Drops the default database, which would destroy data written by other tests.
+ *   drops_default_database,
  * ]
  */
 

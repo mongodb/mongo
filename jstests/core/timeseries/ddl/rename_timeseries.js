@@ -13,6 +13,8 @@
  *  # with legacy viewful timeseries collection it was not supported.
  *  featureFlagCreateViewlessTimeseriesCollections,
  *  requires_fcv_90,
+ *  # Drops the default database, which would destroy data written by other tests.
+ *  drops_default_database,
  * ]
  */
 

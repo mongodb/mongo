@@ -14,6 +14,8 @@
  *   # This test sets a server parameter via setParameterOnAllNonConfigNodes. To keep the host list
  *   # consistent, no add/remove shard operations should occur during the test.
  *   assumes_stable_shard_list,
+ *   # Drops the default database, which would destroy data written by other tests.
+ *   drops_default_database,
  * ]
  */
 

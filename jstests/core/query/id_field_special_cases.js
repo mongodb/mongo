@@ -14,6 +14,8 @@
  *   # Test does not survive cluster disruptions
  *   does_not_support_stepdowns,
  *   does_not_support_transactions,
+ *   # Drops the default database, which would destroy data written by other tests.
+ *   drops_default_database,
  * ]
  */
 

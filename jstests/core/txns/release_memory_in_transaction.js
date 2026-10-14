@@ -8,6 +8,8 @@
  *   not_allowed_with_signed_security_token,
  *   requires_fcv_82,
  *   uses_transactions,
+ *   # Drops the default database, which would destroy data written by other tests.
+ *   drops_default_database,
  * ]
  */
 

@@ -20,6 +20,8 @@
 //   uses_compact,
 //   creates_and_authenticates_user,
 //   resource_intensive,
+//   # Drops the default database, which would destroy data written by other tests.
+//   drops_default_database,
 // ]
 
 /*

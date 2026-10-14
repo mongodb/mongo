@@ -9,7 +9,9 @@
 //   # The config fuzzer with a very low level of concurrency is exhausting the write tickets.
 //   does_not_support_config_fuzzer,
 //   # Uses $where
-//   requires_scripting
+//   requires_scripting,
+//   # Drops the default database, which would destroy data written by other tests.
+//   drops_default_database,
 // ]
 
 import {

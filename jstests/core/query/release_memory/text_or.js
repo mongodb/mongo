@@ -17,6 +17,8 @@
  *   assumes_stable_shard_list,
  *   # Time series collections do not support text indexes.
  *   exclude_from_timeseries_crud_passthrough,
+ *   # Drops the default database, which would destroy data written by other tests.
+ *   drops_default_database,
  * ]
  */
 
