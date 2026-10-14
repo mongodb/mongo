@@ -5,30 +5,34 @@
  *   - findAndModify, update, insert, delete (regular collections),
  *   - bulkWrite insert/update/delete (run against the admin database).
  *
- * Time-series updates are tested in retryableTimeseriesUpdateMetrics.js where the appropriate
+ * Time-series updates are tested in retryable_timeseries_update_metrics.js where the appropriate
  * feature flags are enabled.
  *
- * Uses a 1-node replica set so the counters are deterministic (no sharded background writes).
+ * Runs against the suite's 1-node replica set so the counters are deterministic (no sharded
+ * background writes). assumes_against_mongod_not_mongos keeps it off mongos/sharded passthroughs
+ * (the counters are mongod-side), and multiversion_incompatible because retryableCommandsCount /
+ * retriedWritesDelayMillis are new fields.
  *
- * @tags: [requires_replication, multiversion_incompatible]
+ * @tags: [
+ *   requires_replication,
+ *   assumes_against_mongod_not_mongos,
+ *   multiversion_incompatible,
+ *   # Primary-driven index builds require batched container writes, which
+ *   # config.image_collection does not support. The retryable findAndModify case below depends on
+ *   # that collection to replay its retry image, so it cannot run under PDIB. See SERVER-120044.
+ *   primary_driven_index_builds_incompatible_with_retryable_writes,
+ *   # The tag above is only honored by the retryable_writes_* PDIB suites; the tag below excludes
+ *   # this test from every PDIB suite.
+ *   primary_driven_index_builds_incompatible,
+ * ]
  */
-import {before, beforeEach, describe, it, after} from "jstests/libs/mochalite.js";
-import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 
 describe("retryable writes metrics", function () {
-    let rst;
-    let primary;
-    let db;
     let coll;
-
     let txnNumber;
 
     before(function () {
-        rst = new ReplSetTest({name: jsTestName(), nodes: 1});
-        rst.startSet();
-        rst.initiate();
-        primary = rst.getPrimary();
-        db = primary.getDB("test");
         coll = db.getCollection(jsTestName() + "coll");
         txnNumber = 0;
     });
@@ -38,12 +42,8 @@ describe("retryable writes metrics", function () {
         txnNumber++;
     });
 
-    after(function () {
-        rst.stopSet();
-    });
-
     function getTransactionsStats() {
-        return primary.adminCommand({serverStatus: 1}).transactions;
+        return db.adminCommand({serverStatus: 1}).transactions;
     }
 
     /**
@@ -73,7 +73,7 @@ describe("retryable writes metrics", function () {
         jsTestLog.info("Initial status before " + name + ": ", initialStatus);
         jsTestLog.info("Running " + name + " command twice: ", retryableCmd);
 
-        const runDb = adminDb ? primary.getDB("admin") : db;
+        const runDb = adminDb ? db.getSiblingDB("admin") : db;
         const result = assert.commandWorked(runDb.runCommand(retryableCmd));
         if (betweenRuns) {
             betweenRuns();
