@@ -21,6 +21,7 @@
 #include "mongo/db/exec/sbe/stages/ix_scan.h"
 #include "mongo/db/exec/sbe/stages/limit_skip.h"
 #include "mongo/db/exec/sbe/stages/merge_join.h"
+#include "mongo/db/exec/sbe/stages/multi_range_clustered_scan_stage.h"
 #include "mongo/db/exec/sbe/stages/project.h"
 #include "mongo/db/exec/sbe/stages/sort.h"
 #include "mongo/db/exec/sbe/stages/sorted_merge.h"
@@ -100,10 +101,6 @@ struct Lowerer {
         MONGO_UNREACHABLE;
     }
 
-    std::unique_ptr<sbe::PlanStage> operator()(SbBlueprintPassthrough node) {
-        return std::move(node.stage);
-    }
-
     std::unique_ptr<sbe::PlanStage> operator()(SbBlueprintCoScan node) {
         return sbe::makeS<sbe::CoScanStage>(node.nodeId);
     }
@@ -148,6 +145,26 @@ struct Lowerer {
             lowerSlotId(node.info->indexInfoSlots.indexKeyPatternSlot),
             std::move(node.info->scanFieldNames),
             std::move(node.info->scanFieldSlots),
+            node.info->forward,
+            _state.yieldPolicy,
+            node.nodeId,
+            std::move(node.info->scanOpenCallback),
+            /*participateInTrialRunTracking=*/true);
+    }
+
+    std::unique_ptr<sbe::PlanStage> operator()(SbBlueprintMultiRangeScan node) {
+        return sbe::makeS<sbe::MultiRangeClusteredScanStage>(
+            node.info->collectionUuid,
+            std::move(node.info->dbName),
+            node.info->recordSlot,
+            node.info->recordIdSlot,
+            lowerSlotId(node.info->indexInfoSlots.snapshotIdSlot),
+            lowerSlotId(node.info->indexInfoSlots.indexIdentSlot),
+            lowerSlotId(node.info->indexInfoSlots.indexKeySlot),
+            lowerSlotId(node.info->indexInfoSlots.indexKeyPatternSlot),
+            std::move(node.info->scanFieldNames),
+            std::move(node.info->scanFieldSlots),
+            std::move(node.info->scanBounds),
             node.info->forward,
             _state.yieldPolicy,
             node.nodeId,

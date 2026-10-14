@@ -36,6 +36,7 @@
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
+#include "mongo/db/query/record_id_range_list.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr_helpers.h"
 #include "mongo/db/storage/key_string/key_string.h"
@@ -63,21 +64,6 @@ using SbSortDirectionVector = absl::InlinedVector<sbe::value::SortDirection, 4>;
 // ============================================================
 // Leaf blueprints
 // ============================================================
-
-/**
- * Wraps an already-lowered sbe::PlanStage so that it can be used as the child of a blueprint.
- * Lowering returns the wrapped stage unchanged. This is used for stages that have no blueprint
- * (e.g. MultiRangeClusteredScanStage).
- */
-struct SbBlueprintPassthrough {
-    std::unique_ptr<sbe::PlanStage> stage;
-
-    template <typename F>
-    void visitChildren(F&&) {}
-
-    template <typename F>
-    void visitExprs(F&&) {}
-};
 
 /**
  * CoScanStage: produces an infinite stream of advances with no output slots.
@@ -136,6 +122,44 @@ struct SbBlueprintScanInfo {
 struct SbBlueprintScan {
     PlanNodeId nodeId{kEmptyPlanNodeId};
     std::unique_ptr<SbBlueprintScanInfo> info;
+
+    template <typename F>
+    void visitChildren(F&& fn) {
+        info->visitChildren(fn);
+    }
+
+    template <typename F>
+    void visitExprs(F&& fn) {
+        info->visitExprs(fn);
+    }
+};
+
+struct SbBlueprintMultiRangeScanInfo {
+    UUID collectionUuid;
+    DatabaseName dbName;
+    bool forward{true};
+    std::vector<std::string> scanFieldNames;
+    RecordIdRangeList scanBounds;
+    SbIndexInfoSlots indexInfoSlots;
+    sbe::ScanOpenCallback scanOpenCallback{nullptr};
+
+    sbe::value::SlotId recordSlot{0};
+    sbe::value::SlotId recordIdSlot{0};
+    sbe::value::SlotVector scanFieldSlots;
+
+    template <typename F>
+    void visitChildren(F&&) {}
+
+    template <typename F>
+    void visitExprs(F&&) {}
+};
+
+/**
+ * MultiRangeClusteredScanStage: clustered collection scan over multiple disjoint RecordId ranges.
+ */
+struct SbBlueprintMultiRangeScan {
+    PlanNodeId nodeId{kEmptyPlanNodeId};
+    std::unique_ptr<SbBlueprintMultiRangeScanInfo> info;
 
     template <typename F>
     void visitChildren(F&& fn) {
@@ -908,10 +932,10 @@ struct SbBlueprintLowered {
  * The discriminated union of all blueprint types.
  */
 using SbBlueprintNode = std::variant<SbBlueprintLowered,
-                                     SbBlueprintPassthrough,
                                      SbBlueprintCoScan,
                                      SbBlueprintVirtualScan,
                                      SbBlueprintScan,
+                                     SbBlueprintMultiRangeScan,
                                      SbBlueprintSimpleIndexScan,
                                      SbBlueprintGenericIndexScan,
                                      SbBlueprintFilter,
@@ -1047,7 +1071,6 @@ private:
     size_t _loweredPrefix{0};
 };
 
-
 /**
  * While an instance is alive, every node added to 'blueprint' is marked as not participating in
  * trial run tracking; lowering applies the mark to the stage. Guards do not nest.
@@ -1078,10 +1101,7 @@ private:
  * Returns the PlanNodeId of the QSN that 'node' was built for.
  */
 inline PlanNodeId getNodeId(const SbBlueprintNode& node) {
-    return std::visit(OverloadedVisitor{[](const SbBlueprintPassthrough& n) -> PlanNodeId {
-                                            return n.stage->getCommonStats()->nodeId;
-                                        },
-                                        [](const SbBlueprintLowered&) -> PlanNodeId {
+    return std::visit(OverloadedVisitor{[](const SbBlueprintLowered&) -> PlanNodeId {
                                             tasserted(13621601,
                                                       "Blueprint node has already been lowered");
                                         },

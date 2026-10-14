@@ -3,7 +3,6 @@
 
 #include "mongo/db/query/stage_builder/sbe/sbe_stage_blueprint.h"
 
-#include "mongo/db/exec/sbe/stages/co_scan.h"
 #include "mongo/db/exec/sbe/util/debug_print.h"
 #include "mongo/db/exec/trial_run_tracker.h"
 #include "mongo/db/query/stage_builder/sbe/sbe_stage_lowering.h"
@@ -64,7 +63,7 @@ TEST_F(SbBlueprintLoweringTest, LowerTreeWithIndexChildren) {
     auto left = blueprint.add(SbBlueprintCoScan{.nodeId = 1});
     auto unwind = blueprint.add(
         SbBlueprintUnwind{.child = left, .nodeId = 2, .inSlot = 10, .outSlot = 11, .idxSlot = 12});
-    auto right = blueprint.add(SbBlueprintPassthrough{sbe::makeS<sbe::CoScanStage>(3)});
+    auto right = blueprint.add(SbBlueprintCoScan{.nodeId = 3});
     auto root = blueprint.add(SbBlueprintUnion{
         .nodeId = 4, .children = {unwind, right}, .inputSlots = {{11}, {10}}, .outputSlots = {20}});
 
@@ -121,16 +120,6 @@ TEST(SbBlueprintTest, TrialRunTrackingGuardMarksNodesAddedInScope) {
     ASSERT_FALSE(blueprint.isTrialRunTrackingDisabled(SbBlueprintNodeIdx{0}));
     ASSERT_TRUE(blueprint.isTrialRunTrackingDisabled(SbBlueprintNodeIdx{1}));
     ASSERT_FALSE(blueprint.isTrialRunTrackingDisabled(SbBlueprintNodeIdx{2}));
-}
-
-TEST_F(SbBlueprintLoweringTest, PassthroughWrapsLoweredStage) {
-    SbBuilder b{*_state, 6};
-    auto stage = b.makePassthrough(sbe::makeS<sbe::CoScanStage>(7));
-    ASSERT_TRUE(std::holds_alternative<SbBlueprintPassthrough>(_state->blueprint()[stage.idx()]));
-    ASSERT_EQ(getNodeId(_state->blueprint()[stage.idx()]), 7);
-
-    auto limited = b.makeLimit(std::move(stage), b.makeInt64Constant(1));
-    ASSERT_EQ(lowerAndPrint(std::move(limited)), "[6] limit 1ll \n[7] coscan ");
 }
 
 TEST_F(SbBlueprintLoweringTest, DisableTrialRunTrackingAppliesToLoweredStage) {

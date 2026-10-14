@@ -21,7 +21,6 @@
 #include "mongo/db/exec/sbe/stages/ix_scan.h"
 #include "mongo/db/exec/sbe/stages/limit_skip.h"
 #include "mongo/db/exec/sbe/stages/merge_join.h"
-#include "mongo/db/exec/sbe/stages/multi_range_clustered_scan_stage.h"
 #include "mongo/db/exec/sbe/stages/project.h"
 #include "mongo/db/exec/sbe/stages/sort.h"
 #include "mongo/db/exec/sbe/stages/sorted_merge.h"
@@ -433,10 +432,6 @@ SbExpr SbExprBuilder::makeBooleanOpTree(abt::Operations logicOp, SbExpr lhs, SbE
     return makeBooleanOpTree(logicOp, std::move(leaves));
 }
 
-SbStage SbBuilder::makePassthrough(std::unique_ptr<sbe::PlanStage> stage) {
-    return SbStage{_state.blueprint().add(SbBlueprintPassthrough{std::move(stage)})};
-}
-
 SbBuilder::MakeScanResult SbBuilder::makeScan(UUID collectionUuid,
                                               DatabaseName dbName,
                                               bool forward,
@@ -488,25 +483,22 @@ SbBuilder::MakeScanResult SbBuilder::makeScan(UUID collectionUuid,
         scanFieldSlots.emplace_back(SbSlot{_state.slotId()});
     }
 
-    auto scanStage = makePassthrough(
-        sbe::makeS<sbe::MultiRangeClusteredScanStage>(collectionUuid,
-                                                      std::move(dbName),
-                                                      lower(resultSlot),
-                                                      lower(recordIdSlot),
-                                                      lower(indexInfoSlots.snapshotIdSlot),
-                                                      lower(indexInfoSlots.indexIdentSlot),
-                                                      lower(indexInfoSlots.indexKeySlot),
-                                                      lower(indexInfoSlots.indexKeyPatternSlot),
-                                                      std::move(scanFieldNames),
-                                                      lower(scanFieldSlots),
-                                                      std::move(scanBounds),
-                                                      forward,
-                                                      _state.yieldPolicy,
-                                                      _nodeId,
-                                                      std::move(scanOpenCallback),
-                                                      true /* participateInTrialRunTracking */));
-
-    return {std::move(scanStage), resultSlot, recordIdSlot, std::move(scanFieldSlots)};
+    auto stage = addBlueprint(
+        _state,
+        SbBlueprintMultiRangeScan{
+            .nodeId = _nodeId,
+            .info = std::make_unique<SbBlueprintMultiRangeScanInfo>(
+                SbBlueprintMultiRangeScanInfo{.collectionUuid = std::move(collectionUuid),
+                                              .dbName = std::move(dbName),
+                                              .forward = forward,
+                                              .scanFieldNames = std::move(scanFieldNames),
+                                              .scanBounds = std::move(scanBounds),
+                                              .indexInfoSlots = indexInfoSlots,
+                                              .scanOpenCallback = std::move(scanOpenCallback),
+                                              .recordSlot = resultSlot.getId(),
+                                              .recordIdSlot = recordIdSlot.getId(),
+                                              .scanFieldSlots = lower(scanFieldSlots)})});
+    return {std::move(stage), resultSlot, recordIdSlot, std::move(scanFieldSlots)};
 }
 
 std::tuple<SbStage, SbSlot, SbSlotVector, SbIndexInfoSlots> SbBuilder::makeSimpleIndexScan(
