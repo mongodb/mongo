@@ -44,20 +44,6 @@
 namespace mongo {
 class PlanExecutorSBE final : public PlanExecutor {
 public:
-    struct MetaDataAccessor {
-        template <typename BSONTraits = BSONObj::DefaultSizeTrait>
-        BSONObj appendToBson(BSONObj doc) const;
-        Document appendToDocument(Document doc) const;
-
-        // Whether or not any metadata accessor are initialized.
-        bool anyAccessorsInitialized() const {
-            return sortKey;
-        }
-
-        sbe::value::SlotAccessor* sortKey{nullptr};
-        bool isSingleSortKey{true};
-    };
-
     PlanExecutorSBE(OperationContext* opCtx,
                     std::unique_ptr<CanonicalQuery> cq,
                     sbe::plan_ranker::CandidatePlan plan,
@@ -210,9 +196,6 @@ private:
     // Only for a resumed scan ("seek"). Slot holding the TypeTags::RecordId of the record to resume
     // the scan from. '_seekRecordId' is the RecordId value, initialized from the slot at runtime.
     boost::optional<sbe::value::SlotId> _resumeRecordIdSlot;
-
-    MetaDataAccessor _metadataAccessors;
-    bool _useMetadataAccessors{false};
 
     // NOTE: '_stash' stores documents as BSON. Currently, one of the '_stash' is usages is to store
     // documents received from the plan during multiplanning. This means that the documents
