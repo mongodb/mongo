@@ -38,6 +38,7 @@ venv
 
 # This is not run by bazel at the moment
 monguard
+release-container
 
 # Nested worktrees should be ignored
 .claude/worktrees
