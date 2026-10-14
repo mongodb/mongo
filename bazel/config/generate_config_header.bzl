@@ -2,6 +2,7 @@ load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain")
 load("@bazel_tools//tools/build_defs/cc:action_names.bzl", "ACTION_NAMES")
 load("//bazel/config:configs.bzl", "sdkroot_provider")
 load("//bazel:utils.bzl", "write_target")
+load(":target_platform_arch.bzl", "TARGET_ARCH_CONSTRAINTS", "target_platform_arch")
 
 def _strip_sysroot_flags(flags):
     """Remove --sysroot and sysroot-debug-prefix-map flags.
@@ -87,7 +88,7 @@ def generate_config_header_impl(ctx):
                 key: ctx.expand_make_variables("generate_config_header_expand", val, ctx.var),
             }
 
-    expanded_extra_definitions["TARGET_ARCH"] = cc_toolchain.cpu
+    expanded_extra_definitions["TARGET_ARCH"] = target_platform_arch(ctx)
 
     expanded_extra_definitions |= {
         "compile_variables": " ".join(build_info_compiler_flags + ctx.attr.cpp_opts),
@@ -182,7 +183,7 @@ generate_config_header_rule = rule(
         ),
         "_cc_toolchain": attr.label(default = "@bazel_tools//tools/cpp:current_cc_toolchain"),
         "_sdkroot": attr.label(default = "//bazel/config:sdkroot"),
-    },
+    } | TARGET_ARCH_CONSTRAINTS,
     fragments = ["cpp"],
     toolchains = ["@bazel_tools//tools/cpp:toolchain_type", "@rules_python//python:toolchain_type"],
     output_to_genfiles = True,
