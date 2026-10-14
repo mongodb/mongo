@@ -162,10 +162,6 @@ resmoke_suite_test(
         "change_streams",
         "ci-default",
     ],
-    target_compatible_with = select({
-        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],  # TODO: SERVER-114563 for re-enabling this. Right now very slow for TSAN builds.
-        "//conditions:default": [],
-    }),
     deps = [
         "//src/mongo/db:mongod",
         "//src/mongo/s:mongos",
@@ -181,10 +177,6 @@ resmoke_suite_test(
         "change_streams",
         "ci-default",
     ],
-    target_compatible_with = select({
-        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],  # TODO: SERVER-114563 for re-enabling this. Right now very slow for TSAN builds.
-        "//conditions:default": [],
-    }),
     deps = [
         "//src/mongo/db:mongod",
         "//src/mongo/s:mongos",
