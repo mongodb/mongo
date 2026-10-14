@@ -5,12 +5,17 @@
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {AnalyzeShardKeyUtil} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
 import {QuerySamplingUtil} from "jstests/sharding/analyze_shard_key/libs/query_sampling_util.js";
 
 const numNodesPerRS = 2;
+// The write concern to use when inserting documents into test collections. Waiting for the
+// documents to get replicated to all nodes is necessary since mongos runs the analyzeShardKey
+// command with readPreference "secondaryPreferred".
+const writeConcern = {
+    w: numNodesPerRS,
+};
 
-function testQuerySampling(conn, writeConcern, {rst, st}) {
+function testQuerySampling(conn, {rst, st}) {
     const dbName = "testDb";
     const collName = "testColl";
     const numDocs = 1000;
@@ -104,8 +109,7 @@ const mongosSetParameterCmdObj = {
         assert.commandWorked(node.adminCommand(mongodSetParameterCmdObj));
     });
 
-    const writeConcern = AnalyzeShardKeyUtil.getReplicationWriteConcern(st.s, numNodesPerRS);
-    testQuerySampling(st.s, writeConcern, {st});
+    testQuerySampling(st.s, {st});
     st.stop();
 }
 
@@ -121,8 +125,6 @@ const mongosSetParameterCmdObj = {
         assert.commandWorked(node.adminCommand(mongodSetParameterCmdObj));
     });
 
-    const primary = rst.getPrimary();
-    const writeConcern = AnalyzeShardKeyUtil.getReplicationWriteConcern(primary, numNodesPerRS);
-    testQuerySampling(primary, writeConcern, {rst});
+    testQuerySampling(rst.getPrimary(), {rst});
     rst.stopSet();
 }

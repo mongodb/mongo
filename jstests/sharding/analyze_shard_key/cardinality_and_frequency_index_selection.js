@@ -16,7 +16,14 @@ import {AnalyzeShardKeyUtil} from "jstests/sharding/analyze_shard_key/libs/analy
 const numNodesPerRS = 2;
 const numMostCommonValues = 5;
 
-function testAnalyzeShardKey(conn, writeConcern, {docs, indexSpecs, shardKeys, metrics}) {
+// The write concern to use when inserting documents into test collections. Waiting for the
+// documents to get replicated to all nodes is necessary since mongos runs the analyzeShardKey
+// command with readPreference "secondaryPreferred".
+const writeConcern = {
+    w: numNodesPerRS,
+};
+
+function testAnalyzeShardKey(conn, {docs, indexSpecs, shardKeys, metrics}) {
     const dbName = "testDb-" + extractUUIDFromObject(UUID());
     const collName = "testColl";
     const ns = dbName + "." + collName;
@@ -44,7 +51,6 @@ function testAnalyzeShardKey(conn, writeConcern, {docs, indexSpecs, shardKeys, m
 
 function testAnalyzeShardKeyFails(
     conn,
-    writeConcern,
     {docs, indexSpecs, shardKey, expectedErrorCode, expectedErrorMsg},
 ) {
     const dbName = "testDb-" + extractUUIDFromObject(UUID());
@@ -77,8 +83,8 @@ function testAnalyzeShardKeyFails(
     assert(coll.drop());
 }
 
-function runTest(conn, writeConcern) {
-    testAnalyzeShardKey(conn, writeConcern, {
+function runTest(conn) {
+    testAnalyzeShardKey(conn, {
         docs: [{x: -1}, {x: 1}],
         indexSpecs: [
             {
@@ -104,7 +110,7 @@ function runTest(conn, writeConcern) {
         },
     });
 
-    testAnalyzeShardKey(conn, writeConcern, {
+    testAnalyzeShardKey(conn, {
         docs: [{x: -1}, {x: 1}],
         indexSpecs: [
             {
@@ -130,7 +136,7 @@ function runTest(conn, writeConcern) {
         },
     });
 
-    testAnalyzeShardKey(conn, writeConcern, {
+    testAnalyzeShardKey(conn, {
         docs: [
             {x: -1, y: -1},
             {x: 1, y: 1},
@@ -159,7 +165,7 @@ function runTest(conn, writeConcern) {
         },
     });
 
-    testAnalyzeShardKey(conn, writeConcern, {
+    testAnalyzeShardKey(conn, {
         docs: [
             {x: -1, y: -1, z: -1},
             {x: 1, y: 1, z: 1},
@@ -192,7 +198,7 @@ function runTest(conn, writeConcern) {
         },
     });
 
-    testAnalyzeShardKey(conn, writeConcern, {
+    testAnalyzeShardKey(conn, {
         docs: [
             {x: -1, y: -1},
             {x: 1, y: 1},
@@ -211,7 +217,7 @@ function runTest(conn, writeConcern) {
         },
     });
 
-    testAnalyzeShardKeyFails(conn, writeConcern, {
+    testAnalyzeShardKeyFails(conn, {
         docs: [{x: -1}, {x: 1}],
         indexSpecs: [{name: "x_-1", key: {x: -1}}],
         shardKey: {x: 1},
@@ -220,7 +226,7 @@ function runTest(conn, writeConcern) {
             "Cannot analyze the characteristics of a shard key that does not have a supporting index",
     });
 
-    testAnalyzeShardKeyFails(conn, writeConcern, {
+    testAnalyzeShardKeyFails(conn, {
         docs: [{x: -1}, {x: 1}],
         indexSpecs: [{name: "x_-1", key: {x: -1}, unique: true}],
         shardKey: {x: 1},
@@ -240,8 +246,7 @@ const setParameterOpts = {
         rs: {nodes: numNodesPerRS, setParameter: setParameterOpts},
     });
 
-    const writeConcern = AnalyzeShardKeyUtil.getReplicationWriteConcern(st.s, numNodesPerRS);
-    runTest(st.s, writeConcern);
+    runTest(st.s);
 
     st.stop();
 }
@@ -256,8 +261,7 @@ if (!jsTestOptions().useAutoBootstrapProcedure) {
     rst.initiate();
     const primary = rst.getPrimary();
 
-    const writeConcern = AnalyzeShardKeyUtil.getReplicationWriteConcern(primary, numNodesPerRS);
-    runTest(primary, writeConcern);
+    runTest(primary);
 
     rst.stopSet();
 }
