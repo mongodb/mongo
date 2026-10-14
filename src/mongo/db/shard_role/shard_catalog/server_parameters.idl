@@ -37,3 +37,10 @@ feature_flags:
         cpp_varname: gFeatureFlagPerformDeepCopyOfCollections
         default: false
         fcv_gated: false
+
+    featureFlagReferentialIntegrity:
+        description: >-
+            Enables referential integrity: foreign-key constraint definition and enforcement.
+        cpp_varname: feature_flags::gFeatureFlagReferentialIntegrity
+        default: false
+        fcv_gated: true
