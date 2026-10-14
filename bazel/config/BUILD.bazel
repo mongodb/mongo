@@ -70,8 +70,11 @@ load(
     "use_wiredtiger",
     "visibility_support",
 )
+load(":target_platform_arch_test.bzl", "target_platform_arch_test_suite")
 
 package(default_visibility = ["//visibility:public"])
+
+target_platform_arch_test_suite(name = "target_platform_arch_test")
 
 # --------------------------------------
 # WASI / WebAssembly builds

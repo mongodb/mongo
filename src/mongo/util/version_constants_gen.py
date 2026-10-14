@@ -95,6 +95,8 @@ def get_toolchain_ver(tool, compiler_path, env_vars):
 #   inVersion: <bool> : should it be included in --version output
 # The `value` field will be passed to bazel
 def default_buildinfo_environment_data(compiler_path, extra_definitions, env_vars):
+    target_arch = (extra_definitions.get("TARGET_ARCH") or platform.machine()).lower()
+
     data = (
         (
             "distmod",
@@ -104,7 +106,7 @@ def default_buildinfo_environment_data(compiler_path, extra_definitions, env_var
         ),
         (
             "distarch",
-            platform.machine().lower(),
+            target_arch,
             True,
             True,
         ),
@@ -140,7 +142,7 @@ def default_buildinfo_environment_data(compiler_path, extra_definitions, env_var
         ),
         (
             "target_arch",
-            platform.machine().lower(),
+            target_arch,
             True,
             True,
         ),
