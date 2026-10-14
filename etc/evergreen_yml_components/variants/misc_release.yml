@@ -880,6 +880,7 @@ buildvariants:
   - name: save_waterfall_artifacts_linux_packages
   - name: save_waterfall_artifacts_cryptd
   - name: save_waterfall_artifacts_crypt_shared
+  - name: save_waterfall_artifacts_mh
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: debian11
@@ -990,6 +991,7 @@ buildvariants:
   - name: save_waterfall_artifacts_linux_packages
   - name: save_waterfall_artifacts_cryptd
   - name: save_waterfall_artifacts_crypt_shared
+  - name: save_waterfall_artifacts_mh
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -2216,6 +2218,7 @@ buildvariants:
   - name: save_waterfall_artifacts_linux_packages
   - name: save_waterfall_artifacts_cryptd
   - name: save_waterfall_artifacts_crypt_shared
+  - name: save_waterfall_artifacts_mh
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
