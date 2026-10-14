@@ -249,12 +249,16 @@ StatusWith<std::tuple<bool, std::string>> SaslX509ServerMechanism::stepImpl(
         // than local.__system.
         auto userRequest = uassertStatusOK(
             UserRequestX509::makeUserRequestX509(username, boost::none, sslPeerInfo));
-        bool userExists = am->acquireUser(opCtx, std::move(userRequest)).isOK();
+        auto status = am->acquireUser(opCtx, std::move(userRequest)).getStatus();
+        // Any error other than UserNotFound means the lookup failed; fail closed.
+        if (status != ErrorCodes::UserNotFound) {
+            uassertStatusOK(status);
+        }
         uassert(ErrorCodes::AuthenticationFailed,
                 "The provided certificate represents both a cluster member and an "
                 "explicit user which exists in the authzn database. "
                 "Prohibiting authentication due to enforceUserClusterSeparation setting.",
-                !userExists);
+                status == ErrorCodes::UserNotFound);
     }
 
     return std::make_tuple(true, std::string());
