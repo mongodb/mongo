@@ -511,6 +511,25 @@ bool Type::canPathBeArray(const FieldRef& path) const {
     return current.hasType(BSONType::array);
 }
 
+Type getPathType(const Type& type, const FieldRef& path) {
+    Type current = type;
+    for (size_t i = 0; i < path.numParts(); ++i) {
+        if (current.hasType(BSONType::array)) {
+            return Type::any();
+        }
+        if (!current.hasType(BSONType::object)) {
+            return Type::missing();
+        }
+        if (!current.hasOnlyType(BSONType::object)) {
+            // getField() projects only the object alternative, dropping non-object alternatives
+            // (which yield missing for this path). Conservatively keep the full result unknown.
+            return Type::any();
+        }
+        current = current.getField(path.getPart(i));
+    }
+    return current;
+}
+
 void Type::setField(std::string_view fieldName, Type fieldType) {
     tassert(13459104,
             "Type should include object to be able to set a field",

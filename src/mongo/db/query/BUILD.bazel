@@ -348,6 +348,7 @@ mongo_cc_library(
         "//src/mongo/db/query:plan_executor",
         "//src/mongo/db/query:plan_yield_policy",
         "//src/mongo/db/query/compiler/metadata:path_arrayness",
+        "//src/mongo/db/query/compiler/metadata:schema_type_info",
         "//src/mongo/util:clock_sources",
     ],
 )
@@ -1013,6 +1014,7 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_third_group"],
     deps = [
         "collection_query_info",
+        ":plan_yield_policy_sbe",
         "//src/mongo/db/index_builds:index_build_test_helpers",
         "//src/mongo/db/query:query_test_service_context",
         "//src/mongo/db/query/compiler/ce/sampling:sampling_test_utils",

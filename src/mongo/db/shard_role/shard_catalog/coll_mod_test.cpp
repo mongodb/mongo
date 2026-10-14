@@ -430,7 +430,7 @@ TEST_F(CollModTest, CollModRebuildsSchemaTypeInfoForValidatorAndLevelChanges) {
     };
 
     const auto initialInfo = readSchemaTypeInfo();
-    ASSERT_TRUE(initialInfo->getRootType().getField("x").hasType(BSONType::string));
+    ASSERT_TRUE(initialInfo->getPathType(FieldRef("x")).hasType(BSONType::string));
 
     BSONObjBuilder result;
     CollMod validationLevelMod(nss);
@@ -438,16 +438,15 @@ TEST_F(CollModTest, CollModRebuildsSchemaTypeInfoForValidatorAndLevelChanges) {
     uassertStatusOK(processCollModCommand(opCtx.get(), nss, validationLevelMod, nullptr, &result));
 
     const auto strictInfo = readSchemaTypeInfo();
-    ASSERT_GT(strictInfo->epoch(), initialInfo->epoch());
-    ASSERT_TRUE(strictInfo->getRootType() == pipeline::type_system::Type::anyObject());
+    ASSERT_TRUE(strictInfo->getPathType(FieldRef("x")) == pipeline::type_system::Type::any());
 
     CollMod validatorMod(nss);
     validatorMod.setValidator(fromjson("{x: {$type: 'number'}}"));
     uassertStatusOK(processCollModCommand(opCtx.get(), nss, validatorMod, nullptr, &result));
 
     const auto validatorUpdatedInfo = readSchemaTypeInfo();
-    ASSERT_GT(validatorUpdatedInfo->epoch(), strictInfo->epoch());
-    ASSERT_TRUE(validatorUpdatedInfo->getRootType() == pipeline::type_system::Type::anyObject());
+    ASSERT_TRUE(validatorUpdatedInfo->getPathType(FieldRef("x")) ==
+                pipeline::type_system::Type::any());
 
     CollMod prepareConstraintMod(nss);
     prepareConstraintMod.setPrepareConstraintValidationLevel(true);
@@ -459,9 +458,8 @@ TEST_F(CollModTest, CollModRebuildsSchemaTypeInfoForValidatorAndLevelChanges) {
     uassertStatusOK(processCollModCommand(opCtx.get(), nss, constraintLevelMod, nullptr, &result));
 
     const auto constraintInfo = readSchemaTypeInfo();
-    ASSERT_GT(constraintInfo->epoch(), validatorUpdatedInfo->epoch());
-    ASSERT_FALSE(constraintInfo->getRootType().getField("x").hasType(BSONType::string));
-    ASSERT_TRUE(constraintInfo->getRootType().getField("x").hasType(BSONType::numberInt));
+    ASSERT_FALSE(constraintInfo->getPathType(FieldRef("x")).hasType(BSONType::string));
+    ASSERT_TRUE(constraintInfo->getPathType(FieldRef("x")).hasType(BSONType::numberInt));
 }
 
 TEST_F(CollModTest, CollModInvalidatesSchemaTypeInfoWhenFeatureFlagIsDisabled) {
@@ -480,7 +478,7 @@ TEST_F(CollModTest, CollModInvalidatesSchemaTypeInfoWhenFeatureFlagIsDisabled) {
     };
 
     const auto initialInfo = readSchemaTypeInfo();
-    ASSERT_TRUE(initialInfo->getRootType().getField("x").hasType(BSONType::string));
+    ASSERT_TRUE(initialInfo->getPathType(FieldRef("x")).hasType(BSONType::string));
 
     {
         unittest::ServerParameterGuard disabledTypeInferenceFlag{"featureFlagQueryTypeInference",
@@ -507,8 +505,7 @@ TEST_F(CollModTest, CollModInvalidatesSchemaTypeInfoWhenFeatureFlagIsDisabled) {
 
     // Ends at level 'constraint', so with the flag enabled this would infer 'x: number'.
     const auto invalidatedInfo = readSchemaTypeInfo();
-    ASSERT_GT(invalidatedInfo->epoch(), initialInfo->epoch());
-    ASSERT_TRUE(invalidatedInfo->getRootType() == pipeline::type_system::Type::anyObject());
+    ASSERT_TRUE(invalidatedInfo->getPathType(FieldRef("x")) == pipeline::type_system::Type::any());
 }
 
 TEST_F(CollModTest, CollModSetting_ReplicatedRecordIds_ToTrue_Fails) {

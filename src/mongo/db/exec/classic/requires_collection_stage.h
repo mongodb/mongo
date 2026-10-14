@@ -7,6 +7,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/compiler/metadata/path_arrayness.h"
+#include "mongo/db/query/compiler/metadata/schema_type_info.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/restore_context.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
@@ -33,16 +34,7 @@ class RequiresCollectionStage : public PlanStage {
 public:
     RequiresCollectionStage(std::string_view stageType,
                             ExpressionContext* expCtx,
-                            CollectionAcquisition coll)
-        : PlanStage(stageType, expCtx),
-          _collection(coll),
-          _collectionPtr(&coll.getCollectionPtr()),
-          _collectionUUID(coll.getCollectionPtr()->uuid()),
-          _catalogEpoch(getCatalogEpoch()),
-          _nss(coll.getCollectionPtr()->ns()),
-          _pathArraynessChecker{.nonArrayPaths =
-                                    expCtx->nonArrayPathsForNss(coll.getCollectionPtr()->ns()),
-                                .prevEpoch = boost::none} {}
+                            CollectionAcquisition coll);
 
     ~RequiresCollectionStage() override = default;
 
@@ -90,7 +82,11 @@ private:
     // renames.
     const NamespaceString _nss;
 
+    // Fixed at construction so the stage behaves consistently across yields.
+    const bool _checkSchemaMetadata;
+
     PathArraynessChecker _pathArraynessChecker;
+    CollectionSchemaChecker _collectionSchemaChecker;
 };
 
 // Type alias for use by PlanStages that write to a Collection.

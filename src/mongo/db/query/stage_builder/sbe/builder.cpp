@@ -247,6 +247,24 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
              }});
     }
 
+    if (expCtx->hasUsedSchemaTypeInfo()) {
+        stdx::unordered_map<NamespaceString, CollectionSchemaChecker> perNss;
+        collections.forEach([&](const CollectionPtr& coll) {
+            if (coll) {
+                auto [it, inserted] = perNss.emplace(coll->ns(), CollectionSchemaChecker{});
+                invariant(inserted);
+                it->second.uassertIfInvalidatedAndSyncSchema(
+                    *CollectionQueryInfo::get(coll).getSchemaTypeInfo());
+            }
+        });
+        yieldPolicy->setMultipleCollectionSchemaChecker(
+            {MultipleCollectionAccessor{collections},
+             std::move(perNss),
+             [](const CollectionPtr& coll) {
+                 return CollectionQueryInfo::get(coll).getSchemaTypeInfo();
+             }});
+    }
+
     root->prepare(env.ctx);
 
     // Populate/renew "shardFilterer" if there exists a "shardFilterer" slot. The slot value should

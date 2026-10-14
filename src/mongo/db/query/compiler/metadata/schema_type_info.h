@@ -6,11 +6,10 @@
 #include "mongo/db/field_ref.h"
 #include "mongo/db/query/compiler/type_system/type.h"
 
-#include <cstdint>
-
 namespace mongo {
 
 class MatchExpression;
+class CollectionQueryInfo;
 
 /**
  * Represents the type and arrayness of each field of a collection's documents, as inferred from
@@ -18,19 +17,9 @@ class MatchExpression;
  */
 class SchemaTypeInfo {
 public:
-    explicit SchemaTypeInfo(uint64_t epoch = 0)
-        : _rootType(pipeline::type_system::Type::anyObject()), _epoch(epoch) {}
+    explicit SchemaTypeInfo() : _rootType(pipeline::type_system::Type::anyObject()) {}
 
-    SchemaTypeInfo(pipeline::type_system::Type rootType, uint64_t epoch = 0)
-        : _rootType(std::move(rootType)), _epoch(epoch) {}
-
-    uint64_t epoch() const {
-        return _epoch;
-    }
-
-    void incrementEpoch() {
-        ++_epoch;
-    }
+    SchemaTypeInfo(pipeline::type_system::Type rootType) : _rootType(std::move(rootType)) {}
 
     /**
      * Empty schema metadata representing the conservative case where nothing is known about the
@@ -61,12 +50,32 @@ public:
      */
     bool canPathBeArray(const FieldRef& path) const;
 
+    /**
+     * Returns the inferred type of the value at 'path'. A path that traverses a possible array is
+     * not modelled and yields 'any'; a path through a non-object yields 'missing'.
+     */
+    pipeline::type_system::Type getPathType(const FieldRef& path) const;
+
 private:
+    friend struct CollectionSchemaChecker;
+    friend class CollectionQueryInfo;
+
     // Inferred type of the collection's root document.
     pipeline::type_system::Type _rootType;
+};
 
-    // Monotonically increasing version of the validator-derived metadata.
-    uint64_t _epoch;
+/**
+ * Tracks schema metadata version for a collection and kills the plan if that metadata changes while
+ * the plan is yielded.
+ */
+struct CollectionSchemaChecker {
+public:
+    CollectionSchemaChecker() = default;
+
+    void uassertIfInvalidatedAndSyncSchema(const SchemaTypeInfo& current);
+
+private:
+    boost::optional<pipeline::type_system::Type> _prevRootType;
 };
 
 }  // namespace mongo

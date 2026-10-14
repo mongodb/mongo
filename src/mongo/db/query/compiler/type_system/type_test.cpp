@@ -565,6 +565,24 @@ TEST(TypeTest, CanPathBeArrayStopsAtNever) {
     ASSERT_FALSE(Type::never().canPathBeArray(FieldRef("x.y")));
 }
 
+TEST(TypeTest, GetPathTypeTraversesNestedFieldsConservatively) {
+    const auto inner = Type::object({{"b", Type(BSONType::string, Extent::kAll)}}, Open::kYes);
+    const auto objectOrNumber =
+        unionType(Type::object({{"x", Type(BSONType::string, Extent::kAll)}}, Open::kNo),
+                  Type(BSONType::numberInt, Extent::kAll));
+    const auto root = Type::object({{"a", inner},
+                                    {"array", Type(BSONType::array, Extent::kAll)},
+                                    {"scalar", Type(BSONType::string, Extent::kAll)},
+                                    {"mixed", objectOrNumber}},
+                                   Open::kYes);
+
+    ASSERT_EQ(getPathType(root, FieldRef("a.b")), Type(BSONType::string, Extent::kAll));
+    ASSERT_EQ(getPathType(root, FieldRef("unknown")), Type::any());
+    ASSERT_EQ(getPathType(root, FieldRef("array.x")), Type::any());
+    ASSERT_EQ(getPathType(root, FieldRef("scalar.x")), Type::missing());
+    ASSERT_EQ(getPathType(root, FieldRef("mixed.x")), Type::any());
+}
+
 TEST(TypeTest, SetFieldNarrowsTheNamedField) {
     auto type = object(Extent::kAll);
     type.setField("x", allValues(BSONType::string));

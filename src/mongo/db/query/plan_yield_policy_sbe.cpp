@@ -82,9 +82,32 @@ void PlanYieldPolicySBE::setMultipleCollectionPathArraynessChecker(
     _multipleCollectionsPathArraynessChecker.emplace(std::move(checker));
 }
 
+void PlanYieldPolicySBE::MultipleCollectionSchemaChecker::uassertIfInvalidatedAndSyncSchema() {
+    collections.forEach([&](const CollectionPtr& coll) {
+        if (!coll) {
+            return;
+        }
+        auto it = perNss.find(coll->ns());
+        if (it == perNss.end()) {
+            return;
+        }
+        auto current = getSchemaTypeInfo(coll);
+        tassert(12567301, "Expected schema type info to be set on CollectionQueryInfo", current);
+        it->second.uassertIfInvalidatedAndSyncSchema(*current);
+    });
+}
+
+void PlanYieldPolicySBE::setMultipleCollectionSchemaChecker(
+    MultipleCollectionSchemaChecker checker) {
+    _multipleCollectionsSchemaChecker.emplace(std::move(checker));
+}
+
 void PlanYieldPolicySBE::checkConstraintsValid() {
     if (_multipleCollectionsPathArraynessChecker) {
         _multipleCollectionsPathArraynessChecker->uassertIfInvalidatedAndSyncEpoch();
+    }
+    if (_multipleCollectionsSchemaChecker) {
+        _multipleCollectionsSchemaChecker->uassertIfInvalidatedAndSyncSchema();
     }
 }
 

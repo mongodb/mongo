@@ -398,6 +398,12 @@ ExpressionContextBuilder& ExpressionContextBuilder::nonArrayPathsForNssFrom(
     return *this;
 }
 
+ExpressionContextBuilder& ExpressionContextBuilder::schemaTypeInfoUsageFrom(
+    const ExpressionContext& other) {
+    params.schemaTypeInfoUsed = other._params.schemaTypeInfoUsed;
+    return *this;
+}
+
 ExpressionContextBuilder& ExpressionContextBuilder::fromRequest(
     OperationContext* operationContext,
     const FindCommandRequest& request,
@@ -594,6 +600,7 @@ boost::intrusive_ptr<ExpressionContext> makeCopyFromExpressionContext(
     ExpressionContextBuilder builder;
     builder.opCtx(other->getOperationContext(), other->getVersionContext())
         .ifrContext(other->getIfrContext())
+        .schemaTypeInfoUsageFrom(*other)
         .collator(std::move(collator))
         .mongoProcessInterface(other->getMongoProcessInterface())
         // For stages like $lookup and $unionWith that have a $rankFusion as subpipeline, we

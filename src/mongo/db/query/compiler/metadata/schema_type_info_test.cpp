@@ -3,6 +3,7 @@
 
 #include "mongo/db/query/compiler/metadata/schema_type_info.h"
 
+#include "mongo/base/error_codes.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
@@ -29,27 +30,21 @@ std::unique_ptr<MatchExpression> parseMatchExpr(const std::string& query) {
 
 TEST(SchemaTypeInfoTest, DefaultConstructedIsAnyObject) {
     SchemaTypeInfo info;
-    ASSERT_TRUE(info.getRootType() == Type::anyObject());
+    ASSERT_TRUE(info.getPathType(FieldRef("x")) == Type::any());
+    ASSERT_TRUE(info.canPathBeArray(FieldRef("x")));
 }
 
 TEST(SchemaTypeInfoTest, EmptySchemaTypeInfoIsAnyObject) {
-    ASSERT_TRUE(SchemaTypeInfo::empty().getRootType() == Type::anyObject());
-}
-
-TEST(SchemaTypeInfoTest, EmptySchemaTypeInfoDefaultsEpochToZero) {
-    ASSERT_EQ(SchemaTypeInfo::empty().epoch(), 0ULL);
-}
-
-TEST(SchemaTypeInfoTest, IncrementEpochChangesEpoch) {
-    SchemaTypeInfo info;
-    info.incrementEpoch();
-    ASSERT_EQ(info.epoch(), 1ULL);
+    auto info = SchemaTypeInfo::empty();
+    ASSERT_TRUE(info.getPathType(FieldRef("x")) == Type::any());
+    ASSERT_TRUE(info.canPathBeArray(FieldRef("x")));
 }
 
 TEST(SchemaTypeInfoTest, PopulateFromNullValidatorLeavesAnyObject) {
     SchemaTypeInfo info;
     info.populateFromValidator(nullptr);
-    ASSERT_TRUE(info.getRootType() == Type::anyObject());
+    ASSERT_TRUE(info.getPathType(FieldRef("x")) == Type::any());
+    ASSERT_TRUE(info.canPathBeArray(FieldRef("x")));
 }
 
 TEST(SchemaTypeInfoTest, PopulateFromValidatorNarrowsFieldType) {
@@ -59,8 +54,8 @@ TEST(SchemaTypeInfoTest, PopulateFromValidatorNarrowsFieldType) {
     info.populateFromValidator(expr.get());
 
     // The predicate is narrowed to 'string', but 'object' is definitely excluded.
-    ASSERT_TRUE(info.getRootType().getField("x").hasType(BSONType::string));
-    ASSERT_FALSE(info.getRootType().getField("x").hasType(BSONType::object));
+    ASSERT_TRUE(info.getPathType(FieldRef("x")).hasType(BSONType::string));
+    ASSERT_FALSE(info.getPathType(FieldRef("x")).hasType(BSONType::object));
 }
 
 TEST(SchemaTypeInfoTest, PopulateFromValidatorRebuildsFromScratch) {
@@ -72,8 +67,8 @@ TEST(SchemaTypeInfoTest, PopulateFromValidatorRebuildsFromScratch) {
     info.populateFromValidator(numberExpr.get());
 
     // The second call must not narrow on top of the first, but rebuild from 'anyObject'.
-    ASSERT_FALSE(info.getRootType().getField("x").hasType(BSONType::string));
-    ASSERT_TRUE(info.getRootType().getField("x").hasType(BSONType::numberInt));
+    ASSERT_FALSE(info.getPathType(FieldRef("x")).hasType(BSONType::string));
+    ASSERT_TRUE(info.getPathType(FieldRef("x")).hasType(BSONType::numberInt));
 }
 
 TEST(SchemaTypeInfoTest, PopulateFromValidatorLeavesFieldUnknownForNonTypePredicate) {
@@ -84,7 +79,7 @@ TEST(SchemaTypeInfoTest, PopulateFromValidatorLeavesFieldUnknownForNonTypePredic
 
     // Narrowing doesn't understand $gt, so nothing can be determined about 'x': it's still
     // possible for 'x' to hold any type, including an array.
-    ASSERT_TRUE(info.getRootType().getField("x") == Type::any());
+    ASSERT_TRUE(info.getPathType(FieldRef("x")) == Type::any());
     ASSERT_TRUE(info.canPathBeArray(FieldRef("x")));
 }
 
@@ -96,7 +91,7 @@ TEST(SchemaTypeInfoTest, PopulateFromValidatorLeavesFieldUnknownForJSONSchemaBso
     SchemaTypeInfo info;
     info.populateFromValidator(expr.get());
 
-    ASSERT_TRUE(info.getRootType().getField("x") == Type::any());
+    ASSERT_TRUE(info.getPathType(FieldRef("x")) == Type::any());
     ASSERT_TRUE(info.canPathBeArray(FieldRef("x")));
 }
 
@@ -111,7 +106,7 @@ TEST(SchemaTypeInfoTest, PopulateFromValidatorLeavesFieldUnknownForJSONSchemaReq
     SchemaTypeInfo info;
     info.populateFromValidator(expr.get());
 
-    ASSERT_TRUE(info.getRootType().getField("x") == Type::any());
+    ASSERT_TRUE(info.getPathType(FieldRef("x")) == Type::any());
     ASSERT_TRUE(info.canPathBeArray(FieldRef("x")));
 }
 
@@ -210,6 +205,83 @@ TEST(SchemaTypeInfoTest, CanPathBeArrayChecksEveryPathComponent) {
     ASSERT_TRUE(info.canPathBeArray(FieldRef("a.b")));
     // 'a.b.c' traverses through the array at 'a.b', so it can also be an array.
     ASSERT_TRUE(info.canPathBeArray(FieldRef("a.b.c")));
+}
+
+TEST(CollectionSchemaCheckerTest, DoesNotKillWhenTypeIsUnchanged) {
+    SchemaTypeInfo current(Type::anyObject());
+    CollectionSchemaChecker checker;
+    checker.uassertIfInvalidatedAndSyncSchema(current);
+
+    checker.uassertIfInvalidatedAndSyncSchema(current);
+}
+
+TEST(CollectionSchemaCheckerTest, KillsPlanWhenTypeChanges) {
+    SchemaTypeInfo current(Type::anyObject());
+    CollectionSchemaChecker checker;
+    checker.uassertIfInvalidatedAndSyncSchema(current);
+
+    current =
+        SchemaTypeInfo(Type::object({{"x", Type(BSONType::string, Extent::kAll)}}, Open::kYes));
+    ASSERT_THROWS_CODE(checker.uassertIfInvalidatedAndSyncSchema(current),
+                       DBException,
+                       ErrorCodes::QueryPlanKilled);
+}
+
+TEST(CollectionSchemaCheckerTest, SyncsTypeAfterKill) {
+    SchemaTypeInfo current(Type::anyObject());
+    CollectionSchemaChecker checker;
+    checker.uassertIfInvalidatedAndSyncSchema(current);
+
+    current =
+        SchemaTypeInfo(Type::object({{"x", Type(BSONType::string, Extent::kAll)}}, Open::kYes));
+    ASSERT_THROWS_CODE(checker.uassertIfInvalidatedAndSyncSchema(current),
+                       DBException,
+                       ErrorCodes::QueryPlanKilled);
+
+    checker.uassertIfInvalidatedAndSyncSchema(current);
+}
+
+TEST(CollectionSchemaCheckerTest, DoesNotKillWhenRebuiltTypeIsEqual) {
+    CollectionSchemaChecker checker;
+    checker.uassertIfInvalidatedAndSyncSchema(
+        SchemaTypeInfo(Type::object({{"x", Type(BSONType::string, Extent::kAll)}}, Open::kYes)));
+    checker.uassertIfInvalidatedAndSyncSchema(
+        SchemaTypeInfo(Type::object({{"x", Type(BSONType::string, Extent::kAll)}}, Open::kYes)));
+}
+
+TEST(CollectionSchemaCheckerTest, KillsPlanWhenTypeBecomesUnconstrained) {
+    CollectionSchemaChecker checker;
+    checker.uassertIfInvalidatedAndSyncSchema(
+        SchemaTypeInfo(Type::object({{"x", Type(BSONType::string, Extent::kAll)}}, Open::kYes)));
+    ASSERT_THROWS_CODE(checker.uassertIfInvalidatedAndSyncSchema(SchemaTypeInfo()),
+                       DBException,
+                       ErrorCodes::QueryPlanKilled);
+}
+
+TEST(CollectionSchemaCheckerTest, KillsPlanWhenNestedFieldTypeChanges) {
+    const auto schemaWithNestedField = [](BSONType fieldType) {
+        return SchemaTypeInfo(Type::object(
+            {{"x", Type::object({{"y", Type(fieldType, Extent::kAll)}}, Open::kYes)}}, Open::kYes));
+    };
+    CollectionSchemaChecker checker;
+    checker.uassertIfInvalidatedAndSyncSchema(schemaWithNestedField(BSONType::string));
+    ASSERT_THROWS_WHAT(
+        checker.uassertIfInvalidatedAndSyncSchema(schemaWithNestedField(BSONType::numberInt)),
+        DBException,
+        "query plan killed :: collection schema metadata changed during yield");
+}
+
+TEST(SchemaTypeInfoTest, GetPathTypeOfEmptyPathIsTheRootType) {
+    const Type root = Type::object({{"a", Type(BSONType::string, Extent::kAll)}}, Open::kYes);
+    ASSERT_TRUE(SchemaTypeInfo(root).getPathType(FieldRef("")) == root);
+}
+
+TEST(SchemaTypeInfoTest, GetPathTypeIsMissingWhenTheRootCoversNoObject) {
+    ASSERT_TRUE(SchemaTypeInfo(Type::never()).getPathType(FieldRef("a")) == Type::missing());
+}
+
+TEST(SchemaTypeInfoTest, GetPathTypeOfADeepUnmodelledPathIsAny) {
+    ASSERT_TRUE(SchemaTypeInfo().getPathType(FieldRef("a.b.c")) == Type::any());
 }
 
 }  // namespace

@@ -6,6 +6,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/compiler/metadata/path_arrayness.h"
+#include "mongo/db/query/compiler/metadata/schema_type_info.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/stdx/unordered_map.h"
@@ -70,10 +71,20 @@ public:
      */
     void setMultipleCollectionPathArraynessChecker(MultipleCollectionPathArraynessChecker checker);
 
+    struct MultipleCollectionSchemaChecker {
+        MultipleCollectionAccessor collections;
+        stdx::unordered_map<NamespaceString, CollectionSchemaChecker> perNss;
+        std::function<std::shared_ptr<const SchemaTypeInfo>(const CollectionPtr&)>
+            getSchemaTypeInfo;
+
+        void uassertIfInvalidatedAndSyncSchema();
+    };
+
+    void setMultipleCollectionSchemaChecker(MultipleCollectionSchemaChecker checker);
+
     /**
-     * Throws QueryPlanKilled if catalog metadata that the registered plans were built against has
-     * changed in a way that invalidates them. Must be called after every restore of the registered
-     * plans, including restores that do not go through a yield (e.g. at the start of a getMore).
+     * Runs the registered path arrayness and schema checks. Also called on PlanExecutor restore,
+     * which resumes on a new snapshot without going through an internal yield.
      */
     void checkConstraintsValid();
 
@@ -96,6 +107,7 @@ private:
 
     boost::optional<MultipleCollectionPathArraynessChecker>
         _multipleCollectionsPathArraynessChecker;
+    boost::optional<MultipleCollectionSchemaChecker> _multipleCollectionsSchemaChecker;
 };
 
 }  // namespace mongo

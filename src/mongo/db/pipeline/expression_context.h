@@ -48,6 +48,7 @@
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 
+#include <atomic>
 #include <cstdint>
 #include <memory>
 #include <string_view>
@@ -1135,6 +1136,15 @@ public:
         }
     }
 
+    // Call when validator-derived type information affects planning for this query.
+    void markSchemaTypeInfoUsed() const {
+        _params.schemaTypeInfoUsed->store(true);
+    }
+
+    bool hasUsedSchemaTypeInfo() const {
+        return _params.schemaTypeInfoUsed->load();
+    }
+
 protected:
     struct ExpressionContextParams {
         OperationContext* opCtx = nullptr;
@@ -1305,6 +1315,8 @@ protected:
         stdx::unordered_map<NamespaceString, std::shared_ptr<const PathArrayness>>
             pathArraynessForNss;
         NonArrayPathsForNss nonArrayPathsForNss;
+        std::shared_ptr<std::atomic<bool>> schemaTypeInfoUsed =
+            std::make_shared<std::atomic<bool>>(false);
     };
 
     ExpressionContextParams _params;

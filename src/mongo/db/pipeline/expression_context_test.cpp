@@ -599,6 +599,20 @@ TEST_F(ExpressionContextTest, isReparsingRepresentativeQueryShapeDefaultsToFalse
     ASSERT_FALSE(expCtx->getIsReparsingRepresentativeQueryShape());
 }
 
+TEST_F(ExpressionContextTest, SchemaTypeInfoUsageIsFalseByDefaultAndSharedWithCopies) {
+    auto opCtx = makeOperationContext();
+    auto expCtx = ExpressionContextBuilder{}
+                      .opCtx(opCtx.get())
+                      .ns(NamespaceString::createNamespaceString_forTest("test"sv, "coll"sv))
+                      .build();
+
+    ASSERT_FALSE(expCtx->hasUsedSchemaTypeInfo());
+    auto copy = makeCopyFromExpressionContext(
+        expCtx, NamespaceString::createNamespaceString_forTest("test"sv, "other"sv));
+    copy->markSchemaTypeInfoUsed();
+    ASSERT_TRUE(expCtx->hasUsedSchemaTypeInfo());
+}
+
 // An internal-only expression must still be rejected when an external client sends it, but must
 // parse when the server re-parses a stored query shape that contains it. Otherwise reading
 // $queryStats as an external client fails on any entry recorded for an internal client. See

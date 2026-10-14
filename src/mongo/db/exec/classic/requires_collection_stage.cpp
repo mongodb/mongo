@@ -11,6 +11,24 @@
 
 namespace mongo {
 
+RequiresCollectionStage::RequiresCollectionStage(std::string_view stageType,
+                                                 ExpressionContext* expCtx,
+                                                 CollectionAcquisition coll)
+    : PlanStage(stageType, expCtx),
+      _collection(coll),
+      _collectionPtr(&coll.getCollectionPtr()),
+      _collectionUUID(coll.getCollectionPtr()->uuid()),
+      _catalogEpoch(getCatalogEpoch()),
+      _nss(coll.getCollectionPtr()->ns()),
+      _checkSchemaMetadata(expCtx->hasUsedSchemaTypeInfo()),
+      _pathArraynessChecker{.nonArrayPaths = expCtx->nonArrayPathsForNss(_nss),
+                            .prevEpoch = boost::none} {
+    if (_checkSchemaMetadata) {
+        auto schemaTypeInfo = CollectionQueryInfo::get(coll.getCollectionPtr()).getSchemaTypeInfo();
+        _collectionSchemaChecker.uassertIfInvalidatedAndSyncSchema(*schemaTypeInfo);
+    }
+}
+
 void RequiresCollectionStage::doSaveState() {
     doSaveStateRequiresCollection();
 }
@@ -59,6 +77,11 @@ void RequiresCollectionStage::doRestoreState(const RestoreContext& context) {
         if (auto current = CollectionQueryInfo::get(coll).getPathArrayness()) {
             _pathArraynessChecker.uassertIfInvalidatedAndSyncEpoch(*current, coll->ns());
         }
+    }
+
+    if (_checkSchemaMetadata) {
+        auto current = CollectionQueryInfo::get(coll).getSchemaTypeInfo();
+        _collectionSchemaChecker.uassertIfInvalidatedAndSyncSchema(*current);
     }
 
     doRestoreStateRequiresCollection();

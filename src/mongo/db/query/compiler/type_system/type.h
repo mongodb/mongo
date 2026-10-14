@@ -251,6 +251,12 @@ private:
     detail::Shape _shape;
 };
 
+/**
+ * Returns the inferred type at 'path'. Traversing an array or a union of object and non-object
+ * types returns any conservatively; traversing a non-object type returns missing.
+ */
+Type getPathType(const Type& type, const FieldRef& path);
+
 /// Returns the values covered by 'lhs' or by 'rhs'.
 TypeSet unionType(TypeSet lhs, TypeSet rhs);
 

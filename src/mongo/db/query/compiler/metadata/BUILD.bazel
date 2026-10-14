@@ -113,6 +113,7 @@ mongo_cc_library(
     deps = [
         "//src/mongo:base",
         "//src/mongo/db:common",
+        "//src/mongo/db/pipeline:field_path",
         "//src/mongo/db/query/compiler/type_system",
     ],
 )
