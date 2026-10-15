@@ -1022,8 +1022,21 @@ lock_import.package(
     repo = "pypi",
 )
 
+# //release-container is its own uv project with its own lock. It pins `docker==6.0.1` and
+# `urllib3==1.26.15`, which conflict with the versions in the root uv.lock, so it gets a separate
+# hub: depend on it as @release_container_pypi//:<pkg> (see `hub` in //bazel/uv:defs.bzl).
+# Every package in that lock ships a wheel, so no sdist build dependencies are needed.
+lock_import.import_uv(
+    all_development_groups = True,
+    lock_file = "//release-container:uv.lock",
+    project_file = "//release-container:pyproject.toml",
+    repo = "release_container_pypi",
+    require_static_urls = True,
+    target_environments = ["@mongo_pycross_environments//:environments"],
+)
+
 lock_repos = use_extension("@rules_pycross//pycross/extensions:lock_repos.bzl", "lock_repos")
-use_repo(lock_repos, "pypi")
+use_repo(lock_repos, "pypi", "release_container_pypi")
 ###################### END PYTHON DEPS ######################
 
 bazel_dep(name = "bazel_rules_mongo", version = "0.0.0")

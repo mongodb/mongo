@@ -50,16 +50,20 @@ def _normalize(name):
         out = out.replace("--", "-")
     return out
 
-def dependency(name, group = None):
+def dependency(name, group = None, hub = "pypi"):
     """Return the Bazel label for a PyPI package locked in uv.lock.
 
     Args:
         name: PyPI distribution name (case-insensitive; will be normalized).
         group: Ignored. Accepted for compatibility with the old rules_poetry
             macro signature.
+        hub: Name of the rules_pycross hub repo that holds the package. The
+            default `pypi` is the root uv.lock; a separate uv project (for
+            example //release-container) has its own hub declared in
+            //MODULE.bazel.
 
     Returns:
         A label string like "@pypi//:pyyaml".
     """
     _ = group  # buildifier: silence unused-argument
-    return "@pypi//:" + _normalize(name)
+    return "@" + hub + "//:" + _normalize(name)
