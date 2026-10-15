@@ -851,6 +851,18 @@ mongo_cc_unit_test(
     ],
 )
 
+mongo_cc_unit_test(
+    name = "sharding_task_executor_pool_controller_test",
+    srcs = [
+        "sharding_task_executor_pool_controller_test.cpp",
+    ],
+    tags = ["mongo_unittest_eighth_group"],
+    deps = [
+        ":sharding_api",
+        "//src/mongo/db/sharding_environment:shard_server_test_fixture",
+    ],
+)
+
 resmoke_suite_test(
     name = "mongos_test",
     config = "//buildscripts/resmokeconfig:suites/mongos_test.yml",

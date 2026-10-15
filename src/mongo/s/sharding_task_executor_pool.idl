@@ -30,8 +30,8 @@ server_parameters:
 
     ShardingTaskExecutorPoolMaxConnecting:
         description: <-
-            The maximum number of in-flight connections for each executor
-            in the pool for the sharding grid.
+            The maximum number of in-flight connections per host for each executor in the pool
+            for the sharding grid. Does not apply to the Sharding-Fixed pool.
         set_at: [startup, runtime]
         cpp_varname: "ShardingTaskExecutorPoolController::gParameters.maxConnecting"
         validator:
@@ -101,6 +101,42 @@ server_parameters:
         validator:
             gte: -1
         default: -1
+        redact: false
+
+    ShardingFixedTaskExecutorPoolMinSize:
+        description: <-
+            The minimum number of connections for the sharding grid's fixed executor, reported as
+            Sharding-Fixed. ShardingTaskExecutorPoolMinSize and
+            ShardingTaskExecutorPoolMinSizeForConfigServers do not apply to this pool.
+        set_at: [startup, runtime]
+        cpp_varname: "ShardingTaskExecutorPoolController::gParameters.fixedExecutorMinConnections"
+        validator:
+            gte: 0
+        default: 1
+        redact: false
+
+    ShardingFixedTaskExecutorPoolMaxSize:
+        description: <-
+            The maximum number of connections for the sharding grid's fixed executor, reported as
+            Sharding-Fixed. ShardingTaskExecutorPoolMaxSize and
+            ShardingTaskExecutorPoolMaxSizeForConfigServers do not apply to this pool.
+        set_at: [startup, runtime]
+        cpp_varname: "ShardingTaskExecutorPoolController::gParameters.fixedExecutorMaxConnections"
+        validator:
+            gte: 1
+        default: 32767
+        redact: false
+
+    ShardingFixedTaskExecutorPoolMaxConnecting:
+        description: <-
+            The maximum number of in-flight connections per host for the sharding grid's fixed
+            executor, reported as Sharding-Fixed. ShardingTaskExecutorPoolMaxConnecting does not
+            apply to this pool.
+        set_at: [startup, runtime]
+        cpp_varname: "ShardingTaskExecutorPoolController::gParameters.fixedExecutorMaxConnecting"
+        validator:
+            gte: 1
+        default: 2
         redact: false
 
     ShardingTaskExecutorPoolMaxQueueDepth:

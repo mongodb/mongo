@@ -163,10 +163,11 @@ Status initializeGlobalShardingState(
     boost::optional<size_t> taskExecutorPoolSize,
     std::function<std::unique_ptr<KeysCollectionClient>(ShardingCatalogClient*)> initKeysClient) {
 
-    ConnectionPool::Options connPoolOptions;
     std::shared_ptr<ShardRegistry> srsp(std::move(shardRegistry));
-    connPoolOptions.controllerFactory = [srwp = std::weak_ptr(srsp)] {
-        return std::make_shared<ShardingTaskExecutorPoolController>(srwp);
+    ConnectionPool::Options fixedConnPoolOptions;
+    fixedConnPoolOptions.controllerFactory = [srwp = std::weak_ptr(srsp)] {
+        return std::make_shared<ShardingTaskExecutorPoolController>(
+            srwp, ShardingTaskExecutorPoolController::PoolType::kFixed);
     };
 
     auto network = executor::makeNetworkInterface(
@@ -174,13 +175,19 @@ Status initializeGlobalShardingState(
         {
             .connectionHook = std::make_unique<ShardingNetworkConnectionHook>(),
             .metadataHook = hookBuilder(),
-            .connectionPoolOptions = connPoolOptions,
+            .connectionPoolOptions = std::move(fixedConnPoolOptions),
             .trackRequestCounts =
                 serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer),
         });
+
     auto networkPtr = network.get();
+    ConnectionPool::Options connPoolOptions;
+    connPoolOptions.controllerFactory = [srwp = std::weak_ptr(srsp)] {
+        return std::make_shared<ShardingTaskExecutorPoolController>(
+            srwp, ShardingTaskExecutorPoolController::PoolType::kArbitrary);
+    };
     auto executorPool = makeShardingTaskExecutorPool(
-        std::move(network), hookBuilder, connPoolOptions, taskExecutorPoolSize);
+        std::move(network), hookBuilder, std::move(connPoolOptions), taskExecutorPoolSize);
     executorPool->startup();
 
     auto& numHostsTargetedMetrics = NumHostsTargetedMetrics::get(opCtx);

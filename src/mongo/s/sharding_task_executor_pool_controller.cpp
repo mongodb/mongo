@@ -10,6 +10,7 @@
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/util/str.h"
 
 #include <algorithm>
@@ -215,6 +216,24 @@ auto ShardingTaskExecutorPoolController::updateHost(PoolId id, const PoolMetrics
     auto& poolData = getOrInvariant(_poolDatas, id);
 
     const auto [minConns, maxConns] = [&] {
+        if (_poolType == PoolType::kFixed) {
+            size_t lo = gParameters.fixedExecutorMinConnections.loadRelaxed();
+            size_t hi = gParameters.fixedExecutorMaxConnections.loadRelaxed();
+            if (lo > hi) {
+                static logv2::SeveritySuppressor logSeverity{
+                    Minutes{10}, logv2::LogSeverity::Error(), logv2::LogSeverity::Debug(2)};
+                LOGV2_DEBUG(10711800,
+                            logSeverity().toInt(),
+                            "Sharding-Fixed pool minimum exceeds maximum; clamping minimum",
+                            "minParam"_attr = "ShardingFixedTaskExecutorPoolMinSize",
+                            "minValue"_attr = lo,
+                            "maxParam"_attr = "ShardingFixedTaskExecutorPoolMaxSize",
+                            "maxValue"_attr = hi);
+                lo = hi;
+            }
+            return std::tuple(lo, hi);
+        }
+
         size_t lo = gParameters.minConnections.load();
         size_t hi = gParameters.maxConnections.load();
         if (poolData.isConfigServer) {
@@ -232,6 +251,7 @@ auto ShardingTaskExecutorPoolController::updateHost(PoolId id, const PoolMetrics
                 5,
                 "Update connection pool",
                 "host"_attr = poolData.host,
+                "pool"_attr = getPool()->getName(),
                 "minConns"_attr = minConns,
                 "maxConns"_attr = maxConns);
 
@@ -308,7 +328,9 @@ auto ShardingTaskExecutorPoolController::getControls(PoolId id) -> ConnectionCon
     std::lock_guard lk(_mutex);
     auto& poolData = getOrInvariant(_poolDatas, id);
 
-    const size_t maxPending = gParameters.maxConnecting.load();
+    const size_t maxPending = _poolType == PoolType::kFixed
+        ? gParameters.fixedExecutorMaxConnecting.loadRelaxed()
+        : gParameters.maxConnecting.loadRelaxed();
 
     auto groupData = poolData.groupData.lock();
     if (!groupData || gParameters.matchingStrategy.load() == MatchingStrategy::kDisabled) {
@@ -336,7 +358,8 @@ size_t ShardingTaskExecutorPoolController::connectionRequestsMaxQueueDepth() con
 }
 
 size_t ShardingTaskExecutorPoolController::maxConnections() const {
-    return gParameters.maxConnections.load();
+    return _poolType == PoolType::kFixed ? gParameters.fixedExecutorMaxConnections.loadRelaxed()
+                                         : gParameters.maxConnections.loadRelaxed();
 }
 
 void ShardingTaskExecutorPoolController::updateConnectionPoolStats(

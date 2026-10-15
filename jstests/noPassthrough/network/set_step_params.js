@@ -13,6 +13,7 @@ let stepParams = {
     ShardingTaskExecutorPoolMinSize: minConns,
     ShardingTaskExecutorPoolMaxSize: 10,
     ShardingTaskExecutorPoolMaxConnecting: 5,
+    ShardingFixedTaskExecutorPoolMaxConnecting: 3,
     ShardingTaskExecutorPoolHostTimeoutMS: 300000,
     ShardingTaskExecutorPoolRefreshRequirementMS: 60000,
     ShardingTaskExecutorPoolRefreshTimeoutMS: 20000,
@@ -40,6 +41,14 @@ let currentCheckNum = 0;
 const numPools = assert.commandWorked(
     mongos.adminCommand({"getParameter": 1, "taskExecutorPoolSize": 1}),
 )["taskExecutorPoolSize"];
+
+assert.eq(
+    stepParams.ShardingFixedTaskExecutorPoolMaxConnecting,
+    assert.commandWorked(
+        mongos.adminCommand({getParameter: 1, ShardingFixedTaskExecutorPoolMaxConnecting: 1}),
+    ).ShardingFixedTaskExecutorPoolMaxConnecting,
+    "Sharding-Fixed connecting limit should match the startup parameter",
+);
 
 function updateSetParameters(params) {
     let cmd = Object.assign({"setParameter": 1}, params);

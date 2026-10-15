@@ -72,6 +72,12 @@ public:
         kMatchBusiestNode,
     };
 
+    /**
+     * Selects which executor pool size and max-connecting parameters apply. The fixed pool uses
+     * its own limits and ignores config-server overrides; arbitrary pools use the shared limits.
+     */
+    enum class PoolType { kArbitrary, kFixed };
+
     friend std::string_view matchingStrategyToString(MatchingStrategy strategy) {
         switch (strategy) {
             case ShardingTaskExecutorPoolController::MatchingStrategy::kMatchPrimaryNode:
@@ -102,6 +108,10 @@ public:
 
         Atomic<int> minConnectionsForConfigServers;
         Atomic<int> maxConnectionsForConfigServers;
+
+        Atomic<int> fixedExecutorMinConnections;
+        Atomic<int> fixedExecutorMaxConnections;
+        Atomic<int> fixedExecutorMaxConnecting;
     };
 
     static inline Parameters gParameters;
@@ -124,8 +134,9 @@ public:
      */
     static Status onUpdateMatchingStrategy(const std::string& str);
 
-    explicit ShardingTaskExecutorPoolController(std::weak_ptr<ShardRegistry> shardRegistry)
-        : _shardRegistry(std::move(shardRegistry)) {
+    ShardingTaskExecutorPoolController(std::weak_ptr<ShardRegistry> shardRegistry,
+                                       PoolType poolType)
+        : _shardRegistry(std::move(shardRegistry)), _poolType(poolType) {
         ObservableMutexRegistry::get().add("shardingTaskExecutorPoolControllerMutex", _mutex);
     }
 
@@ -221,6 +232,8 @@ private:
 
     /** Needed by isConfigServer */
     std::weak_ptr<ShardRegistry> const _shardRegistry;
+
+    const PoolType _poolType;
 
     std::shared_ptr<ReplicaSetChangeNotifier::Listener> _listener;
 
