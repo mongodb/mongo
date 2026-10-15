@@ -87,7 +87,6 @@ filters:
   - "mozjs":
     approvers:
       - 10gen/query-integration-features
-      - 10gen/server-security
   - "murmurhash3":
     approvers:
       - 10gen/server-programmability
