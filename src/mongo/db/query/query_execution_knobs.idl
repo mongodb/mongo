@@ -991,36 +991,6 @@ server_parameters:
         default: 0
         redact: false
 
-    # TODO SERVER-135771: Remove this parameter. It has been unused since the SBE window stage
-    # was deleted.
-    internalQuerySlotBasedExecutionWindowBufferMemorySamplingAtLeast:
-        mod_visibility: needs_replacement
-        description: >-
-            The window buffer memory sampling in the window stage is performed in an exponential
-            backoff way on the processed records. This setting defines the least sampling frequency.
-        set_at: [startup, runtime]
-        cpp_varname: "internalQuerySlotBasedExecutionWindowBufferMemorySamplingAtLeast"
-        cpp_vartype: Atomic<long long>
-        default: 1024
-        validator:
-            gt: 0
-        redact: false
-
-    # TODO SERVER-135771: Remove this parameter. It has been unused since the SBE window stage
-    # was deleted.
-    internalQuerySlotBasedExecutionWindowStateMemorySamplingAtLeast:
-        mod_visibility: needs_replacement
-        description: >-
-            The window state memory sampling in the window stage is performed in an exponential
-            backoff way for different window frame size. This setting defines the least sampling frequency.
-        set_at: [startup, runtime]
-        cpp_varname: "internalQuerySlotBasedExecutionWindowStateMemorySamplingAtLeast"
-        cpp_vartype: Atomic<long long>
-        default: 1024
-        validator:
-            gt: 0
-        redact: false
-
     internalQuerySlotBasedExecutionDisableTimeSeriesPushdown:
         description: "If true, the system will not push down time-series queries to the SBE execution engine."
         set_at: [startup, runtime]
