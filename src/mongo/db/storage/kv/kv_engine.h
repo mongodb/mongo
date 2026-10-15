@@ -751,7 +751,8 @@ public:
 
     /**
      * Pauses background auto-compaction for a replica set write block transition. Auto-compaction
-     * must be explicitly re-enabled after the write block is released.
+     * must be explicitly re-enabled after the write block is released; rollback does not re-enable
+     * it.
      */
     virtual Status pauseAutoCompactForReplicaSetWritesBlock(RecoveryUnit&) {
         return Status::OK();

@@ -25,14 +25,18 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/shard_role/ddl/create_gen.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_options_gen.h"
+#include "mongo/db/shard_role/shard_catalog/collection_mock.h"
 #include "mongo/db/shard_role/shard_catalog/collection_operation_source.h"
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
 #include "mongo/db/shard_role/shard_role.h"
+#include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/storage/storage_engine_mock.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/topology/user_write_block/global_user_write_block_state.h"
@@ -68,6 +72,49 @@ private:
 CreateCommand createCommandForTest(std::string_view nss) {
     return CreateCommand(NamespaceString::createNamespaceString_forTest(nss));
 }
+
+class PauseAutoCompactThrowsStorageEngine final : public StorageEngineMock {
+public:
+    Status tryPauseAutoCompactForReplicaSetWritesBlock(OperationContext*) override {
+        ++_attempts;
+        return {ErrorCodes::ObjectIsBusy, "auto-compact reconfigure is busy"};
+    }
+
+    int attempts() const {
+        return _attempts;
+    }
+
+private:
+    int _attempts = 0;
+};
+
+class ReplicaSetWriteBlockSecondaryOpObserverTest : public ServiceContextTest {
+public:
+    void setUp() override {
+        ServiceContextTest::setUp();
+
+        auto* service = getServiceContext();
+        auto storageEngine = std::make_unique<PauseAutoCompactThrowsStorageEngine>();
+        _storageEngine = storageEngine.get();
+        service->setStorageEngine(std::move(storageEngine));
+
+        repl::ReplSettings settings;
+        settings.setReplSetString("mySet/node1:12345");
+        auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(service, settings);
+        _replCoord = replCoord.get();
+        repl::ReplicationCoordinator::set(service, std::move(replCoord));
+        ASSERT_OK(_replCoord->setFollowerMode(repl::MemberState::RS_SECONDARY));
+    }
+
+protected:
+    PauseAutoCompactThrowsStorageEngine* storageEngine() const {
+        return _storageEngine;
+    }
+
+private:
+    PauseAutoCompactThrowsStorageEngine* _storageEngine;
+    repl::ReplicationCoordinatorMock* _replCoord;
+};
 
 // Primary on a replset mock so canAcceptWritesFor is true and the op observer applies checks.
 class ReplicaSetWriteBlockOpObserverTest : public ServiceContextMongoDTest {
@@ -293,6 +340,40 @@ private:
         return settings;
     }
 };
+
+TEST_F(ReplicaSetWriteBlockSecondaryOpObserverTest,
+       AutoCompactPauseMakesOneNonBlockingAttemptOnSecondary) {
+    auto opCtx = cc().makeOperationContext();
+    CollectionMock collection(NamespaceString::kReplicaSetWritesCriticalSectionsNamespace);
+
+    ReplicaSetWriteBlockingCriticalSectionDocument doc(
+        UserWritesRecoverableCriticalSectionService::kBlockReplicaSetWritesNamespace);
+    doc.setEnabled(true);
+    doc.setAllowDeletions(false);
+    doc.setReplicaSetWritesBlockReason(ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace);
+    const auto updatedDoc = doc.toBSON();
+    const auto criteria = updatedDoc["_id"].wrap();
+    CollectionUpdateArgs collectionUpdateArgs{criteria};
+    collectionUpdateArgs.criteria = criteria;
+    collectionUpdateArgs.update = BSON("$set" << BSON("allowDeletions" << false));
+    collectionUpdateArgs.updatedDoc = updatedDoc;
+
+    ReplicaSetWriteBlockOpObserver opObserver;
+    CollectionPtr collectionPtr(&collection);
+    OplogUpdateEntryArgs updateArgs(&collectionUpdateArgs, collectionPtr);
+    // Stands in for the collection acquisition the oplog applier holds across the commit handler.
+    Lock::GlobalLock globalLock(opCtx.get(), MODE_IX);
+    WriteUnitOfWork wuow(opCtx.get());
+    opObserver.onUpdate(opCtx.get(), updateArgs);
+
+    // A transient pause failure must not prevent the replicated update from committing. The
+    // secondary makes only one non-blocking attempt from the oplog-apply commit callback.
+    ASSERT_DOES_NOT_THROW(wuow.commit());
+    ASSERT_EQ(1, storageEngine()->attempts());
+    ASSERT_TRUE(ReplicaSetWriteBlockState::get(opCtx.get())->isReplicaSetWriteBlockingEnabled());
+    ASSERT_TRUE(
+        ReplicaSetWriteBlockState::get(opCtx.get())->isReplicaSetDeletionsBlockingEnabled());
+}
 
 TEST_F(ReplicaSetWriteBlockOpObserverTest, ReplicaSetWriteAndDeletionBlockingDisabledNoBypass) {
     auto opCtx = cc().makeOperationContext();

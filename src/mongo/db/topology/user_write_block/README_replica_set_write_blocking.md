@@ -65,12 +65,16 @@ therefore lets an operator choose. When deletions are allowed, an operator can b
 updates while still permitting users to delete data and recover. When deletions are blocked, they
 are treated like any other write and rejected. Blocking deletions also prevents starting on-demand
 `compact` (`checkIfCompactAllowedToStart`) or enabling background auto-compaction, because either
-can itself require disk space. A newly acquired block with `allowDeletions: false`, or an active
-block changed from `allowDeletions: true` to `false`, also pauses existing background
-auto-compaction via `pauseAutoCompactForReplicaSetWritesBlock`. The paused configuration is not
-retained or automatically restored; changing `allowDeletions` back to `true` or releasing the block
-still requires an operator to explicitly re-enable auto-compaction. Recovery only updates
-write-block state and does not reconcile an already-running background auto-compaction.
+can itself require disk space. On the primary, existing background auto-compaction is paused
+synchronously, retrying transient `ObjectIsBusy` errors, after a durable transition that blocks
+deletions: a newly inserted critical-section document with `allowDeletions: false`, or an active
+block whose `allowDeletions` field has committed from `true` to `false`. On secondaries,
+`ReplicaSetWriteBlockOpObserver` executes the same pause synchronously during oplog application, but
+attempts it only once to avoid delaying replication. Idempotent re-acquires and already-false
+updates do not pause. The paused configuration is not retained or automatically restored; changing
+`allowDeletions` back to `true`, releasing the block, or rolling back that transition still requires
+an operator to explicitly re-enable auto-compaction. Recovery only updates write-block state and
+does not re-enable auto-compaction.
 
 ## On-disk state and recovery
 
@@ -87,8 +91,9 @@ becomes available (`recoverRecoverableCriticalSections`). Rollback of
 `config.replica_set_writes_critical_section` is a separate path: after oplog recovery,
 `ReplicaSetWriteBlockOpObserver::onReplicationRollback` calls
 `recoverReplicaSetWritesCriticalSection`. That recovery restores in-memory write-block and
-`allowDeletions` state from the durable document, but does **not** reconcile auto-compaction.
-Consequently, rollback or recovery can leave node-local background auto-compaction out of sync with
+`allowDeletions` state from the durable document, but does **not** re-enable auto-compaction. A
+rolled-back true-to-false `allowDeletions` update therefore leaves compaction paused rather than
+restarting it. Rollback or recovery can leave node-local background auto-compaction out of sync with
 the recovered deletion policy.
 
 ## In-memory state
@@ -145,8 +150,8 @@ internal-database, and `system.profile` exemptions described above):
 - **Blocked only when deletions are blocked** (i.e. `allowDeletions` was false): deletes — including
   range deletions (orphan cleanup) and TTL deletions — the on-demand `compact` command
   (`checkIfCompactAllowedToStart`), and attempts to enable background auto-compaction. Existing
-  background auto-compaction is paused when a new block is acquired with deletions blocked or an
-  active block changes from allowing to blocking deletions, as described above.
+  background auto-compaction is paused after a committed transition that blocks deletions, as
+  described above.
 - **Held (paused and resumed):**
   - `reshardCollection` already in progress on the recipient — the resharding recipient treats
     `ErrorCodes::ReplicaSetWritesBlocked` as a transient error and hold, resuming once the block is

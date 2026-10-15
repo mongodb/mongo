@@ -40,6 +40,9 @@ selector:
     # TODO SERVER-94428: Reenable this test.
     # This test is currently incompatible with dbcheck.
     - jstests/core/timeseries/write/timeseries_update_multi.js
+    # The auto-compaction tests in this file require background compaction to become active, which
+    # is not guaranteed while oplog application is deliberately lagged.
+    - jstests/core/administrative/block_replica_set_writes.js
 
   exclude_with_any_tags:
     - assumes_standalone_mongod

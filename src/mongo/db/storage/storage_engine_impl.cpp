@@ -79,6 +79,15 @@ MONGO_FAIL_POINT_DEFINE(pauseTimestampMonitor);
 namespace {
 const auto kCatalogLogLevel = logv2::LogSeverity::Debug(2);
 
+// The storage engine transiently rejects an auto-compaction reconfigure while a previous one is
+// still being consumed. Retry for up to ~30 seconds before giving up.
+constexpr Milliseconds kAutoCompactReconfigureRetryInterval{50};
+constexpr int kMaxAutoCompactReconfigureAttempts = 600;
+
+bool isTransientAutoCompactStatus(Status status) {
+    return status == ErrorCodes::ObjectIsBusy;
+}
+
 // Returns true if the ident refers to a resumable index build table.
 bool isResumableIndexBuildIdent(std::string_view ident) {
     return ident::isInternalIdent(ident, kResumableIndexIdentStem);
@@ -1188,21 +1197,11 @@ Status StorageEngineImpl::fixDatabaseSize() {
     return _engine->fixDatabaseSize();
 }
 
-namespace {
-// Background auto-compaction reconfigures are applied asynchronously by the storage engine;
-// while a previous reconfigure is still being consumed, a new one is transiently rejected with
-// ObjectIsBusy.
-const Milliseconds kAutoCompactReconfigureRetryInterval{50};
-constexpr int kMaxAutoCompactReconfigureAttempts = 600;  // ~30s of retrying before giving up.
+void StorageEngineImpl::pauseAutoCompactForReplicaSetWritesBlock(OperationContext* opCtx) {
+    if (!rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider().supportsCompaction()) {
+        return;
+    }
 
-/**
- * Pauses auto-compaction for a write block transition under the global lock, retrying
- * the transient ObjectIsBusy (a previous reconfigure not yet applied by the background server) up
- * to kMaxAutoCompactReconfigureAttempts so the change isn't dropped. A non-OK status is logged, not
- * thrown, to avoid failing the replica set write block.
- */
-void retryPauseAutoCompactForReplicaSetWritesBlock(
-    OperationContext* opCtx, const std::function<Status(RecoveryUnit&)>& reconfigure) {
     Status status = Status::OK();
     for (int attempt = 0; attempt < kMaxAutoCompactReconfigureAttempts; ++attempt) {
         status = [&] {
@@ -1212,35 +1211,61 @@ void retryPauseAutoCompactForReplicaSetWritesBlock(
                 Date_t::max(),
                 Lock::InterruptBehavior::kThrow,
                 Lock::GlobalLockOptions{.skipFlowControlTicket = true, .skipRSTLLock = true}};
-            return reconfigure(*shard_role_details::getRecoveryUnit(opCtx));
+            return _engine->pauseAutoCompactForReplicaSetWritesBlock(
+                *shard_role_details::getRecoveryUnit(opCtx));
         }();
-
-        if (status != ErrorCodes::ObjectIsBusy) {
+        if (!isTransientAutoCompactStatus(status)) {
             break;
         }
-        // A previous auto-compact reconfigure has not been consumed by the background server
-        // yet. Wait (interruptibly) and retry so this reconfigure is not dropped.
         opCtx->sleepFor(kAutoCompactReconfigureRetryInterval);
     }
-
-    // IllegalOperation means auto-compaction is simply not applicable, so there is nothing to
-    // stop. Warn only on unexpected errors.
     if (!status.isOK() && status != ErrorCodes::IllegalOperation) {
         LOGV2_WARNING(12966500,
                       "Failed to pause auto-compaction for replica set write block",
                       "error"_attr = status);
     }
 }
-}  // namespace
 
-void StorageEngineImpl::pauseAutoCompactForReplicaSetWritesBlock(OperationContext* opCtx) {
+Status StorageEngineImpl::tryPauseAutoCompactForReplicaSetWritesBlock(OperationContext* opCtx) {
     if (!rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider().supportsCompaction()) {
-        return;
+        return Status::OK();
     }
 
-    retryPauseAutoCompactForReplicaSetWritesBlock(opCtx, [&](RecoveryUnit& ru) {
-        return _engine->pauseAutoCompactForReplicaSetWritesBlock(ru);
-    });
+    // Try to acquire the global lock to guard against racing with storage shutdown, but never wait
+    // for it, so it is safe to call from a RecoveryUnit::Change commit handler, which must not
+    // block.
+    Lock::GlobalLock lk{
+        opCtx,
+        MODE_IS,
+        Date_t(),
+        Lock::InterruptBehavior::kLeaveUnlocked,
+        Lock::GlobalLockOptions{.skipFlowControlTicket = true, .skipRSTLLock = true}};
+    if (!lk.isLocked()) {
+        LOGV2_WARNING(13374201,
+                      "Could not acquire the global lock without waiting to pause auto-compaction "
+                      "for a replica set write block");
+        return {ErrorCodes::LockTimeout,
+                "Could not acquire the global lock without waiting to pause auto-compaction for a "
+                "replica set write block"};
+    }
+
+    const auto status = [&] {
+        try {
+            return _engine->pauseAutoCompactForReplicaSetWritesBlock(
+                *shard_role_details::getRecoveryUnit(opCtx));
+        } catch (const DBException& ex) {
+            return ex.toStatus();
+        }
+    }();
+
+    // IllegalOperation indicates that auto-compaction is unsupported in this configuration and
+    // should not be logged as a warning.
+    if (!status.isOK() && status != ErrorCodes::IllegalOperation) {
+        LOGV2_WARNING(13374202,
+                      "Failed to pause auto-compaction for replica set write block",
+                      "error"_attr = status);
+    }
+    return status;
 }
 
 bool StorageEngineImpl::underCachePressure(int concurrentOpOuts) {

@@ -69,9 +69,7 @@ class UserWritesRecoverableCriticalSectionService
 public:
     static const NamespaceString kGlobalUserWritesNamespace;
     static const NamespaceString kBlockReplicaSetWritesNamespace;
-
     UserWritesRecoverableCriticalSectionService() = default;
-
     static UserWritesRecoverableCriticalSectionService* get(ServiceContext* serviceContext);
     static UserWritesRecoverableCriticalSectionService* get(OperationContext* opCtx);
 
@@ -138,12 +136,15 @@ public:
     /**
      * Mirrors the on-disk replica set writes critical section into memory. Used on rollback of
      * config.replica_set_writes_critical_section. When the durable document is missing (for
-     * example, a rolled-back acquire), clears in-memory replica set write blocking.
+     * example, a rolled-back acquire), clears in-memory replica set write blocking. Does not
+     * re-enable auto-compaction.
      */
     void recoverReplicaSetWritesCriticalSection(OperationContext* opCtx);
 
     /**
-     * Acquires the user writes critical section preventing replica set writes.
+     * Acquires the user writes critical section preventing replica set writes. On the primary, a
+     * newly inserted document with allowDeletions:false synchronously pauses background
+     * auto-compaction after committing.
      */
     void acquireRecoverableCriticalSectionBlockingReplicaSetWrites(
         OperationContext* opCtx,
@@ -155,7 +156,9 @@ public:
      * If the replica set writes critical section is already active, updates only its
      * 'allowDeletions' option. The existing reason must match. Returns false if the critical
      * section has not been acquired. Repeating the current 'allowDeletions' value is a no-op.
-     * Each allowDeletions change increments replicaSetWritesBlockCounters for the reason.
+     * Each allowDeletions change increments replicaSetWritesBlockCounters for the reason. A
+     * true-to-false transition synchronously pauses background auto-compaction on the primary and
+     * on secondaries (best effort) during replicated application.
      */
     bool updateAllowDeletionsForActiveReplicaSetWriteBlock(OperationContext* opCtx,
                                                            const NamespaceString& nss,
@@ -169,7 +172,6 @@ public:
         OperationContext* opCtx,
         const NamespaceString& nss,
         ReplicaSetWritesBlockReasonEnum reason);
-
 
 private:
     void onConsistentDataAvailable(OperationContext* opCtx,

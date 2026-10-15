@@ -3,21 +3,46 @@
 
 #include "mongo/db/topology/user_write_block/replica_set_write_block_op_observer.h"
 
+#include "mongo/base/error_codes.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/collection_operation_source.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/topology/user_write_block/replica_set_write_block_state.h"
 #include "mongo/db/topology/user_write_block/replica_set_writes_critical_section_document_gen.h"
 #include "mongo/db/topology/user_write_block/writes_recoverable_critical_section_service.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 
 #include <boost/optional/optional.hpp>
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
+
 namespace mongo {
+namespace {
+
+void tryPauseAutoCompactForReplicaSetWritesBlockOnSecondary(OperationContext* opCtx) {
+    // This runs from the recovery unit's commit callback on the oplog-apply thread, which may
+    // neither acquire locks nor block. The storage engine performs one non-blocking attempt.
+    Status status = Status::OK();
+    try {
+        status = opCtx->getServiceContext()
+                     ->getStorageEngine()
+                     ->tryPauseAutoCompactForReplicaSetWritesBlock(opCtx);
+    } catch (const DBException& ex) {
+        status = ex.toStatus();
+    }
+
+    if (status.isOK()) {
+        LOGV2_INFO(13374200, "Requested auto-compaction pause for a replica set write block");
+    }
+}
+
+}  // namespace
 
 bool ReplicaSetWriteBlockOpObserver::_isReplSetAndCanAcceptWritesForNamespace(
     OperationContext* opCtx, const NamespaceString& nss) const {
@@ -62,6 +87,7 @@ void ReplicaSetWriteBlockOpObserver::onInserts(OperationContext* opCtx,
     // TODO (SERVER-91506): Determine if we should change this to check isDataConsistent.
     if (nss == NamespaceString::kReplicaSetWritesCriticalSectionsNamespace &&
         !repl::ReplicationCoordinator::get(opCtx)->isInInitialSyncOrRollback()) {
+        const bool isPrimary = _isReplSetAndCanAcceptWritesForNamespace(opCtx, nss);
         for (auto it = first; it != last; ++it) {
             const auto& insertedDoc = it->doc;
 
@@ -71,6 +97,7 @@ void ReplicaSetWriteBlockOpObserver::onInserts(OperationContext* opCtx,
             shard_role_details::getRecoveryUnit(opCtx)->onCommit(
                 [blockWrites = collCSDoc.getEnabled(),
                  blockDeletions = !collCSDoc.getAllowDeletions(),
+                 pauseOnSecondary = !collCSDoc.getAllowDeletions() && !isPrimary,
                  blockUserWritesReason = collCSDoc.getReplicaSetWritesBlockReason()](
                     OperationContext* opCtx, boost::optional<Timestamp>) {
                     auto* replicaSetWriteBlockState = ReplicaSetWriteBlockState::get(opCtx);
@@ -80,6 +107,9 @@ void ReplicaSetWriteBlockOpObserver::onInserts(OperationContext* opCtx,
                     }
                     if (blockDeletions) {
                         replicaSetWriteBlockState->enableReplicaSetDeletionsBlocking();
+                        if (pauseOnSecondary) {
+                            tryPauseAutoCompactForReplicaSetWritesBlockOnSecondary(opCtx);
+                        }
                     }
                 });
         }
@@ -96,12 +126,14 @@ void ReplicaSetWriteBlockOpObserver::onUpdate(OperationContext* opCtx,
     // TODO (SERVER-91506): Determine if we should change this to check isDataConsistent.
     if (nss == NamespaceString::kReplicaSetWritesCriticalSectionsNamespace &&
         !repl::ReplicationCoordinator::get(opCtx)->isInInitialSyncOrRollback()) {
+        const bool isPrimary = _isReplSetAndCanAcceptWritesForNamespace(opCtx, nss);
         const auto collCSDoc = ReplicaSetWriteBlockingCriticalSectionDocument::parse(
             args.updateArgs->updatedDoc, IDLParserContext("ReplicaSetWriteBlockOpObserver"));
 
         shard_role_details::getRecoveryUnit(opCtx)->onCommit(
             [blockWrites = collCSDoc.getEnabled(),
              blockDeletions = !collCSDoc.getAllowDeletions(),
+             pauseOnSecondary = !collCSDoc.getAllowDeletions() && !isPrimary,
              blockUserWritesReason = collCSDoc.getReplicaSetWritesBlockReason()](
                 OperationContext* opCtx, boost::optional<Timestamp>) {
                 auto* replicaSetWriteBlockState = ReplicaSetWriteBlockState::get(opCtx);
@@ -119,6 +151,9 @@ void ReplicaSetWriteBlockOpObserver::onUpdate(OperationContext* opCtx,
                 }
                 if (blockDeletions) {
                     replicaSetWriteBlockState->enableReplicaSetDeletionsBlocking();
+                    if (pauseOnSecondary) {
+                        tryPauseAutoCompactForReplicaSetWritesBlockOnSecondary(opCtx);
+                    }
                 } else {
                     replicaSetWriteBlockState->disableReplicaSetDeletionsBlocking();
                 }

@@ -174,6 +174,7 @@ void releaseCriticalSection(OperationContext* opCtx,
         uassertStatusOK(getStatusFromWriteCommandReply(commandReply));
     }
 }
+
 }  // namespace
 
 const NamespaceString UserWritesRecoverableCriticalSectionService::kGlobalUserWritesNamespace =

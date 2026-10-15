@@ -5,6 +5,12 @@
 //   requires_replication,
 //   uses_parallel_shell,
 //   does_not_support_stepdowns,
+//   # This test verifies that a replica set write block replicates to a secondary, which can
+//   # cause the test to timeout while waiting for the secondary to apply the write block.
+//   no_kill_secondary,
+//   # This test reads replica set configuration from secondaries, for which
+//   # linearizable read concern is not supported.
+//   assumes_read_concern_unchanged,
 //   assumes_read_preference_unchanged,
 //   assumes_against_mongod_not_mongos,
 //   featureFlagBlockReplicaSetWrites,
@@ -20,11 +26,167 @@ import {
     disableReplicaSetWriteBlock,
     enableReplicaSetWriteBlock,
 } from "jstests/libs/block_replica_set_writes_utils.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {afterEach, before, describe, it} from "jstests/libs/mochalite.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {PersistenceProviderUtil} from "jstests/libs/server-rss/persistence_provider_util.js";
 import {isEnterpriseShell, runEncryptedTest} from "jstests/fle2/libs/encrypted_client_util.js";
 import {checkLog} from "src/mongo/shell/check_log.js";
+
+// Confirms background auto-compact is running by probing with a different configuration. A
+// transient ObjectIsBusy (the previous command's signal not yet consumed) is retried.
+function assertAutoCompactRunning(adminDB, probeMB) {
+    assert.soon(() => {
+        const res = adminDB.runCommand({autoCompact: true, freeSpaceTargetMB: probeMB});
+        if (res.code === ErrorCodes.ObjectIsBusy) return false;
+        assert.eq(
+            res.code,
+            ErrorCodes.AlreadyInitialized,
+            "auto-compact reconfigure should be rejected because it is already running",
+            {res},
+        );
+        return true;
+    }, "Timed out confirming auto-compact is running");
+}
+
+function assertReplicaSetWriteBlockApplied(adminDB, allowDeletions, blockOperationTime) {
+    assert.soon(() => {
+        const replSetStatus = assert.commandWorked(adminDB.runCommand({replSetGetStatus: 1}));
+        // A lagged secondary may temporarily replay an older write-block transition with the same
+        // state. Wait for this command's oplog entry before accepting the observed state.
+        if (bsonWoCompare(replSetStatus.optimes.appliedOpTime.ts, blockOperationTime) < 0) {
+            return false;
+        }
+        const replStatus = assert.commandWorked(adminDB.serverStatus()).repl;
+        return (
+            replStatus.replicaSetWritesBlock === 2 &&
+            replStatus.replicaSetWritesBlockAllowDeletions === allowDeletions
+        );
+    }, "Timed out waiting for replica set write block to be applied");
+}
+
+function assertReplicaSetWriteBlockDisabled(adminDB, blockOperationTime) {
+    assert.soon(() => {
+        const replSetStatus = assert.commandWorked(adminDB.runCommand({replSetGetStatus: 1}));
+        if (bsonWoCompare(replSetStatus.optimes.appliedOpTime.ts, blockOperationTime) < 0) {
+            return false;
+        }
+        const replStatus = assert.commandWorked(adminDB.serverStatus()).repl;
+        return replStatus.replicaSetWritesBlock === 1;
+    }, "Timed out waiting for replica set write block disable to be applied");
+}
+
+function runAutoCompactPauseOnSecondaryTest(
+    replicaSetPrimary,
+    primaryAdminDB,
+    {startWithDeletionsAllowed, freeSpaceTargetMB},
+) {
+    const secondary = FixtureHelpers.getSecondaries(primaryAdminDB)[0];
+    if (
+        !secondary ||
+        PersistenceProviderUtil.allNodesHavePropertyWithValue(
+            replicaSetPrimary,
+            "supportsLocalCollections",
+            false,
+        )
+    ) {
+        jsTest.log.info(
+            "Skipping secondary auto-compact write block pause test: secondary or local collections unavailable",
+        );
+        return;
+    }
+
+    const secondaryAdminDB = secondary.getDB("admin");
+
+    // Make sure prior test cleanup has been applied before enabling auto-compaction. The release
+    // command runs on the primary, but its oplog entry may still be queued on this secondary.
+    const primaryReplSetStatus = assert.commandWorked(
+        primaryAdminDB.runCommand({replSetGetStatus: 1}),
+    );
+    assertReplicaSetWriteBlockDisabled(
+        secondaryAdminDB,
+        primaryReplSetStatus.optimes.appliedOpTime.ts,
+    );
+
+    // Optionally begin with deletions allowed, then transition the active block to disallow them.
+    if (startWithDeletionsAllowed) {
+        const allowDeletionsRes = enableReplicaSetWriteBlock(
+            primaryAdminDB,
+            true /* allowDeletions */,
+            "InsufficientDiskSpace",
+        );
+        assertReplicaSetWriteBlockApplied(
+            secondaryAdminDB,
+            true /* allowDeletions */,
+            allowDeletionsRes.operationTime,
+        );
+    }
+
+    // Enable auto-compact on the secondary.
+    assert.soon(() => {
+        const res = secondaryAdminDB.runCommand({autoCompact: true, freeSpaceTargetMB});
+        // A prior write block's release may not have replicated to this secondary yet.
+        if (
+            res.code === ErrorCodes.ObjectIsBusy ||
+            res.code === ErrorCodes.ReplicaSetWritesBlocked
+        ) {
+            return false;
+        }
+        if (res.code === ErrorCodes.AlreadyInitialized) return true;
+        assert.commandWorked(res);
+        return true;
+    }, "Timed out enabling autoCompact on secondary");
+    assertAutoCompactRunning(secondaryAdminDB, freeSpaceTargetMB + 1);
+    assert.commandWorked(secondaryAdminDB.runCommand({clearLog: "global"}));
+
+    // Enabling the block (or changing its policy) must pause auto-compact on the secondary.
+    const blockRes = enableReplicaSetWriteBlock(
+        primaryAdminDB,
+        false /* allowDeletions */,
+        "InsufficientDiskSpace",
+    );
+    assertReplicaSetWriteBlockApplied(
+        secondaryAdminDB,
+        false /* allowDeletions */,
+        blockRes.operationTime,
+    );
+    assert.commandFailedWithCode(
+        secondaryAdminDB.runCommand({autoCompact: true}),
+        ErrorCodes.ReplicaSetWritesBlocked,
+    );
+
+    // Verify that the secondary paused auto-compaction.
+    assert(
+        checkLog.checkContainsOnceJson(secondary, 13374200, {}),
+        "Expected secondary to log paused auto-compaction",
+    );
+
+    const unblockRes = disableReplicaSetWriteBlock(
+        primaryAdminDB,
+        "InsufficientDiskSpace" /* reason */,
+    );
+    assertReplicaSetWriteBlockDisabled(secondaryAdminDB, unblockRes.operationTime);
+
+    // Re-enabling with a different target succeeds, proving auto-compaction remained stopped
+    // (did not return AlreadyInitialized).
+    assert.soon(() => {
+        const res = secondaryAdminDB.runCommand({
+            autoCompact: true,
+            freeSpaceTargetMB: freeSpaceTargetMB + 1,
+        });
+        if (res.code === ErrorCodes.ObjectIsBusy) return false;
+        assert.commandWorked(res);
+        return true;
+    }, "Timed out confirming auto-compact remained stopped after write block release");
+
+    // Leave background compaction off.
+    assert.soon(() => {
+        const res = secondaryAdminDB.runCommand({autoCompact: false});
+        if (res.code === ErrorCodes.ObjectIsBusy) return false;
+        assert.commandWorked(res);
+        return true;
+    }, "Timed out disabling autoCompact on secondary");
+}
 
 describe("Test blockReplicaSetWrites command on replica set level", function () {
     before(function () {
@@ -729,6 +891,20 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
             assert.commandWorked(res);
             return true;
         }, "Timed out waiting to disable autoCompact");
+    });
+
+    it("Test that a replica set write block pauses auto-compact on secondaries (best effort)", function () {
+        runAutoCompactPauseOnSecondaryTest(this.replicaSetPrimary, this.replicaSetPrimaryAdminDB, {
+            startWithDeletionsAllowed: false,
+            freeSpaceTargetMB: 700,
+        });
+    });
+
+    it("Test that blocking deletions after the write block is enabled pauses auto-compact on secondaries (best effort)", function () {
+        runAutoCompactPauseOnSecondaryTest(this.replicaSetPrimary, this.replicaSetPrimaryAdminDB, {
+            startWithDeletionsAllowed: true,
+            freeSpaceTargetMB: 750,
+        });
     });
 
     it("Test interaction between global write block and replica set write block (disable replica set write block first)", function () {

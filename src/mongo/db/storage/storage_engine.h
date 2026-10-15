@@ -1052,6 +1052,14 @@ public:
     virtual void pauseAutoCompactForReplicaSetWritesBlock(OperationContext* opCtx) {}
 
     /**
+     * Attempts once to pause background auto-compaction (best-effort) for a replica set write block
+     * transition. Used on secondaries to avoid delaying oplog application.
+     */
+    virtual Status tryPauseAutoCompactForReplicaSetWritesBlock(OperationContext* opCtx) {
+        return Status::OK();
+    }
+
+    /**
      * Return true if the storage engine indicates that it is under cache pressure.
      */
     virtual bool underCachePressure(int concurrentOpOuts) {

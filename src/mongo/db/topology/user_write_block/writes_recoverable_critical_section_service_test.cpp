@@ -153,6 +153,9 @@ TEST_F(WritesRecoverableCriticalSectionServiceTest,
     ASSERT_TRUE(document["allowDeletions"].trueValue());
     ASSERT_EQ(document["replicaSetWritesBlockReason"].str(), "InsufficientDiskSpace");
 
+    // false->true updates the durable policy only. Auto-compaction is not resumed, including if
+    // this update later rolls back.
+
     // Reapplying the same policy is a document no-op.
     ASSERT_TRUE(service->updateAllowDeletionsForActiveReplicaSetWriteBlock(
         opCtx.get(),

@@ -72,6 +72,9 @@
 
 - name: exclusions
   value:
+    exclude_with_any_tags:
+      # Excludes tests that cannot run while the PeriodicKillSecondaries hook kills secondaries.
+      - no_kill_secondary
     exclude_files:
       # The following tests perform a write with a writeConcern of w=2 when 'testingReplication' is
       # true. This causes the test to hang because the secondary is running with the "rsSyncApplyStop"
