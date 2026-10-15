@@ -12,7 +12,9 @@
 #include "mongo/transport/session_manager.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/histogram.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/ssl_options.h"
@@ -439,6 +441,9 @@ private:
     // handing them off to dedicated connection threads. We use an int64 since Microseconds is not
     // an arithmetic type for atomic operations.
     Atomic<std::int64_t> _listenerProcessingTotalMicros;
+
+    // Same data as above but in histogram format.
+    Histogram<Microseconds> _listenerProcessingTimes;
 
     // Tracks the number of connections that are initiated to itself, where the remote and local
     // addresses are the same. This excludes connections over Unix Domain Sockets.

@@ -608,6 +608,41 @@ TEST(AsioTransportLayer, ThrowOnNetworkErrorInEnsureSync) {
                          Any()));
 }
 
+TEST(AsioTransportLayer, ListenerProcessingTimeHistogram) {
+    TestFixture tf;
+    auto& duringFp = asioTransportLayerHangDuringAcceptCallback;
+    auto& beforeFp = asioTransportLayerHangBeforeAcceptCallback;
+    const auto duringEntered = duringFp.setMode(FailPoint::alwaysOn);
+    ON_BLOCK_EXIT([&] {
+        duringFp.setMode(FailPoint::off);
+        beforeFp.setMode(FailPoint::off);
+    });
+
+    ConnectionThread connectThread(tf.tla().listenerMainPort());
+    duringFp.waitForTimesEntered(duringEntered + 1);
+    connectThread.wait();
+
+    // Resuming the callback with hangBefore enabled parks it right after its ScopeGuard (which
+    // records the processing time) but before the acceptor is re-armed, guaranteeing exactly one
+    // histogram entry.
+    const auto beforeEntered = beforeFp.setMode(FailPoint::alwaysOn);
+    duringFp.setMode(FailPoint::off);
+    beforeFp.waitForTimesEntered(beforeEntered + 1);
+
+    BSONObjBuilder bob;
+    tf.tla().appendStatsForServerStatus(&bob);
+    const auto output = bob.obj();
+    const auto histogramOutput = output["listenerProcessingTimeHistogram"].Obj();
+
+    long long bucketCounts = 0;
+    for (const auto& bucket : histogramOutput) {
+        if (bucket.fieldNameStringData() != "totalCount")
+            bucketCounts += bucket.Obj()["count"].Long();
+    }
+    ASSERT_EQ(bucketCounts, 1);
+    ASSERT_EQ(histogramOutput["totalCount"].Long(), 1);
+}
+
 /* check that timeouts actually time out */
 TEST(AsioTransportLayer, SourceSyncTimeoutTimesOut) {
     TestFixture tf;

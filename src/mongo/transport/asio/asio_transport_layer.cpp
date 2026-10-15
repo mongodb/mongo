@@ -363,6 +363,21 @@ Reactor* AsioTransportLayer::TimerService::_getReactor() {
     return _reactor.get();
 }
 
+namespace {
+
+std::vector<Microseconds> listenerProcessingTimePartitions() {
+    // {1 μs, 5 μs, 25 μs, 125 μs, 625 μs, ...}
+    std::vector<Microseconds> bounds(10);
+    Microseconds upperBound{1};
+    for (Microseconds& bound : bounds) {
+        bound = upperBound;
+        upperBound *= 5;
+    }
+    return bounds;
+}
+
+}  // namespace
+
 AsioTransportLayer::AsioTransportLayer(const AsioTransportLayer::Options& opts,
                                        std::unique_ptr<SessionManager> sessionManager)
     : _ingressReactor(std::make_shared<AsioReactor>()),
@@ -385,7 +400,8 @@ AsioTransportLayer::AsioTransportLayer(const AsioTransportLayer::Options& opts,
               : nullptr),
       _sessionManager(std::move(sessionManager)),
       _listenerOptions(opts),
-      _timerService(std::make_unique<TimerService>()) {
+      _timerService(std::make_unique<TimerService>()),
+      _listenerProcessingTimes(listenerProcessingTimePartitions()) {
     uassert(ErrorCodes::InvalidOptions,
             "Unable to start AsioTransportLayer for ingress without a SessionManager",
             _sessionManager || !_listenerOptions.isIngress());
@@ -1441,6 +1457,8 @@ void AsioTransportLayer::appendStatsForServerStatus(BSONObjBuilder* bob) const {
     // was "Milliseconds"
     bob->append("listenerProcessingTime",
                 BSON("durationMicros" << _listenerProcessingTotalMicros.load()));
+    static const auto bucketKeys = makeHistogramBucketKeys(_listenerProcessingTimes);
+    appendHistogram(*bob, _listenerProcessingTimes, "listenerProcessingTimeHistogram", bucketKeys);
     BSONArrayBuilder queueDepthsArrayBuilder(
         bob->subarrayStart("listenerSocketBacklogQueueDepths"));
     for (const auto& record : _listenerInterfaceMainPort->getAcceptorRecords()) {
@@ -1641,7 +1659,9 @@ void AsioTransportLayer::_acceptConnection(GenericAcceptor& acceptor) {
 #endif
 
         ScopeGuard nextAcceptGuarantee([&]() {
-            _listenerProcessingTotalMicros.fetchAndAdd(timer.micros());
+            const Microseconds processingTime{timer.micros()};
+            _listenerProcessingTotalMicros.fetchAndAddRelaxed(processingTime.count());
+            _listenerProcessingTimes.increment(processingTime);
             _acceptConnection(acceptor);
         });
 
