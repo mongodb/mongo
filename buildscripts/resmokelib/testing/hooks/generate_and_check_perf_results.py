@@ -254,145 +254,20 @@ class GenerateAndCheckPerfResults(interface.Hook):
         return time.strftime("%Y-%m-%dT%H:%M:%SZ")
 
     def after_test(self, test, test_report):
-        """Update test report."""
-        with TRACER.start_as_current_span(
-            "generate_and_check_perf_results.after_test",
-            attributes=_evergreen_context_attributes(),
-        ) as span:
-            try:
-                self._after_test_impl(test, test_report)
-            except (errors.ServerFailure, errors.TestFailure):
-                raise
-            except Exception as exc:
-                self.logger.exception(
-                    "Unexpected error in generate_and_check_perf_results after_test"
-                )
-                span.set_status(StatusCode.ERROR, description=str(exc))
-                span.set_attribute("error.type", type(exc).__name__)
-                span.set_attribute("error.message", str(exc))
+        """Check the benchmark's report in a `CheckPerfResultTestCase` with its own test log."""
+        hook_test_case = CheckPerfResultTestCase.create_after_test(
+            test.logger, test, self, test.report_name()
+        )
+        hook_test_case.configure(self.fixture)
+        hook_test_case.run_dynamic_test(test_report)
 
-    def _after_test_impl(self, test, test_report):
-        bm_report_path = test.report_name()
+    def record_cedar_results(self, cedar_results: list[CedarTestReport]):
+        """Add one benchmark's results to the Cedar report written in `after_suite`."""
+        self.cedar_reports.extend(cedar_results)
 
-        with open(bm_report_path, "r") as bm_report_file:
-            bm_report_dict = json.load(bm_report_file)
-
-        # Reports grouped by name without thread.
-        benchmark_reports = self._parse_report(bm_report_dict)
-        # Flat list where results are separated by name and thread_level.
-        cedar_formatted_results = self._generate_cedar_report(benchmark_reports)
-
-        self.cedar_reports.extend(cedar_formatted_results)
-
-        self._check_pass_fail(benchmark_reports, cedar_formatted_results, test, test_report)
-
-    def _check_pass_fail(
-        self,
-        benchmark_reports: dict[str, "_BenchmarkThreadsReport"],
-        cedar_formatted_results: list[CedarTestReport],
-        test,
-        test_report,
-    ):
-        """Check to see if any of the reported results violate any of the thresholds set."""
-        if self.variant is None:
-            self.logger.info(
-                "No variant information was given to resmoke. Please set the --variantName flag to let resmoke know what thresholds to use when checking."
-            )
-            return
-
-        # Project name and base commit resolution are deferred until we know at least one threshold
-        # check will run. If no thresholds are set for the benchmarks/variant being run, the hook
-        # passes without needing any Evergreen information.
-
-        for test_name in benchmark_reports.keys():
-            variant_thresholds = self.performance_thresholds.get(test_name, None)
-            if variant_thresholds is None:
-                self.logger.info(
-                    f"No thresholds were set for {test_name}, skipping threshold check"
-                )
-                continue
-            test_thresholds = variant_thresholds.get(self.variant, None)
-            if test_thresholds is None:
-                self.logger.info(
-                    f"No thresholds were set for {test_name} on {self.variant}, skipping threshold check"
-                )
-                continue
-
-            # At least one threshold applies, so resolve the project and base commit now. Resolved
-            # once per run and cached across all benchmark files.
-            project, parent_version_id = self._get_base_version()
-
-            # Transform the thresholds set into something we can more easily use.
-            metrics_to_check: list[IndividualMetricThreshold] = []
-            for item in test_thresholds:
-                thread_level = item["thread_level"]
-                for metric in item["metrics"]:
-                    self.has_checked_results = True
-                    value = self._retrieve_base_commit_value(
-                        test_name=test_name,
-                        task_name=SEP_BENCHMARKS_TASK_NAME,
-                        variant=self.variant,
-                        measurement=metric["name"],
-                        args={"thread_level": thread_level},
-                        project=project,
-                        version_id=parent_version_id,
-                    )
-                    if value is None:
-                        # Don't fail the task if there's an issue retrieving the base commit value.
-                        # Since this runs in PR checks, we want to avoid blocking developers because of an SPS/Evergreen issue.
-                        _log_perf_error(
-                            self.logger,
-                            f"Skipping threshold check because no raw perf result found for test {test_name}, measurement {metric['name']} on variant {self.variant} in project {project}. "
-                            f"This may be because the task did not run successfully on the base commit or a delay in processing results for the base commit.",
-                            code=PerfErrorCode.MISSING_RAW_PERF_RESULT,
-                            extra_attributes={
-                                ATTR_TEST_NAME: test_name,
-                                ATTR_MEASUREMENT: metric["name"],
-                                ATTR_VARIANT: self.variant,
-                                ATTR_PROJECT: project,
-                                ATTR_BASE_VERSION_ID: parent_version_id,
-                            },
-                        )
-                        continue
-                    metrics_to_check.append(
-                        IndividualMetricThreshold(
-                            test_name=test_name,
-                            thread_level=thread_level,
-                            metric_name=metric["name"],
-                            value=value,
-                            bound_direction=metric["bound_direction"],
-                            threshold_limit=metric["threshold_limit"],
-                        )
-                    )
-            # Transform the reported performance results into something we can more easily use.
-            transformed_metrics: dict[ReportedMetric, CedarMetric] = {}
-            for cedar_result in cedar_formatted_results:
-                for individual_metric in cedar_result.metrics:
-                    reported_metric = ReportedMetric(
-                        test_name=cedar_result.test_name,
-                        thread_level=cedar_result.thread_level,
-                        metric_name=individual_metric.name,
-                    )
-                    if transformed_metrics.get(reported_metric, None) is not None:
-                        _log_perf_error(
-                            self.logger,
-                            f"Multiple values reported for the same metric: {reported_metric}. Skipping this one.",
-                            code=PerfErrorCode.DUPLICATE_REPORTED_METRIC,
-                            extra_attributes={
-                                ATTR_TEST_NAME: reported_metric.test_name,
-                                ATTR_MEASUREMENT: reported_metric.metric_name,
-                                ATTR_THREAD_LEVEL: reported_metric.thread_level,
-                            },
-                        )
-                        continue
-                    else:
-                        transformed_metrics[reported_metric] = individual_metric
-            # Add a dynamic resmoke test to make sure that the pass/fail results are reported correctly.
-            hook_test_case = CheckPerfResultTestCase.create_after_test(
-                self.logger, test, self, metrics_to_check, transformed_metrics
-            )
-            hook_test_case.configure(self.fixture)
-            hook_test_case.run_dynamic_test(test_report)
+    def mark_results_checked(self):
+        """Record that at least one threshold applied, which `after_suite` validates."""
+        self.has_checked_results = True
 
     def _get_build_subject(self) -> Optional[str]:
         """Return the subject that identifies whether this build is a revert, or None on failure.
@@ -458,33 +333,33 @@ class GenerateAndCheckPerfResults(interface.Hook):
             )
         return self._is_revert
 
-    def _get_base_version(self) -> tuple[str, Optional[str]]:
-        """Return the base version (project, version_id)."""
+    def get_base_version(self, logger) -> tuple[str, Optional[str]]:
+        """Return the base version (project, version_id), resolving it once per job into `logger`."""
         if self._base_version is None:
-            self._base_version = self._resolve_base_version()
+            self._base_version = self._resolve_base_version(logger)
         return self._base_version
 
-    def _resolve_base_version(self) -> tuple[str, Optional[str]]:
+    def _resolve_base_version(self, logger) -> tuple[str, Optional[str]]:
         """Resolve Evergreen project name and base commit's waterfall version ID.
 
         Called only if at least one threshold is set.
         """
         if _config.EVERGREEN_PROJECT_NAME is None:
             _log_perf_error(
-                self.logger,
+                logger,
                 "Unable to determine the Evergreen project name. "
                 "Cannot check performance thresholds without a project to compare against.",
                 code=PerfErrorCode.MISSING_PROJECT_NAME,
             )
             return "", None
         project = _config.EVERGREEN_PROJECT_NAME
-        self.logger.info(
+        logger.info(
             f"Checking performance thresholds for project {project} and variant {self.variant}."
         )
 
         # For mainline builds, Evergreen does not make the base commit available in the expansions
         # we retrieve it by looking for the previous commit in the Git log
-        self.logger.info(f"EVERGREEN_REQUESTER={_config.EVERGREEN_REQUESTER}")
+        logger.info(f"EVERGREEN_REQUESTER={_config.EVERGREEN_REQUESTER}")
         if _config.EVERGREEN_REQUESTER in MAINLINE_REQUESTERS:
             base_commit_hash = subprocess.check_output(
                 ["git", "log", "-1", "--pretty=format:%H", "HEAD~1"], cwd=".", text=True
@@ -492,12 +367,12 @@ class GenerateAndCheckPerfResults(interface.Hook):
         # For patch builds the evergreen revision is set to the base commit
         else:
             base_commit_hash = _config.EVERGREEN_REVISION
-        self.logger.info(f"base_commit_hash={base_commit_hash}")
+        logger.info(f"base_commit_hash={base_commit_hash}")
 
         # Without a base commit (e.g. a local run with no EVERGREEN_REVISION) there is nothing to
         # resolve, so skip the Evergreen API call rather than querying it with a None revision.
         if not base_commit_hash:
-            self.logger.warning(
+            logger.warning(
                 "No base commit is available to resolve a baseline version; skipping threshold comparison."
             )
             return project, None
@@ -517,7 +392,7 @@ class GenerateAndCheckPerfResults(interface.Hook):
                 parent_version_id = base_commit_tasks[0].version_id
         except Exception as exc:
             _log_perf_error(
-                self.logger,
+                logger,
                 f"Failed to resolve base commit {base_commit_hash} to an Evergreen version ID: {exc}",
                 code=PerfErrorCode.BASE_VERSION_RESOLUTION_FAILED,
                 extra_attributes={
@@ -526,7 +401,7 @@ class GenerateAndCheckPerfResults(interface.Hook):
                     ATTR_EXCEPTION_MESSAGE: str(exc),
                 },
             )
-        self.logger.info(f"parent_version_id={parent_version_id}")
+        logger.info(f"parent_version_id={parent_version_id}")
 
         return project, parent_version_id
 
@@ -617,6 +492,99 @@ class GenerateAndCheckPerfResults(interface.Hook):
                 },
             )
 
+
+class CheckPerfResultTestCase(interface.DynamicTestCase):
+    """CheckPerfResultTestCase class."""
+
+    def __init__(self, logger, test_name, description, base_test_name, hook, bm_report_path: str):
+        super().__init__(logger, test_name, description, base_test_name, hook)
+        self.bm_report_path = bm_report_path
+        self.github: Github = Github(get_expansion("github_token_mongo"))
+
+    def _is_authorized_override_user(self, login: str) -> bool:
+        """Return whether `login` may override a failed threshold check.
+
+        A user is authorized if they are an active member of any team in OVERRIDE_APPROVER_TEAMS,
+        as resolved via the GitHub API.
+
+        A definitive "not a member" response (HTTP 404) means the user is not on that team, so we
+        move on to the next team. Any other GitHub API error (e.g. permissions, rate limit) is
+        logged and treated as "not authorized" (fail-safe): a transient failure can never silently
+        grant an override.
+        """
+        org = self.github.get_organization(OVERRIDE_APPROVER_ORG)
+        for team_slug in OVERRIDE_APPROVER_TEAMS:
+            try:
+                membership = org.get_team_by_slug(team_slug).get_team_membership(login)
+                if membership.state == "active":
+                    return True
+            except GithubException as exc:
+                if exc.status == 404:
+                    # Not a member of this team; check the remaining teams.
+                    continue
+                _log_perf_error(
+                    self.logger,
+                    f"Could not verify membership of '{login}' in team "
+                    f"'{OVERRIDE_APPROVER_ORG}/{team_slug}' due to a GitHub API error: {exc}. "
+                    "Treating user as not authorized to override.",
+                    code=PerfErrorCode.OVERRIDE_MEMBERSHIP_CHECK_FAILED,
+                    extra_attributes={
+                        ATTR_LOGIN: login,
+                        ATTR_TEAM: f"{OVERRIDE_APPROVER_ORG}/{team_slug}",
+                        ATTR_EXCEPTION_TYPE: type(exc).__name__,
+                        ATTR_EXCEPTION_MESSAGE: str(exc),
+                    },
+                )
+        return False
+
+    def run_test(self):
+        """Check the benchmark report against the thresholds, logging unexpected errors only."""
+        with TRACER.start_as_current_span(
+            "generate_and_check_perf_results.after_test",
+            attributes=_evergreen_context_attributes(),
+        ) as span:
+            try:
+                self._run_test_impl()
+            except (errors.ServerFailure, errors.TestFailure):
+                raise
+            except Exception as exc:
+                self.logger.exception(
+                    "Unexpected error in generate_and_check_perf_results after_test"
+                )
+                span.set_status(StatusCode.ERROR, description=str(exc))
+                span.set_attribute("error.type", type(exc).__name__)
+                span.set_attribute("error.message", str(exc))
+
+    def _run_test_impl(self):
+        with open(self.bm_report_path, "r") as bm_report_file:
+            bm_report_dict = json.load(bm_report_file)
+
+        # Reports grouped by name without thread.
+        benchmark_reports = self._parse_report(bm_report_dict)
+        # Flat list where results are separated by name and thread_level.
+        cedar_formatted_results = self._generate_cedar_report(benchmark_reports)
+
+        self._hook.record_cedar_results(cedar_formatted_results)
+
+        thresholds_to_check = self._collect_thresholds(benchmark_reports)
+        if thresholds_to_check:
+            self._check_thresholds(
+                thresholds_to_check, self._index_reported_metrics(cedar_formatted_results)
+            )
+
+    def _parse_report(self, report_dict) -> dict[str, "_BenchmarkThreadsReport"]:
+        context = report_dict["context"]
+        # Reports grouped by name without thread.
+        benchmark_reports: dict[str, "_BenchmarkThreadsReport"] = {}
+
+        for benchmark_res in report_dict["benchmarks"]:
+            bm_name_obj = _BenchmarkThreadsReport.parse_bm_name(benchmark_res)
+
+            if bm_name_obj.base_name not in benchmark_reports:
+                benchmark_reports[bm_name_obj.base_name] = _BenchmarkThreadsReport(context)
+            benchmark_reports[bm_name_obj.base_name].add_report(bm_name_obj, benchmark_res)
+        return benchmark_reports
+
     def _generate_cedar_report(
         self, benchmark_reports: dict[str, "_BenchmarkThreadsReport"]
     ) -> list[CedarTestReport]:
@@ -648,18 +616,109 @@ class GenerateAndCheckPerfResults(interface.Hook):
 
         return cedar_report
 
-    def _parse_report(self, report_dict) -> dict[str, "_BenchmarkThreadsReport"]:
-        context = report_dict["context"]
-        # Reports grouped by name without thread.
-        benchmark_reports: dict[str, "_BenchmarkThreadsReport"] = {}
+    def _collect_thresholds(
+        self, benchmark_reports: dict[str, "_BenchmarkThreadsReport"]
+    ) -> list[IndividualMetricThreshold]:
+        """Return the thresholds that apply to the reported benchmarks, with their base commit values."""
+        if self._hook.variant is None:
+            self.logger.info(
+                "No variant information was given to resmoke. Please set the --variantName flag to let resmoke know what thresholds to use when checking."
+            )
+            return []
 
-        for benchmark_res in report_dict["benchmarks"]:
-            bm_name_obj = _BenchmarkThreadsReport.parse_bm_name(benchmark_res)
+        # Project name and base commit resolution are deferred until we know at least one threshold
+        # check will run. If no thresholds are set for the benchmarks/variant being run, the hook
+        # passes without needing any Evergreen information.
 
-            if bm_name_obj.base_name not in benchmark_reports:
-                benchmark_reports[bm_name_obj.base_name] = _BenchmarkThreadsReport(context)
-            benchmark_reports[bm_name_obj.base_name].add_report(bm_name_obj, benchmark_res)
-        return benchmark_reports
+        metrics_to_check: list[IndividualMetricThreshold] = []
+        for test_name in benchmark_reports.keys():
+            variant_thresholds = self._hook.performance_thresholds.get(test_name, None)
+            if variant_thresholds is None:
+                self.logger.info(
+                    f"No thresholds were set for {test_name}, skipping threshold check"
+                )
+                continue
+            test_thresholds = variant_thresholds.get(self._hook.variant, None)
+            if test_thresholds is None:
+                self.logger.info(
+                    f"No thresholds were set for {test_name} on {self._hook.variant}, skipping threshold check"
+                )
+                continue
+
+            # At least one threshold applies, so resolve the project and base commit now. Resolved
+            # once per run and cached across all benchmark files.
+            project, parent_version_id = self._hook.get_base_version(self.logger)
+
+            # Transform the thresholds set into something we can more easily use.
+            for item in test_thresholds:
+                thread_level = item["thread_level"]
+                for metric in item["metrics"]:
+                    self._hook.mark_results_checked()
+                    value = self._retrieve_base_commit_value(
+                        test_name=test_name,
+                        task_name=SEP_BENCHMARKS_TASK_NAME,
+                        variant=self._hook.variant,
+                        measurement=metric["name"],
+                        args={"thread_level": thread_level},
+                        project=project,
+                        version_id=parent_version_id,
+                    )
+                    if value is None:
+                        # Don't fail the task if there's an issue retrieving the base commit value.
+                        # Since this runs in PR checks, we want to avoid blocking developers because of an SPS/Evergreen issue.
+                        _log_perf_error(
+                            self.logger,
+                            f"Skipping threshold check because no raw perf result found for test {test_name}, measurement {metric['name']} on variant {self._hook.variant} in project {project}. "
+                            f"This may be because the task did not run successfully on the base commit or a delay in processing results for the base commit.",
+                            code=PerfErrorCode.MISSING_RAW_PERF_RESULT,
+                            extra_attributes={
+                                ATTR_TEST_NAME: test_name,
+                                ATTR_MEASUREMENT: metric["name"],
+                                ATTR_VARIANT: self._hook.variant,
+                                ATTR_PROJECT: project,
+                                ATTR_BASE_VERSION_ID: parent_version_id,
+                            },
+                        )
+                        continue
+                    metrics_to_check.append(
+                        IndividualMetricThreshold(
+                            test_name=test_name,
+                            thread_level=thread_level,
+                            metric_name=metric["name"],
+                            value=value,
+                            bound_direction=metric["bound_direction"],
+                            threshold_limit=metric["threshold_limit"],
+                        )
+                    )
+        return metrics_to_check
+
+    def _index_reported_metrics(
+        self, cedar_formatted_results: list[CedarTestReport]
+    ) -> dict[ReportedMetric, CedarMetric]:
+        """Return the reported results keyed by test name, thread level and metric name."""
+        transformed_metrics: dict[ReportedMetric, CedarMetric] = {}
+        for cedar_result in cedar_formatted_results:
+            for individual_metric in cedar_result.metrics:
+                reported_metric = ReportedMetric(
+                    test_name=cedar_result.test_name,
+                    thread_level=cedar_result.thread_level,
+                    metric_name=individual_metric.name,
+                )
+                if transformed_metrics.get(reported_metric, None) is not None:
+                    _log_perf_error(
+                        self.logger,
+                        f"Multiple values reported for the same metric: {reported_metric}. Skipping this one.",
+                        code=PerfErrorCode.DUPLICATE_REPORTED_METRIC,
+                        extra_attributes={
+                            ATTR_TEST_NAME: reported_metric.test_name,
+                            ATTR_MEASUREMENT: reported_metric.metric_name,
+                            ATTR_THREAD_LEVEL: reported_metric.thread_level,
+                        },
+                    )
+                    continue
+                else:
+                    transformed_metrics[reported_metric] = individual_metric
+        return transformed_metrics
 
     def _retrieve_base_commit_value(
         self,
@@ -760,62 +819,11 @@ class GenerateAndCheckPerfResults(interface.Hook):
 
         return None
 
-
-class CheckPerfResultTestCase(interface.DynamicTestCase):
-    """CheckPerfResultTestCase class."""
-
-    def __init__(
+    def _check_thresholds(
         self,
-        logger,
-        test_name,
-        description,
-        base_test_name,
-        hook,
-        thresholds_to_check: list["IndividualMetricThreshold"],
+        thresholds_to_check: list[IndividualMetricThreshold],
         reported_metrics: dict[ReportedMetric, CedarMetric],
     ):
-        super().__init__(logger, test_name, description, base_test_name, hook)
-        self.thresholds_to_check: list["IndividualMetricThreshold"] = thresholds_to_check
-        self.reported_metrics: dict[ReportedMetric, CedarMetric] = reported_metrics
-        self.github: Github = Github(get_expansion("github_token_mongo"))
-
-    def _is_authorized_override_user(self, login: str) -> bool:
-        """Return whether `login` may override a failed threshold check.
-
-        A user is authorized if they are an active member of any team in OVERRIDE_APPROVER_TEAMS,
-        as resolved via the GitHub API.
-
-        A definitive "not a member" response (HTTP 404) means the user is not on that team, so we
-        move on to the next team. Any other GitHub API error (e.g. permissions, rate limit) is
-        logged and treated as "not authorized" (fail-safe): a transient failure can never silently
-        grant an override.
-        """
-        org = self.github.get_organization(OVERRIDE_APPROVER_ORG)
-        for team_slug in OVERRIDE_APPROVER_TEAMS:
-            try:
-                membership = org.get_team_by_slug(team_slug).get_team_membership(login)
-                if membership.state == "active":
-                    return True
-            except GithubException as exc:
-                if exc.status == 404:
-                    # Not a member of this team; check the remaining teams.
-                    continue
-                _log_perf_error(
-                    self.logger,
-                    f"Could not verify membership of '{login}' in team "
-                    f"'{OVERRIDE_APPROVER_ORG}/{team_slug}' due to a GitHub API error: {exc}. "
-                    "Treating user as not authorized to override.",
-                    code=PerfErrorCode.OVERRIDE_MEMBERSHIP_CHECK_FAILED,
-                    extra_attributes={
-                        ATTR_LOGIN: login,
-                        ATTR_TEAM: f"{OVERRIDE_APPROVER_ORG}/{team_slug}",
-                        ATTR_EXCEPTION_TYPE: type(exc).__name__,
-                        ATTR_EXCEPTION_MESSAGE: str(exc),
-                    },
-                )
-        return False
-
-    def run_test(self):
         """
         Check the values reported by this performance run.
 
@@ -824,8 +832,8 @@ class CheckPerfResultTestCase(interface.DynamicTestCase):
         """
         any_metric_has_failed = False
 
-        for metric_to_check in self.thresholds_to_check:
-            reported_metric = self.reported_metrics.get(
+        for metric_to_check in thresholds_to_check:
+            reported_metric = reported_metrics.get(
                 ReportedMetric(
                     test_name=metric_to_check.test_name,
                     thread_level=metric_to_check.thread_level,

@@ -2,8 +2,11 @@
 """Unit tests for the resmokelib.testing.hooks.combine_benchmark_results module."""
 
 import datetime
+import json
 import logging
+import os
 import subprocess
+import tempfile
 import unittest
 
 import mock
@@ -222,12 +225,14 @@ class GenerateAndCheckPerfResultsFixture(unittest.TestCase):
         self.cbr_hook.end_time = datetime.datetime.fromtimestamp(
             _END_TIME, tz=datetime.timezone.utc
         ).replace(tzinfo=None)
-        self.cbr_hook._parse_report(_BM_FULL_REPORT)
+        self.check = cbr.CheckPerfResultTestCase(
+            logging.getLogger("test_logger"), "my-test", None, None, self.cbr_hook, "report.json"
+        )
 
 
 class TestGenerateAndCheckPerfResults(GenerateAndCheckPerfResultsFixture):
     def test_generate_cedar_report(self):
-        report = self.cbr_hook._generate_cedar_report(self.cbr_hook._parse_report(_BM_FULL_REPORT))
+        report = self.check._generate_cedar_report(self.check._parse_report(_BM_FULL_REPORT))
 
         self.assertEqual(len(report), 2)
         self.assertEqual(report[0].thread_level, 1)
@@ -237,10 +242,10 @@ class TestGenerateAndCheckPerfResults(GenerateAndCheckPerfResultsFixture):
 
     def test_generate_cedar_report_with_dup_metric_names(self):
         # After we parse the same report twice we have duplicated metrics
-        report = self.cbr_hook._parse_report(_BM_FULL_REPORT_WITH_DUPS)
+        report = self.check._parse_report(_BM_FULL_REPORT_WITH_DUPS)
 
-        with self.assertLogs("hook_logger", level="ERROR") as cm:
-            cedar_report = self.cbr_hook._generate_cedar_report(report)
+        with self.assertLogs("test_logger", level="ERROR") as cm:
+            cedar_report = self.check._generate_cedar_report(report)
 
         self.assertTrue(
             any("has duplicated metric names" in msg for msg in cm.output),
@@ -250,13 +255,8 @@ class TestGenerateAndCheckPerfResults(GenerateAndCheckPerfResultsFixture):
         self.assertEqual(len(cedar_report), 1)
         self.assertEqual(cedar_report[0].test_name, "BM_Name2")
 
-    @mock.patch(
-        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.CheckPerfResultTestCase"
-    )
     @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
-    def test_check_pass_fail_handles_missing_project_name(
-        self, mock_config, MockCheckPerfResultTestCase
-    ):
+    def test_collect_thresholds_handles_missing_project_name(self, mock_config):
         mock_config.EVERGREEN_PROJECT_NAME = None
         mock_config.EVERGREEN_REQUESTER = "github_pr"
         mock_config.EVERGREEN_REVISION = "abc123"
@@ -279,36 +279,23 @@ class TestGenerateAndCheckPerfResults(GenerateAndCheckPerfResultsFixture):
             }
         }
 
-        benchmark_reports = self.cbr_hook._parse_report(_BM_FULL_REPORT)
-        cedar_formatted_results = self.cbr_hook._generate_cedar_report(benchmark_reports)
+        benchmark_reports = self.check._parse_report(_BM_FULL_REPORT)
 
-        with self.assertLogs("hook_logger", level="ERROR") as cm:
-            self.cbr_hook._check_pass_fail(
-                benchmark_reports,
-                cedar_formatted_results,
-                mock.MagicMock(),
-                mock.MagicMock(),
-            )
+        with self.assertLogs("test_logger", level="ERROR") as cm:
+            thresholds = self.check._collect_thresholds(benchmark_reports)
 
         self.assertTrue(
             any("Unable to determine the Evergreen project name" in msg for msg in cm.output),
             f"Expected error about missing project name in {cm.output}",
         )
-        # A dynamic test case is still created but with an empty thresholds list, so it passes.
-        MockCheckPerfResultTestCase.create_after_test.assert_called_once()
-        mock_hook_test_case = MockCheckPerfResultTestCase.create_after_test.return_value
-        mock_hook_test_case.run_dynamic_test.assert_called_once()
+        # Without a base version there is nothing to compare against, so no threshold is checked.
+        self.assertEqual(thresholds, [])
 
     @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
     @mock.patch(
-        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.CheckPerfResultTestCase"
-    )
-    @mock.patch(
         "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.evergreen_conn.get_evergreen_api"
     )
-    def test_check_pass_fail_resolves_version_id(
-        self, mock_get_api, MockCheckPerfResultTestCase, mock_config
-    ):
+    def test_collect_thresholds_resolves_version_id(self, mock_get_api, mock_config):
         # The version ID is resolved from the Evergreen API so that it is correct for any project,
         # including staging projects whose identifiers Evergreen sanitizes in non-obvious ways.
         mock_config.EVERGREEN_PROJECT_NAME = "mongodb-mongo-master-v8.3-staging"
@@ -337,21 +324,12 @@ class TestGenerateAndCheckPerfResults(GenerateAndCheckPerfResultsFixture):
         mock_task.version_id = "mongodb_mongo_master_v8_3_staging_abc123"
         mock_get_api.return_value.tasks_by_project_and_commit.return_value = [mock_task]
 
-        mock_hook_test_case = mock.MagicMock()
-        MockCheckPerfResultTestCase.create_after_test.return_value = mock_hook_test_case
-
-        benchmark_reports = self.cbr_hook._parse_report(_BM_FULL_REPORT)
-        cedar_formatted_results = self.cbr_hook._generate_cedar_report(benchmark_reports)
+        benchmark_reports = self.check._parse_report(_BM_FULL_REPORT)
 
         with mock.patch.object(
-            self.cbr_hook, "_retrieve_base_commit_value", return_value=50
+            self.check, "_retrieve_base_commit_value", return_value=50
         ) as mock_retrieve:
-            self.cbr_hook._check_pass_fail(
-                benchmark_reports,
-                cedar_formatted_results,
-                mock.MagicMock(),
-                mock.MagicMock(),
-            )
+            self.check._collect_thresholds(benchmark_reports)
 
             mock_get_api.return_value.tasks_by_project_and_commit.assert_called_once_with(
                 "mongodb-mongo-master-v8.3-staging", "abc123", params={"limit": 1}
@@ -368,14 +346,9 @@ class TestGenerateAndCheckPerfResults(GenerateAndCheckPerfResultsFixture):
 
     @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
     @mock.patch(
-        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.CheckPerfResultTestCase"
-    )
-    @mock.patch(
         "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.evergreen_conn.get_evergreen_api"
     )
-    def test_check_pass_fail_handles_version_resolution_failure(
-        self, mock_get_api, MockCheckPerfResultTestCase, mock_config
-    ):
+    def test_collect_thresholds_handles_version_resolution_failure(self, mock_get_api, mock_config):
         # If the Evergreen API lookup fails, version_id is None and the retrieve step falls back.
         mock_config.EVERGREEN_PROJECT_NAME = "mongodb-mongo-master"
         mock_config.EVERGREEN_REQUESTER = "github_pr"
@@ -401,23 +374,14 @@ class TestGenerateAndCheckPerfResults(GenerateAndCheckPerfResultsFixture):
 
         mock_get_api.side_effect = Exception("API error")
 
-        mock_hook_test_case = mock.MagicMock()
-        MockCheckPerfResultTestCase.create_after_test.return_value = mock_hook_test_case
-
-        benchmark_reports = self.cbr_hook._parse_report(_BM_FULL_REPORT)
-        cedar_formatted_results = self.cbr_hook._generate_cedar_report(benchmark_reports)
+        benchmark_reports = self.check._parse_report(_BM_FULL_REPORT)
 
         with mock.patch.object(
-            self.cbr_hook, "_retrieve_base_commit_value", return_value=50
+            self.check, "_retrieve_base_commit_value", return_value=50
         ) as mock_retrieve:
             # The resolution failure must be logged at ERROR so it reaches alerting.
-            with self.assertLogs("hook_logger", level="ERROR") as log_ctx:
-                self.cbr_hook._check_pass_fail(
-                    benchmark_reports,
-                    cedar_formatted_results,
-                    mock.MagicMock(),
-                    mock.MagicMock(),
-                )
+            with self.assertLogs("test_logger", level="ERROR") as log_ctx:
+                self.check._collect_thresholds(benchmark_reports)
 
             mock_retrieve.assert_called_once_with(
                 test_name="BM_Name1/arg1/arg with space",
@@ -437,7 +401,7 @@ class TestGenerateAndCheckPerfResults(GenerateAndCheckPerfResultsFixture):
         "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.evergreen_conn.get_evergreen_api"
     )
     @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
-    def test_check_pass_fail_passes_when_no_thresholds_set(self, mock_config, mock_get_api):
+    def test_collect_thresholds_passes_when_no_thresholds_set(self, mock_config, mock_get_api):
         # The hook should pass when no thresholds are set for any benchmark, even if the project
         # name is unavailable. The project-name failure (and the base-version resolution) must be
         # deferred until at least one threshold check will actually run.
@@ -446,16 +410,10 @@ class TestGenerateAndCheckPerfResults(GenerateAndCheckPerfResultsFixture):
         self.cbr_hook.variant = "test-variant"
         self.cbr_hook.performance_thresholds = {}
 
-        benchmark_reports = self.cbr_hook._parse_report(_BM_FULL_REPORT)
-        cedar_formatted_results = self.cbr_hook._generate_cedar_report(benchmark_reports)
+        benchmark_reports = self.check._parse_report(_BM_FULL_REPORT)
 
         # Should not raise even though the project name is None, because no checks run.
-        self.cbr_hook._check_pass_fail(
-            benchmark_reports,
-            cedar_formatted_results,
-            mock.MagicMock(),
-            mock.MagicMock(),
-        )
+        self.check._collect_thresholds(benchmark_reports)
 
         self.assertFalse(self.cbr_hook.has_checked_results)
         # No threshold check ran, so the base version (an Evergreen API call) was never resolved.
@@ -465,7 +423,9 @@ class TestGenerateAndCheckPerfResults(GenerateAndCheckPerfResultsFixture):
         "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.evergreen_conn.get_evergreen_api"
     )
     @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
-    def test_check_pass_fail_passes_when_no_thresholds_for_variant(self, mock_config, mock_get_api):
+    def test_collect_thresholds_passes_when_no_thresholds_for_variant(
+        self, mock_config, mock_get_api
+    ):
         # Thresholds exist for the benchmark but not for the variant being run, so no check runs and
         # the hook should pass without resolving the project or base version.
         mock_config.EVERGREEN_PROJECT_NAME = None
@@ -488,30 +448,19 @@ class TestGenerateAndCheckPerfResults(GenerateAndCheckPerfResultsFixture):
             }
         }
 
-        benchmark_reports = self.cbr_hook._parse_report(_BM_FULL_REPORT)
-        cedar_formatted_results = self.cbr_hook._generate_cedar_report(benchmark_reports)
+        benchmark_reports = self.check._parse_report(_BM_FULL_REPORT)
 
         # Should not raise even though the project name is None, because no checks run.
-        self.cbr_hook._check_pass_fail(
-            benchmark_reports,
-            cedar_formatted_results,
-            mock.MagicMock(),
-            mock.MagicMock(),
-        )
+        self.check._collect_thresholds(benchmark_reports)
 
         self.assertFalse(self.cbr_hook.has_checked_results)
         mock_get_api.assert_not_called()
 
     @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
     @mock.patch(
-        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.CheckPerfResultTestCase"
-    )
-    @mock.patch(
         "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.evergreen_conn.get_evergreen_api"
     )
-    def test_check_pass_fail_missing_baseline_logs_error(
-        self, mock_get_api, MockCheckPerfResultTestCase, mock_config
-    ):
+    def test_collect_thresholds_missing_baseline_logs_error(self, mock_get_api, mock_config):
         # The commit-queue use case: a missing base value must not fail the task, but must emit a
         # clear ERROR-level log that alerting can match on.
         mock_config.EVERGREEN_PROJECT_NAME = "mongodb-mongo-master"
@@ -539,19 +488,12 @@ class TestGenerateAndCheckPerfResults(GenerateAndCheckPerfResultsFixture):
         mock_task = mock.MagicMock()
         mock_task.version_id = "mongodb_mongo_master_abc123"
         mock_get_api.return_value.tasks_by_project_and_commit.return_value = [mock_task]
-        MockCheckPerfResultTestCase.create_after_test.return_value = mock.MagicMock()
 
-        benchmark_reports = self.cbr_hook._parse_report(_BM_FULL_REPORT)
-        cedar_formatted_results = self.cbr_hook._generate_cedar_report(benchmark_reports)
+        benchmark_reports = self.check._parse_report(_BM_FULL_REPORT)
 
-        with mock.patch.object(self.cbr_hook, "_retrieve_base_commit_value", return_value=None):
-            with self.assertLogs("hook_logger", level="ERROR") as log_ctx:
-                self.cbr_hook._check_pass_fail(
-                    benchmark_reports,
-                    cedar_formatted_results,
-                    mock.MagicMock(),
-                    mock.MagicMock(),
-                )
+        with mock.patch.object(self.check, "_retrieve_base_commit_value", return_value=None):
+            with self.assertLogs("test_logger", level="ERROR") as log_ctx:
+                self.check._collect_thresholds(benchmark_reports)
 
         self.assertTrue(
             any(
@@ -563,14 +505,9 @@ class TestGenerateAndCheckPerfResults(GenerateAndCheckPerfResultsFixture):
 
     @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
     @mock.patch(
-        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.CheckPerfResultTestCase"
-    )
-    @mock.patch(
         "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.evergreen_conn.get_evergreen_api"
     )
-    def test_missing_baseline_does_not_fail_suite(
-        self, mock_get_api, MockCheckPerfResultTestCase, mock_config
-    ):
+    def test_missing_baseline_does_not_fail_suite(self, mock_get_api, mock_config):
         # End-to-end: even with check_result=True (as in benchmarks_sep, which runs in the commit
         # queue), a missing base value must not block the task. The metric still counts as checked
         # so the after_suite reconciliation passes; alerting is expected to key off the ERROR log.
@@ -601,18 +538,11 @@ class TestGenerateAndCheckPerfResults(GenerateAndCheckPerfResultsFixture):
         mock_task = mock.MagicMock()
         mock_task.version_id = "mongodb_mongo_master_abc123"
         mock_get_api.return_value.tasks_by_project_and_commit.return_value = [mock_task]
-        MockCheckPerfResultTestCase.create_after_test.return_value = mock.MagicMock()
 
-        benchmark_reports = self.cbr_hook._parse_report(_BM_FULL_REPORT)
-        cedar_formatted_results = self.cbr_hook._generate_cedar_report(benchmark_reports)
+        benchmark_reports = self.check._parse_report(_BM_FULL_REPORT)
 
-        with mock.patch.object(self.cbr_hook, "_retrieve_base_commit_value", return_value=None):
-            self.cbr_hook._check_pass_fail(
-                benchmark_reports,
-                cedar_formatted_results,
-                mock.MagicMock(),
-                mock.MagicMock(),
-            )
+        with mock.patch.object(self.check, "_retrieve_base_commit_value", return_value=None):
+            self.check._collect_thresholds(benchmark_reports)
 
         # A skipped-for-missing-baseline metric still counts as checked, so after_suite must not raise.
         self.assertTrue(self.cbr_hook.has_checked_results)
@@ -631,7 +561,7 @@ class TestGenerateAndCheckPerfResults(GenerateAndCheckPerfResultsFixture):
         mock_config.EVERGREEN_REVISION = None
         self.cbr_hook.variant = "test-variant"
 
-        project, version_id = self.cbr_hook._resolve_base_version()
+        project, version_id = self.cbr_hook._resolve_base_version(logging.getLogger("test_logger"))
 
         self.assertEqual(project, "mongodb-mongo-master")
         self.assertIsNone(version_id)
@@ -639,15 +569,10 @@ class TestGenerateAndCheckPerfResults(GenerateAndCheckPerfResultsFixture):
 
     @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
     @mock.patch(
-        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.CheckPerfResultTestCase"
-    )
-    @mock.patch(
         "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.evergreen_conn.get_evergreen_api"
     )
-    def test_base_version_resolved_once_across_benchmark_files(
-        self, mock_get_api, MockCheckPerfResultTestCase, mock_config
-    ):
-        # _check_pass_fail runs once per benchmark file (via after_test). The base commit is constant
+    def test_base_version_resolved_once_across_benchmark_files(self, mock_get_api, mock_config):
+        # _collect_thresholds runs once per benchmark file (via after_test). The base commit is constant
         # for the whole run, so the Evergreen version is resolved once and cached across calls.
         mock_config.EVERGREEN_PROJECT_NAME = "mongodb-mongo-master"
         mock_config.EVERGREEN_REQUESTER = "github_pr"
@@ -674,19 +599,13 @@ class TestGenerateAndCheckPerfResults(GenerateAndCheckPerfResultsFixture):
         mock_task = mock.MagicMock()
         mock_task.version_id = "mongodb_mongo_master_abc123"
         mock_get_api.return_value.tasks_by_project_and_commit.return_value = [mock_task]
-        MockCheckPerfResultTestCase.create_after_test.return_value = mock.MagicMock()
 
-        benchmark_reports = self.cbr_hook._parse_report(_BM_FULL_REPORT)
-        cedar_formatted_results = self.cbr_hook._generate_cedar_report(benchmark_reports)
+        benchmark_reports = self.check._parse_report(_BM_FULL_REPORT)
 
-        with mock.patch.object(self.cbr_hook, "_retrieve_base_commit_value", return_value=50):
-            # Two benchmark files in the same run -> two _check_pass_fail calls.
-            self.cbr_hook._check_pass_fail(
-                benchmark_reports, cedar_formatted_results, mock.MagicMock(), mock.MagicMock()
-            )
-            self.cbr_hook._check_pass_fail(
-                benchmark_reports, cedar_formatted_results, mock.MagicMock(), mock.MagicMock()
-            )
+        with mock.patch.object(self.check, "_retrieve_base_commit_value", return_value=50):
+            # Two benchmark files in the same run -> two _collect_thresholds calls.
+            self.check._collect_thresholds(benchmark_reports)
+            self.check._collect_thresholds(benchmark_reports)
 
         mock_get_api.return_value.tasks_by_project_and_commit.assert_called_once_with(
             "mongodb-mongo-master", "abc123", params={"limit": 1}
@@ -854,22 +773,18 @@ class TestGenerateAndCheckPerfResults(GenerateAndCheckPerfResultsFixture):
         "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.get_expansion"
     )
     @mock.patch(
-        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.CheckPerfResultTestCase"
-    )
-    @mock.patch(
         "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.evergreen_conn.get_evergreen_api"
     )
     @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
-    def test_check_pass_fail_skips_for_revert_pr(
+    def test_collect_thresholds_skips_for_revert_pr(
         self,
         mock_config,
         mock_get_api,
-        MockCheckPerfResultTestCase,
         mock_get_expansion,
         mock_github_cls,
     ):
         """Revert PRs skip threshold checks: _before_suite_impl detects the revert and returns
-        early without loading thresholds, so _check_pass_fail finds no thresholds to check."""
+        early without loading thresholds, so _collect_thresholds finds no thresholds to check."""
         mock_config.EVERGREEN_PROJECT_NAME = "mongodb-mongo-master"
         mock_config.EVERGREEN_REQUESTER = "github_pr"
         mock_config.EVERGREEN_REVISION = "abc123"
@@ -885,18 +800,11 @@ class TestGenerateAndCheckPerfResults(GenerateAndCheckPerfResultsFixture):
         self.cbr_hook._before_suite_impl(mock.MagicMock())
         self.assertEqual(self.cbr_hook.performance_thresholds, {})
 
-        benchmark_reports = self.cbr_hook._parse_report(_BM_FULL_REPORT)
-        cedar_formatted_results = self.cbr_hook._generate_cedar_report(benchmark_reports)
+        benchmark_reports = self.check._parse_report(_BM_FULL_REPORT)
 
-        self.cbr_hook._check_pass_fail(
-            benchmark_reports,
-            cedar_formatted_results,
-            mock.MagicMock(),
-            mock.MagicMock(),
-        )
+        self.check._collect_thresholds(benchmark_reports)
 
-        # No dynamic test case should be created, no Evergreen API call.
-        MockCheckPerfResultTestCase.create_after_test.assert_not_called()
+        # No threshold is checked, so there is no Evergreen API call.
         mock_get_api.assert_not_called()
         self.assertFalse(self.cbr_hook.has_checked_results)
 
@@ -926,16 +834,10 @@ class TestGenerateAndCheckPerfResults(GenerateAndCheckPerfResultsFixture):
         self.cbr_hook._before_suite_impl(mock.MagicMock())
         self.assertEqual(self.cbr_hook.performance_thresholds, {})
 
-        benchmark_reports = self.cbr_hook._parse_report(_BM_FULL_REPORT)
-        cedar_formatted_results = self.cbr_hook._generate_cedar_report(benchmark_reports)
+        benchmark_reports = self.check._parse_report(_BM_FULL_REPORT)
 
-        # _check_pass_fail finds no thresholds to check, so has_checked_results stays False.
-        self.cbr_hook._check_pass_fail(
-            benchmark_reports,
-            cedar_formatted_results,
-            mock.MagicMock(),
-            mock.MagicMock(),
-        )
+        # _collect_thresholds finds no thresholds to check, so has_checked_results stays False.
+        self.check._collect_thresholds(benchmark_reports)
         self.assertFalse(self.cbr_hook.has_checked_results)
 
         # after_suite should NOT log an ERROR even though check_result=True and
@@ -1167,7 +1069,14 @@ def _build_override_github(
 
 
 def _build_failing_test_case():
-    """Build a CheckPerfResultTestCase whose single metric exceeds its threshold."""
+    """Build a CheckPerfResultTestCase without a hook."""
+    return cbr.CheckPerfResultTestCase(
+        logging.getLogger("hook_logger"), "my-test", None, None, None, "report.json"
+    )
+
+
+def _check_failing_thresholds(test_case):
+    """Check a single metric that exceeds its threshold."""
     thresholds_to_check: list[cbr.IndividualMetricThreshold] = [
         cbr.IndividualMetricThreshold(
             metric_name="latency",
@@ -1183,15 +1092,7 @@ def _build_failing_test_case():
             test_name="fake-test", thread_level=1, metric_name="latency"
         ): CedarMetric(name="latency", type="LATENCY", value=100)
     }
-    return cbr.CheckPerfResultTestCase(
-        logging.getLogger("hook_logger"),
-        "my-test",
-        None,
-        None,
-        None,
-        thresholds_to_check,
-        reported_metrics,
-    )
+    test_case._check_thresholds(thresholds_to_check, reported_metrics)
 
 
 class TestRetrieveBaseCommitValue(GenerateAndCheckPerfResultsFixture):
@@ -1220,7 +1121,7 @@ class TestRetrieveBaseCommitValue(GenerateAndCheckPerfResultsFixture):
         mock_response.raise_for_status.return_value = None
         mock_get.return_value = mock_response
 
-        value = self.cbr_hook._retrieve_base_commit_value(
+        value = self.check._retrieve_base_commit_value(
             test_name="BM_Test",
             task_name="benchmarks_sep",
             variant="my-variant",
@@ -1270,7 +1171,7 @@ class TestRetrieveBaseCommitValue(GenerateAndCheckPerfResultsFixture):
         mock_response.raise_for_status.return_value = None
         mock_get.return_value = mock_response
 
-        value = self.cbr_hook._retrieve_base_commit_value(
+        value = self.check._retrieve_base_commit_value(
             test_name="BM_Test",
             task_name="benchmarks_sep",
             variant="my-variant",
@@ -1313,7 +1214,7 @@ class TestRetrieveBaseCommitValue(GenerateAndCheckPerfResultsFixture):
         mock_response.raise_for_status.return_value = None
         mock_get.return_value = mock_response
 
-        value = self.cbr_hook._retrieve_base_commit_value(
+        value = self.check._retrieve_base_commit_value(
             test_name="BM_Test",
             task_name="benchmarks_sep",
             variant="my-variant",
@@ -1330,7 +1231,7 @@ class TestRetrieveBaseCommitValue(GenerateAndCheckPerfResultsFixture):
         with mock.patch(
             "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.requests.get"
         ) as mock_get:
-            value = self.cbr_hook._retrieve_base_commit_value(
+            value = self.check._retrieve_base_commit_value(
                 test_name="BM_Test",
                 task_name="benchmarks_sep",
                 variant="my-variant",
@@ -1368,7 +1269,7 @@ class TestRetrieveBaseCommitValue(GenerateAndCheckPerfResultsFixture):
         mock_response.raise_for_status.return_value = None
         mock_get.return_value = mock_response
 
-        value = self.cbr_hook._retrieve_base_commit_value(
+        value = self.check._retrieve_base_commit_value(
             test_name="BM_Test",
             task_name="benchmarks_sep",
             variant="my-variant",
@@ -1401,7 +1302,7 @@ class TestRetrieveBaseCommitValue(GenerateAndCheckPerfResultsFixture):
         mock_response.raise_for_status.return_value = None
         mock_get.return_value = mock_response
 
-        value = self.cbr_hook._retrieve_base_commit_value(
+        value = self.check._retrieve_base_commit_value(
             test_name="BM_Test",
             task_name="benchmarks_sep",
             variant="my-variant",
@@ -1428,7 +1329,7 @@ class TestRetrieveBaseCommitValue(GenerateAndCheckPerfResultsFixture):
         mock_response.raise_for_status.return_value = None
         mock_get.return_value = mock_response
 
-        value = self.cbr_hook._retrieve_base_commit_value(
+        value = self.check._retrieve_base_commit_value(
             test_name="BM_Test",
             task_name="benchmarks_sep",
             variant="my-variant",
@@ -1447,8 +1348,8 @@ class TestRetrieveBaseCommitValue(GenerateAndCheckPerfResultsFixture):
         """A request failure is non-blocking: it logs an ERROR and returns None rather than raising."""
         mock_get.side_effect = requests.RequestException("Connection error")
 
-        with self.assertLogs("hook_logger", level="ERROR") as log_ctx:
-            value = self.cbr_hook._retrieve_base_commit_value(
+        with self.assertLogs("test_logger", level="ERROR") as log_ctx:
+            value = self.check._retrieve_base_commit_value(
                 test_name="BM_Test",
                 task_name="benchmarks_sep",
                 variant="my-variant",
@@ -1479,7 +1380,7 @@ class TestRetrieveBaseCommitValue(GenerateAndCheckPerfResultsFixture):
         mock_response.raise_for_status.return_value = None
         mock_get.return_value = mock_response
 
-        value = self.cbr_hook._retrieve_base_commit_value(
+        value = self.check._retrieve_base_commit_value(
             test_name="BM_Test",
             task_name="benchmarks_sep",
             variant="my-variant",
@@ -1523,7 +1424,7 @@ class TestRetrieveBaseCommitValue(GenerateAndCheckPerfResultsFixture):
         mock_response.raise_for_status.return_value = None
         mock_get.return_value = mock_response
 
-        value = self.cbr_hook._retrieve_base_commit_value(
+        value = self.check._retrieve_base_commit_value(
             test_name="BM_Test",
             task_name="benchmarks_sep",
             variant="my-variant",
@@ -1559,12 +1460,11 @@ class TestCheckPerfResultTestCase(unittest.TestCase):
             None,
             None,
             None,
-            thresholds_to_check,
-            reported_metrics,
+            "report.json",
         )
 
         # We want to make sure this can run without any exceptions.
-        test_case.run_test()
+        test_case._check_thresholds(thresholds_to_check, reported_metrics)
 
     def test_a_metric_fails(self):
         thresholds_to_check: list[cbr.IndividualMetricThreshold] = [
@@ -1588,12 +1488,11 @@ class TestCheckPerfResultTestCase(unittest.TestCase):
             None,
             None,
             None,
-            thresholds_to_check,
-            reported_metrics,
+            "report.json",
         )
 
         with self.assertRaisesRegex(ServerFailure, "threshold check"):
-            test_case.run_test()
+            test_case._check_thresholds(thresholds_to_check, reported_metrics)
 
     @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
     @mock.patch(
@@ -1617,7 +1516,7 @@ class TestCheckPerfResultTestCase(unittest.TestCase):
         test_case.github = mock_github
 
         # Should not raise an exception due to override comment
-        test_case.run_test()
+        _check_failing_thresholds(test_case)
 
     @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
     @mock.patch(
@@ -1640,7 +1539,7 @@ class TestCheckPerfResultTestCase(unittest.TestCase):
         test_case.github = mock_github
 
         # Should not raise an exception due to override comment
-        test_case.run_test()
+        _check_failing_thresholds(test_case)
 
     @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
     @mock.patch(
@@ -1664,7 +1563,7 @@ class TestCheckPerfResultTestCase(unittest.TestCase):
         test_case.github = mock_github
 
         # Should not raise an exception due to override comment
-        test_case.run_test()
+        _check_failing_thresholds(test_case)
 
     @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
     @mock.patch(
@@ -1688,7 +1587,7 @@ class TestCheckPerfResultTestCase(unittest.TestCase):
 
         # Should raise an exception since user is not authorized
         with self.assertRaisesRegex(ServerFailure, "threshold check"):
-            test_case.run_test()
+            _check_failing_thresholds(test_case)
 
     @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
     @mock.patch(
@@ -1714,7 +1613,7 @@ class TestCheckPerfResultTestCase(unittest.TestCase):
 
         # Should raise an exception since there's no override comment
         with self.assertRaisesRegex(ServerFailure, "threshold check"):
-            test_case.run_test()
+            _check_failing_thresholds(test_case)
 
     @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
     @mock.patch(
@@ -1735,7 +1634,7 @@ class TestCheckPerfResultTestCase(unittest.TestCase):
         test_case = _build_failing_test_case()
         test_case.github = mock_github
 
-        test_case.run_test()
+        _check_failing_thresholds(test_case)
 
         mock_github.get_organization.assert_called_once_with(cbr.OVERRIDE_APPROVER_ORG)
         mock_github.get_organization.return_value.get_team_by_slug.assert_called_once_with(
@@ -1790,7 +1689,7 @@ class TestCheckPerfResultTestCase(unittest.TestCase):
             cbr, "OVERRIDE_APPROVER_TEAMS", frozenset(["first-team", "second-team"])
         ):
             # Should not raise: the user is an active member of one of the teams.
-            test_case.run_test()
+            _check_failing_thresholds(test_case)
 
     @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
     @mock.patch(
@@ -1812,7 +1711,7 @@ class TestCheckPerfResultTestCase(unittest.TestCase):
         test_case.github = mock_github
 
         with self.assertRaisesRegex(ServerFailure, "threshold check"):
-            test_case.run_test()
+            _check_failing_thresholds(test_case)
 
     @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
     @mock.patch(
@@ -1835,7 +1734,7 @@ class TestCheckPerfResultTestCase(unittest.TestCase):
 
         # The threshold failure must stand, surfaced as ServerFailure (not the raw API error).
         with self.assertRaisesRegex(ServerFailure, "threshold check"):
-            test_case.run_test()
+            _check_failing_thresholds(test_case)
 
     @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
     @mock.patch(
@@ -1869,13 +1768,12 @@ class TestCheckPerfResultTestCase(unittest.TestCase):
             None,
             None,
             None,
-            thresholds_to_check,
-            reported_metrics,
+            "report.json",
         )
 
         # Should raise an exception since we're not in merge queue
         with self.assertRaisesRegex(ServerFailure, "threshold check"):
-            test_case.run_test()
+            test_case._check_thresholds(thresholds_to_check, reported_metrics)
 
     @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
     @mock.patch(
@@ -1909,13 +1807,12 @@ class TestCheckPerfResultTestCase(unittest.TestCase):
             None,
             None,
             None,
-            thresholds_to_check,
-            reported_metrics,
+            "report.json",
         )
 
         with self.assertLogs("hook_logger", level="ERROR") as cm:
             with self.assertRaisesRegex(ServerFailure, "threshold check"):
-                test_case.run_test()
+                test_case._check_thresholds(thresholds_to_check, reported_metrics)
 
         self.assertTrue(
             any("github_pr_number" in msg for msg in cm.output),
@@ -1944,12 +1841,11 @@ class TestCheckPerfResultTestCase(unittest.TestCase):
             None,
             None,
             None,
-            thresholds_to_check,
-            reported_metrics,
+            "report.json",
         )
 
         with self.assertRaisesRegex(ServerFailure, "threshold check"):
-            test_case.run_test()
+            test_case._check_thresholds(thresholds_to_check, reported_metrics)
 
     def test_thread_level_doesnt_exist(self):
         thresholds_to_check: list[cbr.IndividualMetricThreshold] = [
@@ -1973,12 +1869,11 @@ class TestCheckPerfResultTestCase(unittest.TestCase):
             None,
             None,
             None,
-            thresholds_to_check,
-            reported_metrics,
+            "report.json",
         )
 
         with self.assertRaisesRegex(ServerFailure, "threshold check"):
-            test_case.run_test()
+            test_case._check_thresholds(thresholds_to_check, reported_metrics)
 
 
 class TestGetGithubPrNumber(unittest.TestCase):
@@ -2193,15 +2088,113 @@ class TestLogPerfError(unittest.TestCase):
             mock_span.add_event.reset_mock()
 
 
+def _threshold(thread_level, metric_name, threshold_limit):
+    """Return an upper bound threshold for one metric at one thread level."""
+    return {
+        "test-variant": [
+            {
+                "thread_level": thread_level,
+                "metrics": [
+                    {
+                        "name": metric_name,
+                        "bound_direction": "upper",
+                        "threshold_limit": threshold_limit,
+                    }
+                ],
+            }
+        ]
+    }
+
+
+class TestAfterTest(GenerateAndCheckPerfResultsFixture):
+    def _write_report(self, tmp_dir):
+        """Write the full benchmark report and point the hook test case at it."""
+        self.check.bm_report_path = os.path.join(tmp_dir, "report.json")
+        with open(self.check.bm_report_path, "w") as fh:
+            json.dump(_BM_FULL_REPORT, fh)
+
+    @mock.patch.object(cbr.CheckPerfResultTestCase, "create_after_test")
+    def test_after_test_runs_a_hook_test_for_the_report(self, mock_create_after_test):
+        test = mock.MagicMock()
+        test_report = mock.MagicMock()
+
+        self.cbr_hook.after_test(test, test_report)
+
+        mock_create_after_test.assert_called_once_with(
+            test.logger, test, self.cbr_hook, test.report_name()
+        )
+        mock_create_after_test.return_value.run_dynamic_test.assert_called_once_with(test_report)
+
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.get_expansion"
+    )
+    def test_run_test_logs_to_the_test_log(self, mock_get_expansion):
+        mock_get_expansion.return_value = None
+        self.cbr_hook.variant = "test-variant"
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            self._write_report(tmp_dir)
+            with self.assertNoLogs("hook_logger"):
+                with self.assertLogs("test_logger", level="INFO") as log_ctx:
+                    self.check.run_test()
+
+        self.assertIn(
+            "No thresholds were set for BM_Name1/arg1/arg with space, skipping threshold check",
+            "\n".join(log_ctx.output),
+        )
+        self.assertEqual(len(self.cbr_hook.cedar_reports), 2)
+
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.get_expansion"
+    )
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.evergreen_conn.get_evergreen_api"
+    )
+    @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
+    def test_run_test_checks_every_benchmark_after_a_failure(
+        self, mock_config, mock_get_api, mock_get_expansion
+    ):
+        mock_config.EVERGREEN_PROJECT_NAME = "mongodb-mongo-master"
+        mock_config.EVERGREEN_REQUESTER = "patch"
+        mock_config.EVERGREEN_REVISION = "abc123"
+        mock_get_expansion.return_value = None
+        mock_task = mock.MagicMock()
+        mock_task.version_id = "mongodb_mongo_master_abc123"
+        mock_get_api.return_value.tasks_by_project_and_commit.return_value = [mock_task]
+
+        self.cbr_hook.variant = "test-variant"
+        self.cbr_hook.performance_thresholds = {
+            "BM_Name1/arg1/arg with space": _threshold(1, "latency_per_op_mean", 10),
+            "BM_Name2": _threshold(10, "latency_per_op_median", 1000),
+        }
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            self._write_report(tmp_dir)
+            with mock.patch.object(self.check, "_retrieve_base_commit_value", return_value=0):
+                with self.assertLogs("test_logger", level="INFO") as log_ctx:
+                    with self.assertRaisesRegex(ServerFailure, "threshold check"):
+                        self.check.run_test()
+
+        output = "\n".join(log_ctx.output)
+        self.assertIn(
+            "Metric latency_per_op_mean in BM_Name1/arg1/arg with space with thread_level of 1 has failed",
+            output,
+        )
+        self.assertIn(
+            "Metric latency_per_op_median in BM_Name2 with thread_level of 10 has passed", output
+        )
+        self.assertTrue(self.cbr_hook.has_checked_results)
+
+
 class TestHookSpanContext(GenerateAndCheckPerfResultsFixture):
     @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.TRACER")
     @mock.patch(
         "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.get_expansion"
     )
     @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
-    @mock.patch.object(cbr.GenerateAndCheckPerfResults, "_after_test_impl")
-    def test_after_test_span_carries_context(
-        self, mock_after_test_impl, mock_config, mock_get_expansion, mock_tracer
+    @mock.patch.object(cbr.CheckPerfResultTestCase, "_run_test_impl")
+    def test_run_test_span_carries_context(
+        self, mock_run_test_impl, mock_config, mock_get_expansion, mock_tracer
     ):
         mock_config.EVERGREEN_TASK_ID = "task_1"
         mock_config.EVERGREEN_TASK_NAME = "benchmarks_sep"
@@ -2213,8 +2206,8 @@ class TestHookSpanContext(GenerateAndCheckPerfResultsFixture):
         mock_config.EVERGREEN_REQUESTER = "github_pr"
         mock_get_expansion.return_value = 0
 
-        self.cbr_hook.after_test(mock.MagicMock(), mock.MagicMock())
-        mock_after_test_impl.assert_called_once()
+        self.check.run_test()
+        mock_run_test_impl.assert_called_once()
 
         args, kwargs = mock_tracer.start_as_current_span.call_args
         self.assertEqual(args[0], "generate_and_check_perf_results.after_test")
@@ -2222,6 +2215,21 @@ class TestHookSpanContext(GenerateAndCheckPerfResultsFixture):
         self.assertEqual(
             kwargs["attributes"]["evergreen.project.identifier"], "mongodb-mongo-master"
         )
+
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.get_expansion"
+    )
+    @mock.patch.object(cbr.CheckPerfResultTestCase, "_run_test_impl")
+    def test_run_test_logs_unexpected_errors_without_failing(
+        self, mock_run_test_impl, mock_get_expansion
+    ):
+        mock_get_expansion.return_value = None
+        mock_run_test_impl.side_effect = RuntimeError("Evergreen is down")
+
+        with self.assertLogs("test_logger", level="ERROR") as log_ctx:
+            self.check.run_test()
+
+        self.assertIn("Unexpected error in generate_and_check_perf_results", log_ctx.output[0])
 
 
 if __name__ == "__main__":
