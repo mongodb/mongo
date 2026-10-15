@@ -125,6 +125,8 @@ private:
      */
     std::shared_ptr<TimeseriesOptions> validateTimeseries();
 
+    void quotaExceeded() override;
+
     static constexpr int kMaxCatalogRetryAttempts = 5;
 
     // Stash the writeConcern of the original command as the operation context may change by the

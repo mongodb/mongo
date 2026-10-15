@@ -3,6 +3,7 @@
 
 #include "mongo/db/exec/agg/out_stage.h"
 
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/pipeline/document_source_out.h"
@@ -37,6 +38,15 @@ MONGO_FAIL_POINT_DEFINE(outImplictlyCreateDBOnSpecificShard);
 MONGO_FAIL_POINT_DEFINE(hangDollarOutAfterInsert);
 
 REGISTER_AGG_STAGE_MAPPING(outStage, DocumentSourceOut::id, documentSourceOutToStageFn)
+
+namespace {
+auto& outInvokedWithQuota = *MetricBuilder<Counter64>{"query.out.countInvokedWithQuota"};
+auto& outFailedOverQuota = *MetricBuilder<Counter64>{"query.out.countFailedOverQuota"};
+}  // namespace
+
+void OutStage::quotaExceeded() {
+    outFailedOverQuota.increment();
+}
 
 void OutStage::doDispose() {
     if (_tmpCleanUpState == OutCleanUpProgress::kComplete) {
@@ -420,6 +430,7 @@ void OutStage::initialize() {
     // rename the temporary collection to be the target collection once we are done.
 
     if (pExpCtx->getRemainingQuota() >= 0) {
+        outInvokedWithQuota.increment();
         setEffectiveQuota(pExpCtx->getRemainingQuota());
     }
     retrieveOriginalOutCollInfo();
