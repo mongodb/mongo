@@ -8,6 +8,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/platform/random.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 
@@ -47,7 +48,7 @@ namespace mongo {
  * The load-shed decision, called from query-execution interrupt/yield points (see callers). Returns
  * QueryMemoryLimitExceeded (and marks the op killed) when the operation should be load-shed,
  * otherwise Status::OK() (disabled/exempt, RSS below the low mark, or the roll did not select it).
- * noexcept-compatible: never throws.
+ * Must be called on the operation's own thread. noexcept-compatible: never throws.
  */
 [[MONGO_MOD_PUBLIC]] Status queryMemoryCheckLoadShedding(OperationContext* opCtx);
 
@@ -59,6 +60,15 @@ namespace mongo {
  */
 [[MONGO_MOD_PUBLIC]] bool isOperationQueryMemorySheddingEligible(OperationContext* opCtx);
 [[MONGO_MOD_PUBLIC]] void markOperationQueryMemorySheddingEligible(OperationContext* opCtx);
+
+/**
+ * Evaluates every operation that is blocked waiting for a read ticket (or a shared lock) for load
+ * shedding. Intended to be called periodically from a monitor thread. It's a no-op when shedding
+ * is disabled or RSS is at/below the low mark. For testing purposes, returns the number of
+ * shedding candidates found, whether or not the PRNG draw caused them to be shed.
+ */
+[[MONGO_MOD_PUBLIC]] size_t sweepQueuedOperationsForMemoryPressure(ServiceContext* serviceContext,
+                                                                   PseudoRandom& prng);
 
 /**
  * Appends the load-shedding metrics to 'b'. No-op when disabled.

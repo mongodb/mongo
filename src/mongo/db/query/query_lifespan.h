@@ -70,12 +70,22 @@ public:
     using Handle = std::shared_ptr<QueryLifespan>;
     QueryLifespan(Passkey) {}
 
+    QueryLifespan(const QueryLifespan&) = delete;
+    QueryLifespan& operator=(const QueryLifespan&) = delete;
+
     /**
      * Returns the QueryLifespan for 'opCtx', creating it on first access. The reference is
      * unowned and should be consumed immediately rather than stored; use 'handle()' if it needs
      * to outlive the current scope.
      */
     static QueryLifespan& get(OperationContext* opCtx);
+
+    /**
+     * Returns the QueryLifespan currently bound to 'opCtx', or nullptr if none is bound. Unlike
+     * 'get', this never creates one, so callers on hot paths can cheaply skip work for operations
+     * that have no query lifespan.
+     */
+    static QueryLifespan* getIfExists(OperationContext* opCtx);
 
     /**
      * Binds this lifespan onto 'opCtx', making its decorations accessible through that

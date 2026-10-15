@@ -55,7 +55,9 @@ server_parameters:
     queryMemoryRssMonitorIntervalMillis:
         description: >-
             How often the built-in monitor samples RSS, in milliseconds. Startup-only: read once when
-            the monitor's periodic job is created.
+            the monitor's periodic job is created. This also controls the frequency that queued
+            operations are shed. Setting this above 1000 (kMaxShedEvalDt) is not recommended, as this
+            will limit the efficacy of query memory load shedding on queued operations.
         set_at: [startup]
         cpp_varname: gQueryMemoryRssMonitorIntervalMillis
         cpp_vartype: AtomicWord<int32_t>

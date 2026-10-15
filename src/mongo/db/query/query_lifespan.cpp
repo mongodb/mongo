@@ -28,6 +28,11 @@ QueryLifespan& QueryLifespan::get(OperationContext* opCtx) {
     return *handle;
 }
 
+QueryLifespan* QueryLifespan::getIfExists(OperationContext* opCtx) {
+    tassert(12765300, "QueryLifespan::getIfExists requires a non-null OperationContext", opCtx);
+    return opCtxDecoration(opCtx).get();
+}
+
 void QueryLifespan::bind(OperationContext* opCtx) {
     tassert(13020601, "QueryLifespan::bind requires a non-null OperationContext", opCtx);
     auto& slot = opCtxDecoration(opCtx);
