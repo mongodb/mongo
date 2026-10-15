@@ -18,6 +18,7 @@ from bazel.wrapper_hook.compiledb_postprocess import (
     load_compile_command_fragments_from_paths,
     write_compile_commands,
 )
+from bazel.wrapper_hook.compiledb_windows import wrap_windows_compile_commands
 from bazel.wrapper_hook.write_wrapper_hook_bazelrc import write_wrapper_hook_bazelrc
 from buildscripts.setup_clang_tidy import PLUGIN_CANDIDATES, materialize_clang_tidy_ide_files
 
@@ -993,6 +994,7 @@ def _generate_compiledb_via_aspect(
                 )
             )
 
+        output_json = wrap_windows_compile_commands(output_json, repo_root_resolved)
         output_json.sort(key=compile_command_sort_key)
         write_compile_commands(output_json, REPO_ROOT / "compile_commands.json")
         if setup_clang_tidy and extra_build_targets:

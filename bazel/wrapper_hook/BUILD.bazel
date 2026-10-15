@@ -34,6 +34,7 @@ py_library(
         "check_resources.py",
         "compiledb.py",
         "compiledb_postprocess.py",
+        "compiledb_windows.py",
         "engflow_check.py",
         "generate_common_bes_bazelrc.py",
         "git_age_check.py",
@@ -348,6 +349,17 @@ py_test(
     deps = [
         ":wrapper_hook",
     ],
+)
+
+py_test(
+    name = "compiledb_windows_test",
+    srcs = ["compiledb_windows_test.py"],
+    deps = [":compiledb_windows"],
+)
+
+py_library(
+    name = "compiledb_windows",
+    srcs = ["compiledb_windows.py"],
 )
 
 py_test(

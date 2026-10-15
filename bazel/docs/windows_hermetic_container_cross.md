@@ -44,6 +44,36 @@ $env:MONGO_BAZEL_USE_HERMETIC_CONTAINER="0"
 `bazel test` is not auto-routed through Windows cross mode. For non-test `bazel run` targets, build
 the target and run the downloaded `.exe` from PowerShell.
 
+## Replaying compilation database commands
+
+When the Windows cross build publishes a persistent-container runner configuration,
+`bazel build --config=windows-cross-x86_64 compiledb` records commands that invoke
+`bazel/wrapper_hook/compiledb_windows.py` using the build's host Python interpreter. Run an entry's
+`arguments` from its recorded `directory`, quoting each argument for your shell. The wrapper
+supplies the cross-toolchain environment, translates host paths, and uses the build's container
+runner to start the compiler. Docker and the generated toolchain inputs must still be available on
+that host.
+
+Outputs are recorded under the container's writable shared install directory, in `compiledb_out`, so
+replay does not overwrite Bazel action outputs or write through the container's read-only
+source/output-base mounts. Long commands refer to a generated response file under the same shared
+directory. Keep these response files alongside the database; regenerate the database after removing
+its output base.
+
+The wrapper creates a replay copy of the case-insensitive header overlay with absolute container
+paths, so aliases remain valid from the database's recorded directory. The original build overlay is
+unchanged.
+
+The validator invokes the recorded wrapper from the recorded directory with `--validate`. The
+wrapper selects a separate validation output directory on its configured writable shared mount. An
+explicit `VALIDATE_COMPILE_COMMANDS_OUT_DIR` uses the wrapper's `--output-dir DIRECTORY` override;
+that directory must also be writable inside the container. The validator does not supply the
+container environment or translate the compiler command.
+
+This replay mode requires the Windows persistent-container runner integration. A cross database
+generation fails with a setup error if its runner or configuration is absent, rather than emitting
+commands that depend on validator-only setup.
+
 ## Required Toolchain Inputs
 
 The cross toolchain is hermetic: Bazel actions must see the same declared Linux LLVM, Windows SDK,

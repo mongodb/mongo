@@ -1,6 +1,7 @@
 import errno
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -212,6 +213,76 @@ class ValidateCompileCommandsTest(unittest.TestCase):
         mock_run.assert_called_once_with(
             ["bazel", "build", "compiledb", "install-wiredtiger"], check=True
         )
+
+    def test_spawn_replay_runs_recorded_command_without_container_adaptation(self):
+        args = [
+            "C:/python/python.exe",
+            "C:/repo/bazel/wrapper_hook/compiledb_windows.py",
+            "C:/output/config.json",
+            "C:/output/external/toolchain/clang-cl.cmd",
+            "/IC:/SDK/include",
+            "@C:/output/compile.rsp",
+        ]
+        environment = {"PATH": "host-path"}
+        completed = subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+        with mock.patch.object(validator.subprocess, "run", return_value=completed) as run:
+            validator._spawn_replay_compile(args, "C:/repo", environment)
+        run.assert_called_once_with(
+            args, cwd="C:/repo", env=environment, capture_output=True, text=True
+        )
+
+    def test_compiler_diagnostics_drops_show_includes_notes(self):
+        output = (
+            "Note: including file: src/mongo/a.h\n"
+            "src/mongo/a.cpp(3,5): error: unknown type name 'foo'\n"
+            "Note: including file:  src/mongo/b.h\n"
+            "1 error generated.\n"
+        )
+        self.assertEqual(
+            validator._compiler_diagnostics(output),
+            "src/mongo/a.cpp(3,5): error: unknown type name 'foo'\n1 error generated.",
+        )
+        self.assertEqual(validator._compiler_diagnostics("x" * 20, limit=5), "xxxxx")
+
+    def test_wrapped_validation_delegates_output_selection_to_the_wrapper(self):
+        with tempfile.TemporaryDirectory() as workspace:
+            args = [
+                "python.exe",
+                os.path.join(workspace, "compiledb_windows.py"),
+                "config.json",
+                "clang-cl.cmd",
+                "/c",
+                "foo.cpp",
+            ]
+            entry = {"arguments": args, "directory": workspace, "file": "src/mongo/foo.cpp"}
+            completed = subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+            with (
+                mock.patch.dict(
+                    os.environ,
+                    {"BUILD_WORKSPACE_DIRECTORY": workspace, "VALIDATE_COMPILE_COMMANDS_JOBS": "1"},
+                    clear=True,
+                ),
+                mock.patch.object(validator.os, "chdir"),
+                mock.patch.object(validator, "_ensure_compiledb_exists"),
+                mock.patch.object(validator, "_validate_clang_tidy_setup"),
+                mock.patch.object(
+                    validator, "_parse_args", return_value=mock.Mock(run_all=False, sample_size=1)
+                ),
+                mock.patch.object(
+                    validator, "_select_entries_for_test_compile", return_value=(1000, [entry])
+                ),
+                mock.patch.object(validator, "_validation_output_dir") as output_dir,
+                mock.patch.object(validator, "_maybe_add_windows_toolchain_env") as native_env,
+                mock.patch.object(validator, "_ensure_parent_dirs_exist_for_outputs"),
+                mock.patch.object(
+                    validator, "_spawn_replay_compile", return_value=completed
+                ) as spawn,
+            ):
+                self.assertEqual(validator.main(), 0)
+            output_dir.assert_not_called()
+            native_env.assert_not_called()
+            self.assertEqual(spawn.call_args.args[0], [*args[:2], "--validate", *args[2:]])
+            self.assertEqual(spawn.call_args.args[1], workspace)
 
 
 if __name__ == "__main__":

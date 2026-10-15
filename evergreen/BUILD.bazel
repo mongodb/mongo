@@ -9,6 +9,7 @@ py_binary(
     name = "validate_compile_commands",
     srcs = ["validate_compile_commands.py"],
     main = "validate_compile_commands.py",
+    deps = ["//bazel/wrapper_hook:compiledb_windows"],
 )
 
 py_test(
@@ -17,6 +18,7 @@ py_test(
         "validate_compile_commands.py",
         "validate_compile_commands_test.py",
     ],
+    deps = ["//bazel/wrapper_hook:compiledb_windows"],
 )
 
 py_test(
