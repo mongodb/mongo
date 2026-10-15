@@ -65,6 +65,8 @@ last-patch:
       ticket: SERVER-130498
     - test_file: jstests/fle2/implicit_ecoc_creation.js
       ticket: SERVER-126384
+    - test_file: jstests/noPassthrough/index_builds/index_build_stepup_abandoned_before_writable.js
+      ticket: SERVER-136502
     - test_file: jstests/noPassthrough/network/min_wait_streaming_hello_mongos.js
       ticket: SERVER-132650
     - test_file: jstests/replsets/clean_shutdown_log.js
@@ -190,6 +192,8 @@ last-continuous:
       ticket: SERVER-126384
     - test_file: jstests/noPassthrough/ddl/clear_jumbo.js
       ticket: SERVER-125661
+    - test_file: jstests/noPassthrough/index_builds/index_build_stepup_abandoned_before_writable.js
+      ticket: SERVER-136502
     - test_file: jstests/noPassthrough/network/min_wait_streaming_hello_mongos.js
       ticket: SERVER-132650
     - test_file: jstests/noPassthrough/query/runtime_constants_user_roles_auth_bypass.js
@@ -697,6 +701,8 @@ last-lts:
       ticket: SERVER-92476
     - test_file: jstests/noPassthrough/ftdc/ftdc_connection_reuse.js
       ticket: SERVER-102477
+    - test_file: jstests/noPassthrough/index_builds/index_build_stepup_abandoned_before_writable.js
+      ticket: SERVER-136502
     - test_file: jstests/noPassthrough/move_collection_not_tracked.js
       ticket: SERVER-93149
     - test_file: jstests/noPassthrough/move_primary_failpoint.js
