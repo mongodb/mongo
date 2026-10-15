@@ -11,10 +11,10 @@ filters:
       - 10gen/server-networking-and-observability
   - "MongoTraceCheck.*":
     approvers:
-      - 10gen/server-networking-and-observability
+      - 10gen/query-integration-observability
   - "MongoUnstructuredLogCheck.*":
     approvers:
-      - 10gen/server-networking-and-observability
+      - 10gen/query-integration-observability
   - "MongoBannedCatalogAccessFromQueryCodeCheck.*":
     approvers:
       - 10gen/server-catalog-and-routing

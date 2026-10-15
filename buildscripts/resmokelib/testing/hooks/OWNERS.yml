@@ -32,7 +32,7 @@ filters:
       - 10gen/server-recovery
   - "metrics_filtering_background.py":
     approvers:
-      - 10gen/server-networking-and-observability
+      - 10gen/query-integration-observability
   - "maintenance.py":
     approvers:
       - 10gen/server-jstest-infra

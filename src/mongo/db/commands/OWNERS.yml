@@ -140,7 +140,7 @@ filters:
       - 10gen/server-networking-and-observability
   - "parse_log_component_settings*":
     approvers:
-      - 10gen/server-networking-and-observability
+      - 10gen/query-integration-observability
   - "traffic_recording_cmds.cpp":
     approvers:
       - 10gen/query-optimization
@@ -152,7 +152,7 @@ filters:
       - 10gen/server-networking-and-observability
   - "xray_commands.*":
     approvers:
-      - 10gen/server-networking-and-observability
+      - 10gen/query-integration-observability
   - "test_api_version_2_commands.cpp":
     approvers:
       - 10gen/server-replication-reviewers
@@ -170,7 +170,7 @@ filters:
       - 10gen/server-networking-and-observability
   - "get_metrics_filtering_allowlist*":
     approvers:
-      - 10gen/server-networking-and-observability
+      - 10gen/query-integration-observability
   - "update_metrics_filtering_allowlist*":
     approvers:
-      - 10gen/server-networking-and-observability
+      - 10gen/query-integration-observability

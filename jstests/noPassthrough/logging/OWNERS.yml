@@ -2,10 +2,4 @@ version: 1.0.0
 filters:
   - "*":
     approvers:
-      - 10gen/server-networking-and-observability
-  - "log_collectionType*.js":
-    approvers:
-      - 10gen/query-integration-observability
-  - "log_write_command_fields.js":
-    approvers:
       - 10gen/query-integration-observability

@@ -44,7 +44,7 @@ filters:
       - 10gen/server-workload-resilience
   - "log_and_backoff*":
     approvers:
-      - 10gen/server-networking-and-observability
+      - 10gen/query-integration-observability
   - "read_through_cache*":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
@@ -53,7 +53,4 @@ filters:
       - 10gen/devprod-build
   - "moving_average*":
     approvers:
-      - 10gen/server-networking-and-observability
-  - "observable_mutex*":
-    approvers:
-      - 10gen/server-networking-and-observability
+      - 10gen/query-integration-observability

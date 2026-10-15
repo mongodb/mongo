@@ -107,7 +107,7 @@ filters:
       - 10gen/server-programmability
   - "operation_cpu_timer*":
     approvers:
-      - 10gen/server-networking-and-observability
+      - 10gen/query-integration-observability
   - "operation_id*":
     approvers:
       - 10gen/server-networking-and-observability
@@ -411,10 +411,10 @@ filters:
       - 10gen/query-execution
   - "metrics_filtering_util*":
     approvers:
-      - 10gen/server-networking-and-observability
+      - 10gen/query-integration-observability
   - "metrics_policy_manager*":
     approvers:
-      - 10gen/server-networking-and-observability
+      - 10gen/query-integration-observability
   - "metrics_category.idl":
     approvers:
-      - 10gen/server-networking-and-observability
+      - 10gen/query-integration-observability

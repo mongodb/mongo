@@ -3,4 +3,4 @@ filters:
   - "*":
     approvers:
       - markbenvenuto
-      - 10gen/server-networking-and-observability
+      - 10gen/query-integration-observability
