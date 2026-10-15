@@ -1061,7 +1061,7 @@ connection_runtime_config = [
         'checkpoint_evict_page',
         'checkpoint_handle', 'checkpoint_slow', 'checkpoint_stop', 'commit_transaction_slow',
         'compact_slow', 'conn_close_stress_log_printf', 'disagg_role_transition',
-        'evict_reposition',
+        'drop_deferred_hold', 'evict_reposition',
         'failpoint_disagg_checkpoint_apply',
         'disagg_stable_dhandle_delay',
         'failpoint_disagg_checkpoint_queue_drain', 'failpoint_eviction_split',
@@ -1836,10 +1836,10 @@ methods = {
             'this_id' configuration in an earlier backup. A source id is required to begin an
             incremental backup'''),
         Config('this_id', '', r'''
-            a string that identifies the current system state  as a future backup source for
-            an incremental backup via \c src_id. This identifier is required when opening an
-            incremental backup cursor and an error will be returned if one is not provided.
-            The identifiers can be any text string, but should be unique'''),
+            a string that identifies the current system state as a future backup source for
+            an incremental backup via \c src_id. Supplying it starts tracking a new source;
+            omitting it reads the changes since \c src_id without starting a new source. The
+            identifiers can be any text string, but should be unique'''),
         ]),
     Config('next_random', 'false', r'''
         configure the cursor to return a pseudo-random record from the object when the

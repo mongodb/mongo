@@ -97,7 +97,7 @@ class test_truncate35(wttest.WiredTigerTestCase):
         # A pure metadata rewrite: it does not touch the leaf or the history store.
         self.session.alter(self.uri, 'write_timestamp_usage=never')
 
-        fast_before = self.get_stat(stat.conn.rec_page_delete_fast)
+        fast_before = self.get_stat(stat.conn.cursor_truncate_fast_delete_pages)
         hs_clear_before = self.get_stat(stat.conn.cache_hs_key_truncate)
 
         # Ordinary usage for a table now configured "never": no timestamp at all, and no
@@ -109,7 +109,7 @@ class test_truncate35(wttest.WiredTigerTestCase):
         start.close()
         self.session.commit_transaction()
 
-        self.assertGreater(self.get_stat(stat.conn.rec_page_delete_fast), fast_before,
+        self.assertGreater(self.get_stat(stat.conn.cursor_truncate_fast_delete_pages), fast_before,
             'truncate did not take the fast path')
         self.assertEqual(self.get_stat(stat.conn.cache_hs_key_truncate), hs_clear_before,
             'a per-key history store clear ran; the fast path was not actually exercised')

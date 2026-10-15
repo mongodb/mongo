@@ -482,14 +482,14 @@ __wt_txn_snapshot_save(WT_SESSION_IMPL *session)
 
     txn = session->txn;
 
-    WT_RET(__wt_calloc_def(session, sizeof(WT_TXN_SNAPSHOT), &txn->backup_snapshot_data));
+    WT_RET(__wt_calloc_one(session, &txn->backup_snapshot_data));
 
     txn->backup_snapshot_data->snap_max = txn->snapshot_data.snap_max;
     txn->backup_snapshot_data->snap_min = txn->snapshot_data.snap_min;
     txn->backup_snapshot_data->snapshot_count = txn->snapshot_data.snapshot_count;
 
-    WT_ERR(__wt_calloc_def(session, sizeof(uint64_t) * S2C(session)->session_array.size,
-      &txn->backup_snapshot_data->snapshot));
+    WT_ERR(__wt_calloc_def(
+      session, S2C(session)->session_array.size, &txn->backup_snapshot_data->snapshot));
 
     /* Swap the snapshot pointers. */
     __txn_swap_snapshot(&txn->snapshot_data.snapshot, &txn->backup_snapshot_data->snapshot);

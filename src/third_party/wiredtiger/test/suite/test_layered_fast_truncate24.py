@@ -102,9 +102,9 @@ class test_layered_fast_truncate24(LayeredFastTruncateConfigMixin, wttest.WiredT
         self.populate()
         self.evict_leaves()
 
-        fast_before = self.get_stat(stat.conn.rec_page_delete_fast)
+        fast_before = self.get_stat(stat.conn.cursor_truncate_fast_delete_pages)
         self.truncate_on(self.session, 100, 900, 20)
-        self.assertGreater(self.get_stat(stat.conn.rec_page_delete_fast), fast_before)
+        self.assertGreater(self.get_stat(stat.conn.cursor_truncate_fast_delete_pages), fast_before)
         expected = list(range(1, 100)) + list(range(901, self.nrows + 1))
         self.assertEqual(self.scan_keys(self.session, 25), expected)
 
@@ -121,7 +121,7 @@ class test_layered_fast_truncate24(LayeredFastTruncateConfigMixin, wttest.WiredT
         self.evict_leaves()
 
         self.truncate_on(self.session, 1, 800, 20)
-        self.assertGreater(self.get_stat(stat.conn.rec_page_delete_fast), 0)
+        self.assertGreater(self.get_stat(stat.conn.cursor_truncate_fast_delete_pages), 0)
         self.assertEqual(self.scan_keys(self.session, 25), list(range(801, self.nrows + 1)))
         self.leader_checkpoint(20)
 
@@ -138,12 +138,14 @@ class test_layered_fast_truncate24(LayeredFastTruncateConfigMixin, wttest.WiredT
                 'follower did not skip a deleted in-memory stable subtree')
 
             disk_before, inmem_before = self.skip_stats(conn_follow)
-            fast_before = self.get_stat(stat.conn.rec_page_delete_fast, conn=conn_follow)
+            fast_before = self.get_stat(
+                stat.conn.cursor_truncate_fast_delete_pages, conn=conn_follow)
 
             self.truncate_on(session_follow, 1, 950, 30)
 
             disk_after, inmem_after = self.skip_stats(conn_follow)
-            fast_after = self.get_stat(stat.conn.rec_page_delete_fast, conn=conn_follow)
+            fast_after = self.get_stat(
+                stat.conn.cursor_truncate_fast_delete_pages, conn=conn_follow)
             self.assertGreater(
                 disk_after + inmem_after, disk_before + inmem_before,
                 'follower boundary positioning did not skip a deleted stable subtree')

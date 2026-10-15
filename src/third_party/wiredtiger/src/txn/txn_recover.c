@@ -957,6 +957,7 @@ __metadata_clean_incomplete_table(WT_RECOVERY *r, const char *uri, const char *c
     WT_WITH_SCHEMA_LOCK(r->session,
       WT_WITH_TABLE_WRITE_LOCK(
         r->session, ret = __wt_schema_drop(r->session, uri, drop_cfg, false)));
+    __wt_drop_pending_apply(r->session);
     WT_ERR(ret);
 
 err:

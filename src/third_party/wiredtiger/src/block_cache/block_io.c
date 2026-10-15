@@ -34,6 +34,12 @@ __blkcache_read_corrupt(WT_SESSION_IMPL *session, int error, const uint8_t *addr
     WT_ASSERT(session, ret != 0);
 
     F_SET_ATOMIC_32(S2C(session), WT_CONN_DATA_CORRUPTION);
+
+    /*
+     * Read the btree's verify flag, not the block handle's: this read layer serves both the file
+     * and disaggregated block managers, whose handles store a verify flag at different offsets past
+     * the prefix they share.
+     */
     if (!F_ISSET(btree, WT_BTREE_VERIFY) && !WT_SESSION_READ_CORRUPT_OK(session)) {
         WT_TRET(bm->corrupt(bm, session, addr, addr_size));
         WT_RET_PANIC(session, ret, "%s: fatal read error: %s", btree->dhandle->name, fail_msg);
@@ -341,7 +347,10 @@ __wt_blkcache_read(WT_SESSION_IMPL *session, WT_ITEM *buf, WT_PAGE_BLOCK_META *b
     }
 
 verify:
-    /* If the handle is a verify handle, verify the physical page. */
+    /*
+     * Verify the physical page when reading through a verify handle. As in the corruption check
+     * above, use the btree's verify flag: this layer serves both block handle types.
+     */
     if (F_ISSET(btree, WT_BTREE_VERIFY)) {
         if (tmp == NULL)
             WT_ERR(__wt_scr_alloc(session, 4 * 1024, &tmp));

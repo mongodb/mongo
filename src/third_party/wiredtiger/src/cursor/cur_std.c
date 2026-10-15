@@ -1488,6 +1488,26 @@ __wt_cursor_dup_position(WT_CURSOR *to_dup, WT_CURSOR *cursor)
 }
 
 /*
+ * __wt_cursor_lookup_str --
+ *     Search a cursor with string keys and values for a key, and return the value, or NULL if the
+ *     cursor has no such key. The value is valid until the cursor moves.
+ */
+int
+__wt_cursor_lookup_str(WT_CURSOR *cursor, const char *key, const char **valuep)
+{
+    WT_DECL_RET;
+
+    *valuep = NULL;
+
+    cursor->set_key(cursor, key);
+    WT_RET_NOTFOUND_OK(ret = cursor->search(cursor));
+    if (ret == WT_NOTFOUND)
+        return (0);
+
+    return (cursor->get_value(cursor, valuep));
+}
+
+/*
  * __wt_cursor_init --
  *     Default cursor initialization.
  */

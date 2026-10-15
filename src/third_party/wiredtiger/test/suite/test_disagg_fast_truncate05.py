@@ -99,7 +99,7 @@ class test_disagg_fast_truncate05(wttest.WiredTigerTestCase):
             start.set_key(self.trunc_start)
             stop.set_key(self.trunc_stop)
             self.session.truncate(None, start, stop, None)
-        self.assertGreater(self.read_stat(stat.dsrc.rec_page_delete_fast), 0)
+        self.assertGreater(self.read_stat(stat.dsrc.cursor_truncate_fast_delete_pages), 0)
 
         surviving = self.nrows - (self.trunc_stop - self.trunc_start + 1)
         self.assertEqual(len(self.scan(25)), surviving)

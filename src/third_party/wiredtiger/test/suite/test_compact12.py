@@ -51,7 +51,7 @@ class test_compact12(compact_util, test_cc_base):
     value_size = kilobyte # The value should be small enough so that we don't create overflow pages.
 
     def get_fast_truncated_pages(self):
-        return self.get_stat(stat.conn.rec_page_delete_fast)
+        return self.get_stat(stat.conn.cursor_truncate_fast_delete_pages)
 
     def populate(self, uri, num_keys):
         c = self.session.open_cursor(uri, None)

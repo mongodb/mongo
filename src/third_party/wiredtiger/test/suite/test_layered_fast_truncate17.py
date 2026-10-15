@@ -84,9 +84,9 @@ class test_layered_fast_truncate17(LayeredFastTruncateConfigMixin, wttest.WiredT
         self.session_follow.rollback_transaction()
 
     def assert_fast_truncate_fired(self, msg):
-        before = self.get_stat(stat.conn.rec_page_delete_fast, conn=self.conn_follow)
+        before = self.get_stat(stat.conn.cursor_truncate_fast_delete_pages, conn=self.conn_follow)
         self.step_up()
-        after = self.get_stat(stat.conn.rec_page_delete_fast, conn=self.conn_follow)
+        after = self.get_stat(stat.conn.cursor_truncate_fast_delete_pages, conn=self.conn_follow)
         self.assertGreater(after, before, msg)
 
     def assert_replayed_subtree_not_skipped(self, ts):

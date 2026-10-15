@@ -46,7 +46,7 @@ class test_checkpoint34(wttest.WiredTigerTestCase):
     scenarios = make_scenarios(format_values)
 
     def get_fast_truncated_pages(self):
-        return self.get_stat(stat.conn.rec_page_delete_fast)
+        return self.get_stat(stat.conn.cursor_truncate_fast_delete_pages)
 
     def test_checkpoint(self):
         uri = 'table:checkpoint34'

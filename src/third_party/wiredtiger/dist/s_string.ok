@@ -2131,6 +2131,7 @@ wrlock
 wrlsn
 wtch
 wtdataset
+wtdrop
 wthooks
 wthread
 wti

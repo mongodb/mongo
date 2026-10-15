@@ -25,6 +25,7 @@ typedef struct __wt_meta_track {
         WT_ST_SET          /* Reset a metadata entry */
     } op;
     char *a, *b;             /* Strings */
+    WT_DROP_PENDING *dp;     /* Removal queued at commit */
     WT_DATA_HANDLE *dhandle; /* Locked handle */
     uint32_t btree_id;       /* Btree whose history store content is dropped */
     bool created;            /* Handle on newly created file */
@@ -74,6 +75,8 @@ __meta_track_clear(WT_SESSION_IMPL *session, WT_META_TRACK *trk)
 {
     __wt_free(session, trk->a);
     __wt_free(session, trk->b);
+    if (trk->dp != NULL)
+        __wt_drop_pending_free(session, trk->dp);
     memset(trk, 0, sizeof(WT_META_TRACK));
 }
 
@@ -127,6 +130,36 @@ __wt_meta_track_on(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __meta_track_drop_apply --
+ *     Commit a file drop: rename the file to its target and leave the removal to the session, or
+ *     remove it in place.
+ */
+static int
+__meta_track_drop_apply(WT_SESSION_IMPL *session, WT_META_TRACK *trk)
+{
+    WT_DECL_RET;
+    WT_DROP_PENDING *dp;
+
+    /*
+     * The metadata is already committed and an apply failure panics the connection, so the entry
+     * was allocated while the drop could still be unrolled.
+     */
+    if ((dp = trk->dp) != NULL) {
+        trk->dp = NULL;
+        if (__wt_fs_rename(session, trk->a, dp->name, false) == 0) {
+            TAILQ_INSERT_TAIL(&session->drop_pending, dp, q);
+            WT_STAT_CONN_INCR(session, session_table_drop_deferred);
+            return (0);
+        }
+        __wt_drop_pending_free(session, dp);
+    }
+
+    if ((ret = __wt_block_manager_drop(session, trk->a, false)) != 0)
+        __wt_err(session, ret, "metadata remove dropped file %s", trk->a);
+    return (ret);
+}
+
+/*
  * __meta_track_apply --
  *     Apply the changes in a metadata tracking record.
  */
@@ -146,8 +179,7 @@ __meta_track_apply(WT_SESSION_IMPL *session, WT_META_TRACK *trk)
         WT_WITH_DHANDLE(session, trk->dhandle, ret = bm->checkpoint_resolve(bm, session, false));
         break;
     case WT_ST_DROP_COMMIT:
-        if ((ret = __wt_block_manager_drop(session, trk->a, false)) != 0)
-            __wt_err(session, ret, "metadata remove dropped file %s", trk->a);
+        ret = __meta_track_drop_apply(session, trk);
         break;
     case WT_ST_HS_TRUNCATE:
         /* The truncate opens its own cursors, so save our caller's handle. */
@@ -504,6 +536,49 @@ __wt_meta_track_drop(WT_SESSION_IMPL *session, const char *filename)
 err:
     __meta_track_err(session);
     return (ret);
+}
+
+/*
+ * __wt_meta_track_drop_defer --
+ *     Schedule the drop just tracked to rename its file at commit instead of removing it, and
+ *     allocate the entry that removes it once the drop's locks are released. The target must not
+ *     exist: replacing a file frees its extents inside the rename.
+ */
+void
+__wt_meta_track_drop_defer(WT_SESSION_IMPL *session, uint32_t id)
+{
+    WT_DECL_RET;
+    WT_DROP_PENDING *dp;
+    WT_META_TRACK *trk;
+    size_t len;
+    int suffix;
+    bool exist;
+
+    trk = (WT_META_TRACK *)session->meta_track_next - 1;
+    WT_ASSERT(session, trk->op == WT_ST_DROP_COMMIT && trk->dp == NULL);
+
+    if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY | WT_CONN_LIVE_RESTORE_FS))
+        return;
+    WT_ERR(__wt_fs_exist(session, trk->a, &exist));
+    if (!exist)
+        return;
+
+    WT_ERR(__wt_calloc_one(session, &dp));
+    trk->dp = dp;
+    len = strlen(trk->a) + strlen(".4294967295.wtdrop.2147483647") + 1;
+    WT_ERR(__wt_malloc(session, len, &dp->name));
+    WT_ERR(__wt_snprintf(dp->name, len, "%s.%" PRIu32 ".wtdrop", trk->a, id));
+    for (suffix = 1; (ret = __wt_fs_exist(session, dp->name, &exist)) == 0 && exist; ++suffix)
+        WT_ERR(__wt_snprintf(dp->name, len, "%s.%" PRIu32 ".wtdrop.%d", trk->a, id, suffix));
+    WT_ERR(ret);
+    return;
+
+err:
+    if (trk->dp != NULL)
+        __wt_drop_pending_free(session, trk->dp);
+    trk->dp = NULL;
+    __wt_verbose_notice(session, WT_VERB_FILEOPS, "%s: could not defer file removal: %s", trk->a,
+      __wt_strerror(session, ret, NULL, 0));
 }
 
 /*

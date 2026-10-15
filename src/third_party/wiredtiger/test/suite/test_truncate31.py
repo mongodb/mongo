@@ -239,7 +239,7 @@ class test_truncate31(wttest.WiredTigerTestCase):
         # We should have fast-deleted at least one page on the way to the stall,
         # and the rollback should be reflected in the tracking statistic.
         stat_cursor = self.session.open_cursor('statistics:', None, None)
-        fastdelete_pages = stat_cursor[stat.conn.rec_page_delete_fast][2]
+        fastdelete_pages = stat_cursor[stat.conn.cursor_truncate_fast_delete_pages][2]
         truncate_rollbacks = \
             stat_cursor[stat.conn.txn_truncate_dirty_cache_rollback][2]
         stat_cursor.close()

@@ -33,6 +33,7 @@
 import glob, json, os, subprocess
 import wiredtiger, wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages, DisaggSchemaEpochMixin
+from run import wt_builddir
 from wtscenario import make_scenarios
 
 @disagg_test_class
@@ -79,7 +80,7 @@ class test_layered_schema32(wttest.WiredTigerTestCase, DisaggSchemaEpochMixin):
 
     def pages_by_table(self):
         """Return {page log table id: page count} straight from the page log."""
-        sqlite_exe = os.path.join(os.environ.get('WT_BUILDDIR', '.'), 'sqlite3')
+        sqlite_exe = os.path.join(wt_builddir, 'sqlite3')
         counts = {}
         home = os.path.abspath(self.home)
         for db in sorted(glob.glob(os.path.join(home, 'kv_home', 'pages_*.db'))):

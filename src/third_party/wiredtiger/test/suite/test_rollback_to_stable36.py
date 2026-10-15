@@ -155,7 +155,7 @@ class test_rollback_to_stable36(wttest.WiredTigerTestCase):
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(20))
 
         # Make sure we did at least one fast-delete. (Unless we specifically didn't want to)
-        fastdelete_pages = self.get_stat(stat.conn.rec_page_delete_fast)
+        fastdelete_pages = self.get_stat(stat.conn.cursor_truncate_fast_delete_pages)
         if self.trunc_with_remove:
             self.assertEqual(fastdelete_pages, 0)
         else:

@@ -175,7 +175,7 @@ class test_disagg_fast_truncate03(test_cc_base):
     def snapshot_stats(self):
         """Snapshot the counters that witness each step of the scenario."""
         return {
-            "fast_deleted": self.read_stat(stat.dsrc.rec_page_delete_fast),
+            "fast_deleted": self.read_stat(stat.dsrc.cursor_truncate_fast_delete_pages),
             "real_deleted": self.read_stat(stat.dsrc.rec_page_delete),
             "evict_blocked": self.read_stat(
                 stat.dsrc.cache_eviction_blocked_disagg_dirty_internal_page

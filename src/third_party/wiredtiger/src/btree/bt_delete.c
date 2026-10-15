@@ -81,6 +81,22 @@
  */
 
 /*
+ * __delete_page_fallback_stat --
+ *     Count a leaf page that range truncate could not fast-delete.
+ */
+static WT_INLINE void
+__delete_page_fallback_stat(WT_SESSION_IMPL *session, WT_REF *ref, bool in_memory)
+{
+    /* Internal pages are never fast-deleted: the walk descends into them instead. */
+    if (F_ISSET(ref, WT_REF_FLAG_INTERNAL))
+        return;
+
+    WT_STAT_CONN_DSRC_INCR(session, cursor_truncate_fast_delete_fallback_pages);
+    if (in_memory)
+        WT_STAT_CONN_DSRC_INCR(session, cursor_truncate_fast_delete_fallback_in_memory);
+}
+
+/*
  * __wti_delete_page --
  *     If deleting a range, try to delete the page without instantiating it.
  */
@@ -103,6 +119,7 @@ __wti_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
       WT_REF_CAS_STATE(session, ref, previous_state, WT_REF_LOCKED)) {
         if (__wt_page_is_modified(ref->page)) {
             WT_REF_SET_STATE(ref, previous_state);
+            __delete_page_fallback_stat(session, ref, true);
             return (0);
         }
 
@@ -122,11 +139,15 @@ __wti_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
      * Fast check to see if it's worth locking, then atomically switch the page's state to lock it.
      */
     previous_state = WT_REF_GET_STATE(ref);
-    if (previous_state != WT_REF_DISK)
+    if (previous_state != WT_REF_DISK) {
+        __delete_page_fallback_stat(session, ref, true);
         return (0);
+    }
 
-    if (!WT_REF_CAS_STATE(session, ref, WT_REF_DISK, WT_REF_LOCKED))
+    if (!WT_REF_CAS_STATE(session, ref, WT_REF_DISK, WT_REF_LOCKED)) {
+        __delete_page_fallback_stat(session, ref, true);
         return (0);
+    }
 
     /*
      * There should be no previous page-delete information: if the page was previously deleted and
@@ -164,7 +185,7 @@ __wti_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
      * them.
      */
     if (!WT_IS_HS(session->dhandle) && WT_TIME_AGGREGATE_HAS_STOP(&addr.ta)) {
-        WT_STAT_CONN_DSRC_INCR(session, rec_page_delete_fast_skip_deleted);
+        WT_STAT_CONN_DSRC_INCR(session, cursor_truncate_fast_delete_pages_skipped_already_deleted);
         goto err;
     }
 
@@ -224,7 +245,7 @@ __wti_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
     }
 
     *skipp = true;
-    WT_STAT_CONN_DSRC_INCR(session, rec_page_delete_fast);
+    WT_STAT_CONN_DSRC_INCR(session, cursor_truncate_fast_delete_pages);
 
     if (WT_DELTA_INT_ENABLED(btree, S2C(session)))
         __wt_atomic_store_uint8_v_release(&ref->dirty_state, WT_REF_DIRTY);
@@ -237,11 +258,18 @@ __wti_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
      * it and let the transaction's cache-pressure check roll the truncate back if it has pinned too
      * much; the delete just performed unwinds normally on rollback.
      *
-     * Skipped for the history store, whose truncation is non-transactional: there would be no
-     * transaction to bound, and none to resolve and give back the bytes counted below.
+     * The transaction accounting is skipped for the history store, whose truncation is
+     * non-transactional: there would be no transaction to bound, and none to resolve and give back
+     * the bytes counted below.
      */
-    if (parent_was_clean && !WT_IS_HS(session->dhandle)) {
+    if (parent_was_clean) {
         footprint = __wt_atomic_load_size_relaxed(&parent->memory_footprint);
+        WT_STAT_CONN_DSRC_INCR(session, cursor_truncate_internal_pages_dirtied);
+        WT_STAT_CONN_DSRC_INCRV(
+          session, cursor_truncate_internal_bytes_dirtied, (int64_t)footprint);
+        if (WT_IS_HS(session->dhandle))
+            return (0);
+
         session->txn->truncate_dirty_bytes += footprint;
 
         /*
@@ -266,6 +294,8 @@ __wti_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
     return (ret);
 
 err:
+    if (ret == 0)
+        __delete_page_fallback_stat(session, ref, false);
     __wt_free(session, ref->page_del);
 
     /* Return the page to its previous state. */

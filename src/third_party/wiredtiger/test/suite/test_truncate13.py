@@ -204,7 +204,7 @@ class test_truncate13(wttest.WiredTigerTestCase):
         # Check stats to make sure we fast-deleted at least one page.
         # (Except if we are running with trunc_with_remove.)
         stat_cursor = self.session.open_cursor('statistics:', None, None)
-        fastdelete_pages = stat_cursor[stat.conn.rec_page_delete_fast][2]
+        fastdelete_pages = stat_cursor[stat.conn.cursor_truncate_fast_delete_pages][2]
         if self.trunc_with_remove:
             self.assertEqual(fastdelete_pages, 0)
         else:

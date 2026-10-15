@@ -8242,8 +8242,7 @@ buildvariants:
     - name: ".stress-test-asan"
     - name: ".stress-test-disagg"
       distros: amazon2023.3-arm64-large
-    # FIXME-WT-18739: Run legacy-switch once its checkpoint stall under ASan is fixed.
-    - name: ".stress-test-schema-disagg !schema-disagg-abort-legacy-switch-test-disagg-1"
+    - name: ".stress-test-schema-disagg"
       distros: amazon2023.3-arm64-large
     - name: ".unit_test"
     - name: ".unit_test_disagg"

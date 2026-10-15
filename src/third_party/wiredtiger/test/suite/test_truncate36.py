@@ -98,7 +98,7 @@ class test_truncate36(wttest.WiredTigerTestCase):
         else:
             self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(3))
         stat = self.session.open_cursor('statistics:' + self.uri)
-        self.assertGreater(stat[wiredtiger.stat.dsrc.rec_page_delete_fast][2], 0)
+        self.assertGreater(stat[wiredtiger.stat.dsrc.cursor_truncate_fast_delete_pages][2], 0)
         stat.close()
 
         # Persist the truncate before any truncated leaf is instantiated.

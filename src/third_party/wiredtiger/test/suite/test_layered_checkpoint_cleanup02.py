@@ -109,7 +109,7 @@ class test_layered_checkpoint_cleanup02(wttest.WiredTigerTestCase):
             start_cursor.set_key(trunc_start)
             stop_cursor.set_key(trunc_stop)
             self.session.truncate(None, start_cursor, stop_cursor, None)
-        fast_deleted = self.get_stat(stat.dsrc.rec_page_delete_fast, self.uri)
+        fast_deleted = self.get_stat(stat.dsrc.cursor_truncate_fast_delete_pages, self.uri)
         self.assertGreater(fast_deleted, 0, "truncate did not fast-delete any pages")
 
         removed_before = self.get_stat(stat.dsrc.checkpoint_cleanup_pages_removed, self.uri)

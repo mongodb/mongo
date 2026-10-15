@@ -89,7 +89,7 @@ class test_truncate34(wttest.WiredTigerTestCase):
         # Truncate the fully-deleted range.
         # Start at key 5 so this is a range truncate: a truncate spanning the whole
         # table takes a different, tree-level path that never visits the pages.
-        fast_before = self.get_stat(stat.conn.rec_page_delete_fast)
+        fast_before = self.get_stat(stat.conn.cursor_truncate_fast_delete_pages)
         self.session.begin_transaction()
         start = self.session.open_cursor(self.uri)
         start.set_key(5)
@@ -98,9 +98,9 @@ class test_truncate34(wttest.WiredTigerTestCase):
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(30))
 
         # The live leaves fast-delete; the fully-deleted leaves must be skipped.
-        self.assertGreater(self.get_stat(stat.conn.rec_page_delete_fast), fast_before,
+        self.assertGreater(self.get_stat(stat.conn.cursor_truncate_fast_delete_pages), fast_before,
                            'no live pages were fast-deleted; the walk did not run')
-        self.assertGreater(self.get_stat(stat.conn.rec_page_delete_fast_skip_deleted), 0,
+        self.assertGreater(self.get_stat(stat.conn.cursor_truncate_fast_delete_pages_skipped_already_deleted), 0,
                            'no fully-deleted pages were skipped; the case was not exercised')
 
         # Correctness across timestamps: values before the deletes, gone after.

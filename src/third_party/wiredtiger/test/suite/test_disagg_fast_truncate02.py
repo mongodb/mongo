@@ -115,14 +115,14 @@ class test_disagg_fast_truncate02(wttest.WiredTigerTestCase):
     def test_verify_undiscarded_fast_truncated_pages(self):
         self.populate()
 
-        fast_delete_before = self.get_stat(stat.dsrc.rec_page_delete_fast, self.uri)
+        fast_delete_before = self.get_stat(stat.dsrc.cursor_truncate_fast_delete_pages, self.uri)
 
         # With oldest pinned at 1 the truncate is committed but not globally visible, so the
         # checkpoint writes proxy cells for the truncated leaf pages and their blocks aren't
         # discarded yet in PALI.
         self.fast_truncate(self.trunc_start, self.trunc_stop, self.truncate_ts)
         self.assertStatGreaterSoon(
-            stat.dsrc.rec_page_delete_fast,
+            stat.dsrc.cursor_truncate_fast_delete_pages,
             fast_delete_before,
             self.uri,
             msg="fast truncate did not trigger",

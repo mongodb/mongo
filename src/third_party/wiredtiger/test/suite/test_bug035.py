@@ -77,7 +77,7 @@ class test_bug035(backup_base):
         stat_cursor = backup_session.open_cursor('statistics:', None, None)
 
         # Assert that fast truncate was performed.
-        fast_truncate_pages = stat_cursor[stat.conn.rec_page_delete_fast][2]
+        fast_truncate_pages = stat_cursor[stat.conn.cursor_truncate_fast_delete_pages][2]
         self.assertGreater(fast_truncate_pages, 0)
 
         # Reopen the connection with verify_metadata=true to ensure the excluded tables (`last_5_tables`)

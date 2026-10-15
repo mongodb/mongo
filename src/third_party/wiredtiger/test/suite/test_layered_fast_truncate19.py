@@ -121,7 +121,7 @@ class test_layered_fast_truncate19(wttest.WiredTigerTestCase):
         self.reopen_disagg_conn(self.conn_config())
 
         delta_int_before = self.get_stat(stat.dsrc.rec_page_delta_internal, uri=self.uri)
-        rd_fast_before   = self.get_stat(stat.conn.rec_page_delete_fast)
+        rd_fast_before   = self.get_stat(stat.conn.cursor_truncate_fast_delete_pages)
         read_del_before  = self.get_stat(stat.conn.cache_read_deleted)
 
         # Phase 2: update rows outside the truncation range -- internal page delta must fire.
@@ -148,7 +148,7 @@ class test_layered_fast_truncate19(wttest.WiredTigerTestCase):
         self.assertEqual(verify_cur.search(), wiredtiger.WT_NOTFOUND)
         verify_cur.close()
 
-        rd_fast_after   = self.get_stat(stat.conn.rec_page_delete_fast)
+        rd_fast_after   = self.get_stat(stat.conn.cursor_truncate_fast_delete_pages)
         read_del_after  = self.get_stat(stat.conn.cache_read_deleted)
         delta_int_after = self.get_stat(stat.dsrc.rec_page_delta_internal, uri=self.uri)
 

@@ -237,6 +237,7 @@ extern const char __WT_CONFIG_CHOICE_disagg_role_transition[];
 extern const char __WT_CONFIG_CHOICE_disagg_stable_dhandle_delay[];
 extern const char __WT_CONFIG_CHOICE_disaggregated_storage[];
 extern const char __WT_CONFIG_CHOICE_disk_validate[];
+extern const char __WT_CONFIG_CHOICE_drop_deferred_hold[];
 extern const char __WT_CONFIG_CHOICE_dsync[];
 extern const char __WT_CONFIG_CHOICE_during_key_rotation[];
 extern const char __WT_CONFIG_CHOICE_error[];

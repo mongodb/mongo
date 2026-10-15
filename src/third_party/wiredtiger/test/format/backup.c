@@ -337,12 +337,14 @@ restore_backup_info(WT_SESSION *session, ACTIVE_FILES *active)
      * file was not yet checkpointed. Sometimes it will, sometimes it won't. If we don't find it
      * then return non-zero so that we skip incremental restart testing.
      *
-     * NOTE: This call to open a backup cursor to check the source id uses a made up 'this_id' that
-     * tries to generate one that cannot possibly be in use. This call can/should be changed if the
-     * API ever allows us to open a cursor with a source id that does not require a this id.
+     * Open the cursor with only the source identifier: this cursor is only checked, never iterated,
+     * and a source identifier on its own is enough for that. Supplying a this_id would create a new
+     * identifier that a checkpoint then persists in the metadata, and because a derived id is not
+     * unique across reopens a later run would fail with "Incremental identifier already exists". A
+     * this_id is required only if this cursor is ever used to take a backup rather than checked, so
+     * that the run leaves a source for the next incremental backup.
      */
-    testutil_snprintf(
-      buf, sizeof(buf), "incremental=(enabled,src_id=%" PRIu64 ",this_id=%" PRIu64 ")", id, id / 2);
+    testutil_snprintf(buf, sizeof(buf), "incremental=(enabled,src_id=%" PRIu64 ")", id);
     while ((ret = session->open_cursor(session, "backup:", NULL, buf, &cursor)) == EBUSY)
         __wt_yield();
     if (ret != 0) {

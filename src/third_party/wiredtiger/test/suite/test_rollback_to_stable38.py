@@ -115,7 +115,7 @@ class test_rollback_to_stable38(wttest.WiredTigerTestCase):
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         hs_btree_truncate = stat_cursor[stat.conn.cache_hs_btree_truncate][2]
-        fastdelete_pages = stat_cursor[stat.conn.rec_page_delete_fast][2]
+        fastdelete_pages = stat_cursor[stat.conn.cursor_truncate_fast_delete_pages][2]
         self.assertGreater(hs_btree_truncate, 0)
         self.assertGreater(fastdelete_pages, 0)
         stat_cursor.close()

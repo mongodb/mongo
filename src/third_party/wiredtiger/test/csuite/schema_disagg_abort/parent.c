@@ -366,8 +366,7 @@ open_for_recovery(const TEST_CONFIG *cfg, uint32_t node_id, WT_CONNECTION **conn
     disagg_opts_init(cfg);
     cfg->opts->disagg.mode = "leader";
 
-    testutil_wiredtiger_open(
-      cfg->opts, home_dir, "create,disaggregated=(lose_all_my_data=true)", NULL, connp, true);
+    testutil_wiredtiger_open(cfg->opts, home_dir, ENV_CONFIG_BASE, NULL, connp, true);
 }
 
 /*

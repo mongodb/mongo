@@ -89,8 +89,11 @@
  */
 #define ADOPTED_CKPT_FILE "ckpt_adopted"
 
-/* Connection config. */
-#define ENV_CONFIG_DEF "create,statistics=(all),statistics_log=(json,on_close,wait=1)"
+/* WiredTiger connection config. Local state is disposable, as in MongoDB. */
+#define ENV_CONFIG_BASE "create,disaggregated=(lose_all_my_data=true)"
+
+/* The nodes connections log statistics. */
+#define ENV_CONFIG_DEF ENV_CONFIG_BASE ",statistics=(all),statistics_log=(json,on_close,wait=1)"
 
 /* Timestamp fields accepted by query_ts and set_ts. */
 #define TS_OLDEST 0x01u

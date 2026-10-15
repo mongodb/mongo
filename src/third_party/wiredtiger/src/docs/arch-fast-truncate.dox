@@ -380,6 +380,16 @@ end cursors, which requires the pages under them to be present in memory.
 This point is not particularly important operationally but can create complications for
 writing tests.
 
+Range-truncate activity counters are available in connection and data-source statistics;
+\c cursor_truncate_fast_delete_pages counts the leaf pages that were fast-deleted.
+The \c cursor_truncate_fast_delete_fallback_in_memory count is a subset of
+\c cursor_truncate_fast_delete_fallback_pages. Newly dirtied internal page bytes count the parent's
+memory footprint when a fast delete first dirties it, not the size of the deleted content; these
+cumulative counters are not reduced on rollback or eviction, and are approximate when other writers
+modify the same pages. History store truncation is counted.
+Use the statistics cursor for the underlying WT table to attribute the counters to a
+particular data source; connection statistics include activity from all tables.
+
 Finally note that currently the initial eviction attempt is done unconditionally even in
 cases where we could determine beforehand that the page will be ineligible.
 This causes it to be evicted and read in again, which is suboptimal, and should perhaps be

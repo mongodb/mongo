@@ -38,6 +38,7 @@ const WT_NAME_FLAG __wt_stress_types[] = {
   {"conn_close_stress_log_printf", WT_TIMING_STRESS_CLOSE_STRESS_LOG},
   {"disagg_stable_dhandle_delay", WT_TIMING_STRESS_DISAGG_STABLE_DHANDLE_DELAY},
   {"disagg_role_transition", WT_TIMING_STRESS_DISAGG_ROLE_TRANSITION},
+  {"drop_deferred_hold", WT_TIMING_STRESS_DROP_DEFERRED_HOLD},
   {"evict_reposition", WT_TIMING_STRESS_EVICT_REPOSITION},
   {"failpoint_disagg_checkpoint_apply", WT_TIMING_STRESS_FAILPOINT_DISAGG_CHECKPOINT_APPLY},
   {"failpoint_disagg_checkpoint_queue_drain",

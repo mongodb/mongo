@@ -249,6 +249,8 @@ struct __wt_disaggregated_storage;
 typedef struct __wt_disaggregated_storage WT_DISAGGREGATED_STORAGE;
 struct __wt_dlh;
 typedef struct __wt_dlh WT_DLH;
+struct __wt_drop_pending;
+typedef struct __wt_drop_pending WT_DROP_PENDING;
 struct __wt_dsrc_stats;
 typedef struct __wt_dsrc_stats WT_DSRC_STATS;
 struct __wt_error_info;

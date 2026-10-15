@@ -176,3 +176,13 @@ typedef struct __wt_disagg_metadata {
     int version;            /* Metadata version */
     int compatible_version; /* Minimum compatible reader version */
 } WT_DISAGG_METADATA;
+
+/*
+ * WT_DROP_PENDING --
+ *	A renamed file a committed drop removes once its locks are released.
+ */
+struct __wt_drop_pending {
+    char *name;
+
+    TAILQ_ENTRY(__wt_drop_pending) q;
+};
