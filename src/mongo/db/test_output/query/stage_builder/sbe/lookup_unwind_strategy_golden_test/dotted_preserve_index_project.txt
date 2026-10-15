@@ -133,8 +133,12 @@
 ## Results
 { lkey: null, a: { b: { _id: 13, fkey: null, c: 400 } } }
 { lkey: 1, a: { b: { _id: 10, fkey: 1, c: 100 } } }
+{ lkey: 1, a: { b: { _id: 10, fkey: 1, c: 100 } } }
+{ lkey: 1, a: { b: { _id: 11, fkey: 1, c: 200 } } }
 { lkey: 1, a: { b: { _id: 11, fkey: 1, c: 200 } } }
 { lkey: 2, a: {} }
 { lkey: 3, a: { b: { _id: 12, fkey: 3, c: 300 } } }
+{ lkey: 98, a: {} }
+{ lkey: 99, a: {} }
 { a: { b: { _id: 13, fkey: null, c: 400 } } }
 { lkey: [ 3, 7 ], a: { b: { _id: 12, fkey: 3, c: 300 } } }

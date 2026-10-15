@@ -142,3 +142,7 @@
 { _id: 3, lkey: 3, joined: "preexisting", a: { x: 1, b: { _id: 12, fkey: 3, c: 300 } }, idx: 0 }
 { _id: 4, n: 1, a: { b: { _id: 13, fkey: null, c: 400 } }, idx: 0 }
 { _id: 5, lkey: null, joined: "preexisting", a: { b: { _id: 13, fkey: null, c: 400 } }, idx: 0 }
+{ _id: 6, joined: "preexisting", lkey: 99, n: 2, a: { x: 2 }, idx: null }
+{ _id: 7, idx: 0, lkey: 1, n: 3, joined: "preexisting", a: { b: { _id: 10, fkey: 1, c: 100 } } }
+{ _id: 7, idx: 1, lkey: 1, n: 3, joined: "preexisting", a: { b: { _id: 11, fkey: 1, c: 200 } } }
+{ _id: 8, idx: null, lkey: 98, n: 4, a: {} }

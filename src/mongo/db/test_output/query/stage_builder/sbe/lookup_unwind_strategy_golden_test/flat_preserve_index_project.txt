@@ -133,8 +133,12 @@
 ## Results
 { lkey: null, joined: { _id: 13, fkey: null, c: 400 } }
 { lkey: 1, joined: { _id: 10, fkey: 1, c: 100 } }
+{ lkey: 1, joined: { _id: 10, fkey: 1, c: 100 } }
+{ lkey: 1, joined: { _id: 11, fkey: 1, c: 200 } }
 { lkey: 1, joined: { _id: 11, fkey: 1, c: 200 } }
 { lkey: 2 }
 { lkey: 3, joined: { _id: 12, fkey: 3, c: 300 } }
+{ lkey: 98 }
+{ lkey: 99 }
 { joined: { _id: 13, fkey: null, c: 400 } }
 { lkey: [ 3, 7 ], joined: { _id: 12, fkey: 3, c: 300 } }

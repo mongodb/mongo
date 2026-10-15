@@ -41,7 +41,10 @@ constexpr std::string_view kLocalDocs = R"([
     {_id: 2, lkey: [3, 7], n: 9, a: 5},
     {_id: 3, lkey: 3, joined: "preexisting", a: {x: 1, b: "preexisting"}},
     {_id: 4, n: 1, a: {}},
-    {_id: 5, lkey: null, joined: "preexisting"}
+    {_id: 5, lkey: null, joined: "preexisting"},
+    {_id: 6, joined: "preexisting", lkey: 99, n: 2, a: {x: 2, b: "preexisting"}},
+    {_id: 7, idx: "preexisting", lkey: 1, n: 3, joined: "preexisting"},
+    {_id: 8, idx: "preexisting", lkey: 98, n: 4}
 ])";
 
 constexpr std::string_view kForeignDocs = R"([
@@ -59,9 +62,11 @@ constexpr std::string_view kDotted = "a.b";
 constexpr bool kPreserve = true;
 constexpr bool kNoPreserve = false;
 
-// The $unwind 'includeArrayIndex' option: whether the match's array index is written to "idx".
-constexpr bool kIndex = true;
-constexpr bool kNoIndex = false;
+// The $unwind 'includeArrayIndex' option: the path that receives the match's array index, if any.
+constexpr std::string_view kIndex = "idx";
+constexpr std::string_view kNoIndex = "";
+constexpr std::string_view kIndexOnAs = "joined";
+constexpr std::string_view kIndexOnLocalKey = "lkey";
 
 // The stage, if any, that follows the $unwind and consumes its output.
 enum class Follower {
@@ -141,7 +146,7 @@ const EqLookupNode* findEqLookup(const QuerySolutionNode* node) {
 
 class LookupUnwindStrategyGoldenTest : public GoldenSbeStageBuilderTestFixture {
 public:
-    void runGrid(std::string_view as, bool preserve, bool index, Follower follower) {
+    void runGrid(std::string_view as, bool preserve, std::string_view index, Follower follower) {
         createCollection(arrayToVector(kLocalDocs), boost::none);
         for (auto strategy : kStrategies) {
             createSecondaryCollection(
@@ -153,8 +158,8 @@ public:
         if (preserve) {
             unwind.append("preserveNullAndEmptyArrays", true);
         }
-        if (index) {
-            unwind.append("includeArrayIndex", "idx");
+        if (!index.empty()) {
+            unwind.append("includeArrayIndex", index);
         }
         const BSONObj unwindStage = BSON("$unwind" << unwind.obj());
         const auto follow = followerStages(follower, as);
@@ -284,6 +289,15 @@ private:
 
 LOOKUP_UNWIND_PRESERVE(Flat)
 LOOKUP_UNWIND_PRESERVE(Dotted)
+
+LOOKUP_UNWIND_TEST(Flat, Preserve, IndexOnAs, Project)
+LOOKUP_UNWIND_TEST(Flat, Preserve, IndexOnAs, AddFields)
+LOOKUP_UNWIND_TEST(Flat, NoPreserve, IndexOnAs, Project)
+LOOKUP_UNWIND_TEST(Flat, NoPreserve, IndexOnAs, AddFields)
+LOOKUP_UNWIND_TEST(Flat, Preserve, IndexOnLocalKey, Project)
+LOOKUP_UNWIND_TEST(Flat, Preserve, IndexOnLocalKey, AddFields)
+LOOKUP_UNWIND_TEST(Flat, NoPreserve, IndexOnLocalKey, Project)
+LOOKUP_UNWIND_TEST(Flat, NoPreserve, IndexOnLocalKey, AddFields)
 
 }  // namespace
 }  // namespace mongo

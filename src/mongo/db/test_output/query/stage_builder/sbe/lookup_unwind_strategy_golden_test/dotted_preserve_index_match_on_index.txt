@@ -136,3 +136,4 @@
 
 ## Results
 { _id: 0, lkey: 1, n: 5, a: { x: 10, b: { _id: 11, fkey: 1, c: 200 } }, idx: 1 }
+{ _id: 7, idx: 1, lkey: 1, n: 3, joined: "preexisting", a: { b: { _id: 11, fkey: 1, c: 200 } } }
