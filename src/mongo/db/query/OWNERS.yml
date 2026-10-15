@@ -31,6 +31,15 @@ filters:
   - "bson_typemask.h":
     approvers:
       - 10gen/query-optimization
+  - "forced_join_method*":
+    approvers:
+      - 10gen/query-optimization-join-ordering
+  - "join_plan_tree_shape*":
+    approvers:
+      - 10gen/query-optimization-join-ordering
+  - "join_reorder_mode*":
+    approvers:
+      - 10gen/query-optimization-join-ordering
   - "collection_index_usage_tracker*":
     approvers:
       - 10gen/query-execution-write-exec

@@ -26,10 +26,10 @@ filters:
       - 10gen/query-execution-classic
   - "*join_optimization*":
     approvers:
-      - 10gen/query-optimization
+      - 10gen/query-optimization-join-ordering
   - "*join_plan_cache*":
     approvers:
-      - 10gen/query-optimization
+      - 10gen/query-optimization-join-ordering
   - "aggregation_sharded_collections_causally_consistent_passthrough.yml":
     approvers:
       - 10gen/query-execution-classic
