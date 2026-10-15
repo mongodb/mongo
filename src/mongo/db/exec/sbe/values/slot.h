@@ -534,8 +534,6 @@ using SpoolIdGenerator = IdGenerator<SpoolId>;
  */
 class BSONObjValueAccessor final : public AssignableSlotAccessor {
 public:
-    using AssignableSlotAccessor::reset;
-
     BSONObjValueAccessor() = default;
 
     BSONObjValueAccessor(const BSONObjValueAccessor& other) {
@@ -625,16 +623,30 @@ public:
         reset(TypeTags::Nothing, 0);
     }
 
+    /*
+     * Shadow the reset() methods instead of inheriting them to avoid
+     * extra virtual dispatch, similar to `OwnedValueAccessor`.
+     */
     void reset(TypeTags tag, Value val) {
-        reset_raw(true, tag, val);
+        resetImpl(true, tag, val);
+    }
+
+    void reset(TagValueView value) {
+        resetImpl(false, value.tag, value.value);
+    }
+
+    void reset(TagValueOwned value) {
+        auto [tag, val] = value.releaseToRaw();
+        resetImpl(true, tag, val);
+    }
+
+    void reset(TagValueMaybeOwned value) {
+        auto [owned, tag, val] = value.releaseToRaw();
+        resetImpl(owned, tag, val);
     }
 
     void reset_raw(bool owned, TypeTags tag, Value val) override {
-        release();
-
-        _tag = tag;
-        _val = val;
-        _owned = owned;
+        resetImpl(owned, tag, val);
     }
 
     void makeOwned() {
@@ -647,6 +659,14 @@ public:
     }
 
 private:
+    void resetImpl(bool owned, TypeTags tag, Value val) {
+        release();
+
+        _tag = tag;
+        _val = val;
+        _owned = owned;
+    }
+
     void release() {
         if (_owned) {
             releaseValue(_tag, _val);

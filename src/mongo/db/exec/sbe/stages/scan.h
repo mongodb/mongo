@@ -209,8 +209,9 @@ protected:
     // Contains unchanging state that will be shared across clones instead of copied.
     const std::shared_ptr<ScanStageBaseState> _state;
 
-    // Holds the current record.
-    value::OwnedValueAccessor _recordAccessor;
+    // Holds the current record. A BSONObjValueAccessor lets consumers share one owned copy of the
+    // record via getOwnedBSONObj() instead of copying it each time.
+    value::BSONObjValueAccessor _recordAccessor;
 
     // Holds the RecordId of the current record as a TypeTags::RecordId.
     value::OwnedValueAccessor _recordIdAccessor;

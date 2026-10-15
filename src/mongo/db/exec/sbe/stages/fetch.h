@@ -121,7 +121,9 @@ private:
 
     value::SlotAccessor* _seekRecordIdAccessor{nullptr};
 
-    value::OwnedValueAccessor _recordAccessor;
+    // Holds the fetched record. A BSONObjValueAccessor lets consumers share one owned copy of the
+    // record via getOwnedBSONObj() instead of copying it each time.
+    value::BSONObjValueAccessor _recordAccessor;
     value::OwnedValueAccessor _recordIdAccessor;
     RecordId _seekRid;
 

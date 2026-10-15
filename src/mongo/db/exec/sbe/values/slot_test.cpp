@@ -215,4 +215,76 @@ TEST_F(BSONObjValueAccessorTest, Tests) {
     runTests();
 }
 
+namespace {
+void resetToView(value::BSONObjValueAccessor& slot, const BSONObj& obj) {
+    slot.reset(value::TagValueView{value::TypeTags::bsonObject,
+                                   value::bitcastFrom<const char*>(obj.objdata())});
+}
+
+const char* viewData(const value::BSONObjValueAccessor& slot) {
+    return value::bitcastTo<const char*>(slot.getViewOfValue().value);
+}
+}  // namespace
+
+TEST_F(BSONObjValueAccessorTest, RepeatedGetOwnedBSONObjSharesOneCopy) {
+    BSONObj obj = BSON("a" << 1 << "b" << "str");
+    value::BSONObjValueAccessor slot;
+    resetToView(slot, obj);
+
+    BSONObj first = slot.getOwnedBSONObj();
+    BSONObj second = slot.getOwnedBSONObj();
+    ASSERT_TRUE(first.isOwned());
+    ASSERT_NE(first.objdata(), obj.objdata());
+    ASSERT_EQ(first.objdata(), second.objdata());
+    ASSERT_BSONOBJ_EQ(first, obj);
+}
+
+TEST_F(BSONObjValueAccessorTest, MakeOwnedAfterSharingDoesNotCopy) {
+    BSONObj obj = BSON("a" << 1);
+    value::BSONObjValueAccessor slot;
+    resetToView(slot, obj);
+
+    BSONObj shared = slot.getOwnedBSONObj();
+    const char* before = viewData(slot);
+    ASSERT_EQ(before, shared.objdata());
+
+    slot.makeOwned();
+    ASSERT_EQ(viewData(slot), before);
+    ASSERT_EQ(slot.getOwnedBSONObj().objdata(), shared.objdata());
+}
+
+TEST_F(BSONObjValueAccessorTest, ResetAfterSharingKeepsConsumerCopyValid) {
+    BSONObj obj = BSON("a" << 1 << "b" << BSON_ARRAY(1 << 2 << 3));
+    BSONObj other = BSON("c" << 2);
+    value::BSONObjValueAccessor slot;
+    resetToView(slot, obj);
+
+    BSONObj shared = slot.getOwnedBSONObj();
+    resetToView(slot, other);
+    ASSERT_EQ(viewData(slot), other.objdata());
+
+    ASSERT_TRUE(shared.isOwned());
+    ASSERT_BSONOBJ_EQ(shared, obj);
+
+    // The next record gets its own copy rather than the previous record's buffer.
+    BSONObj next = slot.getOwnedBSONObj();
+    ASSERT_NE(next.objdata(), shared.objdata());
+    ASSERT_BSONOBJ_EQ(next, other);
+}
+
+TEST_F(BSONObjValueAccessorTest, CopyOrMoveValueAfterSharingCopies) {
+    BSONObj obj = BSON("a" << 1);
+    value::BSONObjValueAccessor slot;
+    resetToView(slot, obj);
+
+    BSONObj shared = slot.getOwnedBSONObj();
+    auto copy = slot.copyOrMoveValue();
+    ASSERT_EQ(copy.tag(), value::TypeTags::bsonObject);
+    ASSERT_NE(value::bitcastTo<const char*>(copy.value()), shared.objdata());
+    ASSERT_BSONOBJ_EQ(BSONObj(value::bitcastTo<const char*>(copy.value())), obj);
+
+    // The accessor still holds the shared buffer.
+    ASSERT_EQ(viewData(slot), shared.objdata());
+}
+
 }  // namespace mongo::sbe
