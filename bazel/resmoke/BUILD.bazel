@@ -244,19 +244,6 @@ py_binary(
     visibility = ["//visibility:public"],
     deps = [
         "//buildscripts:resmoke_local_host_tool",
-        "//buildscripts/util",
-        dependency(
-            "requests",
-            group = "core",
-        ),
-        dependency(
-            "oauthlib",
-            group = "core",
-        ),
-        dependency(
-            "requests-oauthlib",
-            group = "core",
-        ),
     ],
 )
 
@@ -274,19 +261,6 @@ py_test(
     main = "generate_tss_test_list_test.py",
     deps = [
         "//buildscripts:resmoke",
-        "//buildscripts/util",
-        dependency(
-            "requests",
-            group = "core",
-        ),
-        dependency(
-            "oauthlib",
-            group = "core",
-        ),
-        dependency(
-            "requests-oauthlib",
-            group = "core",
-        ),
     ],
 )
 

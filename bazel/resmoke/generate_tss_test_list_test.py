@@ -6,10 +6,11 @@ import os
 import pathlib
 import sys
 import tempfile
+import threading
+import time
 import unittest
 from unittest.mock import patch
 
-import requests
 import yaml
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -139,165 +140,66 @@ class TestTaskIdSelfCheck(unittest.TestCase):
 
 
 class TestSelectTests(unittest.TestCase):
-    """Selection talks to TSS over the mesh; every failure must raise so the caller fails open."""
+    """Selection asks Evergreen's REST API; every failure must raise so the caller fails open."""
 
     @contextlib.contextmanager
-    def _tss(self, status_code=200, payload=None):
-        response = unittest.mock.MagicMock()
-        response.json.return_value = payload
-        response.status_code = status_code
-        if status_code >= 400:
-            response.raise_for_status.side_effect = requests.HTTPError(f"{status_code} error")
-        response.history = []
-        response.is_redirect = False
-        response.is_permanent_redirect = False
-        session = unittest.mock.MagicMock()
-        session.post.return_value = response
+    def _evg(self, result=None, side_effect=None):
+        api = unittest.mock.MagicMock()
+        api.select_tests.return_value = result
+        api.select_tests.side_effect = side_effect
         with (
-            patch.object(under_test, "tss_session", return_value=session),
-            patch.object(under_test, "find_tss_client_secret", return_value="secret"),
+            patch.object(under_test.evergreen_conn, "get_evergreen_api", return_value=api),
+            patch.object(under_test, "find_evergreen_config", return_value=None),
         ):
-            yield session
+            yield api
 
     def test_selection_can_only_narrow_never_add(self):
         volatile = dict(MAINLINE, task_id="x", requester="patch_request")
-        with self._tss(payload=["a.js", "not_in_suite.js"]):
-            tests = under_test.select_tests(
-                ["a.js", "b.js"], "//pkg:suite", volatile, ["Optimistic"]
-            )
-        self.assertEqual(["a.js"], tests)
-
-    def test_posts_to_the_environment_url(self):
-        # Spelled out rather than built from the constants: the address and route are the
-        # service's contract, so a change to either should have to be made here too.
-        volatile = dict(MAINLINE, task_id="x", requester="patch_request")
-        with self._tss(payload=[]) as session:
-            under_test.select_tests(["a.js"], "//pkg:suite", volatile, ["Optimistic"])
-        self.assertEqual(
-            "https://test-selection-services.cloud-build.prod.corp.mongodb.com"
-            "/api/test_selection/select_tests/",
-            session.post.call_args[0][0],
-        )
-
-    def test_environment_defaults_to_production(self):
-        with patch.object(under_test, "read_expansions", return_value={}):
-            self.assertEqual("prod", under_test.tss_environment())
-
-    def test_staging_is_opt_in_by_patch_parameter(self):
-        for value in ("true", "True", "1", "yes", "on", " true "):
-            with self.subTest(value=value):
-                expansions = {under_test.TSS_STAGING_PARAM: value}
-                with patch.object(under_test, "read_expansions", return_value=expansions):
-                    self.assertEqual("staging", under_test.tss_environment())
-
-    def test_falsey_or_absent_parameter_stays_on_production(self):
-        for expansions in ({}, {"use_tss_staging": ""}, {"use_tss_staging": "false"}):
-            with self.subTest(expansions=expansions):
-                with patch.object(under_test, "read_expansions", return_value=expansions):
-                    self.assertEqual("prod", under_test.tss_environment())
-
-    def test_every_environment_has_a_url(self):
-        self.assertEqual({"staging", "prod"}, set(under_test.TSS_BASE_URLS))
+        with self._evg(result={"tests": ["b.js", "not_discovered.js"]}):
+            selected = under_test.select_tests(["a.js", "b.js"], "//pkg:suite", volatile, [])
+        self.assertEqual(["b.js"], selected)
 
     def test_sends_the_constructed_task_id_not_the_runner_one(self):
         volatile = dict(MAINLINE, task_id="the_runner_task", requester="patch_request")
-        with self._tss(payload=[]) as session:
+        with self._evg(result={"tests": []}) as api:
             under_test.select_tests(["a.js"], "//pkg:suite", volatile, ["Optimistic"])
-        sent = session.post.call_args[1]["json"]
-        self.assertEqual(under_test.construct_task_id(volatile, "//pkg:suite"), sent["task_id"])
-        self.assertEqual("//pkg:suite", sent["task_name"])
-        self.assertEqual(["Optimistic"], sent["strategies"])
+        kwargs = api.select_tests.call_args[1]
+        self.assertNotEqual("the_runner_task", kwargs["task_id"])
+        self.assertEqual(under_test.construct_task_id(volatile, "//pkg:suite"), kwargs["task_id"])
+        self.assertEqual("//pkg:suite", kwargs["task_name"])
+        self.assertEqual(["Optimistic"], kwargs["strategies"])
+        self.assertEqual(["a.js"], kwargs["tests"])
 
-    def test_http_error_quotes_the_body_so_the_cause_is_visible(self):
-        # A validation error names the fields it rejected; that body is the whole diagnosis.
-        volatile = dict(MAINLINE, task_id="x")
-        with self._tss(status_code=422) as session:
-            session.post.return_value.text = '{"detail":[{"loc":["body","tests"]}]}'
-            with self.assertRaises(RuntimeError) as caught:
-                under_test.select_tests(["a.js"], "//pkg:suite", volatile, ["Optimistic"])
-        self.assertIn("422", str(caught.exception))
-        self.assertIn('"loc":["body","tests"]', str(caught.exception))
-
-    def test_a_wrapped_list_is_rejected_rather_than_silently_dropping_tests(self):
-        # The service returns a bare list. An object would make set() iterate its keys, which
-        # would look like a successful selection of nothing rather than an error.
-        volatile = dict(MAINLINE, task_id="x")
-        with self._tss(payload={"tests": ["a.js"]}):
+    def test_missing_task_id_raises_so_caller_fails_open(self):
+        with self._evg(result={"tests": []}):
             with self.assertRaises(RuntimeError):
-                under_test.select_tests(["a.js"], "//pkg:suite", volatile, ["Optimistic"])
+                under_test.select_tests(["a.js"], "//pkg:suite", {"build_id": "nope"}, [])
 
-    def test_non_list_response_raises_so_caller_fails_open(self):
-        volatile = dict(MAINLINE, task_id="x")
-        with self._tss(payload="nonsense"):
-            with self.assertRaises(RuntimeError):
-                under_test.select_tests(["a.js"], "//pkg:suite", volatile, ["Optimistic"])
+    def test_api_error_propagates_so_caller_fails_open(self):
+        volatile = dict(MAINLINE, task_id="x", requester="patch_request")
+        with self._evg(side_effect=ConnectionError("500 error")):
+            with self.assertRaises(ConnectionError):
+                under_test.select_tests(["a.js"], "//pkg:suite", volatile, [])
 
-    def test_redirect_is_reported_instead_of_being_followed(self):
-        # Following the service's slash redirect lands on http:// port 80 and times out, so the
-        # redirect itself has to be the error.
-        volatile = dict(MAINLINE, task_id="x")
-        with self._tss(payload=[]) as session:
-            session.post.return_value.is_redirect = True
-            session.post.return_value.status_code = 301
-            session.post.return_value.headers = {
-                "Location": "http://test-selection-services/api/test_selection/select_tests/"
-            }
-            with self.assertRaises(RuntimeError) as caught:
-                under_test.select_tests(["a.js"], "//pkg:suite", volatile, ["Optimistic"])
-        self.assertIn("301", str(caught.exception))
-        self.assertIn("http://test-selection-services", str(caught.exception))
+    def test_a_stalled_request_does_not_hold_up_failing_open(self):
+        volatile = dict(MAINLINE, task_id="x", requester="patch_request")
+        release = threading.Event()
+        self.addCleanup(release.set)
+        with (
+            self._evg(side_effect=lambda **_: release.wait()),
+            patch.object(under_test, "_SELECT_TESTS_TIMEOUT", 0.2),
+        ):
+            started = time.monotonic()
+            with self.assertRaises(TimeoutError):
+                under_test.select_tests(["a.js"], "//pkg:suite", volatile, [])
+        self.assertLess(time.monotonic() - started, 5)
 
-    def test_redirects_are_not_followed(self):
-        volatile = dict(MAINLINE, task_id="x")
-        with self._tss(payload=[]) as session:
-            under_test.select_tests(["a.js"], "//pkg:suite", volatile, ["Optimistic"])
-        self.assertIs(False, session.post.call_args[1]["allow_redirects"])
-
-    def test_non_json_body_is_quoted_in_the_error(self):
-        # A 2xx whose body is not JSON means we reached something other than the endpoint, and
-        # the body is the only clue as to what.
-        volatile = dict(MAINLINE, task_id="x")
-        with self._tss(payload=None) as session:
-            session.post.return_value.json.side_effect = ValueError("no json")
-            session.post.return_value.text = "<html>login</html>"
-            session.post.return_value.headers = {"Content-Type": "text/html"}
-            with self.assertRaises(RuntimeError) as caught:
-                under_test.select_tests(["a.js"], "//pkg:suite", volatile, ["Optimistic"])
-        self.assertIn("<html>login</html>", str(caught.exception))
-        self.assertIn("text/html", str(caught.exception))
-
-    def test_missing_client_secret_raises_so_caller_fails_open(self):
-        volatile = dict(MAINLINE, task_id="x")
-        with patch.object(under_test, "find_tss_client_secret", return_value=""):
-            with self.assertRaises(RuntimeError):
-                under_test.select_tests(["a.js"], "//pkg:suite", volatile, ["Optimistic"])
-
-
-class TestTssSession(unittest.TestCase):
-    """Only the network call is mocked, so the real credentials model is exercised here."""
-
-    @contextlib.contextmanager
-    def _okta(self, token):
-        oauth_session = unittest.mock.MagicMock()
-        oauth_session.fetch_token.return_value = token
-        with patch.object(under_test, "OAuth2Session", return_value=oauth_session) as constructor:
-            yield oauth_session, constructor
-
-    def test_builds_a_session_with_a_bearer_header(self):
-        token = {"access_token": "the-token", "expires_in": 3600}
-        with self._okta(token):
-            session = under_test.tss_session("secret")
-        self.assertEqual("Bearer the-token", session.headers["Authorization"])
-
-    def test_requests_the_expected_client_and_scope(self):
-        token = {"access_token": "the-token", "expires_in": 3600}
-        with self._okta(token) as (oauth_session, _):
-            under_test.tss_session("secret")
-        kwargs = oauth_session.fetch_token.call_args[1]
-        self.assertEqual(under_test.TSS_OAUTH_CLIENT_ID, kwargs["client_id"])
-        self.assertEqual("secret", kwargs["client_secret"])
-        self.assertEqual(under_test.TSS_OAUTH_SCOPE, kwargs["scope"])
-        self.assertIn("aus4k4jv00hWjNnps297", kwargs["token_url"])
+    def test_response_without_tests_raises_rather_than_silently_dropping_tests(self):
+        volatile = dict(MAINLINE, task_id="x", requester="patch_request")
+        for result in ({"other": []}, ["a.js"], None):
+            with self.subTest(result=result), self._evg(result=result):
+                with self.assertRaises(RuntimeError):
+                    under_test.select_tests(["a.js"], "//pkg:suite", volatile, [])
 
 
 class TestIsSelectable(unittest.TestCase):
@@ -397,35 +299,6 @@ class TestReadSelectionSettings(unittest.TestCase):
         self.assertEqual((True, ["Optimistic"]), self._read(" TRUE \n  Optimistic , \n"))
 
 
-class TestFindTssClientSecret(unittest.TestCase):
-    def test_environment_is_preferred(self):
-        with patch.dict(os.environ, {under_test.TSS_CLIENT_SECRET_KEY: "from-env"}):
-            self.assertEqual("from-env", under_test.find_tss_client_secret())
-
-    def test_falls_back_to_expansions(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            workspace = pathlib.Path(tmpdir) / "src"
-            workspace.mkdir()
-            (pathlib.Path(tmpdir) / "expansions.yml").write_text(
-                yaml.safe_dump({under_test.TSS_CLIENT_SECRET_KEY: "from-expansions"})
-            )
-            with (
-                patch.dict(os.environ, {}, clear=True),
-                patch.object(under_test, "find_workspace_root", return_value=workspace),
-            ):
-                self.assertEqual("from-expansions", under_test.find_tss_client_secret())
-
-    def test_absent_everywhere_returns_empty(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            workspace = pathlib.Path(tmpdir) / "src"
-            workspace.mkdir()
-            with (
-                patch.dict(os.environ, {}, clear=True),
-                patch.object(under_test, "find_workspace_root", return_value=workspace),
-            ):
-                self.assertEqual("", under_test.find_tss_client_secret())
-
-
 class TestSelectionSummaryLine(unittest.TestCase):
     """The summary must not claim narrowing when the selection kept everything."""
 
@@ -454,7 +327,6 @@ class TestSelectionSummaryLine(unittest.TestCase):
                 patch.object(under_test, "parse_volatile_status", return_value={"task_id": "t"}),
                 patch.object(under_test, "task_id_format_is_understood", return_value=True),
                 patch.object(under_test, "select_tests", return_value=selected_tests),
-                patch.object(under_test, "tss_environment", return_value="staging"),
                 contextlib.redirect_stderr(stderr),
             ):
                 under_test.main()

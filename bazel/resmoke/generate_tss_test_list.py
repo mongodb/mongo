@@ -15,6 +15,7 @@ import io
 import os
 import pathlib
 import sys
+import threading
 import traceback
 
 import yaml
@@ -26,54 +27,12 @@ sys.path.append(str(REPO_ROOT))
 # Matches the timeout resmoke itself uses in buildscripts/resmokelib/testing/suite.py.
 _SELECT_TESTS_TIMEOUT = 60
 
-# How much of an unexpected response body to quote when reporting a failure.
-_ERROR_BODY_CHARS = 500
-
-import requests
-from oauthlib.oauth2 import BackendApplicationClient
-from requests_oauthlib import OAuth2Session
-
 from buildscripts.resmokelib import cli
 from buildscripts.resmokelib import config as _config
-from buildscripts.util.read_config import read_config_file
-
-# Test selection is reached directly over the mesh rather than through the Evergreen REST API.
-# Authentication is an Okta client-credentials token for a machine user, whose secret arrives in
-# the task's expansions.
-TSS_OAUTH_CLIENT_ID = "0oa12w49832J9h3bX298"
-TSS_OAUTH_SCOPE = "kanopy"
-OKTA_TOKEN_URL = "https://corp.mongodb.com/oauth2/aus4k4jv00hWjNnps297/v1/token"
-# Name of both the environment variable and the Evergreen project variable holding the secret.
-TSS_CLIENT_SECRET_KEY = "tss_mesh_client_secret"
-# Evergreen patch parameter that opts a run into the staging deployment.
-TSS_STAGING_PARAM = "use_tss_staging"
-# Per-environment addresses of the service. The in-mesh name
-# test-selection-services-webapp-web-app.cloud-build.svc.cluster.local would pick the matching
-# environment by itself, but it does not resolve from an Evergreen host, so the environment has to
-# be chosen here instead. See tss_environment().
-TSS_BASE_URLS = {
-    "staging": "https://test-selection-services.cloud-build.staging.corp.mongodb.com",
-    "prod": "https://test-selection-services.cloud-build.prod.corp.mongodb.com",
-}
-
-# The service's StrategyEnum. Anything outside this set is rejected with a validation error, so
-# check locally and say so rather than spending a round trip to find out.
-TSS_STRATEGIES = (
-    "ExcludeManuallyQuarantined",
-    "Existential",
-    "NotFailing",
-    "NotPassing",
-    "Optimistic",
-    "StartsWithT",
-)
+from buildscripts.resmokelib.utils import evergreen_conn
 
 # Test kinds whose "tests" are not file names, so there is nothing for selection to work with.
 UNSELECTABLE_TEST_KINDS = ("mongos_test",)
-
-# Selection endpoint on the TSS service. The trailing slash matters: without it the service
-# answers with a redirect that adds it, which is a wasted round trip at best and, through the
-# corp hostnames, pointed at a closed port.
-TSS_SELECT_PATH = "/api/test_selection/select_tests/"
 
 
 def is_selectable(suite_path: str) -> bool:
@@ -178,63 +137,6 @@ def task_id_format_is_understood(volatile: dict) -> bool:
     return construct_task_id(volatile, volatile.get("task_name", "")) == own_task_id
 
 
-def find_workspace_root() -> pathlib.Path:
-    """Return the real repository root.
-
-    Bazel actions run from the output tree, so relative paths do not reach the checkout. The
-    execroot does hold a MODULE.bazel symlink into the real repository, which
-    bazel/resmoke/multiversion/run_db_contrib_tool.sh uses the same way to find the checkout.
-    """
-    return pathlib.Path(os.path.realpath("MODULE.bazel")).parent
-
-
-def read_expansions() -> dict:
-    """Return the task's expansions, or {} when not running in Evergreen.
-
-    Evergreen writes expansions.yml next to the checkout, so it sits one level above the workspace
-    root. Bazel scrubs the environment of its actions, so it has to be found by path rather than
-    read from an env var.
-    """
-    try:
-        expansions_file = find_workspace_root().parent / "expansions.yml"
-        if not expansions_file.is_file():
-            return {}
-        return read_config_file(str(expansions_file)) or {}
-    except OSError:
-        return {}
-
-
-def find_tss_client_secret() -> str:
-    """Return the TSS machine user's client secret, or "" if it is not available.
-
-    Prefers the environment, which is how a developer supplies the secret when running this
-    directly. In Evergreen it comes from the task's expansions: f_expansions_write runs with
-    'redacted: true', so private project variables are serialized into expansions.yml.
-    """
-    from_env = os.environ.get(TSS_CLIENT_SECRET_KEY)
-    if from_env:
-        return from_env
-    return read_expansions().get(TSS_CLIENT_SECRET_KEY) or ""
-
-
-def tss_session(client_secret: str) -> requests.Session:
-    """Return a requests session that authenticates to TSS as the machine user.
-
-    The token is fetched once and reused as a bearer header: OAuth2Session is not thread safe,
-    and a plain session only ever reads the now-static access token.
-    """
-    oauth = OAuth2Session(client=BackendApplicationClient(client_id=TSS_OAUTH_CLIENT_ID))
-    token = oauth.fetch_token(
-        token_url=OKTA_TOKEN_URL,
-        client_id=TSS_OAUTH_CLIENT_ID,
-        client_secret=client_secret,
-        scope=TSS_OAUTH_SCOPE,
-    )
-    session = requests.Session()
-    session.headers.update({"Authorization": f"Bearer {token['access_token']}"})
-    return session
-
-
 def read_selection_settings(path: str) -> tuple[bool, list[str]]:
     """Return (selection enabled, strategies) from the build settings file.
 
@@ -256,24 +158,24 @@ def read_selection_settings(path: str) -> tuple[bool, list[str]]:
     return enabled, strategies or list(_config.DEFAULT_EVERGREEN_TEST_SELECTION_STRATEGY)
 
 
-def tss_environment() -> str:
-    """Return which test selection deployment to talk to.
+def find_evergreen_config() -> str | None:
+    """Return the checkout's .evergreen.yml, or None to use the usual lookup.
 
-    Production, unless the run explicitly asks for staging. Nothing a task knows about itself
-    names a deployment -- volatile-status describes the project, variant and build, and the
-    generated src/.evergreen.yml always points at production Evergreen -- so staging has to be
-    requested rather than detected:
-
-        evergreen patch --param use_tss_staging=true ...
+    Bazel actions run from the output tree, so the current directory and its parents do not
+    reach the checkout, where Evergreen writes the file next to (or inside) the workspace. The
+    execroot does hold a MODULE.bazel symlink into the real repository, which
+    bazel/resmoke/multiversion/run_db_contrib_tool.sh uses the same way to find the checkout.
     """
-    requested = str(read_expansions().get(TSS_STAGING_PARAM, "")).strip().lower()
-    if requested in ("true", "1", "yes", "on"):
-        return "staging"
-    return "prod"
+    workspace_root = pathlib.Path(os.path.realpath("MODULE.bazel")).parent
+    for directory in (workspace_root, workspace_root.parent):
+        candidate = directory / ".evergreen.yml"
+        if candidate.is_file():
+            return str(candidate)
+    return None
 
 
 def select_tests(tests: list[str], label: str, volatile: dict, strategies: list[str]) -> list[str]:
-    """Narrow the test list by asking test selection directly over the mesh.
+    """Narrow the test list by asking Evergreen's select-tests REST endpoint.
 
     Returns the tests to run. Raises on any failure so the caller can fail open by keeping the
     full list -- test selection must only ever be able to make the list smaller, never to drop
@@ -285,75 +187,43 @@ def select_tests(tests: list[str], label: str, volatile: dict, strategies: list[
             f"could not construct a task id from build_id {volatile.get('build_id')!r}"
         )
 
-    base_url = TSS_BASE_URLS[tss_environment()]
+    evg_api = evergreen_conn.get_evergreen_api(find_evergreen_config())
 
-    unknown = [strategy for strategy in strategies if strategy not in TSS_STRATEGIES]
-    if unknown:
-        raise RuntimeError(
-            f"unknown test selection strategies {unknown}, expected any of "
-            f"{list(TSS_STRATEGIES)}"
-        )
+    # Run the request on a daemon thread and wait for it with a deadline. A ThreadPoolExecutor
+    # would not bound this: leaving its "with" block waits for the worker, so a stalled request
+    # would hold up failing open. A daemon thread that outlives the deadline is simply abandoned
+    # and does not keep the interpreter alive when main() returns.
+    outcome: dict = {}
 
-    client_secret = find_tss_client_secret()
-    if not client_secret:
-        raise RuntimeError("no test selection client secret in the task's expansions")
+    def request():
+        try:
+            outcome["result"] = evg_api.select_tests(
+                project_id=volatile.get("project", ""),
+                build_variant=volatile.get("build_variant", ""),
+                requester=volatile.get("requester", ""),
+                task_id=task_id,
+                task_name=label,
+                tests=tests,
+                strategies=strategies,
+            )
+        except BaseException as exc:
+            outcome["error"] = exc
 
-    # Field names come from the service's Body_select_tests_with_data_in_body schema. Note
-    # build_variant_name rather than build_variant, and test_names rather than tests.
-    request = {
-        "project_id": volatile.get("project", ""),
-        "build_variant_name": volatile.get("build_variant", ""),
-        "requester": volatile.get("requester", ""),
-        "task_id": task_id,
-        "task_name": label,
-        # test_names is declared uniqueItems, so send each name once, in discovery order.
-        "test_names": list(dict.fromkeys(tests)),
-        "strategies": strategies,
-    }
-    response = tss_session(client_secret).post(
-        f"{base_url}{TSS_SELECT_PATH}",
-        json=request,
-        timeout=_SELECT_TESTS_TIMEOUT,
-        # Redirects here are never useful: the service's own slash redirect points at http:// on
-        # a closed port, and an auth gateway redirects to a sign-in page. Following either buries
-        # the cause in a timeout or an HTML body, so report the redirect itself instead.
-        allow_redirects=False,
-    )
-    if response.is_redirect or response.is_permanent_redirect:
-        raise RuntimeError(
-            f"test selection returned {response.status_code} redirecting to "
-            f"{response.headers.get('Location')!r} instead of answering. The request did not "
-            "reach the endpoint."
-        )
-    if response.status_code >= 400:
-        # Quote the body rather than using raise_for_status(): a validation error names the
-        # fields it rejected, and that is the only thing that identifies a payload mismatch.
-        raise RuntimeError(
-            f"test selection returned {response.status_code}: "
-            f"{response.text[:_ERROR_BODY_CHARS]!r}"
-        )
+    worker = threading.Thread(target=request, daemon=True)
+    worker.start()
+    worker.join(_SELECT_TESTS_TIMEOUT)
+    if worker.is_alive():
+        raise TimeoutError(f"test selection did not answer within {_SELECT_TESTS_TIMEOUT}s")
+    if "error" in outcome:
+        raise outcome["error"]
+    result = outcome["result"]
 
-    # The service answers with the chosen test names as a bare list, not wrapped in an object.
-    # Report the status and body on anything unexpected: a 2xx that is not the list we expect
-    # means the request reached something other than the endpoint we think it did, and the body
-    # is what identifies it.
-    try:
-        result = response.json()
-    except ValueError as exc:
-        raise RuntimeError(
-            f"test selection returned {response.status_code} with a non-JSON body "
-            f"(content-type {response.headers.get('Content-Type')!r}): "
-            f"{response.text[:_ERROR_BODY_CHARS]!r}"
-        ) from exc
-    if not isinstance(result, list):
-        raise RuntimeError(
-            f"test selection returned {response.status_code} with an unexpected shape, "
-            f"expected a list of test names: {result!r}"
-        )
+    if not isinstance(result, dict) or not isinstance(result.get("tests"), list):
+        raise RuntimeError(f"test selection returned an unexpected response: {result!r}")
 
     # Intersect rather than take the response as-is, so selection can only narrow the list. The
     # same guard exists in buildscripts/resmokelib/testing/suite.py.
-    selected = set(result)
+    selected = set(result["tests"])
     return [test for test in tests if test in selected]
 
 
