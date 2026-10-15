@@ -33,6 +33,11 @@
 namespace mongo {
 namespace {
 
+using ::testing::ElementsAre;
+using ::testing::Eq;
+using ::testing::IsEmpty;
+using unittest::match::StatusIs;
+
 const HostAndPort kHost{"localhost", 27017};
 const BSONObj kSecondaryHelloReply = BSON("ok" << 1 << "secondary" << true << "setName"
                                                << "testSet");
@@ -42,6 +47,22 @@ public:
     void dropConnections(const Status&) override {}
     void dropConnections(const HostAndPort&, const Status&) override {}
     void setKeepOpen(const HostAndPort&, bool) override {}
+};
+
+class RecordingConnectionManager : public executor::EgressConnectionCloser {
+public:
+    void dropConnections(const Status&) override {
+        ++dropAllCount;
+    }
+    void dropConnections(const HostAndPort& host, const Status& status) override {
+        droppedHosts.push_back(host);
+        lastStatus = status;
+    }
+    void setKeepOpen(const HostAndPort&, bool) override {}
+
+    std::vector<HostAndPort> droppedHosts;
+    int dropAllCount = 0;
+    Status lastStatus = Status::OK();
 };
 
 class OnServerHeartbeatFailureEventTest : service_context_test::WithSetupTransportLayer,
@@ -156,6 +177,51 @@ TEST_F(OnServerHeartbeatFailureEventTest, DoesNotMarkServerUnknown) {
 
     triggerHeartbeatFailure(Status(ErrorCodes::ExceededTimeLimit, "error3"), kHost, BSONObj());
     ASSERT_EQUALS(sdam::ServerType::kRSSecondary, getServerType(kHost));
+}
+
+using OnTopologyChangeEventTest = OnServerHeartbeatFailureEventTest;
+
+// Hiding a member removes it from the topology.
+TEST_F(OnTopologyChangeEventTest, DropsConnectionsWhenHostLeavesTopology) {
+    const HostAndPort host0{"localhost", 27017};
+    const HostAndPort host1{"localhost", 27018};
+    auto connectionManager = std::make_shared<RecordingConnectionManager>();
+    const auto uri = uassertStatusOK(
+        MongoURI::parse("mongodb://localhost:27017,localhost:27018/?replicaSet=testSet"));
+    auto monitor = std::make_shared<StreamableReplicaSetMonitor>(
+        uri,
+        _executor,
+        connectionManager,
+        [] {},
+        std::make_shared<ReplicaSetMonitorManagerStats>());
+
+    sdam::SdamConfiguration sdamConfig(std::vector<HostAndPort>{host0},
+                                       sdam::TopologyType::kReplicaSetNoPrimary,
+                                       std::string("testSet"));
+    monitor->initForTesting(
+        std::make_unique<sdam::TopologyManagerImpl>(sdamConfig, SystemClockSource::get()));
+
+    sdam::SdamConfiguration bothHosts(std::vector<HostAndPort>{host0, host1},
+                                      sdam::TopologyType::kReplicaSetNoPrimary,
+                                      std::string("testSet"));
+    auto previous = sdam::TopologyDescription::create(bothHosts);
+    auto unchanged = sdam::TopologyDescription::clone(*previous);
+    static_cast<sdam::TopologyListener*>(monitor.get())
+        ->onTopologyDescriptionChangedEvent(previous, unchanged);
+    EXPECT_THAT(connectionManager->droppedHosts, IsEmpty());
+
+    auto withoutHost1 = sdam::TopologyDescription::clone(*previous);
+    withoutHost1->removeServerDescription(host1);
+    static_cast<sdam::TopologyListener*>(monitor.get())
+        ->onTopologyDescriptionChangedEvent(previous, withoutHost1);
+
+    EXPECT_THAT(connectionManager->droppedHosts, ElementsAre(host1));
+    EXPECT_THAT(connectionManager->lastStatus,
+                StatusIs(Eq(ErrorCodes::PooledConnectionsDropped),
+                         Eq("Host was removed from the replica set topology")));
+    EXPECT_THAT(connectionManager->dropAllCount, Eq(0));
+
+    monitor->drop();
 }
 
 }  // namespace
