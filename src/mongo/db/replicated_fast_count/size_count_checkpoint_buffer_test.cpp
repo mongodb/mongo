@@ -755,6 +755,11 @@ TEST_F(SizeCountCheckpointBufferAwaitTest, AwaitRecordsElapsedWaitTime) {
     OplogScanResult batch;
     stdx::thread waiter([&]() { batch = buffer.awaitCheckoutForFlush(operationContext()); });
 
+    // Wait for the above thread to block on the condition variable.
+    while (!operationContext()->isWaitingForConditionOrInterrupt()) {
+        sleepFor(Milliseconds(1));
+    }
+
     // Delay the batch cut so the waiter is guaranteed to block for at least this long.
     constexpr auto kWaitTime = Milliseconds(100);
     sleepFor(kWaitTime);
@@ -767,7 +772,7 @@ TEST_F(SizeCountCheckpointBufferAwaitTest, AwaitRecordsElapsedWaitTime) {
     waiter.join();
     EXPECT_EQ(batch.lastTimestamp, Timestamp(2, 2));
     EXPECT_GE(capturer.readInt64Counter(MetricNames::kReplicatedFastCountWatermarkAwaitTimeMsTotal),
-              kWaitTime.count());
+              100);
 }
 
 DEATH_TEST(SizeCountCheckpointBufferDeathTest, LastBufferedRidBeforeEntries, "12101812") {
