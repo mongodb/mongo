@@ -39,6 +39,7 @@
       # TODO(SERVER-93922): enable this test once bulkWrite trims
       # the overhead it introduces in the command object.
       - jstests/core/query/bson_size_limit_agg.js
+      - jstests/core/query/bson_size_limit_convert.js
 
 - name: single_op_txns_excluded_files
   value:

@@ -81,6 +81,7 @@
       # primary's oplog when run as a part of burn_in_tests.
       - jstests/core/**/query/max_doc_size.js
       - jstests/core/**/query/bson_size_limit_agg.js
+      - jstests/core/**/query/bson_size_limit_convert.js
       - jstests/core/**/mr_bigobject.js
       - jstests/core/**/capped_large_docs.js
       - jstests/core/**/capped_resize.js

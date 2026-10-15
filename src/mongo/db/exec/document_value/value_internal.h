@@ -36,8 +36,8 @@ public:
     static boost::intrusive_ptr<const RCString> create(std::string_view s) {
         static constexpr size_t sizeLimit = BSONObjMaxUserSize;
         uassert(ErrorCodes::BSONObjectTooLarge,
-                fmt::format("RCString too large. Requires size={} < limit={}", s.size(), sizeLimit),
-                s.size() < sizeLimit);
+                fmt::format("RCString too large. Size {} exceeds maximum {}", s.size(), sizeLimit),
+                s.size() <= sizeLimit);
         return boost::intrusive_ptr{new (s) RCString{s}};
     }
 
