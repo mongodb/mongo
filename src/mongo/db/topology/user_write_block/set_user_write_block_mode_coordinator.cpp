@@ -115,13 +115,6 @@ ExecutorFuture<void> SetUserWriteBlockModeCoordinator::_runImpl(
                 auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
                 const auto session = _getNewSession(opCtx);
 
-                // Ensure the topology is stable so we don't miss propagating the write blocking
-                // state to any concurrently added shard. Keep it stable until we have persisted the
-                // user write blocking state on the configsvr so that new shards that get added will
-                // see the new state.
-                Lock::SharedLock stableTopologyRegion =
-                    ShardingCatalogManager::get(opCtx)->enterStableTopologyRegion(opCtx);
-
                 // Propagate the state to the shards.
                 sendSetUserWriteBlockModeCmdToAllShards(
                     opCtx,
@@ -155,13 +148,6 @@ ExecutorFuture<void> SetUserWriteBlockModeCoordinator::_runImpl(
             _buildPhaseHandler(Phase::kComplete, [this, anchor = shared_from_this()](auto* opCtx) {
                 auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
                 auto session = _getNewSession(opCtx);
-
-                // Ensure the topology is stable so we don't miss propagating the write blocking
-                // state to any concurrently added shard. Keep it stable until we have persisted the
-                // user write blocking state on the configsvr so that new shards that get added will
-                // e see the new state.
-                Lock::SharedLock stableTopologyRegion =
-                    ShardingCatalogManager::get(opCtx)->enterStableTopologyRegion(opCtx);
 
                 // Propagate the state to the shards.
                 sendSetUserWriteBlockModeCmdToAllShards(

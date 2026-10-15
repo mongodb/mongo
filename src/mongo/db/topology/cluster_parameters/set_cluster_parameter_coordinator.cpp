@@ -294,13 +294,6 @@ ExecutorFuture<void> SetClusterParameterCoordinator::_runImpl(
 
                 const auto session = _getNewSession(opCtx);
                 {
-                    // Ensure the topology is stable so shards added concurrently will
-                    // not miss the cluster parameter. Keep it stable until we have
-                    // persisted the cluster parameter on the configsvr so that new
-                    // shards that get added will see the new cluster parameter.
-                    Lock::SharedLock stableTopologyRegion =
-                        catalogManager->enterStableTopologyRegion(opCtx);
-
                     _sendSetClusterParameterToAllShards(opCtx, session, executor);
 
                     _commit(opCtx);

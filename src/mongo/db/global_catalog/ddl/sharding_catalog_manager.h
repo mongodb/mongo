@@ -642,12 +642,6 @@ public:
     RemoveShardProgress removeShard(OperationContext* opCtx, const ShardId& shardId);
 
     /**
-     * Returns a scoped lock object, which holds the _kShardMembershipLock in shared mode. While
-     * this lock is held no topology changes can occur.
-     */
-    [[nodiscard]] Lock::SharedLock enterStableTopologyRegion(OperationContext* opCtx);
-
-    /**
      * Returns a scoped lock object, which holds the _kShardMembershipLock in exclusive mode. This
      * should only be acquired by topology change operations.
      */
@@ -671,9 +665,7 @@ public:
 
     /**
      * Updates the "hasTwoOrMoreShard" cluster cardinality parameter based on the number of shards
-     * in the shard registry after reloading it. Cannot be called while holding the
-     * _kShardMembershipLock in exclusive mode since setting cluster parameters requires taking this
-     * lock in shared mode.
+     * in the shard registry after reloading it.
      */
     Status updateClusterCardinalityParameterIfNeeded(OperationContext* opCtx);
 

@@ -362,8 +362,8 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
     // Take the cluster cardinality parameter lock and the shard membership lock in exclusive mode
     // so that no add/remove shard operation and its set cluster cardinality parameter operation can
     // interleave with the ones below. Release the shard membership lock before initiating the
-    // _configsvrSetClusterParameter command after finishing the add shard operation since setting a
-    // cluster parameter requires taking this lock.
+    // _configsvrSetClusterParameter command after finishing the add shard operation so the
+    // exclusive lock is not held across that distributed update.
     auto clusterCardinalityParameterLock =
         acquireClusterCardinalityParameterLockForTopologyChange(opCtx);
     auto shardMembershipLock = acquireShardMembershipLockForTopologyChange(opCtx);
@@ -392,8 +392,8 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         // committed snapshot.
         repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
 
-        // Release the shard membership lock since the set cluster parameter operation below
-        // require taking this lock.
+        // Release the shard membership lock so it is not held across the distributed cluster
+        // parameter update below.
         shardMembershipLock.unlock();
         auto updateStatus = _updateClusterCardinalityParameterAfterAddShardIfNeeded(
             clusterCardinalityParameterLock, opCtx);
@@ -602,8 +602,8 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
 
     topology_change_helpers::hangAddShardBeforeUpdatingClusterCardinalityParameterFailpoint(opCtx);
 
-    // Release the shard membership lock since the set cluster parameter operation below requires
-    // taking this lock.
+    // Release the shard membership lock so it is not held across the distributed cluster
+    // parameter update below.
     shardMembershipLock.unlock();
 
     // Unblock ShardingDDLCoordinators on the cluster.
@@ -655,9 +655,7 @@ boost::optional<RemoveShardProgress> ShardingCatalogManager::checkPreconditionsA
 
     // Take the cluster cardinality parameter lock and the shard membership lock in exclusive mode
     // so that no add/remove shard operation and its set cluster cardinality parameter operation can
-    // interleave with the ones below. Release the shard membership lock before initiating the
-    // _configsvrSetClusterParameter command after finishing the remove shard operation since
-    // setting a cluster parameter requires taking this lock.
+    // interleave with starting drain below.
     Lock::ExclusiveLock clusterCardinalityParameterLock =
         acquireClusterCardinalityParameterLockForTopologyChange(opCtx);
     Lock::ExclusiveLock shardMembershipLock =
@@ -665,8 +663,7 @@ boost::optional<RemoveShardProgress> ShardingCatalogManager::checkPreconditionsA
 
     auto optShard = topology_change_helpers::getShardIfExists(opCtx, _localConfigShard, shardId);
     if (!optShard) {
-        // Release the shard membership lock since the set cluster parameter operation below
-        // requires taking this lock.
+        // The shard is already absent, so release the membership lock and report completion.
         shardMembershipLock.unlock();
 
         return RemoveShardProgress(ShardDrainingStateEnum::kCompleted);
@@ -735,9 +732,7 @@ void ShardingCatalogManager::stopDrain(OperationContext* opCtx, const ShardId& s
 
     // Take the cluster cardinality parameter lock and the shard membership lock in exclusive mode
     // so that no add/remove shard operation and its set cluster cardinality parameter operation can
-    // interleave with the ones below. Release the shard membership lock before initiating the
-    // _configsvrSetClusterParameter command after finishing the remove shard operation since
-    // setting a cluster parameter requires taking this lock.
+    // interleave with stopping drain below.
     Lock::ExclusiveLock clusterCardinalityParameterLock =
         acquireClusterCardinalityParameterLockForTopologyChange(opCtx);
     Lock::ExclusiveLock shardMembershipLock =
@@ -955,8 +950,8 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
             shardName,
             Grid::get(opCtx)->getExecutorPool()->getFixedExecutor());
 
-        // Release the shard membership lock since the set cluster parameter operation below
-        // require taking this lock.
+        // Release the shard membership lock so it is not held across the distributed cluster
+        // parameter update below.
         shardMembershipLock.unlock();
 
         // Release also the fixedFCVRegion since it is not needed after this and prevents us from
@@ -1085,10 +1080,6 @@ void ShardingCatalogManager::appendShardDrainingStatus(OperationContext* opCtx,
     }
     result.append("msg", topology_change_helpers::getRemoveShardMessage(state));
     shardDrainingStatus.serialize(&result);
-}
-
-Lock::SharedLock ShardingCatalogManager::enterStableTopologyRegion(OperationContext* opCtx) {
-    return Lock::SharedLock(opCtx, _kShardMembershipLock);
 }
 
 Lock::ExclusiveLock ShardingCatalogManager::acquireShardMembershipLockForTopologyChange(

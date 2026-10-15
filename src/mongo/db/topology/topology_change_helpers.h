@@ -308,8 +308,7 @@ void addShardInTransaction(OperationContext* opCtx,
 
 /**
  * Updates the "hasTwoOrMoreShard" cluster cardinality parameter. Can only be called while holding
- * the _kClusterCardinalityParameterLock in exclusive mode and not holding the _kShardMembershipLock
- * in exclusive mode since setting cluster parameters requires taking the latter in shared mode.
+ * the _kClusterCardinalityParameterLock in exclusive mode.
  */
 void updateClusterCardinalityParameter(const Lock::ExclusiveLock& clusterCardinalityParameterLock,
                                        OperationContext* opCtx);
