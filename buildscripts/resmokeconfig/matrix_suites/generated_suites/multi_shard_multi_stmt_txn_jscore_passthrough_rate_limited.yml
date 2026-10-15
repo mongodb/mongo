@@ -54,6 +54,7 @@ executor:
         defaultClientMaxBackoffMillis: 1000
         defaultClientMaxRetryAttempts: 16
         enableTestCommands: 1
+        failpoint.disableReplicatedFastCount: "{mode: 'alwaysOn'}"
         failpoint.failIngressRequestRateLimiting:
           mode:
             activationProbability: 0.25

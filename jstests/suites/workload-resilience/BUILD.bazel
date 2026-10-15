@@ -65,7 +65,6 @@ resmoke_suite_test(
         "ingress_request_rate_limited",
         "multi_shard",
         "multi_stmt",
-        "requires_replicated_fast_count_recovery",
     ],
     deps = [
         "//src/mongo/db:mongod",

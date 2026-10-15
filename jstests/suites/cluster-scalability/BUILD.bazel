@@ -181,7 +181,6 @@ resmoke_suite_test(
         "ci-default",
         "common",
         "multi_shard",
-        "requires_replicated_fast_count_recovery",
     ],
     deps = [
         "//src/mongo/db:mongod",
@@ -200,7 +199,6 @@ resmoke_suite_test(
         "common",
         "multi_shard",
         "multi_stmt",
-        "requires_replicated_fast_count_recovery",
     ],
     deps = [
         "//src/mongo/db:mongod",
