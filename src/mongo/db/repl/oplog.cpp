@@ -822,13 +822,6 @@ void createOplog(OperationContext* opCtx) {
     createOplog(opCtx, NamespaceString::kRsOplogNamespace, isReplSet);
 }
 
-UUID getOplogUuid(OperationContext* opCtx) {
-    AutoGetOplogFastPath oplogRead(opCtx, OplogAccessMode::kRead);
-    const auto& oplogColl = oplogRead.getCollection();
-    massert(13655700, "oplog collection not found", oplogColl);
-    return oplogColl->uuid();
-}
-
 std::vector<OplogSlot> getNextOpTimes(OperationContext* opCtx,
                                       std::size_t count,
                                       std::size_t opTimeOffset) {

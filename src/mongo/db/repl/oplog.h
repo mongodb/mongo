@@ -120,11 +120,6 @@ void createOplog(OperationContext* opCtx,
 void createOplog(OperationContext* opCtx);
 
 /**
- * Returns the UUID of the oplog collection.
- */
-UUID getOplogUuid(OperationContext* opCtx);
-
-/**
  * Returns the optime of the oplog entry written to the oplog.
  * Returns a null optime if oplog was not modified.
  */
