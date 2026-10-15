@@ -1377,5 +1377,12 @@ error_codes:
       categories: [PlannerEstimationError, InternalOnly],
     }
 
+  # Search request was canceled due to overload
+  - {
+      code: 530,
+      name: SearchRequestCanceledDueToOverload,
+      categories: [SystemOverloadedError],
+    }
+
   # ^^^^
   # Add new codes, sequentially numbered, above.
