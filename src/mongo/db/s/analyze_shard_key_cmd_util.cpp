@@ -160,6 +160,13 @@ void validateKeyCharacteristicsMetrics(KeyCharacteristicsMetrics metrics) {
         7826511, msg, metrics.getNumDocsSampled() >= (int64_t)metrics.getMostCommonValues().size());
 }
 
+// Properties of the underlying hint index
+struct IndexSpec {
+    BSONObj keyPattern;
+    std::string indexName;
+    bool isUnique;
+};
+
 /**
  * Returns an aggregate command request for calculating the cardinality and frequency metrics for
  * the given shard key.
@@ -184,15 +191,16 @@ void validateKeyCharacteristicsMetrics(KeyCharacteristicsMetrics metrics) {
  * The former case involves an additional FETCH for every document returned since it needs to look
  * up a document from the index value.
  */
-AggregateCommandRequest makeAggregateRequestForCardinalityAndFrequency(const NamespaceString& nss,
-                                                                       const BSONObj& shardKey,
-                                                                       const BSONObj& hintIndexKey,
-                                                                       int numMostCommonValues,
-                                                                       int64_t numDocsTotal,
-                                                                       int64_t numDocsToSample) {
+AggregateCommandRequest makeAggregateRequestForCardinalityAndFrequency(
+    const NamespaceString& nss,
+    const BSONObj& shardKey,
+    const IndexSpec& hintIndexSpec,
+    int numMostCommonValues,
+    int64_t numDocsTotal,
+    int64_t numDocsToSample) {
     // Validate only the shard key prefix. Additional fields are not needed for calculating metrics.
-    uassertStatusOK(
-        validateIndexKey(hintIndexKey.filterFieldsUndotted(shardKey, true /* inFilter */)));
+    uassertStatusOK(validateIndexKey(
+        hintIndexSpec.keyPattern.filterFieldsUndotted(shardKey, true /* inFilter */)));
 
     std::vector<BSONObj> pipeline;
 
@@ -220,7 +228,7 @@ AggregateCommandRequest makeAggregateRequestForCardinalityAndFrequency(const Nam
             tempFieldName,
             BSON("$getField" << BSON("field" << origFieldName << "input"
                                              << ("$" + std::string{kIndexKeyFieldName}))));
-        if (ShardKeyPattern::isHashedPatternEl(hintIndexKey.getField(origFieldName))) {
+        if (ShardKeyPattern::isHashedPatternEl(hintIndexSpec.keyPattern.getField(origFieldName))) {
             origHashedFieldName.emplace(origFieldName);
             tempHashedFieldName.emplace(tempFieldName);
         }
@@ -291,7 +299,8 @@ AggregateCommandRequest makeAggregateRequestForCardinalityAndFrequency(const Nam
     }
 
     AggregateCommandRequest aggRequest(nss, pipeline);
-    aggRequest.setHint(hintIndexKey);
+    // Hint by name since multiple indexes can have the same key pattern.
+    aggRequest.setHint(BSON("$hint" << hintIndexSpec.indexName));
     aggRequest.setAllowDiskUse(true);
     // (re)shardCollection by design uses simple collation for comparing shard key values.
     aggRequest.setCollation(CollationSpec::kSimpleSpec);
@@ -400,11 +409,6 @@ void runAggregate(OperationContext* opCtx,
     return runLocalAggregate(opCtx, aggRequest, callbackFn);
 }
 
-struct IndexSpec {
-    BSONObj keyPattern;
-    bool isUnique;
-};
-
 /**
  * To be used for finding the index that can be used as a hint for the aggregate command for
  * calculating the cardinality and frequency metrics.
@@ -422,6 +426,7 @@ struct IndexSpec {
  * - It must not be multi-key since a shard key field cannot be an array.
  * - It must not have descending fields within the shard key prefix since they are unsupported by
  * shardCollection.
+ * - It must not be hidden since a hidden index cannot be used as a query hint.
  */
 boost::optional<IndexSpec> findCompatiblePrefixedIndex(OperationContext* opCtx,
                                                        const CollectionPtr& collection,
@@ -431,7 +436,8 @@ boost::optional<IndexSpec> findCompatiblePrefixedIndex(OperationContext* opCtx,
         auto indexKey = indexSpec.getKey();
         if (shardKey.isFieldNamePrefixOf(indexKey)) {
             tassert(6875201, "Expected clustered index to be unique", indexSpec.getUnique());
-            return IndexSpec{indexKey, indexSpec.getUnique()};
+            tassert(13548901, "Expected clustered index to have a name", indexSpec.getName());
+            return IndexSpec{indexKey, std::string{*indexSpec.getName()}, indexSpec.getUnique()};
         }
     }
 
@@ -455,6 +461,9 @@ boost::optional<IndexSpec> findCompatiblePrefixedIndex(OperationContext* opCtx,
         if (indexDesc->isSetSparseByUser() || indexDesc->isPartial()) {
             continue;
         }
+        if (indexDesc->hidden()) {
+            continue;
+        }
         if (!indexDesc->collation().isEmpty()) {
             continue;
         }
@@ -475,7 +484,7 @@ boost::optional<IndexSpec> findCompatiblePrefixedIndex(OperationContext* opCtx,
             (!compatibleIndexSpec->isUnique && indexDesc->unique())) {
             // Give preference to indexes with fewer fields and unique indexes since they can help
             // us infer if the shard key is unique.
-            compatibleIndexSpec = IndexSpec{indexKey, indexDesc->unique()};
+            compatibleIndexSpec = IndexSpec{indexKey, indexDesc->indexName(), indexDesc->unique()};
         }
     }
 
@@ -532,7 +541,7 @@ BSONObj truncateBSONObj(const BSONObj& obj, int maxSize, int depth = 0) {
 
 /**
  * Returns the cardinality and frequency metrics for a shard key given that the shard key is unique
- * and the collection has the the given fast count of the number of documents.
+ * and the collection has the given fast count of the number of documents.
  */
 CardinalityFrequencyMetrics calculateCardinalityAndFrequencyUnique(OperationContext* opCtx,
                                                                    const UUID& analyzeShardKeyId,
@@ -588,7 +597,7 @@ CardinalityFrequencyMetrics calculateCardinalityAndFrequencyGeneric(OperationCon
                                                                     const UUID& analyzeShardKeyId,
                                                                     const NamespaceString& nss,
                                                                     const BSONObj& shardKey,
-                                                                    const BSONObj& hintIndexKey,
+                                                                    const IndexSpec& hintIndexSpec,
                                                                     int64_t numDocsTotal,
                                                                     int64_t numDocsToSample,
                                                                     int numMostCommonValues) {
@@ -597,7 +606,8 @@ CardinalityFrequencyMetrics calculateCardinalityAndFrequencyGeneric(OperationCon
           logAttrs(nss),
           "analyzeShardKeyId"_attr = analyzeShardKeyId,
           "shardKey"_attr = shardKey,
-          "indexKey"_attr = hintIndexKey,
+          "indexKey"_attr = hintIndexSpec.keyPattern,
+          "indexName"_attr = hintIndexSpec.indexName,
           "numDocsTotal"_attr = numDocsTotal,
           "numDocsToSample"_attr = numDocsToSample,
           "numMostCommonValues"_attr = numMostCommonValues);
@@ -607,7 +617,7 @@ CardinalityFrequencyMetrics calculateCardinalityAndFrequencyGeneric(OperationCon
     const auto maxSizeBytesPerValue = kMaxBSONObjSizeMostCommonValues / numMostCommonValues;
 
     auto aggRequest = makeAggregateRequestForCardinalityAndFrequency(
-        nss, shardKey, hintIndexKey, numMostCommonValues, numDocsTotal, numDocsToSample);
+        nss, shardKey, hintIndexSpec, numMostCommonValues, numDocsTotal, numDocsToSample);
 
     runAggregate(opCtx, aggRequest, [&](const BSONObj& doc) {
         auto numDocs = doc.getField(kNumDocsFieldName).exactNumberLong();
@@ -662,15 +672,15 @@ CardinalityFrequencyMetrics calculateCardinalityAndFrequencyGeneric(OperationCon
 }
 
 /**
- * Returns the cardinality and frequency metrics for a shard key given that the shard key is unique
- * and the collection has the the given fast count of the number of documents.
+ * Returns the cardinality and frequency metrics for the given shard key. Calls the unique version
+ * if the shard key is unique, and the generic version otherwise.
  */
 CardinalityFrequencyMetrics calculateCardinalityAndFrequency(OperationContext* opCtx,
                                                              const UUID& analyzeShardKeyId,
                                                              const NamespaceString& nss,
                                                              const BSONObj& shardKey,
-                                                             const BSONObj& hintIndexKey,
-                                                             bool isUnique,
+                                                             const IndexSpec& hintIndexSpec,
+                                                             bool isShardKeyUnique,
                                                              int64_t numDocsTotal,
                                                              boost::optional<double> sampleRate,
                                                              boost::optional<int64_t> sampleSize) {
@@ -688,21 +698,21 @@ CardinalityFrequencyMetrics calculateCardinalityAndFrequency(OperationContext* o
 
     const auto numDocsToSample =
         sampleRate ? std::ceil(*sampleRate * numDocsTotal) : std::min(*sampleSize, numDocsTotal);
-    return isUnique ? calculateCardinalityAndFrequencyUnique(opCtx,
-                                                             analyzeShardKeyId,
-                                                             nss,
-                                                             shardKey,
-                                                             numDocsTotal,
-                                                             numDocsToSample,
-                                                             numMostCommonValues)
-                    : calculateCardinalityAndFrequencyGeneric(opCtx,
-                                                              analyzeShardKeyId,
-                                                              nss,
-                                                              shardKey,
-                                                              hintIndexKey,
-                                                              numDocsTotal,
-                                                              numDocsToSample,
-                                                              numMostCommonValues);
+    return isShardKeyUnique ? calculateCardinalityAndFrequencyUnique(opCtx,
+                                                                     analyzeShardKeyId,
+                                                                     nss,
+                                                                     shardKey,
+                                                                     numDocsTotal,
+                                                                     numDocsToSample,
+                                                                     numMostCommonValues)
+                            : calculateCardinalityAndFrequencyGeneric(opCtx,
+                                                                      analyzeShardKeyId,
+                                                                      nss,
+                                                                      shardKey,
+                                                                      hintIndexSpec,
+                                                                      numDocsTotal,
+                                                                      numDocsToSample,
+                                                                      numMostCommonValues);
 }
 
 /**
@@ -1074,7 +1084,7 @@ boost::optional<KeyCharacteristicsMetrics> calculateKeyCharacteristicsMetrics(
     KeyCharacteristicsMetrics metrics;
 
     auto shardKeyBson = shardKey.toBSON();
-    BSONObj indexKeyBson;
+    boost::optional<IndexSpec> indexSpec;
     {
         const auto collection = acquireCollectionMaybeLockFree(
             opCtx,
@@ -1113,26 +1123,28 @@ boost::optional<KeyCharacteristicsMetrics> calculateKeyCharacteristicsMetrics(
         repl::ReadConcernArgs::get(opCtx) = originalReadConcernArgs;
 
         const auto& collectionPtr = collection.getCollectionPtr();
-        auto indexSpec = findCompatiblePrefixedIndex(opCtx, collectionPtr, shardKeyBson);
+        indexSpec = findCompatiblePrefixedIndex(opCtx, collectionPtr, shardKeyBson);
 
         if (!indexSpec) {
             return boost::none;
         }
 
-        indexKeyBson = indexSpec->keyPattern.getOwned();
+        indexSpec->keyPattern = indexSpec->keyPattern.getOwned();
 
         LOGV2(6915305,
               "Start calculating metrics about the characteristics of the shard key",
               logAttrs(nss),
               "analyzeShardKeyId"_attr = analyzeShardKeyId,
               "shardKey"_attr = shardKeyBson,
-              "indexKey"_attr = indexKeyBson,
+              "indexKey"_attr = indexSpec->keyPattern,
+              "indexName"_attr = indexSpec->indexName,
               "sampleRate"_attr = sampleRate,
               "sampleSize"_attr = sampleSize);
         analyzeShardKeyPauseBeforeCalculatingKeyCharacteristicsMetrics.pauseWhileSet(opCtx);
 
-        metrics.setIsUnique(shardKeyBson.nFields() == indexKeyBson.nFields() ? indexSpec->isUnique
-                                                                             : false);
+        metrics.setIsUnique(shardKeyBson.nFields() == indexSpec->keyPattern.nFields()
+                                ? indexSpec->isUnique
+                                : false);
         LOGV2(7790001,
               "Start calculating metrics about the monotonicity of the shard key",
               logAttrs(nss),
@@ -1165,7 +1177,7 @@ boost::optional<KeyCharacteristicsMetrics> calculateKeyCharacteristicsMetrics(
                                                                         analyzeShardKeyId,
                                                                         nss,
                                                                         shardKeyBson,
-                                                                        indexKeyBson,
+                                                                        *indexSpec,
                                                                         metrics.getIsUnique(),
                                                                         collStatsMetrics.numDocs,
                                                                         sampleRate,
@@ -1198,7 +1210,8 @@ boost::optional<KeyCharacteristicsMetrics> calculateKeyCharacteristicsMetrics(
           logAttrs(nss),
           "analyzeShardKeyId"_attr = analyzeShardKeyId,
           "shardKey"_attr = shardKeyBson,
-          "indexKey"_attr = indexKeyBson);
+          "indexKey"_attr = indexSpec->keyPattern,
+          "indexName"_attr = indexSpec->indexName);
 
     return metrics;
 }

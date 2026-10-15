@@ -23,7 +23,12 @@ const writeConcern = {
     w: numNodesPerRS,
 };
 
-function testAnalyzeShardKey(conn, {docs, indexSpecs, shardKeys, metrics}) {
+function testAnalyzeShardKey(conn, {docs, indexSpecs, shardKeys, metrics, collectionOptions}) {
+    assert(
+        !(collectionOptions && indexSpecs),
+        "Cannot specify both collectionOptions and indexSpecs",
+    );
+
     const dbName = "testDb-" + extractUUIDFromObject(UUID());
     const collName = "testColl";
     const ns = dbName + "." + collName;
@@ -32,7 +37,11 @@ function testAnalyzeShardKey(conn, {docs, indexSpecs, shardKeys, metrics}) {
     const db = conn.getDB(dbName);
     const coll = db.getCollection(collName);
 
-    assert.commandWorked(db.runCommand({createIndexes: collName, indexes: indexSpecs}));
+    if (collectionOptions) {
+        assert.commandWorked(db.createCollection(collName, collectionOptions));
+    } else {
+        assert.commandWorked(db.runCommand({createIndexes: collName, indexes: indexSpecs}));
+    }
     assert.commandWorked(coll.insert(docs, {writeConcern}));
 
     for (let shardKey of shardKeys) {
@@ -127,6 +136,68 @@ function runTest(conn) {
         metrics: {
             numDocs: 2,
             isUnique: true,
+            numDistinctValues: 2,
+            mostCommonValues: [
+                {value: {x: -1}, frequency: 1},
+                {value: {x: 1}, frequency: 1},
+            ],
+            numMostCommonValues,
+        },
+    });
+
+    testAnalyzeShardKey(conn, {
+        docs: [{x: -1}, {x: 1}],
+        indexSpecs: [
+            {
+                name: "x_1",
+                key: {x: 1},
+            },
+            {
+                name: "x_1_unique_ci",
+                key: {x: 1},
+                unique: true,
+                collation: {locale: "en", strength: 2},
+            },
+            {
+                name: "x_1_unique_hidden",
+                key: {x: 1},
+                unique: true,
+                hidden: true,
+            },
+        ],
+        shardKeys: [{x: 1}, {x: "hashed"}],
+        metrics: {
+            numDocs: 2,
+            isUnique: false,
+            numDistinctValues: 2,
+            mostCommonValues: [
+                {value: {x: -1}, frequency: 1},
+                {value: {x: 1}, frequency: 1},
+            ],
+            numMostCommonValues,
+        },
+    });
+
+    testAnalyzeShardKey(conn, {
+        docs: [
+            {x: -1, y: -1},
+            {x: 1, y: 1},
+        ],
+        indexSpecs: [
+            {
+                name: "x_1_y_1",
+                key: {x: 1, y: 1},
+            },
+            {
+                name: "x_1_y_1_unique",
+                key: {x: 1, y: 1},
+                unique: true,
+            },
+        ],
+        shardKeys: [{x: 1}, {x: "hashed"}],
+        metrics: {
+            numDocs: 2,
+            isUnique: false,
             numDistinctValues: 2,
             mostCommonValues: [
                 {value: {x: -1}, frequency: 1},
@@ -233,6 +304,22 @@ function runTest(conn) {
         expectedErrorCode: ErrorCodes.IllegalOperation,
         expectedErrorMsg:
             "Cannot analyze the characteristics of a shard key that does not have a supporting index",
+    });
+
+    testAnalyzeShardKey(conn, {
+        docs: [{_id: -1}, {_id: 1}],
+        collectionOptions: {clusteredIndex: {key: {_id: 1}, unique: true}},
+        shardKeys: [{_id: 1}],
+        metrics: {
+            numDocs: 2,
+            isUnique: true,
+            numDistinctValues: 2,
+            mostCommonValues: [
+                {value: {_id: -1}, frequency: 1},
+                {value: {_id: 1}, frequency: 1},
+            ],
+            numMostCommonValues,
+        },
     });
 }
 
