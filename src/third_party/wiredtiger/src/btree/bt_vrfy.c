@@ -269,13 +269,11 @@ __verify_unique_internal(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
     uint32_t *ids = NULL;
 
     while ((ret = cursor->next(cursor)) == 0) {
-        const char *key;
+        const char *key, *value;
         WT_ERR(cursor->get_key(cursor, &key));
-        if (!WT_PREFIX_MATCH(key, "file:") || !WT_URI_IS_STABLE(key))
-            continue;
-
-        const char *value;
         WT_ERR(cursor->get_value(cursor, &value));
+        if (!WT_PREFIX_MATCH(key, "file:") || !__wt_btree_entry_is_shared(session, key, value))
+            continue;
 
         WT_CONFIG_ITEM id_val;
         WT_ERR(__wt_config_getones(session, value, "id", &id_val));
@@ -302,9 +300,9 @@ err:
 
 /*
  * __verify_unique_btree_ids --
- *     Verify that no two stable constituent files in the local metadata share the same btree ID.
- *     Only called for .wt_stable files, where the verify session's exclusive lock is on the stable
- *     file not the metadata file so a metadata cursor can be opened directly.
+ *     Verify that no two shared files in the local metadata share the same btree ID. Only called
+ *     for shared trees, where the verify session's exclusive lock is on the shared file not the
+ *     metadata file so a metadata cursor can be opened directly.
  */
 static int
 __verify_unique_btree_ids(WT_SESSION_IMPL *session)
@@ -367,12 +365,12 @@ __wt_disagg_get_database_size(WT_SESSION_IMPL *session, uint64_t *sizep)
     while ((ret = cursor->next(cursor)) == 0) {
         WT_ERR(cursor->get_key(cursor, &uri));
 
-        /* Only consider file URIs as only they contribute to database_size. */
-        if (!WT_PREFIX_MATCH(uri, "file:") || !WT_SUFFIX_MATCH(uri, ".wt_stable"))
+        /* Only consider shared file entries as only they contribute to database_size. */
+        WT_ERR(cursor->get_value(cursor, &value));
+        if (!WT_PREFIX_MATCH(uri, "file:") || !__wt_btree_entry_is_shared(session, uri, value))
             continue;
 
-        /* Look up the metadata string and extract the most recent checkpoint size. */
-        WT_ERR(cursor->get_value(cursor, &value));
+        /* Extract the most recent checkpoint size from the metadata string. */
         WT_ERR_NOTFOUND_OK(__wt_ckpt_last_size(session, value, &ckpt_size), true);
         if (ret == WT_NOTFOUND)
             continue;
@@ -641,13 +639,13 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
         goto done;
 
     /*
-     * Check that no two stable constituent files share the same btree ID. Only run for stable files
-     * the verify session's exclusive lock is on the stable file, not the metadata file, so a shared
-     * metadata cursor can be opened directly on the verify session.
+     * Check that no two shared files share the same btree ID. Only run for shared trees: the verify
+     * session's exclusive lock is on the shared file, not the metadata file, so a shared metadata
+     * cursor can be opened directly on the verify session.
      *
      * FIXME-WT-18582: Having these per-URI means we do a metadata scan for each verified URI.
      */
-    if (WT_URI_IS_STABLE(name)) {
+    if (__wt_dhandle_shared_btree_kind(btree->dhandle) != WT_SHARED_BTREE_NONE) {
         WT_ERR(__verify_unique_btree_ids(session));
 
         /* If we're already verifying shared metadata, don't manually perform this step. */

@@ -18,9 +18,9 @@ __wt_checkpoint_handle_stats_clear(WT_SESSION_IMPL *session)
     WT_CKPT_CONNECTION *ckpt = &S2C(session)->ckpt;
 
     ckpt->handle_stats.apply = ckpt->handle_stats.drop = ckpt->handle_stats.lock =
-      ckpt->handle_stats.meta_check = ckpt->handle_stats.skip = 0;
+      ckpt->handle_stats.skip = 0;
     ckpt->handle_stats.apply_time = ckpt->handle_stats.drop_time = ckpt->handle_stats.lock_time =
-      ckpt->handle_stats.meta_check_time = ckpt->handle_stats.skip_time = 0;
+      ckpt->handle_stats.skip_time = 0;
 }
 
 /*
@@ -53,9 +53,6 @@ __wt_checkpoint_handle_stats(WT_SESSION_IMPL *session, uint64_t gathering_handle
     WT_STAT_CONN_SET(session, checkpoint_handle_duration, gathering_handles_time_us);
     WT_STAT_CONN_SET(session, checkpoint_handle_lock_duration, ckpt->handle_stats.lock_time);
     WT_STAT_CONN_SET(session, checkpoint_handle_locked, ckpt->handle_stats.lock);
-    WT_STAT_CONN_SET(session, checkpoint_handle_meta_checked, ckpt->handle_stats.meta_check);
-    WT_STAT_CONN_SET(
-      session, checkpoint_handle_meta_check_duration, ckpt->handle_stats.meta_check_time);
     WT_STAT_CONN_SET(session, checkpoint_handle_skipped, ckpt->handle_stats.skip);
     WT_STAT_CONN_SET(session, checkpoint_handle_skip_duration, ckpt->handle_stats.skip_time);
 }

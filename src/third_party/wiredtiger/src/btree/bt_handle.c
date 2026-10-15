@@ -217,7 +217,7 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
         F_SET_ATOMIC_32(btree, WT_BTREE_READONLY);
 
     /* For disaggregated stable tree opens, separate any trailing checkpoint indicator. */
-    WT_ERR(__wt_btree_shared_base_name(session, &dhandle_name, &checkpoint, &name_buf));
+    WT_ERR(__wt_dhandle_shared_base_name(session, &dhandle_name, &checkpoint, &name_buf));
 
     /* Get the checkpoint information for this name/checkpoint pair. */
     if (checkpoint != NULL) {
@@ -578,15 +578,14 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool is_ckpt)
             F_SET(btree, WT_BTREE_LOGGED);
     }
 
-    /*
-     * Detect if the btree is disaggregated. FIXME-WT-14721: the file extension check should be
-     * replaced with something more robust.
-     */
+    /* Detect if the btree is disaggregated. */
+    /* FIXME-WT-18895: Identify an ingest btree by a flag instead of its name. */
     if (WT_URI_IS_INGEST(btree->dhandle->name))
         /* Flag the ingest btree as participating in automatic garbage collection */
         F_SET(btree, WT_BTREE_GARBAGE_COLLECT);
     else {
         WT_RET(__wt_config_gets(session, cfg, "block_manager", &cval));
+        /* FIXME-WT-18866: Drop the name check once no database has legacy entries. */
         if (WT_URI_IS_STABLE(btree->dhandle->name) || WT_CONFIG_LIT_MATCH("disagg", cval)) {
             F_SET(btree, WT_BTREE_DISAGGREGATED);
 
@@ -608,7 +607,7 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool is_ckpt)
              */
             if (!__wt_atomic_load_bool_acquire(&conn->layered_table_manager.leader) &&
               WT_URI_IS_STABLE(btree->dhandle->name) &&
-              !WT_URI_IS_STABLE_CHECKPOINT(btree->dhandle->name) &&
+              __wt_dhandle_shared_btree_kind(btree->dhandle) != WT_SHARED_BTREE_CHECKPOINT &&
               !WT_IS_URI_METADATA(btree->dhandle->name) && !WT_IS_URI_HS(btree->dhandle->name)) {
                 WT_ASSERT(session, __wt_conn_is_disagg(session));
                 WT_STAT_CONN_INCR(session, layered_stable_live_open_refused);
@@ -818,26 +817,26 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool is_ckpt)
     /*
      * Reset the runtime write generation when the checkpoint's transaction ids are not usable in
      * this run: an imported tree, or a checkpoint whose generations precede this run's base write
-     * generation. A stable tree opened at a specific checkpoint by name (a
-     * "...wt_stable/checkpoint" URI) also resets: it is a follower's view of a checkpoint another
-     * node wrote, and the ids are meaningless in this node's id space. A leader's live tree keeps
-     * its own ids, so a checkpoint it reopens in the same run stays readable.
+     * generation. A shared tree opened at a specific checkpoint by name (a "<uri>/<checkpoint>"
+     * name) also resets: it is a follower's view of a checkpoint another node wrote, and the ids
+     * are meaningless in this node's id space. A leader's live tree keeps its own ids, so a
+     * checkpoint it reopens in the same run stays readable.
      *
      * For a checkpoint that carries the write generation high-water mark, the run_write_gen <
-     * base_write_gen comparison usually makes the WT_URI_IS_STABLE_CHECKPOINT clause below
-     * redundant: the follower lifts its base write generation past the mark at pickup, so the
-     * mark's checkpoint has run_write_gen < base_write_gen. The WT_URI_IS_STABLE_CHECKPOINT clause
-     * is still required for two cases the comparison does not cover. A checkpoint written before
-     * the mark existed (an old-format or cross-version checkpoint) has no mark to adopt, and the
-     * follower cannot scan to derive a base (that is leader-only), so its base stays low and the
-     * comparison does not fire. And at the very first generations the base and a checkpoint's
-     * run_write_gen can both still be at their initial value, where the strict comparison also does
-     * not fire. In both cases the WT_URI_IS_STABLE_CHECKPOINT clause is what treats the foreign
-     * checkpoint's ids as cross-run.
+     * base_write_gen comparison usually makes the shared-checkpoint clause below redundant: the
+     * follower lifts its base write generation past the mark at pickup, so the mark's checkpoint
+     * has run_write_gen < base_write_gen. The shared-checkpoint clause is still required for two
+     * cases the comparison does not cover. A checkpoint written before the mark existed (an
+     * old-format or cross-version checkpoint) has no mark to adopt, and the follower cannot scan to
+     * derive a base (that is leader-only), so its base stays low and the comparison does not fire.
+     * And at the very first generations the base and a checkpoint's run_write_gen can both still be
+     * at their initial value, where the strict comparison also does not fire. In both cases the
+     * shared-checkpoint clause is what treats the foreign checkpoint's ids as cross-run.
      */
     if (F_ISSET(session, WT_SESSION_IMPORT) ||
       ckpt->run_write_gen < __wt_atomic_load_uint64_relaxed(&conn->base_write_gen) ||
-      (F_ISSET(btree, WT_BTREE_DISAGGREGATED) && WT_URI_IS_STABLE_CHECKPOINT(btree->dhandle->name)))
+      (F_ISSET(btree, WT_BTREE_DISAGGREGATED) &&
+        __wt_dhandle_shared_btree_kind(btree->dhandle) == WT_SHARED_BTREE_CHECKPOINT))
         btree->run_write_gen = btree->write_gen;
     else
         btree->run_write_gen = ckpt->run_write_gen;

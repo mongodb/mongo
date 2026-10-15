@@ -1365,8 +1365,8 @@ __disagg_metadata_table_init(WT_SESSION_IMPL *session)
     conn = S2C(session);
 
     WT_ERR(__wt_open_internal_session(conn, "disagg-init", false, 0, 0, &internal_session));
-    WT_ERR(__wt_session_create(
-      internal_session, WT_DISAGG_METADATA_URI, "key_format=S,value_format=S,log=(enabled=false)"));
+    WT_ERR(__wt_session_create(internal_session, WT_DISAGG_METADATA_URI,
+      "block_manager=disagg,key_format=S,value_format=S,log=(enabled=false)"));
 
     /*
      * A follower should never access the live shared metadata dhandle. However, session->create

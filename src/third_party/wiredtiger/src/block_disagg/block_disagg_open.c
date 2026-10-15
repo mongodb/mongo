@@ -203,7 +203,7 @@ __block_disagg_ckpt_size_dhandle(WT_SESSION_IMPL *session, uint64_t *sizep)
     const char *uri;
 
     uri = session->dhandle->name;
-    WT_ERR(__wt_btree_shared_base_name(session, &uri, NULL, &name_buf));
+    WT_ERR(__wt_dhandle_shared_base_name(session, &uri, NULL, &name_buf));
     WT_ERR(__wt_block_disagg_ckpt_size(session, uri, sizep));
 
 err:

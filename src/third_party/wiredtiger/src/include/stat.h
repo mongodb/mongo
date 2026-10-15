@@ -866,11 +866,9 @@ struct __wt_connection_stats {
     int64_t checkpoint_handle_duration;
     int64_t checkpoint_handle_apply_duration;
     int64_t checkpoint_handle_skip_duration;
-    int64_t checkpoint_handle_meta_check_duration;
     int64_t checkpoint_handle_lock_duration;
     int64_t checkpoint_handle_applied;
     int64_t checkpoint_handle_dropped;
-    int64_t checkpoint_handle_meta_checked;
     int64_t checkpoint_handle_locked;
     int64_t checkpoint_handle_skipped;
     int64_t checkpoint_handle_walked;
@@ -958,7 +956,6 @@ struct __wt_connection_stats {
     int64_t cursor_get_value_error;
     int64_t cursor_insert;
     int64_t cursor_insert_error;
-    int64_t cursor_insert_check_error;
     int64_t cursor_insert_bytes;
     int64_t cursor_largest_key_error;
     int64_t cursor_modify;
@@ -1810,7 +1807,6 @@ struct __wt_dsrc_stats {
     int64_t cursor_get_key_error;
     int64_t cursor_get_value_error;
     int64_t cursor_insert_error;
-    int64_t cursor_insert_check_error;
     int64_t cursor_largest_key_error;
     int64_t cursor_modify_error;
     int64_t cursor_next_error;

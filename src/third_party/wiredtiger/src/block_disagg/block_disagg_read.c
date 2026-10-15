@@ -377,7 +377,7 @@ corrupt:
 
         /* Panic if a checksum fails during an ordinary read. */
         F_SET_ATOMIC_32(S2C(session), WT_CONN_DATA_CORRUPTION);
-        if (WT_SESSION_READ_CORRUPT_OK(session))
+        if (block_disagg->verify || WT_SESSION_READ_CORRUPT_OK(session))
             WT_ERR(WT_ERROR);
         WT_ERR_PANIC(session, WT_ERROR, "%s: fatal read error (table_id: %" PRIu64 ")",
           block_disagg->name, block_disagg->tableid);

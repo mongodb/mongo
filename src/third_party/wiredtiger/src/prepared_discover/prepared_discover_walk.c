@@ -9,16 +9,26 @@
 #include "wt_internal.h"
 
 /*
- * __prepared_discover_is_follower_stable_walk --
- *     Return true when prepared discovery should read this URI from the stable checkpoint and
- *     replay onto ingest: a disaggregated follower walking a layered stable constituent.
+ * __prepared_discover_is_follower --
+ *     Return true on a disaggregated follower.
  */
 static WT_INLINE bool
-__prepared_discover_is_follower_stable_walk(WT_SESSION_IMPL *session, const char *uri)
+__prepared_discover_is_follower(WT_SESSION_IMPL *session)
 {
     return (__wt_conn_is_disagg(session) &&
-      !__wt_atomic_load_bool_relaxed(&S2C(session)->layered_table_manager.leader) &&
-      WT_URI_IS_STABLE(uri));
+      !__wt_atomic_load_bool_relaxed(&S2C(session)->layered_table_manager.leader));
+}
+
+/*
+ * __prepared_discover_is_follower_stable_walk --
+ *     Return true when prepared discovery should read the current handle from the stable checkpoint
+ *     and replay onto ingest: a disaggregated follower walking a layered stable constituent.
+ */
+static WT_INLINE bool
+__prepared_discover_is_follower_stable_walk(WT_SESSION_IMPL *session)
+{
+    return (__prepared_discover_is_follower(session) &&
+      __wt_dhandle_shared_btree_kind(S2BT(session)->dhandle) == WT_SHARED_BTREE_CHECKPOINT);
 }
 
 /*
@@ -90,8 +100,7 @@ __prepared_discover_process_ondisk_kv(WT_SESSION_IMPL *session, WT_REF *ref, WT_
          * table. Leaders, non-disagg btrees, and non-stable constituents should already have their
          * prepared updates restored on their own btree, so we should never hit this block for them.
          */
-        WT_ASSERT_ALWAYS(session,
-          __prepared_discover_is_follower_stable_walk(session, session->dhandle->name),
+        WT_ASSERT_ALWAYS(session, __prepared_discover_is_follower_stable_walk(session),
           "prepared update restoration from on-disk cell should only happen when walking a stable "
           "constituent on a disaggregated follower");
 
@@ -405,7 +414,7 @@ __prepared_discover_walk_one_tree(WT_SESSION_IMPL *session, const char *uri)
     btree = S2BT(session);
     /* There is nothing to do on an empty tree. */
     if (btree->root.page != NULL) {
-        if (__prepared_discover_is_follower_stable_walk(session, uri))
+        if (__prepared_discover_is_follower_stable_walk(session))
             WT_ERR(__prepared_discover_open_ingest_cursor(session, &ingest_cursor));
 
         flags = WT_READ_NO_EVICT | WT_READ_VISIBLE_ALL | WT_READ_WONT_NEED | WT_READ_SEE_DELETED;
@@ -455,7 +464,8 @@ __wt_prepared_discover_filter_apply_handles(WT_SESSION_IMPL *session)
         WT_ERR(__wt_meta_checkpoint_has_prepare(session, config, &has_prepare));
         if (!has_prepare)
             continue;
-        if (__prepared_discover_is_follower_stable_walk(session, uri)) {
+        if (__prepared_discover_is_follower(session) && config != NULL &&
+          __wt_btree_entry_is_shared(session, uri, config)) {
             /* Look up the most recent data store checkpoint. This fetches the exact name to use. */
             WT_ERR(__wt_meta_checkpoint_last_name(session, uri, &checkpoint_name, NULL, NULL));
             WT_ASSERT(session, ret == 0);

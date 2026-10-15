@@ -424,38 +424,6 @@ err:
 }
 
 /*
- * __wt_curfile_insert_check --
- *     WT_CURSOR->insert_check method for the btree cursor type.
- */
-int
-__wt_curfile_insert_check(WT_CURSOR *cursor)
-{
-    WT_CURSOR_BTREE *cbt;
-    WT_DECL_RET;
-    WT_SESSION_IMPL *session;
-    int tret;
-
-    cbt = (WT_CURSOR_BTREE *)cursor;
-    tret = 0;
-    CURSOR_UPDATE_API_CALL_BTREE(cursor, session, ret, insert_check);
-
-    CURSOR_API_CHECK_SYSTEM_OVERLOAD(session, ret);
-
-    WT_ERR(__cursor_copy_release(cursor));
-    WT_ERR(__cursor_checkkey(cursor));
-
-    tret = __wt_btcur_insert_check(cbt);
-
-/*
- * Detecting a conflict should not cause transaction error.
- */
-err:
-    CURSOR_UPDATE_API_END(session, ret);
-    WT_TRET(tret);
-    API_RET_STAT(session, ret, cursor_insert_check);
-}
-
-/*
  * __curfile_modify --
  *     WT_CURSOR->modify method for the btree cursor type.
  */

@@ -63,6 +63,8 @@ class test_layered_config14(wttest.WiredTigerTestCase):
             self.assertTrue(uri in metadata)
             if uri.endswith("wt_ingest") or uri.endswith("wt_stable") or uri in self.file_uris:
                 self.assertTrue("log=(enabled=false)" in metadata[uri])
+            if uri.endswith("wt_stable"):
+                self.assertTrue("block_manager=disagg" in metadata[uri])
         for uri in expect_missing:
             self.assertFalse(uri in metadata)
         cursor.close()

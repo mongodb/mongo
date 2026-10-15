@@ -368,6 +368,25 @@ TEST_CASE_METHOD(read_checksum_fixture, "disagg block read: checksum validation"
     }
 
     /*
+     * Verify reaches corrupt pages through non-quiet traversal reads, so the session does not
+     * tolerate corruption the way the rest of these sections arrange. The block manager's verify
+     * flag must still turn the checksum failure into an error the caller can continue past, rather
+     * than a panic that takes the connection down.
+     */
+    SECTION("a corrupt page read under verify returns an error instead of panicking")
+    {
+        uint32_t cookie_checksum = build_chain(blocks, 0, WT_BLOCK_DISAGG_DATA_CKSUM);
+        blocks[0].corrupt_body(300);
+
+        F_CLR(session, WT_SESSION_QUIET_CORRUPT_FILE);
+        block_disagg.verify = true;
+
+        REQUIRE(read_multiple(cookie_checksum) == WT_ERROR);
+        CHECK(corruption_flagged());
+        CHECK_FALSE(F_ISSET_ATOMIC_32(conn, WT_CONN_PANIC));
+    }
+
+    /*
      * Without a data checksum the stored checksum covers only the leading bytes, so damage past
      * that point is outside what the block manager promises to detect.
      */

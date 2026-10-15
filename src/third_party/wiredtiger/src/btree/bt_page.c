@@ -222,7 +222,14 @@ __page_init_delta_leaf_merge_state(WT_SESSION_IMPL *session, WT_BTREE *btree, WT
   size_t delta_size, WTI_DELTA_LEAF_MERGE_STATE **sp)
 {
     WTI_DELTA_LEAF_MERGE_STATE *s = NULL;
+
     WT_RET(__wt_calloc_def(session, delta_size, &s));
+
+    /*
+     * Publish the array before initializing its entries: if a per-entry allocation fails part-way
+     * through the loop, the caller's cleanup must be able to reach the entries already initialized.
+     */
+    *sp = s;
 
     for (size_t i = 0; i < delta_size; i++) {
         WT_PAGE_HEADER *tmp = (WT_PAGE_HEADER *)deltas[i].data;
@@ -232,7 +239,6 @@ __page_init_delta_leaf_merge_state(WT_SESSION_IMPL *session, WT_BTREE *btree, WT
         WT_RET(__wt_scr_alloc(session, 0, &s[i].current_key));
         WT_RET(__wt_calloc_one(session, &s[i].unpack));
     }
-    *sp = s;
 
     return (0);
 }
@@ -246,11 +252,21 @@ __page_free_delta_leaf_merge_state(
   WT_SESSION_IMPL *session, size_t delta_size, WTI_DELTA_LEAF_MERGE_STATE **sp)
 {
     WTI_DELTA_LEAF_MERGE_STATE *s = *sp;
+
+    /*
+     * Initialization can fail before the array is allocated, leaving it NULL with nothing to
+     * release. Entries the allocation did not initialize are zero-filled, so releasing them is a
+     * no-op.
+     */
+    if (s == NULL)
+        return;
+
     for (size_t i = 0; i < delta_size; i++) {
         __wt_scr_free(session, &s[i].current_key);
         __wt_free(session, s[i].unpack);
     }
     __wt_free(session, s);
+    *sp = NULL;
 }
 
 /*

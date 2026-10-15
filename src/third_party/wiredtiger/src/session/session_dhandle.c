@@ -963,6 +963,7 @@ static void
 __session_dhandle_stable_delay_stress(WT_SESSION_IMPL *session, const char *uri)
 {
     struct timespec tsp;
+    WT_DATA_HANDLE *dhandle;
 
     /* The stress point is off outside tests. */
     if (!FLD_ISSET(S2C(session)->timing_stress_flags, WT_TIMING_STRESS_DISAGG_STABLE_DHANDLE_DELAY))
@@ -980,8 +981,9 @@ __session_dhandle_stable_delay_stress(WT_SESSION_IMPL *session, const char *uri)
     if (FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_SCHEMA))
         return;
 
-    /* Only a stable-table open can land in the pickup's prune window. */
-    if (!WT_URI_IS_STABLE(uri))
+    /* Only an open shared tree can be in the pickup's prune window. */
+    dhandle = session->dhandle;
+    if (__wt_dhandle_shared_btree_kind(dhandle) == WT_SHARED_BTREE_NONE)
         return;
 
     /* The history store has its own dhandle lifecycle, not the pickup's outdated/prune pairing. */
@@ -1074,9 +1076,7 @@ __wt_session_get_dhandle(WT_SESSION_IMPL *session, const char *uri, const char *
                  * leader reads a checkpoint from shared metadata, it must also acquire the
                  * checkpoint lock.
                  */
-                const char *suffix = strstr(uri, ".wt_stable/");
-                if (suffix != NULL)
-                    checkpoint_lock_needed = true;
+                WT_ERR(__wt_btree_name_is_shared_checkpoint(session, uri, &checkpoint_lock_needed));
             }
 
             if (checkpoint_lock_needed) {

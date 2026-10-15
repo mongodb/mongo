@@ -80,13 +80,15 @@ static int
 __create_file_block_manager(WT_SESSION_IMPL *session, const char *uri, const char *filename,
   uint32_t allocsize, const char **cfg)
 {
-    WT_CONFIG_ITEM page_log_item;
+    WT_CONFIG_ITEM bm_item, page_log_item;
     WT_DECL_RET;
     WT_NAMED_PAGE_LOG *npage_log;
 
     npage_log = NULL;
 
-    if (WT_URI_IS_STABLE(uri)) {
+    WT_RET(__wt_config_gets(session, cfg, "block_manager", &bm_item));
+    /* FIXME-WT-18866: Drop the name check once no database has legacy entries. */
+    if (WT_URI_IS_STABLE(uri) || WT_CONFIG_LIT_MATCH("disagg", bm_item)) {
         WT_RET_NOTFOUND_OK(
           __wt_config_gets(session, cfg, "disaggregated.page_log", &page_log_item));
         if (ret == WT_NOTFOUND || page_log_item.len == 0)
@@ -347,9 +349,14 @@ __create_file(
             fileid = __wt_generate_file_id(session, uri, is_shared);
 
             WT_ERR(__wt_scr_alloc(session, 0, &val));
+            /*
+             * Persist block_manager=disagg for a shared file, so readers can identify its base tree
+             * as shared from the metadata without opening it.
+             */
             WT_ERR(__wt_buf_fmt(session, val,
-              "id=%" PRIu32 ",version=(major=%" PRIu16 ",minor=%" PRIu16 "),checkpoint_lsn=",
-              fileid, WT_BTREE_VERSION_MAX.major, WT_BTREE_VERSION_MAX.minor));
+              "id=%" PRIu32 ",version=(major=%" PRIu16 ",minor=%" PRIu16 "),checkpoint_lsn=%s",
+              fileid, WT_BTREE_VERSION_MAX.major, WT_BTREE_VERSION_MAX.minor,
+              is_shared ? ",block_manager=disagg" : ""));
 
             for (p = filecfg; *p != NULL; ++p)
                 ;
@@ -1133,6 +1140,9 @@ __create_layered(WT_SESSION_IMPL *session, const char *uri, bool exclusive, cons
     stable_cfg[1] = disagg_config->data;
 
     /*
+     * A stable constituent uses the disaggregated block manager. Persist this setting in metadata
+     * so readers can identify its base tree as shared without opening it.
+     *
      * Disable logging on the stable table to ensure we have timestamps. Force block_manager=disagg:
      * a legacy step-up derives a missing stable constituent from the ingest metadata, cannot
      * recover the user's value and forces disagg, so the create-time metadata must match.

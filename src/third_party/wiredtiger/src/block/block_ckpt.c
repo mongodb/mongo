@@ -1229,7 +1229,7 @@ __wti_block_checkpoint_extlist_dump(WT_SESSION_IMPL *session, WT_BLOCK *block)
      * and would trip the checkpoint-validate diagnostics.
      */
     fname = session->dhandle->name;
-    WT_ERR(__wt_btree_shared_base_name(session, &fname, NULL, &name_buf));
+    WT_ERR(__wt_dhandle_shared_base_name(session, &fname, NULL, &name_buf));
     WT_ERR(__wt_metadata_search(session, fname, &config));
     WT_ERR(__wt_meta_ckptlist_get_from_config(session, false, &ckptbase, NULL, config));
     WT_CKPT_FOREACH (ckptbase, ckpt_iter) {

@@ -487,6 +487,8 @@ struct __wti_base_int_merge_state;
 typedef struct __wti_base_int_merge_state WTI_BASE_INT_MERGE_STATE;
 struct __wti_base_leaf_merge_state;
 typedef struct __wti_base_leaf_merge_state WTI_BASE_LEAF_MERGE_STATE;
+struct __wti_checkpoint_db_config;
+typedef struct __wti_checkpoint_db_config WTI_CHECKPOINT_DB_CONFIG;
 struct __wti_ckpt_handle_stats;
 typedef struct __wti_ckpt_handle_stats WTI_CKPT_HANDLE_STATS;
 struct __wti_ckpt_progress;

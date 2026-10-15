@@ -438,9 +438,9 @@ __wt_metadata_stable_uris_for_id(WT_SESSION_IMPL *session, WT_CURSOR *cursor, ui
 
     while ((ret = cursor->next(cursor)) == 0) {
         WT_ERR(cursor->get_key(cursor, &key));
-        if (!WT_PREFIX_MATCH(key, "file:") || !WT_URI_IS_STABLE(key))
-            continue;
         WT_ERR(cursor->get_value(cursor, &value));
+        if (!WT_PREFIX_MATCH(key, "file:") || !__wt_btree_entry_is_shared(session, key, value))
+            continue;
         WT_ERR(__wt_config_getones(session, value, "id", &id_val));
         if ((uint32_t)id_val.val != btree_id)
             continue;

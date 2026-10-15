@@ -46,6 +46,9 @@ __wt_nlpo2_round
 __wt_page_from_npos
 __wt_page_from_npos_for_read
 __wt_session_breakpoint
+__wt_stat_connection_otel_keys
+__wt_stat_dsrc_otel_keys
+__wt_stat_session_otel_keys
 __wt_strcat
 __wt_stream_set_no_buffer
 __wt_try_readlock

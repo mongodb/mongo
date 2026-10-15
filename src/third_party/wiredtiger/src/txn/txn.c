@@ -1865,7 +1865,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
             if (WT_URI_IS_INGEST(op->btree->dhandle->name)) {
                 wrote_ingest = true;
                 WT_ASSERT(session, txn->first_commit_timestamp > step_down_ts);
-            } else if (WT_URI_IS_STABLE(op->btree->dhandle->name)) {
+            } else if (__wt_dhandle_shared_btree_kind(op->btree->dhandle) == WT_SHARED_BTREE_LIVE) {
                 if (!mirroring) {
                     wrote_stable = true;
                     WT_ASSERT(session, txn->time_point.durable_timestamp <= step_down_ts);

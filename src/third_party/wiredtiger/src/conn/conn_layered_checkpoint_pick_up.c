@@ -447,6 +447,7 @@ __disagg_key_at_table(const char *key, int idx, const char *current, size_t curr
  *       - it legitimately changes across checkpoints,
  *       - it holds node-local state,
  *       - it can be changed at runtime via WT_SESSION::alter,
+ *       - entries written by earlier versions may lack it,
  *       - already compared directly by __disagg_check_meta_identity.
  *
  *     The list holds top-level field names only, sorted alphabetically.
@@ -455,8 +456,8 @@ static bool
 __disagg_meta_skip_field(const WT_CONFIG_ITEM *key)
 {
     static const char *const skip[] = {"access_pattern_hint", "app_metadata", "assert",
-      "cache_resident", "checkpoint", "checkpoint_backup_info", "checkpoint_lsn", "id",
-      "live_restore", "log", "os_cache_dirty_max", "os_cache_max", "verbose",
+      "block_manager", "cache_resident", "checkpoint", "checkpoint_backup_info", "checkpoint_lsn",
+      "id", "live_restore", "log", "os_cache_dirty_max", "os_cache_max", "verbose",
       "write_timestamp_usage", NULL};
     u_int i;
     int cmp;
@@ -663,8 +664,7 @@ __disagg_stable_btree_ids_append(
 
 /*
  * __disagg_stable_btree_ids_add --
- *     Record a metadata entry's btree ID, skipping anything that is not the stable constituent of a
- *     layered table.
+ *     Record a local metadata entry's btree ID, skipping anything that is not a shared tree.
  */
 static int
 __disagg_stable_btree_ids_add(WT_SESSION_IMPL *session,
@@ -672,7 +672,7 @@ __disagg_stable_btree_ids_add(WT_SESSION_IMPL *session,
 {
     WT_CONFIG_ITEM id_val;
 
-    if (!WT_PREFIX_MATCH(key, "file:") || !WT_URI_IS_STABLE(key))
+    if (!WT_PREFIX_MATCH(key, "file:") || !__wt_btree_entry_is_shared(session, key, value))
         return (0);
 
     WT_RET(__wt_config_getones(session, value, "id", &id_val));
@@ -786,7 +786,7 @@ __disagg_file_entry_reconcile(WT_SESSION_IMPL *session, WT_CURSOR *md_cursor, WT
     WT_RET(__disagg_check_meta_identity(session, key, &md_id, &sh_id));
 
     /* Applying a checkpoint moves an entry's checkpoint forward, never its id. */
-    if (WT_URI_IS_STABLE(key))
+    if (__wt_btree_entry_is_shared(session, key, md_copy))
         WT_RET(__disagg_stable_btree_ids_append(session, stable_btree_ids, (uint32_t)md_id.val));
 
     entry->md_value = md_copy;

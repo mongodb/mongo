@@ -40,11 +40,12 @@ __conn_dhandle_config_set(WT_SESSION_IMPL *session)
     WT_DECL_ITEM(name_buf);
     WT_DECL_RET;
     char *metaconf, *tmp;
-    const char *base, *cfg[5], *dhandle_name, *strip;
+    const char *base, *cfg[5], *checkpoint, *dhandle_name, *strip;
 
     dhandle = session->dhandle;
     dhandle_name = dhandle->name;
     base = NULL;
+    checkpoint = NULL;
     metaconf = NULL;
     tmp = NULL;
 
@@ -53,7 +54,9 @@ __conn_dhandle_config_set(WT_SESSION_IMPL *session)
       "Assert failure: %s: attempt to open data handle during metadata recovery", session->name);
 
     /* Adjust the dhandle name for disaggregated storage. */
-    WT_ERR(__wt_btree_shared_base_name(session, &dhandle_name, NULL, &name_buf));
+    WT_ERR(__wt_btree_shared_base_name(session, &dhandle_name, &checkpoint, &name_buf));
+    if (checkpoint != NULL)
+        F_SET(dhandle, WT_DHANDLE_SHARED_BTREE_CHECKPOINT);
 
     /*
      * Read the object's entry from the metadata file, we're done if we don't find one.
@@ -278,16 +281,16 @@ __wt_conn_dhandle_find(WT_SESSION_IMPL *session, const char *uri, const char *ch
             if (__wt_atomic_load_bool_relaxed(&dhandle->outdated)) {
                 /*
                  * An outdated read-only stable handle is only safe to reuse in its checkpoint-view
-                 * form (a "...wt_stable/WiredTigerCheckpoint.N" name): those checkpoint handles
-                 * span eras and sweep keeps them alive for readers and the checkpoint tracking
-                 * logic. A live stable handle must be reopened fresh instead -- draining through an
-                 * outdated one hits resident inserts or unresolved prepared updates left by the
-                 * previous leader era.
+                 * form (a "<uri>/WiredTigerCheckpoint.N" name): those checkpoint handles span eras
+                 * and sweep keeps them alive for readers and the checkpoint tracking logic. A live
+                 * stable handle must be reopened fresh instead -- draining through an outdated one
+                 * hits resident inserts or unresolved prepared updates left by the previous leader
+                 * era.
                  */
                 if (WT_DHANDLE_BTREE(dhandle) &&
                   F_ISSET_ATOMIC_32((WT_BTREE *)dhandle->handle, WT_BTREE_READONLY)) {
                     if (__wt_atomic_load_int32_acquire(&dhandle->session_inuse) == 0 ||
-                      !WT_URI_IS_STABLE_CHECKPOINT(dhandle->name))
+                      __wt_dhandle_shared_btree_kind(dhandle) != WT_SHARED_BTREE_CHECKPOINT)
                         continue;
                 } else
                     continue;

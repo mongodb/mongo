@@ -660,6 +660,8 @@ err:
 static int
 __curstat_size(WT_SESSION_IMPL *session, const char *uri, bool *was_fastp, int64_t *sizep)
 {
+    bool checkpoint_view;
+
     WT_ASSERT(session, uri != NULL);
     WT_ASSERT(session, was_fastp != NULL);
     WT_ASSERT(session, sizep != NULL);
@@ -673,7 +675,10 @@ __curstat_size(WT_SESSION_IMPL *session, const char *uri, bool *was_fastp, int64
     WT_ASSERT(session, WT_PREFIX_MATCH(uri, "file:"));
 
     /* Checkpoint-view URIs require the slow path. */
-    if (WT_URI_IS_STABLE_CHECKPOINT(uri))
+    checkpoint_view = false;
+    if (__wt_conn_is_disagg(session))
+        WT_RET(__wt_btree_name_is_shared_checkpoint(session, uri, &checkpoint_view));
+    if (checkpoint_view)
         return (0);
 
     return (__curstat_file_size(session, uri, was_fastp, sizep));

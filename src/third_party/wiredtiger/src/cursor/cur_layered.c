@@ -1708,7 +1708,8 @@ __wt_clayered_range_truncate_stable_replay(WT_TRUNCATE_INFO *trunc_info)
 
     /* Only valid on stable tables during step up to leader, routed via WT_SESSION_INGEST_REPLAY. */
     WT_ASSERT(session, F_ISSET(session, WT_SESSION_INGEST_REPLAY));
-    WT_ASSERT(session, WT_URI_IS_STABLE(trunc_info->start->internal_uri));
+    WT_ASSERT(session,
+      __wt_dhandle_shared_btree_kind(CUR2BT(trunc_info->start)->dhandle) == WT_SHARED_BTREE_LIVE);
     WT_ASSERT(session, __wt_atomic_load_bool_relaxed(&S2C(session)->layered_table_manager.leader));
 
     /* Both boundary cursors must be fully positioned. */

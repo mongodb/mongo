@@ -350,13 +350,139 @@ __wt_btree_shared(WT_SESSION_IMPL *session, const char *uri, const char **bt_cfg
     *shared = false;
 
     WT_RET(__wt_config_gets(session, bt_cfg, "block_manager", &cval));
-    *shared = (WT_URI_IS_STABLE(uri) || WT_CONFIG_LIT_MATCH("disagg", cval));
+    /* FIXME-WT-18866: Drop the name check once no database has legacy entries. */
+    *shared = WT_URI_IS_STABLE(uri) || WT_CONFIG_LIT_MATCH("disagg", cval);
 
     /* Ingest btrees must never be shared. */
     WT_ASSERT_ALWAYS(
       session, !(*shared && WT_URI_IS_INGEST(uri)), "Ingest btree incorrectly created as shared.");
 
     return (0);
+}
+
+/*
+ * __wt_btree_entry_is_shared --
+ *     Whether a file's metadata entry describes a shared tree. Entries written by earlier versions
+ *     carry no block_manager setting and are recognized by their name.
+ */
+static WT_INLINE bool
+__wt_btree_entry_is_shared(WT_SESSION_IMPL *session, const char *uri, const char *config)
+{
+    WT_CONFIG_ITEM cval;
+
+    /* FIXME-WT-18866: Drop the name check once no database has legacy entries. */
+    return (WT_URI_IS_STABLE(uri) ||
+      (__wt_config_getones(session, config, "block_manager", &cval) == 0 &&
+        WT_CONFIG_LIT_MATCH("disagg", cval)));
+}
+
+/*
+ * __btree_name_split --
+ *     Break a checkpoint-view name at the given slash into its base name, in a returned buffer, and
+ *     the checkpoint id string.
+ */
+static WT_INLINE int
+__btree_name_split(WT_SESSION_IMPL *session, const char *slash, const char **namep,
+  const char **checkpointp, WT_ITEM **name_bufp)
+{
+    WT_DECL_RET;
+    WT_ITEM *name_buf;
+
+    WT_RET(__wt_scr_alloc(session, 0, name_bufp));
+    name_buf = *name_bufp;
+    WT_ERR(__wt_buf_fmt(session, name_buf, "%.*s", (int)(slash - *namep), *namep));
+
+    *namep = (const char *)name_buf->data;
+    if (checkpointp != NULL)
+        *checkpointp = slash + 1;
+    return (0);
+
+err:
+    __wt_scr_free(session, name_bufp);
+    return (ret);
+}
+
+/*
+ * __wt_dhandle_shared_btree_kind --
+ *     Classify a tree from its handle flags alone. This never accesses the metadata, so it is safe
+ *     on hot paths such as eviction and sweep. A checkpoint view is reported from the time the
+ *     handle's configuration is set, but a live shared btree only once its handle is open, because
+ *     that is when the btree flag is set; before that it reads as not shared.
+ */
+static WT_INLINE WT_SHARED_BTREE_KIND
+__wt_dhandle_shared_btree_kind(WT_DATA_HANDLE *dhandle)
+{
+    if (F_ISSET(dhandle, WT_DHANDLE_SHARED_BTREE_CHECKPOINT))
+        return (WT_SHARED_BTREE_CHECKPOINT);
+    if (WT_DHANDLE_BTREE(dhandle) && F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
+      F_ISSET((WT_BTREE *)dhandle->handle, WT_BTREE_DISAGGREGATED))
+        return (WT_SHARED_BTREE_LIVE);
+    return (WT_SHARED_BTREE_NONE);
+}
+
+/*
+ * __wt_name_shared_btree_kind --
+ *     Classify a tree from its name when no open handle is available. This can search the metadata,
+ *     so it is meant for open-time and metadata-only callers: use __wt_dhandle_shared_btree_kind
+ *     where a handle is open or the path is performance-sensitive.
+ */
+static WT_INLINE int
+__wt_name_shared_btree_kind(WT_SESSION_IMPL *session, const char *name, WT_SHARED_BTREE_KIND *kindp)
+{
+    WT_DECL_ITEM(base);
+    WT_DECL_RET;
+    char *config;
+    const char *slash;
+    bool shared;
+
+    *kindp = WT_SHARED_BTREE_NONE;
+    config = NULL;
+
+    if (!WT_PREFIX_MATCH(name, "file:"))
+        return (0);
+
+    /* A slash can also be part of a local file's path: only a shared base has a checkpoint id. */
+    slash = strrchr(name, '/');
+
+    /* FIXME-WT-18866: Drop the name check once no database has legacy entries. */
+    shared = WT_URI_IS_STABLE(name);
+    if (!shared) {
+        WT_RET(__wt_scr_alloc(session, 0, &base));
+        WT_ERR(__wt_buf_fmt(
+          session, base, "%.*s", slash == NULL ? (int)strlen(name) : (int)(slash - name), name));
+        WT_ERR_NOTFOUND_OK(__wt_metadata_search(session, (const char *)base->data, &config), true);
+        if (ret == WT_NOTFOUND)
+            ret = 0;
+        else
+            shared = __wt_btree_entry_is_shared(session, (const char *)base->data, config);
+    }
+
+    if (shared)
+        *kindp = slash == NULL ? WT_SHARED_BTREE_LIVE : WT_SHARED_BTREE_CHECKPOINT;
+
+err:
+    __wt_free(session, config);
+    __wt_scr_free(session, &base);
+    return (ret);
+}
+
+/*
+ * __wt_dhandle_shared_base_name --
+ *     Break the session's open handle name down into its base name and checkpoint id string. The
+ *     handle already knows whether its name carries a checkpoint id.
+ */
+static WT_INLINE int
+__wt_dhandle_shared_base_name(
+  WT_SESSION_IMPL *session, const char **namep, const char **checkpointp, WT_ITEM **name_bufp)
+{
+    const char *slash;
+
+    if (__wt_dhandle_shared_btree_kind(session->dhandle) != WT_SHARED_BTREE_CHECKPOINT)
+        return (0);
+
+    slash = strrchr(*namep, '/');
+    WT_ASSERT(session, slash != NULL);
+    return (__btree_name_split(session, slash, namep, checkpointp, name_bufp));
 }
 
 /*
@@ -368,33 +494,33 @@ static WT_INLINE int
 __wt_btree_shared_base_name(
   WT_SESSION_IMPL *session, const char **namep, const char **checkpointp, WT_ITEM **name_bufp)
 {
-    WT_ITEM *name_buf;
-    size_t len;
-    const char *name, *suffix;
+    WT_SHARED_BTREE_KIND kind;
+    const char *slash;
 
-    name = *namep;
-
-    /* If this isn't a stable URI, or there is no trailing checkpoint id, there's nothing to do. */
-    suffix = strstr(name, ".wt_stable/");
-    if (suffix == NULL)
+    if (!WT_PREFIX_MATCH(*namep, "file:") || (slash = strrchr(*namep, '/')) == NULL)
         return (0);
 
-    /* Move the suffix to point to the slash */
-    suffix += strlen(".wt_stable");
+    WT_RET(__wt_name_shared_btree_kind(session, *namep, &kind));
+    if (kind != WT_SHARED_BTREE_CHECKPOINT)
+        return (0);
+    return (__btree_name_split(session, slash, namep, checkpointp, name_bufp));
+}
 
-    /* The returned name is the part before the suffix */
-    len = (size_t)(suffix - name);
-    WT_RET(__wt_scr_alloc(session, len + 1, name_bufp));
-    name_buf = *name_bufp;
-    WT_RET(__wt_buf_catfmt(session, name_buf, "%s", name));
-    ((char *)name_buf->data)[len] = '\0';
+/*
+ * __wt_btree_name_is_shared_checkpoint --
+ *     Whether a name is a checkpoint view of a shared tree.
+ */
+static WT_INLINE int
+__wt_btree_name_is_shared_checkpoint(WT_SESSION_IMPL *session, const char *uri, bool *resultp)
+{
+    WT_SHARED_BTREE_KIND kind;
 
-    *namep = (const char *)name_buf->data;
+    *resultp = false;
+    if (!WT_PREFIX_MATCH(uri, "file:") || strrchr(uri, '/') == NULL)
+        return (0);
 
-    /* The checkpoint id string, if needed, immediately follows the suffix. */
-    if (checkpointp != NULL)
-        *checkpointp = suffix + 1;
-
+    WT_RET(__wt_name_shared_btree_kind(session, uri, &kind));
+    *resultp = kind == WT_SHARED_BTREE_CHECKPOINT;
     return (0);
 }
 
@@ -3003,7 +3129,8 @@ __wt_btcur_skip_internal_page_read_only(WT_SESSION_IMPL *session, WT_REF *ref)
     if (!F_ISSET_ATOMIC_32(S2BT(session), WT_BTREE_READONLY))
         return (false);
 
-    if (!WT_READING_CHECKPOINT(session) && !WT_URI_IS_STABLE_CHECKPOINT(session->dhandle->name))
+    if (!WT_READING_CHECKPOINT(session) &&
+      __wt_dhandle_shared_btree_kind(session->dhandle) != WT_SHARED_BTREE_CHECKPOINT)
         return (false);
 
     if (!__wt_ref_addr_copy(session, ref, &addr))

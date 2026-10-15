@@ -487,6 +487,8 @@ struct __wt_block_disagg {
     uint64_t previous_root_size; /* Size of previous root page */
     uint64_t root_size_gen;      /* Checkpoint generation of the last root size update */
 
+    bool verify; /* If running verify */
+
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_BLOCK_DISAGG_HS 0x1u
     /*AUTOMATIC FLAG VALUE GENERATION STOP 32 */

@@ -58,6 +58,17 @@ def remove_suffix_digits(str):
     return re.sub(r'\d+$', '', str)
 
 ##########################################
+# Check the OTel type of a statistic.
+# At most one valid otel_ flag may be set; no flag means otel_none.
+##########################################
+OTEL_TYPES = ('otel_counter', 'otel_gauge', 'otel_histogram', 'otel_none')
+
+def check_otel_type(stat):
+    if stat.otel_type not in OTEL_TYPES:
+        raise Exception(f"ERROR: {stat.name} has invalid OTel type '{stat.otel_type}', " \
+                f"expected one of {', '.join(OTEL_TYPES)}")
+
+##########################################
 # For each stat subclass check the names are sorted in alphabetical order.
 ##########################################
 def check_name_sorted(stat_list):
@@ -78,6 +89,7 @@ all_stat_list = [conn_dsrc_stats, conn_stats, dsrc_stats, session_stats]
 for stat_list in all_stat_list:
     for stat in stat_list:
         check_description_format(stat)
+        check_otel_type(stat)
     check_name_sorted(stat_list)
 
 conn_dsrc_stats.sort(key=attrgetter('desc'))
@@ -138,6 +150,8 @@ def print_defines_one(capname, base, stats):
                 ', only reported if cache_walk or all statistics are enabled'
         if 'tree_walk' in l.flags:
             desc += ', only reported if tree_walk or all statistics are enabled'
+        if l.otel_type != 'otel_none':
+            desc += ', OTel type: ' + l.otel_type
         if len(textwrap.wrap(desc, 70)) > 1:
             f.write('/*!\n')
             f.write(' * %s\n' % '\n * '.join(textwrap.wrap(desc, 70)))
@@ -215,6 +229,45 @@ __wt_stat_''' + name + '''_desc(WT_CURSOR_STAT *cst, int slot, const char **p)
 {
 \tWT_UNUSED(cst);
 \t*p = __stats_''' + name + '''_desc[slot];
+\treturn (0);
+}
+''')
+
+    # Per OTel type, the sorted statistics keys, so a cursor can step between that type's
+    # statistics without visiting the others.
+    var = '__stats_' + name + '_otel_'
+    prefix = 'WT_STAT_' + (capname if capname else name.upper()) + '_'
+    for otel_type in OTEL_TYPES:
+        keys = [prefix + l.name.upper() for l in statlist if l.otel_type == otel_type]
+        if not keys:
+            continue
+        array = var + otel_type[len('otel_'):] + ('s' if otel_type != 'otel_none' else '')
+        f.write('\nstatic const int ' + array + '[] = {\n')
+        for key in keys:
+            f.write('\t' + key + ',\n')
+        f.write('};\n')
+
+    f.write('''
+int
+__wt_stat_''' + name + '''_otel_keys(uint32_t otel_flag, const int **keysp, u_int *countp)
+{
+\tswitch (otel_flag) {
+''')
+    for otel_type in OTEL_TYPES:
+        plural = 's' if otel_type != 'otel_none' else ''
+        flag = 'WT_STAT_' + otel_type.upper() + plural.upper()
+        array = var + otel_type[len('otel_'):] + plural
+        f.write('\tcase ' + flag + ':\n')
+        if any(l.otel_type == otel_type for l in statlist):
+            f.write('\t\t*keysp = ' + array + ';\n')
+            f.write('\t\t*countp = WT_ELEMENTS(' + array + ');\n')
+        else:
+            f.write('\t\t*keysp = NULL;\n')
+            f.write('\t\t*countp = 0;\n')
+        f.write('\t\tbreak;\n')
+    f.write('''\tdefault:
+\t\treturn (EINVAL);
+\t}
 \treturn (0);
 }
 ''')
