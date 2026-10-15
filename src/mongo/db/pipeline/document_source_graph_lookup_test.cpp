@@ -134,6 +134,32 @@ TEST_F(DocumentSourceGraphLookUpTest, GraphLookupShouldReportAsFieldIsModified) 
     ASSERT_EQ(1U, modifiedPaths.paths.count("results"));
 }
 
+TEST_F(DocumentSourceGraphLookUpTest, GraphLookupReportsThatItMaySpill) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "test", "foreign");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+    expCtx->setMongoProcessInterface(std::make_shared<test::GraphLookUpMockMongoInterface>(
+        std::deque<DocumentSource::GetNextResult>{}));
+    auto graphLookupStage = DocumentSourceGraphLookUp::create(
+        expCtx,
+        fromNs,
+        "results",
+        "from",
+        "to",
+        ExpressionFieldPath::createPathFromString(
+            expCtx.get(), "startPoint", expCtx->variablesParseState),
+        boost::none,
+        boost::none,
+        boost::none,
+        boost::none);
+
+    for (auto pipeState : {PipelineSplitState::kUnsplit, PipelineSplitState::kSplitForShards}) {
+        ASSERT(graphLookupStage->constraints(pipeState).diskRequirement ==
+               StageConstraints::DiskUseRequirement::kWritesTmpData);
+    }
+}
+
 TEST_F(DocumentSourceGraphLookUpTest, GraphLookupShouldReportFieldsModifiedByAbsorbedUnwind) {
     auto expCtx = getExpCtx();
     NamespaceString fromNs =
