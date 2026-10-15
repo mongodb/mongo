@@ -559,6 +559,13 @@ common:windows --//bazel/config:linker=auto
 # Data dependencies don't work in bazel run or bazel test on windows without this
 startup --windows_enable_symlinks
 common:windows --enable_runfiles
+
+# Execute Windows tests through the native launcher from their original binary path.
+test:windows --run_under=//bazel:windows_test_launcher
+
+# Static linking and the native launcher for Evergreen Windows unit-test tasks.
+common:windows_unittest --linkstatic=True
+test:windows_unittest --run_under=//bazel:windows_test_launcher
 build:windows --action_env=MSYS=winsymlinks:nativestrict
 test:windows --action_env=MSYS=winsymlinks:nativestrict
 

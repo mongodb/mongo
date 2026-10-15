@@ -1,3 +1,5 @@
+load("@bazel_skylib//rules:copy_file.bzl", "copy_file")
+load("@bazel_skylib//rules:native_binary.bzl", "native_binary")
 load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load("//bazel/uv:defs.bzl", "dependency")
@@ -89,6 +91,25 @@ py_test(
 filegroup(
     name = "test_wrapper",
     srcs = ["test_wrapper.sh"],
+)
+
+# The default --run_under for bazel test on Windows (see .bazelrc). Bazel's test runner starts it
+# from inside each test's runfiles tree and cannot start executables at paths of 256 characters or
+# more once 8.3 short names are disabled, as on the CI hosts. The deepest test's runfiles directory
+# is ~200 characters, so the outputs get short names (bazel/wtl.exe is 222 characters in it).
+# The native entry passes an argument payload to wtl.ps1 without invoking cmd.exe.
+copy_file(
+    name = "windows_test_launcher_ps1",
+    src = "//bazel/windows_test_launcher:windows_test_launcher.ps1",
+    out = "wtl.ps1",
+)
+
+native_binary(
+    name = "windows_test_launcher",
+    src = "//bazel/windows_test_launcher:windows_test_launcher_native",
+    out = "wtl.exe",
+    data = [":windows_test_launcher_ps1"],
+    target_compatible_with = ["@platforms//os:windows"],
 )
 
 # TODO(SERVER-129799): add these tests to CI.

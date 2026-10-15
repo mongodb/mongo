@@ -320,6 +320,15 @@ py_test(
 )
 
 py_test(
+    name = "test_create_bazel_test_report",
+    srcs = ["test_create_bazel_test_report.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:create_bazel_test_report",
+    ],
+)
+
+py_test(
     name = "test_evergreen_resmoke_job_count",
     srcs = ["test_evergreen_resmoke_job_count.py"],
     visibility = ["//visibility:public"],

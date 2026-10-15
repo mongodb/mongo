@@ -71,6 +71,18 @@ struct GoldenTestConfig {
 };
 
 /**
+ * Resolves the directory that golden data paths are relative to.
+ * Precedence:
+ *  1. 'configuredDataRoot' (set via the GOLDEN_TEST_DATA_ROOT environment variable, e.g. with
+ *     bazel's --test_env flag) when set.
+ *  2. bazel's TEST_SRCDIR/TEST_WORKSPACE environment variables, when both are set, so that tests
+ *     running with a working directory other than the repository root still find their data.
+ *  3. the current working directory when neither of the above is configured.
+ */
+boost::filesystem::path resolveGoldenDataRoot(
+    const boost::optional<std::string>& configuredDataRoot);
+
+/**
  * Global environment shared across all golden test suites.
  * Specifically, output directory is shared across all suites to allow simple directory diffing,
  * even if multiple suites were executed.
@@ -241,6 +253,9 @@ struct GoldenTestOptions {
      *  - GOLDEN_TEST_OUTPUT_ROOT_PATTERN: (optional) overrides the `outputRootPattern` value
      *    loaded from the yaml config. Intended to let resmoke.py pre-resolve a single output
      *    root and share it across all golden tests in one invocation.
+     *  - GOLDEN_TEST_DATA_ROOT: (optional) overrides the directory that golden data paths
+     *    (GoldenTestConfig::relativePath) are resolved against. Useful when the test's working
+     *    directory is not the root of the repository.
      */
     static GoldenTestOptions parseEnvironment();
 
@@ -251,6 +266,13 @@ struct GoldenTestOptions {
      * random lowercase hexadecimal digits.
      */
     boost::optional<std::string> outputRootPattern;
+
+    /**
+     * Directory that golden data paths (GoldenTestConfig::relativePath) are resolved against. If
+     * not specified, the directory is derived from bazel's TEST_SRCDIR/TEST_WORKSPACE environment
+     * variables when available, or defaults to the current working directory.
+     */
+    boost::optional<std::string> goldenDataRoot;
 
     /**
      * Shell command to diff a single golden test run output.

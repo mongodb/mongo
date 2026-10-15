@@ -243,12 +243,21 @@ void myInvalidParameterHandler(const wchar_t* expression,
         gSynchronousSignalHandlerCb();
     }
 
+    // The Windows Universal C Runtime (UCRT) is allowed to pass null pointers for any of the
+    // string arguments (for example, fwrite on a null FILE* reports the invalid parameter with
+    // no function, file, or expression information). Passing nullptr to toUtf8String would
+    // construct its std::wstring argument from nullptr, invoking undefined behavior before
+    // toUtf8String is entered and potentially crashing inside wcslen.
+    auto safeToUtf8 = [](const wchar_t* str) {
+        return str ? toUtf8String(str) : std::string("(null)");
+    };
+
     logNoRecursion(fmt::format(
         "Invalid parameter detected in function {} in {} at line {} with expression '{}'\n",
-        toUtf8String(function),
-        toUtf8String(file),
+        safeToUtf8(function),
+        safeToUtf8(file),
         line,
-        toUtf8String(expression)));
+        safeToUtf8(expression)));
 
     abruptQuit(SIGABRT);
 }

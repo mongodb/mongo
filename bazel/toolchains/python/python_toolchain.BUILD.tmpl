@@ -30,6 +30,9 @@ py_runtime(
     files = [":files"],
     interpreter = ":interpreter",
     python_version = "PY3",
+    # rules_python recreates Windows venvs with a copy of python.exe. The image loader
+    # needs these DLLs beside that copy before Python can read pyvenv.cfg.
+    venv_bin_files = glob(["dist/*.dll"], allow_empty = True),
     visibility = ["//visibility:public"],
 )
 

@@ -17,6 +17,21 @@ set -o pipefail
 bazel_evergreen_shutils::activate_and_cd_src
 bazel_evergreen_shutils::export_ssl_paths_if_needed
 
+# Windows tests execute locally on the host and the windows test runner does not
+# materialize data deps into the runfiles tree when the runfiles paths exceed the 260
+# character MAX_PATH limit (the golden data files of the deep test directories), so
+# golden tests could not find their data files. Point them at the checked-out source
+# tree instead: its paths stay well under the limit. Convert with cygpath -m: the shell
+# is cygwin and pwd is a /cygdrive/... path that boost::filesystem cannot use.
+if [[ "${distro_id:-}" == windows-* ]]; then
+    export GOLDEN_TEST_DATA_ROOT="$(cygpath -m "$(pwd)")"
+    # A bare --test_env=GOLDEN_TEST_DATA_ROOT does not deliver the client environment
+    # variable to locally executed test actions on Windows (the test falls back to the
+    # runfiles lookup, whose data deps tw.cc does not materialize past MAX_PATH), so
+    # pass the value explicitly. Appended last, it wins over the task's bare flag.
+    task_compile_flags="${task_compile_flags:-} --test_env=GOLDEN_TEST_DATA_ROOT=$GOLDEN_TEST_DATA_ROOT --run_under=//bazel:windows_test_launcher"
+fi
+
 # Use `eval` to force evaluation of the environment variables in the echo statement:
 eval echo "Execution environment: Targets: ${targets}"
 

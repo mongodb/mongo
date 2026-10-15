@@ -1,0 +1,34 @@
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
+load("@rules_python//python:defs.bzl", "py_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(["windows_test_launcher.ps1"])
+
+cc_binary(
+    name = "windows_test_launcher_native",
+    srcs = ["windows_test_launcher.cpp"],
+    target_compatible_with = ["@platforms//os:windows"],
+    deps = [":windows_test_launcher_args"],
+)
+
+cc_library(
+    name = "windows_test_launcher_args",
+    hdrs = ["windows_test_launcher.h"],
+)
+
+cc_test(
+    name = "windows_test_launcher_args_test",
+    srcs = ["windows_test_launcher_test.cpp"],
+    deps = [
+        ":windows_test_launcher_args",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+py_test(
+    name = "windows_test_launcher_test",
+    srcs = ["windows_test_launcher_test.py"],
+    data = ["//bazel:windows_test_launcher"],
+    target_compatible_with = ["@platforms//os:windows"],
+)

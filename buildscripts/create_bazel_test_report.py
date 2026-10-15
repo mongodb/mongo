@@ -5,9 +5,9 @@ from pathlib import Path
 
 import typer
 from typing_extensions import TypedDict
-from util.expansions import get_expansion
 
 from buildscripts.parse_test_xml import parse_test_xml
+from buildscripts.util.expansions import get_expansion
 
 
 class Result(TypedDict):
@@ -48,14 +48,17 @@ def main(testlog_dir: str):
         else:
             status = "pass"
 
-        log_raw = Path(test_xml).with_suffix(".log").read_text()
+        # Bazel writes test logs as UTF-8. Pass the encoding explicitly: the default
+        # on Windows is the ANSI code page, and non-ASCII test output would raise
+        # UnicodeDecodeError, losing the entire report.
+        log_raw = Path(test_xml).with_suffix(".log").read_text(encoding="utf-8", errors="replace")
 
         # Bazel gives just a duration, while Evergreen expects a start and end
         # time to calculate the duration. Evergreen itself does something similar
-        # for when only a duration is known.
+        # for when only a duration is known. The duration may be fractional.
         duration = testcase.attrib["time"]
         start = time.time()
-        end = start + int(duration)
+        end = start + float(duration)
 
         report["results"].append(
             Result(

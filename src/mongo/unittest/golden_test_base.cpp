@@ -42,6 +42,25 @@ using namespace std::literals::string_view_literals;
 namespace fs = ::boost::filesystem;
 namespace po = ::boost::program_options;
 
+fs::path resolveGoldenDataRoot(const boost::optional<std::string>& configuredDataRoot) {
+    // An explicitly configured root from GOLDEN_TEST_DATA_ROOT always wins.
+    if (configuredDataRoot && !configuredDataRoot->empty()) {
+        return fs::path(*configuredDataRoot);
+    }
+
+    // Bazel may run the test binary with a working directory that is not the repository root
+    // (for example, Windows tests are executed from inside the runfiles tree). Bazel always
+    // provides the runfiles root and the main repository name through the test environment, so
+    // resolve the repository root from them when available.
+    const char* testSrcdir = std::getenv("TEST_SRCDIR");
+    const char* testWorkspace = std::getenv("TEST_WORKSPACE");
+    if (testSrcdir && *testSrcdir && testWorkspace && *testWorkspace) {
+        return fs::path(testSrcdir) / testWorkspace;
+    }
+
+    return ".";
+}
+
 std::string readFile(const fs::path& path) {
     uassert(6741506,
             str::stream() << "path '" << path.string() << "' must not be a directory",
@@ -82,9 +101,11 @@ GoldenTestEnvironment* GoldenTestEnvironment::getInstance() {
     return &instance;
 }
 
-GoldenTestEnvironment::GoldenTestEnvironment() : _goldenDataRoot(".") {
+GoldenTestEnvironment::GoldenTestEnvironment() {
     // Parse environment variables
     auto opts = GoldenTestOptions::parseEnvironment();
+
+    _goldenDataRoot = resolveGoldenDataRoot(opts.goldenDataRoot);
 
     fs::path outputRoot;
     if (opts.outputRootPattern) {
@@ -216,12 +237,14 @@ GoldenTestOptions GoldenTestOptions::parseEnvironment() {
     po::options_description desc_env;
     boost::optional<std::string> configPath;
     boost::optional<std::string> outputRootPatternOverride;
+    boost::optional<std::string> dataRoot;
     desc_env.add_options()  //
         ("config_path",
          po::value<std::string>()->notifier([&configPath](auto v) { configPath = v; }))  //
         ("output_root_pattern",
          po::value<std::string>()->notifier(
-             [&outputRootPatternOverride](auto v) { outputRootPatternOverride = v; }));
+             [&outputRootPatternOverride](auto v) { outputRootPatternOverride = v; }))  //
+        ("data_root", po::value<std::string>()->notifier([&dataRoot](auto v) { dataRoot = v; }));
 
     po::variables_map vm_env;
     po::store(po::parse_environment(desc_env, "GOLDEN_TEST_"), vm_env);
@@ -249,6 +272,8 @@ GoldenTestOptions GoldenTestOptions::parseEnvironment() {
     if (outputRootPatternOverride) {
         opts.outputRootPattern = *outputRootPatternOverride;
     }
+
+    opts.goldenDataRoot = dataRoot;
 
     return opts;
 }

@@ -396,6 +396,24 @@ py_binary(
 )
 
 py_binary(
+    name = "create_bazel_test_report",
+    srcs = ["create_bazel_test_report.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":parse_test_xml",
+        "//buildscripts/util",
+        dependency(
+            "typer",
+            group = "core",
+        ),
+        dependency(
+            "typing_extensions",
+            group = "core",
+        ),
+    ],
+)
+
+py_binary(
     name = "burn_in_tests",
     srcs = ["burn_in_tests.py"],
     visibility = ["//visibility:public"],
