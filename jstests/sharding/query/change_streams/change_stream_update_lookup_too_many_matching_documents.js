@@ -12,6 +12,7 @@
  *
  * @tags: [
  *   uses_change_streams,
+ *   does_not_support_stepdowns,
  * ]
  */
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
