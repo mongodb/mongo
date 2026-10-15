@@ -4,7 +4,10 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/generic_argument_util.h"
@@ -60,11 +63,14 @@ public:
         }
         void doCheckAuthorization(OperationContext* opCtx) const final {
             auto ns = request().getNamespace();
+            PrivilegeVector privileges{
+                Privilege(ResourcePattern::forExactNamespace(ns), ActionType::dropCollection)};
+            auth::addImplicitPrivilegesForRestrictedNamespaces(&privileges);
             uassert(ErrorCodes::Unauthorized,
                     str::stream() << "Not authorized to drop collection '"
                                   << ns.toStringForErrorMsg() << "'",
                     AuthorizationSession::get(opCtx->getClient())
-                        ->isAuthorizedForActionsOnNamespace(ns, ActionType::dropCollection));
+                        ->isAuthorizedForPrivileges(privileges));
         }
         Reply typedRun(OperationContext* opCtx) final {
             auto nss = request().getNamespace();

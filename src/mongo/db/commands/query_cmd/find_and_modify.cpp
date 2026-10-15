@@ -9,6 +9,7 @@
 #include "mongo/db/admission/write_throttler_admission_context.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
@@ -290,6 +291,7 @@ void CmdFindAndModify::Invocation::doCheckAuthorization(OperationContext* opCtx)
             "Invalid target namespace " + resource.toString(),
             resource.isExactNamespacePattern());
     privileges.push_back(Privilege(resource, actions));
+    auth::addImplicitPrivilegesForRestrictedNamespaces(&privileges);
 
     uassert(ErrorCodes::Unauthorized,
             str::stream() << "Not authorized to find and modify on database'"

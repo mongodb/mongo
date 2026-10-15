@@ -70,7 +70,75 @@ Status checkAuthForCreateOrModifyView(OperationContext* opCtx,
     return Status::OK();
 }
 
+// Returns the pseudo namespace guarding restricted internal collections, carrying the tenant id of
+// the namespace being accessed so that the check applies within the caller's tenant.
+NamespaceString makeAuthForInternalNamespace(const boost::optional<TenantId>& tenantId) {
+    if (!tenantId) {
+        return NamespaceString::kAuthForInternalNamespace;
+    }
+
+    return AuthNamespaceStringUtil::deserialize(tenantId,
+                                                DatabaseName::kAdmin.db(omitTenant),
+                                                NamespaceString::kAuthForInternalNamespace.coll());
+}
+
+// Wrappers around AuthorizationSession::isAuthorizedForActionsOnNamespace which additionally
+// require the implicit privilege of any restricted namespace. Prefer these over calling
+// AuthorizationSession directly from this file.
+bool isAuthorizedForActionsOnNamespace(AuthorizationSession* authSession,
+                                       const NamespaceString& origNs,
+                                       const ActionSet& actions) {
+    if (auto implicitPrivilege = getImplicitPrivilegeForRestrictedNamespace(
+            ResourcePattern::forExactNamespace(origNs), actions)) {
+        if (!authSession->isAuthorizedForPrivilege(*implicitPrivilege)) {
+            return false;
+        }
+    }
+
+    return authSession->isAuthorizedForActionsOnNamespace(origNs, actions);
+}
+
+bool isAuthorizedForActionsOnNamespace(AuthorizationSession* authSession,
+                                       const NamespaceString& origNs,
+                                       ActionType action) {
+    return isAuthorizedForActionsOnNamespace(authSession, origNs, ActionSet{action});
+}
+
 }  // namespace
+
+bool isRestrictedNamespace(const NamespaceString& ns) {
+    // Compared on database and collection name only, so that a tenanted request naming the same
+    // collection cannot sidestep the check by carrying a tenant id.
+    return ns.isConfigDB() &&
+        ns.coll() == NamespaceString::kMultiUpdateCoordinatorsNamespace.coll();
+}
+
+boost::optional<Privilege> getImplicitPrivilegeForRestrictedNamespace(
+    const ResourcePattern& resource, const ActionSet& actions) {
+    if (actions.empty() || !resource.isExactNamespacePattern() ||
+        !isRestrictedNamespace(resource.ns())) {
+        return boost::none;
+    }
+
+    return Privilege(
+        ResourcePattern::forExactNamespace(makeAuthForInternalNamespace(resource.tenantId())),
+        actions);
+}
+
+void addImplicitPrivilegesForRestrictedNamespaces(PrivilegeVector* privileges) {
+    // Collect first, since adding to 'privileges' while iterating over it would invalidate the
+    // iterators, and an added privilege never itself names a restricted namespace.
+    PrivilegeVector implicitPrivileges;
+    for (const auto& privilege : *privileges) {
+        if (auto implicitPrivilege = getImplicitPrivilegeForRestrictedNamespace(
+                privilege.getResourcePattern(), privilege.getActions())) {
+            Privilege::addPrivilegeToPrivilegeVector(&implicitPrivileges,
+                                                     std::move(*implicitPrivilege));
+        }
+    }
+
+    Privilege::addPrivilegesToPrivilegeVector(privileges, implicitPrivileges);
+}
 
 Status checkAuthForFind(AuthorizationSession* authSession,
                         const NamespaceString& ns,
@@ -80,7 +148,8 @@ Status checkAuthForFind(AuthorizationSession* authSession,
                       str::stream() << "Checking query auth on command namespace "
                                     << ns.toStringForErrorMsg());
     }
-    if (!authSession->isAuthorizedForActionsOnNamespace(ns, ActionType::find)) {
+
+    if (!isAuthorizedForActionsOnNamespace(authSession, ns, ActionType::find)) {
         return Status(ErrorCodes::Unauthorized,
                       str::stream() << "not authorized for query on " << ns.toStringForErrorMsg());
     }
@@ -132,7 +201,8 @@ Status checkAuthForInsert(AuthorizationSession* authSession,
     if (DocumentValidationSettings::get(opCtx).isSchemaValidationDisabled()) {
         required.addAction(ActionType::bypassDocumentValidation);
     }
-    if (!authSession->isAuthorizedForActionsOnNamespace(ns, required)) {
+
+    if (!isAuthorizedForActionsOnNamespace(authSession, ns, required)) {
         return Status(ErrorCodes::Unauthorized,
                       str::stream() << "not authorized for insert on " << ns.toStringForErrorMsg());
     }
@@ -158,7 +228,7 @@ Status checkAuthForUpdate(AuthorizationSession* authSession,
         required.addAction(ActionType::bypassDocumentValidation);
     }
 
-    if (!authSession->isAuthorizedForActionsOnNamespace(ns, required)) {
+    if (!isAuthorizedForActionsOnNamespace(authSession, ns, required)) {
         return Status(ErrorCodes::Unauthorized,
                       str::stream() << "not authorized for " << operationType << " on "
                                     << ns.toStringForErrorMsg());
@@ -171,7 +241,7 @@ Status checkAuthForDelete(AuthorizationSession* authSession,
                           OperationContext* opCtx,
                           const NamespaceString& ns,
                           const BSONObj& query) {
-    if (!authSession->isAuthorizedForActionsOnNamespace(ns, ActionType::remove)) {
+    if (!isAuthorizedForActionsOnNamespace(authSession, ns, ActionType::remove)) {
         return Status(ErrorCodes::Unauthorized,
                       str::stream()
                           << "not authorized to remove from " << ns.toStringForErrorMsg());
@@ -232,12 +302,12 @@ Status checkAuthForCreate(OperationContext* opCtx,
     auto ns = cmd.getNamespace();
 
     if (cmd.getCapped() &&
-        !authSession->isAuthorizedForActionsOnNamespace(ns, ActionType::convertToCapped)) {
+        !isAuthorizedForActionsOnNamespace(authSession, ns, ActionType::convertToCapped)) {
         return Status(ErrorCodes::Unauthorized, "unauthorized");
     }
 
     const bool hasCreateCollectionAction =
-        authSession->isAuthorizedForActionsOnNamespace(ns, ActionType::createCollection);
+        isAuthorizedForActionsOnNamespace(authSession, ns, ActionType::createCollection);
 
     // If attempting to create a view, check for additional required privileges.
     if (auto optViewOn = cmd.getViewOn()) {
@@ -268,7 +338,7 @@ Status checkAuthForCreate(OperationContext* opCtx,
     // To create a regular collection, ActionType::createCollection or ActionType::insert are
     // both acceptable.
     if (hasCreateCollectionAction ||
-        authSession->isAuthorizedForActionsOnNamespace(ns, ActionType::insert)) {
+        isAuthorizedForActionsOnNamespace(authSession, ns, ActionType::insert)) {
         return Status::OK();
     }
 
@@ -281,7 +351,7 @@ Status checkAuthForCollMod(OperationContext* opCtx,
                            const BSONObj& cmdObj,
                            bool isMongos,
                            const SerializationContext& serializationContext) {
-    if (!authSession->isAuthorizedForActionsOnNamespace(ns, ActionType::collMod)) {
+    if (!isAuthorizedForActionsOnNamespace(authSession, ns, ActionType::collMod)) {
         return Status(ErrorCodes::Unauthorized, "unauthorized");
     }
 
@@ -342,6 +412,7 @@ StatusWith<PrivilegeVector> getPrivilegesForAggregate(OperationContext* opCtx,
         Privilege currentPriv =
             Privilege(ResourcePattern::forExactNamespace(nss), ActionType::find);
         Privilege::addPrivilegeToPrivilegeVector(&privileges, currentPriv);
+        addImplicitPrivilegesForRestrictedNamespaces(&privileges);
         return privileges;
     }
 
@@ -371,6 +442,11 @@ StatusWith<PrivilegeVector> getPrivilegesForAggregate(OperationContext* opCtx,
                           " or manually opt out by overriding requiresAuthzChecks to false");
         }
     }
+
+    // Covers both an aggregation directly over a restricted namespace and one that names it as a
+    // secondary namespace, e.g. via $lookup, $unionWith, $out or $merge.
+    addImplicitPrivilegesForRestrictedNamespaces(&privileges);
+
     return privileges;
 }
 

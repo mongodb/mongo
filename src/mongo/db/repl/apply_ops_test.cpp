@@ -943,6 +943,30 @@ TEST_F(ApplyOpsUUIDAuthTest, IsAuthorizedForRenameCollection) {
                         ActionSet{ActionType::find, ActionType::dropCollection});
 }
 
+TEST_F(ApplyOpsUUIDAuthTest, RestrictedNamespaceRequiresImplicitPrivilege) {
+    // The multi-update-coordinator namespace is restricted: reaching it requires the equivalent
+    // action on its pseudo namespace in addition to the action on the namespace itself.
+    const NamespaceString restrictedNss = NamespaceString::kMultiUpdateCoordinatorsNamespace;
+
+    // Holding the action on the restricted namespace alone is not enough.
+    _authzSession->assumePrivilegesForDB(
+        Privilege(ResourcePattern::forExactNamespace(restrictedNss), ActionType::dropCollection),
+        restrictedNss.dbName());
+    ASSERT_FALSE(detail::isAuthorizedForUUIDTargetedCommand(
+        _authzSession, OplogEntry::CommandType::kDrop, restrictedNss));
+
+    // Adding the implicit privilege on the pseudo namespace grants access.
+    _authzSession->assumePrivilegesForDB(
+        PrivilegeVector{Privilege(ResourcePattern::forExactNamespace(restrictedNss),
+                                  ActionType::dropCollection),
+                        Privilege(ResourcePattern::forExactNamespace(
+                                      NamespaceString::kAuthForInternalNamespace),
+                                  ActionType::dropCollection)},
+        restrictedNss.dbName());
+    ASSERT_TRUE(detail::isAuthorizedForUUIDTargetedCommand(
+        _authzSession, OplogEntry::CommandType::kDrop, restrictedNss));
+}
+
 // ---- checkAuthForUUIDTargetedCommand ----
 
 TEST_F(ApplyOpsUUIDAuthTest, CheckAuthDoesNotThrowWhenOpHasNoUUID) {
