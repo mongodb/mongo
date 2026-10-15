@@ -6,6 +6,7 @@
 #include "mongo/db/query/util/stop_token.h"
 #include "mongo/logv2/log.h"
 #include "mongo/replay/performance_reporter.h"
+#include "mongo/stdx/thread.h"
 
 #include <chrono>
 #include <exception>
@@ -26,7 +27,7 @@ void SessionHandler::createSession(key_t key, PacketSource source) {
                                                       std::move(commandExecutor),
                                                       std::move(perfReporter));
     ++_runningSessionCount;
-    std::thread([session = std::move(session), this] {
+    stdx::thread([session = std::move(session), this] {
         try {
             session->run(_allSessionStop.get_token());
         } catch (...) {

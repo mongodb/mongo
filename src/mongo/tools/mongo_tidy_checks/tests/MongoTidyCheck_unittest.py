@@ -22,7 +22,8 @@ class MongoTidyTests(unittest.TestCase):
             self.fail(f"Unexpected test id format: {self.id()}")
         self._name = m[1]
 
-    def run_clang_tidy(self, expected: list[str]):
+    def run_clang_tidy(self, expected: list[str], unexpected: list[str] | None = None):
+        unexpected = unexpected or []
         base_path = f"//src/mongo/tools/mongo_tidy_checks/tests:test_{self._name}"
         cmd = [
             "bazel",
@@ -41,7 +42,7 @@ class MongoTidyTests(unittest.TestCase):
             text=True,
             check=False,
         )
-        passed = all(s in p.stdout for s in expected)
+        passed = all(s in p.stdout for s in expected) and not any(s in p.stdout for s in unexpected)
 
         msg = "\n".join(
             [
@@ -55,6 +56,9 @@ class MongoTidyTests(unittest.TestCase):
                 "",
                 "Output expected in stdout: ",
                 "\n".join(f"EXPECT: {s}" for s in expected),
+                "",
+                "Output that must NOT appear in stdout: ",
+                "\n".join(f"UNEXPECTED: {s}" for s in unexpected),
                 "",
                 "stdout was:",
                 "\n".join(f"STDOUT: {s}" for s in p.stdout.splitlines()),
@@ -264,39 +268,40 @@ class MongoTidyTests(unittest.TestCase):
 
         test_names = [
             ("std::get_terminate()", stdx_note),
-            ("std::future<int> myFuture", "Consider using mongo::Future instead."),
+            ("std::future<int>", "Consider using mongo::Future instead."),
             (
-                "std::recursive_mutex recursiveMut",
+                "std::recursive_mutex",
                 "Do not use. A recursive mutex is often an indication of a design problem "
                 "and is prone to deadlocks because you don't know what code you are calling "
                 "while holding the lock.",
             ),
-            ("const std::condition_variable cv", stdx_note),
-            ("static std::unordered_map<int, int> myMap", stdx_note),
-            ("boost::unordered_map<int, int> boostMap", stdx_note),
+            ("std::condition_variable", stdx_note),
+            ("std::unordered_map<int, int>", stdx_note),
+            ("boost::unordered_map<int, int>", stdx_note),
             (
                 'std::regex_search(std::string(""), std::regex(""))',
                 "Consider using mongo::pcre::Regex instead.",
             ),
             (
-                "std::jthread t([] {})",
+                "std::jthread",
                 "Do not use. Consider stdx::thread with an explicit join in production or "
                 "unittest::JoinThread in unit tests.",
             ),
-            ("std::atomic<int> atomicVar", "Consider using mongo::Atomic<T> instead."),
+            ("std::atomic<int>", "Consider using mongo::Atomic<T> instead."),
             (
-                "std::optional<std::string> strOpt",
+                "std::optional<std::string>",
                 "Consider using boost::optional instead.",
             ),
-            ("std::atomic<int> fieldDecl", "Consider using mongo::Atomic<T> instead."),
             (
-                "std::optional<T> templateDecl",
+                "std::optional<T>",
                 "Consider using boost::optional instead.",
             ),
             ("using std::optional", "Consider using boost::optional instead."),
             ("std::optional<int>", "Consider using boost::optional instead."),
             ("std::optional<long>", "Consider using boost::optional instead."),
             ("std::optional<char>", "Consider using boost::optional instead."),
+            ("std::optional", "Consider using boost::optional instead."),
+            ("std::optional<short>", "Consider using boost::optional instead."),
         ]
 
         self.run_clang_tidy(
@@ -305,7 +310,10 @@ class MongoTidyTests(unittest.TestCase):
                 "Use '//  NOLINT' if usage is absolutely necessary. Be especially "
                 "careful doing so outside of test code."
                 for (name, msg) in test_names
-            ]
+            ],
+            # Allowed types must not be flagged just because banned-name text appears in the
+            # arguments of a construction.
+            unexpected=["Forbidden use of banned name in boost::optional"],
         )
 
     def test_MongoRandCheck(self):

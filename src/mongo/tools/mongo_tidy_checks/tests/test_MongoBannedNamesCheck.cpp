@@ -3,9 +3,11 @@
 #include <future>
 #include <mutex>
 #include <regex>
+#include <string>
 #include <thread>
 #include <unordered_map>
 
+#include <boost/optional.hpp>
 #include <boost/unordered_map.hpp>
 
 namespace mongo {
@@ -42,6 +44,22 @@ auto trailingOptionalReturn() -> std::optional<long> {
 void lambdaOptionalReturn() {
     auto lambda = []() -> std::optional<char> {
         return {};
+    };
+}
+
+void explicitOptionalConstruction() {
+    auto ctad = [] {
+        return std::optional{5};
+    };
+    auto functionalCast = [] {
+        return std::optional<short>(7);
+    };
+    // Allowed types: banned-name text in an initializer must not be flagged.
+    boost::optional<std::string> allowedDecl{"std::optional"};
+    boost::optional<std::string> allowedCopyDecl = std::string("std::optional");
+    using boost::optional;
+    auto allowed = [] {
+        return boost::optional<std::string>{"std::optional"};
     };
 }
 }  // namespace mongo
