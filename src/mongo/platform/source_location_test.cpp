@@ -52,12 +52,13 @@ TEST_F(SourceLocationTest, GlobalVariable) {
 }
 
 /*
- * The MSVC version we're dealing with right now is 14.44.35207 -
- * "Visual Studio 2022 - 17.14.20". It gets current source location
- * wrong in some ways. These tests confirm its incorrect behavior.
+ * MSVC 14.44.35207 - "Visual Studio 2022 - 17.14.20" gets current source
+ * location wrong in some ways. These tests confirm its incorrect behavior.
  * This condition can be adjusted when we upgrade to a better MSVC.
+ * clang-cl defines _MSC_VER for MSVC compatibility, but reports the standard
+ * (constructor call site) location, so it is excluded here.
  */
-#if defined(_MSC_VER)
+#if defined(_MSC_VER) && !defined(__clang__)
 constexpr bool wrongLocation = true;
 #else
 constexpr bool wrongLocation = false;

@@ -115,7 +115,7 @@ public:
         std::unique_ptr<RecipientStateMachineExternalState> externalState,
         ServiceContext* serviceContext);
 
-    ~RecipientStateMachine() override = default;
+    ~RecipientStateMachine() override;
 
     /**
      *  Runs up until the recipient is in state kStrictConsistency or encountered an error.

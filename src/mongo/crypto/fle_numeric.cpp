@@ -434,8 +434,9 @@ OSTType_Decimal128 getTypeInfoDecimal128(Decimal128 value,
     int64_t highCoefficent = value.getCoefficientHigh();
     int64_t lowCoefficient = value.getCoefficientLow();
 
-// use int128_t where possible on gcc/clang
-#ifdef __SIZEOF_INT128__
+// Use int128_t where possible on GCC/Clang. Clang-cl defines __SIZEOF_INT128__,
+// but Boost's MSVC configuration does not recognize __int128 as an arithmetic type.
+#if defined(__SIZEOF_INT128__) && !defined(_MSC_VER)
     __int128 cMax1 = 0x1ed09bead87c0;
     cMax1 <<= 64;
     cMax1 |= 0x378d8e63ffffffff;
@@ -445,7 +446,7 @@ OSTType_Decimal128 getTypeInfoDecimal128(Decimal128 value,
         dassert(cMaxStr == cMax);
     }
 #else
-    boost::multiprecision::uint128_t cMax("9999999999999999999999999999999999");
+    static const boost::multiprecision::uint128_t cMax("9999999999999999999999999999999999");
 #endif
     const int64_t eMin = -6176;
 

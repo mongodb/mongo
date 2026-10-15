@@ -134,7 +134,8 @@
  * Overrides compiler heuristics to force a function to be inlined.
  */
 #define MONGO_COMPILER_ALWAYS_INLINE MONGO_COMPILER_ALWAYS_INLINE_
-#if defined(_MSC_VER)
+// clang-cl defines _MSC_VER for MSVC compatibility, but is still Clang for attribute support.
+#if defined(_MSC_VER) && !defined(__clang__)
 #define MONGO_COMPILER_ALWAYS_INLINE_ [[msvc::forceinline]]
 #elif MONGO_COMPILER_HAS_ATTRIBUTE(gnu::always_inline)
 #define MONGO_COMPILER_ALWAYS_INLINE_ [[gnu::always_inline]]

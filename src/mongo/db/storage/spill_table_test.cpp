@@ -86,7 +86,7 @@ TEST_F(SpillTableTest, InsertRecordsRandomWriteConflicts) {
 
     auto writeConflict = enableWriteConflictForWrites(FailPoint::ModeOptions{
         .mode = FailPoint::Mode::random,
-        .val = static_cast<int32_t>(std::numeric_limits<int32_t>::max() * 0.1)});
+        .val = static_cast<FailPoint::ValType>(std::numeric_limits<int32_t>::max() * 0.1)});
     ASSERT_OK(spillTable->insertRecords(opCtx.get(), &records));
 
     auto cursor = spillTable->getCursor(opCtx.get());
