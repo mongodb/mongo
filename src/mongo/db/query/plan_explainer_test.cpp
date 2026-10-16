@@ -1496,6 +1496,9 @@ TEST_F(PlanExplainerTest, INLJEmbeddingTest) {
         std::move(innerScanNode),
         std::vector<QSNJoinPredicate>{QSNJoinPredicate{.op = QSNJoinPredicate::ComparisonOp::Eq,
                                                        .leftField = FieldPath("x"),
+                                                       .rightField = FieldPath("xyz.y")}},
+        std::vector<QSNJoinPredicate>{QSNJoinPredicate{.op = QSNJoinPredicate::ComparisonOp::Eq,
+                                                       .leftField = FieldPath("x"),
                                                        .rightField = FieldPath("y")}},
         /*leftFieldEmbedding=*/boost::none,
         FieldPath(/*inputPath=*/"xyz"));
@@ -1513,6 +1516,9 @@ TEST_F(PlanExplainerTest, INLJEmbeddingTest) {
             "leftEmbeddingField": "none",
             "rightEmbeddingField": "xyz",
             "joinPredicates": [
+                "x = xyz.y"
+            ],
+            "probePredicates": [
                 "x = y"
             ],
             "inputStages": [

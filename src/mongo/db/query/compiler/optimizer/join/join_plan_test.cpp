@@ -142,7 +142,7 @@ TEST_F(JoinPlanNodeRegistryTest, JoinPlanNodeToBSONIncludesSubsetCollectionNames
     const JoinGraph graph = makeJoinGraph({fooNss, barNss});
 
     const auto indexes = makeIndexCatalogEntries({BSON("a" << 1)});
-    const auto inlRhsId = _registry.registerINLJRHSNode(1, indexes.front(), barNss);
+    const auto inlRhsId = _registry.registerINLJRHSNode(1, 0, indexes.front(), barNss);
 
     JoinSubset subset(makeNodeSet(0, 1));
     const auto joinId =

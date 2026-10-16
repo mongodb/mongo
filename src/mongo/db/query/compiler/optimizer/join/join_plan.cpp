@@ -82,9 +82,12 @@ JoinPlanNodeId JoinPlanNodeRegistry::registerBaseNode(NodeId node,
 }
 
 JoinPlanNodeId JoinPlanNodeRegistry::registerINLJRHSNode(
-    NodeId node, std::shared_ptr<const IndexCatalogEntry> entry, const NamespaceString& nss) {
+    NodeId node,
+    EdgeId probeEdge,
+    std::shared_ptr<const IndexCatalogEntry> entry,
+    const NamespaceString& nss) {
     JoinPlanNodeId id = _allJoinPlans.size();
-    _allJoinPlans.emplace_back(INLJRHSNode{std::move(entry), nss, node});
+    _allJoinPlans.emplace_back(INLJRHSNode{std::move(entry), nss, node, probeEdge});
     return id;
 }
 
@@ -183,7 +186,8 @@ void JoinPlanNodeRegistry::joinPlanNodeToBSON(BSONObjBuilder& bob,
             },
             [&bob](const INLJRHSNode& ip) {
                 bob << "accessPath"
-                    << (str::stream() << "INDEX_PROBE " << ip.entry->descriptor()->keyPattern());
+                    << (str::stream() << "INDEX_PROBE " << ip.entry->descriptor()->keyPattern())
+                    << "probeEdge" << ip.probeEdge;
             },
             [&bob](const BaseNode& base) {
                 bob << "accessPath" << base.soln->summaryString();

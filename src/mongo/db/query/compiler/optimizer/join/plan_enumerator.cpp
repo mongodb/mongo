@@ -109,7 +109,7 @@ void PlanEnumeratorContext::enumerateINLJPlan(EdgeId edge,
     }
 
     const auto& nss = _ctx.joinGraph.accessPathAt(rightNodeId)->nss();
-    auto rhs = _registry.registerINLJRHSNode(rightNodeId, ie, nss);
+    auto rhs = _registry.registerINLJRHSNode(rightNodeId, edge, ie, nss);
     addPlanToSubset(JoinMethod::INLJ, leftPlan, rhs, std::move(inljCost), subset, isBestPlan);
 }
 

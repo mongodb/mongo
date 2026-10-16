@@ -2113,18 +2113,40 @@ std::unique_ptr<QuerySolutionNode> NestedLoopJoinEmbeddingNode::clone() const {
                                                          rightEmbeddingField);
 }
 
+IndexedNestedLoopJoinEmbeddingNode::IndexedNestedLoopJoinEmbeddingNode(
+    std::unique_ptr<QuerySolutionNode> leftChildArg,
+    std::unique_ptr<QuerySolutionNode> rightChildArg,
+    std::vector<QSNJoinPredicate> joinPredicatesArg,
+    std::vector<QSNJoinPredicate> probePredicatesArg,
+    boost::optional<FieldPath> leftEmbeddingFieldArg,
+    boost::optional<FieldPath> rightEmbeddingFieldArg)
+    : BinaryJoinEmbeddingNode(std::move(leftChildArg),
+                              std::move(rightChildArg),
+                              std::move(joinPredicatesArg),
+                              std::move(leftEmbeddingFieldArg),
+                              std::move(rightEmbeddingFieldArg)),
+      probePredicates{probePredicatesArg} {}
+
 void IndexedNestedLoopJoinEmbeddingNode::appendToString(str::stream* ss, int indent) const {
     addIndent(ss, indent);
     *ss << "INDEXED_NESTED_LOOP_JOIN\n";
+    addIndent(ss, indent + 1);
+    *ss << "probePredicates:\n";
+    for (auto&& probePred : probePredicates) {
+        addIndent(ss, indent + 2);
+        *ss << probePred.toString() << "\n";
+    }
     BinaryJoinEmbeddingNode::appendToString(ss, indent);
 }
 
 std::unique_ptr<QuerySolutionNode> IndexedNestedLoopJoinEmbeddingNode::clone() const {
-    return std::make_unique<IndexedNestedLoopJoinEmbeddingNode>(children[0]->clone(),
-                                                                children[1]->clone(),
-                                                                joinPredicates,
-                                                                leftEmbeddingField,
-                                                                rightEmbeddingField);
+    auto cloneNode = std::make_unique<IndexedNestedLoopJoinEmbeddingNode>(children[0]->clone(),
+                                                                          children[1]->clone(),
+                                                                          joinPredicates,
+                                                                          probePredicates,
+                                                                          leftEmbeddingField,
+                                                                          rightEmbeddingField);
+    return cloneNode;
 }
 
 IndexProbeNode::IndexProbeNode(NamespaceString nssArg, IndexEntry indexArg)

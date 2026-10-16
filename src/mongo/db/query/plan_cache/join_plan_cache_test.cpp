@@ -22,9 +22,10 @@ std::unique_ptr<JoinPlanCacheEntry> makeEntry() {
                                                 std::vector<NodeFingerprint>{});
 }
 
-std::unique_ptr<CachedJoinPlan> makeComplexTree() {
-    return std::make_unique<CachedJoinPlan>(CachedJoinNode{
-        .method = join_ordering::JoinMethod::HJ,
+std::unique_ptr<CachedJoinPlan> makeComplexTree(
+    join_ordering::JoinMethod method = join_ordering::JoinMethod::HJ) {
+    CachedJoinNode node{
+        .method = method,
         .joinPredicates = {QSNJoinPredicate{
             .op = QSNJoinPredicate::ComparisonOp::Eq,
             .leftField = FieldPath("foo"),
@@ -38,7 +39,15 @@ std::unique_ptr<CachedJoinPlan> makeComplexTree() {
             .nodeId = 1,
             .solnCacheData = std::make_unique<SolutionCacheData>(SolutionCacheData{}),
         }),
-    });
+    };
+    if (method == join_ordering::JoinMethod::INLJ) {
+        node.probePredicates = {QSNJoinPredicate{
+            .op = QSNJoinPredicate::ComparisonOp::Eq,
+            .leftField = FieldPath("foo"),
+            .rightField = FieldPath("baz"),
+        }};
+    }
+    return std::make_unique<CachedJoinPlan>(std::move(node));
 }
 
 JoinPlanCache largeBudgetSinglePartitionCache() {
@@ -222,14 +231,36 @@ TEST(JoinPlanCacheSizeTest, LongerFieldPathIncreasesSize) {
 }
 
 TEST(JoinPlanCacheSizeTest, AdditionalPredicateIncreasesSize) {
-    auto baseline = std::make_unique<JoinPlanCacheEntry>(makeComplexTree(),
-                                                         join_ordering::NodeId{0},
-                                                         std::vector<CollectionTag>{},
-                                                         std::vector<NodeFingerprint>{});
+    auto baseline =
+        std::make_unique<JoinPlanCacheEntry>(makeComplexTree(join_ordering::JoinMethod::INLJ),
+                                             join_ordering::NodeId{0},
+                                             std::vector<CollectionTag>{},
+                                             std::vector<NodeFingerprint>{});
 
-    auto extraPredTree = makeComplexTree();
+    // Validate join predicates contribute to size.
+    auto extraJoinPredTree = makeComplexTree(join_ordering::JoinMethod::INLJ);
+    std::get<CachedJoinNode>(extraJoinPredTree->node)
+        .joinPredicates.push_back(QSNJoinPredicate{
+            .op = QSNJoinPredicate::ComparisonOp::Eq,
+            .leftField = FieldPath("baz"),
+            .rightField = FieldPath("qux"),
+        });
+    auto extraJoinPredEntry = std::make_unique<JoinPlanCacheEntry>(std::move(extraJoinPredTree),
+                                                                   join_ordering::NodeId{0},
+                                                                   std::vector<CollectionTag>{},
+                                                                   std::vector<NodeFingerprint>{});
+    ASSERT_GT(extraJoinPredEntry->estimatedEntrySizeBytes, baseline->estimatedEntrySizeBytes);
+
+    // Validate probe predicates contribute to size.
+    auto extraPredTree = makeComplexTree(join_ordering::JoinMethod::INLJ);
     std::get<CachedJoinNode>(extraPredTree->node)
         .joinPredicates.push_back(QSNJoinPredicate{
+            .op = QSNJoinPredicate::ComparisonOp::Eq,
+            .leftField = FieldPath("baz"),
+            .rightField = FieldPath("qux"),
+        });
+    std::get<CachedJoinNode>(extraPredTree->node)
+        .probePredicates.push_back(QSNJoinPredicate{
             .op = QSNJoinPredicate::ComparisonOp::Eq,
             .leftField = FieldPath("baz"),
             .rightField = FieldPath("qux"),
@@ -239,7 +270,7 @@ TEST(JoinPlanCacheSizeTest, AdditionalPredicateIncreasesSize) {
                                                                std::vector<CollectionTag>{},
                                                                std::vector<NodeFingerprint>{});
 
-    ASSERT_GT(extraPredEntry->estimatedEntrySizeBytes, baseline->estimatedEntrySizeBytes);
+    ASSERT_GT(extraPredEntry->estimatedEntrySizeBytes, extraJoinPredEntry->estimatedEntrySizeBytes);
 }
 
 TEST(JoinPlanCacheSizeTest, LongerInljIndexNameIncreasesSize) {
@@ -499,6 +530,28 @@ TEST(JoinPlanCacheStatsTest, SerializesComplexPlanTree) {
               plan["joinMethod"].str());
     ASSERT_EQ(BSONType::array, plan["joinPredicates"].type());
     ASSERT_EQ(1, plan["joinPredicates"].Array().size());
+    ASSERT_FALSE(plan.hasField("probePredicates"));
+    // Both children are serialized recursively as access-path leaves.
+    ASSERT_TRUE(plan["left"].Obj().hasField("nodeId"));
+    ASSERT_TRUE(plan["right"].Obj().hasField("nodeId"));
+}
+
+TEST(JoinPlanCacheStatsTest, SerializesComplexInljPlanTree) {
+    auto entry =
+        std::make_unique<JoinPlanCacheEntry>(makeComplexTree(join_ordering::JoinMethod::INLJ),
+                                             join_ordering::NodeId{0},
+                                             std::vector<CollectionTag>{},
+                                             std::vector<NodeFingerprint>{});
+
+    BSONObj obj = joinPlanCacheEntryToBSON("key", *entry);
+    ASSERT_TRUE(obj.hasField("plan"));
+    BSONObj plan = obj["plan"].Obj();
+    ASSERT_EQ(join_ordering::joinMethodToString(join_ordering::JoinMethod::INLJ),
+              plan["joinMethod"].str());
+    ASSERT_EQ(BSONType::array, plan["joinPredicates"].type());
+    ASSERT_EQ(1, plan["joinPredicates"].Array().size());
+    ASSERT_EQ(BSONType::array, plan["probePredicates"].type());
+    ASSERT_EQ(1, plan["probePredicates"].Array().size());
     // Both children are serialized recursively as access-path leaves.
     ASSERT_TRUE(plan["left"].Obj().hasField("nodeId"));
     ASSERT_TRUE(plan["right"].Obj().hasField("nodeId"));

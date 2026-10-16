@@ -2,6 +2,8 @@ Graph:
 A -- B
 Solution with seed 0:
 INDEXED_NESTED_LOOP_JOIN
+---probePredicates:
+------a = b
 ---leftEmbeddingField: (none)
 ---rightEmbeddingField: b
 ---joinPredicates:

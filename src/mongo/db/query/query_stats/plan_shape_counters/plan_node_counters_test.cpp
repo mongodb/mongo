@@ -403,6 +403,7 @@ public:
         add(std::make_unique<IndexedNestedLoopJoinEmbeddingNode>(makeCollScan(),
                                                                  makeIndexProbe(),
                                                                  std::vector<QSNJoinPredicate>{},
+                                                                 std::vector<QSNJoinPredicate>{},
                                                                  boost::none,
                                                                  boost::none),
             {QsnNodeCounter::kInlj,

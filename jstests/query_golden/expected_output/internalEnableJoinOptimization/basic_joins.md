@@ -1926,6 +1926,7 @@ usedJoinOptimization: true
 INDEXED_NESTED_LOOP_JOIN_EMBEDDING [b = b]
 leftEmbeddingField: "none"
 rightEmbeddingField: "y"
+probePredicates: [ "b = b" ]
   |  |
   |  FETCH [test.basic_joins_md_foreign2]
   |  
@@ -3049,6 +3050,7 @@ rightEmbeddingField: "none"
   |  INDEXED_NESTED_LOOP_JOIN_EMBEDDING [a = _id,x.a = _id]
   |  leftEmbeddingField: "none"
   |  rightEmbeddingField: "y"
+  |  probePredicates: [ "a = _id" ]
   |  |  |
   |  |  FETCH [test.basic_joins_md_foreign2]
   |  |  
@@ -3388,6 +3390,7 @@ usedJoinOptimization: true
 INDEXED_NESTED_LOOP_JOIN_EMBEDDING [b $= b]
 leftEmbeddingField: "none"
 rightEmbeddingField: "z"
+probePredicates: [ "b $= b" ]
   |  |
   |  FETCH [test.basic_joins_md_foreign2]
   |  
@@ -4544,6 +4547,7 @@ usedJoinOptimization: true
 INDEXED_NESTED_LOOP_JOIN_EMBEDDING [a = a]
 leftEmbeddingField: "none"
 rightEmbeddingField: "x"
+probePredicates: [ "a = a" ]
   |  |
   |  FETCH [test.basic_joins_md_foreign1]
   |  
@@ -6261,6 +6265,7 @@ usedJoinOptimization: true
 INDEXED_NESTED_LOOP_JOIN_EMBEDDING [a = a]
 leftEmbeddingField: "none"
 rightEmbeddingField: "x"
+probePredicates: [ "a = a" ]
   |  |
   |  PROJECTION_DEFAULT
   |  transformBy: { "_id" : true, "a" : true, "computed" : { "$const" : "bar" } }
@@ -6358,6 +6363,7 @@ usedJoinOptimization: true
 INDEXED_NESTED_LOOP_JOIN_EMBEDDING [a = a]
 leftEmbeddingField: "x"
 rightEmbeddingField: "none"
+probePredicates: [ "a = a" ]
   |  |
   |  PROJECTION_DEFAULT
   |  transformBy: { "_id" : true, "a" : true, "computed" : { "$const" : "y" } }
@@ -6453,6 +6459,7 @@ usedJoinOptimization: true
 INDEXED_NESTED_LOOP_JOIN_EMBEDDING [m = n]
 leftEmbeddingField: "none"
 rightEmbeddingField: "x"
+probePredicates: [ "m = a" ]
   |  |
   |  PROJECTION_DEFAULT
   |  transformBy: { "_id" : true, "n" : "$a" }
@@ -6548,6 +6555,7 @@ usedJoinOptimization: true
 INDEXED_NESTED_LOOP_JOIN_EMBEDDING [n = m]
 leftEmbeddingField: "x"
 rightEmbeddingField: "none"
+probePredicates: [ "n = a" ]
   |  |
   |  PROJECTION_DEFAULT
   |  transformBy: { "_id" : true, "m" : "$a" }
@@ -6649,6 +6657,7 @@ usedJoinOptimization: true
 INDEXED_NESTED_LOOP_JOIN_EMBEDDING [m $= n]
 leftEmbeddingField: "none"
 rightEmbeddingField: "x"
+probePredicates: [ "m $= a" ]
   |  |
   |  PROJECTION_DEFAULT
   |  transformBy: { "_id" : true, "n" : "$a" }
@@ -6750,6 +6759,7 @@ usedJoinOptimization: true
 INDEXED_NESTED_LOOP_JOIN_EMBEDDING [n $= m]
 leftEmbeddingField: "x"
 rightEmbeddingField: "none"
+probePredicates: [ "n $= a" ]
   |  |
   |  PROJECTION_DEFAULT
   |  transformBy: { "_id" : true, "m" : "$a" }

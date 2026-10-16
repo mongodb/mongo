@@ -2320,8 +2320,12 @@ struct NestedLoopJoinEmbeddingNode : public BinaryJoinEmbeddingNode {
  * an index over the fields in the join predicates.
  */
 struct IndexedNestedLoopJoinEmbeddingNode : public BinaryJoinEmbeddingNode {
-    // Inherit the constructor from BinaryJoinEmbeddingNode
-    using BinaryJoinEmbeddingNode::BinaryJoinEmbeddingNode;
+    IndexedNestedLoopJoinEmbeddingNode(std::unique_ptr<QuerySolutionNode> leftChildArg,
+                                       std::unique_ptr<QuerySolutionNode> rightChildArg,
+                                       std::vector<QSNJoinPredicate> joinPredicatesArg,
+                                       std::vector<QSNJoinPredicate> probePredicatesArg,
+                                       boost::optional<FieldPath> leftEmbeddingFieldArg,
+                                       boost::optional<FieldPath> rightEmbeddingFieldArg);
 
     StageType getType() const override {
         return STAGE_INDEXED_NESTED_LOOP_JOIN_EMBEDDING_NODE;
@@ -2329,6 +2333,15 @@ struct IndexedNestedLoopJoinEmbeddingNode : public BinaryJoinEmbeddingNode {
 
     void appendToString(str::stream* ss, int indent) const override;
     std::unique_ptr<QuerySolutionNode> clone() const override;
+
+    void hash(absl::HashState h) const override {
+        h = absl::HashState::combine(std::move(h), probePredicates);
+        BinaryJoinEmbeddingNode::hash(std::move(h));
+    }
+
+    // Identifies predicates used for probing the index. The fields referenced on the RHS are not
+    // aliased, i.e. they should match fields provided by the index.
+    std::vector<QSNJoinPredicate> probePredicates;
 };
 
 /**

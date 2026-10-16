@@ -573,6 +573,14 @@ void qsnToBson(const QuerySolutionNode* node,
                 }
                 bob->append("joinPredicates", bab.arr());
             }
+            if (bjen->getType() == STAGE_INDEXED_NESTED_LOOP_JOIN_EMBEDDING_NODE) {
+                auto inlj = static_cast<const IndexedNestedLoopJoinEmbeddingNode*>(bjen);
+                BSONArrayBuilder bab;
+                for (auto&& pp : inlj->probePredicates) {
+                    bab.append(pp.toString());
+                }
+                bob->append("probePredicates", bab.arr());
+            }
             break;
         }
         case STAGE_INDEX_PROBE_NODE: {

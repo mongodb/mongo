@@ -28,6 +28,7 @@ namespace {
 std::unique_ptr<QuerySolutionNode> makeBinaryJoinEmbeddingQSN(
     JoinMethod method,
     std::vector<QSNJoinPredicate>&& joinPreds,
+    std::vector<QSNJoinPredicate>&& probePreds,
     std::unique_ptr<QuerySolutionNode> leftChild,
     boost::optional<FieldPath> leftEmbedPath,
     std::unique_ptr<QuerySolutionNode> rightChild,
@@ -45,12 +46,14 @@ std::unique_ptr<QuerySolutionNode> makeBinaryJoinEmbeddingQSN(
                                                                  std::move(joinPreds),
                                                                  leftEmbedPath,
                                                                  rightEmbedPath);
-        case JoinMethod::INLJ:
+        case JoinMethod::INLJ: {
             return std::make_unique<IndexedNestedLoopJoinEmbeddingNode>(std::move(leftChild),
                                                                         std::move(rightChild),
                                                                         std::move(joinPreds),
+                                                                        std::move(probePreds),
                                                                         leftEmbedPath,
                                                                         rightEmbedPath);
+        }
     }
     MONGO_UNREACHABLE_TASSERT(11336909);
 }
@@ -135,6 +138,31 @@ std::vector<QSNJoinPredicate> makeJoinPreds(const JoinReorderingContext& ctx,
         }
     }
     return preds;
+}
+
+// Helper to construct a join predicate used by an INLJ probe.
+std::vector<QSNJoinPredicate> makeProbePredicates(const JoiningNode& join,
+                                                  const JoinPlanNodeRegistry& registry,
+                                                  const JoinReorderingContext& ctx,
+                                                  bool expandLeftPath) {
+    std::vector<QSNJoinPredicate> probePreds;
+    if (join.method == JoinMethod::INLJ) {
+        const auto& rhs = registry.getAs<INLJRHSNode>(join.right);
+        auto probeEdge = ctx.joinGraph.getEdge(rhs.probeEdge);
+        if (probeEdge.right != rhs.node) {
+            probeEdge = probeEdge.reverseEdge();
+        }
+        for (const auto& pred : probeEdge.predicates) {
+            probePreds.push_back({.op = convertToPhysicalOperator(pred.op),
+                                  // We expand the left field & apply aliases as normal, since it
+                                  // comes from the left subtree.
+                                  .leftField = expandEmbeddedPath(ctx, pred.left, expandLeftPath),
+                                  // We don't expand the right field or apply any projections to it,
+                                  // as this is sourced directly from the index.
+                                  .rightField = ctx.resolvedPaths[pred.right].underlyingFieldPath});
+        }
+    }
+    return probePreds;
 }
 
 void addEstimatesForExplain(const JoinReorderingContext& ctx,
@@ -296,8 +324,9 @@ std::unique_ptr<QuerySolutionNode> buildQSNFromJoiningNode(
     auto leftChild = buildQSNFromJoinPlan(ctx, peCtx, join.left, estimates, metrics);
     auto rightChild = buildQSNFromJoinPlan(ctx, peCtx, join.right, estimates, metrics);
 
-    const auto& leftSubset = peCtx.registry().getBitset(join.left);
-    const auto& rightSubset = peCtx.registry().getBitset(join.right);
+    const auto& registry = peCtx.registry();
+    const auto& leftSubset = registry.getBitset(join.left);
+    const auto& rightSubset = registry.getBitset(join.right);
 
     const bool isLeftBaseNode = leftSubset.count() == 1;
     const bool isRightBaseNode = rightSubset.count() == 1;
@@ -323,6 +352,7 @@ std::unique_ptr<QuerySolutionNode> buildQSNFromJoiningNode(
 
     return makeBinaryJoinEmbeddingQSN(join.method,
                                       std::move(joinPreds),
+                                      makeProbePredicates(join, registry, ctx, expandLeftPath),
                                       std::move(leftChild),
                                       leftEmbedding,
                                       std::move(rightChild),
@@ -626,6 +656,7 @@ std::unique_ptr<CachedJoinPlan> toCachedJoinPlan(const JoinReorderingContext& ct
                 return std::make_unique<CachedJoinPlan>(CachedJoinNode{
                     .method = join.method,
                     .joinPredicates = std::move(joinPreds),
+                    .probePredicates = makeProbePredicates(join, registry, ctx, !isLeftBase),
                     .leftEmbeddingField = std::move(leftEmbed),
                     .rightEmbeddingField = std::move(rightEmbed),
                     .left = toCachedJoinPlan(ctx, registry, join.left),
@@ -694,13 +725,15 @@ std::unique_ptr<QuerySolutionNode> fromCachedJoinPlan(OperationContext* opCtx,
                     fromCachedJoinPlan(opCtx, joinGraph, collections, perCollIdxs, *join.left);
                 auto rightChild =
                     fromCachedJoinPlan(opCtx, joinGraph, collections, perCollIdxs, *join.right);
-                return makeBinaryJoinEmbeddingQSN(
-                    join.method,
-                    std::vector<QSNJoinPredicate>(join.joinPredicates),
-                    std::move(leftChild),
-                    join.leftEmbeddingField,
-                    std::move(rightChild),
-                    join.rightEmbeddingField);
+                auto qsn =
+                    makeBinaryJoinEmbeddingQSN(join.method,
+                                               std::vector<QSNJoinPredicate>(join.joinPredicates),
+                                               std::vector<QSNJoinPredicate>(join.probePredicates),
+                                               std::move(leftChild),
+                                               join.leftEmbeddingField,
+                                               std::move(rightChild),
+                                               join.rightEmbeddingField);
+                return qsn;
             },
         },
         plan.node);

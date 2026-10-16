@@ -539,6 +539,7 @@ usedJoinOptimization: true
 INDEXED_NESTED_LOOP_JOIN_EMBEDDING [key = key,cor.key.foo $= key]
 leftEmbeddingField: "none"
 rightEmbeddingField: "lf"
+probePredicates: [ "key = key" ]
   |  |
   |  FETCH [test.null_semantics_md_other]
   |  

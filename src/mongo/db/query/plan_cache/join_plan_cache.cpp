@@ -69,6 +69,13 @@ size_t CachedJoinNode::estimateHeapBytes() const {
                 estimateFieldPathHeapBytes(pred.rightField);
         },
         /*includeShallowSize=*/true);
+    size += container_size_helper::estimateObjectSizeInBytes(
+        probePredicates,
+        [](const QSNJoinPredicate& pred) {
+            return estimateFieldPathHeapBytes(pred.leftField) +
+                estimateFieldPathHeapBytes(pred.rightField);
+        },
+        /*includeShallowSize=*/true);
     if (leftEmbeddingField) {
         size += estimateFieldPathHeapBytes(*leftEmbeddingField);
     }
@@ -113,6 +120,15 @@ BSONObj CachedJoinPlan::toBSON() const {
                            predsBob.append(pred.toString());
                        }
                        predsBob.doneFast();
+
+                       if (node.method == join_ordering::JoinMethod::INLJ) {
+                           BSONArrayBuilder probesBob(bob.subarrayStart("probePredicates"));
+                           for (const auto& pred : node.probePredicates) {
+                               probesBob.append(pred.toString());
+                           }
+                           probesBob.doneFast();
+                       }
+
                        if (node.leftEmbeddingField) {
                            bob.append("leftEmbeddingField", node.leftEmbeddingField->fullPath());
                        }

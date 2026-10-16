@@ -2329,6 +2329,7 @@ TEST(QuerySolutionTest, AssertDifferentHashesForProbesOnDifferentIndexes) {
                                         foreignNss),
             std::vector<QSNJoinPredicate>{
                 {QSNJoinPredicate::ComparisonOp::Eq, FieldPath("x"), FieldPath("y")}},
+            std::vector<QSNJoinPredicate>{},
             boost::none,
             FieldPath("customer"));
         auto qs = std::make_unique<QuerySolution>();
@@ -2338,6 +2339,34 @@ TEST(QuerySolutionTest, AssertDifferentHashesForProbesOnDifferentIndexes) {
 
     ASSERT_NE(makeInlj(BSON("a" << 1), "index_a")->hash(),
               makeInlj(BSON("b" << 1), "index_b")->hash());
+}
+
+TEST(QuerySolutionTest, AssertDifferentHashesForDifferentProbePredicates) {
+    const NamespaceString foreignNss = NamespaceString::createNamespaceString_forTest("db.foreign");
+
+    auto makeInlj = [&](std::vector<QSNJoinPredicate> probePreds) {
+        auto root = std::make_unique<IndexedNestedLoopJoinEmbeddingNode>(
+            std::make_unique<CollectionScanNode>(),
+            std::make_unique<FetchNode>(
+                std::make_unique<IndexProbeNode>(foreignNss,
+                                                 buildSimpleIndexEntry(BSON("a" << 1), "a_1")),
+                foreignNss),
+            std::vector<QSNJoinPredicate>{
+                {QSNJoinPredicate::ComparisonOp::Eq, FieldPath("x"), FieldPath("y")}},
+            std::move(probePreds),
+            boost::none,
+            FieldPath("customer"));
+        auto qs = std::make_unique<QuerySolution>();
+        qs->setRoot(std::move(root));
+        return qs;
+    };
+
+    ASSERT_EQ(
+        makeInlj({{QSNJoinPredicate::ComparisonOp::Eq, FieldPath("x"), FieldPath("y")}})->hash(),
+        makeInlj({{QSNJoinPredicate::ComparisonOp::Eq, FieldPath("x"), FieldPath("y")}})->hash());
+    ASSERT_NE(
+        makeInlj({{QSNJoinPredicate::ComparisonOp::Eq, FieldPath("x"), FieldPath("y")}})->hash(),
+        makeInlj({{QSNJoinPredicate::ComparisonOp::Eq, FieldPath("c"), FieldPath("d")}})->hash());
 }
 
 TEST(QuerySolutionTest, GetSecondaryNamespaceVectorDeduplicatesMainNss) {
@@ -2571,6 +2600,7 @@ TEST(QuerySolutionTest, SummaryStringForNestedJoinPlan) {
         std::make_unique<IndexedNestedLoopJoinEmbeddingNode>(std::move(collscan),
                                                              std::move(probe),
                                                              makeJoinPredicates("b", "c"),
+                                                             std::vector<QSNJoinPredicate>{},
                                                              /*leftEmbeddingField=*/boost::none,
                                                              FieldPath{"cOut"});
     auto hashJoin = std::make_unique<HashJoinEmbeddingNode>(std::move(ixscan),

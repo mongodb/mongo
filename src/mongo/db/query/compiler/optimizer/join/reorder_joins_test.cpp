@@ -555,7 +555,7 @@ TEST_F(CachedJoinPlanTest, INLJRHSNodeToCachedInljNode) {
     ASSERT_EQ(entries.size(), 1u);
 
     JoinPlanNodeRegistry registry;
-    auto inljId = registry.registerINLJRHSNode(nodeId, entries[0], namespaces[0]);
+    auto inljId = registry.registerINLJRHSNode(nodeId, 0, entries[0], namespaces[0]);
 
     auto result = toCachedJoinPlan(jCtx, registry, inljId);
     ASSERT(result);
@@ -573,9 +573,11 @@ TEST_F(CachedJoinPlanTest, INLJJoinNodeToCachedJoinNode) {
 
     resolvedPaths = {
         ResolvedPath{.nodeId = idA, .underlyingFieldPath = FieldPath{"a"}},
-        ResolvedPath{.nodeId = idB, .underlyingFieldPath = FieldPath{"b"}},
+        ResolvedPath{.nodeId = idB,
+                     .underlyingFieldPath = FieldPath{"b"},
+                     .fieldPathAfterRenames = FieldPath{"b_renamed"}},
     };
-    graph.addSimpleEqualityEdge(idA, idB, 0 /*a*/, 1 /*b*/);
+    auto edgeId = graph.addSimpleEqualityEdge(idA, idB, 0 /*a*/, 1 /*b*/);
 
     auto jCtx = makeContext();
     auto solnA = makeSolnWithCacheData(namespaces[0]);
@@ -585,7 +587,7 @@ TEST_F(CachedJoinPlanTest, INLJJoinNodeToCachedJoinNode) {
 
     JoinPlanNodeRegistry registry;
     auto baseAId = registry.registerBaseNode(idA, solnA.get(), namespaces[0], zeroCostEstimate());
-    auto inljBId = registry.registerINLJRHSNode(idB, entries[0], namespaces[1]);
+    auto inljBId = registry.registerINLJRHSNode(idB, *edgeId, entries[0], namespaces[1]);
 
     JoinSubset joinSubset(makeNodeSet(idA, idB));
     auto joinId = registry.registerJoinNode(
@@ -597,6 +599,12 @@ TEST_F(CachedJoinPlanTest, INLJJoinNodeToCachedJoinNode) {
     auto* joinNode = std::get_if<CachedJoinNode>(&result->node);
     ASSERT_NE(joinNode, nullptr);
     ASSERT_EQ(joinNode->method, JoinMethod::INLJ);
+    ASSERT_EQ(joinNode->joinPredicates.size(), 1u);
+    ASSERT_EQ(joinNode->joinPredicates[0].leftField.fullPath(), "a");
+    ASSERT_EQ(joinNode->joinPredicates[0].rightField.fullPath(), "b_renamed");
+    ASSERT_EQ(joinNode->probePredicates.size(), 1u);
+    ASSERT_EQ(joinNode->probePredicates[0].leftField.fullPath(), "a");
+    ASSERT_EQ(joinNode->probePredicates[0].rightField.fullPath(), "b");
     ASSERT(!joinNode->leftEmbeddingField.has_value());
     ASSERT(!joinNode->rightEmbeddingField.has_value());
 
@@ -640,6 +648,7 @@ TEST_F(CachedJoinPlanTest, HJTwoBaseNodesToCachedJoinNode) {
     ASSERT_EQ(joinNode->joinPredicates.size(), 1u);
     ASSERT_EQ(joinNode->joinPredicates[0].leftField.fullPath(), "x");
     ASSERT_EQ(joinNode->joinPredicates[0].rightField.fullPath(), "y");
+    ASSERT_EQ(joinNode->probePredicates.size(), 0u);
     ASSERT(!joinNode->leftEmbeddingField.has_value());
     ASSERT(!joinNode->rightEmbeddingField.has_value());
 
@@ -766,7 +775,7 @@ TEST_F(CachedJoinPlanTest, INLJJoinRoundTrip) {
         ResolvedPath{.nodeId = idA, .underlyingFieldPath = FieldPath{"a"}},
         ResolvedPath{.nodeId = idB, .underlyingFieldPath = FieldPath{"b"}},
     };
-    graph.addSimpleEqualityEdge(idA, idB, 0 /*a*/, 1 /*b*/);
+    auto edgeId = graph.addSimpleEqualityEdge(idB, idA, 1 /*b*/, 0 /*a*/);
 
     auto jCtx = makeContext();
 
@@ -775,7 +784,7 @@ TEST_F(CachedJoinPlanTest, INLJJoinRoundTrip) {
 
     JoinPlanNodeRegistry registry;
     auto baseAId = registry.registerBaseNode(idA, solnA.get(), namespaces[0], zeroCostEstimate());
-    auto inljBId = registry.registerINLJRHSNode(idB, entries[0], namespaces[1]);
+    auto inljBId = registry.registerINLJRHSNode(idB, *edgeId, entries[0], namespaces[1]);
 
     JoinSubset joinSubset(makeNodeSet(idA, idB));
     auto joinId = registry.registerJoinNode(
@@ -790,6 +799,11 @@ TEST_F(CachedJoinPlanTest, INLJJoinRoundTrip) {
 
     ASSERT_NE(qsn, nullptr);
     ASSERT_EQ(qsn->getType(), STAGE_INDEXED_NESTED_LOOP_JOIN_EMBEDDING_NODE);
+    auto* inljNode = dynamic_cast<IndexedNestedLoopJoinEmbeddingNode*>(qsn.get());
+    ASSERT_NE(inljNode, nullptr);
+    ASSERT_EQ(inljNode->probePredicates.size(), 1u);
+    ASSERT_EQ(inljNode->probePredicates[0].leftField.fullPath(), "a");
+    ASSERT_EQ(inljNode->probePredicates[0].rightField.fullPath(), "b");
     ASSERT_EQ(qsn->children.size(), 2u);
     ASSERT_EQ(qsn->children[0]->getType(), STAGE_COLLSCAN);
     ASSERT_EQ(qsn->children[1]->getType(), STAGE_FETCH);

@@ -63,6 +63,7 @@ struct CachedInljNode {
 struct CachedJoinNode {
     join_ordering::JoinMethod method;
     std::vector<QSNJoinPredicate> joinPredicates;
+    std::vector<QSNJoinPredicate> probePredicates;
     boost::optional<FieldPath> leftEmbeddingField;
     boost::optional<FieldPath> rightEmbeddingField;
     std::unique_ptr<CachedJoinPlan> left;

@@ -192,7 +192,8 @@
             "rightSubset": "010",
             "rightNode": {
                 "planNodeId": 3,
-                "accessPath": "INDEX_PROBE { a1: 1 }"
+                "accessPath": "INDEX_PROBE { a1: 1 }",
+                "probeEdge": 0
             }
         },
         {
@@ -293,7 +294,8 @@
             "rightSubset": "001",
             "rightNode": {
                 "planNodeId": 7,
-                "accessPath": "INDEX_PROBE { a0: -1 }"
+                "accessPath": "INDEX_PROBE { a0: -1 }",
+                "probeEdge": 0
             }
         },
         {
@@ -415,7 +417,8 @@
             "rightSubset": "100",
             "rightNode": {
                 "planNodeId": 11,
-                "accessPath": "INDEX_PROBE { a2: -1 }"
+                "accessPath": "INDEX_PROBE { a2: -1 }",
+                "probeEdge": 1
             }
         },
         {
@@ -516,7 +519,8 @@
             "rightSubset": "001",
             "rightNode": {
                 "planNodeId": 15,
-                "accessPath": "INDEX_PROBE { a0: -1 }"
+                "accessPath": "INDEX_PROBE { a0: -1 }",
+                "probeEdge": 1
             }
         },
         {
@@ -653,7 +657,8 @@
             "rightSubset": "100",
             "rightNode": {
                 "planNodeId": 19,
-                "accessPath": "INDEX_PROBE { a2: -1 }"
+                "accessPath": "INDEX_PROBE { a2: -1 }",
+                "probeEdge": 1
             }
         },
         {
@@ -692,7 +697,8 @@
             "rightSubset": "100",
             "rightNode": {
                 "planNodeId": 21,
-                "accessPath": "INDEX_PROBE { a2: -1 }"
+                "accessPath": "INDEX_PROBE { a2: -1 }",
+                "probeEdge": 1
             }
         },
         {
@@ -731,7 +737,8 @@
             "rightSubset": "100",
             "rightNode": {
                 "planNodeId": 23,
-                "accessPath": "INDEX_PROBE { a2: -1 }"
+                "accessPath": "INDEX_PROBE { a2: -1 }",
+                "probeEdge": 1
             }
         },
         {
@@ -770,7 +777,8 @@
             "rightSubset": "100",
             "rightNode": {
                 "planNodeId": 25,
-                "accessPath": "INDEX_PROBE { a2: -1 }"
+                "accessPath": "INDEX_PROBE { a2: -1 }",
+                "probeEdge": 1
             }
         },
         {
@@ -809,7 +817,8 @@
             "rightSubset": "100",
             "rightNode": {
                 "planNodeId": 27,
-                "accessPath": "INDEX_PROBE { a2: -1 }"
+                "accessPath": "INDEX_PROBE { a2: -1 }",
+                "probeEdge": 1
             }
         },
         {
@@ -848,7 +857,8 @@
             "rightSubset": "100",
             "rightNode": {
                 "planNodeId": 29,
-                "accessPath": "INDEX_PROBE { a2: -1 }"
+                "accessPath": "INDEX_PROBE { a2: -1 }",
+                "probeEdge": 1
             }
         },
         {
@@ -1445,7 +1455,8 @@
             "rightSubset": "010",
             "rightNode": {
                 "planNodeId": 49,
-                "accessPath": "INDEX_PROBE { a1: 1 }"
+                "accessPath": "INDEX_PROBE { a1: 1 }",
+                "probeEdge": 0
             }
         },
         {
@@ -1484,7 +1495,8 @@
             "rightSubset": "010",
             "rightNode": {
                 "planNodeId": 51,
-                "accessPath": "INDEX_PROBE { a1: 1 }"
+                "accessPath": "INDEX_PROBE { a1: 1 }",
+                "probeEdge": 0
             }
         },
         {
@@ -1523,7 +1535,8 @@
             "rightSubset": "010",
             "rightNode": {
                 "planNodeId": 53,
-                "accessPath": "INDEX_PROBE { a1: 1 }"
+                "accessPath": "INDEX_PROBE { a1: 1 }",
+                "probeEdge": 0
             }
         },
         {
@@ -1562,7 +1575,8 @@
             "rightSubset": "010",
             "rightNode": {
                 "planNodeId": 55,
-                "accessPath": "INDEX_PROBE { a1: 1 }"
+                "accessPath": "INDEX_PROBE { a1: 1 }",
+                "probeEdge": 0
             }
         },
         {
@@ -1601,7 +1615,8 @@
             "rightSubset": "010",
             "rightNode": {
                 "planNodeId": 57,
-                "accessPath": "INDEX_PROBE { a1: 1 }"
+                "accessPath": "INDEX_PROBE { a1: 1 }",
+                "probeEdge": 0
             }
         },
         {
@@ -1640,7 +1655,8 @@
             "rightSubset": "010",
             "rightNode": {
                 "planNodeId": 59,
-                "accessPath": "INDEX_PROBE { a1: 1 }"
+                "accessPath": "INDEX_PROBE { a1: 1 }",
+                "probeEdge": 0
             }
         },
         {

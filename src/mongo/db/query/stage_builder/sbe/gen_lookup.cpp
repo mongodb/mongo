@@ -2539,28 +2539,11 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildIndexedJoinEmbedd
     // definition.
     StringMap<SbSlot> slotForForeignFields;
     SbExprOptSlotVector leftPrj;
-
-    std::vector<std::string> indexFieldNames;
-    BSONObjIterator it(indexInfo.index.keyPattern);
-    while (it.more()) {
-        BSONElement elt = it.next();
-        indexFieldNames.emplace_back(elt.fieldNameStringData());
-    }
-
-    for (const auto& predicate : indexedJoinEmbeddingNode->joinPredicates) {
+    for (const auto& predicate : indexedJoinEmbeddingNode->probePredicates) {
         tassert(11122204, "Unknown operation in join predicate", predicate.isEquality());
 
         SbSlot targetSlot{_state.slotId()};
-        // TODO: SERVER-132272: Join optimizer can return an alias for the indexed predicate; check
-        // if the predicate is an official index column name, otherwise use the first index column
-        // name to let the buildIndexSeek create the correct keyString.
-        if (std::find(indexFieldNames.begin(),
-                      indexFieldNames.end(),
-                      predicate.rightField.fullPath()) == indexFieldNames.end()) {
-            slotForForeignFields[indexFieldNames.front()] = targetSlot;
-        } else {
-            slotForForeignFields[predicate.rightField.fullPath()] = targetSlot;
-        }
+        slotForForeignFields[predicate.rightField.fullPath()] = targetSlot;
         // Create an expression for the left side of the predicate, and add it to a ProjectStage
         // to be placed on top of the source stages. Any path that fails to evaluate, because of a
         // missing or non-object path component, gets treated as if it evaluated to a null value for

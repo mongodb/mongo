@@ -1860,16 +1860,26 @@ TEST_F(BinaryJoinStageBuilderTest, IndexJoinWithCompoundPredicate) {
                              .leftField = FieldPath("lkey2"),
                              .rightField = FieldPath("fkey2")}};
 
+        std::vector<QSNJoinPredicate> probePredicateList{
+            QSNJoinPredicate{.op = QSNJoinPredicate::ComparisonOp::Eq,
+                             .leftField = FieldPath("lkey1"),
+                             .rightField = FieldPath("fkey1")},
+            QSNJoinPredicate{.op = QSNJoinPredicate::ComparisonOp::Eq,
+                             .leftField = FieldPath("lkey2"),
+                             .rightField = FieldPath("fkey2")}};
+
         auto rightScanNode = std::make_unique<FetchNode>(
             std::make_unique<IndexProbeNode>(
                 foreignCollectionName, makeIndexEntry(foreignCollectionName, indexKeyPattern)),
             foreignCollectionName);
-        auto solution = makeQuerySolution(
+        auto inljNode =
             std::make_unique<IndexedNestedLoopJoinEmbeddingNode>(std::move(leftScanNode),
                                                                  std::move(rightScanNode),
                                                                  std::move(predicateList),
+                                                                 std::move(probePredicateList),
                                                                  boost::none,
-                                                                 FieldPath("embedding")));
+                                                                 FieldPath("embedding"));
+        auto solution = makeQuerySolution(std::move(inljNode));
 
         auto execPlan = makeExecutablePlan(_nss,
                                            {foreignCollectionName},

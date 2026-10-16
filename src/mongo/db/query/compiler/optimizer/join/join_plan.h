@@ -103,6 +103,9 @@ struct INLJRHSNode {
     // Corresponds to node in the graph this represents a base table access to.
     const NodeId node;
 
+    // Corresponds to the edge being used to probe the index.
+    const EdgeId probeEdge;
+
     std::string toString(size_t numNodesToPrint = kHardMaxNodesInJoin,
                          std::string indentStr = "") const;
 };
@@ -183,6 +186,7 @@ public:
                                     const NamespaceString& nss,
                                     JoinCostEstimate cost);
     JoinPlanNodeId registerINLJRHSNode(NodeId node,
+                                       EdgeId probeEdge,
                                        std::shared_ptr<const IndexCatalogEntry> entry,
                                        const NamespaceString& nss);
 
