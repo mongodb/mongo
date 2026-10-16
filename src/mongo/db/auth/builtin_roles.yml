@@ -504,6 +504,10 @@ roles:
         collection: "system.version"
         actions: *queryableBackupReadActions
       - matchType: exact_namespace
+        db: "admin"
+        collection: "system.authForInternalNamespace"
+        actions: *queryableBackupReadActions
+      - matchType: exact_namespace
         db: "config"
         collection: "settings"
         actions: *queryableBackupReadActions
@@ -597,6 +601,10 @@ roles:
         actions:
           - *restoreRoleWriteActions
           - find
+      - matchType: exact_namespace
+        db: "admin"
+        collection: "system.authForInternalNamespace"
+        actions: *restoreRoleWriteActions
       - matchType: collection
         collection: "system.users"
         actions:

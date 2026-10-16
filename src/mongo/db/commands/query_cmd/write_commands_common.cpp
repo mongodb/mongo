@@ -36,6 +36,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/namespace_string.h"
@@ -89,6 +90,7 @@ void checkAuthorizationImpl(AuthorizationSession* authzSession,
         privileges.push_back(
             Privilege(ResourcePattern::forExactNamespace(op.getNamespace()), actions));
     }
+    addImplicitPrivilegesForRestrictedNamespaces(&privileges);
     uassert(ErrorCodes::Unauthorized,
             "unauthorized",
             authzSession->isAuthorizedForPrivileges(privileges));

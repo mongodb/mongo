@@ -49,6 +49,33 @@
 
 namespace mongo::auth {
 
+/**
+ * A small number of namespaces hold state that the server later replays with internal authority,
+ * so merely holding privileges on the namespace itself (for instance via write access to the
+ * 'config' database) must not be enough to touch them. Access to such a namespace additionally
+ * requires the equivalent actions on a "pseudo namespace" that must be explicitly granted.
+ *
+ * Returns the privilege that must also be held in order to take 'actions' on 'resource', or
+ * boost::none if 'resource' is not restricted.
+ *
+ * Callers that build a PrivilegeVector should prefer addImplicitPrivilegesForRestrictedNamespaces.
+ *
+ * isRestrictedNamespace answers only whether a namespace is one of these. It is for the rarer case
+ * of a command whose authorization rules offer a shortcut that must not apply to such a namespace;
+ * anything checking privileges should use one of the two helpers instead.
+ */
+MONGO_MOD_PUBLIC bool isRestrictedNamespace(const NamespaceString& ns);
+
+MONGO_MOD_PUBLIC boost::optional<Privilege> getImplicitPrivilegeForRestrictedNamespace(
+    const ResourcePattern& resource, const ActionSet& actions);
+
+/**
+ * For every restricted namespace named by a privilege already in 'privileges', appends the
+ * implicit privilege required to act on it with that privilege's actions. Callers must invoke this
+ * after they have finished populating 'privileges' and before checking them.
+ */
+MONGO_MOD_PUBLIC void addImplicitPrivilegesForRestrictedNamespaces(PrivilegeVector* privileges);
+
 // Checks if this connection has the privileges necessary to perform a find operation
 // on the supplied namespace identifier.
 MONGO_MOD_PUBLIC Status checkAuthForFind(AuthorizationSession* authSession,

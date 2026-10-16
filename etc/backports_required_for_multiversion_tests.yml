@@ -251,6 +251,8 @@ last-continuous:
       ticket: SERVER-130431
     - test_file: jstests/sharding/reshard_collection_hashed_prefix_with_zones.js
       ticket: SERVER-133282
+    - test_file: jstests/sharding/migration_blocking_operation/multi_update_coordinator_state_document_privilege_escalation.js
+      ticket: SERVER-133600
     - test_file: jstests/fle2/create_encrypted_collection.js
       ticket: SERVER-130498
   suites: null
@@ -992,6 +994,8 @@ last-lts:
       ticket: SERVER-131326
     - test_file: jstests/noPassthrough/network/min_wait_streaming_hello_mongos.js
       ticket: SERVER-132650
+    - test_file: jstests/sharding/migration_blocking_operation/multi_update_coordinator_state_document_privilege_escalation.js
+      ticket: SERVER-133600
     - test_file: jstests/fle2/create_encrypted_collection.js
       ticket: SERVER-130498
   suites: null

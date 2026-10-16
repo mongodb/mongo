@@ -826,6 +826,7 @@ mongo_cc_library(
         "//src/mongo/db:import_collection_oplog_entry",
         "//src/mongo/db:multitenancy",
         "//src/mongo/db:server_base",
+        "//src/mongo/db/auth:auth_checks",
         "//src/mongo/db/collection_crud",
         "//src/mongo/db/commands:txn_cmd_request",
         "//src/mongo/db/index_builds:index_build_oplog_entry",

@@ -139,6 +139,9 @@
       DatabaseName::kConfig,                                                                       \
       "localMigrationBlockingOperations.multiUpdateCoordinators"_sd)                               \
                                                                                                    \
+    /*  Pseudo Namespace to act a namespace resource for internal collections. */                  \
+    X(kAuthForInternalNamespace, DatabaseName::kAdmin, "system.authForInternalNamespace"_sd)       \
+                                                                                                   \
     /*  Namespace for persisting sharding DDL rename participant state documents */                \
     X(kShardingRenameParticipantsNamespace, DatabaseName::kConfig, "localRenameParticipants"_sd)   \
                                                                                                    \

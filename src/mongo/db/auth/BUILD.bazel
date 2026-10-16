@@ -731,6 +731,7 @@ mongo_cc_unit_test(
         "auth_identifier_test.cpp",
         "auth_op_observer_test.cpp",
         "authentication_session_test.cpp",
+        "authorization_checks_test.cpp",
         "authorization_contract_test.cpp",
         "authorization_manager_test.cpp",
         "authorization_session_test.cpp",
@@ -762,6 +763,7 @@ mongo_cc_unit_test(
     ],
     deps = [
         ":address_restriction",
+        ":auth_checks",
         ":auth_op_observer",
         ":authentication_session",
         ":authorization_session_test_fixture",

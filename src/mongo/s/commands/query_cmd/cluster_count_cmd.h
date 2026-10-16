@@ -33,7 +33,9 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/query_cmd/count_cmd_helper.h"
@@ -625,8 +627,10 @@ public:
 
         void doCheckAuthorization(OperationContext* opCtx) const override {
             auto* as = AuthorizationSession::get(opCtx->getClient());
-            if (!as->isAuthorizedForActionsOnResource(
-                    CommandHelpers::resourcePatternForNamespace(ns()), ActionType::find)) {
+            PrivilegeVector privileges{
+                Privilege(CommandHelpers::resourcePatternForNamespace(ns()), ActionType::find)};
+            auth::addImplicitPrivilegesForRestrictedNamespaces(&privileges);
+            if (!as->isAuthorizedForPrivileges(privileges)) {
                 uasserted(ErrorCodes::Unauthorized, "unauthorized");
             }
 

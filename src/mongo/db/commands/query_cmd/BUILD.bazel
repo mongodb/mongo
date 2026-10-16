@@ -165,6 +165,7 @@ mongo_cc_library(
         ":update_metrics",
         "//src/mongo/db:local_executor",
         "//src/mongo/db/auth",
+        "//src/mongo/db/auth:auth_checks",
         "//src/mongo/db/auth:authprivilege",
         "//src/mongo/db/pipeline:lite_parsed_document_source",
         "//src/mongo/db/query/write_ops:write_ops_parsers",
