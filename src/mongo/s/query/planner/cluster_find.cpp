@@ -1120,6 +1120,7 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
     auto cursorState = ClusterCursorManager::CursorState::NotExhausted;
     BSONObj postBatchResumeToken;
     bool stashedResult = false;
+    bool invalidated = false;
 
     // If the 'waitWithPinnedCursorDuringGetMoreBatch' fail point is enabled, set the 'msg'
     // field of this operation's CurOp to signal that we've hit this point.
@@ -1149,6 +1150,7 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
 
             postBatchResumeToken = extraInfo->getInvalidateResumeToken();
             cursorState = ClusterCursorManager::CursorState::Exhausted;
+            invalidated = true;
             break;
         }
 
@@ -1254,7 +1256,8 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
                           boost::none,
                           boost::none,
                           boost::none,
-                          partialResultsReturned);
+                          partialResultsReturned,
+                          invalidated);
 }
 
 }  // namespace mongo
