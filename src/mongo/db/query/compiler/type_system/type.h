@@ -174,7 +174,11 @@ public:
     /// A type covering any value except BSONType::object or BSONType::array
     static Type anyScalar();
 
-    /// A type covering the type of 'value'. Generally a kSubset, except for singleton types.
+    /**
+     * A type covering the type of 'value'. Generally a kSubset, except for singleton types.
+     * If 'value' contains a Document, returns an object type covering the document with fields of
+     * the corresponding types and with no additional fields (Open::kNo).
+     */
     static Type fromValue(const Value& value);
 
     /// A type covering every value of every type named by 'matcherTypeSet'.
@@ -209,6 +213,11 @@ public:
 
     /// Returns the extent of 'type'. A type which is not covered is covered in full.
     Extent getExtent(BSONType type) const;
+
+    /**
+     * Returns true if 'value' is one of the values of this type.
+     */
+    bool hasValue(const Value& value) const;
 
     /**
      * Returns the type of the 'fieldName' field of the covered object subset.

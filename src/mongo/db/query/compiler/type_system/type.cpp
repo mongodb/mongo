@@ -4,6 +4,7 @@
 #include "mongo/db/query/compiler/type_system/type.h"
 
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/ctype.h"
 #include "mongo/util/str_escape.h"
@@ -440,7 +441,20 @@ Type Type::anyScalar() {
 }
 
 Type Type::fromValue(const Value& value) {
-    return Type(TypeSet::fromValue(value));
+    if (!value.isObject()) {
+        return Type(TypeSet::fromValue(value));
+    }
+    detail::Shape shape;
+    shape.open = Open::kNo;
+    for (auto it = value.getDocument().fieldIterator(); it.more();) {
+        auto [fieldName, fieldValue] = it.next();
+        if (shape.fields.find(fieldName)) {
+            // Duplicate fields are not handled, return broad object type.
+            return Type(BSONType::object, Extent::kSubset);
+        }
+        storeField(shape, fieldName, fromValue(fieldValue));
+    }
+    return Type(TypeSet::fromValue(value), std::move(shape));
 }
 
 Type Type::fromMatcherTypeSet(const MatcherTypeSet& matcherTypeSet) {
@@ -483,6 +497,30 @@ bool Type::isNever() const {
 
 Extent Type::getExtent(BSONType type) const {
     return _typeSet.getExtent(type);
+}
+
+bool Type::hasValue(const Value& value) const {
+    if (!_typeSet.hasType(value.getType())) {
+        return false;
+    }
+    if (!value.isObject()) {
+        return true;
+    }
+    const Document document = value.getDocument();
+    for (const auto& [fieldName, fieldType] : _shape.fields) {
+        if (!fieldType.hasValue(document.getField(std::string_view(fieldName)))) {
+            return false;
+        }
+    }
+    if (isOpen(_shape.open)) {
+        return true;
+    }
+    for (auto it = document.fieldIterator(); it.more();) {
+        if (!_shape.fields.find(it.next().first)) {
+            return false;
+        }
+    }
+    return true;
 }
 
 Type Type::getField(std::string_view fieldName) const {

@@ -3,7 +3,11 @@
 
 #include "mongo/db/query/compiler/type_system/type.h"
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/query/compiler/type_system/type_system_test_util.h"
 #include "mongo/unittest/tassert_guard.h"
 #include "mongo/unittest/unittest.h"
 
@@ -1105,6 +1109,101 @@ TEST(TypeTest, ResolveFieldAccessOnNestedObject) {
 
 TEST(TypeTest, ResolveFieldAccessRejectsNever) {
     ASSERT_TASSERT_CODE(resolveFieldAccess(Type::never(), "x"), 13459501);
+}
+
+/// Parses the 'json' string into a value holding the document.
+Value parseDocument(const std::string& json) {
+    return Value(Document(fromjson(json)));
+}
+
+TEST(TypeTest, HasValueWorksWithPrimitives) {
+    ASSERT_TRUE(Type(BSONType::string, Extent::kAll).hasValue(Value("str"sv)));
+    ASSERT_TRUE(Type(BSONType::string, Extent::kSubset).hasValue(Value("str"sv)));
+    ASSERT_TRUE(Type::any().hasValue(Value("str"sv)));
+    ASSERT_TRUE(Type::any().hasValue(Value(BSONNULL)));
+    ASSERT_FALSE(allNumbers().hasValue(Value("str"sv)));
+    ASSERT_FALSE(allNumbers().hasValue(Value(BSONNULL)));
+    ASSERT_FALSE(Type::never().hasValue(Value("str"sv)));
+    ASSERT_FALSE(Type::never().hasValue(Value(BSONNULL)));
+}
+
+TEST(TypeTest, ObjectWithoutShapeHasEveryDocument) {
+    ASSERT_TRUE(Type::anyObject().hasValue(parseDocument("{a: 1, b: 'str'}")));
+    ASSERT_TRUE(openObject({}).hasValue(parseDocument("{a: 1, b: 'str'}")));
+    ASSERT_TRUE(object(Extent::kSubset).hasValue(parseDocument("{a: 1}")));
+}
+
+TEST(TypeTest, DoesNotHaveDocumentWithoutObjectType) {
+    ASSERT_FALSE(allNumbers().hasValue(parseDocument("{}")));
+    ASSERT_FALSE(complement(Type::anyObject()).hasValue(parseDocument("{a: 1}")));
+}
+
+TEST(TypeTest, NamedFieldIsCheckedAgainstDocument) {
+    auto type = openObject({{"a", allNumbers()}});
+    ASSERT_TRUE(type.hasValue(parseDocument("{a: 1}")));
+    ASSERT_TRUE(type.hasValue(parseDocument("{a: 1, b: 'str'}")));
+    ASSERT_FALSE(type.hasValue(parseDocument("{a: 'str'}")));
+}
+
+TEST(TypeTest, NamedFieldIsCheckedRecursively) {
+    auto type = openObject({{"a", openObject({{"b", allNumbers()}})}});
+    ASSERT_TRUE(type.hasValue(parseDocument("{a: {b: 1}}")));
+    ASSERT_TRUE(type.hasValue(parseDocument("{a: {b: 1, c: 'str'}}")));
+    ASSERT_FALSE(type.hasValue(parseDocument("{a: {b: 'str'}}")));
+    ASSERT_FALSE(type.hasValue(parseDocument("{a: 1}")));
+}
+
+TEST(TypeTest, NamedFieldAbsentFromDocumentHoldsMissing) {
+    ASSERT_FALSE(openObject({{"a", allNumbers()}}).hasValue(parseDocument("{b: 1}")));
+    ASSERT_TRUE(openObject({{"a", unionType(allNumbers(), Type::missing())}})
+                    .hasValue(parseDocument("{b: 1}")));
+    ASSERT_TRUE(openObject({{"a", Type::missing()}}).hasValue(parseDocument("{b: 1}")));
+}
+
+TEST(TypeTest, FieldLeftUnnamedByClosedObjectHoldsMissing) {
+    auto type = closedObject({{"a", allNumbers()}});
+    ASSERT_TRUE(type.hasValue(parseDocument("{a: 1}")));
+    ASSERT_FALSE(type.hasValue(parseDocument("{a: 1, b: 'str'}")));
+}
+
+TEST(TypeTest, HasArrayWheneverFieldHasArrayType) {
+    ASSERT_TRUE(openObject({{"a", Type(BSONType::array, Extent::kSubset)}})
+                    .hasValue(parseDocument("{a: [1, 'str']}")));
+    ASSERT_FALSE(openObject({{"a", allNumbers()}}).hasValue(parseDocument("{a: [1]}")));
+}
+
+TEST(TypeTest, FromValueOfDocumentHasClosedShapeOfItsFields) {
+    ASSERT_EQ(Type::fromValue(parseDocument("{a: 1, b: {c: 'str'}, d: [1]}")).toDebugString(),
+              "{a: int(S), b: {c: string(S)}, d: array(S)}");
+}
+
+TEST(TypeTest, FromValueOfEmptyDocumentHasNoField) {
+    ASSERT_EQ(Type::fromValue(parseDocument("{}")), closedObject({}));
+}
+
+TEST(TypeTest, FromValueOfDocumentWithDuplicateFieldHasNoShape) {
+    auto document = Value(BSON("a" << 1 << "a" << "str"));
+    auto type = Type::fromValue(document);
+    ASSERT_EQ(type, Type(BSONType::object, Extent::kSubset));
+    ASSERT_TRUE(type.hasValue(document));
+}
+
+TEST(TypeTest, FromValueOfDocumentWithNestedDuplicateFieldHasNoShape) {
+    auto document = Value(BSON("b" << BSON("a" << 1 << "a" << "str")));
+    auto type = Type::fromValue(document);
+    // Just the nested type becomes generic.
+    ASSERT_EQ(type.toDebugString(), "{b: object(S)}");
+    ASSERT_TRUE(type.hasValue(document));
+}
+
+TEST(TypeTest, FromValueAlwaysHasTheValue) {
+    std::vector<Value> values = scalarRepresentatives();
+    for (const auto& document : generateCombinedCorpus({"x.y.z", "x.0.y", "x..y"})) {
+        values.emplace_back(document);
+    }
+    for (const auto& value : values) {
+        ASSERT_TRUE(Type::fromValue(value).hasValue(value)) << value.toString();
+    }
 }
 
 }  // namespace

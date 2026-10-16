@@ -63,6 +63,7 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_second_group"],
     deps = [
         ":type_system",
+        ":type_system_test_util",
     ],
 )
 
