@@ -53,6 +53,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 
 #include <algorithm>
@@ -74,6 +75,8 @@ using namespace std::literals::string_view_literals;
 
 static const NamespaceString kNss =
     NamespaceString::createNamespaceString_forTest("unittests.QueryStageCollectionScan");
+static const NamespaceString kCappedNss =
+    NamespaceString::createNamespaceString_forTest("unittests.QueryStageCollectionScanCapped");
 
 //
 // Stage-specific tests.
@@ -559,6 +562,47 @@ TEST_F(QueryStageCollectionScanTest, QueryStageCollscanDeleteUpcomingObjectBackw
     }
 
     ASSERT_EQUALS(numObj(), count);
+}
+
+TEST_F(QueryStageCollectionScanTest, QueryStageCollscanCappedRollOffTolerated) {
+    // A scan that tolerates capped repositioning continues from the oldest surviving document when
+    // the one it was positioned on rolls off.
+    constexpr int kCappedMax = 5;
+    DBDirectClient client(&_opCtx);
+    ON_BLOCK_EXIT([&] { client.dropCollection(kCappedNss); });
+    ASSERT_TRUE(client.createCollection(kCappedNss, 1024 * 1024, /*capped=*/true, kCappedMax));
+    for (int i = 0; i < kCappedMax; ++i) {
+        client.insert(kCappedNss, BSON("foo" << i));
+    }
+
+    dbtests::WriteContextForTests ctx(&_opCtx, kCappedNss.ns_forTest());
+    CollectionScanParams params;
+    params.direction = CollectionScanParams::FORWARD;
+    params.tolerateCappedRepositioning = true;
+    WorkingSet ws;
+    auto scan =
+        std::make_unique<CollectionScan>(_expCtx.get(), ctx.getCollection(), params, &ws, nullptr);
+
+    std::vector<int> seen;
+    auto workUntil = [&](size_t count) {
+        while (seen.size() < count && !scan->isEOF()) {
+            WorkingSetID id = WorkingSet::INVALID_ID;
+            if (PlanStage::ADVANCED == scan->work(&id)) {
+                seen.push_back(ws.get(id)->doc.value()["foo"].getInt());
+            }
+        }
+    };
+    workUntil(3);
+
+    // Roll off every document, including the one the scan is positioned on.
+    scan->saveState();
+    for (int i = kCappedMax; i < 2 * kCappedMax; ++i) {
+        client.insert(kCappedNss, BSON("foo" << i));
+    }
+    scan->restoreState(RestoreContext(nullptr));
+    workUntil(3 * kCappedMax);
+
+    ASSERT_EQ((std::vector<int>{0, 1, 2, 5, 6, 7, 8, 9}), seen);
 }
 
 // Verify that successfully seeking to the resumeAfterRecordId returns PlanStage::NEED_TIME and

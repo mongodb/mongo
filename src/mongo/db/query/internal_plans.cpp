@@ -113,7 +113,8 @@ CollectionScanParams createCollectionScanParams(
     boost::optional<RecordIdBound> minRecord,
     boost::optional<RecordIdBound> maxRecord,
     CollectionScanParams::ScanBoundInclusion boundInclusion,
-    bool shouldReturnEofOnFilterMismatch) {
+    bool shouldReturnEofOnFilterMismatch,
+    bool tolerateCappedRepositioning) {
     const auto& collection = *coll;
     tassert(11321309, "collection must not be null", collection);
 
@@ -135,6 +136,7 @@ CollectionScanParams createCollectionScanParams(
     }
     params.boundInclusion = boundInclusion;
     params.shouldReturnEofOnFilterMismatch = shouldReturnEofOnFilterMismatch;
+    params.tolerateCappedRepositioning = tolerateCappedRepositioning;
     return params;
 }
 }  // namespace
@@ -205,7 +207,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::collection
                                                      std::move(params.minRecord),
                                                      std::move(params.maxRecord),
                                                      params.boundInclusion,
-                                                     params.shouldReturnEofOnFilterMismatch);
+                                                     params.shouldReturnEofOnFilterMismatch,
+                                                     params.tolerateCappedRepositioning);
 
     auto cs = _collectionScan(expCtx, ws.get(), params.collection, collScanParams);
 
@@ -275,7 +278,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
                                                      std::move(minRecord),
                                                      std::move(maxRecord),
                                                      boundInclusion,
-                                                     shouldReturnEofOnFilterMismatch);
+                                                     shouldReturnEofOnFilterMismatch,
+                                                     /*tolerateCappedRepositioning=*/false);
 
     auto root = _collectionScan(expCtx, ws.get(), coll, collScanParams, filter);
 

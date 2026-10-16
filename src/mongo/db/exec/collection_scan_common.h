@@ -103,6 +103,11 @@ struct [[MONGO_MOD_PUBLIC]] CollectionScanParams {
     // Whether or not to return EOF and stop further scanning once MatchExpression evaluates to
     // false. Can only be set to true if the MatchExpression is present.
     bool shouldReturnEofOnFilterMismatch = false;
+
+    // If true, restoring on a capped collection whose current record was deleted moves to the next
+    // record instead of failing with CappedPositionLost. Only safe for callers that learn about
+    // deleted records some other way, such as index builds through their side writes table.
+    bool tolerateCappedRepositioning = false;
 };
 
 }  // namespace mongo

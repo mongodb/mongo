@@ -544,9 +544,10 @@ void CollectionScan::doRestoreStateRequiresCollection() {
         // If this collection scan serves a read operation on a capped collection, only restore the
         // cursor if it can be repositioned exactly where it was, so that consumers don't silently
         // get 'holes' when scanning capped collections. If this collection scan serves a write
-        // operation on a capped collection like a clustered TTL deletion, exempt this operation
-        // from the guarantees above.
-        const auto tolerateCappedCursorRepositioning = expCtx()->getIsCappedDelete();
+        // operation on a capped collection like a clustered TTL deletion, or the caller opted out,
+        // exempt this operation from the guarantees above.
+        const auto tolerateCappedCursorRepositioning =
+            expCtx()->getIsCappedDelete() || _params.tolerateCappedRepositioning;
         const bool couldRestore = _cursor->restore(*shard_role_details::getRecoveryUnit(opCtx()),
                                                    tolerateCappedCursorRepositioning);
         uassert(ErrorCodes::CappedPositionLost,

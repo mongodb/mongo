@@ -857,7 +857,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
         // Forced replica set re-configs will clear the majority committed snapshot, which may be
         // used by the collection scan. The collection scan will restart from the beginning in this
         // case. Capped cursors are invalidated when the document they were positioned on gets
-        // deleted. The collection scan will restart in both cases.
+        // deleted. Two-phase builds restart the collection scan in both cases.
         restartCollectionScan = true;
         logAndBackoff(5470300,
                       ::mongo::logv2::LogComponent::kIndex,
@@ -874,8 +874,9 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
                           shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource()),
                       "error"_attr = ex);
 
-        // TODO (SERVER-119512): Support collection scan restart for primary-driven index builds.
-        uassert(12232700,
+        // Primary-driven builds never read at majority and tolerate capped repositioning, so
+        // neither restart trigger applies to them.
+        tassert(11951200,
                 "Primary-driven index build cannot restart collection scan",
                 _method != IndexBuildMethodEnum::kPrimaryDriven);
 
@@ -894,8 +895,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
         _lastRecordIdInserted = boost::none;
         for (auto& index : _indexes) {
             auto indexCatalogEntry = index.block->getEntry(opCtx, collection->getCollectionPtr());
-            // TODO SERVER-119512 PDIB doesn't restart the collection scan, so SpillCallbacks would
-            // be unreachable here even if populated.
+            // Only two-phase builds restart, so there are no SpillCallbacks to install.
             index.bulk = index.real->initiateBulk(
                 opCtx,
                 collection->getCollectionPtr(),
@@ -1017,8 +1017,15 @@ void MultiIndexBlock::_doCollectionScan(OperationContext* opCtx,
         yieldPolicy = PlanYieldPolicy::YieldPolicy::WRITE_CONFLICT_RETRY_ONLY;
     }
 
-    _exec = getCollectionScanExecutor(
-        opCtx, collection, yieldPolicy, CollectionScanDirection::kForward, resumeAfterRecordId);
+    // A primary-driven build does not restart its scan, since its spills may already be replicated.
+    // Skipping records that rolled off is safe since the side writes table records their deletes.
+    _exec = getCollectionScanExecutor(opCtx,
+                                      collection,
+                                      yieldPolicy,
+                                      CollectionScanDirection::kForward,
+                                      resumeAfterRecordId,
+                                      /*tolerateCappedRepositioning=*/_method ==
+                                          IndexBuildMethodEnum::kPrimaryDriven);
     ON_BLOCK_EXIT([this] {
         _exec.reset();
         _objToIndex = BSONObj{};

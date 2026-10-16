@@ -1819,11 +1819,17 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getCollectionScanExecutor(
     const CollectionAcquisition& collection,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     CollectionScanDirection scanDirection,
-    const boost::optional<RecordId>& resumeAfterRecordId) {
+    const boost::optional<RecordId>& resumeAfterRecordId,
+    bool tolerateCappedRepositioning) {
     auto isForward = scanDirection == CollectionScanDirection::kForward;
     auto direction = isForward ? InternalPlanner::FORWARD : InternalPlanner::BACKWARD;
     return InternalPlanner::collectionScan(
-        opCtx, collection, yieldPolicy, direction, resumeAfterRecordId);
+        {.opCtx = opCtx,
+         .collection = collection,
+         .yieldPolicy = yieldPolicy,
+         .direction = direction,
+         .resumeAfterRecordId = resumeAfterRecordId,
+         .tolerateCappedRepositioning = tolerateCappedRepositioning});
 }
 
 }  // namespace mongo
