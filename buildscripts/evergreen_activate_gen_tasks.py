@@ -84,6 +84,26 @@ class EvgExpansions(NamedTuple):
         return remove_gen_suffix(self.task_name)
 
 
+def _get_tasks_to_activate(
+    expansions: "EvgExpansions", evg_api: "SimpleEvergreenApi"
+) -> Iterator["Task"]:
+    """Yield matching tasks, including burn-in tasks across the version's variants."""
+    if expansions.task == BURN_IN_TAGS:
+        version = evg_api.version_by_id(expansions.version_id)
+        for build_variant, build_id in version.build_variants_map.items():
+            is_generated_variant = build_variant.endswith(BURN_IN_VARIANT_SUFFIX)
+            for task in evg_api.tasks_by_build(build_id):
+                if is_generated_variant:
+                    if task.display_name == BURN_IN_TESTS:
+                        yield task
+                elif re.match(BURN_IN_TESTS, task.display_name):
+                    yield task
+    else:
+        for task in evg_api.tasks_by_build(expansions.build_id):
+            if task.display_name == expansions.task:
+                yield task
+
+
 def activate_task(expansions: "EvgExpansions", evg_api: "SimpleEvergreenApi") -> None:
     """
     Activate the given task in the specified build.
@@ -92,51 +112,16 @@ def activate_task(expansions: "EvgExpansions", evg_api: "SimpleEvergreenApi") ->
     :param evg_api: Evergreen API client.
     """
     tasks_not_activated = []
-    if expansions.task == BURN_IN_TAGS:
-        version = evg_api.version_by_id(expansions.version_id)
-        for build_variant in version.build_variants_map.keys():
-            build_id = version.build_variants_map[build_variant]
-            task_list = evg_api.tasks_by_build(build_id)
-            if build_variant.endswith(BURN_IN_VARIANT_SUFFIX):
-                for task in task_list:
-                    if task.display_name == BURN_IN_TESTS:
-                        print(f"Activating task {task.display_name} ({task.task_id})")
-                        try:
-                            evg_api.configure_task(task.task_id, activated=True)
-                        except Exception as err:
-                            print(
-                                f"Could not activate task {task.display_name} "
-                                f"({task.task_id}): {err}",
-                                file=sys.stderr,
-                            )
-                            tasks_not_activated.append(task.task_id)
-            else:
-                for task in task_list:
-                    if re.match(BURN_IN_TESTS, task.display_name):
-                        print(f"Activating task {task.display_name} ({task.task_id})")
-                        try:
-                            evg_api.configure_task(task.task_id, activated=True)
-                        except Exception as err:
-                            print(
-                                f"Could not activate task {task.display_name} "
-                                f"({task.task_id}): {err}",
-                                file=sys.stderr,
-                            )
-                            tasks_not_activated.append(task.task_id)
-
-    else:
-        task_list = evg_api.tasks_by_build(expansions.build_id)
-        for task in task_list:
-            if task.display_name == expansions.task:
-                print(f"Activating task {task.display_name} ({task.task_id})")
-                try:
-                    evg_api.configure_task(task.task_id, activated=True)
-                except Exception as err:
-                    print(
-                        f"Could not activate task {task.display_name} ({task.task_id}): {err}",
-                        file=sys.stderr,
-                    )
-                    tasks_not_activated.append(task.task_id)
+    for task in _get_tasks_to_activate(expansions, evg_api):
+        print(f"Activating task {task.display_name} ({task.task_id})")
+        try:
+            evg_api.configure_task(task.task_id, activated=True)
+        except Exception as err:
+            print(
+                f"Could not activate task {task.display_name} ({task.task_id}): {err}",
+                file=sys.stderr,
+            )
+            tasks_not_activated.append(task.task_id)
     if len(tasks_not_activated) > 0:
         print(
             f"Some tasks were unable to be activated: {len(tasks_not_activated)}", file=sys.stderr

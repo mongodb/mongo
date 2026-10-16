@@ -4,7 +4,7 @@ import http.client
 import json
 import unittest
 import urllib.error
-from io import BytesIO
+from io import BytesIO, StringIO
 
 from mock import patch
 
@@ -92,6 +92,47 @@ class TestActivateTask(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             run(fake)
+
+    def test_activation_failures_are_reported_after_attempting_all_matching_tasks(self):
+        for task_name, variant, display_name in (
+            ("auth_gen", None, "auth"),
+            ("burn_in_tags_gen", "variant-generated-by-burn-in-tags", "burn_in_tests"),
+            ("burn_in_tags_gen", "variant", "burn_in_tests_multiversion"),
+        ):
+            with self.subTest(task_name=task_name, variant=variant):
+                pages = []
+                if variant:
+                    pages.append(version_doc((variant, "b1")))
+                pages.append(
+                    MockResponse(
+                        [
+                            build_task(display_name, "id_fail_first"),
+                            build_task(display_name, "id_success"),
+                            build_task(display_name, "id_fail_last"),
+                        ]
+                    )
+                )
+                fake = FakeUrlopen(pages)
+
+                def reject_some_tasks(request, *args, **kwargs):
+                    if request.method == "PATCH" and "id_fail_" in request.full_url:
+                        raise ValueError("activation rejected")
+                    return fake(request, *args, **kwargs)
+
+                wrapper = FakeUrlopenWrapper(reject_some_tasks)
+                stderr = StringIO()
+                with patch.object(under_test.sys, "stderr", stderr):
+                    with self.assertRaisesRegex(ValueError, "Some tasks were unable"):
+                        run(wrapper, {"task_name": task_name})
+
+                self.assertEqual(
+                    wrapper.activated_task_ids,
+                    ["id_fail_first", "id_success", "id_fail_last"],
+                )
+                self.assertEqual(fake.activated_task_ids, ["id_success"])
+                self.assertIn(f"{display_name} (id_fail_first)", stderr.getvalue())
+                self.assertIn(f"{display_name} (id_fail_last)", stderr.getvalue())
+                self.assertIn("Some tasks were unable to be activated: 2", stderr.getvalue())
 
     def test_burn_in_tests_gen_activates_burn_in_tests(self):
         fake = FakeUrlopen([MockResponse([build_task("burn_in_tests", "id_burn_in")])])
@@ -217,6 +258,26 @@ def version_doc(*variants):
 
 class TestBurnInTags(unittest.TestCase):
     """'burn_in_tags_gen' generates 'burn_in_tests' tasks into other variants of the version."""
+
+    def test_only_generated_variants_require_an_exact_task_name_match(self):
+        fake = FakeUrlopen(
+            [
+                version_doc(
+                    ("variant-generated-by-burn-in-tags", "b1"),
+                    ("variant", "b2"),
+                ),
+                MockResponse(
+                    [
+                        build_task("burn_in_tests", "id_exact"),
+                        build_task("burn_in_tests_multiversion", "id_generated_prefix"),
+                    ]
+                ),
+                MockResponse([build_task("burn_in_tests_multiversion", "id_prefix")]),
+            ]
+        )
+
+        run(fake, {"task_name": "burn_in_tags_gen"})
+        self.assertEqual(fake.activated_task_ids, ["id_exact", "id_prefix"])
 
     def test_burn_in_tests_is_activated_in_every_generated_variant(self):
         fake = FakeUrlopen(
