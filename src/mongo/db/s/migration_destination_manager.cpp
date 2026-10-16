@@ -2102,16 +2102,18 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx, const
                 }
             }
 
-            writeConflictRetry(opCtx, "transferModsDeletes", _nss, [&] {
-                deleteObjects(opCtx,
-                              collection,
-                              id,
-                              true /* justOne */,
-                              false /* god */,
-                              true /* fromMigrate */);
+            const auto numDeleted = writeConflictRetry(opCtx, "transferModsDeletes", _nss, [&] {
+                return deleteObjects(opCtx,
+                                     collection,
+                                     id,
+                                     true /* justOne */,
+                                     false /* god */,
+                                     true /* fromMigrate */);
             });
 
-            changeInOrphans--;
+            if (numDeleted > 0) {
+                changeInOrphans--;
+            }
             didAnything = true;
         }
     }
