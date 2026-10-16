@@ -30,6 +30,7 @@ class TestTransitionThread(unittest.TestCase):
         self.rs_fixture = mock.Mock(spec=replicaset.ReplicaSetFixture)
         self.rs_fixture.replset_name = "rs0"
         self.rs_fixture.get_node_info.return_value = []
+        self.rs_fixture.requires_configsvr_replset_config.return_value = True
         self.thread = continuous_transition._TransitionThread(
             logger=logging.getLogger("hook_logger"),
             rs_fixtures=[self.rs_fixture],
@@ -53,6 +54,62 @@ class TestTransitionThread(unittest.TestCase):
 
         node.mongod.stop.assert_called_once_with(mode=fixture_interface.TeardownMode.TERMINATE)
         self.rs_fixture.restart_node.assert_called_once_with(node, {}, timeout=stop_timeout_secs)
+
+    def test_restart_node_passes_config_server_and_maintenance_flags(self):
+        node = _make_node(27018)
+
+        self.thread._restart_node(
+            node,
+            self.rs_fixture,
+            enable_maintenance_mode=True,
+            is_config_server=True,
+        )
+
+        node.mongod.stop.assert_called_once_with(mode=fixture_interface.TeardownMode.TERMINATE)
+        self.rs_fixture.restart_node.assert_called_once_with(
+            node,
+            {
+                "configsvr": "",
+                "replicaSetConfigShardMaintenanceMode": "",
+            },
+            timeout=None,
+        )
+
+    def test_standard_fixture_reconfigures_replica_set_config(self):
+        primary = _make_node(27017)
+        client = primary.mongo_client.return_value
+        config_to_csrs = {"version": 1}
+        config_to_rs = {"version": 2, "configsvr": True}
+        client.admin.command.side_effect = [
+            {"config": config_to_csrs},
+            {},
+            {"config": config_to_rs},
+            {},
+        ]
+        self.rs_fixture.get_primary.return_value = primary
+
+        self.thread._reconfigure_as_csrs(self.rs_fixture)
+        self.thread._reconfigure_as_rs(self.rs_fixture)
+
+        self.assertEqual(
+            client.admin.command.call_args_list,
+            [
+                mock.call("replSetGetConfig"),
+                mock.call({"replSetReconfig": {"version": 2, "configsvr": True}}),
+                mock.call("replSetGetConfig"),
+                mock.call({"replSetReconfig": {"version": 3}}),
+            ],
+        )
+        self.assertEqual(self.rs_fixture.await_last_op_committed.call_count, 2)
+
+    def test_fixture_with_startup_config_server_role_skips_legacy_reconfigs(self):
+        self.rs_fixture.requires_configsvr_replset_config.return_value = False
+
+        self.thread._reconfigure_as_csrs(self.rs_fixture)
+        self.thread._reconfigure_as_rs(self.rs_fixture)
+
+        self.rs_fixture.get_primary.assert_not_called()
+        self.rs_fixture.await_last_op_committed.assert_not_called()
 
     def test_demotion_restarts_primary_before_stepup_when_required(self):
         old_primary = _make_node(27017)

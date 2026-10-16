@@ -1093,6 +1093,10 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         """Return whether the primary must exit before another node can be stepped up."""
         return False
 
+    def requires_configsvr_replset_config(self):
+        """Return whether transitioning to a config server requires a replSetReconfig."""
+        return True
+
     def stop_primary(self, primary, background_reconfig, should_kill):
         """Stop the primary node method."""
         # Check that the fixture is still running before stepping down or killing the primary.

@@ -453,8 +453,22 @@ class _TransitionThread(threading.Thread):
             rs_fixture, enable_maintenance_mode=True, is_config_server=True
         )
 
+    def _should_reconfigure_replica_set_config(self, rs_fixture):
+        """Return whether this fixture requires the legacy config-server reconfiguration."""
+        if rs_fixture.requires_configsvr_replset_config():
+            return True
+
+        self.logger.info(
+            "Skipping replSetReconfig for replica set '%s'; its config-server role is "
+            "determined by mongod startup options.",
+            rs_fixture.replset_name,
+        )
+        return False
+
     def _reconfigure_as_csrs(self, rs_fixture):
         rs_name = rs_fixture.replset_name
+        if not self._should_reconfigure_replica_set_config(rs_fixture):
+            return
         self.logger.info("Reconfiguring replica set '%s' to contain 'configsvr:true'.", rs_name)
         client = rs_fixture.get_primary().mongo_client()
         config = client.admin.command("replSetGetConfig")["config"]
@@ -480,6 +494,8 @@ class _TransitionThread(threading.Thread):
 
     def _reconfigure_as_rs(self, rs_fixture):
         rs_name = rs_fixture.replset_name
+        if not self._should_reconfigure_replica_set_config(rs_fixture):
+            return
         self.logger.info("Reconfiguring replica set '%s' to not contain 'configsvr:true'.", rs_name)
         client = rs_fixture.get_primary().mongo_client()
         config = client.admin.command("replSetGetConfig")["config"]
