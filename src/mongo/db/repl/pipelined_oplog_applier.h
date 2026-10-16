@@ -12,7 +12,6 @@
 #include "mongo/db/repl/pipelined_applier_advancer.h"
 #include "mongo/db/repl/pipelined_applier_batch_tracker.h"
 #include "mongo/db/repl/pipelined_applier_worker_pool.h"
-#include "mongo/db/repl/pipelined_op_router.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/util/modules.h"
@@ -49,11 +48,18 @@ private:
                                         std::vector<OplogEntry> ops) override;
 
     /**
-     * Classifies and hash-routes one batch onto the workers, enqueuing one work item per
-     * participating worker per batch. Expands any single ops that may contain multiple ops to
-     * different keys if needed (e.g. container writes or applyOps)
+     * Performs the "drain, dispatch, drain" sequence for batches that must be applied serialized,
+     * otherwise dispatches the batch to the worker pool and returns immediately.
+     * Expects that the batch has been processed by the OplogApplierBatcher
+     * (i.e. DDL operations sit alone, etc).
      */
-    void _dispatchOps(OperationContext* opCtx, std::vector<OplogEntry> ops);
+    void _dispatchBatch(OperationContext* opCtx, std::vector<OplogEntry> ops);
+
+    /**
+     * Derives and routes one batch of oplog entries onto the workers and registers the batch with
+     * the batch tracker.
+     */
+    void _dispatchBatchToWorkers(OperationContext* opCtx, std::vector<OplogEntry> ops);
 
     // Waits for all queued and active worker tasks to finish. Returns true once all dispatched
     // batches are fully published, meaning worker threads and the advancer are idle. Returns false
@@ -66,29 +72,19 @@ private:
     // Requires dispatch to be paused.
     [[nodiscard]] bool _waitForAdvancerIdle();
 
-    // Applies a single kRequiresInline op on the dispatcher thread, using the caller's opCtx.
-    // Registers the op as its own single-worker batch with the tracker, waits for the advancer to
-    // publish it, and returns the published OpTimeAndWallTime on success. Returns boost::none if a
-    // global shutdown interrupted application, leaving lastApplied unchanged so restart recovery
-    // re-applies the op. Requires the worker pool and advancer to already be drained.
-    [[nodiscard]] boost::optional<OpTimeAndWallTime> _applyOpInline(OperationContext* opCtx,
-                                                                    const OplogEntry& entry);
-
     // Publishes a completed batch's replication progress and wakes oplog waiters.
     void _publishBatch(const PipelinedApplierBatchTracker::InflightBatch& batch);
 
     ReplicationCoordinator* const _replCoord;
     StorageInterface* const _storageInterface;
 
+    bool _disableTransactionUpdateCoalescing = false;
+
     // Tracks dispatched batches in FIFO order and signals when their workers finish.
     PipelinedApplierBatchTracker _batchTracker;
 
     // Persistent worker threads that consume dispatched work items.
     PipelinedApplierWorkerPool _workerPool;
-
-    // Classifies each oplog entry as pipelined or requiring inline application, and selects the
-    // worker for pipelined entries by hash so ops on one document are applied in order.
-    PipelinedOpRouter _router;
 
     // Declared last so the advancer shuts down before the workers and batch tracker are destroyed.
     PipelinedApplierAdvancer _advancer;
@@ -108,5 +104,11 @@ void consumeWorkItem(size_t workerIdx,
                      const OplogApplier::Options& options,
                      const PipelinedApplierWorkerPool::WorkItem& item,
                      PipelinedApplierBatchTracker& batchTracker);
+
+/**
+ * Returns whether a batch must be applied serialized ("drain, dispatch, drain") because it
+ * contains an entry that must not be applied concurrently with its neighbors.
+ */
+bool batchMustBeAppliedSerialized(OplogApplication::Mode mode, const std::vector<OplogEntry>& ops);
 
 }  // namespace mongo::repl

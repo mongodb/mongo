@@ -6,6 +6,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_batch.h"
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/oplog_entry.h"
@@ -28,6 +29,37 @@ namespace mongo {
 namespace repl {
 
 constexpr std::size_t kMaxPrepareOpsPerBatch = 128;
+
+/**
+ * Controls how an oplog entry may be accumulated into the batch being built by the
+ * OplogApplierBatcher.
+ */
+enum class BatchAction {
+    kContinueBatch,
+    kStartNewBatch,
+    kProcessIndividually,
+};
+
+/**
+ * Counters over the entries accumulated in a batch so far and used to break the
+ * batch when the limits are exceeded.
+ */
+struct BatchStats {
+    std::size_t totalOps = 0;
+    std::size_t totalBytes = 0;
+    std::size_t prepareOps = 0;
+    std::size_t commitOrAbortOps = 0;
+};
+
+/**
+ * Returns how we should batch an oplog entry: grouping with the current batch, starting a new
+ * batch, or processing it individually in its own batch. `firstEntryInBatch` is the first entry
+ * of the batch being accumulated; it is `entry` itself when deciding on the first entry.
+ */
+BatchAction getBatchActionForEntry(OplogApplication::Mode mode,
+                                   const OplogEntry& firstEntryInBatch,
+                                   const OplogEntry& entry,
+                                   const BatchStats& batchStats);
 
 class OplogApplier;
 
@@ -109,24 +141,6 @@ public:
     static std::size_t getOpCount(const OplogEntry& entry);
 
 private:
-    enum class BatchAction { kContinueBatch, kStartNewBatch, kProcessIndividually };
-
-    class BatchStats {
-    public:
-        std::size_t totalOps = 0;
-        std::size_t totalBytes = 0;
-        std::size_t prepareOps = 0;
-        std::size_t commitOrAbortOps = 0;
-    };
-
-    /**
-     * Returns how we should batch an oplog entry: grouping with the current batch, starting a new
-     * new batch, or processing it individually in its own batch.
-     */
-    BatchAction _getBatchActionForEntry(const OplogEntry& firstEntryInBatch,
-                                        const OplogEntry& entry,
-                                        const BatchStats& batchStats);
-
     /**
      * If secondaryDelaySecs is enabled, this function calculates the most recent timestamp of any
      * oplog entries that can be be returned in a batch.

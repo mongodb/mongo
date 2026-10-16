@@ -1261,6 +1261,7 @@ mongo_cc_library(
     name = "oplog_application",
     srcs = [
         "insert_group.cpp",
+        "oplog_applier_dispatch.cpp",
         "oplog_applier_impl.cpp",
         "oplog_applier_utils.cpp",
         "session_update_tracker.cpp",
@@ -1352,12 +1353,10 @@ mongo_cc_library(
     name = "pipelined_oplog_applier",
     srcs = [
         "pipelined_applier_worker_pool.cpp",
-        "pipelined_op_router.cpp",
         "pipelined_oplog_applier.cpp",
     ],
     hdrs = [
         "pipelined_applier_worker_pool.h",
-        "pipelined_op_router.h",
         "pipelined_oplog_applier.h",
     ],
     deps = [
@@ -2328,27 +2327,6 @@ mongo_cc_unit_test(
         "//src/mongo/stdx",
         "//src/mongo/unittest",
         "//src/mongo/util:mock_periodic_runner",
-    ],
-)
-
-mongo_cc_unit_test(
-    name = "pipelined_op_router_test",
-    srcs = [
-        "pipelined_op_router_test.cpp",
-    ],
-    tags = ["mongo_unittest_fourth_group"],
-    target_compatible_with = select({
-        "//bazel/config:use_wiredtiger_enabled": [],
-        "//conditions:default": ["@platforms//:incompatible"],
-    }),
-    deps = [
-        ":oplog_applier_impl_test_fixture",
-        ":oplog_entry",
-        ":oplog_entry_test_helpers",
-        ":pipelined_oplog_applier",
-        "//src/mongo:base",
-        "//src/mongo/db/session:logical_session_id_helpers",
-        "//src/mongo/unittest",
     ],
 )
 

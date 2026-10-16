@@ -166,8 +166,8 @@ StatusWith<OplogApplierBatch> OplogApplierBatcher::getNextApplierBatch(
             }
         }
 
-        BatchAction action =
-            _getBatchActionForEntry(ops.empty() ? entry : ops.front(), entry, batchStats);
+        BatchAction action = getBatchActionForEntry(
+            _oplogApplier->getOptions().mode, ops.empty() ? entry : ops.front(), entry, batchStats);
         switch (action) {
             case BatchAction::kContinueBatch:
                 break;
@@ -260,40 +260,39 @@ StatusWith<OplogApplierBatch> OplogApplierBatcher::getNextApplierBatch(
  *       RecordIds are inserted in an ascending order. Therefore, the truncate has to be processed
  *       individually.
  */
-OplogApplierBatcher::BatchAction OplogApplierBatcher::_getBatchActionForEntry(
-    const OplogEntry& firstEntryInBatch, const OplogEntry& entry, const BatchStats& batchStats) {
+BatchAction getBatchActionForEntry(OplogApplication::Mode mode,
+                                   const OplogEntry& firstEntryInBatch,
+                                   const OplogEntry& entry,
+                                   const BatchStats& batchStats) {
     // Used by non-commit and non-abort entries to cut the batch if it already contains any
     // commit or abort entries.
     auto continueOrStartNewBatch = [&] {
-        return batchStats.commitOrAbortOps > 0 ? OplogApplierBatcher::BatchAction::kStartNewBatch
-                                               : OplogApplierBatcher::BatchAction::kContinueBatch;
+        return batchStats.commitOrAbortOps > 0 ? BatchAction::kStartNewBatch
+                                               : BatchAction::kContinueBatch;
     };
 
     // We split the batch on the new Primary entry to ensure there is not record ID reuse within
     // a batch. It can be batched with any subsequent oplog that is batchable as the only
     // possibility of record ID reuse in between a new Primary start.
     if (entry.isNewPrimaryNoop()) {
-        return OplogApplierBatcher::BatchAction::kStartNewBatch;
+        return BatchAction::kStartNewBatch;
     }
 
     if (!entry.isCommand()) {
-        return entry.getNss().mustBeAppliedInOwnOplogBatch()
-            ? OplogApplierBatcher::BatchAction::kProcessIndividually
-            : continueOrStartNewBatch();
+        return entry.getNss().mustBeAppliedInOwnOplogBatch() ? BatchAction::kProcessIndividually
+                                                             : continueOrStartNewBatch();
     }
 
-    if (_oplogApplier->getOptions().mode == OplogApplication::Mode::kSecondary) {
+    if (mode == OplogApplication::Mode::kSecondary) {
         if (entry.shouldPrepare()) {
             // Grouping too many prepare ops in a batch may have performance implications,
             // so we break the batch when it contains enough prepare ops.
-            return batchStats.prepareOps >= kMaxPrepareOpsPerBatch
-                ? OplogApplierBatcher::BatchAction::kStartNewBatch
-                : continueOrStartNewBatch();
+            return batchStats.prepareOps >= kMaxPrepareOpsPerBatch ? BatchAction::kStartNewBatch
+                                                                   : continueOrStartNewBatch();
         }
         if (entry.isPreparedCommitOrAbort()) {
-            return batchStats.commitOrAbortOps == 0
-                ? OplogApplierBatcher::BatchAction::kStartNewBatch
-                : OplogApplierBatcher::BatchAction::kContinueBatch;
+            return batchStats.commitOrAbortOps == 0 ? BatchAction::kStartNewBatch
+                                                    : BatchAction::kContinueBatch;
         }
     }
 
@@ -307,7 +306,7 @@ OplogApplierBatcher::BatchAction OplogApplierBatcher::_getBatchActionForEntry(
         // that the commit point can be moved forward in between applying truncateRange entries to
         // relieve cache pressure.
         if (storageGlobalParams.magicRestore) {
-            return OplogApplierBatcher::BatchAction::kProcessIndividually;
+            return BatchAction::kProcessIndividually;
         }
 
         if (ns.isChangeStreamPreImagesCollection()) {
@@ -318,12 +317,12 @@ OplogApplierBatcher::BatchAction OplogApplierBatcher::_getBatchActionForEntry(
             // Entries in the current batch can be applied concurrently as the truncate. Make sure
             // applying the current batch does not insert preimages into the truncate range.
             return maxTruncateTimestamp >= firstEntryInBatch.getTimestamp()
-                ? OplogApplierBatcher::BatchAction::kStartNewBatch
+                ? BatchAction::kStartNewBatch
                 : continueOrStartNewBatch();
         } else if (ns.isOplog()) {
             return continueOrStartNewBatch();
         } else {
-            return OplogApplierBatcher::BatchAction::kProcessIndividually;
+            return BatchAction::kProcessIndividually;
         }
     }
 
@@ -331,15 +330,14 @@ OplogApplierBatcher::BatchAction OplogApplierBatcher::_getBatchActionForEntry(
     // reading from a consistent snapshot. However, it can be batched with any subsequent oplog that
     // is batchable.
     if (entry.getCommandType() == OplogEntry::CommandType::kDbCheck) {
-        return OplogApplierBatcher::BatchAction::kStartNewBatch;
+        return BatchAction::kStartNewBatch;
     }
 
     bool processIndividually = (entry.getCommandType() != OplogEntry::CommandType::kApplyOps) ||
         entry.shouldPrepare() || entry.isSingleOplogEntryTransactionWithCommand() ||
         entry.isEndOfLargeTransaction();
 
-    return processIndividually ? OplogApplierBatcher::BatchAction::kProcessIndividually
-                               : continueOrStartNewBatch();
+    return processIndividually ? BatchAction::kProcessIndividually : continueOrStartNewBatch();
 }
 
 /**

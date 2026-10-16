@@ -2687,7 +2687,7 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx,
                     // Remove 'prevOpTime' when a non-retryable batch replicates as a single
                     // applyOps oplog entry. This preserves backwards compatibility with the legacy
                     // atomic applyOps oplog entry format that we use to replicate batched writes.
-                    // OplogApplierImpl::_deriveOpsAndFillWriterVectors() enforces this restriction
+                    // deriveOpsAndFillWriterVectors() enforces this restriction
                     // using an invariant added in SERVER-43651. For batched writes that replicate
                     // over a chain of applyOps oplog entries, we keep 'prevOpTime' so that oplog
                     // application is able to consume all the linked operations, similar to large

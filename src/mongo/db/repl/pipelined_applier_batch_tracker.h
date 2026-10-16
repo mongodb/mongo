@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/duration.h"
@@ -13,6 +14,7 @@
 #include <deque>
 #include <memory>
 #include <mutex>
+#include <vector>
 
 #include <boost/optional.hpp>
 
@@ -30,11 +32,21 @@ public:
     struct InflightBatch {
         OpTimeAndWallTime lastOpTime;
         std::shared_ptr<std::atomic<uint32_t>> remainingWorkers;
+        // `ops` holds the original batch entries (possibly mutated by retry-image rectification);
+        // `derivedOps` holds pseudo-operations.
+        // These serve as the backing memory for the ApplierOperation pointers that are passed to
+        // worker threads. Therefore it's important that they outlive the worker threads as they
+        // are applying the batch.
+        std::vector<OplogEntry> ops;
+        std::vector<std::vector<OplogEntry>> derivedOps;
     };
 
     // Registers a batch before dispatch and returns the counter shared by its worker slices.
-    std::shared_ptr<std::atomic<uint32_t>> addBatch(OpTimeAndWallTime lastOpTime,
-                                                    uint32_t numWorkers);
+    std::shared_ptr<std::atomic<uint32_t>> addBatch(
+        OpTimeAndWallTime lastOpTime,
+        uint32_t numWorkers,
+        std::vector<OplogEntry> ops = {},
+        std::vector<std::vector<OplogEntry>> derivedOps = {});
 
     // Signals completion of one worker slice and notifies the consumer when its batch is complete.
     // Called from the worker thread.

@@ -5,6 +5,7 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/oplog_entry_or_grouped_inserts.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/modules.h"
@@ -35,10 +36,11 @@ class [[MONGO_MOD_PUBLIC]] PipelinedApplierWorkerPool {
 public:
     /**
      * A unit of work consumed by a worker: the ops slice of a single dispatched batch routed to
-     * that worker.
+     * that worker. `ops` holds ApplierOperations whose `op` pointers alias memory owned by the
+     * dispatching batch.
      */
     struct WorkItem {
-        std::vector<OplogEntry> ops;
+        std::vector<ApplierOperation> ops;
         std::shared_ptr<std::atomic<uint32_t>> batchRemainingWorkers;
     };
 

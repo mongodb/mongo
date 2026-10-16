@@ -6,13 +6,15 @@
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/admission/ticketing/admission_context.h"
 #include "mongo/db/client.h"
-#include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/oplog_applier_batcher.h"
+#include "mongo/db/repl/oplog_applier_dispatch.h"
 #include "mongo/db/repl/oplog_applier_impl.h"
 #include "mongo/db/repl/oplog_applier_utils.h"
 #include "mongo/db/repl/oplog_entry_or_grouped_inserts.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/pipelined_applier_otel_metrics.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/logv2/log.h"
@@ -45,6 +47,20 @@ void setWorkerOpCtxStates(OperationContext* opCtx) {
 
 }  // namespace
 
+/**
+ * Returns if a batch containing the given ops must be applied serialized, i.e. with
+ * no other batches in flight.
+ */
+bool batchMustBeAppliedSerialized(OplogApplication::Mode mode, const std::vector<OplogEntry>& ops) {
+    invariant(!ops.empty());
+    const BatchStats batchStats;
+    const auto& firstEntryInBatch = ops.front();
+    return std::any_of(ops.begin(), ops.end(), [&](const OplogEntry& entry) {
+        const auto action = getBatchActionForEntry(mode, firstEntryInBatch, entry, batchStats);
+        return action == BatchAction::kProcessIndividually || action == BatchAction::kStartNewBatch;
+    });
+}
+
 PipelinedOplogApplier::PipelinedOplogApplier(executor::TaskExecutor* executor,
                                              OplogBuffer* oplogBuffer,
                                              Observer* observer,
@@ -59,8 +75,12 @@ PipelinedOplogApplier::PipelinedOplogApplier(executor::TaskExecutor* executor,
                   [this](size_t workerIdx, const PipelinedApplierWorkerPool::WorkItem& item) {
                       consumeWorkItem(workerIdx, getOptions(), item, _batchTracker);
                   }),
-      _router(numWorkers),
-      _advancer(_batchTracker, [this](const auto& batch) { _publishBatch(batch); }) {}
+      _advancer(_batchTracker, [this](const auto& batch) { _publishBatch(batch); }) {
+    _disableTransactionUpdateCoalescing =
+        rss::ReplicatedStorageService::get(cc().getServiceContext())
+            .getPersistenceProvider()
+            .shouldDisableTransactionUpdateCoalescing();
+}
 
 PipelinedOplogApplier::~PipelinedOplogApplier() = default;
 
@@ -84,10 +104,8 @@ void PipelinedOplogApplier::_run(OplogBuffer* oplogBuffer) {
     OpTime lastDispatchedOpTime = _replCoord->getMyLastAppliedOpTime();
 
     while (true) {
-        // An operation context is allocated per batch so that catalog lookups made while routing
-        // use the current snapshot. The collection properties cached by _router persist across
-        // batches; the router clears and refetches them itself when it classifies an op as
-        // requiring inline application, as the op may invalidate the cached properties.
+        // An operation context is allocated per batch so that catalog lookups use the current
+        // snapshot.
         const auto opCtxPtr = cc().getServiceContext()->makeKillOpsExemptOperationContext(&cc());
         auto* opCtx = opCtxPtr.get();
         ScopedAdmissionPriority<ExecutionAdmissionContext> priority(
@@ -118,7 +136,7 @@ void PipelinedOplogApplier::_run(OplogBuffer* oplogBuffer) {
 
         const auto numOpsInBatch = batch.count();
         try {
-            _dispatchOps(opCtx, batch.releaseBatch());
+            _dispatchBatch(opCtx, batch.releaseBatch());
         } catch (const DBException& ex) {
             LOGV2_FATAL(13322701,
                         "Pipelined oplog applier failed to dispatch a batch",
@@ -135,104 +153,79 @@ StatusWith<OpTime> PipelinedOplogApplier::_applyOplogBatch(OperationContext* opC
     MONGO_UNIMPLEMENTED;
 }
 
-void PipelinedOplogApplier::_dispatchOps(OperationContext* opCtx, std::vector<OplogEntry> ops) {
-    using OpClass = PipelinedOpRouter::OpClass;
+void PipelinedOplogApplier::_dispatchBatch(OperationContext* opCtx, std::vector<OplogEntry> ops) {
+    invariant(!ops.empty());
+
+    // A batch containing any entry that must apply alone — e.g. DDL, the new-primary noop, or a
+    // truncate — is applied serialized. This is done through a "drain, dispatch, drain" sequence:
+    // drain everything in flight, dispatch the batch, then drain and wait for it to be applied
+    // and published before resuming.
+    // If the batch doesn't require serialization, the batch is dispatched to the worker pool and
+    // pipelined with other batches.
+    if (batchMustBeAppliedSerialized(getOptions().mode, ops)) {
+        if (!_drainWorkers()) {
+            // TODO(SERVER-136053): Propagate shutdown failure to `_run`
+            return;
+        }
+        _dispatchBatchToWorkers(opCtx, std::move(ops));
+        if (!_drainWorkers()) {
+            // TODO(SERVER-136053): Propagate shutdown failure to `_run`
+            return;
+        }
+    } else {
+        _dispatchBatchToWorkers(opCtx, std::move(ops));
+    }
+}
+
+void PipelinedOplogApplier::_dispatchBatchToWorkers(OperationContext* opCtx,
+                                                    std::vector<OplogEntry> ops) {
     using WorkItem = PipelinedApplierWorkerPool::WorkItem;
     const size_t numWorkers = _workerPool.numWorkers();
     invariant(!ops.empty());
 
-    // Preserve the original batch boundary before expansion can remove the final entry.
-    const OpTimeAndWallTime batchEnd{ops.back().getOpTime(), ops.back().getWallClockTime()};
-    OpTimeAndWallTime lastRegisteredOpTime{};
+    // Capture the last op time to publish lastApplied after all workers finish.
+    const OpTimeAndWallTime lastOpTime{ops.back().getOpTime(), ops.back().getWallClockTime()};
 
-    // Packed container ops write several keys in one entry; hashing the whole entry would not
-    // agree with the hash of any single key, so a packed op and a later op on one of its keys
-    // could land on different workers and be applied concurrently. Split them into single-key ops
-    // first so each key is hashed and routed independently.
-    OplogApplierUtils::expandBatchedContainerOps(ops);
-
-    // The ops to dispatch, in oplog order, each paired with its worker. Inner ops extracted from an
-    // applyOps entry are owned by 'derivedOps'; everything else points into 'ops'.
-    std::vector<std::pair<size_t, OplogEntry*>> routedOps;
-    routedOps.reserve(ops.size());
+    // Holds pseudo-operations (expanded applyOps, config.transactions session updates, expanded
+    // container ops, etc).
     std::vector<std::vector<OplogEntry>> derivedOps;
-    // opsPerWorker tracks the number of ops a particular worker will receive. The index corresponds
-    // to the worker thread.
-    std::vector<size_t> opsPerWorker(numWorkers, 0);
-    auto route = [&](OplogEntry* op) {
-        auto workerIdx = _router.selectWorker(opCtx, op);
-        routedOps.emplace_back(workerIdx, op);
-        ++opsPerWorker[workerIdx];
-    };
+    // Note that writerVectors holds ApplierOperations, which simply has pointers to the OplogEntry
+    // objects in ops and derivedOps. The ApplierOperations do not own the OplogEntry objects; the
+    // inflight batch in the batch tracker owns them.
+    std::vector<std::vector<ApplierOperation>> writerVectors(numWorkers);
+    // Continuous internode checkpoint validation is only implemented for the classic applier, so
+    // no validator is passed here.
+    fillWriterVectors(getOptions(),
+                      _disableTransactionUpdateCoalescing,
+                      opCtx,
+                      &ops,
+                      &writerVectors,
+                      &derivedOps,
+                      /*checkpointValidator=*/nullptr);
 
-    auto flushPerWorkerBuffer = [&]() -> void {
-        if (routedOps.empty()) {
-            return;
-        }
-        // Each worker slice of ops is sized before any op is moved into it, so it never reallocates
-        // upon insertion.
-        std::vector<WorkItem> items(numWorkers);
-        for (size_t workerIdx = 0; workerIdx < numWorkers; ++workerIdx) {
-            items[workerIdx].ops.reserve(opsPerWorker[workerIdx]);
-        }
-        for (auto& [workerIdx, op] : routedOps) {
-            items[workerIdx].ops.push_back(std::move(*op));
-        }
-        lastRegisteredOpTime = {routedOps.back().second->getOpTime(),
-                                routedOps.back().second->getWallClockTime()};
-
-        // Count worker slices assigned ops in this batch, as not all workers may have received ops.
-        const auto participatingWorkers = std::count_if(
-            opsPerWorker.begin(), opsPerWorker.end(), [](size_t count) { return count != 0; });
-        auto remainingWorkers = _batchTracker.addBatch(lastRegisteredOpTime,
-                                                       static_cast<uint32_t>(participatingWorkers));
-        PipelinedApplyOtelMetrics::addOpsDispatched(routedOps.size());
-        for (size_t workerIdx = 0; workerIdx < numWorkers; ++workerIdx) {
-            if (!items[workerIdx].ops.empty()) {
-                items[workerIdx].batchRemainingWorkers = remainingWorkers;
-                _workerPool.enqueue(workerIdx, std::move(items[workerIdx]));
-            }
-        }
-    };
-
-    for (auto& op : ops) {
-        switch (_router.classify(op)) {
-            case OpClass::kPipelined:
-                route(&op);
-                break;
-            case OpClass::kPipelinedApplyOps: {
-                auto& innerOps = derivedOps.emplace_back(ApplyOps::extractOperations(op));
-                OplogApplierUtils::expandBatchedContainerOps(innerOps);
-                for (auto& innerOp : innerOps) {
-                    route(&innerOp);
-                }
-                break;
-            }
-            case OpClass::kRequiresInline: {
-                flushPerWorkerBuffer();
-                routedOps.clear();
-                derivedOps.clear();
-                std::fill(opsPerWorker.begin(), opsPerWorker.end(), 0ull);
-                if (!_drainWorkers()) {
-                    return;
-                }
-                auto optionalOpTime = _applyOpInline(opCtx, op);
-                if (!optionalOpTime.has_value()) {
-                    // TODO(SERVER-136053): Propagate shutdown failure to `_run`
-                    return;
-                }
-                lastRegisteredOpTime = optionalOpTime.get();
-                break;
-            }
-        }
+    std::vector<WorkItem> items(numWorkers);
+    uint32_t participatingWorkers = 0;
+    int64_t opsDispatched = 0;
+    for (size_t workerIdx = 0; workerIdx < numWorkers; ++workerIdx) {
+        if (writerVectors[workerIdx].empty())
+            continue;
+        ++participatingWorkers;
+        opsDispatched += writerVectors[workerIdx].size();
+        items[workerIdx].ops = std::move(writerVectors[workerIdx]);
     }
 
-    flushPerWorkerBuffer();
-    // If the final entry in the batch was a packed operation that produced zero worker ops when
-    // expanded, then expansion would have removed that entry from the batch vector.
-    // Ensure that, if this happens, we still publish the original final optime.
-    if (lastRegisteredOpTime < batchEnd) {
-        _batchTracker.addBatch(batchEnd, 0);
+    // Register the batch and move "ops" and "derivedOps" into the batch tracker. This is to
+    // guarantee that the oplog entries in the batch are alive for the duration the workers apply
+    // the batch. The original batch boundary is registered even when the dispatching routes no
+    // operations to any worker, so lastApplied still reaches it.
+    auto remainingWorkers = _batchTracker.addBatch(
+        lastOpTime, participatingWorkers, std::move(ops), std::move(derivedOps));
+    PipelinedApplyOtelMetrics::addOpsDispatched(opsDispatched);
+    for (size_t workerIdx = 0; workerIdx < numWorkers; ++workerIdx) {
+        if (!items[workerIdx].ops.empty()) {
+            items[workerIdx].batchRemainingWorkers = remainingWorkers;
+            _workerPool.enqueue(workerIdx, std::move(items[workerIdx]));
+        }
     }
 }
 
@@ -241,8 +234,7 @@ bool PipelinedOplogApplier::_drainWorkers() {
     LOGV2_DEBUG(13469900, 1, "Draining pipelined oplog applier workers");
     _workerPool.waitForIdle();
     // Publication may include deferred multikey writes after the batch is popped from the FIFO.
-    // Wait for all publication side effects to finish before allowing inline application to
-    // proceed.
+    // Wait for all publication side effects to finish.
     return _waitForAdvancerIdle();
 }
 
@@ -257,41 +249,6 @@ void PipelinedOplogApplier::_publishBatch(
     signalOplogWaiters();
 }
 
-boost::optional<OpTimeAndWallTime> PipelinedOplogApplier::_applyOpInline(OperationContext* opCtx,
-                                                                         const OplogEntry& entry) {
-    // Reuses the dispatcher's per-batch opCtx: _run already owns one bound to this Client, and
-    // ServiceContext refuses a second concurrent opCtx on the same Client (tassert 4946801).
-    Status status = [&] {
-        try {
-            return opCtx->runWithoutInterruptionExceptAtGlobalShutdown(
-                [&] { return applyWorkItem(opCtx, getOptions(), {{entry}}); });
-        } catch (const DBException& ex) {
-            return ex.toStatus();
-        }
-    }();
-    if (MONGO_unlikely(!status.isOK())) {
-        // A global-shutdown interrupt abandons the item unapplied; lastApplied stays below this
-        // batch and restart recovery re-applies it.
-        if (ErrorCodes::isShutdownError(status.code())) {
-            LOGV2(13474700,
-                  "Pipelined oplog applier interrupted by shutdown while trying to apply op inline",
-                  "error"_attr = redact(status));
-            return boost::none;
-        }
-        LOGV2_FATAL(13474701,
-                    "Pipelined oplog applier failed to apply a work item inline",
-                    "op"_attr = entry.toBSONForLogging(),
-                    "error"_attr = redact(status));
-    }
-    OpTimeAndWallTime opTimeAndWallTime{entry.getOpTime(), entry.getWallClockTime()};
-    auto counter = _batchTracker.addBatch(opTimeAndWallTime, 1);
-    _batchTracker.onWorkerCompletion(std::move(counter));
-    if (!_waitForAdvancerIdle()) {
-        return boost::none;
-    }
-    return opTimeAndWallTime;
-}
-
 Status applyWorkItem(OperationContext* opCtx,
                      const OplogApplier::Options& options,
                      const PipelinedApplierWorkerPool::WorkItem& item) {
@@ -301,11 +258,7 @@ Status applyWorkItem(OperationContext* opCtx,
     UnreplicatedWritesBlock uwb(opCtx);
     setWorkerOpCtxStates(opCtx);
 
-    std::vector<ApplierOperation> ops;
-    ops.reserve(item.ops.size());
-    for (const auto& op : item.ops) {
-        ops.emplace_back(&op);
-    }
+    std::vector<ApplierOperation> ops = item.ops;
     // A DSC node always resumes oplog application from a consistent point: it recovers to the
     // stable checkpoint and replays from there, so there is never a window where its data is
     // inconsistent with the ops being applied. As a result, we hardcode isDataConsistent to true.
@@ -355,9 +308,9 @@ void consumeWorkItem(size_t workerIdx,
                 "Pipelined oplog applier worker failed to apply a work item",
                 "workerIdx"_attr = workerIdx,
                 "numOperationsInBatch"_attr = item.ops.size(),
-                "firstOperation"_attr = redact(item.ops.front().toBSONForLogging()),
-                "firstOperationOpTime"_attr = item.ops.front().getOpTime(),
-                "lastOperationOpTime"_attr = item.ops.back().getOpTime(),
+                "firstOperation"_attr = redact(item.ops.front()->toBSONForLogging()),
+                "firstOperationOpTime"_attr = item.ops.front()->getOpTime(),
+                "lastOperationOpTime"_attr = item.ops.back()->getOpTime(),
                 "error"_attr = redact(status));
 }
 

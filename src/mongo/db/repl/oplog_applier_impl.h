@@ -18,7 +18,6 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_consistency_markers.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/session_update_tracker.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/replication_state_transition_lock_guard.h"
 #include "mongo/executor/task_executor.h"
@@ -88,12 +87,6 @@ private:
      */
     StatusWith<OpTime> _applyOplogBatch(OperationContext* opCtx,
                                         std::vector<OplogEntry> ops) override;
-
-    void _deriveOpsAndFillWriterVectors(OperationContext* opCtx,
-                                        std::vector<OplogEntry>* ops,
-                                        std::vector<std::vector<ApplierOperation>>* writerVectors,
-                                        std::vector<std::vector<OplogEntry>>* derivedOps,
-                                        SessionUpdateTracker* sessionUpdateTracker) noexcept;
 
     void _fillWriterVectors(OperationContext* opCtx,
                             std::vector<OplogEntry>* ops,

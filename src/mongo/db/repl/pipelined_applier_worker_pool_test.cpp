@@ -23,6 +23,7 @@
 #include "mongo/util/time_support.h"
 
 #include <algorithm>
+#include <deque>
 #include <mutex>
 #include <vector>
 
@@ -102,9 +103,13 @@ protected:
         const auto ns = NamespaceString::createNamespaceString_forTest("test.poa_workers");
         std::vector<Timestamp> timestamps;
         for (size_t i = 0; i < count; ++i) {
-            auto entry = repl::makeInsertOplogEntry(_nextSeq++, ns);
-            timestamps.push_back(entry.getTimestamp());
-            item.ops.push_back(std::move(entry));
+            // WorkItem.ops holds ApplierOperations pointing into backing memory that contains
+            // the oplog entries. _backing is a deque to hold the OplogEntries for the life of
+            // the fixture, so that the ApplierOperations remain valid until the pool is shut
+            // down and joined.
+            _backing.emplace_back(repl::makeInsertOplogEntry(_nextSeq++, ns));
+            item.ops.emplace_back(&_backing.back());
+            timestamps.push_back(_backing.back().getTimestamp());
         }
         pool.enqueue(workerIdx, std::move(item));
         return timestamps;
@@ -155,7 +160,7 @@ private:
             AuthorizationSession::get(cc())->isAuthenticated();
         std::lock_guard lk(_mutex);
         for (const auto& op : item.ops) {
-            _consumed.push_back({workerIdx, op.getTimestamp(), onKillExemptClient});
+            _consumed.push_back({workerIdx, op->getTimestamp(), onKillExemptClient});
         }
         // If the test is blocking on n items to be consumed, unblock.
         _consumedCv.notify_all();
@@ -166,6 +171,8 @@ private:
     stdx::condition_variable _consumedCv;
     std::vector<Consumed> _consumed;  // (M)
     int _nextSeq = 1;
+    // Backing storage for the OplogEntries referenced by enqueued work items.
+    std::deque<OplogEntry> _backing;  // (M)
 
     std::mutex _gateMutex;
     stdx::condition_variable _gateCv;
