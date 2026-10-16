@@ -1,6 +1,7 @@
 """Replica set fixture for executing JSTests against."""
 
 import os.path
+import subprocess
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Lock
@@ -1087,6 +1088,11 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             )
         self.logger.info("Read concern is available on all nodes")
 
+    # TODO(SERVER-131909): Remove this once disaggregated replica sets have elegant stepdown.
+    def should_stop_primary_before_stepup(self):
+        """Return whether the primary must exit before another node can be stepped up."""
+        return False
+
     def stop_primary(self, primary, background_reconfig, should_kill):
         """Stop the primary node method."""
         # Check that the fixture is still running before stepping down or killing the primary.
@@ -1231,7 +1237,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             # into Rollback (which causes it to close any open connections).
             return False
 
-    def restart_node(self, chosen, temporary_flags={}):
+    def restart_node(self, chosen, temporary_flags={}, timeout=None):
         """Restart the new step up node."""
         self.logger.info(
             "Waiting for the old primary on port %d of replica set '%s' to exit.",
@@ -1239,9 +1245,15 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             self.replset_name,
         )
 
-        exit_code = chosen.mongod.wait()
-        # This function is called after stop_primary() which could kill or cleanly shutdown the
-        # process. We therefore also allow an exit code of -9.
+        try:
+            exit_code = chosen.mongod.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            raise self.fixturelib.ServerFailure(
+                "Timed out after {}s waiting for mongod on port {} of replica set '{}' to "
+                "terminate.".format(timeout, chosen.port, self.replset_name)
+            )
+        # The process may have been killed or cleanly shut down. We therefore also allow an exit
+        # code of -9.
         if exit_code in (0, -interface.TeardownMode.KILL.value):
             self.logger.info("Successfully stopped the mongod on port {:d}.".format(chosen.port))
         else:

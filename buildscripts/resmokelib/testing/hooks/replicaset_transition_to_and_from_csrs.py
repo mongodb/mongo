@@ -311,7 +311,16 @@ class _TransitionThread(threading.Thread):
         else:
             self.backward_transitions[self.states[current_state]](_rs_fixture)
 
-    def _restart_node(self, node, rs_fixture, enable_maintenance_mode, is_config_server):
+    # TODO(SERVER-131909): Remove stop_timeout_secs once disaggregated replica sets have elegant
+    # stepdown.
+    def _restart_node(
+        self,
+        node,
+        rs_fixture,
+        enable_maintenance_mode,
+        is_config_server,
+        stop_timeout_secs=None,
+    ):
         self.logger.info(
             "Waiting for mongod on port %d of replica set '%s' to stop and restart.",
             node.port,
@@ -323,7 +332,7 @@ class _TransitionThread(threading.Thread):
             temporary_options["configsvr"] = ""
         if enable_maintenance_mode:
             temporary_options["replicaSetConfigShardMaintenanceMode"] = ""
-        rs_fixture.restart_node(node, temporary_options)
+        rs_fixture.restart_node(node, temporary_options, timeout=stop_timeout_secs)
         self.logger.info(fixture_interface.create_fixture_table(rs_fixture))
         self.logger.info(
             "Restarted mongod on port %d of replica set '%s'.",
@@ -368,20 +377,33 @@ class _TransitionThread(threading.Thread):
             first_secondary.port,
             rs_fixture.replset_name,
         )
+        restart_primary_before_stepup = rs_fixture.should_stop_primary_before_stepup()
+        if restart_primary_before_stepup:
+            # Restart the old primary as a follower before step-up so a two-node replica set still
+            # has enough voting members to elect the chosen secondary. The timeout ensures the old
+            # primary has fully stopped before the step-up request is issued.
+            self._restart_node(
+                old_primary,
+                rs_fixture,
+                enable_maintenance_mode,
+                is_config_server,
+                stop_timeout_secs=fixture_interface.Fixture.AWAIT_READY_TIMEOUT_SECS,
+            )
         self._stepup_node_with_timeout(first_secondary, rs_fixture)
         new_secondaries = secondaries[1:]
         for node in new_secondaries:
             self._restart_node(node, rs_fixture, enable_maintenance_mode, is_config_server)
         self.logger.info("Finished restarting secondaries of replica set '%s'.", rs_name)
-        self._restart_node(old_primary, rs_fixture, enable_maintenance_mode, is_config_server)
+        if not restart_primary_before_stepup:
+            self._restart_node(old_primary, rs_fixture, enable_maintenance_mode, is_config_server)
         self.logger.info("Finished rolling restart of replica set '%s'.", rs_name)
 
     def _rolling_restart_nodes_promotion(
         self, rs_fixture, enable_maintenance_mode, is_config_server
     ):
         # We are doing a rolling restart of the replica set members. This implies to restart
-        # first all the secondaries, then choose randomly a secondary for stepping up, and
-        # finally restart the old primary.
+        # first all the secondaries, then choose randomly a secondary for stepping up, and restart
+        # the old primary either immediately before or after the step-up as required by the fixture.
 
         rs_name = rs_fixture.replset_name
         self.logger.info(
@@ -393,6 +415,7 @@ class _TransitionThread(threading.Thread):
 
         old_primary = rs_fixture.get_primary()
         secondaries = rs_fixture.get_secondaries()
+        restart_primary_before_stepup = False
         if secondaries:
             for node in secondaries:
                 self._restart_node(node, rs_fixture, enable_maintenance_mode, is_config_server)
@@ -403,13 +426,26 @@ class _TransitionThread(threading.Thread):
                 chosen_secondary.port,
                 rs_fixture.replset_name,
             )
+            restart_primary_before_stepup = rs_fixture.should_stop_primary_before_stepup()
+            if restart_primary_before_stepup:
+                # Restart the old primary as a follower before step-up so a two-node replica set
+                # still has enough voting members to elect the chosen secondary. The timeout
+                # ensures the old primary has fully stopped before the step-up request is issued.
+                self._restart_node(
+                    old_primary,
+                    rs_fixture,
+                    enable_maintenance_mode,
+                    is_config_server,
+                    stop_timeout_secs=fixture_interface.Fixture.AWAIT_READY_TIMEOUT_SECS,
+                )
             self._stepup_node_with_timeout(chosen_secondary, rs_fixture)
             self.logger.info(
                 "Successfully stepped up the secondary on port %d of replica set '%s'.",
                 chosen_secondary.port,
                 rs_fixture.replset_name,
             )
-        self._restart_node(old_primary, rs_fixture, enable_maintenance_mode, is_config_server)
+        if not restart_primary_before_stepup:
+            self._restart_node(old_primary, rs_fixture, enable_maintenance_mode, is_config_server)
         self.logger.info("Finished rolling restart of replica set '%s'.", rs_name)
 
     def _restart_as_csrs_maintenance(self, rs_fixture):

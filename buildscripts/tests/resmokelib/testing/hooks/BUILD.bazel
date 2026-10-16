@@ -35,3 +35,20 @@ py_test(
         ),
     ],
 )
+
+# TODO(SERVER-131909): Remove this once disaggregated replica sets have elegant stepdown.
+py_test(
+    name = "test_replicaset_transition_to_and_from_csrs",
+    srcs = [
+        "__init__.py",
+        "test_replicaset_transition_to_and_from_csrs.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/resmokelib",
+        dependency(
+            "mock",
+            group = "testing",
+        ),
+    ],
+)
