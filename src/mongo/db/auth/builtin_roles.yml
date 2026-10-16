@@ -498,6 +498,10 @@ roles:
               collection: 'system.version'
               actions: [ find ]
             - matchType: exact_namespace
+              db: "admin"
+              collection: "system.authForInternalNamespace"
+              actions: [ find ]
+            - matchType: exact_namespace
               db: 'config'
               collection: 'settings'
               actions: [ find ]
@@ -588,6 +592,10 @@ roles:
               actions:
                   - *restoreRoleWriteActions
                   - find
+            - matchType: exact_namespace
+              db: "admin"
+              collection: "system.authForInternalNamespace"
+              actions: *restoreRoleWriteActions
             - matchType: collection
               collection: 'system.users'
               actions:

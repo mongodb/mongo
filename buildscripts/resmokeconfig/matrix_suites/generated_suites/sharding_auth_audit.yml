@@ -31,6 +31,7 @@ selector:
   - jstests/sharding/*[aA]uth*.js
   - jstests/sharding/analyze_shard_key/*[aA]uth*.js
   - jstests/sharding/query/*[aA]uth*.js
+  - jstests/sharding/migration_blocking_operation/multi_update_coordinator_state_document_privilege_escalation.js
   - jstests/sharding/advance_cluster_time_action_type.js
   - jstests/sharding/query/aggregation_currentop.js
   - jstests/sharding/internal_txns/internal_client_restrictions.js

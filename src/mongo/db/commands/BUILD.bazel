@@ -77,6 +77,7 @@ mongo_cc_library(
     deps = [
         "//src/mongo/db:local_executor",
         "//src/mongo/db/auth",
+        "//src/mongo/db/auth:auth_checks",
         "//src/mongo/db/auth:authprivilege",
         "//src/mongo/db/commands:update_metrics",
         "//src/mongo/db/ops:write_ops_parsers",
@@ -115,6 +116,7 @@ mongo_cc_library(
         "//src/mongo/db:mongohasher",
         "//src/mongo/db:server_base",
         "//src/mongo/db/auth",
+        "//src/mongo/db/auth:auth_checks",
         "//src/mongo/db/auth:authprivilege",
         "//src/mongo/db/catalog:collection_catalog",
         "//src/mongo/db/commands:fle2_cleanup_idl",
@@ -938,6 +940,7 @@ mongo_cc_library(
         "//src/mongo/db:set_change_stream_state_coordinator",
         "//src/mongo/db/auth",
         "//src/mongo/db/auth:address_restriction",
+        "//src/mongo/db/auth:auth_checks",
         "//src/mongo/db/auth:auth_options_idl",
         "//src/mongo/db/auth:auth_umc",
         "//src/mongo/db/auth:authprivilege",

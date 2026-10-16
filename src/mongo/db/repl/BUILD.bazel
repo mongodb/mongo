@@ -90,6 +90,7 @@ mongo_cc_library(
         "//src/mongo/db:multitenancy",
         "//src/mongo/db:server_base",
         "//src/mongo/db:shard_role",
+        "//src/mongo/db/auth:auth_checks",
         "//src/mongo/db/catalog:catalog_helpers",
         "//src/mongo/db/catalog:collection_crud",
         "//src/mongo/db/catalog:health_log_interface",

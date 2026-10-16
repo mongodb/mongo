@@ -154,6 +154,9 @@ NSS_CONSTANT(kMultiUpdateCoordinatorsNamespace,
              DatabaseName::kConfig,
              "localMigrationBlockingOperations.multiUpdateCoordinators"_sd)
 
+// Pseudo Namespace to act a namespace resource for internal collections.
+NSS_CONSTANT(kAuthForInternalNamespace, DatabaseName::kAdmin, "system.authForInternalNamespace"_sd)
+
 // Namespace for persisting sharding DDL rename participant state documents
 NSS_CONSTANT(kShardingRenameParticipantsNamespace,
              DatabaseName::kConfig,

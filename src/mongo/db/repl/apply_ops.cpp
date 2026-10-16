@@ -45,8 +45,11 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog_raii.h"
@@ -91,6 +94,23 @@ MONGO_FAIL_POINT_DEFINE(applyOpsPauseBetweenOperations);
 
 namespace detail {
 
+namespace {
+
+// Returns whether 'authSession' is authorized to take 'action' on 'nss'. Unlike calling
+// AuthorizationSession::isAuthorizedForActionsOnNamespace directly, this also requires the implicit
+// privilege of a restricted namespace (see authorization_checks.h), so that a coarser grant -- for
+// instance write access to the 'config' database -- is not sufficient to reach such a namespace.
+bool isAuthorizedForActionsOnNamespace(AuthorizationSession* authSession,
+                                       const NamespaceString& nss,
+                                       ActionType action) {
+    PrivilegeVector privileges{
+        Privilege(ResourcePattern::forExactNamespace(nss), ActionSet{action})};
+    auth::addImplicitPrivilegesForRestrictedNamespaces(&privileges);
+    return authSession->isAuthorizedForPrivileges(privileges);
+}
+
+}  // namespace
+
 // The DDL command ops whose applyOps execution resolves the target collection from the op's UUID
 // rather than from the collection named in the command body.
 constexpr std::array kUUIDTargetedDDLCommands{
@@ -108,19 +128,19 @@ bool isAuthorizedForUUIDTargetedCommand(AuthorizationSession* authSession,
     }
     switch (cmdType) {
         case OplogEntry::CommandType::kDrop:
-            return authSession->isAuthorizedForActionsOnNamespace(nss, ActionType::dropCollection);
+            return isAuthorizedForActionsOnNamespace(authSession, nss, ActionType::dropCollection);
         case OplogEntry::CommandType::kDropIndexes:
-            return authSession->isAuthorizedForActionsOnNamespace(nss, ActionType::dropIndex);
+            return isAuthorizedForActionsOnNamespace(authSession, nss, ActionType::dropIndex);
         case OplogEntry::CommandType::kCollMod:
-            return authSession->isAuthorizedForActionsOnNamespace(nss, ActionType::collMod);
+            return isAuthorizedForActionsOnNamespace(authSession, nss, ActionType::collMod);
         case OplogEntry::CommandType::kRenameCollection: {
             // Mirror the source-side requirements of renameCollection authorization: the caller
             // must be able to read the source and either drop it (cross-database rename) or rename
             // within its database.
             const bool canReadSource =
-                authSession->isAuthorizedForActionsOnNamespace(nss, ActionType::find);
+                isAuthorizedForActionsOnNamespace(authSession, nss, ActionType::find);
             const bool canDropSource =
-                authSession->isAuthorizedForActionsOnNamespace(nss, ActionType::dropCollection);
+                isAuthorizedForActionsOnNamespace(authSession, nss, ActionType::dropCollection);
             const bool canRenameInDb = authSession->isAuthorizedForActionsOnResource(
                 ResourcePattern::forDatabaseName(nss.dbName()), ActionType::renameCollectionSameDB);
             return canReadSource && (canDropSource || canRenameInDb);

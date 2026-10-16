@@ -203,8 +203,11 @@ public:
                                  const DatabaseName& dbName,
                                  const BSONObj& cmdObj) const override {
         auto* as = AuthorizationSession::get(opCtx->getClient());
-        if (!as->isAuthorizedForActionsOnResource(parseResourcePattern(dbName, cmdObj),
-                                                  ActionType::find)) {
+        PrivilegeVector privileges{
+            Privilege(CommandHelpers::resourcePatternForNamespace(parseNs(dbName, cmdObj)),
+                      ActionType::find)};
+        auth::addImplicitPrivilegesForRestrictedNamespaces(&privileges);
+        if (!as->isAuthorizedForPrivileges(privileges)) {
             return {ErrorCodes::Unauthorized, "unauthorized"};
         }
 

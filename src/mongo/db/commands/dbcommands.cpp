@@ -49,6 +49,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/catalog/coll_mod.h"
 #include "mongo/db/catalog/collection.h"
@@ -220,11 +221,14 @@ public:
 
         void doCheckAuthorization(OperationContext* opCtx) const final {
             auto ns = request().getNamespace();
+            PrivilegeVector privileges{
+                Privilege(ResourcePattern::forExactNamespace(ns), ActionType::dropCollection)};
+            auth::addImplicitPrivilegesForRestrictedNamespaces(&privileges);
             uassert(ErrorCodes::Unauthorized,
                     str::stream() << "Not authorized to drop collection '"
                                   << ns.toStringForErrorMsg() << "'",
                     AuthorizationSession::get(opCtx->getClient())
-                        ->isAuthorizedForActionsOnNamespace(ns, ActionType::dropCollection));
+                        ->isAuthorizedForPrivileges(privileges));
         }
         Reply typedRun(OperationContext* opCtx) final {
             if (request().getNamespace().isOplog()) {
