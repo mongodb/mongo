@@ -37,19 +37,23 @@ TimeseriesTest.run((insert) => {
     doc.a = "bar";
     assert.commandWorked(insert(coll, doc));
     assert.eq(2, coll.find({"m": "meta"}).toArray().length);
-    assert.eq(
-        1,
-        getTimeseriesCollForRawOps(coll).find({"meta": "meta"}).rawData().toArray().length,
-    );
+    if (TimeseriesTest.canAssumeCanonicalTimeseriesBucketsLayout()) {
+        assert.eq(
+            1,
+            getTimeseriesCollForRawOps(coll).find({"meta": "meta"}).rawData().toArray().length,
+        );
+    }
 
     // new measurement, because schema changed, we have a new bucket
     doc.a = 1;
     assert.commandWorked(insert(coll, doc));
     assert.eq(3, coll.find({"m": "meta"}).toArray().length);
-    assert.eq(
-        2,
-        getTimeseriesCollForRawOps(coll).find({"meta": "meta"}).rawData().toArray().length,
-    );
+    if (TimeseriesTest.canAssumeCanonicalTimeseriesBucketsLayout()) {
+        assert.eq(
+            2,
+            getTimeseriesCollForRawOps(coll).find({"meta": "meta"}).rawData().toArray().length,
+        );
+    }
     let schemaChangedBucket = getTimeseriesCollForRawOps(coll)
         .find({"control.min.a": 1})
         .rawData()
