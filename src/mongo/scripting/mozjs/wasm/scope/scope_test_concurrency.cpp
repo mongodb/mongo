@@ -773,3 +773,29 @@ TEST_F(WasmtimeScopeInterruptTranslationTest, InterruptFansOutToAllRegisteredSco
     ASSERT_TRUE(scopeA->isKillPending());
     ASSERT_TRUE(scopeB->isKillPending());
 }
+
+// Fixture that provides a ServiceContext but deliberately installs no global ScriptEngine, so
+// registerOperation() takes its no-engine path.
+class WasmtimeScopeNoGlobalEngineTest : public unittest::Test,
+                                        public ScopedGlobalServiceContextForTest {};
+TEST_F(WasmtimeScopeNoGlobalEngineTest, RegisterWithNoWasmEngineStoresNoBackPointer) {
+    ASSERT_FALSE(getGlobalScriptEngine()) << "fixture must leave the global script engine unset";
+
+    auto client = getService()->makeClient("no-global-engine-register-test");
+    AlternativeClientRegion acr(client);
+    auto opCtx = cc().makeOperationContext();
+
+    // Locally owned: creating a scope needs an engine object, but not the global one.
+    WasmtimeScriptEngine engine;
+    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+    scope->registerOperation(opCtx.get());
+
+    opCtx->markKilled(ErrorCodes::MaxTimeMSExpired);
+
+    // The operation is not registered without a global engine.
+    ASSERT_FALSE(scope->isKillPending())
+        << "scope kept a back-pointer to an OperationContext it never registered with";
+
+    // Reads the opCtx pointer stored.
+    scope->unregisterOperation();
+}
