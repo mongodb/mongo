@@ -160,3 +160,10 @@ feature_flags:
         cpp_varname: gFeatureFlagConcurrentResharding
         default: false
         fcv_gated: true
+    featureFlagReshardingPrePostConditionsValidations:
+        mod_visibility: public
+        description: >-
+            Feature flag to enable pre and post state machine transition validation checks during resharding.
+        cpp_varname: gFeatureFlagReshardingPrePostConditionsValidations
+        default: false
+        fcv_gated: true
