@@ -62,14 +62,14 @@ assert.eq(
 
 let entryWorks = entry.works;
 assert.eq(entry.isActive, false);
-assertPlanHasIxScanStage(false, entry, "a_1", planCacheShapeHash);
+assertPlanHasIxScanStage(entry, "a_1", planCacheShapeHash);
 
 // Re-run the query. The inactive cache entry should be promoted to an active entry.
 assert.eq(1, coll.find(cheapQuery).itcount());
 entry = getCachedPlanForQuery(db, coll, expensiveQuery);
 assert.eq(entry.isActive, true);
 assert.eq(entry.works, entryWorks);
-assertPlanHasIxScanStage(false, entry, "a_1", planCacheShapeHash);
+assertPlanHasIxScanStage(entry, "a_1", planCacheShapeHash);
 
 // Now run the expensiveQuery and expect a replan with the same plan.
 {
@@ -78,7 +78,7 @@ assertPlanHasIxScanStage(false, entry, "a_1", planCacheShapeHash);
     assert.eq(990, coll.find(expensiveQuery).itcount());
     entry = getCachedPlanForQuery(db, coll, expensiveQuery);
     assert.eq(entry.isActive, false);
-    assertPlanHasIxScanStage(false, entry, "a_1", planCacheShapeHash);
+    assertPlanHasIxScanStage(entry, "a_1", planCacheShapeHash);
     assert.eq(replannedMetric + 1, getReplannedMetric());
     assert.eq(replannedPlanIsCachedPlanMetric + 1, getReplannedPlanIsCachedPlanMetric());
 }
@@ -90,7 +90,7 @@ assertPlanHasIxScanStage(false, entry, "a_1", planCacheShapeHash);
     assert.eq(1, coll.find(cheapQuery).itcount());
     entry = getCachedPlanForQuery(db, coll, cheapQuery);
     assert.eq(entry.isActive, true);
-    assertPlanHasIxScanStage(false, entry, "a_1", planCacheShapeHash);
+    assertPlanHasIxScanStage(entry, "a_1", planCacheShapeHash);
     assert.eq(replannedMetric, getReplannedMetric());
     assert.eq(replannedPlanIsCachedPlanMetric, getReplannedPlanIsCachedPlanMetric());
 }

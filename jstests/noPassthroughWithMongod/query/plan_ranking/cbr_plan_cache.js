@@ -69,7 +69,7 @@ function runInitialCacheTest(isMultiplanning) {
 
     let planCacheShapeHash = getPlanCacheShapeHashFromObject(entry);
     assert.eq(entry.isActive, false);
-    assertPlanHasIxScanStage(false /* isSbePlanCacheEnabled */, entry, "a_1", planCacheShapeHash);
+    assertPlanHasIxScanStage(entry, "a_1", planCacheShapeHash);
 
     if (isMultiplanning) {
         assert.eq(entry.creationExecStats.length, 2); // One for each candidate plan.
@@ -86,7 +86,7 @@ function runInitialCacheTest(isMultiplanning) {
     entry = getCachedPlanForQuery(db, coll, aIndexQuery);
 
     assert.eq(entry.isActive, true);
-    assertPlanHasIxScanStage(false /* isSbePlanCacheEnabled */, entry, "a_1", planCacheShapeHash);
+    assertPlanHasIxScanStage(entry, "a_1", planCacheShapeHash);
 
     if (isMultiplanning) {
         assert.eq(entry.creationExecStats.length, 2); // One for each candidate plan.
@@ -112,7 +112,7 @@ function runReplanningTest(isMultiplanning) {
     const entryPlanCacheKey = entry.planCacheKey;
     assert.eq(entry.isActive, false);
     assert.eq(entryWorks, currWorks);
-    assertPlanHasIxScanStage(false /* isSbePlanCacheEnabled */, entry, "b_1", planCacheShapeHash);
+    assertPlanHasIxScanStage(entry, "b_1", planCacheShapeHash);
 
     // Running the query again activates the cache entry.
     coll.find(bIndexQuery).toArray();
@@ -120,7 +120,7 @@ function runReplanningTest(isMultiplanning) {
     assert.eq(entry.isActive, true);
     assert.eq(entry.works, entryWorks);
     assert.eq(entry.planCacheKey, entryPlanCacheKey);
-    assertPlanHasIxScanStage(false /* isSbePlanCacheEnabled */, entry, "b_1", planCacheShapeHash);
+    assertPlanHasIxScanStage(entry, "b_1", planCacheShapeHash);
 
     // 'bIndexQuery' matches no documents, so CBR estimates one of the index scans to zero and
     // abandons ranking altogether, handing both candidates to MP. This holds for every CBR
@@ -134,7 +134,7 @@ function runReplanningTest(isMultiplanning) {
     entry = getCachedPlanForQuery(db, coll, aIndexQuery);
     assert.eq(entry.isActive, false);
     assert.eq(entry.planCacheKey, entryPlanCacheKey);
-    assertPlanHasIxScanStage(false /* isSbePlanCacheEnabled */, entry, "a_1", planCacheShapeHash);
+    assertPlanHasIxScanStage(entry, "a_1", planCacheShapeHash);
 
     if (isMultiplanning) {
         assert.eq(entry.creationExecStats.length, 2); // One for each candidate plan.

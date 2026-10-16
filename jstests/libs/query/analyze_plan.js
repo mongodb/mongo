@@ -1960,29 +1960,14 @@ export function getCachedPlanForQuery(db, coll, filter) {
  *
  * Also verifies that the 'planCacheShapeHash' matches the provided 'expectedPlanCacheShapeHash'.
  */
-export function assertPlanHasIxScanStage(
-    isSbePlanCacheEnabled,
-    entry,
-    indexName,
-    expectedPlanCacheShapeHash,
-) {
+export function assertPlanHasIxScanStage(entry, indexName, expectedPlanCacheShapeHash) {
     assert.eq(entry.planCacheShapeHash, expectedPlanCacheShapeHash, entry);
 
     const cachedPlan = getCachedPlan(entry.cachedPlan);
-    if (isSbePlanCacheEnabled) {
-        // The $planCacheStats output for the SBE plan cache only contains an debug string
-        // representation of the execution plan. Rather than parse this string, we just check that
-        // the index name appears somewhere in the plan.
-        assert.eq(entry.version, "2", entry);
-        assert(cachedPlan.hasOwnProperty("stages"));
-        const planDebugString = cachedPlan.stages;
-        assert(planDebugString.includes(indexName), entry);
-    } else {
-        assert.eq(entry.version, "1", entry);
-        const stage = getPlanStage(cachedPlan, "IXSCAN");
-        assert.neq(stage, null, entry);
-        assert.eq(indexName, stage.indexName, entry);
-    }
+    assert.eq(entry.version, "1", entry);
+    const stage = getPlanStage(cachedPlan, "IXSCAN");
+    assert.neq(stage, null, entry);
+    assert.eq(indexName, stage.indexName, entry);
 }
 
 /**
