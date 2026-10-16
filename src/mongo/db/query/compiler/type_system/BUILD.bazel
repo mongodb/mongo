@@ -75,6 +75,7 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_sixth_group"],
     deps = [
         ":type_system",
+        ":type_system_test_util",
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/query/compiler/parsers/matcher:parsed_match_expression_for_test",
         "//src/mongo/unittest:server_parameter_guard",
