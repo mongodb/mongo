@@ -1013,12 +1013,6 @@ public:
         return _initialEnabled;
     }
 
-    // Timestamp of the setFCV sequence visible when this guard was constructed. Both phases of a
-    // sequence share this value, and it is assigned when the sequence starts.
-    boost::optional<Timestamp> initialChangeTimestamp() const {
-        return _initialChangeTimestamp;
-    }
-
     bool validateUnchanged() const {
         const auto currentFcvDoc = readFCVDocument(_opCtx);
         return _featureFlag.isEnabledOnVersion(currentFcvDoc.getVersion()) == _initialEnabled &&
@@ -1036,21 +1030,6 @@ private:
     bool _initialEnabled;
     boost::optional<Timestamp> _initialChangeTimestamp;
 };
-
-// If the snapshot predates the fcv change, then skip this check as we will encounter metadata
-// inconsistencies (because of auth shards).
-bool snapshotPredatesAuthoritativeShardsFCVChange(
-    OperationContext* opCtx,
-    RSNodeMode rsMode,
-    boost::optional<Timestamp> shardCatalogReadTimestamp) {
-    if (rsMode != RSNodeMode::kDelayedSecondary || !shardCatalogReadTimestamp) {
-        return false;
-    }
-    const OptimisticFCVFeatureFlagGuard authoritativeShardsGuard(
-        opCtx, feature_flags::gAuthoritativeShardsCRUD);
-    const auto fcvChangeTimestamp = authoritativeShardsGuard.initialChangeTimestamp();
-    return fcvChangeTimestamp && *fcvChangeTimestamp > *shardCatalogReadTimestamp;
-}
 
 void checkCollectionMetadataInShardCatalog(
     OperationContext* opCtx,
@@ -3083,12 +3062,14 @@ std::vector<MetadataInconsistencyItem> checkCollectionShardingMetadataConsistenc
 }
 
 std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistency(
-    OperationContext* opCtx,
-    const DatabaseType& dbInGlobalCatalog,
-    RSNodeMode rsMode,
-    boost::optional<Timestamp> shardCatalogReadTimestamp) {
-    if (snapshotPredatesAuthoritativeShardsFCVChange(opCtx, rsMode, shardCatalogReadTimestamp)) {
-        return {};
+    OperationContext* opCtx, const DatabaseType& dbInGlobalCatalog, RSNodeMode rsMode) {
+
+    if (rsMode == RSNodeMode::kDelayedSecondary) {
+        const OptimisticFCVFeatureFlagGuard authoritativeShardsGuard(
+            opCtx, feature_flags::gAuthoritativeShardsCRUD);
+        if (!authoritativeShardsGuard.wasEnabled()) {
+            return {};
+        }
     }
 
     const auto dbName = dbInGlobalCatalog.getDbName();
@@ -3344,8 +3325,8 @@ runCheckMetadataConsistencyOnParticipant(OperationContext* opCtx,
             const auto dbInGlobalCatalog = Grid::get(opCtx)->catalogClient()->getDatabase(
                 opCtx, nss.dbName(), getReadConcernForConfigServer(opCtx));
 
-            auto dbMetadataInconsistencies = checkDatabaseMetadataConsistency(
-                opCtx, dbInGlobalCatalog, rsMode, snapshotTimestamp);
+            auto dbMetadataInconsistencies =
+                checkDatabaseMetadataConsistency(opCtx, dbInGlobalCatalog, rsMode);
             inconsistencies.insert(inconsistencies.end(),
                                    std::make_move_iterator(dbMetadataInconsistencies.begin()),
                                    std::make_move_iterator(dbMetadataInconsistencies.end()));

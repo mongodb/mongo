@@ -698,49 +698,70 @@ TEST_F(MetadataConsistencyTest, FindInconsistentDatabaseVersionInShardCatalogCac
         inconsistencies);
 }
 
-void setFcvChangeTimestamp(OperationContext* opCtx, Timestamp changeTimestamp) {
+void setDurableFcv(
+    OperationContext* opCtx,
+    multiversion::FeatureCompatibilityVersion version,
+    boost::optional<multiversion::FeatureCompatibilityVersion> targetVersion = boost::none,
+    boost::optional<Timestamp> changeTimestamp = boost::none) {
+    FeatureCompatibilityVersionDocument fcvDoc;
+    fcvDoc.setVersion(version);
+    fcvDoc.setTargetVersion(targetVersion);
+    fcvDoc.setChangeTimestamp(changeTimestamp);
+
     DBDirectClient client(opCtx);
     client.update(NamespaceString::kServerConfigurationNamespace,
                   BSON("_id" << multiversion::kParameterName),
-                  BSON("$set" << BSON("changeTimestamp" << changeTimestamp)),
+                  fcvDoc.toBSON(),
                   false /* upsert */,
                   false /* multi */);
 }
 
-TEST_F(MetadataConsistencyTest, WhenDelayedSecondarySnapshotPredatesFcvChange_ThenNoInconsistency) {
+// (Generic FCV reference): used for testing
+TEST_F(MetadataConsistencyTest, WhenDelayedSecondaryFcvAtSnapshotIsDowngraded_ThenNoInconsistency) {
     Timestamp dbTimestamp{1, 0};
     DatabaseType dbInGlobalCatalog{_dbName, kMyShardName, {_dbUuid, dbTimestamp}};
 
-    {
-        auto scopedDsr = DatabaseShardingStateMock::acquire(operationContext(), _dbName);
-        scopedDsr->setDbMetadata(operationContext(), dbInGlobalCatalog);
-    }
-    setFcvChangeTimestamp(operationContext(), Timestamp{10, 0});
+    // Shards were not database-authoritative at the snapshot, so the shard catalog is legitimately
+    // empty there even though the shard is authoritative now.
+    setDurableFcv(operationContext(), multiversion::GenericFCV::kLastLTS);
 
     const auto inconsistencies = metadata_consistency_util::checkDatabaseMetadataConsistency(
         operationContext(),
         dbInGlobalCatalog,
-        metadata_consistency_util::RSNodeMode::kDelayedSecondary,
-        Timestamp{5, 0});
+        metadata_consistency_util::RSNodeMode::kDelayedSecondary);
 
     ASSERT_TRUE(inconsistencies.empty());
 }
 
-TEST_F(MetadataConsistencyTest, WhenDelayedSecondarySnapshotFollowsFcvChange_ThenInconsistency) {
+// (Generic FCV reference): used for testing
+TEST_F(MetadataConsistencyTest, WhenDelayedSecondaryFcvAtSnapshotIsUpgrading_ThenNoInconsistency) {
     Timestamp dbTimestamp{1, 0};
     DatabaseType dbInGlobalCatalog{_dbName, kMyShardName, {_dbUuid, dbTimestamp}};
 
-    {
-        auto scopedDsr = DatabaseShardingStateMock::acquire(operationContext(), _dbName);
-        scopedDsr->setDbMetadata(operationContext(), dbInGlobalCatalog);
-    }
-    setFcvChangeTimestamp(operationContext(), Timestamp{10, 0});
+    setDurableFcv(
+        operationContext(), multiversion::GenericFCV::kLastLTS, multiversion::GenericFCV::kLatest);
 
     const auto inconsistencies = metadata_consistency_util::checkDatabaseMetadataConsistency(
         operationContext(),
         dbInGlobalCatalog,
-        metadata_consistency_util::RSNodeMode::kDelayedSecondary,
-        Timestamp{10, 0});
+        metadata_consistency_util::RSNodeMode::kDelayedSecondary);
+
+    ASSERT_TRUE(inconsistencies.empty());
+}
+
+// (Generic FCV reference): used for testing
+TEST_F(MetadataConsistencyTest,
+       WhenDelayedSecondaryFcvAtSnapshotIsAuthoritative_ThenInconsistency) {
+    Timestamp dbTimestamp{1, 0};
+    DatabaseType dbInGlobalCatalog{_dbName, kMyShardName, {_dbUuid, dbTimestamp}};
+
+    setDurableFcv(
+        operationContext(), multiversion::GenericFCV::kLatest, boost::none, Timestamp(10, 0));
+
+    const auto inconsistencies = metadata_consistency_util::checkDatabaseMetadataConsistency(
+        operationContext(),
+        dbInGlobalCatalog,
+        metadata_consistency_util::RSNodeMode::kDelayedSecondary);
 
     assertOneInconsistencyFound(
         MetadataInconsistencyTypeEnum::kMissingDatabaseMetadataInShardCatalog, inconsistencies);

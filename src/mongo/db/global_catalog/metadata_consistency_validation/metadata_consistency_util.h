@@ -194,8 +194,7 @@ std::vector<MetadataInconsistencyItem> checkCollectionShardingMetadataConsistenc
 std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistency(
     OperationContext* opCtx,
     const DatabaseType& dbInGlobalCatalog,
-    RSNodeMode rsMode = RSNodeMode::kPrimary,
-    boost::optional<Timestamp> shardCatalogReadTimestamp = boost::none);
+    RSNodeMode rsMode = RSNodeMode::kPrimary);
 
 /**
  * Checks that this shard's config database shard catalog collections match the current FCV
