@@ -43,23 +43,27 @@ enum class JoinType : uint8_t { Inner, Left, Right };
 class LoopJoinStage final : public PlanStage {
 public:
     // Legacy constructor.
-    LoopJoinStage(std::unique_ptr<PlanStage> outer,
-                  std::unique_ptr<PlanStage> inner,
-                  value::SlotVector outerProjects,
-                  value::SlotVector outerCorrelated,
-                  std::unique_ptr<EExpression> predicate,
-                  PlanNodeId planNodeId,
-                  bool participateInTrialRunTracking = true);
+    LoopJoinStage(
+        std::unique_ptr<PlanStage> outer,
+        std::unique_ptr<PlanStage> inner,
+        value::SlotVector outerProjects,
+        value::SlotVector outerCorrelated,
+        std::unique_ptr<EExpression> predicate,
+        PlanNodeId planNodeId,
+        bool participateInTrialRunTracking = true,
+        IntermediateTrackingBehavior intermediateTracking = IntermediateTrackingBehavior::kNone);
 
-    LoopJoinStage(std::unique_ptr<PlanStage> outer,
-                  std::unique_ptr<PlanStage> inner,
-                  value::SlotVector outerProjects,
-                  value::SlotVector outerCorrelated,
-                  value::SlotVector innerProjects,
-                  std::unique_ptr<EExpression> predicate,
-                  JoinType joinType,
-                  PlanNodeId planNodeId,
-                  bool participateInTrialRunTracking = true);
+    LoopJoinStage(
+        std::unique_ptr<PlanStage> outer,
+        std::unique_ptr<PlanStage> inner,
+        value::SlotVector outerProjects,
+        value::SlotVector outerCorrelated,
+        value::SlotVector innerProjects,
+        std::unique_ptr<EExpression> predicate,
+        JoinType joinType,
+        PlanNodeId planNodeId,
+        bool participateInTrialRunTracking = true,
+        IntermediateTrackingBehavior intermediateTracking = IntermediateTrackingBehavior::kNone);
 
     std::unique_ptr<PlanStage> clone() const final;
 

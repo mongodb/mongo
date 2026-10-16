@@ -591,7 +591,9 @@ public:
                                 const SbSlotVector& outerCorrelated,
                                 const SbSlotVector& innerProjects = SbSlotVector{},
                                 SbExpr predicate = SbExpr{},
-                                sbe::JoinType joinType = sbe::JoinType::Inner) {
+                                sbe::JoinType joinType = sbe::JoinType::Inner,
+                                sbe::IntermediateTrackingBehavior intermediateTracking =
+                                    sbe::IntermediateTrackingBehavior::kNone) {
         return makeLoopJoin(VariableTypes{},
                             std::move(outer),
                             std::move(inner),
@@ -599,7 +601,8 @@ public:
                             outerCorrelated,
                             innerProjects,
                             std::move(predicate),
-                            joinType);
+                            joinType,
+                            intermediateTracking);
     }
 
     SbStage makeLoopJoin(const VariableTypes& varTypes,
@@ -609,7 +612,9 @@ public:
                          const SbSlotVector& outerCorrelated,
                          const SbSlotVector& innerProjects = SbSlotVector{},
                          SbExpr predicate = SbExpr{},
-                         sbe::JoinType joinType = sbe::JoinType::Inner);
+                         sbe::JoinType joinType = sbe::JoinType::Inner,
+                         sbe::IntermediateTrackingBehavior intermediateTracking =
+                             sbe::IntermediateTrackingBehavior::kNone);
 
     std::pair<SbStage, SbSlot> makeHashLookup(SbStage localStage,
                                               SbStage foreignStage,
@@ -678,7 +683,9 @@ public:
                          const SbSlotVector& innerCondSlots,
                          const SbSlotVector& innerProjectSlots,
                          boost::optional<sbe::value::SlotId> collatorSlot,
-                         boost::optional<size_t> estimatedBuildCardinality);
+                         boost::optional<size_t> estimatedBuildCardinality,
+                         sbe::IntermediateTrackingBehavior intermediateTracking =
+                             sbe::IntermediateTrackingBehavior::kNone);
 
     SbStage makeMergeJoin(SbStage outerStage,
                           SbStage innerStage,

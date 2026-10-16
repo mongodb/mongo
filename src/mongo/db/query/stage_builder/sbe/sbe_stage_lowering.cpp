@@ -503,7 +503,9 @@ struct Lowerer {
                                               std::move(node.innerProjects),
                                               le(node.predicate),
                                               node.joinType,
-                                              node.nodeId);
+                                              node.nodeId,
+                                              true /* participateInTrialRunTracking */,
+                                              node.intermediateTracking);
     }
 
     std::unique_ptr<sbe::PlanStage> operator()(SbBlueprintHashJoin node) {
@@ -519,7 +521,9 @@ struct Lowerer {
                                               _state.allowDiskUse,
                                               _state.yieldPolicy,
                                               node.nodeId,
-                                              node.info->estimatedBuildCardinality);
+                                              node.info->estimatedBuildCardinality,
+                                              true /* participateInTrialRunTracking */,
+                                              node.info->intermediateTracking);
     }
 
     std::unique_ptr<sbe::PlanStage> operator()(SbBlueprintMergeJoin node) {

@@ -47,18 +47,20 @@ namespace mongo::sbe {
  */
 class HashJoinStage final : public PlanStage {
 public:
-    HashJoinStage(std::unique_ptr<PlanStage> outer,
-                  std::unique_ptr<PlanStage> inner,
-                  value::SlotVector outerCond,
-                  value::SlotVector outerProjects,
-                  value::SlotVector innerCond,
-                  value::SlotVector innerProjects,
-                  boost::optional<value::SlotId> collatorSlot,
-                  bool allowDiskUse,
-                  PlanYieldPolicySBE* yieldPolicy,
-                  PlanNodeId planNodeId,
-                  boost::optional<size_t> estimatedBuildCardinality,
-                  bool participateInTrialRunTracking = true);
+    HashJoinStage(
+        std::unique_ptr<PlanStage> outer,
+        std::unique_ptr<PlanStage> inner,
+        value::SlotVector outerCond,
+        value::SlotVector outerProjects,
+        value::SlotVector innerCond,
+        value::SlotVector innerProjects,
+        boost::optional<value::SlotId> collatorSlot,
+        bool allowDiskUse,
+        PlanYieldPolicySBE* yieldPolicy,
+        PlanNodeId planNodeId,
+        boost::optional<size_t> estimatedBuildCardinality,
+        bool participateInTrialRunTracking = true,
+        IntermediateTrackingBehavior intermediateTracking = IntermediateTrackingBehavior::kNone);
 
     std::unique_ptr<PlanStage> clone() const final;
 

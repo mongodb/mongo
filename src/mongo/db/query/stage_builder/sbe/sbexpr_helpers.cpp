@@ -1091,7 +1091,8 @@ SbStage SbBuilder::makeLoopJoin(const VariableTypes& varTypes,
                                 const SbSlotVector& outerCorrelated,
                                 const SbSlotVector& innerProjects,
                                 SbExpr predicate,
-                                sbe::JoinType joinType) {
+                                sbe::JoinType joinType,
+                                sbe::IntermediateTrackingBehavior intermediateTracking) {
     return addBlueprint(_state,
                         SbBlueprintLoopJoin{.outer = outer.release(),
                                             .inner = inner.release(),
@@ -1100,7 +1101,8 @@ SbStage SbBuilder::makeLoopJoin(const VariableTypes& varTypes,
                                             .outerProjects = lower(outerProjects),
                                             .outerCorrelated = lower(outerCorrelated),
                                             .innerProjects = lower(innerProjects),
-                                            .predicate = std::move(predicate)},
+                                            .predicate = std::move(predicate),
+                                            .intermediateTracking = intermediateTracking},
                         &varTypes);
 }
 
@@ -1164,7 +1166,8 @@ SbStage SbBuilder::makeHashJoin(SbStage outerStage,
                                 const SbSlotVector& innerCondSlots,
                                 const SbSlotVector& innerProjectSlots,
                                 boost::optional<sbe::value::SlotId> collatorSlot,
-                                boost::optional<size_t> estimatedBuildCardinality) {
+                                boost::optional<size_t> estimatedBuildCardinality,
+                                sbe::IntermediateTrackingBehavior intermediateTracking) {
     return addBlueprint(
         _state,
         SbBlueprintHashJoin{
@@ -1177,7 +1180,8 @@ SbStage SbBuilder::makeHashJoin(SbStage outerStage,
                                         .innerCondSlots = lower(innerCondSlots),
                                         .innerProjectSlots = lower(innerProjectSlots),
                                         .collatorSlot = collatorSlot,
-                                        .estimatedBuildCardinality = estimatedBuildCardinality})});
+                                        .estimatedBuildCardinality = estimatedBuildCardinality,
+                                        .intermediateTracking = intermediateTracking})});
 }
 
 SbStage SbBuilder::makeMergeJoin(SbStage outerStage,

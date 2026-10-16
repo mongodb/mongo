@@ -7,13 +7,16 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
 #include "mongo/db/exec/sbe/stages/fetch.h"
 #include "mongo/db/exec/sbe/stages/hash_agg.h"
+#include "mongo/db/exec/sbe/stages/hash_join.h"
 #include "mongo/db/exec/sbe/stages/limit_skip.h"
+#include "mongo/db/exec/sbe/stages/loop_join.h"
 #include "mongo/db/exec/sbe/stages/scan.h"
 #include "mongo/db/exec/sbe/stages/sort.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
@@ -24,6 +27,7 @@
 #include "mongo/db/exec/trial_run_tracker.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/uuid.h"
@@ -399,5 +403,278 @@ TEST_F(TrialRunTrackerTest, SpillsBreachWhenMaxIsZero) {
         std::make_unique<TrialRunTracker>(boost::none, boost::none, boost::none, size_t{0});
 
     ASSERT_TRUE(tracker->trackProgress<TrialRunTracker::kNumSpills>(1));
+}
+
+namespace {
+
+/**
+ * Builds a HashJoinStage over two virtual scans (each with a key and a project slot), plus the
+ * stage's output slots.
+ */
+std::pair<value::SlotVector, std::unique_ptr<PlanStage>> makeHashJoinStageWithTracking(
+    PlanStageTestFixture* fixture,
+    const BSONArray& outerDocs,
+    const BSONArray& innerDocs,
+    IntermediateTrackingBehavior intermediateTracking,
+    bool allowDiskUse = true) {
+    auto [outerTag, outerVal] = stage_builder::makeValue(outerDocs);
+    auto [outerSlots, outerStage] = fixture->generateVirtualScanMulti(2, outerTag, outerVal);
+    auto [innerTag, innerVal] = stage_builder::makeValue(innerDocs);
+    auto [innerSlots, innerStage] = fixture->generateVirtualScanMulti(2, innerTag, innerVal);
+
+    value::SlotVector outputSlots{innerSlots[0], outerSlots[0], innerSlots[1], outerSlots[1]};
+
+    auto stage = makeS<HashJoinStage>(std::move(outerStage),
+                                      std::move(innerStage),
+                                      makeSV(outerSlots[0]),
+                                      makeSV(outerSlots[1]),
+                                      makeSV(innerSlots[0]),
+                                      makeSV(innerSlots[1]),
+                                      boost::none /* collatorSlot */,
+                                      allowDiskUse,
+                                      nullptr /* yieldPolicy */,
+                                      kEmptyPlanNodeId,
+                                      boost::none /* estimatedBuildCardinality */,
+                                      true /* participateInTrialRunTracking */,
+                                      intermediateTracking);
+    return {std::move(outputSlots), std::move(stage)};
+}
+
+/** A hash join that spills, plus the guard that installs the tiny memory limit. */
+struct SpillingHashJoin {
+    unittest::ServerParameterGuard maxMemoryLimit;
+    value::SlotVector outputSlots;
+    std::unique_ptr<PlanStage> stage;
+};
+
+SpillingHashJoin makeSpillingHashJoinStage(PlanStageTestFixture* fixture,
+                                           IntermediateTrackingBehavior intermediateTracking) {
+    // Install the tiny limit before the stage is prepared.
+    unittest::ServerParameterGuard maxMemoryLimit(
+        "internalQuerySlotBasedExecutionHashJoinApproxMemoryUseInBytesBeforeSpill",
+        static_cast<long long>(16));
+
+    BSONArrayBuilder innerBuilder;
+    for (int i = 0; i < 50; ++i) {
+        innerBuilder.append(BSON_ARRAY(i << ("big_string_" + std::to_string(i))));
+    }
+
+    auto [outputSlots, stage] = makeHashJoinStageWithTracking(fixture,
+                                                              BSON_ARRAY(BSON_ARRAY(1 << "x")),
+                                                              innerBuilder.arr(),
+                                                              intermediateTracking,
+                                                              true /* allowDiskUse */);
+    return {std::move(maxMemoryLimit), std::move(outputSlots), std::move(stage)};
+}
+
+/** Builds a LoopJoinStage over a 3x3 cross product of two virtual scans, plus its outer slot. */
+std::pair<value::SlotId, std::unique_ptr<PlanStage>> makeLoopJoinStageWithTracking(
+    PlanStageTestFixture* fixture, IntermediateTrackingBehavior intermediateTracking) {
+    auto [outerTag, outerVal] = stage_builder::makeValue(BSON_ARRAY(1 << 2 << 3));
+    auto [outerSlot, outerStage] = fixture->generateVirtualScan(
+        value::TagValueMaybeOwned::fromRaw(true, outerTag, outerVal), PlanNodeId{1});
+    auto [innerTag, innerVal] = stage_builder::makeValue(BSON_ARRAY(4 << 5 << 6));
+    auto [innerSlot, innerStage] = fixture->generateVirtualScan(
+        value::TagValueMaybeOwned::fromRaw(true, innerTag, innerVal), PlanNodeId{2});
+
+    auto stage = makeS<LoopJoinStage>(std::move(outerStage),
+                                      std::move(innerStage),
+                                      makeSV(outerSlot) /* outerProjects */,
+                                      makeSV() /* outerCorrelated */,
+                                      makeSV() /* innerProjects */,
+                                      nullptr /* predicate */,
+                                      JoinType::Inner,
+                                      PlanNodeId{3},
+                                      true /* participateInTrialRunTracking */,
+                                      intermediateTracking);
+    return {outerSlot, std::move(stage)};
+}
+
+}  // namespace
+
+TEST_F(TrialRunTrackerTest, TrackerTracksIntermediateRowsFromMarkedLoopJoinStage) {
+    auto ctx = makeCompileCtx();
+
+    // maxNumIntermediateRows = SIZE_MAX: record intermediate rows without a limit.
+    auto tracker = std::make_unique<TrialRunTracker>(
+        boost::none, boost::none, std::numeric_limits<size_t>::max(), boost::none);
+
+    auto [outerSlot, loopJoinStage] =
+        makeLoopJoinStageWithTracking(this, IntermediateTrackingBehavior::kTrackIntermediateRows);
+
+    ASSERT_EQ(loopJoinStage->attachToTrialRunTracker(tracker.get()),
+              PlanStage::TrialRunTrackingType::TrackIntermediateRows);
+
+    // A 3x3 cross product produces 9 intermediate rows, and the virtual scans perform no reads.
+    auto resultAccessor = prepareTree(ctx.get(), loopJoinStage.get(), outerSlot);
+    exhaustStage(loopJoinStage.get(), resultAccessor);
+
+    ASSERT_EQ(tracker->getMetric<TrialRunTracker::kNumIntermediateRows>(), 9);
+    ASSERT_EQ(tracker->getMetric<TrialRunTracker::kNumReads>(), 0);
+}
+
+TEST_F(TrialRunTrackerTest, TrackerDoesNotTrackIntermediateRowsFromUnmarkedLoopJoinStage) {
+    auto ctx = makeCompileCtx();
+
+    auto tracker =
+        std::make_unique<TrialRunTracker>(boost::none, boost::none, boost::none, boost::none);
+
+    auto [outerSlot, loopJoinStage] =
+        makeLoopJoinStageWithTracking(this, IntermediateTrackingBehavior::kNone);
+
+    ASSERT_EQ(loopJoinStage->attachToTrialRunTracker(tracker.get()),
+              PlanStage::TrialRunTrackingType::NoTracking);
+
+    auto resultAccessor = prepareTree(ctx.get(), loopJoinStage.get(), outerSlot);
+    exhaustStage(loopJoinStage.get(), resultAccessor);
+
+    ASSERT_EQ(tracker->getMetric<TrialRunTracker::kNumIntermediateRows>(), 0);
+}
+
+TEST_F(TrialRunTrackerTest, NestedLoopJoinBreachesIntermediateRowLimit) {
+    auto ctx = makeCompileCtx();
+
+    // maxNumIntermediateRows = 2: the 3x3 cross product breaches it.
+    auto tracker =
+        std::make_unique<TrialRunTracker>(boost::none, boost::none, size_t{2}, boost::none);
+
+    auto [outerSlot, loopJoinStage] =
+        makeLoopJoinStageWithTracking(this, IntermediateTrackingBehavior::kTrackIntermediateRows);
+
+    ASSERT_EQ(loopJoinStage->attachToTrialRunTracker(tracker.get()),
+              PlanStage::TrialRunTrackingType::TrackIntermediateRows);
+
+    ASSERT_THROWS_CODE(
+        [&] {
+            auto resultAccessor = prepareTree(ctx.get(), loopJoinStage.get(), outerSlot);
+            exhaustStage(loopJoinStage.get(), resultAccessor);
+        }(),
+        DBException,
+        ErrorCodes::QueryTrialRunCompleted);
+}
+
+TEST_F(TrialRunTrackerTest, TrackerTracksIntermediateRowsFromMarkedHashJoinStage) {
+    auto ctx = makeCompileCtx();
+
+    // maxNumIntermediateRows = SIZE_MAX: record intermediate rows without a limit.
+    auto tracker = std::make_unique<TrialRunTracker>(
+        boost::none, boost::none, std::numeric_limits<size_t>::max(), boost::none);
+
+    auto [outputSlots, hashJoinStage] = makeHashJoinStageWithTracking(
+        this,
+        BSON_ARRAY(BSON_ARRAY(1 << "a") << BSON_ARRAY(2 << "b") << BSON_ARRAY(3 << "c")),
+        BSON_ARRAY(BSON_ARRAY(2 << "x") << BSON_ARRAY(3 << "y") << BSON_ARRAY(4 << "z")),
+        IntermediateTrackingBehavior::kTrackIntermediateRows);
+
+    ASSERT_EQ(hashJoinStage->attachToTrialRunTracker(tracker.get()),
+              PlanStage::TrialRunTrackingType::TrackIntermediateRows);
+
+    // Keys 2 and 3 match, producing 2 intermediate rows.
+    auto resultAccessors = prepareTree(ctx.get(), hashJoinStage.get(), outputSlots);
+    value::TagValueOwned::fromRaw(getAllResultsMulti(hashJoinStage.get(), resultAccessors));
+
+    ASSERT_EQ(tracker->getMetric<TrialRunTracker::kNumIntermediateRows>(), 2);
+}
+
+TEST_F(TrialRunTrackerTest, ClonedJoinStagePreservesIntermediateTracking) {
+    auto tracker = std::make_unique<TrialRunTracker>(
+        boost::none, boost::none, std::numeric_limits<size_t>::max(), boost::none);
+
+    auto hashJoin =
+        makeHashJoinStageWithTracking(this,
+                                      BSON_ARRAY(BSON_ARRAY(1 << "a") << BSON_ARRAY(2 << "b")),
+                                      BSON_ARRAY(BSON_ARRAY(2 << "x") << BSON_ARRAY(3 << "y")),
+                                      IntermediateTrackingBehavior::kTrackIntermediateRows);
+    auto clonedStage = hashJoin.second->clone();
+
+    // The clone must stay marked, otherwise it silently stops reporting intermediate rows.
+    ASSERT_EQ(clonedStage->attachToTrialRunTracker(tracker.get()),
+              PlanStage::TrialRunTrackingType::TrackIntermediateRows);
+}
+
+TEST_F(TrialRunTrackerTest, ClonedLoopJoinStagePreservesIntermediateTracking) {
+    auto tracker = std::make_unique<TrialRunTracker>(
+        boost::none, boost::none, std::numeric_limits<size_t>::max(), boost::none);
+
+    auto loopJoin =
+        makeLoopJoinStageWithTracking(this, IntermediateTrackingBehavior::kTrackIntermediateRows);
+    auto clonedStage = loopJoin.second->clone();
+
+    // The clone must stay marked, otherwise it silently stops reporting intermediate rows.
+    ASSERT_EQ(clonedStage->attachToTrialRunTracker(tracker.get()),
+              PlanStage::TrialRunTrackingType::TrackIntermediateRows);
+}
+
+TEST_F(TrialRunTrackerTest, ClonedUnmarkedJoinStageStaysUnmarked) {
+    auto ctx = makeCompileCtx();
+
+    auto tracker = std::make_unique<TrialRunTracker>(
+        boost::none, boost::none, std::numeric_limits<size_t>::max(), boost::none);
+
+    auto [outputSlots, hashJoinStage] =
+        makeHashJoinStageWithTracking(this,
+                                      BSON_ARRAY(BSON_ARRAY(1 << "a") << BSON_ARRAY(2 << "b")),
+                                      BSON_ARRAY(BSON_ARRAY(2 << "x") << BSON_ARRAY(3 << "y")),
+                                      IntermediateTrackingBehavior::kNone);
+    auto clonedStage = hashJoinStage->clone();
+
+    // An unmarked stage's clone must stay unmarked too.
+    ASSERT_EQ(clonedStage->attachToTrialRunTracker(tracker.get()),
+              PlanStage::TrialRunTrackingType::NoTracking);
+
+    auto resultAccessors = prepareTree(ctx.get(), clonedStage.get(), outputSlots);
+    value::TagValueOwned::fromRaw(getAllResultsMulti(clonedStage.get(), resultAccessors));
+
+    ASSERT_EQ(tracker->getMetric<TrialRunTracker::kNumIntermediateRows>(), 0);
+}
+
+TEST_F(TrialRunTrackerTest, TrackerReportsSpillFromMarkedHashJoinStage) {
+    auto ctx = makeCompileCtx();
+    // maxNumSpills = SIZE_MAX: record spills without a limit.
+    auto tracker = std::make_unique<TrialRunTracker>(
+        boost::none, boost::none, boost::none, std::numeric_limits<size_t>::max());
+    auto spilling =
+        makeSpillingHashJoinStage(this, IntermediateTrackingBehavior::kTrackIntermediateRows);
+
+    spilling.stage->attachToTrialRunTracker(tracker.get());
+
+    auto resultAccessors = prepareTree(ctx.get(), spilling.stage.get(), spilling.outputSlots);
+    value::TagValueOwned::fromRaw(getAllResultsMulti(spilling.stage.get(), resultAccessors));
+
+    ASSERT_EQ(tracker->getMetric<TrialRunTracker::kNumSpills>(), 1);
+}
+
+TEST_F(TrialRunTrackerTest, TrackerDoesNotReportSpillFromUnmarkedHashJoinStage) {
+    auto ctx = makeCompileCtx();
+    auto tracker = std::make_unique<TrialRunTracker>(
+        boost::none, boost::none, boost::none, std::numeric_limits<size_t>::max());
+    auto spilling = makeSpillingHashJoinStage(this, IntermediateTrackingBehavior::kNone);
+
+    spilling.stage->attachToTrialRunTracker(tracker.get());
+
+    auto resultAccessors = prepareTree(ctx.get(), spilling.stage.get(), spilling.outputSlots);
+    value::TagValueOwned::fromRaw(getAllResultsMulti(spilling.stage.get(), resultAccessors));
+
+    ASSERT_EQ(tracker->getMetric<TrialRunTracker::kNumSpills>(), 0);
+}
+
+TEST_F(TrialRunTrackerTest, DisallowedSpillFromMarkedHashJoinTerminatesTrial) {
+    auto ctx = makeCompileCtx();
+    // maxNumSpills = 0: any spill ends the trial.
+    auto tracker =
+        std::make_unique<TrialRunTracker>(boost::none, boost::none, boost::none, size_t{0});
+    auto spilling =
+        makeSpillingHashJoinStage(this, IntermediateTrackingBehavior::kTrackIntermediateRows);
+
+    spilling.stage->attachToTrialRunTracker(tracker.get());
+
+    ASSERT_THROWS_CODE(
+        [&] {
+            auto resultAccessors =
+                prepareTree(ctx.get(), spilling.stage.get(), spilling.outputSlots);
+            getAllResultsMulti(spilling.stage.get(), resultAccessors);
+        }(),
+        DBException,
+        ErrorCodes::QueryTrialRunCompleted);
 }
 }  // namespace mongo::sbe

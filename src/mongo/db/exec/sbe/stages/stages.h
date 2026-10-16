@@ -279,6 +279,12 @@ protected:
 };
 
 /**
+ * Prescribes whether a stage tracks intermediate rows during a trial run. Join stages use this to
+ * declare that they implement a join operator in a join-optimized plan.
+ */
+enum class IntermediateTrackingBehavior { kNone, kTrackIntermediateRows };
+
+/**
  * Provides methods to obtain execution statistics specific to a plan stage.
  *
  * Parameter 'T' is the typename of the class derived from this class. It's used to implement the
@@ -292,6 +298,8 @@ public:
         NoTracking = 0x0,
         TrackReads = 1 << 0,
         TrackResults = 1 << 1,
+        // Set on join stages that implement a join operator in a join-optimized plan.
+        TrackIntermediateRows = 1 << 2,
     };
 
     // Bit mask to accumulate what stats are tracked when a TrialRunTracker is attached.
@@ -305,10 +313,11 @@ public:
           _participateInTrialRunTracking(participateInTrialRunTracking),
           _trackingType(trackingType) {
         tassert(8804701,
-                "Expect individual stages to track only reads, as results are tracked in the base "
-                "CanTrackStats code",
+                "Expect individual stages to track only reads or intermediate rows, as results "
+                "are tracked in the base CanTrackStats code",
                 trackingType == TrialRunTrackingType::NoTracking ||
-                    trackingType == TrialRunTrackingType::TrackReads);
+                    trackingType == TrialRunTrackingType::TrackReads ||
+                    trackingType == TrialRunTrackingType::TrackIntermediateRows);
     }
 
     /**
@@ -476,6 +485,15 @@ protected:
     }
 
     /**
+     * The intermediate-row tracking behavior of this stage, inferred from its tracking type.
+     */
+    IntermediateTrackingBehavior intermediateTrackingBehavior() const {
+        return (_trackingType & TrialRunTrackingType::TrackIntermediateRows)
+            ? IntermediateTrackingBehavior::kTrackIntermediateRows
+            : IntermediateTrackingBehavior::kNone;
+    }
+
+    /**
      * If trial run tracker is attached, increments the read metric and terminates the trial run
      * with a special exception if metric has reached the limit.
      */
@@ -490,6 +508,14 @@ protected:
         }
     }
 
+    /** Reports a spill and terminates the trial run if the kNumSpills metric breaches. */
+    void trackSpill() {
+        if (_tracker && _tracker->trackProgress<TrialRunTracker::kNumSpills>(1)) {
+            uasserted(ErrorCodes::QueryTrialRunCompleted,
+                      str::stream() << "Trial run early exit in " << _commonStats.stageType);
+        }
+    }
+
     PlanState trackPlanState(PlanState state) {
         if (state == PlanState::IS_EOF) {
             _commonStats.isEOF = true;
@@ -498,11 +524,21 @@ protected:
             _commonStats.advances++;
             _slotsAccessible = true;
 
-            if ((_trackingType & TrialRunTrackingType::TrackResults) && _tracker) {
-                bool trackerResult = _tracker->trackProgress<TrialRunTracker::kNumResults>(1);
-                tassert(8523903,
-                        "TrialRunTracker should not terminate plans on reaching kNumResults",
-                        !trackerResult);
+            if (_tracker) {
+                if (_trackingType & TrialRunTrackingType::TrackResults) {
+                    bool trackerResult = _tracker->trackProgress<TrialRunTracker::kNumResults>(1);
+                    tassert(8523903,
+                            "TrialRunTracker should not terminate plans on reaching kNumResults",
+                            !trackerResult);
+                }
+
+                if (_trackingType & TrialRunTrackingType::TrackIntermediateRows) {
+                    if (_tracker->trackProgress<TrialRunTracker::kNumIntermediateRows>(1)) {
+                        uasserted(ErrorCodes::QueryTrialRunCompleted,
+                                  str::stream()
+                                      << "Trial run early exit in " << _commonStats.stageType);
+                    }
+                }
             }
         }
         return state;
@@ -539,6 +575,10 @@ private:
         if (_trackingType & TrialRunTrackingType::TrackResults) {
             _tracker = tracker;
             result |= TrialRunTrackingType::TrackResults;
+        }
+        if (_trackingType & TrialRunTrackingType::TrackIntermediateRows) {
+            _tracker = tracker;
+            result |= TrialRunTrackingType::TrackIntermediateRows;
         }
         return result;
     }

@@ -2259,7 +2259,9 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildNestedLoopJoinEmb
                        outerProjects,
                        /*outerCorrelated=*/{},
                        /*innerProjects=*/{},
-                       b.makeBooleanOpTree(abt::Operations::And, std::move(equalityPredicates)));
+                       b.makeBooleanOpTree(abt::Operations::And, std::move(equalityPredicates)),
+                       sbe::JoinType::Inner,
+                       sbe::IntermediateTrackingBehavior::kTrackIntermediateRows);
 
     return generateJoinResult(nestedLoopJoinEmbeddingNode,
                               reqs,
@@ -2370,7 +2372,8 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildHashJoinEmbedding
                                         leftPrjOutputs,
                                         leftProjectSlots,
                                         boost::none,
-                                        estimatedBuildCardinality);
+                                        estimatedBuildCardinality,
+                                        sbe::IntermediateTrackingBehavior::kTrackIntermediateRows);
 
     // If there is at least one $expr equality, insert an extra filter layer that excludes records
     // matching due to treating missing values equal to 'null'.
@@ -2611,7 +2614,9 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildIndexedJoinEmbedd
                        /*outerProjects=*/projectedSlots,
                        /*outerCorrelated=*/projectedSlots,
                        {}, /* innerProjects */
-                       b.makeBooleanOpTree(abt::Operations::And, std::move(equalityPredicates)));
+                       b.makeBooleanOpTree(abt::Operations::And, std::move(equalityPredicates)),
+                       sbe::JoinType::Inner,
+                       sbe::IntermediateTrackingBehavior::kTrackIntermediateRows);
 
     return generateJoinResult(indexedJoinEmbeddingNode,
                               reqs,

@@ -29,8 +29,15 @@ HashJoinStage::HashJoinStage(std::unique_ptr<PlanStage> outer,
                              PlanYieldPolicySBE* yieldPolicy,
                              PlanNodeId planNodeId,
                              boost::optional<size_t> estimatedBuildCardinality,
-                             bool participateInTrialRunTracking)
-    : PlanStage("hj"sv, yieldPolicy, planNodeId, participateInTrialRunTracking),
+                             bool participateInTrialRunTracking,
+                             IntermediateTrackingBehavior intermediateTracking)
+    : PlanStage("hj"sv,
+                yieldPolicy,
+                planNodeId,
+                participateInTrialRunTracking,
+                intermediateTracking == IntermediateTrackingBehavior::kTrackIntermediateRows
+                    ? TrialRunTrackingType::TrackIntermediateRows
+                    : TrialRunTrackingType::NoTracking),
       _outerKey(std::move(outerKey)),
       _outerProjects(std::move(outerProjects)),
       _innerKey(std::move(innerKey)),
@@ -60,7 +67,8 @@ std::unique_ptr<PlanStage> HashJoinStage::clone() const {
                                            _yieldPolicy,
                                            _commonStats.nodeId,
                                            _estimatedBuildCardinality,
-                                           participateInTrialRunTracking());
+                                           participateInTrialRunTracking(),
+                                           intermediateTrackingBehavior());
 }
 
 void HashJoinStage::prepare(CompileCtx& ctx) {
@@ -161,7 +169,11 @@ void HashJoinStage::open(bool reOpen) {
             project.reset(idx++, p->getCopyOfValue());
         }
 
+        const bool spilledBefore = _stats.usedDisk;
         _joinImpl->addBuild(std::move(key), std::move(project));
+        if (!spilledBefore && _stats.usedDisk) {
+            trackSpill();
+        }
     }
     _joinImpl->finishBuild();
 

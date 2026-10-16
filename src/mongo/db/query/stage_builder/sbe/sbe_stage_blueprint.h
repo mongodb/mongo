@@ -752,6 +752,8 @@ struct SbBlueprintLoopJoin {
     sbe::value::SlotVector outerCorrelated;
     sbe::value::SlotVector innerProjects;
     SbExpr predicate;
+    sbe::IntermediateTrackingBehavior intermediateTracking{
+        sbe::IntermediateTrackingBehavior::kNone};
 
     void def(SbSlotCollector&) const {}
 
@@ -783,6 +785,8 @@ struct SbBlueprintHashJoinInfo {
     sbe::value::SlotVector innerProjectSlots;
     boost::optional<sbe::value::SlotId> collatorSlot;
     boost::optional<size_t> estimatedBuildCardinality;
+    sbe::IntermediateTrackingBehavior intermediateTracking{
+        sbe::IntermediateTrackingBehavior::kNone};
 
     void def(SbSlotCollector&) const {}
 
