@@ -369,14 +369,12 @@ std::size_t hashValue(TypeTags tag, Value val, const CollatorInterface* collator
             return getKeyString(val)->hash();
         case TypeTags::Array:
         case TypeTags::bsonArray: {
-            auto arr = ArrayEnumerator{tag, val};
             auto res = hashInit();
 
-            // There should be enough entropy in the first 4 elements.
-            for (int i = 0; i < 4 && !arr.atEnd(); ++i) {
+            // Hash all of the elements
+            for (ArrayEnumerator arr{tag, val}; !arr.atEnd(); arr.advance()) {
                 auto [elemTag, elemVal] = arr.getViewOfValue();
                 res = hashCombine(res, hashValue(elemTag, elemVal, collator));
-                arr.advance();
             }
 
             return res;
@@ -398,14 +396,12 @@ std::size_t hashValue(TypeTags tag, Value val, const CollatorInterface* collator
         }
         case TypeTags::Object:
         case TypeTags::bsonObject: {
-            auto obj = ObjectEnumerator{tag, val};
             auto res = hashInit();
 
-            // There should be enough entropy in the first 4 elements.
-            for (int i = 0; i < 4 && !obj.atEnd(); ++i) {
+            // Hash all of the fields
+            for (ObjectEnumerator obj{tag, val}; !obj.atEnd(); obj.advance()) {
                 auto [elemTag, elemVal] = obj.getViewOfValue();
                 res = hashCombine(res, hashValue(elemTag, elemVal, collator));
-                obj.advance();
             }
 
             return res;
