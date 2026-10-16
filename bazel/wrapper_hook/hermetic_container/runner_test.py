@@ -61,7 +61,7 @@ class HermeticContainerWorkspaceDiscoveryTest(unittest.TestCase):
     def test_finds_all_supported_workspace_markers(self):
         for marker in hermetic_container.BAZEL_WORKSPACE_FILES:
             with self.subTest(marker=marker), tempfile.TemporaryDirectory() as temp_dir:
-                workspace = pathlib.Path(temp_dir) / "workspace"
+                workspace = pathlib.Path(temp_dir).resolve() / "workspace"
                 nested_directory = workspace / "nested"
                 nested_directory.mkdir(parents=True)
                 (workspace / marker).touch()
@@ -151,7 +151,7 @@ class HermeticContainerCommandTest(unittest.TestCase):
 
     def test_user_output_base_tracks_bazels_md5_workspace_directory(self):
         with tempfile.TemporaryDirectory() as temp_dir:
-            root = pathlib.Path(temp_dir)
+            root = pathlib.Path(temp_dir).resolve()
             workspace = root / "workspace"
             output_root = root / "output-root"
             workspace.mkdir()

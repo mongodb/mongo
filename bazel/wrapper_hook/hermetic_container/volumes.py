@@ -11,6 +11,8 @@ import subprocess
 import sys
 from collections.abc import Mapping
 
+from bazel.hermetic_container import container_paths
+
 from .constants import (
     DEFAULT_CONTAINER_CA_BUNDLE,
     DEFAULT_HOST_CA_BUNDLE,
@@ -180,13 +182,7 @@ def _hermetic_container_image_with_git_layer(
 
 
 def _container_path(path: pathlib.Path | str, system: str | None = None) -> str:
-    value = str(path)
-    if system == "Windows" or re.match(r"^[A-Za-z]:[\\/]", value):
-        windows_path = pathlib.PureWindowsPath(value)
-        drive = windows_path.drive.rstrip(":")
-        parts = [part for part in windows_path.parts[1:] if part not in {"\\", "/"}]
-        return pathlib.PurePosixPath("/", drive, *parts).as_posix()
-    return pathlib.PurePosixPath(value).as_posix()
+    return container_paths.container_path(path, windows=system == "Windows")
 
 
 def _path_volume(

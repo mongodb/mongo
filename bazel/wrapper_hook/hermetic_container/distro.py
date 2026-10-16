@@ -9,6 +9,8 @@ import platform
 import re
 from collections.abc import Callable, Mapping
 
+from bazel.toolchains.cc.container_action import safe_name as _safe_name  # noqa: F401
+
 from .constants import (
     AL2023_DISTRO,
     LINUX_HOST_CONTAINER_ARCHES,
@@ -207,7 +209,3 @@ def _is_digest_pinned_container_url(container_url: str) -> bool:
     """Returns whether a container URL names an immutable sha256 image digest."""
     image = container_url.removeprefix("docker://")
     return re.search(r"@sha256:[0-9a-f]{64}$", image) is not None
-
-
-def _safe_name(value: str) -> str:
-    return re.sub(r"[^A-Za-z0-9_.-]", "_", value)

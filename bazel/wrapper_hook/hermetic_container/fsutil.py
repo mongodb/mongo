@@ -14,6 +14,8 @@ import tempfile
 import time
 from collections.abc import Mapping, Sequence
 
+from bazel.toolchains.cc.container_action import exclusive_file_lock as _exclusive_file_lock
+
 from .constants import (
     HERMETIC_CONTAINER_MACOS_CASE_SENSITIVE_OUTPUT_ENV,
     HERMETIC_CONTAINER_MACOS_OUTPUT_IMAGE_SIZE_ENV,
@@ -249,48 +251,6 @@ def _container_user(system: str) -> str:
     if hasattr(os, "getuid") and hasattr(os, "getgid"):
         return f"{os.getuid()}:{os.getgid()}"
     return ""
-
-
-@contextlib.contextmanager
-def _exclusive_file_lock(lock_path: pathlib.Path):
-    """Acquire an inter-process lock on Unix and Windows."""
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
-    with lock_path.open("a+b") as lock_file:
-        try:
-            import fcntl
-        except ImportError:
-            fcntl = None
-
-        if fcntl is not None:
-            fcntl.flock(lock_file, fcntl.LOCK_EX)
-            try:
-                yield
-            finally:
-                fcntl.flock(lock_file, fcntl.LOCK_UN)
-            return
-
-        try:
-            import msvcrt
-        except ImportError:
-            msvcrt = None
-
-        if msvcrt is not None:
-            lock_file.seek(0, os.SEEK_END)
-            if lock_file.tell() == 0:
-                lock_file.write(b"\0")
-                lock_file.flush()
-            lock_file.seek(0)
-            msvcrt.locking(lock_file.fileno(), msvcrt.LK_LOCK, 1)
-            try:
-                yield
-            finally:
-                lock_file.seek(0)
-                msvcrt.locking(lock_file.fileno(), msvcrt.LK_UNLCK, 1)
-            return
-
-        # All supported host platforms provide one of the locking APIs above.
-        # Keep unsupported platforms usable for dry-run and unit-test paths.
-        yield
 
 
 @contextlib.contextmanager

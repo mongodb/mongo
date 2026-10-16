@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import errno
+import io
+import json
 import os
 import pathlib
 import shutil
 import signal
 import subprocess
+import tarfile
 import tempfile
 import time
 import unittest
@@ -19,6 +22,321 @@ from bazel.toolchains.cc import container_action as shared
 
 
 class ContainerActionTest(unittest.TestCase):
+    @staticmethod
+    def _container_user_result(args, user=""):
+        return subprocess.CompletedProcess(args, 0, json.dumps(user).encode(), b"")
+
+    @staticmethod
+    def _probe_archive(contents: bytes) -> bytes:
+        archive = io.BytesIO()
+        with tarfile.open(fileobj=archive, mode="w") as tar:
+            member = tarfile.TarInfo("result")
+            member.size = len(contents)
+            tar.addfile(member, io.BytesIO(contents))
+        return archive.getvalue()
+
+    def test_input_probe_transfers_large_manifest_without_expanding_command_line(self):
+        paths = [f"/container/{index:05d}/" + "long name;\n'" * 20 for index in range(2000)]
+        uploaded = []
+
+        def docker_run(args, **kwargs):
+            self.assertLess(len(subprocess.list2cmdline(args)), 32767)
+            if args[1] == "inspect":
+                return self._container_user_result(args)
+            if args[1] == "cp":
+                if args[2].startswith("container:"):
+                    return subprocess.CompletedProcess(
+                        args, 0, self._probe_archive(b"7\n1999\ndone 2000\n"), b""
+                    )
+                else:
+                    self.assertEqual(args[2:], ["-", "container:/tmp"])
+                    with tarfile.open(fileobj=io.BytesIO(kwargs["input"])) as tar:
+                        uploaded.append(tar.extractfile(tar.getmembers()[0]).read())
+            return subprocess.CompletedProcess(args, 0, "", "")
+
+        with mock.patch.object(shared, "run", side_effect=docker_run) as run:
+            missing = shared.missing_container_path_indices(
+                ["docker"], "container", paths, deadline=time.monotonic() + 30
+            )
+        self.assertEqual(missing, {7, 1999})
+        self.assertEqual(uploaded, [("\0".join(paths) + "\0").encode("utf-8")])
+        self.assertEqual(run.call_count, 6)
+
+    def test_input_probe_owns_private_artifacts_as_the_container_user(self):
+        for user in ("501:20", "1001", "builder:staff", ""):
+            owner = "0:0"
+            manifest = b""
+            container_dir = ""
+            checked_as_action_user = False
+            cleaned = False
+
+            def docker_run(args, **kwargs):
+                nonlocal owner, manifest, container_dir, checked_as_action_user, cleaned
+                if args[1] == "inspect":
+                    return self._container_user_result(args, user)
+                if args[1:3] == ["cp", "-"]:
+                    with tarfile.open(fileobj=io.BytesIO(kwargs["input"])) as tar:
+                        member = tar.getmembers()[0]
+                        self.assertEqual((member.uid, member.gid, member.mode), (0, 0, 0o600))
+                        manifest = tar.extractfile(member).read()
+                        container_dir = "/tmp/" + member.name.split("/")[0]
+                elif args[1] == "exec":
+                    if shared.CONTAINER_INPUT_PROBE_SETUP_SCRIPT in args:
+                        self.assertEqual(args[2:6], ["-d", "-u", "0", "container"])
+                        self.assertEqual(args[-2:], [container_dir, user or "0:0"])
+                        owner = args[-1]
+                    elif shared.CONTAINER_INPUT_PROBE_SCRIPT in args:
+                        self.assertEqual(args[2:4], ["-d", "container"])
+                        self.assertEqual(owner, user or "0:0", "probe artifacts are inaccessible")
+                        checked_as_action_user = True
+                    elif "/bin/rm" in args:
+                        self.assertEqual(args[2:6], ["-d", "-u", "0", "container"])
+                        self.assertEqual(args[-1], container_dir)
+                        cleaned = True
+                elif args[1] == "cp":
+                    self.assertTrue(checked_as_action_user)
+                    self.assertEqual(manifest, b"/bin/bash\0/missing\0")
+                    return subprocess.CompletedProcess(
+                        args, 0, self._probe_archive(b"1\ndone 2\n"), b""
+                    )
+                return subprocess.CompletedProcess(args, 0, b"", b"")
+
+            with self.subTest(user=user), mock.patch.object(shared, "run", side_effect=docker_run):
+                self.assertEqual(
+                    shared.missing_container_path_indices(
+                        ["docker"],
+                        "container",
+                        ["/bin/bash", "/missing"],
+                        deadline=time.monotonic() + 30,
+                    ),
+                    {1},
+                )
+            self.assertTrue(cleaned)
+
+    @unittest.skipUnless(
+        hasattr(os, "geteuid") and os.geteuid() == 0 and os.name == "posix",
+        "Ownership regression needs a root Linux runner to launch a nonroot probe",
+    )
+    def test_input_probe_transport_checks_paths_as_nonroot(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            root.chmod(0o755)
+            private_input = root / "root-only"
+            private_input.mkdir(mode=0o700)
+            (private_input / "input").touch()
+            processes = []
+            probe_dir = None
+
+            def docker_run(args, **kwargs):
+                nonlocal probe_dir
+                if args[1] == "inspect":
+                    return self._container_user_result(args, "1001:1001")
+                if args[1:3] == ["cp", "-"]:
+                    with tarfile.open(fileobj=io.BytesIO(kwargs["input"])) as tar:
+                        member = tar.getmembers()[0]
+                        probe_dir = root / member.name.split("/")[0]
+                        probe_dir.mkdir(mode=0o700)
+                        manifest = probe_dir / "manifest"
+                        manifest.write_bytes(tar.extractfile(member).read())
+                        manifest.chmod(member.mode)
+                elif args[1] == "exec":
+                    command = args[args.index("container") + 1 :]
+                    command = [
+                        str(probe_dir) if value.startswith("/tmp/mongo-input-probe-") else value
+                        for value in command
+                    ]
+                    privileged = "-u" in args
+                    if command[0] == "/bin/rm":
+                        return subprocess.run(
+                            command, capture_output=True, timeout=kwargs["timeout"]
+                        )
+                    if privileged:
+                        # Force the probe to start while its private directory
+                        # still belongs to root, as detached Docker exec can.
+                        command[2] = "/bin/sleep 0.1\n" + command[2]
+                    processes.append(
+                        subprocess.Popen(
+                            command,
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.PIPE,
+                            user=0 if privileged else 1001,
+                            group=0 if privileged else 1001,
+                            extra_groups=[],
+                        )
+                    )
+                elif args[1] == "cp":
+                    result = probe_dir / "result"
+                    if not result.exists():
+                        return subprocess.CompletedProcess(args, 1, b"", b"")
+                    self.assertEqual(probe_dir.stat().st_uid, 1001)
+                    self.assertEqual((probe_dir / "manifest").stat().st_uid, 1001)
+                    self.assertEqual(result.stat().st_uid, 1001)
+                    return subprocess.CompletedProcess(
+                        args, 0, self._probe_archive(result.read_bytes()), b""
+                    )
+                return subprocess.CompletedProcess(args, 0, b"", b"")
+
+            try:
+                with mock.patch.object(shared, "run", side_effect=docker_run):
+                    self.assertEqual(
+                        shared.missing_container_path_indices(
+                            ["docker"],
+                            "container",
+                            ["/bin/bash", str(private_input / "input")],
+                            deadline=time.monotonic() + 5,
+                        ),
+                        {1},
+                    )
+                self.assertFalse(probe_dir.exists())
+            finally:
+                for process in processes:
+                    _, error = process.communicate(timeout=5)
+                    self.assertEqual(process.returncode, 0, error)
+
+    def test_input_probe_fails_closed_on_transport_and_protocol_errors(self):
+        for output in (None, b"", b"0\n", b"done 2\n", b"99\ndone 1\n", b"bad\ndone 1\n"):
+
+            def docker_run(args, **kwargs):
+                if args[1] == "inspect":
+                    return self._container_user_result(args)
+                if args[1] == "cp" and args[2].startswith("container:"):
+                    if output is None:
+                        raise subprocess.TimeoutExpired(args, kwargs["timeout"])
+                    return subprocess.CompletedProcess(args, 0, self._probe_archive(output), b"")
+                return subprocess.CompletedProcess(args, 0, "", "")
+
+            with (
+                self.subTest(output=output),
+                mock.patch.object(shared, "run", side_effect=docker_run),
+            ):
+                self.assertIsNone(
+                    shared.missing_container_path_indices(
+                        ["docker"], "container", ["/input"], deadline=time.monotonic() + 30
+                    )
+                )
+
+    def test_input_probe_retries_until_atomic_result_is_available(self):
+        copies = 0
+
+        def docker_run(args, **kwargs):
+            nonlocal copies
+            if args[1] == "inspect":
+                return self._container_user_result(args)
+            if args[1] == "cp" and args[2].startswith("container:"):
+                copies += 1
+                if copies == 1:
+                    return subprocess.CompletedProcess(args, 1, b"", b"")
+                return subprocess.CompletedProcess(
+                    args, 0, self._probe_archive(b"0\ndone 1\n"), b""
+                )
+            return subprocess.CompletedProcess(args, 0, b"", b"")
+
+        with (
+            mock.patch.object(shared, "run", side_effect=docker_run),
+            mock.patch.object(shared.time, "sleep") as sleep,
+        ):
+            self.assertEqual(
+                shared.missing_container_path_indices(
+                    ["docker"], "container", ["/missing"], deadline=time.monotonic() + 30
+                ),
+                {0},
+            )
+        self.assertEqual(copies, 2)
+        sleep.assert_called_once_with(shared.ACTION_COMPLETION_POLL_SECONDS)
+
+    def test_input_probe_rejects_failed_upload_launch_and_invalid_archives(self):
+        for failure in ("inspect", "upload", "setup", "launch", "archive"):
+
+            def docker_run(args, **kwargs):
+                if args[1] == "inspect":
+                    if failure == "inspect":
+                        return subprocess.CompletedProcess(args, 1, b"", b"")
+                    return self._container_user_result(args)
+                if failure == "upload" and args[1:3] == ["cp", "-"]:
+                    return subprocess.CompletedProcess(args, 1, b"", b"")
+                if failure == "launch" and shared.CONTAINER_INPUT_PROBE_SCRIPT in args:
+                    return subprocess.CompletedProcess(args, 1, b"", b"")
+                if failure == "setup" and shared.CONTAINER_INPUT_PROBE_SETUP_SCRIPT in args:
+                    return subprocess.CompletedProcess(args, 1, b"", b"")
+                return subprocess.CompletedProcess(args, 0, b"invalid archive", b"")
+
+            with (
+                self.subTest(failure=failure),
+                mock.patch.object(shared, "run", side_effect=docker_run),
+            ):
+                self.assertIsNone(
+                    shared.missing_container_path_indices(
+                        ["docker"], "container", ["/input"], deadline=time.monotonic() + 30
+                    )
+                )
+
+    @unittest.skipIf(os.name == "nt", "The probe script executes inside Linux containers")
+    def test_input_probe_script_preserves_arbitrary_filenames(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            present = root / "space; quote'\nnew line"
+            present.touch()
+            missing = root / " missing\npath "
+            (root / "manifest").write_bytes(f"{present}\0{missing}\0".encode("utf-8"))
+            (root / "ready").touch()
+            # macOS has no coreutils timeout; run the inner Bash loop directly.
+            script = shared.CONTAINER_INPUT_PROBE_SCRIPT.replace(
+                '/usr/bin/timeout --kill-after=1s "${budget}s" ', ""
+            )
+            result = subprocess.run(
+                ["/bin/bash", "-c", script, "_", directory, "5", "2"],
+                capture_output=True,
+                timeout=5,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual((root / "result").read_bytes(), b"1\ndone 2\n")
+
+    def test_input_probe_bounds_every_request_and_cleanup_by_deadline(self):
+        for stalled_request in range(6):
+            now = 0.0
+            calls = []
+
+            def docker_run(args, **kwargs):
+                nonlocal now
+                self.assertLess(now, 2)
+                self.assertGreater(kwargs["timeout"], 0)
+                self.assertLessEqual(kwargs["timeout"], 2 - now)
+                calls.append(args)
+                if len(calls) == stalled_request + 1:
+                    now += kwargs["timeout"]
+                    raise subprocess.TimeoutExpired(args, kwargs["timeout"])
+                now += 0.1
+                if args[1] == "inspect":
+                    return self._container_user_result(args)
+                if args[1] == "cp" and args[2].startswith("container:"):
+                    return subprocess.CompletedProcess(
+                        args, 0, self._probe_archive(b"done 1\n"), b""
+                    )
+                return subprocess.CompletedProcess(args, 0, "", "")
+
+            with (
+                self.subTest(request=stalled_request),
+                mock.patch.object(shared.time, "monotonic", side_effect=lambda: now),
+                mock.patch.object(shared, "run", side_effect=docker_run),
+            ):
+                result = shared.missing_container_path_indices(
+                    ["docker"], "container", ["/input"], deadline=2
+                )
+            self.assertEqual(len(calls), stalled_request + 1)
+            self.assertEqual(result, set() if stalled_request == 5 else None)
+
+    def test_input_probe_does_not_start_requests_after_expiry(self):
+        with (
+            mock.patch.object(shared.time, "monotonic", return_value=2),
+            mock.patch.object(shared, "run") as run,
+        ):
+            self.assertIsNone(
+                shared.missing_container_path_indices(
+                    ["docker"], "container", ["/input"], deadline=2
+                )
+            )
+        run.assert_not_called()
+
     @unittest.skipIf(os.name == "nt", "Process-backed container simulation needs a POSIX shell")
     def test_detached_actions_stop_descendants_on_timeout_interruption_and_lost_runner(self):
         for failure in (
@@ -765,6 +1083,39 @@ class ContainerActionTest(unittest.TestCase):
             [mode for _, mode, _ in Msvcrt.calls],
             [Msvcrt.LK_NBLCK] * 2 + [Msvcrt.LK_UNLCK],
         )
+
+    def test_required_lock_fails_when_no_locking_api_is_available(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with (
+                mock.patch.object(shared, "fcntl", None),
+                mock.patch.object(shared, "msvcrt", None),
+                self.assertRaisesRegex(RuntimeError, "no file locking primitive"),
+                shared.exclusive_file_lock(pathlib.Path(temp_dir) / "config.lock", required=True),
+            ):
+                self.fail("Required locking must not silently continue")
+
+    def test_windows_lock_does_not_retry_permanent_errors(self):
+        runtime = mock.Mock(LK_NBLCK=3, LK_UNLCK=2)
+        runtime.locking.side_effect = OSError(errno.EBADF, "Bad file descriptor")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with (
+                mock.patch.object(shared, "fcntl", None),
+                mock.patch.object(shared, "msvcrt", runtime),
+                mock.patch.object(shared.time, "sleep") as sleep,
+                self.assertRaises(OSError),
+                shared.exclusive_file_lock(pathlib.Path(temp_dir) / "config.lock"),
+            ):
+                self.fail("Permanent errors must propagate")
+        sleep.assert_not_called()
+
+    def test_optional_lock_supports_dry_runs_without_locking_api(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with (
+                mock.patch.object(shared, "fcntl", None),
+                mock.patch.object(shared, "msvcrt", None),
+                shared.exclusive_file_lock(pathlib.Path(temp_dir) / "container.lock"),
+            ):
+                pass
 
 
 if __name__ == "__main__":

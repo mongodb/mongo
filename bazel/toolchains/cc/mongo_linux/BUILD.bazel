@@ -34,6 +34,7 @@ py_test(
         "linux_container_action_wrapper_test.py",
     ],
     main = "linux_container_action_wrapper_test.py",
+    deps = ["//bazel/toolchains/cc:container_action"],
 )
 
 py_binary(

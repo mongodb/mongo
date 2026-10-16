@@ -9,6 +9,8 @@ from __future__ import annotations
 import contextlib
 import dataclasses
 import errno
+import io
+import json
 import os
 import pathlib
 import re
@@ -16,6 +18,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import tarfile
 import threading
 import time
 import uuid
@@ -125,17 +128,25 @@ def docker_info_os_type(docker: Sequence[str]) -> str:
 
 
 def run(
-    args: Sequence[str], *, stdout=None, stderr=None, timeout=DOCKER_REQUEST_TIMEOUT_SECONDS
+    args: Sequence[str],
+    *,
+    stdout=None,
+    stderr=None,
+    timeout=DOCKER_REQUEST_TIMEOUT_SECONDS,
+    input: bytes | None = None,
+    text: bool = True,
 ) -> subprocess.CompletedProcess:
     # Tool output is replayed rather than parsed, so never fail on bytes that the
     # host locale cannot decode (Windows console code pages are not UTF-8).
+    # Archive transfers opt into binary stdin/stdout to preserve their bytes.
     return subprocess.run(
         args,
         check=False,
         stdout=stdout,
         stderr=stderr,
-        text=True,
-        errors="replace",
+        text=text,
+        errors="replace" if text else None,
+        input=input,
         timeout=timeout,
     )
 
@@ -143,6 +154,154 @@ def run(
 def _request_timeout(deadline: float) -> float:
     """Bound requests so polling and lease renewal cannot be blocked by the Docker CLI."""
     return max(0.001, min(ACTION_HEARTBEAT_INTERVAL_SECONDS, deadline - time.monotonic()))
+
+
+CONTAINER_INPUT_PROBE_SETUP_SCRIPT = r"""
+probe=$1
+owner=$2
+umask 077
+/bin/chmod 700 "$probe" &&
+    /bin/chmod 600 "$probe/manifest" &&
+    /bin/chown -- "$owner" "$probe/manifest" &&
+    : >"$probe/ready" &&
+    /bin/chown -- "$owner" "$probe"
+"""
+
+CONTAINER_INPUT_PROBE_SCRIPT = r"""
+probe=$1
+budget=$2
+count=$3
+/usr/bin/timeout --kill-after=1s "${budget}s" /bin/bash -c '
+    while [ ! -e "$1/ready" ]; do /bin/sleep 0.05; done
+    exec >"$1/result.tmp" || exit 1
+    index=0
+    while IFS= read -r -d "" path; do
+        [ -e "$path" ] || printf "%s\n" "$index"
+        index=$((index + 1))
+    done <"$1/manifest"
+    [ "$index" -eq "$2" ] || exit 1
+    printf "done %s\n" "$index"
+' _ "$probe" "$count" &&
+    /bin/mv "$probe/result.tmp" "$probe/result"
+"""
+
+
+def missing_container_path_indices(
+    docker: Sequence[str], name: str, paths: Sequence[str], *, deadline: float
+) -> set[int] | None:
+    """Check a NUL-separated manifest with bounded Docker requests.
+
+    Return missing indices, or None when visibility could not be verified. The
+    detached probe publishes a complete result via docker cp, avoiding both the
+    Windows exec relay and command-line limits. Its read-only shell loop also
+    expires if the host disappears. Privileged setup gives the private probe
+    artifacts to the configured container user; path checks keep that user's
+    access permissions. Setup and cleanup share the caller's deadline.
+    """
+    if not paths:
+        return set()
+
+    def request(
+        command: Sequence[str], *, input: bytes | None = None
+    ) -> subprocess.CompletedProcess:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise subprocess.TimeoutExpired(command, 0)
+        return run(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            timeout=min(ACTION_HEARTBEAT_INTERVAL_SECONDS, remaining),
+            input=input,
+            text=False,
+        )
+
+    if time.monotonic() >= deadline:
+        return None
+    identity = f"mongo-input-probe-{uuid.uuid4().hex}"
+    container_dir = f"/tmp/{identity}"
+    uploaded = False
+    try:
+        inspected = request([*docker, "inspect", "--format", "{{json .Config.User}}", name])
+        if inspected.returncode:
+            return None
+        user = json.loads(inspected.stdout)
+        if not isinstance(user, str):
+            return None
+        manifest = ("\0".join(paths) + "\0").encode("utf-8")
+        archive = io.BytesIO()
+        with tarfile.open(fileobj=archive, mode="w") as tar:
+            member = tarfile.TarInfo(f"{identity}/manifest")
+            member.size = len(manifest)
+            member.mode = 0o600
+            tar.addfile(member, io.BytesIO(manifest))
+        # Stream an archive instead of a host filename: a WSL Docker client
+        # cannot open Windows temporary paths, and needs no host drive mounts.
+        uploaded = True  # A failed CLI may still have completed its copy.
+        if request([*docker, "cp", "-", f"{name}:/tmp"], input=archive.getvalue()).returncode:
+            return None
+        # docker cp creates root-owned artifacts. Only their setup runs as root;
+        # the probe itself must observe the same permissions as the action.
+        # Transfer directory access last because detached exec can return before
+        # setup ends; until then only root can observe the ready marker.
+        if request(
+            [
+                *docker,
+                "exec",
+                "-d",
+                "-u",
+                "0",
+                name,
+                "/bin/bash",
+                "-c",
+                CONTAINER_INPUT_PROBE_SETUP_SCRIPT,
+                "_",
+                container_dir,
+                user or "0:0",
+            ]
+        ).returncode:
+            return None
+        budget = max(0.001, deadline - time.monotonic())
+        if request(
+            [
+                *docker,
+                "exec",
+                "-d",
+                name,
+                "/bin/bash",
+                "-c",
+                CONTAINER_INPUT_PROBE_SCRIPT,
+                "_",
+                container_dir,
+                str(budget),
+                str(len(paths)),
+            ]
+        ).returncode:
+            return None
+        while True:
+            copied = request([*docker, "cp", f"{name}:{container_dir}/result", "-"])
+            if copied.returncode == 0:
+                with tarfile.open(fileobj=io.BytesIO(copied.stdout), mode="r:*") as tar:
+                    result = tar.extractfile("result")
+                    if result is None:
+                        return None
+                    lines = result.read().decode("ascii").splitlines()
+                if not lines or lines[-1] != f"done {len(paths)}":
+                    return None
+                indices = {int(line) for line in lines[:-1]}
+                return indices if all(0 <= index < len(paths) for index in indices) else None
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return None
+            time.sleep(min(ACTION_COMPLETION_POLL_SECONDS, remaining))
+    except (OSError, ValueError, KeyError, tarfile.TarError, subprocess.TimeoutExpired):
+        return None
+    finally:
+        if uploaded and time.monotonic() < deadline:
+            try:
+                request([*docker, "exec", "-d", "-u", "0", name, "/bin/rm", "-rf", container_dir])
+            except (OSError, subprocess.TimeoutExpired):
+                pass
 
 
 def safe_name(value: str) -> str:
@@ -168,7 +327,7 @@ def container_exists(docker: Sequence[str], name: str) -> bool:
 
 
 @contextlib.contextmanager
-def exclusive_file_lock(lock_path: pathlib.Path):
+def exclusive_file_lock(lock_path: pathlib.Path, *, required: bool = False) -> Iterator[None]:
     """Acquire a process lock for container startup on Unix and Windows."""
 
     lock_path.parent.mkdir(parents=True, exist_ok=True)
@@ -209,6 +368,8 @@ def exclusive_file_lock(lock_path: pathlib.Path):
                 msvcrt.locking(lock_file.fileno(), msvcrt.LK_UNLCK, 1)
             return
 
+        if required:
+            raise RuntimeError(f"no file locking primitive is available for {lock_path}")
         yield
 
 

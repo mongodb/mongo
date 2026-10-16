@@ -1,3 +1,4 @@
+import collections
 import getpass
 import hashlib
 import json
@@ -9,9 +10,11 @@ import shlex
 import shutil
 import subprocess
 import sys
-import collections
 import time
 
+# Also support loading this standalone module directly by filename.
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+from container_paths import wsl_volume_source
 
 HERMETIC_CONTAINER_RC_FILE = ".hermetic_containerrc"
 HERMETIC_CONTAINER_RUN_FILE = ".hermetic_container_run"
@@ -649,22 +652,10 @@ class DockerInstance:
         return remote_directory
 
     def _docker_volume_source(self, local_directory):
-        """Return a host path as seen by the Docker daemon.
-
-        With Docker Desktop, the Windows Docker CLI and daemon understand Windows
-        paths directly. With a Docker Engine running inside WSL, the daemon sees
-        Windows drives through WSL's drvfs mount points instead.
-        """
+        """Map a source using this instance's configured daemon and mount prefix."""
         if self.volume_source_mode != "wsl":
             return local_directory
-
-        drive, drive_path = os.path.splitdrive(local_directory)
-        if not drive:
-            return local_directory
-
-        drive_name = drive.rstrip(":").lower()
-        posix_path = pathlib.PureWindowsPath(drive_path).as_posix().lstrip("/")
-        return str(pathlib.PurePosixPath(self.wsl_drive_mount_prefix, drive_name, posix_path))
+        return wsl_volume_source(local_directory, self.wsl_drive_mount_prefix)
 
     def _map_volume_source(self, volume):
         if self.volume_source_mode != "wsl":

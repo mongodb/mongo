@@ -24,7 +24,6 @@ import hashlib
 import json
 import os
 import pathlib
-import re
 import shlex
 import shutil
 import signal
@@ -34,6 +33,9 @@ import sys
 import tempfile
 import uuid
 from collections.abc import Mapping, Sequence
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[4]))
+from bazel.toolchains.cc.container_action import safe_name as _safe_name
 
 
 def _run(args: Sequence[str], **kwargs) -> subprocess.CompletedProcess:
@@ -50,10 +52,6 @@ def _check(args: Sequence[str]) -> None:
     result = _run(args, stdout=subprocess.DEVNULL)
     if result.returncode:
         raise SystemExit(result.returncode)
-
-
-def _safe_name(value: str) -> str:
-    return re.sub(r"[^A-Za-z0-9_.-]", "_", value)
 
 
 _WORKSPACE_LABEL = "com.mongodb.linux-container-actions.workspace"

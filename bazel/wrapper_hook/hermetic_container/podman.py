@@ -269,16 +269,12 @@ def _compact_runtime_detail(detail: str, limit: int = 2000) -> str:
 @contextlib.contextmanager
 def _podman_recovery_lock(runtime_env: Mapping[str, str]):
     """Serialize recovery of the rootless Podman pause process."""
-    import fcntl
+    from bazel.toolchains.cc.container_action import exclusive_file_lock
 
     runtime_dir = pathlib.Path(runtime_env["XDG_RUNTIME_DIR"])
     lock_path = runtime_dir / "mongo-podman-recovery.lock"
-    with lock_path.open("a", encoding="utf-8") as lock_file:
-        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
-        try:
-            yield
-        finally:
-            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+    with exclusive_file_lock(lock_path, required=True):
+        yield
 
 
 def _podman_command_detail(result: subprocess.CompletedProcess[str]) -> str:

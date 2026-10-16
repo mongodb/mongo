@@ -11,10 +11,17 @@ exports_files(["macos_cross_action_wrapper.py"])
 sh_binary(
     name = "macos_cross_action_wrapper_sh",
     srcs = ["macos_cross_action_wrapper.py"],
+    data = [
+        "//bazel:hermetic_container/container_paths.py",
+        "//bazel/toolchains/cc:container_action.py",
+        "//bazel/toolchains/cc:container_engine.py",
+        "//bazel/toolchains/cc:container_mounts.py",
+    ],
 )
 
 py_binary(
     name = "macos_cross_action_wrapper",
     srcs = ["macos_cross_action_wrapper.py"],
     main = "macos_cross_action_wrapper.py",
+    deps = ["//bazel/toolchains/cc:container_runtime"],
 )

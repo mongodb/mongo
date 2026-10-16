@@ -4,15 +4,55 @@ from __future__ import annotations
 
 import pathlib
 import subprocess
+import tempfile
 import unittest
 from contextlib import redirect_stderr
 from io import StringIO
 from unittest import mock
 
+from bazel.toolchains.cc import container_action
 from bazel.wrapper_hook.hermetic_container import container_actions
 
 
 class ContainerActionsTest(unittest.TestCase):
+    def test_config_lock_requires_a_locking_api(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            with (
+                mock.patch.object(container_action, "fcntl", None),
+                mock.patch.object(container_action, "msvcrt", None),
+                self.assertRaisesRegex(RuntimeError, "no file locking primitive"),
+                container_actions.lock(pathlib.Path(temporary) / "output-base"),
+            ):
+                self.fail("Config publication must not proceed without locking")
+
+    def test_config_lock_serializes_other_processes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            output_base = pathlib.Path(temporary) / "output-base"
+            script = (
+                "import sys; from bazel.wrapper_hook.hermetic_container import container_actions; "
+                "from pathlib import Path; print('ready', flush=True); "
+                "\nwith container_actions.lock(Path(sys.argv[1])): print('acquired', flush=True)"
+            )
+            process = None
+            try:
+                with container_actions.lock(output_base):
+                    process = subprocess.Popen(
+                        [container_actions.sys.executable, "-c", script, str(output_base)],
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True,
+                    )
+                    self.assertEqual(process.stdout.readline(), "ready\n")
+                    with self.assertRaises(subprocess.TimeoutExpired):
+                        process.communicate(timeout=0.1)
+                output, error = process.communicate(timeout=10)
+                self.assertEqual(process.returncode, 0, error)
+                self.assertEqual(output, "acquired\n")
+            finally:
+                if process is not None and process.poll() is None:
+                    process.kill()
+                    process.communicate()
+
     def test_protocol_keeps_runner_and_output_paths_together(self):
         output_base = pathlib.Path("/output base")
         runner = pathlib.Path("/runner path/windows.py")

@@ -6,11 +6,11 @@ https://github.com/pypa/sampleproject
 """
 
 # Always prefer setuptools over distutils
-from setuptools import setup, find_packages
-
 # To use a consistent encoding
 from codecs import open
 from os import path
+
+from setuptools import find_packages, setup
 
 here = path.abspath(path.dirname(__file__))
 
@@ -64,7 +64,7 @@ setup(
     packages=find_packages(exclude=["contrib", "docs", "tests"]),
     # Alternatively, if you want to distribute just a my_module.py, uncomment
     # this:
-    py_modules=["hermetic_container"],
+    py_modules=["hermetic_container", "container_paths"],
     # List run-time dependencies here.  These will be installed by pip when
     # your project is installed. For an analysis of "install_requires" vs pip's
     # requirements files see:

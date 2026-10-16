@@ -56,10 +56,10 @@ class MacOSCrossActionWrapperTest(unittest.TestCase):
             output_base.mkdir()
             with (
                 mock.patch.object(
-                    macos_cross_action_wrapper, "_container_running", return_value=False
+                    macos_cross_action_wrapper.shared, "container_running", return_value=False
                 ),
                 mock.patch.object(
-                    macos_cross_action_wrapper, "_container_exists", return_value=False
+                    macos_cross_action_wrapper.shared, "container_exists", return_value=False
                 ),
                 mock.patch.object(macos_cross_action_wrapper, "_check") as check,
                 mock.patch.dict(macos_cross_action_wrapper.os.environ, {}, clear=True),
@@ -82,8 +82,8 @@ class MacOSCrossActionWrapperTest(unittest.TestCase):
         with (
             mock.patch.object(macos_cross_action_wrapper.platform, "system", return_value="Linux"),
             mock.patch.object(
-                macos_cross_action_wrapper,
-                "_run",
+                macos_cross_action_wrapper.shared,
+                "run",
                 return_value=subprocess.CompletedProcess(args=[], returncode=0),
             ) as run,
         ):
@@ -98,7 +98,9 @@ class MacOSCrossActionWrapperTest(unittest.TestCase):
                 0,
             )
 
-        run.assert_called_once_with(["/toolchains/python/bin/python3", "buildscripts/idl/idlc.py"])
+        run.assert_called_once_with(
+            ["/toolchains/python/bin/python3", "buildscripts/idl/idlc.py"], timeout=None
+        )
 
     def test_loads_host_runtime_settings_from_output_base_manifest(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -145,13 +147,82 @@ class MacOSCrossActionWrapperTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             lock_path = pathlib.Path(temp_dir) / "container.lock"
             with (
-                mock.patch.object(macos_cross_action_wrapper, "fcntl", None),
-                mock.patch.object(macos_cross_action_wrapper, "msvcrt", Msvcrt),
-                macos_cross_action_wrapper._exclusive_file_lock(lock_path),
+                mock.patch.object(macos_cross_action_wrapper.shared, "fcntl", None),
+                mock.patch.object(macos_cross_action_wrapper.shared, "msvcrt", Msvcrt),
+                macos_cross_action_wrapper.shared.exclusive_file_lock(lock_path),
             ):
                 self.assertTrue(lock_path.exists())
 
         self.assertEqual([mode for _, mode, _ in Msvcrt.calls], [Msvcrt.LK_LOCK, Msvcrt.LK_UNLCK])
+
+    def test_mac_action_replays_transport_output_and_exit_code(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp).resolve()
+            output_base = root / "output"
+            cwd = output_base / "execroot" / "_main"
+            cwd.mkdir(parents=True)
+            with (
+                mock.patch.object(pathlib.Path, "cwd", return_value=cwd),
+                mock.patch.dict(
+                    macos_cross_action_wrapper.os.environ,
+                    {
+                        "MONGO_MACOS_CROSS_ACTION_REPO_ROOT": str(root),
+                        "MONGO_MACOS_CROSS_ACTION_IMAGE": "example/image",
+                    },
+                    clear=True,
+                ),
+                mock.patch.object(macos_cross_action_wrapper, "_start_container"),
+                mock.patch.object(
+                    macos_cross_action_wrapper.container_mounts,
+                    "verify_container_action_inputs",
+                    return_value=True,
+                ),
+                mock.patch.object(
+                    macos_cross_action_wrapper.shared,
+                    "run_container_command",
+                    return_value=(42, "compiler diagnostic\n", []),
+                ) as run,
+                redirect_stdout(StringIO()) as output,
+            ):
+                self.assertEqual(
+                    macos_cross_action_wrapper._run_in_container(
+                        pathlib.Path("/tool/clang"), ["-c", "source.cc"]
+                    ),
+                    42,
+                )
+            self.assertEqual(output.getvalue(), "compiler diagnostic\n")
+            self.assertEqual(run.call_args.args[4], ["/tool/clang", "-c", "source.cc"])
+
+    def test_missing_inputs_prevent_compiler_execution(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp).resolve()
+            cwd = root / "output" / "execroot" / "_main"
+            cwd.mkdir(parents=True)
+            with (
+                mock.patch.object(pathlib.Path, "cwd", return_value=cwd),
+                mock.patch.dict(
+                    macos_cross_action_wrapper.os.environ,
+                    {
+                        "MONGO_MACOS_CROSS_ACTION_REPO_ROOT": str(root),
+                        "MONGO_MACOS_CROSS_ACTION_IMAGE": "example/image",
+                    },
+                    clear=True,
+                ),
+                mock.patch.object(macos_cross_action_wrapper, "_start_container"),
+                mock.patch.object(
+                    macos_cross_action_wrapper.container_mounts,
+                    "verify_container_action_inputs",
+                    return_value=False,
+                ),
+                mock.patch.object(
+                    macos_cross_action_wrapper.shared, "run_container_command"
+                ) as run,
+            ):
+                self.assertEqual(
+                    macos_cross_action_wrapper._run_in_container(pathlib.Path("/tool/clang"), []),
+                    125,
+                )
+            run.assert_not_called()
 
 
 class MacOSCrossHostTestTest(unittest.TestCase):

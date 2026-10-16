@@ -11,6 +11,7 @@ py_library(
         "hermetic_container/fsutil.py",
         "release_distro.py",
     ],
+    deps = ["//bazel/toolchains/cc:container_action"],
 )
 
 py_test(
@@ -71,6 +72,7 @@ py_library(
     visibility = ["//visibility:public"],
     deps = [
         ":release_distro",
+        "//bazel:container_paths",
         "//buildscripts:bazel_custom_formatter",
         "//buildscripts:setup_clang_tidy",
     ],
@@ -160,6 +162,9 @@ py_test(
     data = [
         "//bazel:hermetic_container/hermetic_container.py",
         "//bazel/platforms:remote_execution_containers.bzl",
+        "//bazel/toolchains/cc:container_action.py",
+        "//bazel/toolchains/cc:container_engine.py",
+        "//bazel/toolchains/cc:container_mounts.py",
         "//bazel/toolchains/cc/mongo_apple_cross:macos_cross_action_wrapper.py",
         "//bazel/toolchains/cc/mongo_linux:mongo_toolchain_version_v5.bzl",
     ],

@@ -16,8 +16,9 @@ import shlex
 import subprocess
 import sys
 import tempfile
-import time
 from collections.abc import Iterator
+
+from bazel.toolchains.cc.container_action import exclusive_file_lock
 
 from .constants import REPO_ROOT
 from .distro import _safe_name
@@ -32,16 +33,6 @@ from .podman import (
     _print_container_command_output,
 )
 
-try:
-    import msvcrt
-except ImportError:
-    msvcrt = None
-
-try:
-    import fcntl
-except ImportError:
-    fcntl = None
-
 CONTAINER_ACTIONS_CONFIG_FILENAME = "mongo_linux_container_actions.json"
 CONTAINER_ACTIONS_LOCK_FILENAME = "mongo_linux_container_actions.lock"
 CONTAINER_ACTIONS_GENERATION_FILENAME = "mongo_linux_output_base_generation"
@@ -53,40 +44,11 @@ def state_dir(repo_root: pathlib.Path = REPO_ROOT) -> pathlib.Path:
 
 @contextlib.contextmanager
 def lock(output_base: pathlib.Path) -> Iterator[None]:
-    """Serializes action-config publication and container preflight for one output base."""
-    output_base.mkdir(parents=True, exist_ok=True)
-    lock_path = output_base.resolve() / CONTAINER_ACTIONS_LOCK_FILENAME
-    # Select the lock primitive by what the interpreter offers rather than by
-    # platform.system(), which tests substitute to exercise the Windows planning paths.
-    if fcntl is None and msvcrt is not None:
-        with lock_path.open("a+b") as lock_file:
-            lock_file.seek(0, os.SEEK_END)
-            if lock_file.tell() == 0:
-                lock_file.write(b"\0")
-                lock_file.flush()
-            lock_file.seek(0)
-            while True:
-                try:
-                    msvcrt.locking(lock_file.fileno(), msvcrt.LK_NBLCK, 1)
-                    break
-                except OSError:
-                    time.sleep(0.1)
-            try:
-                yield
-            finally:
-                lock_file.seek(0)
-                msvcrt.locking(lock_file.fileno(), msvcrt.LK_UNLCK, 1)
-        return
-
-    if fcntl is None:
-        raise RuntimeError("no file locking primitive is available for the action config lock")
-
-    with lock_path.open("a", encoding="utf-8") as lock_file:
-        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
-        try:
-            yield
-        finally:
-            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+    """Serializes config publication, requiring a real lock even for unsupported hosts."""
+    with exclusive_file_lock(
+        output_base.resolve() / CONTAINER_ACTIONS_LOCK_FILENAME, required=True
+    ):
+        yield
 
 
 def ensure_container_image(docker_command: str, image: str) -> bool:

@@ -3,27 +3,19 @@
 
 from __future__ import annotations
 
-import contextlib
 import hashlib
 import json
 import os
 import pathlib
 import platform
-import re
 import shlex
 import subprocess
 import sys
 from collections.abc import Sequence
 
-try:
-    import fcntl
-except ImportError:
-    fcntl = None
-
-try:
-    import msvcrt
-except ImportError:
-    msvcrt = None
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[4]))
+from bazel.toolchains.cc import container_action as shared
+from bazel.toolchains.cc import container_engine, container_mounts
 
 DISABLED_VALUES = {"0", "false", "no", "off"}
 DEFAULT_CONTAINER_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -39,12 +31,8 @@ def _docker_command() -> list[str]:
     return shlex.split(os.environ.get("MONGO_MACOS_CROSS_ACTION_DOCKER_COMMAND", "docker"))
 
 
-def _run(args: Sequence[str], *, stdout=None, stderr=None) -> subprocess.CompletedProcess:
-    return subprocess.run(args, check=False, stdout=stdout, stderr=stderr, text=True)
-
-
 def _check(args: Sequence[str]) -> None:
-    result = _run(args)
+    result = shared.run(args, timeout=None)
     if result.returncode:
         raise SystemExit(result.returncode)
 
@@ -88,10 +76,6 @@ def _load_action_config(output_base: pathlib.Path) -> None:
             os.environ[key] = value
 
 
-def _safe_name(value: str) -> str:
-    return re.sub(r"[^A-Za-z0-9_.-]", "_", value)
-
-
 def _container_execroot(repo_root: pathlib.Path, execroot: pathlib.Path) -> pathlib.Path:
     digest = hashlib.sha256(str(execroot).encode()).hexdigest()[:12]
     mirror = repo_root / ".tmp" / "hermetic_container" / "container-execroots" / digest
@@ -122,12 +106,12 @@ def _container_name(repo_root: pathlib.Path, output_base: pathlib.Path, image: s
     digest = hashlib.sha256(
         f"{repo_root.resolve()}|{output_base.resolve()}|{image}".encode()
     ).hexdigest()[:12]
-    return _safe_name(f"{prefix}_{digest}")[:120]
+    return shared.safe_name(f"{prefix}_{digest}")[:120]
 
 
 def _image_exists(docker: Sequence[str], image: str) -> bool:
     return (
-        _run(
+        shared.run(
             [*docker, "image", "inspect", image],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
@@ -136,28 +120,8 @@ def _image_exists(docker: Sequence[str], image: str) -> bool:
     )
 
 
-def _container_running(docker: Sequence[str], name: str) -> bool:
-    result = _run(
-        [*docker, "inspect", "-f", "{{.State.Running}}", name],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.DEVNULL,
-    )
-    return result.returncode == 0 and result.stdout.strip() == "true"
-
-
-def _container_exists(docker: Sequence[str], name: str) -> bool:
-    return (
-        _run(
-            [*docker, "inspect", name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-        ).returncode
-        == 0
-    )
-
-
 def _volume(path: pathlib.Path, read_only: bool = False) -> list[str]:
-    resolved = path.resolve()
-    suffix = ":ro" if read_only else ""
-    return ["-v", f"{resolved}:{resolved}{suffix}"]
+    return container_mounts.volume_at(path, path.resolve(), read_only=read_only)
 
 
 def _extra_path_mounts() -> list[str]:
@@ -169,37 +133,6 @@ def _extra_path_mounts() -> list[str]:
             if path.exists():
                 mounts.extend(_volume(path, read_only=True))
     return mounts
-
-
-@contextlib.contextmanager
-def _exclusive_file_lock(lock_path: pathlib.Path):
-    """Acquire a process lock for container startup on Unix and Windows."""
-
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
-    with lock_path.open("a+b") as lock_file:
-        if fcntl is not None:
-            fcntl.flock(lock_file, fcntl.LOCK_EX)
-            try:
-                yield
-            finally:
-                fcntl.flock(lock_file, fcntl.LOCK_UN)
-            return
-
-        if msvcrt is not None:
-            lock_file.seek(0, os.SEEK_END)
-            if lock_file.tell() == 0:
-                lock_file.write(b"\0")
-                lock_file.flush()
-            lock_file.seek(0)
-            msvcrt.locking(lock_file.fileno(), msvcrt.LK_LOCK, 1)
-            try:
-                yield
-            finally:
-                lock_file.seek(0)
-                msvcrt.locking(lock_file.fileno(), msvcrt.LK_UNLCK, 1)
-            return
-
-        yield
 
 
 def _start_container(
@@ -214,10 +147,10 @@ def _start_container(
     if dockerfile and not _image_exists(docker, image):
         _check([*docker, "build", "-t", image, "-f", dockerfile, str(repo_root)])
 
-    if _container_running(docker, name):
+    if shared.container_running(docker, name):
         return
 
-    if _container_exists(docker, name):
+    if shared.container_exists(docker, name):
         _check([*docker, "rm", name])
 
     home = pathlib.Path(
@@ -289,30 +222,37 @@ def _run_in_container(real_tool: pathlib.Path, tool_args: Sequence[str]) -> int:
     name = _container_name(repo_root, output_base, image)
 
     lock_path = repo_root / ".tmp" / "hermetic_container" / "macos-cross-action-wrapper.lock"
-    with _exclusive_file_lock(lock_path):
-        _start_container(
+    with shared.exclusive_file_lock(lock_path):
+        started = container_engine.start_container_with_recovery(
             docker,
-            name=name,
-            image=image,
-            dockerfile=dockerfile,
-            repo_root=repo_root,
-            output_base=output_base,
+            lambda: _start_container(
+                docker,
+                name=name,
+                image=image,
+                dockerfile=dockerfile,
+                repo_root=repo_root,
+                output_base=output_base,
+            ),
         )
+    if not started:
+        return 125
+    if not container_mounts.verify_container_action_inputs(
+        docker, name, cwd, mirror_cwd, tool_args
+    ):
+        return 125
 
-    result = _run(
-        [
-            *docker,
-            "exec",
-            "-i",
-            "-w",
-            str(mirror_cwd),
-            *_exec_env(mirror_cwd),
-            name,
-            str(real_tool.resolve()),
-            *tool_args,
-        ]
+    exit_code, output, _ = shared.run_container_command(
+        docker,
+        name,
+        pathlib.PurePosixPath(str(mirror_cwd)),
+        _exec_env(mirror_cwd),
+        [str(real_tool.resolve()), *tool_args],
+        repo_root / ".tmp" / "hermetic_container",
     )
-    return result.returncode
+    if output:
+        sys.stdout.write(output)
+        sys.stdout.flush()
+    return exit_code
 
 
 def main(argv: Sequence[str]) -> int:
@@ -324,10 +264,10 @@ def main(argv: Sequence[str]) -> int:
     tool_args = argv[2:]
 
     if _env_is_false(os.environ.get("MONGO_MACOS_CROSS_ACTION_WRAPPER")):
-        return _run([str(real_tool), *tool_args]).returncode
+        return shared.run([str(real_tool), *tool_args], timeout=None).returncode
 
     if platform.system() == "Linux":
-        return _run([str(real_tool), *tool_args]).returncode
+        return shared.run([str(real_tool), *tool_args], timeout=None).returncode
 
     missing = [
         name

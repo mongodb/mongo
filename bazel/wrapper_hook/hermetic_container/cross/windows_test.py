@@ -41,7 +41,7 @@ class WindowsCrossSysrootTest(unittest.TestCase):
     def test_default_windows_cross_image_supports_pinned_llvm_runtime(self):
         from bazel.wrapper_hook.hermetic_container.cross import windows
 
-        containers = hermetic_container_integration.load_remote_execution_containers()
+        containers = distro_module.load_remote_execution_containers()
         image = containers["ubuntu24"]["container-url"]
         args = windows._windows_cross_host_wrapper_action_args(
             ["build", "//target"], {}, containers

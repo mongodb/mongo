@@ -12,9 +12,21 @@ package(default_visibility = ["//visibility:public"])
 exports_files([
     "utils.bzl",
     "hermetic_container/hermetic_container.py",
+    "hermetic_container/container_paths.py",
     "install_rules.py",
     "run_under_working_dir.sh",
 ])
+
+py_library(
+    name = "container_paths",
+    srcs = ["hermetic_container/container_paths.py"],
+)
+
+py_test(
+    name = "container_paths_test",
+    srcs = ["hermetic_container/container_paths_test.py"],
+    deps = [":container_paths"],
+)
 
 sh_binary(
     name = "lint",
