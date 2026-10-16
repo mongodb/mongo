@@ -63,6 +63,15 @@ public:
         }
 
         /**
+         * Wait recorded when acquireToken() reserved this slot. The request will in practice sleep
+         * for less than this time if any ticks have passed between when it was originally computed
+         * and the sleep is performed.
+         */
+        [[MONGO_MOD_PUBLIC]] Milliseconds getNapDuration_forTest() const {
+            return _napTime;
+        }
+
+        /**
          * Waits until the pre-reserved token slot becomes valid, or until the opCtx is
          * interrupted. For ready deferred tokens, this method returns immediately.
          *
