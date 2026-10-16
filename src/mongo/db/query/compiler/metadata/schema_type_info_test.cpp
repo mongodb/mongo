@@ -95,18 +95,21 @@ TEST(SchemaTypeInfoTest, PopulateFromValidatorLeavesFieldUnknownForJSONSchemaBso
     ASSERT_TRUE(info.canPathBeArray(FieldRef("x")));
 }
 
-// TODO SERVER-134938: $jsonSchema's "required" keyword translates to
-// InternalSchemaAllElemMatchFromIndexMatchExpression/ExistsMatchExpression nodes that narrowType
-// does not yet handle either, so the field's type still isn't narrowed even though it's
-// guaranteed to be present.
-TEST(SchemaTypeInfoTest, PopulateFromValidatorLeavesFieldUnknownForJSONSchemaRequired) {
+// TODO SERVER-134937: $jsonSchema's "required" keyword translates to
+// InternalSchemaTypeExpression and ExistsMatchExpression nodes.
+// InternalSchemaTypeExpression is not yet implemented.
+TEST(SchemaTypeInfoTest, PopulateFromValidatorWithTypedRequiredField) {
     auto expr =
         parseMatchExpr("{$jsonSchema: {required: ['x'], properties: {x: {bsonType: 'string'}}}}");
+    auto serialized =
+        "{ $and: [ { $and: [{ $and: [{ x: { $_internalSchemaType: [2] } }] }] },"
+        "          { $and: [{ x: { $exists: true } }] }]}";
+    ASSERT_BSONOBJ_EQ(expr->serialize(), fromjson(serialized));
 
     SchemaTypeInfo info;
     info.populateFromValidator(expr.get());
 
-    ASSERT_TRUE(info.getPathType(FieldRef("x")) == Type::any());
+    ASSERT_EQ(info.getPathType(FieldRef("x")).toDebugString(), "~missing");
     ASSERT_TRUE(info.canPathBeArray(FieldRef("x")));
 }
 

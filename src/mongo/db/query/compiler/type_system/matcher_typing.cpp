@@ -104,10 +104,11 @@ struct NarrowTypeMatchExpressionVisitor final : public SelectiveMatchExpressionV
         : type(std::move(inputType)), assumeTrue(assumeTrue) {}
 
     void visit(const TypeMatchExpression* expr) override {
-        type = matcher::narrowPath(std::move(type),
-                                   *expr->elementPath(),
-                                   Type::fromMatcherTypeSet(expr->typeSet()),
-                                   assumeTrue);
+        applyPathConstraint(expr, Type::fromMatcherTypeSet(expr->typeSet()));
+    }
+
+    void visit(const ExistsMatchExpression* expr) override {
+        applyPathConstraint(expr, complement(Type::missing()));
     }
 
     void visit(const NotMatchExpression* expr) override {
@@ -133,6 +134,14 @@ struct NarrowTypeMatchExpressionVisitor final : public SelectiveMatchExpressionV
     void visit(const NorMatchExpression* expr) override {
         // $nor is just a negated $or.
         type = narrowByDisjunction(std::move(type), expr, !assumeTrue);
+    }
+
+    /**
+     * Applies the 'constraint' type to the path the predicate matches on.
+     */
+    void applyPathConstraint(const PathMatchExpression* expr, Type constraint) {
+        type = matcher::narrowPath(
+            std::move(type), *expr->elementPath(), std::move(constraint), assumeTrue);
     }
 
     /// The input type, narrowed by every expression which carries type information so far.

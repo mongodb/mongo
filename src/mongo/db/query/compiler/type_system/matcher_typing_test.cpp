@@ -1343,6 +1343,104 @@ TEST(MatcherTypingTest, NorOfDottedPathsRemovesTheTypeOfEveryLeaf) {
     ASSERT_EQ(narrowedDebugString(predicate, input), expected);
 }
 
+TEST(MatcherTypingTest, ExistsTrueNarrowsLeaf) {
+    auto input = Type::anyObject();
+    auto predicate = "{x: {$exists: true}}";
+    auto expected = "{x: ~missing, ...}";
+    ASSERT_TRUE(matches(predicate, "{x: 1}"));
+    ASSERT_TRUE(matches(predicate, "{x: null}"));
+    ASSERT_FALSE(matches(predicate, "{}"));
+    ASSERT_EQ(narrowedDebugString(predicate, input), expected);
+}
+
+TEST(MatcherTypingTest, ExistsFalseNarrowsLeaf) {
+    auto input = Type::anyObject();
+    auto predicate = "{x: {$exists: false}}";
+    auto expected = "{x: missing, ...}";
+    ASSERT_FALSE(matches(predicate, "{x: 1}"));
+    ASSERT_FALSE(matches(predicate, "{x: null}"));
+    ASSERT_TRUE(matches(predicate, "{}"));
+    ASSERT_EQ(narrowedDebugString(predicate, input), expected);
+}
+
+TEST(MatcherTypingTest, NotExistsTrueNarrowsLeaf) {
+    auto input = Type::anyObject();
+    auto predicate = "{x: {$not: {$exists: true}}}";
+    auto expected = "{x: missing, ...}";
+    ASSERT_FALSE(matches(predicate, "{x: 1}"));
+    ASSERT_FALSE(matches(predicate, "{x: null}"));
+    ASSERT_TRUE(matches(predicate, "{}"));
+    ASSERT_EQ(narrowedDebugString(predicate, input), expected);
+}
+
+TEST(MatcherTypingTest, NotExistsFalseNarrowsLeaf) {
+    auto input = Type::anyObject();
+    auto predicate = "{x: {$not: {$exists: false}}}";
+    auto expected = "{x: ~missing, ...}";
+    ASSERT_TRUE(matches(predicate, "{x: 1}"));
+    ASSERT_TRUE(matches(predicate, "{x: null}"));
+    ASSERT_FALSE(matches(predicate, "{}"));
+    ASSERT_EQ(narrowedDebugString(predicate, input), expected);
+}
+
+TEST(MatcherTypingTest, ExistsTrueRemovesMissingFromKnownField) {
+    auto input = openObject({{"x", unionType(Type::missing(), allValues(BSONType::numberInt))}});
+    auto predicate = "{x: {$exists: true}}";
+    auto expected = "{x: int, ...}";
+    ASSERT_TRUE(matches(predicate, "{x: 1}"));
+    ASSERT_FALSE(matches(predicate, "{}"));
+    ASSERT_EQ(narrowedDebugString(predicate, input), expected);
+}
+
+TEST(MatcherTypingTest, ExistsFalseKeepsOnlyMissingOfKnownField) {
+    auto input = openObject({{"x", unionType(Type::missing(), allValues(BSONType::numberInt))}});
+    auto predicate = "{x: {$exists: false}}";
+    auto expected = "{x: missing, ...}";
+    ASSERT_FALSE(matches(predicate, "{x: 1}"));
+    ASSERT_TRUE(matches(predicate, "{}"));
+    ASSERT_EQ(narrowedDebugString(predicate, input), expected);
+}
+
+TEST(MatcherTypingTest, ExistsTrueOnNestedNarrows) {
+    auto input = Type::anyObject();
+    auto predicate = "{'x.y': {$exists: true}}";
+    // 'x' must be an object or array with an object, and the object must have 'y' as non-missing.
+    auto expected = "{x: {y: ~missing, ...}|array(S), ...}";
+    ASSERT_TRUE(matches(predicate, "{x: {y: 1}}"));
+    ASSERT_TRUE(matches(predicate, "{x: {y: null}}"));
+    ASSERT_TRUE(matches(predicate, "{x: [{y: 1}]}"));
+    ASSERT_TRUE(matches(predicate, "{x: [{y: 1}, {z: 1}]}"));
+    ASSERT_FALSE(matches(predicate, "{}"));
+    ASSERT_FALSE(matches(predicate, "{x: 1}"));
+    ASSERT_FALSE(matches(predicate, "{x: [{z: 1}]}"));
+    ASSERT_FALSE(matches(predicate, "{x: []}"));
+    ASSERT_EQ(narrowedDebugString(predicate, input), expected);
+}
+
+TEST(MatcherTypingTest, ExistsFalseOnNestedNarrows) {
+    auto input = Type::anyObject();
+    auto predicate = "{'x.y': {$exists: false}}";
+    // 'x' can be any type, but if object, the object must be {y: missing, ...}, which specifies 'y'
+    // is missing as expected.
+    auto expected = "{x: ~(object|array(S))|{y: missing, ...}, ...}";
+    ASSERT_TRUE(matches(predicate, "{}"));
+    ASSERT_TRUE(matches(predicate, "{x: 1}"));
+    ASSERT_TRUE(matches(predicate, "{x: [{z: 1}]}"));
+    ASSERT_TRUE(matches(predicate, "{x: []}"));
+    ASSERT_FALSE(matches(predicate, "{x: {y: 1}}"));
+    ASSERT_FALSE(matches(predicate, "{x: {y: null}}"));
+    ASSERT_FALSE(matches(predicate, "{x: [{y: 1}]}"));
+    ASSERT_FALSE(matches(predicate, "{x: [{y: 1}, {z: 1}]}"));
+    ASSERT_EQ(narrowedDebugString(predicate, input), expected);
+}
+
+TEST(MatcherTypingTest, ExistsMatchExpressionNarrowingOnCorpus) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    for (auto predicate : {"{$exists: true}", "{$exists: false}"}) {
+        testPathExpressionOnCorpus(predicate, expCtx);
+    }
+}
+
 TEST(MatcherTypingTest, NarrowingOnDottedPathAdmitsEveryDocumentMatcherLeavesPossible) {
     const auto documents =
         generateCombinedCorpus({"a.b.c", "a.0.b", "a.b.0", "a..b"}, ScalarCorpus::kMatchTraversal);
