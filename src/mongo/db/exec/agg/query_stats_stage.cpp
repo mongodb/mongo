@@ -185,7 +185,14 @@ boost::optional<Document> QueryStatsStage::toDocument(
         // We use the representative shape to generate the key and shape hashes. This avoids
         // returning duplicate hashes if we have bugs that cause two different representative shapes
         // to re-parse into the same debug shape.
-        auto keyHash = computeKeyHashString(pExpCtx->getOperationContext(), *key);
+        //
+        // The user-visible hash is cached on the entry only when a secondary index is maintained.
+        // Compute it here otherwise.
+        const auto& opCtx = pExpCtx->getOperationContext();
+        const std::string userVisibleHash =
+            QueryStatsStoreManager::get(opCtx->getServiceContext())->hasSecondaryIndex()
+            ? queryStatsEntry.userVisibleHash
+            : computeUserVisibleHash(opCtx, *key);
         auto queryShapeHash = key->getQueryShapeHash(pExpCtx->getOperationContext(),
                                                      SerializationContext::stateDefault())
                                   .toHexString();
@@ -213,7 +220,7 @@ boost::optional<Document> QueryStatsStage::toDocument(
             feature_flags::gFeatureFlagQueryStatsMetricsSubsections.isEnabled();
         bool includeErrorMetrics = feature_flags::gFeatureFlagQueryStatsErrors.checkEnabled();
         return Document{{"key", std::move(queryStatsKey)},
-                        {"keyHash", keyHash},
+                        {"keyHash", userVisibleHash},
                         {"queryShapeHash", queryShapeHash},
                         {"metrics",
                          queryStatsEntry.toBSON(useQueryStatsWithSubsectionsFormat,

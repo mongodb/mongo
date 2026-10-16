@@ -30,8 +30,13 @@
 
 #include <climits>
 #include <memory>
+#include <string>
+#include <utility>
+#include <variant>
+#include <vector>
 
-#include <absl/container/node_hash_map.h>
+#include <absl/container/flat_hash_map.h>
+#include <absl/container/flat_hash_set.h>
 #include <absl/hash/hash.h>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -309,21 +314,23 @@ void updateStatistics(const QueryStatsStore::Partition& proofOfLock,
     }
 }
 
-void insertQueryStatsEntry(
+void doInsertQueryStatsEntry(
     QueryStatsStore::Partition& proofOfLock,
     QueryStatsStore& queryStatsStore,
-    boost::optional<size_t> queryStatsKeyHash,
+    boost::optional<size_t> storeKey,
     std::unique_ptr<Key> key,
     const QueryStatsSnapshot& snapshot,
-    std::vector<std::unique_ptr<SupplementalStatsEntry>> supplementalMetrics) {
+    std::vector<std::unique_ptr<SupplementalStatsEntry>> supplementalMetrics,
+    std::string userVisibleHash) {
     tassert(7315200,
             "key cannot be null when writing a new entry to the queryStats store",
             key != nullptr);
-    size_t numEvicted =
-        queryStatsStore.put(*queryStatsKeyHash, QueryStatsEntry(std::move(key)), proofOfLock);
+
+    size_t numEvicted = queryStatsStore.put(
+        *storeKey, QueryStatsEntry(std::move(key), std::move(userVisibleHash)), proofOfLock);
     queryStatsEvictedMetric.increment(numEvicted);
-    auto newMetrics = proofOfLock->get(*queryStatsKeyHash);
-    if (!newMetrics.isOK()) {
+    auto newEntry = proofOfLock->get(*storeKey);
+    if (!newEntry.isOK()) {
         // This can happen if the budget is immediately exceeded. Specifically
         // if the there is not enough room for a single new entry if the number
         // of partitions is too high relative to the size.
@@ -331,13 +338,35 @@ void insertQueryStatsEntry(
         LOGV2_DEBUG(7560900,
                     0,
                     "Failed to store queryStats entry.",
-                    "status"_attr = newMetrics.getStatus(),
-                    "queryStatsKeyHash"_attr = queryStatsKeyHash);
+                    "status"_attr = newEntry.getStatus(),
+                    "storeKeyHash"_attr = storeKey);
         return;
     }
 
     return updateStatistics(
-        proofOfLock, newMetrics.getValue()->second, snapshot, std::move(supplementalMetrics));
+        proofOfLock, newEntry.getValue()->second, snapshot, std::move(supplementalMetrics));
+}
+
+/**
+ * Inserts a new entry. The user-visible hash is computed and cached only when a secondary index is
+ * maintained; otherwise it is left empty and the read path computes it lazily.
+ */
+void insertQueryStatsEntry(QueryStatsStore::Partition& proofOfLock,
+                           QueryStatsStore& queryStatsStore,
+                           bool hasSecondaryIndex,
+                           boost::optional<size_t> storeKey,
+                           std::unique_ptr<Key> key,
+                           const QueryStatsSnapshot& snapshot,
+                           std::vector<std::unique_ptr<SupplementalStatsEntry>> supplementalMetrics,
+                           const BSONObj& representativeShapeKey) {
+    doInsertQueryStatsEntry(proofOfLock,
+                            queryStatsStore,
+                            storeKey,
+                            std::move(key),
+                            snapshot,
+                            std::move(supplementalMetrics),
+                            hasSecondaryIndex ? computeUserVisibleHash(representativeShapeKey)
+                                              : std::string{});
 }
 
 void registerRequestImpl(const OperationContext* opCtx,
@@ -466,20 +495,80 @@ Status validateQueryStatsKeyBson(const BSONObj& keyBson) {
         "Query stats key is too deeply nested");
 }
 
-// This SHA256 version of the hash is output to aid in data analytics use cases. In these
-// cases, we often care about comparing hashes from different hosts, potentially on
-// different versions and platforms. The thinking here is that the SHA256 algorithm is more
-// stable across these different environments than the quicker 'absl::HashOf'
-// implementation. This must match the value used to populate the store's 'KeyHashIndex',
-// which the $match on keyHash optimization relies on.
-std::string computeKeyHashString(OperationContext* opCtx, const Key& key) {
-    auto representativeShapeKey =
-        key.toBson(opCtx,
-                   query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
-                   SerializationContext::stateDefault());
+void QueryStatsStoreInsertionEvictionListener::onInsert(const std::size_t& storeKey,
+                                                        const QueryStatsEntry& entry,
+                                                        size_t estimatedSize) {
+    queryStatsStoreSizeEstimateBytesMetric.increment(estimatedSize);
+    queryStatsStoreSizeMetric.increment();
+    if (_index) {
+        _index->_insert(entry.userVisibleHash, storeKey);
+    }
+}
+
+void QueryStatsStoreInsertionEvictionListener::onEvict(const std::size_t& storeKey,
+                                                       const QueryStatsEntry& entry,
+                                                       size_t estimatedSize) {
+    queryStatsStoreSizeEstimateBytesMetric.decrement(estimatedSize);
+    queryStatsStoreSizeMetric.decrement();
+    if (_index) {
+        _index->_erase(entry.userVisibleHash, storeKey);
+    }
+}
+
+void QueryStatsStoreInsertionEvictionListener::onClear(size_t estimatedSize) {
+    // onClear clears one store partition, which has no matching index partition (because both store
+    // and index partition on different values), so index erasure is left to onEvict.
+    queryStatsStoreSizeEstimateBytesMetric.decrement(estimatedSize);
+    queryStatsStoreSizeMetric.setToZero();
+}
+
+KeyLocations QueryStatsStoreManager::findStoreKeysByUserHash(
+    const std::vector<std::string>& keyHashes) {
+    // When off, the index is not maintained so must default to a full store scan.
+    if (!hasSecondaryIndex()) {
+        return FullStoreScanRequired{};
+    }
+    absl::flat_hash_map<QueryStatsStore::PartitionId, std::vector<std::size_t>> byPartition;
+    absl::flat_hash_set<std::size_t> seenStoreKeys;
+    for (const auto& keyHash : keyHashes) {
+        auto storeKeys = _keyHashIndex._lookup(keyHash);
+        if (!storeKeys) {
+            // The store holds no entry for this keyHash (every live entry is indexed).
+            continue;
+        }
+        // A store key is reported once even if several requested hashes resolve to it.
+        for (auto storeKey : *storeKeys) {
+            if (!seenStoreKeys.insert(storeKey).second) {
+                continue;
+            }
+            byPartition[_queryStatsStore->partitionOf(storeKey)].push_back(storeKey);
+        }
+    }
+
+    std::vector<KeyHashTargetGroup> groups;
+    groups.reserve(byPartition.size());
+    for (auto& [partitionId, storeKeys] : byPartition) {
+        groups.push_back(KeyHashTargetGroup{partitionId, std::move(storeKeys)});
+    }
+    return groups;
+}
+
+BSONObj computeRepresentativeShapeKey(OperationContext* opCtx, const Key& key) {
+    return key.toBson(opCtx,
+                      query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                      SerializationContext::stateDefault());
+}
+
+// SHA256 is more stable across platforms and versions than the quicker 'absl::HashOf', so the
+// user-visible hash is the SHA256 of the representative shape.
+std::string computeUserVisibleHash(const BSONObj& representativeShapeKey) {
     return SHA256Block::computeHash((const uint8_t*)representativeShapeKey.objdata(),
                                     representativeShapeKey.objsize())
         .toString();
+}
+
+std::string computeUserVisibleHash(OperationContext* opCtx, const Key& key) {
+    return computeUserVisibleHash(computeRepresentativeShapeKey(opCtx, key));
 }
 
 void registerRequest(OperationContext* opCtx,
@@ -588,16 +677,58 @@ QueryStatsSnapshot captureMetrics(const OperationContext* opCtx,
     return snapshot;
 }
 
+namespace {
+
+/**
+ * Looks up the entry for 'storeKey' and, if present, updates its metrics. When no entry exists,
+ * returns the locked partition so the caller can insert into it.
+ */
+boost::optional<QueryStatsStore::Partition> updateExistingEntryOrLock(
+    QueryStatsStore& queryStatsStore,
+    std::size_t storeKey,
+    const QueryStatsSnapshot& snapshot,
+    std::vector<std::unique_ptr<SupplementalStatsEntry>>& supplementalMetrics) {
+    auto&& [statusWithMetrics, partitionLock] = queryStatsStore.getWithPartitionLock(storeKey);
+    if (!statusWithMetrics.isOK()) {
+        return std::move(partitionLock);
+    }
+    updateStatistics(
+        partitionLock, *statusWithMetrics.getValue(), snapshot, std::move(supplementalMetrics));
+    return boost::none;
+}
+
+/**
+ * Serializes 'key's representative shape, or returns boost::none when it cannot be serialized. Such
+ * a key can be neither indexed nor emitted by $queryStats, so the caller should not store it.
+ */
+boost::optional<BSONObj> tryComputeRepresentativeShapeKey(OperationContext* opCtx,
+                                                          const Key& key,
+                                                          boost::optional<size_t> storeKey) {
+    try {
+        return computeRepresentativeShapeKey(opCtx, key);
+    } catch (const DBException& ex) {
+        queryStatsStoreWriteErrorsMetric.increment();
+        LOGV2_DEBUG(13519100,
+                    2,
+                    "Failed to serialize the query stats key. Skipping it.",
+                    "error"_attr = ex,
+                    "storeKeyHash"_attr = storeKey);
+        return boost::none;
+    }
+}
+
+}  // namespace
+
 void writeQueryStats(OperationContext* opCtx,
-                     boost::optional<size_t> queryStatsKeyHash,
+                     boost::optional<size_t> storeKey,
                      std::unique_ptr<Key> key,
                      const QueryStatsSnapshot& snapshot,
                      std::vector<std::unique_ptr<SupplementalStatsEntry>> supplementalMetrics,
                      bool isChangeStreamQuery) {
     // Generally we expect a 'key' to write query stats. However, for a change stream query, we
-    // expect it has no 'key' after its first writeQueryStats(), but it must have a
-    // 'queryStatsKeyHash' for its entry to be updated.
-    if (!key && !(isChangeStreamQuery && queryStatsKeyHash)) {
+    // expect it has no 'key' after its first writeQueryStats(), but it must have a 'storeKey' for
+    // its entry to be updated.
+    if (!key && !(isChangeStreamQuery && storeKey)) {
         return;
     }
 
@@ -610,22 +741,22 @@ void writeQueryStats(OperationContext* opCtx,
                     2,
                     "Query stats was enabled when the command started but is now disabled. "
                     "Metrics will not be collected.",
-                    "queryStatsKeyHash"_attr = queryStatsKeyHash);
+                    "storeKeyHash"_attr = storeKey);
         return;
     }
-    auto&& queryStatsStore =
-        QueryStatsStoreManager::get(opCtx->getServiceContext())->getQueryStatsStore();
+    auto& manager = *QueryStatsStoreManager::get(opCtx->getServiceContext());
+    auto&& queryStatsStore = manager.getQueryStatsStore();
     if (key) {
-        dassert(absl::HashOf(*key) == queryStatsKeyHash,
+        dassert(absl::HashOf(*key) == storeKey,
                 "Expecting query stats key to hash to the given hash. Is the OpCtx state being "
                 "incorrectly re-used?");
     }
-    auto&& [statusWithMetrics, partitionLock] =
-        queryStatsStore.getWithPartitionLock(*queryStatsKeyHash);
-    if (statusWithMetrics.isOK()) {
-        // Found an existing entry! Just update the metrics and we're done.
-        return updateStatistics(
-            partitionLock, *statusWithMetrics.getValue(), snapshot, std::move(supplementalMetrics));
+    {
+        // Look up the existing entry while holding its partition lock, but release the lock before
+        // the userVisibleHash computation below. Return early if entry was found and updated.
+        if (!updateExistingEntryOrLock(queryStatsStore, *storeKey, snapshot, supplementalMetrics)) {
+            return;
+        }
     }
 
     // It is possible a cursor that lives forever has no key associated with it and its entry may
@@ -634,18 +765,35 @@ void writeQueryStats(OperationContext* opCtx,
         return;
     }
 
-    // Otherwise we didn't find an existing entry. Try to create one.
-    return insertQueryStatsEntry(partitionLock,
+    // Serialize the key's representative shape.
+    auto representativeShapeKey = tryComputeRepresentativeShapeKey(opCtx, *key, storeKey);
+    if (!representativeShapeKey) {
+        return;
+    }
+
+    // Re-acquire the partition lock and re-check whether an entry exists. Another writer may have
+    // inserted an entry while the partition lock was briefly released.
+    auto result =
+        updateExistingEntryOrLock(queryStatsStore, *storeKey, snapshot, supplementalMetrics);
+    if (!result) {
+        // Another writer created the entry after our first miss.
+        return;
+    }
+
+    // Otherwise we still didn't find an existing entry. Try to create one.
+    return insertQueryStatsEntry(*result,
                                  queryStatsStore,
-                                 queryStatsKeyHash,
+                                 manager.hasSecondaryIndex(),
+                                 storeKey,
                                  std::move(key),
                                  snapshot,
-                                 std::move(supplementalMetrics));
+                                 std::move(supplementalMetrics),
+                                 *representativeShapeKey);
 }
 
 void writeQueryStatsOnCursorDisposeOrKill(
     OperationContext* opCtx,
-    boost::optional<size_t> queryStatsKeyHash,
+    boost::optional<size_t> storeKey,
     std::unique_ptr<Key> key,
     bool isChangeStreamQuery,
     boost::optional<Microseconds> firstResponseExecutionTime,
@@ -668,7 +816,7 @@ void writeQueryStatsOnCursorDisposeOrKill(
             opCtx, query_stats::microsecondsToUint64(firstResponseExecutionTime), metrics);
 
         query_stats::writeQueryStats(
-            opCtx, queryStatsKeyHash, std::move(key), snapshot, std::move(supplementalMetrics));
+            opCtx, storeKey, std::move(key), snapshot, std::move(supplementalMetrics));
     } else if (isChangeStreamQuery && opCtx) {
         // Since we already recorded information about the possible getMores associated with a
         // cursor that never ends, the only information left to record is about the kill/dispose
@@ -677,8 +825,7 @@ void writeQueryStatsOnCursorDisposeOrKill(
         auto snapshot = query_stats::captureMetrics(
             opCtx, query_stats::microsecondsToUint64(boost::none), OpDebug::AdditiveMetrics());
 
-        query_stats::writeQueryStats(
-            opCtx, queryStatsKeyHash, nullptr, snapshot, {}, isChangeStreamQuery);
+        query_stats::writeQueryStats(opCtx, storeKey, nullptr, snapshot, {}, isChangeStreamQuery);
     }
 }
 

@@ -215,7 +215,7 @@ struct WritesEntry {
  * as server status metrics.
  */
 struct QueryStatsEntry {
-    QueryStatsEntry(std::unique_ptr<const Key> key_)
+    QueryStatsEntry(std::unique_ptr<const Key> key_, std::string userVisibleHash_)
         : firstSeenTimestamp(Date_t::now()),
           // 'internalQueryStatsMaxErrorCodesPerShape' is a startup-only knob, so the bound is fixed
           // for the lifetime of the process and can be handed to the cache to enforce itself.
@@ -225,7 +225,8 @@ struct QueryStatsEntry {
                   ? static_cast<size_t>(internalQueryStatsMaxErrorCodesPerShape.load()) *
                       kApproxBytesPerRecentError
                   : 0),
-          key(std::move(key_)) {}
+          key(std::move(key_)),
+          userVisibleHash(std::move(userVisibleHash_)) {}
 
     BSONObj toBSON(bool buildSubsections = false,
                    bool includeWriteMetrics = false,
@@ -325,6 +326,11 @@ struct QueryStatsEntry {
      * The Key that can generate the query stats key for this request.
      */
     std::shared_ptr<const Key> key;
+
+    /**
+     * The SHA256 user-visible hash of 'key', represented as a base64-encoded string.
+     */
+    std::string userVisibleHash;
 
     /**
      * Adds supplemental metric to supplementalStatsMap.

@@ -72,6 +72,28 @@ therefore, if adding a new entry to the partition makes it go over its size limi
 recently used entries will be evicted to drop below the max size. Eviction will be tracked in the
 new [server status metrics](#server-status-metrics) for queryStats.
 
+### The KeyHash Index
+
+`$queryStats` output includes a `keyHash` field: the base64 SHA256 of the representative query stats
+key. We call this the _user-visible hash_. It is distinct from the store key the `QueryStatsStore`
+is keyed and partitioned by, so a `$match` on `keyHash` cannot look an entry up directly.
+
+The `KeyHashIndex` closes that gap by mapping each user-visible hash to the store key(s) indexed
+under it. A `$match` on `keyHash` for `$eq` or `$in` then resolves each requested hash to its store
+keys and reads only those entries instead of scanning the store.
+
+`insertQueryStatsEntry()` is the entry point for inserting into the store and index. Both operations
+are done under the same partition lock. When the index is maintained, the entry also caches its
+user-visible hash (computed once on the write path), so `$queryStats` output and index erasure reuse
+it. Otherwise, no hash is computed on the write path and `$queryStats` computes it lazily on read.
+The eviction listener (`onEvict`) erases mappings as entries leave. including when `resetSize()`
+shrinks the store. Thus, every live entry has exactly one mapping and no stale mapping can survive.
+The index's memory is therefore bounded by the number of live entries.
+
+The `keyHash` index is maintained only when `internalQueryStatsMatchPushdownOptimizationEnabled` is
+enabled. The knob is startup-only, so the decision is fixed when the store is constructed. When it
+is disabled, the index stays empty and lookups fall back to scanning the store.
+
 ## Metric Collection
 
 At a high level, when a query is run and collection of query stats is enabled, during planning we
@@ -699,6 +721,12 @@ aggregate command which returns everything in one batch is also one query execut
 particular sensitive elements/pieces of an object. It is "one-way" because it is never meant to be
 undone. This allows us to detect when two queries are using the same identifiers, but never to
 reveal what those identifiers were.
+
+**KeyHash**: The base64 SHA256 of the representative query stats key, emitted as the `keyHash` field
+of `$queryStats` output. We call this the _user-visible hash_. It is distinct from the store key
+(`absl::HashOf(Key)`) the store is keyed and partitioned by, and from the _Query Stats Store Key_
+(the `Key` object) it is derived from. The [KeyHash Index](#the-keyhash-index) maps `keyHash` to the
+store key.
 
 **Query Shape**: [Query Shape](../query_shape/README.md)
 

@@ -78,10 +78,12 @@ public:
      * enough number of partitions so the entries can be more equally dispersed to avoid unnecessary
      * evictions.
      */
-    explicit PartitionedCache(size_t cacheSize, size_t numPartitions)
+    explicit PartitionedCache(size_t cacheSize,
+                              size_t numPartitions,
+                              InsertionEvictionListener listener = InsertionEvictionListener())
         : _numPartitions(numPartitions) {
         invariant(numPartitions > 0);
-        Lru lru{cacheSize / numPartitions};
+        Lru lru{cacheSize / numPartitions, std::move(listener)};
         _partitionedCache =
             std::make_unique<Partitioned<Lru, Partitioner>>(numPartitions, std::move(lru));
     }
@@ -252,6 +254,13 @@ public:
      */
     size_t numPartitions() const {
         return _numPartitions;
+    }
+
+    /**
+     * Returns the id of the partition that 'key' belongs to.
+     */
+    PartitionId partitionOf(const KeyType& key) const {
+        return Partitioner()(key, _numPartitions);
     }
 
     /**

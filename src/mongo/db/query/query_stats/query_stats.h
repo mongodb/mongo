@@ -10,6 +10,7 @@
 #include "mongo/db/query/partitioned_cache.h"
 #include "mongo/db/query/query_stats/key.h"
 #include "mongo/db/query/query_stats/query_stats_entry.h"
+#include "mongo/db/query/query_stats/query_stats_key_hash_index.h"
 #include "mongo/db/query/query_stats/rate_limiting.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/modules.h"
@@ -19,9 +20,10 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <variant>
+#include <vector>
 
 #include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::query_stats {
 
@@ -44,31 +46,42 @@ struct QueryStatsPartitioner {
 struct QueryStatsStoreEntryBudgetor {
     size_t operator()(const std::size_t hash, const QueryStatsEntry& value) {
         return sizeof(decltype(value)) + sizeof(decltype(hash)) + value.key->size() +
-            value.reservedErrorBudgetBytes;
+            value.reservedErrorBudgetBytes +
+            // The entry's cached SHA256 'userVisibleHash' is a heap-allocated string that's
+            // non-empty only when a secondary index is maintained.
+            value.userVisibleHash.size() +
+            // When 'internalQueryStatsMatchPushdownOptimizationEnabled' is disabled, the index
+            // holds no mappings and shouldn't count towards the memory footprint. When enabled, the
+            // 'KeyHashIndex' holds its own heap copy of the userVisibleHash string plus the mapped
+            // store key for every indexed entry. The string is counted once per entry, so this
+            // slightly over-counts when one keyHash maps to several store keys.
+            (internalQueryStatsMatchPushdownOptimizationEnabled.load()
+                 ? value.userVisibleHash.size() + sizeof(std::size_t)
+                 : 0);
     }
 };
 
 /*
- * 'QueryStatsStore insertion and eviction listener implementation. This class adjusts the
+ * QueryStatsStore insertion and eviction listener implementation. This class adjusts the
  * 'queryStatsStoreSizeEstimateBytes' and 'numEntries' serverStatus metrics when entries are
- * inserted or evicted.
+ * inserted or evicted, and keeps the 'KeyHashIndex' in sync with the store contents. The listener
+ * is bound to the index it maintains, so evicting from one store can never update another store's
+ * index. 'index' is null when 'internalQueryStatsMatchPushdownOptimizationEnabled' was disabled.
  */
 struct QueryStatsStoreInsertionEvictionListener {
-    void onInsert(const std::size_t&, const QueryStatsEntry&, size_t estimatedSize) {
-        queryStatsStoreSizeEstimateBytesMetric.increment(estimatedSize);
-        queryStatsStoreSizeMetric.increment();
-    }
+    explicit QueryStatsStoreInsertionEvictionListener(KeyHashIndex* index = nullptr)
+        : _index(index) {}
 
-    void onEvict(const std::size_t&, const QueryStatsEntry&, size_t estimatedSize) {
-        queryStatsStoreSizeEstimateBytesMetric.decrement(estimatedSize);
-        queryStatsStoreSizeMetric.decrement();
-    }
+    void onInsert(const std::size_t&, const QueryStatsEntry&, size_t estimatedSize);
+    void onEvict(const std::size_t&, const QueryStatsEntry&, size_t estimatedSize);
+    void onClear(size_t estimatedSize);
 
-    void onClear(size_t estimatedSize) {
-        queryStatsStoreSizeEstimateBytesMetric.decrement(estimatedSize);
-        queryStatsStoreSizeMetric.setToZero();
-    }
+private:
+    // TODO SERVER-137022: Once the knob is gone, the index will always be available, so this no
+    // longer needs to be a pointer.
+    KeyHashIndex* _index;
 };
+
 using QueryStatsStore = PartitionedCache<std::size_t,
                                          QueryStatsEntry,
                                          QueryStatsStoreEntryBudgetor,
@@ -76,14 +89,29 @@ using QueryStatsStore = PartitionedCache<std::size_t,
                                          QueryStatsStoreInsertionEvictionListener>;
 
 /**
- * A manager for the queryStats store allows a "pointer swap" on the queryStats store itself. The
- * usage patterns are as follows:
+ * One store partition, and the store keys within it that the requested keyHashes resolved to.
+ */
+struct KeyHashTargetGroup {
+    QueryStatsStore::PartitionId partitionId;
+    std::vector<std::size_t> storeKeys;
+};
+
+/**
+ * The outcome of resolving keyHashes: either the resolved target groups (which may be empty, when
+ * no requested hash is indexed), or a signal that the keyHash index is not maintained so the caller
+ * must scan the store instead.
+ */
+struct FullStoreScanRequired {};
+
+using KeyLocations = std::variant<std::vector<KeyHashTargetGroup>, FullStoreScanRequired>;
+
+/**
+ * A manager for the queryStats store. The usage patterns are as follows:
  *
  * - Updating the queryStats store uses the `getQueryStatsStore()` method. The queryStats store
  *   instance is obtained, entries are looked up and mutated, or created anew.
- * - The queryStats store is "reset". This involves atomically allocating a new instance, once
- * there are no more updaters (readers of the store "pointer"), and returning the existing
- * instance.
+ * - The queryStats store is resized via `resetSize()`, which sets a new budget and evicts entries
+ *   until the store fits within it.
  */
 class QueryStatsStoreManager {
 public:
@@ -93,9 +121,12 @@ public:
     static const ServiceContext::Decoration<RateLimiter> getRateLimiter;
     static const ServiceContext::Decoration<RateLimiter> getWriteCmdRateLimiter;
 
-    template <typename... QueryStatsStoreArgs>
     QueryStatsStoreManager(size_t cacheSize, size_t numPartitions)
-        : _queryStatsStore(std::make_unique<QueryStatsStore>(cacheSize, numPartitions)),
+        : _keyHashIndex(numPartitions),
+          _queryStatsStore(std::make_unique<QueryStatsStore>(
+              cacheSize,
+              numPartitions,
+              QueryStatsStoreInsertionEvictionListener{_indexEnabled ? &_keyHashIndex : nullptr})),
           _maxSize(cacheSize) {}
 
     /**
@@ -109,16 +140,44 @@ public:
         return _maxSize.load();
     }
 
+    // TODO SERVER-137022: This function becomes unnecessary once the knob
+    // `internalQueryStatsMatchPushdownOptimizationEnabled` is removed.
+    bool hasSecondaryIndex() const {
+        return _indexEnabled;
+    }
+
+    /**
+     * Resolves 'keyHashes' to the store keys they are indexed under, grouped by store partition.
+     * Returns a 'FullStoreScanRequired' when the keyHash index is not maintained. Otherwise,
+     * returns the groups, which may be empty when no requested hash is indexed. Unknown hashes are
+     * dropped, and a store key appears once even if several hashes resolve to it.
+     */
+    KeyLocations findStoreKeysByUserHash(const std::vector<std::string>& keyHashes);
+
+    [[MONGO_MOD_PRIVATE]] size_t numKeyHashes_forTest() const {
+        return _keyHashIndex._numKeyHashes_forTest();
+    }
+
+    [[MONGO_MOD_PRIVATE]] size_t numMappings_forTest() {
+        return _keyHashIndex._numMappings_forTest();
+    }
+
     /**
      * Resize the queryStats store and return the number of evicted
      * entries.
      */
     size_t resetSize(size_t cacheSize) {
         _maxSize.store(cacheSize);
+        // The store's eviction listener erases each index mapping as reset() evicts entries.
         return _queryStatsStore->reset(cacheSize);
     }
 
 private:
+    // Secondary index over '_queryStatsStore'.
+    KeyHashIndex _keyHashIndex;
+
+    const bool _indexEnabled = internalQueryStatsMatchPushdownOptimizationEnabled.load();
+
     std::unique_ptr<QueryStatsStore> _queryStatsStore;
 
     /**
@@ -129,9 +188,20 @@ private:
 };
 
 /**
- * Computes the user-visible SHA256 'keyHash' for 'key'.
+ * Serializes 'key' to its representative query shape.
  */
-std::string computeKeyHashString(OperationContext* opCtx, const Key& key);
+BSONObj computeRepresentativeShapeKey(OperationContext* opCtx, const Key& key);
+
+/**
+ * Computes the user-visible SHA256 hash ('userVisibleHash') of a serialized representative query
+ * shape.
+ */
+std::string computeUserVisibleHash(const BSONObj& representativeShapeKey);
+
+/**
+ * Computes the user-visible SHA256 hash ('userVisibleHash') of 'key's representative query shape.
+ */
+std::string computeUserVisibleHash(OperationContext* opCtx, const Key& key);
 
 /**
  * Acquire a reference to the global queryStats store.
@@ -289,7 +359,7 @@ QueryStatsSnapshot captureMetrics(const OperationContext* opCtx,
                                   const OpDebug::AdditiveMetrics& metrics);
 
 /**
- * Writes query stats to the query stats store for the operation identified by `queryStatsKeyHash`.
+ * Writes query stats to the query stats store for the operation identified by `storeKey`.
  *
  * Direct calls to writeQueryStats in new code should be avoided in favor of calling existing
  * functions:
@@ -299,7 +369,7 @@ QueryStatsSnapshot captureMetrics(const OperationContext* opCtx,
  *    multiple operations (via getMore)
  */
 void writeQueryStats(OperationContext* opCtx,
-                     boost::optional<size_t> queryStatsKeyHash,
+                     boost::optional<size_t> storeKey,
                      std::unique_ptr<Key> key,
                      const QueryStatsSnapshot& snapshot,
                      std::vector<std::unique_ptr<SupplementalStatsEntry>> supplementalMetrics = {},
@@ -311,7 +381,7 @@ void writeQueryStats(OperationContext* opCtx,
  */
 void writeQueryStatsOnCursorDisposeOrKill(
     OperationContext* opCtx,
-    boost::optional<size_t> queryStatsKeyHash,
+    boost::optional<size_t> storeKey,
     std::unique_ptr<Key> key,
     bool isChangeStreamQuery,
     boost::optional<Microseconds> firstResponseExecutionTime,

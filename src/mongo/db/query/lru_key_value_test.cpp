@@ -118,6 +118,7 @@ void assertInKVStore(LRUKeyValue<Key, Value, Estimator, Listener>& cache, Key ke
 template <typename Key, typename Value, typename Estimator, typename Listener>
 void assertNotInKVStore(LRUKeyValue<Key, Value, Estimator, Listener>& cache, Key key) {
     ASSERT_FALSE(cache.hasKey(key));
+    ASSERT(!cache.peek(key).isOK());
     auto s = cache.get(key);
     ASSERT(!s.isOK());
 }
@@ -278,6 +279,30 @@ TEST(LRUKeyValueTest, PromotionTest) {
         } else {
             assertNotInKVStore(cache, i);
         }
+    }
+}
+
+/**
+ * Ensures that a peeked key is evicted on the same schedule as one that was never read.
+ */
+TEST(LRUKeyValueTest, PeekDoesNotPromoteTest) {
+    int maxSize = 10;
+    TestSharedPtrValue cache{static_cast<size_t>(maxSize)};
+    for (int i = 0; i < maxSize; ++i) {
+        ASSERT_EQ(0, cache.add(i, std::make_shared<int>(i)));
+    }
+
+    // peek() the least recently used entry.
+    const int peekKey = 0;
+    auto peeked = cache.peek(peekKey);
+    ASSERT_OK(peeked.getStatus());
+    ASSERT_EQUALS(*(peeked.getValue()->second), peekKey);
+
+    // A single insertion over budget evicts the entry that was just peeked.
+    ASSERT_GT(cache.add(maxSize, std::make_shared<int>(maxSize)), 0u);
+    assertNotInKVStore(cache, peekKey);
+    for (int i = 1; i < maxSize; ++i) {
+        ASSERT_TRUE(cache.hasKey(i));
     }
 }
 

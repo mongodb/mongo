@@ -13,7 +13,6 @@
 #include <cstddef>
 #include <functional>
 #include <list>
-#include <memory>
 #include <utility>
 
 #include <fmt/format.h>
@@ -51,7 +50,9 @@ public:
 template <class K, class V, typename Estimator, typename InsertionEvictionListener>
 class LRUBudgetTracker {
 public:
-    LRUBudgetTracker(size_t maxBudget) : _max(maxBudget), _current(0) {}
+    LRUBudgetTracker(size_t maxBudget,
+                     InsertionEvictionListener listener = InsertionEvictionListener())
+        : _max(maxBudget), _current(0), _listener(std::move(listener)) {}
 
     void onAdd(const K& k, const V& v) {
         size_t budget = _estimator(k, v);
@@ -164,7 +165,8 @@ public:
     using mapped_type = typename KVMap::mapped_type;
     using value_type = typename KVMap::value_type;
 
-    LRUKeyValue(size_t maxSize) : _budgetTracker{maxSize} {}
+    LRUKeyValue(size_t maxSize, InsertionEvictionListener listener = InsertionEvictionListener())
+        : _budgetTracker{maxSize, std::move(listener)} {}
 
     ~LRUKeyValue() {
         clear();
@@ -195,18 +197,30 @@ public:
     }
 
     /**
-     * Retrieve the iterator to the value associated with 'key' from the kv-store. Note that this
-     * iterator returned is only guaranteed to be valid until the next call to any method in this
-     * class. As a side effect, the retrieved entry is promoted to the most recently used.
+     * Retrieve the iterator to the value associated with 'key' from the kv-store, without
+     * promoting the entry to the most recently used. The returned iterator is only guaranteed to be
+     * valid until the next call to any method in this class.
      */
-    StatusWith<KVListIt> get(const K& key) const {
+    StatusWith<KVListIt> peek(const K& key) const {
         KVMapConstIt i = _kvMap.find(&key);
         if (i == _kvMap.end()) {
             return Status(ErrorCodes::NoSuchKey, "no such key in LRU key-value store");
         }
-        KVListIt found = i->second;
+        return i->second;
+    }
+
+    /**
+     * Same as peek(), but as a side effect, the retrieved entry is promoted to the most recently
+     * used. The returned iterator is only guaranteed to be valid until the next call to any method
+     * in this class.
+     */
+    StatusWith<KVListIt> get(const K& key) const {
+        auto found = peek(key);
+        if (!found.isOK()) {
+            return found.getStatus();
+        }
         // Promote the kv-store entry to the front of the list. It is now the most recently used.
-        _kvList.splice(_kvList.begin(), _kvList, found);
+        _kvList.splice(_kvList.begin(), _kvList, found.getValue());
         return _kvList.begin();
     }
 

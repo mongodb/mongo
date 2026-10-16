@@ -17,6 +17,7 @@
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/scopeguard.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQueryStats
 
@@ -297,6 +298,85 @@ TEST(QueryStatsKeyBsonValidation, RejectsKeyTooDeepToBeWrappedInAReply) {
         deep = BSON("a" << deep);
     }
     ASSERT_EQ(validateQueryStatsKeyBson(deep).code(), ErrorCodes::Overflow);
+}
+
+TEST_F(QueryStatsTest, KeyHashIndexStaysBoundedAfterEviction) {
+    unittest::ServerParameterGuard knobGuard("internalQueryStatsMatchPushdownOptimizationEnabled",
+                                             true);
+    // With the errors flag off, an entry reserves no error budget, so a budgeted entry stays small
+    // enough that 'kCacheSizeBytes' below holds at least one of them.
+    const bool errorsFlagWasEnabled = feature_flags::gFeatureFlagQueryStatsErrors.checkEnabled();
+    ON_BLOCK_EXIT([&] {
+        feature_flags::gFeatureFlagQueryStatsErrors.setForServerParameter(errorsFlagWasEnabled);
+    });
+    feature_flags::gFeatureFlagQueryStatsErrors.setForServerParameter(false);
+
+    auto serviceCtx = getServiceContext();
+    // Holds some but not all of the 'kNumShapes' shapes written below, so entries are evicted and
+    // the index has to shrink in lockstep. 'kNumShapes' is derived from this budget.
+    static constexpr int kCacheSizeBytes = 4000;
+    QueryStatsStoreManager::get(serviceCtx) =
+        std::make_unique<QueryStatsStoreManager>(kCacheSizeBytes, /*numPartitions*/ 1);
+    QueryStatsStoreManager::getRateLimiter(serviceCtx)
+        .configureWindowBased(INT_MAX);  // collect all
+
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("testDB.testColl");
+
+    // Identifies a shape both ways: 'storeKey' (absl::HashOf) and 'userVisibleHash' (SHA256)
+    struct ShapeId {
+        std::string userVisibleHash;
+        std::size_t storeKey;
+    };
+
+    // Registers + writes a distinct find shape (unique field name per 'i') and returns its ids.
+    auto writeShape = [&](int i) -> ShapeId {
+        auto opCtx = makeOperationContext();
+        auto fcr = std::make_unique<FindCommandRequest>(NamespaceStringOrUUID(nss));
+        fcr->setFilter(BSON(("field" + std::to_string(i)) << i));
+        auto expCtx = ExpressionContextBuilder{}.fromRequest(opCtx.get(), *fcr).build();
+        auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(fcr)}));
+        auto findShape = std::make_unique<query_shape::FindCmdShape>(*parsedFind, expCtx);
+        registerRequest(opCtx.get(), nss, [&]() {
+            return std::make_unique<FindKey>(expCtx,
+                                             *parsedFind->findCommandRequest,
+                                             std::move(findShape),
+                                             query_shape::CollectionType::kCollection);
+        });
+        auto& info = CurOp::get(*opCtx)->debug().getQueryStatsInfo();
+        // Capture the identifiers before 'key' is moved into writeQueryStats.
+        ShapeId id{computeUserVisibleHash(opCtx.get(), *info.key), *info.keyHash};
+        writeQueryStats(opCtx.get(), info.keyHash, std::move(info.key), QueryStatsSnapshot{});
+        return id;
+    };
+
+    // Twice as many shapes as the budget can hold by raw entry size, so entries are certainly
+    // evicted while the budget still fits at least one of them. A budgeted entry is always larger
+    // than 'sizeof(QueryStatsEntry)' (see 'QueryStatsStoreEntryBudgetor'), so this many cannot fit.
+    static constexpr int kNumShapes =
+        2 * (kCacheSizeBytes / static_cast<int>(sizeof(QueryStatsEntry)));
+    std::vector<ShapeId> shapes;
+    for (int i = 0; i < kNumShapes; ++i) {
+        shapes.push_back(writeShape(i));
+    }
+
+    auto& manager = QueryStatsStoreManager::get(serviceCtx);
+    auto& store = manager->getQueryStatsStore();
+
+    // Per shape, the index must resolve its userVisibleHash if the store still holds the entry.
+    size_t survived = 0;
+    size_t evicted = 0;
+    for (const auto& shape : shapes) {
+        const bool inStore = store.lookup(shape.storeKey).isOK();
+        auto locations = manager->findStoreKeysByUserHash({shape.userVisibleHash});
+        const auto* groups = std::get_if<std::vector<KeyHashTargetGroup>>(&locations);
+        const bool inIndex = groups && !groups->empty();
+        ASSERT_EQ(inIndex, inStore) << "keyHash index and store disagree for a shape";
+        inStore ? ++survived : ++evicted;
+    }
+
+    ASSERT_GT(survived, 0u);
+    ASSERT_GT(evicted, 0u);
+    ASSERT_EQ(manager->numMappings_forTest(), survived);
 }
 
 }  // namespace mongo::query_stats

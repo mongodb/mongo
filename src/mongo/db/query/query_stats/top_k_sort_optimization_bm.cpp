@@ -162,7 +162,8 @@ struct Fixture {
                 ? makeSimpleFindKey(keyExpCtx, i)
                 : makeNestedPipelineKey(keyExpCtx, i);
             auto storeKey = absl::HashOf(*key);
-            query_stats::QueryStatsEntry entry(std::move(key));
+            // The benchmark doesn't maintain the keyHash index, so the entry caches no hash.
+            query_stats::QueryStatsEntry entry(std::move(key), "");
             // Assign a random value for 'workingTimeMillis' so the $sort has work to do.
             entry.workingTimeMillis.aggregate(timeDist(rng));
             totalEvicted += store.put(storeKey, std::move(entry));

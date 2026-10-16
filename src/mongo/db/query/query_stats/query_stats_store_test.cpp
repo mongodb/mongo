@@ -38,6 +38,7 @@
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/scopeguard.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -46,6 +47,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <variant>
 
 #include <absl/hash/hash.h>
 #include <boost/cstdint.hpp>
@@ -76,14 +78,44 @@ static const NamespaceStringOrUUID kDefaultTestNss =
     NamespaceStringOrUUID{NamespaceString::createNamespaceString_forTest("testDB.testColl")};
 class QueryStatsStoreTest : public ServiceContextTest {
 public:
-    static std::unique_ptr<const Key> makeFindKeyFromQuery(BSONObj filter) {
+    static std::pair<std::unique_ptr<const Key>, boost::intrusive_ptr<ExpressionContextForTest>>
+    makeFindKeyAndExpCtx(BSONObj filter) {
         auto expCtx = make_intrusive<ExpressionContextForTest>();
         auto fcr = std::make_unique<FindCommandRequest>(kDefaultTestNss);
         fcr->setFilter(filter.getOwned());
         auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(fcr)}));
         auto findShape = std::make_unique<query_shape::FindCmdShape>(*parsedFind, expCtx);
-        return std::make_unique<FindKey>(
+        auto key = std::make_unique<FindKey>(
             expCtx, *parsedFind->findCommandRequest, std::move(findShape), collectionType);
+        return {std::move(key), expCtx};
+    }
+
+    static std::unique_ptr<const Key> makeFindKeyFromQuery(BSONObj filter) {
+        return makeFindKeyAndExpCtx(std::move(filter)).first;
+    }
+
+    // Like makeFindKeyFromQuery, but also returns the entry's SHA256 keyHash, for tests that build
+    // a QueryStatsEntry directly and must supply the hash.
+    static std::pair<std::unique_ptr<const Key>, std::string> makeFindKeyAndHashFromQuery(
+        BSONObj filter) {
+        auto [key, expCtx] = makeFindKeyAndExpCtx(std::move(filter));
+        auto userVisibleHash = computeUserVisibleHash(expCtx->getOperationContext(), *key);
+        return {std::move(key), std::move(userVisibleHash)};
+    }
+
+    // Like makeFindKeyAndHashFromQuery, but sets 'hint' on the find request.
+    static std::pair<std::unique_ptr<const Key>, std::string> makeHintedFindKeyAndHash(
+        BSONObj filter, BSONObj hint) {
+        auto expCtx = make_intrusive<ExpressionContextForTest>();
+        auto fcr = std::make_unique<FindCommandRequest>(kDefaultTestNss);
+        fcr->setFilter(filter.getOwned());
+        fcr->setHint(hint.getOwned());
+        auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(fcr)}));
+        auto findShape = std::make_unique<query_shape::FindCmdShape>(*parsedFind, expCtx);
+        auto key = std::make_unique<FindKey>(
+            expCtx, *parsedFind->findCommandRequest, std::move(findShape), collectionType);
+        auto userVisibleHash = computeUserVisibleHash(expCtx->getOperationContext(), *key);
+        return {std::move(key), std::move(userVisibleHash)};
     }
 
     static constexpr auto collectionType = query_shape::CollectionType::kCollection;
@@ -138,11 +170,12 @@ TEST_F(QueryStatsStoreTest, BasicUsage) {
     };
 
     auto collectMetrics = [&](BSONObj query) {
-        auto key = makeFindKeyFromQuery(query);
+        auto [key, userVisibleHash] = makeFindKeyAndHashFromQuery(query);
         auto lookupHash = absl::HashOf(key);
         auto lookupResult = queryStatsStore.lookup(lookupHash);
         if (!lookupResult.isOK()) {
-            queryStatsStore.put(lookupHash, QueryStatsEntry{std::move(key)});
+            queryStatsStore.put(lookupHash,
+                                QueryStatsEntry{std::move(key), std::move(userVisibleHash)});
             lookupResult = queryStatsStore.lookup(lookupHash);
         }
         auto metrics = lookupResult.getValue();
@@ -188,10 +221,10 @@ TEST_F(QueryStatsStoreTest, EvictionTest) {
     // behavior with very large queries.
     // Add an entry that is smaller than the max partition size.
     auto query = BSON("query" << 1 << "xEquals" << 42);
-    auto key = makeFindKeyFromQuery(query);
+    auto [key, userVisibleHash] = makeFindKeyAndHashFromQuery(query);
 
     auto hash = absl::HashOf(key);
-    QueryStatsEntry entry{std::move(key)};
+    QueryStatsEntry entry{std::move(key), std::move(userVisibleHash)};
     const size_t cacheSize = QueryStatsStoreEntryBudgetor{}(hash, entry) + 100;
     const auto numPartitions = 1;
     QueryStatsStore queryStatsStore{cacheSize, numPartitions};
@@ -232,11 +265,12 @@ TEST_F(QueryStatsStoreTest, EvictionTest) {
         auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(fcr)}));
         auto findShape = std::make_unique<query_shape::FindCmdShape>(*parsedFind, expCtx);
 
-        key = std::make_unique<query_stats::FindKey>(
+        auto largeKey = std::make_unique<query_stats::FindKey>(
             expCtx, *parsedFind->findCommandRequest, std::move(findShape), collectionType);
-        auto lookupHash = absl::HashOf(key);
-        QueryStatsEntry testMetrics{std::move(key)};
-        queryStatsStore.put(lookupHash, testMetrics);
+        auto lookupHash = absl::HashOf(largeKey);
+        auto userVisibleHash = computeUserVisibleHash(opCtx.get(), *largeKey);
+        queryStatsStore.put(lookupHash,
+                            QueryStatsEntry{std::move(largeKey), std::move(userVisibleHash)});
     };
 
     addLargeEntry(queryStatsStore);
@@ -253,7 +287,8 @@ TEST_F(QueryStatsStoreTest, EvictionTest) {
 
 TEST_F(QueryStatsStoreTest, RecordErrorCodeBasic) {
     auto query = BSON("query" << 1);
-    QueryStatsEntry entry{makeFindKeyFromQuery(query)};
+    auto [key, userVisibleHash] = makeFindKeyAndHashFromQuery(query);
+    QueryStatsEntry entry{std::move(key), std::move(userVisibleHash)};
     entry.recordErrorCode(ErrorCodes::BadValue);
 
     ASSERT_EQ(entry.execCountErrored, 1);
@@ -265,7 +300,8 @@ TEST_F(QueryStatsStoreTest, RecordErrorCodeBasic) {
 
 TEST_F(QueryStatsStoreTest, RecordErrorCodeUpdatesExistingEntry) {
     auto query = BSON("query" << 1);
-    QueryStatsEntry entry{makeFindKeyFromQuery(query)};
+    auto [key, userVisibleHash] = makeFindKeyAndHashFromQuery(query);
+    QueryStatsEntry entry{std::move(key), std::move(userVisibleHash)};
 
     entry.recordErrorCode(ErrorCodes::BadValue);
     entry.recordErrorCode(ErrorCodes::BadValue);
@@ -286,7 +322,8 @@ TEST_F(QueryStatsStoreTest, RecordErrorCodeEvictsLeastRecentlySeen) {
     internalQueryStatsMaxErrorCodesPerShape.store(static_cast<int>(maxRecentErrors));
 
     auto query = BSON("query" << 1);
-    QueryStatsEntry entry{makeFindKeyFromQuery(query)};
+    auto [key, userVisibleHash] = makeFindKeyAndHashFromQuery(query);
+    QueryStatsEntry entry{std::move(key), std::move(userVisibleHash)};
 
     entry.recordErrorCode(ErrorCodes::BadValue);
     entry.recordErrorCode(ErrorCodes::MaxTimeMSExpired);
@@ -378,6 +415,271 @@ TEST_F(QueryStatsStoreTest, UpdateStatisticsGatesErrorCollectionBehindFeatureFla
             ASSERT_TRUE(entry.recentErrors.hasKey(ErrorCodes::BadValue));
         }
     }
+}
+
+class KeyHashIndexTest : public QueryStatsStoreTest {
+public:
+    static void insert(KeyHashIndex& index, const std::string& keyHash, std::size_t storeKey) {
+        index._insert(keyHash, storeKey);
+    }
+
+    static bool hasHash(KeyHashIndex& index, const std::string& keyHash) {
+        return index._lookup(keyHash).has_value();
+    }
+
+    static bool hasKey(KeyHashIndex& index, const std::string& keyHash, std::size_t storeKey) {
+        auto storeKeys = index._lookup(keyHash);
+        return storeKeys && storeKeys->contains(storeKey);
+    }
+
+    static void erase(KeyHashIndex& index, const std::string& keyHash, std::size_t storeKey) {
+        index._erase(keyHash, storeKey);
+    }
+
+    static size_t numKeyHashes(const KeyHashIndex& index) {
+        return index._numKeyHashes_forTest();
+    }
+
+    static size_t numMappings(KeyHashIndex& index) {
+        return index._numMappings_forTest();
+    }
+};
+
+TEST_F(KeyHashIndexTest, BasicOps) {
+    // 'KeyHashIndex' maps the user-visible SHA256 keyHash (base64) to the set of absl::HashOf store
+    // keys indexed under it.
+    KeyHashIndex index{/*numPartitions*/ 4};
+
+    const std::string userVisibleHashA(64, 'a');
+    const std::string userVisibleHashB(64, 'b');
+
+    // Unknown lookups return none.
+    ASSERT_FALSE(hasHash(index, userVisibleHashA));
+
+    insert(index, userVisibleHashA, /*storeKey*/ 111);
+    insert(index, userVisibleHashB, /*storeKey*/ 222);
+
+    ASSERT_TRUE(hasKey(index, userVisibleHashA, 111));
+    ASSERT_TRUE(hasKey(index, userVisibleHashB, 222));
+    ASSERT_EQ(numKeyHashes(index), 2);
+
+    // A second store key under the same keyHash coexists (1:N).
+    insert(index, userVisibleHashA, /*storeKey*/ 333);
+    ASSERT_TRUE(hasKey(index, userVisibleHashA, 111));
+    ASSERT_TRUE(hasKey(index, userVisibleHashA, 333));
+    ASSERT_EQ(numKeyHashes(index), 2);
+    // The two store keys under 'userVisibleHashA' are two mappings under one keyHash.
+    ASSERT_EQ(numMappings(index), 3);
+
+    // Erasing removes only the given store key.
+    erase(index, userVisibleHashA, 111);
+    ASSERT_FALSE(hasKey(index, userVisibleHashA, 111));
+    ASSERT_TRUE(hasKey(index, userVisibleHashA, 333));
+
+    // Erasing the last store key under a keyHash drops the keyHash entirely.
+    erase(index, userVisibleHashA, 333);
+    ASSERT_FALSE(hasHash(index, userVisibleHashA));
+    ASSERT_TRUE(hasHash(index, userVisibleHashB));
+
+    // Erasing an absent key is a no-op.
+    erase(index, userVisibleHashA, 999);
+    ASSERT_TRUE(hasHash(index, userVisibleHashB));
+    ASSERT_EQ(numKeyHashes(index), 1);
+}
+
+namespace {
+
+/**
+ * Inserts an entry for 'key' into 'manager's store under 'storeKey', caching 'userVisibleHash' on
+ * the entry, so the store and the keyHash index are populated together.
+ */
+void insertEntryWithKeyHash(QueryStatsStoreManager& manager,
+                            std::unique_ptr<const Key> key,
+                            std::size_t storeKey,
+                            const std::string& userVisibleHash) {
+    auto& store = manager.getQueryStatsStore();
+    auto&& [statusWithMetrics, partitionLock] = store.getWithPartitionLock(storeKey);
+    store.put(storeKey, QueryStatsEntry(std::move(key), userVisibleHash), partitionLock);
+}
+
+/**
+ * Adds an entry for the find shape 'filter' produces to 'manager's store, so the store
+ * and the keyHash index are populated together. Returns its userVisibleHash and store key.
+ */
+std::pair<std::string, std::size_t> insertIndexedEntry(QueryStatsStoreManager& manager,
+                                                       OperationContext* opCtx,
+                                                       BSONObj filter) {
+    auto key = QueryStatsStoreTest::makeFindKeyFromQuery(std::move(filter));
+    const auto userVisibleHash = computeUserVisibleHash(opCtx, *key);
+    const std::size_t storeKey = absl::HashOf(*key);
+    insertEntryWithKeyHash(manager, std::move(key), storeKey, userVisibleHash);
+    return {userVisibleHash, storeKey};
+}
+
+/**
+ * Whether 'userVisibleHash' resolves to 'storeKey' through the manager's keyHash index.
+ */
+bool isIndexed(QueryStatsStoreManager& manager,
+               const std::string& userVisibleHash,
+               std::size_t storeKey) {
+    auto locations = manager.findStoreKeysByUserHash({userVisibleHash});
+    const auto* groups = std::get_if<std::vector<KeyHashTargetGroup>>(&locations);
+    return groups && groups->size() == 1 &&
+        (*groups)[0].storeKeys == std::vector<std::size_t>{storeKey};
+}
+
+/**
+ * All store keys 'userVisibleHash' resolves to, sorted.
+ */
+std::vector<std::size_t> resolvedStoreKeys(QueryStatsStoreManager& manager,
+                                           const std::string& userVisibleHash) {
+    std::vector<std::size_t> storeKeys;
+    auto locations = manager.findStoreKeysByUserHash({userVisibleHash});
+    if (const auto* groups = std::get_if<std::vector<KeyHashTargetGroup>>(&locations)) {
+        for (const auto& group : *groups) {
+            storeKeys.insert(storeKeys.end(), group.storeKeys.begin(), group.storeKeys.end());
+        }
+    }
+    std::sort(storeKeys.begin(), storeKeys.end());
+    return storeKeys;
+}
+
+}  // namespace
+
+TEST_F(QueryStatsStoreTest, KeyHashIndexRetainsEntriesRetainedByResetSize) {
+    unittest::ServerParameterGuard knobGuard("internalQueryStatsMatchPushdownOptimizationEnabled",
+                                             true);
+    QueryStatsStoreManager manager{/*cacheSize*/ 100000, /*numPartitions*/ 4};
+    auto opCtx = makeOperationContext();
+
+    // insertIndexedEntry() populates the store and the index together.
+    const auto [userVisibleHash, storeKey] =
+        insertIndexedEntry(manager, opCtx.get(), BSON("a" << 1));
+    ASSERT_EQ(countAllEntries(manager.getQueryStatsStore()), 1);
+    ASSERT_TRUE(isIndexed(manager, userVisibleHash, storeKey));
+
+    // Growing the store evicts nothing.
+    manager.resetSize(200000);
+    ASSERT_EQ(countAllEntries(manager.getQueryStatsStore()), 1);
+    ASSERT_TRUE(isIndexed(manager, userVisibleHash, storeKey));
+    ASSERT_EQ(manager.numKeyHashes_forTest(), 1);
+}
+
+TEST_F(QueryStatsStoreTest, KeyHashIndexPrunedForEntriesEvictedByResetSize) {
+    unittest::ServerParameterGuard knobGuard("internalQueryStatsMatchPushdownOptimizationEnabled",
+                                             true);
+    QueryStatsStoreManager manager{/*cacheSize*/ 100000, /*numPartitions*/ 1};
+    auto opCtx = makeOperationContext();
+
+    const auto [userVisibleHash, storeKey] =
+        insertIndexedEntry(manager, opCtx.get(), BSON("a" << 1));
+    ASSERT_TRUE(isIndexed(manager, userVisibleHash, storeKey));
+
+    // A budget of zero evicts everything, so reset()'s evictions erase the mapping from the index
+    // through the store's eviction listener.
+    manager.resetSize(0);
+    ASSERT_EQ(countAllEntries(manager.getQueryStatsStore()), 0);
+    ASSERT_FALSE(isIndexed(manager, userVisibleHash, storeKey));
+    ASSERT_EQ(manager.numKeyHashes_forTest(), 0);
+}
+
+TEST_F(QueryStatsStoreTest, KeyHashIndexResolvesAndEvictsMultipleStoreKeysPerKeyHash) {
+    unittest::ServerParameterGuard knobGuard("internalQueryStatsMatchPushdownOptimizationEnabled",
+                                             true);
+    // One partition so both store keys resolve to a single 'KeyHashTargetGroup'.
+    QueryStatsStoreManager manager{/*cacheSize*/ 100000, /*numPartitions*/ 1};
+
+    // An object-valued '$hint' is redacted in the representative shape (the keyHash) but hashed raw
+    // into the store key, so these two finds share a keyHash yet land on different store keys.
+    auto [keyA, userVisibleHashA] =
+        makeHintedFindKeyAndHash(BSON("a" << 1), BSON("$hint" << BSON("x" << 1)));
+    auto [keyB, userVisibleHashB] =
+        makeHintedFindKeyAndHash(BSON("a" << 1), BSON("$hint" << BSON("y" << 1)));
+
+    ASSERT_EQ(userVisibleHashA, userVisibleHashB);
+    const std::size_t storeKeyA = absl::HashOf(*keyA);
+    const std::size_t storeKeyB = absl::HashOf(*keyB);
+    ASSERT_NE(storeKeyA, storeKeyB);
+
+    insertEntryWithKeyHash(manager, std::move(keyA), storeKeyA, userVisibleHashA);
+    insertEntryWithKeyHash(manager, std::move(keyB), storeKeyB, userVisibleHashA);
+    ASSERT_EQ(countAllEntries(manager.getQueryStatsStore()), 2);
+
+    // The one keyHash resolves to both store keys, and the index holds a single keyHash.
+    auto expected = std::vector<std::size_t>{storeKeyA, storeKeyB};
+    std::sort(expected.begin(), expected.end());
+    ASSERT_EQ(resolvedStoreKeys(manager, userVisibleHashA), expected);
+    ASSERT_EQ(manager.numKeyHashes_forTest(), 1);
+
+    // Evicting one store key leaves the other under the same keyHash.
+    manager.getQueryStatsStore().remove(storeKeyA);
+    ASSERT_EQ(resolvedStoreKeys(manager, userVisibleHashA), (std::vector<std::size_t>{storeKeyB}));
+    ASSERT_EQ(manager.numKeyHashes_forTest(), 1);
+
+    // Evicting the last store key drops the keyHash from the index. The index is still maintained,
+    // so this resolves to an empty result, not a 'FullStoreScanRequired'.
+    manager.getQueryStatsStore().remove(storeKeyB);
+    auto locations = manager.findStoreKeysByUserHash({userVisibleHashA});
+    const auto* groups = std::get_if<std::vector<KeyHashTargetGroup>>(&locations);
+    ASSERT_NE(groups, nullptr);
+    ASSERT_TRUE(groups->empty());
+    ASSERT_EQ(manager.numKeyHashes_forTest(), 0);
+}
+
+TEST_F(QueryStatsStoreTest, EvictionKeepsLocalManagerIndexInSync) {
+    unittest::ServerParameterGuard knobGuard("internalQueryStatsMatchPushdownOptimizationEnabled",
+                                             true);
+    // Fill a local manager's store past its budget so entries are evicted; the keyHash index must
+    // shrink in lockstep. The manager under test is local (not the service decoration), so an
+    // eviction that reached a global manager would leave the index over-counted.
+    QueryStatsStoreManager manager{/*cacheSize*/ 20000, /*numPartitions*/ 1};
+    auto opCtx = makeOperationContext();
+
+    for (int i = 0; i < 200; ++i) {
+        insertIndexedEntry(manager, opCtx.get(), BSON("field" << i));
+    }
+
+    // Enough inserts must have been evicted for the equality assertion to be meaningful.
+    ASSERT_LT(countAllEntries(manager.getQueryStatsStore()), 200);
+    ASSERT_EQ(manager.numMappings_forTest(),
+              static_cast<size_t>(countAllEntries(manager.getQueryStatsStore())));
+}
+
+TEST_F(QueryStatsStoreTest, KeyHashIndexDisabledByKnob) {
+    // The shared knob defaults to off; keep the guard explicit so this test is robust to the
+    // default flipping on.
+    unittest::ServerParameterGuard knobGuard("internalQueryStatsMatchPushdownOptimizationEnabled",
+                                             false);
+    QueryStatsStoreManager manager{/*cacheSize*/ 100000, /*numPartitions*/ 4};
+    auto opCtx = makeOperationContext();
+
+    const auto [userVisibleHash, storeKey] =
+        insertIndexedEntry(manager, opCtx.get(), BSON("a" << 1));
+    insertIndexedEntry(manager, opCtx.get(), BSON("b" << 1));
+
+    // The store fills normally but no mapping is maintained. findStoreKeysByUserHash reports that a
+    // full scan is required, so callers don't trust an empty result.
+    ASSERT_EQ(countAllEntries(manager.getQueryStatsStore()), 2);
+    ASSERT_EQ(manager.numKeyHashes_forTest(), 0);
+    ASSERT_TRUE(std::holds_alternative<FullStoreScanRequired>(
+        manager.findStoreKeysByUserHash({userVisibleHash})));
+}
+
+TEST_F(QueryStatsStoreTest, InsertedEntryCachesKeyHash) {
+    unittest::ServerParameterGuard knobGuard("internalQueryStatsMatchPushdownOptimizationEnabled",
+                                             true);
+    QueryStatsStoreManager manager{/*cacheSize*/ 100000, /*numPartitions*/ 4};
+    auto opCtx = makeOperationContext();
+
+    // insertIndexedEntry() computes the userVisibleHash once; the stored entry must cache the same
+    // value so $queryStats output and index erasure reuse it rather than recompute it.
+    const auto [userVisibleHash, storeKey] =
+        insertIndexedEntry(manager, opCtx.get(), BSON("a" << 1));
+    auto&& [entryStatus, partitionLock] =
+        manager.getQueryStatsStore().getWithPartitionLock(storeKey);
+    ASSERT_OK(entryStatus.getStatus());
+    const auto& entry = *entryStatus.getValue();
+    ASSERT_EQ(entry.userVisibleHash, userVisibleHash);
 }
 
 TEST_F(QueryStatsStoreTest, RegisterRequestSkipsShapeExceedingMaxUserSize) {
@@ -1957,11 +2259,12 @@ TEST_F(QueryStatsStoreTest, BasicDiskUsage) {
         };
 
         auto collectMetricsBase = [&](BSONObj query) {
-            auto key = makeFindKeyFromQuery(query);
+            auto [key, userVisibleHash] = makeFindKeyAndHashFromQuery(query);
             auto lookupHash = absl::HashOf(key);
             auto lookupResult = queryStatsStore.lookup(lookupHash);
             if (!lookupResult.isOK()) {
-                queryStatsStore.put(lookupHash, QueryStatsEntry{std::move(key)});
+                queryStatsStore.put(lookupHash,
+                                    QueryStatsEntry{std::move(key), std::move(userVisibleHash)});
                 lookupResult = queryStatsStore.lookup(lookupHash);
             }
 
@@ -2033,9 +2336,9 @@ TEST_F(QueryStatsStoreTest, BasicDiskUsage) {
 TEST_F(QueryStatsStoreTest, BasicErrorMetricsBSON) {
     QueryStatsStore queryStatsStore{5000000, 1000};
     auto query1 = BSON("query" << 1);
-    auto key = makeFindKeyFromQuery(query1);
+    auto [key, userVisibleHash] = makeFindKeyAndHashFromQuery(query1);
     auto lookupHash = absl::HashOf(key);
-    queryStatsStore.put(lookupHash, QueryStatsEntry{std::move(key)});
+    queryStatsStore.put(lookupHash, QueryStatsEntry{std::move(key), std::move(userVisibleHash)});
     auto lookupResult = queryStatsStore.lookup(lookupHash);
     ASSERT_OK(lookupResult);
     auto& entry = *lookupResult.getValue();
@@ -2087,11 +2390,12 @@ TEST_F(QueryStatsStoreTest, BasicDiskUsageWithCBRMetrics) {
         };
 
         auto collectMetricsBase = [&](BSONObj query) {
-            auto key = makeFindKeyFromQuery(query);
+            auto [key, userVisibleHash] = makeFindKeyAndHashFromQuery(query);
             auto lookupHash = absl::HashOf(key);
             auto lookupResult = queryStatsStore.lookup(lookupHash);
             if (!lookupResult.isOK()) {
-                queryStatsStore.put(lookupHash, QueryStatsEntry{std::move(key)});
+                queryStatsStore.put(lookupHash,
+                                    QueryStatsEntry{std::move(key), std::move(userVisibleHash)});
                 lookupResult = queryStatsStore.lookup(lookupHash);
             }
             return lookupResult.getValue();
@@ -2191,11 +2495,12 @@ TEST_F(QueryStatsStoreTest, BasicPlanShapeCounters) {
         };
 
         auto collectMetricsBase = [&](BSONObj query) {
-            auto key = makeFindKeyFromQuery(query);
+            auto [key, userVisibleHash] = makeFindKeyAndHashFromQuery(query);
             auto lookupHash = absl::HashOf(key);
             auto lookupResult = queryStatsStore.lookup(lookupHash);
             if (!lookupResult.isOK()) {
-                queryStatsStore.put(lookupHash, QueryStatsEntry{std::move(key)});
+                queryStatsStore.put(lookupHash,
+                                    QueryStatsEntry{std::move(key), std::move(userVisibleHash)});
                 lookupResult = queryStatsStore.lookup(lookupHash);
             }
             return lookupResult.getValue();

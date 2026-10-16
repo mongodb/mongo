@@ -157,6 +157,18 @@ server_parameters:
         default: false
         redact: false
 
+    internalQueryStatsMatchPushdownOptimizationEnabled:
+        description: >-
+            Enables the $match on keyHash optimization. When true, the query stats store maintains
+            the keyHash secondary index and a query can resolve $match keyHashes through it instead
+            of scanning the store. When false, the index is not maintained and the store
+            scans-and-filters as before.
+        set_at: [startup]
+        cpp_varname: "internalQueryStatsMatchPushdownOptimizationEnabled"
+        cpp_vartype: Atomic<bool>
+        default: false
+        redact: false
+
     internalQueryStatsTopKSortOptimizationEnabled:
         description: >-
             Whether the $queryStats top-K sort optimization is enabled. When enabled, a

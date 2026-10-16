@@ -20,6 +20,7 @@
 #include "mongo/db/query/query_shape/shape_helpers.h"
 #include "mongo/db/query/query_stats/agg_key.h"
 #include "mongo/db/query/query_stats/find_key.h"
+#include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/query_stats/query_stats_top_k_metrics.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/unittest/unittest.h"
@@ -67,6 +68,11 @@ public:
                                                       *parsedFind->findCommandRequest,
                                                       std::move(statusWithShape.getValue()),
                                                       query_shape::CollectionType::kCollection);
+    }
+
+    QueryStatsEntry makeEntry(std::unique_ptr<const Key> key) {
+        const auto userVisibleHash = computeUserVisibleHash(getOpCtx(), *key);
+        return QueryStatsEntry{std::move(key), userVisibleHash};
     }
 
     std::unique_ptr<const Key> makeAggKeyWithAllowPartialResults(
@@ -128,7 +134,7 @@ public:
         for (int i = 0; i < numEntries; ++i) {
             BSONObjBuilder filter;
             filter.append("field" + std::to_string(i), i);
-            queryStatsStore.put(i, QueryStatsEntry{makeFindKeyFromQuery(filter.obj())});
+            queryStatsStore.put(i, makeEntry(makeFindKeyFromQuery(filter.obj())));
             queryStatsStore.lookup(i).getValue()->execCount = i;
         }
     }
@@ -283,9 +289,9 @@ TEST_F(DocumentSourceQueryStatsTest, GetNextOverMultiplePartitions) {
     // First, populate the query stats store. One partition will have 2 entries, one will have
     // 1, and one will have none.
     auto& queryStatsStore = setUpQueryStatsStore(/*numPartitions=*/3);
-    queryStatsStore.put(0, QueryStatsEntry{makeFindKeyFromQuery(BSON("a" << 5))});
-    queryStatsStore.put(1, QueryStatsEntry{makeFindKeyFromQuery(BSON("b" << 10))});
-    queryStatsStore.put(3, QueryStatsEntry{makeFindKeyFromQuery(BSON("c" << 15))});
+    queryStatsStore.put(0, makeEntry(makeFindKeyFromQuery(BSON("a" << 5))));
+    queryStatsStore.put(1, makeEntry(makeFindKeyFromQuery(BSON("b" << 10))));
+    queryStatsStore.put(3, makeEntry(makeFindKeyFromQuery(BSON("c" << 15))));
 
     ASSERT_TRUE(queryStatsStore.getPartition(0)->hasKey(0));
     ASSERT_TRUE(queryStatsStore.getPartition(0)->hasKey(3));
@@ -322,13 +328,13 @@ TEST_F(DocumentSourceQueryStatsTest, GetNextForAllowPartialResultsTriState) {
     auto& queryStatsStore = setUpQueryStatsStore();
     auto keyOmitted = makeAggKeyWithAllowPartialResults(boost::none);
     const auto hashOmitted = absl::HashOf(*keyOmitted);
-    queryStatsStore.put(hashOmitted, QueryStatsEntry{std::move(keyOmitted)});
+    queryStatsStore.put(hashOmitted, makeEntry(std::move(keyOmitted)));
     auto keyTrue = makeAggKeyWithAllowPartialResults(true);
     const auto hashTrue = absl::HashOf(*keyTrue);
-    queryStatsStore.put(hashTrue, QueryStatsEntry{std::move(keyTrue)});
+    queryStatsStore.put(hashTrue, makeEntry(std::move(keyTrue)));
     auto keyFalse = makeAggKeyWithAllowPartialResults(false);
     const auto hashFalse = absl::HashOf(*keyFalse);
-    queryStatsStore.put(hashFalse, QueryStatsEntry{std::move(keyFalse)});
+    queryStatsStore.put(hashFalse, makeEntry(std::move(keyFalse)));
 
     const auto source =
         DocumentSourceQueryStats::createFromBson(kQueryStatsStage.firstElement(), getExpCtx());
@@ -372,8 +378,8 @@ TEST_F(DocumentSourceQueryStatsTest, GetNextForAllowPartialResultsTriState) {
 TEST_F(DocumentSourceQueryStatsTest, GetNextTransformIdentifiers) {
     // First, populate the query stats store. Both entries will be in the single store partition.
     auto& queryStatsStore = setUpQueryStatsStore();
-    queryStatsStore.put(0, QueryStatsEntry{makeFindKeyFromQuery(BSON("a" << 5))});
-    queryStatsStore.put(1, QueryStatsEntry{makeFindKeyFromQuery(BSON("b" << 10))});
+    queryStatsStore.put(0, makeEntry(makeFindKeyFromQuery(BSON("a" << 5))));
+    queryStatsStore.put(1, makeEntry(makeFindKeyFromQuery(BSON("b" << 10))));
 
     const auto source = DocumentSourceQueryStats::createFromBson(
         kQueryStatsStageWithTransformIdentifiers.firstElement(), getExpCtx());
@@ -418,7 +424,7 @@ TEST_F(DocumentSourceQueryStatsTest, GetNextKeyFailsToReParse) {
 
     // Populate the query stats store with an entry that fails to re-parse.
     auto& queryStatsStore = setUpQueryStatsStore();
-    queryStatsStore.put(0, QueryStatsEntry{std::move(findKey)});
+    queryStatsStore.put(0, makeEntry(std::move(findKey)));
 
     // First case - don't treat errors as fatal.
     internalQueryStatsErrorsAreCommandFatal.store(false);
@@ -499,33 +505,30 @@ TEST_F(DocumentSourceQueryStatsTest, DataTypeHashConsistency) {
     // distinct type or interesting values because they will get converted to representative values
     // at this first parse-and-serialize step.)
     auto& queryStatsStore = setUpQueryStatsStore();
-    queryStatsStore.put(0, QueryStatsEntry{makeFindKeyFromQuery(BSON("number" << 5))});
-    queryStatsStore.put(1, QueryStatsEntry{makeFindKeyFromQuery(BSON("string" << "hello"))});
+    queryStatsStore.put(0, makeEntry(makeFindKeyFromQuery(BSON("number" << 5))));
+    queryStatsStore.put(1, makeEntry(makeFindKeyFromQuery(BSON("string" << "hello"))));
+    queryStatsStore.put(2, makeEntry(makeFindKeyFromQuery(BSON("obj" << BSON("c" << BSONObj())))));
     queryStatsStore.put(
-        2, QueryStatsEntry{makeFindKeyFromQuery(BSON("obj" << BSON("c" << BSONObj())))});
-    queryStatsStore.put(
-        3,
-        QueryStatsEntry{makeFindKeyFromQuery(BSON("array" << BSON_ARRAY(1 << "hello" << true)))});
+        3, makeEntry(makeFindKeyFromQuery(BSON("array" << BSON_ARRAY(1 << "hello" << true)))));
     queryStatsStore.put(4,
-                        QueryStatsEntry{makeFindKeyFromQuery(BSON(
-                            "binData" << BSONBinData("hello", 5, BinDataType::BinDataGeneral)))});
+                        makeEntry(makeFindKeyFromQuery(BSON(
+                            "binData" << BSONBinData("hello", 5, BinDataType::BinDataGeneral)))));
     queryStatsStore.put(
-        5, QueryStatsEntry{makeFindKeyFromQuery(BSON("oid" << OID("aaaaaaaaaaaaaaaaaaaaaaaa")))});
-    queryStatsStore.put(6, QueryStatsEntry{makeFindKeyFromQuery(BSON("bool" << true))});
-    queryStatsStore.put(7, QueryStatsEntry{makeFindKeyFromQuery(BSON("date" << Date_t::min()))});
-    queryStatsStore.put(8, QueryStatsEntry{makeFindKeyFromQuery(BSON("null" << BSONNULL))});
-    queryStatsStore.put(9, QueryStatsEntry{makeFindKeyFromQuery(BSON("regex" << BSONRegEx(".*")))});
+        5, makeEntry(makeFindKeyFromQuery(BSON("oid" << OID("aaaaaaaaaaaaaaaaaaaaaaaa")))));
+    queryStatsStore.put(6, makeEntry(makeFindKeyFromQuery(BSON("bool" << true))));
+    queryStatsStore.put(7, makeEntry(makeFindKeyFromQuery(BSON("date" << Date_t::min()))));
+    queryStatsStore.put(8, makeEntry(makeFindKeyFromQuery(BSON("null" << BSONNULL))));
+    queryStatsStore.put(9, makeEntry(makeFindKeyFromQuery(BSON("regex" << BSONRegEx(".*")))));
     queryStatsStore.put(10,
-                        QueryStatsEntry{makeFindKeyFromQuery(
-                            BSON("dbRef" << BSONDBRef("ns", OID("aaaaaaaaaaaaaaaaaaaaaaaa"))))});
-    queryStatsStore.put(11, QueryStatsEntry{makeFindKeyFromQuery(BSON("js" << BSONCode("code")))});
+                        makeEntry(makeFindKeyFromQuery(
+                            BSON("dbRef" << BSONDBRef("ns", OID("aaaaaaaaaaaaaaaaaaaaaaaa"))))));
+    queryStatsStore.put(11, makeEntry(makeFindKeyFromQuery(BSON("js" << BSONCode("code")))));
     queryStatsStore.put(12,
-                        QueryStatsEntry{makeFindKeyFromQuery(BSON(
-                            "jsScope" << BSONCodeWScope("code", BSON("c" << 1))))});  // CodeWScope
-    queryStatsStore.put(
-        13, QueryStatsEntry{makeFindKeyFromQuery(BSON("timestamp" << Timestamp::max()))});
-    queryStatsStore.put(14, QueryStatsEntry{makeFindKeyFromQuery(BSON("minKey" << MINKEY))});
-    queryStatsStore.put(15, QueryStatsEntry{makeFindKeyFromQuery(BSON("maxKey" << MAXKEY))});
+                        makeEntry(makeFindKeyFromQuery(BSON(
+                            "jsScope" << BSONCodeWScope("code", BSON("c" << 1))))));  // CodeWScope
+    queryStatsStore.put(13, makeEntry(makeFindKeyFromQuery(BSON("timestamp" << Timestamp::max()))));
+    queryStatsStore.put(14, makeEntry(makeFindKeyFromQuery(BSON("minKey" << MINKEY))));
+    queryStatsStore.put(15, makeEntry(makeFindKeyFromQuery(BSON("maxKey" << MAXKEY))));
 
     const auto source =
         DocumentSourceQueryStats::createFromBson(kQueryStatsStage.firstElement(), getExpCtx());
