@@ -26,8 +26,8 @@ struct c_api_to_cpp_api<::MongoExtensionByteBuf> {
  */
 class ExtensionByteBufAPI : public VTableAPI<::MongoExtensionByteBuf> {
 public:
-    ExtensionByteBufAPI(::MongoExtensionByteBuf* byteBufPtr)
-        : VTableAPI<::MongoExtensionByteBuf>(byteBufPtr) {}
+    ExtensionByteBufAPI(::MongoExtensionByteBuf* byteBufPtr, const CapabilityVersion& capability)
+        : VTableAPI<::MongoExtensionByteBuf>(byteBufPtr, capability) {}
 
     /**
      * Get a read-only byte view of the contents of ByteBuf.
@@ -43,7 +43,7 @@ public:
         return byteViewAsStringView(_vtable().get_view(get()));
     }
 
-    static void assertVTableConstraints(const VTable_t& vtable) {
+    static void assertVTableConstraints(const VTable_t& vtable, const CapabilityVersion&) {
         tassert(ErrorCodes::InvalidExtensionVTable,
                 "ByteBuf 'get_view' is null",
                 vtable.get_view != nullptr);

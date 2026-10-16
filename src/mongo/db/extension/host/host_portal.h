@@ -19,13 +19,16 @@ namespace mongo::extension::host {
  */
 class HostPortal : public host_connector::HostPortalBase {
 public:
+    HostPortal(const CapabilityVersion& capVersion = CapabilityVersion::latestCapability())
+        : host_connector::HostPortalBase(capVersion) {}
+
     void registerStageDescriptor(
         const ::MongoExtensionAggStageDescriptor* descriptor) const override {
         tassert(ErrorCodes::ExtensionError,
                 "Got null stage descriptor during extension registration",
                 descriptor != nullptr);
         host::DocumentSourceExtensionOptimizable::registerStage(
-            AggStageDescriptorHandle(descriptor));
+            AggStageDescriptorHandle(descriptor, _capability));
     };
 
     void registerStageRules(MongoExtensionByteView stageName,

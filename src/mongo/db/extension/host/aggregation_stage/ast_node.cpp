@@ -41,7 +41,7 @@ DPLCallbackOwner::DPLCallbackOwner(CallbackInvoker invoker, std::function<void()
 bool DPLCallbackOwner::hasCallback() const {
     return _state && _state->invoker;
 }
-
+// TODO SERVER-136921: Figure out a way to provide CapabilityVersion to this method.
 const DocumentSourceInternalDocumentResultsAndMetadata::ShardedPlanSpec&
 DPLCallbackOwner::getOrInvoke(ExpressionContext* expCtx) const {
     tassert(12728604, "getOrInvoke() called without a DPL callback", hasCallback());

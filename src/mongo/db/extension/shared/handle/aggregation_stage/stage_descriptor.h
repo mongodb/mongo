@@ -27,8 +27,9 @@ struct c_api_to_cpp_api<::MongoExtensionAggStageDescriptor> {
  */
 class AggStageDescriptorAPI : public VTableAPI<::MongoExtensionAggStageDescriptor> {
 public:
-    AggStageDescriptorAPI(::MongoExtensionAggStageDescriptor* descriptor)
-        : VTableAPI<::MongoExtensionAggStageDescriptor>(descriptor) {}
+    AggStageDescriptorAPI(::MongoExtensionAggStageDescriptor* descriptor,
+                          const CapabilityVersion& capability)
+        : VTableAPI<::MongoExtensionAggStageDescriptor>(descriptor, capability) {}
 
     /**
      * Returns a std::string_view containing the name of this aggregation stage.
@@ -58,7 +59,7 @@ public:
         return _vtable().get_client_type(get());
     }
 
-    static void assertVTableConstraints(const VTable_t& vtable) {
+    static void assertVTableConstraints(const VTable_t& vtable, const CapabilityVersion&) {
         tassert(ErrorCodes::InvalidExtensionVTable,
                 "ExtensionAggStageDescriptorAdapter 'get_name' is null",
                 vtable.get_name != nullptr);

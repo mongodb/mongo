@@ -27,8 +27,8 @@ using UnownedExecAggStageHandle = UnownedHandle<::MongoExtensionExecAggStage>;
  */
 class ExecAggStageAPI : public VTableAPI<::MongoExtensionExecAggStage> {
 public:
-    ExecAggStageAPI(::MongoExtensionExecAggStage* execAggStage)
-        : VTableAPI<::MongoExtensionExecAggStage>(execAggStage) {}
+    ExecAggStageAPI(::MongoExtensionExecAggStage* execAggStage, const CapabilityVersion& capability)
+        : VTableAPI<::MongoExtensionExecAggStage>(execAggStage, capability) {}
 
     ExtensionGetNextResult getNext(MongoExtensionQueryExecutionContext* execCtxPtr);
 
@@ -50,7 +50,7 @@ public:
     BSONObj explain(MongoExtensionQueryExecutionContext& execCtx,
                     ExplainOptions::Verbosity verbosity) const;
 
-    static void assertVTableConstraints(const VTable_t& vtable) {
+    static void assertVTableConstraints(const VTable_t& vtable, const CapabilityVersion&) {
         tassert(ErrorCodes::InvalidExtensionVTable,
                 "ExecAggStage 'get_next' is null",
                 vtable.get_next != nullptr);

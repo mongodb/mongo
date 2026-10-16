@@ -55,7 +55,8 @@ using LoggerHandle = UnownedHandle<const ::MongoExtensionLogger>;
 
 class LoggerAPI : public VTableAPI<::MongoExtensionLogger> {
 public:
-    LoggerAPI(::MongoExtensionLogger* services) : VTableAPI<::MongoExtensionLogger>(services) {}
+    LoggerAPI(::MongoExtensionLogger* services, const CapabilityVersion& capability)
+        : VTableAPI<::MongoExtensionLogger>(services, capability) {}
 
     /**
      * Creates a MongoExtensionLogMessage struct for regular log messages.
@@ -112,7 +113,7 @@ public:
         return out;
     }
 
-    static void assertVTableConstraints(const VTable_t& vtable);
+    static void assertVTableConstraints(const VTable_t& vtable, const CapabilityVersion&);
 };
 }  // namespace sdk
 }  // namespace mongo::extension

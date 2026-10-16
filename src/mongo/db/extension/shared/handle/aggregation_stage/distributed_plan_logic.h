@@ -23,8 +23,9 @@ struct c_api_to_cpp_api<::MongoExtensionDistributedPlanLogic> {
  */
 class DistributedPlanLogicAPI : public VTableAPI<::MongoExtensionDistributedPlanLogic> {
 public:
-    DistributedPlanLogicAPI(::MongoExtensionDistributedPlanLogic* dpl)
-        : VTableAPI<::MongoExtensionDistributedPlanLogic>(dpl) {}
+    DistributedPlanLogicAPI(::MongoExtensionDistributedPlanLogic* dpl,
+                            const CapabilityVersion& capability)
+        : VTableAPI<::MongoExtensionDistributedPlanLogic>(dpl, capability) {}
 
     std::vector<VariantDPLHandle> extractShardsPipeline();
 
@@ -32,7 +33,7 @@ public:
 
     BSONObj getSortPattern() const;
 
-    static void assertVTableConstraints(const VTable_t& vtable) {
+    static void assertVTableConstraints(const VTable_t& vtable, const CapabilityVersion&) {
         tassert(ErrorCodes::InvalidExtensionVTable,
                 "DistributedPlanLogic 'extract_shards_pipeline' is null",
                 vtable.extract_shards_pipeline != nullptr);

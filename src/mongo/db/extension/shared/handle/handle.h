@@ -1,6 +1,7 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 #pragma once
+#include "mongo/db/extension/shared/extension_version.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
@@ -17,6 +18,16 @@ struct c_api_to_cpp_api {
 template <typename T, bool>
 class Handle;
 
+template <typename T>
+struct c_api_to_min_supported_capability
+    : std::integral_constant<uint32_t,
+                             static_cast<uint32_t>(CapabilityVersion::legacyCapability())> {};
+
+template <typename T>
+struct c_api_to_max_supported_capability
+    : std::integral_constant<uint32_t,
+                             static_cast<uint32_t>(CapabilityVersion::latestCapability())> {};
+
 /**
  * VTableAPI is a wrapper around a pointer that implements a C API via a vtable pointer.
  * VTableAPI abstracts access to the C API instance pointer, as well as its vtable.
@@ -32,36 +43,66 @@ class Handle;
  * When a VTableAPI object is instantiated, the static method assertVTableConstraints() is called.
  * Implementors of the VTableAPI specialization must implement this static method correctly,
  * ensuring all the vtable entries they expect to be present are valid.
+ *
+ * A VTableAPI object must always be provided with its associated CapabilityVersion. The
+ * CapabilityVersion encodes the negotiated api major and minor version negotiated between the host
+ * and the extension. VTableAPI is responsible for using the CapabilityVersion to determine what
+ * methods to call. The CapabilityVersion must be propagated by all objects interacting with the
+ * extension, since all api boundary objects must be aware of the agreed upon version at runtime.
+ *
+ * Implementations of the API type are required to define the two additional type traits:
+ *     1) c_api_to_min_supported_capability: The minimum capabilityVersion that this VTableAPI->API
+ *        mapping supports.
+ *     2) c_api_to_max_supported_capability: The maximum capabilityVersion that this
+ *        VTableAPI->API mapping supports.
+ *
+ * These values are used for a consistency check at runtime to ensure the negotiated version is
+ * valid with the requested VTableAPI type.
  */
 template <typename T, typename API = c_api_to_cpp_api<T>::CppApi_t>
 class VTableAPI {
 public:
     using VTablePtr_t = decltype(std::declval<T>().vtable);
     using VTable_t = typename std::remove_pointer<VTablePtr_t>::type;
+    static constexpr CapabilityVersion kMinSupportedCapability =
+        CapabilityVersion::fromPackedValue(c_api_to_min_supported_capability<T>::value);
+    static constexpr CapabilityVersion kMaxSupportedCapability =
+        CapabilityVersion::fromPackedValue(c_api_to_max_supported_capability<T>::value);
+    // TODO SERVER-136919: Remove/adapt static assertions once all VTable impls have implemented
+    // the type traits.
+    static_assert(kMinSupportedCapability >= CapabilityVersion::legacyCapability());
+    static_assert(kMaxSupportedCapability >= kMinSupportedCapability);
 
-    VTableAPI(T* ptr) : _ptr(ptr) {
+    // TODO SERVER-136919: Remove default value for capabilityVersion. For the time being, use a
+    // default parameter to limit the size of this initial change to the VTableAPI/Handle framework.
+    VTableAPI(T* ptr, CapabilityVersion capabilityVersion = CapabilityVersion::latestCapability())
+        : _ptr(ptr), _capability(capabilityVersion) {
         _assertValidVTable();
     }
     ~VTableAPI() = default;
 
-    VTableAPI(const VTableAPI& other) : _ptr(other._ptr) {
+    VTableAPI(const VTableAPI& other) : _ptr(other._ptr), _capability(other._capability) {
         _assertValidVTable();
     }
 
     VTableAPI& operator=(const VTableAPI& other) {
         if (this != &other) {
             _ptr = other._ptr;
+            _capability = other._capability;
             _assertValidVTable();
         }
         return *this;
     }
 
-    VTableAPI(VTableAPI&& other) : _ptr(std::exchange(other._ptr, nullptr)) {
+    VTableAPI(VTableAPI&& other)
+        : _ptr(std::exchange(other._ptr, nullptr)),
+          _capability(std::exchange(other._capability, CapabilityVersion::zeroCapability())) {
         _assertValidVTable();
     }
 
     VTableAPI& operator=(VTableAPI&& other) {
         _ptr = std::exchange(other._ptr, nullptr);
+        _capability = std::exchange(other._capability, CapabilityVersion::zeroCapability());
         _assertValidVTable();
         return *this;
     }
@@ -76,10 +117,16 @@ public:
 
     // Specializations of this class must implement this function to confirm the vtable is valid on
     // the API.
-    static void assertVTableConstraints(const VTable_t& vtable) = delete;
+    static void assertVTableConstraints(const VTable_t& vtable,
+                                        const CapabilityVersion& capability) = delete;
 
     void assertValid() const {
         tassert(10596403, "Invalid VTable API", _ptr != nullptr);
+    }
+
+    static constexpr bool isSupported(const CapabilityVersion& capabilityVersion) {
+        return capabilityVersion >= kMinSupportedCapability &&
+            capabilityVersion <= kMaxSupportedCapability;
     }
 
 protected:
@@ -94,12 +141,24 @@ protected:
     // at the point of first use.
     void _assertValidVTable() const {
         if (_ptr) {
-            API::assertVTableConstraints(_vtable());
+            tassert(ErrorCodes::ExtensionUnsupportedCapabilityVersion,
+                    fmt::format("Provided CapabilityVersion {} is not supported by the requested "
+                                "API (supported range: [{}, {}])",
+                                _capability.toString(),
+                                kMinSupportedCapability.toString(),
+                                kMaxSupportedCapability.toString()),
+                    isSupported(_capability));
+            API::assertVTableConstraints(_vtable(), _capability);
         }
+    }
+
+    CapabilityVersion _getCapabilityVersion() const {
+        return _capability;
     }
 
 private:
     T* _ptr;
+    CapabilityVersion _capability;
 };
 
 /**
@@ -150,8 +209,10 @@ public:
 
     // Ensure any instantiation of Handle has a properly defined mapping.
     static_assert(!std::is_same_v<T, CppApi_t>);
-
-    Handle(T* ptr) : _ptr(ptr), _api(const_cast<std::remove_const_t<T>*>(ptr)) {
+    // TODO SERVER-136919: Remove default value for capabilityVersion. For the time being, use a
+    // default parameter to limit the size of this initial change to the VTableAPI/Handle framework.
+    Handle(T* ptr, const CapabilityVersion& capability = CapabilityVersion::legacyCapability())
+        : _ptr(ptr), _api(const_cast<std::remove_const_t<T>*>(ptr), capability) {
         if constexpr (IsOwned) {
             _assertValidDestroy();
         }
@@ -212,7 +273,7 @@ public:
     }
 
     T* release() {
-        _api = CppApi_t(nullptr);
+        _api = CppApi_t(nullptr, CapabilityVersion::zeroCapability());
         if constexpr (std::is_same_v<UnderlyingPtr_t, ExtensionObjectOwnedPtr>) {
             return _ptr.release();
         } else {

@@ -22,8 +22,9 @@ struct c_api_to_cpp_api<::MongoExtensionExpandedArrayContainer> {
  */
 class ExpandedArrayContainerAPI : public VTableAPI<::MongoExtensionExpandedArrayContainer> {
 public:
-    ExpandedArrayContainerAPI(::MongoExtensionExpandedArrayContainer* container)
-        : VTableAPI<::MongoExtensionExpandedArrayContainer>(container) {}
+    ExpandedArrayContainerAPI(::MongoExtensionExpandedArrayContainer* container,
+                              const CapabilityVersion& capability)
+        : VTableAPI<::MongoExtensionExpandedArrayContainer>(container, capability) {}
 
     size_t size() const {
         return _vtable().size(get());
@@ -42,7 +43,7 @@ public:
         return expandedArrayToRaiiVector(targetArray);
     }
 
-    static void assertVTableConstraints(const VTable_t& vtable) {
+    static void assertVTableConstraints(const VTable_t& vtable, const CapabilityVersion&) {
         tassert(ErrorCodes::InvalidExtensionVTable,
                 "ExpandedArrayContainer 'size' is null",
                 vtable.size != nullptr);

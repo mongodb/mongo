@@ -27,8 +27,9 @@ using PipelineDependenciesHandle = UnownedHandle<const ::MongoExtensionPipelineD
 
 class PipelineDependenciesAPI : public VTableAPI<::MongoExtensionPipelineDependencies> {
 public:
-    PipelineDependenciesAPI(::MongoExtensionPipelineDependencies* ptr)
-        : VTableAPI<::MongoExtensionPipelineDependencies>(ptr) {}
+    PipelineDependenciesAPI(::MongoExtensionPipelineDependencies* ptr,
+                            const CapabilityVersion& capability)
+        : VTableAPI<::MongoExtensionPipelineDependencies>(ptr, capability) {}
 
     /**
      * Returns true if the pipeline depends on the metadata field identified by 'name'
@@ -78,7 +79,7 @@ public:
         return bsonObjFromByteView(ownedBuf->getByteView()).getOwned();
     }
 
-    static void assertVTableConstraints(const VTable_t& vtable) {
+    static void assertVTableConstraints(const VTable_t& vtable, const CapabilityVersion&) {
         tassert(12200101,
                 "PipelineDependencies 'needs_metadata' is null",
                 vtable.needs_metadata != nullptr);

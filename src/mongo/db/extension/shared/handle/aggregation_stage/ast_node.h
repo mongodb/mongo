@@ -29,8 +29,8 @@ struct c_api_to_cpp_api<::MongoExtensionAggStageAstNode> {
  */
 class AggStageAstNodeAPI : public VTableAPI<::MongoExtensionAggStageAstNode> {
 public:
-    AggStageAstNodeAPI(::MongoExtensionAggStageAstNode* ptr)
-        : VTableAPI<::MongoExtensionAggStageAstNode>(ptr) {}
+    AggStageAstNodeAPI(::MongoExtensionAggStageAstNode* ptr, const CapabilityVersion& capability)
+        : VTableAPI<::MongoExtensionAggStageAstNode>(ptr, capability) {}
 
     /**
      * Returns a std::string_view containing the name of this aggregation stage.
@@ -73,7 +73,7 @@ public:
      */
     void bindResolvedNamespace(const ::MongoExtensionResolvedNamespace& resolvedNamespace);
 
-    static void assertVTableConstraints(const VTable_t& vtable) {
+    static void assertVTableConstraints(const VTable_t& vtable, const CapabilityVersion&) {
         tassert(ErrorCodes::InvalidExtensionVTable,
                 "AggStageAstNode 'get_name' is null",
                 vtable.get_name != nullptr);

@@ -3,6 +3,7 @@
 #pragma once
 
 #include "mongo/db/extension/public/api.h"
+#include "mongo/db/extension/shared/extension_version.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
@@ -23,6 +24,11 @@ public:
     virtual void registerStageRules(::MongoExtensionByteView stageName,
                                     const ::MongoExtensionPipelineRewriteRule* rules,
                                     size_t numRules) const = 0;
+
+protected:
+    HostPortalBase(const CapabilityVersion& capVersion) : _capability(capVersion) {}
+
+    const CapabilityVersion _capability;
 };
 
 /**

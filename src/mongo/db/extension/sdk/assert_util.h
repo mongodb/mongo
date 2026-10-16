@@ -8,7 +8,7 @@
 
 #define MAKE_EXCEPTION_INFO(code, message) \
     BSON("message" << message << "errorCode" << static_cast<int>(code));
-
+// TODO SERVER-136922: Provide CapabilityVersion to assertion helpers.
 #define sdk_uasserted(code, message)                                                    \
     do {                                                                                \
         auto exceptionInfo = MAKE_EXCEPTION_INFO(code, message);                        \

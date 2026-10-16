@@ -282,19 +282,19 @@ std::unique_ptr<host::AggStageAstNode> makeIdLookupAstNode() {
 DEATH_TEST(HostAstNodeVTableDeathTest, InvalidAstNodeVTableFailsGetName, "517") {
     auto vtable = host::HostAggStageAstNodeAdapter::getVTable();
     vtable.get_name = nullptr;
-    AggStageAstNodeAPI::assertVTableConstraints(vtable);
+    AggStageAstNodeAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
 }
 
 DEATH_TEST(HostAstNodeVTableDeathTest, InvalidAstNodeVTableFailsGetProperties, "517") {
     auto vtable = host::HostAggStageAstNodeAdapter::getVTable();
     vtable.get_properties = nullptr;
-    AggStageAstNodeAPI::assertVTableConstraints(vtable);
+    AggStageAstNodeAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
 }
 
 DEATH_TEST(HostAstNodeVTableDeathTest, InvalidAstNodeVTableFailsPromote, "517") {
     auto vtable = host::HostAggStageAstNodeAdapter::getVTable();
     vtable.promote = nullptr;
-    AggStageAstNodeAPI::assertVTableConstraints(vtable);
+    AggStageAstNodeAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
 }
 
 DEATH_TEST(HostAstNodeVTableDeathTest,
@@ -302,13 +302,13 @@ DEATH_TEST(HostAstNodeVTableDeathTest,
            "517") {
     auto vtable = host::HostAggStageAstNodeAdapter::getVTable();
     vtable.get_first_stage_view_application_policy = nullptr;
-    AggStageAstNodeAPI::assertVTableConstraints(vtable);
+    AggStageAstNodeAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
 }
 
 DEATH_TEST(HostAstNodeVTableDeathTest, InvalidAstNodeVTableFailsBindResolvedNamespace, "517") {
     auto vtable = host::HostAggStageAstNodeAdapter::getVTable();
     vtable.bind_resolved_namespace = nullptr;
-    AggStageAstNodeAPI::assertVTableConstraints(vtable);
+    AggStageAstNodeAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
 }
 
 DEATH_TEST(HostAstNodeTestDeathTest, HostGetPropertiesUnimplemented, "11347801") {

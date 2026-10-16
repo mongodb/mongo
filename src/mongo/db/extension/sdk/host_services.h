@@ -37,10 +37,11 @@ namespace sdk {
  */
 class IdleThreadBlockAPI : public VTableAPI<::MongoExtensionIdleThreadBlock> {
 public:
-    IdleThreadBlockAPI(::MongoExtensionIdleThreadBlock* ptr)
-        : VTableAPI<::MongoExtensionIdleThreadBlock>(ptr) {}
+    IdleThreadBlockAPI(::MongoExtensionIdleThreadBlock* ptr, const CapabilityVersion& capability)
+        : VTableAPI<::MongoExtensionIdleThreadBlock>(ptr, capability) {}
 
-    static void assertVTableConstraints(const VTable_t& vtable) {}
+    static void assertVTableConstraints(const VTable_t& vtable,
+                                        const CapabilityVersion& capability) {}
 };
 
 using IdleThreadBlockHandle = OwnedHandle<::MongoExtensionIdleThreadBlock>;
@@ -58,8 +59,8 @@ using HostServicesHandle = UnownedHandle<const ::MongoExtensionHostServices>;
  */
 class HostServicesAPI : public VTableAPI<::MongoExtensionHostServices> {
 public:
-    HostServicesAPI(::MongoExtensionHostServices* services)
-        : VTableAPI<::MongoExtensionHostServices>(services) {}
+    HostServicesAPI(::MongoExtensionHostServices* services, const CapabilityVersion& capability)
+        : VTableAPI<::MongoExtensionHostServices>(services, capability) {}
 
     ::MongoExtensionStatus* userAsserted(::MongoExtensionByteView structuredErrorMessage) const {
         return _vtable().user_asserted(structuredErrorMessage);
@@ -123,7 +124,8 @@ public:
         return LoggerHandle(_vtable().get_logger());
     }
 
-    static void assertVTableConstraints(const VTable_t& vtable);
+    static void assertVTableConstraints(const VTable_t& vtable,
+                                        const CapabilityVersion& capability);
 
 private:
     static UnownedHandle<const ::MongoExtensionHostServices> _sHostServices;

@@ -27,7 +27,10 @@ namespace host_connector {
  */
 class ExtensionAPI : public VTableAPI<::MongoExtension> {
 public:
-    ExtensionAPI(::MongoExtension* ext) : VTableAPI<::MongoExtension>(ext) {}
+    // TODO SERVER-136935: Remove default parameter when we propagate version at load time.
+    ExtensionAPI(::MongoExtension* ext,
+                 const CapabilityVersion& capabilityVersion = CapabilityVersion::legacyCapability())
+        : VTableAPI<::MongoExtension>(ext, capabilityVersion) {}
 
     /**
      * Initialize the extension by providing it with a HostPortal.
@@ -43,7 +46,7 @@ public:
         return get()->version;
     }
 
-    static void assertVTableConstraints(const VTable_t& vtable) {
+    static void assertVTableConstraints(const VTable_t& vtable, const CapabilityVersion&) {
         tassert(ErrorCodes::InvalidExtensionVTable,
                 "Extension 'initialize' is null",
                 vtable.initialize != nullptr);

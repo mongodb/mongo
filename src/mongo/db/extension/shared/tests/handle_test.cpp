@@ -67,8 +67,9 @@ struct c_api_to_cpp_api<DestroyableCAPI> {
 
 class DestroyableAPI : public VTableAPI<DestroyableCAPI> {
 public:
-    explicit DestroyableAPI(DestroyableCAPI* ptr) : VTableAPI<DestroyableCAPI>(ptr) {}
-    static void assertVTableConstraints(const VTable_t&) {}
+    explicit DestroyableAPI(DestroyableCAPI* ptr, const CapabilityVersion& capability)
+        : VTableAPI<DestroyableCAPI>(ptr, capability) {}
+    static void assertVTableConstraints(const VTable_t&, const CapabilityVersion&) {}
 };
 
 
@@ -237,6 +238,17 @@ DEATH_TEST(HandleTestDeathTest, ownedHandleConstructorRejectsNullDestroyPointer,
     DestroyableVTable invalidVtable{.destroy = nullptr};
     DestroyableCAPI obj{&invalidVtable};
     OwnedDestroyableHandle handle(&obj);
+}
+
+DEATH_TEST(HandleTestDeathTest, handleConstructorRejectsCapabilityBelowMinSupported, "531") {
+    DestroyableImpl impl;
+    UnownedDestroyableHandle handle(&impl, CapabilityVersion::zeroCapability());
+}
+
+DEATH_TEST(HandleTestDeathTest, handleConstructorRejectsCapabilityAboveMaxSupported, "531") {
+    DestroyableImpl impl;
+    UnownedDestroyableHandle handle(&impl,
+                                    CapabilityVersion(MONGODB_EXTENSION_API_MAJOR_VERSION + 1, 0));
 }
 }  // namespace
 }  // namespace mongo::extension

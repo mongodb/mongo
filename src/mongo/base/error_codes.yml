@@ -1384,5 +1384,12 @@ error_codes:
       categories: [SystemOverloadedError],
     }
 
+  # Extension negotiated a capability version that is not supported by the requested API.
+  - {
+      code: 531,
+      name: ExtensionUnsupportedCapabilityVersion,
+      categories: [ExtensionError],
+    }
+
   # ^^^^
   # Add new codes, sequentially numbered, above.

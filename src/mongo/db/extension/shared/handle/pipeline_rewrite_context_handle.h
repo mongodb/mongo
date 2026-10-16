@@ -41,8 +41,10 @@ struct c_api_to_cpp_api<::MongoExtensionPipelineRewriteContext> {
 
 class PipelineRewriteContextAPI : public VTableAPI<::MongoExtensionPipelineRewriteContext> {
 public:
-    PipelineRewriteContextAPI(::MongoExtensionPipelineRewriteContext* ptr)
-        : VTableAPI<::MongoExtensionPipelineRewriteContext>(ptr) {}
+    PipelineRewriteContextAPI(
+        ::MongoExtensionPipelineRewriteContext* ptr,
+        const CapabilityVersion& capability = CapabilityVersion::legacyCapability())
+        : VTableAPI<::MongoExtensionPipelineRewriteContext>(ptr, capability) {}
 
     /**
      * Returns the Nth stage after the current stage in the pipeline (N=1 is the immediately
@@ -91,7 +93,7 @@ public:
         return result;
     }
 
-    static void assertVTableConstraints(const VTable_t& vtable) {
+    static void assertVTableConstraints(const VTable_t& vtable, const CapabilityVersion&) {
         tassert(12200600,
                 "PipelineRewriteContextAPI 'get_nth_next_stage' is null",
                 vtable.get_nth_next_stage != nullptr);

@@ -149,73 +149,73 @@ DEATH_TEST_F(AggStageErrorFixtureDeathTest, DescriptorAndParseNodeNameMismatchFa
 DEATH_TEST(ParseNodeVTableDeathTest, InvalidParseNodeVTableFailsGetName, "517") {
     auto vtable = sdk::ExtensionAggStageParseNodeAdapter::getVTable();
     vtable.get_name = nullptr;
-    AggStageParseNodeAPI::assertVTableConstraints(vtable);
+    AggStageParseNodeAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
 }
 
 DEATH_TEST(ParseNodeVTableDeathTest, InvalidParseNodeVTableFailsGetQueryShape, "517") {
     auto vtable = sdk::ExtensionAggStageParseNodeAdapter::getVTable();
     vtable.get_query_shape = nullptr;
-    AggStageParseNodeAPI::assertVTableConstraints(vtable);
+    AggStageParseNodeAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
 }
 
 DEATH_TEST(ParseNodeVTableDeathTest, InvalidParseNodeVTableFailsExpand, "517") {
     auto vtable = sdk::ExtensionAggStageParseNodeAdapter::getVTable();
     vtable.expand = nullptr;
-    AggStageParseNodeAPI::assertVTableConstraints(vtable);
+    AggStageParseNodeAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
 }
 
 DEATH_TEST(AstNodeVTableDeathTest, InvalidAstNodeVTableFailsGetName, "517") {
     auto vtable = sdk::ExtensionAggStageAstNodeAdapter::getVTable();
     vtable.get_name = nullptr;
-    AggStageAstNodeAPI::assertVTableConstraints(vtable);
+    AggStageAstNodeAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
 }
 
 DEATH_TEST(AstNodeVTableDeathTest, InvalidAstNodeVTablePromote, "517") {
     auto vtable = sdk::ExtensionAggStageAstNodeAdapter::getVTable();
     vtable.promote = nullptr;
-    AggStageAstNodeAPI::assertVTableConstraints(vtable);
+    AggStageAstNodeAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
 }
 
 DEATH_TEST(AstNodeVTableDeathTest, InvalidAstNodeVTableGetProperties, "517") {
     auto vtable = sdk::ExtensionAggStageAstNodeAdapter::getVTable();
     vtable.get_properties = nullptr;
-    AggStageAstNodeAPI::assertVTableConstraints(vtable);
+    AggStageAstNodeAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
 }
 
 DEATH_TEST(ExecAggStageVTableDeathTest, InvalidExecAggStageVTableFailsGetNext, "517") {
     auto vtable = sdk::ExtensionExecAggStageAdapter::getVTable();
     vtable.get_next = nullptr;
-    ExecAggStageAPI::assertVTableConstraints(vtable);
+    ExecAggStageAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
 }
 
 DEATH_TEST(ExecAggStageVTableDeathTest, InvalidExecAggStageVTableFailsSetSource, "517") {
     auto vtable = sdk::ExtensionExecAggStageAdapter::getVTable();
     vtable.set_source = nullptr;
-    ExecAggStageAPI::assertVTableConstraints(vtable);
+    ExecAggStageAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
 }
 
 DEATH_TEST(ExecAggStageVTableDeathTest, InvalidExecAggStageVTableFailsOpen, "517") {
     auto vtable = sdk::ExtensionExecAggStageAdapter::getVTable();
     vtable.open = nullptr;
-    ExecAggStageAPI::assertVTableConstraints(vtable);
+    ExecAggStageAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
 }
 
 DEATH_TEST(ExecAggStageVTableDeathTest, InvalidExecAggStageVTableFailsReopen, "517") {
     auto vtable = sdk::ExtensionExecAggStageAdapter::getVTable();
     vtable.reopen = nullptr;
-    ExecAggStageAPI::assertVTableConstraints(vtable);
+    ExecAggStageAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
 }
 
 DEATH_TEST(ExecAggStageVTableDeathTest, InvalidExecAggStageVTableFailsClose, "517") {
     auto vtable = sdk::ExtensionExecAggStageAdapter::getVTable();
     vtable.close = nullptr;
-    ExecAggStageAPI::assertVTableConstraints(vtable);
+    ExecAggStageAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
 }
 
 DEATH_TEST(ExecAggStageVTableDeathTest, InvalidExecAggStageVTableFailsExplain, "517") {
     auto vtable = sdk::ExtensionExecAggStageAdapter::getVTable();
     vtable.explain = nullptr;
-    ExecAggStageAPI::assertVTableConstraints(vtable);
+    ExecAggStageAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
 }
 
 DEATH_TEST_F(AggStageErrorFixtureDeathTest, InvalidExtensionGetNextResultAdvanced, "519") {
@@ -342,13 +342,13 @@ DEATH_TEST_F(AggStageErrorFixtureDeathTest,
 DEATH_TEST_F(AggStageErrorFixtureDeathTest, InvalidDPLArrayContainerVTableFailsSize, "517") {
     auto vtable = sdk::ExtensionDPLArrayContainerAdapter::getVTable();
     vtable.size = nullptr;
-    DPLArrayContainerAPI::assertVTableConstraints(vtable);
+    DPLArrayContainerAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
 }
 
 DEATH_TEST_F(AggStageErrorFixtureDeathTest, InvalidDPLArrayContainerVTableFailsTransfer, "517") {
     auto vtable = sdk::ExtensionDPLArrayContainerAdapter::getVTable();
     vtable.transfer = nullptr;
-    DPLArrayContainerAPI::assertVTableConstraints(vtable);
+    DPLArrayContainerAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
 }
 
 DEATH_TEST_F(AggStageErrorFixtureDeathTest,
@@ -391,31 +391,31 @@ DEATH_TEST_F(AggStageErrorFixtureDeathTest,
 DEATH_TEST(DistributedPlanLogicVTableDeathTest, InvalidDPLVTableFailsGetShards, "517") {
     auto vtable = sdk::ExtensionDistributedPlanLogicAdapter::getVTable();
     vtable.extract_shards_pipeline = nullptr;
-    DistributedPlanLogicAPI::assertVTableConstraints(vtable);
+    DistributedPlanLogicAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
 }
 
 DEATH_TEST(DistributedPlanLogicVTableDeathTest, InvalidDPLVTableFailsGetMerging, "517") {
     auto vtable = sdk::ExtensionDistributedPlanLogicAdapter::getVTable();
     vtable.extract_merging_pipeline = nullptr;
-    DistributedPlanLogicAPI::assertVTableConstraints(vtable);
+    DistributedPlanLogicAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
 }
 
 DEATH_TEST(DistributedPlanLogicVTableDeathTest, InvalidDPLVTableFailsGetSortPattern, "517") {
     auto vtable = sdk::ExtensionDistributedPlanLogicAdapter::getVTable();
     vtable.get_sort_pattern = nullptr;
-    DistributedPlanLogicAPI::assertVTableConstraints(vtable);
+    DistributedPlanLogicAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
 }
 
 DEATH_TEST(LogicalAggStageVTableDeathTest, NullEvaluateRulePreconditionTasserts, "517") {
     auto vtable = sdk::ExtensionLogicalAggStageAdapter::getVTable();
     vtable.evaluate_pipeline_rewrite_rule_precondition = nullptr;
-    LogicalAggStageAPI::assertVTableConstraints(vtable);
+    LogicalAggStageAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
 }
 
 DEATH_TEST(LogicalAggStageVTableDeathTest, NullEvaluateRuleTransformTasserts, "517") {
     auto vtable = sdk::ExtensionLogicalAggStageAdapter::getVTable();
     vtable.evaluate_pipeline_rewrite_rule_transform = nullptr;
-    LogicalAggStageAPI::assertVTableConstraints(vtable);
+    LogicalAggStageAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
 }
 
 DEATH_TEST_F(AggStageErrorFixtureDeathTest, NullRegisterStageRulesTasserts, "12201401") {
@@ -428,7 +428,7 @@ DEATH_TEST_F(AggStageErrorFixtureDeathTest, NullRegisterStageRulesTasserts, "122
         },
         .register_stage_rules = nullptr,
     };
-    sdk::HostPortalAPI::assertVTableConstraints(vtable);
+    sdk::HostPortalAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
 }
 
 DEATH_TEST_F(AggStageErrorFixtureDeathTest,

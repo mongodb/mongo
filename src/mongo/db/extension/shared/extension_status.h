@@ -232,7 +232,9 @@ using StatusHandle = OwnedHandle<::MongoExtensionStatus>;
  */
 class StatusAPI : public VTableAPI<::MongoExtensionStatus> {
 public:
-    StatusAPI(::MongoExtensionStatus* status) : VTableAPI<::MongoExtensionStatus>(status) {}
+    StatusAPI(::MongoExtensionStatus* status,
+              const CapabilityVersion& capability = CapabilityVersion::legacyCapability())
+        : VTableAPI<::MongoExtensionStatus>(status, capability) {}
 
     /**
      * Return a non-zero code associated with `error`.
@@ -254,7 +256,7 @@ public:
 
     StatusHandle clone() const;
 
-    static void assertVTableConstraints(const VTable_t& vtable) {
+    static void assertVTableConstraints(const VTable_t& vtable, const CapabilityVersion&) {
         tassert(ErrorCodes::InvalidExtensionVTable,
                 "HostStatus 'get_code' is null",
                 vtable.get_code != nullptr);

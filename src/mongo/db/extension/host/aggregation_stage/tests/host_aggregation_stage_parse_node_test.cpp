@@ -77,19 +77,19 @@ TEST(HostParseNodeTest, IsNotHostAllocated) {
 DEATH_TEST(HostParseNodeVTableDeathTest, InvalidParseNodeVTableFailsGetName, "517") {
     auto vtable = host::HostAggStageParseNodeAdapter::getVTable();
     vtable.get_name = nullptr;
-    AggStageParseNodeAPI::assertVTableConstraints(vtable);
+    AggStageParseNodeAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
 }
 
 DEATH_TEST(HostParseNodeVTableDeathTest, InvalidParseNodeVTableFailsGetQueryShape, "517") {
     auto vtable = host::HostAggStageParseNodeAdapter::getVTable();
     vtable.get_query_shape = nullptr;
-    AggStageParseNodeAPI::assertVTableConstraints(vtable);
+    AggStageParseNodeAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
 }
 
 DEATH_TEST(HostParseNodeVTableDeathTest, InvalidParseNodeVTableFailsExpand, "517") {
     auto vtable = host::HostAggStageParseNodeAdapter::getVTable();
     vtable.expand = nullptr;
-    AggStageParseNodeAPI::assertVTableConstraints(vtable);
+    AggStageParseNodeAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
 }
 
 DEATH_TEST(HostParseNodeTestDeathTest, HostExpandUnimplemented, "10977801") {

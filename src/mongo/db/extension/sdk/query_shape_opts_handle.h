@@ -33,8 +33,8 @@ namespace sdk {
  */
 class QueryShapeOptsAPI : public VTableAPI<::MongoExtensionHostQueryShapeOpts> {
 public:
-    QueryShapeOptsAPI(::MongoExtensionHostQueryShapeOpts* ctx)
-        : VTableAPI<::MongoExtensionHostQueryShapeOpts>(ctx) {}
+    QueryShapeOptsAPI(::MongoExtensionHostQueryShapeOpts* ctx, const CapabilityVersion& capability)
+        : VTableAPI<::MongoExtensionHostQueryShapeOpts>(ctx, capability) {}
 
     std::string serializeIdentifier(const std::string& identifier) const;
 
@@ -44,7 +44,7 @@ public:
                        std::string_view fieldName,
                        const BSONElement& bsonElement) const;
 
-    static void assertVTableConstraints(const VTable_t& vtable) {
+    static void assertVTableConstraints(const VTable_t& vtable, const CapabilityVersion&) {
         sdk_tassert(11136800,
                     "HostQueryShapeOpts' 'serializeIdentifier' is null",
                     vtable.serialize_identifier != nullptr);

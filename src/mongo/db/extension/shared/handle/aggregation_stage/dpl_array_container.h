@@ -22,8 +22,10 @@ struct c_api_to_cpp_api<::MongoExtensionDPLArrayContainer> {
  */
 class DPLArrayContainerAPI : public VTableAPI<::MongoExtensionDPLArrayContainer> {
 public:
-    DPLArrayContainerAPI(::MongoExtensionDPLArrayContainer* container)
-        : VTableAPI<::MongoExtensionDPLArrayContainer>(container) {}
+    DPLArrayContainerAPI(
+        ::MongoExtensionDPLArrayContainer* container,
+        const CapabilityVersion& capability = CapabilityVersion::legacyCapability())
+        : VTableAPI<::MongoExtensionDPLArrayContainer>(container, capability) {}
 
     size_t size() const {
         return _vtable().size(get());
@@ -42,7 +44,7 @@ public:
         return dplArrayToRaiiVector(targetArray);
     }
 
-    static void assertVTableConstraints(const VTable_t& vtable) {
+    static void assertVTableConstraints(const VTable_t& vtable, const CapabilityVersion&) {
         tassert(ErrorCodes::InvalidExtensionVTable,
                 "DPLArrayContainer 'size' is null",
                 vtable.size != nullptr);

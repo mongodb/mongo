@@ -37,8 +37,8 @@ using HostPortalHandle = UnownedHandle<const ::MongoExtensionHostPortal>;
  */
 class HostPortalAPI : public VTableAPI<::MongoExtensionHostPortal> {
 public:
-    HostPortalAPI(::MongoExtensionHostPortal* portal)
-        : VTableAPI<::MongoExtensionHostPortal>(portal) {}
+    HostPortalAPI(::MongoExtensionHostPortal* portal, const CapabilityVersion& capability)
+        : VTableAPI<::MongoExtensionHostPortal>(portal, capability) {}
 
     void registerStageDescriptor(const ExtensionAggStageDescriptorAdapter* stageDesc) const {
         invokeCAndConvertStatusToException([&] {
@@ -77,7 +77,7 @@ public:
             std::string(byteViewAsStringView(_vtable().get_extension_options(get()))));
     }
 
-    static void assertVTableConstraints(const VTable_t& vtable) {
+    static void assertVTableConstraints(const VTable_t& vtable, const CapabilityVersion&) {
         sdk_tassert(10926401,
                     "Extension 'register_stage_descriptor' is null",
                     vtable.register_stage_descriptor != nullptr);

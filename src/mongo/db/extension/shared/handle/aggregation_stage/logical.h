@@ -30,8 +30,9 @@ struct c_api_to_cpp_api<::MongoExtensionLogicalAggStage> {
  */
 class LogicalAggStageAPI : public VTableAPI<::MongoExtensionLogicalAggStage> {
 public:
-    LogicalAggStageAPI(::MongoExtensionLogicalAggStage* ptr)
-        : VTableAPI<::MongoExtensionLogicalAggStage>(ptr) {}
+    LogicalAggStageAPI(::MongoExtensionLogicalAggStage* ptr,
+                       const CapabilityVersion& capability = CapabilityVersion::legacyCapability())
+        : VTableAPI<::MongoExtensionLogicalAggStage>(ptr, capability) {}
 
     std::string_view getName() const;
 
@@ -113,7 +114,7 @@ public:
      */
     boost::optional<MongoExtensionDocsNeededBoundsInfo> getDocsNeededBounds() const;
 
-    static void assertVTableConstraints(const VTable_t& vtable) {
+    static void assertVTableConstraints(const VTable_t& vtable, const CapabilityVersion&) {
         tassert(ErrorCodes::InvalidExtensionVTable,
                 "LogicalAggStage 'get_name' is null",
                 vtable.get_name != nullptr);

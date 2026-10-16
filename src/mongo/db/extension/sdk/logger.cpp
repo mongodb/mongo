@@ -72,7 +72,7 @@ LogMessageGuard LoggerAPI::createDebugLogMessageStruct(
     return LogMessageGuard(logMessage);
 }
 
-void LoggerAPI::assertVTableConstraints(const VTable_t& vtable) {
+void LoggerAPI::assertVTableConstraints(const VTable_t& vtable, const CapabilityVersion&) {
     sdk_tassert(11188200, "Logger's 'log' is null", vtable.log != nullptr);
     sdk_tassert(11288201, "Logger's 'should_log' is null", vtable.should_log != nullptr);
 }

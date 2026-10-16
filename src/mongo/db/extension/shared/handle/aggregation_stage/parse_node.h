@@ -67,8 +67,9 @@ std::vector<VariantDPLHandle> dplArrayToRaiiVector(::MongoExtensionDPLArray& arr
  */
 class AggStageParseNodeAPI : public VTableAPI<::MongoExtensionAggStageParseNode> {
 public:
-    AggStageParseNodeAPI(::MongoExtensionAggStageParseNode* parseNode)
-        : VTableAPI<::MongoExtensionAggStageParseNode>(parseNode) {}
+    AggStageParseNodeAPI(::MongoExtensionAggStageParseNode* parseNode,
+                         const CapabilityVersion& capability)
+        : VTableAPI<::MongoExtensionAggStageParseNode>(parseNode, capability) {}
 
 
     /**
@@ -107,7 +108,7 @@ public:
 
     BSONObj toBsonForLog() const;
 
-    static void assertVTableConstraints(const VTable_t& vtable) {
+    static void assertVTableConstraints(const VTable_t& vtable, const CapabilityVersion&) {
         tassert(ErrorCodes::InvalidExtensionVTable,
                 "AggStageParseNode 'get_name' is null",
                 vtable.get_name != nullptr);

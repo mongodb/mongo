@@ -73,7 +73,7 @@ DEATH_TEST(ByteBufDeathTest, AssignNullWithPositiveLenFails, "518") {
 DEATH_TEST(ExtensionByteBufVTableDeathTest, InvalidExtensionByteBufVTableFailsGetView, "517") {
     auto vtable = ByteBuf::getVTable();
     vtable.get_view = nullptr;
-    ExtensionByteBufAPI::assertVTableConstraints(vtable);
+    ExtensionByteBufAPI::assertVTableConstraints(vtable, CapabilityVersion::legacyCapability());
 }
 
 }  // namespace

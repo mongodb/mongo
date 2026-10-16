@@ -30,8 +30,9 @@ namespace sdk {
  */
 class QueryExecutionContextAPI : public VTableAPI<::MongoExtensionQueryExecutionContext> {
 public:
-    QueryExecutionContextAPI(::MongoExtensionQueryExecutionContext* ctx)
-        : VTableAPI<::MongoExtensionQueryExecutionContext>(ctx) {}
+    QueryExecutionContextAPI(::MongoExtensionQueryExecutionContext* ctx,
+                             const CapabilityVersion& capability)
+        : VTableAPI<::MongoExtensionQueryExecutionContext>(ctx, capability) {}
 
     ExtensionGenericStatus checkForInterrupt() const;
 
@@ -48,7 +49,7 @@ public:
 
     void setBatchSize(uint64_t batchSize) const;
 
-    static void assertVTableConstraints(const VTable_t& vtable) {
+    static void assertVTableConstraints(const VTable_t& vtable, const CapabilityVersion&) {
         sdk_tassert(11098300,
                     "QueryExecutionContext' 'check_for_interrupt' is null",
                     vtable.check_for_interrupt != nullptr);

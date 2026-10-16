@@ -21,8 +21,8 @@ using UnownedOperationMetricsHandle = UnownedHandle<::MongoExtensionOperationMet
 
 class OperationMetricsAPI : public VTableAPI<::MongoExtensionOperationMetrics> {
 public:
-    OperationMetricsAPI(::MongoExtensionOperationMetrics* ctx)
-        : VTableAPI<::MongoExtensionOperationMetrics>(ctx) {}
+    OperationMetricsAPI(::MongoExtensionOperationMetrics* ctx, const CapabilityVersion& capability)
+        : VTableAPI<::MongoExtensionOperationMetrics>(ctx, capability) {}
 
     // Call the underlying object's serialize function and return the resulting BSON object.
     BSONObj serialize() const {
@@ -44,7 +44,7 @@ public:
         invokeCAndConvertStatusToException([&]() { return _vtable().update(get(), byteView); });
     }
 
-    static void assertVTableConstraints(const VTable_t& vtable) {
+    static void assertVTableConstraints(const VTable_t& vtable, const CapabilityVersion&) {
         tassert(ErrorCodes::InvalidExtensionVTable,
                 "HostOperationMetrics' 'serialize' is null",
                 vtable.serialize != nullptr);

@@ -154,31 +154,36 @@ public:
 DEATH_TEST_F(QueryExecutionContextVTableDeathTest, InvalidCheckForInterrupt, "11098300") {
     auto vtable = mongo::extension::host_connector::QueryExecutionContextAdapter::getVTable();
     vtable.check_for_interrupt = nullptr;
-    sdk::QueryExecutionContextAPI::assertVTableConstraints(vtable);
+    sdk::QueryExecutionContextAPI::assertVTableConstraints(vtable,
+                                                           CapabilityVersion::legacyCapability());
 };
 
 DEATH_TEST_F(QueryExecutionContextVTableDeathTest, InvalidGetMetrics, "11213507") {
     auto vtable = mongo::extension::host_connector::QueryExecutionContextAdapter::getVTable();
     vtable.get_metrics = nullptr;
-    sdk::QueryExecutionContextAPI::assertVTableConstraints(vtable);
+    sdk::QueryExecutionContextAPI::assertVTableConstraints(vtable,
+                                                           CapabilityVersion::legacyCapability());
 };
 
 DEATH_TEST_F(QueryExecutionContextVTableDeathTest, InvalidGetDeadlineTimestampMs, "11646100") {
     auto vtable = mongo::extension::host_connector::QueryExecutionContextAdapter::getVTable();
     vtable.get_deadline_timestamp_ms = nullptr;
-    sdk::QueryExecutionContextAPI::assertVTableConstraints(vtable);
+    sdk::QueryExecutionContextAPI::assertVTableConstraints(vtable,
+                                                           CapabilityVersion::legacyCapability());
 };
 
 DEATH_TEST_F(QueryExecutionContextVTableDeathTest, InvalidGetHostMetrics, "12199900") {
     auto vtable = mongo::extension::host_connector::QueryExecutionContextAdapter::getVTable();
     vtable.get_host_metrics = nullptr;
-    sdk::QueryExecutionContextAPI::assertVTableConstraints(vtable);
+    sdk::QueryExecutionContextAPI::assertVTableConstraints(vtable,
+                                                           CapabilityVersion::legacyCapability());
 };
 
 DEATH_TEST_F(QueryExecutionContextVTableDeathTest, InvalidSetBatchSize, "13150703") {
     auto vtable = mongo::extension::host_connector::QueryExecutionContextAdapter::getVTable();
     vtable.set_batch_size = nullptr;
-    sdk::QueryExecutionContextAPI::assertVTableConstraints(vtable);
+    sdk::QueryExecutionContextAPI::assertVTableConstraints(vtable,
+                                                           CapabilityVersion::legacyCapability());
 };
 
 TEST_F(QueryExecutionContextTestFixture, ThrowsErrorWhenBatchSizeSetToZero) {

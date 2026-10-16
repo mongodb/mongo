@@ -30,7 +30,7 @@ TEST_F(HostLogicalAggStageAdapterTest, GetNameFromServerStage) {
     auto sortDs = DocumentSourceSort::create(_expCtx, BSON("a" << 1));
 
     host_connector::HostLogicalAggStageAdapter adapter(host::LogicalAggStage::make(sortDs.get()));
-    LogicalAggStageAPI api(&adapter);
+    LogicalAggStageAPI api(&adapter, CapabilityVersion::legacyCapability());
 
     ASSERT_EQ(api.getName(), DocumentSourceSort::kStageName);
 }

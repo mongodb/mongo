@@ -14,7 +14,7 @@ namespace mongo::extension::sdk {
 // statically.
 UnownedHandle<const ::MongoExtensionHostServices> HostServicesAPI::_sHostServices{nullptr};
 
-void HostServicesAPI::assertVTableConstraints(const VTable_t& vtable) {
+void HostServicesAPI::assertVTableConstraints(const VTable_t& vtable, const CapabilityVersion&) {
     sdk_tassert(
         11097801, "Host services' 'user_asserted' is null", vtable.user_asserted != nullptr);
     sdk_tassert(11338300, "Host services' 'get_logger' is null", vtable.get_logger != nullptr);

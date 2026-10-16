@@ -55,7 +55,7 @@ public:
     ExtensionGetNextResult getNext(MongoExtensionQueryExecutionContext* ctx);
     // ...
 
-    static void assertVTableConstraints(const VTable_t& vtable) {
+    static void assertVTableConstraints(const VTable_t& vtable, const CapabilityVersion&) {
         tassert(ErrorCodes::InvalidExtensionVTable, "ExecAggStage 'open' is null",     vtable.open     != nullptr);
         tassert(ErrorCodes::InvalidExtensionVTable, "ExecAggStage 'get_next' is null", vtable.get_next != nullptr);
         // ...
