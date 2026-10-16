@@ -42,22 +42,22 @@ export const $config = (function () {
         /**
          * Used for mutual exclusion. Uses a collection to ensure atomicity on the read and update
          * operation.
+         * It's a fair ticket lock to avoid starvation timeouts on slow variants, see SERVER-137118.
          */
         mutexLock: function (collName) {
             jsTest.log.info("Trying to acquire mutexLock");
+            const controlCollection = this.getControlCollection(this.mutexSessionDb, collName);
+            const ticket = controlCollection.findAndModify({
+                query: {_id: this.controlDocumentId},
+                update: {$inc: {nextTicket: 1}},
+            }).nextTicket;
             let acquiredDoc;
             assert.soon(() => {
-                const doc = this.mutexSessionDb[
-                    collName + this.controlCollectionSuffix
-                ].findAndModify({
-                    query: {_id: this.controlDocumentId},
-                    update: {$set: {mutex: 1}},
+                acquiredDoc = controlCollection.findOne({
+                    _id: this.controlDocumentId,
+                    currentTicket: ticket,
                 });
-                if (doc.mutex === 0) {
-                    acquiredDoc = doc;
-                    return true;
-                }
-                return false;
+                return acquiredDoc !== null;
             });
             jsTest.log.info("Acquired mutexLock");
             return acquiredDoc;
@@ -67,7 +67,7 @@ export const $config = (function () {
             assert.commandWorked(
                 this.mutexSessionDb[collName + this.controlCollectionSuffix].updateOne(
                     {_id: this.controlDocumentId},
-                    {$set: {mutex: 0}},
+                    {$inc: {currentTicket: 1}},
                 ),
             );
             jsTest.log.info("Unlocked mutex");
@@ -165,7 +165,8 @@ export const $config = (function () {
         assert.commandWorked(
             controlCollection.insertOne({
                 _id: this.controlDocumentId,
-                mutex: 0,
+                nextTicket: 0,
+                currentTicket: 0,
                 sourceCollName: initialCollection.getName(),
             }),
         );
