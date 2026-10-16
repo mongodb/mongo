@@ -65,6 +65,10 @@ TxnNumber getNextTxnNumber() {
 
 namespace migrationutil {
 
+void logMigrationTermination(logv2::DynamicAttributes attrs) {
+    LOGV2(12960100, "Chunk migration terminated", attrs);
+}
+
 MigrationCoordinator::MigrationCoordinator(UUID migrationId,
                                            MigrationSessionId sessionId,
                                            ShardId donorShard,

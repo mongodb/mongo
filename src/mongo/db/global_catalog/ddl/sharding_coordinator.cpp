@@ -552,6 +552,8 @@ std::function<void()> RecoverableShardingCoordinator::_buildPhaseHandlerGeneric(
     CoordinatorGenericPhase newPhase,
     std::function<bool(OperationContext*)>&& shouldExecute,
     std::function<void(OperationContext*)>&& handlerFn) {
+    handlerFn = _decoratePhaseHandlerGeneric(newPhase, std::move(handlerFn));
+
     return [=, this] {
         const auto currPhase = [this] {
             std::lock_guard lk{_docMutex};

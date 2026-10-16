@@ -395,6 +395,11 @@ protected:
         return _sessionTracker.getCurrentSession(opCtx);
     }
 
+    virtual std::function<void(OperationContext*)> _decoratePhaseHandlerGeneric(
+        CoordinatorGenericPhase newPhase, std::function<void(OperationContext*)> handlerFn) {
+        return handlerFn;
+    }
+
     std::function<void()> _buildPhaseHandlerGeneric(
         CoordinatorGenericPhase newPhase, std::function<void(OperationContext*)>&& handlerFn);
 
@@ -559,6 +564,11 @@ protected:
      * the opCtxs made under them automatically marked as non-deprioritizable.
      */
     virtual bool isInCriticalSection(Phase phase) const = 0;
+
+    virtual std::function<void(OperationContext*)> _decoratePhaseHandler(
+        Phase phase, std::function<void(OperationContext*)> handlerFn) {
+        return handlerFn;
+    }
 
     explicit NonRecoverableTypedDocMixin(const BSONObj& coorDoc)
         : _docWrapper(

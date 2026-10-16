@@ -162,6 +162,12 @@ private:
         return this->isInCriticalSection(
             CoordinatorStateDocImpl<StateDoc>::castToCoordinatorPhase(phase));
     }
+
+    std::function<void(OperationContext*)> _decoratePhaseHandlerGeneric(
+        CoordinatorGenericPhase phase, std::function<void(OperationContext*)> handlerFn) final {
+        return this->_decoratePhaseHandler(
+            CoordinatorStateDocImpl<StateDoc>::castToCoordinatorPhase(phase), std::move(handlerFn));
+    }
 };
 
 }  // namespace mongo

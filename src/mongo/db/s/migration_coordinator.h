@@ -13,6 +13,7 @@
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
+#include "mongo/logv2/attribute_storage.h"
 #include "mongo/util/future.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
@@ -24,6 +25,8 @@
 
 namespace mongo {
 namespace migrationutil {
+
+void logMigrationTermination(logv2::DynamicAttributes attrs);
 
 /**
  * Manages the migration commit/abort process, including updates to config.rangeDeletions on the

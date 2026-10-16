@@ -170,16 +170,12 @@ const allMoveRangeCoordinatorPhases = [
 function getMigrationTerminationInfo(conn, ns) {
     let info = null;
     assert.soon(() => {
-        for (const line of checkLog.getGlobalLog(conn)) {
-            if (!line.includes('"id":12960100')) {
-                continue;
-            }
-            const entry = JSON.parse(line);
-            if (entry.id === 12960100 && entry.attr.namespace === ns) {
-                info = entry.attr.info;
-            }
+        const messages = checkLog.getFilteredLogMessages(conn, 12960100, {namespace: ns});
+        if (!messages || messages.length === 0) {
+            return false;
         }
-        return info !== null;
+        info = messages[messages.length - 1].attr.info;
+        return true;
     }, "Could not find the migration termination log for " + ns);
     return info;
 }

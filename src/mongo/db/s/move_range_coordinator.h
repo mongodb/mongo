@@ -129,6 +129,9 @@ private:
         boost::optional<MigrationChunkClonerSource::CloneStats> cloneStats;
     };
 
+    std::function<void(OperationContext*)> _decoratePhaseHandler(
+        Phase phase, std::function<void(OperationContext*)> handlerFn) override;
+
     std::function<void(OperationContext*)> _timePhase(Phase phase,
                                                       std::function<void(OperationContext*)> fn);
 
