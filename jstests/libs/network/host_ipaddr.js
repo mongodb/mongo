@@ -1,3 +1,18 @@
+let ipv4Pattern = "([\\d]+\\.[\\d]+\\.[\\d]+\\.[\\d]+)";
+
+// Returns the address from 'ip route get' output filtered to "src <addr>", or null if absent.
+export function parseRouteSrcOutput(output) {
+    let match = output.match(new RegExp("src " + ipv4Pattern));
+    return match ? match[1] : null;
+}
+
+// Returns the first address from interface listing output (ifconfig, 'ip addr', or 'hostname -I'
+// rewritten as "inet <addr>") already filtered to non-loopback "inet " lines, or null if absent.
+export function parseInterfaceListOutput(output) {
+    let match = output.replace(/addr:/g, "").match(new RegExp("inet " + ipv4Pattern));
+    return match ? match[1] : null;
+}
+
 // Returns non-localhost ipaddr of host running the mongo shell process
 export function get_ipaddr() {
     // set temp path, if it exists
@@ -14,7 +29,15 @@ export function get_ipaddr() {
 
     let ipFile = path + "ipaddr-" + Random.srand() + ".log";
     let windowsCmd = "ipconfig > " + ipFile;
-    let unixCmd =
+    // Prefer the source address of the default route. Interface listings are sorted by name, so
+    // transient docker bridges (br-*, docker0) would otherwise be picked ahead of the primary NIC,
+    // and those addresses disappear when the containers that own them are torn down.
+    // Writes a line like "src 10.0.0.5" to ipFile, or nothing if 'ip' is unavailable.
+    let unixRouteSrcCmd =
+        "/usr/sbin/ip -4 route get 1.1.1.1 2>/dev/null | grep -o 'src [0-9.]*' > " + ipFile;
+    // Fallback: the first non-loopback address from an interface listing. Writes lines like
+    // "inet 10.0.0.5 ..." (or "inet addr:10.0.0.5 ..." for older ifconfig) to ipFile.
+    let unixInterfacesCmd =
         "(/sbin/ifconfig || /usr/sbin/ip addr || hostname -I | tr ' ' '\\n' | grep -v '^$' | sed 's/^/inet /') | grep 'inet ' | grep -v '127.0.0.1' > " +
         ipFile;
     let ipAddr = null;
@@ -28,10 +51,14 @@ export function get_ipaddr() {
             runProgram("cmd.exe", "/c", windowsCmd);
             ipAddr = cat(ipFile).match(/IPv4.*: (.*)/)[1];
         } else {
-            runProgram("/bin/sh", "-c", unixCmd);
-            ipAddr = cat(ipFile)
-                .replace(/addr:/g, "")
-                .match(/inet ([\d]+\.[\d]+\.[\d]+\.[\d]+)/)[1];
+            runProgram("/bin/sh", "-c", unixRouteSrcCmd);
+            ipAddr = parseRouteSrcOutput(cat(ipFile));
+            if (!ipAddr) {
+                runProgram("/bin/sh", "-c", unixInterfacesCmd);
+                let output = cat(ipFile);
+                ipAddr = parseInterfaceListOutput(output);
+                assert(ipAddr, "Could not find a non-loopback IPv4 address", {output});
+            }
         }
     } finally {
         removeFile(ipFile);
