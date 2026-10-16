@@ -688,17 +688,16 @@ unique_ptr<Scope> ScriptEngine::getPooledScope(OperationContext* opCtx,
                                                const string& scopeType) {
     const auto fullPoolName = std::make_tuple(db, scopeType);
 
+    tassert(13286900, "must have an operation context", opCtx);
+
     // Fail before registering the operation on a scope: an already-interrupted operation (e.g.
     // maxTimeMS expired) would only throw part-way through the setup below, leaving a scope
     // registered to a soon-to-be-destroyed OperationContext.
-    if (opCtx) {
-        opCtx->checkForInterrupt();
-    }
+    opCtx->checkForInterrupt();
 
     std::shared_ptr<Scope> s = scopeCache.tryAcquire(opCtx, fullPoolName);
     if (!s) {
         s.reset(newScope());
-        tassert(13286900, "must have an operation context", opCtx);
         s->registerOperation(opCtx);
     }
 
