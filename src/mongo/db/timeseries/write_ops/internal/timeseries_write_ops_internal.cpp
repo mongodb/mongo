@@ -173,11 +173,16 @@ void filterOutExecutedMeasurements(OperationContext* opCtx,
     std::function<void(size_t)> filterOutExecutedMeasurement = [&](size_t index) {
         invariant(index < request.getDocuments().size());
         auto stmtId = getStmtIdForWriteAt(request, index);
-        if (!TransactionParticipant::get(opCtx).checkStatementExecuted(opCtx, stmtId)) {
+        const auto timestampIfAlreadyExecuted =
+            TransactionParticipant::get(opCtx).checkStatementExecutedAndGetWallClockTime(opCtx,
+                                                                                         stmtId);
+        if (!timestampIfAlreadyExecuted) {
             filteredBatch.emplace_back(originalUserMeasurementBatch.at(index));
             filteredIndices.emplace_back(index);
         } else {
             RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
+            RetryableWritesStats::get(opCtx)->recordRetriedWriteDelay(
+                opCtx->fastClockSource().now() - *timestampIfAlreadyExecuted);
         }
     };
     std::function<void(size_t)> filterOutSuccessfullyInsertedMeasurement = [&](size_t index) {

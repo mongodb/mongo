@@ -107,6 +107,18 @@ export function runTimeseriesRetryDeleteAndUpdateTest(
             statementsRetried,
         );
 
+        // Each retried statement records exactly one retry-delay sample.
+        const shard0Transactions = shard0.getDB(jsTestName()).serverStatus().transactions;
+        assert.eq(
+            shard0Transactions.retriedStatementsCount,
+            shard0Transactions.retriedWritesDelayMillis.reduce(
+                (total, bucket) => total + bucket.count,
+                0,
+            ),
+            "Expected one retriedWritesDelayMillis sample per retried statement: " +
+                tojson(shard0Transactions),
+        );
+
         session.endSession();
     };
 
