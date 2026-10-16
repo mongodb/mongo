@@ -5,8 +5,12 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
 
 namespace mongo {
 namespace {
@@ -41,6 +45,37 @@ void testExprRewrite(BSONObj expr, BSONObj expectedMatch, bool reversedInRewrite
         ASSERT_BSONOBJ_EQ(expectedMatch, bob.obj());
     } else {
         ASSERT_FALSE(result.matchExpression());
+    }
+}
+
+/**
+ * Rewrites 'expr' in the presence of a case-insensitive collation and confirms that the resulting
+ * MatchExpression matches every document in 'matchingDocs' and none of the documents in
+ * 'nonMatchingDocs'.
+ */
+void testExprRewriteWithCollator(BSONObj expr,
+                                 std::vector<BSONObj> matchingDocs,
+                                 std::vector<BSONObj> nonMatchingDocs,
+                                 bool reversedInRewrite = false) {
+    auto expCtx = ExpressionContextForTest{};
+    expCtx.setCollator(
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kToLowerString));
+    internalQueryExtraPredicateForReversedIn.store(reversedInRewrite);
+
+    auto expression =
+        Expression::parseOperand(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+    expression = expression->optimize();
+
+    auto result = RewriteExpr::rewrite(expression, expCtx.getCollator());
+    ASSERT(result.matchExpression());
+
+    for (const auto& doc : matchingDocs) {
+        ASSERT_TRUE(exec::matcher::matchesBSON(result.matchExpression(), doc))
+            << "expected " << doc << " to match " << result.matchExpression()->debugString();
+    }
+    for (const auto& doc : nonMatchingDocs) {
+        ASSERT_FALSE(exec::matcher::matchesBSON(result.matchExpression(), doc))
+            << "expected " << doc << " not to match " << result.matchExpression()->debugString();
     }
 }
 
@@ -432,6 +467,50 @@ TEST(RewriteExpr, InWithRootAsLHSFieldPathDoesNotGetRewrittenToMatch) {
     const BSONObj expectedMatch;
     testExprRewrite(expr, expectedMatch);
     testExprRewrite(expr, expectedMatch, true);
+}
+
+TEST(RewriteExpr, EqRewritesToMatchThatRespectsCollation) {
+    const BSONObj expr = fromjson("{$expr: {$eq: ['$x', 'ABC']}}");
+    testExprRewriteWithCollator(expr, {fromjson("{x: 'abc'}")}, {fromjson("{x: 'abd'}")});
+}
+
+TEST(RewriteExpr, InRewritesToMatchThatRespectsCollation) {
+    const BSONObj expr = fromjson("{$expr: {$in: ['$x', ['ABC', 'DEF']]}}");
+    const std::vector<BSONObj> matchingDocs = {fromjson("{x: 'abc'}"), fromjson("{x: 'dEf'}")};
+    const std::vector<BSONObj> nonMatchingDocs = {fromjson("{x: 'ghi'}")};
+    testExprRewriteWithCollator(expr, matchingDocs, nonMatchingDocs);
+}
+
+TEST(RewriteExpr, SingleElementInRewritesToMatchThatRespectsCollation) {
+    // A single-element $in is optimized into an equality, which must also keep the collation.
+    const BSONObj expr = fromjson("{$expr: {$in: ['$x', ['ABC']]}}");
+    testExprRewriteWithCollator(expr, {fromjson("{x: 'abc'}")}, {fromjson("{x: 'abd'}")});
+}
+
+TEST(RewriteExpr, InWithFieldPathOnRHSRewritesToMatchThatRespectsCollation) {
+    const BSONObj expr = fromjson("{$expr: {$in: ['ABC', '$x']}}");
+    testExprRewriteWithCollator(expr,
+                                {fromjson("{x: ['abc', 'ghi']}"), fromjson("{x: 'abc'}")},
+                                {fromjson("{x: ['ghi']}"), fromjson("{x: 'abd'}")},
+                                true /* reversedInRewrite */);
+}
+
+TEST(RewriteExpr, InWithFieldPathOnRHSInOrRewritesToMatchThatRespectsCollation) {
+    const BSONObj expr = fromjson(
+        "{$expr: {$or: [{$in: ['ABC', '$x']}, {$in: ['DEF', '$x']}, {$in: ['GHI', '$x']}]}}");
+    testExprRewriteWithCollator(expr,
+                                {fromjson("{x: 'abc'}"), fromjson("{x: 'dEf'}")},
+                                {fromjson("{x: 'abd'}"), fromjson("{x2: 'abc'}")},
+                                true /* reversedInRewrite */);
+}
+
+TEST(RewriteExpr, InWithMultipleRHSFieldPathsInOrRewritesToMatchThatRespectsCollation) {
+    const BSONObj expr = fromjson(
+        "{$expr: {$or: [{$in: ['ABC', '$x']}, {$in: ['DEF', '$x']}, {$in: ['GHI', '$x2']}]}}");
+    testExprRewriteWithCollator(expr,
+                                {fromjson("{x: 'abc'}"), fromjson("{x2: 'ghi'}")},
+                                {fromjson("{x: 'abd'}"), fromjson("{x2: 'abd'}")},
+                                true /* reversedInRewrite */);
 }
 
 TEST(RewriteExpr, InWithRegexAsLHSConstDoesNotGetRewrittenToMatch) {

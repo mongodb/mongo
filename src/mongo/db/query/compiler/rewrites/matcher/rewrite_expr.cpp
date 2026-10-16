@@ -30,7 +30,9 @@ bool validateFieldPathForExprInRewrite(const ExpressionFieldPath& fieldPathExpr)
 
 template <bool wrapConstInArray>
 std::unique_ptr<InMatchExpression> rewriteExprInMatchExpression(
-    const ExpressionFieldPath& fieldPathExpr, const ExpressionConstant& literalExpr) {
+    const ExpressionFieldPath& fieldPathExpr,
+    const ExpressionConstant& literalExpr,
+    const CollatorInterface* collator) {
     // Build expression BSON.
     auto fieldPath = fieldPathExpr.getFieldPath().tail().fullPath();
     BSONArray inArray;
@@ -51,6 +53,9 @@ std::unique_ptr<InMatchExpression> rewriteExprInMatchExpression(
     // setEqualitiesArray takes the backing BSONObj by value and inObj is owned — no external
     // storage needed.
     auto inMatch = std::make_unique<InMatchExpression>(std::string_view(fieldPath));
+    // The collator must be set before the equalities, so that the list is built and sorted using
+    // the collation rather than having to be rebuilt afterwards.
+    inMatch->setCollator(collator);
     uassertStatusOK(inMatch->setEqualitiesArray(inArray));
 
     return inMatch;
@@ -339,8 +344,8 @@ std::unique_ptr<MatchExpression> RewriteExpr::_rewriteInExpression(
                     // We don't need to place additional restrictions on 'rhs' here, because $in
                     // would error out for a non-array value of 'rhs'- similarly, 'lhs' will become
                     // an array, so we don't need th same checks as in the case below.
-                    return rewriteExprInMatchExpression<true /* wrapConstInArray */>(*rhsFieldPath,
-                                                                                     *lhsConst);
+                    return rewriteExprInMatchExpression<true /* wrapConstInArray */>(
+                        *rhsFieldPath, *lhsConst, _collator);
                 }
             }
         }
@@ -382,6 +387,7 @@ std::unique_ptr<MatchExpression> RewriteExpr::_rewriteInExpression(
         }
     }
 
-    return rewriteExprInMatchExpression<false /* wrapConstInArray */>(*lhsFieldPath, *rhsConst);
+    return rewriteExprInMatchExpression<false /* wrapConstInArray */>(
+        *lhsFieldPath, *rhsConst, _collator);
 }
 }  // namespace mongo
