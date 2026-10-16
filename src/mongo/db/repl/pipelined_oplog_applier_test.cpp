@@ -18,6 +18,7 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_test_helpers.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/pipelined_applier_otel_metrics.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_test_fixture.h"
@@ -32,6 +33,8 @@
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/otel/metrics/metric_names.h"
+#include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/log_capture.h"
 #include "mongo/unittest/unittest.h"
@@ -90,6 +93,11 @@ DEATH_TEST_REGEX_F(PipelinedOplogApplierDeathTest,
 class PipelinedWorkItemTest : public OplogApplierImplTest {
 protected:
     using WorkItem = PipelinedApplierWorkerPool::WorkItem;
+
+    void setUp() override {
+        OplogApplierImplTest::setUp();
+        PipelinedApplyOtelMetrics::initialize();
+    }
 
     static OplogApplier::Options secondaryOptions() {
         return OplogApplier::Options(OplogApplication::Mode::kSecondary);
@@ -459,6 +467,7 @@ protected:
 
     void setUp() override {
         OplogApplierImplTest::setUp();
+        PipelinedApplyOtelMetrics::initialize();
         // Synthetic optimes bypass the oplog writer, so allDurable can move backwards during apply.
         // Disable the mock's automatic committed-snapshot updates while still recording
         // lastApplied.
@@ -1466,6 +1475,155 @@ DEATH_TEST_REGEX_F(PipelinedOplogApplierRunDeathTest,
                       "injected unrecoverable failure during inline op");
         };
     applyThroughBuffer({makeCreateCollectionOplogEntry(_opCtx.get(), nextOpTime(), kNss)});
+}
+
+TEST_F(PipelinedWorkItemTest, OpsAppliedByWorkersCounterIncrementsPerAppliedOp) {
+    if (!otel::metrics::OtelMetricsCapturer::canReadMetrics()) {
+        return;
+    }
+    otel::metrics::OtelMetricsCapturer capturer;
+    const int64_t before =
+        capturer.readInt64Counter(otel::metrics::MetricNames::kPipelinedApplyOpsAppliedByWorkers);
+
+    createCollectionWithUuid(_opCtx.get(), kNss);
+    const auto options = secondaryOptions();
+
+    // Two work items totaling 5 ops. The counter should grow by exactly 5 on the happy path.
+    ASSERT_OK(applyWorkItem(_opCtx.get(),
+                            options,
+                            makeItem({insertOp(kNss, BSON("_id" << 0)),
+                                      insertOp(kNss, BSON("_id" << 1)),
+                                      updateOp(kNss, BSON("_id" << 0), BSON("a" << 1))})));
+    ASSERT_OK(applyWorkItem(
+        _opCtx.get(),
+        options,
+        makeItem({insertOp(kNss, BSON("_id" << 2)), deleteOp(kNss, BSON("_id" << 1))})));
+
+    const int64_t after =
+        capturer.readInt64Counter(otel::metrics::MetricNames::kPipelinedApplyOpsAppliedByWorkers);
+    ASSERT_EQ(after - before, 5);
+}
+
+TEST_F(PipelinedOplogApplierRunTest, OpsDispatchedCounterCountsEveryOpInEveryBatch) {
+    if (!otel::metrics::OtelMetricsCapturer::canReadMetrics()) {
+        return;
+    }
+    otel::metrics::OtelMetricsCapturer capturer;
+    const int64_t before =
+        capturer.readInt64Counter(otel::metrics::MetricNames::kPipelinedApplyOpsDispatched);
+
+    createCollectionWithUuid(_opCtx.get(), kNss);
+    // Small batches so the loop pulls and dispatches several of them.
+    setServerParameter("replBatchLimitOperations", 8);
+
+    constexpr int kNumOps = 25;
+    std::vector<OplogEntry> ops;
+    ops.reserve(kNumOps);
+    for (int i = 0; i < kNumOps; ++i) {
+        ops.push_back(insertOp(kNss, BSON("_id" << i)));
+    }
+    applyThroughBuffer(ops);
+
+    const int64_t after =
+        capturer.readInt64Counter(otel::metrics::MetricNames::kPipelinedApplyOpsDispatched);
+    ASSERT_EQ(after - before, kNumOps);
+}
+
+TEST_F(PipelinedOplogApplierRunTest, OpsDispatchedCounterCountsInnerOpsOfApplyOps) {
+    if (!otel::metrics::OtelMetricsCapturer::canReadMetrics()) {
+        return;
+    }
+    otel::metrics::OtelMetricsCapturer capturer;
+    const int64_t before =
+        capturer.readInt64Counter(otel::metrics::MetricNames::kPipelinedApplyOpsDispatched);
+
+    auto uuid = createCollectionWithUuid(_opCtx.get(), kNss);
+
+    // Two applyOps entries (one holding 3 inner ops, another holding 4), plus one plain insert:
+    // 3 + 4 + 1 = 8
+    applyThroughBuffer({
+        applyOpsInsertingOp(kNss, uuid, {BSON("_id" << 0), BSON("_id" << 1), BSON("_id" << 2)}),
+        applyOpsInsertingOp(
+            kNss, uuid, {BSON("_id" << 3), BSON("_id" << 4), BSON("_id" << 5), BSON("_id" << 6)}),
+        insertOp(kNss, BSON("_id" << 7)),
+    });
+
+    const int64_t after =
+        capturer.readInt64Counter(otel::metrics::MetricNames::kPipelinedApplyOpsDispatched);
+    ASSERT_EQ(after - before, 8);
+}
+
+// The opsDispatched counter counts the single-key ops that a packed container op expands to,
+// not the packed op itself.
+TEST_F(PipelinedOplogApplierRunTest, OpsDispatchedCounterCountsExpandedContainerOps) {
+    if (!otel::metrics::OtelMetricsCapturer::canReadMetrics()) {
+        return;
+    }
+    otel::metrics::OtelMetricsCapturer capturer;
+    const int64_t before =
+        capturer.readInt64Counter(otel::metrics::MetricNames::kPipelinedApplyOpsDispatched);
+
+    auto ident = createBytesContainer();
+    auto value = BSONBinData("V", 1, BinDataGeneral);
+
+    // A packed insert of 3 keys and a single-key delete:
+    // 3 + 1 = 4 single-key ops enqueued.
+    applyThroughBuffer(
+        {containerOp(
+             ident, OpTypeEnum::kContainerInsert, packedInsertOf({"K1", "K2", "K3"}, value)),
+         containerOp(ident, OpTypeEnum::kContainerDelete, BSON("k" << bytesKey("K2")))});
+
+    const int64_t after =
+        capturer.readInt64Counter(otel::metrics::MetricNames::kPipelinedApplyOpsDispatched);
+    ASSERT_EQ(after - before, 4);
+}
+
+// A packed container op nested inside an applyOps entry is expanded to its single-key ops before
+// routing; the opsDispatched counter must count the fully-expanded ops, not the applyOps entry or
+// the packed container op that lives inside it.
+TEST_F(PipelinedOplogApplierRunTest, OpsDispatchedCounterCountsExpandedContainerOpsInsideApplyOps) {
+    if (!otel::metrics::OtelMetricsCapturer::canReadMetrics()) {
+        return;
+    }
+    otel::metrics::OtelMetricsCapturer capturer;
+    const int64_t before =
+        capturer.readInt64Counter(otel::metrics::MetricNames::kPipelinedApplyOpsDispatched);
+
+    auto uuid = createCollectionWithUuid(_opCtx.get(), kNss);
+    auto ident = createBytesContainer();
+    auto value = BSONBinData("V", 1, BinDataGeneral);
+
+    // The applyOps holds one plain insert plus a packed container insert of 3 keys, which expands
+    // to 4 dispatched ops.
+    applyThroughBuffer({applyOpsOp(
+        {MutableOplogEntry::makeInsertOperation(kNss, uuid, BSON("_id" << 0), BSON("_id" << 0)),
+         containerReplOp(
+             ident, OpTypeEnum::kContainerInsert, packedInsertOf({"K1", "K2", "K3"}, value))})});
+
+    const int64_t after =
+        capturer.readInt64Counter(otel::metrics::MetricNames::kPipelinedApplyOpsDispatched);
+    ASSERT_EQ(after - before, 4);
+}
+
+// A packed container op that expands to zero single-key ops (an empty key list) does not contribute
+// to the opsDispatched counter.
+TEST_F(PipelinedOplogApplierRunTest, OpsDispatchedCounterIgnoresEmptyPackedContainerOp) {
+    if (!otel::metrics::OtelMetricsCapturer::canReadMetrics()) {
+        return;
+    }
+    otel::metrics::OtelMetricsCapturer capturer;
+    const int64_t before =
+        capturer.readInt64Counter(otel::metrics::MetricNames::kPipelinedApplyOpsDispatched);
+
+    auto ident = createBytesContainer();
+    auto value = BSONBinData("V", 1, BinDataGeneral);
+
+    applyThroughBuffer(
+        {containerOp(ident, OpTypeEnum::kContainerInsert, packedInsertOf({}, value))});
+
+    const int64_t after =
+        capturer.readInt64Counter(otel::metrics::MetricNames::kPipelinedApplyOpsDispatched);
+    ASSERT_EQ(after - before, 0);
 }
 
 }  // namespace

@@ -1301,6 +1301,21 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "pipelined_applier_otel_metrics",
+    srcs = [
+        "pipelined_applier_otel_metrics.cpp",
+    ],
+    hdrs = [
+        "pipelined_applier_otel_metrics.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:server_feature_flags",
+        "//src/mongo/otel/metrics:otel_metrics_service",
+    ],
+)
+
+mongo_cc_library(
     name = "pipelined_applier_batch_tracker",
     srcs = [
         "pipelined_applier_batch_tracker.cpp",
@@ -1353,6 +1368,7 @@ mongo_cc_library(
         ":oplog_entry",
         ":pipelined_applier_advancer",
         ":pipelined_applier_batch_tracker",
+        ":pipelined_applier_otel_metrics",
         ":repl_coordinator_interface",
         ":storage_interface",
         "//src/mongo:base",
@@ -2253,6 +2269,8 @@ mongo_cc_unit_test(
         "//src/mongo/db/storage/kv:kv_engine",
         "//src/mongo/executor:network_interface_mock",
         "//src/mongo/executor:thread_pool_task_executor",
+        "//src/mongo/otel/metrics:metrics_test_util",
+        "//src/mongo/otel/metrics:otel_metrics_service",
         "//src/mongo/unittest",
         "//src/mongo/util/concurrency:thread_pool",
     ],
@@ -2305,8 +2323,11 @@ mongo_cc_unit_test(
         ":pipelined_oplog_applier",
         "//src/mongo:base",
         "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/otel/metrics:metrics_test_util",
+        "//src/mongo/otel/metrics:otel_metrics_service",
         "//src/mongo/stdx",
         "//src/mongo/unittest",
+        "//src/mongo/util:mock_periodic_runner",
     ],
 )
 

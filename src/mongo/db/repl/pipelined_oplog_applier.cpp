@@ -12,6 +12,7 @@
 #include "mongo/db/repl/oplog_applier_utils.h"
 #include "mongo/db/repl/oplog_entry_or_grouped_inserts.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/pipelined_applier_otel_metrics.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/logv2/log.h"
@@ -185,6 +186,7 @@ void PipelinedOplogApplier::_dispatchOps(OperationContext* opCtx, std::vector<Op
             opsPerWorker.begin(), opsPerWorker.end(), [](size_t count) { return count != 0; });
         auto remainingWorkers = _batchTracker.addBatch(lastRegisteredOpTime,
                                                        static_cast<uint32_t>(participatingWorkers));
+        PipelinedApplyOtelMetrics::addOpsDispatched(routedOps.size());
         for (size_t workerIdx = 0; workerIdx < numWorkers; ++workerIdx) {
             if (!items[workerIdx].ops.empty()) {
                 items[workerIdx].batchRemainingWorkers = remainingWorkers;
@@ -308,12 +310,17 @@ Status applyWorkItem(OperationContext* opCtx,
     // stable checkpoint and replays from there, so there is never a window where its data is
     // inconsistent with the ops being applied. As a result, we hardcode isDataConsistent to true.
     const bool isDataConsistent = true;
-    return OplogApplierUtils::applyOplogBatchCommon(opCtx,
-                                                    ops,
-                                                    options.mode,
-                                                    options.allowNamespaceNotFoundErrorsOnCrudOps,
-                                                    isDataConsistent,
-                                                    &applyOplogEntryOrGroupedInserts);
+    const auto status =
+        OplogApplierUtils::applyOplogBatchCommon(opCtx,
+                                                 ops,
+                                                 options.mode,
+                                                 options.allowNamespaceNotFoundErrorsOnCrudOps,
+                                                 isDataConsistent,
+                                                 &applyOplogEntryOrGroupedInserts);
+    if (status.isOK()) {
+        PipelinedApplyOtelMetrics::addOpsAppliedByWorkers(item.ops.size());
+    }
+    return status;
 }
 
 void consumeWorkItem(size_t workerIdx,

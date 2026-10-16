@@ -7,9 +7,14 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
+#include "mongo/db/repl/pipelined_applier_otel_metrics.h"
+#include "mongo/db/repl/pipelined_oplog_applier.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/periodic_runner.h"
+
+#include <limits>
 
 #include <fmt/format.h>
 
@@ -40,10 +45,52 @@ std::deque<PipelinedApplierWorkerPool::Worker> PipelinedApplierWorkerPool::_star
     return workers;
 }
 
+PeriodicJobAnchor PipelinedApplierWorkerPool::_makeMetricsCollector(
+    const std::deque<Worker>& workers) {
+    auto* runner = getGlobalServiceContext()->getPeriodicRunner();
+    if (!runner) {
+        return {};
+    }
+    return runner->makeJob({
+        "PipelinedApplierWorkerPool queue depth metrics",
+        // Capturing `workers` by reference is safe because `_metricsCollector` is declared after
+        // `_workers` in the class, so the periodic job will be created after and destroyed before
+        // the deque.
+        [&workers](auto*) {
+            if (workers.empty()) {
+                return;
+            }
+            uint64_t minQueueDepth = std::numeric_limits<uint64_t>::max();
+            uint64_t maxQueueDepth = 0;
+            for (const auto& worker : workers) {
+                // Load `executed` before `scheduled` so the calculated depth can never be negative.
+                uint64_t executed = worker.executed.loadRelaxed();
+                uint64_t scheduled = worker.scheduled.loadRelaxed();
+                invariant(scheduled >= executed);
+                uint64_t queueDepth = scheduled - executed;
+                minQueueDepth = std::min(minQueueDepth, queueDepth);
+                maxQueueDepth = std::max(maxQueueDepth, queueDepth);
+            }
+            // This would only occur if we didn't check any workers, in which case we should have
+            // early-returned from this callback already.
+            invariant(minQueueDepth != std::numeric_limits<uint64_t>::max());
+            PipelinedApplyOtelMetrics::setQueueDepthMin(minQueueDepth);
+            PipelinedApplyOtelMetrics::setQueueDepthMax(maxQueueDepth);
+        },
+        Seconds(1),
+        true /*isKillableByStepdown*/
+    });
+}
+
 PipelinedApplierWorkerPool::PipelinedApplierWorkerPool(size_t numWorkers, ConsumeFn consumeFn)
     : _consumeFn(std::move(consumeFn)),
       _numWorkers(numWorkers),
-      _workers(_startWorkers(numWorkers)) {}
+      _workers(_startWorkers(numWorkers)),
+      _metricsCollector(_makeMetricsCollector(_workers)) {
+    if (_metricsCollector.isValid()) {
+        _metricsCollector.start();
+    }
+}
 
 PipelinedApplierWorkerPool::~PipelinedApplierWorkerPool() {
     // Idempotent: drains and joins here only if the owner never shut the pool down explicitly.
@@ -55,6 +102,7 @@ void PipelinedApplierWorkerPool::enqueue(size_t workerIdx, WorkItem item) {
             "Pipelined oplog applier workers are shutting down",
             !_isShutdown.load());
     invariant(workerIdx < _numWorkers);
+    PipelinedApplyOtelMetrics::addOpsQueued(item.ops.size());
     auto& worker = _workers[workerIdx];
     // Counted before scheduling so a report never shows more items executed than scheduled.
     worker.scheduled.fetchAndAddRelaxed(1);

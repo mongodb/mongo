@@ -757,6 +757,21 @@ public:
         MetricNameMaker::make("mongodb.serverStatus.metrics.getLastError.default.wtimeouts");
     static constexpr MetricName kGetLastErrorDefaultUnsatisfiable =
         MetricNameMaker::make("mongodb.serverStatus.metrics.getLastError.default.unsatisfiable");
+    static constexpr MetricName kPipelinedApplyOpsDispatched =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.repl.pipelinedApply.opsDispatched");
+    static constexpr MetricName kPipelinedApplyOpsAppliedByWorkers = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.repl.pipelinedApply.opsAppliedByWorkers");
+    static constexpr MetricName kPipelinedApplyOpsDrained =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.repl.pipelinedApply.opsDrained");
+    static constexpr MetricName kPipelinedApplyOpsQueued =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.repl.pipelinedApply.opsQueued");
+    static constexpr MetricName kPipelinedApplyQueueDepthMin =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.repl.pipelinedApply.queueDepthMin");
+    static constexpr MetricName kPipelinedApplyQueueDepthMax =
+        MetricNameMaker::make("mongodb.serverStatus.metrics.repl.pipelinedApply.queueDepthMax");
+    static constexpr MetricName kPipelinedApplyLastAppliedAdvancements = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.repl.pipelinedApply.lastAppliedAdvancements");
+
 
     // DB Integration & Observability Team Metrics
 
