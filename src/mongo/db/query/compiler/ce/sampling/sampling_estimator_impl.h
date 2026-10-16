@@ -254,7 +254,7 @@ public:
      * Returns the sample size calculated by SamplingEstimator.
      */
     inline size_t getSampleSize() const final {
-        return _spec.sampleSize;
+        return _spec.requestedSampleSize;
     }
 
     /**

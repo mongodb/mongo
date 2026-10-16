@@ -497,7 +497,7 @@ SamplingEstimatorImpl::SamplingEstimatorImpl(
     SamplingSourceEnum samplingSource,
     SamplingCEMethodEnum persistentSamplingMethod)
     : _spec{.nss = nss,
-            .sampleSize = sampleSize,
+            .requestedSampleSize = sampleSize,
             .onTheFlySamplingMethod = onTheFlySamplingMethod,
             .persistentSamplingMethod = persistentSamplingMethod,
             .numChunks = numChunks,
@@ -563,7 +563,7 @@ SamplingMetadata SamplingEstimatorImpl::getSamplingMetadata() const {
     SamplingMetadata meta;
     meta.isPersisted = _sample->isPersisted();
     meta.docCount = _sample->size();
-    meta.requestedDocCount = _spec.sampleSize;
+    meta.requestedDocCount = _spec.requestedSampleSize;
     meta.memorySizeBytes = memorySizeBytes;
     meta.technique = _sample->technique();
     if (_sample->technique() == SamplingTechniqueEnum::kChunk) {

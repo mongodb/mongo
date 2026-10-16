@@ -255,7 +255,7 @@ makeRandomSamplingPlan(const SampleSpec& spec,
     stage = sbe::makeS<sbe::LimitSkipStage>(
         std::move(stage),
         sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
-                                   sbe::value::bitcastFrom<int64_t>(spec.sampleSize)),
+                                   sbe::value::bitcastFrom<int64_t>(spec.requestedSampleSize)),
         /*skip=*/nullptr,
         /*nodeId=*/0);
 
@@ -278,7 +278,7 @@ makeChunkSamplingPlan(const SampleSpec& spec,
     auto staticData = std::make_unique<stage_builder::PlanStageStaticData>();
     sbe::value::SlotIdGenerator ids;
     staticData->resultSlot = ids.generate();
-    auto chunkSize = static_cast<int64_t>(spec.sampleSize / *spec.numChunks);
+    auto chunkSize = static_cast<int64_t>(spec.requestedSampleSize / *spec.numChunks);
 
     boost::optional<sbe::value::SlotId> outerRid = ids.generate();
     // There's no need for the outer stage to retrieve the record/document since it'll be seeked
@@ -375,8 +375,9 @@ makeTestSamplingPlan(const SampleSpec& spec,
             // collection in order to generate a repeatable sample.
             stage = sbe::makeS<sbe::LimitSkipStage>(
                 std::move(stage),
-                sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
-                                           sbe::value::bitcastFrom<int64_t>(spec.sampleSize)),
+                sbe::makeE<sbe::EConstant>(
+                    sbe::value::TypeTags::NumberInt64,
+                    sbe::value::bitcastFrom<int64_t>(spec.requestedSampleSize)),
                 /*skip=*/nullptr,
                 /*nodeId=*/0);
             break;
@@ -385,9 +386,9 @@ makeTestSamplingPlan(const SampleSpec& spec,
             const auto collCard = static_cast<size_t>(collection->numRecords(opCtx));
             tassert(12433206,
                     "Sample size must be greater than zero for stride sampling",
-                    spec.sampleSize > 0);
+                    spec.requestedSampleSize > 0);
             const auto strideModulus =
-                std::max(int64_t{1}, static_cast<int64_t>(collCard / spec.sampleSize));
+                std::max(int64_t{1}, static_cast<int64_t>(collCard / spec.requestedSampleSize));
 
             // Sequentially scan the collection and keep documents whose _id satisfies
             // shardHash(_id) % strideModulus == 0, then cap the sample at 'sampleSize' documents.
@@ -414,8 +415,9 @@ makeTestSamplingPlan(const SampleSpec& spec,
                 std::move(stage), std::move(hashModFilter), /*nodeId=*/0);
             stage = sbe::makeS<sbe::LimitSkipStage>(
                 std::move(stage),
-                sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
-                                           sbe::value::bitcastFrom<int64_t>(spec.sampleSize)),
+                sbe::makeE<sbe::EConstant>(
+                    sbe::value::TypeTags::NumberInt64,
+                    sbe::value::bitcastFrom<int64_t>(spec.requestedSampleSize)),
                 /*skip=*/nullptr,
                 /*nodeId=*/0);
             break;

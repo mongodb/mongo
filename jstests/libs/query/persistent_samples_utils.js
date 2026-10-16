@@ -14,7 +14,7 @@ export const sampleDocFieldNames = {
     idField: "_id",
     uuidField: "collectionUuid",
     samplingMethodField: "samplingMethod",
-    sampleSizeField: "sampleSize",
+    requestedSampleSizeField: "requestedSampleSize",
     numChunksField: "numChunks",
     createdAtField: "createdAt",
     docsField: "docs",
@@ -182,22 +182,27 @@ export function makeDocsOfTotalSize(numDocs, totalBytes) {
 
 // Returns the expected _id string for a sample page document. This must mirror
 // ce::makePersistentSampleId() in persistent_sample_loader.cpp:
-//     <collectionUuid>_<schemaVersion>_<samplingMethod>_<sampleSize>[_<numChunks>]_<pageNo>
-// samplingType is "random" or "chunk"; sampleSize is the sample count encoded in the _id.
+//     <collectionUuid>_<schemaVersion>_<samplingMethod>_<requestedSampleSize>[_<numChunks>]_<pageNo>
+// samplingType is "random" or "chunk"; requestedSampleSize is the sample count encoded in the _id.
 // numChunks is included in the _id only for chunk mode.
 // pageNo defaults to 0 (expected when only 1 page exists) and is zero-padded to the width of
-// sampleSize so that lexicographic _id order matches page order.
+// requestedSampleSize so that lexicographic _id order matches page order.
 export function getExpectedId(
     uuid,
     samplingType,
-    sampleSize,
+    requestedSampleSize,
     expectedSchemaVersion = kPersistentSampleSchemaVersion,
     numChunks = null,
     pageNo = 0,
 ) {
     return (
-        getExpectedIdPrefix(uuid, samplingType, sampleSize, expectedSchemaVersion, numChunks) +
-        padPageNo(pageNo, sampleSize)
+        getExpectedIdPrefix(
+            uuid,
+            samplingType,
+            requestedSampleSize,
+            expectedSchemaVersion,
+            numChunks,
+        ) + padPageNo(pageNo, requestedSampleSize)
     );
 }
 
@@ -218,18 +223,18 @@ export function getSampleDoc(samplesColl, expectedId) {
 export function getSampleLookupFilter(
     uuid,
     samplingType,
-    sampleSize,
+    requestedSampleSize,
     expectedSchemaVersion = kPersistentSampleSchemaVersion,
     numChunks = null,
 ) {
     const prefix = getExpectedIdPrefix(
         uuid,
         samplingType,
-        sampleSize,
+        requestedSampleSize,
         expectedSchemaVersion,
         numChunks,
     );
-    const width = String(sampleSize).length;
+    const width = String(requestedSampleSize).length;
     return {
         [sampleDocFieldNames.idField]: {
             $gte: prefix + "0".repeat(width),
@@ -307,11 +312,11 @@ export function validatePersistentSample(
 function getExpectedIdPrefix(
     uuid,
     samplingType,
-    sampleSize,
+    requestedSampleSize,
     expectedSchemaVersion = kPersistentSampleSchemaVersion,
     numChunks = null,
 ) {
-    let prefix = `${uuid}_${expectedSchemaVersion}_${samplingType}_${sampleSize}_`;
+    let prefix = `${uuid}_${expectedSchemaVersion}_${samplingType}_${requestedSampleSize}_`;
     if (numChunks !== null) {
         assert.eq(
             "chunk",
@@ -323,14 +328,17 @@ function getExpectedIdPrefix(
     return prefix;
 }
 
-// Zero-pads `pageNo` to the width of `sampleSize`, mirroring ce::makePersistentSampleId().
-function padPageNo(pageNo, sampleSize) {
-    const width = String(sampleSize).length;
+// Zero-pads `pageNo` to the width of `requestedSampleSize`, mirroring
+// ce::makePersistentSampleId().
+function padPageNo(pageNo, requestedSampleSize) {
+    const width = String(requestedSampleSize).length;
     const page = String(pageNo);
-    assert.lte(page.length, width, "pageNo does not fit the padding width implied by sampleSize", {
-        pageNo,
-        sampleSize,
-    });
+    assert.lte(
+        page.length,
+        width,
+        "pageNo does not fit the padding width implied by requestedSampleSize",
+        {pageNo, requestedSampleSize},
+    );
     return page.padStart(width, "0");
 }
 
@@ -370,8 +378,8 @@ function validateSamplePage(
     );
     assert.eq(
         requestedSampleSize,
-        page[sampleDocFieldNames.sampleSizeField],
-        "Unexpected sampleSize",
+        page[sampleDocFieldNames.requestedSampleSizeField],
+        "Unexpected requestedSampleSize",
         {sampleId},
     );
     assert.eq(
@@ -428,12 +436,12 @@ function validateSampledDocCount(samplingMethod, docsCount, actualSampleSize, nu
         assert.eq(
             actualSampleSize,
             docsCount,
-            "sampleSize and sampled docs count don't match",
+            "actualSampleSize and sampled docs count don't match",
             attr,
         );
     } else if (samplingMethod == "chunk") {
         // When using chunk sampling, actual num docs sampled might be lower than the parameter passed to `analyze`
-        // depending on whether sampleSize divides evenly into the specified number of chunks,
+        // depending on whether requestedSampleSize divides evenly into the specified number of chunks,
         // and whether the random cursors fall close to the end of the collection. In the worst case, every random
         // cursor falls on the last document in the collection which means every chunk only has 1 document, so the
         // entire sample only has numChunks documents
@@ -475,7 +483,7 @@ function assertPagesShareMetadata(pages) {
     const metaFields = [
         sampleDocFieldNames.uuidField,
         sampleDocFieldNames.samplingMethodField,
-        sampleDocFieldNames.sampleSizeField,
+        sampleDocFieldNames.requestedSampleSizeField,
         sampleDocFieldNames.numChunksField,
         sampleDocFieldNames.schemaVersionField,
         sampleDocFieldNames.createdAtField,
@@ -511,7 +519,7 @@ function assertPagesShareMetadata(pages) {
 function idWithoutPageNo(id, page) {
     const width = padPageNo(
         page[sampleDocFieldNames.pageNoField],
-        page[sampleDocFieldNames.sampleSizeField],
+        page[sampleDocFieldNames.requestedSampleSizeField],
     ).length;
     return id.slice(0, id.length - width);
 }

@@ -72,19 +72,20 @@ constexpr int kNumDocsDiscardedFieldBytes = 1 /* type indicator */ +
 void appendSamplePageMetadata(BSONObjBuilder& builder,
                               const UUID& collectionUuid,
                               SamplingTechniqueEnum method,
-                              size_t sampleSize,
+                              size_t requestedSampleSize,
                               boost::optional<int> numChunks,
                               int pageNo,
                               Date_t createdAt) {
     const std::string id =
-        makePersistentSampleId(collectionUuid, method, sampleSize, numChunks, pageNo);
+        makePersistentSampleId(collectionUuid, method, requestedSampleSize, numChunks, pageNo);
 
     builder.append(PersistentSampleDoc::k_idFieldName, id);
     builder.append(PersistentSampleDoc::kPageNoFieldName, pageNo);
     builder.append(PersistentSampleDoc::kCollectionUuidFieldName, collectionUuid.toString());
     builder.append(PersistentSampleDoc::kSchemaVersionFieldName, kPersistentSampleSchemaVersion);
     builder.appendDate(PersistentSampleDoc::kCreatedAtFieldName, createdAt);
-    builder.append(PersistentSampleDoc::kSampleSizeFieldName, static_cast<long long>(sampleSize));
+    builder.append(PersistentSampleDoc::kRequestedSampleSizeFieldName,
+                   static_cast<long long>(requestedSampleSize));
     builder.append(PersistentSampleDoc::kSamplingMethodFieldName, idlSerialize(method));
     if (method == SamplingTechniqueEnum::kChunk) {
         builder.append(PersistentSampleDoc::kNumChunksFieldName, *numChunks);
@@ -95,7 +96,7 @@ void appendSamplePageMetadata(BSONObjBuilder& builder,
 
 std::vector<BSONObj> makePersistentSamplePageDocs(const UUID& collectionUuid,
                                                   SamplingTechniqueEnum method,
-                                                  size_t sampleSize,
+                                                  size_t requestedSampleSize,
                                                   boost::optional<int> numChunks,
                                                   const std::vector<BSONObj>& sample,
                                                   Date_t createdAt) {
@@ -113,7 +114,7 @@ std::vector<BSONObj> makePersistentSamplePageDocs(const UUID& collectionUuid,
         builders.emplace_back();
         auto& builder = builders.back();
         appendSamplePageMetadata(
-            builder, collectionUuid, method, sampleSize, numChunks, pageNo, createdAt);
+            builder, collectionUuid, method, requestedSampleSize, numChunks, pageNo, createdAt);
         BSONArrayBuilder docsArr(builder.subarrayStart(PersistentSampleDoc::kDocsFieldName));
 
         // Size of this page with its metadata but no documents.
@@ -286,7 +287,7 @@ StatusWith<PersistedSampleSummary> SampleManager::persistAndReplaceExisting(
     // Serialize the sample into one or more page documents
     std::vector<BSONObj> pageDocs = makePersistentSamplePageDocs(collectionUuid,
                                                                  samplingMethodToPersist,
-                                                                 spec.sampleSize,
+                                                                 spec.requestedSampleSize,
                                                                  numChunks,
                                                                  sample.docs(),
                                                                  createdAt);
@@ -309,7 +310,7 @@ StatusWith<PersistedSampleSummary> SampleManager::persistAndReplaceExisting(
     }
 
     const auto [minId, maxId] = makePersistentSampleIdRange(
-        collectionUuid, samplingMethodToPersist, spec.sampleSize, numChunks);
+        collectionUuid, samplingMethodToPersist, spec.requestedSampleSize, numChunks);
 
     // Atomically insert the sample docs/replace the existing sample if one exists.
     writeConflictRetry(_opCtx, "analyzePersistSample", samplesNss, [&] {

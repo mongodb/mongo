@@ -31,7 +31,7 @@ SampleSpec makeSpec(const NamespaceString& nss,
                     boost::optional<int> numChunks = boost::none) {
     return SampleSpec{
         .nss = nss,
-        .sampleSize = sampleSize,
+        .requestedSampleSize = sampleSize,
         .onTheFlySamplingMethod = method,
         .persistentSamplingMethod = method,
         .numChunks = numChunks,
@@ -237,7 +237,7 @@ TEST_F(SamplingEstimatorTest, SampleManagerLoadIsNotMemoized) {
         samplesNss,
         {buildPersistentSampleDoc(uuid,
                                   SamplingTechniqueEnum::kRandom,
-                                  /*sampleSize=*/7,
+                                  /*requestedSampleSize=*/7,
                                   {BSON("_id" << 100 << "tag" << "other")})},
         /*clustered=*/true);
 
@@ -460,10 +460,10 @@ namespace {
 
 
 std::vector<BSONObj> makeRandomSamplePageDocs(const std::vector<BSONObj>& sample,
-                                              size_t sampleSize) {
+                                              size_t requestedSampleSize) {
     return makePersistentSamplePageDocs(UUID::gen(),
                                         SamplingTechniqueEnum::kRandom,
-                                        sampleSize,
+                                        requestedSampleSize,
                                         /*numChunks=*/boost::none,
                                         sample,
                                         Date_t::now());
@@ -511,14 +511,14 @@ TEST(ReassemblePersistentSample, PagesWithMismatchedDiscardCountRejected) {
     auto result = reassemblePersistentSample({
         buildPage(uuid,
                   SamplingTechniqueEnum::kRandom,
-                  /*sampleSize=*/4,
+                  /*requestedSampleSize=*/4,
                   /*docs=*/{BSON("a" << 0)},
                   /*pageNo=*/0,
                   /*numChunks=*/boost::none,
                   /*numDocsDiscarded=*/1),
         buildPage(uuid,
                   SamplingTechniqueEnum::kRandom,
-                  /*sampleSize=*/4,
+                  /*requestedSampleSize=*/4,
                   /*docs=*/{BSON("a" << 0)},
                   /*pageNo=*/1,
                   /*numChunks=*/boost::none,
@@ -571,7 +571,8 @@ TEST(MakePersistentSamplePageDocs, SoleOversizedDocFails) {
 TEST(MakePersistentSamplePageDocs, DiscardBudgetIsRelativeToTheSampleNotTheRequestedSampleSize) {
     // Only 5 docs were actually sampled even though 100 were requested, so the budget is 0 docs.
     const auto sample = makeSampleWithOversizedDocs(/*numDocs=*/5, /*oversizedIdxs=*/{2});
-    ASSERT_THROWS_CODE(makeRandomSamplePageDocs(sample, /*sampleSize=*/100), DBException, 13106000);
+    ASSERT_THROWS_CODE(
+        makeRandomSamplePageDocs(sample, /*requestedSampleSize=*/100), DBException, 13106000);
 }
 
 TEST(MakePersistentSamplePageDocs, DiscardFractionIsControlledByServerParameter) {
@@ -679,7 +680,7 @@ TEST(MakePersistentSamplePageDocs, NumDocsDiscardedReservationDefersADocToANewPa
     // exactly one page is filled as much as possible (including the space reserved for the
     // `numDocsDiscarded` field).
     std::vector<BSONObj> sample{makeSizedDoc(0, BSONObjMaxUserSize - 2048)};
-    for (int i = 1; i <= 99; ++i) {
+    for (int i = 1; i <= 98; ++i) {
         sample.push_back(BSON("_id" << i));
     }
 
@@ -704,7 +705,7 @@ TEST(MakePersistentSamplePageDocs, NumDocsDiscardedReservationDefersADocToANewPa
 }
 
 TEST(MakePersistentSamplePageDocs, EmptySampleProducesSingleEmptyPage) {
-    const auto pages = makeRandomSamplePageDocs({}, /*sampleSize=*/10);
+    const auto pages = makeRandomSamplePageDocs({}, /*requestedSampleSize=*/10);
     ASSERT_EQ(pages.size(), 1u);
     auto swParsed = parsePersistentSample(pages[0]);
     ASSERT_OK(swParsed.getStatus());
@@ -775,7 +776,7 @@ TEST(MakePersistentSamplePageDocs, ProducesParseableRandomSampleDoc) {
     auto swParsed = parsePersistentSample(pages[0]);
     ASSERT_OK(swParsed.getStatus());
     const PersistentSampleDoc& parsed = swParsed.getValue();
-    ASSERT_EQ(parsed.getSampleSize(), 1000);
+    ASSERT_EQ(parsed.getRequestedSampleSize(), 1000);
     ASSERT(parsed.getSamplingMethod() == SamplingTechniqueEnum::kRandom);
     ASSERT_EQ(parsed.getPageNo(), 0);
     ASSERT_EQ(parsed.getDocs().size(), 2u);

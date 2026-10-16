@@ -193,7 +193,7 @@ TEST(ParsePersistentSample, ValidRandomSamplePopulatesAllFields) {
 
     ASSERT_EQUALS(sample.getCollectionUuid(), uuid.toString());
     ASSERT_EQUALS(sample.getSamplingMethod(), SamplingTechniqueEnum::kRandom);
-    ASSERT_EQUALS(static_cast<size_t>(sample.getSampleSize()), docs.size());
+    ASSERT_EQUALS(static_cast<size_t>(sample.getRequestedSampleSize()), docs.size());
     ASSERT_FALSE(sample.getNumChunks().has_value());
     ASSERT_EQUALS(sample.getPageNo(), 0);
 
@@ -215,33 +215,39 @@ TEST(ParsePersistentSample, ChunkSamplePopulatesNumChunks) {
     ASSERT_EQUALS(sample.getNumChunks().value(), 1);
 }
 
-TEST(ParsePersistentSample, RejectsDocsArrayLargerThanSampleSize) {
-    // 'docs' must not contain more entries than 'sampleSize'. Fewer is allowed: chunk sampling
-    // may collect less than the requested size when a chunk starts near end-of-collection.
+TEST(ParsePersistentSample, RejectsDocsArrayLargerThanRequestedSampleSize) {
+    // 'docs' must not contain more entries than 'requestedSampleSize'. Fewer is allowed: chunk
+    // sampling may collect less than the requested size when a chunk starts near end-of-collection.
     const std::vector<BSONObj> docs{BSON("a" << 1), BSON("a" << 2)};
 
-    // docs.size() > sampleSize — rejected.
-    auto docsExceedDeclared = parsePersistentSample(buildPersistentSampleDoc(
-        UUID::gen(), SamplingTechniqueEnum::kRandom, /*sampleSize=*/docs.size() - 1, docs));
+    // docs.size() > requestedSampleSize — rejected.
+    auto docsExceedDeclared =
+        parsePersistentSample(buildPersistentSampleDoc(UUID::gen(),
+                                                       SamplingTechniqueEnum::kRandom,
+                                                       /*requestedSampleSize=*/docs.size() - 1,
+                                                       docs));
     ASSERT_NOT_OK(docsExceedDeclared.getStatus());
     ASSERT_EQUALS(docsExceedDeclared.getStatus().code(), ErrorCodes::UnsupportedFormat);
 
-    // docs.size() < sampleSize — allowed (underfull chunk sample).
-    auto underFull = parsePersistentSample(buildPersistentSampleDoc(
-        UUID::gen(), SamplingTechniqueEnum::kRandom, /*sampleSize=*/docs.size() + 1, docs));
+    // docs.size() < requestedSampleSize — allowed (underfull chunk sample).
+    auto underFull =
+        parsePersistentSample(buildPersistentSampleDoc(UUID::gen(),
+                                                       SamplingTechniqueEnum::kRandom,
+                                                       /*requestedSampleSize=*/docs.size() + 1,
+                                                       docs));
     ASSERT_OK(underFull.getStatus());
 }
 
 TEST(ParsePersistentSample, RejectsEmptySample) {
     auto result = parsePersistentSample(buildPersistentSampleDoc(
-        UUID::gen(), SamplingTechniqueEnum::kRandom, /*sampleSize=*/0, /*docs=*/{}));
+        UUID::gen(), SamplingTechniqueEnum::kRandom, /*requestedSampleSize=*/0, /*docs=*/{}));
     ASSERT_NOT_OK(result.getStatus());
 }
 
 TEST(ParsePersistentSample, RejectsMissingSchemaVersion) {
     BSONObjBuilder b;
     b.append(PersistentSampleDoc::kCollectionUuidFieldName, UUID::gen().toString());
-    b.append(PersistentSampleDoc::kSampleSizeFieldName,
+    b.append(PersistentSampleDoc::kRequestedSampleSizeFieldName,
              static_cast<long long>(kStubSampleDocs.size()));
     b.append(PersistentSampleDoc::kSamplingMethodFieldName,
              idlSerialize(SamplingTechniqueEnum::kRandom));
@@ -257,13 +263,13 @@ TEST(ParsePersistentSample, RejectsMissingSchemaVersion) {
 }
 
 TEST(ParsePersistentSample, RejectsBelowMinSchemaVersion) {
-    auto result =
-        parsePersistentSample(buildPersistentSampleDoc(UUID::gen(),
-                                                       SamplingTechniqueEnum::kRandom,
-                                                       /*sampleSize=*/kStubSampleDocs.size(),
-                                                       /*docs=*/kStubSampleDocs,
-                                                       /*numChunks=*/boost::none,
-                                                       /*schemaVersion=*/0));
+    auto result = parsePersistentSample(
+        buildPersistentSampleDoc(UUID::gen(),
+                                 SamplingTechniqueEnum::kRandom,
+                                 /*requestedSampleSize=*/kStubSampleDocs.size(),
+                                 /*docs=*/kStubSampleDocs,
+                                 /*numChunks=*/boost::none,
+                                 /*schemaVersion=*/0));
     ASSERT_NOT_OK(result.getStatus());
 }
 
@@ -271,7 +277,7 @@ TEST(ParsePersistentSample, RejectsNonNumericSchemaVersion) {
     auto result = parsePersistentSample(
         buildPersistentSampleDoc(UUID::gen(),
                                  SamplingTechniqueEnum::kRandom,
-                                 /*sampleSize=*/kStubSampleDocs.size(),
+                                 /*requestedSampleSize=*/kStubSampleDocs.size(),
                                  /*docs=*/kStubSampleDocs,
                                  /*numChunks=*/boost::none,
                                  /*schemaVersion=*/kPersistentSampleSchemaVersion,
@@ -283,7 +289,7 @@ TEST(ParsePersistentSample, RejectsMissingCollectionUuid) {
     auto result = parsePersistentSample(buildPersistentSampleDoc(
         UUID::gen(),
         SamplingTechniqueEnum::kRandom,
-        /*sampleSize=*/kStubSampleDocs.size(),
+        /*requestedSampleSize=*/kStubSampleDocs.size(),
         /*docs=*/kStubSampleDocs,
         /*numChunks=*/boost::none,
         /*schemaVersion=*/kPersistentSampleSchemaVersion,
@@ -296,7 +302,7 @@ TEST(ParsePersistentSample, RejectsUnknownSamplingMethod) {
     auto result = parsePersistentSample(
         buildPersistentSampleDoc(UUID::gen(),
                                  SamplingTechniqueEnum::kRandom,
-                                 /*sampleSize=*/kStubSampleDocs.size(),
+                                 /*requestedSampleSize=*/kStubSampleDocs.size(),
                                  /*docs=*/kStubSampleDocs,
                                  /*numChunks=*/boost::none,
                                  /*schemaVersion=*/kPersistentSampleSchemaVersion,
@@ -305,14 +311,14 @@ TEST(ParsePersistentSample, RejectsUnknownSamplingMethod) {
 }
 
 TEST(ParsePersistentSample, RejectsNonNumericSize) {
-    auto result = parsePersistentSample(
-        buildPersistentSampleDoc(UUID::gen(),
-                                 SamplingTechniqueEnum::kRandom,
-                                 /*sampleSize=*/kStubSampleDocs.size(),
-                                 /*docs=*/kStubSampleDocs,
-                                 /*numChunks=*/boost::none,
-                                 /*schemaVersion=*/kPersistentSampleSchemaVersion,
-                                 BSON(PersistentSampleDoc::kSampleSizeFieldName << "huge")));
+    auto result = parsePersistentSample(buildPersistentSampleDoc(
+        UUID::gen(),
+        SamplingTechniqueEnum::kRandom,
+        /*requestedSampleSize=*/kStubSampleDocs.size(),
+        /*docs=*/kStubSampleDocs,
+        /*numChunks=*/boost::none,
+        /*schemaVersion=*/kPersistentSampleSchemaVersion,
+        BSON(PersistentSampleDoc::kRequestedSampleSizeFieldName << "huge")));
     ASSERT_NOT_OK(result.getStatus());
 }
 
@@ -320,42 +326,42 @@ TEST(ParsePersistentSample, RejectsNegativeSize) {
     auto result = parsePersistentSample(
         buildPersistentSampleDoc(UUID::gen(),
                                  SamplingTechniqueEnum::kRandom,
-                                 /*sampleSize=*/kStubSampleDocs.size(),
+                                 /*requestedSampleSize=*/kStubSampleDocs.size(),
                                  /*docs=*/kStubSampleDocs,
                                  /*numChunks=*/boost::none,
                                  /*schemaVersion=*/kPersistentSampleSchemaVersion,
-                                 BSON(PersistentSampleDoc::kSampleSizeFieldName << -1LL)));
+                                 BSON(PersistentSampleDoc::kRequestedSampleSizeFieldName << -1LL)));
     ASSERT_NOT_OK(result.getStatus());
 }
 
 TEST(ParsePersistentSample, RejectsChunkSampleWithoutNumChunks) {
     // Chunk technique without chunk_size — malformed.
-    auto result =
-        parsePersistentSample(buildPersistentSampleDoc(UUID::gen(),
-                                                       SamplingTechniqueEnum::kChunk,
-                                                       /*sampleSize=*/kStubSampleDocs.size(),
-                                                       /*docs=*/kStubSampleDocs,
-                                                       /*numChunks=*/boost::none));
+    auto result = parsePersistentSample(
+        buildPersistentSampleDoc(UUID::gen(),
+                                 SamplingTechniqueEnum::kChunk,
+                                 /*requestedSampleSize=*/kStubSampleDocs.size(),
+                                 /*docs=*/kStubSampleDocs,
+                                 /*numChunks=*/boost::none));
     ASSERT_NOT_OK(result.getStatus());
     ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::UnsupportedFormat);
 }
 
 TEST(ParsePersistentSample, RejectsNonPositiveNumChunks) {
     // chunk_size of zero is invalid — chunks must contain at least one doc.
-    auto zeroResult =
-        parsePersistentSample(buildPersistentSampleDoc(UUID::gen(),
-                                                       SamplingTechniqueEnum::kChunk,
-                                                       /*sampleSize=*/kStubSampleDocs.size(),
-                                                       /*docs=*/kStubSampleDocs,
-                                                       /*numChunks=*/0));
+    auto zeroResult = parsePersistentSample(
+        buildPersistentSampleDoc(UUID::gen(),
+                                 SamplingTechniqueEnum::kChunk,
+                                 /*requestedSampleSize=*/kStubSampleDocs.size(),
+                                 /*docs=*/kStubSampleDocs,
+                                 /*numChunks=*/0));
     ASSERT_NOT_OK(zeroResult.getStatus());
 
-    auto negativeResult =
-        parsePersistentSample(buildPersistentSampleDoc(UUID::gen(),
-                                                       SamplingTechniqueEnum::kChunk,
-                                                       /*sampleSize=*/kStubSampleDocs.size(),
-                                                       /*docs=*/kStubSampleDocs,
-                                                       /*numChunks=*/-1));
+    auto negativeResult = parsePersistentSample(
+        buildPersistentSampleDoc(UUID::gen(),
+                                 SamplingTechniqueEnum::kChunk,
+                                 /*requestedSampleSize=*/kStubSampleDocs.size(),
+                                 /*docs=*/kStubSampleDocs,
+                                 /*numChunks=*/-1));
     ASSERT_NOT_OK(negativeResult.getStatus());
 }
 
@@ -364,7 +370,7 @@ TEST(ParsePersistentSample, RejectsNegativePageNo) {
     auto result = parsePersistentSample(
         buildPersistentSampleDoc(UUID::gen(),
                                  SamplingTechniqueEnum::kRandom,
-                                 /*sampleSize=*/kStubSampleDocs.size(),
+                                 /*requestedSampleSize=*/kStubSampleDocs.size(),
                                  /*docs=*/kStubSampleDocs,
                                  /*numChunks=*/boost::none,
                                  /*schemaVersion=*/
@@ -377,7 +383,7 @@ TEST(ParsePersistentSample, RejectsNonDateCreatedAt) {
     auto result = parsePersistentSample(
         buildPersistentSampleDoc(UUID::gen(),
                                  SamplingTechniqueEnum::kRandom,
-                                 /*sampleSize=*/kStubSampleDocs.size(),
+                                 /*requestedSampleSize=*/kStubSampleDocs.size(),
                                  /*docs=*/kStubSampleDocs,
                                  /*numChunks=*/boost::none,
                                  /*schemaVersion=*/kPersistentSampleSchemaVersion,
@@ -395,7 +401,7 @@ TEST(ParsePersistentSample, RejectsMissingDocsField) {
     b.append(PersistentSampleDoc::kCollectionUuidFieldName, uuid.toString());
     b.append(PersistentSampleDoc::kSchemaVersionFieldName, kPersistentSampleSchemaVersion);
     b.appendDate(PersistentSampleDoc::kCreatedAtFieldName, Date_t::now());
-    b.append(PersistentSampleDoc::kSampleSizeFieldName,
+    b.append(PersistentSampleDoc::kRequestedSampleSizeFieldName,
              static_cast<long long>(kStubSampleDocs.size()));
     b.append(PersistentSampleDoc::kSamplingMethodFieldName,
              idlSerialize(SamplingTechniqueEnum::kRandom));
@@ -408,7 +414,7 @@ TEST(ParsePersistentSample, RejectsNonArrayDocsField) {
     auto result = parsePersistentSample(
         buildPersistentSampleDoc(UUID::gen(),
                                  SamplingTechniqueEnum::kRandom,
-                                 /*sampleSize=*/kStubSampleDocs.size(),
+                                 /*requestedSampleSize=*/kStubSampleDocs.size(),
                                  /*docs=*/kStubSampleDocs,
                                  /*numChunks=*/boost::none,
                                  /*schemaVersion=*/kPersistentSampleSchemaVersion,
@@ -423,7 +429,7 @@ TEST(ParsePersistentSample, RejectsNonObjectEntryInDocsArray) {
     auto result = parsePersistentSample(
         buildPersistentSampleDoc(UUID::gen(),
                                  SamplingTechniqueEnum::kRandom,
-                                 /*sampleSize=*/kStubSampleDocs.size(),
+                                 /*requestedSampleSize=*/kStubSampleDocs.size(),
                                  /*docs=*/kStubSampleDocs,
                                  /*numChunks=*/boost::none,
                                  /*schemaVersion=*/kPersistentSampleSchemaVersion,
@@ -435,7 +441,7 @@ TEST(ParsePersistentSample, RejectsNegativeNumDocsDiscarded) {
     auto result = parsePersistentSample(
         buildPersistentSampleDoc(UUID::gen(),
                                  SamplingTechniqueEnum::kRandom,
-                                 /*sampleSize=*/kStubSampleDocs.size(),
+                                 /*requestedSampleSize=*/kStubSampleDocs.size(),
                                  /*docs=*/kStubSampleDocs,
                                  /*numChunks=*/boost::none,
                                  /*schemaVersion=*/kPersistentSampleSchemaVersion,
@@ -469,13 +475,15 @@ TEST(ReassemblePersistentSample, MultiplePagesConcatenatedInPageNoOrder) {
     const BSONObj d1 = BSON("_id" << 1);
     const BSONObj d2 = BSON("_id" << 2);
     const BSONObj d3 = BSON("_id" << 3);
-    const size_t sampleSize = 4;
+    const size_t requestedSampleSize = 4;
 
     // The clustered forward scan delivers pages already ordered by pageNo, so reassembly relies on
     // that ordering rather than sorting.
     auto result = reassemblePersistentSample({
-        buildPage(uuid, SamplingTechniqueEnum::kRandom, sampleSize, {d0, d1}, /*pageNo=*/0),
-        buildPage(uuid, SamplingTechniqueEnum::kRandom, sampleSize, {d2, d3}, /*pageNo=*/1),
+        buildPage(
+            uuid, SamplingTechniqueEnum::kRandom, requestedSampleSize, {d0, d1}, /*pageNo=*/0),
+        buildPage(
+            uuid, SamplingTechniqueEnum::kRandom, requestedSampleSize, {d2, d3}, /*pageNo=*/1),
     });
     ASSERT_OK(result.getStatus());
     const auto& sample = result.getValue();
@@ -531,7 +539,7 @@ TEST(ReassemblePersistentSample, DuplicatePageNoRejected) {
 
 TEST(ReassemblePersistentSample, IdentityMismatchAcrossPagesRejected) {
     const UUID uuid = UUID::gen();
-    // page 0 declares sampleSize 4, page 1 declares sampleSize 5 — inconsistent identity.
+    // page 0 declares requestedSampleSize 4, page 1 declares 5 — inconsistent identity.
     auto result = reassemblePersistentSample({
         buildPage(uuid, SamplingTechniqueEnum::kRandom, 4, {BSON("a" << 0)}, /*pageNo=*/0),
         buildPage(uuid, SamplingTechniqueEnum::kRandom, 5, {BSON("a" << 1)}, /*pageNo=*/1),
@@ -540,9 +548,9 @@ TEST(ReassemblePersistentSample, IdentityMismatchAcrossPagesRejected) {
     ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::UnsupportedFormat);
 }
 
-TEST(ReassemblePersistentSample, ReassembledDocsExceedingSampleSizeRejected) {
+TEST(ReassemblePersistentSample, ReassembledDocsExceedingRequestedSampleSizeRejected) {
     const UUID uuid = UUID::gen();
-    // Each page is individually within sampleSize=2, but combined they hold 3 docs.
+    // Each page is individually within requestedSampleSize=2, but combined they hold 3 docs.
     auto result = reassemblePersistentSample({
         buildPage(uuid,
                   SamplingTechniqueEnum::kRandom,

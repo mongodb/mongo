@@ -437,7 +437,7 @@ void runNdvMode(OperationContext* opCtx,
 
 void runSampleMode(OperationContext* opCtx,
                    const NamespaceString& nss,
-                   boost::optional<int> sampleSizeOpt,
+                   boost::optional<int> requestedSampleSizeOpt,
                    boost::optional<SamplingCEMethodEnum> requestedSamplingMethodOpt,
                    boost::optional<int> numChunksOpt) {
     auto* tickSource = opCtx->getServiceContext()->getTickSource();
@@ -456,7 +456,8 @@ void runSampleMode(OperationContext* opCtx,
     const SamplingCEMethodEnum requestedSamplingMethod = requestedSamplingMethodOpt.value_or(
         qkc.getInternalQuerySamplingCEMethodForPersistentSamples());
 
-    const size_t sampleSize = sampleSizeOpt ? sampleSizeOpt.value() : ce::calculateSampleSize(qkc);
+    const size_t requestedSampleSize =
+        requestedSampleSizeOpt ? requestedSampleSizeOpt.value() : ce::calculateSampleSize(qkc);
 
     if (requestedSamplingMethod == SamplingCEMethodEnum::kChunk && !numChunksOpt) {
         numChunksOpt = internalQueryNumChunksForChunkBasedSampling.load();
@@ -470,7 +471,7 @@ void runSampleMode(OperationContext* opCtx,
     // read an existing one.
     const ce::SampleSpec spec{
         .nss = nss,
-        .sampleSize = sampleSize,
+        .requestedSampleSize = requestedSampleSize,
         .onTheFlySamplingMethod = requestedSamplingMethod,
         .persistentSamplingMethod = requestedSamplingMethod,
         .numChunks = numChunksOpt,

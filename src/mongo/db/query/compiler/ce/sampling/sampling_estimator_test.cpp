@@ -557,7 +557,7 @@ TEST_F(SamplingEstimatorTest, DrawANewSample) {
                                                  colls,
                                                  kTestNss,
                                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                                                 /*sampleSize=*/3,
+                                                 /*requestedSampleSize=*/3,
                                                  SamplingCEMethodEnum::kRandom,
                                                  numChunks,
                                                  makeCardinalityEstimate(10),
@@ -2351,7 +2351,7 @@ TEST_F(SamplingEstimatorTest, TryLoadReportsPagesReadAndBsonBytes) {
     auto colls = MultipleCollectionAccessor(coll, {}, false);
     const ce::SampleSpec spec{
         .nss = kTestNss,
-        .sampleSize = persistedDocs.size(),
+        .requestedSampleSize = persistedDocs.size(),
         .onTheFlySamplingMethod = SamplingCEMethodEnum::kRandom,
         .persistentSamplingMethod = SamplingCEMethodEnum::kRandom,
         .numChunks = boost::none,
@@ -2765,9 +2765,10 @@ TEST_F(SamplingEstimatorTest, ChunkSamplingSkipsPersistentSampleWhenFeatureFlagD
 }
 
 TEST_F(SamplingEstimatorTest, MalformedPersistentSampleFallsBackToOnTheFly) {
-    // A doc with the correct _id key exists in system.stats.samples but is malformed (sampleSize
-    // field disagrees with the docs array length). tryLoadPersistentSample must log the error and
-    // fall back to on-the-fly sampling rather than crashing or returning a corrupt sample.
+    // A doc with the correct _id key exists in system.stats.samples but is malformed
+    // (requestedSampleSize field is less than the docs array length). tryLoadPersistentSample
+    // must log the error and fall back to on-the-fly sampling rather than crashing or returning a
+    // corrupt sample.
     // TODO SERVER-135439: Remove once featureFlagPersistentStats is enabled by default.
     unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
     insertDocuments(kTestNss,
@@ -2785,8 +2786,8 @@ TEST_F(SamplingEstimatorTest, MalformedPersistentSampleFallsBackToOnTheFly) {
         auto srcColl = acquireCollection(operationContext(), kTestNss);
         return srcColl.getCollectionPtr()->uuid();
     }();
-    // Build a doc whose _id matches the lookup key but whose sampleSize disagrees with the docs
-    // array — parsePersistentSample will return UnsupportedFormat (not NoSuchKey), triggering
+    // Build a doc whose _id matches the lookup key but whose requestedSampleSize disagrees with the
+    // docs array — parsePersistentSample will return UnsupportedFormat (not NoSuchKey), triggering
     // the non-miss logging path and the on-the-fly fallback.
     std::vector<BSONObj> persistedDocs{BSON("_id" << 11 << "tag" << "persisted"),
                                        BSON("_id" << 12 << "tag" << "persisted"),
@@ -2800,8 +2801,8 @@ TEST_F(SamplingEstimatorTest, MalformedPersistentSampleFallsBackToOnTheFly) {
                                   persistedDocs,
                                   /*numChunks=*/boost::none,
                                   /*schemaVersion=*/kPersistentSampleSchemaVersion,
-                                  // Corrupt sampleSize: claims 1 doc but array has 3.
-                                  BSON(PersistentSampleDoc::kSampleSizeFieldName << 1LL))},
+                                  // Corrupt requestedSampleSize: claims 1 doc but array has 3.
+                                  BSON(PersistentSampleDoc::kRequestedSampleSizeFieldName << 1LL))},
         /*clustered=*/true);
 
     auto coll = acquireCollection(operationContext(), kTestNss);

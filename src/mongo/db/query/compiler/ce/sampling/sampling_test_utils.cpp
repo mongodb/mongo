@@ -594,7 +594,7 @@ size_t numberKeysMatch(const IndexBounds& bounds,
 
 BSONObj buildPersistentSampleDoc(const UUID& collUuid,
                                  SamplingTechniqueEnum method,
-                                 size_t sampleSize,
+                                 size_t requestedSampleSize,
                                  const std::vector<BSONObj>& docs,
                                  boost::optional<int> numChunks,
                                  int schemaVersion,
@@ -603,25 +603,27 @@ BSONObj buildPersistentSampleDoc(const UUID& collUuid,
                                  size_t numDocsDiscarded) {
     BSONObjBuilder builder;
     // _id is required by the IDL schema. For intentionally-malformed docs (e.g. kChunk without
-    // numChunks, or sampleSize=0, used in parse-rejection tests) we can't build a valid key, so
-    // use a stand-in random _id string so the doc still has a well-formed key.
-    const bool validForKey = sampleSize > 0 &&
+    // numChunks, or requestedSampleSize=0, used in parse-rejection tests) we can't build a valid
+    // key, so use a stand-in random _id string so the doc still has a well-formed key.
+    const bool validForKey = requestedSampleSize > 0 &&
         (method != SamplingTechniqueEnum::kChunk || (numChunks.has_value() && *numChunks > 0));
     if (validForKey) {
-        builder.append("_id",
-                       makePersistentSampleId(collUuid, method, sampleSize, numChunks, pageNo));
+        builder.append(
+            "_id",
+            makePersistentSampleId(collUuid, method, requestedSampleSize, numChunks, pageNo));
     } else {
         builder.append("_id",
                        makePersistentSampleId(collUuid,
                                               SamplingTechniqueEnum::kRandom,
-                                              sampleSize > 0 ? sampleSize : 1,
+                                              requestedSampleSize > 0 ? requestedSampleSize : 1,
                                               boost::none));
     }
     builder.append(PersistentSampleDoc::kPageNoFieldName, pageNo);
     builder.append(PersistentSampleDoc::kCollectionUuidFieldName, collUuid.toString());
     builder.append(PersistentSampleDoc::kSchemaVersionFieldName, schemaVersion);
     builder.appendDate(PersistentSampleDoc::kCreatedAtFieldName, Date_t::now());
-    builder.append(PersistentSampleDoc::kSampleSizeFieldName, static_cast<long long>(sampleSize));
+    builder.append(PersistentSampleDoc::kRequestedSampleSizeFieldName,
+                   static_cast<long long>(requestedSampleSize));
     builder.append(PersistentSampleDoc::kSamplingMethodFieldName, idlSerialize(method));
     builder.append(PersistentSampleDoc::kNumDocsDiscardedFieldName,
                    static_cast<long long>(numDocsDiscarded));
@@ -651,14 +653,14 @@ BSONObj buildPersistentSampleDoc(const UUID& collUuid,
 
 BSONObj buildPage(const UUID& uuid,
                   SamplingTechniqueEnum method,
-                  size_t sampleSize,
+                  size_t requestedSampleSize,
                   const std::vector<BSONObj>& docs,
                   int pageNo,
                   boost::optional<int> numChunks,
                   size_t numDocsDiscarded) {
     return buildPersistentSampleDoc(uuid,
                                     method,
-                                    sampleSize,
+                                    requestedSampleSize,
                                     docs,
                                     numChunks,
                                     /*schemaVersion=*/kPersistentSampleSchemaVersion,

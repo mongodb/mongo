@@ -40,7 +40,7 @@ structs:
                 type: string
             samplingMethod:
                 type: SamplingTechnique
-            sampleSize:
+            requestedSampleSize:
                 type: long
                 validator: {gt: 0}
             numChunks:

@@ -170,7 +170,8 @@ try {
         );
 
         // Chunk sampling scans full WiredTiger pages so the actual doc count may be less than
-        // sampleSize; compare sampleDocCount against what was actually stored, not the request size.
+        // requestedSampleSize; compare sampleDocCount against what was actually stored, not the
+        // request size.
         const storedDocCount = (() => {
             const uuid = PersistentSamplesUtils.getCollUUID(db, collName);
             const id = PersistentSamplesUtils.getExpectedId(

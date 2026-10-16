@@ -197,7 +197,8 @@ insertDocs(500);
     });
 }
 
-// Small collection (< default): the actual sample size is clamped to numRecords, but the sampleSize and _id fields will encode the requested size
+// Small collection (< default): the actual sample size is clamped to numRecords, but the
+// requestedSampleSize and _id fields will encode the requested size
 cleanup();
 insertDocs(50);
 {

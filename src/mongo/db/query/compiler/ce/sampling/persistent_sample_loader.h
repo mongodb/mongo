@@ -32,17 +32,18 @@ inline constexpr int kPersistentSampleSchemaVersion = 1;
 /**
  * Builds the `_id` string for a persisted sample page document:
  *
- *     <collectionUuid>_<schemaVersion>_<samplingMethod>_<sampleSize>[_<numChunks>]_<pageNo>
+ *     <collectionUuid>_<schemaVersion>_<samplingMethod>_<requestedSampleSize>[_<numChunks>]_<pageNo>
  *
  * All pages of a given sample share an identical prefix up to (and including) the separator that
  * precedes the page number, so the pages of one sample - and only that sample - form a contiguous
- * run in lexicographic `_id` order. `pageNo` is zero-padded to the width of `sampleSize` so that
- * lexicographic order matches numeric order. This is enough padding because a sample can never
- * have more pages than it has documents, and it can never have more documents than `sampleSize`.
+ * run in lexicographic `_id` order. `pageNo` is zero-padded to the width of `requestedSampleSize`
+ * so that lexicographic order matches numeric order. This is enough padding because a sample can
+ * never have more pages than it has documents, and it can never have more documents than
+ * `requestedSampleSize`.
  */
 std::string makePersistentSampleId(const UUID& collectionUuid,
                                    SamplingTechniqueEnum method,
-                                   size_t sampleSize,
+                                   size_t requestedSampleSize,
                                    boost::optional<int> numChunks,
                                    int pageNo = 0);
 
@@ -52,7 +53,7 @@ std::string makePersistentSampleId(const UUID& collectionUuid,
  */
 std::pair<std::string, std::string> makePersistentSampleIdRange(const UUID& collectionUuid,
                                                                 SamplingTechniqueEnum method,
-                                                                size_t sampleSize,
+                                                                size_t requestedSampleSize,
                                                                 boost::optional<int> numChunks);
 
 StatusWith<PersistentSampleDoc> parsePersistentSample(const BSONObj& doc);
@@ -91,8 +92,9 @@ protected:
         // TODO SERVER-136539
         const size_t collectionCard =
             static_cast<size_t>(_collections.lookupCollection(spec.nss)->numRecords(_opCtx));
-        return spec.sampleSize >= collectionCard ? SamplingTechniqueEnum::kFullCollScan
-                                                 : resolveSamplingTechnique(spec, collectionCard);
+        return spec.requestedSampleSize >= collectionCard
+            ? SamplingTechniqueEnum::kFullCollScan
+            : resolveSamplingTechnique(spec, collectionCard);
     }
 };
 

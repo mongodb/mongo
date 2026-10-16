@@ -34,7 +34,7 @@ namespace mongo::ce {
  */
 std::vector<BSONObj> makePersistentSamplePageDocs(const UUID& collectionUuid,
                                                   SamplingTechniqueEnum method,
-                                                  size_t sampleSize,
+                                                  size_t requestedSampleSize,
                                                   boost::optional<int> numChunks,
                                                   const std::vector<BSONObj>& sample,
                                                   Date_t createdAt);

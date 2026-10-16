@@ -67,7 +67,7 @@ SamplingTechniqueEnum resolveSamplingTechnique(const SampleSpec& spec, size_t co
     }
 
     // If the requested sample is too large then the whole collection is sampled.
-    if (spec.sampleSize >= collectionCard) {
+    if (spec.requestedSampleSize >= collectionCard) {
         return SamplingTechniqueEnum::kFullCollScan;
     }
 

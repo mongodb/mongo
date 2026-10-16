@@ -46,8 +46,8 @@ namespace mongo::ce {
 namespace {
 /**
  * Separator between the parts of a persistent sample `_id`. Must sort strictly greater than every
- * digit so that a sample whose identity prefix is a numeric prefix of another's (e.g. sampleSize
- * 1 vs 10) sorts outside the latter's page range rather than inside it.
+ * digit so that a sample whose identity prefix is a numeric prefix of another's (e.g.
+ * requestedSampleSize 1 vs 10) sorts outside the latter's page range rather than inside it.
  */
 constexpr char kIdSeparator = '_';
 static_assert(kIdSeparator > '9');
@@ -62,8 +62,8 @@ constexpr int kNumDocsDiscardedFieldBytes = 1 /* type indicator */ +
 /**
  * Number of digits the page number is zero-padded to for a sample of the given size.
  */
-size_t pageNoWidth(size_t sampleSize) {
-    return fmt::formatted_size("{}", sampleSize);
+size_t pageNoWidth(size_t requestedSampleSize) {
+    return fmt::formatted_size("{}", requestedSampleSize);
 }
 
 /**
@@ -72,7 +72,7 @@ size_t pageNoWidth(size_t sampleSize) {
  */
 std::string makePersistentSampleIdPrefix(const UUID& collectionUuid,
                                          SamplingTechniqueEnum method,
-                                         size_t sampleSize,
+                                         size_t requestedSampleSize,
                                          boost::optional<int> numChunks) {
     tassert(12432800,
             "Chunk-based persistent sample ID requires numChunks",
@@ -84,7 +84,9 @@ std::string makePersistentSampleIdPrefix(const UUID& collectionUuid,
             "A persistent sample document should never be created or looked up with sampling "
             "method kFullCollScan",
             method != SamplingTechniqueEnum::kFullCollScan);
-    tassert(13102000, "Persistent sample ID requires a positive sample size", sampleSize > 0);
+    tassert(13102000,
+            "Persistent sample ID requires a positive requested sample size",
+            requestedSampleSize > 0);
 
     std::string prefix = fmt::format("{}{}{}{}{}{}{}{}",
                                      collectionUuid.toString(),
@@ -93,7 +95,7 @@ std::string makePersistentSampleIdPrefix(const UUID& collectionUuid,
                                      kIdSeparator,
                                      idlSerialize(method),
                                      kIdSeparator,
-                                     sampleSize,
+                                     requestedSampleSize,
                                      kIdSeparator);
     if (numChunks) {
         fmt::format_to(std::back_inserter(prefix), "{}{}", *numChunks, kIdSeparator);
@@ -156,32 +158,34 @@ StatusWith<std::vector<BSONObj>> findPersistentSamplePages(OperationContext* opC
 
 std::string makePersistentSampleId(const UUID& collectionUuid,
                                    SamplingTechniqueEnum method,
-                                   size_t sampleSize,
+                                   size_t requestedSampleSize,
                                    boost::optional<int> numChunks,
                                    int pageNo) {
     tassert(13321001, "Persistent sample page number must be non-negative", pageNo >= 0);
 
-    const size_t width = pageNoWidth(sampleSize);
+    const size_t width = pageNoWidth(requestedSampleSize);
     tassert(13321000,
             str::stream() << "Persistent sample page number " << pageNo
                           << " does not fit in the padding width " << width
-                          << " implied by sample size " << sampleSize,
+                          << " implied by requested sample size " << requestedSampleSize,
             fmt::formatted_size("{}", pageNo) <= width);
 
-    std::string id = makePersistentSampleIdPrefix(collectionUuid, method, sampleSize, numChunks);
+    std::string id =
+        makePersistentSampleIdPrefix(collectionUuid, method, requestedSampleSize, numChunks);
     fmt::format_to(std::back_inserter(id), "{:0{}}", pageNo, width);
     return id;
 }
 
 std::pair<std::string, std::string> makePersistentSampleIdRange(const UUID& collectionUuid,
                                                                 SamplingTechniqueEnum method,
-                                                                size_t sampleSize,
+                                                                size_t requestedSampleSize,
                                                                 boost::optional<int> numChunks) {
     // The bounds are the lowest and highest page-number components representable in the padding
     // width, so they bracket every page this sample could have without needing a sentinel page
     // number that no document uses.
-    const size_t width = pageNoWidth(sampleSize);
-    std::string minId = makePersistentSampleIdPrefix(collectionUuid, method, sampleSize, numChunks);
+    const size_t width = pageNoWidth(requestedSampleSize);
+    std::string minId =
+        makePersistentSampleIdPrefix(collectionUuid, method, requestedSampleSize, numChunks);
     std::string maxId = minId;
     minId.append(width, '0');
     maxId.append(width, '9');
@@ -217,16 +221,17 @@ StatusWith<PersistentSampleDoc> parsePersistentSample(const BSONObj& doc) {
                       "persistent sample 'numChunks' must only be set for chunk-technique samples");
     }
 
-    const auto sampleSize = static_cast<size_t>(parsed.getSampleSize());
-    // It is valid for `docs` to contain fewer entries than `sampleSize`: this happens when the
-    // collection is smaller than the requested sample size at analyze time or if the sample was
+    const auto requestedSampleSize = static_cast<size_t>(parsed.getRequestedSampleSize());
+    // It is valid for `docs` to contain fewer entries than `requestedSampleSize`: this happens when
+    // the collection is smaller than the requested sample size at analyze time or if the sample was
     // generated with chunking technique and some were starting less docs away from EOF than the
     // chunk size.
-    if (parsed.getDocs().size() > sampleSize) {
+    if (parsed.getDocs().size() > requestedSampleSize) {
         return Status(ErrorCodes::UnsupportedFormat,
                       str::stream()
                           << "persistent sample 'docs' array length (" << parsed.getDocs().size()
-                          << ") exceeds declared 'sampleSize' (" << sampleSize << ")");
+                          << ") exceeds declared 'requestedSampleSize' (" << requestedSampleSize
+                          << ")");
     }
 
     // The IDL parser materialises each `docs` entry as a BSONObj view into the parsed
@@ -238,7 +243,7 @@ StatusWith<PersistentSampleDoc> parsePersistentSample(const BSONObj& doc) {
     // returning it. This way, callers can copy the returned `docs` entries and keep them alive
     // independently of the parsed struct's lifetime if they want to.
     std::vector<BSONObj> ownedDocs;
-    ownedDocs.reserve(sampleSize);
+    ownedDocs.reserve(requestedSampleSize);
     for (const BSONObj& entry : parsed.getDocs()) {
         BSONObj owned = entry;
         owned.shareOwnershipWith(ownedSource);
@@ -265,7 +270,7 @@ StatusWith<PersistentSampleDoc> reassemblePersistentSample(std::vector<BSONObj> 
     // over-allocating in cases where the actual number of sampled docs is less than the requested
     // sample size. Further inserts will have amortized O(1) complexity.
     size_t initialReservedSize = static_cast<size_t>(firstPage.getValue().getDocs().size());
-    size_t totalMaxSampleSize = static_cast<size_t>(firstPage.getValue().getSampleSize());
+    size_t totalMaxSampleSize = static_cast<size_t>(firstPage.getValue().getRequestedSampleSize());
 
     std::vector<BSONObj> allDocs;
     allDocs.reserve(initialReservedSize);
@@ -297,7 +302,7 @@ StatusWith<PersistentSampleDoc> reassemblePersistentSample(std::vector<BSONObj> 
         if (page.getSchemaVersion() != reassembled.getSchemaVersion() ||
             page.getCollectionUuid() != reassembled.getCollectionUuid() ||
             page.getSamplingMethod() != reassembled.getSamplingMethod() ||
-            page.getSampleSize() != reassembled.getSampleSize() ||
+            page.getRequestedSampleSize() != reassembled.getRequestedSampleSize() ||
             page.getNumChunks() != reassembled.getNumChunks() ||
             page.getNumDocsDiscarded() != reassembled.getNumDocsDiscarded()) {
             return Status(ErrorCodes::UnsupportedFormat,
@@ -311,9 +316,10 @@ StatusWith<PersistentSampleDoc> reassemblePersistentSample(std::vector<BSONObj> 
                        std::make_move_iterator(pageDocs.end()));
         if (allDocs.size() > totalMaxSampleSize) {
             return Status(ErrorCodes::UnsupportedFormat,
-                          str::stream() << "reassembled persistent sample 'docs' array length ("
-                                        << allDocs.size() << ") exceeds declared 'sampleSize' ("
-                                        << totalMaxSampleSize << ")");
+                          str::stream()
+                              << "reassembled persistent sample 'docs' array length ("
+                              << allDocs.size() << ") exceeds declared 'requestedSampleSize' ("
+                              << totalMaxSampleSize << ")");
         }
     }
 
@@ -416,7 +422,7 @@ StatusWith<Sample> PersistentSampleLoader::tryLoad(const SampleSpec& spec) {
     // Perform a bounded range scan on the clustered samples collection to retrieve all pages in a
     // sample ordered by pageNo.
     const auto [minId, maxId] =
-        makePersistentSampleIdRange(collectionUuid, method, spec.sampleSize, numChunks);
+        makePersistentSampleIdRange(collectionUuid, method, spec.requestedSampleSize, numChunks);
 
     auto scanStatus = findPersistentSamplePages(_opCtx, samplesNss, minId, maxId);
 

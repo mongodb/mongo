@@ -28,7 +28,7 @@ using CardinalityEstimate = mongo::cost_based_ranker::CardinalityEstimate;
 struct SampleSpec {
     // Collection the sample is drawn from.
     NamespaceString nss;
-    size_t sampleSize;
+    size_t requestedSampleSize;
     // Technique to use when the sample is generated on the fly.
     SamplingCEMethodEnum onTheFlySamplingMethod;
     // Technique to use when looking up the persisted sample or persisting one.
