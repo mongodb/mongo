@@ -61,6 +61,72 @@ namespace mongo::stage_builder {
 using SbBlueprintChildVector = absl::InlinedVector<SbBlueprintNodeIdx, 2>;
 using SbSortDirectionVector = absl::InlinedVector<sbe::value::SortDirection, 4>;
 
+/**
+ * Collects the slots a blueprint node defines or uses. Every node type implements
+ *
+ *   void def(SbSlotCollector& out) const;  // the slots the node exposes that its children do not
+ *   void use(SbSlotCollector& out) const;  // the slots the node reads, including from expressions
+ *
+ * A slot that a stage reads and re-exposes under the same id (a sort's forwarded slots, a hash
+ * aggregation's group-by slots) is a use only. Slots used but defined by no node come from the
+ * RuntimeEnvironment.
+ */
+class SbSlotCollector {
+public:
+    void add(sbe::value::SlotId slot) {
+        _slots.push_back(slot);
+    }
+
+    void add(const boost::optional<sbe::value::SlotId>& slot) {
+        if (slot) {
+            add(*slot);
+        }
+    }
+
+    void add(const boost::optional<SbSlot>& slot) {
+        if (slot) {
+            add(slot->getId());
+        }
+    }
+
+    void add(const sbe::value::SlotVector& slots) {
+        _slots.insert(_slots.end(), slots.begin(), slots.end());
+    }
+
+    void add(const SbExpr& expr) {
+        expr.visitReferencedSlots([&](SbSlot slot) { add(slot.getId()); });
+    }
+
+    void add(const SbBlockAggExpr& expr) {
+        add(expr.init);
+        add(expr.blockAgg);
+        add(expr.agg);
+    }
+
+    const sbe::value::SlotVector& slots() const {
+        return _slots;
+    }
+
+private:
+    sbe::value::SlotVector _slots;
+};
+
+// Index info slots produced by a scan-type stage. 'indexKeyPatternSlot' is a RuntimeEnvironment
+// slot registered by SbBuilder::allocateIndexInfoSlots(), not an output of the stage.
+inline void addIndexInfoDefs(const SbIndexInfoSlots& slots, SbSlotCollector& out) {
+    out.add(slots.indexIdentSlot);
+    out.add(slots.indexKeySlot);
+    out.add(slots.snapshotIdSlot);
+}
+
+// Index info slots read by a fetch-type stage to validate the record it fetches.
+inline void addIndexInfoUses(const SbIndexInfoSlots& slots, SbSlotCollector& out) {
+    out.add(slots.indexIdentSlot);
+    out.add(slots.indexKeySlot);
+    out.add(slots.indexKeyPatternSlot);
+    out.add(slots.snapshotIdSlot);
+}
+
 // ============================================================
 // Leaf blueprints
 // ============================================================
@@ -70,6 +136,10 @@ using SbSortDirectionVector = absl::InlinedVector<sbe::value::SortDirection, 4>;
  */
 struct SbBlueprintCoScan {
     PlanNodeId nodeId{kEmptyPlanNodeId};
+
+    void def(SbSlotCollector&) const {}
+
+    void use(SbSlotCollector&) const {}
 
     template <typename F>
     void visitChildren(F&&) {}
@@ -85,6 +155,12 @@ struct SbBlueprintVirtualScan {
     PlanNodeId nodeId{kEmptyPlanNodeId};
     sbe::value::SlotId outSlot{0};
     sbe::value::TagValueOwned input;
+
+    void def(SbSlotCollector& out) const {
+        out.add(outSlot);
+    }
+
+    void use(SbSlotCollector&) const {}
 
     template <typename F>
     void visitChildren(F&&) {}
@@ -106,6 +182,20 @@ struct SbBlueprintScanInfo {
     sbe::value::SlotId recordIdSlot{0};
     sbe::value::SlotVector scanFieldSlots;
 
+    void def(SbSlotCollector& out) const {
+        out.add(recordSlot);
+        out.add(recordIdSlot);
+        out.add(scanFieldSlots);
+    }
+
+    void use(SbSlotCollector& out) const {
+        // A bounded scan reads its record id bounds; a seek scan also reads the index info slots to
+        // validate the record it lands on.
+        out.add(scanBounds.minRecordIdSlot);
+        out.add(scanBounds.maxRecordIdSlot);
+        addIndexInfoUses(indexInfoSlots, out);
+    }
+
     template <typename F>
     void visitChildren(F&&) {}
 
@@ -122,6 +212,14 @@ struct SbBlueprintScanInfo {
 struct SbBlueprintScan {
     PlanNodeId nodeId{kEmptyPlanNodeId};
     std::unique_ptr<SbBlueprintScanInfo> info;
+
+    void def(SbSlotCollector& out) const {
+        info->def(out);
+    }
+
+    void use(SbSlotCollector& out) const {
+        info->use(out);
+    }
 
     template <typename F>
     void visitChildren(F&& fn) {
@@ -147,6 +245,18 @@ struct SbBlueprintMultiRangeScanInfo {
     sbe::value::SlotId recordIdSlot{0};
     sbe::value::SlotVector scanFieldSlots;
 
+    void def(SbSlotCollector& out) const {
+        out.add(recordSlot);
+        out.add(recordIdSlot);
+        out.add(scanFieldSlots);
+    }
+
+    void use(SbSlotCollector& out) const {
+        // The stage seeks to the start of each range and reads the index info slots to validate
+        // the record it lands on.
+        addIndexInfoUses(indexInfoSlots, out);
+    }
+
     template <typename F>
     void visitChildren(F&&) {}
 
@@ -160,6 +270,14 @@ struct SbBlueprintMultiRangeScanInfo {
 struct SbBlueprintMultiRangeScan {
     PlanNodeId nodeId{kEmptyPlanNodeId};
     std::unique_ptr<SbBlueprintMultiRangeScanInfo> info;
+
+    void def(SbSlotCollector& out) const {
+        info->def(out);
+    }
+
+    void use(SbSlotCollector& out) const {
+        info->use(out);
+    }
 
     template <typename F>
     void visitChildren(F&& fn) {
@@ -185,6 +303,17 @@ struct SbBlueprintSimpleIndexScanInfo {
     sbe::value::SlotVector indexKeySlots;
     SbIndexInfoSlots indexInfoSlots;
 
+    void def(SbSlotCollector& out) const {
+        out.add(recordIdSlot);
+        out.add(indexKeySlots);
+        addIndexInfoDefs(indexInfoSlots, out);
+    }
+
+    void use(SbSlotCollector& out) const {
+        out.add(lowKeyExpr);
+        out.add(highKeyExpr);
+    }
+
     template <typename F>
     void visitChildren(F&&) {}
 
@@ -201,6 +330,14 @@ struct SbBlueprintSimpleIndexScanInfo {
 struct SbBlueprintSimpleIndexScan {
     PlanNodeId nodeId{kEmptyPlanNodeId};
     std::unique_ptr<SbBlueprintSimpleIndexScanInfo> info;
+
+    void def(SbSlotCollector& out) const {
+        info->def(out);
+    }
+
+    void use(SbSlotCollector& out) const {
+        info->use(out);
+    }
 
     template <typename F>
     void visitChildren(F&& fn) {
@@ -228,6 +365,16 @@ struct SbBlueprintGenericIndexScanInfo {
     sbe::value::SlotVector indexKeySlots;
     SbIndexInfoSlots indexInfoSlots;
 
+    void def(SbSlotCollector& out) const {
+        out.add(recordIdSlot);
+        out.add(indexKeySlots);
+        addIndexInfoDefs(indexInfoSlots, out);
+    }
+
+    void use(SbSlotCollector& out) const {
+        out.add(boundsExpr);
+    }
+
     template <typename F>
     void visitChildren(F&&) {}
 
@@ -243,6 +390,14 @@ struct SbBlueprintGenericIndexScanInfo {
 struct SbBlueprintGenericIndexScan {
     PlanNodeId nodeId{kEmptyPlanNodeId};
     std::unique_ptr<SbBlueprintGenericIndexScanInfo> info;
+
+    void def(SbSlotCollector& out) const {
+        info->def(out);
+    }
+
+    void use(SbSlotCollector& out) const {
+        info->use(out);
+    }
 
     template <typename F>
     void visitChildren(F&& fn) {
@@ -276,6 +431,12 @@ struct SbBlueprintFilter {
     SbExpr condition;
     FilterType filterType{FilterType::kStandard};
 
+    void def(SbSlotCollector&) const {}
+
+    void use(SbSlotCollector& out) const {
+        out.add(condition);
+    }
+
     template <typename F>
     void visitChildren(F&& fn) {
         fn(child);
@@ -294,6 +455,18 @@ struct SbBlueprintProject {
     SbBlueprintNodeIdx child;
     PlanNodeId nodeId{kEmptyPlanNodeId};
     SbExprSlotVector projects;
+
+    void def(SbSlotCollector& out) const {
+        for (const auto& [expr, slot] : projects) {
+            out.add(slot.getId());
+        }
+    }
+
+    void use(SbSlotCollector& out) const {
+        for (const auto& [expr, slot] : projects) {
+            out.add(expr);
+        }
+    }
 
     template <typename F>
     void visitChildren(F&& fn) {
@@ -316,6 +489,13 @@ struct SbBlueprintLimitSkip {
     PlanNodeId nodeId{kEmptyPlanNodeId};
     SbExpr limitExpr;
     SbExpr skipExpr;
+
+    void def(SbSlotCollector&) const {}
+
+    void use(SbSlotCollector& out) const {
+        out.add(limitExpr);
+        out.add(skipExpr);
+    }
 
     template <typename F>
     void visitChildren(F&& fn) {
@@ -342,6 +522,14 @@ struct SbBlueprintSort {
     SbExpr limitExpr;
     size_t memoryLimit{0};
 
+    void def(SbSlotCollector&) const {}
+
+    void use(SbSlotCollector& out) const {
+        out.add(orderBy);
+        out.add(forwardedSlots);
+        out.add(limitExpr);
+    }
+
     template <typename F>
     void visitChildren(F&& fn) {
         fn(child);
@@ -361,6 +549,12 @@ struct SbBlueprintUnique {
     PlanNodeId nodeId{kEmptyPlanNodeId};
     sbe::value::SlotVector keys;
 
+    void def(SbSlotCollector&) const {}
+
+    void use(SbSlotCollector& out) const {
+        out.add(keys);
+    }
+
     template <typename F>
     void visitChildren(F&& fn) {
         fn(child);
@@ -377,6 +571,12 @@ struct SbBlueprintUniqueRoaring {
     SbBlueprintNodeIdx child;
     PlanNodeId nodeId{kEmptyPlanNodeId};
     sbe::value::SlotId key{0};
+
+    void def(SbSlotCollector&) const {}
+
+    void use(SbSlotCollector& out) const {
+        out.add(key);
+    }
 
     template <typename F>
     void visitChildren(F&& fn) {
@@ -398,6 +598,15 @@ struct SbBlueprintUnwind {
     sbe::value::SlotId idxSlot{0};
     bool preserveNullAndEmptyArrays{false};
 
+    void def(SbSlotCollector& out) const {
+        out.add(outSlot);
+        out.add(idxSlot);
+    }
+
+    void use(SbSlotCollector& out) const {
+        out.add(inSlot);
+    }
+
     template <typename F>
     void visitChildren(F&& fn) {
         fn(child);
@@ -417,6 +626,16 @@ struct SbBlueprintUnion {
     std::vector<sbe::value::SlotVector> inputSlots;
     sbe::value::SlotVector outputSlots;
 
+    void def(SbSlotCollector& out) const {
+        out.add(outputSlots);
+    }
+
+    void use(SbSlotCollector& out) const {
+        for (const auto& slots : inputSlots) {
+            out.add(slots);
+        }
+    }
+
     template <typename F>
     void visitChildren(F&& fn) {
         for (auto& c : children) {
@@ -434,6 +653,19 @@ struct SbBlueprintSortedMergeInfo {
     SbSortDirectionVector dirs;
     std::vector<sbe::value::SlotVector> inputVals;
     sbe::value::SlotVector outputVals;
+
+    void def(SbSlotCollector& out) const {
+        out.add(outputVals);
+    }
+
+    void use(SbSlotCollector& out) const {
+        for (const auto& keys : inputKeys) {
+            out.add(keys);
+        }
+        for (const auto& vals : inputVals) {
+            out.add(vals);
+        }
+    }
 
     template <typename F>
     void visitChildren(F&& fn) {
@@ -453,6 +685,14 @@ struct SbBlueprintSortedMergeInfo {
 struct SbBlueprintSortedMerge {
     PlanNodeId nodeId{kEmptyPlanNodeId};
     std::unique_ptr<SbBlueprintSortedMergeInfo> info;
+
+    void def(SbSlotCollector& out) const {
+        info->def(out);
+    }
+
+    void use(SbSlotCollector& out) const {
+        info->use(out);
+    }
 
     template <typename F>
     void visitChildren(F&& fn) {
@@ -477,6 +717,16 @@ struct SbBlueprintBranch {
     sbe::value::SlotVector thenSlots;
     sbe::value::SlotVector elseSlots;
     sbe::value::SlotVector outputSlots;
+
+    void def(SbSlotCollector& out) const {
+        out.add(outputSlots);
+    }
+
+    void use(SbSlotCollector& out) const {
+        out.add(conditionExpr);
+        out.add(thenSlots);
+        out.add(elseSlots);
+    }
 
     template <typename F>
     void visitChildren(F&& fn) {
@@ -503,6 +753,15 @@ struct SbBlueprintLoopJoin {
     sbe::value::SlotVector innerProjects;
     SbExpr predicate;
 
+    void def(SbSlotCollector&) const {}
+
+    void use(SbSlotCollector& out) const {
+        out.add(outerProjects);
+        out.add(outerCorrelated);
+        out.add(innerProjects);
+        out.add(predicate);
+    }
+
     template <typename F>
     void visitChildren(F&& fn) {
         fn(outer);
@@ -525,6 +784,16 @@ struct SbBlueprintHashJoinInfo {
     boost::optional<sbe::value::SlotId> collatorSlot;
     boost::optional<size_t> estimatedBuildCardinality;
 
+    void def(SbSlotCollector&) const {}
+
+    void use(SbSlotCollector& out) const {
+        out.add(outerCondSlots);
+        out.add(outerProjectSlots);
+        out.add(innerCondSlots);
+        out.add(innerProjectSlots);
+        out.add(collatorSlot);
+    }
+
     template <typename F>
     void visitChildren(F&& fn) {
         fn(outer);
@@ -541,6 +810,14 @@ struct SbBlueprintHashJoinInfo {
 struct SbBlueprintHashJoin {
     PlanNodeId nodeId{kEmptyPlanNodeId};
     std::unique_ptr<SbBlueprintHashJoinInfo> info;
+
+    void def(SbSlotCollector& out) const {
+        info->def(out);
+    }
+
+    void use(SbSlotCollector& out) const {
+        info->use(out);
+    }
 
     template <typename F>
     void visitChildren(F&& fn) {
@@ -562,6 +839,15 @@ struct SbBlueprintMergeJoinInfo {
     sbe::value::SlotVector innerProjectSlots;
     SbSortDirectionVector dirs;
 
+    void def(SbSlotCollector&) const {}
+
+    void use(SbSlotCollector& out) const {
+        out.add(outerKeySlots);
+        out.add(outerProjectSlots);
+        out.add(innerKeySlots);
+        out.add(innerProjectSlots);
+    }
+
     template <typename F>
     void visitChildren(F&& fn) {
         fn(outer);
@@ -580,6 +866,14 @@ struct SbBlueprintMergeJoinInfo {
 struct SbBlueprintMergeJoin {
     PlanNodeId nodeId{kEmptyPlanNodeId};
     std::unique_ptr<SbBlueprintMergeJoinInfo> info;
+
+    void def(SbSlotCollector& out) const {
+        info->def(out);
+    }
+
+    void use(SbSlotCollector& out) const {
+        info->use(out);
+    }
 
     template <typename F>
     void visitChildren(F&& fn) {
@@ -613,6 +907,30 @@ struct SbBlueprintHashAgg {
     boost::optional<sbe::value::SlotId> collatorSlot;
     bool forceIncreasedSpilling{false};
 
+    void def(SbSlotCollector& out) const {
+        for (const auto& acc : accumulators) {
+            out.add(acc.outSlot);
+            // The stage fills the spill slot with a partial aggregate recovered from a spill.
+            out.add(acc.spillSlot);
+        }
+    }
+
+    void use(SbSlotCollector& out) const {
+        out.add(groupBySlots);
+        out.add(collatorSlot);
+        for (const auto& acc : accumulators) {
+            std::visit(OverloadedVisitor{[&](const SbHashAggCompiledAccumulator& impl) {
+                                             out.add(impl.init);
+                                             out.add(impl.agg);
+                                             out.add(impl.merge);
+                                         },
+                                         [&](const auto& impl) {
+                                             out.add(impl.transform);
+                                         }},
+                       acc.implementation);
+        }
+    }
+
     template <typename F>
     void visitChildren(F&& fn) {
         fn(child);
@@ -645,6 +963,29 @@ struct SbBlueprintBlockHashAggInfo {
     SbExprSlotVector mergingExprs;
     bool forceIncreasedSpilling{false};
 
+    void def(SbSlotCollector& out) const {
+        for (const auto& [outSlot, agg] : aggs) {
+            out.add(outSlot);
+        }
+        for (const auto& [expr, slot] : mergingExprs) {
+            out.add(slot.getId());
+        }
+        out.add(bitmapInternalSlot);
+        out.add(accumulatorDataSlots);
+    }
+
+    void use(SbSlotCollector& out) const {
+        out.add(groupBySlots);
+        out.add(selectivityBitmapSlot);
+        out.add(blockAccArgSlots);
+        for (const auto& [outSlot, agg] : aggs) {
+            out.add(agg);
+        }
+        for (const auto& [expr, slot] : mergingExprs) {
+            out.add(expr);
+        }
+    }
+
     template <typename F>
     void visitChildren(F&& fn) {
         fn(child);
@@ -671,6 +1012,14 @@ struct SbBlueprintBlockHashAgg {
     PlanNodeId nodeId{kEmptyPlanNodeId};
     std::unique_ptr<SbBlueprintBlockHashAggInfo> info;
 
+    void def(SbSlotCollector& out) const {
+        info->def(out);
+    }
+
+    void use(SbSlotCollector& out) const {
+        info->use(out);
+    }
+
     template <typename F>
     void visitChildren(F&& fn) {
         info->visitChildren(fn);
@@ -690,6 +1039,18 @@ struct SbBlueprintAggProject {
     SbBlueprintNodeIdx child;
     PlanNodeId nodeId{kEmptyPlanNodeId};
     std::vector<std::pair<sbe::value::SlotId, SbBlockAggExpr>> aggs;
+
+    void def(SbSlotCollector& out) const {
+        for (const auto& [outSlot, agg] : aggs) {
+            out.add(outSlot);
+        }
+    }
+
+    void use(SbSlotCollector& out) const {
+        for (const auto& [outSlot, agg] : aggs) {
+            out.add(agg);
+        }
+    }
 
     template <typename F>
     void visitChildren(F&& fn) {
@@ -717,6 +1078,15 @@ struct SbBlueprintBlockToRow {
     sbe::value::SlotVector blockSlots;
     sbe::value::SlotVector outputSlots;
 
+    void def(SbSlotCollector& out) const {
+        out.add(outputSlots);
+    }
+
+    void use(SbSlotCollector& out) const {
+        out.add(blockSlots);
+        out.add(bitmapSlot);
+    }
+
     template <typename F>
     void visitChildren(F&& fn) {
         fn(child);
@@ -736,6 +1106,16 @@ struct SbBlueprintTsBucketToCellBlockInfo {
     sbe::value::SlotVector topLevelSlots;
     sbe::value::SlotVector traverseSlots;
 
+    void def(SbSlotCollector& out) const {
+        out.add(bitmapSlot);
+        out.add(topLevelSlots);
+        out.add(traverseSlots);
+    }
+
+    void use(SbSlotCollector& out) const {
+        out.add(bucketSlot);
+    }
+
     template <typename F>
     void visitChildren(F&& fn) {
         fn(child);
@@ -751,6 +1131,14 @@ struct SbBlueprintTsBucketToCellBlockInfo {
 struct SbBlueprintTsBucketToCellBlock {
     PlanNodeId nodeId{kEmptyPlanNodeId};
     std::unique_ptr<SbBlueprintTsBucketToCellBlockInfo> info;
+
+    void def(SbSlotCollector& out) const {
+        info->def(out);
+    }
+
+    void use(SbSlotCollector& out) const {
+        info->use(out);
+    }
 
     template <typename F>
     void visitChildren(F&& fn) {
@@ -772,6 +1160,16 @@ struct SbBlueprintAndHashInfo {
     sbe::value::SlotVector innerProjectSlots;
     boost::optional<sbe::value::SlotId> collatorSlot;
 
+    void def(SbSlotCollector&) const {}
+
+    void use(SbSlotCollector& out) const {
+        out.add(outerCondSlots);
+        out.add(outerProjectSlots);
+        out.add(innerCondSlots);
+        out.add(innerProjectSlots);
+        out.add(collatorSlot);
+    }
+
     template <typename F>
     void visitChildren(F&& fn) {
         fn(outer);
@@ -788,6 +1186,14 @@ struct SbBlueprintAndHashInfo {
 struct SbBlueprintAndHash {
     PlanNodeId nodeId{kEmptyPlanNodeId};
     std::unique_ptr<SbBlueprintAndHashInfo> info;
+
+    void def(SbSlotCollector& out) const {
+        info->def(out);
+    }
+
+    void use(SbSlotCollector& out) const {
+        info->use(out);
+    }
 
     template <typename F>
     void visitChildren(F&& fn) {
@@ -813,6 +1219,18 @@ struct SbBlueprintHashLookup {
     sbe::value::SlotId outSlot{0};
     SbExpr aggExpr;
     boost::optional<sbe::value::SlotId> collatorSlot;
+
+    void def(SbSlotCollector& out) const {
+        out.add(outSlot);
+    }
+
+    void use(SbSlotCollector& out) const {
+        out.add(localKeySlot);
+        out.add(foreignKeySlot);
+        out.add(foreignRecordSlot);
+        out.add(collatorSlot);
+        out.add(aggExpr);
+    }
 
     template <typename F>
     void visitChildren(F&& fn) {
@@ -841,6 +1259,18 @@ struct SbBlueprintHashLookupUnwind {
     boost::optional<sbe::value::SlotId> collatorSlot;
     boost::optional<sbe::value::SlotId> indexSlot;
 
+    void def(SbSlotCollector& out) const {
+        out.add(outSlot);
+        out.add(indexSlot);
+    }
+
+    void use(SbSlotCollector& out) const {
+        out.add(localKeySlot);
+        out.add(foreignKeySlot);
+        out.add(foreignRecordSlot);
+        out.add(collatorSlot);
+    }
+
     template <typename F>
     void visitChildren(F&& fn) {
         fn(localStage);
@@ -864,6 +1294,17 @@ struct SbBlueprintFetchInfo {
     sbe::value::SlotId recordIdSlot{0};
     sbe::value::SlotVector scanFieldSlots;
 
+    void def(SbSlotCollector& out) const {
+        out.add(recordSlot);
+        out.add(recordIdSlot);
+        out.add(scanFieldSlots);
+    }
+
+    void use(SbSlotCollector& out) const {
+        out.add(seekSlot);
+        addIndexInfoUses(indexInfoSlots, out);
+    }
+
     template <typename F>
     void visitChildren(F&& fn) {
         fn(child);
@@ -879,6 +1320,14 @@ struct SbBlueprintFetchInfo {
 struct SbBlueprintFetch {
     PlanNodeId nodeId{kEmptyPlanNodeId};
     std::unique_ptr<SbBlueprintFetchInfo> info;
+
+    void def(SbSlotCollector& out) const {
+        info->def(out);
+    }
+
+    void use(SbSlotCollector& out) const {
+        info->use(out);
+    }
 
     template <typename F>
     void visitChildren(F&& fn) {
@@ -900,6 +1349,18 @@ struct SbBlueprintExtractFieldPaths {
     std::vector<sbe::PathSlot> inputs;
     std::vector<sbe::PathSlot> outputs;
 
+    void def(SbSlotCollector& out) const {
+        for (const auto& [path, slot] : outputs) {
+            out.add(slot);
+        }
+    }
+
+    void use(SbSlotCollector& out) const {
+        for (const auto& [path, slot] : inputs) {
+            out.add(slot);
+        }
+    }
+
     template <typename F>
     void visitChildren(F&& fn) {
         fn(child);
@@ -917,6 +1378,14 @@ struct SbBlueprintExtractFieldPaths {
  * Left in an SbBlueprintNodeVector in place of a node that has already been lowered.
  */
 struct SbBlueprintLowered {
+    void def(SbSlotCollector&) const {
+        tasserted(13627000, "Blueprint node has already been lowered");
+    }
+
+    void use(SbSlotCollector&) const {
+        tasserted(13627001, "Blueprint node has already been lowered");
+    }
+
     template <typename F>
     void visitChildren(F&&) {
         tasserted(13621602, "Blueprint node has already been lowered");
@@ -963,14 +1432,19 @@ using SbBlueprintNode = std::variant<SbBlueprintLowered,
                                      SbBlueprintExtractFieldPaths>;
 
 /**
- * Every blueprint node type implements visitChildren() and visitExprs(), which call the given
- * function on each of the node's children (in child order) and on each SbExpr it owns (including
- * null ones). Both pass references, so the function may modify what it is given.
+ * Every blueprint node type implements four things:
+ *
+ *   visitChildren(fn)/visitExprs(fn) call 'fn' on each of the node's children (in child order)
+ *       and on each SbExpr it owns (including null ones). Both pass references, so the function
+ *       may modify what it is given.
+ *   def(out)/use(out) report the slots the node defines and reads (see SbSlotCollector).
  */
 template <typename T>
-concept SbBlueprintNodeType = requires(T& node) {
+concept SbBlueprintNodeType = requires(T& node, const T& constNode, SbSlotCollector& out) {
     node.visitChildren([](SbBlueprintNodeIdx&) {});
     node.visitExprs([](SbExpr&) {});
+    constNode.def(out);
+    constNode.use(out);
 };
 
 template <typename Variant>
@@ -978,7 +1452,8 @@ constexpr bool kAllSbBlueprintNodeTypes = false;
 template <typename... Ts>
 constexpr bool kAllSbBlueprintNodeTypes<std::variant<Ts...>> = (SbBlueprintNodeType<Ts> && ...);
 static_assert(kAllSbBlueprintNodeTypes<SbBlueprintNode>,
-              "Every blueprint node type must implement visitChildren() and visitExprs()");
+              "Every blueprint node type must implement visitChildren(), visitExprs(), def() and "
+              "use()");
 
 // The node types 128 bytes or larger keep their fields in a separately allocated *Info struct,
 // so that a node is little more than the largest small node type.

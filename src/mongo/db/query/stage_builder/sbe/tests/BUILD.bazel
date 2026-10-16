@@ -42,6 +42,7 @@ mongo_cc_unit_test(
         "gen_lookup_unwind_golden_test.cpp",
         "sbe_builder_test.cpp",
         "sbe_builder_ts_test.cpp",
+        "sbe_stage_blueprint_slot_usage_test.cpp",
         "sbe_stage_blueprint_test.cpp",
         "shard_filter_test.cpp",
         "type_checker_test.cpp",

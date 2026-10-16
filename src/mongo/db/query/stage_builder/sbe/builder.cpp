@@ -52,6 +52,7 @@
 #include "mongo/db/query/stage_builder/sbe/gen_index_scan.h"
 #include "mongo/db/query/stage_builder/sbe/gen_projection.h"
 #include "mongo/db/query/stage_builder/sbe/sbe_stage_blueprint.h"
+#include "mongo/db/query/stage_builder/sbe/sbe_stage_blueprint_slot_usage.h"
 #include "mongo/db/query/stage_builder/sbe/sbe_stage_lowering.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr_helpers.h"
 #include "mongo/db/query/stage_builder/stage_builder_util.h"
@@ -62,6 +63,7 @@
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/debug_util.h"
 #include "mongo/util/string_map.h"
 
 #include <cstdint>
@@ -996,9 +998,6 @@ SlotBasedStageBuilder::PlanType SlotBasedStageBuilder::build(const QuerySolution
     _data->resultSlot = resultSlot ? boost::make_optional(resultSlot->getId()) : boost::none;
     _data->recordIdSlot = recordIdSlot ? boost::make_optional(recordIdSlot->getId()) : boost::none;
 
-    // The whole blueprint tree has been built; lower it to sbe::PlanStages.
-    auto loweredRoot = lowerSbeBlueprint(_state.blueprint(), stage.release(), _state);
-
     // Register the slots used in the dynamic index bounds in the global environment.
     for (auto& indexInfo : _data->indexBoundsEvaluationInfos) {
         if (auto singlePlan = std::get_if<ParameterizedIndexScanSlots::SingleIntervalPlan>(
@@ -1014,6 +1013,28 @@ SlotBasedStageBuilder::PlanType SlotBasedStageBuilder::build(const QuerySolution
                 sbe::value::TypeTags::Nothing, 0, true, genericPlan->lowHighKeyIntervals);
         }
     }
+
+    if constexpr (kDebugBuild) {
+        // Every slot the plan reads must be defined by a node of the tree or registered in the
+        // RuntimeEnvironment.
+        auto rootUses = sbe::value::SlotVector{};
+        if (_data->resultSlot) {
+            rootUses.push_back(*_data->resultSlot);
+        }
+        if (_data->recordIdSlot) {
+            rootUses.push_back(*_data->recordIdSlot);
+        }
+        auto usage = SbBlueprintSlotUsage::build(_state.blueprint(), stage.idx(), rootUses);
+        usage.forEachUndefinedUse([&](sbe::value::SlotId slot) {
+            tassert(13627004,
+                    str::stream() << "Blueprint slot " << slot << " is used but defined by no node",
+                    _state.env->isSlotRegistered(slot));
+        });
+    }
+
+    // The whole blueprint tree has been built; lower it to sbe::PlanStages.
+    auto loweredRoot = lowerSbeBlueprint(_state.blueprint(), stage.release(), _state);
+
     return {std::move(loweredRoot), PlanStageData(std::move(_env), std::move(_data))};
 }
 

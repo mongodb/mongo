@@ -424,6 +424,27 @@ void SbExpr::optimize(StageBuilderState& state, const VariableTypes* slotInfo) {
     }
 }
 
+void SbExpr::visitReferencedSlots(const std::function<void(SbSlot)>& callback) const {
+    if (isNull()) {
+        return;
+    }
+
+    if (holds_alternative<SlotId>(_storage)) {
+        callback(SbSlot{get<SlotId>(_storage), getTypeSignature()});
+        return;
+    }
+
+    if (holds_alternative<LocalVarInfo>(_storage)) {
+        return;
+    }
+
+    abt::VariableEnvironment::walkVariables(getAbtInternal(), [&](const abt::Variable& var) {
+        if (auto slot = SbSlot::fromProjectionName(var.name())) {
+            callback(*slot);
+        }
+    });
+}
+
 void SbExpr::setFinishedOptimizing() {
     if (!holds_alternative<OptimizedAbt>(_storage) && !isNull()) {
         // extractABT() may mutate '_typeSig', so we need to read '_typeSig' in advance.

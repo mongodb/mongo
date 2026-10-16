@@ -13,6 +13,7 @@
 #include "mongo/util/modules.h"
 
 #include <cstdint>
+#include <functional>
 #include <limits>
 #include <utility>
 #include <variant>
@@ -576,6 +577,13 @@ public:
     bool isFinishedOptimizing() const {
         return holds_alternative<OptimizedAbt>(_storage);
     }
+
+    /**
+     * Calls 'callback' for each slot variable referenced by this SbExpr. Local variables (bound
+     * by Let or Lambda nodes within the expression) are not reported. Does nothing if this SbExpr
+     * is null.
+     */
+    void visitReferencedSlots(const std::function<void(SbSlot)>& callback) const;
 
     void setFinishedOptimizing();
 
