@@ -45,6 +45,7 @@ std::unique_ptr<PlanStage> StreamingAggStage::clone() const {
 }
 
 void StreamingAggStage::prepare(CompileCtx& ctx) {
+    _bytecode = ctx.getByteCode();
     _children[0]->prepare(ctx);
 
     if (_collatorSlot) {
@@ -136,14 +137,14 @@ void StreamingAggStage::startGroup() {
 
     for (size_t idx = 0; idx < _accumulatorList.size(); ++idx) {
         _curAggAccessors[idx].reset();
-        _accumulatorList[idx]->initialize(_bytecode, _curAggAccessors[idx]);
+        _accumulatorList[idx]->initialize(*_bytecode, _curAggAccessors[idx]);
     }
     accumulate();
 }
 
 void StreamingAggStage::accumulate() {
     for (size_t idx = 0; idx < _accumulatorList.size(); ++idx) {
-        _accumulatorList[idx]->accumulate(_bytecode, _curAggAccessors[idx]);
+        _accumulatorList[idx]->accumulate(*_bytecode, _curAggAccessors[idx]);
     }
 }
 

@@ -92,7 +92,7 @@ private:
     // visible through getAccessor() regardless of the binding mode.
     bool _prepared{false};
 
-    vm::ByteCode _bytecode;
+    std::shared_ptr<vm::ByteCode> _bytecode;
 };
 
 template <typename... Ts>

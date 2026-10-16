@@ -71,6 +71,7 @@ std::unique_ptr<PlanStage> HashAggStage::clone() const {
 }
 
 void HashAggStage::prepare(CompileCtx& ctx) {
+    _bytecode = ctx.getByteCode();
     _children[0]->prepare(ctx);
 
     if (_collatorSlot) {
@@ -260,14 +261,14 @@ void HashAggStage::open(bool reOpen) {
         if (newKey) {
             // Run all acc initializers for this key.
             for (size_t idx = 0; idx < _outAggAccessors.size(); ++idx) {
-                _accumulatorList[idx]->initialize(_bytecode, *_outHashAggAccessors[idx]);
+                _accumulatorList[idx]->initialize(*_bytecode, *_outHashAggAccessors[idx]);
             }
         }
 
         // Accumulate state in '_ht' value, which is a materialized row of '_outAggAccessors'
         // each of which contains the current accumulator state for one accumulator.
         for (size_t idx = 0; idx < _outAggAccessors.size(); ++idx) {
-            _accumulatorList[idx]->accumulate(_bytecode, *_outHashAggAccessors[idx]);
+            _accumulatorList[idx]->accumulate(*_bytecode, *_outHashAggAccessors[idx]);
         }
 
         // If the group-by key is empty we will only ever aggregate into a single row so no
@@ -388,7 +389,7 @@ PlanState HashAggStage::getNextSpilled() {
         // state to be merged into it is in _spilledAggRow.getViewOfValue(idx).
         _spilledAggRow = std::move(recoveredRow.second);
         for (size_t idx = 0; idx < _accumulatorList.size(); ++idx) {
-            _accumulatorList[idx]->merge(_bytecode, *_outRecordStoreAggAccessors[idx]);
+            _accumulatorList[idx]->merge(*_bytecode, *_outRecordStoreAggAccessors[idx]);
         }
     }
 
@@ -405,7 +406,8 @@ PlanState HashAggStage::getNext() {
         PlanState planState = getNextSpilled();
         if (planState == PlanState::ADVANCED) {
             for (size_t accIdx = 0; accIdx < _accumulatorList.size(); ++accIdx) {
-                _accumulatorList[accIdx]->finalize(_bytecode, *_outRecordStoreAggAccessors[accIdx]);
+                _accumulatorList[accIdx]->finalize(*_bytecode,
+                                                   *_outRecordStoreAggAccessors[accIdx]);
             }
         }
         return planState;
@@ -420,7 +422,7 @@ PlanState HashAggStage::getNext() {
     }
 
     for (size_t accIdx = 0; accIdx < _accumulatorList.size(); ++accIdx) {
-        _accumulatorList[accIdx]->finalize(_bytecode, *_outHashAggAccessors[accIdx]);
+        _accumulatorList[accIdx]->finalize(*_bytecode, *_outHashAggAccessors[accIdx]);
     }
     return trackPlanState(PlanState::ADVANCED);
 }

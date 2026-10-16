@@ -154,6 +154,7 @@ std::unique_ptr<PlanStage> BlockHashAggStage::clone() const {
 }
 
 void BlockHashAggStage::prepare(CompileCtx& ctx) {
+    _bytecode = ctx.getByteCode();
     _children[0]->prepare(ctx);
 
     value::SlotSet dupCheck;
@@ -308,14 +309,14 @@ void BlockHashAggStage::executeBlockLevelAccumulatorCode(const value::Materializ
         // Run accumulator initializers if needed.
         for (size_t i = 0; i < _initCodes.size(); ++i) {
             if (_initCodes[i]) {
-                _rowAggHtAccessors[i]->reset(_bytecode.run(_initCodes[i].get()));
+                _rowAggHtAccessors[i]->reset(_bytecode->run(_initCodes[i].get()));
             }
         }
     }
 
     // Run the block level accumulators.
     for (size_t i = 0; i < _blockAggCodes.size(); ++i) {
-        _rowAggHtAccessors[i]->reset(_bytecode.run(_blockAggCodes[i].get()));
+        _rowAggHtAccessors[i]->reset(_bytecode->run(_blockAggCodes[i].get()));
     }
 }
 
@@ -361,7 +362,7 @@ void BlockHashAggStage::executeRowLevelAccumulatorCode(
             // Run accumulator initializers if needed.
             for (size_t i = 0; i < _initCodes.size(); ++i) {
                 if (_initCodes[i]) {
-                    _rowAggHtAccessors[i]->reset(_bytecode.run(_initCodes[i].get()));
+                    _rowAggHtAccessors[i]->reset(_bytecode->run(_initCodes[i].get()));
                 }
             }
         }
@@ -374,7 +375,7 @@ void BlockHashAggStage::executeRowLevelAccumulatorCode(
 
         // Run each row level accumulator.
         for (size_t i = 0; i < _aggCodes.size(); ++i) {
-            _rowAggHtAccessors[i]->reset(_bytecode.run(_aggCodes[i].get()));
+            _rowAggHtAccessors[i]->reset(_bytecode->run(_aggCodes[i].get()));
         }
     }
 }
@@ -789,7 +790,7 @@ bool BlockHashAggStage::getNextSpilledHelper() {
         // Merge in the new partial aggregate values.
         _spilledAggRow = std::move(recoveredRow.second);
         for (size_t idx = 0; idx < _mergingExprCodes.size(); ++idx) {
-            _rowAggRSAccessors[idx]->reset(_bytecode.run(_mergingExprCodes[idx].get()));
+            _rowAggRSAccessors[idx]->reset(_bytecode->run(_mergingExprCodes[idx].get()));
         }
     }
 

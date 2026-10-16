@@ -113,7 +113,7 @@ private:
     // meaning that if they are coming from the 'outer', they must be projected by the 'outer'.
     const std::unique_ptr<EExpression> _predicate;
 
-    vm::ByteCode _bytecode;
+    std::shared_ptr<vm::ByteCode> _bytecode;
     std::unique_ptr<vm::CodeFragment> _predicateCode;
 
     // Switching between the input and Nothing/null for outer joins. Unused for inner joins.

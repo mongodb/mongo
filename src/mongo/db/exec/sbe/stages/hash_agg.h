@@ -227,7 +227,7 @@ private:
     // equal. This comparison is collation-aware if the query has a non-simple collation.
     value::MaterializedRowEq _keyEq;
 
-    vm::ByteCode _bytecode;
+    std::shared_ptr<vm::ByteCode> _bytecode;
 
     bool _compiled{false};
     bool _childOpened{false};

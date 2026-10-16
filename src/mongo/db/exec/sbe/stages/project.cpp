@@ -50,6 +50,7 @@ std::unique_ptr<PlanStage> ProjectStage::clone() const {
 }
 
 void ProjectStage::prepare(CompileCtx& ctx) {
+    _bytecode = ctx.getByteCode();
     _children[0]->prepare(ctx);
 
     // Compile the expressions in order. With sequential binding, each output slot becomes visible
@@ -95,7 +96,7 @@ PlanState ProjectStage::getNext() {
         // Run the expressions in order so that each one sees the values produced for this row by
         // the expressions before it.
         for (auto& project : _compiled) {
-            project.accessor.reset(_bytecode.run(project.code.get()));
+            project.accessor.reset(_bytecode->run(project.code.get()));
         }
     }
 

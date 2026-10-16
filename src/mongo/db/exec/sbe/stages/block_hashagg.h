@@ -257,7 +257,7 @@ private:
     std::vector<value::ValueBlock*> _dataBlocks;
     std::deque<boost::optional<value::MonoBlock>> _monoBlocks;
 
-    vm::ByteCode _bytecode;
+    std::shared_ptr<vm::ByteCode> _bytecode;
     bool _compiled = false;
 
     bool _done = false;

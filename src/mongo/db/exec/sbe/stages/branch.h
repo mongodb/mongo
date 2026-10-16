@@ -74,7 +74,7 @@ private:
     bool _thenOpened{false};
     bool _elseOpened{false};
 
-    vm::ByteCode _bytecode;
+    std::shared_ptr<vm::ByteCode> _bytecode;
     BranchStats _specificStats;
 };
 }  // namespace mongo::sbe

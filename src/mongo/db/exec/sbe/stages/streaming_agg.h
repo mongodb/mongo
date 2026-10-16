@@ -86,7 +86,7 @@ private:
     value::SlotAccessor* _collatorAccessor = nullptr;
     value::SlotAccessorMap _outAccessors;
 
-    vm::ByteCode _bytecode;
+    std::shared_ptr<vm::ByteCode> _bytecode;
 
     bool _compiled = false;
     bool _isEOF = false;

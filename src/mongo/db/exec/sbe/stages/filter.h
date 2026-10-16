@@ -59,6 +59,7 @@ public:
     }
 
     void prepare(CompileCtx& ctx) final {
+        _bytecode = ctx.getByteCode();
         _children[0]->prepare(ctx);
 
         ctx.root = this;
@@ -77,7 +78,7 @@ public:
         if constexpr (IsConst) {
             _specificStats.numTested++;
 
-            auto pass = _bytecode.runPredicate(_filterCode.get());
+            auto pass = _bytecode->runPredicate(_filterCode.get());
             if (!pass) {
                 close();
                 return;
@@ -108,7 +109,7 @@ public:
             if (state == PlanState::ADVANCED) {
                 _specificStats.numTested++;
 
-                pass = _bytecode.runPredicate(_filterCode.get());
+                pass = _bytecode->runPredicate(_filterCode.get());
 
                 if constexpr (IsEof) {
                     if (!pass) {
@@ -184,7 +185,7 @@ private:
     const std::unique_ptr<EExpression> _filter;
     std::unique_ptr<vm::CodeFragment> _filterCode;
 
-    vm::ByteCode _bytecode;
+    std::shared_ptr<vm::ByteCode> _bytecode;
 
     bool _childOpened{false};
     FilterStats _specificStats;

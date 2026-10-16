@@ -81,6 +81,7 @@ std::unique_ptr<PlanStage> LoopJoinStage::clone() const {
 }
 
 void LoopJoinStage::prepare(CompileCtx& ctx) {
+    _bytecode = ctx.getByteCode();
     for (auto& f : _outerProjects) {
         auto [it, inserted] = _outerRefs.emplace(f);
         uassert(4822820, str::stream() << "duplicate field: " << f, inserted);
@@ -162,7 +163,7 @@ PlanState LoopJoinStage::getNext() {
 
     for (;;) {
         while (_children[1]->getNext() == PlanState::ADVANCED) {
-            if (!_predicateCode || _bytecode.runPredicate(_predicateCode.get())) {
+            if (!_predicateCode || _bytecode->runPredicate(_predicateCode.get())) {
                 return trackPlanState(PlanState::ADVANCED);
             }
         }

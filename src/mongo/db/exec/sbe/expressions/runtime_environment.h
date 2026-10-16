@@ -22,6 +22,10 @@
 // IWYU pragma: no_include "ext/alloc_traits.h"
 
 namespace mongo::sbe {
+namespace vm {
+class ByteCode;
+}  // namespace vm
+
 /**
  * A holder for "global" slots and accessors. These are used in a PlanStage tree but:
  *  - Cannot be made constants due to restrictions on the lifetime of such values (e.g., they're
@@ -43,11 +47,11 @@ namespace mongo::sbe {
 using InputParamToSlotMap = stdx::unordered_map<MatchExpression::InputParamId, sbe::value::SlotId>;
 class RuntimeEnvironment final : public SlotsProvider {
 public:
-    RuntimeEnvironment() = default;
+    RuntimeEnvironment();
     RuntimeEnvironment(RuntimeEnvironment&&) = delete;
     RuntimeEnvironment& operator=(const RuntimeEnvironment&) = delete;
     RuntimeEnvironment& operator=(const RuntimeEnvironment&&) = delete;
-    virtual ~RuntimeEnvironment() = default;
+    virtual ~RuntimeEnvironment();
 
     class Accessor final : public value::AssignableSlotAccessor {
     public:
@@ -154,6 +158,12 @@ public:
     std::unique_ptr<RuntimeEnvironment> makeDeepCopy() const;
 
     /**
+     * Returns the plan's VM instance to be used for compiled expressions. It is not shared with
+     * copies.
+     */
+    std::shared_ptr<vm::ByteCode> getByteCode();
+
+    /**
      * Dumps all the slots currently defined in this environment into the given string builder.
      */
     void debugString(StringBuilder* builder, boost::optional<size_t> lengthCap = boost::none) const;
@@ -203,6 +213,8 @@ private:
     std::shared_ptr<State> _state{std::make_shared<State>()};
     value::SlotMap<Accessor> _accessors;
     bool _isSmp{false};
+
+    std::shared_ptr<vm::ByteCode> _byteCode;
 
     friend class Accessor;
 };

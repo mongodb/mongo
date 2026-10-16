@@ -5,6 +5,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/util/assert_util.h"
 
@@ -41,6 +42,7 @@ std::unique_ptr<PlanStage> LimitSkipStage::clone() const {
 }
 
 void LimitSkipStage::prepare(CompileCtx& ctx) {
+    _bytecode = ctx.getByteCode();
     _children[0]->prepare(ctx);
     if (_limitExpr) {
         _limitCode = _limitExpr->compile(ctx);
@@ -149,7 +151,7 @@ boost::optional<int64_t> LimitSkipStage::_runLimitOrSkipCode(const vm::CodeFragm
         return boost::none;
     }
 
-    value::TagValueMaybeOwned res = _bytecode.run(code);
+    value::TagValueMaybeOwned res = _bytecode->run(code);
     tassert(8349200,
             "Expect limit or skip code to return an int64",
             res.tag() == value::TypeTags::NumberInt64);

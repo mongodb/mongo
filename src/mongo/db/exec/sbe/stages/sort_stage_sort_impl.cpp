@@ -22,6 +22,7 @@ public:
     explicit SortImpl(SortStage& stage) : _stage(stage) {}
 
     void prepare(CompileCtx& ctx) override {
+        _bytecode = ctx.getByteCode();
         _stage._children[0]->prepare(ctx);
 
         size_t counter = 0;
@@ -207,7 +208,7 @@ private:
     };
 
     int64_t _runLimitCode() {
-        value::TagValueMaybeOwned res = vm::ByteCode{}.run(_limitCode.get());
+        value::TagValueMaybeOwned res = _bytecode->run(_limitCode.get());
         tassert(8349205,
                 "Limit code returned unexpected value",
                 res.tag() == value::TypeTags::NumberInt64);
@@ -256,6 +257,7 @@ private:
     SorterData* _outputDataIt{&_outputData};
     std::unique_ptr<Sorter<KeyRow, ValueRow>> _sorter;
     std::unique_ptr<vm::CodeFragment> _limitCode;
+    std::shared_ptr<vm::ByteCode> _bytecode;
 };
 
 std::unique_ptr<SortStage::SortIface> SortStage::_makeStageImpl() {

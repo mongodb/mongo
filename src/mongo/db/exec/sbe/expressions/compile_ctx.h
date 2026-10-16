@@ -32,6 +32,13 @@ struct CompileCtx {
         return _env->getAccessor(slotId);
     }
 
+    /**
+     * Returns the plan's VM instance to be used for compiled expressions.
+     */
+    std::shared_ptr<vm::ByteCode> getByteCode() {
+        return _env->getByteCode();
+    }
+
     void pushCorrelated(value::SlotId slot, value::SlotAccessor* accessor);
     void popCorrelated();
 

@@ -64,7 +64,7 @@ protected:
 private:
     boost::optional<int64_t> _runLimitOrSkipCode(const vm::CodeFragment* code);
 
-    vm::ByteCode _bytecode;
+    std::shared_ptr<vm::ByteCode> _bytecode;
 
     std::unique_ptr<EExpression> _limitExpr;
     std::unique_ptr<EExpression> _skipExpr;

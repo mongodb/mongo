@@ -146,7 +146,7 @@ private:
     // Compiled expression to aggregate all inner matches into a single $lookup "as" output array.
     std::unique_ptr<vm::CodeFragment> _aggCode;
     bool _compileInnerAgg{false};
-    vm::ByteCode _bytecode;
+    std::shared_ptr<vm::ByteCode> _bytecode;
 
     // Accessor for collator. Only set if collatorSlot provided during construction.
     value::SlotAccessor* _collatorAccessor{nullptr};

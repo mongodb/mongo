@@ -32,6 +32,7 @@ std::unique_ptr<PlanStage> AggProjectStage::clone() const {
 }
 
 void AggProjectStage::prepare(CompileCtx& ctx) {
+    _bytecode = ctx.getByteCode();
     _children[0]->prepare(ctx);
 
     // Compile agg expressions here.
@@ -66,7 +67,7 @@ void AggProjectStage::open(bool reOpen) {
 
     for (size_t idx = 0; idx < _slots.size(); ++idx) {
         if (_initCodes[idx]) {
-            _outAccessors[idx]->reset(_bytecode.run(_initCodes[idx].get()));
+            _outAccessors[idx]->reset(_bytecode->run(_initCodes[idx].get()));
         } else {
             _outAccessors[idx]->reset();
         }
@@ -84,7 +85,7 @@ PlanState AggProjectStage::getNext() {
     if (state == PlanState::ADVANCED) {
         // Run the agg project expressions here.
         for (size_t idx = 0; idx < _slots.size(); ++idx) {
-            _outAccessors[idx]->reset(_bytecode.run(_aggCodes[idx].get()));
+            _outAccessors[idx]->reset(_bytecode->run(_aggCodes[idx].get()));
         }
     }
 

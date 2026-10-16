@@ -4,6 +4,7 @@
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 
 #include "mongo/bson/util/builder.h"
+#include "mongo/db/exec/sbe/vm/vm.h"
 
 #include <iosfwd>
 #include <string_view>
@@ -16,6 +17,17 @@ RuntimeEnvironment::RuntimeEnvironment(const RuntimeEnvironment& other)
     for (auto&& [slotId, index] : _state->slots) {
         emplaceAccessor(slotId, index);
     }
+}
+
+RuntimeEnvironment::RuntimeEnvironment() = default;
+
+RuntimeEnvironment::~RuntimeEnvironment() = default;
+
+std::shared_ptr<vm::ByteCode> RuntimeEnvironment::getByteCode() {
+    if (!_byteCode) {
+        _byteCode = std::make_shared<vm::ByteCode>();
+    }
+    return _byteCode;
 }
 
 void RuntimeEnvironment::registerSlot(value::TypeTags tag,

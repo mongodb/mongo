@@ -55,6 +55,7 @@ std::unique_ptr<PlanStage> BranchStage::clone() const {
 }
 
 void BranchStage::prepare(CompileCtx& ctx) {
+    _bytecode = ctx.getByteCode();
     value::SlotSet dupCheck;
 
     _children[0]->prepare(ctx);
@@ -107,7 +108,7 @@ void BranchStage::open(bool reOpen) {
     _specificStats.numTested++;
 
     // run the filter expressions here
-    value::TagValueMaybeOwned filterResult = _bytecode.run(_filterCode.get());
+    value::TagValueMaybeOwned filterResult = _bytecode->run(_filterCode.get());
     if (filterResult.tag() == value::TypeTags::Boolean) {
         if (value::bitcastTo<bool>(filterResult.value())) {
             _activeBranch = 0;

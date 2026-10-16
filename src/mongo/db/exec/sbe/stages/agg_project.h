@@ -61,7 +61,7 @@ private:
     std::vector<std::unique_ptr<vm::CodeFragment>> _aggCodes;
     std::vector<std::unique_ptr<value::OwnedValueAccessor>> _outAccessors;
 
-    vm::ByteCode _bytecode;
+    std::shared_ptr<vm::ByteCode> _bytecode;
 
     bool _compiled{false};
 };

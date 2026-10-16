@@ -53,6 +53,7 @@ std::unique_ptr<PlanStage> HashLookupStage::clone() const {
 }
 
 void HashLookupStage::prepare(CompileCtx& ctx) {
+    _bytecode = ctx.getByteCode();
     outerChild()->prepare(ctx);
     innerChild()->prepare(ctx);
 
@@ -185,7 +186,7 @@ void HashLookupStage::accumulateFromValueIndices(const RecordIndexCollection* bu
         _outInnerProjectAccessor.reset(*innerMatch);
 
         // Run the VM code to "accumulate" the current inner doc into the lookup output array.
-        _lookupStageOutput.reset(/*idx=*/0, _bytecode.run(_aggCode.get()));
+        _lookupStageOutput.reset(/*idx=*/0, _bytecode->run(_aggCode.get()));
     }
 }  // HashLookupStage::accumulateFromValueIndices
 

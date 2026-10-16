@@ -63,6 +63,7 @@ IndexScanStageBase::IndexScanStageBase(std::string_view stageType,
 }
 
 void IndexScanStageBase::prepareImpl(CompileCtx& ctx) {
+    _bytecode = ctx.getByteCode();
     _accessors.resize(_vars.size());
     for (size_t idx = 0; idx < _accessors.size(); ++idx) {
         auto [it, inserted] = _accessorMap.emplace(_vars[idx], &_accessors[idx]);
@@ -678,7 +679,7 @@ void GenericIndexScanStage::open(bool reOpen) {
 
     IndexScanStageBase::openImpl(reOpen);
 
-    value::TagValueMaybeOwned bound = _bytecode.run(_indexBoundsCode.get());
+    value::TagValueMaybeOwned bound = _bytecode->run(_indexBoundsCode.get());
     if (bound.tag() == value::TypeTags::Nothing) {
         _scanState = ScanState::kFinished;
         return;
