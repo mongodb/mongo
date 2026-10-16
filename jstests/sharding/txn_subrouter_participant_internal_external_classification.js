@@ -17,7 +17,6 @@
  *   uses_prepare_transaction,
  *   requires_fcv_91,
  *   config_shard_incompatible,
- *   featureFlagServerInitiatedTransactionClassification,
  * ]
  */
 import {after, before, describe, it} from "jstests/libs/mochalite.js";

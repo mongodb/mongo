@@ -17,7 +17,6 @@
  *   requires_sharding,
  *   requires_fcv_91,
  *   resource_intensive,
- *   featureFlagServerInitiatedTransactionClassification,
  * ]
  */
 import {after, before, describe, it} from "jstests/libs/mochalite.js";

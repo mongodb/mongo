@@ -349,7 +349,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
                                       << "atClusterTime" << kInMemoryLogicalTime.asTimestamp())
                       << "transactionRuntimeContext" << BSON("createdDatabases" << BSONArray())
                       << "startTransaction" << true << "coordinator" << true << "autocommit"
-                      << false << "txnNumber" << txnNum);
+                      << false << "txnNumber" << txnNum << "isServerInitiatedTransaction" << true);
 
     {
         auto newCmd =
@@ -383,7 +383,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, BasicStartTxnWithAtClusterTime) 
                                       << "atClusterTime" << kInMemoryLogicalTime.asTimestamp())
                       << "transactionRuntimeContext" << BSON("createdDatabases" << BSONArray())
                       << "startTransaction" << true << "coordinator" << true << "autocommit"
-                      << false << "txnNumber" << txnNum);
+                      << false << "txnNumber" << txnNum << "isServerInitiatedTransaction" << true);
 
     {
         auto newCmd =
@@ -429,7 +429,8 @@ TEST_F(TransactionRouterTestWithDefaultSession, SubRouterAttachesTxnMetadata) {
                           << "transactionRuntimeContext" << BSON("createdDatabases" << BSONArray())
                           << "shardVersion" << expectedShardVersion.toBSON() << "databaseVersion"
                           << expectedDatabaseVersion.toBSON() << "startOrContinueTransaction"
-                          << true << "autocommit" << false << "txnNumber" << txnNum);
+                          << true << "autocommit" << false << "txnNumber" << txnNum
+                          << "isServerInitiatedTransaction" << true);
         auto newCmd = txnRouter.attachTxnFieldsIfNeeded(
             operationContext(),
             shard1,
@@ -507,7 +508,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, SubRouterCannotCommit) {
                                       << "atClusterTime" << kInMemoryLogicalTime.asTimestamp())
                       << "transactionRuntimeContext" << BSON("createdDatabases" << BSONArray())
                       << "startOrContinueTransaction" << true << "autocommit" << false
-                      << "txnNumber" << txnNum);
+                      << "txnNumber" << txnNum << "isServerInitiatedTransaction" << true);
 
     {
         auto newCmd =
@@ -544,7 +545,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, SubRouterCannotAbort) {
                                       << "atClusterTime" << kInMemoryLogicalTime.asTimestamp())
                       << "transactionRuntimeContext" << BSON("createdDatabases" << BSONArray())
                       << "startOrContinueTransaction" << true << "autocommit" << false
-                      << "txnNumber" << txnNum);
+                      << "txnNumber" << txnNum << "isServerInitiatedTransaction" << true);
 
     {
         auto newCmd =
@@ -578,7 +579,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, SubRouterCannotImplicitlyAbort) 
                                       << "atClusterTime" << kInMemoryLogicalTime.asTimestamp())
                       << "transactionRuntimeContext" << BSON("createdDatabases" << BSONArray())
                       << "startOrContinueTransaction" << true << "autocommit" << false
-                      << "txnNumber" << txnNum);
+                      << "txnNumber" << txnNum << "isServerInitiatedTransaction" << true);
 
     {
         auto newCmd =
@@ -625,7 +626,8 @@ TEST_F(TransactionRouterTestWithDefaultSession, StartOrContinueWithMatchingReadC
                                                      << "createdDatabases" << BSONArray())
                      << "shardVersion" << expectedShardVersion.toBSON() << "databaseVersion"
                      << expectedDatabaseVersion.toBSON() << "startOrContinueTransaction" << true
-                     << "autocommit" << false << "txnNumber" << txnNum);
+                     << "autocommit" << false << "txnNumber" << txnNum
+                     << "isServerInitiatedTransaction" << true);
         auto newCmd = txnRouter.attachTxnFieldsIfNeeded(
             operationContext(),
             shard1,
@@ -735,7 +737,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, StartOrContinueWithSnapshotRCSet
                                       << "atClusterTime" << kInMemoryLogicalTime.asTimestamp())
                       << "transactionRuntimeContext" << BSON("createdDatabases" << BSONArray())
                       << "startOrContinueTransaction" << true << "autocommit" << false
-                      << "txnNumber" << txnNum);
+                      << "txnNumber" << txnNum << "isServerInitiatedTransaction" << true);
 
     {
         auto newCmd =
@@ -792,9 +794,6 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 }
 
 TEST_F(TransactionRouterTestWithDefaultSession, SubRouterForwardsParticipantClassification) {
-    // TODO SERVER-135549: Remove this guard once
-    // featureFlagServerInitiatedTransactionClassification is enabled by default.
-    unittest::ServerParameterGuard ff("featureFlagServerInitiatedTransactionClassification", true);
     for (bool isServerInitiated : {true, false}) {
         TxnNumber txnNum{isServerInitiated ? 3 : 4};
         operationContext()->setTxnNumber(txnNum);
@@ -1570,7 +1569,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, NewParticipantMustAttachTxnAndRe
                                       << "atClusterTime" << kInMemoryLogicalTime.asTimestamp())
                       << "transactionRuntimeContext" << BSON("createdDatabases" << BSONArray())
                       << "startTransaction" << true << "coordinator" << true << "autocommit"
-                      << false << "txnNumber" << txnNum);
+                      << false << "txnNumber" << txnNum << "isServerInitiatedTransaction" << true);
 
     {
         auto newCmd =
@@ -1588,13 +1587,14 @@ TEST_F(TransactionRouterTestWithDefaultSession, NewParticipantMustAttachTxnAndRe
                           newCmd);
     }
 
-    expectedNewObj = BSON(
-        "insert" << "test"
-                 << "readConcern"
-                 << BSON("level" << "snapshot"
-                                 << "atClusterTime" << kInMemoryLogicalTime.asTimestamp())
-                 << "transactionRuntimeContext" << BSON("createdDatabases" << BSONArray())
-                 << "startTransaction" << true << "autocommit" << false << "txnNumber" << txnNum);
+    expectedNewObj =
+        BSON("insert" << "test"
+                      << "readConcern"
+                      << BSON("level" << "snapshot"
+                                      << "atClusterTime" << kInMemoryLogicalTime.asTimestamp())
+                      << "transactionRuntimeContext" << BSON("createdDatabases" << BSONArray())
+                      << "startTransaction" << true << "autocommit" << false << "txnNumber"
+                      << txnNum << "isServerInitiatedTransaction" << true);
 
     {
         auto newCmd =
@@ -1632,7 +1632,8 @@ TEST_F(TransactionRouterTestWithDefaultSession, StartingNewTxnShouldClearState) 
                                           << "atClusterTime" << kInMemoryLogicalTime.asTimestamp())
                           << "transactionRuntimeContext" << BSON("createdDatabases" << BSONArray())
                           << "startTransaction" << true << "coordinator" << true << "autocommit"
-                          << false << "txnNumber" << txnNum),
+                          << false << "txnNumber" << txnNum << "isServerInitiatedTransaction"
+                          << true),
             newCmd);
     }
 
@@ -1649,7 +1650,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, StartingNewTxnShouldClearState) 
                                       << "atClusterTime" << kInMemoryLogicalTime.asTimestamp())
                       << "transactionRuntimeContext" << BSON("createdDatabases" << BSONArray())
                       << "startTransaction" << true << "coordinator" << true << "autocommit"
-                      << false << "txnNumber" << txnNum2);
+                      << false << "txnNumber" << txnNum2 << "isServerInitiatedTransaction" << true);
 
     {
         auto newCmd =
@@ -2177,13 +2178,14 @@ TEST_F(TransactionRouterTestWithDefaultSession, DoesNotAttachTxnNumIfAlreadyTher
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
 
-    BSONObj expectedNewObj = BSON(
-        "insert" << "test"
-                 << "txnNumber" << txnNum << "readConcern"
-                 << BSON("level" << "snapshot"
-                                 << "atClusterTime" << kInMemoryLogicalTime.asTimestamp())
-                 << "transactionRuntimeContext" << BSON("createdDatabases" << BSONArray())
-                 << "startTransaction" << true << "coordinator" << true << "autocommit" << false);
+    BSONObj expectedNewObj =
+        BSON("insert" << "test"
+                      << "txnNumber" << txnNum << "readConcern"
+                      << BSON("level" << "snapshot"
+                                      << "atClusterTime" << kInMemoryLogicalTime.asTimestamp())
+                      << "transactionRuntimeContext" << BSON("createdDatabases" << BSONArray())
+                      << "startTransaction" << true << "coordinator" << true << "autocommit"
+                      << false << "isServerInitiatedTransaction" << true);
 
     auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(),
                                                     shard1,
@@ -2275,7 +2277,8 @@ TEST_F(TransactionRouterTestWithDefaultSession, AttachTxnValidatesReadConcernIfA
                                           << "atClusterTime" << kInMemoryLogicalTime.asTimestamp())
                           << "transactionRuntimeContext" << BSON("createdDatabases" << BSONArray())
                           << "startTransaction" << true << "coordinator" << true << "autocommit"
-                          << false << "txnNumber" << txnNum),
+                          << false << "txnNumber" << txnNum << "isServerInitiatedTransaction"
+                          << true),
             newCmd);
     }
 }
@@ -2410,7 +2413,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, PassesThroughEmptyReadConcernToP
                       << BSON("placementConflictTime" << afterClusterTime << "createdDatabases"
                                                       << BSONArray())
                       << "startTransaction" << true << "coordinator" << true << "autocommit"
-                      << false << "txnNumber" << txnNum);
+                      << false << "txnNumber" << txnNum << "isServerInitiatedTransaction" << true);
 
     auto newCmd =
         txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, BSON("insert" << "test"));
@@ -2438,7 +2441,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
                  << BSON("placementConflictTime" << kAfterClusterTime.asTimestamp()
                                                  << "createdDatabases" << BSONArray())
                  << "startTransaction" << true << "coordinator" << true << "autocommit" << false
-                 << "txnNumber" << txnNum);
+                 << "txnNumber" << txnNum << "isServerInitiatedTransaction" << true);
 
     auto newCmd =
         txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, BSON("insert" << "test"));
@@ -8430,14 +8433,14 @@ TEST_F(TransactionRouterTest, ParticipantCanBeAddedOnNonRetryableStmtInRetryable
     {
         BSONObj cmdObj = BSON("insert" << "test"
                                        << "stmtId" << -1);
-        BSONObj expectedNewObj =
-            BSON("insert" << "test"
-                          << "stmtId" << -1 << "readConcern"
-                          << BSON("level" << "snapshot"
-                                          << "atClusterTime" << kInMemoryLogicalTime.asTimestamp())
-                          << "transactionRuntimeContext" << BSON("createdDatabases" << BSONArray())
-                          << "startTransaction" << true << "coordinator" << true << "autocommit"
-                          << false << "txnNumber" << txnNum);
+        BSONObj expectedNewObj = BSON(
+            "insert" << "test"
+                     << "stmtId" << -1 << "readConcern"
+                     << BSON("level" << "snapshot"
+                                     << "atClusterTime" << kInMemoryLogicalTime.asTimestamp())
+                     << "transactionRuntimeContext" << BSON("createdDatabases" << BSONArray())
+                     << "startTransaction" << true << "coordinator" << true << "autocommit" << false
+                     << "txnNumber" << txnNum << "isServerInitiatedTransaction" << true);
 
         auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, cmdObj);
         ASSERT_BSONOBJ_EQ(expectedNewObj, newCmd);
@@ -8502,12 +8505,6 @@ TEST_F(TransactionRouterTest, ParticipantCannotBeAddedOnRetryableStmtInRetryable
 
 TEST_F(TransactionRouterTestWithDefaultSession,
        IsServerInitiatedTransactionAttachedOncePerParticipant) {
-    // TODO SERVER-135549: Remove this guard once
-    // featureFlagServerInitiatedTransactionClassification is
-    // enabled by default, and update the existing attachTxnFieldsIfNeeded test cases to assert on
-    // isServerInitiatedTransaction.
-    unittest::ServerParameterGuard ff("featureFlagServerInitiatedTransactionClassification", true);
-
     TxnNumber txnNum{3};
     operationContext()->setTxnNumber(txnNum);
 
@@ -8601,8 +8598,9 @@ protected:
                 // attached.
                 expectedCmdObj = expectedCmdObj.addFields(BSON("coordinator" << true));
             }
-            expectedCmdObj =
-                expectedCmdObj.addFields(BSON("autocommit" << false << "txnNumber" << txnNum));
+            expectedCmdObj = expectedCmdObj.addFields(
+                BSON("autocommit" << false << "txnNumber" << txnNum
+                                  << "isServerInitiatedTransaction" << true));
             ASSERT_BSONOBJ_EQ(expectedCmdObj, actualCmdObj);
         }
 
@@ -8620,7 +8618,8 @@ protected:
                 BSON("update" << "test"
                               << "readConcern" << txnReadConcernObj << "transactionRuntimeContext"
                               << BSON("createdDatabases" << BSONArray()) << startActionString
-                              << true << "autocommit" << false << "txnNumber" << txnNum);
+                              << true << "autocommit" << false << "txnNumber" << txnNum
+                              << "isServerInitiatedTransaction" << true);
             ASSERT_BSONOBJ_EQ(expectedCmdObj, actualCmdObj);
         }
 
@@ -8666,7 +8665,8 @@ protected:
                 BSON("delete" << "test"
                               << "readConcern" << txnReadConcernObj << "transactionRuntimeContext"
                               << BSON("createdDatabases" << BSONArray()) << startActionString
-                              << true << "autocommit" << false << "txnNumber" << txnNum);
+                              << true << "autocommit" << false << "txnNumber" << txnNum
+                              << "isServerInitiatedTransaction" << true);
             ASSERT_BSONOBJ_EQ(expectedCmdObj, actualCmdObj);
         }
 
