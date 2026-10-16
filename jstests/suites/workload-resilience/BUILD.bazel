@@ -281,7 +281,6 @@ resmoke_suite_test(
         "ci-default",
         "common",
         "execution_control_with_prioritization",
-        "requires_replicated_fast_count_recovery",
         "sharding",
     ],
     target_compatible_with = select({

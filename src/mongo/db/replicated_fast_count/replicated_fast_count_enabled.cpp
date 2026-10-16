@@ -62,6 +62,12 @@ bool shouldReadFromReplicatedFastCount(OperationContext* opCtx, const NamespaceS
         return true;
     }
 
+    // The collection can take writes across FCV changes during node setup so the replicated size
+    // and count may not be tracked correctly.
+    if (nss == NamespaceString::kUserWritesCriticalSectionsNamespace) {
+        return false;
+    }
+
     if (MONGO_unlikely(disableReplicatedFastCount.shouldFail())) {
         return false;
     }

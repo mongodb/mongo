@@ -70,7 +70,6 @@ resmoke_suite_test(
     tags = [
         "ci-all-variants",
         "common",
-        "requires_replicated_fast_count_recovery",
         "sharding",
     ],
     target_compatible_with = select({
@@ -101,7 +100,6 @@ resmoke_suite_test(
         "common",
         "csrs",
         "non_live_record",
-        "requires_replicated_fast_count_recovery",
         "sharding",
     ],
     target_compatible_with = select({
@@ -627,7 +625,6 @@ resmoke_suite_test(
             "default",
             "multiversion",
             "random_multiversion_ds",
-            "requires_replicated_fast_count_recovery",
         ],
         deps = [
             "//src/mongo/db:mongod",

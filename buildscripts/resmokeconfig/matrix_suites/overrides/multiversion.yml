@@ -428,6 +428,9 @@
             TestData:
               useRandomBinVersionsWithinReplicaSet: "last-lts"
               mongosBinVersion: "last-lts"
+              # Disable replicated fast count in this mixed-bin-version suite.
+              setParameters:
+                "failpoint.disableReplicatedFastCount": "{mode: 'alwaysOn'}"
 
 - name: sharding_multiversion_testdata_last_continuous
   value:
@@ -438,6 +441,9 @@
             TestData:
               useRandomBinVersionsWithinReplicaSet: "last-continuous"
               mongosBinVersion: "last-continuous"
+              # Disable replicated fast count in this mixed-bin-version suite.
+              setParameters:
+                "failpoint.disableReplicatedFastCount": "{mode: 'alwaysOn'}"
 
 - name: sharding_multiversion_testdata_last_patch
   value:
@@ -448,6 +454,9 @@
             TestData:
               useRandomBinVersionsWithinReplicaSet: "last-patch"
               mongosBinVersion: "last-patch"
+              # Disable replicated fast count in this mixed-bin-version suite.
+              setParameters:
+                "failpoint.disableReplicatedFastCount": "{mode: 'alwaysOn'}"
 
 - name: sharding_multiversion_mongos_testdata_last_lts
   value:

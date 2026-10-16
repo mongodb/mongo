@@ -16,6 +16,8 @@ executor:
       global_vars:
         TestData:
           mongosBinVersion: last-lts
+          setParameters:
+            failpoint.disableReplicatedFastCount: "{mode: 'alwaysOn'}"
           useRandomBinVersionsWithinReplicaSet: last-lts
       nodb: ""
 matrix_suite: true

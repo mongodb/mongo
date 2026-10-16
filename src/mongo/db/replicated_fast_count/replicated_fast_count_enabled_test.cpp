@@ -223,6 +223,7 @@ INSTANTIATE_TEST_SUITE_P(
                 {"config", "system.preimages", false},
                 {"config", "image_collection", false},
                 {"config", "system.profile", false},
+                {"config", "user_writes_critical_sections", false},
                 {NamespaceString::kRsOplogNamespace.dbName().toString_forTest(),
                  std::string{NamespaceString::kRsOplogNamespace.coll()},
                  false},
@@ -247,6 +248,7 @@ INSTANTIATE_TEST_SUITE_P(
                 {"config", "system.preimages", false},
                 {"config", "image_collection", false},
                 {"config", "system.profile", false},
+                {"config", "user_writes_critical_sections", false},
             },
         },
         ShouldReadFromReplicatedFastCountParams{
@@ -266,6 +268,7 @@ INSTANTIATE_TEST_SUITE_P(
                 {"config", "system.preimages", false},
                 {"config", "image_collection", false},
                 {"config", "system.profile", false},
+                {"config", "user_writes_critical_sections", true},
             },
         },
         ShouldReadFromReplicatedFastCountParams{
@@ -285,6 +288,7 @@ INSTANTIATE_TEST_SUITE_P(
                 {"config", "system.preimages", false},
                 {"config", "image_collection", false},
                 {"config", "system.profile", false},
+                {"config", "user_writes_critical_sections", true},
             },
         }),
     [](const ::testing::TestParamInfo<ShouldReadFromReplicatedFastCountParams>& info) {
