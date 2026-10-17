@@ -309,6 +309,10 @@ public:
     // Query Execution Team Metrics
     static constexpr MetricName kQueryMemoryLoadSheddingOperationsShed =
         MetricNameMaker::make("mongodb.serverStatus.queryMemory.loadShedding.operationsShed");
+    static constexpr MetricName kQueryMemoryLoadSheddingIdleCursorsShed =
+        MetricNameMaker::make("mongodb.serverStatus.queryMemory.loadShedding.idleCursorsShed");
+    static constexpr MetricName kQueryMemoryLoadSheddingIdleCursorBytesShed =
+        MetricNameMaker::make("mongodb.serverStatus.queryMemory.loadShedding.idleCursorBytesShed");
     static constexpr MetricName kChangeStreamCursorsTotalOpened =
         MetricNameMaker::make("mongodb.serverStatus.metrics.changeStreams.cursor.totalOpened");
     static constexpr MetricName kChangeStreamCursorsLifespan =

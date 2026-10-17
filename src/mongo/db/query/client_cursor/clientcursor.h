@@ -722,12 +722,14 @@ public:
         zero(singleTarget);
         zero(queuedData);
         zero(timedOut);
+        zero(shedForMemory);
     }
 
     Counter64& open{_makeStat("open.total")};         // resettable
     Counter64& openPinned{_makeStat("open.pinned")};  // resettable
     Counter64& openNoTimeout{_makeStat("open.noTimeout")};
-    Counter64& timedOut{_makeStat("timedOut")};  // resettable
+    Counter64& timedOut{_makeStat("timedOut")};            // resettable
+    Counter64& shedForMemory{_makeStat("shedForMemory")};  // resettable
     Counter64& totalOpened{_makeStat("totalOpened")};
     Counter64& moreThanOneBatch{_makeStat("moreThanOneBatch")};
 

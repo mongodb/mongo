@@ -52,6 +52,19 @@ server_parameters:
             expr: 32 * 1024 * 1024
         validator: {gt: 0, lte: {expr: 1024 * 1024 * 1024}}
         redact: false
+    queryMemoryIdleCursorSheddingIntervalMillis:
+        description: >-
+            How often idle cursors are evaluated for load shedding, in milliseconds. This may be
+            shorter than the clientCursorMonitorFrequencySecs used for reaping timed-out cursors.
+            Setting this above 1000 (kMaxShedEvalDt) is not recommended, as this will consistently
+            under-shed idle cursors.
+        set_at: [startup, runtime]
+        cpp_varname: gQueryMemoryIdleCursorSheddingIntervalMillis
+        cpp_vartype: AtomicWord<int32_t>
+        default: 1000
+        validator: {gte: 100, lte: 3600000}
+        redact: false
+
     queryMemoryRssMonitorIntervalMillis:
         description: >-
             How often the built-in monitor samples RSS, in milliseconds. Startup-only: read once when

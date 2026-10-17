@@ -22,7 +22,7 @@
  * SBE tracker factories (e.g. SBE $group's hash_agg) that classic-only coverage misses.
  *
  * @tags: [
- *   requires_fcv_90,
+ *   requires_fcv_91,
  *   assumes_against_mongod_not_mongos,
  * ]
  */
@@ -113,6 +113,10 @@ for (const engine of kEngines) {
                     queryMemoryLoadSheddingHighMarkPercent: 100,
                     // Tiny size reference so the ~10 MB group is always at the full size factor.
                     queryMemoryLoadSheddingSizeReferenceBytes: 1024,
+                    // This test covers shedding at interrupt checkpoints. Prevent the idle-cursor
+                    // sweep (query_memory_idle_cursor_shedding.js) from shedding the cursors these
+                    // cases leave idle, e.g. before releaseMemory pins one.
+                    queryMemoryIdleCursorSheddingIntervalMillis: 3600 * 1000,
                     internalDocumentSourceGroupMaxMemoryBytes: kHuge,
                     internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill: kHuge,
                     internalQueryFrameworkControl: engine.framework,

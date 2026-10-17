@@ -19,30 +19,42 @@ operator (or an external policy such as mongotune) enables it at runtime.
 
 The first three parameters below are runtime-settable.
 
-| Parameter                                   | Default         | Meaning                                                                                    |
-| ------------------------------------------- | --------------- | ------------------------------------------------------------------------------------------ |
-| `queryMemoryLoadSheddingLowMarkPercent`     | `-1` (disabled) | RSS % of the memory limit at/below which nothing is shed. Enables the feature when `>= 0`. |
-| `queryMemoryLoadSheddingHighMarkPercent`    | `85`            | RSS % at/above which every eligible op is shed (probability 1).                            |
-| `queryMemoryLoadSheddingSizeReferenceBytes` | `32 MiB`        | "Medium-sized" reference point. Set this below your largest & above your typical queries.  |
-| `queryMemoryRssMonitorIntervalMillis`       | `100`           | RSS sampling interval (startup-only). Trades off shedding responsiveness versus overhead.  |
+| Parameter                                     | Default         | Meaning                                                                                    |
+| --------------------------------------------- | --------------- | ------------------------------------------------------------------------------------------ |
+| `queryMemoryLoadSheddingLowMarkPercent`       | `-1` (disabled) | RSS % of the memory limit at/below which nothing is shed. Enables the feature when `>= 0`. |
+| `queryMemoryLoadSheddingHighMarkPercent`      | `85`            | RSS % at/above which every eligible op is shed (probability 1).                            |
+| `queryMemoryLoadSheddingSizeReferenceBytes`   | `32 MiB`        | "Medium-sized" reference point. Set this below your largest & above your typical queries.  |
+| `queryMemoryRssMonitorIntervalMillis`         | `100`           | RSS sampling interval (startup-only). Trades off shedding responsiveness versus overhead.  |
+| `queryMemoryIdleCursorSheddingIntervalMillis` | `1000`          | How often idle cursors are evaluated for shedding (milliseconds).                          |
 
 ## Observability
 
 `serverStatus().queryMemory.loadShedding` (present only while enabled) reports: `currentUsageBytes`
-(latest RSS), `lowMarkBytes`, `highMarkBytes`, `memLimitBytes`, and `operationsShed` (cumulative
-count of shed operations).
+(latest RSS), `lowMarkBytes`, `highMarkBytes`, `memLimitBytes`, `operationsShed` (cumulative count
+of all sheds — both operations killed at an interrupt checkpoint and idle cursors reaped by the
+idle-cursor sweep), `idleCursorsShed` (the subset of `operationsShed` that were idle cursor reaps),
+and `idleCursorBytesShed` (cumulative tracked memory reclaimed by reaping idle cursors).
 
-For fleet-wide monitoring, `operationsShed` is also exported as an OpenTelemetry counter
-(`mongodb.serverStatus.queryMemory.loadShedding.operationsShed`), which appears in `serverStatus` by
-default and flows into the metrics ingestion/Grafana pipeline. RSS and the memory limit are _not_
-mirrored to OTel — process RSS is already `serverStatus().mem.resident`, and the memory limit is
-available from `hostInfo` (`system.memLimitMB`) — so a dashboard can compute RSS-vs-limit from those
-without a duplicate metric.
+`serverStatus().metrics.cursor.shedForMemory` counts idle cursors reaped by the idle-cursor sweep,
+alongside the existing `timedOut` counter, so the cursor-lifecycle view accounts for every way a
+cursor can vanish.
 
-Each shed also emits a log line (id `13033300`) that identifies the shed operation — namespace,
-redacted command, plan summary, and opId — alongside the pressure fields and whether the operation
-was waiting for an execution ticket, rate-limited to one full line per second (the first at
-`Warning`, the rest at debug severity).
+For fleet-wide monitoring, `operationsShed`, `idleCursorsShed`, and `idleCursorBytesShed` are also
+exported as OpenTelemetry counters (`mongodb.serverStatus.queryMemory.loadShedding.*`), which appear
+in `serverStatus` by default and flow into the metrics ingestion/Grafana pipeline. RSS and the
+memory limit are _not_ mirrored to OTel — process RSS is already `serverStatus().mem.resident`, and
+the memory limit is available from `hostInfo` (`system.memLimitMB`).
+
+Each shed also emits a log line that identifies the shed operation — namespace, redacted command,
+plan summary, and cursor/op id — alongside the pressure fields. The active-query case uses id
+`13033300` (which also reports whether the operation was waiting for an execution ticket) and the
+idle-cursor case uses id `13200200`. Each of these is rate-limited to one full line per second (the
+first at `Warning`, the rest at debug severity). A per-pass summary line (id `13200201`) is emitted
+when an idle-cursor sweep sheds anything.
+
+When an idle cursor is shed, the next `getMore` for that cursor returns `QueryMemoryLimitExceeded`
+(a `RetriableError` + `SystemOverloadedError`, so well-behaved clients back off and re-run the
+query) instead of a generic `CursorNotFound`.
 
 ## Why probabilistic?
 
@@ -61,9 +73,14 @@ The design deliberately separates the _signal_ (how much memory pressure exists)
   `ProcessInfo::getResidentSize()` every `queryMemoryRssMonitorIntervalMillis` and publishes it to a
   `ServiceContext` decoration (`QueryMemoryLoadSheddingState`). The process memory limit
   (`ProcessInfo::getMemSizeBytes()`, cgroup-aware) is captured once at `ServiceContext` creation.
-- **Reaction**: at every check-for-interrupt point, each memory-tracked operation independently
-  rolls a probability derived from the current pressure and its own footprint, and aborts itself if
-  the roll succeeds.
+- **Reaction**: each memory-tracked query independently rolls a probability derived from the current
+  pressure and its own footprint, and is shed if the roll succeeds. The same roll runs in three
+  places, depending on the state of the query:
+  - **Executing**: the query evaluates itself at its own interrupt checkpoints and aborts itself.
+  - **Waiting for an execution ticket**: the queued-operation sweep on the RSS monitor thread
+    evaluates it and kills it.
+  - **Idle between getMores**: the idle-cursor sweep on the `ClientCursorMonitor` thread evaluates
+    its cursor and destroys it.
 
 ## The shed decision
 
@@ -177,11 +194,22 @@ times (`dt = 1ms`). That cancellation _is_ the memoryless property — a check c
 per-operation state beyond `lastShedEvalTime`, so past checks never matter, only the elapsed
 interval. It is the "time-based, not check-count-based" fairness property in action.
 
-## Where the decision runs: the execution call sites
+## Where the decision runs
+
+All three paths share the probabilistic core (`rollForShed`) and the per-query dt baseline, so a
+query is charged the same hazard whichever state it is in. They differ in which thread evaluates the
+query and how the shedding is carried out.
+
+| Query state           | Evaluated by                                  | Thread                | Shedding mechanism                       |
+| --------------------- | --------------------------------------------- | --------------------- | ---------------------------------------- |
+| Executing             | `queryMemoryCheckLoadShedding`                | the query's own       | `markKilled` at its next interrupt check |
+| Waiting for a ticket  | `sweepQueuedOperationsForMemoryPressure`      | RSS monitor           | `killOperation`, waking its ticket wait  |
+| Idle between getMores | `CursorManager::shedCursorsForMemoryPressure` | `ClientCursorMonitor` | disposing the cursor                     |
+
+### At interrupt checkpoints
 
 The decision is evaluated in `queryMemoryCheckLoadShedding(OperationContext*)`. When the roll
-selects an operation it is aborted with `ErrorCodes::QueryMemoryLimitExceeded` (a `RetriableError` +
-`SystemOverloadedError`, so well-behaved clients back off and retry later). The abort is made
+selects an operation it is aborted with `ErrorCodes::QueryMemoryLimitExceeded`. The abort is made
 **sticky** via `opCtx->markKilled(QueryMemoryLimitExceeded)` (the same mechanism as deadlines and
 `killOp`) rather than a one-shot status: the operation stays killed, every later interrupt check
 agrees, and the kill shows up in `currentOp`/kill metrics. Each call site invokes it only after the
@@ -211,10 +239,10 @@ own library, which depends on `query_memory_load_shedding`.
 
 ### Operations waiting for an execution ticket
 
-An operation blocked waiting for an execution ticket (or a lock) also cannot reach a checkpoint. On
-an overloaded system, execution control deprioritizes long-running queries and assigned them to a
-small ticket pool, so queueing of high-memory operations can be expected. The RSS monitor thread
-therefore also evaluates queued operations for shedding after its RSS sampling.
+An operation blocked waiting for an execution ticket (or a lock) does not check for interrupt. On an
+overloaded system, execution control deprioritizes long-running queries and assigned them to a small
+ticket pool, so queueing of high-memory operations can be expected. The RSS monitor thread therefore
+evaluates queued operations for shedding after each RSS sample.
 
 Only operations queued as readers are swept. A queued reader is normally killed in its ticket wait,
 so it fails without acquiring any lock. A later IX acquisition for a write also fails if the kill is
@@ -223,13 +251,23 @@ sweep decides on another thread, so the operation can be granted its ticket and 
 between the sweep's check and the kill, and then be killed after a partial write. SERVER-136543
 tracks moving this check onto the queued operation's own thread, which closes the race.
 
+### Idle cursors
+
+A query that accumulates memory and then sits idle between getMores has no active operation, so
+neither of the paths above sees it. The cursor timeout thread is reused to also apply the query
+memory load shedding evaluation. A cursor selected by the roll is deregistered and disposed exactly
+like a timed-out cursor but its id and cancellation-reason are recorded so the next getMore fails
+with `QueryMemoryLimitExceeded` rather than a generic `CursorNotFound`; the log line (id`13200200`)
+provides the detail. Cursors opened in a multi-document transaction are skipped by the idle-cursor
+sweep, mirroring the interrupt path's write-intent exemption.
+
 ### Hot-path cost
 
-These funnels are extremely hot, so the off cost and the enabled-but-healthy cost are both
-engineered to be cheap:
+Only the interrupt checkpoints are a hot path; the two sweeps run once per pass on their own monitor
+threads and skip their scans entirely at/below the low mark. The hot path is engineered to be cheap:
 
 1. When the feature is off — the default — `queryMemoryCheckLoadShedding` returns after a single
-   relaxed atomic load (`loadSheddingEnabled()`), so each call site pays only that load at its
+   relaxed atomic load (`sheddingConfigured()`), so each call site pays only that load at its
    already-throttled interrupt point.
 2. When enabled, `queryMemoryCheckLoadShedding` short-circuits at/below the low water mark (the
    steady state) after a couple of relaxed atomic loads — the RSS sample compared against the
@@ -244,18 +282,20 @@ The random roll reuses the client's warm PRNG via `Client::getPrng().trueWithPro
 
 ## Operation eligibility
 
-`queryMemoryCheckLoadShedding` sheds an operation only if all of these hold:
+All three paths shed a query only if all of these hold:
 
 - The process is a **data-bearing** node, not a pure router (see "Limitations & future work").
 - The feature is enabled (`lowMarkPercent >= 0`).
-- The operation has an `OperationMemoryUsageTracker` (via `getIfExists`, which never creates one) —
-  i.e. it is a memory-tracking read. Point queries, writes without tracked memory, and internal
-  bookkeeping have no tracker and are never shed.
+- The query holds tracked memory: it has an `OperationMemoryUsageTracker` (via `getIfExists`, which
+  never creates one) with a positive total. Point queries, writes without tracked memory, and
+  internal bookkeeping have no tracker and are never shed.
 - The operation is marked **eligible** (see the next section).
-- The operation has not taken a write-intent global lock
-  (`wasGlobalLockTakenInModeConflictingWithWrites()`); see "Writes are exempt via the write-intent
-  lock latch".
+- The query has not begun a write; see "Writes are exempt via the write-intent lock latch".
 - `pressure > 0` and `size > 0` and the probabilistic roll fires.
+
+The sweeps add exclusions of their own: the queued-operation sweep evaluates only operations queued
+as readers, and the idle-cursor sweep skips cursors opened in a multi-document transaction and
+`noCursorTimeout` cursors.
 
 ### Eligibility is opt-in
 
@@ -293,10 +333,10 @@ The flag is a per-opCtx decoration (like the exemption latch), defaulting false.
 
 An operation that has begun a write must not be aborted mid-way, or shedding would surface a
 `RetriableError` after a partial, non-idempotent write that a naive client retry could re-apply. We
-detect this from the `Locker`: `queryMemoryCheckLoadShedding` skips any op for which
-`wasGlobalLockTakenInModeConflictingWithWrites()` is true — i.e. it has ever taken the global lock
-in `IX`/`X` (write intent). The flag also latches on a global `S` lock, which only fsyncLock takes,
-so it excludes no shed-eligible read. This is a **sticky, one-way signal**: the flag is never
+detect this from the `Locker`: the interrupt path and the queued-operation sweep skip any op for
+which `wasGlobalLockTakenInModeConflictingWithWrites()` is true — i.e. it has ever taken the global
+lock in `IX`/`X` (write intent). The flag also latches on a global `S` lock, which only fsyncLock
+takes, so it excludes no shed-eligible read. This is a **sticky, one-way signal**: the flag is never
 cleared, so once an op takes a write-intent lock it stays exempt for the rest of its life, and
 surviving yields. It is atomic, so the queued-operation sweep can read it from the monitor thread.
 
@@ -311,18 +351,23 @@ The exemption is distinct from eligibility: eligibility (opt-in, above) governs 
 operation can be shed at all, while the write-intent lock check protects an _eligible_ operation
 once it has begun a write.
 
+The idle-cursor sweep skips cursors opened in a multi-document transaction, since destroying one
+aborts the transaction and discards any writes it has already made. The sweep cannot use the
+write-intent latch here, because an idle cursor carries no lock state it can check.
+
 ## Components
 
-| File                                     | Role                                                                                                                                                                                                                        |
-| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `query_memory_load_shedding.h/.cpp`      | The decision (`queryMemoryCheckLoadShedding`), the pure `shedProbability`, the RSS monitor (`startQueryMemoryRssMonitor`), the `QueryMemoryLoadSheddingState` decoration, stats, and the on-update hook.                    |
-| `query_memory_load_shedding.idl`         | Server parameters.                                                                                                                                                                                                          |
-| `operation_memory_usage_tracker.{h,cpp}` | Per-operation tracked-memory total (`inUseTrackedMemoryBytes()`, `getIfExists()`, `lastShedEvalTime`) plus the eligibility flag: `markOperationQueryMemorySheddingEligible()` / `isOperationQueryMemorySheddingEligible()`. |
-| `expression_context.{h,cpp}`             | Classic-agg call site: `InterruptChecker::checkForLoadShedding()` shim.                                                                                                                                                     |
-| `plan_yield_policy.cpp`                  | Classic-PlanStage / yielding-SBE call site, in `yieldOrInterrupt()`.                                                                                                                                                        |
-| `sbe/stages/stages.{h,cpp}`              | No-yield SBE call site: `sbe::checkForLoadShedding()` shim, called from `CanInterrupt::checkForInterruptNoYield()`.                                                                                                         |
-| `query_memory_server_status_section.cpp` | `serverStatus().queryMemory`.                                                                                                                                                                                               |
-| `mongod_main.cpp`                        | Calls `startQueryMemoryRssMonitor` at startup (data-bearing nodes only; a pure router never starts it).                                                                                                                     |
+| File                                         | Role                                                                                                                                                                                                                                                                                                                                                    |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `query_memory_load_shedding.h/.cpp`          | The shared decision (`rollForShed`, the pure `shedProbability`), the interrupt-path entry point (`queryMemoryCheckLoadShedding`), the queued-operation sweep, the idle-query decision (`queryMemoryShouldShedIdleQuery`), the RSS monitor (`startQueryMemoryRssMonitor`), the `QueryMemoryLoadSheddingState` decoration, stats, and the on-update hook. |
+| `query_memory_load_shedding.idl`             | Server parameters.                                                                                                                                                                                                                                                                                                                                      |
+| `operation_memory_usage_tracker.{h,cpp}`     | Per-operation tracked-memory total (`inUseTrackedMemoryBytes()`, `getIfExists()`, `lastShedEvalTime`) plus the eligibility flag: `markOperationQueryMemorySheddingEligible()` / `isOperationQueryMemorySheddingEligible()`.                                                                                                                             |
+| `expression_context.{h,cpp}`                 | Classic-agg call site: `InterruptChecker::checkForLoadShedding()` shim.                                                                                                                                                                                                                                                                                 |
+| `plan_yield_policy.cpp`                      | Classic-PlanStage / yielding-SBE call site, in `yieldOrInterrupt()`.                                                                                                                                                                                                                                                                                    |
+| `sbe/stages/stages.{h,cpp}`                  | No-yield SBE call site: `sbe::checkForLoadShedding()` shim, called from `CanInterrupt::checkForInterruptNoYield()`.                                                                                                                                                                                                                                     |
+| `cursor_manager.{h,cpp}`, `clientcursor.cpp` | The idle-cursor sweep (`shedCursorsForMemoryPressure`, run by `ClientCursorMonitor`), and the owner-only reaped-cursor reasons map.                                                                                                                                                                                                                     |
+| `query_memory_server_status_section.cpp`     | `serverStatus().queryMemory`.                                                                                                                                                                                                                                                                                                                           |
+| `mongod_main.cpp`                            | Calls `startQueryMemoryRssMonitor` at startup (data-bearing nodes only; a pure router never starts it).                                                                                                                                                                                                                                                 |
 
 ## Limitations & future work
 

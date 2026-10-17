@@ -787,5 +787,141 @@ TEST_F(QueryMemoryLoadSheddingQueuedSweepTest, SkipsQueuedWriters) {
     ASSERT_EQ(writer.opCtx->getKillStatus(), ErrorCodes::OK);
 }
 
+// Drives the idle-query path -- the decision the idle-cursor sweep makes for a query sitting
+// between getMores. Unlike the interrupt path there is no opCtx to kill, so the decision is
+// returned to the caller, which destroys the cursor instead.
+using QueryMemoryLoadSheddingIdleTest = AggregationContextFixture;
+
+// The idle-cursor sweep's pre-lock gate: nothing to evaluate when the feature is off or RSS is
+// at/below the low mark, which is what keeps a healthy server from paying for the scan at all.
+TEST_F(QueryMemoryLoadSheddingIdleTest, ShouldEvaluateOnlyWhenEnabledAndAboveLowMark) {
+    auto restore = scopedRestoreMarks();
+    ON_BLOCK_EXIT([] {
+        globalFailPointRegistry().find("queryMemoryPressureOverride")->setMode(FailPoint::off);
+    });
+
+    // Disabled: no evaluation even under extreme pressure.
+    gQueryMemoryLoadSheddingLowMarkPercent.store(-1);
+    setPressureOverride(99);
+    ASSERT_FALSE(queryMemoryShouldEvaluateIdleQueries(getServiceContext()));
+
+    // Enabled but below the low mark.
+    gQueryMemoryLoadSheddingLowMarkPercent.store(50);
+    setPressureOverride(10);
+    ASSERT_FALSE(queryMemoryShouldEvaluateIdleQueries(getServiceContext()));
+
+    // Enabled and above the low mark.
+    setPressureOverride(90);
+    ASSERT_TRUE(queryMemoryShouldEvaluateIdleQueries(getServiceContext()));
+}
+
+// An idle query is shed only when it opted in, holds tracked memory, and the process is above the
+// low mark -- the same gates as the interrupt path, minus the write-intent exemption (an idle query
+// holds no locks). The decision also reports the pressure that produced it, which is what the
+// idle-cursor sweep's log line publishes.
+TEST_F(QueryMemoryLoadSheddingIdleTest, ShedsOnlyEligibleIdleQueriesHoldingMemory) {
+    auto restore = scopedRestoreMarks();
+    gQueryMemoryLoadSheddingLowMarkPercent.store(50);  // enable (high mark stays default)
+    ON_BLOCK_EXIT([] {
+        globalFailPointRegistry().find("queryMemoryPressureOverride")->setMode(FailPoint::off);
+        globalFailPointRegistry()
+            .find("queryMemoryLoadSheddingAlwaysShed")
+            ->setMode(FailPoint::off);
+    });
+
+    auto* opCtx = getExpCtx()->getOperationContext();  // deliberately left ineligible at first
+    setPressureOverride(95);
+    globalFailPointRegistry()
+        .find("queryMemoryLoadSheddingAlwaysShed")
+        ->setMode(FailPoint::alwaysOn);
+
+    // Ineligible: never shed, even forced.
+    ASSERT_FALSE(queryMemoryShouldShedIdleQuery(opCtx, 1 << 20).shed);
+
+    // Eligible but holding nothing (e.g. already spilled): never shed, even forced.
+    markOperationQueryMemorySheddingEligible(opCtx);
+    ASSERT_FALSE(queryMemoryShouldShedIdleQuery(opCtx, 0).shed);
+
+    // Eligible and holding memory: shed, and the decision carries the pressure inputs.
+    const auto decision = queryMemoryShouldShedIdleQuery(opCtx, 1 << 20);
+    ASSERT_TRUE(decision.shed);
+    ASSERT_GT(decision.memLimitBytes, 0);
+    ASSERT_EQ(decision.currentUsageBytes, decision.memLimitBytes * 95 / 100);
+
+    // Pressure falling back below the low mark stops the shedding, even with the failpoint on,
+    // which bypasses the probability calculation.
+    setPressureOverride(10);
+    ASSERT_FALSE(queryMemoryShouldShedIdleQuery(opCtx, 1 << 20).shed);
+}
+
+// A shed idle cursor is counted in both the comprehensive operationsShed total and the
+// idle-specific breakdown counters (cursors and bytes). operationsShed is the primary "how much
+// shedding is happening" metric; the idle counters are a subset for understanding the idle-cursor
+// sweep's contribution versus the interrupt path.
+TEST_F(QueryMemoryLoadSheddingIdleTest, ShedCountsCursorsAndBytes) {
+    // The capturer must exist before the counters are created/recorded.
+    otel::metrics::OtelMetricsCapturer capturer;
+
+    auto restore = scopedRestoreMarks();
+    gQueryMemoryLoadSheddingLowMarkPercent.store(50);  // enable (high mark stays default)
+    ON_BLOCK_EXIT([] {
+        globalFailPointRegistry().find("queryMemoryPressureOverride")->setMode(FailPoint::off);
+        globalFailPointRegistry()
+            .find("queryMemoryLoadSheddingAlwaysShed")
+            ->setMode(FailPoint::off);
+    });
+
+    auto* opCtx = getExpCtx()->getOperationContext();
+    markOperationQueryMemorySheddingEligible(opCtx);
+    setPressureOverride(95);
+    globalFailPointRegistry()
+        .find("queryMemoryLoadSheddingAlwaysShed")
+        ->setMode(FailPoint::alwaysOn);
+
+    auto readStats = [&] {
+        BSONObjBuilder b;
+        appendQueryMemoryLoadSheddingStats(getServiceContext(), b);
+        return b.obj().getObjectField("loadShedding").getOwned();
+    };
+    const BSONObj before = readStats();
+
+    constexpr int64_t kTrackedBytes = 1 << 20;
+    ASSERT_TRUE(queryMemoryShouldShedIdleQuery(opCtx, kTrackedBytes).shed);
+
+    const BSONObj after = readStats();
+    // The idle shed is included in the comprehensive operationsShed total.
+    ASSERT_EQ(after["operationsShed"].numberLong(), before["operationsShed"].numberLong() + 1);
+    // And in the idle-specific breakdown.
+    ASSERT_EQ(after["idleCursorsShed"].numberLong(), before["idleCursorsShed"].numberLong() + 1);
+    ASSERT_EQ(after["idleCursorBytesShed"].numberLong(),
+              before["idleCursorBytesShed"].numberLong() + kTrackedBytes);
+
+    // Not all platforms can read OTel metrics back in-process (e.g. Windows); skip there.
+    if (capturer.canReadMetrics()) {
+        ASSERT_EQ(capturer.readInt64Counter(
+                      otel::metrics::MetricNames::kQueryMemoryLoadSheddingOperationsShed),
+                  1);
+        ASSERT_EQ(capturer.readInt64Counter(
+                      otel::metrics::MetricNames::kQueryMemoryLoadSheddingIdleCursorsShed),
+                  1);
+        ASSERT_EQ(capturer.readInt64Counter(
+                      otel::metrics::MetricNames::kQueryMemoryLoadSheddingIdleCursorBytesShed),
+                  kTrackedBytes);
+    }
+}
+
+// The idle-cursor sweep period follows the shedding interval only while the feature is enabled;
+// with shedding off there is nothing to sweep for, so the cursor monitor keeps its own cadence.
+TEST_F(QueryMemoryLoadSheddingIdleTest, SheddingIntervalOnlyReportedWhileEnabled) {
+    auto restore = scopedRestoreMarks();
+
+    gQueryMemoryLoadSheddingLowMarkPercent.store(-1);
+    ASSERT_FALSE(queryMemoryIdleQuerySheddingInterval().has_value());
+
+    gQueryMemoryLoadSheddingLowMarkPercent.store(50);
+    ASSERT_EQ(queryMemoryIdleQuerySheddingInterval(),
+              Milliseconds(gQueryMemoryIdleCursorSheddingIntervalMillis.load()));
+}
+
 }  // namespace
 }  // namespace mongo

@@ -8,6 +8,7 @@
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
+#include "mongo/db/memory_tracking/query_memory_load_shedding.h"
 #include "mongo/db/query/client_cursor/cursor_manager.h"
 #include "mongo/db/query/client_cursor/cursor_server_params.h"
 #include "mongo/db/query/client_cursor/generic_cursor_utils.h"
@@ -24,6 +25,7 @@
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/exit.h"
 
+#include <algorithm>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -451,23 +453,56 @@ public:
     void run() override {
         ThreadClient tc("clientcursormon", getGlobalServiceContext()->getService());
 
+        // The timeout and idle-cursor shedding sweeps have independent intervals. Each pass runs
+        // whichever sweeps are due, then sleeps until the next one is.
+        Date_t lastTimeoutSweep;
+        Date_t lastSheddingSweep;
         while (!globalInShutdownDeprecated()) {
+            const Milliseconds timeoutInterval = Seconds(getClientCursorMonitorFrequencySecs());
+            const boost::optional<Milliseconds> shedInterval =
+                queryMemoryIdleQuerySheddingInterval();
+            Date_t now;
+            Date_t afterSweeps;
             {
                 const ServiceContext::UniqueOperationContext opCtx = cc().makeOperationContext();
-                auto now = opCtx->getServiceContext()->getPreciseClockSource()->now();
-                try {
-                    cursorStats().timedOut.increment(
-                        CursorManager::get(opCtx.get())->timeoutCursors(opCtx.get(), now));
-                } catch (const DBException& e) {
-                    LOGV2_WARNING(
-                        7466202,
-                        "Cursor Time Out job encountered unexpected error, will retry after cursor "
-                        "time out interval",
-                        "error"_attr = e.toString());
+                now = opCtx->getServiceContext()->getPreciseClockSource()->now();
+                auto* cursorManager = CursorManager::get(opCtx.get());
+                if (now - lastTimeoutSweep >= timeoutInterval) {
+                    lastTimeoutSweep = now;
+                    try {
+                        cursorStats().timedOut.increment(
+                            cursorManager->timeoutCursors(opCtx.get(), now));
+                    } catch (const DBException& e) {
+                        LOGV2_WARNING(
+                            7466202,
+                            "Cursor Time Out job encountered unexpected error, will retry after "
+                            "cursor time out interval",
+                            "error"_attr = e.toString());
+                    }
+                    cursorManager->expireReapedCursorReasons(now);
                 }
+                if (shedInterval && now - lastSheddingSweep >= *shedInterval) {
+                    lastSheddingSweep = now;
+                    try {
+                        cursorStats().shedForMemory.increment(
+                            cursorManager->shedCursorsForMemoryPressure(opCtx.get()));
+                    } catch (const DBException& e) {
+                        LOGV2_WARNING(13200202,
+                                      "Idle-cursor query-memory load shedding encountered "
+                                      "unexpected error, will retry after cursor monitor interval",
+                                      "error"_attr = e.toString());
+                    }
+                }
+                // Measure the remaining wait from after the sweeps, which may have taken a while.
+                afterSweeps = opCtx->getServiceContext()->getPreciseClockSource()->now();
+            }
+            Date_t nextSweep = lastTimeoutSweep + timeoutInterval;
+            if (shedInterval) {
+                nextSweep = std::min(nextSweep, lastSheddingSweep + *shedInterval);
             }
             MONGO_IDLE_THREAD_BLOCK;
-            sleepsecs(getClientCursorMonitorFrequencySecs());
+            sleepmillis(
+                std::max<long long>(1, durationCount<Milliseconds>(nextSweep - afterSweeps)));
         }
     }
 };

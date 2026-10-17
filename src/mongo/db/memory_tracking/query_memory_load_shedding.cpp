@@ -52,6 +52,14 @@ struct QueryMemoryLoadSheddingState {
     // Written (fetchAndAdd) on every shed. On its own cache line so those writes don't invalidate
     // the read-hot rssBytes/memLimitBytes line for the interrupt-check path (avoids false sharing).
     CacheExclusive<AtomicWord<long long>> operationsShed{0};
+
+    // Cursors reaped while idle, and the tracked memory they held. These totals are also included
+    // in 'operationsShed' but tracked separately to distinguish the different classes of shedding.
+    struct IdleShedCounters {
+        AtomicWord<long long> cursors{0};
+        AtomicWord<long long> bytes{0};
+    };
+    CacheExclusive<IdleShedCounters> idleShed{};
 };
 const auto getProcessState = ServiceContext::declareDecoration<QueryMemoryLoadSheddingState>();
 
@@ -117,13 +125,22 @@ MONGO_FAIL_POINT_DEFINE(queryMemoryPressureOverride);
 // Test-only: forces the probabilistic roll to shed any otherwise-eligible operation.
 MONGO_FAIL_POINT_DEFINE(queryMemoryLoadSheddingAlwaysShed);
 
-bool loadSheddingEnabled() {
+bool sheddingConfigured() {
     return gQueryMemoryLoadSheddingLowMarkPercent.loadRelaxed() >= 0;
 }
 
 // Shed only on data-bearing processes (shards, config servers, standalone/replica-set mongods).
 bool loadSheddingSupportedOnThisProcess() {
     return !serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer);
+}
+
+bool sheddingActive() {
+    return loadSheddingSupportedOnThisProcess() && sheddingConfigured();
+}
+
+// The configured idle-cursor sweep period.
+Milliseconds idleShedInterval() {
+    return Milliseconds(gQueryMemoryIdleCursorSheddingIntervalMillis.loadRelaxed());
 }
 
 // The current RSS signal in bytes, honoring the test-only override. Returns -1 when no signal.
@@ -260,6 +277,23 @@ void recordShed(QueryMemoryLoadSheddingState& processState,
                 "operationsShed"_attr = total);
 }
 
+// OTel mirrors of the idle-cursor shed counters, following operationsShedCounter() above.
+otel::metrics::Counter<int64_t>& idleCursorsShedCounter() {
+    static auto& counter = otel::metrics::MetricsService::instance().createInt64Counter(
+        otel::metrics::MetricNames::kQueryMemoryLoadSheddingIdleCursorsShed,
+        "Idle cursors reaped due to query-memory pressure",
+        otel::metrics::MetricUnit::kOperations);
+    return counter;
+}
+
+otel::metrics::Counter<int64_t>& idleCursorBytesShedCounter() {
+    static auto& counter = otel::metrics::MetricsService::instance().createInt64Counter(
+        otel::metrics::MetricNames::kQueryMemoryLoadSheddingIdleCursorBytesShed,
+        "Tracked query memory reclaimed by reaping idle cursors",
+        otel::metrics::MetricUnit::kBytes);
+    return counter;
+}
+
 // Samples the process RSS once and publishes it as the current signal.
 void publishRssSample(ServiceContext* serviceContext) {
     const int64_t rssBytes = static_cast<int64_t>(ProcessInfo{}.getResidentSize()) * 1024 * 1024;
@@ -348,7 +382,7 @@ void markOperationQueryMemorySheddingEligible(OperationContext* opCtx) {
 }
 
 Status queryMemoryCheckLoadShedding(OperationContext* opCtx) {
-    if (!loadSheddingEnabled()) {
+    if (!sheddingConfigured()) {
         return Status::OK();
     }
 
@@ -417,7 +451,7 @@ bool isQueuedReader(OperationContext* opCtx) {
 // the ClientLock so the op's blocked ticket/lock wait is interrupted.
 size_t sweepQueuedOperationsForMemoryPressure(ServiceContext* serviceContext, PseudoRandom& prng) {
     size_t candidates = 0;
-    if (!loadSheddingSupportedOnThisProcess() || !loadSheddingEnabled()) {
+    if (!sheddingActive()) {
         return candidates;
     }
     auto& processState = getProcessState(serviceContext);
@@ -466,8 +500,59 @@ size_t sweepQueuedOperationsForMemoryPressure(ServiceContext* serviceContext, Ps
     return candidates;
 }
 
+bool queryMemoryShouldEvaluateIdleQueries(ServiceContext* serviceContext) {
+    if (!sheddingActive()) {
+        return false;
+    }
+    return samplePressure(getProcessState(serviceContext)).aboveLowMark();
+}
+
+IdleQueryShedDecision queryMemoryShouldShedIdleQuery(OperationContext* opCtx,
+                                                     int64_t trackedBytes) {
+    auto& processState = getProcessState(opCtx->getServiceContext());
+    const PressureSnapshot pressure = samplePressure(processState);
+    // Initialize a non-shedding decision, used in the early-exit cases below.
+    IdleQueryShedDecision decision{/*shed=*/false, pressure.rssBytes, pressure.memLimitBytes};
+
+    // shedProbability() is already zero in these cases, but the always-shed test failpoint
+    // bypasses it, so check explicitly to limit forced sheds to cases that could really shed.
+    if (!sheddingConfigured() || !pressure.aboveLowMark() || trackedBytes <= 0) {
+        return decision;
+    }
+
+    // Check the operation's shedding eligibility. The interrupt path's write-intent exemption is
+    // handled by the idle-cursor sweep, which skips cursors opened in a multi-document transaction.
+    LoadSheddingOpState& opState = getOpState(opCtx);
+    if (!opState.isEligible()) {
+        return decision;
+    }
+
+    // Make a probabilistic shedding decision.
+    const Date_t now = opCtx->getServiceContext()->getFastClockSource()->now();
+    if (!rollForShed(pressure, opState, trackedBytes, now, opCtx->getClient()->getPrng())) {
+        return decision;
+    }
+
+    // The operation will be shed. Do the necessary book-keeping.
+    decision.shed = true;
+    processState.operationsShed->fetchAndAdd(1);
+    operationsShedCounter().add(1);
+    processState.idleShed->cursors.fetchAndAdd(1);
+    idleCursorsShedCounter().add(1);
+    processState.idleShed->bytes.fetchAndAdd(trackedBytes);
+    idleCursorBytesShedCounter().add(trackedBytes);
+    return decision;
+}
+
+boost::optional<Milliseconds> queryMemoryIdleQuerySheddingInterval() {
+    if (!sheddingActive()) {
+        return boost::none;
+    }
+    return idleShedInterval();
+}
+
 void appendQueryMemoryLoadSheddingStats(ServiceContext* serviceContext, BSONObjBuilder& b) {
-    if (!loadSheddingSupportedOnThisProcess() || !loadSheddingEnabled()) {
+    if (!sheddingActive()) {
         return;
     }
     auto& processState = getProcessState(serviceContext);
@@ -481,6 +566,8 @@ void appendQueryMemoryLoadSheddingStats(ServiceContext* serviceContext, BSONObjB
     sub.appendNumber("highMarkBytes", static_cast<long long>(memLimit * highPct / 100));
     sub.appendNumber("memLimitBytes", static_cast<long long>(memLimit));
     sub.appendNumber("operationsShed", processState.operationsShed->loadRelaxed());
+    sub.appendNumber("idleCursorsShed", processState.idleShed->cursors.loadRelaxed());
+    sub.appendNumber("idleCursorBytesShed", processState.idleShed->bytes.loadRelaxed());
 }
 
 Status onUpdateQueryMemoryLoadSheddingEnablement(std::int32_t newPercent) {
@@ -506,14 +593,9 @@ Status onUpdateQueryMemoryLoadSheddingEnablement(std::int32_t newPercent) {
 }
 
 void startQueryMemoryRssMonitor(ServiceContext* serviceContext, bool ignoreWhenNoPeriodicRunner) {
-    // Never run on a pure router (see loadSheddingSupportedOnThisProcess): the monitor stays
-    // uninstalled there, so shedding cannot fire regardless of the knob.
-    if (!loadSheddingSupportedOnThisProcess()) {
-        return;
-    }
-    // Only run the sampler while enabled, so no thread exists when the feature is off (the
-    // default).
-    if (!loadSheddingEnabled()) {
+    // Only run the sampler while enabled on a data-bearing process, so no thread exists when the
+    // feature is off (the default) or on a pure router.
+    if (!sheddingActive()) {
         return;
     }
     auto& holder = getMonitorHolder(serviceContext);
@@ -538,7 +620,7 @@ void startQueryMemoryRssMonitor(ServiceContext* serviceContext, bool ignoreWhenN
     PeriodicRunner::PeriodicJob job(
         "queryMemoryRssMonitor",
         [](Client* client) {
-            if (!loadSheddingEnabled()) {
+            if (!sheddingConfigured()) {
                 return;
             }
             publishRssSample(client->getServiceContext());

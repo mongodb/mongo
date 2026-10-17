@@ -5,6 +5,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/db/auth/user_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/partitioned.h"
@@ -24,6 +25,7 @@
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/lru_cache.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
@@ -97,6 +99,20 @@ public:
      * task executor shutdown so those cursor-owned references do not block executor teardown.
      */
     std::size_t disposeIdleMongotCursorsForShutdown(OperationContext* opCtx);
+
+    /**
+     * Destroys idle cursors for query-memory load shedding. When load shedding is disabled or RSS
+     * is below the low-water mark, it returns without taking any lock.
+     *
+     * Returns the number of cursors that were shed.
+     */
+    std::size_t shedCursorsForMemoryPressure(OperationContext* opCtx);
+
+    /**
+     * Evicts reaped-cursor reasons older than the cursor timeout. After that, we can fall back to
+     * the default CursorNotFound error, so the custom reason is no longer needed.
+     */
+    void expireReapedCursorReasons(Date_t now);
 
     /**
      * Constructs a new ClientCursor according to the given 'cursorParams'. The cursor is atomically
@@ -262,6 +278,24 @@ private:
                        CursorId id,
                        const std::function<void(const ClientCursor&)>& authChecker);
 
+    /**
+     * Records why 'cursor' was reaped for a non-default reason (e.g., memory load shedding), so a
+     * subsequent pinCursor by the cursor's owner can return that specific error instead of a
+     * generic CursorNotFound. Bounded: when full, the oldest record is evicted, and its cursor
+     * degrades to CursorNotFound. Timeout does not use this map -- its error is the default
+     * CursorNotFound.
+     */
+    void _recordReapedCursorReason_inlock(const ClientCursor& cursor, Status reason, Date_t now);
+
+    /**
+     * Returns and consumes the reason that cursor 'id' was reaped, if that cursor was reaped and
+     * the caller owns the cursor. Otherwise returns boost::none and leaves the entry.
+     */
+    boost::optional<Status> _takeReapedCursorReason(OperationContext* opCtx,
+                                                    CursorId id,
+                                                    AuthCheck checkSessionAuth);
+
+
     ClockSource* _preciseClockSource;
 
     // A CursorManager holds a pointer to all open ClientCursors. ClientCursors are owned by the
@@ -288,6 +322,25 @@ private:
     // registering a cursor.
     mutable std::mutex _opKeyMutex;
     stdx::unordered_map<OperationKey, std::set<CursorId>, UUID::Hash> _opKeyMap;
+
+    // See _recordReapedCursorReason_inlock. Protected by its own mutex. Never acquire a _cursorMap
+    // partition lock while holding it; it may be taken with or without a partition lock held.
+    // Entries expire after the cursor timeout (see expireReapedCursorReasons).
+    struct ReapedCursorReasons {
+        struct Entry {
+            Status reason;
+            Date_t recordedAt;
+            // The reaped cursor's owner, for _takeReapedCursorReason's ownership checks.
+            boost::optional<LogicalSessionId> lsid;
+            boost::optional<UserName> authenticatedUser;
+        };
+        static constexpr size_t kMaxEntries = 10000;
+        mutable std::mutex mutex;
+        // Ordered by recordedAt, oldest last: entries are never promoted, so expiry can stop at the
+        // first unexpired entry. When full, adding evicts the oldest.
+        LRUCache<CursorId, Entry> reasons{kMaxEntries};
+    };
+    ReapedCursorReasons _reapedCursorReasons;
 };
 
 }  // namespace mongo

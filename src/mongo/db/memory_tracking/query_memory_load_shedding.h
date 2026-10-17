@@ -71,6 +71,36 @@ namespace mongo {
                                                                    PseudoRandom& prng);
 
 /**
+ * The load-shed decision for an idle query, carrying the pressure inputs that produced it so the
+ * caller can log why it reaped a cursor without re-reading the shared state.
+ */
+struct IdleQueryShedDecision {
+    bool shed = false;
+    int64_t currentUsageBytes = 0;
+    int64_t memLimitBytes = 0;
+};
+
+/**
+ * True when idle queries are worth evaluating right now: load shedding is enabled on a data-bearing
+ * process and the latest RSS sample is above the low mark. This check allows us to avoid the
+ * idle-cursor sweep when the server is healthy.
+ */
+[[MONGO_MOD_PUBLIC]] bool queryMemoryShouldEvaluateIdleQueries(ServiceContext* serviceContext);
+
+/**
+ * The load-shedding decision for a query that is idle between getMores while holding 'trackedBytes'
+ * of query memory. 'opCtx' must be bound to that query's QueryLifespan: it supplies the clock and
+ * the PRNG, but is never marked killed, since an idle query has no active operation to interrupt.
+ */
+[[MONGO_MOD_PUBLIC]] IdleQueryShedDecision queryMemoryShouldShedIdleQuery(OperationContext* opCtx,
+                                                                          int64_t trackedBytes);
+
+/**
+ * How often idle queries should be evaluated, or boost::none when load shedding is disabled.
+ */
+[[MONGO_MOD_PUBLIC]] boost::optional<Milliseconds> queryMemoryIdleQuerySheddingInterval();
+
+/**
  * Appends the load-shedding metrics to 'b'. No-op when disabled.
  */
 void appendQueryMemoryLoadSheddingStats(ServiceContext* serviceContext, BSONObjBuilder& b);
