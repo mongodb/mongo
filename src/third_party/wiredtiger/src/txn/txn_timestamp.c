@@ -684,6 +684,7 @@ set:
             __wt_atomic_store_uint64_relaxed(
               &txn_global->step_down_disaggregated_schema_epoch, step_down_epoch);
         __wt_writeunlock(session, &txn_global->step_down_lock);
+        WT_STAT_CONN_INCR(session, disagg_step_down_attempted);
         WT_STAT_CONN_SET(session, txn_stepdown_ts_set, 1);
         if (has_step_down_epoch)
             WT_STAT_CONN_SET(session, txn_stepdown_epoch_set, 1);

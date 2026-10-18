@@ -78,6 +78,7 @@ struct __wt_ckpt_connection {
     WTI_CKPT_TIMER ckpt_api;
     WTI_CKPT_TIMER prepare;
     WTI_CKPT_TIMER scrub;
+    WTI_CKPT_TIMER stepdown;
 
     /* Per-checkpoint reconciliation time accumulators (clock ticks, across all files). */
     wt_shared uint64_t reconcile_time_ticks;

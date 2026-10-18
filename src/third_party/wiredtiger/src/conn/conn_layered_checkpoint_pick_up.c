@@ -1669,6 +1669,7 @@ __disagg_defer_checkpoint(WT_SESSION_IMPL *session, char **meta_strp, uint64_t l
      */
     WT_ERR(__wt_calloc_one(session, &entry));
     entry->lsn = lsn;
+    entry->queued_time = __wt_clock(session);
     entry->meta = *meta_strp;
     *meta_strp = NULL;
     TAILQ_INSERT_TAIL(&disagg->deferred_ckpt_qh, entry, q);
@@ -1885,7 +1886,8 @@ __wti_disagg_deferred_pickup_server_destroy(WT_SESSION_IMPL *session)
  *     behind an adoption. Returns WT_NOTFOUND when no entry may be adopted.
  */
 static int
-__disagg_deferred_copy(WT_SESSION_IMPL *session, bool force, char **metap, uint64_t *lsnp)
+__disagg_deferred_copy(
+  WT_SESSION_IMPL *session, bool force, char **metap, uint64_t *lsnp, uint64_t *wait_msp)
 {
     WT_DECL_RET;
     WT_DISAGG_DEFERRED_CKPT *entry, *selected;
@@ -1894,6 +1896,7 @@ __disagg_deferred_copy(WT_SESSION_IMPL *session, bool force, char **metap, uint6
 
     *metap = NULL;
     *lsnp = WT_DISAGG_LSN_NONE;
+    *wait_msp = 0;
 
     /*
      * The oldest pin decides the whole queue, so scan the sessions once, before taking the queue
@@ -1914,6 +1917,7 @@ __disagg_deferred_copy(WT_SESSION_IMPL *session, bool force, char **metap, uint6
         ret = WT_NOTFOUND;
     else {
         *lsnp = selected->lsn;
+        *wait_msp = WT_CLOCKDIFF_MS(__wt_clock(session), selected->queued_time);
         /*
          * Copy the metadata: the adoption runs without this lock, and a concurrent adoption's
          * pruning may free the entry meanwhile.
@@ -1934,18 +1938,20 @@ __wti_disagg_deferred_pickup_retry(WT_SESSION_IMPL *session, bool force)
 {
     WT_DECL_RET;
     WT_DISAGGREGATED_STORAGE *disagg = &S2C(session)->disaggregated_storage;
-    uint64_t deferred_lsn;
+    uint64_t deferred_lsn, wait_ms;
     char *meta_copy = NULL;
 
     deferred_lsn = WT_DISAGG_LSN_NONE;
 
     /* Having nothing to adopt is the common case, not a failure. */
-    ret = __disagg_deferred_copy(session, force, &meta_copy, &deferred_lsn);
+    ret = __disagg_deferred_copy(session, force, &meta_copy, &deferred_lsn, &wait_ms);
     if (ret == WT_NOTFOUND)
         return (0);
     WT_RET(ret);
 
     ret = __disagg_adopt_deferred_checkpoint_meta(session, meta_copy, strlen(meta_copy));
+    if (ret == 0)
+        WT_STAT_CONN_SET(session, disagg_checkpoint_defer_adopt_wait, (int64_t)wait_ms);
 
     /*
      * A concurrent pickup may have adopted this checkpoint, or a newer one, between the copy above
@@ -2336,12 +2342,13 @@ __disagg_pick_up_checkpoint_meta(WT_SESSION_IMPL *session, const char *meta_data
     WT_SESSION_IMPL *internal_session;
     uint64_t metadata_checksum, pending_lsn;
     char *meta_str;
-    bool encoding, prev_adopted, prev_encoding;
+    bool adopted_on_delivery, encoding, prev_adopted, prev_encoding;
 
     WT_CLEAR(ckpt_meta);
     disagg = &S2C(session)->disaggregated_storage;
     meta_str = NULL;
     internal_session = NULL;
+    adopted_on_delivery = false;
     prev_encoding = F_ISSET(disagg, WT_DISAGG_STABLE_TOMBSTONE_ENCODING);
     prev_adopted = disagg->stable_tombstone_encoding_adopted;
 
@@ -2417,12 +2424,14 @@ __disagg_pick_up_checkpoint_meta(WT_SESSION_IMPL *session, const char *meta_data
      * (startup, step-up) are never deferred.
      */
     if (!force &&
-      ckpt_meta.metadata_lsn > __wt_atomic_load_uint64_acquire(&disagg->last_checkpoint_meta_lsn) &&
-      __wt_gen_active(session, WT_GEN_DISAGG_CKPT, ckpt_meta.metadata_lsn)) {
-        WT_ERR(__disagg_defer_checkpoint(session, &meta_str, ckpt_meta.metadata_lsn));
-        /* Wake the pickup server: the delivery may already be adoptable. */
-        __wt_disagg_deferred_pickup_signal(session, 0);
-        goto err;
+      ckpt_meta.metadata_lsn > __wt_atomic_load_uint64_acquire(&disagg->last_checkpoint_meta_lsn)) {
+        if (__wt_gen_active(session, WT_GEN_DISAGG_CKPT, ckpt_meta.metadata_lsn)) {
+            WT_ERR(__disagg_defer_checkpoint(session, &meta_str, ckpt_meta.metadata_lsn));
+            /* Wake the pickup server: the delivery may already be adoptable. */
+            __wt_disagg_deferred_pickup_signal(session, 0);
+            goto err;
+        }
+        adopted_on_delivery = true;
     }
 
     WT_ERR(__wt_open_internal_session(
@@ -2436,6 +2445,8 @@ __disagg_pick_up_checkpoint_meta(WT_SESSION_IMPL *session, const char *meta_data
     WT_STAT_CONN_SET(session, disagg_checkpoint_storage_version, ckpt_meta.version);
     WT_STAT_CONN_SET(
       session, disagg_checkpoint_storage_compatible_version, ckpt_meta.compatible_version);
+    if (adopted_on_delivery)
+        WT_STAT_CONN_SET(session, disagg_checkpoint_defer_adopt_wait, 0);
 
 err:
     /* A failed pickup must not leave the failed checkpoint's encoding mode adopted. */

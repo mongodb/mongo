@@ -308,8 +308,9 @@ struct __wt_repair {
  *      active.
  */
 struct __wt_disagg_deferred_ckpt {
-    uint64_t lsn; /* Checkpoint metadata LSN */
-    char *meta;   /* Checkpoint metadata configuration */
+    uint64_t lsn;         /* Checkpoint metadata LSN */
+    uint64_t queued_time; /* Clock reading when the checkpoint was deferred */
+    char *meta;           /* Checkpoint metadata configuration */
     TAILQ_ENTRY(__wt_disagg_deferred_ckpt) q;
 };
 

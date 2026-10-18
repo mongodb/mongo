@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import signal
+import re, signal
 import wttest, wiredtiger
 from suite_subprocess import suite_subprocess
 from wtscenario import make_scenarios
@@ -48,10 +48,14 @@ class test_schema09(wttest.WiredTigerTestCase, suite_subprocess):
     # __metadata_clean_incomplete_table should force drop any incomplete tables, allowing
     # new tables with the same name to be created.
     crash_point_values = [
-        ('before_insert_file',      dict(crash_point='before_insert_file')),
-        ('before_insert_colgroup',  dict(crash_point='before_insert_colgroup')),
-        ('after_drop_file',         dict(crash_point='after_drop_file')),
-        ('after_drop_colgroup',     dict(crash_point='after_drop_colgroup')),
+        ('before_insert_file', dict(crash_point='before_insert_file',
+            state='colgroup exists, file missing')),
+        ('before_insert_colgroup', dict(crash_point='before_insert_colgroup',
+            state='colgroup missing, file missing')),
+        ('after_drop_file', dict(crash_point='after_drop_file',
+            state='colgroup exists, file missing')),
+        ('after_drop_colgroup', dict(crash_point='after_drop_colgroup',
+            state='colgroup missing, file missing')),
     ]
     scenarios = make_scenarios(crash_point_values)
 
@@ -93,7 +97,8 @@ class test_schema09(wttest.WiredTigerTestCase, suite_subprocess):
         # through the recovery message, which the drop scenarios do not need.
         new_home_dir = self.crash_in_subprocess(subdir, func, signal.SIGABRT)
 
-        with self.expectedStdoutPattern('removing incomplete table'):
+        message = f"removing incomplete table '{self.tablename}' ({self.state})"
+        with self.expectedStdoutPattern(re.escape(message)):
             self.conn = self.setUpConnectionOpen(new_home_dir)
         self.session = self.setUpSessionOpen(self.conn)
 

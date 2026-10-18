@@ -380,8 +380,8 @@ err:
  *     allocated. The caller is responsible for freeing the output buffer.
  */
 static int
-__read_decompress(WT_SESSION_IMPL *session, const void *in, size_t mem_sz, WT_ITEM *out,
-  const uint8_t *addr, size_t addr_size)
+__read_decompress(WT_SESSION_IMPL *session, const void *in, size_t compressed_size, size_t mem_sz,
+  WT_ITEM *out, const uint8_t *addr, size_t addr_size)
 {
     WT_BTREE *btree;
     WT_COMPRESSOR *compressor;
@@ -395,6 +395,13 @@ __read_decompress(WT_SESSION_IMPL *session, const void *in, size_t mem_sz, WT_IT
         WT_RET(__blkcache_read_corrupt(session, WT_ERROR, addr, addr_size,
           "compressed block for which no compression configured"));
 
+    if (mem_sz <= WT_BLOCK_COMPRESS_SKIP)
+        WT_RET(__blkcache_read_corrupt(
+          session, WT_ERROR, addr, addr_size, "compressed block has an invalid in-memory size"));
+    if (compressed_size <= WT_BLOCK_COMPRESS_SKIP)
+        WT_RET(__blkcache_read_corrupt(
+          session, WT_ERROR, addr, addr_size, "compressed block has an invalid on-disk size"));
+
     WT_RET(__wt_buf_initsize(session, out, mem_sz));
 
     memcpy(out->mem, in, WT_BLOCK_COMPRESS_SKIP);
@@ -404,7 +411,7 @@ __read_decompress(WT_SESSION_IMPL *session, const void *in, size_t mem_sz, WT_IT
      */
     ret =
       compressor->decompress(compressor, &session->iface, (uint8_t *)in + WT_BLOCK_COMPRESS_SKIP,
-        mem_sz - WT_BLOCK_COMPRESS_SKIP, (uint8_t *)out->mem + WT_BLOCK_COMPRESS_SKIP,
+        compressed_size - WT_BLOCK_COMPRESS_SKIP, (uint8_t *)out->mem + WT_BLOCK_COMPRESS_SKIP,
         out->memsize - WT_BLOCK_COMPRESS_SKIP, &result_len);
     if (result_len != mem_sz - WT_BLOCK_COMPRESS_SKIP)
         WT_TRET(WT_ERROR);
@@ -413,7 +420,7 @@ __read_decompress(WT_SESSION_IMPL *session, const void *in, size_t mem_sz, WT_IT
         WT_ERR(
           __blkcache_read_corrupt(session, ret, addr, addr_size, "block decompression failed"));
 
-    compression_ratio = result_len / (out->size - WT_BLOCK_COMPRESS_SKIP);
+    compression_ratio = result_len / (compressed_size - WT_BLOCK_COMPRESS_SKIP);
     __wt_stat_compr_ratio_read_hist_incr(session, compression_ratio);
 
     if (0) {
@@ -579,7 +586,7 @@ __wt_blkcache_read_multi(WT_SESSION_IMPL *session, WT_ITEM **buf, size_t *buf_co
     dsk = ip->data;
     if (F_ISSET(dsk, WT_PAGE_COMPRESSED)) {
         WT_ERR(__wt_scr_alloc(session, 0, &ctmp));
-        WT_ERR(__read_decompress(session, dsk, dsk->mem_size, ctmp, addr, addr_size));
+        WT_ERR(__read_decompress(session, dsk, ip->size, dsk->mem_size, ctmp, addr, addr_size));
         ip = ctmp;
     }
     if (ip != &results[0]) {
@@ -632,7 +639,8 @@ __wt_blkcache_read_multi(WT_SESSION_IMPL *session, WT_ITEM **buf, size_t *buf_co
         if (F_ISSET(blk, WT_BLOCK_DISAGG_COMPRESSED)) {
             dsk = ip->data;
             WT_ERR(__wt_scr_alloc(session, 0, &ctmp));
-            WT_ERR(__read_decompress(session, ip->data, dsk->mem_size, ctmp, addr, addr_size));
+            WT_ERR(
+              __read_decompress(session, ip->data, ip->size, dsk->mem_size, ctmp, addr, addr_size));
             ip = ctmp;
         }
         if (ip != &results[i]) {

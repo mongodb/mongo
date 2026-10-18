@@ -52,6 +52,47 @@ class test_layered_async_stepdown05(LayeredStepdownMixin, wttest.WiredTigerTestC
 
     uri = f'layered:{test_name}'
 
+    def get_stat(self, stat_id):
+        stat_cursor = self.session.open_cursor('statistics:', None, None)
+        value = stat_cursor[stat_id][2]
+        stat_cursor.close()
+        return value
+
+    # A planned step-down is counted when its cutoff is set, completed on demotion, and the
+    # checkpoint taken while the cutoff is set has its duration recorded separately.
+    def test_step_down_statistics(self):
+        self.set_global_ts(1, 1)
+        self.session.create(self.uri, 'key_format=S,value_format=S')
+        self.assertEqual(self.get_stat(wiredtiger.stat.conn.disagg_step_down_attempted), 0)
+        self.assertEqual(self.get_stat(wiredtiger.stat.conn.disagg_step_down_completed), 0)
+
+        # A checkpoint without the cutoff set is not a step-down checkpoint.
+        self.session.checkpoint()
+        self.assertEqual(self.get_stat(wiredtiger.stat.conn.checkpoint_stepdown_time_recent), 0)
+        self.assertEqual(self.get_stat(wiredtiger.stat.conn.checkpoint_stepdown_time_total), 0)
+
+        self.set_step_down_ts(20)
+        self.assertEqual(self.step_down_ts_is_set(), 1)
+        self.assertEqual(self.get_stat(wiredtiger.stat.conn.disagg_step_down_attempted), 1)
+        self.assertEqual(self.get_stat(wiredtiger.stat.conn.disagg_step_down_completed), 0)
+
+        self.complete_step_down(20)
+        self.assertEqual(self.step_down_ts_is_set(), 0)
+        self.assertEqual(self.get_stat(wiredtiger.stat.conn.disagg_step_down_attempted), 1)
+        self.assertEqual(self.get_stat(wiredtiger.stat.conn.disagg_step_down_completed), 1)
+
+        # The step-down checkpoint is the most recent checkpoint, so the two times agree. With a
+        # single step-down checkpoint so far, all four timings collapse onto its duration.
+        stepdown_time = self.get_stat(wiredtiger.stat.conn.checkpoint_stepdown_time_recent)
+        self.assertEqual(stepdown_time,
+            self.get_stat(wiredtiger.stat.conn.checkpoint_time_recent))
+        self.assertEqual(self.get_stat(wiredtiger.stat.conn.checkpoint_stepdown_time_min),
+            stepdown_time)
+        self.assertEqual(self.get_stat(wiredtiger.stat.conn.checkpoint_stepdown_time_max),
+            stepdown_time)
+        self.assertEqual(self.get_stat(wiredtiger.stat.conn.checkpoint_stepdown_time_total),
+            stepdown_time)
+
     # The cutoff cannot be replaced while one is set.
     def test_second_step_down_ts_rejected(self):
         self.set_global_ts(1, 1)

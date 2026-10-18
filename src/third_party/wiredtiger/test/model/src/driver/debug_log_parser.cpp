@@ -377,6 +377,37 @@ debug_log_parser::table_by_fileid(uint64_t fileid)
 }
 
 /*
+ * debug_log_parser::colgroup_bind --
+ *     Map the column group's file ID to its table, creating the table if it does not exist.
+ */
+void
+debug_log_parser::colgroup_bind(const std::string &name, const std::string &source, uint64_t fileid)
+{
+    /* Establish mapping from the file ID to the table name. */
+    _fileid_to_table_name[fileid] = name;
+
+    /* Create the table, if it does not exist. */
+    if (!_database.contains_table(name)) {
+        std::shared_ptr<config_map> file_config = _metadata[source];
+        std::shared_ptr<config_map> table_config = _metadata["table:" + name];
+
+        std::string key_format = table_config->get_string("key_format");
+        std::string value_format = table_config->get_string("value_format");
+
+        kv_table_config config;
+        if (file_config->contains("log"))
+            config.log_enabled = file_config->get_map("log")->get_bool("enabled");
+        config.type = kv_table::type_by_key_value_format(key_format, value_format);
+
+        kv_table_ptr table = _database.create_table(name, config);
+        table->set_key_value_format(key_format, value_format);
+    }
+
+    /* Establish mapping from the file ID to the table object. */
+    _fileid_to_table[fileid] = _database.table(name);
+}
+
+/*
  * debug_log_parser::metadata_apply --
  *     Apply the given operation to the model.
  */
@@ -404,31 +435,10 @@ debug_log_parser::metadata_apply(kv_transaction_ptr txn, const row_put &op)
         std::string source = m->get_string("source");
         _file_to_colgroup_name[source] = name;
 
-        /* Establish mapping from the file ID to the table name. */
+        /* The column group can be logged before its file, which then binds it. */
         auto i = _file_to_fileid.find(source);
-        if (i == _file_to_fileid.end())
-            throw model_exception("The database does not yet contain file " + source);
-        _fileid_to_table_name[i->second] = name;
-
-        /* Create the table, if it does not exist. */
-        if (!_database.contains_table(name)) {
-            std::shared_ptr<config_map> file_config = _metadata[source];
-            std::shared_ptr<config_map> table_config = _metadata["table:" + name];
-
-            std::string key_format = table_config->get_string("key_format");
-            std::string value_format = table_config->get_string("value_format");
-
-            kv_table_config config;
-            if (file_config->contains("log"))
-                config.log_enabled = file_config->get_map("log")->get_bool("enabled");
-            config.type = kv_table::type_by_key_value_format(key_format, value_format);
-
-            kv_table_ptr table = _database.create_table(name, config);
-            table->set_key_value_format(key_format, value_format);
-        }
-
-        /* Establish mapping from the file ID to the table object. */
-        _fileid_to_table[i->second] = _database.table(name);
+        if (i != _file_to_fileid.end())
+            colgroup_bind(name, source, i->second);
     }
 
     /* Special handling for files. */
@@ -436,6 +446,10 @@ debug_log_parser::metadata_apply(kv_transaction_ptr txn, const row_put &op)
         uint64_t id = m->get_uint64("id");
         _fileid_to_file[id] = key;
         _file_to_fileid[key] = id;
+
+        auto i = _file_to_colgroup_name.find(key);
+        if (i != _file_to_colgroup_name.end())
+            colgroup_bind(i->second, key, id);
     }
 
     /* Special handling for tables. */

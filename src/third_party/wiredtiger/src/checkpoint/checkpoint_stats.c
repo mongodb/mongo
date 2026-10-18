@@ -35,6 +35,7 @@ __wt_checkpoint_timer_stats_clear(WT_SESSION_IMPL *session)
     ckpt->prepare.min = UINT64_MAX;
     ckpt->ckpt_api.min = UINT64_MAX;
     ckpt->scrub.min = UINT64_MAX;
+    ckpt->stepdown.min = UINT64_MAX;
 }
 
 /*
@@ -110,6 +111,16 @@ __wt_checkpoint_timer_stats(WT_SESSION_IMPL *session)
       session, checkpoint_time_recent, __wt_atomic_load_uint64_relaxed(&ckpt->ckpt_api.recent));
     WT_STAT_CONN_SET(
       session, checkpoint_time_total, __wt_atomic_load_uint64_relaxed(&ckpt->ckpt_api.total));
+
+    WT_STAT_CONN_SET(
+      session, checkpoint_stepdown_time_max, __wt_atomic_load_uint64_relaxed(&ckpt->stepdown.max));
+    min = __wt_atomic_load_uint64_relaxed(&ckpt->stepdown.min);
+    if (min != UINT64_MAX)
+        WT_STAT_CONN_SET(session, checkpoint_stepdown_time_min, min);
+    WT_STAT_CONN_SET(session, checkpoint_stepdown_time_recent,
+      __wt_atomic_load_uint64_relaxed(&ckpt->stepdown.recent));
+    WT_STAT_CONN_SET(session, checkpoint_stepdown_time_total,
+      __wt_atomic_load_uint64_relaxed(&ckpt->stepdown.total));
 
     rec_ticks = __wt_atomic_load_uint64_relaxed(&ckpt->reconcile_time_ticks);
     total_ticks = __wt_atomic_load_uint64_relaxed(&ckpt->sync_time_ticks);

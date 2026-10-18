@@ -86,7 +86,7 @@ class test_layered_schema33(
         self.assert_fully_absent(self.conn, uri)
 
     def test_drop_unpublished_table_uri(self):
-        """The same through the table URI, which queues two creates for one table."""
+        """The same through the table URI."""
         self.set_stable_epoch(1)
         name = f'{self.test_name}_table_uri'
         self.session.create(f'table:{name}', self.table_config + ',type=layered')

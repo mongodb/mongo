@@ -769,6 +769,10 @@ __checkpoint_stats(WT_SESSION_IMPL *session)
     msec = WT_TIMEDIFF_MS(stop, conn->ckpt.ckpt_api.timer_start);
     __checkpoint_timer_stats_set(&conn->ckpt.ckpt_api, msec);
 
+    /* A checkpoint taken while the step-down timestamp is set is the step-down checkpoint. */
+    if (__wt_atomic_load_uint64_relaxed(&conn->txn_global.step_down_timestamp) != WT_TS_NONE)
+        __checkpoint_timer_stats_set(&conn->ckpt.stepdown, msec);
+
     /* Compute timer statistics for the scrub. */
     msec = WT_TIMEDIFF_MS(conn->ckpt.scrub.timer_end, conn->ckpt.scrub.timer_start);
     __checkpoint_timer_stats_set(&conn->ckpt.scrub, msec);

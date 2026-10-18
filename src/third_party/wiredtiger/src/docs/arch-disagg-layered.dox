@@ -66,6 +66,8 @@ Layered tables support all the regular tables operations, with exceptions listed
 - Table compaction is not supported on layered tables
 - Backup cursors will not return information about layered tables
 - Bulk cursors are not supported on layered tables
+- A table backed by a layered table can only have a single, unnamed column group, whose source is
+  the layered table with the same name
 
 @section layered-implementation Implementation aspects
 
@@ -93,8 +95,9 @@ file:foo.wt_ingest
 file:foo.wt_stable
 ```
 
-The ingest and stable table could also have table: prefixed metadata entries if the table was created
-with the `block_manager=disagg,type=layered` config.
+A layered table created through a `table:` URI with the `type=layered` config is that table's only
+column group, so it also has `table:foo` and `colgroup:foo` entries, and the column group's source is
+`layered:foo`.
 
 Since shared metadata and history store tables are shared but not layered tables, they both have
 `.wt_stable` suffixed metadata entries but no associated `layered:` ones:

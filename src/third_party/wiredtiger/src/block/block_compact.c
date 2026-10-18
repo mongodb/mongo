@@ -26,6 +26,14 @@ __wt_block_compact_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
           is_bg_compact ? "Background" : "Foreground", block->name, block->compact_session_id);
     }
 
+    /*
+     * Start the background compaction bookkeeping first: it is the only call here that can fail,
+     * and the block is left marked as compacting and in first-fit allocation if it does, making the
+     * file permanently unavailable for compaction.
+     */
+    if (session == S2C(session)->background_compact.session)
+        WT_RET(__wt_background_compact_start(session));
+
     /* Switch to first-fit allocation. */
     __wti_block_configure_first_fit(block, true);
 
@@ -43,9 +51,6 @@ __wt_block_compact_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
     block->compact_prev_pages_rewritten = 0;
     block->compact_prev_size = 0;
     block->compact_session_id = session->id;
-
-    if (session == S2C(session)->background_compact.session)
-        WT_RET(__wt_background_compact_start(session));
 
     return (0);
 }

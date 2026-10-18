@@ -577,6 +577,13 @@ __wt_disagg_enqueue_metadata_operation(WT_SESSION_IMPL *session, const char *sta
 
     /* Cannot fail past this point. */
     __wt_spin_lock(session, &conn->disaggregated_storage.shared_metadata_queue_lock);
+#ifdef HAVE_DIAGNOSTIC
+    /* A table's queued creates and removes alternate: it is never created or dropped twice. */
+    if (metadata_op != WT_SHARED_METADATA_UPDATE) {
+        WT_DISAGG_METADATA_OP *latest = __wt_disagg_table_latest_create_remove(session, table_name);
+        WT_ASSERT(session, latest == NULL || latest->metadata_op != metadata_op);
+    }
+#endif
     TAILQ_INSERT_TAIL(&conn->disaggregated_storage.shared_metadata_qh, entry, q);
     __wt_spin_unlock(session, &conn->disaggregated_storage.shared_metadata_queue_lock);
 
@@ -2012,6 +2019,8 @@ __disagg_step_down_int(WT_SESSION_IMPL *session)
     __wt_atomic_store_uint64_relaxed(
       &conn->txn_global.step_down_disaggregated_schema_epoch, WT_SCHEMA_EPOCH_NONE);
     __wt_writeunlock(session, &conn->txn_global.step_down_lock);
+    if (step_down_ts != WT_TS_NONE)
+        WT_STAT_CONN_INCR(session, disagg_step_down_completed);
     WT_STAT_CONN_SET(session, txn_stepdown_ts_set, 0);
     WT_STAT_CONN_SET(session, txn_stepdown_epoch_set, 0);
 
