@@ -6653,8 +6653,6 @@ buildvariants:
     - name: ".unit_test_long"
       distros: ubuntu2004-large
     - name: compile
-    - name: compile-develop
-    - name: compatibility-test-against-develop
     - name: doc-compile
     - name: make-check-test
     - name: configure-combinations

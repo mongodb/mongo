@@ -31,12 +31,57 @@
 # verify:prepare
 # [END_TAGS]
 
-from helper import copy_wiredtiger_home
+from helper import WiredTigerCursor, copy_wiredtiger_home
 import wttest
 from wtdataset import SimpleDataSet
-import os
+import os, re, sys
 from wtscenario import make_scenarios
 from wiredtiger import stat
+
+# Byte offset of each address triple (offset, size, checksum) within a decoded checkpoint cookie.
+_CKPT_COOKIE_TRIPLE = {'root': 0, 'alloc': 3, 'avail': 6, 'discard': 9}
+
+def checkpoint_extent_list_blocks(session, uri, kinds=('alloc', 'avail', 'discard'), allocsize=4096):
+    """
+    Decode every checkpoint's address cookie in uri's metadata and return the on-disk
+    (offset, size) of its extent-list blocks for the requested kinds ('alloc', 'avail', 'discard').
+
+    A regular (non-tiered, non-disagg) checkpoint cookie is version 1 followed by 14 packed integers:
+    the root, alloc, avail and discard address triples, then the file and checkpoint sizes. Only
+    blocks with a non-zero size, i.e. those written to their own on-disk block, are returned.
+    """
+    # unpack_int lives with the wt tooling, which is not on the suite path by default.
+    tools_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'tools')
+    if tools_dir not in sys.path:
+        sys.path.append(tools_dir)
+    from py_common.binary_data import unpack_int
+
+    with WiredTigerCursor(session, 'metadata:') as c:
+        c.set_key(uri)
+        if c.search() != 0:
+            raise KeyError(f"URI not found in metadata: {uri}")
+        config = c.get_value()
+
+    blocks = []
+    for cookie in re.findall(r'addr="([0-9a-fA-F]+)"', config):
+        addr = bytes(bytearray.fromhex(cookie))
+        if addr[0] != 1:
+            continue
+        addr = addr[1:]
+        values = []
+        while True:
+            try:
+                v, addr = unpack_int(addr)
+                values.append(v)
+            except Exception:
+                break
+        if len(values) != 14:
+            continue
+        for kind in kinds:
+            off, size, _ = values[_CKPT_COOKIE_TRIPLE[kind]:_CKPT_COOKIE_TRIPLE[kind] + 3]
+            if size != 0:
+                blocks.append(((off + 1) * allocsize, size * allocsize))
+    return blocks
 
 # test_prepare_hs03.py
 # test to ensure salvage, verify & simulating crash are working for prepared transactions.
@@ -72,12 +117,27 @@ class test_prepare_hs03(wttest.WiredTigerTestCase):
         tablename="test_prepare_hs03.wt"
         self.assertEqual(os.path.exists(tablename), True)
 
-        # This code will overwrite part of the table with 'bad' data, corrupting the table in the process.
-        # The impact of this overwriting can depend on the number of bytes overwritten, depending on what the
-        # rest of the test does and expects.
-        with open(tablename, 'r+') as tablepointer:
-            tablepointer.seek(1024)
-            tablepointer.write(data_to_corrupt_with)
+        # Leave the checkpoint's extent-list blocks intact. Salvage cannot recover a corrupt extent
+        # list, and a later checkpoint that drops this one reads its extent lists: a failed read
+        # there is fatal (a WT_PANIC under the default corruption_abort), so corrupting one aborts
+        # the test whenever the file layout happens to place an extent-list block in the range below.
+        protect = sorted(checkpoint_extent_list_blocks(self.session, 'file:' + tablename))
+        start = 1024
+        data = bytes(data_to_corrupt_with, 'latin-1')
+        end = start + len(data)
+        with open(tablename, 'r+b') as f:
+            pos = start
+            for b_off, b_size in protect:
+                b_end = b_off + b_size
+                if b_end <= pos or b_off >= end:
+                    continue
+                if b_off > pos:
+                    f.seek(pos)
+                    f.write(data[pos - start:b_off - start])
+                pos = max(pos, b_end)
+            if pos < end:
+                f.seek(pos)
+                f.write(data[pos - start:])
 
     def corrupt_salvage_verify(self):
         # An exclusive handle operation can fail if there is dirty data in the cache, closing the
