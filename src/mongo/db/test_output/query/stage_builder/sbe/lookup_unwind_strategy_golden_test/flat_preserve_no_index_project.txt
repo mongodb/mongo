@@ -4,8 +4,7 @@
 { $project: { _id: 0, lkey: 1, joined: 1 } }
 
 ## HashJoin
-[4] project [s11 = makeBsonObj(MakeObjSpec([lkey, joined], Closed, RetNothing, 0), s10)] 
-[3] project [s10 = makeObj(MakeObjSpec([joined = Set(0)], Open, NewObj, 0), s1, s9)] 
+[4] project [s10 = makeBsonObj(MakeObjSpec([joined = Set(0), lkey], Closed, NewObj, 0), s1, s9)] 
 [3] hash_lookup_unwind left s9 
     outer s7 
         [3] project [s7 = arrayToSet(
@@ -31,7 +30,7 @@
         [2] scan generic [s4 = record, s5 = recordId] [s6 = fkey] @"UUID" 
 
 ## NestedLoopJoin
-[4] project [s9 = makeBsonObj(MakeObjSpec([lkey, joined], Closed, RetNothing, 0), s8)] 
+[4] project [s9 = makeBsonObj(MakeObjSpec([lkey, joined], Closed, NewObj, 0), s8)] 
 [3] project [s8 = makeObj(MakeObjSpec([joined = Set(0)], Open, NewObj, 0), s1, s4)] 
 [3] nlj left [s1] [s7] 
     left 
@@ -50,7 +49,7 @@
         [2] scan generic [s4 = record, s5 = recordId] [s6 = fkey] @"UUID" 
 
 ## IndexedLoopJoin
-[5] project [s19 = makeBsonObj(MakeObjSpec([lkey, joined], Closed, RetNothing, 0), s18)] 
+[5] project [s19 = makeBsonObj(MakeObjSpec([lkey, joined], Closed, NewObj, 0), s18)] 
 [4] project [s18 = makeObj(MakeObjSpec([joined = Set(0)], Open, NewObj, 0), s1, s11)] 
 [4] nlj left [s1] [s14] 
     left 
@@ -86,7 +85,7 @@
                 [2] ixseek seekKeyLow = s4 seekKeyHigh = s5 [s8 = indexKey, s6 = recordId, s9 = snapshotId, s7 = indexIdent] [] @"UUID" @"fkey_1" forward 
 
 ## DynamicIndexedLoopJoin
-[6] project [s24 = makeBsonObj(MakeObjSpec([lkey, joined], Closed, RetNothing, 0), s23)] 
+[6] project [s24 = makeBsonObj(MakeObjSpec([lkey, joined], Closed, NewObj, 0), s23)] 
 [5] project [s23 = makeObj(MakeObjSpec([joined = Set(0)], Open, NewObj, 0), s1, s21)] 
 [5] nlj left [s1] [s17, s1] 
     left 

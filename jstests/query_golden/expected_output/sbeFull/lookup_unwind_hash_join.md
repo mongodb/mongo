@@ -211,54 +211,52 @@ Slots: $$RESULT=s10 env: {  }
 ### Plan
 Engine: SBE
 Strategy: HashJoin
-Slots: $$RESULT=s19 env: {  }
+Slots: $$RESULT=s15 env: {  }
 ```text
-[4] project [s19 = makeBsonObj(MakeObjSpec([computed = Set(0)], Open, NewObj, 0), s14, s18)] 
-[4] project [s18 = 
-    if (isNullish(s15) || isNullish(s17)) 
+[4] project [s15 = makeBsonObj(MakeObjSpec([joined = Set(0), computed = Set(1)], Open, NewObj, 0), s1, s12, s14)] 
+[4] project [s14 = 
+    if (isNullish(s3) || isNullish(s13)) 
     then null 
     elif ((
-        if isNumber(s15) 
+        if isNumber(s3) 
         then 0 
-        elif isDate(s15) 
+        elif isDate(s3) 
         then 1 
         else fail(7157723, "only numbers and dates are allowed in an $add expression") 
     + 
-        if isNumber(s17) 
+        if isNumber(s13) 
         then 0 
-        elif isDate(s17) 
+        elif isDate(s13) 
         then 1 
         else fail(7157723, "only numbers and dates are allowed in an $add expression") 
    ) > 1) 
     then fail(7157722, "only one date allowed in an $add expression") 
-    else (s15 + s17) 
+    else (s3 + s13) 
 ] 
-[4] extract_field_paths inputs[s15 = Get(a)/Id, s16 = Get(joined)/Id] outputs[s17 = Get(joined)/Traverse/Get(b)/Id] 
-[3] project [s15 = getField(s14, "a"), s16 = getField(s14, "joined")] 
-[3] project [s14 = makeObj(MakeObjSpec([joined = Set(0)], Open, NewObj, 0), s1, s13)] 
-[3] hash_lookup_unwind left s13 
-    outer s11 
-        [3] project [s11 = arrayToSet(
-            if (isArray(s5) ?: false) 
+[4] extract_field_paths inputs[s3 = Get(a)/Id, s12 = Get(joined)/Id] outputs[s13 = Get(joined)/Traverse/Get(b)/Id] 
+[3] hash_lookup_unwind left s12 
+    outer s10 
+        [3] project [s10 = arrayToSet(
+            if (isArray(s4) ?: false) 
             then 
-                if isArrayEmpty(s5) 
+                if isArrayEmpty(s4) 
                 then [null] 
-                else s5 
+                else s4 
             
-            else newArray((s5 ?: null)) 
+            else newArray((s4 ?: null)) 
        )] 
-        [1] scan generic [s1 = record, s2 = recordId] [s3 = a, s4 = joined, s5 = lkey] @"" 
-    inner s12 s6 
-        [3] project [s12 = arrayToSet(
+        [1] scan generic [s1 = record, s2 = recordId] [s3 = a, s4 = lkey] @"" 
+    inner s11 s5 
+        [3] project [s11 = arrayToSet(
             let [
-                l4.0 = (s9 ?: null) 
+                l4.0 = (s8 ?: null) 
             ] 
             in 
                 if isArray(l4.0) 
                 then concatArrays(l4.0, newArray(l4.0)) 
                 else newArray(move(l4.0)) 
        )] 
-        [2] scan generic [s6 = record, s7 = recordId] [s8 = a, s9 = fkey, s10 = joined] @"" 
+        [2] scan generic [s5 = record, s6 = recordId] [s7 = a, s8 = fkey, s9 = joined] @"" 
 ```
 
 ### Pipeline
@@ -306,13 +304,12 @@ Slots: $$RESULT=s19 env: {  }
 ### Plan
 Engine: SBE
 Strategy: HashJoin
-Slots: $$RESULT=s12 env: {  }
+Slots: $$RESULT=s10 env: {  }
 ```text
-[5] project [s12 = makeBsonObj(MakeObjSpec([lkey, joined], Closed, RetNothing, 0), s11)] 
-[4] project [s11 = makeObj(MakeObjSpec([joined = Set(0)], Open, NewObj, 0), s4, s10)] 
-[4] hash_lookup_unwind left s10 
-    outer s8 
-        [4] project [s8 = arrayToSet(
+[5] project [s10 = makeBsonObj(MakeObjSpec([lkey, joined = Add(0)], Closed, NewObj, 0), s1, s9)] 
+[4] hash_lookup_unwind left s9 
+    outer s7 
+        [4] project [s7 = arrayToSet(
             if (isArray(s3) ?: false) 
             then 
                 if isArrayEmpty(s3) 
@@ -321,19 +318,18 @@ Slots: $$RESULT=s12 env: {  }
             
             else newArray((s3 ?: null)) 
        )] 
-        [2] project [s4 = newBsonObj("lkey", s3)] 
         [1] scan generic [s1 = record, s2 = recordId] [s3 = lkey] @"" 
-    inner s9 s5 
-        [4] project [s9 = arrayToSet(
+    inner s8 s4 
+        [4] project [s8 = arrayToSet(
             let [
-                l3.0 = (s7 ?: null) 
+                l3.0 = (s6 ?: null) 
             ] 
             in 
                 if isArray(l3.0) 
                 then concatArrays(l3.0, newArray(l3.0)) 
                 else newArray(move(l3.0)) 
        )] 
-        [3] scan generic [s5 = record, s6 = recordId] [s7 = fkey] @"" 
+        [3] scan generic [s4 = record, s5 = recordId] [s6 = fkey] @"" 
 ```
 
 ## 3. Unwind: { "$unwind" : { "path" : "$joined", "includeArrayIndex" : "idx" } }

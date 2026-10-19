@@ -745,8 +745,7 @@ void QsnAnalysis::analyzeQsNode(const QuerySolutionNode* qsNode, QsnInfo& qsnInf
         case STAGE_EQ_LOOKUP_UNWIND: {
             auto eqLookup = static_cast<const EqLookupNode*>(qsNode);
 
-            if (eqLookup->joinField.getPathLength() > 1 || eqLookup->unwindSpec->indexPath ||
-                eqLookup->unwindSpec->preserveNullAndEmptyArrays) {
+            if (eqLookup->joinField.getPathLength() > 1 || eqLookup->unwindSpec->indexPath) {
                 qsnInfo.setPostimageAllowedFields(&kUniverseFieldSet);
                 return;
             }
