@@ -9,6 +9,12 @@
 REPO_ROOT=$(dirname $(dirname $(realpath "$0")))
 bazel_real="$BAZEL_REAL"
 
+# RC defaults and aliases require the Python policy check. Only explicit local
+# fallback may proceed when the wrapper cannot run.
+wrapper_fallback_allowed=0
+if [[ -z "${CI:-}" && -z "${task_id+x}" && -z "${EVG_TASK_ID+x}" && -z "${distro_id+x}" && "$MONGO_BAZEL_WRAPPER_FALLBACK" == 1 ]]; then
+  wrapper_fallback_allowed=1
+fi
 
 
 # If disk space becomes an issue, this block can be used to clean up configs
@@ -153,12 +159,14 @@ fi
 if [[ "$python" = "" ]] || [ ! -f $python ]; then
   >&2 echo "python prereq missing, using bazel to install python..."
   >&2 $bazel_real build --bes_backend= --bes_results_url= @py_${os}_${ARCH}//:all
-  if [[ $? != 0 ]]; then
-    if [[ ! -z "$CI" ]] || [[ $MONGO_BAZEL_WRAPPER_FALLBACK == 1 ]]; then
+  bootstrap_exit_code=$?
+  if [[ $bootstrap_exit_code != 0 ]]; then
+    if [[ $wrapper_fallback_allowed == 1 ]]; then
       >&2 echo "wrapper script failed to install python! falling back to normal bazel call..."
-      exec "$bazel_real" $@
+      exec "$bazel_real" "$@"
     else
-      exit $?
+      >&2 echo "wrapper script failed to install python! refusing unchecked bazel invocation."
+      exit "$bootstrap_exit_code"
     fi
   fi
 fi
@@ -184,12 +192,18 @@ MONGO_BAZEL_WRAPPER_ARGS=$(mktemp)
 MONGO_BAZEL_WRAPPER_ARGS=$MONGO_BAZEL_WRAPPER_ARGS \
 MONGO_AUTOCOMPLETE_QUERY=$autocomplete_query \
 >&2 $python $REPO_ROOT/bazel/wrapper_hook/wrapper_hook.py $bazel_real "$@"
-if [[ $? != 0 ]]; then
-  if [[ ! -z "$CI" ]] || [[ $MONGO_BAZEL_WRAPPER_FALLBACK == 1 ]]; then
+exit_code=$?
+# Linter failures and release-policy rejection must preserve their status.
+if [[ $exit_code == 3 || $exit_code == 4 ]]; then
+  exit "$exit_code"
+fi
+if [[ $exit_code != 0 ]]; then
+  if [[ $wrapper_fallback_allowed == 1 ]]; then
     >&2 echo "wrapper script failed! falling back to normal bazel call..."
-    exec "$bazel_real" $@
+    exec "$bazel_real" "$@"
   else
-    exit $? 
+    >&2 echo "wrapper script failed! refusing unchecked bazel invocation."
+    exit "$exit_code"
   fi
 fi
 

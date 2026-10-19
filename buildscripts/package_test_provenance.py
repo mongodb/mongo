@@ -20,6 +20,7 @@ from typing import Any, BinaryIO, Callable, Iterable, Iterator
 import requests
 from google.protobuf.message import DecodeError
 
+from bazel.wrapper_hook.release_distro import validate_release_distro_id
 from buildscripts import bazel_spawn_pb2
 
 RELEASE_BINARY_PROVENANCE_ARTIFACT_NAME = "Release Binary Provenance"
@@ -201,7 +202,75 @@ def fetch_release_binary_provenance_from_tasks(tasks: list[Any], task_display_na
     """Fetch release binary provenance from an Evergreen task list."""
 
     build_task = find_build_task(tasks, task_display_name)
-    return fetch_task_artifact_text(build_task, RELEASE_BINARY_PROVENANCE_ARTIFACT_NAME)
+    provenance_text = fetch_task_artifact_text(build_task, RELEASE_BINARY_PROVENANCE_ARTIFACT_NAME)
+    validate_release_binary_provenance_distro(json.loads(provenance_text), build_task)
+    return provenance_text
+
+
+def read_build_distro_id(build_command_file: Path) -> str:
+    """Read the distro captured with the primary build, rather than a later task step."""
+    distro_file = Path(f"{build_command_file}.distro_id")
+    try:
+        distro_id = distro_file.read_text().strip()
+    except FileNotFoundError as exc:
+        raise ValueError(f"Missing captured build distro file: {distro_file}") from exc
+    validate_release_distro_id(distro_id)
+    return distro_id
+
+
+def validate_release_binary_provenance_distro(
+    provenance: dict[str, Any], build_task: Any = None
+) -> None:
+    """Check the recorded distro and, when available, independent Evergreen metadata."""
+    distro_id = provenance.get("distro_id")
+    validate_release_distro_id(distro_id)
+    if build_task is not None:
+        actual_distro_id = build_task.distro_id
+        validate_release_distro_id(actual_distro_id)
+        if distro_id != actual_distro_id:
+            raise ValueError(
+                "Release binary provenance distro_id does not match Evergreen build task: "
+                f"{distro_id} != {actual_distro_id}"
+            )
+        if provenance.get("task_id") != build_task.task_id:
+            raise ValueError(
+                "Release binary provenance task_id does not match Evergreen build task: "
+                f"{provenance.get('task_id')} != {build_task.task_id}"
+            )
+
+
+def create_release_binary_provenance_from_archive_dist_test(
+    tasks: list[Any], evg_build_id: str, download_dir: Path
+) -> str:
+    """Create release binary provenance from archive_dist_test's existing artifacts."""
+
+    task_name = "archive_dist_test"
+    archive_task = find_build_task(tasks, task_name)
+    artifacts_path = fetch_task_artifact_to_file(
+        archive_task, "Artifacts", download_dir / "archive_dist_test_artifacts.tgz"
+    )
+    build_command_path = extract_file_from_tar_by_basename(
+        artifacts_path, ARCHIVE_DIST_TEST_PROVENANCE_BUILD_COMMAND_PATH, download_dir
+    )
+    extract_file_from_tar_by_basename(
+        artifacts_path, f"{ARCHIVE_DIST_TEST_PROVENANCE_BUILD_COMMAND_PATH}.distro_id", download_dir
+    )
+    binary_archive_path = fetch_task_artifact_to_file(
+        archive_task, "Binaries", download_dir / "archive_dist_test_binaries"
+    )
+
+    build_command = build_command_path.read_text()
+    validate_release_build_command(build_command)
+    provenance = {
+        "build_id": evg_build_id,
+        "task_id": archive_task.task_id,
+        "task_name": task_name,
+        "distro_id": read_build_distro_id(build_command_path),
+        "build_command": build_command,
+        "binaries": hash_release_binaries_in_archive(binary_archive_path),
+    }
+    validate_release_binary_provenance_distro(provenance, archive_task)
+    return json.dumps(provenance)
 
 
 def fetch_release_execution_log_from_tasks(
@@ -363,7 +432,9 @@ def make_release_binary_provenance(
 
     build_command = build_command_file.read_text()
     validate_release_build_command(build_command)
+    distro_id = read_build_distro_id(build_command_file)
     return {
+        "distro_id": distro_id,
         "build_id": os.environ.get("build_id", ""),
         "build_variant": os.environ.get("build_variant", ""),
         "execution": os.environ.get("execution", ""),
@@ -454,6 +525,8 @@ def validate_release_binary_provenance_hashes(
     if not isinstance(build_command, str):
         raise ValueError("Release binary provenance is missing a string build_command")
     validate_release_build_command(build_command)
+
+    validate_release_binary_provenance_distro(provenance)
 
     expected_binaries = provenance.get("binaries")
     if not isinstance(expected_binaries, dict):

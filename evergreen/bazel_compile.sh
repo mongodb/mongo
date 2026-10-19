@@ -31,7 +31,8 @@ fi
 
 # These files are generated only for tasks that consume a provenance invocation. Remove any
 # leftover copies before deciding whether this compile should create one.
-rm -f .bazel_provenance_build_invocation .bazel_crypt_build_invocation
+rm -f .bazel_provenance_build_invocation .bazel_crypt_build_invocation \
+  .bazel_provenance_build_invocation.distro_id .bazel_crypt_build_invocation.distro_id
 
 # if build_patch_id is passed, try to download binaries from specified
 # evergreen patch.
@@ -178,9 +179,6 @@ LOCAL_ARG="$(bazel_evergreen_shutils::compute_local_arg build)"
 # the building", so we do want that flag.
 RELEASE_FLAG="$(bazel_evergreen_shutils::maybe_release_flag)"
 
-# Ensure server is up and print PID
-bazel_evergreen_shutils::ensure_server_and_print_pid "$BAZEL_BINARY"
-
 # Build flags line
 BEP_FULL="build_events_full.json"
 BEP_OUT="build_events.json"
@@ -223,11 +221,17 @@ echo "${ALL_FLAGS}" > .bazel_build_flags
 
 # Save the entire bazel build invocation to attach to the task for re-running locally
 BUILD_INVOCATION="bazel build ${ALL_FLAGS} ${targets} ${RELEASE_LOCAL_SAFETY_FLAGS}"
+bazel_evergreen_shutils::check_release_distro build ${ALL_FLAGS} ${targets} ${RELEASE_LOCAL_SAFETY_FLAGS}
+export distro_id
 echo "${BUILD_INVOCATION}" > .bazel_build_invocation
 
 if [[ -n "${PROVENANCE_BUILD_INVOCATION_FILE}" ]]; then
   echo "${BUILD_INVOCATION}" > "${PROVENANCE_BUILD_INVOCATION_FILE}"
+  printf '%s\n' "${distro_id:-}" > "${PROVENANCE_BUILD_INVOCATION_FILE}.distro_id"
 fi
+
+# Reject unsafe assignments before starting Bazel, including its info call.
+bazel_evergreen_shutils::ensure_server_and_print_pid "$BAZEL_BINARY"
 
 set +o errexit
 

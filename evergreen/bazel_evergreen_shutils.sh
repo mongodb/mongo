@@ -150,6 +150,12 @@ bazel_evergreen_shutils::maybe_release_flag() {
 
 # --- Timeouts --------------------------------------------------------------
 
+# Use the native wrapper's resolver to check RC defaults and inherited aliases.
+# prelude.sh loads expansions as shell variables, so pass the distro explicitly.
+bazel_evergreen_shutils::check_release_distro() {
+  distro_id="${distro_id:-}" "${python}" -m bazel.wrapper_hook.release_distro --evergreen -- "$@"
+}
+
 # Timeout helper: returns a "timeout <secs>" prefix or empty string.
 # Prints a one-time warning to stderr if a timeout was requested but no
 # timeout binary is available. Supports macOS 'gtimeout' if installed.

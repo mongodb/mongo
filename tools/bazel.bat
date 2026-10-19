@@ -5,6 +5,12 @@ echo common --//bazel/config:running_through_bazelisk > .bazelrc.bazelisk
 
 set REPO_ROOT=%~dp0..
 
+REM RC defaults and aliases require Python validation; only explicit local fallback is safe.
+set "wrapper_fallback_allowed=0"
+if "%MONGO_BAZEL_WRAPPER_FALLBACK%"=="1" if not defined CI if not defined task_id if not defined EVG_TASK_ID if not defined distro_id (
+    set "wrapper_fallback_allowed=1"
+)
+
 for %%I in (%REPO_ROOT%) do set cur_dir=%%~nxI
 
 REM skip python if the bazel command type is in a known list of commands to skip
@@ -50,12 +56,15 @@ if exist %REPO_ROOT%\bazel-%cur_dir% (
 if not exist "!python!" (
     echo python prereq missing, using bazel to install python... 1>&2
     "%BAZEL_REAL%" build --bes_backend= --bes_results_url= @py_windows_x86_64//:all 1>&2
-    
-    if %ERRORLEVEL% NEQ 0 (
-        if "%CI%"=="" if "%MONGO_BAZEL_WRAPPER_FALLBACK%"=="" exit %ERRORLEVEL%
-        echo wrapper script failed to install python! falling back to normal bazel call... 1>&2
-        "%BAZEL_REAL%" %*
-        exit %ERRORLEVEL%
+    set "bootstrap_exit=!ERRORLEVEL!"
+    if !bootstrap_exit! NEQ 0 (
+        if !wrapper_fallback_allowed! EQU 1 (
+            echo wrapper script failed to install python! falling back to normal bazel call... 1>&2
+            "%BAZEL_REAL%" %*
+            exit /b !ERRORLEVEL!
+        )
+        echo wrapper script failed to install python! refusing unchecked bazel invocation. 1>&2
+        exit /b !bootstrap_exit!
     )
 )
 
@@ -68,12 +77,23 @@ SET STARTTIME=%TIME%
 set "MONGO_BAZEL_WRAPPER_ARGS=%tmp%\bat~%RANDOM%.tmp"
 echo "" > %MONGO_BAZEL_WRAPPER_ARGS%
 %python% %REPO_ROOT%/bazel/wrapper_hook/wrapper_hook.py "%BAZEL_REAL%" %* 1>&2
-if %ERRORLEVEL% NEQ 0 (
-    if "%CI%"=="" if "%MONGO_BAZEL_WRAPPER_FALLBACK%"=="" exit %ERRORLEVEL%
-    echo wrapper script failed! falling back to normal bazel call... 1>&2
-    "%BAZEL_REAL%" %*
-    exit %ERRORLEVEL%
+set "exit_code=%ERRORLEVEL%"
+if %exit_code% EQU 0 goto :wrapper_hook_succeeded
+REM Linter failures and release policy rejection must never fall back.
+if %exit_code% EQU 3 goto :wrapper_hook_failed
+if %exit_code% EQU 4 goto :wrapper_hook_failed
+if %wrapper_fallback_allowed% EQU 0 (
+    echo wrapper script failed! refusing unchecked bazel invocation. 1>&2
+    goto :wrapper_hook_failed
 )
+echo wrapper script failed! falling back to normal bazel call... 1>&2
+"%BAZEL_REAL%" %*
+set "exit_code=%ERRORLEVEL%"
+
+:wrapper_hook_failed
+exit /b %exit_code%
+
+:wrapper_hook_succeeded
 
 for /F "delims=" %%a in (%MONGO_BAZEL_WRAPPER_ARGS%) do (
     set str="%%a"
