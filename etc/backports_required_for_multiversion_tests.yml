@@ -21,6 +21,8 @@
 #
 last-patch:
   all:
+    - test_file: jstests/fle2/create_encrypted_collection.js
+      ticket: SERVER-130498
     - test_file: jstests/sharding/localhostAuthBypass.js
       ticket: SERVER-134872
     - test_file: jstests/replsets/localhostAuthBypass.js

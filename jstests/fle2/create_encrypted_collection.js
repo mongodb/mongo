@@ -97,23 +97,27 @@ assert.commandWorked(
     }),
 );
 
-// createCollection with invalid state collection names
+// createCollection with invalid state collection names. The IDL validator only checks that each
+// name looks like enxcol_.<name>.(esc|ecoc), so names with the wrong suffix for their role, or that
+// are not bound to the collection, are rejected by the create command's binding check instead.
 const stateCollNameInvalidFormatTests = [
-    {escCollection: "legit.esc", ecocCollection: "enxcol_.legit.ecoc", code: 7406900},
-    {escCollection: "enxcol_.legit.ecoc", ecocCollection: "enxcol_.legit.ecoc", code: 7406900},
-    {escCollection: "enxcol_.legit.esc", ecocCollection: "legit.ecoc", code: 7406902},
-    {escCollection: "enxcol_.legit.esc", ecocCollection: "enxcol_.legit.esc", code: 7406902},
-    {escCollection: "enxcol_.invalid.esc", ecocCollection: "enxcol_.legit.ecoc", code: 13049800},
-    {escCollection: "enxcol_.legit.esc", ecocCollection: "enxcol_.invalid.ecoc", code: 13049801},
+    {escCollection: "legit.esc", ecocCollection: "enxcol_.legit.ecoc"},
+    {escCollection: "enxcol_.legit.ecoc", ecocCollection: "enxcol_.legit.ecoc"},
+    {escCollection: "enxcol_.legit.esc", ecocCollection: "legit.ecoc"},
+    {escCollection: "enxcol_.legit.esc", ecocCollection: "enxcol_.legit.esc"},
+    {escCollection: "enxcol_.invalid.esc", ecocCollection: "enxcol_.legit.ecoc"},
+    {escCollection: "enxcol_.legit.esc", ecocCollection: "enxcol_.invalid.ecoc"},
 ];
 for (let testCase of stateCollNameInvalidFormatTests) {
-    let code = testCase.code;
-    delete testCase.code;
+    const escParseError = 7406900;
+    const ecocParseError = 7406902;
+    const escRuntimeError = 13049800;
+    const ecocRuntimeError = 13049801;
     assert.commandFailedWithCode(
         dbTest.createCollection("legit", {
             encryptedFields: encryptedFields(testCase),
         }),
-        code,
+        [escParseError, ecocParseError, escRuntimeError, ecocRuntimeError],
         `createCollection should reject state collection names ${tojson(testCase)}`,
     );
 }
