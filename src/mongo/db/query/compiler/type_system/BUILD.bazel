@@ -12,6 +12,7 @@ exports_files(
 mongo_cc_library(
     name = "type_system",
     srcs = [
+        "expression_typing.cpp",
         "matcher_typing.cpp",
         "type.cpp",
     ],
@@ -78,6 +79,19 @@ mongo_cc_unit_test(
         ":type_system_test_util",
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/query/compiler/parsers/matcher:parsed_match_expression_for_test",
+        "//src/mongo/unittest:server_parameter_guard",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "expression_typing_test",
+    srcs = [
+        "expression_typing_test.cpp",
+    ],
+    tags = ["mongo_unittest_eighth_group"],
+    deps = [
+        ":type_system",
+        "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/unittest:server_parameter_guard",
     ],
 )
