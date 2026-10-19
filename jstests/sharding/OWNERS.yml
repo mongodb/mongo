@@ -77,6 +77,9 @@ filters:
   - "add_shard_*":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
+  - "run_command_on_all_shards_shard_removed.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
   - "custom_write_concern.js":
     approvers:
       - 10gen/server-catalog-and-routing
