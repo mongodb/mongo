@@ -901,3 +901,95 @@ extract_debuginfo_test = rule(
     executable = True,
     test = True,
 )
+
+def _extract_debuginfo_rust_impl(ctx):
+    """Split debug info out of a rust shared library.
+
+    The cc extraction rules above are shaped around CcInfo/CcSharedLibraryInfo and the
+    static/shared archive pairs that mongo_cc_library produces. A rust cdylib has none of
+    that - nothing links against it, it is dlopen'd at runtime - so this rule only needs to
+    run the same objcopy steps and hand back the resulting files.
+    """
+    cc_toolchain = find_cc_toolchain(ctx)
+
+    shared_input = None
+    for file in ctx.attr.shared_library_with_debug.files.to_list():
+        if file.basename.endswith(WITH_DEBUG_SUFFIX + ctx.attr.shared_ext):
+            shared_input = file
+    if shared_input == None:
+        fail("Expected a '{}{}' file from {}".format(
+            WITH_DEBUG_SUFFIX,
+            ctx.attr.shared_ext,
+            ctx.attr.shared_library_with_debug.label,
+        ))
+
+    basename = shared_input.basename[:-len(WITH_DEBUG_SUFFIX + ctx.attr.shared_ext)]
+    output_bin = ctx.actions.declare_file(basename + ctx.attr.shared_ext)
+
+    # The objcopy steps below are ELF specific. Rust shared libraries are currently
+    # linux only, so rather than guess at the mac/windows equivalents, pass the
+    # library through untouched there and leave that for whoever needs it first.
+    linux_constraint = ctx.attr._linux_constraint[platform_common.ConstraintValueInfo]
+    if not ctx.attr.enabled or not ctx.target_platform_has_constraint(linux_constraint):
+        ctx.actions.symlink(output = output_bin, target_file = shared_input)
+        return [
+            DefaultInfo(files = depset([output_bin])),
+            OutputGroupInfo(shared_library = depset([output_bin])),
+            TagInfo(tags = ctx.attr.tags),
+        ]
+
+    debug_info = ctx.actions.declare_file(basename + ctx.attr.shared_ext + ".debug")
+
+    ctx.actions.run(
+        executable = cc_toolchain.objcopy_executable,
+        outputs = [debug_info],
+        inputs = depset([shared_input], transitive = [cc_toolchain.all_files]),
+        arguments = [
+            "--only-keep-debug",
+            shared_input.path,
+            debug_info.path,
+        ],
+        mnemonic = "ExtractDebugInfo",
+    )
+
+    ctx.actions.run(
+        executable = cc_toolchain.objcopy_executable,
+        outputs = [output_bin],
+        inputs = depset([shared_input, debug_info], transitive = [cc_toolchain.all_files]),
+        arguments = [
+            "--strip-debug",
+            "--add-gnu-debuglink",
+            debug_info.path,
+            shared_input.path,
+            output_bin.path,
+        ],
+        mnemonic = "StripDebugInfo",
+    )
+
+    return [
+        DefaultInfo(files = depset([output_bin, debug_info])),
+        OutputGroupInfo(
+            shared_library = depset([output_bin]),
+            debug_file = depset([debug_info]),
+        ),
+        TagInfo(tags = ctx.attr.tags),
+    ]
+
+extract_debuginfo_rust = rule(
+    _extract_debuginfo_rust_impl,
+    attrs = {
+        "shared_library_with_debug": attr.label(
+            doc = "The rust shared library to extract debuginfo from.",
+            allow_files = True,
+        ),
+        "shared_ext": attr.string(
+            doc = "Platform extension for shared libraries, e.g. '.so'.",
+        ),
+        "enabled": attr.bool(default = False, doc = "Flag to enable/disable separate debug generation."),
+        "_cc_toolchain": attr.label(default = "@rules_cc//cc:current_cc_toolchain"),
+        "_linux_constraint": attr.label(default = "@platforms//os:linux"),
+    },
+    doc = "Extract debuginfo from a rust shared library into a separate file",
+    toolchains = ["@bazel_tools//tools/cpp:toolchain_type"],
+    fragments = ["cpp"],
+)

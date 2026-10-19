@@ -25,6 +25,7 @@ load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("@rules_cc//cc:cc_shared_library.bzl", "cc_shared_library")
 load("@rules_cc//cc:cc_test.bzl", "cc_test")
 load("@rules_rust//rust:defs.bzl", "rust_library", "rust_shared_library", "rust_test")
+load("//bazel/toolchains/rust:mongo_rust_toolchain.bzl", "MONGO_RUSTC_FIRST_PARTY_FLAGS")
 load("@rules_proto//proto:defs.bzl", "proto_library")
 load(
     "//bazel:separate_debug.bzl",
@@ -33,6 +34,7 @@ load(
     "WITH_DEBUG_SUFFIX",
     "extract_debuginfo",
     "extract_debuginfo_binary",
+    "extract_debuginfo_rust",
     "extract_debuginfo_test",
 )
 load("@local_host_values//:local_host_values_set.bzl", "NUM_CPUS")
@@ -1882,6 +1884,7 @@ def windows_rc(name, src, manifest_in = None, icon = None):
 
 def mongo_rust_library(name, rustc_flags = [], target_compatible_with = [], **kwargs):
     compile_data = kwargs.pop("compile_data", []) + LIBVOIDSTAR_INPUTS
+    rustc_flags = rustc_flags + MONGO_RUSTC_FIRST_PARTY_FLAGS
     rust_library(
         name = name,
         compile_data = compile_data,
@@ -1899,8 +1902,10 @@ def mongo_rust_library(name, rustc_flags = [], target_compatible_with = [], **kw
 
 def mongo_rust_shared_library(name, rustc_flags = [], target_compatible_with = [], **kwargs):
     compile_data = kwargs.pop("compile_data", []) + LIBVOIDSTAR_INPUTS
+    rustc_flags = rustc_flags + MONGO_RUSTC_FIRST_PARTY_FLAGS
+    with_debug_name = name + WITH_DEBUG_SUFFIX
     rust_shared_library(
-        name = name,
+        name = with_debug_name,
         compile_data = compile_data,
         rustc_flags = rustc_flags,
         target_compatible_with = target_compatible_with,
@@ -1908,8 +1913,19 @@ def mongo_rust_shared_library(name, rustc_flags = [], target_compatible_with = [
     )
     rust_test(
         name = name + "_test",
-        crate = ":" + name,
+        crate = ":" + with_debug_name,
         # most arguments are automatically propagated from the crate. These are the exceptions:
         rustc_flags = rustc_flags,
+        target_compatible_with = target_compatible_with,
+    )
+    extract_debuginfo_rust(
+        name = name,
+        shared_library_with_debug = ":" + with_debug_name,
+        shared_ext = select({
+            "@platforms//os:macos": ".dylib",
+            "@platforms//os:windows": ".dll",
+            "//conditions:default": ".so",
+        }),
+        enabled = SEPARATE_DEBUG_ENABLED,
         target_compatible_with = target_compatible_with,
     )

@@ -705,6 +705,33 @@ rust_host.host_tools(
 )
 use_repo(rust_host, "rust_host_tools_nightly")
 
+# The toolchains above can't carry per-target flags, so //bazel/toolchains/rust wraps
+# the linux-targeting ones to add mongo's rustc flags. Root module registrations take
+# precedence over the rules_rust registration of the unwrapped toolchains.
+# Keep in sync with mongo_rust_toolchain_repos() in
+# //bazel/toolchains/rust:mongo_rust_toolchain.bzl.
+use_repo(
+    rust,
+    "rust_linux_aarch64__aarch64-unknown-linux-gnu__nightly_tools",
+    "rust_linux_aarch64__powerpc64le-unknown-linux-gnu__nightly_tools",
+    "rust_linux_aarch64__s390x-unknown-linux-gnu__nightly_tools",
+    "rust_linux_aarch64__x86_64-unknown-linux-gnu__nightly_tools",
+    "rust_linux_powerpc64le__aarch64-unknown-linux-gnu__nightly_tools",
+    "rust_linux_powerpc64le__powerpc64le-unknown-linux-gnu__nightly_tools",
+    "rust_linux_powerpc64le__s390x-unknown-linux-gnu__nightly_tools",
+    "rust_linux_powerpc64le__x86_64-unknown-linux-gnu__nightly_tools",
+    "rust_linux_s390x__aarch64-unknown-linux-gnu__nightly_tools",
+    "rust_linux_s390x__powerpc64le-unknown-linux-gnu__nightly_tools",
+    "rust_linux_s390x__s390x-unknown-linux-gnu__nightly_tools",
+    "rust_linux_s390x__x86_64-unknown-linux-gnu__nightly_tools",
+    "rust_linux_x86_64__aarch64-unknown-linux-gnu__nightly_tools",
+    "rust_linux_x86_64__powerpc64le-unknown-linux-gnu__nightly_tools",
+    "rust_linux_x86_64__s390x-unknown-linux-gnu__nightly_tools",
+    "rust_linux_x86_64__x86_64-unknown-linux-gnu__nightly_tools",
+)
+
+register_toolchains("//bazel/toolchains/rust:all")
+
 crate = use_extension("@rules_rust//crate_universe:extensions.bzl", "crate")
 crate.spec(
     package = "wasmtime",
