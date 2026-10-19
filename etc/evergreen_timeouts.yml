@@ -36,6 +36,15 @@ overrides:
       exec_timeout: 80 # 1 hour 20 minutes
       idle_timeout: 16
 
+  # The weekly verifier restores every snapshot in the format-matrix archive, so its runtime grows
+  # along with the archive. The historic estimate is derived from the previous passing run, so
+  # the timeout may fall short when the archive grows significantly between restore runs.
+  enterprise-amazon-linux2023-arm64-format-matrix-restore-verifier:
+    - task: ^disagg_format_snapshot_restore$
+      # TODO(SERVER-137365): Revisit restore sampling heuristics if runtime exceeds the default 3hrs
+      exec_timeout: 180 # 3 hours
+      idle_timeout: 180
+
   amazon-linux2023-aubsan-all-feature-flags-extra-system-deps-replica-sets:
     - task: ^disagg_replica_sets_.*
       exec_timeout: 210 # 3.5 hours
