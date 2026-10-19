@@ -11,7 +11,6 @@ import {runWithKnobs} from "jstests/libs/query/knob_utils.js";
 // Setup mongod and data.
 const conn = MongoRunner.runMongod({
     setParameter: {
-        featureFlagGetExecutorDeferredEngineChoice: true,
         featureFlagSbeEqLookupUnwindLocalIxscanFetch: true,
         featureFlagSbeNonLeadingMatch: true,
     },
@@ -70,42 +69,6 @@ describe("Test plan cache", function () {
             );
         });
     }
-
-    // The new get executor encodes plan cache keys differently, so we expect an additional
-    // plan cache entry to be created after flipping the flag and rerunning the query.
-    it("featureFlagGetExecutorDeferredEngineChoice flip", function () {
-        const k1 = localColl.getPlanCache().list()[0].planCacheKey;
-        runWithKnobs(
-            db,
-            () => {
-                localColl.aggregate(pipeline).toArray();
-
-                // Inspect explain.
-                const explain = localColl.explain().aggregate(pipeline);
-                const k2 = getQueryPlanner(explain).planCacheKey;
-                assert.neq(k2, k1);
-
-                // Inspect plan cache.
-                const entries = localColl.getPlanCache().list();
-                assert.eq(entries.length, 2);
-                assert(entries.map((e) => e.planCacheKey).includes(k1));
-                assert(entries.map((e) => e.planCacheKey).includes(k2));
-            },
-            {featureFlagGetExecutorDeferredEngineChoice: false},
-        );
-
-        // Now that we rolled back the feature flag, assert that we still use the previous cache
-        // entry.
-        localColl.aggregate(pipeline).toArray();
-
-        // Inspect explain.
-        const explain = localColl.explain().aggregate(pipeline);
-        assert.eq(getQueryPlanner(explain).planCacheKey, k1);
-
-        // Inspect plan cache.
-        const entries = localColl.getPlanCache().list();
-        assert.eq(entries.length, 2);
-    });
 
     after(function () {
         MongoRunner.stopMongod(conn);

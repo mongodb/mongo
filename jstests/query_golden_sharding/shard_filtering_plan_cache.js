@@ -4,7 +4,6 @@
  *
  * @tags: [
  *   # TODO SERVER-128587 remove this tag
- *   featureFlagGetExecutorDeferredEngineChoice,
  *   featureFlagShardFilteringDistinctScan,
  *   requires_fcv_82,
  * ]

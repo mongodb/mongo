@@ -147,9 +147,6 @@ std::unique_ptr<PlannerInterface> retryMakePlanner(
     CanonicalQuery* canonicalQuery,
     std::size_t plannerOptions,
     Pipeline* pipeline) {
-    const bool deferredExecutorEnabled =
-        canonicalQuery->getExpCtx()->getIfrContext()->getSavedFlagValue(
-            feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice);
     // We create this once on replanning and then make a copy for each QueryPlannerParams to own for
     // subsequent calls.
     boost::optional<QueryPlannerParams::ReplanningData> replanningData = boost::none;
@@ -162,22 +159,11 @@ std::unique_ptr<PlannerInterface> retryMakePlanner(
         try {
             // First try the single collection query parameters, as these would have been
             // generated with query settings if present.
-            auto result = makePlanner(std::move(plannerParams));
-            // The assertions in `inspectPlannerResult` do not apply when the deferred executor is
-            // enabled.
-            if (!deferredExecutorEnabled) {
-                inspectPlannerResult(result, replanningData);
-            }
-            return result;
+            return makePlanner(std::move(plannerParams));
         } catch (const ExceptionFor<ErrorCodes::NoDistinctScansForDistinctEligibleQuery>&) {
             // The planner failed to generate a DISTINCT_SCAN for a distinct-like query. Remove
             // the distinct property and replan using SBE or subplanning as applicable.
             canonicalQuery->resetDistinct();
-            if (canonicalQuery->isSbeCompatible() && !deferredExecutorEnabled) {
-                // Stages still need to be finalized for SBE since classic was used previously. In
-                // the deferred get_executor, the stages are finalized during lowering.
-                finalizePipelineStages(pipeline, canonicalQuery);
-            }
             plannerParams = makeQueryPlannerParams(*canonicalQuery, plannerOptions, replanningData);
         } catch (const ExceptionFor<ErrorCodes::NoQueryExecutionPlans>& exception) {
             // The planner failed to generate a viable plan. Remove the query settings and

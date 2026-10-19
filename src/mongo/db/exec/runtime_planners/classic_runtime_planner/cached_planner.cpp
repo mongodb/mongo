@@ -36,11 +36,6 @@ const QuerySolution* CachedPlanner::querySolution() const {
 }
 
 PlanRankingResult CachedPlanner::extractPlanRankingResult() {
-    tassert(11756603,
-            "Expected `extractPlanRankingResult` to only be called with get executor deferred "
-            "feature flag enabled.",
-            cq()->getExpCtx()->getIfrContext()->getSavedFlagValue(
-                feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice));
     std::vector<std::unique_ptr<QuerySolution>> solutions;
     solutions.push_back(extractQuerySolution());
     return PlanRankingResult{

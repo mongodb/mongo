@@ -76,15 +76,6 @@ describe("planRanker in slow query log and profiler", function () {
     }
 
     it("reports 'costBased' when the cost-based ranker chooses the winning plan", function () {
-        // TODO (SERVER-119581): Remove once featureFlagGetExecutorDeferredEngineChoice is removed.
-        if (!FeatureFlagUtil.isEnabled(db, "GetExecutorDeferredEngineChoice")) {
-            jsTest.log.info(
-                "Skipping: featureFlagGetExecutorDeferredEngineChoice is disabled, " +
-                    "CBR is not invoked without the deferred engine-choice path.",
-            );
-            return;
-        }
-
         setPlanRankerConfig(db, {
             internalQueryPlanRanker: "costBased",
             internalQueryCBRCEMode: "samplingCE",

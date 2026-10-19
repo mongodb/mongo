@@ -82,11 +82,6 @@ std::unique_ptr<QuerySolution> IdHackPlanner::extractQuerySolution() {
 }
 
 PlanRankingResult IdHackPlanner::extractPlanRankingResult() {
-    tassert(11974301,
-            "Expected `extractPlanRankingResult` to only be called with get executor deferred "
-            "feature flag enabled.",
-            cq()->getExpCtx()->getIfrContext()->getSavedFlagValue(
-                feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice));
     return PlanRankingResult{.usedIdhack = true,
                              .execState = SavedExecState{ClassicExecState{.workingSet = extractWs(),
                                                                           .root = extractRoot()}},

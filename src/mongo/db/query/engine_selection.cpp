@@ -93,16 +93,6 @@ bool isQuerySbeCompatible(const CollectionPtr& collection,
         return false;
     }
 
-
-    // Queries against collections with a particular shape of compound hashed indexes are not
-    // supported.
-    const bool deferredExecutorEnabled = cq.getExpCtx()->getIfrContext()->getSavedFlagValue(
-        feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice);
-    if (!deferredExecutorEnabled && collection &&
-        collectionHasIndexWithHashedPathPrefixOfNonHashedPath(collection, expCtx)) {
-        return false;
-    }
-
     // Find and aggregate queries with the $_startAt parameter are not supported in SBE.
     if (!cq.getFindCommandRequest().getStartAt().isEmpty()) {
         return false;
@@ -150,37 +140,6 @@ EngineSelectionResult shouldUseRegularSbeDeferredEngineSelection(
     extendSolutionWithPipelineFn();
     return engineSelectionForPlan(solution, dataAccessNode, *cq.getExpCtx()->getIfrContext());
 }
-
-/**
- * Function which returns true if 'cq' uses features that are currently supported in SBE without
- * 'featureFlagSbeFull' being set; false otherwise.
- */
-EngineChoice shouldUseRegularSbe(OperationContext* opCtx,
-                                 const CanonicalQuery& cq,
-                                 const CollectionPtr& mainCollection,
-                                 const bool sbeFull) {
-    // When featureFlagSbeFull is not enabled, we cannot use SBE unless 'trySbeEngine' is enabled or
-    // if 'trySbeRestricted' is enabled, and we have eligible pushed down stages in the cq pipeline.
-    auto& queryKnob = cq.getExpCtx()->getQueryKnobConfiguration();
-    if (!queryKnob.canPushDownFullyCompatibleStages() && cq.cqPipeline().empty()) {
-        return EngineChoice::kClassic;
-    }
-
-    if (mainCollection && mainCollection->isTimeseriesCollection() && cq.cqPipeline().empty()) {
-        // TS queries only use SBE when there's a pipeline.
-        return EngineChoice::kClassic;
-    }
-
-    // Return true if all the expressions in the CanonicalQuery's filter and projection are SBE
-    // compatible.
-    SbeCompatibility minRequiredCompatibility =
-        getMinRequiredSbeCompatibility(queryKnob.getInternalQueryFrameworkControlForOp(), sbeFull);
-    if (cq.getExpCtx()->getSbeCompatibility() >= minRequiredCompatibility) {
-        return EngineChoice::kSbe;
-    }
-
-    return EngineChoice::kClassic;
-}
 }  // namespace
 
 EngineSelectionResult chooseEngine(OperationContext* opCtx,
@@ -192,13 +151,7 @@ EngineSelectionResult chooseEngine(OperationContext* opCtx,
                                    const QuerySolution* solution,
                                    const std::function<void()>& extendSolutionWithPipelineFn) {
     const bool hasSolution = solution != nullptr;
-    const bool deferredEngineChoice = cq->getExpCtx()->getIfrContext()->getSavedFlagValue(
-        feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice);
-    tassert(11742301,
-            "Expected to choose engine based on solution only if "
-            "featureFlagGetExecutorDeferredEngineChoice is "
-            "enabled.",
-            hasSolution == deferredEngineChoice);
+    tassert(11742301, "Expected to choose engine based on the winning solution.", hasSolution);
 
     const auto& mainColl = collections.getMainCollection();
     const bool forceClassic =
@@ -208,18 +161,15 @@ EngineSelectionResult chooseEngine(OperationContext* opCtx,
     }
 
     // Add the stages that are candidates for SBE lowering from the 'pipeline' into the
-    // 'canonicalQuery'. This must be done _before_ checking shouldUseRegularSbe() or
-    // creating the planner.
+    // 'canonicalQuery'. This must be done _before_ engine selection.
     attachPipelineStages(collections, pipeline, needsMerge, cq, std::move(plannerParams));
 
     const bool sbeFull = feature_flags::gFeatureFlagSbeFull.isEnabled();
     if (sbeFull) {
         return {EngineChoice::kSbe, nullptr};
     }
-    return deferredEngineChoice
-        ? shouldUseRegularSbeDeferredEngineSelection(
-              opCtx, *cq, mainColl, sbeFull, solution, extendSolutionWithPipelineFn)
-        : EngineSelectionResult{shouldUseRegularSbe(opCtx, *cq, mainColl, sbeFull), nullptr};
+    return shouldUseRegularSbeDeferredEngineSelection(
+        opCtx, *cq, mainColl, sbeFull, solution, extendSolutionWithPipelineFn);
 }
 
 EngineChoice extendSolutionAndSelectEngine(std::unique_ptr<QuerySolution>& solution,

@@ -26,7 +26,6 @@ const queriesShouldUseSbe = (function () {
     }
 
     const requiredFlags = [
-        "GetExecutorDeferredEngineChoice",
         "SbeEqLookupUnwindHashJoin",
         "SbeEqLookupUnwindIndexedLoopJoin",
         "SbeEqLookupUnwindNestedLoopJoin",

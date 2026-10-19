@@ -28,7 +28,6 @@ describe("nonLeadingPushdown metrics", function () {
         db = conn.getDB(jsTestName());
 
         if (
-            !FeatureFlagUtil.isEnabled(db, "GetExecutorDeferredEngineChoice") ||
             !FeatureFlagUtil.isEnabled(db, "SbeNonLeadingMatch") ||
             !FeatureFlagUtil.isEnabled(db, "SbeTransformStages")
         ) {
@@ -224,7 +223,6 @@ describe("nonLeadingPushdown metrics with some disabled feature flags", function
         db = conn.getDB(jsTestName());
 
         if (
-            !FeatureFlagUtil.isEnabled(db, "GetExecutorDeferredEngineChoice") ||
             FeatureFlagUtil.isEnabled(db, "SbeNonLeadingMatch") ||
             FeatureFlagUtil.isEnabled(db, "SbeTransformStages")
         ) {

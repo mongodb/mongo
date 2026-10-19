@@ -58,28 +58,13 @@ function assertLuUsage(flags, expectedEngine) {
 
 assertLuUsage(
     {
-        featureFlagGetExecutorDeferredEngineChoice: true,
         featureFlagSbeEqLookupUnwindHashJoin: true,
         featureFlagSbeEqLookupUnwindLocalCollscan: true,
     },
     "sbe",
 );
-// We require the deferred get executor to be on for LU to be used.
-assertLuUsage({featureFlagGetExecutorDeferredEngineChoice: false}, "classic");
 // forceClassic should force LU to use classic, even with the deferred get executor on.
-assertLuUsage(
-    {
-        featureFlagGetExecutorDeferredEngineChoice: true,
-        internalQueryFrameworkControl: "forceClassicEngine",
-    },
-    "classic",
-);
+assertLuUsage({internalQueryFrameworkControl: "forceClassicEngine"}, "classic");
 // SBE full and trySBE should force LU to use SBE, even with the deferred get executor off.
-assertLuUsage({featureFlagGetExecutorDeferredEngineChoice: false, featureFlagSbeFull: true}, "sbe");
-assertLuUsage(
-    {
-        featureFlagGetExecutorDeferredEngineChoice: false,
-        internalQueryFrameworkControl: "trySbeEngine",
-    },
-    "sbe",
-);
+assertLuUsage({featureFlagSbeFull: true}, "sbe");
+assertLuUsage({internalQueryFrameworkControl: "trySbeEngine"}, "sbe");

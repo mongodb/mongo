@@ -35,11 +35,6 @@ PreComputedRankingResultPlanner::PreComputedRankingResultPlanner(PlannerData pla
       _result(std::move(result)) {}
 
 PlanRankingResult PreComputedRankingResultPlanner::extractPlanRankingResult() {
-    tassert(11282302,
-            "Expected `extractPlanRankingResult` to only be called with get executor deferred "
-            "feature flag enabled.",
-            cq()->getExpCtx()->getIfrContext()->getSavedFlagValue(
-                feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice));
     return std::move(_result);
 }
 

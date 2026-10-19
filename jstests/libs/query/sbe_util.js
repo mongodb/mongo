@@ -163,18 +163,8 @@ export function checkSbeNonLeadingMatchEnabled(theDB) {
 }
 
 export function isDeferredGetExecutorEnabled(theDB) {
-    if (theDB !== null) {
-        return discoverNodesAndCheck(theDB, (conn) => {
-            return FeatureFlagUtil.isPresentAndEnabled(conn, "GetExecutorDeferredEngineChoice");
-        });
-    } else {
-        // If we don't have a database available, we can only look at the TestData to see what
-        // parameters resmoke was given.
-        return (
-            TestData.setParameters.featureFlagGetExecutorDeferredEngineChoice &&
-            TestData.setParameters.featureFlagGetExecutorDeferredEngineChoice === "true"
-        );
-    }
+    // TODO SERVER-137028 delete this function.
+    return true;
 }
 
 /**

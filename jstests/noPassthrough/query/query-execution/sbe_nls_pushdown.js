@@ -80,12 +80,10 @@ function runAllExamples() {
     for (const flags of [
         {
             featureFlagSbeNonLeadingMatch: false,
-            featureFlagGetExecutorDeferredEngineChoice: false,
             featureFlagSbeTransformStages: false,
         },
         {
             featureFlagSbeNonLeadingMatch: true,
-            featureFlagGetExecutorDeferredEngineChoice: true,
             featureFlagSbeTransformStages: true,
         },
     ]) {

@@ -401,13 +401,6 @@ feature_flags:
         fcv_gated: false
         incremental_rollout_phase: in_development
 
-    featureFlagGetExecutorDeferredEngineChoice:
-        description: "Feature flag to enable engine selection based on query plan, rather than query text."
-        cpp_varname: gFeatureFlagGetExecutorDeferredEngineChoice
-        fcv_gated: false
-        default: true
-        incremental_rollout_phase: release
-
     featureFlagImprovedDepsAnalysis:
         description: "Feature flag to enable pipeline rewrites that require a dependency graph"
         cpp_varname: gFeatureFlagImprovedDepsAnalysis

@@ -563,7 +563,6 @@ function defineSuiteForRanker(frameworkControl, ranker, cases) {
             conn = MongoRunner.runMongod({
                 setParameter: {
                     featureFlagCostBasedRanker: true,
-                    featureFlagGetExecutorDeferredEngineChoice: true,
                     internalQueryFrameworkControl: frameworkControl,
                     internalQueryPlanRanker: ranker,
                 },

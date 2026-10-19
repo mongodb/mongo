@@ -24,11 +24,7 @@ import {
 import {after, describe, it} from "jstests/libs/mochalite.js";
 import {checkSbeCompletelyDisabled, checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
-const conn = MongoRunner.runMongod({
-    setParameter: {
-        featureFlagGetExecutorDeferredEngineChoice: true,
-    },
-});
+const conn = MongoRunner.runMongod();
 assert.neq(conn, null, "mongod failed to start up");
 const db = conn.getDB(jsTestName());
 if (checkSbeCompletelyDisabled(db) || checkSbeFullyEnabled(db)) {

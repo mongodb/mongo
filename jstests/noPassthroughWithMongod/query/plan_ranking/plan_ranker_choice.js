@@ -22,14 +22,14 @@ import {
     getPlanRankerConfig,
 } from "jstests/libs/query/cbr_utils.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
+import {checkSbeFullyEnabled, isDeferredGetExecutorEnabled} from "jstests/libs/query/sbe_util.js";
 import {LcgRandom} from "jstests/libs/lcg_random.js";
 
 // In the legacy (non-deferred) getExecutor path, CBR is disabled for queries that will be
 // executed via SBE.
 // TODO SERVER-119581: Once the feature flag controlling the deferred engine selection is
 // deleted, this block should be able to be deleted.
-if (checkSbeFullyEnabled(db) && !FeatureFlagUtil.isEnabled(db, "GetExecutorDeferredEngineChoice")) {
+if (checkSbeFullyEnabled(db) && !isDeferredGetExecutorEnabled(db)) {
     jsTestLog(
         `Skipping ${jsTestName()}: CBR is not run for SBE plans without deferred engine choice`,
     );

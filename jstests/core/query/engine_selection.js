@@ -37,15 +37,11 @@ const trySbeEngineSet = frameworkControl.internalQueryFrameworkControl === "tryS
 const ffSbeFull = FeatureFlagUtil.isPresentAndEnabled(db, "SbeFull");
 const ffSbeTransformStages = FeatureFlagUtil.isPresentAndEnabled(db, "SbeTransformStages");
 const ffSbeNonLeadingMatch = FeatureFlagUtil.isPresentAndEnabled(db, "SbeNonLeadingMatch");
-const ffGetExecutorDeferredEngineChoice = FeatureFlagUtil.isPresentAndEnabled(
-    db,
-    "GetExecutorDeferredEngineChoice",
-);
 const ffSbeEqLookupUnwindHashJoin = FeatureFlagUtil.isPresentAndEnabled(
     db,
     "SbeEqLookupUnwindHashJoin",
 );
-const lookupUnwindPushesDown = ffGetExecutorDeferredEngineChoice && ffSbeEqLookupUnwindHashJoin;
+const lookupUnwindPushesDown = ffSbeEqLookupUnwindHashJoin;
 const sbeFullyEnabled = ffSbeFull || trySbeEngineSet;
 
 const coll = db.coll;

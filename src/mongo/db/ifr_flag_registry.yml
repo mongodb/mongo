@@ -40,7 +40,6 @@ release:
   featureFlagCostBasedRanker: {}
   featureFlagExtensionsInsideHybridSearch: {}
   featureFlagExtractFieldPathsSbeStage: {}
-  featureFlagGetExecutorDeferredEngineChoice: {}
   featureFlagImprovedDepsAnalysis: {}
   featureFlagMultiPlanLimiter: {}
   featureFlagSbeAccumulators: {}

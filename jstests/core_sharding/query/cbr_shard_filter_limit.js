@@ -43,19 +43,8 @@ const mongodDb = FixtureHelpers.isMongos(db)
 // executed via SBE. When we are running in the legacy getExecutor path and SBE is fully enabled,
 // then we will always build an SBE plan for the query so CBR will never run as expected in the
 // test.
-// TODO SERVER-119581: Once the feature flag controlling the deferred engine selection is
-// deleted, this block should be able to be deleted.
-const canRunCBR = !(
-    checkSbeFullyEnabled(mongodDb) &&
-    !FeatureFlagUtil.isEnabled(mongodDb, "GetExecutorDeferredEngineChoice")
-);
-if (!canRunCBR) {
-    jsTest.log.info(
-        `Skipping ${jsTestName()}: CBR is not run for SBE plans without deferred engine choice`,
-    );
-}
 
-(canRunCBR ? describe : describe.skip)("a limit above a shard filter", function () {
+describe("a limit above a shard filter", function () {
     before(function () {
         prevPlanRankerConfig = getPlanRankerConfig(mongodDb);
         setPlanRankerConfigOnAllNonConfigNodes(db.getMongo(), {

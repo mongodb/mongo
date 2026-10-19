@@ -35,20 +35,6 @@ if (!FeatureFlagUtil.isEnabled(db, "PersistentStats")) {
     quit();
 }
 
-// In the legacy (non-deferred) getExecutor path, CBR is disabled for queries that will be
-// executed via SBE. When we are running in the legacy getExecutor path and SBE is fully enabled,
-// then we will always build an SBE plan for the query so CBR will never run as expected in the
-// test.
-// TODO SERVER-119581: Once the feature flag controlling the deferred engine selection is
-// deleted, this block should be able to be deleted.
-if (checkSbeFullyEnabled(db) && !FeatureFlagUtil.isEnabled(db, "GetExecutorDeferredEngineChoice")) {
-    jsTest.log.info(
-        `Skipping ${jsTestName()}: CBR is not run for SBE plans without deferred engine choice`,
-    );
-    MongoRunner.stopMongod(conn);
-    quit();
-}
-
 const coll = db[kCollName];
 const kSampleSize = PersistentSamplesUtils.defaultSampleSize(db);
 const kNumDocs = 2 * kSampleSize;

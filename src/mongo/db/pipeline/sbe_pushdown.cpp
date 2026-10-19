@@ -119,17 +119,9 @@ struct CompatiblePipelineStages {
 SbeCompatibility determineSbeCompatibility(DocumentSourceLookUp* lookup) {
     // This stage has the SBE compatibility as least the same as that of the expression context.
     SbeCompatibility sbeCompatibility = lookup->getExpCtx()->getSbeCompatibility();
-    if (lookup->hasUnwindSrc()) {
-        if (lookup->getExpCtx()
-                ->getQueryKnobConfiguration()
-                .getSbeDisableLookupUnwindPushdownForOp()) {
-            sbeCompatibility = SbeCompatibility::notCompatible;
-        } else if (!feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice.checkWithContext(
-                       lookup->getExpCtx()->getVersionContext(),
-                       *lookup->getExpCtx()->getIfrContext(),
-                       serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-            sbeCompatibility = std::min(sbeCompatibility, SbeCompatibility::requiresTrySbe);
-        }
+    if (lookup->hasUnwindSrc() &&
+        lookup->getExpCtx()->getQueryKnobConfiguration().getSbeDisableLookupUnwindPushdownForOp()) {
+        sbeCompatibility = SbeCompatibility::notCompatible;
     }
     if (lookup->hasPipeline() || lookup->hasAdditionalFilter()) {
         sbeCompatibility = SbeCompatibility::notCompatible;

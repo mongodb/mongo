@@ -11,9 +11,7 @@
 import {getEngine} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeCompletelyDisabled, checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
-const conn = MongoRunner.runMongod({
-    setParameter: {featureFlagGetExecutorDeferredEngineChoice: true},
-});
+const conn = MongoRunner.runMongod();
 const db = conn.getDB("engine_selection");
 
 // This test expects SBE to be selected, which cannot happen when forceClassicEngine or SBE full

@@ -24,18 +24,6 @@ if (!checkSbeRestrictedOrFullyEnabled(db)) {
     quit();
 }
 
-// featureFlagGetExecutorDeferredEngineChoice gates plan-based engine selection, which is required
-// for $lookup-$unwind to run in SBE. disableUnreleasedIFRFlags can disable it, which would cause the
-// queries to fall back to classic and prevent the lookupUnwind counters from incrementing.
-if (!FeatureFlagUtil.isPresentAndEnabled(db, "GetExecutorDeferredEngineChoice")) {
-    jsTest.log.info(
-        "Skipping test because featureFlagGetExecutorDeferredEngineChoice is disabled " +
-            "(e.g. by disableUnreleasedIFRFlags).",
-    );
-    MongoRunner.stopMongod(conn);
-    quit();
-}
-
 // localNoIdx: no index on join field 'a', outer side uses COLLSCAN
 // localWithIdx: index on join field 'a', outer side uses IXSCAN+FETCH
 // localOrIdx: indexes on 'a' and 'b', outer side uses a complex OR plan

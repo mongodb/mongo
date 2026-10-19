@@ -187,7 +187,6 @@ if (!checkSbeCompletelyDisabled(null)) {
 
     const sbeConn = MongoRunner.runMongod({
         setParameter: {
-            featureFlagGetExecutorDeferredEngineChoice: true,
             featureFlagCostBasedRanker: true,
             internalQueryPlanRanker: "costBased",
             internalQuerySamplingBySequentialScan: true,
