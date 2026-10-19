@@ -399,8 +399,8 @@ ExpressionContextBuilder& ExpressionContextBuilder::nonArrayPathsForNssFrom(
 }
 
 ExpressionContextBuilder& ExpressionContextBuilder::schemaTypeInfoUsageFrom(
-    const ExpressionContext& other) {
-    params.schemaTypeInfoUsed = other._params.schemaTypeInfoUsed;
+    ExpressionContext& other) {
+    params.schemaTypeInfoUsed = other.getOrCreateSchemaTypeInfoUsed();
     return *this;
 }
 

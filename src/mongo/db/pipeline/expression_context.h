@@ -1137,12 +1137,13 @@ public:
     }
 
     // Call when validator-derived type information affects planning for this query.
-    void markSchemaTypeInfoUsed() const {
-        _params.schemaTypeInfoUsed->store(true);
+    void markSchemaTypeInfoUsed() {
+        getOrCreateSchemaTypeInfoUsed()->store(true);
     }
 
     bool hasUsedSchemaTypeInfo() const {
-        return _params.schemaTypeInfoUsed->load();
+        const auto& flag = _params.schemaTypeInfoUsed;
+        return flag && flag->load();
     }
 
 protected:
@@ -1315,9 +1316,20 @@ protected:
         stdx::unordered_map<NamespaceString, std::shared_ptr<const PathArrayness>>
             pathArraynessForNss;
         NonArrayPathsForNss nonArrayPathsForNss;
-        std::shared_ptr<std::atomic<bool>> schemaTypeInfoUsed =
-            std::make_shared<std::atomic<bool>>(false);
+
+        // Tracks whether validator-derived type information affected planning for this query.
+        // Allocated lazily (see 'getOrCreateSchemaTypeInfoUsed') so that queries which never use
+        // schema type info do not pay for a heap allocation.
+        std::shared_ptr<std::atomic<bool>> schemaTypeInfoUsed;
     };
+
+    // Returns the shared schema-type-info-usage flag, allocating it on first use.
+    const std::shared_ptr<std::atomic<bool>>& getOrCreateSchemaTypeInfoUsed() {
+        if (!_params.schemaTypeInfoUsed) {
+            _params.schemaTypeInfoUsed = std::make_shared<std::atomic<bool>>(false);
+        }
+        return _params.schemaTypeInfoUsed;
+    }
 
     ExpressionContextParams _params;
 
