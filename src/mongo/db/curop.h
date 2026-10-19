@@ -559,7 +559,7 @@ public:
     // 'planCacheKey' against concurrent reportDebugInfo() reads from other threads. Mutators
     // must hold it; readers on the operation's own thread need not. Do not acquire the Client
     // lock while holding it, as reportDebugInfo() callers hold the Client lock first.
-    std::unique_lock<std::mutex> lockCrossThreadDebugInfo() {
+    [[nodiscard]] std::unique_lock<std::mutex> lockCrossThreadDebugInfo() {
         return std::unique_lock<std::mutex>(_crossThreadDebugInfoMutex);
     }
 

@@ -490,12 +490,16 @@ void CurOp::_fetchStorageStatsIfNecessary(Date_t deadline, bool isFinal) {
                             Lock::GlobalLockOptions{.skipRSTLLock = true});
         auto storageStats =
             shard_role_details::getRecoveryUnit(opCtx)->computeOperationStatisticsSinceLastCall();
-        auto debugInfoLock = lockCrossThreadDebugInfo();
-        if (_debug.storageStats == nullptr) {
-            _debug.storageStats = std::move(storageStats);
-        } else if (storageStats != nullptr) {
-            *_debug.storageStats += *storageStats;
+        {
+            auto debugInfoLock = lockCrossThreadDebugInfo();
+            if (_debug.storageStats == nullptr) {
+                _debug.storageStats = std::move(storageStats);
+            } else if (storageStats != nullptr) {
+                *_debug.storageStats += *storageStats;
+            }
         }
+        // Only accessed by the operation's own thread, so it is not guarded by the cross-thread
+        // debug info lock.
         _allowStorageStatsUpdate = !isFinal;
     }
 }
