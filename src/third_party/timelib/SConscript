@@ -48,6 +48,7 @@ env.Library(
     source=[
         'dist/astro.c',
         'dist/dow.c',
+        'dist/duration.c',
         'dist/interval.c',
         'dist/parse_date.c',
         'dist/parse_iso_intervals.c',

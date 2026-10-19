@@ -687,7 +687,7 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:github/derickr/timelib@2022.10",
+      "bom-ref": "pkg:github/derickr/timelib@2026.02",
       "authors": [
         {
           "name": "Derick Rethans"
@@ -695,7 +695,7 @@
       ],
       "group": "derickr",
       "name": "timelib",
-      "version": "2022.10",
+      "version": "2026.02",
       "description": "Timelib is a timezone and date/time library that can calculate local time, convert between timezones and parse textual descriptions of date/time information.",
       "scope": "required",
       "licenses": [
@@ -707,7 +707,7 @@
         }
       ],
       "copyright": "Copyright (c) 2015-2021 Derick Rethans, Copyright (c) 2017-2019,2021 MongoDB, Inc.",
-      "purl": "pkg:github/derickr/timelib@2022.10",
+      "purl": "pkg:github/derickr/timelib@2026.02",
       "externalReferences": [
         {
           "url": "https://github.com/derickr/timelib.git",
@@ -2493,7 +2493,7 @@
       "ref": "pkg:github/dcleblanc/safeint@3.0.26"
     },
     {
-      "ref": "pkg:github/derickr/timelib@2022.10"
+      "ref": "pkg:github/derickr/timelib@2026.02"
     },
     {
       "ref": "pkg:github/facebook/folly@v2025.04.21.00"
@@ -2563,7 +2563,7 @@
         "pkg:github/confluentinc/librdkafka@2.0.2",
         "pkg:github/cyrusimap/cyrus-sasl@cyrus-sasl-2.1.28",
         "pkg:github/dcleblanc/safeint@3.0.26",
-        "pkg:github/derickr/timelib@2022.10",
+        "pkg:github/derickr/timelib@2026.02",
         "pkg:github/facebook/folly@v2025.04.21.00",
         "pkg:github/facebook/zstd@v1.5.2",
         "pkg:github/fmtlib/fmt@7.1.3",

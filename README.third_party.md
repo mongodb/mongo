@@ -55,7 +55,7 @@ a notice will be included in
 | [SCons - a Software Construction tool]               | MIT                               | 4.9.1                                    |                      |                                 |
 | [snappy]                                             | BSD-3-Clause                      | 1.1.7                                    | ✗                    | ✗                               |
 | [Snowball Stemming Algorithms (libstemmer)]          | BSD-3-Clause                      | 1.0.0                                    | ✗                    | ✗                               |
-| [timelib]                                            | MIT                               | 2022.10                                  |                      | ✗                               |
+| [timelib]                                            | MIT                               | 2026.02                                  |                      | ✗                               |
 | [Unicode Character Database]                         | Unicode-DFS-2016                  | 8.0.0                                    | ✗                    | ✗                               |
 | [valgrind.h]                                         | BSD-4-Clause                      | 3.17.0                                   |                      | ✗                               |
 | [yaml-cpp]                                           | MIT                               | 0.6.3                                    |                      | ✗                               |
