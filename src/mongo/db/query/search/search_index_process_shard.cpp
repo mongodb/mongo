@@ -40,7 +40,7 @@ SearchIndexProcessShard::fetchCollectionUUIDAndResolveView(OperationContext* opC
         return std::make_pair(catalog->lookupUUIDByNSS(opCtx, nss), boost::none);
     } else {
         auto resolvedView =
-            view_catalog_helpers::resolveView(opCtx, catalog, nss, boost::none).getValue();
+            uassertStatusOK(view_catalog_helpers::resolveView(opCtx, catalog, nss, boost::none));
 
         return std::make_pair(catalog->lookupUUIDByNSS(opCtx, resolvedView.getResolvedNamespace()),
                               boost::make_optional(resolvedView));
