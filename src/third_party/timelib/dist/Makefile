@@ -18,6 +18,7 @@ FLAGS=-O0 -ggdb3 \
 	-Wshadow \
 	-Wsign-compare \
 	-Wsizeof-array-argument \
+	-Wundef \
 	-Wunused-but-set-variable \
 	-Wvariadic-macros \
 	-Wwrite-strings \
@@ -27,7 +28,7 @@ FLAGS=-O0 -ggdb3 \
 	-fno-optimize-sibling-calls \
 	-fstack-protector \
 	-pedantic \
-	-DHAVE_STDINT_H -DHAVE_GETTIMEOFDAY -DHAVE_UNISTD_H -DHAVE_DIRENT_H -I.# -DDEBUG_PARSER
+	-DHAVE_GETTIMEOFDAY -DHAVE_UNISTD_H -DHAVE_DIRENT_H -I.# -DDEBUG_PARSER
 
 CFLAGS_BASE=-Wdeclaration-after-statement ${FLAGS}
 CFLAGS=-fsanitize=address -fsanitize=undefined ${CFLAGS_BASE}
@@ -42,7 +43,7 @@ TEST_LDFLAGS=-lCppUTest
 CC=gcc
 CXX=g++
 
-FILES=parse_iso_intervals.o parse_date.o unixtime2tm.o tm2unixtime.o dow.o parse_tz.o parse_zoneinfo.o timelib.o astro.o interval.o parse_posix.o
+FILES=parse_iso_intervals.o parse_date.o unixtime2tm.o tm2unixtime.o dow.o parse_tz.o parse_zoneinfo.o timelib.o astro.o interval.o parse_posix.o duration.o
 
 MANUAL_TESTS=tests/tester-parse-interval \
 	tests/tester-iso-week tests/test-abbr-to-id \
@@ -59,7 +60,8 @@ C_TESTS=tests/c/timelib_get_current_offset_test.o tests/c/timelib_decimal_hour.o
 	tests/c/parse_date.o tests/c/php-rfc.o tests/c/diff.o tests/c/interval.o \
 	tests/c/timezones_same.o tests/c/diff_days.o \
 	tests/c/timelib_hmsf_to_decimal_hour.o tests/c/dow.o \
-	tests/c/timelib_get_offset_info_test.o tests/c/add.o tests/c/sub.o
+	tests/c/timelib_get_offset_info_test.o tests/c/add.o tests/c/sub.o \
+	tests/c/duration.o
 
 TEST_BINARIES=${MANUAL_TESTS} ${AUTO_TESTS} ctest
 
@@ -70,10 +72,10 @@ all: parse_date.o tm2unixtime.o unixtime2tm.o dow.o astro.o interval.o timelib.a
 		${TEST_BINARIES} ${EXAMPLE_BINARIES}
 
 parse_date.c: timezonemap.h parse_date.re
-	re2c -d -b parse_date.re > parse_date.c
+	re2c -d -b parse_date.re --output parse_date.c
 
 parse_iso_intervals.c: parse_iso_intervals.re
-	re2c -d -b parse_iso_intervals.re > parse_iso_intervals.c
+	re2c -d -b parse_iso_intervals.re --output parse_iso_intervals.c
 
 timelib.a: ${FILES}
 	ar -rc timelib.a ${FILES}
