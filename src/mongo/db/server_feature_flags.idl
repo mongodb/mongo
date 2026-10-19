@@ -75,6 +75,24 @@ feature_flags:
         default: false
         fcv_gated: true
         check_against_fcv: legacy_fcv_snapshot_only
+    # TODO(SERVER-131656): Enable this feature flag once the end-of-transaction change stream work
+    # is fully completed. This flag gates the whole feature: the new multi-shard path (commit
+    # accounting metadata and router-side synthesis) and the existing replica-set / single-shard
+    # applyOps synthesis.
+    #
+    # This flag defaults to false during development, and the IDL forbids specifying a 'version'
+    # for a flag that defaults to false. As a result its FCV floor is currently the binary's latest
+    # FCV. When the project completes and the flag is flipped to 'default: true', add
+    # 'version: "9.0"' so that the feature is FCV-gated on 9.0, matching the
+    # 'showEndOfTransaction' option and the 'allowEndOfTransaction' cluster parameter.
+    featureFlagEndOfTransactionChangeEventSynthesis:
+        description: >-
+            Enable synthesis of endOfTransaction change stream events for sharded transactions from
+            commit-entry accounting metadata, as well as the replica-set / single-shard applyOps
+            synthesis.
+        cpp_varname: feature_flags::gFeatureFlagEndOfTransactionChangeEventSynthesis
+        default: false
+        fcv_gated: true
     featureFlagAllMongodsAreSharded:
         description: "Feature flag to enable and autobootstrap sharding for all mongods"
         cpp_varname: gFeatureFlagAllMongodsAreSharded
