@@ -56,7 +56,7 @@ function resumeAndAssertNotRegressed({
     const resumedCursor = ctx.cst.startWatchingChanges({
         pipeline: [{$changeStream: changeStreamStage}],
         collection: collectionArg,
-        aggregateOptions: {cursor: {batchSize}, maxTimeMS: 3000},
+        aggregateOptions: {cursor: {batchSize}},
     });
 
     const pbrt = resumedCursor.postBatchResumeToken;
@@ -211,7 +211,7 @@ export function runChainedResumePbrtMonotonicTest({ctx, watchMode}) {
             const resumedCursor = ctx.cst.startWatchingChanges({
                 pipeline: [{$changeStream: changeStreamStage}],
                 collection: collectionArg,
-                aggregateOptions: {cursor: {batchSize: 0}, maxTimeMS: 3000},
+                aggregateOptions: {cursor: {batchSize: 0}},
             });
 
             const pbrt1 = resumedCursor.postBatchResumeToken;
@@ -231,7 +231,7 @@ export function runChainedResumePbrtMonotonicTest({ctx, watchMode}) {
             const chainedCursor = ctx.cst.startWatchingChanges({
                 pipeline: [{$changeStream: chainedStage}],
                 collection: collectionArg,
-                aggregateOptions: {cursor: {batchSize: 0}, maxTimeMS: 3000},
+                aggregateOptions: {cursor: {batchSize: 0}},
             });
 
             const pbrt2 = chainedCursor.postBatchResumeToken;
@@ -251,7 +251,7 @@ export function runChainedResumePbrtMonotonicTest({ctx, watchMode}) {
             const deepCursor = ctx.cst.startWatchingChanges({
                 pipeline: [{$changeStream: deepStage}],
                 collection: collectionArg,
-                aggregateOptions: {cursor: {batchSize: 0}, maxTimeMS: 3000},
+                aggregateOptions: {cursor: {batchSize: 0}},
             });
 
             const pbrt3 = deepCursor.postBatchResumeToken;
