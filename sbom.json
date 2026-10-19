@@ -3,9 +3,9 @@
   "bomFormat": "CycloneDX",
   "specVersion": "1.6",
   "serialNumber": "urn:uuid:2d7fbf85-c8b6-4f90-9966-70da88224a36",
-  "version": 18,
+  "version": 19,
   "metadata": {
-    "timestamp": "2026-10-16T08:09:44+00:00",
+    "timestamp": "2026-10-19T08:11:18+00:00",
     "lifecycles": [
       {
         "phase": "pre-build"
@@ -14,7 +14,7 @@
     "tools": [
       {
         "name": "Endor Labs Inc",
-        "version": "v1.7.1196"
+        "version": "v1.7.1201"
       }
     ],
     "component": {
@@ -273,10 +273,10 @@
       "evidence": {
         "occurrences": [
           {
-            "location": "src/mongo/shell/linenoise.cpp"
+            "location": "src/mongo/shell/linenoise.h"
           },
           {
-            "location": "src/mongo/shell/linenoise.h"
+            "location": "src/mongo/shell/linenoise.cpp"
           }
         ],
         "licenses": [
@@ -1890,7 +1890,7 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:github/jeremy-rifkin/cpptrace@v1.0.2",
+      "bom-ref": "pkg:github/jeremy-rifkin/cpptrace@v1.0.3",
       "authors": [
         {
           "name": "Jeremy Rifkin"
@@ -1898,7 +1898,7 @@
       ],
       "group": "jeremy-rifkin",
       "name": "cpptrace",
-      "version": "1.0.2",
+      "version": "1.0.3",
       "description": "Simple, portable, and self-contained stacktrace library for C++11 and newer",
       "scope": "excluded",
       "licenses": [
@@ -1910,7 +1910,7 @@
         }
       ],
       "copyright": "Copyright (c) 2023-2025 Jeremy Rifkin",
-      "purl": "pkg:github/jeremy-rifkin/cpptrace@v1.0.2",
+      "purl": "pkg:github/jeremy-rifkin/cpptrace@v1.0.3",
       "externalReferences": [
         {
           "url": "https://github.com/jeremy-rifkin/cpptrace.git",
@@ -3455,7 +3455,7 @@
       "ref": "pkg:github/jbeder/yaml-cpp@yaml-cpp-0.6.3"
     },
     {
-      "ref": "pkg:github/jeremy-rifkin/cpptrace@v1.0.2"
+      "ref": "pkg:github/jeremy-rifkin/cpptrace@v1.0.3"
     },
     {
       "ref": "pkg:github/json-c/json-c@0.17"
@@ -3520,7 +3520,7 @@
         "pkg:github/gperftools/gperftools@2.9.1",
         "pkg:github/grpc/grpc@1.74.1",
         "pkg:github/jbeder/yaml-cpp@yaml-cpp-0.6.3",
-        "pkg:github/jeremy-rifkin/cpptrace@v1.0.2",
+        "pkg:github/jeremy-rifkin/cpptrace@v1.0.3",
         "pkg:github/json-schema-org/json-schema-test-suite@728066f9c5c258ba3b1804a22a5b998f2ec77ec0",
         "pkg:github/jupp0r/prometheus-cpp@v1.2.2",
         "pkg:github/libtom/libtomcrypt@v1.18.2",

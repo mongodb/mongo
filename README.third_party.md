@@ -29,7 +29,7 @@ a notice will be included in
 | [Boost C++ Libraries]                                | BSL-1.0                                        | 1.88.0                                   |                      | ✗                               |
 | [bzip2]                                              | bzip2-1.0.6                                    | 1.0.8                                    |                      | ✗                               |
 | [c-ares]                                             | MIT                                            | 1.27.0                                   |                      | ✗                               |
-| [cpptrace]                                           | MIT                                            | 1.0.2                                    |                      |                                 |
+| [cpptrace]                                           | MIT                                            | 1.0.3                                    |                      |                                 |
 | [CRoaring]                                           | MIT [3]                                        | 3.0.1                                    |                      | ✗                               |
 | [Cyrus SASL]                                         | BSD-Attribution-HPND-disclaimer                | 2.1.28                                   |                      |                                 |
 | [fmt]                                                | MIT                                            | 11.2.0                                   |                      | ✗                               |
