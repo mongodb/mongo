@@ -20,8 +20,12 @@
 # (ticket, test_file) pair on the last-continuous branch.
 #
 last-patch:
-  all: []
-  suites: {}
+  all:
+    - test_file: jstests/sharding/localhostAuthBypass.js
+      ticket: SERVER-134872
+    - test_file: jstests/replsets/localhostAuthBypass.js
+      ticket: SERVER-134872
+  suites: null
 
 last-continuous:
   all:
