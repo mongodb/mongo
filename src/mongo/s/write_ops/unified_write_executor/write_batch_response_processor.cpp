@@ -510,7 +510,7 @@ void WriteBatchResponseProcessor::noteRetryableError(OperationContext* opCtx,
                     info->getNss(), std::make_pair(info->getShardId(), info->getVersionReceived()));
             }
         }
-        routingCtx.onStaleError(status);
+        routingCtx.onStaleError(status, boost::none /* nss */);
     } else if (status == ErrorCodes::ShardCannotRefreshDueToLocksHeld) {
         LOGV2_DEBUG(10413104,
                     4,

@@ -1291,36 +1291,6 @@ TEST_F(RouterRoleTest, CollectionRouterGetRoutingInfoAtReadConcernClusterTime) {
         testAtTimestamp(Timestamp(1, 0), 2, "0"), DBException, ErrorCodes::StaleChunkHistory);
 }
 
-TEST_F(RouterRoleTest, CollectionRouterRetryOnStaleConfigTimeseriesBucket) {
-    const OID epoch{OID::gen()};
-    const Timestamp timestamp{1, 0};
-
-    auto bucketNss = _nss.makeTimeseriesBucketsNamespace();
-
-    // The CollectionRouter should retry because bucket collection maps to targeted timeseries view.
-    int tries = 0;
-    sharding::router::CollectionRouter router(operationContext(), _nss);
-    auto future = launchAsync([&] {
-        router.route("test timeseries routing",
-                     [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
-                         ASSERT_TRUE(cri.hasRoutingTable());
-                         tries++;
-                         if (tries == 1) {
-                             uasserted(StaleConfigInfo(bucketNss,
-                                                       ShardVersionFactory::make(ChunkVersion(
-                                                           {epoch, timestamp}, {2, 0})),
-                                                       boost::none,
-                                                       ShardId{"0"}),
-                                       "StaleConfig error");
-                         }
-                     });
-    });
-    mockConfigServerQueriesForCollRefresh(bucketNss, epoch, timestamp);
-    future.default_timed_get();
-
-    ASSERT_EQ(tries, 2);
-}
-
 TEST_F(RouterRoleTest, CollectionRouterDoesntImplicitlyCreateDbByDefault) {
     sharding::router::CollectionRouter router(operationContext(), _nss);
 

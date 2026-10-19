@@ -18,10 +18,33 @@
 
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace mongo {
 namespace sharding {
 namespace router {
+
+/**
+ * Invalidates catalog cache entries for stale routing errors. Returns true if the error was a stale
+ * routing error for a targeted namespace and the cache was updated, and false otherwise. If
+ * 'filterUnrelatedNamespaces' is set, a stale error whose namespace is not in 'namespaces' is
+ * treated as not handled.
+ *
+ * @param nss Optional namespace to invalidate. This parameter exists to handle legacy StaleEpoch
+ *            errors that may not contain ExtraInfo with namespace information.
+ *
+ *            This parameter is only consulted for StaleEpoch errors without ExtraInfo. For errors
+ *            with ExtraInfo (StaleConfigInfo, StaleEpochInfo, StaleDbRoutingVersion), the namespace
+ *            is extracted from the ExtraInfo and this parameter is ignored.
+ *
+ * TODO SERVER-109793: Remove the nss parameter once all StaleShardVersion errors are guaranteed to
+ * contain ExtraInfo with namespace information.
+ */
+[[MONGO_MOD_PUBLIC]] bool onStaleError(CatalogCache* catalogCache,
+                                       const Status& status,
+                                       const std::vector<NamespaceString>& namespaces,
+                                       bool filterUnrelatedNamespaces = false,
+                                       boost::optional<const NamespaceString&> nss = boost::none);
 
 class [[MONGO_MOD_PRIVATE]] RouterBase {
 protected:

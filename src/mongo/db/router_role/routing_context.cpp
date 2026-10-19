@@ -6,9 +6,9 @@
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/router_role/router_role.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/grid.h"
-#include "mongo/db/versioning_protocol/stale_exception.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/str.h"
@@ -158,78 +158,14 @@ void RoutingContext::onRequestSentForNss(const NamespaceString& nss) {
 
 void RoutingContext::onStaleError(const Status& status,
                                   boost::optional<const NamespaceString&> nss) {
-
     tassert(11451300,
             str::stream() << "onStaleError called with invalid error category: " << status.code()
                           << ". Expected StaleShardVersionError or StaleDbVersion",
             status.code() == ErrorCodes::StaleDbVersion ||
                 ErrorCodes::isStaleShardVersionError(status));
 
-    if (status.code() == ErrorCodes::StaleDbVersion) {
-        auto si = status.extraInfo<StaleDbRoutingVersion>();
-        // If the database version is stale, refresh its entry in the catalog cache.
-        _catalogCache->onStaleDatabaseVersion(si->getDb(), si->getVersionWanted());
-    } else if (ErrorCodes::isStaleShardVersionError(status)) {
-        // 1. If the exception provides a shardId, add it to the set of shards requiring a refresh.
-        // 2. If the cache currently considers the collection to be unsharded, this will trigger an
-        //    epoch refresh.
-        // 3. If no shard is provided, then the epoch is stale and we must refresh.
-        if (auto si = status.extraInfo<StaleConfigInfo>()) {
-            const auto& staleNs = si->getNss();
-
-            // TODO(SERVER-118822): Remove this once 9.0 becomes last LTS
-            if (staleNs.isTimeseriesBucketsCollection()) {
-                // Legacy timeseries: buckets is tracked. Also invalidate the view namespace
-                // in case it was converted to viewless and now the main namespace is tracked.
-                _catalogCache->onStaleCollectionVersion(staleNs.getTimeseriesViewNamespace(),
-                                                        boost::none);
-            } else if (auto it = _nssRoutingInfoMap.find(staleNs); it != _nssRoutingInfoMap.end()) {
-                const auto& cri = it->second.cri;
-                if (cri.hasRoutingTable() && cri.getChunkManager().isNewTimeseriesWithoutView()) {
-                    // Viewless timeseries: view is tracked. Also invalidate the buckets
-                    // namespace in case it was converted to legacy and now the buckets namespace is
-                    // tracked.
-                    _catalogCache->onStaleCollectionVersion(
-                        staleNs.makeTimeseriesBucketsNamespace(), boost::none);
-                }
-            }
-
-            _catalogCache->onStaleCollectionVersion(staleNs, si->getVersionWanted());
-        } else if (auto sei = status.extraInfo<StaleEpochInfo>()) {
-            const auto& versionWanted = sei->getVersionWanted();
-            if (!versionWanted.has_value() || versionWanted == ShardVersion{}) {
-                // The StaleEpochInfo does not always have a valid `wanted` version.
-                _catalogCache->onStaleCollectionVersion(sei->getNss(), boost::none);
-            } else {
-                _catalogCache->onStaleCollectionVersion(sei->getNss(), versionWanted);
-            }
-        } else {
-            // StaleEpoch errors may not contain ExtraInfo with namespace information.
-            // In such cases, we require the namespace to be passed as a parameter to properly
-            // invalidate the routing cache. This is a legacy behavior that should be removed
-            // once all StaleEpoch errors are guaranteed to contain namespace information.
-            // TODO: SERVER-109793 Remove the optional nss parameter once all StaleShardVersion
-            // errors contain ExtraInfo with namespace information.
-
-            tassert(11451301,
-                    str::stream() << "StaleShardVersion error without ExtraInfo must be "
-                                  << "StaleEpoch error. Error code: " << status.code(),
-                    status.code() == ErrorCodes::StaleEpoch);
-
-            if (nss.has_value()) {
-                _catalogCache->invalidateCollectionEntry_LINEARIZABLE(*nss);
-            } else {
-                // Let's refresh all the namespaces assigned to this RoutingContext if there is no
-                // way to know what are the namespaces with stale routing info
-                // TODO: SERVER-109793 once StaleEpochInfo becomes non-optional, it won't be
-                // possible to reach this `else`. Therefore, we should replace the for below and add
-                // a tassert.
-                for (const auto& [nss, _] : _nssRoutingInfoMap) {
-                    _catalogCache->invalidateCollectionEntry_LINEARIZABLE(nss);
-                }
-            }
-        }
-    }
+    sharding::router::onStaleError(
+        _catalogCache, status, getNssList(), false /* filterUnrelatedNamespaces */, nss);
 }
 
 void RoutingContext::onStaleShardVersionError(const NamespaceString& nss,
