@@ -51,10 +51,20 @@ bazel build //bazel/toolchains/cc/mongo_linux_cross:ppc64le_cross_smoke \
 
 Use the corresponding rhel8 or rhel10 configuration for those targets. The PPC compiler and runtime
 pins come from the published ARM64 toolchain-builder revision
-`1bce2cbf33a4c08af2e73c3b2084e282ca76f3f5` (PRs 154 and 156); no manual S3 upload is needed. The
-smoke target verifies little-endian PPC64, 128-byte alignment, libstdc++, threading support, and the
+`1bce2cbf33a4c08af2e73c3b2084e282ca76f3f5` (PRs 154 and 156); no manual S3 upload is needed. PPC
+builds use the ARM64-hosted LLD 19.1.7 from the pinned `@mongo_toolchain_v5` repository, with its
+executables and supporting libraries declared as Bazel inputs. The newer linker bundled in the PPC
+cross archive is not selected. The existing s390x linker configuration is preserved. The smoke
+target verifies little-endian PPC64, 128-byte alignment, libstdc++, threading support, and the
 generated config header's AltiVec byte-mask behavior. The AltiVec output lane follows the supported
 GCC 14 / Clang 19 ABI, matching master without executing a target probe on the ARM64 host. PPC Rust
 remains disabled by the existing v9.0 build settings. Static release artifacts build on release
 ARM64 distros; shared test archives build on regular ARM64 distros. Native PPC hosts retain unit,
 integration, dbtest, jsCore, and library-test coverage.
+
+Check release linker selection and its declared executables without compiling the smoke binary:
+
+```sh
+bazel test //bazel/toolchains/cc/mongo_linux_cross:ppc_cross_lld_link_test \
+  --config=opt --config=linux-ppc64le-rhel9-cross-gcc-arm64
+```

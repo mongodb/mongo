@@ -425,6 +425,21 @@ toolchain(
 )
 
 
+# Inputs needed when a cross compiler uses this toolchain's native LLD.
+filegroup(
+    name = "lld_files",
+    srcs = [
+        "stow/llvm-{version}/bin/ld.lld",
+        "stow/llvm-{version}/bin/lld",
+    ] + glob([
+        "stow/llvm-{version}/lib/*.so*",
+        "stow/gcc-{version}/lib/*.so*",
+        "stow/gcc-{version}/lib64/*.so*",
+        "stow/libedit-{version}/lib/*.so*",
+        "{version}/lib/*.so*",
+    ]),
+)
+
 # This file group makes it possible to set the clang-tidy configuration setting:
 #   --@bazel_clang_tidy//:clang_tidy_executable=@mongo_toolchain//:clang_tidy
 filegroup(

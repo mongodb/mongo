@@ -2,6 +2,7 @@
 
 load("//bazel:utils.bzl", "retry_download_and_extract")
 load("//bazel/toolchains/cc/mongo_linux:mongo_mold.bzl", "MOLD_MAP")
+load(":mongo_toolchain_flags_v5.bzl", "cross_lld_bin_dir")
 load(":mongo_toolchain_version_v5.bzl", "PPC64LE_GCC_TOOLCHAINS", "S390X_GCC_TOOLCHAINS")
 
 _ENV = "MONGO_LINUX_CROSS_TOOLCHAIN"
@@ -32,10 +33,11 @@ def _cross_toolchain_impl(ctx):
         "stow/gcc-v5/bin/{}-mongodb-linux-gcc".format(ctx.attr.arch),
         "stow/gcc-v5/bin/{}-mongodb-linux-g++".format(ctx.attr.arch),
         "stow/gcc-v5/{}-mongodb-linux/bin/as".format(ctx.attr.arch),
-        "stow/llvm-v5/bin/ld.lld",
     ]:
         if not ctx.path(path).exists:
             fail("GCC cross archive is missing {}".format(path))
+    if ctx.attr.arch == "s390x" and not ctx.path("stow/llvm-v5/bin/ld.lld").exists:
+        fail("GCC cross archive is missing stow/llvm-v5/bin/ld.lld")
     mold = MOLD_MAP["aarch64"]
     retry_download_and_extract(ctx, tries = 5, url = mold["url"], sha256 = mold["sha"])
     substitutions = {
@@ -45,6 +47,7 @@ def _cross_toolchain_impl(ctx):
         "{sysroot_repo_name}": ctx.attr.arch + "_cross_sysroot",
         "{distro}": ctx.attr.distro,
         "{toolchain_repo_name}": ctx.name,
+        "{lld_bin_dir}": cross_lld_bin_dir(ctx.attr.arch, ctx.name),
     }
     ctx.template("BUILD.bazel", ctx.attr.build_tpl, substitutions = substitutions)
     ctx.template("mongo_toolchain_flags.bzl", ctx.attr.flags_tpl, substitutions = substitutions)

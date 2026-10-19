@@ -9,6 +9,7 @@ load(":mongo_toolchain_flags.bzl",
     "COMMON_INCLUDE_DIRECTORIES",
     "COMMON_LINK_FLAGS",
     "GCC_INCLUDE_DIRS",
+    "cross_lld_files",
 )
 load("@{sysroot_repo_name}//:sysroot_info.bzl", "SYSROOT_PATH")
 
@@ -206,6 +207,8 @@ BUILTIN_SYSROOT = SYSROOT_PATH
 EFFECTIVE_BUILTIN_INCLUDE_DIRS = COMMON_BUILTIN_INCLUDE_DIRECTORIES + GCC_INCLUDE_DIRS + COMMON_INCLUDE_DIRECTORIES
 
 # Helper target for the toolchain (see below):
+# Declare PPC's native LLD inputs unconditionally: this filegroup is configured
+# for ARM64 execution, where linker=auto resolves differently than on PPC.
 filegroup(
     name = "all_files",
     srcs = glob(["**/*"]) + select({
@@ -227,7 +230,7 @@ filegroup(
     }) + select ({
         "@//bazel/config:ubsan_enabled": ["@//etc:ubsan_denylist_h"],
         "@//conditions:default": [],
-    }) + ["@{sysroot_repo_name}//:sysroot_files"]
+    }) + cross_lld_files("{arch}") + ["@{sysroot_repo_name}//:sysroot_files"]
 )
 
 feature_attrs = get_common_features_attrs()

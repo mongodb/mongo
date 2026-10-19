@@ -1,4 +1,4 @@
-load(":mongo_linux_cross_toolchain_test.bzl", "matrix_test")
+load(":mongo_linux_cross_toolchain_test.bzl", "matrix_test", "ppc_lld_link_test")
 load(":target_platform_check.bzl", "ppc64le_target_platform_check", "s390x_rust_toolchain_check", "s390x_target_platform_check")
 
 exports_files(glob([
@@ -7,6 +7,12 @@ exports_files(glob([
 ]))
 
 matrix_test(name = "cross_toolchain_matrix_test")
+
+ppc_lld_link_test(
+    name = "ppc_cross_lld_link_test",
+    tags = ["manual"],
+    target_under_test = ":ppc64le_cross_smoke",
+)
 
 s390x_target_platform_check(
     name = "s390x_target_platform_check",
