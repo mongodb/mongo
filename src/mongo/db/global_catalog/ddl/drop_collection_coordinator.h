@@ -70,6 +70,11 @@ public:
 protected:
     bool isInCriticalSection(Phase phase) const override;
 
+    std::set<NamespaceString> _conflictingIndexBuildNamespaces(ShardingCoordinator& self,
+                                                               OperationContext* opCtx) override {
+        return {};
+    }
+
 private:
     const BSONObj _critSecReason;
 

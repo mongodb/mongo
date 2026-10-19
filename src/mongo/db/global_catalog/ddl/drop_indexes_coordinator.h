@@ -28,6 +28,11 @@ public:
 protected:
     bool isInCriticalSection(Phase phase) const override;
 
+    std::set<NamespaceString> _conflictingIndexBuildNamespaces(ShardingCoordinator& self,
+                                                               OperationContext* opCtx) override {
+        return {};
+    }
+
 private:
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
