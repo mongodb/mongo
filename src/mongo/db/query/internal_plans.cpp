@@ -114,7 +114,7 @@ CollectionScanParams createCollectionScanParams(
     boost::optional<RecordIdBound> maxRecord,
     CollectionScanParams::ScanBoundInclusion boundInclusion,
     bool shouldReturnEofOnFilterMismatch,
-    bool tolerateCappedRepositioning) {
+    bool tolerateDeletedScanPosition) {
     const auto& collection = *coll;
     tassert(11321309, "collection must not be null", collection);
 
@@ -123,8 +123,7 @@ CollectionScanParams createCollectionScanParams(
         shouldWaitForOplogVisibility(expCtx->getOperationContext(), collection, false);
 
     if (resumeAfterRecordId) {
-        params.resumeScanPoint =
-            ResumeScanPoint{*resumeAfterRecordId, false /* tolerateKeyNotFound */};
+        params.resumeScanPoint = ResumeScanPoint{*resumeAfterRecordId, tolerateDeletedScanPosition};
     }
 
     params.minRecord = std::move(minRecord);
@@ -136,7 +135,7 @@ CollectionScanParams createCollectionScanParams(
     }
     params.boundInclusion = boundInclusion;
     params.shouldReturnEofOnFilterMismatch = shouldReturnEofOnFilterMismatch;
-    params.tolerateCappedRepositioning = tolerateCappedRepositioning;
+    params.tolerateCappedRepositioning = tolerateDeletedScanPosition;
     return params;
 }
 }  // namespace
@@ -208,7 +207,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::collection
                                                      std::move(params.maxRecord),
                                                      params.boundInclusion,
                                                      params.shouldReturnEofOnFilterMismatch,
-                                                     params.tolerateCappedRepositioning);
+                                                     params.tolerateDeletedScanPosition);
 
     auto cs = _collectionScan(expCtx, ws.get(), params.collection, collScanParams);
 
@@ -279,7 +278,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
                                                      std::move(maxRecord),
                                                      boundInclusion,
                                                      shouldReturnEofOnFilterMismatch,
-                                                     /*tolerateCappedRepositioning=*/false);
+                                                     /*tolerateDeletedScanPosition=*/false);
 
     auto root = _collectionScan(expCtx, ws.get(), coll, collScanParams, filter);
 

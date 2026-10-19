@@ -208,6 +208,6 @@ enum class [[MONGO_MOD_PUBLIC]] CollectionScanDirection {
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     CollectionScanDirection scanDirection,
     const boost::optional<RecordId>& resumeAfterRecordId = boost::none,
-    bool tolerateCappedRepositioning = false);
+    bool tolerateDeletedScanPosition = false);
 
 }  // namespace mongo

@@ -79,7 +79,7 @@ public:
             CollectionScanParams::ScanBoundInclusion::kIncludeBothStartAndEndRecords;
         bool shouldReturnEofOnFilterMismatch = false;
         size_t plannerOptions = 0;
-        bool tolerateCappedRepositioning = false;
+        bool tolerateDeletedScanPosition = false;
     };
 
     /**

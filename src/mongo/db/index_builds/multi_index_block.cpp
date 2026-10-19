@@ -874,7 +874,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
                           shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource()),
                       "error"_attr = ex);
 
-        // Primary-driven builds never read at majority and tolerate capped repositioning, so
+        // Primary-driven builds never read at majority and tolerate deleted scan positions, so
         // neither restart trigger applies to them.
         tassert(11951200,
                 "Primary-driven index build cannot restart collection scan",
@@ -931,7 +931,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
         timer.reset();
 
         try {
-            // Resumable index builds can only be resumed prior to the oplog recovery phase of
+            // Resumable two-phase builds can only be resumed prior to the oplog recovery phase of
             // startup. When restarting the collection scan, any saved index build progress is lost.
             _doCollectionScan(opCtx,
                               *collection,
@@ -1018,13 +1018,14 @@ void MultiIndexBlock::_doCollectionScan(OperationContext* opCtx,
     }
 
     // A primary-driven build does not restart its scan, since its spills may already be replicated.
-    // Skipping records that rolled off is safe since the side writes table records their deletes.
+    // It also resumes on a live replica set, so its resume record may have been deleted. Skipping
+    // deleted records is safe since the side writes table records their deletes.
     _exec = getCollectionScanExecutor(opCtx,
                                       collection,
                                       yieldPolicy,
                                       CollectionScanDirection::kForward,
                                       resumeAfterRecordId,
-                                      /*tolerateCappedRepositioning=*/_method ==
+                                      /*tolerateDeletedScanPosition=*/_method ==
                                           IndexBuildMethodEnum::kPrimaryDriven);
     ON_BLOCK_EXIT([this] {
         _exec.reset();
