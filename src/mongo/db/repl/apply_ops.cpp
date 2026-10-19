@@ -238,9 +238,7 @@ Status _applyOps(OperationContext* opCtx,
                             return Status::OK();
                         }
                         invariant(shard_role_details::getLocker(opCtx)->isW());
-                        if (oplogApplicationMode == OplogApplication::Mode::kApplyOpsCmd) {
-                            detail::checkAuthForUUIDTargetedCommand(opCtx, entry);
-                        }
+                        detail::checkAuthForUUIDTargetedCommand(opCtx, entry);
                         uassertStatusOK(applyCommand_inlock(
                             opCtx, ApplierOperation{&entry}, oplogApplicationMode));
                         return Status::OK();
