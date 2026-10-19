@@ -3,6 +3,9 @@ filters:
   - "*":
     approvers:
       - 10gen/query
+  - "sbe*":
+    approvers:
+      - 10gen/query-execution-sbe
   - "*pbt*":
     approvers:
       - 10gen/query-property-based-testing

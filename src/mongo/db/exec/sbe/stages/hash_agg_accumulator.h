@@ -550,30 +550,27 @@ protected:
 };
 
 /**
- * Single-purpose implementation of the $minN/$maxN accumulators.
+ * Base class for the single-purpose implementation of the $minN/$maxN accumulators.
  */
 template <AccumulatorMinMaxN::MinMaxSense S>
-class MinMaxNHashAggAccumulator : public SinglePurposeHashAggAccumulator {
+class MinMaxNHashAggAccumulatorBase : public SinglePurposeHashAggAccumulator {
 public:
-    MinMaxNHashAggAccumulator(value::SlotId outSlot,
-                              value::SlotId spillSlot,
-                              std::unique_ptr<EExpression> transformExpr,
-                              boost::optional<value::SlotId> collatorSlot,
-                              int64_t maxSize,
-                              int32_t memLimit)
+    MinMaxNHashAggAccumulatorBase(value::SlotId outSlot,
+                                  value::SlotId spillSlot,
+                                  std::unique_ptr<EExpression> transformExpr,
+                                  boost::optional<value::SlotId> collatorSlot,
+                                  std::unique_ptr<EExpression> maxSizeExpr,
+                                  int32_t memLimit)
         : SinglePurposeHashAggAccumulator(
               outSlot, spillSlot, std::move(transformExpr), collatorSlot),
           _collatorSlot(collatorSlot),
-          _maxSize(maxSize),
+          _maxSizeExpr(std::move(maxSizeExpr)),
           _memLimit(memLimit) {}
-
-    std::unique_ptr<HashAggAccumulator> clone() const final {
-        return std::make_unique<MinMaxNHashAggAccumulator<S>>(
-            _outSlot, _spillSlot, _transformExpr->clone(), _collatorSlot, _maxSize, _memLimit);
-    }
 
     void initialize(vm::ByteCode& bytecode,
                     value::AssignableSlotAccessor& accumulatorState) const final;
+
+    size_t estimateSize() const override;
 
 protected:
     void singlePurposePrepare(CompileCtx& ctx) final;
@@ -584,25 +581,67 @@ protected:
     void mergeRecoveredState(value::TagValueMaybeOwned recoveredState,
                              value::MaterializedSingleRowAccessor& accumulatorState) const final;
 
-    void finalizePartialAggregate(value::TagValueOwned partialAggregate,
-                                  value::AssignableSlotAccessor& result) const final;
+    value::TagValueOwned extractHeap(value::TagValueOwned partialAggregate) const;
 
     std::string getDebugName() const final {
         return S == AccumulatorMinMaxN::MinMaxSense::kMin ? "_internalMinN" : "_internalMaxN";
     }
 
-private:
     CollatorInterface* getCollator() const;
 
     boost::optional<value::SlotId> _collatorSlot;
     value::SlotAccessor* _collatorAccessor = nullptr;
-    int64_t _maxSize;
+    std::unique_ptr<EExpression> _maxSizeExpr;
+    std::unique_ptr<vm::CodeFragment> _maxSizeCode;
     int32_t _memLimit;
-    mutable int32_t _memUsage{};
 };
 
-using MinNHashAggAccumulator = MinMaxNHashAggAccumulator<AccumulatorMinMaxN::MinMaxSense::kMin>;
-using MaxNHashAggAccumulator = MinMaxNHashAggAccumulator<AccumulatorMinMaxN::MinMaxSense::kMax>;
+template <AccumulatorMinMaxN::MinMaxSense S>
+class MinMaxNHashAggAccumulatorTerminal : public MinMaxNHashAggAccumulatorBase<S> {
+public:
+    using MinMaxNHashAggAccumulatorBase<S>::MinMaxNHashAggAccumulatorBase;
+
+    std::unique_ptr<HashAggAccumulator> clone() const final {
+        return std::make_unique<MinMaxNHashAggAccumulatorTerminal<S>>(this->_outSlot,
+                                                                      this->_spillSlot,
+                                                                      this->_transformExpr->clone(),
+                                                                      this->_collatorSlot,
+                                                                      this->_maxSizeExpr->clone(),
+                                                                      this->_memLimit);
+    }
+
+protected:
+    void finalizePartialAggregate(value::TagValueOwned partialAggregate,
+                                  value::AssignableSlotAccessor& result) const final;
+};
+
+template <AccumulatorMinMaxN::MinMaxSense S>
+class MinMaxNHashAggAccumulatorPartial : public MinMaxNHashAggAccumulatorBase<S> {
+public:
+    using MinMaxNHashAggAccumulatorBase<S>::MinMaxNHashAggAccumulatorBase;
+
+    std::unique_ptr<HashAggAccumulator> clone() const final {
+        return std::make_unique<MinMaxNHashAggAccumulatorPartial<S>>(this->_outSlot,
+                                                                     this->_spillSlot,
+                                                                     this->_transformExpr->clone(),
+                                                                     this->_collatorSlot,
+                                                                     this->_maxSizeExpr->clone(),
+                                                                     this->_memLimit);
+    }
+
+protected:
+    void finalizePartialAggregate(value::TagValueOwned partialAggregate,
+                                  value::AssignableSlotAccessor& result) const final;
+};
+
+using MinNHashAggAccumulator =
+    MinMaxNHashAggAccumulatorTerminal<AccumulatorMinMaxN::MinMaxSense::kMin>;
+using MaxNHashAggAccumulator =
+    MinMaxNHashAggAccumulatorTerminal<AccumulatorMinMaxN::MinMaxSense::kMax>;
+using MinNHashAggAccumulatorPartial =
+    MinMaxNHashAggAccumulatorPartial<AccumulatorMinMaxN::MinMaxSense::kMin>;
+using MaxNHashAggAccumulatorPartial =
+    MinMaxNHashAggAccumulatorPartial<AccumulatorMinMaxN::MinMaxSense::kMax>;
 
 namespace size_estimator {
 inline size_t estimate(const std::unique_ptr<HashAggAccumulator>& accumulator) {

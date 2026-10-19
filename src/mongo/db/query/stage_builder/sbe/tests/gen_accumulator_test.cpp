@@ -170,14 +170,15 @@ protected:
 
     void runGroupAggregationToFail(std::string_view groupSpec,
                                    std::vector<BSONArray> inputDocs,
-                                   ErrorCodes::Error expectedError,
+                                   std::vector<ErrorCodes::Error> expectedErrors,
                                    std::unique_ptr<CollatorInterface> collator = nullptr) {
         try {
             getResultsForAggregation(fromjson(groupSpec), inputDocs, std::move(collator));
-            ASSERT(false) << "Expected error: " << expectedError << " for " << groupSpec
-                          << " but succeeded";
+            ASSERT(false) << "Expected one of " << expectedErrors.size() << " error codes for "
+                          << groupSpec << " but succeeded";
         } catch (const DBException& e) {
-            ASSERT_TRUE(e.code() == expectedError)
+            ASSERT_TRUE(std::find(expectedErrors.begin(), expectedErrors.end(), e.code()) !=
+                        expectedErrors.end())
                 << "group spec: " << groupSpec << " received error " << e.code();
         }
     }
@@ -368,14 +369,14 @@ TEST_F(SbeStageBuilderGroupTest, TestIdNumericExprOnNonNumericData) {
                                                            << "2"))};
 
     runGroupAggregationToFail(
-        R"({_id: {"$add": ["$a", "$b"]}})", docs, static_cast<ErrorCodes::Error>(7157723));
+        R"({_id: {"$add": ["$a", "$b"]}})", docs, {static_cast<ErrorCodes::Error>(7157723)});
 
     runGroupAggregationToFail(
-        R"({_id: {"$multiply": ["$b", 1000]}})", docs, static_cast<ErrorCodes::Error>(7157721));
+        R"({_id: {"$multiply": ["$b", 1000]}})", docs, {static_cast<ErrorCodes::Error>(7157721)});
 
     runGroupAggregationToFail(R"({_id: {"$divide": [{"$multiply": ["$a", 1000]}, "$b"]}})",
                               docs,
-                              static_cast<ErrorCodes::Error>(7157719));
+                              {static_cast<ErrorCodes::Error>(7157719)});
 }
 
 TEST_F(SbeStageBuilderGroupTest, TestIdObjectExpression) {
@@ -1884,13 +1885,16 @@ TEST_F(SbeStageBuilderGroupTest, MultiAccumulatorInvalidConstantN) {
         "$firstN", "$lastN", "$maxN", "$minN"};
     const std::vector<std::string> outputFieldMultiAccumulators{"$topN", "$bottomN"};
     const std::vector<std::string> testCases{"'string'", "4.2", "-1", "0"};
+    const std::vector<ErrorCodes::Error> inputFieldErrors{static_cast<ErrorCodes::Error>(7548606),
+                                                          static_cast<ErrorCodes::Error>(13224210),
+                                                          static_cast<ErrorCodes::Error>(13224211)};
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 11 << "b" << 1))};
     for (const auto& acc : inputFieldMultiAccumulators) {
         for (const auto& testCase : testCases) {
             runGroupAggregationToFail(str::stream() << "{_id: null, x: {" << acc
                                                     << ": {input: '$a', n: " << testCase << "}}}",
                                       docs,
-                                      static_cast<ErrorCodes::Error>(7548606));
+                                      inputFieldErrors);
         }
     }
     for (const auto& acc : outputFieldMultiAccumulators) {
@@ -1899,7 +1903,7 @@ TEST_F(SbeStageBuilderGroupTest, MultiAccumulatorInvalidConstantN) {
                                                     << ": {output: '$a', sortBy: {s: 1}, n: "
                                                     << testCase << "}}}",
                                       docs,
-                                      static_cast<ErrorCodes::Error>(7548606));
+                                      {static_cast<ErrorCodes::Error>(7548606)});
         }
     }
 }
@@ -1910,6 +1914,10 @@ TEST_F(SbeStageBuilderGroupTest, MultiAccumulatorInvalidDynamicN) {
     const std::vector<std::string> outputFieldMultiAccumulators{"$topN", "$bottomN"};
     const std::vector<BSONObj> testCases{
         BSON("n" << "string"), BSON("n" << 4.2), BSON("n" << -1), BSON("n" << 0)};
+    // The native $minN/$maxN hash agg accumulator validates 'n' with its own error codes.
+    const std::vector<ErrorCodes::Error> inputFieldErrors{static_cast<ErrorCodes::Error>(7548607),
+                                                          static_cast<ErrorCodes::Error>(13224210),
+                                                          static_cast<ErrorCodes::Error>(13224211)};
     for (const auto& acc : inputFieldMultiAccumulators) {
         for (const auto& testCase : testCases) {
             auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 11 << "n1" << testCase))};
@@ -1917,11 +1925,11 @@ TEST_F(SbeStageBuilderGroupTest, MultiAccumulatorInvalidDynamicN) {
             runGroupAggregationToFail(str::stream() << "{_id: null, x: {" << acc
                                                     << ": {input: '$a', n: '$n'}}}",
                                       docs,
-                                      static_cast<ErrorCodes::Error>(7548607));
+                                      inputFieldErrors);
             runGroupAggregationToFail(str::stream() << "{_id: {n: '$n1.n'}, x: {" << acc
                                                     << ": {input: '$a', n: '$n'}}}",
                                       docs,
-                                      static_cast<ErrorCodes::Error>(7548607));
+                                      inputFieldErrors);
         }
     }
     for (const auto& acc : outputFieldMultiAccumulators) {
@@ -1933,12 +1941,12 @@ TEST_F(SbeStageBuilderGroupTest, MultiAccumulatorInvalidDynamicN) {
                                           << "{_id: null, x: {" << acc
                                           << ": {output: '$a', sortBy: {s: 1}, n: '$n'}}}",
                                       docs,
-                                      static_cast<ErrorCodes::Error>(7548607));
+                                      {static_cast<ErrorCodes::Error>(7548607)});
             runGroupAggregationToFail(str::stream()
                                           << "{_id: {n: '$n1.n'}, x: {" << acc
                                           << ": {output: '$a', sortBy: {s: 1}, n: '$n'}}}",
                                       docs,
-                                      static_cast<ErrorCodes::Error>(7548607));
+                                      {static_cast<ErrorCodes::Error>(7548607)});
         }
     }
 }

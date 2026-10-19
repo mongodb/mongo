@@ -745,15 +745,32 @@ SbHashAggAccumulatorVector generateScalarAccumulators(StageBuilderState& state,
             SbSlot spillSlot(state.slotId());
             auto inputExpression =
                 generateExpression(state, accStmt.expr.argument.get(), rootSlot, outputs);
+
+            AccumInputsPtr inputs = [&]() -> AccumInputsPtr {
+                if (accStmt.expr.name == AccumulatorMinN::getName() ||
+                    accStmt.expr.name == AccumulatorMaxN::getName()) {
+                    // Evaluate 'n' against the group key, not against the incoming document.
+                    PlanStageSlots initSlots;
+                    if (initRootSlot) {
+                        initSlots.setResultObj(*initRootSlot);
+                    }
+                    auto initExpr = generateExpression(
+                        state, accStmt.expr.initializer.get(), initRootSlot, initSlots);
+                    return std::make_unique<AddSingleInputWithInit>(std::move(inputExpression),
+                                                                    std::move(initExpr));
+                }
+                return std::make_unique<AddSingleInput>(std::move(inputExpression));
+            }();
+
             accumulatorList.emplace_back(
                 (state.needsMerge && groupNode.willBeMerged)
                     ? accOp.buildSinglePurposeAccumulatorForMerge(state,
-                                                                  std::move(inputExpression),
+                                                                  std::move(inputs),
                                                                   accStmt.fieldName,
                                                                   std::move(outSlot),
                                                                   std::move(spillSlot))
                     : accOp.buildSinglePurposeAccumulator(state,
-                                                          std::move(inputExpression),
+                                                          std::move(inputs),
                                                           accStmt.fieldName,
                                                           std::move(outSlot),
                                                           std::move(spillSlot)));

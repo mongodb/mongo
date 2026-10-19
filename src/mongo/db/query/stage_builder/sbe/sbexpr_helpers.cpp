@@ -763,19 +763,24 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeHashAgg(
         auto outSlot = sbAccumulator.outSlot ? *sbAccumulator.outSlot : SbSlot{_state.slotId()};
         aggOutSlots.emplace_back(outSlot);
 
-        auto implementation =
-            std::visit(OverloadedVisitor{
-                           [](const SbHashAggCompiledAccumulator& impl) -> AccumulatorImpl {
-                               return SbHashAggCompiledAccumulator{
-                                   impl.init.clone(), impl.agg.clone(), impl.merge.clone()};
-                           },
-                           []<class Implementation>(
-                               const SbHashAggSinglePurposeScalarAccumulator<Implementation>& impl)
-                               -> AccumulatorImpl {
-                               return SbHashAggSinglePurposeScalarAccumulator<Implementation>{
-                                   impl.transform.clone()};
-                           }},
-                       sbAccumulator.implementation);
+        auto implementation = std::visit(
+            OverloadedVisitor{
+                [](const SbHashAggCompiledAccumulator& impl) -> AccumulatorImpl {
+                    return SbHashAggCompiledAccumulator{
+                        impl.init.clone(), impl.agg.clone(), impl.merge.clone()};
+                },
+                []<class Implementation>(
+                    const SbHashAggSinglePurposeScalarAccumulator<Implementation>& impl)
+                    -> AccumulatorImpl {
+                    return SbHashAggSinglePurposeScalarAccumulator<Implementation>{
+                        impl.transform.clone()};
+                },
+                []<class Implementation>(
+                    const SbHashAggMinMaxNAccumulator<Implementation>& impl) -> AccumulatorImpl {
+                    return SbHashAggMinMaxNAccumulator<Implementation>{
+                        impl.transform.clone(), impl.maxSizeExpr.clone(), impl.memLimit};
+                }},
+            sbAccumulator.implementation);
 
         accumulators.push_back(
             SbBlueprintHashAggAccumulator{.outSlot = outSlot.getId(),

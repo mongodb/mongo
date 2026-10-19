@@ -948,6 +948,10 @@ struct SbBlueprintHashAgg {
                                              fn(impl.agg);
                                              fn(impl.merge);
                                          },
+                                         [&]<class Impl>(SbHashAggMinMaxNAccumulator<Impl>& impl) {
+                                             fn(impl.transform);
+                                             fn(impl.maxSizeExpr);
+                                         },
                                          [&](auto& impl) {
                                              fn(impl.transform);
                                          }},

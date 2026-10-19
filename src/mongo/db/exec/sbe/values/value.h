@@ -971,6 +971,27 @@ template <typename T>
     }
 }
 
+template <typename T>
+T bitcastToChecked(TypeTags tag, Value val) {
+    static_assert(std::is_same_v<T, int32_t> || std::is_same_v<T, int64_t>,
+                  "bitcastToChecked is only supported for int32_t and int64_t");
+    if constexpr (std::is_same_v<T, int32_t>) {
+        tassert(
+            13224219, "Expected value to have 32-bit integer type", tag == TypeTags::NumberInt32);
+    } else if constexpr (std::is_same_v<T, int64_t>) {
+        tassert(
+            13224220, "Expected value to have 64-bit integer type", tag == TypeTags::NumberInt64);
+    } else {
+        tasserted(13224221, "bitcastToChecked is only supported for int32_t and int64_t");
+    }
+    return bitcastTo<T>(val);
+}
+
+template <typename T>
+T bitcastToChecked(TagValueView v) {
+    return bitcastToChecked<T>(v.tag, v.value);
+}
+
 /**
  * Defines hash value for <TypeTags, Value> pair. To be used in associative containers.
  */
@@ -2072,6 +2093,19 @@ inline std::pair<TypeTags, Value> makeCopyArrayMultiSet(const ArrayMultiSet& inA
 
 inline Array* getArrayView(Value val) noexcept {
     return reinterpret_cast<Array*>(val);
+}
+
+inline Array* getArrayViewChecked(TypeTags tag, Value val) {
+    tassert(13224218, "Expected value to have array type", tag == TypeTags::Array);
+    return getArrayView(val);
+}
+
+inline Array* getArrayViewChecked(TagValueView v) {
+    return getArrayViewChecked(v.tag, v.value);
+}
+
+inline Array* getArrayViewChecked(const TagValueOwned& v) {
+    return getArrayViewChecked(v.tag(), v.value());
 }
 
 inline ArraySet* getArraySetView(Value val) noexcept {

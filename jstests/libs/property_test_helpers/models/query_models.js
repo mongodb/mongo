@@ -165,7 +165,14 @@ export function getAggPipelineArb({
 
 export function getTrySbeRestrictedPushdownEligibleAggPipelineArb(
     foreignCollName,
-    {allowOrs = true, deterministicBag = true, allowedStages = [], isTS = false} = {},
+    {
+        allowOrs = true,
+        deterministicBag = true,
+        allowedStages = [],
+        isTS = false,
+        groupStageArb = groupArb,
+        includeLookup = true,
+    } = {},
 ) {
     // This list is ordered from simplest to most complex. This works best for fast check minimization.
     const stages = [
@@ -176,15 +183,24 @@ export function getTrySbeRestrictedPushdownEligibleAggPipelineArb(
         computedProjectArb,
         addFieldsVarArb,
         replaceRootArb,
-        groupArb,
-        getEqLookupArb(foreignCollName),
+        groupStageArb,
     ];
+    if (includeLookup) {
+        stages.push(getEqLookupArb(foreignCollName));
+    }
     return fc.array(oneof(...stages), {minLength: 1, maxLength: 6});
 }
 
 export function getTrySbeEnginePushdownEligibleAggPipelineArb(
     foreignCollName,
-    {allowOrs = true, deterministicBag = true, allowedStages = [], isTS = false} = {},
+    {
+        allowOrs = true,
+        deterministicBag = true,
+        allowedStages = [],
+        isTS = false,
+        groupStageArb = groupArb,
+        includeLookup = true,
+    } = {},
 ) {
     // This list is ordered from simplest to most complex. This works best for fast check minimization.
     // Not yet included, $window and $unwind.
@@ -201,17 +217,27 @@ export function getTrySbeEnginePushdownEligibleAggPipelineArb(
         addFieldsVarArb,
         replaceRootArb,
         getSortArb(),
-        groupArb,
-        getEqLookupArb(fc.constantFrom(foreignCollName)),
-        getEqLookupUnwindArb(foreignCollName),
+        groupStageArb,
     );
+    if (includeLookup) {
+        stages.push(
+            getEqLookupArb(fc.constantFrom(foreignCollName)),
+            getEqLookupUnwindArb(foreignCollName),
+        );
+    }
     // eqLookupUnwind returns a javascript array; flatten that here.
     return fc.array(oneof(...stages), {minLength: 1, maxLength: 6}).map((item) => item.flat());
 }
 
 export function getSbeFullPushdownEligibleAggPipelineArb(
     foreignCollName,
-    {allowOrs = true, deterministicBag = true, allowedStages = [], isTS = false} = {},
+    {
+        allowOrs = true,
+        deterministicBag = true,
+        allowedStages = [],
+        isTS = false,
+        groupStageArb = groupArb,
+    } = {},
 ) {
     // TODO SERVER-122621: Add $unwind/$search/$searchMeta arb when available
     return getTrySbeEnginePushdownEligibleAggPipelineArb(foreignCollName, {
@@ -219,6 +245,7 @@ export function getSbeFullPushdownEligibleAggPipelineArb(
         deterministicBag,
         allowedStages,
         isTS,
+        groupStageArb,
     });
 }
 

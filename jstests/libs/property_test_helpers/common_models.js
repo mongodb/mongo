@@ -22,10 +22,11 @@ import {
     getMatchArb,
     getMatchPredicateSpec,
 } from "jstests/libs/property_test_helpers/models/match_models.js";
-import {groupArb} from "jstests/libs/property_test_helpers/models/group_models.js";
+import {groupArb, groupMinMaxNArb} from "jstests/libs/property_test_helpers/models/group_models.js";
 import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workload_models.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 import {oneof} from "jstests/libs/property_test_helpers/models/model_utils.js";
+import {checkSbeStatus, kSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 export function createStabilityWorkload(numQueriesPerRun) {
     // TODO SERVER-108077: when this ticket is complete, remove filters and allow ORs.
@@ -155,4 +156,23 @@ export function findLayerOnlyPipeline() {
         getSortArb(),
     );
     return fc.array(findLayerStageArb, {minLength: 0, maxLength: 4});
+}
+
+// SBE-eligible pipeline that uses minN/maxN group accumulator.
+export function minMaxNPushdownEligibleAggModel({isTS = false} = {}) {
+    const fullyEnabled = checkSbeStatus(db) === kSbeFullyEnabled;
+    const pipelineArb = fullyEnabled
+        ? getTrySbeEnginePushdownEligibleAggPipelineArb(/*foreignCollName=*/ null, {
+              isTS,
+              groupStageArb: groupMinMaxNArb,
+              includeLookup: false,
+          })
+        : getTrySbeRestrictedPushdownEligibleAggPipelineArb(/*foreignCollName=*/ null, {
+              isTS,
+              groupStageArb: groupMinMaxNArb,
+              includeLookup: false,
+          });
+    return fc.record({pipeline: pipelineArb}).map(({pipeline}) => {
+        return {pipeline, "options": {}};
+    });
 }

@@ -6,6 +6,7 @@
 #include "mongo/db/exec/sbe/accumulator_sum_value_enum.h"  // countName, partialSumName
 #include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/exec/sbe/util/debug_print.h"
+#include "mongo/db/exec/sbe/values/arith_common.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/db/pipeline/accumulator_multi.h"
@@ -22,6 +23,8 @@
 namespace mongo {
 namespace sbe {
 namespace {
+
+enum NativeMinMaxNStateIndices { kHeap = 0, kMemUsage = 1, kMaxSize = 2, kStateSize = 3 };
 
 template <class Comparator>
 int32_t minMaxNInsert(value::Array* heap,
@@ -634,23 +637,42 @@ void CountHashAggAccumulatorPartial::finalizePartialAggregate(
 }
 
 template <AccumulatorMinMaxN::MinMaxSense S>
-void MinMaxNHashAggAccumulator<S>::initialize(
+void MinMaxNHashAggAccumulatorBase<S>::initialize(
     vm::ByteCode& bytecode, value::AssignableSlotAccessor& accumulatorState) const {
-    _memUsage = 0;
+    auto stateOwned = value::TagValueOwned::fromRaw(value::makeNewArray());
+    auto* state = value::getArrayViewChecked(stateOwned);
 
-    auto [heapTag, heapVal] = value::makeNewArray();
-    accumulatorState.reset(value::TagValueOwned::fromRaw(heapTag, heapVal));
+    state->push_back(value::TagValueOwned::fromRaw(value::makeNewArray()));
+    state->push_back(value::TagValueOwned::numberInt32(0));
+
+    auto maxSizeResult = bytecode.run(_maxSizeCode.get());
+    auto maxSizeConverted =
+        genericNumConvert(maxSizeResult.tag(), maxSizeResult.value(), value::TypeTags::NumberInt64);
+    uassert(13224210,
+            "Expected $minN/$maxN 'n' to be convertible to a 64-bit integer",
+            maxSizeConverted.tag() == value::TypeTags::NumberInt64);
+    auto maxSize = value::bitcastTo<int64_t>(maxSizeConverted.value());
+    uassert(13224211, "Expected $minN/$maxN 'n' to be positive", maxSize > 0);
+    state->push_back(value::TagValueOwned::numberInt64(maxSize));
+
+    accumulatorState.reset(std::move(stateOwned));
 }
 
 template <AccumulatorMinMaxN::MinMaxSense S>
-void MinMaxNHashAggAccumulator<S>::singlePurposePrepare(CompileCtx& ctx) {
+void MinMaxNHashAggAccumulatorBase<S>::singlePurposePrepare(CompileCtx& ctx) {
     if (_collatorSlot) {
         _collatorAccessor = ctx.getAccessor(*_collatorSlot);
     }
+    _maxSizeCode = _maxSizeExpr->compile(ctx);
 }
 
 template <AccumulatorMinMaxN::MinMaxSense S>
-CollatorInterface* MinMaxNHashAggAccumulator<S>::getCollator() const {
+size_t MinMaxNHashAggAccumulatorBase<S>::estimateSize() const {
+    return SinglePurposeHashAggAccumulator::estimateSize() + size_estimator::estimate(_maxSizeExpr);
+}
+
+template <AccumulatorMinMaxN::MinMaxSense S>
+CollatorInterface* MinMaxNHashAggAccumulatorBase<S>::getCollator() const {
     if (!_collatorAccessor) {
         return nullptr;
     }
@@ -660,7 +682,7 @@ CollatorInterface* MinMaxNHashAggAccumulator<S>::getCollator() const {
 }
 
 template <AccumulatorMinMaxN::MinMaxSense S>
-void MinMaxNHashAggAccumulator<S>::accumulateTransformedValue(
+void MinMaxNHashAggAccumulatorBase<S>::accumulateTransformedValue(
     value::TagValueMaybeOwned field, value::AssignableSlotAccessor& accumulatorState) const {
     if (value::isNullish(field.tag())) {
         return;
@@ -670,60 +692,88 @@ void MinMaxNHashAggAccumulator<S>::accumulateTransformedValue(
     value::ValueCompare<less> comp{getCollator()};
 
     auto [stateTag, stateVal] = accumulatorState.getViewOfValue();
-    auto* heap = value::getArrayView(stateVal);
+    auto* state = value::getArrayViewChecked(stateTag, stateVal);
+    tassert(13224213,
+            "Expected $minN/$maxN accumulator state to have the correct number of elements",
+            state->size() == static_cast<size_t>(kStateSize));
+    auto* heap = value::getArrayViewChecked(state->getAt(kHeap));
+    auto memUsage = value::bitcastToChecked<int32_t>(state->getAt(kMemUsage));
+    auto maxSize = static_cast<size_t>(value::bitcastToChecked<int64_t>(state->getAt(kMaxSize)));
 
-    _memUsage = minMaxNInsert(
-        heap, static_cast<size_t>(_maxSize), _memUsage, _memLimit, comp, field.moveToOwned());
+    memUsage = minMaxNInsert(heap, maxSize, memUsage, _memLimit, comp, field.moveToOwned());
+
+    state->setAt(kMemUsage, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(memUsage));
 }
 
 template <AccumulatorMinMaxN::MinMaxSense S>
-void MinMaxNHashAggAccumulator<S>::mergeRecoveredState(
+void MinMaxNHashAggAccumulatorBase<S>::mergeRecoveredState(
     value::TagValueMaybeOwned recoveredState,
     value::MaterializedSingleRowAccessor& accumulatorState) const {
-    tassert(13199701,
-            "Expected recovered partial aggregate to have array type",
-            recoveredState.tag() == value::TypeTags::Array);
-    auto* recoveredHeap = value::getArrayView(recoveredState.value());
+    auto* recoveredStateArray =
+        value::getArrayViewChecked(recoveredState.tag(), recoveredState.value());
+    tassert(13224202,
+            "Expected recovered partial aggregate to have the correct number of elements",
+            recoveredStateArray->size() == static_cast<size_t>(kStateSize));
+    auto* recoveredHeap = value::getArrayViewChecked(recoveredStateArray->getAt(kHeap));
 
     constexpr bool less = S == AccumulatorMinMaxN::MinMaxSense::kMin;
     value::ValueCompare<less> comp{getCollator()};
 
     auto [mergeStateTag, mergeStateVal] = accumulatorState.getViewOfValue();
-    tassert(13199705,
-            "Expected merge partial aggregate to have array type",
-            mergeStateTag == value::TypeTags::Array);
-    auto* mergeHeap = value::getArrayView(mergeStateVal);
-
-    _memUsage = 0;
-    for (const auto& elem : mergeHeap->values()) {
-        _memUsage += value::getApproximateSize(elem.first, elem.second);
-    }
+    auto* mergeState = value::getArrayViewChecked(mergeStateTag, mergeStateVal);
+    tassert(13224206,
+            "Expected merge partial aggregate to have the correct number of elements",
+            mergeState->size() == static_cast<size_t>(kStateSize));
+    auto* mergeHeap = value::getArrayViewChecked(mergeState->getAt(kHeap));
+    auto mergeMemUsage = value::bitcastToChecked<int32_t>(mergeState->getAt(kMemUsage));
+    auto maxSize =
+        static_cast<size_t>(value::bitcastToChecked<int64_t>(mergeState->getAt(kMaxSize)));
 
     for (size_t i = 0; i < recoveredHeap->size(); ++i) {
         value::TagValueOwned field = recoveredHeap->swapAt(i, value::TypeTags::Null, 0);
-        _memUsage = minMaxNInsert(
-            mergeHeap, static_cast<size_t>(_maxSize), _memUsage, _memLimit, comp, std::move(field));
+        mergeMemUsage =
+            minMaxNInsert(mergeHeap, maxSize, mergeMemUsage, _memLimit, comp, std::move(field));
     }
+
+    mergeState->setAt(
+        kMemUsage, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(mergeMemUsage));
 }
 
 template <AccumulatorMinMaxN::MinMaxSense S>
-void MinMaxNHashAggAccumulator<S>::finalizePartialAggregate(
-    value::TagValueOwned partialAggregate, value::AssignableSlotAccessor& result) const {
-    tassert(13199704,
-            "Expected partial aggregate to have array type before finalization",
-            partialAggregate.tag() == value::TypeTags::Array);
-
-    auto* heap = value::getArrayView(partialAggregate.value());
-
-    constexpr bool less = S == AccumulatorMinMaxN::MinMaxSense::kMin;
-    value::ValueCompare<less> comp{getCollator()};
-    std::sort_heap(heap->values().begin(), heap->values().end(), comp);
-
-    result.reset(std::move(partialAggregate));
+value::TagValueOwned MinMaxNHashAggAccumulatorBase<S>::extractHeap(
+    value::TagValueOwned partialAggregate) const {
+    auto* state = value::getArrayViewChecked(partialAggregate);
+    value::getArrayViewChecked(state->getAt(kHeap));
+    return state->swapAt(kHeap, value::TypeTags::Null, 0);
 }
 
-template class MinMaxNHashAggAccumulator<AccumulatorMinMaxN::MinMaxSense::kMin>;
-template class MinMaxNHashAggAccumulator<AccumulatorMinMaxN::MinMaxSense::kMax>;
+template <AccumulatorMinMaxN::MinMaxSense S>
+void MinMaxNHashAggAccumulatorTerminal<S>::finalizePartialAggregate(
+    value::TagValueOwned partialAggregate, value::AssignableSlotAccessor& result) const {
+    auto heapOwned = this->extractHeap(std::move(partialAggregate));
+    auto* heap = value::getArrayViewChecked(heapOwned);
+
+    constexpr bool less = S == AccumulatorMinMaxN::MinMaxSense::kMin;
+    value::ValueCompare<less> comp{this->getCollator()};
+    std::sort_heap(heap->values().begin(), heap->values().end(), comp);
+
+    result.reset(std::move(heapOwned));
+}
+
+template <AccumulatorMinMaxN::MinMaxSense S>
+void MinMaxNHashAggAccumulatorPartial<S>::finalizePartialAggregate(
+    value::TagValueOwned partialAggregate, value::AssignableSlotAccessor& result) const {
+    // Partial aggregates don't need to be sorted; they are merged one-at-a-time.
+    // See MinMaxNHashAggAccumulatorBase<S>::mergeRecoveredState and AccumulatorN::processInternal.
+    result.reset(this->extractHeap(std::move(partialAggregate)));
+}
+
+template class MinMaxNHashAggAccumulatorBase<AccumulatorMinMaxN::MinMaxSense::kMin>;
+template class MinMaxNHashAggAccumulatorBase<AccumulatorMinMaxN::MinMaxSense::kMax>;
+template class MinMaxNHashAggAccumulatorTerminal<AccumulatorMinMaxN::MinMaxSense::kMin>;
+template class MinMaxNHashAggAccumulatorTerminal<AccumulatorMinMaxN::MinMaxSense::kMax>;
+template class MinMaxNHashAggAccumulatorPartial<AccumulatorMinMaxN::MinMaxSense::kMin>;
+template class MinMaxNHashAggAccumulatorPartial<AccumulatorMinMaxN::MinMaxSense::kMax>;
 
 }  // namespace sbe
 }  // namespace mongo

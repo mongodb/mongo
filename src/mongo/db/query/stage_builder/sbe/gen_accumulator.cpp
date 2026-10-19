@@ -89,7 +89,7 @@ template <typename T>
 using BuildSinglePurposeAccumFnType =
     BuildFnType<SbHashAggAccumulator, T, std::string, SbSlot, SbSlot>;
 
-using BuildSinglePurposeAccumFn = BuildSinglePurposeAccumFnType<AddSingleInput>;
+using BuildSinglePurposeAccumFn = BuildSinglePurposeAccumFnType<AccumInputs>;
 
 // std::function type for buildAddExprs() with inputs and without inputs.
 using BuildAccumExprsNoInputsFn = BuildNoInputsFnType<AccumInputsPtr>;
@@ -252,6 +252,27 @@ SbHashAggAccumulator buildSinglePurposeAccum(const AccumOp& acc,
                                     SbHashAggSinglePurposeScalarAccumulator<Implementation>{
                                         .transform = std::move(inputs->inputExpr),
                                     }};
+}
+
+template <class Implementation>
+SbHashAggAccumulator buildSinglePurposeMinMaxNAccum(const AccumOp& acc,
+                                                    std::unique_ptr<AddSingleInputWithInit> inputs,
+                                                    StageBuilderState& state,
+                                                    std::string fieldName,
+                                                    SbSlot outSlot,
+                                                    SbSlot spillSlot) {
+    SbExprBuilder b(state);
+    return SbHashAggAccumulator{
+        .fieldName = fieldName,
+        .outSlot = outSlot,
+        .spillSlot = std::move(spillSlot),
+        .resultExpr = SbExpr{outSlot},
+        .implementation = SbHashAggMinMaxNAccumulator<Implementation>{
+            .transform = b.makeFunction(sbe::EFn::kSetToArray, std::move(inputs->inputExpr)),
+            .maxSizeExpr = std::move(inputs->initExpr),
+            .memLimit = static_cast<int32_t>(
+                state.expCtx->getQueryKnobConfiguration().getTopNAccumulatorBytes()),
+        }};
 }
 
 /**
@@ -1603,7 +1624,11 @@ static const StringDataMap<AccumOpInfo> accumOpInfoMap = {
 
     // MaxN
     {AccumulatorMaxN::kName,
-     AccumOpInfo{.buildAddExprs = makeBuildFn(&buildAccumExprsMinMaxN),
+     AccumOpInfo{.buildSinglePurposeAccum =
+                     makeBuildFn(&buildSinglePurposeMinMaxNAccum<sbe::MaxNHashAggAccumulator>),
+                 .buildSinglePurposeAccumForMerge = makeBuildFn(
+                     &buildSinglePurposeMinMaxNAccum<sbe::MaxNHashAggAccumulatorPartial>),
+                 .buildAddExprs = makeBuildFn(&buildAccumExprsMinMaxN),
                  .buildAddAggs = makeBuildFn(&buildAccumAggsMinMaxN),
                  .buildInit = makeBuildFn(&buildInitializeAccumN),
                  .buildFinalize = makeBuildFn(&buildFinalizeMinMaxN),
@@ -1626,7 +1651,11 @@ static const StringDataMap<AccumOpInfo> accumOpInfoMap = {
 
     // MinN
     {AccumulatorMinN::kName,
-     AccumOpInfo{.buildAddExprs = makeBuildFn(&buildAccumExprsMinMaxN),
+     AccumOpInfo{.buildSinglePurposeAccum =
+                     makeBuildFn(&buildSinglePurposeMinMaxNAccum<sbe::MinNHashAggAccumulator>),
+                 .buildSinglePurposeAccumForMerge = makeBuildFn(
+                     &buildSinglePurposeMinMaxNAccum<sbe::MinNHashAggAccumulatorPartial>),
+                 .buildAddExprs = makeBuildFn(&buildAccumExprsMinMaxN),
                  .buildAddAggs = makeBuildFn(&buildAccumAggsMinMaxN),
                  .buildInit = makeBuildFn(&buildInitializeAccumN),
                  .buildFinalize = makeBuildFn(&buildFinalizeMinMaxN),
@@ -1728,24 +1757,23 @@ bool AccumOp::canBuildSinglePurposeAccumulator() const {
 }
 
 SbHashAggAccumulator AccumOp::buildSinglePurposeAccumulator(StageBuilderState& state,
-                                                            SbExpr inputExpression,
+                                                            AccumInputsPtr inputs,
                                                             std::string fieldName,
                                                             SbSlot outSlot,
                                                             SbSlot spillSlot) const {
     uassert(11618600,
             str::stream() << "Unsupported Accumulator in SBE accumulator builder: " << _opName,
             _opInfo != nullptr);
-    return _opInfo->buildSinglePurposeAccum(
-        *this,
-        std::make_unique<AddSingleInput>(std::move(inputExpression)),
-        state,
-        std::move(fieldName),
-        std::move(outSlot),
-        std::move(spillSlot));
+    return _opInfo->buildSinglePurposeAccum(*this,
+                                            std::move(inputs),
+                                            state,
+                                            std::move(fieldName),
+                                            std::move(outSlot),
+                                            std::move(spillSlot));
 }
 
 SbHashAggAccumulator AccumOp::buildSinglePurposeAccumulatorForMerge(StageBuilderState& state,
-                                                                    SbExpr inputExpression,
+                                                                    AccumInputsPtr inputs,
                                                                     std::string fieldName,
                                                                     SbSlot outSlot,
                                                                     SbSlot spillSlot) const {
@@ -1756,7 +1784,7 @@ SbHashAggAccumulator AccumOp::buildSinglePurposeAccumulatorForMerge(StageBuilder
         ? _opInfo->buildSinglePurposeAccumForMerge
         : _opInfo->buildSinglePurposeAccum;
     return builderFunction(*this,
-                           std::make_unique<AddSingleInput>(std::move(inputExpression)),
+                           std::move(inputs),
                            state,
                            std::move(fieldName),
                            std::move(outSlot),

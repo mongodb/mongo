@@ -730,6 +730,13 @@ struct SbHashAggSinglePurposeScalarAccumulator {
     SbExpr transform;
 };
 
+template <class Implementation>
+struct SbHashAggMinMaxNAccumulator {
+    SbExpr transform;
+    SbExpr maxSizeExpr;
+    int32_t memLimit;
+};
+
 /**
  * An object that can be lowered into the execute HashAggAccumulator object used by an SBE
  * HashAggStage.
@@ -753,7 +760,11 @@ struct SbHashAggAccumulator {
         SbHashAggSinglePurposeScalarAccumulator<sbe::CountHashAggAccumulatorTerminal>,
         SbHashAggSinglePurposeScalarAccumulator<sbe::CountHashAggAccumulatorPartial>,
         SbHashAggSinglePurposeScalarAccumulator<sbe::FirstHashAggAccumulator>,
-        SbHashAggSinglePurposeScalarAccumulator<sbe::PushHashAggAccumulator>>
+        SbHashAggSinglePurposeScalarAccumulator<sbe::PushHashAggAccumulator>,
+        SbHashAggMinMaxNAccumulator<sbe::MinNHashAggAccumulator>,
+        SbHashAggMinMaxNAccumulator<sbe::MaxNHashAggAccumulator>,
+        SbHashAggMinMaxNAccumulator<sbe::MinNHashAggAccumulatorPartial>,
+        SbHashAggMinMaxNAccumulator<sbe::MaxNHashAggAccumulatorPartial>>
         implementation;
 };
 using SbHashAggAccumulatorVector = std::vector<SbHashAggAccumulator>;

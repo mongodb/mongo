@@ -416,6 +416,30 @@ function testSpillingForVariousAccumulators() {
             {_id: 4, acc: {a: 4, b: 9}},
         ],
     });
+
+    testAccumulator({
+        accumulator: {$minN: {n: 3, input: "$b"}},
+        sortInputBy: "random",
+        expectedOutput: [
+            {_id: 0, acc: [0, 1, 2]},
+            {_id: 1, acc: [100, 101, 102]},
+            {_id: 2, acc: [200, 201, 202]},
+            {_id: 3, acc: [300, 301, 302]},
+            {_id: 4, acc: [400, 401, 402]},
+        ],
+    });
+
+    testAccumulator({
+        accumulator: {$maxN: {n: 3, input: "$b"}},
+        sortInputBy: "random",
+        expectedOutput: [
+            {_id: 0, acc: [9, 8, 7]},
+            {_id: 1, acc: [109, 108, 107]},
+            {_id: 2, acc: [209, 208, 207]},
+            {_id: 3, acc: [309, 308, 307]},
+            {_id: 4, acc: [409, 408, 407]},
+        ],
+    });
 }
 
 (function () {

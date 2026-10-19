@@ -1646,9 +1646,40 @@ TEST_F(HashAggAccumulatorTest, CountHashAggAccumulatorPartialSpilled) {
     ASSERT_BSONOBJ_EQ(BSON_ARRAY(16 << 5.0 << 0.0), resultArr);
 }
 
+TEST_F(HashAggAccumulatorTest, MinNHashAggAccumulatorEstimateSizeIncludesMaxSizeExpr) {
+    MinNHashAggAccumulator smallAccumulator(
+        outSlot(),
+        spillSlot(),
+        makeVariable(inSlot()),
+        boost::none,
+        makeConstant(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(3)),
+        kDefaultCap);
+
+    auto largeMaxSizeExpr =
+        makeConstant(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(3));
+    for (int i = 0; i < 10; ++i) {
+        largeMaxSizeExpr =
+            makeFunction(EFn::kValueBlockAdd, largeMaxSizeExpr->clone(), largeMaxSizeExpr->clone());
+    }
+
+    MinNHashAggAccumulator largeAccumulator(outSlot(),
+                                            spillSlot(),
+                                            makeVariable(inSlot()),
+                                            boost::none,
+                                            largeMaxSizeExpr->clone(),
+                                            kDefaultCap);
+
+    ASSERT_LT(smallAccumulator.estimateSize(), largeAccumulator.estimateSize());
+}
+
 TEST_F(HashAggAccumulatorTest, MinNHashAggAccumulator) {
     MinNHashAggAccumulator accumulator(
-        outSlot(), spillSlot(), makeVariable(inSlot()), boost::none, 3, kDefaultCap);
+        outSlot(),
+        spillSlot(),
+        makeVariable(inSlot()),
+        boost::none,
+        makeConstant(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(3)),
+        kDefaultCap);
 
     vm::ByteCode bytecode;
     accumulator.prepare(compileContext(), &accumulatorState());
@@ -1658,7 +1689,9 @@ TEST_F(HashAggAccumulatorTest, MinNHashAggAccumulator) {
     {
         auto [stateTag, stateVal] = accumulatorState().getViewOfValue();
         ASSERT(value::isArray(stateTag));
-        ASSERT_EQ(value::getArrayView(stateVal)->size(), 0u);
+        auto* state = value::getArrayView(stateVal);
+        auto* heap = value::getArrayView(state->getAt(0).value);
+        ASSERT_EQ(heap->size(), 0u);
     }
 
     inAccessor().reset(value::TagValueView::numberInt32(5));
@@ -1690,7 +1723,12 @@ TEST_F(HashAggAccumulatorTest, MinNHashAggAccumulator) {
 
 TEST_F(HashAggAccumulatorTest, MinNHashAggAccumulatorEmpty) {
     MinNHashAggAccumulator accumulator(
-        outSlot(), spillSlot(), makeVariable(inSlot()), boost::none, 3, kDefaultCap);
+        outSlot(),
+        spillSlot(),
+        makeVariable(inSlot()),
+        boost::none,
+        makeConstant(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(3)),
+        kDefaultCap);
 
     vm::ByteCode bytecode;
     accumulator.prepare(compileContext(), &accumulatorState());
@@ -1711,7 +1749,12 @@ TEST_F(HashAggAccumulatorTest, MinNHashAggAccumulatorEmpty) {
 
 TEST_F(HashAggAccumulatorTest, MinNHashAggAccumulatorIgnoresNulls) {
     MinNHashAggAccumulator accumulator(
-        outSlot(), spillSlot(), makeVariable(inSlot()), boost::none, 3, kDefaultCap);
+        outSlot(),
+        spillSlot(),
+        makeVariable(inSlot()),
+        boost::none,
+        makeConstant(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(3)),
+        kDefaultCap);
 
     vm::ByteCode bytecode;
     accumulator.prepare(compileContext(), &accumulatorState());
@@ -1744,7 +1787,12 @@ TEST_F(HashAggAccumulatorTest, MinNHashAggAccumulatorIgnoresNulls) {
 
 TEST_F(HashAggAccumulatorTest, MinNHashAggAccumulatorReinit) {
     MinNHashAggAccumulator accumulator(
-        outSlot(), spillSlot(), makeVariable(inSlot()), boost::none, 2, kDefaultCap);
+        outSlot(),
+        spillSlot(),
+        makeVariable(inSlot()),
+        boost::none,
+        makeConstant(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(2)),
+        kDefaultCap);
 
     vm::ByteCode bytecode;
     accumulator.prepare(compileContext(), &accumulatorState());
@@ -1794,7 +1842,12 @@ TEST_F(HashAggAccumulatorTest, MinNHashAggAccumulatorReinit) {
 
 TEST_F(HashAggAccumulatorTest, MaxNHashAggAccumulator) {
     MaxNHashAggAccumulator accumulator(
-        outSlot(), spillSlot(), makeVariable(inSlot()), boost::none, 3, kDefaultCap);
+        outSlot(),
+        spillSlot(),
+        makeVariable(inSlot()),
+        boost::none,
+        makeConstant(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(3)),
+        kDefaultCap);
 
     vm::ByteCode bytecode;
     accumulator.prepare(compileContext(), &accumulatorState());
@@ -1830,7 +1883,12 @@ TEST_F(HashAggAccumulatorTest, MaxNHashAggAccumulator) {
 
 TEST_F(HashAggAccumulatorTest, MaxNHashAggAccumulatorEmpty) {
     MaxNHashAggAccumulator accumulator(
-        outSlot(), spillSlot(), makeVariable(inSlot()), boost::none, 3, kDefaultCap);
+        outSlot(),
+        spillSlot(),
+        makeVariable(inSlot()),
+        boost::none,
+        makeConstant(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(3)),
+        kDefaultCap);
 
     vm::ByteCode bytecode;
     accumulator.prepare(compileContext(), &accumulatorState());
@@ -1851,7 +1909,12 @@ TEST_F(HashAggAccumulatorTest, MaxNHashAggAccumulatorEmpty) {
 
 TEST_F(HashAggAccumulatorTest, MinNHashAggAccumulatorSpilled) {
     MinNHashAggAccumulator accumulator(
-        outSlot(), spillSlot(), makeVariable(inSlot()), boost::none, 3, kDefaultCap);
+        outSlot(),
+        spillSlot(),
+        makeVariable(inSlot()),
+        boost::none,
+        makeConstant(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(3)),
+        kDefaultCap);
 
     vm::ByteCode bytecode;
     accumulator.prepare(compileContext(), &accumulatorState());
@@ -1915,7 +1978,12 @@ TEST_F(HashAggAccumulatorTest, MinNHashAggAccumulatorSpilled) {
 
 TEST_F(HashAggAccumulatorTest, MaxNHashAggAccumulatorSpilled) {
     MaxNHashAggAccumulator accumulator(
-        outSlot(), spillSlot(), makeVariable(inSlot()), boost::none, 3, kDefaultCap);
+        outSlot(),
+        spillSlot(),
+        makeVariable(inSlot()),
+        boost::none,
+        makeConstant(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(3)),
+        kDefaultCap);
 
     vm::ByteCode bytecode;
     accumulator.prepare(compileContext(), &accumulatorState());
@@ -1979,7 +2047,12 @@ TEST_F(HashAggAccumulatorTest, MaxNHashAggAccumulatorSpilled) {
 
 TEST_F(HashAggAccumulatorTest, MinNHashAggAccumulatorWithCollator) {
     MinNHashAggAccumulator accumulator(
-        outSlot(), spillSlot(), makeVariable(inSlot()), collatorSlot(), 2, kDefaultCap);
+        outSlot(),
+        spillSlot(),
+        makeVariable(inSlot()),
+        collatorSlot(),
+        makeConstant(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(2)),
+        kDefaultCap);
 
     vm::ByteCode bytecode;
     accumulator.prepare(compileContext(), &accumulatorState());
@@ -2009,7 +2082,12 @@ TEST_F(HashAggAccumulatorTest, MinNHashAggAccumulatorWithCollator) {
 
 TEST_F(HashAggAccumulatorTest, MaxNHashAggAccumulatorWithCollator) {
     MaxNHashAggAccumulator accumulator(
-        outSlot(), spillSlot(), makeVariable(inSlot()), collatorSlot(), 2, kDefaultCap);
+        outSlot(),
+        spillSlot(),
+        makeVariable(inSlot()),
+        collatorSlot(),
+        makeConstant(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(2)),
+        kDefaultCap);
 
     vm::ByteCode bytecode;
     accumulator.prepare(compileContext(), &accumulatorState());
@@ -2037,9 +2115,55 @@ TEST_F(HashAggAccumulatorTest, MaxNHashAggAccumulatorWithCollator) {
     ASSERT_BSONOBJ_EQ(BSON_ARRAY("cherry" << "banana"), resultArr);
 }
 
+TEST_F(HashAggAccumulatorTest, MinNHashAggAccumulatorPartialSkipsSort) {
+    MinNHashAggAccumulatorPartial accumulator(
+        outSlot(),
+        spillSlot(),
+        makeVariable(inSlot()),
+        boost::none,
+        makeConstant(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(3)),
+        kDefaultCap);
+
+    vm::ByteCode bytecode;
+    accumulator.prepare(compileContext(), &accumulatorState());
+
+    accumulator.initialize(bytecode, accumulatorState());
+
+    inAccessor().reset(value::TagValueView::numberInt32(5));
+    accumulator.accumulate(bytecode, accumulatorState());
+
+    inAccessor().reset(value::TagValueView::numberInt32(2));
+    accumulator.accumulate(bytecode, accumulatorState());
+
+    inAccessor().reset(value::TagValueView::numberInt32(8));
+    accumulator.accumulate(bytecode, accumulatorState());
+
+    inAccessor().reset(value::TagValueView::numberInt32(1));
+    accumulator.accumulate(bytecode, accumulatorState());
+
+    inAccessor().reset(value::TagValueView::numberInt32(9));
+    accumulator.accumulate(bytecode, accumulatorState());
+
+    accumulator.finalize(bytecode, accumulatorState());
+
+    auto [tagResult, valResult] = accumulatorState().getViewOfValue();
+    ASSERT(value::isArray(tagResult));
+    auto resultArr = [&]() {
+        BSONArrayBuilder resultBuilder;
+        bson::convertToBsonArr(resultBuilder, value::ArrayEnumerator(tagResult, valResult));
+        return resultBuilder.arr();
+    }();
+    ASSERT_BSONOBJ_EQ(BSON_ARRAY(5 << 2 << 1), resultArr);
+}
+
 TEST_F(HashAggAccumulatorTest, MinNHashAggAccumulatorEnforcesMemLimit) {
     MinNHashAggAccumulator accumulator(
-        outSlot(), spillSlot(), makeVariable(inSlot()), boost::none, 3, 192);
+        outSlot(),
+        spillSlot(),
+        makeVariable(inSlot()),
+        boost::none,
+        makeConstant(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(3)),
+        192);
 
     vm::ByteCode bytecode;
     accumulator.prepare(compileContext(), &accumulatorState());
@@ -2060,7 +2184,12 @@ TEST_F(HashAggAccumulatorTest, MinNHashAggAccumulatorEnforcesMemLimit) {
 
 TEST_F(HashAggAccumulatorTest, MinNHashAggAccumulatorEnforcesMemLimitSpilled) {
     MinNHashAggAccumulator accumulator(
-        outSlot(), spillSlot(), makeVariable(inSlot()), boost::none, 3, 192);
+        outSlot(),
+        spillSlot(),
+        makeVariable(inSlot()),
+        boost::none,
+        makeConstant(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(3)),
+        192);
 
     vm::ByteCode bytecode;
     accumulator.prepare(compileContext(), &accumulatorState());

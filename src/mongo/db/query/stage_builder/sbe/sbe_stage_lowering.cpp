@@ -320,6 +320,15 @@ struct Lowerer {
                         -> std::unique_ptr<sbe::HashAggAccumulator> {
                         return std::make_unique<Impl>(
                             acc.outSlot, acc.spillSlot, le(impl.transform), node.collatorSlot);
+                    },
+                    [&]<class Impl>(SbHashAggMinMaxNAccumulator<Impl>& impl)
+                        -> std::unique_ptr<sbe::HashAggAccumulator> {
+                        return std::make_unique<Impl>(acc.outSlot,
+                                                      acc.spillSlot,
+                                                      le(impl.transform),
+                                                      node.collatorSlot,
+                                                      le(impl.maxSizeExpr),
+                                                      impl.memLimit);
                     }},
                 acc.implementation);
 

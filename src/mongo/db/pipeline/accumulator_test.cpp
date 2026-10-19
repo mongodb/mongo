@@ -508,6 +508,34 @@ TEST(Accumulators, MinN) {
         n);
 }
 
+TEST(Accumulators, MinNMergeUnsortedInput) {
+    auto expCtx = ExpressionContextForTest{};
+    auto accum = make_intrusive<AccumulatorMinN>(&expCtx);
+    accum->startNewGroup(Value(3));
+
+    // Verify input does not need to be sorted. SBE's native minN/maxN
+    // accumulators rely on this to avoid sorting on the shards.
+    accum->process(Value(std::vector<Value>{Value(9), Value(1), Value(7), Value(3), Value(5)}),
+                   true /* merging */);
+
+    Value result = accum->getValue(false);
+    ASSERT_VALUE_EQ(Value(std::vector<Value>{Value(1), Value(3), Value(5)}), result);
+}
+
+TEST(Accumulators, MaxNMergeUnsortedInput) {
+    auto expCtx = ExpressionContextForTest{};
+    auto accum = make_intrusive<AccumulatorMaxN>(&expCtx);
+    accum->startNewGroup(Value(3));
+
+    // Verify input does not need to be sorted. SBE's native minN/maxN
+    // accumulators rely on this to avoid sorting on the shards.
+    accum->process(Value(std::vector<Value>{Value(1), Value(9), Value(3), Value(7), Value(5)}),
+                   true /* merging */);
+
+    Value result = accum->getValue(false);
+    ASSERT_VALUE_EQ(Value(std::vector<Value>{Value(9), Value(7), Value(5)}), result);
+}
+
 TEST(Accumulators, MinNRespectsCollation) {
     auto expCtx = ExpressionContextForTest{};
     auto collator =

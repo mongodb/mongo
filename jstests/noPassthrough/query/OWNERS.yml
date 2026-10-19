@@ -15,6 +15,9 @@ filters:
   - "agg_configurable_memory_limits.js":
     approvers:
       - 10gen/query-execution
+  - "min_max_n_dynamic_n_off_key.js":
+    approvers:
+      - 10gen/query-execution
   - "internal_rename_if_options_and_indexes_match_sharding.js":
     approvers:
       - 10gen/server-catalog-and-routing-ddl

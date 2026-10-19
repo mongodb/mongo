@@ -103,7 +103,7 @@ public:
      * Only call this method after ensuring that canBuildSinglePrposeAccumulator() returns true.
      */
     SbHashAggAccumulator buildSinglePurposeAccumulator(StageBuilderState& state,
-                                                       SbExpr inputExpression,
+                                                       AccumInputsPtr inputs,
                                                        std::string fieldName,
                                                        SbSlot outSlot,
                                                        SbSlot spillSlot) const;
@@ -115,7 +115,7 @@ public:
      * Only call this method after ensuring that canBuildSinglePrposeAccumulator() returns true.
      */
     SbHashAggAccumulator buildSinglePurposeAccumulatorForMerge(StageBuilderState& state,
-                                                               SbExpr inputExpression,
+                                                               AccumInputsPtr inputs,
                                                                std::string fieldName,
                                                                SbSlot outSlot,
                                                                SbSlot spillSlot) const;
@@ -201,6 +201,18 @@ struct AddSingleInput : public AccumInputs {
     AccumInputsPtr clone() const final;
 
     SbExpr inputExpr;
+};
+
+struct AddSingleInputWithInit : public AccumInputs {
+    AddSingleInputWithInit(SbExpr inputExpr, SbExpr initExpr)
+        : inputExpr(std::move(inputExpr)), initExpr(std::move(initExpr)) {}
+
+    AccumInputsPtr clone() const final {
+        return std::make_unique<AddSingleInputWithInit>(inputExpr.clone(), initExpr.clone());
+    }
+
+    SbExpr inputExpr;
+    SbExpr initExpr;
 };
 
 struct AddAggsAvgInputs : public AccumInputs {
