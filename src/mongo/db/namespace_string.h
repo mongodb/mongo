@@ -589,20 +589,7 @@ public:
     bool isConfigTransactionsCollection() const;
 
     /**
-     * Returns whether the specified namespace is an FLE2 ECOC collection:
-     * <database>.enxcol_.<.+>.ecoc .
-     */
-    bool isFLE2EcocCollection() const;
-
-    /**
-     * Returns whether the specified namespace is an FLE2 ESC collection:
-     * <database>.enxcol_.<.+>.esc .
-     */
-    bool isFLE2EscCollection() const;
-
-    /**
-     * Returns whether the specified namespace is
-     * <database>.enxcol_.<.+>.(esc|ecc|ecoc|ecoc.compact).
+     * Returns whether the specified namespace is <database>.enxcol_.<.+>.(esc|ecc|ecoc).
      */
     bool isFLE2StateCollection() const;
 

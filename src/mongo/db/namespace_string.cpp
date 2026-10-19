@@ -68,30 +68,6 @@ static const absl::flat_hash_set<NamespaceString> globallyUniqueConfigDbCollecti
     NamespaceString::kConfigMongosNamespace,
     NamespaceString::kLogicalSessionsNamespace};
 
-enum class FLE2StateCollectionNameType { kInvalid, kEsc, kEcoc, kEcocCompact, kEcc };
-FLE2StateCollectionNameType resolveFLE2StateCollectionNameType(StringData coll) {
-    FLE2StateCollectionNameType type = FLE2StateCollectionNameType::kInvalid;
-    if (!coll.startsWith(fle2Prefix)) {
-        return type;
-    }
-    coll = coll.substr(fle2Prefix.size());
-    if (coll.endsWith(fle2EscSuffix)) {
-        coll = coll.substr(0, coll.size() - fle2EscSuffix.size());
-        type = FLE2StateCollectionNameType::kEsc;
-    } else if (coll.endsWith(fle2EcocSuffix)) {
-        coll = coll.substr(0, coll.size() - fle2EcocSuffix.size());
-        type = FLE2StateCollectionNameType::kEcoc;
-    } else if (coll.endsWith(fle2EcocCompactSuffix)) {
-        coll = coll.substr(0, coll.size() - fle2EcocCompactSuffix.size());
-        type = FLE2StateCollectionNameType::kEcocCompact;
-    } else if (coll.endsWith(fle2EccSuffix)) {
-        coll = coll.substr(0, coll.size() - fle2EccSuffix.size());
-        type = FLE2StateCollectionNameType::kEcc;
-    }
-    return NamespaceString::validCollectionName(coll) ? type
-                                                      : FLE2StateCollectionNameType::kInvalid;
-}
-
 }  // namespace
 
 
@@ -462,16 +438,10 @@ bool NamespaceString::isConfigTransactionsCollection() const {
     return ns() == kSessionTransactionsTableNamespace.ns();
 }
 
-bool NamespaceString::isFLE2EcocCollection() const {
-    return resolveFLE2StateCollectionNameType(coll()) == FLE2StateCollectionNameType::kEcoc;
-}
-
-bool NamespaceString::isFLE2EscCollection() const {
-    return resolveFLE2StateCollectionNameType(coll()) == FLE2StateCollectionNameType::kEsc;
-}
-
 bool NamespaceString::isFLE2StateCollection() const {
-    return resolveFLE2StateCollectionNameType(coll()) != FLE2StateCollectionNameType::kInvalid;
+    return coll().startsWith(fle2Prefix) &&
+        (coll().endsWith(fle2EscSuffix) || coll().endsWith(fle2EccSuffix) ||
+         coll().endsWith(fle2EcocSuffix) || coll().endsWith(fle2EcocCompactSuffix));
 }
 
 bool NamespaceString::isOplogOrChangeCollection() const {

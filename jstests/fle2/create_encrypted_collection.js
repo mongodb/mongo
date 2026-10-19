@@ -94,21 +94,23 @@ assert.commandWorked(dbTest.createCollection("basic_int32_cf", {
 
 // createCollection with invalid state collection names
 const stateCollNameInvalidFormatTests = [
-    {escCollection: "legit.esc", ecocCollection: "enxcol_.legit.ecoc", code: 7406900},
-    {escCollection: "enxcol_.legit.ecoc", ecocCollection: "enxcol_.legit.ecoc", code: 7406900},
-    {escCollection: "enxcol_.legit.esc", ecocCollection: "legit.ecoc", code: 7406902},
-    {escCollection: "enxcol_.legit.esc", ecocCollection: "enxcol_.legit.esc", code: 7406902},
-    {escCollection: "enxcol_.invalid.esc", ecocCollection: "enxcol_.legit.ecoc", code: 13049800},
-    {escCollection: "enxcol_.legit.esc", ecocCollection: "enxcol_.invalid.ecoc", code: 13049801},
+    {escCollection: "legit.esc", ecocCollection: "enxcol_.legit.ecoc"},
+    {escCollection: "enxcol_.legit.ecoc", ecocCollection: "enxcol_.legit.ecoc"},
+    {escCollection: "enxcol_.legit.esc", ecocCollection: "legit.ecoc"},
+    {escCollection: "enxcol_.legit.esc", ecocCollection: "enxcol_.legit.esc"},
+    {escCollection: "enxcol_.invalid.esc", ecocCollection: "enxcol_.legit.ecoc"},
+    {escCollection: "enxcol_.legit.esc", ecocCollection: "enxcol_.invalid.ecoc"},
 ];
 for (let testCase of stateCollNameInvalidFormatTests) {
-    let code = testCase.code;
-    delete testCase.code;
+    const escParseError = 7406900;
+    const ecocParseError = 7406902;
+    const escRuntimeError = 13049800;
+    const ecocRuntimeError = 13049801;
     assert.commandFailedWithCode(
         dbTest.createCollection("legit", {
             encryptedFields: encryptedFields(testCase),
         }),
-        code,
+        [escParseError, ecocParseError, escRuntimeError, ecocRuntimeError],
         `createCollection should reject state collection names ${tojson(testCase)}`,
     );
 }

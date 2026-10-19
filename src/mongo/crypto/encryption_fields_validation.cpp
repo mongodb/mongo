@@ -238,7 +238,7 @@ void validateEncryptedFieldConfig(const EncryptedFieldConfig* config) {
         uassert(
             7406900,
             "Encrypted State Collection name should follow enxcol_.<collection>.esc naming pattern",
-            NamespaceString("", config->getEscCollection().get()).isFLE2EscCollection());
+            NamespaceString("", config->getEscCollection().get()).isFLE2StateCollection());
     }
     if (config->getEccCollection()) {
         uassert(
@@ -250,7 +250,7 @@ void validateEncryptedFieldConfig(const EncryptedFieldConfig* config) {
         uassert(7406902,
                 "Encrypted Compaction Collection name should follow enxcol_.<collection>.ecoc "
                 "naming pattern",
-                NamespaceString("", config->getEcocCollection().get()).isFLE2EcocCollection());
+                NamespaceString("", config->getEcocCollection().get()).isFLE2StateCollection());
     }
     for (const auto& field : config->getFields()) {
         UUID keyId = field.getKeyId();
