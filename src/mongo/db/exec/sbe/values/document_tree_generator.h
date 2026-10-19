@@ -15,6 +15,7 @@
 #include <variant>
 #include <vector>
 
+#include <absl/strings/str_format.h>
 #include <fuzztest/fuzztest.h>
 
 namespace mongo::sbe {
@@ -73,6 +74,18 @@ using DocumentSpec = std::vector<NodeSpec>;
 BSONObj renderDocument(const DocumentSpec& spec, long long id);
 
 /**
+ * Renders the spec into the fields of its nested document, without the "_id" field.
+ */
+BSONObj renderDocumentFields(const DocumentSpec& spec);
+
+// These functions are here so that ADL works properly in order to print the fuzzer-generated
+// documents as JSON whenever the fuzzer finds a failure.
+template <typename Sink>
+void AbslStringify(Sink& sink, const DocumentSpec& spec) {
+    absl::Format(&sink, "%s", renderDocumentFields(spec).jsonString());
+}
+
+/**
  * Field name for a value in an object based on position and the depth of the object. At document
  * level 0 the field names are a0, a1..., at level 1 b0, b1..., etc
  */
@@ -105,7 +118,7 @@ inline auto doubleDomain() {
 }
 
 inline auto stringDomain() {
-    return fuzztest::OneOf(fuzztest::ElementOf<std::string>({"", "a", "b", "abc", "f0"}),
+    return fuzztest::OneOf(fuzztest::ElementOf<std::string>({"", "a", "b", "abc", "a0"}),
                            fuzztest::Arbitrary<std::string>().WithMaxSize(16));
 }
 
@@ -120,20 +133,30 @@ inline auto scalarSpecDomain() {
 }
 
 inline auto objectSpecDomain() {
-    return fuzztest::StructOf<ObjectSpec>(fuzztest::InRange<unsigned>(0, kMaxTreeBranching));
+    return fuzztest::StructOf<ObjectSpec>(fuzztest::InRange<unsigned>(0, kMaxTreeBranching)
+                                              .WithSeeds(std::vector<unsigned>{kMaxTreeBranching}));
 }
 
 inline auto arraySpecDomain() {
-    return fuzztest::StructOf<ArraySpec>(fuzztest::InRange<unsigned>(0, kMaxTreeBranching));
+    return fuzztest::StructOf<ArraySpec>(fuzztest::InRange<unsigned>(0, kMaxTreeBranching)
+                                             .WithSeeds(std::vector<unsigned>{kMaxTreeBranching}));
 }
 
 inline auto nodeSpecDomain() {
     return fuzztest::VariantOf(scalarSpecDomain(), objectSpecDomain(), arraySpecDomain());
 }
 
-// Input domain for a single document (vector of Nodes from which a tree is assembled)
+/**
+ * Input domain for a single document (vector of Nodes from which a tree is assembled). The identity
+ * Map wrapper routes printing through the AbslStringify overload.
+ */
 inline auto documentNodesDomain() {
-    return fuzztest::VectorOf(nodeSpecDomain()).WithMinSize(2).WithMaxSize(kMaxDocumentNodes);
+    return fuzztest::Map(
+        [](DocumentSpec spec) { return spec; },
+        // each option has equal probability and fuzztest starts with the smallest size for each
+        fuzztest::OneOf(fuzztest::VectorOf(nodeSpecDomain()).WithMinSize(2),
+                        fuzztest::VectorOf(nodeSpecDomain()).WithMinSize(64),
+                        fuzztest::VectorOf(nodeSpecDomain()).WithMinSize(128)));
 }
 
 }  // namespace mongo::sbe

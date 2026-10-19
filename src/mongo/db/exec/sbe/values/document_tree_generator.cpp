@@ -103,15 +103,21 @@ struct Renderer {
 
 }  // namespace
 
-BSONObj renderDocument(const DocumentSpec& spec, long long id) {
+BSONObj renderDocumentFields(const DocumentSpec& spec) {
     BSONObjBuilder b;
-    b.appendNumber("_id", id);
     Renderer renderer{spec};
     // At the root level, don't enforce the branching factor and consume the whole spec
     unsigned fieldIdx = 0;
     while (!renderer.done()) {
         renderer.appendNode(b, positionalName(fieldIdx++), 0);
     }
+    return b.obj();
+}
+
+BSONObj renderDocument(const DocumentSpec& spec, long long id) {
+    BSONObjBuilder b;
+    b.appendNumber("_id", id);
+    b.appendElements(renderDocumentFields(spec));
     return b.obj();
 }
 
