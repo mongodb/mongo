@@ -37,6 +37,8 @@ last-patch:
       ticket: SERVER-124538
     - test_file: jstests/sharding/migration_blocking_operation/multi_update_coordinator_state_document_privilege_escalation.js
       ticket: SERVER-133600
+    - test_file: jstests/sharding/localhostAuthBypass.js
+      ticket: SERVER-134872
   suites: {}
 
 last-continuous:
