@@ -236,13 +236,11 @@ int curlDebugCallback(CURL* handle, curl_infotype type, char* data, size_t size,
     }
 }
 
-CurlEasyHandle createCurlEasyHandle(Protocols protocol) {
-    CurlEasyHandle handle(curl_easy_init());
-    uassert(ErrorCodes::InternalError, "Curl initialization failed", handle);
 
+void applyCurlEasyHandleOptions(CURL* handle, Protocols protocol) {
     const auto setOption = [&](CURLoption option, auto value) {
         // Ignore the error code, if any.
-        (void)curl_easy_setopt(handle.get(), option, value);
+        (void)curl_easy_setopt(handle, option, value);
     };
 
     setOption(CURLOPT_CONNECTTIMEOUT, longSeconds(kConnectionTimeout));
@@ -275,6 +273,13 @@ CurlEasyHandle createCurlEasyHandle(Protocols protocol) {
         setOption(CURLOPT_VERBOSE, 1);
         setOption(CURLOPT_DEBUGFUNCTION, curlDebugCallback);
     }
+}
+
+CurlEasyHandle createCurlEasyHandle(Protocols protocol) {
+    CurlEasyHandle handle(curl_easy_init());
+    uassert(ErrorCodes::InternalError, "Curl initialization failed", handle);
+
+    applyCurlEasyHandleOptions(handle.get(), protocol);
 
     return handle;
 }
@@ -339,9 +344,9 @@ private:
 class CurlHandleTypeFactory : public executor::ConnectionPool::DependentTypeFactoryInterface {
 public:
     CurlHandleTypeFactory()
-        : _clockSource(SystemClockSource::get()),
+        : _clockSource(std::make_unique<SystemClockSource>()),
           _executor(std::make_shared<ThreadPool>(_makeThreadPoolOptions())),
-          _timerScheduler(std::make_shared<AlarmSchedulerPrecise>(_clockSource)),
+          _timerScheduler(std::make_shared<AlarmSchedulerPrecise>(_clockSource.get())),
           _timerRunner({_timerScheduler}) {}
 
     std::shared_ptr<ConnectionPool::ConnectionInterface> makeConnection(const HostAndPort&,
@@ -351,7 +356,7 @@ public:
 
     std::shared_ptr<ConnectionPool::TimerInterface> makeTimer() final {
         _start();
-        return std::make_shared<CurlHandleTimer>(_clockSource, _timerScheduler);
+        return std::make_shared<CurlHandleTimer>(_clockSource.get(), _timerScheduler);
     }
 
     const std::shared_ptr<OutOfLineExecutor>& getExecutor() final {
@@ -395,7 +400,7 @@ private:
     }
 
 private:
-    ClockSource* const _clockSource;
+    std::unique_ptr<ClockSource> _clockSource;
     std::shared_ptr<OutOfLineExecutor> _executor;
     std::shared_ptr<AlarmScheduler> _timerScheduler;
     bool _running = false;
@@ -517,7 +522,7 @@ CurlHandleTypeFactory::makeConnection(const HostAndPort& host,
     _start();
 
     return std::make_shared<PooledCurlHandle>(_executor,
-                                              _clockSource,
+                                              _clockSource.get(),
                                               _timerScheduler,
                                               host,
                                               mapSSLModeToProtocol(sslMode),
@@ -675,6 +680,12 @@ public:
 
             CurlHandle handle(std::move(swHandle.getValue()));
             try {
+                // Reset to defaults and re-apply the base options so nothing carries
+                // over, whatever future requests set.
+                CURL* curl = handle.get();
+                curl_easy_reset(curl);
+                applyCurlEasyHandleOptions(curl, protocol);
+
                 auto reply = request(handle.get(), method, url, cdr);
                 handle.indicateSuccess();
                 return reply;

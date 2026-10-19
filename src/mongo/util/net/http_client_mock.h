@@ -4,13 +4,32 @@
 #pragma once
 
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/ctype.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/net/http_client.h"
 
 #include <cstdint>
+#include <string>
 #include <string_view>
 
 namespace mongo {
+
+namespace mock_http_client_detail {
+
+// Different libcurl builds percent-encode with either upper- or lower-case hex
+// digits; the two encodings are equivalent, so canonicalize to one case for
+// URL comparison.
+inline std::string canonicalizeUrl(std::string url) {
+    for (size_t i = 0; i + 2 < url.size(); ++i) {
+        if (url[i] == '%') {
+            url[i + 1] = ctype::toUpper(url[i + 1]);
+            url[i + 2] = ctype::toUpper(url[i + 2]);
+        }
+    }
+    return url;
+}
+
+}  // namespace mock_http_client_detail
 
 class [[MONGO_MOD_PUBLIC]] MockHttpClient : public HttpClient {
 public:
@@ -32,10 +51,14 @@ public:
 
         template <typename H>
         friend H AbslHashValue(H h, const Request& request) {
-            return H::combine(std::move(h), request.method, request.url);
+            return H::combine(std::move(h),
+                              request.method,
+                              mock_http_client_detail::canonicalizeUrl(request.url));
         }
         friend bool operator==(const Request& my, const Request& other) {
-            return my.method == other.method && my.url == other.url;
+            return my.method == other.method &&
+                mock_http_client_detail::canonicalizeUrl(my.url) ==
+                mock_http_client_detail::canonicalizeUrl(other.url);
         }
     };
     struct Response {
