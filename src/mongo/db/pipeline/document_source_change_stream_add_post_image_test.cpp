@@ -47,6 +47,32 @@ using namespace std::literals::string_view_literals;
 
 using MockMongoInterface = StubLookupSingleDocumentProcessInterface;
 
+/**
+ * A stub MongoProcessInterface whose local single-document lookup (used to fetch pre-images from
+ * the pre-images collection) returns a configurable result and counts the number of lookups.
+ */
+class MockPreImageLookupInterface final : public StubMongoProcessInterface {
+public:
+    explicit MockPreImageLookupInterface(boost::optional<Document> preImageDoc)
+        : _preImageDoc(std::move(preImageDoc)) {}
+
+    boost::optional<Document> lookupSingleDocumentLocally(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const NamespaceString& nss,
+        const Document& documentKey) override {
+        ++_lookupCount;
+        return _preImageDoc;
+    }
+
+    int lookupCount() const {
+        return _lookupCount;
+    }
+
+private:
+    boost::optional<Document> _preImageDoc;
+    int _lookupCount = 0;
+};
+
 // This provides access to getExpCtx(), but we'll use a different name for this test suite.
 class DocumentSourceChangeStreamAddPostImageTest : public AggregationContextFixture {
 public:
@@ -59,16 +85,24 @@ public:
         return *uuid_gen;
     }
 
-    Document createDocumentWithIdAndResumeToken(int idValue, Document&& doc) {
+    static ResumeTokenData makeResumeTokenData(int idValue,
+                                               Timestamp clusterTime = Timestamp(100, 1),
+                                               size_t txnOpIndex = 0) {
+        return ResumeTokenData(clusterTime,
+                               ResumeTokenData::kDefaultTokenVersion,
+                               txnOpIndex,
+                               testUuid(),
+                               /* eventIdentifier */ Value(Document{{"_id", idValue}}));
+    }
+
+    Document createDocumentWithIdAndResumeToken(int idValue,
+                                                Document&& doc,
+                                                Timestamp clusterTime = Timestamp(100, 1),
+                                                size_t txnOpIndex = 0) {
         MutableDocument combined;
 
         // Sort key comes first, then _id, then all other fields.
-        const Timestamp clusterTime(100, 1);
-        ResumeTokenData tokenData(clusterTime,
-                                  ResumeTokenData::kDefaultTokenVersion,
-                                  /* txnOpIndex */ 0,
-                                  testUuid(),
-                                  /* eventIdentifier */ Value(Document{{"_id", idValue}}));
+        ResumeTokenData tokenData = makeResumeTokenData(idValue, clusterTime, txnOpIndex);
 
         auto resumeTokenDoc = Value(ResumeToken(tokenData).toDocument());
         combined.metadata().setSortKey(resumeTokenDoc, true);
@@ -115,6 +149,35 @@ public:
         exec::agg::stitchStage(*stage, source.get());
         return stage;
     }
+
+    /**
+     * Builds a ChangeStreamAddPostImageStage (the 'required'/'whenAvailable' path) directly, with a
+     * mock source producing 'events' and a mock local lookup for the pre-image.
+     */
+    boost::intrusive_ptr<exec::agg::Stage> buildAddPostImageStage(
+        const std::vector<Document>& events,
+        FullDocumentModeEnum mode,
+        boost::optional<Document> preImageDoc) {
+        auto processInterface =
+            std::make_unique<MockPreImageLookupInterface>(std::move(preImageDoc));
+        _processInterface = processInterface.get();
+        getExpCtx()->setMongoProcessInterface(std::move(processInterface));
+        // Keep the mock source alive for the lifetime of the fixture; the stage holds only a raw
+        // pointer to it.
+        _mockSource = exec::agg::MockStage::createForTest(events, getExpCtx());
+        auto stage = make_intrusive<exec::agg::ChangeStreamAddPostImageStage>(
+            DocumentSourceChangeStreamAddPostImage::kStageName, getExpCtx(), mode);
+        exec::agg::stitchStage(*stage, _mockSource.get());
+        return stage;
+    }
+
+    int lookupCount() const {
+        return _processInterface->lookupCount();
+    }
+
+private:
+    boost::intrusive_ptr<exec::agg::Stage> _mockSource;
+    MockPreImageLookupInterface* _processInterface = nullptr;
 };
 
 TEST_F(DocumentSourceChangeStreamAddPostImageTest,
@@ -530,6 +593,149 @@ TEST_F(DocumentSourceChangeStreamAddPostImageTest, UpdateLookupDependsOnCollecti
     DepsTracker deps;
     ds->getDependencies(&deps);
     ASSERT_EQ(deps.fields.count(std::string{DocumentSourceChangeStream::kCollectionUuidField}), 1u);
+}
+
+// The resume-token event is consumed by DSCSEnsureResumeTokenPresent and never returned to the
+// client, but it is still enriched, so that an image-dependent $match placed before token
+// verification sees the same post-image the original stream would have produced. Its post-image is
+// not required, though.
+TEST_F(DocumentSourceChangeStreamAddPostImageTest,
+       ResumeTokenEventIsEnrichedButExemptFromRequired) {
+    auto expCtx = getExpCtx();
+    const auto token = makeResumeTokenData(0);
+    auto spec = getSpec(FullDocumentModeEnum::kRequired);
+    spec.setResumeAfter(ResumeToken(token));
+    expCtx->setChangeStreamSpec(spec);
+
+    auto event = createDocumentWithIdAndResumeToken(
+        0,
+        Document{{"operationType", "update"sv},
+                 {"preImageId", Document{{"x", 1}}},
+                 {"ns",
+                  Document{{"db", expCtx->getNamespaceString().db_forTest()},
+                           {"coll", expCtx->getNamespaceString().coll()}}}});
+
+    auto stage = buildAddPostImageStage(
+        {event}, FullDocumentModeEnum::kRequired, /* preImageDoc */ boost::none);
+
+    auto next = stage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_VALUE_EQ(
+        next.releaseDocument()[DocumentSourceChangeStreamAddPostImage::kFullDocumentFieldName],
+        Value(BSONNULL));
+    ASSERT_EQ(lookupCount(), 1);
+}
+
+TEST_F(DocumentSourceChangeStreamAddPostImageTest,
+       RequiredPostImageMissingForEventAfterResumePointThrows) {
+    auto expCtx = getExpCtx();
+    const auto resumeToken = makeResumeTokenData(0, Timestamp(100, 1));
+    auto spec = getSpec(FullDocumentModeEnum::kRequired);
+    spec.setResumeAfter(ResumeToken(resumeToken));
+    expCtx->setChangeStreamSpec(spec);
+
+    // The event's clusterTime is past the resume token's.
+    auto event = createDocumentWithIdAndResumeToken(
+        0,
+        Document{{"operationType", "update"sv},
+                 {"preImageId", Document{{"x", 1}}},
+                 {"ns",
+                  Document{{"db", expCtx->getNamespaceString().db_forTest()},
+                           {"coll", expCtx->getNamespaceString().coll()}}}},
+        Timestamp(100, 2));
+
+    auto stage = buildAddPostImageStage(
+        {event}, FullDocumentModeEnum::kRequired, /* preImageDoc */ boost::none);
+
+    ASSERT_THROWS_CODE(stage->getNext(), AssertionException, ErrorCodes::NoMatchingDocument);
+    ASSERT_EQ(lookupCount(), 1);
+}
+
+TEST_F(DocumentSourceChangeStreamAddPostImageTest,
+       RequiredPostImageMissingWithHighWaterMarkResumePointThrows) {
+    auto expCtx = getExpCtx();
+    auto spec = getSpec(FullDocumentModeEnum::kRequired);
+    // A high water mark token never matches an actual event, so the "required" check still applies.
+    spec.setStartAtOperationTime(Timestamp(100, 1));
+    expCtx->setChangeStreamSpec(spec);
+
+    auto event = createDocumentWithIdAndResumeToken(
+        0,
+        Document{{"operationType", "update"sv},
+                 {"preImageId", Document{{"x", 1}}},
+                 {"ns",
+                  Document{{"db", expCtx->getNamespaceString().db_forTest()},
+                           {"coll", expCtx->getNamespaceString().coll()}}}});
+
+    auto stage = buildAddPostImageStage(
+        {event}, FullDocumentModeEnum::kRequired, /* preImageDoc */ boost::none);
+
+    ASSERT_THROWS_CODE(stage->getNext(), AssertionException, ErrorCodes::NoMatchingDocument);
+    ASSERT_EQ(lookupCount(), 1);
+}
+
+// The resume-token event is discarded by DSCSEnsureResumeTokenPresent, but updateLookup still
+// performs its lookup for it, so that an image-dependent $match placed before token verification
+// sees the same 'fullDocument' the original stream would have produced.
+TEST_F(DocumentSourceChangeStreamAddPostImageTest, UpdateLookupPerformsLookupForResumeTokenEvent) {
+    auto expCtx = getExpCtx();
+    const auto token = makeResumeTokenData(0);
+    auto spec = getSpec(FullDocumentModeEnum::kUpdateLookup);
+    spec.setResumeAfter(ResumeToken(token));
+    expCtx->setChangeStreamSpec(spec);
+
+    std::deque<DocumentSource::GetNextResult> mockForeignContents{Document{{"_id", 0}}};
+    expCtx->setMongoProcessInterface(std::make_unique<MockMongoInterface>(mockForeignContents));
+
+    auto mockLocalStage = exec::agg::MockStage::createForTest(
+        createDocumentWithIdAndResumeToken(
+            0,
+            Document{{"documentKey", Document{{"_id", 0}}},
+                     {"operationType", "update"sv},
+                     {"ns",
+                      Document{{"db", expCtx->getNamespaceString().db_forTest()},
+                               {"coll", expCtx->getNamespaceString().coll()}}}}),
+        expCtx);
+
+    auto lookupChangeStage = buildUpdateLookupStage(mockLocalStage);
+
+    auto next = lookupChangeStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_VALUE_EQ(
+        next.releaseDocument()[DocumentSourceChangeStreamAddPostImage::kFullDocumentFieldName],
+        Value(Document{{"_id", 0}}));
+}
+
+TEST_F(DocumentSourceChangeStreamAddPostImageTest,
+       UpdateLookupPerformsLookupForEventAfterResumePoint) {
+    auto expCtx = getExpCtx();
+    const auto resumeToken = makeResumeTokenData(0, Timestamp(100, 1));
+    auto spec = getSpec(FullDocumentModeEnum::kUpdateLookup);
+    spec.setResumeAfter(ResumeToken(resumeToken));
+    expCtx->setChangeStreamSpec(spec);
+
+    std::deque<DocumentSource::GetNextResult> mockForeignContents{Document{{"_id", 0}, {"x", 1}}};
+    expCtx->setMongoProcessInterface(std::make_unique<MockMongoInterface>(mockForeignContents));
+
+    // The event's clusterTime is past the resume token's.
+    auto mockLocalStage = exec::agg::MockStage::createForTest(
+        createDocumentWithIdAndResumeToken(
+            0,
+            Document{{"documentKey", Document{{"_id", 0}}},
+                     {"operationType", "update"sv},
+                     {"ns",
+                      Document{{"db", expCtx->getNamespaceString().db_forTest()},
+                               {"coll", expCtx->getNamespaceString().coll()}}}},
+            Timestamp(100, 2)),
+        expCtx);
+
+    auto lookupChangeStage = buildUpdateLookupStage(mockLocalStage);
+
+    auto next = lookupChangeStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_VALUE_EQ(
+        next.releaseDocument()[DocumentSourceChangeStreamAddPostImage::kFullDocumentFieldName],
+        Value(Document{{"_id", 0}, {"x", 1}}));
 }
 
 // Wire-up tests: assert documentSourceChangeStreamAddPostImageToStageFn builds the right

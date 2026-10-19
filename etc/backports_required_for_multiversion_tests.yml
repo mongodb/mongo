@@ -146,6 +146,12 @@ last-continuous:
       ticket: SERVER-135788
     - test_file: jstests/change_streams/change_stream_update_lookup_resumes_on_optimization_disable.js
       ticket: SERVER-135788
+    - test_file: jstests/change_streams/resume_inside_transaction.js
+      ticket: SERVER-136798
+    - test_file: jstests/change_streams/resume_with_image_filter.js
+      ticket: SERVER-136798
+    - test_file: jstests/change_streams/resume_with_required_image.js
+      ticket: SERVER-136798
     - test_file: jstests/change_streams/update_lookup_before_ddl.js
       ticket: SERVER-134581
     - test_file: jstests/change_streams/update_lookup_before_ddl.js
@@ -315,6 +321,12 @@ last-lts:
       ticket: SERVER-135788
     - test_file: jstests/change_streams/change_stream_update_lookup_resumes_on_optimization_disable.js
       ticket: SERVER-135788
+    - test_file: jstests/change_streams/resume_inside_transaction.js
+      ticket: SERVER-136798
+    - test_file: jstests/change_streams/resume_with_image_filter.js
+      ticket: SERVER-136798
+    - test_file: jstests/change_streams/resume_with_required_image.js
+      ticket: SERVER-136798
     - test_file: jstests/change_streams/update_lookup_before_ddl.js
       ticket: SERVER-134581
     - test_file: jstests/change_streams/update_lookup_before_ddl.js

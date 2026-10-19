@@ -3,6 +3,7 @@
 
 #include "mongo/db/exec/agg/change_stream_add_pre_image_stage.h"
 
+#include "mongo/db/exec/agg/change_stream_check_resumability_stage.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/pipeline/change_stream_hashed_field_accessors.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
@@ -41,7 +42,9 @@ ChangeStreamAddPreImageStage::ChangeStreamAddPreImageStage(
     std::string_view stageName,
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
     const FullDocumentBeforeChangeModeEnum& fullDocumentBeforeChangeMode)
-    : Stage(stageName, pExpCtx), _fullDocumentBeforeChangeMode(fullDocumentBeforeChangeMode) {}
+    : Stage(stageName, pExpCtx),
+      _fullDocumentBeforeChangeMode(fullDocumentBeforeChangeMode),
+      _resumeTokenTracker(ChangeStreamCheckResumabilityStage::getClientResumeToken(pExpCtx)) {}
 
 GetNextResult ChangeStreamAddPreImageStage::doGetNext() {
     auto input = pSource->getNext();
@@ -60,6 +63,13 @@ GetNextResult ChangeStreamAddPreImageStage::doGetNext() {
         return input;
     }
 
+    // The resume event itself is enriched, so that an image-dependent $match placed before token
+    // verification sees the same pre-image the original stream would have produced, but its
+    // pre-image may legitimately be absent (for example when it predates pre-image enablement), so
+    // it is exempt from the "required" check.
+    const bool isResumeTokenEvent = _resumeTokenTracker.classify(input.getDocument()) ==
+        ChangeStreamResumeTokenTracker::EventPosition::kAtResumePoint;
+
     auto preImageId = input.getDocument()[FieldAccessors::kPreImageId];
     tassert(6091900, "Pre-image id field is missing", !preImageId.missing());
     tassert(5868900,
@@ -74,7 +84,8 @@ GetNextResult ChangeStreamAddPreImageStage::doGetNext() {
                          "delete and replace events, but the pre-image was not found for event: "
                       << makePreImageNotFoundErrorMsg(input.getDocument()),
         preImageDoc ||
-            _fullDocumentBeforeChangeMode != FullDocumentBeforeChangeModeEnum::kRequired);
+            _fullDocumentBeforeChangeMode != FullDocumentBeforeChangeModeEnum::kRequired ||
+            isResumeTokenEvent);
 
     // Even if no pre-image was found, we have to populate the 'fullDocumentBeforeChange' field.
     MutableDocument outputDoc(input.releaseDocument());

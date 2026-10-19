@@ -4,6 +4,7 @@
 #include "mongo/db/exec/agg/change_stream_add_post_image_stage.h"
 
 #include "mongo/db/exec/agg/change_stream_add_pre_image_stage.h"
+#include "mongo/db/exec/agg/change_stream_check_resumability_stage.h"
 #include "mongo/db/pipeline/change_stream_hashed_field_accessors.h"
 #include "mongo/db/pipeline/document_source_change_stream_add_post_image.h"
 #include "mongo/db/update/update_driver.h"
@@ -47,7 +48,9 @@ ChangeStreamAddPostImageStage::ChangeStreamAddPostImageStage(
     std::string_view stageName,
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
     const FullDocumentModeEnum& fullDocumentMode)
-    : Stage(stageName, pExpCtx), _fullDocumentMode(fullDocumentMode) {}
+    : Stage(stageName, pExpCtx),
+      _fullDocumentMode(fullDocumentMode),
+      _resumeTokenTracker(ChangeStreamCheckResumabilityStage::getClientResumeToken(pExpCtx)) {}
 
 GetNextResult ChangeStreamAddPostImageStage::doGetNext() {
     auto input = pSource->getNext();
@@ -60,6 +63,14 @@ GetNextResult ChangeStreamAddPostImageStage::doGetNext() {
         return input;
     }
 
+    // The resume event itself is enriched, so that an image-dependent $match placed before token
+    // verification sees the same post-image the original stream would have produced, but its
+    // post-image may legitimately be absent (for example when it predates pre-image enablement), so
+    // it is exempt from the "required" check. Capture this before releasing the input document, as
+    // the sort key is needed to identify the resume event.
+    const bool isResumeTokenEvent = _resumeTokenTracker.classify(input.getDocument()) ==
+        ChangeStreamResumeTokenTracker::EventPosition::kAtResumePoint;
+
     // Create a mutable output document from the input document.
     MutableDocument output(input.releaseDocument());
     const auto postImageDoc = generatePostImage(output.peek());
@@ -67,7 +78,8 @@ GetNextResult ChangeStreamAddPostImageStage::doGetNext() {
             str::stream() << "Change stream was configured to require a post-image for all update "
                              "events, but the post-image was not found for event: "
                           << makePostImageNotFoundErrorMsg(output.peek()),
-            postImageDoc || _fullDocumentMode != FullDocumentModeEnum::kRequired);
+            postImageDoc || _fullDocumentMode != FullDocumentModeEnum::kRequired ||
+                isResumeTokenEvent);
 
     // Even if no post-image was found, we have to populate the 'fullDocument' field.
     output[DocumentSourceChangeStreamAddPostImage::kFullDocumentFieldName] =

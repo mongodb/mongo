@@ -4,6 +4,7 @@
 #include "mongo/db/exec/agg/change_stream_check_resumability_stage.h"
 
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/document_source_change_stream_check_resumability.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
@@ -41,6 +42,47 @@ ChangeStreamCheckResumabilityStage::ChangeStreamCheckResumabilityStage(
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
     ResumeTokenData tokenFromClient)
     : Stage(stageName, pExpCtx), _tokenFromClient(std::move(tokenFromClient)) {}
+
+boost::optional<ResumeTokenData> ChangeStreamCheckResumabilityStage::getClientResumeToken(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    const auto& spec = expCtx->getChangeStreamSpec();
+    if (!spec ||
+        (!spec->getStartAfter() && !spec->getResumeAfter() && !spec->getStartAtOperationTime())) {
+        return boost::none;
+    }
+    return change_stream::resolveResumeTokenFromSpec(expCtx, *spec);
+}
+
+ChangeStreamResumeTokenTracker::ChangeStreamResumeTokenTracker(
+    boost::optional<ResumeTokenData> tokenFromClient)
+    : _tokenFromClient(std::move(tokenFromClient)) {}
+
+ChangeStreamResumeTokenTracker::EventPosition ChangeStreamResumeTokenTracker::classify(
+    const Document& event) {
+    // With no resume token, or once the resume point has been passed, every event is past the
+    // resume point. This also covers events without a sort key, which cannot be the resume token.
+    if (!_tokenFromClient || _atOrPastResumePoint || !event.metadata().hasSortKey()) {
+        return EventPosition::kAfterResumePoint;
+    }
+
+    switch (ChangeStreamCheckResumabilityStage::compareAgainstClientResumeToken(
+        event, *_tokenFromClient)) {
+        case ChangeStreamCheckResumabilityStage::ResumeStatus::kCheckNextDoc:
+            // The event precedes the resume point; more events may still need to be checked.
+            return EventPosition::kBeforeResumePoint;
+        case ChangeStreamCheckResumabilityStage::ResumeStatus::kFoundToken:
+            // The event is the resume point itself. Every later event is past it, so stop
+            // comparing.
+            _atOrPastResumePoint = true;
+            return EventPosition::kAtResumePoint;
+        case ChangeStreamCheckResumabilityStage::ResumeStatus::kSurpassedToken:
+        case ChangeStreamCheckResumabilityStage::ResumeStatus::kNeedsSplit:
+            // The event is at or past the resume point. Stop comparing.
+            _atOrPastResumePoint = true;
+            return EventPosition::kAfterResumePoint;
+    }
+    MONGO_UNREACHABLE;
+}
 
 GetNextResult ChangeStreamCheckResumabilityStage::doGetNext() {
     if (_resumeStatus == ResumeStatus::kSurpassedToken) {
@@ -105,18 +147,29 @@ GetNextResult ChangeStreamCheckResumabilityStage::doGetNext() {
 ChangeStreamCheckResumabilityStage::ResumeStatus
 ChangeStreamCheckResumabilityStage::compareAgainstClientResumeToken(
     const Document& eventFromResumedStream, const ResumeTokenData& tokenDataFromClient) {
-    // Parse the stream doc into comprehensible ResumeTokenData.
-    auto tokenDataFromResumedStream =
-        ResumeToken::parse(eventFromResumedStream.metadata().getSortKey().getDocument()).getData();
+    const auto tokenFromResumedStream =
+        eventFromResumedStream.metadata().getSortKey().getDocument();
+
+    // The clusterTime is the leading field of the encoded resume token, so it can be read without
+    // decoding the whole token. Compare it first: any event past the resume point has a different
+    // clusterTime and can be rejected without the more expensive full parse.
+    const auto clusterTimeFromResumedStream =
+        ResumeToken::extractClusterTime(tokenFromResumedStream);
 
     // We start the resume with a $gte query on the timestamp, so we never expect it to be lower
     // than our resume token's timestamp.
-    invariant(tokenDataFromResumedStream.clusterTime >= tokenDataFromClient.clusterTime);
+    tassert(13679800,
+            "Expected the stream's resume token clusterTime to not be older than the client's "
+            "resume token clusterTime",
+            clusterTimeFromResumedStream >= tokenDataFromClient.clusterTime);
 
     // If the clusterTime differs from the client's token, this stream cannot be resumed.
-    if (tokenDataFromResumedStream.clusterTime != tokenDataFromClient.clusterTime) {
+    if (clusterTimeFromResumedStream != tokenDataFromClient.clusterTime) {
         return ResumeStatus::kSurpassedToken;
     }
+
+    // The clusterTimes match, so the full token is needed for the remaining comparisons.
+    auto tokenDataFromResumedStream = ResumeToken::parse(tokenFromResumedStream).getData();
 
     // If the tokenType exceeds the client token's type, then we have passed the resume token point.
     // This can happen if the client resumes from a synthetic 'high water mark' token from another

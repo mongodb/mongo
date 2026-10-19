@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "mongo/db/exec/agg/change_stream_check_resumability_stage.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/document_source_change_stream_gen.h"
@@ -51,5 +52,12 @@ private:
      */
     FullDocumentBeforeChangeModeEnum _fullDocumentBeforeChangeMode =
         FullDocumentBeforeChangeModeEnum::kOff;
+
+    /**
+     * Tracks the stream's position relative to the client's resume token. Used to skip the
+     * pre-image lookup for events at or before the resume point, which are discarded downstream and
+     * never returned to the client, and to stop comparing once the resume point has been passed.
+     */
+    ChangeStreamResumeTokenTracker _resumeTokenTracker;
 };
 }  // namespace mongo::exec::agg
