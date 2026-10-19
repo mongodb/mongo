@@ -21,7 +21,7 @@ notifications:
           grace_period_days: 5
       team:
         hot:
-          count: 3
+          count: 2
           grace_period_days: 2
         cold:
           count: 3
