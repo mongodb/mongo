@@ -1,6 +1,6 @@
 # Golden test output of SBEPrimNaryTest/BalancedAnd
 -- INPUT EXPRESSION:
-(s1 && s2 && s3 && s4 && s5 && s6 && s7 && s8) 
+(s1 && s2 && s3 && s4 && s5 && s6 && s7 && s8)
 
 -- COMPILED EXPRESSION:
 [0x0000-0x009d] stackSize: 1, maxStackSize: 1

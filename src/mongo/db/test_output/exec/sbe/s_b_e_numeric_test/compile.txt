@@ -1,6 +1,6 @@
 # Golden test output of SBENumericTest/Compile
 -- INPUT EXPRESSION:
-convert ( NumberDecimal(123), int64) 
+convert ( NumberDecimal(123), int64)
 
 -- COMPILED EXPRESSION:
 [0x0000-0x000c] stackSize: 1, maxStackSize: 1

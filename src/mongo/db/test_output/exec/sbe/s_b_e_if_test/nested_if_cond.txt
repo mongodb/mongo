@@ -1,14 +1,12 @@
 # Golden test output of SBEIfTest/NestedIfCond
 -- INPUT EXPRESSION:
 
-    if 
-        if s1 
-        then false 
-        else true 
-    
-    then "then" 
-    else "else" 
-
+    if
+        if s1
+        then false
+        else true
+    then "then"
+    else "else"
 
 -- COMPILED EXPRESSION:
 [0x0000-0x004f] stackSize: 1, maxStackSize: 1

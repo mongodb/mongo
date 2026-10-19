@@ -1,6 +1,6 @@
 # Golden test output of SBEFailTest/FailWithAddDecimal
 -- INPUT EXPRESSION:
-(NumberDecimal(123) + fail(2, "test")) 
+(NumberDecimal(123) + fail(2, "test"))
 
 -- COMPILED EXPRESSION:
 [0x0000-0x0022] stackSize: 1, maxStackSize: 3

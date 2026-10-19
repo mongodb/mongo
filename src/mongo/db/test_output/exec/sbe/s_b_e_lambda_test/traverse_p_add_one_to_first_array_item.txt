@@ -1,10 +1,10 @@
 # Golden test output of SBELambdaTest/TraverseP_AddOneToFirstArrayItem
 -- INPUT EXPRESSION:
-traverseP(s1, lambda(l10.0 l10.1) { 
-    if (l10.1 == 0ll) 
-    then (l10.0 + 1) 
-    else l10.0 
-}, Nothing) 
+traverseP(s1, lambda(l10.0 l10.1) {
+    if (l10.1 == 0ll)
+    then (l10.0 + 1)
+    else l10.0
+}, Nothing)
 
 -- COMPILED EXPRESSION:
 [0x0000-0x0051] stackSize: 1, maxStackSize: 1

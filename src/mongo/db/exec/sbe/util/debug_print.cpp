@@ -14,13 +14,26 @@ std::string DebugPrinter::print(const std::vector<Block>& blocks) {
     std::string ret;
     int ident = 0;
     size_t blockIndex = 0;
+    size_t contentStart = 0;
+    auto trimTrailingSpaces = [&] {
+        while (ret.size() > 0 && ret.back() == ' ') {
+            ret.pop_back();
+        }
+    };
+    auto startLine = [&] {
+        trimTrailingSpaces();
+        if (ret.empty() || ret.back() != '\n') {
+            ret.append("\n");
+        }
+        addIndent(ident, ret);
+        contentStart = ret.size();
+    };
     for (auto& b : blocks) {
         bool addSpace = true;
         switch (b.cmd) {
             case Block::cmdIncIndent:
                 ++ident;
-                ret.append("\n");
-                addIndent(ident, ret);
+                startLine();
                 break;
             case Block::cmdDecIndent:
                 --ident;
@@ -28,13 +41,11 @@ std::string DebugPrinter::print(const std::vector<Block>& blocks) {
                 // tokens.
                 if (blockIndex >= (blocks.size() - 1) ||
                     blocks[blockIndex + 1].cmd != Block::cmdDecIndent) {
-                    ret.append("\n");
-                    addIndent(ident, ret);
+                    startLine();
                 }
                 break;
             case Block::cmdNewLine:
-                ret.append("\n");
-                addIndent(ident, ret);
+                startLine();
                 break;
             case Block::cmdNone:
                 break;
@@ -77,8 +88,8 @@ std::string DebugPrinter::print(const std::vector<Block>& blocks) {
         if (!sv.empty()) {
             if (*sv.begin() == '`') {
                 sv = sv.substr(1);
-                if (!ret.empty() && ret.back() == ' ') {
-                    ret.resize(ret.size() - 1, 0);
+                if (ret.size() > contentStart && ret.back() == ' ') {
+                    ret.pop_back();
                 }
             }
             if (!sv.empty() && *(sv.end() - 1) == '`') {
@@ -95,6 +106,9 @@ std::string DebugPrinter::print(const std::vector<Block>& blocks) {
         ++blockIndex;
     }
 
+    while (!ret.empty() && (ret.back() == ' ' || ret.back() == '\n')) {
+        ret.pop_back();
+    }
     return ret;
 }
 

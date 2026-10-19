@@ -2,15 +2,14 @@
 -- INPUT EXPRESSION:
 
     let [
-        l20.0 = s1 
-        l20.1 = 10 
-        l20.2 = 20 
-    ] 
-    in 
-        if traverseF(l20.0, lambda(l10.0) { (l10.0 == 3) }, Nothing) 
-        then l20.1 
-        else l20.2 
-
+        l20.0 = s1
+        l20.1 = 10
+        l20.2 = 20
+    ]
+    in
+        if traverseF(l20.0, lambda(l10.0) { (l10.0 == 3) }, Nothing)
+        then l20.1
+        else l20.2
 
 -- COMPILED EXPRESSION:
 [0x0000-0x0060] stackSize: 1, maxStackSize: 4

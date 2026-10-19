@@ -69,13 +69,13 @@ TEST_F(SbBlueprintLoweringTest, LowerTreeWithIndexChildren) {
 
     auto stage = lowerSbeBlueprint(blueprint, root, *_state);
     ASSERT_EQ(print(*stage),
-              "[4] union [s20] \n"
-              "    branch0 [s11] \n"
+              "[4] union [s20]\n"
+              "    branch0 [s11]\n"
               "        [2] unwind s11 = outField, s12 = outIndex, s10 = inField "
-              "!_preserveNullAndEmptyArrays \n"
-              "        [1] coscan \n"
-              "    branch1 [s10] \n"
-              "        [3] coscan \n");
+              "!_preserveNullAndEmptyArrays\n"
+              "        [1] coscan\n"
+              "    branch1 [s10]\n"
+              "        [3] coscan");
 }
 
 TEST_F(SbBlueprintLoweringTest, SbBuilderRetainsBlueprintUntilLowered) {

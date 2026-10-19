@@ -1,10 +1,9 @@
 # Golden test output of SBEIfTest/IfWithLogicNot
 -- INPUT EXPRESSION:
 
-    if !(s1) 
-    then "then" 
-    else "else" 
-
+    if !(s1)
+    then "then"
+    else "else"
 
 -- COMPILED EXPRESSION:
 [0x0000-0x002e] stackSize: 1, maxStackSize: 1

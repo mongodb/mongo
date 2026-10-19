@@ -1,6 +1,6 @@
 # Golden test output of SBELambdaTest/TraverseF_OpEq
 -- INPUT EXPRESSION:
-traverseF(s1, lambda(l10.0) { (l10.0 == 3) }, Nothing) 
+traverseF(s1, lambda(l10.0) { (l10.0 == 3) }, Nothing)
 
 -- COMPILED EXPRESSION:
 [0x0000-0x002c] stackSize: 1, maxStackSize: 1
