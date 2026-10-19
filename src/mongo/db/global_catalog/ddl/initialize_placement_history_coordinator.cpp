@@ -176,6 +176,8 @@ ExecutorFuture<void> InitializePlacementHistoryCoordinator::_runImpl(
                 // global catalog. Use this section to:
                 // - Delete the existing content of config.placementHistory, which may be
                 // incomplete/inconsistent; a collection drop is performed to reduce execution time.
+                // - Recreate the collection and its supporting indexes, so that any subsequent
+                //   placement writer observes a well-formed collection.
                 // - Establish the point-in-time for the snapshot read that will support its
                 //   recreation during the kInitialization phase.
                 auto noChunkMigrationCommitsRegion =
@@ -188,6 +190,13 @@ ExecutorFuture<void> InitializePlacementHistoryCoordinator::_runImpl(
                     NamespaceString::kConfigsvrPlacementHistoryNamespace,
                     &dropReply,
                     DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops));
+                // Recreate the collection and its indexes before unblocking DDLs to prevent
+                // placement writes from implicitly creating it without the required indexes,
+                // which would cause a subsequent primary step-up to fail.
+                uassertStatusOK(sharding_util::createIndexesOnCollectionForWritablePrimary(
+                    opCtx,
+                    NamespaceString::kConfigsvrPlacementHistoryNamespace,
+                    getPlacementHistoryCollectionIndexSpecs()));
                 auto initializationTime = now.configTime().asTimestamp();
 
                 _doc.setInitializationTime(initializationTime);
@@ -206,8 +215,8 @@ ExecutorFuture<void> InitializePlacementHistoryCoordinator::_runImpl(
                       "Initializing config.placementHistory",
                       "initializationTime"_attr = initTimeRef);
                 auto* shardingCatalogManager = ShardingCatalogManager::get(opCtx);
-                // Recreate the collection and its supporting index, following the drop performed
-                // within Phase::kDefineInitializationTime.
+                // Ensure the collection and indexes exist when resuming coordinators from older
+                // binaries. Normally, kDefineInitializationTime has already created them.
                 uassertStatusOK(sharding_util::createIndexesOnCollectionForWritablePrimary(
                     opCtx,
                     NamespaceString::kConfigsvrPlacementHistoryNamespace,
