@@ -1953,6 +1953,18 @@ TEST_F(PipelineDependencyGraphTest, InclusionRedefinedBaseFieldAfterPriorInclusi
     });
 }
 
+TEST_F(PipelineDependencyGraphTest, CanModifiedAliasSubPathBeArray) {
+    pathArrayness->addPath("b.x", {}, true);
+    setPipeline(
+        "[{$set: { a: '$b' }}, "
+        " {$set: { 'a.x.y': 1 }}]");
+    runTest([&] {
+        ASSERT_FALSE(graph->canPathBeArray(stages[1].get(), "a.x"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.x"));
+    });
+}
+
 TEST_F(PipelineDependencyGraphTest, CanIncludedDottedBaseCollectionPrefixBeArray) {
     pathArrayness->addPath("a.b", {}, true);
     setPipeline("[{$project: { 'a.b': 1 }}]");
@@ -4095,6 +4107,45 @@ TEST_F(PipelineDependencyGraphTest, CanPathBeArrayNotArrayTypePredicateBeforeDot
     runTest([&] {
         ASSERT_FALSE(graph->canPathBeArray(stages[2].get(), "y.z"));
         ASSERT_FALSE(graph->canPathBeArray(nullptr, "x"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, CanPathBeArrayNotArrayTypePredicateBeforeDottedModification) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setPipeline(R"([
+        {$match: {y: {$not: {$type: 'array'}}}},
+        {$set: {'y.z': 7}}
+    ])");
+    runTest([&] {
+        ASSERT_FALSE(graph->canPathBeArray(stages[1].get(), "y"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "y"));
+        auto yz = graph->getConstant(nullptr, "y.z");
+        ASSERT_TRUE(yz.has_value());
+        ASSERT_VALUE_EQ(*yz, Value(7));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, CanPathBeArrayNotArrayTypePredicateBeforeDottedInclusion) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setPipeline(R"([
+        {$match: {y: {$not: {$type: 'array'}}}},
+        {$project: {'y.z': 1}}
+    ])");
+    runTest([&] {
+        ASSERT_FALSE(graph->canPathBeArray(stages[1].get(), "y"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "y"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, NotArrayTypePredicatePreservesSiblingOfLookupDottedAs) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setPipeline(R"([
+        {$match: {a: {$not: {$type: 'array'}}}},
+        {$lookup: {from: "coll_b", as: "a.b", pipeline: []}}
+    ])");
+    runTest([&] {
+        ASSERT_EQUALS(graph->getPrevModifyingStage(nullptr, "a.c"), nullptr);
+        ASSERT_EQUALS(graph->getPrevModifyingStage(nullptr, "a.b"), stages[1]);
     });
 }
 

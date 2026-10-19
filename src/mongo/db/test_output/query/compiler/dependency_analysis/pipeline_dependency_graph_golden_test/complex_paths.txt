@@ -184,6 +184,9 @@ output: {
                                         }
                                     }
                                 },
+                                "metadata": {
+                                    "array": false
+                                },
                                 "dependencies": [
                                     "b:15"
                                 ]
