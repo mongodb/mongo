@@ -46,7 +46,7 @@
 # endif
 #endif
 
-#if _MSC_VER
+#if defined(_MSC_VER)
 # define TIMELIB_DIR_SEPARATOR "\\"
 #else
 # define TIMELIB_DIR_SEPARATOR "/"
