@@ -51,7 +51,7 @@ public:
     custom_operation(thread_worker *tc) override final
     {
         /* Assert there is only one collection. */
-        testutil_assert(tc->collection_count == 1);
+        testutil_assert(tc->db.get_collection_count() == 1);
 
         /* Create the necessary timers. */
         execution_timer begin_transaction_timer("begin_transaction", test::_args.test_name);

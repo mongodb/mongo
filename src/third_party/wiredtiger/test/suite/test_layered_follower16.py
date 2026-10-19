@@ -133,11 +133,11 @@ class test_layered_follower16(wttest.WiredTigerTestCase):
             session.commit_transaction(f'commit_timestamp={self.timestamp_str(ts)}')
         cursor.close()
 
-    def end_txn(self, session):
+    def end_txn(self, session, commit_ts=10):
         if self.txn_mode == 'rollback':
             session.rollback_transaction()
         else:
-            session.commit_transaction(f'commit_timestamp={self.timestamp_str(10)}')
+            session.commit_transaction(f'commit_timestamp={self.timestamp_str(commit_ts)}')
 
     def test_stable_deferred_until_checkpoint(self):
         """
@@ -200,7 +200,7 @@ class test_layered_follower16(wttest.WiredTigerTestCase):
             opens_stable = 0
         else:
             self.do_op(cursor_follow)
-            self.end_txn(session_follow)
+            self.end_txn(session_follow, commit_ts=11)
 
         self.assertEqual(self.get_stat(wiredtiger.stat.conn.layered_curs_open_stable, session=session_follow), opens_stable)
         self.assertEqual(self.get_stat(wiredtiger.stat.conn.layered_curs_reopen_stable, session=session_follow), 0)

@@ -142,10 +142,10 @@ class test_layered_stepup09(wttest.WiredTigerTestCase):
         conn_follow, session_follow, cursor_follow = self.open_follower()
         self.disagg_advance_checkpoint(conn_follow)
 
-        # Replicate only the first three of the leader's rows to the follower's ingest, leaving
+        # Populate the follower's ingest with the first three keys after the checkpoint, leaving
         # key_4 in stable alone so the search below misses ingest and forces the stable open.
         # `insert_keys` opens a default (overwrite) cursor so stable stays unopened.
-        self.insert_keys(session_follow, 3, 10)
+        self.insert_keys(session_follow, 3, 11)
         self.assertEqual(self.get_stat(wiredtiger.stat.conn.layered_curs_open_stable, session=session_follow), 0)
 
         # First read that misses ingest opens the stable cursor in read-only mode.

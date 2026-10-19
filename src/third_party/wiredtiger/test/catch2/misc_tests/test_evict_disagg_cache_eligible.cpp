@@ -38,6 +38,8 @@ make_dsk(uint32_t mem_size)
     dsk = static_cast<WT_PAGE_HEADER *>(calloc(1, sizeof(WT_PAGE_HEADER)));
     REQUIRE(dsk != nullptr);
     dsk->mem_size = mem_size;
+    /* A stored image always has at least one entry. */
+    dsk->u.entries = 1;
     return (dsk);
 }
 
@@ -320,6 +322,7 @@ TEST_CASE(
 
     WT_PAGE_HEADER replacement{};
     replacement.write_gen = 20;
+    replacement.u.entries = 1;
     const WT_PAGE_HEADER *disk_image = f.dsk;
 
     SECTION("The original image predates a write")

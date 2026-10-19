@@ -644,4 +644,197 @@ TEST_CASE("Layered skip-write retains the backing generation in the victim cache
     REQUIRE(cursor->close(cursor) == 0);
 }
 
+/*
+ * With page deltas off, a page whose keys are all deleted still reconciles to an empty retained
+ * image, and its block carries no delta chain: delta_count is 0. The victim cache refuses that
+ * image: an empty standalone image is never what the page log stores for the block, and serving it
+ * would hand a reader an empty page where the stored page is non-empty.
+ */
+TEST_CASE("Layered empty skip-write image with no delta chain is refused by the victim cache",
+  "[palite_victim_cache][layered_victim_cache_empty_skip_no_delta]")
+{
+    std::string cfg = palite_conn_cfg("victim_cache_max_entries=10000");
+    cfg += ",cache_size=2GB,";
+    const char *home = DB_HOME "_victim_cache_empty_no_delta";
+    const char *uri = "layered:victim_cache_empty_no_delta";
+    const std::string value(1024, 'A');
+
+    testutil_recreate_dir(home);
+    connection_wrapper conn(home, cfg.c_str());
+    WT_CONNECTION *wt_conn = conn.get_wt_connection();
+    WT_SESSION *session = &conn.create_session("cache_cursors=false")->iface;
+    WT_SESSION *read_session = &conn.create_session("cache_cursors=false")->iface;
+
+    auto write_rows = [&](const char *timestamp) {
+        WT_CURSOR *cursor;
+        REQUIRE(session->begin_transaction(session, nullptr) == 0);
+        REQUIRE(session->open_cursor(session, uri, nullptr, nullptr, &cursor) == 0);
+        for (unsigned i = 0; i < 10; ++i) {
+            std::string row_key = std::to_string(i);
+            cursor->set_key(cursor, row_key.c_str());
+            cursor->set_value(cursor, value.c_str());
+            REQUIRE(cursor->insert(cursor) == 0);
+        }
+        REQUIRE(cursor->close(cursor) == 0);
+        REQUIRE(session->commit_transaction(session, timestamp) == 0);
+    };
+    auto delete_rows = [&](const char *timestamp) {
+        WT_CURSOR *cursor;
+        REQUIRE(session->begin_transaction(session, nullptr) == 0);
+        REQUIRE(session->open_cursor(session, uri, nullptr, nullptr, &cursor) == 0);
+        for (unsigned i = 0; i < 10; ++i) {
+            std::string row_key = std::to_string(i);
+            cursor->set_key(cursor, row_key.c_str());
+            REQUIRE(cursor->remove(cursor) == 0);
+        }
+        REQUIRE(cursor->close(cursor) == 0);
+        REQUIRE(session->commit_transaction(session, timestamp) == 0);
+    };
+
+    REQUIRE(wt_conn->set_timestamp(wt_conn, "oldest_timestamp=1,stable_timestamp=1") == 0);
+    REQUIRE(session->create(session, uri, "key_format=S,value_format=S,leaf_page_max=16KB") == 0);
+    write_rows("commit_timestamp=a");
+    layered_disagg_leader_checkpoint(wt_conn, session, 10);
+
+    /* Delete everything and let a checkpoint fold the tombstones into a full image. */
+    delete_rows("commit_timestamp=14");
+    layered_disagg_leader_checkpoint(wt_conn, session, 20);
+
+    /* Position a reader at the pre-delete snapshot and take the leaf's reference. */
+    WT_CURSOR *cursor;
+    REQUIRE(
+      read_session->open_cursor(read_session, uri, nullptr, "debug=(release_evict)", &cursor) == 0);
+    REQUIRE(read_session->begin_transaction(read_session, "read_timestamp=a") == 0);
+    cursor->set_key(cursor, "0");
+    REQUIRE(cursor->search(cursor) == 0);
+    auto *layered = reinterpret_cast<WTI_CURSOR_LAYERED *>(cursor);
+    REQUIRE(layered->stable_cursor != nullptr);
+    auto *cbt = reinterpret_cast<WT_CURSOR_BTREE *>(layered->stable_cursor);
+    REQUIRE(cbt->ref != nullptr);
+    REQUIRE(F_ISSET(cbt->ref, WT_REF_FLAG_LEAF));
+    WT_REF *ref = cbt->ref;
+    WT_PAGE *page = ref->page;
+    REQUIRE(page->disagg_info != nullptr);
+    REQUIRE(page->disagg_info->block_meta.page_id != WT_BLOCK_INVALID_PAGE_ID);
+    const WT_PAGE_BLOCK_META meta_before = page->disagg_info->block_meta;
+
+    WT_SESSION_IMPL *cursor_session = CUR2S(cbt);
+    int ret;
+
+    /* Detach the cursor from the page. */
+    WT_WITH_BTREE(cursor_session, CUR2BT(cbt), ret = __wt_hazard_clear(cursor_session, ref));
+    REQUIRE(ret == 0);
+    cbt->ref = nullptr;
+    REQUIRE(read_session->rollback_transaction(read_session, nullptr) == 0);
+
+    /*
+     * Evict under a snapshot that has seen the deletes but not the new inserts: the tombstones drop
+     * every old key while the new inserts stay invisible.
+     */
+    REQUIRE(read_session->begin_transaction(read_session, "read_timestamp=14") == 0);
+    REQUIRE(wt_conn->set_timestamp(wt_conn, "oldest_timestamp=14") == 0);
+
+    /* Insert new keys past the reader's snapshot: updates the eviction must not write. */
+    {
+        WT_CURSOR *wcursor;
+        REQUIRE(session->begin_transaction(session, nullptr) == 0);
+        REQUIRE(session->open_cursor(session, uri, nullptr, nullptr, &wcursor) == 0);
+        for (unsigned i = 0; i < 10; ++i) {
+            std::string row_key = std::to_string(100 + i);
+            wcursor->set_key(wcursor, row_key.c_str());
+            wcursor->set_value(wcursor, value.c_str());
+            REQUIRE(wcursor->insert(wcursor) == 0);
+        }
+        REQUIRE(wcursor->close(wcursor) == 0);
+        REQUIRE(session->commit_transaction(session, "commit_timestamp=1e") == 0);
+    }
+
+    int64_t skips_before = victim_cache_stat(session, WT_STAT_CONN_REC_SKIP_WRITE);
+    int64_t puts_before = victim_cache_stat(session, WT_STAT_CONN_BLOCK_CACHE_PUTS);
+
+    /*
+     * Force the two-pass eviction: the first pass reconciles the page to the empty skip-write and
+     * restores the new keys, and the clear lets the next pass evict the page clean, which offers
+     * the retained image to the victim cache.
+     */
+    WT_BTREE *btree = CUR2BT(cbt);
+    const int max_attempts = 8;
+    int pass;
+    for (pass = 1; pass <= max_attempts; ++pass) {
+        REQUIRE(WT_REF_GET_STATE(ref) == WT_REF_MEM);
+        ret = 0;
+        bool locked;
+        WT_WITH_BTREE(cursor_session, btree, {
+            locked = WT_REF_CAS_STATE(cursor_session, ref, WT_REF_MEM, WT_REF_LOCKED);
+            REQUIRE(locked);
+            ret = __wt_evict(cursor_session, ref, WT_REF_MEM, WT_EVICT_CALL_URGENT);
+        });
+        CAPTURE(pass, ret);
+        REQUIRE(ret == 0);
+        if (WT_REF_GET_STATE(ref) != WT_REF_MEM)
+            break;
+        WT_WITH_BTREE(cursor_session, btree, __wt_page_modify_clear(cursor_session, ref->page));
+    }
+    /* The loop ran out of passes without the page leaving memory otherwise. */
+    REQUIRE(pass <= max_attempts);
+
+    /*
+     * The skip-write still retains the empty image, but the gate keeps it out of the cache.
+     *
+     * FIXME-WT-18918: the skip-write and disk-state assertions fail once reconciliation frees the
+     * old block instead of skip-writing: nothing skip-writes, and the page evicts as WT_REF_DELETED
+     * because the freed block leaves it no address. Flip both with that change; the put refusal and
+     * the identity checks below hold either way.
+     */
+    REQUIRE(victim_cache_stat(session, WT_STAT_CONN_REC_SKIP_WRITE) > skips_before);
+    REQUIRE(victim_cache_stat(session, WT_STAT_CONN_BLOCK_CACHE_PUTS) == puts_before);
+    REQUIRE(WT_REF_GET_STATE(ref) == WT_REF_DISK);
+
+    /* The btree's own page log handle, to look the block's identity up in the cache. */
+    WT_PAGE_LOG_HANDLE *plh;
+    WT_WITH_BTREE(
+      cursor_session, CUR2BT(cbt), plh = ((WT_BLOCK_DISAGG *)CUR2BT(cbt)->bm->block)->plhandle);
+    REQUIRE(plh != nullptr);
+
+    /* The cache holds nothing for the block's identity. */
+    WT_PAGE_LOG_PUT_ARGS has_args{};
+    has_args.lsn = meta_before.disagg_lsn;
+    REQUIRE(
+      plh->plh_cache_has(plh, read_session, meta_before.page_id, 0, &has_args) == WT_NOTFOUND);
+
+    /* A read of the identity returns the durable image with its entries, never an empty page. */
+    WT_ITEM results[WT_DELTA_LIMIT + 1]{};
+    WT_PAGE_LOG_GET_ARGS get_args{};
+    get_args.lsn = meta_before.disagg_lsn;
+    uint32_t count = WT_DELTA_LIMIT + 1;
+    REQUIRE(
+      plh->plh_get(plh, read_session, meta_before.page_id, 0, &get_args, results, &count) == 0);
+    REQUIRE(count > 0);
+    REQUIRE(get_args.delta_count == 0);
+    WT_PAGE_HEADER header{};
+    std::memcpy(&header, results[count - 1].data, WT_PAGE_HEADER_SIZE);
+    __wt_page_header_byteswap(&header);
+    CAPTURE(header.u.entries, get_args.delta_count);
+    REQUIRE(header.u.entries > 0);
+    free_results(results, count);
+
+    /*
+     * FIXME-WT-18918: the commented-out walk below drives the actual task failure: on a build that
+     * caches the empty image, the same random read aborts on the zero-entries assertion in
+     * __random_leaf_disk. It stays commented out because that abort takes the whole test binary
+     * with it, so the assertions above fail at the put instead, one link earlier where the defect
+     * is. Revisit this with the skip-write removal.
+     */
+    /*
+    WT_CURSOR *stable_random;
+    REQUIRE(read_session->open_cursor(read_session, "file:victim_cache_empty_no_delta.wt_stable",
+      nullptr, "next_random=true", &stable_random) == 0);
+    ret = stable_random->next(stable_random);
+    REQUIRE(ret == WT_NOTFOUND);
+    stable_random->close(stable_random);
+    */
+
+    REQUIRE(cursor->close(cursor) == 0);
+}
+
 #endif

@@ -89,7 +89,7 @@ public:
         execution_timer compiled_config_timer("set_bounds_compiled", test::_args.test_name);
 
         /* Get the collection to work on. */
-        testutil_assert(tc->collection_count == 1);
+        testutil_assert(tc->db.get_collection_count() == 1);
         collection &coll = tc->db.get_collection(0);
 
         /* Open the cursors. */

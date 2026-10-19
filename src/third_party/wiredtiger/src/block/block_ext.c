@@ -139,6 +139,56 @@ __block_size_srch(WT_SIZE **head, wt_off_t size, WT_SIZE ***stack)
 }
 
 /*
+ * __wti_block_avail_front_extent --
+ *     Return whether the available list holds an extent of at least "size" bytes that starts before
+ *     "limit", the point where the region compaction is emptying begins. Only the existence of such
+ *     an extent matters to the caller, so this walks the size-sufficient buckets and returns as
+ *     soon as one of them holds an extent in front of the limit, rather than locating the lowest
+ *     such offset. The list must track sizes, and the caller must hold the live lock.
+ */
+bool
+__wti_block_avail_front_extent(
+  WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el, wt_off_t size, wt_off_t limit)
+{
+    WT_EXT *ext;
+    WT_SIZE **sstack[WT_SKIP_MAXDEPTH], *szp;
+
+    WT_UNUSED(block);
+
+    /* The live lock must be locked, and the by-size skiplist must be maintained. */
+    WT_ASSERT_SPINLOCK_OWNED(session, &block->live_lock);
+    WT_ASSERT(session, el->track_size != 0);
+
+    /*
+     * The head of the by-offset list is the lowest-offset available extent. If it is already at or
+     * past the limit, nothing in the list starts before the limit, so no extent can qualify.
+     */
+    ext = el->off[0];
+    if (ext == NULL || ext->off >= limit)
+        return (false);
+
+    /* If that same lowest-offset extent is large enough, it is itself the answer. */
+    if (ext->size >= size)
+        return (true);
+
+    /*
+     * Otherwise consult the size buckets. The search positions at the first bucket whose size
+     * satisfies the request, every bucket from there on is size-sufficient, and each bucket's
+     * extents are sorted by offset, so a bucket's head is the lowest offset of that size. An extent
+     * starting at the limit is in the region compaction is emptying rather than in front of it, so
+     * the comparison has to match the one made against the head of the by-offset list above.
+     */
+    __block_size_srch(el->sz, size, sstack);
+    for (szp = *sstack[0]; szp != NULL; szp = szp->next[0]) {
+        ext = szp->off[0];
+        if (ext != NULL && ext->off < limit)
+            return (true);
+    }
+
+    return (false);
+}
+
+/*
  * __block_off_srch_pair --
  *     Search a by-offset skiplist for before/after records of the specified offset.
  */
@@ -979,6 +1029,10 @@ __wti_block_extlist_merge(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST 
      * Sometimes the list we are merging is much bigger than the other: if so, swap the lists around
      * to reduce the amount of work we need to do during the merge. The size lists have to match as
      * well, so this is only possible if both lists are tracking sizes, or neither are.
+     *
+     * The cached end-of-list pointer describes the list it is attached to, so it has to be swapped
+     * with the skiplists: the append path dereferences it, and the caller frees the source list
+     * once the merge completes.
      */
     if (a->track_size == b->track_size && a->entries > b->entries) {
         tmp = *a;
@@ -987,6 +1041,8 @@ __wti_block_extlist_merge(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST 
         __wt_atomic_store_uint64_relaxed(&b->bytes, tmp.bytes);
         a->entries = b->entries;
         b->entries = tmp.entries;
+        a->last = b->last;
+        b->last = tmp.last;
         for (i = 0; i < WT_SKIP_MAXDEPTH; i++) {
             a->off[i] = b->off[i];
             b->off[i] = tmp.off[i];

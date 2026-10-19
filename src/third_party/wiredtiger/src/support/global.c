@@ -36,6 +36,7 @@ const WT_NAME_FLAG __wt_stress_types[] = {
   {"commit_transaction_slow", WT_TIMING_STRESS_COMMIT_TRANSACTION_SLOW},
   {"compact_slow", WT_TIMING_STRESS_COMPACT_SLOW},
   {"conn_close_stress_log_printf", WT_TIMING_STRESS_CLOSE_STRESS_LOG},
+  {"disagg_pickup_skip_signal", WT_TIMING_STRESS_DISAGG_PICKUP_SKIP_SIGNAL},
   {"disagg_stable_dhandle_delay", WT_TIMING_STRESS_DISAGG_STABLE_DHANDLE_DELAY},
   {"disagg_role_transition", WT_TIMING_STRESS_DISAGG_ROLE_TRANSITION},
   {"drop_deferred_hold", WT_TIMING_STRESS_DROP_DEFERRED_HOLD},

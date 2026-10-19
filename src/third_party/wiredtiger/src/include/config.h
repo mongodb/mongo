@@ -233,6 +233,7 @@ extern const char __WT_CONFIG_CHOICE_data[];
 extern const char __WT_CONFIG_CHOICE_default[];
 extern const char __WT_CONFIG_CHOICE_delete[];
 extern const char __WT_CONFIG_CHOICE_disagg[];
+extern const char __WT_CONFIG_CHOICE_disagg_pickup_skip_signal[];
 extern const char __WT_CONFIG_CHOICE_disagg_role_transition[];
 extern const char __WT_CONFIG_CHOICE_disagg_stable_dhandle_delay[];
 extern const char __WT_CONFIG_CHOICE_disaggregated_storage[];
