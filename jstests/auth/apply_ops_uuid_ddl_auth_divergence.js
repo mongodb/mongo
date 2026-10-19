@@ -85,10 +85,10 @@ function collHasIndex(collName, indexName) {
 }
 
 // Runs an applyOps command as eve (whose user doc lives on "admin"; auth is connection-wide).
-function asEve(op) {
+function asEve(op, extraFields = {}) {
     assert(conn.getDB("admin").auth("eve", "pwd"));
     try {
-        return conn.getDB(kDbName).runCommand({applyOps: [op]});
+        return conn.getDB(kDbName).runCommand({applyOps: [op], ...extraFields});
     } finally {
         conn.getDB("admin").logout();
     }
@@ -182,6 +182,61 @@ runTest("rejects an applyOps dropDatabase whose ui resolves to another database"
     assert.commandFailedWithCode(res, ErrorCodes.Unauthorized);
     assert(collExists(kDbName, kVictim), "victim database must not be dropped");
 });
+
+// ---- Rejected regardless of the client-supplied oplogApplicationMode. ----
+
+for (const mode of ["ApplyOps", "Secondary", "InitialSync", "Recovering"]) {
+    runTest(`rejects a ui-redirected drop with oplogApplicationMode ${mode}`, function(uuids) {
+        const res =
+            asEve({op: "c", ns: kDbName + "." + kMine, ui: uuids.victimUUID, o: {drop: kMine}},
+                  {oplogApplicationMode: mode});
+        assert.commandFailedWithCode(res, ErrorCodes.Unauthorized);
+        assert(collExists(kDbName, kVictim), "victim must not be dropped");
+    });
+
+    runTest(`rejects a ui-redirected dropIndexes with oplogApplicationMode ${mode}`,
+            function(uuids) {
+                const res = asEve({
+                    op: "c",
+                    ns: kDbName + "." + kMine,
+                    ui: uuids.victimUUID,
+                    o: {dropIndexes: kMine, index: "secret_1"},
+                },
+                                  {oplogApplicationMode: mode});
+                assert.commandFailedWithCode(res, ErrorCodes.Unauthorized);
+                assert(collHasIndex(kVictim, "secret_1"), "victim's index must not be dropped");
+            });
+
+    runTest(`rejects a ui-redirected collMod with oplogApplicationMode ${mode}`, function(uuids) {
+        const res = asEve({
+            op: "c",
+            ns: kDbName + "." + kMine,
+            ui: uuids.victimUUID,
+            o: {collMod: kMine, index: {keyPattern: {secret: 1}, hidden: true}},
+        },
+                          {oplogApplicationMode: mode});
+        assert.commandFailedWithCode(res, ErrorCodes.Unauthorized);
+    });
+
+    runTest(`rejects a ui-redirected renameCollection with oplogApplicationMode ${mode}`,
+            function(uuids) {
+                const res = asEve({
+                    op: "c",
+                    ns: kDbName + "." + kMine,
+                    ui: uuids.victimUUID,
+                    o: {
+                        renameCollection: kDbName + "." + kMine,
+                        to: kDbName + "." + kRenamed,
+                        dropTarget: false,
+                    },
+                },
+                                  {oplogApplicationMode: mode});
+                assert.commandFailedWithCode(res, ErrorCodes.Unauthorized);
+                assert(collExists(kDbName, kVictim), "victim must not be renamed");
+                assert(!collExists(kDbName, kRenamed),
+                       "victim must not be renamed to an attacker name");
+            });
+}
 
 // ---- Still allowed: ui and o name the same authorized namespace. ----
 
