@@ -7,8 +7,6 @@ import {
 } from "jstests/libs/query/replicated_truncates_utils.js";
 import {setFCVWithRetryOnBackgroundOpInProgress} from "jstests/libs/set_fcv_helpers.js";
 
-/* global retryOnRetryableError */
-
 // Symbol used to override the constructor. Please do not use this, it's only meant to aid
 // in migrating the jstest corpus to proper module usage.
 export const kOverrideConstructor = Symbol("overrideConstructor");
@@ -4311,7 +4309,13 @@ function asCluster(rst, conn, fn, keyFileParam = undefined) {
     }
 
     const unauthenticatedConns = connArray.filter((connection) => {
-        const connStatus = connection.adminCommand({connectionStatus: 1, showPrivileges: true});
+        // The connection may drop in suites that kill or step down nodes. The command is
+        // read-only, so retry it rather than failing the caller.
+        const connStatus = retryOnNetworkError(
+            () => connection.adminCommand({connectionStatus: 1, showPrivileges: true}),
+            ReplSetTest.kDefaultRetries,
+            1000,
+        );
         const connIsAuthenticated = connStatus.authInfo.authenticatedUsers.length > 0;
         return !connIsAuthenticated;
     });
