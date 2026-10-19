@@ -259,3 +259,17 @@ mongo_cc_unit_test(
         "//src/mongo/unittest",
     ],
 )
+
+mongo_cc_unit_test(
+    name = "extension_host_utils_test",
+    srcs = [
+        "extension_host_utils_test.cpp",
+    ],
+    tags = ["mongo_unittest_third_group"],
+    deps = [
+        ":extension_host_utils",
+        "//src/mongo:base",
+        "//src/mongo/db/auth:authprivilege",
+        "//src/mongo/db/extension/public:extensions_api_public",
+    ],
+)

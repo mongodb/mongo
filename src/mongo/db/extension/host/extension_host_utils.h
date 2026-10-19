@@ -4,6 +4,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/public/extension_agg_stage_static_properties_gen.h"
+#include "mongo/db/extension/public/extension_privilege_gen.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/util/modules.h"
@@ -15,7 +16,7 @@
 namespace mongo::extension::host {
 namespace static_properties_util {
 
-inline ActionType toActionType(const MongoExtensionPrivilegeActionEnum& action) {
+inline ActionType toActionType(MongoExtensionPrivilegeActionEnum action) {
     switch (action) {
         case MongoExtensionPrivilegeActionEnum::kFind:
             return ActionType::find;
@@ -29,6 +30,12 @@ inline ActionType toActionType(const MongoExtensionPrivilegeActionEnum& action) 
             return ActionType::collStats;
         case MongoExtensionPrivilegeActionEnum::kIndexStats:
             return ActionType::indexStats;
+        case MongoExtensionPrivilegeActionEnum::kCreateSearchIndexes:
+            return ActionType::createSearchIndexes;
+        case MongoExtensionPrivilegeActionEnum::kUpdateSearchIndex:
+            return ActionType::updateSearchIndex;
+        case MongoExtensionPrivilegeActionEnum::kDropSearchIndex:
+            return ActionType::dropSearchIndex;
         default:
             MONGO_UNREACHABLE_TASSERT(11350601);
     }

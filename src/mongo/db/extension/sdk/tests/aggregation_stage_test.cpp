@@ -398,6 +398,17 @@ TEST_F(AggStageTest, BadTypeRequiredPrivilegesAstNodeFails) {
     ASSERT_THROWS_CODE(handle->getProperties(), DBException, ErrorCodes::TypeMismatch);
 }
 
+TEST_F(AggStageTest, MissingResourcePatternRequiredPrivilegesAggStageAstNodeFails) {
+    auto missingResourcePatternRequiredPrivileges =
+        BSON("requiredPrivileges" << BSON_ARRAY(
+                 BSON("actions" << BSON_ARRAY(BSON("action" << "find")))));
+    auto astNode = new sdk::ExtensionAggStageAstNodeAdapter(
+        std::make_unique<sdk::shared_test_stages::CustomPropertiesAstNode>(
+            missingResourcePatternRequiredPrivileges));
+    auto handle = AggStageAstNodeHandle{astNode};
+    ASSERT_THROWS_CODE(handle->getProperties(), DBException, ErrorCodes::IDLFailedToParse);
+}
+
 class SimpleSerializationLogicalStage
     : public sdk::TestLogicalStage<sdk::shared_test_stages::TransformExecAggStage> {
 public:

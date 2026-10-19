@@ -10,6 +10,7 @@ global:
 
 imports:
     - "mongo/db/basic_types.idl"
+    - "mongo/db/extension/public/extension_privilege.idl"
 
 enums:
     MongoExtensionPositionRequirement:
@@ -38,23 +39,6 @@ enums:
         values:
             kStreaming: "streaming"
             kBlocking: "blocking"
-    MongoExtensionPrivilegeResourcePattern:
-        description: What resource the privilege applies to.
-        type: string
-        values:
-            kNamespace: "namespace"
-    MongoExtensionPrivilegeAction:
-        description: >-
-            Allowed actions for this stage. Currently, these are constrained to read-only actions
-            on a specific namespace.
-        type: string
-        values:
-            kFind: "find"
-            kListIndexes: "listIndexes"
-            kListSearchIndexes: "listSearchIndexes"
-            kPlanCacheRead: "planCacheRead"
-            kCollStats: "collStats"
-            kIndexStats: "indexStats"
     MongoExtensionDocsNeededBoundsEffect:
         description: >-
             How this stage affects the DocsNeededBounds of the pipeline. Used by the pipeline
@@ -70,23 +54,6 @@ enums:
             kSkip: "skip"
 
 structs:
-    MongoExtensionPrivilegeActionEntry:
-        description: >-
-            Represents one allowed action entry in the requiredPrivilege field.
-            Each entry wraps a MongoExtensionPrivilegeAction enum to satisfy the IDL restriction
-            that arrays cannot directly contain enums.
-        fields:
-            action:
-                type: MongoExtensionPrivilegeAction
-    MongoExtensionRequiredPrivilege:
-        description: A constrained privilege specification.
-        fields:
-            resourcePattern:
-                description: Kinds of resources targetable by the access control system.
-                type: MongoExtensionPrivilegeResourcePattern
-            actions:
-                description: Actions required on the target.
-                type: array<MongoExtensionPrivilegeActionEntry>
     MongoExtensionStaticProperties:
         description: >-
             Properties specified by the extension that remain static throughout its lifetime, such as
