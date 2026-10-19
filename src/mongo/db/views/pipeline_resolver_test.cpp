@@ -111,7 +111,8 @@ TEST(PipelineResolverTest, RecursesIntoUnionWithSubpipeline) {
     ASSERT_EQ(userLpp.getStages()[0]->getParseTimeName(), "$unionWith"sv);
 
     // Drill into the subpipeline via getMutableSubPipelines.
-    auto* subs = userLpp.getStages()[0]->getMutableSubPipelines();
+    auto subs = userLpp.getStages()[0]->getMutableSubPipelines();
+    ASSERT(subs);
     ASSERT_EQ(subs->size(), 1U);
 
     // The inner subpipeline should now have 2 stages: view's $match prepended + user's $match.
@@ -239,7 +240,7 @@ TEST(PipelineResolverTest, AllowsRepeatedViewReferenceInUserStages) {
     ASSERT_EQ(userLpp.getStages().size(), 1U);
 
     // Outer $unionWith sub-LPP: [{$match:{v:1}} (from viewMain), {$unionWith: viewMain}].
-    auto* outerSubs = userLpp.getStages()[0]->getMutableSubPipelines();
+    auto outerSubs = userLpp.getStages()[0]->getMutableSubPipelines();
     ASSERT_TRUE(outerSubs && outerSubs->size() == 1U);
     const auto& outerSubStages = (*outerSubs)[0]->getStages();
     ASSERT_EQ(outerSubStages.size(), 2U);
@@ -248,7 +249,7 @@ TEST(PipelineResolverTest, AllowsRepeatedViewReferenceInUserStages) {
 
     // Inner $unionWith sub-LPP: [{$match:{v:1}} (from viewMain)] — not empty, proving the
     // second reference to viewMain was resolved and not suppressed as a cycle.
-    auto* innerSubs = outerSubStages[1]->getMutableSubPipelines();
+    auto innerSubs = outerSubStages[1]->getMutableSubPipelines();
     ASSERT_TRUE(innerSubs && innerSubs->size() == 1U);
     const auto& innerSubStages = (*innerSubs)[0]->getStages();
     ASSERT_EQ(innerSubStages.size(), 1U);
@@ -291,20 +292,20 @@ TEST(PipelineResolverTest, ResolvesInnerViewNestedUnderRepeatedBaseCollectionRef
 
     // Walk outer -> middle: neither targets a view, so nothing is prepended at those levels.
     ASSERT_EQ(userLpp.getStages().size(), 1U);
-    auto* outerSubs = userLpp.getStages()[0]->getMutableSubPipelines();
+    auto outerSubs = userLpp.getStages()[0]->getMutableSubPipelines();
     ASSERT_TRUE(outerSubs && outerSubs->size() == 1U);
     const auto& middleStages = (*outerSubs)[0]->getStages();
     ASSERT_EQ(middleStages.size(), 1U);
     ASSERT_EQ(middleStages[0]->getParseTimeName(), "$unionWith"sv);
 
-    auto* middleSubs = middleStages[0]->getMutableSubPipelines();
+    auto middleSubs = middleStages[0]->getMutableSubPipelines();
     ASSERT_TRUE(middleSubs && middleSubs->size() == 1U);
     const auto& innermostStages = (*middleSubs)[0]->getStages();
     ASSERT_EQ(innermostStages.size(), 1U);
     ASSERT_EQ(innermostStages[0]->getParseTimeName(), "$unionWith"sv);
 
     // The innermost $unionWith targeted innerView should be fully resolved.
-    auto* innerSubs = innermostStages[0]->getMutableSubPipelines();
+    auto innerSubs = innermostStages[0]->getMutableSubPipelines();
     ASSERT_TRUE(innerSubs && innerSubs->size() == 1U);
     const auto& viewStages = (*innerSubs)[0]->getStages();
     ASSERT_EQ(viewStages.size(), 1U);
@@ -408,7 +409,8 @@ TEST(PipelineResolverTest, MongotLedPipelineOnViewBindsUnionWithSubpipelineView)
 
     // The recursion must also have handled the view inside the sub-pipeline: the sub-pipeline is
     // not mongot-led, so the view's $match gets stitched in front of the user's $match.
-    auto* subs = userLpp.getStages()[1]->getMutableSubPipelines();
+    auto subs = userLpp.getStages()[1]->getMutableSubPipelines();
+    ASSERT(subs);
     ASSERT_EQ(subs->size(), 1U);
     const auto& innerStages = subs->front()->getStages();
     ASSERT_EQ(innerStages.size(), 2U);

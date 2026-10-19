@@ -392,18 +392,18 @@ TEST(LiteParsedPipelineClone, CloneClonesSubpipelinesForNestedStages) {
     ASSERT_NE(original.getStages()[0].get(), cloned.getStages()[0].get());
 
     // Verify both stages have subpipelines.
-    auto* originalSubPipelinesPtr = original.getStages()[0]->getSubPipelines();
-    auto* clonedSubPipelinesPtr = cloned.getStages()[0]->getSubPipelines();
-    ASSERT_NE(originalSubPipelinesPtr, nullptr);
-    ASSERT_NE(clonedSubPipelinesPtr, nullptr);
-    const auto& originalSubPipelines = *originalSubPipelinesPtr;
-    const auto& clonedSubPipelines = *clonedSubPipelinesPtr;
+    auto originalSubPipelinesOpt = original.getStages()[0]->getSubPipelines();
+    auto clonedSubPipelinesOpt = cloned.getStages()[0]->getSubPipelines();
+    ASSERT(originalSubPipelinesOpt);
+    ASSERT(clonedSubPipelinesOpt);
+    const auto& originalSubPipelines = *originalSubPipelinesOpt;
+    const auto& clonedSubPipelines = *clonedSubPipelinesOpt;
 
     ASSERT_EQ(originalSubPipelines.size(), 1);
     ASSERT_EQ(clonedSubPipelines.size(), 1);
 
     // Verify the subpipelines are different objects (deep copy).
-    ASSERT_NE(&originalSubPipelines[0], &clonedSubPipelines[0]);
+    ASSERT_NE(&*originalSubPipelines[0], &*clonedSubPipelines[0]);
 
     // Verify the subpipeline stages are also cloned (different pointers).
     ASSERT_EQ(originalSubPipelines[0]->getStages().size(), 1);
@@ -484,7 +484,7 @@ TEST(LiteParsedDocumentSourceNestedPipelinesBindResolvedNamespace,
     auto& stage = lpp.getStages()[0];
 
     // Before bind: _pipelines must be empty so needsViewSubpipelineMaterialized() returns true.
-    ASSERT_TRUE(stage->getMutableSubPipelines() != nullptr);
+    ASSERT_TRUE(stage->getMutableSubPipelines().has_value());
     ASSERT_TRUE(stage->getMutableSubPipelines()->empty());
 
     ResolvedNamespaceViewOptions opts;
@@ -506,8 +506,8 @@ TEST(LiteParsedDocumentSourceNestedPipelinesBindResolvedNamespace,
     ASSERT_EQ(backingNss.getNamespace(), kForeignNss);
 
     // The view pipeline must have been materialized into _pipelines.
-    auto* subPipelines = stage->getMutableSubPipelines();
-    ASSERT_NE(subPipelines, nullptr);
+    auto subPipelines = stage->getMutableSubPipelines();
+    ASSERT(subPipelines);
     ASSERT_FALSE(subPipelines->empty());
 }
 
@@ -534,7 +534,7 @@ TEST(LiteParsedDocumentSourceNestedPipelinesBindResolvedNamespace,
     auto& stage = lpp.getStages()[0];
 
     // Before bind: no pipeline slot yet.
-    ASSERT_TRUE(stage->getMutableSubPipelines() != nullptr);
+    ASSERT_TRUE(stage->getMutableSubPipelines().has_value());
     ASSERT_TRUE(stage->getMutableSubPipelines()->empty());
 
     ResolvedNamespaceViewOptions opts;
@@ -554,8 +554,8 @@ TEST(LiteParsedDocumentSourceNestedPipelinesBindResolvedNamespace,
     ASSERT_TRUE(backingNss.isInvolvedNamespaceAView());
     ASSERT_EQ(backingNss.getNamespace(), kForeignNss);
 
-    auto* subPipelines = stage->getMutableSubPipelines();
-    ASSERT_NE(subPipelines, nullptr);
+    auto subPipelines = stage->getMutableSubPipelines();
+    ASSERT(subPipelines);
     ASSERT_FALSE(subPipelines->empty());
 }
 
@@ -587,8 +587,8 @@ TEST(LiteParsedDocumentSourceNestedPipelinesBindResolvedNamespace,
     auto& stage = lpp.getStages()[0];
 
     // Before bind: _pipelines must be empty so needsViewSubpipelineMaterialized() returns true.
-    auto* subPipelinesBefore = stage->getMutableSubPipelines();
-    ASSERT_NE(subPipelinesBefore, nullptr);
+    auto subPipelinesBefore = stage->getMutableSubPipelines();
+    ASSERT(subPipelinesBefore);
     ASSERT_TRUE(subPipelinesBefore->empty());
 
     ResolvedNamespaceViewOptions opts;
@@ -610,8 +610,8 @@ TEST(LiteParsedDocumentSourceNestedPipelinesBindResolvedNamespace,
     ASSERT_EQ(backingNss.getNamespace(), kForeignNss);
 
     // The view pipeline must have been materialized into _pipelines.
-    auto* subPipelines = stage->getMutableSubPipelines();
-    ASSERT_NE(subPipelines, nullptr);
+    auto subPipelines = stage->getMutableSubPipelines();
+    ASSERT(subPipelines);
     ASSERT_EQ(subPipelines->size(), 1u);
     ASSERT_FALSE((*subPipelines)[0]->getStages().empty());
 }
@@ -697,8 +697,8 @@ TEST(LiteParsedDocumentSourceNestedPipelinesBindResolvedNamespace,
     ASSERT_EQ(backingNss.getNamespace(), kForeignNss);
 
     // Nothing was materialized: _pipelines must remain empty.
-    auto* subPipelines = stage->getMutableSubPipelines();
-    ASSERT_NE(subPipelines, nullptr);
+    auto subPipelines = stage->getMutableSubPipelines();
+    ASSERT(subPipelines);
     ASSERT_TRUE(subPipelines->empty());
 }
 
@@ -779,9 +779,9 @@ TEST(LiteParsedPipelineClone, CloneRemainsValidAfterOriginalIsDestroyed) {
     ASSERT_EQ(cloned->getStages().size(), 1);
 
     // Verify the stage data is still accessible.
-    auto* clonedSubPipelinesPtr = cloned->getStages()[0]->getSubPipelines();
-    ASSERT_NE(clonedSubPipelinesPtr, nullptr);
-    const auto& clonedSubPipelines = *clonedSubPipelinesPtr;
+    auto clonedSubPipelinesOpt = cloned->getStages()[0]->getSubPipelines();
+    ASSERT(clonedSubPipelinesOpt);
+    const auto& clonedSubPipelines = *clonedSubPipelinesOpt;
     ASSERT_EQ(clonedSubPipelines.size(), 1);
     ASSERT_EQ(clonedSubPipelines[0]->getStages().size(), 1);
 
@@ -814,9 +814,9 @@ TEST(LiteParsedPipelineClone, OriginalRemainsValidAfterCloneIsDestroyed) {
     ASSERT_EQ(original.getStages().size(), 1);
 
     // Verify the stage data is still accessible.
-    auto* originalSubPipelinesPtr = original.getStages()[0]->getSubPipelines();
-    ASSERT_NE(originalSubPipelinesPtr, nullptr);
-    const auto& originalSubPipelines = *originalSubPipelinesPtr;
+    auto originalSubPipelinesOpt = original.getStages()[0]->getSubPipelines();
+    ASSERT(originalSubPipelinesOpt);
+    const auto& originalSubPipelines = *originalSubPipelinesOpt;
     ASSERT_EQ(originalSubPipelines.size(), 1);
     ASSERT_EQ(originalSubPipelines[0]->getStages().size(), 1);
 

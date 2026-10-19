@@ -27,6 +27,7 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -38,6 +39,18 @@ namespace [[MONGO_MOD_UNFORTUNATELY_OPEN]] mongo {
 
 class LiteParsedPipeline;
 class OwnedLiteParsedPipeline;
+
+/**
+ * Views over a stage's subpipelines, defined in owned_lite_parsed_pipeline.h (the element
+ * accessors require OwnedLiteParsedPipeline to be complete). They allow iterating and editing
+ * each subpipeline in place but not reordering, adding, or removing subpipelines, so that stages
+ * that attach meaning to subpipeline order can rely on that order being stable.
+ */
+template <typename Vector>
+class OwnedLiteParsedPipelinesView;
+using MutableSubPipelinesView = OwnedLiteParsedPipelinesView<std::vector<OwnedLiteParsedPipeline>>;
+using ConstSubPipelinesView =
+    OwnedLiteParsedPipelinesView<const std::vector<OwnedLiteParsedPipeline>>;
 
 struct LiteParserOptions {
     // Allows the foreign collection of a lookup to be in a different database than the local
@@ -576,19 +589,18 @@ public:
     virtual void assertSupportsMultiDocumentTransaction() const {}
 
     /**
-     * Returns this document source's subpipelines (const view), or nullptr if none exist.
+     * Returns this document source's subpipelines (const view), or boost::none if none exist.
      */
-    const std::vector<OwnedLiteParsedPipeline>* getSubPipelines() const {
-        return const_cast<LiteParsedDocumentSource*>(this)->getMutableSubPipelines();
-    }
+    boost::optional<ConstSubPipelinesView> getSubPipelines() const;
 
     /**
-     * Returns mutable subpipelines, or nullptr if this stage has none.
+     * Returns a mutable view of this stage's subpipelines, or boost::none if this stage has none.
      * Overridden by stages that have subpipelines (e.g. $lookup, $facet).
+     *
+     * The view permits modifying each subpipeline in place but not reordering, adding, or
+     * removing subpipelines; stages whose semantics depend on subpipeline order rely on this.
      */
-    virtual std::vector<OwnedLiteParsedPipeline>* getMutableSubPipelines() {
-        return nullptr;
-    }
+    virtual boost::optional<MutableSubPipelinesView> getMutableSubPipelines();
 
     /**
      * Returns the name of the stage that this LiteParsedDocumentSource represents.

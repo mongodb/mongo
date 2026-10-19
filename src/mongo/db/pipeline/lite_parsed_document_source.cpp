@@ -34,6 +34,17 @@ std::shared_ptr<ResolvedNamespace> tryGetPreResolvedNamespace(
 using Parser = LiteParsedDocumentSource::Parser;
 using ParserMap = LiteParsedDocumentSource::ParserMap;
 
+boost::optional<ConstSubPipelinesView> LiteParsedDocumentSource::getSubPipelines() const {
+    if (auto mutableView = const_cast<LiteParsedDocumentSource*>(this)->getMutableSubPipelines()) {
+        return ConstSubPipelinesView{*mutableView};
+    }
+    return boost::none;
+}
+
+boost::optional<MutableSubPipelinesView> LiteParsedDocumentSource::getMutableSubPipelines() {
+    return boost::none;
+}
+
 namespace {
 
 ParserMap parserMap;

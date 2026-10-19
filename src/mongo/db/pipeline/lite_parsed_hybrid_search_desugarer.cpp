@@ -27,14 +27,14 @@ namespace {
 
 // Pairs each input pipeline name with its parsed LiteParsedPipeline, sorted by name so
 // ordering-sensitive output (e.g. scoreDetails) is deterministic.
-std::vector<std::pair<std::string, const OwnedLiteParsedPipeline*>> collectSortedInputPipelines(
-    const BSONObj& pipelinesSpec, const std::vector<OwnedLiteParsedPipeline>& subPipelines) {
-    std::vector<std::pair<std::string, const OwnedLiteParsedPipeline*>> sorted;
+std::vector<std::pair<std::string, const LiteParsedPipeline*>> collectSortedInputPipelines(
+    const BSONObj& pipelinesSpec, const ConstSubPipelinesView& subPipelines) {
+    std::vector<std::pair<std::string, const LiteParsedPipeline*>> sorted;
     sorted.reserve(subPipelines.size());
     {
         size_t idx = 0;
         for (const auto& elem : pipelinesSpec) {
-            sorted.emplace_back(elem.fieldName(), &subPipelines[idx++]);
+            sorted.emplace_back(elem.fieldName(), &*subPipelines[idx++]);
         }
     }
     std::sort(sorted.begin(), sorted.end(), [](const auto& a, const auto& b) {
@@ -44,7 +44,7 @@ std::vector<std::pair<std::string, const OwnedLiteParsedPipeline*>> collectSorte
 }
 
 std::vector<std::string> namesOf(
-    const std::vector<std::pair<std::string, const OwnedLiteParsedPipeline*>>& sorted) {
+    const std::vector<std::pair<std::string, const LiteParsedPipeline*>>& sorted) {
     std::vector<std::string> names;
     names.reserve(sorted.size());
     for (const auto& [name, _] : sorted) {
@@ -78,7 +78,11 @@ StageSpecs desugarRankFusion(const LiteParsedRankFusion& stage,
                              const NamespaceString& nss,
                              std::string_view userCollName) {
     const auto& spec = stage.getSpec();
-    const auto& subPipelines = *stage.getSubPipelines();
+    const auto subPipelinesView = stage.getSubPipelines();
+    tassert(13733900,
+            "$rankFusion: expected subpipelines on a lite-parsed $rankFusion stage",
+            subPipelinesView.has_value());
+    const auto& subPipelines = *subPipelinesView;
     const bool includeScoreDetails = spec.getScoreDetails();
 
     auto sorted = collectSortedInputPipelines(spec.getInput().getPipelines(), subPipelines);
@@ -100,7 +104,7 @@ StageSpecs desugarRankFusion(const LiteParsedRankFusion& stage,
 
     for (size_t i = 0; i < sorted.size(); ++i) {
         const auto& pipelineName = sorted[i].first;
-        const LiteParsedPipeline& subPipeline = sorted[i].second->pipeline();
+        const LiteParsedPipeline& subPipeline = *sorted[i].second;
         double weight = hybrid_scoring_util::getPipelineWeight(weights, pipelineName);
 
         StageSpecs perPipeline = rank_fusion_utils::buildRankFusionInputPipelinePreamble(
@@ -169,7 +173,11 @@ StageSpecs desugarScoreFusion(const LiteParsedScoreFusion& stage,
                               const NamespaceString& nss,
                               std::string_view userCollName) {
     const auto& spec = stage.getSpec();
-    const auto& subPipelines = *stage.getSubPipelines();
+    const auto subPipelinesView = stage.getSubPipelines();
+    tassert(13733901,
+            "$scoreFusion: expected subpipelines on a lite-parsed $scoreFusion stage",
+            subPipelinesView.has_value());
+    const auto& subPipelines = *subPipelinesView;
     const bool includeScoreDetails = spec.getScoreDetails();
 
     auto sorted = collectSortedInputPipelines(spec.getInput().getPipelines(), subPipelines);
@@ -193,7 +201,7 @@ StageSpecs desugarScoreFusion(const LiteParsedScoreFusion& stage,
 
     for (size_t i = 0; i < sorted.size(); ++i) {
         const auto& pipelineName = sorted[i].first;
-        const LiteParsedPipeline& subPipeline = sorted[i].second->pipeline();
+        const LiteParsedPipeline& subPipeline = *sorted[i].second;
         double weight = hybrid_scoring_util::getPipelineWeight(weights, pipelineName);
 
         StageSpecs perPipeline = score_fusion_utils::buildScoreFusionInputPipelinePreamble(

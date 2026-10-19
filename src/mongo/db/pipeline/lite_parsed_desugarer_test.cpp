@@ -78,7 +78,7 @@ public:
 size_t liftSubpipelineStageExpander(LiteParsedPipeline* pipeline,
                                     size_t index,
                                     LiteParsedDocumentSource& stage) {
-    auto* subpipelinesPtr = stage.getMutableSubPipelines();
+    auto subpipelinesPtr = stage.getMutableSubPipelines();
     tassert(8084900,
             "$liftSubpipeline must have exactly one subpipeline",
             subpipelinesPtr && subpipelinesPtr->size() == 1);
@@ -155,8 +155,8 @@ public:
     void assertSubpipelineStageIsMatch(LiteParsedDocumentSource* stage,
                                        size_t subpipelineIdx,
                                        size_t stageIdx) {
-        auto* subpipelinesPtr = stage->getSubPipelines();
-        ASSERT_NE(subpipelinesPtr, nullptr);
+        auto subpipelinesPtr = stage->getSubPipelines();
+        ASSERT(subpipelinesPtr);
         ASSERT_LT(subpipelineIdx, subpipelinesPtr->size());
         auto& stages = (*subpipelinesPtr)[subpipelineIdx]->getStages();
         ASSERT_LT(stageIdx, stages.size());
@@ -579,8 +579,8 @@ TEST_F(LiteParsedDesugarerTest, SkipsSubpipelineDesugaringWhenIfrContextIsNull) 
     ASSERT_FALSE(LiteParsedDesugarer::desugar(&lpp, nullptr));
 
     // Subpipeline unchanged: still [$expandToHostParse] (not desugared to [$match]).
-    auto* subpipelinesPtr = lpp.getStages()[0]->getSubPipelines();
-    ASSERT_NE(subpipelinesPtr, nullptr);
+    auto subpipelinesPtr = lpp.getStages()[0]->getSubPipelines();
+    ASSERT(subpipelinesPtr);
     ASSERT_EQ(subpipelinesPtr->size(), 1);
     auto& subpipelineStages = (*subpipelinesPtr)[0]->getStages();
     ASSERT_EQ(subpipelineStages.size(), 1);
@@ -679,8 +679,8 @@ TEST_F(LiteParsedDesugarerTest, DesugarsNestedSubpipelines) {
     ASSERT_EQ(stages.size(), 1);
 
     // $unionWith's subpipeline: [$lookup]. The $lookup's subpipeline should be desugared.
-    auto* unionWithSubpipelinesPtr = stages[0]->getSubPipelines();
-    ASSERT_NE(unionWithSubpipelinesPtr, nullptr);
+    auto unionWithSubpipelinesPtr = stages[0]->getSubPipelines();
+    ASSERT(unionWithSubpipelinesPtr);
     ASSERT_EQ(unionWithSubpipelinesPtr->size(), 1);
     auto& unionWithPipelineStages = (*unionWithSubpipelinesPtr)[0]->getStages();
     ASSERT_EQ(unionWithPipelineStages.size(), 1);

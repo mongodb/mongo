@@ -370,11 +370,11 @@ bool resolveInvolvedNamespacesImpl(LiteParsedPipeline* lpp,
             if (!stages[i]->shouldResolveSubpipelineViews()) {
                 continue;
             }
-            auto* subs = stages[i]->getMutableSubPipelines();
+            auto subs = stages[i]->getMutableSubPipelines();
             if (!subs) {
                 continue;
             }
-            for (auto& sub : *subs) {
+            for (auto sub : *subs) {
                 auto subNss = sub->getOriginalParseNss();
                 // For materialized view sub-pipelines (e.g. those created by
                 // materializeViewSubpipeline for $graphLookup {from: someView}), the
@@ -389,7 +389,7 @@ bool resolveInvolvedNamespacesImpl(LiteParsedPipeline* lpp,
                     continue;
                 }
                 bound |= resolveInvolvedNamespacesImpl(
-                    sub.operator->(), subNss, resolvedNamespaces, inProgress, bindOnly, 0);
+                    &*sub, subNss, resolvedNamespaces, inProgress, bindOnly, 0);
                 if (isRunningAgainstAView) {
                     inProgress.erase(cycleNss);
                 }

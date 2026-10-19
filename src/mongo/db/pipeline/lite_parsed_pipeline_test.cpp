@@ -245,7 +245,7 @@ TEST(LiteParsedPipelineTest, ReplaceStageWithOwnsUnownedClonedSubpipelineStages)
     LiteParsedPipeline pipeline(kTestNss, std::vector<BSONObj>{unionSpec});
 
     // Unowned clones backed by the $unionWith stage's OwnedLiteParsedPipeline.
-    const auto* subPipelines = pipeline.getStages()[0]->getSubPipelines();
+    const auto subPipelines = pipeline.getStages()[0]->getSubPipelines();
     ASSERT(subPipelines);
     ASSERT_EQ(subPipelines->size(), 1U);
     std::vector<std::unique_ptr<LiteParsedDocumentSource>> replacements;
@@ -304,7 +304,7 @@ TEST(LiteParsedPipelineTest, ReplaceStageWithNestedPipelineReplacementOwnsSubSta
 
     const auto& stages = pipeline.getStages();
     ASSERT_EQ(stages.size(), 1U);
-    const auto* subPipelines = stages[0]->getSubPipelines();
+    const auto subPipelines = stages[0]->getSubPipelines();
     ASSERT(subPipelines);
     ASSERT_EQ(subPipelines->size(), 1U);
     const auto& subStages = (*subPipelines)[0]->getStages();
@@ -343,9 +343,9 @@ TEST(LiteParsedPipelineTest, NestedLookupSubpipelineGetParseNssIsForeignCollecti
 
     ASSERT_EQ(pipeline.getOriginalParseNss(), kTestNss);
 
-    auto* subPipelinesPtr = pipeline.getStages()[0]->getSubPipelines();
-    ASSERT_NE(subPipelinesPtr, nullptr);
-    const auto& subPipelines = *subPipelinesPtr;
+    auto subPipelinesOpt = pipeline.getStages()[0]->getSubPipelines();
+    ASSERT(subPipelinesOpt);
+    const auto& subPipelines = *subPipelinesOpt;
     ASSERT_EQ(subPipelines.size(), 1U);
     ASSERT_EQ(subPipelines[0]->getOriginalParseNss(), kForeignNss);
 }
@@ -364,8 +364,8 @@ TEST(LiteParsedPipelineTest, NestedMergeSubpipelineGetParseNssIsTargetCollection
 
     ASSERT_EQ(pipeline.getOriginalParseNss(), kTestNss);
 
-    const auto* subPipelines = pipeline.getStages()[0]->getSubPipelines();
-    ASSERT_NE(subPipelines, nullptr);
+    const auto subPipelines = pipeline.getStages()[0]->getSubPipelines();
+    ASSERT(subPipelines);
     ASSERT_EQ(subPipelines->size(), 1U);
     ASSERT_EQ((*subPipelines)[0]->getOriginalParseNss(), kTargetNss);
 }

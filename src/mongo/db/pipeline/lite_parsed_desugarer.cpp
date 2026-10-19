@@ -46,8 +46,8 @@ bool LiteParsedDesugarer::desugar(LiteParsedPipeline* pipeline,
         // from LPP - stages with subpipelines should pass the desugared LP subpipelines through
         // StageParams.
         if (ifrContext) {
-            if (auto* subpipelines = stage.getMutableSubPipelines()) {
-                for (auto& subpipelineLpp : *subpipelines) {
+            if (auto subpipelines = stage.getMutableSubPipelines()) {
+                for (auto subpipelineLpp : *subpipelines) {
                     modified |= LiteParsedDesugarer::desugar(&*subpipelineLpp, ifrContext);
                 }
             }

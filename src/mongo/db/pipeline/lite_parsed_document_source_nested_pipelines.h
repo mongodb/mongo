@@ -105,8 +105,8 @@ public:
         return Status::OK();
     }
 
-    std::vector<OwnedLiteParsedPipeline>* getMutableSubPipelines() override {
-        return &_pipelines;
+    boost::optional<MutableSubPipelinesView> getMutableSubPipelines() override {
+        return MutableSubPipelinesView{_pipelines};
     }
 
     /**
@@ -218,5 +218,4 @@ protected:
     // snapshot, so re-resolving the same view namespace always yields the same pipeline.
     bool _viewSubpipelineMaterialized = false;
 };
-
 }  // namespace mongo
