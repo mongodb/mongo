@@ -7232,7 +7232,12 @@ class TestGenerateCopybaraEvergreen(CopybaraTestCase):
             self.assertIn('      - func: "run copybara test sync task"', generated)
             self.assertIn(
                 "  - name: test_copybara_v8_2\n"
-                '    tags: ["assigned_to_jira_team_devprod_test_infrastructure", "auxiliary"]\n'
+                "    tags:\n"
+                "      [\n"
+                '        "assigned_to_jira_team_devprod_test_infrastructure",\n'
+                '        "auxiliary",\n'
+                '        "non_release_critical",\n'
+                "      ]\n"
                 "    patchable: true",
                 generated,
             )

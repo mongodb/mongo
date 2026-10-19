@@ -66,6 +66,10 @@ EVERGREEN_EXEMPT_PATTERNS = (
     "arm64_tsan_needs_8xlarge",
     "arm64_aubsan_grpc_needs_8xlarge",
     "assigned_to_jira_team_*",  # team ownership metadata
+    # release classification metadata (see docs/evergreen-testing/yaml_configuration/task_selection_tags.md)
+    "non_release_critical",
+    "release_critical",
+    "build_critical",
 )
 
 # Evergreen 'incompatible_*' tags exclude a task from a variant/platform. On the Bazel side that

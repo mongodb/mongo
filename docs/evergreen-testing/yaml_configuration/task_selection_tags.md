@@ -50,6 +50,25 @@ found [here](../../../etc/evergreen_lint.yml).
 **Important**: Do not change anything in this list without talking to
 [#ask-devprod-build](https://mongodb.enterprise.slack.com/archives/CR8SNBY0N).
 
+## Task classification tags
+
+In addition to the required task selection tag, tasks carry classification tags that describe if the
+task is blocking for releasing the server. These tags do not presently affect which tasks are
+selected to run.
+
+- `non_release_critical` - the task is not release-blocking. Every task that is not
+  `release_critical` is tagged with this by default, so teams should swap it for `release_critical`
+  as appropriate.
+
+- `release_critical` - a failure in this task blocks a release. Use this when, if the task were
+  failing in the waterfall and you could not inspect the specific failure, you would still be highly
+  confident that the commit contains a release-blocking issue.
+
+- `build_critical` - these tasks represent the absolute minimum that must pass in order for us to
+  build the server. Without them passing we have very low confidence that we can build on a given
+  platform / build variant, let alone release that version. Tasks tagged `build_critical` must also
+  be tagged `release_critical`, and must not be tagged `non_release_critical`.
+
 ## Optional task selection tags
 
 In addition to the required task selection tags there is a list of optional selection tags. Every
