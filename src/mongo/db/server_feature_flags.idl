@@ -348,11 +348,6 @@ feature_flags:
         cpp_varname: gFeatureFlagDSCLinearizableReadConcern
         default: true
         fcv_gated: false
-    featureFlagKEKPushMode:
-        description: "Enable push mode for KEKs."
-        cpp_varname: gFeatureFlagKEKPushMode
-        default: true
-        fcv_gated: false
     featureFlagCMKRotation:
         description: "Enable rotation of the customer master key (CMK)."
         cpp_varname: gFeatureFlagCMKRotation
