@@ -1407,6 +1407,8 @@ private:
     /**
      * Includes the field from the parent scope into the given scope.
      * This has the semantics of an inclusion projection.
+     *
+     * To be done(SERVER-136153): canPathBeArray to check arrayness here
      */
     void includeField(DeclarationCursor cursor) {
         const ParsedPathView path = cursor.remainingPath();
@@ -1615,6 +1617,7 @@ private:
 
     /**
      * Populate metadata when a base field is redefined.
+     * To be done(SERVER-136153): canPathBeArray to check arrayness here
      */
     void populateBaseFieldMetadata(FieldId newBaseField,
                                    FieldMatch priorBaseFieldMatch,
@@ -1839,8 +1842,6 @@ private:
                                 if (canPrefixContainArrays(prefix)) {
                                     break;
                                 }
-                                metadata.canFieldBeArray =
-                                    _fields[oldPathField].metadata.canFieldBeArray;
                                 // Track transitive alias. If the prefix contains arrays
                                 // we skip this: canFieldBeArray is already true and any
                                 // downstream alias resolution would also yield true.
@@ -1851,13 +1852,6 @@ private:
                                 break;
                             }
                             case FieldMatchType::kMissing: {
-                                // A truly missing field cannot be an array. An unknown field
-                                // might be.
-                                metadata.canFieldBeArray =
-                                    !_fields[oldPathField].metadata.knownToBeMissing ||
-                                    // If the prefix can contain arrays, the rename source could
-                                    // still yield an array even if the leaf is missing.
-                                    canPrefixContainArrays(prefix);
                                 break;
                             }
                             case FieldMatchType::kShadowed: {
@@ -1870,11 +1864,6 @@ private:
                                     for (size_t i = consumed; i < parsedOldPath.size(); ++i) {
                                         aliasCollectionPath.push_back(parsedOldPath[i]);
                                     }
-                                    if (!canPrefixContainArrays(prefix) &&
-                                        !_fields[oldPathField].metadata.canFieldBeArray) {
-                                        metadata.canFieldBeArray =
-                                            _canPathBeArray(buildDottedPath(aliasCollectionPath));
-                                    }
                                 }
                                 // Walk the shadowing constant for the suffix when array-free.
                                 if (!canPrefixContainArrays(prefix)) {
@@ -1882,9 +1871,6 @@ private:
                                         constant = walkConstant(*std::move(parent),
                                                                 ParsedPathView(parsedOldPath)
                                                                     .subspan(prefix.size() + 1));
-                                        if (constant) {
-                                            metadata.canFieldBeArray = constant->isArray();
-                                        }
                                     }
                                 }
                                 break;
@@ -1901,9 +1887,13 @@ private:
                     if (isBaseDocumentField) {
                         // We represent all collection field references as FieldId::none(), without
                         // distinguishing between them.
-                        metadata.canFieldBeArray = _canPathBeArray(p.getOldPath());
                         aliasCollectionPath.assign(parsedOldPath.begin(), parsedOldPath.end());
                     }
+
+                    // If the old path could have been an array before the rename, the new field can
+                    // also be an array.
+                    metadata.canFieldBeArray =
+                        canPathBeArray(_stages[stage].documentSource.get(), p.getOldPath());
 
                     // Each rename modifies the new field and depends on the previous field. When
                     // the rename traverses the new path's prefix as an array (e.g. a dotted
