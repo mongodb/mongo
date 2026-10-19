@@ -109,20 +109,23 @@ export var RetryableWritesUtil = (function () {
     }
 
     function isFailedToSatisfyPrimaryReadPreferenceError(res) {
-        const kReplicaSetMonitorError =
-            /Could not find host matching read preference.*mode:.*primary/;
+        // Match on primary FailedToSatisfyReadPreference reasons. These are safe to retry.
+        // - Replica set monitor could not find matching host.
+        // - checkPrimary() failed to connect.
+        const kNoPrimaryAvailableError =
+            /Could not find host matching read preference.*mode:.*primary|can't connect to new replica set primary/;
         if (res.code === ErrorCodes.FailedToSatisfyReadPreference && res.hasOwnProperty("reason")) {
-            return res.reason.match(kReplicaSetMonitorError);
+            return res.reason.match(kNoPrimaryAvailableError);
         }
         if (res.hasOwnProperty("errmsg")) {
-            return res.errmsg.match(kReplicaSetMonitorError);
+            return res.errmsg.match(kNoPrimaryAvailableError);
         }
         if (res.hasOwnProperty("message")) {
-            return res.message.match(kReplicaSetMonitorError);
+            return res.message.match(kNoPrimaryAvailableError);
         }
         if (res.hasOwnProperty("writeErrors")) {
             for (let writeError of res.writeErrors) {
-                if (writeError.errmsg.match(kReplicaSetMonitorError)) {
+                if (writeError.errmsg.match(kNoPrimaryAvailableError)) {
                     return true;
                 }
             }

@@ -451,6 +451,24 @@ const retryOnNetworkErrorTests = [
         },
     },
     {
+        name: "insert with failure to connect to the primary",
+        test: function () {
+            assert.commandWorked(testDB.createCollection(collName1));
+            attachPostCmdFunction("insert", function () {
+                // The error DBClientReplicaSet::checkPrimary() raises.
+                const reason =
+                    "can't connect to new replica set primary [localhost:20001], " +
+                    "err: The server is in quiesce mode and will shut down";
+                const e = new Error(reason);
+                e.code = ErrorCodes.FailedToSatisfyReadPreference;
+                e.reason = reason;
+                throw e;
+            });
+            assert.commandWorked(coll1.insert({_id: 1}));
+            assert.eq(coll1.find().toArray(), [{_id: 1}]);
+        },
+    },
+    {
         name: "ordinary CRUD ops",
         test: function () {
             assert.commandWorked(testDB.createCollection(collName1));

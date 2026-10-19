@@ -779,7 +779,7 @@ function shouldRetryWithNetworkErrorOverride(
         // node in the replica set to take longer than 15 seconds so we allow retrying
         // for up to 5 minutes.
         logError(
-            "Failed to find primary when attempting to run command," +
+            "Failed to find or connect to primary when attempting to run command," +
                 " will retry for another 15 seconds",
         );
         return kContinue;
@@ -920,7 +920,7 @@ function shouldRetryWithNetworkExceptionOverride(
         // node in the replica set to take longer than 15 seconds so we allow retrying
         // for up to 5 minutes.
         logError(
-            "Failed to find primary when attempting to run command," +
+            "Failed to find or connect to primary when attempting to run command," +
                 " will retry for another 15 seconds",
         );
         return false;
