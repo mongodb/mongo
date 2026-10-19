@@ -566,7 +566,7 @@
     },
     "//bazel/toolchains/cc/mongo_linux_cross:mongo_linux_cross_toolchain.bzl%setup_mongo_linux_cross_toolchains_extension": {
       "general": {
-        "bzlTransitiveDigest": "VsuUB5YQS/l1+mVwBpn9GKrEhWRXtaWeFAKS+64NcQw=",
+        "bzlTransitiveDigest": "q0rgmf5vTQlxHRHbRPBHV6w5pLGxHvtqE8obEu9WvHI=",
         "usagesDigest": "CLqWoiirAYDlbHYzkK/ZRzzlKha6+TR03Xh4cCF2u+A=",
         "recordedInputs": [],
         "generatedRepoSpecs": {

@@ -1,7 +1,46 @@
 """Unit tests for the Linux cross toolchain repository rule helpers."""
 
 load("@bazel_skylib//lib:unittest.bzl", "asserts", "unittest")
-load(":mongo_linux_cross_toolchain.bzl", "execs_for_target", "linux_cross_toolchain_repo_names")
+load(
+    ":mongo_linux_cross_toolchain.bzl",
+    "execs_for_target",
+    "linux_cross_toolchain_repo_names",
+    "linux_cross_toolchain_substitutions",
+)
+
+def _fake_host_tool_path(_label):
+    return "/external/mongo_toolchain_v5/v5/bin/clang"
+
+def _windows_unix_root_test_impl(ctx):
+    env = unittest.begin(ctx)
+
+    # The shared BUILD template uses this placeholder for both compilers. Linux
+    # cross toolchains need a quoted empty value so Windows include aliases are
+    # disabled and the generated BUILD file parses on IBM build variants.
+    for target_arch in ("s390x", "ppc64le"):
+        for use_composed_toolchain in (False, True):
+            repo_ctx = struct(
+                name = "mongo_linux_cross_toolchain_v5_rhel9_{}_on_rhel9_aarch64".format(target_arch),
+                attr = struct(
+                    target_arch = target_arch,
+                    target_distro = "rhel9",
+                    exec_arch = "aarch64",
+                    exec_distro = "rhel9",
+                    version = "v5",
+                ),
+                path = _fake_host_tool_path,
+            )
+            substitutions = linux_cross_toolchain_substitutions(repo_ctx, use_composed_toolchain)
+            asserts.equals(
+                env,
+                repr(""),
+                substitutions.get("{windows_unix_root}"),
+                "{} (composed={})".format(target_arch, use_composed_toolchain),
+            )
+
+    return unittest.end(env)
+
+_windows_unix_root_test = unittest.make(_windows_unix_root_test_impl)
 
 def _execs_for_target_test_impl(ctx):
     env = unittest.begin(ctx)
@@ -80,4 +119,5 @@ def mongo_linux_cross_toolchain_test_suite(name):
         name,
         _execs_for_target_test,
         _repo_names_test,
+        _windows_unix_root_test,
     )

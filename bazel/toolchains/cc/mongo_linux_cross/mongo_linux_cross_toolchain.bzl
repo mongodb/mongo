@@ -364,8 +364,20 @@ toolchain(
 """,
     )
 
-def _substitutions(ctx, use_composed_toolchain):
+def linux_cross_toolchain_substitutions(ctx, use_composed_toolchain):
+    """Return template substitutions for a composed or override cross toolchain.
+
+    Args:
+        ctx: Repository rule context.
+        use_composed_toolchain: Whether execution and target archives are composed.
+
+    Returns:
+        Substitutions for the shared BUILD and compiler flag templates.
+    """
     substitutions = {
+        # IBM cross toolchains run on Linux clients, so the shared BUILD
+        # template must disable Windows dependency-path aliases.
+        "{windows_unix_root}": repr(""),
         "{platforms_arch}": _platform_cpu(ctx.attr.target_arch),
         "{bazel_toolchain_cpu}": _platform_cpu(ctx.attr.target_arch),
         "{exec_bazel_toolchain_cpu}": _platform_cpu(ctx.attr.exec_arch),
@@ -442,7 +454,7 @@ def _linux_cross_toolchain_impl(ctx):
 
     selected = ctx.os.environ.get(LINUX_CROSS_TOOLCHAIN_ENV_VAR, "")
     if selected != _selector(ctx):
-        _generate_noop_cross_toolchain(ctx, _substitutions(ctx, False))
+        _generate_noop_cross_toolchain(ctx, linux_cross_toolchain_substitutions(ctx, False))
         return None
 
     url = _first_env_value(ctx, "URL")
@@ -599,7 +611,7 @@ esac
         "openssl_overrides.bzl",
         "OPENSSL_LINK_DIRS = []\nOPENSSL_INCLUDE_DIRS = []\n",
     )
-    substitutions = _substitutions(ctx, use_composed_toolchain)
+    substitutions = linux_cross_toolchain_substitutions(ctx, use_composed_toolchain)
 
     ctx.template(
         "BUILD.bazel",
