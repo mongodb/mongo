@@ -499,6 +499,24 @@ TEST_F(DocumentSourceQueryStatsTest, ClonePreservesTopKSortSpec) {
         topKSort.getDocument().toBson());
 }
 
+TEST_F(DocumentSourceQueryStatsTest, ClonePreservesKeyHashLookupSet) {
+    auto source =
+        DocumentSourceQueryStats::createFromBson(kQueryStatsStage.firstElement(), getExpCtx());
+    const std::vector<std::string> locations{"apple", "banana", "carrot"};
+    static_cast<DocumentSourceQueryStats*>(source.get())->setKeyHashLookupLocations(locations);
+
+    auto clone = source->clone(getExpCtx());
+    query_shape::SerializationOptions explainOpts;
+    explainOpts.verbosity = ExplainOptions::Verbosity::kQueryPlanner;
+    Value lookupLocations =
+        clone->serialize(explainOpts).getDocument()["$queryStats"]["keyHashLookupLocations"];
+    ASSERT_FALSE(lookupLocations.missing()) << "clone dropped the keyHashLookupLocations";
+
+    // Built as a named value so the ASSERT_VALUE_EQ argument has no top-level commas.
+    Value expected{std::vector<Value>(locations.begin(), locations.end())};
+    ASSERT_VALUE_EQ(expected, lookupLocations);
+}
+
 TEST_F(DocumentSourceQueryStatsTest, DataTypeHashConsistency) {
     // First, populate the query stats store. Include a constant of each representative data type so
     // that we have comprehensive coverage of hash consistency. (We don't have to cover every

@@ -28,12 +28,14 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
+
 using namespace std::literals::string_view_literals;
 
 using namespace query_stats;
@@ -141,6 +143,21 @@ public:
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
+    /**
+     * Records the keyHash locations extracted from a downstream keyHash-only $match, or boost::none
+     * if there is no such $match. Set by the query stats keyHash pushdown rule during pipeline
+     * optimization so the execution stage can resolve these values directly through the query stats
+     * store's 'KeyHashIndex' instead of scanning the entire store.
+     */
+    void setKeyHashLookupLocations(boost::optional<std::vector<std::string>> locations) {
+        _keyHashLookupSet = std::move(locations);
+    }
+
+    // Exposes the captured locations for tests, mirroring what the execution stage consumes.
+    const boost::optional<std::vector<std::string>>& getKeyHashLookupLocations_forTest() const {
+        return _keyHashLookupSet;
+    }
+
     void setTopKSortSpec(boost::optional<query_stats::TopKSortSpec> spec) {
         _topKSortSpec = std::move(spec);
     }
@@ -163,6 +180,7 @@ private:
           _transformIdentifiers(other._transformIdentifiers),
           _algorithm(other._algorithm),
           _hmacKey(other._hmacKey),
+          _keyHashLookupSet(other._keyHashLookupSet),
           _topKSortSpec(other._topKSortSpec) {}
 
     // When true, apply hmac to field names from returned query shapes.
@@ -177,6 +195,11 @@ private:
      * Key used for SHA-256 HMAC application on field names.
      */
     std::string _hmacKey;
+
+    // Populated during pipeline optimization when a downstream keyHash-only $match is detected,
+    // boost::none otherwise. Referenced during pipeline execution to avoid a full query stats store
+    // scan in favor of a keyHash-based lookup.
+    boost::optional<std::vector<std::string>> _keyHashLookupSet;
 
     // If set, enables the top-k sort optimization during execution.
     boost::optional<query_stats::TopKSortSpec> _topKSortSpec;

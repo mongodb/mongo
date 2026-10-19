@@ -122,6 +122,13 @@ Value DocumentSourceQueryStats::serialize(const query_shape::SerializationOption
                                      {"isAscending", _topKSortSpec->isAscending}}});
     }
 
+    if (opts.isSerializingForExplain() && _keyHashLookupSet) {
+        // Include the keyHash lookup locations in explain output to assert the pushdown fired.
+        spec.addField(
+            "keyHashLookupLocations",
+            Value{std::vector<Value>(_keyHashLookupSet->begin(), _keyHashLookupSet->end())});
+    }
+
     return Value{Document{{kStageName, spec.freeze()}}};
 }
 

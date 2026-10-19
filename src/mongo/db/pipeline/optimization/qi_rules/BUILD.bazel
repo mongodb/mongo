@@ -50,6 +50,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/pipeline:aggregation_context_fixture",
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/pipeline/optimization:pipeline_optimization",
+        "//src/mongo/db/query/collation:collator_interface_mock",
         "//src/mongo/db/query/query_shape:query_shape_common",
         "//src/mongo/unittest:server_parameter_guard",
     ],

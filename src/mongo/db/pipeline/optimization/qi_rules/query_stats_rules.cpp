@@ -1,6 +1,12 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
+#include "mongo/base/checked_cast.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_leaf.h"
+#include "mongo/db/matcher/expression_tree.h"
+#include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_query_stats.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_source_sort.h"
@@ -11,10 +17,127 @@
 #include "mongo/db/query/query_stats/query_stats_top_k_metrics.h"
 #include "mongo/util/assert_util.h"
 
-namespace mongo {
+#include <algorithm>
+#include <string_view>
+#include <vector>
 
-namespace rule_based_rewrites::pipeline {
+#include <boost/optional/optional.hpp>
+
+namespace mongo::rule_based_rewrites::pipeline {
 namespace {
+
+constexpr std::string_view kKeyHashFieldName = "keyHash";
+
+/**
+ * Extracts the keyHashes from a keyHash-only $eq/$in leaf, or boost::none if 'expr' is not one. The
+ * keyHash index compares exact keyHashes, so a non-simple collation (and, for $in, a regex) makes
+ * the leaf ineligible.
+ */
+boost::optional<std::vector<std::string>> extractKeyHashesFromLeaf(const MatchExpression* expr) {
+    switch (expr->matchType()) {
+        case MatchExpression::EQ: {
+            const auto* eq = static_cast<const EqualityMatchExpression*>(expr);
+            if (eq->path() != kKeyHashFieldName || eq->getData().type() != BSONType::string ||
+                eq->getCollator()) {
+                return boost::none;
+            }
+            return std::vector<std::string>{eq->getData().str()};
+        }
+        case MatchExpression::MATCH_IN: {
+            const auto* in = static_cast<const InMatchExpression*>(expr);
+            if (in->path() != kKeyHashFieldName || in->hasRegex() || in->getCollator()) {
+                return boost::none;
+            }
+            std::vector<std::string> hashes;
+            for (const auto& elem : in->getEqualities()) {
+                if (elem.type() != BSONType::string) {
+                    return boost::none;
+                }
+                hashes.push_back(elem.str());
+            }
+            return hashes;
+        }
+        default:
+            return boost::none;
+    }
+}
+
+/**
+ * The keyHashes present in both 'keyHashSet1' and 'keyHashSet2', in 'keyHashSet1's order.
+ */
+std::vector<std::string> intersectKeyHashes(const std::vector<std::string>& keyHashSet1,
+                                            const std::vector<std::string>& keyHashSet2) {
+    std::vector<std::string> intersection;
+    for (const auto& location : keyHashSet1) {
+        if (std::find(keyHashSet2.begin(), keyHashSet2.end(), location) != keyHashSet2.end()) {
+            intersection.push_back(location);
+        }
+    }
+    return intersection;
+}
+
+boost::optional<std::vector<std::string>> extractKeyHashEqualities(const MatchExpression* expr) {
+    if (!expr) {
+        return boost::none;
+    }
+    if (expr->matchType() == MatchExpression::OR) {
+        std::vector<std::string> locations;
+        for (const auto& child : static_cast<const OrMatchExpression&>(*expr).getChildVector()) {
+            auto childLocations = extractKeyHashEqualities(child.get());
+            if (!childLocations) {
+                return boost::none;
+            }
+            locations.insert(locations.end(), childLocations->begin(), childLocations->end());
+        }
+        return locations;
+    }
+    if (expr->matchType() != MatchExpression::AND) {
+        return extractKeyHashesFromLeaf(expr);
+    }
+
+    // Capture keyHash $eq/$in conjuncts reachable through AND expressions (compound or nested)
+    // only. Anything under a $nor or $not may match a different keyHash, so the index cannot narrow
+    // it. Conjuncts intersect, since a document has a single keyHash.
+    boost::optional<std::vector<std::string>> locations;
+    for (const auto& child : static_cast<const AndMatchExpression&>(*expr).getChildVector()) {
+        auto childLocations = extractKeyHashEqualities(child.get());
+        if (!childLocations) {
+            continue;
+        }
+        if (!locations) {
+            locations = std::move(*childLocations);
+            continue;
+        }
+        locations = intersectKeyHashes(*locations, *childLocations);
+        if (locations->empty()) {
+            // The keyHash conjuncts are disjoint, so no document can match the $and.
+            return std::vector<std::string>{};
+        }
+    }
+    return locations;
+}
+
+bool canExtractMatchKeyHashes(PipelineRewriteContext& ctx) {
+    if (!internalQueryStatsMatchPushdownOptimizationEnabled.load()) {
+        // The runtime knob is off: leave the stage on the default full-scan path.
+        return false;
+    }
+    return !ctx.atLastStage() && dynamic_cast<DocumentSourceMatch*>(ctx.nextStage().get());
+}
+
+/**
+ * Records the keyHash locations from the $match immediately following $queryStats, so execution
+ * resolves them through the query stats store's 'KeyHashIndex' instead of scanning the whole store.
+ *
+ * Writes boost::none when the following $match has no keyHash equal/containment leaf usable by the
+ * index (e.g. only non-keyHash predicates, or an $or with a branch the index cannot resolve).
+ */
+bool captureKeyHashLookupLocations(PipelineRewriteContext& ctx) {
+    auto& nextMatch = checked_cast<DocumentSourceMatch&>(*ctx.nextStage());
+    ctx.currentAs<DocumentSourceQueryStats>().setKeyHashLookupLocations(
+        extractKeyHashEqualities(nextMatch.getMatchExpression()));
+    return false;
+}
 
 bool isProjectStage(const DocumentSource* stage) {
     const auto* singleDocTransform =
@@ -128,7 +251,14 @@ bool optimizeQueryStatsTopK(PipelineRewriteContext& ctx) {
     return false;
 }
 
-}  // namespace
+REGISTER_RULES(DocumentSourceQueryStats,
+               {
+                   .name = "PUSH_MATCH_KEYHASH_LOOKUP_LOCATIONS",
+                   .precondition = canExtractMatchKeyHashes,
+                   .transform = captureKeyHashLookupLocations,
+                   .priority = kDefaultPushdownPriority,
+                   .tags = PipelineRewriteContext::Tags::InPlace,
+               });
 
 REGISTER_RULES(DocumentSourceQueryStats,
                {
@@ -139,5 +269,6 @@ REGISTER_RULES(DocumentSourceQueryStats,
                    .tags = rbr::PipelineRewriteContext::Tags::InPlace,
                });
 
-}  // namespace rule_based_rewrites::pipeline
-}  // namespace mongo
+}  // namespace
+
+}  // namespace mongo::rule_based_rewrites::pipeline
