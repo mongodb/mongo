@@ -83,12 +83,6 @@ public:
      */
     bool isForceClassicEngineEnabled() const;
 
-    /**
-     * Returns whether we can push down fully compatible stages to sbe. This is only true when the
-     * query knob is 'trySbeEngine'.
-     */
-    bool canPushDownFullyCompatibleStages() const;
-
 private:
     /**
      * Constructs a configuration from the current global knob values, with no per-query overrides

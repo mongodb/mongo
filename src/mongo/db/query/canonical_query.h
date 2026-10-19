@@ -305,12 +305,6 @@ public:
         return getExplain() && !getExpCtxRaw()->getInLookup();
     }
 
-    void optimizeProjection() {
-        if (_proj) {
-            _proj->optimize();
-        }
-    }
-
     /**
      * Indicates whether this query was created specifically for the sub planner.
      */

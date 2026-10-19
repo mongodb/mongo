@@ -64,60 +64,6 @@ auto& plannerInvocationCount = *MetricBuilder<Counter64>{"query.planning.invocat
  */
 auto& classicChoseWinningPlan =
     *MetricBuilder<Counter64>{"query.subPlanner.classicChoseWinningPlan"};
-
-void inspectPlannerResult(
-    const std::unique_ptr<PlannerInterface>& result,
-    const boost::optional<QueryPlannerParams::ReplanningData>& replanningData) {
-    // These assertions relate to replanning, so bail if the query did not replan.
-    if (!replanningData.has_value()) {
-        return;
-    }
-
-    // Only planning for classic plans can throw the ReplanningRequired exception. Thus when
-    // we call makePlanner again, we should still end up with a ClassicRuntimePlannerResult
-    // since the query hasn't changed.
-    // TODO SERVER-120501: Throw/catch this exception for SBE plans too.
-    auto planner = dynamic_cast<classic_runtime_planner::ClassicPlannerInterface*>(result.get());
-    tassert(8746607,
-            "Replanning should have resulted in a ClassicPlannerInterface, but it didn't",
-            planner);
-
-    // We do not consult the plan cache upon replanning so we should never enounter a
-    // CachedPlanner here.
-    tassert(8746608,
-            "Replanning should not have resulted in a CachedPlanner, but it did",
-            !dynamic_cast<classic_runtime_planner::CachedPlanner*>(planner));
-
-    // TODO SERVER-120492: Investigate if we can remove this tassert.
-    tassert(8746609,
-            "Replanning should not have resulted in a SubPlanner, but it did",
-            !dynamic_cast<classic_runtime_planner::SubPlanner*>(planner));
-
-    const QuerySolution* solution = planner->querySolution();
-    if (!solution) {
-        // Solution may live in the MultiPlanStage.
-        // TODO SERVER-117118 This should not be needed once we decouple the MultiPlanStage.
-        if (auto* mps = dynamic_cast<MultiPlanStage*>(planner->getRoot())) {
-            solution = mps->bestSolution();
-        }
-    }
-    const auto isSameAsCachedPlan = solution && replanningData->oldPlanHash == solution->hash();
-
-    LOGV2_DEBUG(
-        20582,
-        1,
-        "Query plan after replanning and its cache status",
-        "query"_attr = redact(planner->cq()->toStringShort()),
-        "planSummary"_attr = plan_explainer_factory::make(planner->getRoot())->getPlanSummary(),
-        "shouldCache"_attr =
-            ((replanningData->shouldCache == plan_cache_util::CacheMode::AlwaysCache) ? "yes"
-                                                                                      : "no"),
-        "isSameAsCachedPlan"_attr = isSameAsCachedPlan);
-
-    if (isSameAsCachedPlan) {
-        planCacheCounters.incrementClassicReplannedPlanIsCachedPlanCounter();
-    }
-}
 }  // namespace
 
 void setOpDebugPlanCacheInfo(OperationContext* opCtx, const PlanCacheInfo& cacheInfo) {

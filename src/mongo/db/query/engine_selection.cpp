@@ -16,33 +16,6 @@
 namespace mongo {
 namespace {
 /**
- * Returns true if 'collection' has an index that contains two fields, one of which is a path prefix
- * of the other, where the prefix field is hashed. Indexes can only contain one hashed field.
- *
- * TODO SERVER-99889: At the time of writing, there is a bug in the SBE stage builders that
- * constructs ExpressionFieldPaths over hashed values. This leads to wrong query results.
- *
- * The bug arises for covered index scans where a path P is a non-hashed path in the index and a
- * strict prefix P' of P is a hashed path in the index.
- */
-bool collectionHasIndexWithHashedPathPrefixOfNonHashedPath(const CollectionPtr& collection,
-                                                           ExpressionContext* expCtx) {
-    const IndexCatalog* indexCatalog = collection->getIndexCatalog();
-    tassert(10230200, "'CollectionPtr' does not have an 'IndexCatalog'", indexCatalog);
-    OperationContext* opCtx = expCtx->getOperationContext();
-    tassert(10230201, "'ExpressionContext' does not have an 'OperationContext'", opCtx);
-    std::unique_ptr<IndexCatalog::IndexIterator> indexIter =
-        indexCatalog->getIndexIterator(IndexCatalog::InclusionPolicy::kReady);
-    while (indexIter->more()) {
-        const IndexCatalogEntry* entry = indexIter->next();
-        if (indexHasHashedPathPrefixOfNonHashedPath(entry->descriptor()->keyPattern())) {
-            return true;
-        }
-    }
-    return false;
-}
-
-/**
  * Checks if the given query can be executed with the SBE engine based on the canonical query.
  *
  * This method determines whether the query may be compatible with SBE based only on high-level

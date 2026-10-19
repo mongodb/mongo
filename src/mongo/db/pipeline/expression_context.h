@@ -1082,10 +1082,6 @@ public:
         _params.pathArraynessForNss.emplace(nss, std::move(pathArrayness));
     }
 
-    bool hasPathArraynessForNss(const NamespaceString& nss) const {
-        return _params.pathArraynessForNss.contains(nss);
-    }
-
     /**
      * Returns whether a field path can be an array for the given namespace. Returns true
      * (conservative) when PathArrayness information for 'nss' is unavailable (e.g. on mongos).

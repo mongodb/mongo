@@ -145,15 +145,4 @@ bool QueryKnobConfiguration::isForceClassicEngineEnabled() const {
         QueryFrameworkControlEnum::kForceClassicEngine;
 }
 
-bool QueryKnobConfiguration::canPushDownFullyCompatibleStages() const {
-    switch (get(query_knobs::kQueryFrameworkControl)) {
-        case QueryFrameworkControlEnum::kForceClassicEngine:
-        case QueryFrameworkControlEnum::kTrySbeRestricted:
-            return false;
-        case QueryFrameworkControlEnum::kTrySbeEngine:
-            return true;
-    }
-    MONGO_UNREACHABLE;
-}
-
 }  // namespace mongo
