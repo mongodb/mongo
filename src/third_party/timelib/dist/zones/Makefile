@@ -4,7 +4,7 @@ download:
 	-@rm -f tzdata20*tar.gz
 	-@rm -f tzcode20*tar.gz
 	@echo "Downloading latest Olson TZDB release..."
-	$(eval VERSION := $(shell curl -s -o - https://www.iana.org/time-zones | grep \"version\" | sed 's/.*version">//' | sed 's/<\/span.*//'))
+	$(eval VERSION := $(shell curl -s -o - https://www.iana.org/time-zones | grep -o 'time-zones/releases/[0-9]\{4\}[a-z]*' | head -1 | sed 's|.*/||'))
 	curl -s -o tzdata$(VERSION).tar.gz https://data.iana.org/time-zones/releases/tzdata$(VERSION).tar.gz
 	curl -s -o tzcode$(VERSION).tar.gz https://data.iana.org/time-zones/releases/tzcode$(VERSION).tar.gz
 	@echo " done"
@@ -56,10 +56,9 @@ timezonedb.tgz: index
 release-pecl: timezonedb.tgz
 	$(eval VERSION := $(shell cat version-info.txt | tail -n 1))
 	$(eval TZVERSION := $(shell cat version-info.txt | head -n 1))
-	$(eval TAG := $(shell cat version-info.txt | tail -n 1 | tr "." "_"))
 	cd ~/dev/php/pecl-datetime-timezonedb; git commit -m "Updated to version $(VERSION) ($(TZVERSION))" timezonedb.c timezonedb.h package.xml php_timezonedb.h
-	cd ~/dev/php/pecl-datetime-timezonedb; git tag -s RELEASE_$(TAG) -m "Go with $(VERSION)"
-	cd ~/dev/php/pecl-datetime-timezonedb; git push origin master RELEASE_$(TAG)
+	cd ~/dev/php/pecl-datetime-timezonedb; git tag -s "$(VERSION)" -m "Go with $(VERSION)"
+	cd ~/dev/php/pecl-datetime-timezonedb; git push origin master "$(VERSION)"
 
 release-docs: timezonedb.tgz
 	$(eval VERSION := $(shell cat version-info.txt | tail -n 1))
@@ -73,42 +72,19 @@ release-php-clean:
 	-rm -rf /tmp/tz-tmp
 
 release-php-clone: release-php-clean
-	git clone git@github.com:/php/php-src /tmp/tz-tmp
+	git clone --depth 25 --no-single-branch git@github.com:/php/php-src /tmp/tz-tmp
 
-release-php-commit-80: timezonedb.tgz
+release-php-commit-master: timezonedb.tgz
 	$(eval VERSION := $(shell cat version-info.txt | tail -n 1))
 	$(eval TZVERSION := $(shell cat version-info.txt | head -n 1))
-	cd /tmp/tz-tmp; git checkout PHP-8.0
+	cd /tmp/tz-tmp; git checkout PHP-8.4
 	cp timezonedb.h /tmp/tz-tmp/ext/date/lib
 	cd /tmp/tz-tmp; git commit -m "Updated to version $(VERSION) ($(TZVERSION))" ext/date/lib/timezonedb.h
-
-release-php-commit-81: timezonedb.tgz release-php-commit-80
-	$(eval VERSION := $(shell cat version-info.txt | tail -n 1))
-	$(eval TZVERSION := $(shell cat version-info.txt | head -n 1))
-	cd /tmp/tz-tmp; git checkout PHP-8.1
-	cd /tmp/tz-tmp; git merge PHP-8.0 --strategy=ours -m "Empty merge"
-	cp timezonedb.h /tmp/tz-tmp/ext/date/lib
-	cd /tmp/tz-tmp; git commit -m "Updated to version $(VERSION) ($(TZVERSION))" ext/date/lib/timezonedb.h
-
-release-php-commit-82: timezonedb.tgz release-php-commit-81
-	$(eval VERSION := $(shell cat version-info.txt | tail -n 1))
-	$(eval TZVERSION := $(shell cat version-info.txt | head -n 1))
-	cd /tmp/tz-tmp; git checkout PHP-8.2
-	cd /tmp/tz-tmp; git merge PHP-8.1 --strategy=ours -m "Empty merge"
-	cp timezonedb.h /tmp/tz-tmp/ext/date/lib
-	cd /tmp/tz-tmp; git commit -m "Updated to version $(VERSION) ($(TZVERSION))" ext/date/lib/timezonedb.h
-
-release-php-commit-master: timezonedb.tgz release-php-commit-82
-	$(eval VERSION := $(shell cat version-info.txt | tail -n 1))
-	$(eval TZVERSION := $(shell cat version-info.txt | head -n 1))
+	cd /tmp/tz-tmp; git checkout PHP-8.5
+	cd /tmp/tz-tmp; git merge PHP-8.4
 	cd /tmp/tz-tmp; git checkout master
-	cd /tmp/tz-tmp; git merge PHP-8.2 --strategy=ours -m "Empty merge"
-	cp timezonedb.h /tmp/tz-tmp/ext/date/lib
-	cd /tmp/tz-tmp; git commit -m "Updated to version $(VERSION) ($(TZVERSION))" ext/date/lib/timezonedb.h
+	cd /tmp/tz-tmp; git push --atomic origin PHP-8.4 PHP-8.5 master
 
-release-php-commit: release-php-clone release-php-commit-80 release-php-commit-81 release-php-commit-82 release-php-commit-master
+release-php-commit: release-php-clone release-php-commit-master
 
-release-php-push: release-php-commit
-	cd /tmp/tz-tmp; git push origin PHP-8.0 PHP-8.1 PHP-8.2 master
-
-release-php: release-php-clean release-php-clone release-php-commit release-php-push
+release-php: release-php-clean release-php-clone release-php-commit

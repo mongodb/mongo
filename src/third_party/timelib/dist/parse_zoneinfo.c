@@ -46,7 +46,7 @@
 # endif
 #endif
 
-#if _MSC_VER
+#if defined(_MSC_VER)
 # define TIMELIB_DIR_SEPARATOR "\\"
 #else
 # define TIMELIB_DIR_SEPARATOR "/"
@@ -254,6 +254,10 @@ static int create_zone_index(const char *directory, timelib_tzdb *db)
 
 		count = timelib_scandir(name, &ents, index_filter, timelib_alphasort);
 		if (count == -1) {
+			timelib_free(top);
+			while (dirstack_top > 0) {
+				timelib_free(dirstack[--dirstack_top]);
+			}
 			timelib_free(dirstack);
 			timelib_free(db_index);
 			return -errno;
