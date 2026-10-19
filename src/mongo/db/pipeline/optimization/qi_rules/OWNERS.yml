@@ -11,3 +11,6 @@ filters:
   - "internal_document_results_and_metadata_rules.cpp":
     approvers:
       - 10gen/query-integration-extensions-api
+  - "query_stats*":
+    approvers:
+      - 10gen/query-integration-observability

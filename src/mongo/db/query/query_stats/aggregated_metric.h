@@ -114,6 +114,16 @@ public:
         }
     }
 
+    T getSum() const {
+        return sum;
+    }
+    T getMin() const {
+        return min;
+    }
+    T getMax() const {
+        return max;
+    }
+
 private:
     Summation<T> sum{kInitialSummation<T>};
     T max{kInitialMax<T>};

@@ -3,11 +3,17 @@
 
 #pragma once
 
-#include "mongo/db/commands/server_status/server_status_metric.h"
-#include "mongo/db/exec/container_size_helper.h"
 #include "mongo/db/partitioned.h"
 #include "mongo/db/query/lru_key_value.h"
 #include "mongo/util/modules.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <functional>
+#include <memory>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
 namespace mongo {
 
@@ -119,6 +125,74 @@ public:
         }
 
         return std::make_pair(StatusWith{&entry.getValue()->second}, std::move(partition));
+    }
+
+    /**
+     * Scans all partitions, locking one partition at a time, and returns copies of up to
+     * 'maxCandidates' entries whose extracted sort keys are the best candidates according to
+     * 'isBetter', in no particular order.
+     * - 'extract' maps an entry to a cheap, copyable sort key and is called while the partition
+     * lock is held, so it must be inexpensive.
+     * - 'isBetter(a, b)' must be a strict weak ordering returning true iff the sort key 'a' is a
+     * better candidate than 'b' (e.g. 'a > b' for a descending top-K).
+     * - 'interruptCheck' is called between each partition lock once.
+     *
+     * Only one partition is locked at a time. This means entries selected from different partitions
+     * are not guaranteed to have coexisted at a single point in time, and thus we do not return
+     * top-K entries from a single point-in-time. This would require locking the entire store, which
+     * would affect performance of concurrent queries.
+     */
+    template <typename Extract, typename Better, typename InterruptCheck>
+    std::vector<std::pair<KeyType, ValueType>> topKCandidateEntries(
+        size_t maxCandidates,
+        Extract&& extract,
+        Better&& isBetter,
+        InterruptCheck&& interruptCheck) const {
+        if (maxCandidates == 0) {
+            return {};
+        }
+
+        using SortKey = std::decay_t<std::invoke_result_t<Extract, const ValueType&>>;
+        struct HeapEntry {
+            SortKey sortKey;
+            KeyType key;
+            std::unique_ptr<ValueType> value;
+        };
+        // Binary heap where the front is always the worst surviving candidate, so it can be
+        // replaced as soon as a better one arrives.
+        auto heapComp = [&isBetter](const HeapEntry& a, const HeapEntry& b) {
+            return isBetter(a.sortKey, b.sortKey);
+        };
+        std::vector<HeapEntry> heap;
+
+        // Adds a candidate to the heap, keeping it bounded to the best 'maxCandidates' seen so far.
+        for (size_t partitionId = 0; partitionId < _numPartitions; ++partitionId) {
+            interruptCheck();
+            auto lockedPartition = _partitionedCache->lockOnePartitionById(partitionId);
+            for (auto&& [key, entry] : *lockedPartition) {
+                auto sortKey = extract(entry);
+                // Only copy entries that provisionally make the cut.
+                if (heap.size() < maxCandidates) {
+                    heap.push_back(
+                        HeapEntry{std::move(sortKey), key, std::make_unique<ValueType>(entry)});
+                    std::push_heap(heap.begin(), heap.end(), heapComp);
+                } else if (isBetter(sortKey, heap.front().sortKey)) {
+                    // Replace the worst candidate: move it to the back, overwrite it, sift up.
+                    std::pop_heap(heap.begin(), heap.end(), heapComp);
+                    heap.back() =
+                        HeapEntry{std::move(sortKey), key, std::make_unique<ValueType>(entry)};
+                    std::push_heap(heap.begin(), heap.end(), heapComp);
+                }
+            }
+        }
+
+        // Moves the heap entries into the returned result vector.
+        std::vector<std::pair<KeyType, ValueType>> candidates;
+        candidates.reserve(heap.size());
+        for (auto& node : heap) {
+            candidates.emplace_back(std::move(node.key), std::move(*node.value));
+        }
+        return candidates;
     }
 
     /**
