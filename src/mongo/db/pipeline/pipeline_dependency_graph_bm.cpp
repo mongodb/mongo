@@ -8,6 +8,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_optimization_bm_fixture.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 
 #include <cstddef>
 #include <iterator>
@@ -142,6 +143,63 @@ BENCHMARK_REGISTER_F(PipelineDependencyGraphBMFixture, BM_RebuildDependencyGraph
     ->Arg(16)
     ->Arg(48)
     ->Arg(96)
+    ->Unit(benchmark::kMicrosecond);
+
+/// Benchmarks the cost of type inference used for arrayness checks.
+class PipelineDependencyGraphTypeInferenceBMFixture : public PipelineOptimizationBMFixture {
+public:
+    void SetUp(benchmark::State& state) override {
+        PipelineOptimizationBMFixture::SetUp(state);
+        _originalTypeInference =
+            feature_flags::gFeatureFlagQueryTypeInference.getForServerParameter();
+        feature_flags::gFeatureFlagQueryTypeInference.setForServerParameter(state.range(1));
+    }
+
+    void TearDown(benchmark::State& state) override {
+        feature_flags::gFeatureFlagQueryTypeInference.setForServerParameter(_originalTypeInference);
+        PipelineOptimizationBMFixture::TearDown(state);
+    }
+
+    /// A $match which proves the base field 'x' is not an array, followed by renames of 'x'.
+    std::unique_ptr<Pipeline> makeRenamePipeline(size_t numStages) {
+        std::vector<BSONObj> rawPipeline{fromjson("{$match: {x: {$not: {$type: 'array'}}}}")};
+        for (size_t i = 1; i < numStages; ++i) {
+            rawPipeline.push_back(BSON("$set" << BSON(fmt::format("y{}", i) << "$x")));
+        }
+        return pipeline_factory::makePipeline(
+            rawPipeline, expCtx, pipeline_factory::kOptionsMinimal);
+    }
+
+private:
+    bool _originalTypeInference{};
+};
+
+// Report the cost of the public canPathBeArray() API when it runs type inference.
+BENCHMARK_DEFINE_F(PipelineDependencyGraphTypeInferenceBMFixture, BM_CanPathBeArray)
+(benchmark::State& state) {
+    auto pipeline = makeRenamePipeline(state.range(0));
+    DependencyGraph graph(pipeline->getSources());
+    for (auto keepRunning : state) {
+        benchmark::DoNotOptimize(graph.canPathBeArray(nullptr, "x"));
+    }
+}
+BENCHMARK_REGISTER_F(PipelineDependencyGraphTypeInferenceBMFixture, BM_CanPathBeArray)
+    ->ArgNames({"stages", "typeInference"})
+    ->ArgsProduct({{10, 100, 1000} /*stages*/, {0, 1} /*typeInference*/})
+    ->Unit(benchmark::kMicrosecond);
+
+// Report the cost of building the dependency graph when renames of a base field with unknown
+// arrayness run type inference.
+BENCHMARK_DEFINE_F(PipelineDependencyGraphTypeInferenceBMFixture, BM_BuildDependencyGraphRenames)
+(benchmark::State& state) {
+    auto pipeline = makeRenamePipeline(state.range(0));
+    for (auto keepRunning : state) {
+        benchmark::DoNotOptimize(DependencyGraph(pipeline->getSources()));
+    }
+}
+BENCHMARK_REGISTER_F(PipelineDependencyGraphTypeInferenceBMFixture, BM_BuildDependencyGraphRenames)
+    ->ArgNames({"stages", "typeInference"})
+    ->ArgsProduct({{10, 100, 1000} /*stages*/, {0, 1} /*typeInference*/})
     ->Unit(benchmark::kMicrosecond);
 
 }  // namespace
