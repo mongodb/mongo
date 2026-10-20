@@ -792,10 +792,8 @@ StatusWith<bool> offlineValidateCollection(OperationContext* opCtx,
     const auto validateOptions = collectionValidateOptionsParam->_data.getOptions();
 
     // Enabling parallel record store traversal disables sizeStats.
-    const bool slicingDisabled = !collection_validation::getTargetRecordsPerRecordStoreSlice() ||
-        *collection_validation::getTargetRecordsPerRecordStoreSlice() == 0;
-    const bool onlyOneSlice = collection_validation::getMaxRecordStoreSlices() == 1;
-    const bool enableSizeStats = slicingDisabled || onlyOneSlice;
+    const bool enableSizeStats = !collection_validation::isRecordStoreSlicingEnabled(
+        collection_validation::getTargetRecordsPerRecordStoreSlice());
 
     const auto parsedOptions = !validateOptions.isEmpty()
         ? collection_validation::parseValidateOptions(

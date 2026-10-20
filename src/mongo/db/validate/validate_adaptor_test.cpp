@@ -8,13 +8,19 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/validate/key_string_index_consistency.h"
+#include "mongo/db/validate/validate_adaptor_factory.h"
+#include "mongo/db/validate/validate_adaptor_parallel.h"
+#include "mongo/db/validate/validate_adaptor_serial.h"
 #include "mongo/db/validate/validate_options.h"
 #include "mongo/db/validate/validate_results.h"
 #include "mongo/db/validate/validate_state.h"
 #include "mongo/unittest/unittest.h"
 
+#include <cstdint>
 #include <string_view>
 #include <vector>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo::collection_validation {
 using namespace std::literals::string_view_literals;
@@ -22,7 +28,10 @@ namespace {
 
 const auto kNss = NamespaceString::createNamespaceString_forTest("validateAdaptorDB.coll"sv);
 
-class ValidateAdaptorTest : public CatalogTestFixture {
+enum class AdaptorKind { kSerial, kParallel };
+
+class ValidateAdaptorTest : public CatalogTestFixture,
+                            public testing::WithParamInterface<AdaptorKind> {
 protected:
     struct Result {
         ValidateAdaptor::ValidateRecordResult record;
@@ -39,8 +48,20 @@ protected:
 
     Result validateRecord(const std::vector<char>& data, ValidateMode mode) {
         auto opCtx = operationContext();
-        ValidateState validateState(
-            opCtx, kNss, ValidationOptions(mode, RepairMode::kNone, /*logDiagnostics=*/false));
+        // The factory selects the parallel adaptor when a slice target is set.
+        const boost::optional<int64_t> targetRecordsPerSlice =
+            GetParam() == AdaptorKind::kParallel ? boost::optional<int64_t>(10) : boost::none;
+        ValidateState validateState(opCtx,
+                                    kNss,
+                                    ValidationOptions(mode,
+                                                      RepairMode::kNone,
+                                                      /*logDiagnostics=*/false,
+                                                      currentValidationVersion,
+                                                      /*verifyConfigurationOverride=*/boost::none,
+                                                      /*readTimestamp=*/boost::none,
+                                                      /*hashPrefixes=*/boost::none,
+                                                      /*revealHashedIds=*/boost::none,
+                                                      targetRecordsPerSlice));
         ASSERT_OK(validateState.initializeCollection(opCtx));
         validateState.initializeCursors(opCtx);
 
@@ -50,11 +71,16 @@ protected:
             indexEntries.push_back(coll->getIndexCatalog()->findIndexByIdent(opCtx, indexIdent));
         }
 
-        ValidateAdaptor adaptor(opCtx, &validateState);
+        auto adaptor = ValidateAdaptorFactory::create(opCtx, validateState);
+        if (GetParam() == AdaptorKind::kParallel) {
+            ASSERT_TRUE(dynamic_cast<ValidateAdaptorParallel*>(adaptor.get()));
+        } else {
+            ASSERT_TRUE(dynamic_cast<ValidateAdaptorSerial*>(adaptor.get()));
+        }
         KeyStringIndexConsistency keyStringIndexConsistency(opCtx, &validateState);
         Result result;
         const Record record{RecordId(1), RecordData(data.data(), data.size())};
-        result.record = adaptor.validateRecord(
+        result.record = adaptor->validateRecord(
             opCtx, record, result.results, keyStringIndexConsistency, indexEntries);
         return result;
     }
@@ -88,7 +114,7 @@ BSONObj withInvalidUTF8(std::string_view fieldName) {
     return builder.obj();
 }
 
-TEST_F(ValidateAdaptorTest, ConformantDocumentIsValid) {
+TEST_P(ValidateAdaptorTest, ConformantDocumentIsValid) {
     createCollection({}, {});
     const auto result = validateRecord(toBuffer(BSON("_id" << 1 << "a" << "z")),
                                        ValidateMode::kForegroundCheckBSON);
@@ -97,7 +123,7 @@ TEST_F(ValidateAdaptorTest, ConformantDocumentIsValid) {
     EXPECT_TRUE(result.record.validDocument);
 }
 
-TEST_F(ValidateAdaptorTest, NonConformantDocumentIsCompliantFalse) {
+TEST_P(ValidateAdaptorTest, NonConformantDocumentIsCompliantFalse) {
     createCollection({}, {});
     const auto result =
         validateRecord(toBuffer(withInvalidUTF8("a")), ValidateMode::kForegroundCheckBSON);
@@ -105,14 +131,14 @@ TEST_F(ValidateAdaptorTest, NonConformantDocumentIsCompliantFalse) {
     EXPECT_FALSE(result.record.compliantDocument);
 }
 
-TEST_F(ValidateAdaptorTest, InvalidBSONAfterNonConformantElementIsReported) {
+TEST_P(ValidateAdaptorTest, InvalidBSONAfterNonConformantElementIsReported) {
     createCollection({}, {});
     const auto result = validateRecord(withUnknownType(withInvalidUTF8("a"), "b"),
                                        ValidateMode::kForegroundCheckBSON);
     EXPECT_EQ(result.record.status.code(), ErrorCodes::InvalidBSON);
 }
 
-TEST_F(ValidateAdaptorTest, InvalidBSONAfterNonConformantElementIsReportedWithPartialIndex) {
+TEST_P(ValidateAdaptorTest, InvalidBSONAfterNonConformantElementIsReportedWithPartialIndex) {
     createCollection({},
                      {BSON("v" << 2                        //
                                << "name" << "b_1"          //
@@ -123,7 +149,7 @@ TEST_F(ValidateAdaptorTest, InvalidBSONAfterNonConformantElementIsReportedWithPa
     EXPECT_EQ(result.record.status.code(), ErrorCodes::InvalidBSON);
 }
 
-TEST_F(ValidateAdaptorTest, OversizedStringAfterNonConformantElementIsReported) {
+TEST_P(ValidateAdaptorTest, OversizedStringAfterNonConformantElementIsReported) {
     createCollection({},
                      {BSON("v" << 2                //
                                << "name" << "b_1"  //
@@ -137,7 +163,7 @@ TEST_F(ValidateAdaptorTest, OversizedStringAfterNonConformantElementIsReported) 
     EXPECT_EQ(result.record.status.code(), ErrorCodes::InvalidBSON);
 }
 
-TEST_F(ValidateAdaptorTest, InvalidUTF8InCollatedPartialIndexFieldDoesNotThrow) {
+TEST_P(ValidateAdaptorTest, InvalidUTF8InCollatedPartialIndexFieldDoesNotThrow) {
     CollectionOptions options;
     options.collation = BSON("locale" << "en_US");
     createCollection(options,
@@ -150,6 +176,13 @@ TEST_F(ValidateAdaptorTest, InvalidUTF8InCollatedPartialIndexFieldDoesNotThrow) 
     EXPECT_OK(result.record.status);
     EXPECT_FALSE(result.record.compliantDocument);
 }
+
+INSTANTIATE_TEST_SUITE_P(,
+                         ValidateAdaptorTest,
+                         testing::Values(AdaptorKind::kSerial, AdaptorKind::kParallel),
+                         [](const testing::TestParamInfo<AdaptorKind>& info) {
+                             return info.param == AdaptorKind::kSerial ? "Serial" : "Parallel";
+                         });
 
 }  // namespace
 }  // namespace mongo::collection_validation

@@ -4,13 +4,10 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
-#include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_stats.h"
 #include "mongo/db/validate/concurrent_progress_meter.h"
@@ -18,7 +15,6 @@
 #include "mongo/db/validate/validate_results.h"
 #include "mongo/db/validate/validate_state.h"
 #include "mongo/util/modules.h"
-#include "mongo/util/progress_meter.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -95,9 +91,10 @@ public:
  */
 class ValidateAdaptor {
 public:
-    ValidateAdaptor(OperationContext* opCtx, collection_validation::ValidateState* validateState)
+    ValidateAdaptor(OperationContext* opCtx, collection_validation::ValidateState& validateState)
+        : _keyBasedIndexConsistency(opCtx, &validateState), _validateState(&validateState) {}
 
-        : _keyBasedIndexConsistency(opCtx, validateState), _validateState(validateState) {}
+    virtual ~ValidateAdaptor() = default;
 
     struct ValidateRecordResult {
         Status status{Status::OK()};
@@ -164,33 +161,21 @@ public:
     };
 
     /**
-     * Traverses one slice of the record store, retrieving every record in the slice and going
-     * through its document key set to keep track of the index consistency during a validation.
-     *
-     * This does not mutate any adaptor state: the traversal starts from copies of 'baseResults' and
-     * 'baseConsistency' and returns them, mutated, to the caller. 'progress' is the one exception,
-     * being purely a reporting side channel.
-     */
-    [[nodiscard]] auto traverseRecordStoreImpl(OperationContext* opCtx,
-                                               const ValidateResults& baseResults,
-                                               const KeyStringIndexConsistency& baseConsistency,
-                                               TraverseRecordStoreOptions opts,
-                                               ConcurrentProgressMeterHolder& progress,
-                                               ValidationVersion validationVersion) const
-        -> TraverseRecordStoreResults;
-
-    /**
      * Traverses the record store to retrieve every record and go through its document key
      * set to keep track of the index consistency during a validation. Runs the collection-level
      * checks (fast count and fast size) that require the totals from a complete traversal.
      */
-    void traverseRecordStore(OperationContext* opCtx,
-                             ValidateResults& results,
-                             ValidationVersion validationVersion,
-                             boost::optional<int64_t> targetRecordsPerSlice);
+    virtual void traverseRecordStore(OperationContext* opCtx,
+                                     ValidateResults& results,
+                                     ValidationVersion validationVersion) = 0;
+
     /**
-     * Computes the hash of the collection's local catalog idents and sets it in 'results'.
-     **/
+     * Traverses the whole record store on the calling thread, reading through the ValidateState's
+     * shared throttled cursor.
+     */
+    void traverseRecordStoreSerial(OperationContext* opCtx,
+                                   ValidateResults& validateResults,
+                                   ValidationVersion validationVersion);
     /**
      * Returns the storage statistics accrued by the record store slices that traversed on their own
      * operation contexts during the last call to traverseRecordStore(), or nullptr if there were
@@ -200,6 +185,9 @@ public:
         return _sliceStorageStats.get();
     }
 
+    /**
+     * Computes the hash of the collection's local catalog idents and sets it in 'results'.
+     **/
     void computeMetadataHash(OperationContext* opCtx,
                              const CollectionPtr& coll,
                              ValidateResults& results);
@@ -254,6 +242,61 @@ public:
      * ValidateResultsMap and ValidateResults.
      */
     void addIndexEntryErrors(OperationContext* opCtx, ValidateResults& results);
+
+protected:
+    /**
+     * Sets up the "scanning documents" progress meter and resets the record counter ahead of a
+     * record store traversal. Returns a guard that finishes the progress meter when it goes out of
+     * scope in the caller.
+     */
+    ScopeGuard<std::function<void()>> preTraverseRecordStoreImpl(OperationContext* opCtx);
+
+    void postTraverseRecordStoreImpl(OperationContext* opCtx,
+                                     ValidateResults& validateResults,
+                                     int64_t numRecords,
+                                     int64_t dataSizeTotal);
+
+
+    /**
+     * Traverses one slice of the record store, retrieving every record in the slice and going
+     * through its document key set to keep track of the index consistency during a validation.
+     *
+     * This does not mutate any adaptor state: the traversal starts from copies of 'baseResults' and
+     * 'baseConsistency' and returns them, mutated, to the caller. 'progress' is the one exception,
+     * being purely a reporting side channel.
+     */
+    [[nodiscard]] auto traverseRecordStoreImpl(OperationContext* opCtx,
+                                               const ValidateResults& baseResults,
+                                               const KeyStringIndexConsistency& baseConsistency,
+                                               TraverseRecordStoreOptions opts,
+                                               ConcurrentProgressMeterHolder& progress,
+                                               ValidationVersion validationVersion) const
+        -> TraverseRecordStoreResults;
+
+    /**
+     * Adds the storage statistics of a slice that traversed on its own operation context to those
+     * reported by getSliceStorageStats().
+     */
+    void addSliceStorageStats(const StorageStats& stats) {
+        if (_sliceStorageStats) {
+            *_sliceStorageStats += stats;
+        } else {
+            _sliceStorageStats = stats.clone();
+        }
+    }
+
+    collection_validation::ValidateState& getValidateState() {
+        invariant(_validateState);
+        return *_validateState;
+    }
+
+    KeyStringIndexConsistency& getKeyBasedIndexConsistency() {
+        return _keyBasedIndexConsistency;
+    }
+
+    ConcurrentProgressMeterHolder& getProgress() {
+        return _progress;
+    }
 
 private:
     KeyStringIndexConsistency _keyBasedIndexConsistency;

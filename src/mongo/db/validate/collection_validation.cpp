@@ -41,6 +41,8 @@
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/viewless_timeseries_collection_creation_helpers.h"
 #include "mongo/db/validate/validate_adaptor.h"
+#include "mongo/db/validate/validate_adaptor_factory.h"
+#include "mongo/db/validate/validate_adaptor_serial.h"
 #include "mongo/db/validate/validate_gen.h"
 #include "mongo/db/validate/validate_state.h"
 #include "mongo/logv2/log.h"
@@ -176,6 +178,8 @@ void _gatherIndexEntryErrors(OperationContext* opCtx,
                              ValidateAdaptor& indexValidator,
                              ValidateResults& results) {
     indexValidator.setSecondPhase();
+    // Second-phase results record missing and extra index entries, which have ordering
+    // dependencies that prevent merging slices, so this traversal is always serial.
     if (!indexValidator.limitMemoryUsageForSecondPhase(results)) {
         return;
     }
@@ -190,8 +194,8 @@ void _gatherIndexEntryErrors(OperationContext* opCtx,
         // Second phase doesn't report errors, but needs to know which indexes are structurally
         // sound enough to validate
         tempValidateResults.getIndexResultsMap() = results.getIndexResultsMap();
-        indexValidator.traverseRecordStore(
-            opCtx, tempValidateResults, validateState.validationVersion(), boost::none);
+        indexValidator.traverseRecordStoreSerial(
+            opCtx, tempValidateResults, validateState.validationVersion());
     }
 
     LOGV2_OPTIONS(
@@ -702,11 +706,9 @@ boost::optional<int64_t> getTargetRecordsPerRecordStoreSlice() {
     return gValidateParallelTargetRecordsPerSlice.load();
 }
 
-int64_t getMaxRecordStoreSlices() {
-    if (!gFeatureFlagParallelCollectionValidation.isEnabled()) {
-        return 1;
-    }
-    return gValidateParallelMaxRecordStoreSlices.load();
+bool isRecordStoreSlicingEnabled(const boost::optional<int64_t>& targetRecordsPerSlice) {
+    return targetRecordsPerSlice && *targetRecordsPerSlice > 0 &&
+        gValidateParallelMaxRecordStoreSlices.load() > 1;
 }
 
 ValidationOptions parseValidateOptions(OperationContext* opCtx,
@@ -1205,7 +1207,7 @@ Status validate(OperationContext* opCtx,
 
         if (validateState.isHashDrillDown()) {
             validateState.initializeCursors(opCtx);
-            ValidateAdaptor recordStoreValidator(opCtx, &validateState);
+            ValidateAdaptorSerial recordStoreValidator(opCtx, validateState);
             recordStoreValidator.hashDrillDown(opCtx, results);
             return Status::OK();
         }
@@ -1259,7 +1261,9 @@ Status validate(OperationContext* opCtx,
 
         validateState.initializeCursors(opCtx);
 
-        ValidateAdaptor indexValidator(opCtx, &validateState);
+        std::unique_ptr<ValidateAdaptor> pIndexValidator =
+            ValidateAdaptorFactory::create(opCtx, validateState);
+        auto& indexValidator = *pIndexValidator;
 
         // In traverseRecordStore(), the index validator keeps track the records in the record
         // store so that _validateIndexes() can confirm that the index entries match the records in
@@ -1270,10 +1274,7 @@ Status validate(OperationContext* opCtx,
         Timer phase1Timer;
         {
             Timer timer;
-            indexValidator.traverseRecordStore(opCtx,
-                                               results,
-                                               validateState.validationVersion(),
-                                               validateState.getTargetRecordsPerRecordStoreSlice());
+            indexValidator.traverseRecordStore(opCtx, results, validateState.validationVersion());
             metrics.recordStoreTraversalDuration = timer.elapsed();
             // The slices traverse on their own operation contexts, so their storage statistics
             // are added to this operation's to keep its slow operation reporting complete.

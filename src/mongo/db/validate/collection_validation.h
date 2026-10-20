@@ -69,10 +69,10 @@ struct [[MONGO_MOD_FILE_PRIVATE]] ValidationMetrics {
 boost::optional<int64_t> getTargetRecordsPerRecordStoreSlice();
 
 /**
- * The maximum number of slices to use when splitting a collection or 1 when parallel validation is
- * not enabled.
+ * Whether a validation given 'targetRecordsPerSlice' may split the record store into slices for
+ * parallel traversal.
  */
-int64_t getMaxRecordStoreSlices();
+bool isRecordStoreSlicingEnabled(const boost::optional<int64_t>& targetRecordsPerSlice);
 
 /**
  * Parses and checks the command object and returns a 'ValidationOptions' object used for collection

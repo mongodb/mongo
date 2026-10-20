@@ -362,67 +362,6 @@ private:
     std::shared_ptr<SeekableRecordThrottleCursor> _cursor;
 };
 
-/**
- * Reads through a cursor of its own, unthrottled and without yielding, so that it can run on a
- * worker thread alongside the other slices of a parallel scan. The parallel path is restricted to
- * foreground validation, where throttling is off regardless, so nothing is lost by bypassing it.
- */
-class SliceValidateCursor final : public ValidateCursor {
-public:
-    SliceValidateCursor(std::unique_ptr<SeekableRecordCursor> cursor)
-        : _cursor(std::move(cursor)) {}
-
-    boost::optional<Record> seek(const RecordId& recordId) override {
-        return _cursor->seek(recordId, SeekableRecordCursor::BoundInclusion::kInclude);
-    }
-
-    boost::optional<Record> next() override {
-        return _cursor->next();
-    }
-
-    void yield() override {}
-
-private:
-    std::unique_ptr<SeekableRecordCursor> _cursor;
-};
-
-/**
- * The snapshot settings a slice worker has to adopt from the thread that started the validation.
- *
- * Each worker runs on an OperationContext of its own, so its RecoveryUnit starts out with the
- * defaults (untimestamped, latest committed data, no oplog visibility barrier) rather than whatever
- * the caller established. Left alone, every slice would read from a snapshot of its own, taken at
- * whatever point in time the worker happened to start, and the slices would neither agree with each
- * other nor with the counting traversal that runs on the caller's snapshot.
- */
-struct SnapshotSettings {
-    static SnapshotSettings from(RecoveryUnit& ru) {
-        return {.readSource = ru.getTimestampReadSource(),
-                .readTimestamp = ru.getPointInTimeReadTimestamp(),
-                .prepareConflictBehavior = ru.getPrepareConflictBehavior(),
-                .oplogVisibilityTs = ru.getOplogVisibilityTs()};
-    }
-
-    void applyTo(RecoveryUnit& ru) const {
-        // Must happen before the slice cursor opens a transaction on this RecoveryUnit.
-        invariant(!ru.isActive());
-        ru.setPrepareConflictBehavior(prepareConflictBehavior);
-        ru.setOplogVisibilityTs(oplogVisibilityTs);
-        // A point-in-time read source is reproduced as kProvided so that every worker pins the
-        // same timestamp instead of independently re-deriving one that may have advanced.
-        if (readTimestamp) {
-            ru.setTimestampReadSource(RecoveryUnit::ReadSource::kProvided, *readTimestamp);
-        } else {
-            ru.setTimestampReadSource(readSource);
-        }
-    }
-
-    RecoveryUnit::ReadSource readSource;
-    boost::optional<Timestamp> readTimestamp;
-    PrepareConflictBehavior prepareConflictBehavior;
-    boost::optional<int64_t> oplogVisibilityTs;
-};
-
 }  // namespace
 
 auto ValidateAdaptor::validateRecord(OperationContext* opCtx,
@@ -701,11 +640,8 @@ void ValidateAdaptor::hashDrillDown(OperationContext* opCtx, ValidateResults& re
     results.setPartialHashes(std::move(partial));
 }
 
-
-void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
-                                          ValidateResults& validateResults,
-                                          ValidationVersion validationVersion,
-                                          boost::optional<int64_t> targetRecordsPerSlice) {
+ScopeGuard<std::function<void()>> ValidateAdaptor::preTraverseRecordStoreImpl(
+    OperationContext* opCtx) {
     const auto& coll = _validateState->getCollection();
     const int64_t totalRecords = coll->getRecordStore()->numRecords();
 
@@ -725,203 +661,16 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
         std::unique_lock<Client> lk(*opCtx->getClient());
         _progress.set(lk, CurOp::get(opCtx)->setProgress(lk, curopMessage, totalRecords), opCtx);
     }
-    ON_BLOCK_EXIT([&]() { _progress.finished(); });
-
     _numRecords = 0;
     _sliceStorageStats.reset();
-    int64_t dataSizeTotal{0};
-    int64_t numRecords{0};
+    return ScopeGuard<std::function<void()>>([this]() { _progress.finished(); });
+}
 
-    // Split the record store into slices targeting ~targetRecordsPerSlice records each. Small
-    // collections collapse to a single slice and run single-threaded, larger collections are split
-    // into enough slices to keep the worker pool busy and allow "work stealing", as no guarantee
-    // can be made that the cost of each slice is equal.
-
-    const int64_t sliceCount = targetRecordsPerSlice.has_value() && (*targetRecordsPerSlice > 0)
-        ? std::clamp<int64_t>((totalRecords + *targetRecordsPerSlice - 1) / *targetRecordsPerSlice,
-                              1,
-                              gValidateParallelMaxRecordStoreSlices.load())
-        : 1;
-
-    const bool hashDrillDown = _validateState->getHashPrefixes().has_value() ||
-        _validateState->getRevealHashedIds().has_value();
-    const bool parallelEligible = !_validateState->isBackground() &&
-        _validateState->getRepairMode() == collection_validation::RepairMode::kNone &&
-        _keyBasedIndexConsistency.canMergeResults() && !hashDrillDown && sliceCount > 1;
-
-    const std::vector<RecordId> rsSlicePivots = parallelEligible
-        ? collection_validation::computeSlicePivots(opCtx,
-                                                    *shard_role_details::getRecoveryUnit(opCtx),
-                                                    *coll->getRecordStore(),
-                                                    sliceCount)
-        : std::vector<RecordId>{};
-    const bool synchronousTraversal = rsSlicePivots.size() <= 1;
-
-    if (synchronousTraversal) {
-        auto implResults = traverseRecordStoreImpl(
-            opCtx,
-            validateResults,
-            _keyBasedIndexConsistency,
-            {.beginRecordId = _validateState->getFirstRecordId(),
-             .cursorFactory =
-                 [this](OperationContext* traversalOpCtx) -> std::unique_ptr<ValidateCursor> {
-                 return std::make_unique<ThrottledValidateCursor>(
-                     traversalOpCtx, _validateState->getTraverseRecordStoreCursor());
-             }},
-            _progress,
-            validationVersion);
-        validateResults = std::move(implResults.validateResults);
-        _keyBasedIndexConsistency = std::move(implResults.keyStringIndexConsistency);
-        dataSizeTotal = implResults.dataSizeTotal;
-        numRecords = validateResults.getNumRecords().value_or(0);
-        uassertStatusOK(implResults.status);
-    } else {
-        // Turn the pivots into half-open [begin, end) ranges, with the final slice left open-ended
-        // so that the ranges cover the whole record store no matter how many pivots the slicer
-        // produced. Deduplication of the pivots means there may be fewer slices than 'sliceCount'.
-        //
-        // Every slice gets the same factory, which each worker calls on its own thread to open a
-        // cursor of its own.
-        const ValidateCursor::Factory sliceCursorFactory =
-            [recordStore = _validateState->getCollection()->getRecordStore()](
-                OperationContext* traversalOpCtx) -> std::unique_ptr<ValidateCursor> {
-            return std::make_unique<SliceValidateCursor>(recordStore->getCursor(
-                traversalOpCtx, *shard_role_details::getRecoveryUnit(traversalOpCtx)));
-        };
-        const auto trsOpts = ([&rsSlicePivots, &sliceCursorFactory] {
-            std::vector<TraverseRecordStoreOptions> trsOpts;
-            auto itRangeBegin = rsSlicePivots.begin();
-            auto itRangeEnd = rsSlicePivots.begin();
-            ++itRangeEnd;
-            while (itRangeEnd != rsSlicePivots.end()) {
-                trsOpts.push_back({.beginRecordId = *itRangeBegin,
-                                   .endRecordId = *itRangeEnd,
-                                   .cursorFactory = sliceCursorFactory});
-                ++itRangeBegin;
-                ++itRangeEnd;
-            }
-            trsOpts.push_back(
-                {.beginRecordId = *itRangeBegin, .cursorFactory = sliceCursorFactory});
-            return trsOpts;
-        })();
-
-        {
-            std::vector<PromiseAndFuture<TraverseRecordStoreResults>> rsSliceResults(
-                trsOpts.size());
-
-            const size_t maxThreads =
-                std::min(trsOpts.size(), static_cast<size_t>(ProcessInfo::getNumAvailableCores()));
-
-            ThreadPool threadPool({.poolName = "ValidateRecordStore",
-                                   .threadNamePrefix = "ValidateRecordStoreWorker",
-                                   .maxThreads = maxThreads,
-                                   .onCreateThread = [](const std::string& threadName) {
-                                       Client::initThread(threadName,
-                                                          getGlobalServiceContext()->getService());
-                                   }});
-            threadPool.startup();
-            const auto snapshotSettings =
-                SnapshotSettings::from(*shard_role_details::getRecoveryUnit(opCtx));
-            for (size_t i = 0; i < trsOpts.size(); ++i) {
-                threadPool.schedule([this,
-                                     &rsSliceResults,
-                                     i,
-                                     validationVersion,
-                                     snapshotSettings,
-                                     opts = trsOpts[i]](Status status) {
-                    if (!status.isOK()) {
-                        rsSliceResults[i].promise.setError(status);
-                        return;
-                    }
-                    try {
-                        auto workerOpCtxHolder = cc().makeOperationContext();
-                        auto* workerOpCtx = workerOpCtxHolder.get();
-                        snapshotSettings.applyTo(*shard_role_details::getRecoveryUnit(workerOpCtx));
-                        // Slice starts from an empty ValidateResults rather than the
-                        // caller's; traverseRecordStoreImpl() stamps the identity fields that
-                        // merge() requires to match.
-                        auto innerResults = traverseRecordStoreImpl(workerOpCtx,
-                                                                    ValidateResults{},
-                                                                    _keyBasedIndexConsistency,
-                                                                    opts,
-                                                                    _progress,
-                                                                    validationVersion);
-                        innerResults.storageStats = shard_role_details::getRecoveryUnit(workerOpCtx)
-                                                        ->computeOperationStatisticsSinceLastCall();
-                        rsSliceResults[i].promise.emplaceValue(std::move(innerResults));
-
-                    } catch (const DBException& e) {
-                        rsSliceResults[i].promise.setError(e.toStatus());
-                    }
-                });
-            }
-            threadPool.waitForIdle();
-            threadPool.shutdown();
-            threadPool.join();
-
-            std::vector<TraverseRecordStoreResults> implResults;
-            implResults.reserve(rsSliceResults.size());
-            std::vector<Status> sliceFailures;
-            for (auto& pf : rsSliceResults) {
-                auto swResults = std::move(pf.future).getNoThrow(opCtx);
-                if (!swResults.isOK()) {
-                    sliceFailures.push_back(swResults.getStatus());
-                    continue;
-                }
-                implResults.push_back(std::move(swResults.getValue()));
-            }
-
-            // Combine the per-slice results before surfacing any slice's failure, so that a partial
-            // failure still reports everything the other slices accumulated.
-            for (const auto& ir : implResults) {
-                validateResults.merge(ir.validateResults);
-                _keyBasedIndexConsistency.merge(ir.keyStringIndexConsistency);
-                dataSizeTotal += ir.dataSizeTotal;
-                numRecords += ir.validateResults.getNumRecords().value_or(0);
-                if (ir.storageStats) {
-                    if (_sliceStorageStats) {
-                        *_sliceStorageStats += *ir.storageStats;
-                    } else {
-                        _sliceStorageStats = ir.storageStats->clone();
-                    }
-                }
-            }
-
-            for (const auto& ir : implResults) {
-                if (!ir.status.isOK()) {
-                    sliceFailures.push_back(ir.status);
-                }
-            }
-
-            // Surface every slice's failures.
-            if (!sliceFailures.empty()) {
-                for (const auto& status : sliceFailures) {
-                    LOGV2_ERROR(11157101,
-                                "Record store slice traversal failed",
-                                logAttrs(coll->ns()),
-                                "error"_attr = status);
-                }
-                const auto& reported = *std::min_element(
-                    sliceFailures.begin(), sliceFailures.end(), [](const auto& a, const auto& b) {
-                        // An interrupt outranks the failures it caused in the other slices.
-                        return ErrorCodes::isCancellationError(a.code()) &&
-                            !ErrorCodes::isCancellationError(b.code());
-                    });
-                std::vector<std::string> reasons;
-                reasons.reserve(sliceFailures.size());
-                std::transform(sliceFailures.begin(),
-                               sliceFailures.end(),
-                               std::back_inserter(reasons),
-                               [](const Status& status) { return status.toString(); });
-                uasserted(reported.code(),
-                          fmt::format("{} of {} record store slices failed to traverse: {}",
-                                      sliceFailures.size(),
-                                      trsOpts.size(),
-                                      fmt::join(reasons, "; ")));
-            }
-        }
-    }
-
+void ValidateAdaptor::postTraverseRecordStoreImpl(OperationContext* opCtx,
+                                                  ValidateResults& validateResults,
+                                                  int64_t numRecords,
+                                                  int64_t dataSizeTotal) {
+    const auto& coll = _validateState->getCollection();
     _numRecords = numRecords;
     validateResults.setDataSize(dataSizeTotal);
 
@@ -946,6 +695,31 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
     if (validateResults.isValid() && !_validateState->isBackground()) {
         coll->getRecordStore()->updateStatsAfterRepair(_numRecords, dataSizeTotal);
     }
+}
+
+void ValidateAdaptor::traverseRecordStoreSerial(OperationContext* opCtx,
+                                                ValidateResults& validateResults,
+                                                ValidationVersion validationVersion) {
+    auto progressGuard = preTraverseRecordStoreImpl(opCtx);
+
+    auto implResults = traverseRecordStoreImpl(
+        opCtx,
+        validateResults,
+        _keyBasedIndexConsistency,
+        {.beginRecordId = _validateState->getFirstRecordId(),
+         .cursorFactory =
+             [this](OperationContext* traversalOpCtx) -> std::unique_ptr<ValidateCursor> {
+             return std::make_unique<ThrottledValidateCursor>(
+                 traversalOpCtx, _validateState->getTraverseRecordStoreCursor());
+         }},
+        _progress,
+        validationVersion);
+    validateResults = std::move(implResults.validateResults);
+    _keyBasedIndexConsistency = std::move(implResults.keyStringIndexConsistency);
+    const int64_t numRecords = validateResults.getNumRecords().value_or(0);
+    uassertStatusOK(implResults.status);
+
+    postTraverseRecordStoreImpl(opCtx, validateResults, numRecords, implResults.dataSizeTotal);
 }
 
 auto ValidateAdaptor::traverseRecordStoreImpl(OperationContext* opCtx,
