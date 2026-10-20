@@ -2,8 +2,13 @@
  * Tests that resharding recipients wait for replication lag across all nodes to be below
  * reshardingWaitForReplicationTimeoutSeconds before building indexes, and that the wait can detect
  * and account for node removals.
+ *
+ * @tags: [
+ *   resource_intensive,
+ * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {extractUUIDFromObject, getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
@@ -69,6 +74,30 @@ const fp = configureFailPoint(st.rs1.getPrimary(), "reshardingPauseRecipientBefo
 const moveThread = new Thread(runMoveCollection, st.s.host, ns0, st.shard1.shardName);
 moveThread.start();
 fp.wait();
+
+/**
+ * Primary-driven index builds have no commit quorum, so recipients do not wait for replication
+ * before building indexes. When they are enabled, the test checks that the index build proceeds
+ * without the replication wait.
+ */
+const primaryDrivenIndexBuilds = FeatureFlagUtil.isPresentAndEnabled(
+    st.rs1.getPrimary().getDB("admin"),
+    "PrimaryDrivenIndexBuilds",
+);
+
+if (primaryDrivenIndexBuilds) {
+    fp.off();
+    jsTest.log(
+        "Verify that the resharding operation builds indexes without waiting for replication, " +
+            "since index builds are primary-driven",
+    );
+
+    assert.commandWorked(moveThread.returnData());
+    assert(indexExists(testColl0, {x: 1}));
+
+    st.stop();
+    quit();
+}
 
 // Pause replication on one of the secondaries.
 stopServerReplication(st.rs1.nodes[2]);

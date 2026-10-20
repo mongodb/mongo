@@ -8,10 +8,12 @@
  * on all shards, and having replication lag on the config shard can cause various reads against
  * the sharding metadata collection to fail with timeout errors.
  * @tags: [
- *   config_shard_incompatible
+ *   config_shard_incompatible,
+ *   resource_intensive,
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {isDisagg} from "jstests/libs/oplog_truncation_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
@@ -35,19 +37,32 @@ function validateShardsvrReshardingOperationTimeResponse(res, isRecipient) {
     assert.eq(res.hasOwnProperty("remainingMillis"), isRecipient, res);
 }
 
-function testShardsvrReshardingOperationTimeCmd(reshardingNs, participantRst, {isRecipient}) {
-    const primary = participantRst.getPrimary();
+function getShardsvrReshardingOperationTime(primary, reshardingNs, isRecipient) {
+    const res = assert.commandWorked(
+        primary.adminCommand({_shardsvrReshardingOperationTime: reshardingNs}));
+    jsTest.log("The latest _shardsvrReshardingOperationTime response: " + tojsononeline(res));
+    validateShardsvrReshardingOperationTimeResponse(res, isRecipient);
+    return res;
+}
 
-    jsTest.log("Test the case where there is no replication lag on " + participantRst.name);
+function assertSoonNoMajorityReplicationLag(primary, reshardingNs, isRecipient) {
     assert.soon(() => {
-        const res0 = assert.commandWorked(
-            primary.adminCommand({_shardsvrReshardingOperationTime: reshardingNs}));
-        jsTest.log("The latest _shardsvrReshardingOperationTime response: " + tojsononeline(res0));
-        validateShardsvrReshardingOperationTimeResponse(res0, isRecipient);
-
-        return !res0.hasOwnProperty("majorityReplicationLagMillis") ||
-            res0.majorityReplicationLagMillis <= maxMajorityReplicationLagMillis;
+        const res = getShardsvrReshardingOperationTime(primary, reshardingNs, isRecipient);
+        return !res.hasOwnProperty("majorityReplicationLagMillis") ||
+            res.majorityReplicationLagMillis <= maxMajorityReplicationLagMillis;
     });
+}
+
+function assertMajorityReplicationLagAtLeast(primary, reshardingNs, isRecipient, minLagMillis) {
+    const res = getShardsvrReshardingOperationTime(primary, reshardingNs, isRecipient);
+    if (res.hasOwnProperty("majorityReplicationLagMillis")) {
+        assert.gte(res.majorityReplicationLagMillis, minLagMillis, {res});
+    }
+}
+
+// Creates majority replication lag by pausing replication on the secondaries.
+function testLagWithPausedSecondaries(reshardingNs, participantRst, isRecipient) {
+    const primary = participantRst.getPrimary();
 
     jsTest.log("Test the case where there is replication lag on only one secondary on " +
                participantRst.name);
@@ -57,15 +72,7 @@ function testShardsvrReshardingOperationTimeCmd(reshardingNs, participantRst, {i
     // Perform a write and and wait for it to replicate to the other secondary.
     assert.commandWorked(
         primary.adminCommand({appendOplogNote: 1, data: {replLagNoop: 0}, writeConcern: {w: 2}}));
-    assert.soon(() => {
-        const res1 = assert.commandWorked(
-            primary.adminCommand({_shardsvrReshardingOperationTime: reshardingNs}));
-        jsTest.log("The latest _shardsvrReshardingOperationTime response: " + tojsononeline(res1));
-        validateShardsvrReshardingOperationTimeResponse(res1, isRecipient);
-        
-        return !res1.hasOwnProperty("majorityReplicationLagMillis") || 
-            res1.majorityReplicationLagMillis <= maxMajorityReplicationLagMillis;
-    });
+    assertSoonNoMajorityReplicationLag(primary, reshardingNs, isRecipient);
 
     jsTest.log("Test the case where there is replication lag on both secondaries on " +
                participantRst.name);
@@ -76,30 +83,55 @@ function testShardsvrReshardingOperationTimeCmd(reshardingNs, participantRst, {i
     // has been paused on both secondaries.
     assert.commandWorked(
         primary.adminCommand({appendOplogNote: 1, data: {replLagNoop: 1}, writeConcern: {w: 1}}));
-    const res2 = assert.commandWorked(
-        primary.adminCommand({_shardsvrReshardingOperationTime: reshardingNs}));
-    validateShardsvrReshardingOperationTimeResponse(res2, isRecipient);
-
-    if(res2.hasOwnProperty("majorityReplicationLagMillis")){
-        assert.gte(res2.majorityReplicationLagMillis, sleepMillis2, {res2});
-    }
+    assertMajorityReplicationLagAtLeast(primary, reshardingNs, isRecipient, sleepMillis2);
 
     jsTest.log("Test the case where there is replication lag on only one secondary again on " +
                participantRst.name);
     // Unpause replication on one of the secondaries. The majority replication lag should become
     // 0 eventually.
     restartServerReplication(participantRst.getSecondaries()[0]);
-    assert.soon(() => {
-        const res3 = assert.commandWorked(
-            primary.adminCommand({_shardsvrReshardingOperationTime: reshardingNs}));
-        jsTest.log("The latest _shardsvrReshardingOperationTime response: " + tojsononeline(res3));
-        validateShardsvrReshardingOperationTimeResponse(res3, isRecipient);
-    
-        return !res3.hasOwnProperty("majorityReplicationLagMillis") ||
-            res3.majorityReplicationLagMillis <= maxMajorityReplicationLagMillis;
-    });
+    assertSoonNoMajorityReplicationLag(primary, reshardingNs, isRecipient);
 
     restartServerReplication(participantRst.getSecondaries()[1]);
+}
+
+// Creates majority replication lag by freezing the primary's commit point. In disaggregated
+// storage the commit point is advanced by the log service rather than by secondary
+// acknowledgements, so pausing secondaries does not create majority replication lag.
+function testLagWithFrozenCommitPoint(reshardingNs, participantRst, isRecipient) {
+    const primary = participantRst.getPrimary();
+
+    jsTest.log("Test the case where the commit point is frozen on " + participantRst.name);
+    const commitFp = configureFailPoint(primary, "hangBeforeUpdatingCommittedOpTimeFromLogServer");
+    // Make a write so that a commit point update arrives and hits the failpoint. Once it is hit,
+    // the commit point can no longer advance past this write.
+    assert.commandWorked(
+        primary.adminCommand({appendOplogNote: 1, data: {replLagNoop: 0}, writeConcern: {w: 1}}));
+    commitFp.wait();
+    const sleepMillis = 200;
+    sleep(sleepMillis);
+    // This write is applied locally but cannot be committed, so it is at least 'sleepMillis'
+    // ahead of the commit point.
+    assert.commandWorked(
+        primary.adminCommand({appendOplogNote: 1, data: {replLagNoop: 1}, writeConcern: {w: 1}}));
+    assertMajorityReplicationLagAtLeast(primary, reshardingNs, isRecipient, sleepMillis);
+
+    jsTest.log("Test the case where the commit point is unfrozen on " + participantRst.name);
+    commitFp.off();
+    assertSoonNoMajorityReplicationLag(primary, reshardingNs, isRecipient);
+}
+
+function testShardsvrReshardingOperationTimeCmd(reshardingNs, participantRst, {isRecipient}) {
+    const primary = participantRst.getPrimary();
+
+    jsTest.log("Test the case where there is no replication lag on " + participantRst.name);
+    assertSoonNoMajorityReplicationLag(primary, reshardingNs, isRecipient);
+
+    if (isDisagg(primary)) {
+        testLagWithFrozenCommitPoint(reshardingNs, participantRst, isRecipient);
+    } else {
+        testLagWithPausedSecondaries(reshardingNs, participantRst, isRecipient);
+    }
 }
 
 const st = new ShardingTest({
