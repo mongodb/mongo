@@ -107,6 +107,7 @@ class PerfErrorCode(str, Enum):
         "override_membership_check_failed",
         ErrorCategory.INTERNAL_ALERT,
     )
+    OVERRIDE_LOOKUP_FAILED = ("override_lookup_failed", ErrorCategory.INTERNAL_ALERT)
     MISSING_REPORTED_METRIC = ("missing_reported_metric", ErrorCategory.TASK_FAILURE)
     THRESHOLD_FAILED_LOWER = ("threshold_failed_lower", ErrorCategory.TASK_FAILURE)
     THRESHOLD_FAILED_UPPER = ("threshold_failed_upper", ErrorCategory.TASK_FAILURE)
@@ -819,6 +820,79 @@ class CheckPerfResultTestCase(interface.DynamicTestCase):
 
         return None
 
+    def _is_threshold_failure_overridden(self) -> bool:
+        """Return whether an authorized user overrode the failed threshold check on this PR.
+
+        Overrides only apply to PR and merge queue builds. An error while looking up the override
+        is logged and treated as no override, so the threshold failure still fails the test.
+        """
+        if (
+            _config.EVERGREEN_REQUESTER != "github_pr"
+            and _config.EVERGREEN_REQUESTER != "github_merge_queue"
+        ):
+            return False
+        github_pr_number = _get_github_pr_number()
+        if github_pr_number is None:
+            _log_perf_error(
+                self.logger,
+                "Missing 'github_pr_number' expansion, cannot determine PR to check for threshold check override.",
+                code=PerfErrorCode.MISSING_PR_NUMBER,
+            )
+            return False
+        try:
+            return self._has_authorized_override_comment(github_pr_number)
+        except Exception as exc:
+            _log_perf_error(
+                self.logger,
+                f"Could not look up threshold check override comments on PR #{github_pr_number}: {exc}. "
+                "Treating the threshold check as not overridden.",
+                code=PerfErrorCode.OVERRIDE_LOOKUP_FAILED,
+                extra_attributes={
+                    ATTR_EXCEPTION_TYPE: type(exc).__name__,
+                    ATTR_EXCEPTION_MESSAGE: str(exc),
+                },
+            )
+            return False
+
+    def _has_authorized_override_comment(self, github_pr_number: int) -> bool:
+        """Return whether an authorized user left an override comment on the given PR."""
+        pr = self.github.get_repo(GITHUB_REPO_NAME).get_pull(github_pr_number)
+        self.logger.info(f"Checking PR #{pr.number} for threshold check override comments.")
+
+        # General comments made on the main PR thread, not on a specific line of code - most likely to be used
+        for comment in pr.get_issue_comments():
+            if (
+                THRESHOLD_OVERRIDE_COMMENT in comment.body.lower()
+                and self._is_authorized_override_user(comment.user.login)
+            ):
+                self.logger.info(
+                    f"Found override comment by {comment.user.login}, skipping failure for threshold check."
+                )
+                return True
+
+        # Comments made on a specific line of code in the PR
+        for comment in pr.get_review_comments():
+            if (
+                THRESHOLD_OVERRIDE_COMMENT in comment.body.lower()
+                and self._is_authorized_override_user(comment.user.login)
+            ):
+                self.logger.info(
+                    f"Found override comment by {comment.user.login}, skipping failure for threshold check."
+                )
+                return True
+
+        # Comments made on individual commits associated with the PR - least likely to be used, but checking just in case
+        for comment in pr.get_comments():
+            if (
+                THRESHOLD_OVERRIDE_COMMENT in comment.body.lower()
+                and self._is_authorized_override_user(comment.user.login)
+            ):
+                self.logger.info(
+                    f"Found override comment by {comment.user.login}, skipping failure for threshold check."
+                )
+                return True
+        return False
+
     def _check_thresholds(
         self,
         thresholds_to_check: list[IndividualMetricThreshold],
@@ -901,57 +975,7 @@ class CheckPerfResultTestCase(interface.DynamicTestCase):
                     f"Metric {metric_to_check.metric_name} in {metric_to_check.test_name} with thread_level of {metric_to_check.thread_level} has passed the threshold check. The reported value of {reported_metric.value} is within the threshold limit of {metric_to_check.threshold_limit} from the base commit value of {metric_to_check.value}."
                 )
 
-        if any_metric_has_failed:
-            # Check to see if an override comment was made by an authorized user.
-            if (
-                _config.EVERGREEN_REQUESTER == "github_pr"
-                or _config.EVERGREEN_REQUESTER == "github_merge_queue"
-            ):
-                github_pr_number = _get_github_pr_number()
-                if github_pr_number is None:
-                    _log_perf_error(
-                        self.logger,
-                        "Missing 'github_pr_number' expansion, cannot determine PR to check for threshold check override.",
-                        code=PerfErrorCode.MISSING_PR_NUMBER,
-                    )
-                else:
-                    pr = self.github.get_repo(GITHUB_REPO_NAME).get_pull(github_pr_number)
-                    self.logger.info(
-                        f"Checking PR #{pr.number} for threshold check override comments."
-                    )
-
-                    # General comments made on the main PR thread, not on a specific line of code - most likely to be used
-                    for comment in pr.get_issue_comments():
-                        if (
-                            THRESHOLD_OVERRIDE_COMMENT in comment.body.lower()
-                            and self._is_authorized_override_user(comment.user.login)
-                        ):
-                            self.logger.info(
-                                f"Found override comment by {comment.user.login}, skipping failure for threshold check."
-                            )
-                            return
-
-                    # Comments made on a specific line of code in the PR
-                    for comment in pr.get_review_comments():
-                        if (
-                            THRESHOLD_OVERRIDE_COMMENT in comment.body.lower()
-                            and self._is_authorized_override_user(comment.user.login)
-                        ):
-                            self.logger.info(
-                                f"Found override comment by {comment.user.login}, skipping failure for threshold check."
-                            )
-                            return
-
-                    # Comments made on individual commits associated with the PR - least likely to be used, but checking just in case
-                    for comment in pr.get_comments():
-                        if (
-                            THRESHOLD_OVERRIDE_COMMENT in comment.body.lower()
-                            and self._is_authorized_override_user(comment.user.login)
-                        ):
-                            self.logger.info(
-                                f"Found override comment by {comment.user.login}, skipping failure for threshold check."
-                            )
-                            return
+        if any_metric_has_failed and not self._is_threshold_failure_overridden():
             raise ServerFailure(
                 f"One or more of the metrics reported by this task have failed the threshold check. These thresholds can be found in {THRESHOLD_LOCATION}."
                 " For more information on this failure and how to resolve it, please see the documentation at https://docs.devprod.prod.corp.mongodb.com/performance-testing/workloads/benchmarks/instruction_microbenchmarks"

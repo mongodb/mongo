@@ -1740,6 +1740,31 @@ class TestCheckPerfResultTestCase(unittest.TestCase):
     @mock.patch(
         "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.get_expansion"
     )
+    def test_override_lookup_api_error_fails(self, mock_get_expansion, mock_config):
+        """Test that an error from any override lookup call keeps the threshold failure."""
+        mock_config.EVERGREEN_REQUESTER = "github_merge_queue"
+        mock_get_expansion.side_effect = lambda key, default=None: {
+            "github_pr_number": "12345",
+            "github_token_mongo": "fake_token",
+        }.get(key, default)
+
+        for lookup in ("get_issue_comments", "get_review_comments", "get_comments"):
+            with self.subTest(lookup=lookup):
+                mock_github = _build_override_github()
+                mock_pr = mock_github.get_repo.return_value.get_pull.return_value
+                getattr(mock_pr, lookup).side_effect = GithubException(
+                    502, data={"message": "Bad Gateway"}, headers={}
+                )
+                test_case = _build_failing_test_case()
+                test_case.github = mock_github
+
+                with self.assertRaisesRegex(ServerFailure, "threshold check"):
+                    _check_failing_thresholds(test_case)
+
+    @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.get_expansion"
+    )
     def test_override_not_checked_when_not_merge_queue(self, mock_get_expansion, mock_config):
         """Test that override checking is skipped when not in merge queue."""
         mock_config.EVERGREEN_REQUESTER = "patch_request"
@@ -2184,6 +2209,45 @@ class TestAfterTest(GenerateAndCheckPerfResultsFixture):
             "Metric latency_per_op_median in BM_Name2 with thread_level of 10 has passed", output
         )
         self.assertTrue(self.cbr_hook.has_checked_results)
+
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.get_expansion"
+    )
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results.evergreen_conn.get_evergreen_api"
+    )
+    @mock.patch("buildscripts.resmokelib.testing.hooks.generate_and_check_perf_results._config")
+    def test_run_test_fails_when_override_lookup_errors(
+        self, mock_config, mock_get_api, mock_get_expansion
+    ):
+        mock_config.EVERGREEN_PROJECT_NAME = "mongodb-mongo-master"
+        mock_config.EVERGREEN_REQUESTER = "github_merge_queue"
+        mock_config.EVERGREEN_REVISION = "abc123"
+        mock_get_expansion.side_effect = lambda key, default=None: {
+            "github_pr_number": "12345",
+        }.get(key, default)
+        mock_task = mock.MagicMock()
+        mock_task.version_id = "mongodb_mongo_master_abc123"
+        mock_get_api.return_value.tasks_by_project_and_commit.return_value = [mock_task]
+        mock_github = _build_override_github()
+        mock_github.get_repo.return_value.get_pull.side_effect = GithubException(
+            502, data={"message": "Bad Gateway"}, headers={}
+        )
+        self.check.github = mock_github
+
+        self.cbr_hook.variant = "test-variant"
+        self.cbr_hook.performance_thresholds = {
+            "BM_Name1/arg1/arg with space": _threshold(1, "latency_per_op_mean", 10),
+        }
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            self._write_report(tmp_dir)
+            with mock.patch.object(self.check, "_retrieve_base_commit_value", return_value=0):
+                with self.assertLogs("test_logger", level="ERROR") as log_ctx:
+                    with self.assertRaisesRegex(ServerFailure, "threshold check"):
+                        self.check.run_test()
+
+        self.assertIn("Could not look up threshold check override", "\n".join(log_ctx.output))
 
 
 class TestHookSpanContext(GenerateAndCheckPerfResultsFixture):
