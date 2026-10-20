@@ -200,6 +200,18 @@ feature_flags:
         incremental_rollout_phase: in_development
         fcv_gated: false
 
+    featureFlagExtensionCommands:
+        description: "Feature flag to enable loading extension-defined commands via the Extensions API."
+        cpp_varname: gFeatureFlagExtensionCommands
+        default: false
+        fcv_gated: false
+
+    featureFlagExtensionSearchIndexManagement:
+        description: "Feature flag to use the extension-defined search index management commands."
+        cpp_varname: gFeatureFlagExtensionSearchIndexManagement
+        default: false
+        fcv_gated: false
+
     featureFlagMqlJsEngineGap:
         description: "Feature flag to enable MQL features that cover common use cases for server side Javascript"
         cpp_varname: gFeatureFlagMqlJsEngineGap

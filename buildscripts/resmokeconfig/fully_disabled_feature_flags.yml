@@ -46,3 +46,7 @@
 - featureFlagCollStatsMetricsFiltering
 # TODO SERVER-136165: Remove or re-enable featureFlagListIndexesAlwaysIncludesSimpleCollation.
 - featureFlagListIndexesAlwaysIncludesSimpleCollation
+# Enabling this flag skips registering the built-in search index management commands until a mongot
+# extension provides replacements. Enabling it in the all-feature-flags variants would break
+# existing legacy search passthrough tests.
+- featureFlagExtensionSearchIndexManagement
