@@ -17,7 +17,6 @@
  */
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getEngine, getQueryPlanner, getSingleNodeExplain} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
@@ -386,10 +385,8 @@ TimeseriesTest.run((insert) => {
         {pred: {"objWithOneElemArray.b.c": {$gt: 499}}, ids: [1, 4], usesBlockProcessing: true},
     ];
 
-    // $match pushdown requires sbe to be fully enabled and featureFlagTimeSeriesInSbe to be set.
-    const sbeEnabled =
-        checkSbeFullyEnabled(db) &&
-        FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "TimeSeriesInSbe");
+    // $match pushdown requires sbe to be fully enabled.
+    const sbeEnabled = checkSbeFullyEnabled(db);
     for (let testCase of kTestCases) {
         const pipe = [{$match: testCase.pred}, {$project: {_id: 1}}];
 

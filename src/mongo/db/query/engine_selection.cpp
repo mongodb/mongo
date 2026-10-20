@@ -53,9 +53,7 @@ bool isQuerySbeCompatible(const CollectionPtr& collection,
     const auto isTimeseriesColl = collection && collection->isTimeseriesCollection();
 
     auto& queryKnob = cq.getExpCtx()->getQueryKnobConfiguration();
-    if ((!feature_flags::gFeatureFlagTimeSeriesInSbe.isEnabled() ||
-         queryKnob.getSbeDisableTimeSeriesForOp()) &&
-        isTimeseriesColl) {
+    if (queryKnob.getSbeDisableTimeSeriesForOp() && isTimeseriesColl) {
         return false;
     }
 

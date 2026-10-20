@@ -535,7 +535,6 @@ size_t getNumSbeCompatibleStagesForPushdown(
  *   - The 'featureFlagSbeFull' flag is enabled.
  *
  * $_internalUnpackBucket via 'DocumentSourceInternalUnpackBucket':
- *   - The 'featureFlagTimeSeriesInSbe' flag is enabled and
  *   - the 'internalQuerySlotBasedExecutionDisableTimeSeriesPushdown', is _not_ enabled,
  *
  * $unwind stages ('DocumentSourceUnwind'):
@@ -618,9 +617,7 @@ bool findSbeCompatibleStagesForPushdown(
 
         .search = false,
 
-        // TODO (SERVER-80243): Remove 'featureFlagTimeSeriesInSbe' check.
         .unpackBucket = meetsRequirements(SbeCompatibility::noRequirements) &&
-            feature_flags::gFeatureFlagTimeSeriesInSbe.isEnabled() &&
             !queryKnob.getSbeDisableTimeSeriesForOp() &&
             cq->getExpCtx()->getSbePipelineCompatibility() == SbeCompatibility::noRequirements,
     };
