@@ -766,6 +766,45 @@ server_parameters:
             query_knob:
                 wire_name: explainJoinCostComponents
 
+    internalQueryEnableParallelQuery:
+        mod_visibility: needs_replacement
+        description: >-
+            Global switch for parallel query execution. When false, the parallelism planner is
+            bypassed entirely and every query runs serially, regardless of query shape, collection
+            size, or the maximum degree of parallelism. When true, the parallelism planner is
+            considered for eligible queries; it may still choose a serial plan.
+        set_at: [startup, runtime]
+        cpp_varname: "internalQueryEnableParallelQuery"
+        cpp_vartype: Atomic<bool>
+        default: false
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: enableParallelQuery
+                fcv:
+                    min: "9.1"
+
+    internalQueryMaxDegreeOfParallelism:
+        mod_visibility: needs_replacement
+        description: >-
+            Upper bound on the number of worker threads a single query may use. This is a
+            ceiling, not a mandate: the parallelism planner may choose a lower degree of parallelism,
+            or none at all. A value of 1 means queries are never parallelized. Has no effect unless
+            internalQueryEnableParallelQuery is true.
+        set_at: [startup, runtime]
+        cpp_varname: "internalQueryMaxDegreeOfParallelism"
+        cpp_vartype: Atomic<int>
+        default: 1
+        validator:
+            gte: 1
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: maxDegreeOfParallelism
+                pqs_settable: true
+                fcv:
+                    min: "9.1"
+
     internalJoinReorderMode:
         mod_visibility: public
         description: "Picks which method is used to reorder joins (when enabled)."
