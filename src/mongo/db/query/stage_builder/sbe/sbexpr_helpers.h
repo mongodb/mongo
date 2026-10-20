@@ -295,6 +295,11 @@ protected:
 };
 
 /**
+ * Whether the reads of a loop join's inner side count toward the trial run of its outer side.
+ */
+enum class InnerTrialRunTracking { kTrack, kExclude };
+
+/**
  * The SbBuilder class extends SbExprBuilder with additional methods for creating SbStages.
  */
 class SbBuilder : public SbExprBuilder {
@@ -585,15 +590,17 @@ public:
                                                 const SbSlotVector& thenSlots,
                                                 const SbSlotVector& elseSlots);
 
-    inline SbStage makeLoopJoin(SbStage outer,
-                                SbStage inner,
-                                const SbSlotVector& outerProjects,
-                                const SbSlotVector& outerCorrelated,
-                                const SbSlotVector& innerProjects = SbSlotVector{},
-                                SbExpr predicate = SbExpr{},
-                                sbe::JoinType joinType = sbe::JoinType::Inner,
-                                sbe::IntermediateTrackingBehavior intermediateTracking =
-                                    sbe::IntermediateTrackingBehavior::kNone) {
+    inline SbStage makeLoopJoin(
+        SbStage outer,
+        SbStage inner,
+        const SbSlotVector& outerProjects,
+        const SbSlotVector& outerCorrelated,
+        const SbSlotVector& innerProjects = SbSlotVector{},
+        SbExpr predicate = SbExpr{},
+        sbe::JoinType joinType = sbe::JoinType::Inner,
+        sbe::IntermediateTrackingBehavior intermediateTracking =
+            sbe::IntermediateTrackingBehavior::kNone,
+        InnerTrialRunTracking innerTrialRunTracking = InnerTrialRunTracking::kTrack) {
         return makeLoopJoin(VariableTypes{},
                             std::move(outer),
                             std::move(inner),
@@ -602,19 +609,22 @@ public:
                             innerProjects,
                             std::move(predicate),
                             joinType,
-                            intermediateTracking);
+                            intermediateTracking,
+                            innerTrialRunTracking);
     }
 
-    SbStage makeLoopJoin(const VariableTypes& varTypes,
-                         SbStage outer,
-                         SbStage inner,
-                         const SbSlotVector& outerProjects,
-                         const SbSlotVector& outerCorrelated,
-                         const SbSlotVector& innerProjects = SbSlotVector{},
-                         SbExpr predicate = SbExpr{},
-                         sbe::JoinType joinType = sbe::JoinType::Inner,
-                         sbe::IntermediateTrackingBehavior intermediateTracking =
-                             sbe::IntermediateTrackingBehavior::kNone);
+    SbStage makeLoopJoin(
+        const VariableTypes& varTypes,
+        SbStage outer,
+        SbStage inner,
+        const SbSlotVector& outerProjects,
+        const SbSlotVector& outerCorrelated,
+        const SbSlotVector& innerProjects = SbSlotVector{},
+        SbExpr predicate = SbExpr{},
+        sbe::JoinType joinType = sbe::JoinType::Inner,
+        sbe::IntermediateTrackingBehavior intermediateTracking =
+            sbe::IntermediateTrackingBehavior::kNone,
+        InnerTrialRunTracking innerTrialRunTracking = InnerTrialRunTracking::kTrack);
 
     std::pair<SbStage, SbSlot> makeHashLookup(SbStage localStage,
                                               SbStage foreignStage,

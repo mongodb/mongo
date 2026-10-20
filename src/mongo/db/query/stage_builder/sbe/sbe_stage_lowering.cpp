@@ -58,14 +58,9 @@ struct Lowerer {
     // ----------------------------------------------------------------
     std::unique_ptr<sbe::PlanStage> lower(SbBlueprintNodeIdx idx) {
         auto node = _blueprint.takeForLowering(idx);
-        auto stage = std::visit(
+        return std::visit(
             [&](auto&& n) -> std::unique_ptr<sbe::PlanStage> { return (*this)(std::move(n)); },
             std::move(node));
-
-        if (_blueprint.isTrialRunTrackingDisabled(idx)) {
-            stage->disableTrialRunTracking();
-        }
-        return stage;
     }
 
     // ----------------------------------------------------------------
@@ -505,6 +500,9 @@ struct Lowerer {
     std::unique_ptr<sbe::PlanStage> operator()(SbBlueprintLoopJoin node) {
         auto outer = lower(node.outer);
         auto inner = lower(node.inner);
+        if (node.innerTrialRunTracking == InnerTrialRunTracking::kExclude) {
+            inner->disableTrialRunTracking();
+        }
         return sbe::makeS<sbe::LoopJoinStage>(std::move(outer),
                                               std::move(inner),
                                               std::move(node.outerProjects),
@@ -565,6 +563,8 @@ struct Lowerer {
     std::unique_ptr<sbe::PlanStage> operator()(SbBlueprintHashLookup node) {
         auto localStage = lower(node.localStage);
         auto foreignStage = lower(node.foreignStage);
+        // The foreign side's reads must not influence trial runs of the local side.
+        foreignStage->disableTrialRunTracking();
 
         sbe::SlotExprPair agg{node.outSlot, le(node.aggExpr)};
 
@@ -581,6 +581,8 @@ struct Lowerer {
     std::unique_ptr<sbe::PlanStage> operator()(SbBlueprintHashLookupUnwind node) {
         auto localStage = lower(node.localStage);
         auto foreignStage = lower(node.foreignStage);
+        // The foreign side's reads must not influence trial runs of the local side.
+        foreignStage->disableTrialRunTracking();
 
         return sbe::makeS<sbe::HashLookupUnwindStage>(std::move(localStage),
                                                       std::move(foreignStage),

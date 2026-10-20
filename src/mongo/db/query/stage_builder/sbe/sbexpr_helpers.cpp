@@ -1097,7 +1097,8 @@ SbStage SbBuilder::makeLoopJoin(const VariableTypes& varTypes,
                                 const SbSlotVector& innerProjects,
                                 SbExpr predicate,
                                 sbe::JoinType joinType,
-                                sbe::IntermediateTrackingBehavior intermediateTracking) {
+                                sbe::IntermediateTrackingBehavior intermediateTracking,
+                                InnerTrialRunTracking innerTrialRunTracking) {
     return addBlueprint(_state,
                         SbBlueprintLoopJoin{.outer = outer.release(),
                                             .inner = inner.release(),
@@ -1107,7 +1108,8 @@ SbStage SbBuilder::makeLoopJoin(const VariableTypes& varTypes,
                                             .outerCorrelated = lower(outerCorrelated),
                                             .innerProjects = lower(innerProjects),
                                             .predicate = std::move(predicate),
-                                            .intermediateTracking = intermediateTracking},
+                                            .intermediateTracking = intermediateTracking,
+                                            .innerTrialRunTracking = innerTrialRunTracking},
                         &varTypes);
 }
 

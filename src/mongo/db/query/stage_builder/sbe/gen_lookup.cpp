@@ -449,8 +449,6 @@ std::pair<SbSlot /* keyValuesSetSlot */, SbStage> buildKeySetForForeign(
     const PlanStageSlots& inputSlots,
     const FieldPath& fp,
     const PlanNodeId nodeId) {
-    // The foreign key set's reads must not influence trial runs of the outer side.
-    NoTrialRunTrackingGuard noTrialRunTracking{state.blueprint()};
     SbBuilder b(state, nodeId);
 
     auto inputSlot = inputSlots.getResultObj();
@@ -758,9 +756,6 @@ buildLoopJoinInnerSide(StageBuilderState& state,
                        const PlanNodeId nodeId,
                        bool hasUnwindSrc,
                        boost::optional<sbe::value::SlotId> indexSlotId) {
-    // The inner side's reads must not influence trial runs of the outer side.
-    NoTrialRunTrackingGuard noTrialRunTracking{state.blueprint()};
-
     auto [matchedRecordsSlot, matchesStage] = buildForeignMatches(localKeySlot,
                                                                   std::move(foreignStage),
                                                                   foreignRecordSlot,
@@ -827,7 +822,9 @@ std::pair<SbSlot /* matched docs */, SbStage> buildNljLookupStage(
                                  /*outerCorrelated=*/SbExpr::makeSV(localKeySlot),
                                  /*innerProjects=*/std::move(innerProj),
                                  /*predicate=*/SbExpr{},
-                                 joinType);
+                                 joinType,
+                                 sbe::IntermediateTrackingBehavior::kNone,
+                                 InnerTrialRunTracking::kExclude);
 
     return {matchedRecordsSlot, std::move(nlj)};
 }
@@ -1142,7 +1139,9 @@ std::pair<SbSlot, SbStage> buildIndexJoinLookupStage(
                                    /*outerCorrelated=*/SbExpr::makeSV(localKeysSetSlot),
                                    /*innerProjects=*/std::move(innerProj),
                                    /*predicate=*/SbExpr{},
-                                   joinType);
+                                   joinType,
+                                   sbe::IntermediateTrackingBehavior::kNone,
+                                   InnerTrialRunTracking::kExclude);
     return {foreignGroupSlot, std::move(nljStage)};
 }  // buildIndexJoinLookupStage
 
@@ -1360,7 +1359,9 @@ std::pair<SbSlot, SbStage> buildDynamicIndexedLoopJoinLookupStage(
                                  std::move(outerCorrelated),
                                  /*innerProjects=*/std::move(innerProj),
                                  /*predicate=*/SbExpr{},
-                                 joinType);
+                                 joinType,
+                                 sbe::IntermediateTrackingBehavior::kNone,
+                                 InnerTrialRunTracking::kExclude);
 
     return {finalForeignSlot, std::move(nlj)};
 

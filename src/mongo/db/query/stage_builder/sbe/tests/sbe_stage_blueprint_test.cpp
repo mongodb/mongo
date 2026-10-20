@@ -109,33 +109,22 @@ TEST_F(SbBlueprintLoweringTest, SbBuilderRetainsBlueprintUntilLowered) {
     ASSERT_STRING_CONTAINS(str, "[5] limit 1");
 }
 
-TEST(SbBlueprintTest, TrialRunTrackingGuardMarksNodesAddedInScope) {
-    SbBlueprint blueprint;
-    blueprint.add(SbBlueprintCoScan{});
-    {
-        NoTrialRunTrackingGuard guard{blueprint};
-        blueprint.add(SbBlueprintCoScan{});
-    }
-    blueprint.add(SbBlueprintCoScan{});
-    ASSERT_FALSE(blueprint.isTrialRunTrackingDisabled(SbBlueprintNodeIdx{0}));
-    ASSERT_TRUE(blueprint.isTrialRunTrackingDisabled(SbBlueprintNodeIdx{1}));
-    ASSERT_FALSE(blueprint.isTrialRunTrackingDisabled(SbBlueprintNodeIdx{2}));
-}
-
 TEST_F(SbBlueprintLoweringTest, DisableTrialRunTrackingAppliesToLoweredStage) {
-    // Builds limit(nodeId 2) -> limit 1(nodeId 1) -> coscan(nodeId 1). With node 1 as the runtime
-    // planning root, attaching a trial run tracker reports TrackResults for the inner limit
-    // unless its trial run tracking has been disabled.
+    // The join's inner side reports TrackResults unless the join excludes it from trial runs.
     auto build = [&](bool disableInner) {
-        boost::optional<NoTrialRunTrackingGuard> guard;
-        if (disableInner) {
-            guard.emplace(_state->blueprint());
-        }
         SbBuilder innerBuilder{*_state, 1};
         auto inner = innerBuilder.makeLimitOneCoScanTree();
-        guard.reset();
         SbBuilder rootBuilder{*_state, 2};
-        auto root = rootBuilder.makeLimit(std::move(inner), rootBuilder.makeInt64Constant(2));
+        auto root = rootBuilder.makeLoopJoin(rootBuilder.makeCoScan(),
+                                             std::move(inner),
+                                             /*outerProjects=*/{},
+                                             /*outerCorrelated=*/{},
+                                             /*innerProjects=*/{},
+                                             /*predicate=*/SbExpr{},
+                                             sbe::JoinType::Inner,
+                                             sbe::IntermediateTrackingBehavior::kNone,
+                                             disableInner ? InnerTrialRunTracking::kExclude
+                                                          : InnerTrialRunTracking::kTrack);
         return lowerSbeBlueprint(_state->blueprint(), root.release(), *_state);
     };
 

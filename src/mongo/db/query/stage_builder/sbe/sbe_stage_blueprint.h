@@ -754,6 +754,7 @@ struct SbBlueprintLoopJoin {
     SbExpr predicate;
     sbe::IntermediateTrackingBehavior intermediateTracking{
         sbe::IntermediateTrackingBehavior::kNone};
+    InnerTrialRunTracking innerTrialRunTracking{InnerTrialRunTracking::kTrack};
 
     void def(SbSlotCollector&) const {}
 
@@ -1488,9 +1489,7 @@ inline SbBlueprintNodeIdx addBlueprintNode(SbBlueprintNodeVector& nodes, SbBluep
 class SbBlueprint {
 public:
     SbBlueprintNodeIdx add(SbBlueprintNode node) {
-        auto idx = addBlueprintNode(_nodes, std::move(node));
-        _trialRunTrackingDisabled.push_back(_noTrialRunTrackingOnAdd);
-        return idx;
+        return addBlueprintNode(_nodes, std::move(node));
     }
 
     size_t size() const {
@@ -1533,47 +1532,11 @@ public:
         _loweredPrefix = _nodes.size();
     }
 
-    bool isTrialRunTrackingDisabled(SbBlueprintNodeIdx idx) const {
-        tassert(12703003, "Invalid blueprint node index", idx.value < _nodes.size());
-        return _trialRunTrackingDisabled[idx.value];
-    }
-
 private:
-    friend class NoTrialRunTrackingGuard;
-
     SbBlueprintNodeVector _nodes;
-
-    // Parallel to '_nodes'.
-    std::vector<bool> _trialRunTrackingDisabled;
-
-    // While set (by a NoTrialRunTrackingGuard), add() marks nodes as not participating in trial
-    // run tracking.
-    bool _noTrialRunTrackingOnAdd{false};
 
     // Every node before this index has been lowered.
     size_t _loweredPrefix{0};
-};
-
-/**
- * While an instance is alive, every node added to 'blueprint' is marked as not participating in
- * trial run tracking; lowering applies the mark to the stage. Guards do not nest.
- */
-class NoTrialRunTrackingGuard {
-public:
-    explicit NoTrialRunTrackingGuard(SbBlueprint& blueprint) : _blueprint(blueprint) {
-        tassert(12703004,
-                "Trial run tracking guards do not nest",
-                !_blueprint._noTrialRunTrackingOnAdd);
-        _blueprint._noTrialRunTrackingOnAdd = true;
-    }
-    NoTrialRunTrackingGuard(const NoTrialRunTrackingGuard&) = delete;
-    NoTrialRunTrackingGuard& operator=(const NoTrialRunTrackingGuard&) = delete;
-    ~NoTrialRunTrackingGuard() {
-        _blueprint._noTrialRunTrackingOnAdd = false;
-    }
-
-private:
-    SbBlueprint& _blueprint;
 };
 
 // ============================================================
