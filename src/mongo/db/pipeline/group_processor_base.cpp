@@ -10,8 +10,6 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 
-#include <tuple>
-
 namespace mongo {
 
 GroupProcessorBase::GroupProcessorBase(const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -122,20 +120,8 @@ void GroupProcessorBase::reset() {
     // Before we clear the memory tracker, update GroupStats so explain has $group-level statistics.
     _stats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
 
-    auto opCtx = _expCtx->getOperationContext();
-
-    // Destruction cannot usefully check interrupts, so exclude it from delinquency.
-    auto freeGroups = [&] {
-        _groups = _expCtx->getValueComparator().makeUnorderedValueMap<Accumulators>();
-    };
-    if (opCtx) {
-        // Account for any check-free execution span leading up to teardown.
-        std::ignore = opCtx->checkForInterruptNoAssert();
-        opCtx->runWithoutInterruptionExceptAtGlobalShutdown(freeGroups);
-    } else {
-        freeGroups();
-    }
-
+    // Free our resources.
+    _groups = _expCtx->getValueComparator().makeUnorderedValueMap<Accumulators>();
     _memoryTracker.resetCurrent();
 }
 

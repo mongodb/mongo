@@ -15,12 +15,8 @@
 #include "mongo/db/sorter/sorter_template_defs.h"  // IWYU pragma: keep
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/spill_util.h"
-#include "mongo/util/fail_point.h"
-#include "mongo/util/time_support.h"
 
 namespace mongo {
-
-MONGO_FAIL_POINT_DEFINE(sleepInGroupSpillMergeLoop);
 
 GroupProcessor::GroupProcessor(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                MemoryUsageLimit maxMemoryUsageBytes)
@@ -55,18 +51,6 @@ boost::optional<Document> GroupProcessor::getNextSpilled() {
     }
 
     while (_expCtx->getValueComparator().evaluate(currentId == _firstPartOfNextGroup.first)) {
-        // Each iteration reads one spilled partial aggregate from disk and merges it into the
-        // current accumulator state, which can be arbitrarily expensive. Check every iteration;
-        // iteration count is bounded by the number of spill files containing this key, so this is
-        // effectively free.
-        if (auto opCtx = _expCtx->getOperationContext()) {
-            opCtx->checkForInterrupt();
-        }
-        if (MONGO_unlikely(sleepInGroupSpillMergeLoop.shouldFail())) {
-            sleepInGroupSpillMergeLoop.execute(
-                [&](const BSONObj& data) { sleepmillis(data["millis"].numberLong()); });
-        }
-
         // Inside of this loop, _firstPartOfNextGroup is the current data being processed.
         // At loop exit, it is the first value to be processed in the next group.
         switch (numAccumulators) {  // mirrors switch in spill()
@@ -233,20 +217,15 @@ void GroupProcessor::spill() {
                                                          sorter::kLatestChecksumVersion);
     std::unique_ptr<SortedStorageWriter<Value, Value>> writer =
         sorterStorage.makeWriter(SortOptions(), /*settings=*/{});
-    // Each write loop below can serialize and write up to a memory-limit's worth of groups
-    // (hundreds of thousands of records) in a single check-free span. Check for interrupt
-    // every kInterruptCheckPeriod records.
     switch (_accumulatedFields.size()) {  // same as ptrs[i]->second.size() for all i.
         case 0:                           // no values, essentially a distinct
             for (size_t i = 0; i < ptrs.size(); i++) {
-                _expCtx->checkForInterrupt();
                 writer->addAlreadySorted(ptrs[i]->first, Value());
             }
             break;
 
         case 1:  // just one value, use optimized serialization as single Value
             for (size_t i = 0; i < ptrs.size(); i++) {
-                _expCtx->checkForInterrupt();
                 writer->addAlreadySorted(ptrs[i]->first,
                                          ptrs[i]->second[0]->getValue(/*toBeMerged=*/true));
             }
@@ -254,7 +233,6 @@ void GroupProcessor::spill() {
 
         default:  // multiple values, serialize as array-typed Value
             for (size_t i = 0; i < ptrs.size(); i++) {
-                _expCtx->checkForInterrupt();
                 std::vector<Value> accums;
                 accums.reserve(ptrs[i]->second.size());
                 for (size_t j = 0; j < ptrs[i]->second.size(); j++) {
@@ -277,9 +255,6 @@ void GroupProcessor::spill() {
     // freed by spilling.
     GroupProcessorBase::reset();
     _groupsIterator = _groups.end();
-    if (auto* opCtx = _expCtx->getOperationContext()) {
-        opCtx->checkForInterrupt();
-    }
 
     if (_groupsReady) {
         tassert(9917000,

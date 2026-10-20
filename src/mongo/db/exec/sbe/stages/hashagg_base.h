@@ -11,7 +11,6 @@
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
-#include "mongo/util/fail_point.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
@@ -22,8 +21,6 @@
 
 namespace mongo {
 namespace sbe {
-
-extern FailPoint sleepInSbeGroupSpillMergeLoop;
 
 /**
  * The hash table '_ht' contains a map from $group keys to the current accumulator states for

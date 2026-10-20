@@ -16,10 +16,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/str.h"
-#include "mongo/util/time_support.h"
 
 #include <string_view>
-#include <tuple>
 #include <type_traits>
 
 #include <boost/optional/optional.hpp>
@@ -329,10 +327,8 @@ std::pair<int64_t, int64_t> HashAggStage::spillImpl(SpillingStore* recordStore) 
     int64_t spilledBytes = 0;
     int64_t spilledRecords = 0;
 
-    // Spill only the records that have not been already consumed. Check for interrupt
-    // every kInterruptCheckPeriod rows.
+    // Spill only the records that have not been already consumed.
     for (; _htIt != _ht->end(); ++_htIt) {
-        checkForInterruptNoYield(_opCtx);
         spilledBytes += spillRowToDisk(_htIt->first, _htIt->second);
         spilledRecords++;
     }
@@ -380,14 +376,6 @@ PlanState HashAggStage::getNextSpilled() {
     // Find additional partial aggregates for the same key and merge them in order to compute the
     // final output.
     for (auto nextRecord = _rsCursor->next(); nextRecord; nextRecord = _rsCursor->next()) {
-        // A few expensive partial merges can finish before an amortized check fires.
-        // Check every partial without yielding.
-        _opCtx->checkForInterrupt();
-        if (MONGO_unlikely(sleepInSbeGroupSpillMergeLoop.shouldFail())) {
-            sleepInSbeGroupSpillMergeLoop.execute(
-                [&](const BSONObj& data) { sleepmillis(data["millis"].numberLong()); });
-        }
-
         auto recoveredRow = recoverSpilledRecord(*nextRecord, _stashedKeyBuffer, collator);
         if (!_keyEq(recoveredRow.first, _outKeyRowRecordStore)) {
             // The newly recovered spilled row belongs to a new key, so we're done merging partial
@@ -508,24 +496,12 @@ void HashAggStage::close() {
     auto optTimer(getOptTimer(_opCtx));
 
     trackClose();
-
-    // Destruction cannot usefully check interrupts, so exclude it from delinquency.
-    auto teardownSpillState = [&] {
-        _ht = boost::none;
-
-        if (_recordStore && _opCtx) {
-            _recordStore->resetCursor(_opCtx, _rsCursor);
-        }
-        _rsCursor.reset();
-        _recordStore.reset();
-    };
-    // _opCtx must exist for interrupt checking; if this is a non-executing plan, it may be null.
-    if (_opCtx) {
-        std::ignore = _opCtx->checkForInterruptNoAssert();
-        _opCtx->runWithoutInterruptionExceptAtGlobalShutdown(teardownSpillState);
-    } else {
-        teardownSpillState();
+    _ht = boost::none;
+    if (_recordStore && _opCtx) {
+        _recordStore->resetCursor(_opCtx, _rsCursor);
     }
+    _rsCursor.reset();
+    _recordStore.reset();
     _outKeyRowRecordStore = {0};
     _outAggRowRecordStore = {0};
     _spilledAggRow = {0};

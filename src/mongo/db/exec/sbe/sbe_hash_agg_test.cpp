@@ -20,7 +20,6 @@
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
@@ -31,7 +30,6 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/tick_source_mock.h"
 
 #include <algorithm>
 #include <array>
@@ -41,7 +39,6 @@
 #include <memory>
 #include <set>
 #include <string_view>
-#include <tuple>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -51,30 +48,6 @@
 namespace mongo::sbe {
 class HashAggStageTest : public PlanStageTestFixture {
 public:
-    using PlanStageTestFixture::PlanStageTestFixture;
-
-    std::pair<value::SlotId, std::unique_ptr<PlanStage>> makeCountHashAgg(
-        std::unique_ptr<PlanStage> scanStage, value::SlotId scanSlot) {
-        auto countsSlot = generateSlotId();
-        auto spillSlot = generateSlotId();
-        auto stage = makeS<HashAggStage>(
-            std::move(scanStage),
-            makeSV(scanSlot),
-            makeHashAggAccumulatorList(std::make_unique<CompiledHashAggAccumulator>(
-                countsSlot,
-                spillSlot,
-                makeFunction(
-                    EFn::kSum,
-                    makeE<EConstant>(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(1))),
-                makeFunction(EFn::kSum, makeVariable(spillSlot)))),
-            true,
-            boost::none,
-            true /* allowDiskUse */,
-            nullptr /* yieldPolicy */,
-            kEmptyPlanNodeId);
-        return {countsSlot, std::move(stage)};
-    }
-
     void setUp() override {
         PlanStageTestFixture::setUp();
         _globalLock = std::make_unique<Lock::GlobalLock>(operationContext(), MODE_IS);
@@ -1353,149 +1326,4 @@ TEST_F(HashAggStageTest, HashAggBasicCountWithRecordIds) {
     checkMemoryStats(stage.get(), /*spill=*/false);
     stage->close();
 }
-
-TEST_F(HashAggStageTest, SpillWriteLoopChecksForInterrupt) {
-    auto ctx = makeCompileCtx();
-
-    BSONArrayBuilder bab;
-    for (int i = 0; i < 2000; ++i) {
-        bab.append(i);
-    }
-    value::TagValueOwned inputOwned =
-        value::TagValueOwned::fromRaw(stage_builder::makeValue(bab.arr()));
-    auto [scanSlot, scanStage] = generateVirtualScan(std::move(inputOwned));
-
-    auto [countsSlot, stage] = makeCountHashAgg(std::move(scanStage), scanSlot);
-    std::ignore = prepareTree(ctx.get(), stage.get(), countsSlot);
-
-    // The first result consumes one in-memory row; the remaining 1999 rows are still in the hash
-    // table when the spill is forced.
-    ASSERT_EQ(PlanState::ADVANCED, stage->getNext());
-
-    SpillingStats expectedSpillingStats;
-    expectedSpillingStats.incrementSpills();
-    expectedSpillingStats.incrementSpilledRecords(1999);
-
-    auto* opCtx = operationContext();
-    const auto checksBefore = opCtx->numInterruptChecks();
-    runAndAssertForceSpill(stage.get(), expectedSpillingStats);
-    const auto checksDelta = opCtx->numInterruptChecks() - checksBefore;
-
-    // Allow slack for the checker's kInterruptCheckPeriod amortization.
-    ASSERT_GTE(checksDelta, 1999 / PlanStage::kInterruptCheckPeriod / 2);
-
-    size_t numResults = 1;
-    while (stage->getNext() == PlanState::ADVANCED) {
-        numResults++;
-    }
-    ASSERT_EQ(2000u, numResults);
-    stage->close();
-}
-
-TEST_F(HashAggStageTest, EmptySpillPropagatesInterruptAfterCleanup) {
-    auto ctx = makeCompileCtx();
-    auto input = value::TagValueOwned::fromRaw(stage_builder::makeValue(BSON_ARRAY(1)));
-    auto [scanSlot, scanStage] = generateVirtualScan(std::move(input));
-    auto [countsSlot, stage] = makeCountHashAgg(std::move(scanStage), scanSlot);
-    std::ignore = prepareTree(ctx.get(), stage.get(), countsSlot);
-    ASSERT_EQ(stage->getNext(), PlanState::ADVANCED);
-    stage->saveState();
-    operationContext()->markKilled();
-    ASSERT_THROWS_CODE(stage->forceSpill(nullptr), DBException, ErrorCodes::Interrupted);
-    ASSERT_EQ(stage->getMemoryTracker()->inUseTrackedMemoryBytes(), 0);
-    stage->close();
-}
-
-TEST_F(HashAggStageTest, SpilledMergeLoopChecksForInterruptEveryIteration) {
-    // A result row like {int64, int64} is estimated at ~50B; a 64B threshold keeps about one row
-    // in memory so the build phase spills continuously (same setup as HashAggBasicCountSpill).
-    unittest::ServerParameterGuard maxMemoryLimit(
-        "internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill", 64);
-
-    auto ctx = makeCompileCtx();
-
-    // Repeated spills create many partials for the same keys.
-    constexpr int kInputs = 300;
-    constexpr int kKeys = 3;
-    BSONArrayBuilder bab;
-    for (int i = 0; i < kInputs; ++i) {
-        bab.append(i % kKeys);
-    }
-    value::TagValueOwned inputOwned =
-        value::TagValueOwned::fromRaw(stage_builder::makeValue(bab.arr()));
-    auto [scanSlot, scanStage] = generateVirtualScan(std::move(inputOwned));
-
-    auto [countsSlot, stage] = makeCountHashAgg(std::move(scanStage), scanSlot);
-    auto resultAccessor = prepareTree(ctx.get(), stage.get(), countsSlot);
-
-    auto* opCtx = operationContext();
-    const auto checksBefore = opCtx->numInterruptChecks();
-
-    int64_t totalCount = 0;
-    size_t numResults = 0;
-    while (stage->getNext() == PlanState::ADVANCED) {
-        auto [resTag, resVal] = resultAccessor->getViewOfValue();
-        ASSERT_EQ(value::TypeTags::NumberInt64, resTag);
-        totalCount += value::bitcastFrom<int64_t>(resVal);
-        numResults++;
-    }
-    ASSERT_EQ(static_cast<size_t>(kKeys), numResults);
-    ASSERT_EQ(static_cast<int64_t>(kInputs), totalCount);
-
-    const auto checksDelta = opCtx->numInterruptChecks() - checksBefore;
-
-    auto* stats = static_cast<const HashAggStats*>(stage->getSpecificStats());
-    ASSERT_TRUE(stats->usedDisk);
-    // All spilled records except the first are read inside the checked loop.
-    ASSERT_GT(stats->spillingStats.getSpilledRecords(), kInputs / 2);
-    ASSERT_GTE(checksDelta, stats->spillingStats.getSpilledRecords() - 1);
-
-    stage->close();
-}
-
-class HashAggDelinquencyTest : public HashAggStageTest {
-public:
-    Options makeServiceContextOptions() override {
-        return HashAggStageTest::makeServiceContextOptions().useMockTickSource(true);
-    }
-};
-
-TEST_F(HashAggDelinquencyTest, TeardownIsExcludedFromInterruptDelinquency) {
-    unittest::ServerParameterGuard interval("overdueInterruptCheckIntervalMillis", 10);
-    // Small memory threshold so the aggregation spills and close() also tears down a spilling
-    // store.
-    unittest::ServerParameterGuard maxMemoryLimit(
-        "internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill", 64);
-
-    auto* opCtx = operationContext();
-    auto ctx = makeCompileCtx();
-    auto [inputTag, inputVal] =
-        stage_builder::makeValue(BSON_ARRAY(5 << 6 << 7 << 5 << 6 << 7 << 6 << 7 << 7));
-    auto [scanSlot, scanStage] =
-        generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, inputTag, inputVal));
-
-    auto [countsSlot, stage] = makeCountHashAgg(std::move(scanStage), scanSlot);
-    std::ignore = prepareTree(ctx.get(), stage.get(), countsSlot);
-    while (stage->getNext() == PlanState::ADVANCED) {
-    }
-    auto* stageStats = static_cast<const HashAggStats*>(stage->getSpecificStats());
-    ASSERT_TRUE(stageStats->usedDisk);
-
-    auto* ticks = static_cast<TickSourceMock<>*>(getServiceContext()->getTickSource());
-    opCtx->trackOverdueInterruptChecks(ticks->getTicks());
-    const auto* stats = opCtx->overdueInterruptCheckStats();
-    ticks->advance(Milliseconds{20});
-    const auto before = ticks->getTicks();
-    // Advance time after the pre-teardown check to distinguish it from the exit-window reset.
-    ticks->setAdvanceOnRead(Milliseconds{5});
-    stage->close();
-    ticks->setAdvanceOnRead(Milliseconds{0});
-    ASSERT_EQ(stats->overdueInterruptChecks.loadRelaxed(), 1);
-    ASSERT_EQ(stats->overdueAccumulator.loadRelaxed(), Milliseconds{10});
-    ASSERT_GT(stats->interruptCheckWindowStartTime, before);
-    ASSERT_EQ(stats->interruptCheckWindowStartTime, ticks->getTicks() - 5);
-    std::ignore = opCtx->checkForInterruptNoAssert();
-    ASSERT_EQ(stats->overdueInterruptChecks.loadRelaxed(), 1);
-}
-
 }  // namespace mongo::sbe

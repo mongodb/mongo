@@ -651,8 +651,6 @@ void checkForQueryMemoryLoadShedding(OperationContext* opCtx);
 template <typename T>
 class CanInterrupt {
 public:
-    static constexpr int kInterruptCheckPeriod = 128;
-
     /**
      * This object will always be responsible for interrupt checking, but it can also optionally be
      * responsible for yielding. In order to enable yielding, the caller should pass a non-null
@@ -709,6 +707,7 @@ protected:
     PlanYieldPolicySBE* _yieldPolicy{nullptr};
 
 private:
+    static const int kInterruptCheckPeriod = 128;
     int _interruptCounter = kInterruptCheckPeriod;
 };
 

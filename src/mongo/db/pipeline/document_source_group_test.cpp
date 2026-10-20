@@ -37,7 +37,6 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/string_map.h"
-#include "mongo/util/tick_source_mock.h"
 
 #include <cstdint>
 #include <deque>
@@ -47,7 +46,6 @@
 #include <memory>
 #include <string>
 #include <string_view>
-#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -95,8 +93,6 @@ public:
 // This provides access to getExpCtx(), but we'll use a different name for this test suite.
 class DocumentSourceGroupTest : public AggregationContextFixture {
 public:
-    using AggregationContextFixture::AggregationContextFixture;
-
     auto makePlanCtx(std::string_view pipelineJson, OrderedPathSet shardKeys) {
         auto bson = fromjson(pipelineJson);
         std::vector<BSONObj> rawPipeline;
@@ -951,176 +947,6 @@ BSONObj toBson(const boost::intrusive_ptr<DocumentSource>& source) {
     source->serializeToArray(arr);
     ASSERT_EQUALS(arr.size(), 1UL);
     return arr[0].getDocument().toBson();
-}
-
-TEST_F(DocumentSourceGroupTest, SpilledMergeLoopChecksForInterruptEveryIteration) {
-    auto expCtx = getExpCtx();
-    unittest::TempDir tempDir("DocumentSourceGroupTest");
-    expCtx->setTempDir(tempDir.path());
-    expCtx->setAllowDiskUse(true);
-    // Spill on every duplicate id (capped at 20 files) so the merge phase has many partials per
-    // key without needing a memory-limit's worth of data.
-    unittest::ServerParameterGuard aggressiveSpills("internalQueryEnableAggressiveSpillsInGroup",
-                                                    true);
-
-    auto&& [parser, _1, _2, _3] = AccumulationStatement::getParser("$sum");
-    auto accumulatorArg = BSON("" << 1);
-    auto accExpr = parser(expCtx.get(), accumulatorArg.firstElement(), expCtx->variablesParseState);
-    AccumulationStatement countStatement{"count", accExpr};
-    auto groupByExpression =
-        ExpressionFieldPath::parse(expCtx.get(), "$k", expCtx->variablesParseState);
-
-    GroupProcessor processor(expCtx, MemoryUsageLimit{100 * 1024 * 1024});
-    processor.setIdExpression(groupByExpression);
-    processor.addAccumulationStatement(countStatement);
-    processor.setExecutionStarted();
-
-    const int kKeys = 3;
-    const int kDupsPerKey = 40;
-    for (int i = 0; i < kKeys * kDupsPerKey; i++) {
-        Document doc{{"k", Value(fmt::format("key{}", i % kKeys))}};
-        processor.add(processor.computeGroupKey(doc), doc);
-    }
-    processor.readyGroups();
-
-    auto opCtx = expCtx->getOperationContext();
-    const auto checksBefore = opCtx->numInterruptChecks();
-    std::map<std::string, int> counts;
-    while (auto result = processor.getNext()) {
-        counts[std::string(result->getField("_id").getStringData())] =
-            result->getField("count").coerceToInt();
-    }
-    const auto checksDelta = opCtx->numInterruptChecks() - checksBefore;
-
-    ASSERT_EQUALS(counts.size(), static_cast<size_t>(kKeys));
-    for (const auto& [key, count] : counts) {
-        ASSERT_EQUALS(count, kDupsPerKey);
-    }
-    // Each key has about 20 partials; allow slack in the check-count bound.
-    ASSERT_GTE(checksDelta, kKeys * 10);
-}
-
-TEST_F(DocumentSourceGroupTest, SpillWriteLoopChecksForInterrupt) {
-    auto expCtx = getExpCtx();
-    unittest::TempDir tempDir("DocumentSourceGroupTest");
-    expCtx->setTempDir(tempDir.path());
-    expCtx->setAllowDiskUse(true);
-
-    auto&& [parser, _1, _2, _3] = AccumulationStatement::getParser("$sum");
-    auto accumulatorArg = BSON("" << 1);
-    auto accExpr = parser(expCtx.get(), accumulatorArg.firstElement(), expCtx->variablesParseState);
-    AccumulationStatement countStatement{"count", accExpr};
-    auto groupByExpression =
-        ExpressionFieldPath::parse(expCtx.get(), "$k", expCtx->variablesParseState);
-
-    // A memory limit well under the total data size forces repeated natural spills during the
-    // add phase, staying under the spilled-files cap so every document is written out. Each
-    // spill writes the whole map, so the write loops perform ~kDocs serialized writes total.
-    GroupProcessor processor(expCtx, MemoryUsageLimit{100 * 1024});
-    processor.setIdExpression(groupByExpression);
-    processor.addAccumulationStatement(countStatement);
-    processor.setExecutionStarted();
-
-    const int kDocs = 20'000;
-    auto opCtx = expCtx->getOperationContext();
-    const auto checksBefore = opCtx->numInterruptChecks();
-    for (int i = 0; i < kDocs; i++) {
-        Document doc{{"k", Value(fmt::format("key{}", i))}};
-        processor.add(processor.computeGroupKey(doc), doc);
-    }
-    const auto checksDelta = opCtx->numInterruptChecks() - checksBefore;
-
-    ASSERT_TRUE(processor.usedDisk());
-    // Allow slack for kInterruptCheckPeriod amortization and memory-accounting granularity.
-    ASSERT_GTE(checksDelta, kDocs / ExpressionContext::kInterruptCheckPeriod / 2);
-}
-
-class KillOnDestructionAccumulator : public AccumulatorState {
-public:
-    explicit KillOnDestructionAccumulator(ExpressionContext* expCtx) : AccumulatorState(expCtx) {}
-
-    ~KillOnDestructionAccumulator() override {
-        getExpressionContext()->getOperationContext()->markKilled();
-    }
-
-    const char* getOpName() const override {
-        return "$killOnDestruction";
-    }
-    Value getValue(bool) override {
-        return Value(1);
-    }
-    void reset() override {}
-
-private:
-    void processInternal(const Value&, bool) override {}
-};
-
-TEST_F(DocumentSourceGroupTest, SpillPropagatesInterruptAfterCleanup) {
-    auto expCtx = getExpCtx();
-    expCtx->setAllowDiskUse(true);
-    auto&& [parser, _1, _2, _3] = AccumulationStatement::getParser("$sum");
-    auto argument = BSON("" << 1);
-    auto expression = parser(expCtx.get(), argument.firstElement(), expCtx->variablesParseState);
-    expression.factory = [expCtx] {
-        return make_intrusive<KillOnDestructionAccumulator>(expCtx.get());
-    };
-    GroupProcessor processor(expCtx, MemoryUsageLimit{100 * 1024 * 1024});
-    processor.setIdExpression(
-        ExpressionFieldPath::parse(expCtx.get(), "$k", expCtx->variablesParseState));
-    processor.addAccumulationStatement({"count", expression});
-    processor.setExecutionStarted();
-    Document doc{{"k", Value(1)}};
-    processor.add(processor.computeGroupKey(doc), doc);
-
-    ASSERT_THROWS_CODE(processor.spill(), DBException, ErrorCodes::Interrupted);
-    ASSERT_EQ(processor.getMemoryTracker().inUseTrackedMemoryBytes(), 0);
-}
-
-class DocumentSourceGroupDelinquencyTest : public DocumentSourceGroupTest {
-public:
-    std::unique_ptr<ScopedGlobalServiceContextForTest> makeScopedServiceContext() override {
-        return std::make_unique<ScopedGlobalServiceContextForTest>(
-            ServiceContext::make(nullptr, nullptr, std::make_unique<TickSourceMock<>>()));
-    }
-};
-
-TEST_F(DocumentSourceGroupDelinquencyTest, GroupTeardownIsExcludedFromInterruptDelinquency) {
-    auto expCtx = getExpCtx();
-    auto opCtx = expCtx->getOperationContext();
-    unittest::ServerParameterGuard interval("overdueInterruptCheckIntervalMillis", 10);
-
-    auto&& [parser, _1, _2, _3] = AccumulationStatement::getParser("$sum");
-    auto accumulatorArg = BSON("" << 1);
-    auto accExpr = parser(expCtx.get(), accumulatorArg.firstElement(), expCtx->variablesParseState);
-    AccumulationStatement countStatement{"count", accExpr};
-    auto groupByExpression =
-        ExpressionFieldPath::parse(expCtx.get(), "$k", expCtx->variablesParseState);
-
-    GroupProcessor processor(expCtx, MemoryUsageLimit{100 * 1024 * 1024});
-    processor.setIdExpression(groupByExpression);
-    processor.addAccumulationStatement(countStatement);
-    processor.setExecutionStarted();
-    const int kGroups = 5'000;
-    for (int i = 0; i < kGroups; i++) {
-        Document doc{{"k", Value(fmt::format("key{}", i))}};
-        processor.add(processor.computeGroupKey(doc), doc);
-    }
-
-    auto* ticks = static_cast<TickSourceMock<>*>(getServiceContext()->getTickSource());
-    opCtx->trackOverdueInterruptChecks(ticks->getTicks());
-    const auto* stats = opCtx->overdueInterruptCheckStats();
-    ticks->advance(Milliseconds{20});
-    const auto before = ticks->getTicks();
-    // Advance time after the pre-teardown check to distinguish it from the exit-window reset.
-    ticks->setAdvanceOnRead(Milliseconds{5});
-    processor.reset();
-    ticks->setAdvanceOnRead(Milliseconds{0});
-    ASSERT_EQ(stats->overdueInterruptChecks.loadRelaxed(), 1);
-    ASSERT_EQ(stats->overdueAccumulator.loadRelaxed(), Milliseconds{10});
-    ASSERT_GT(stats->interruptCheckWindowStartTime, before);
-    ASSERT_EQ(stats->interruptCheckWindowStartTime, ticks->getTicks() - 5);
-    std::ignore = opCtx->checkForInterruptNoAssert();
-    ASSERT_EQ(stats->overdueInterruptChecks.loadRelaxed(), 1);
 }
 
 enum class GroupStageType { Default, Streaming };

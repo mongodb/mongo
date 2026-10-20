@@ -15,14 +15,11 @@
 
 #include <memory>
 #include <string_view>
-#include <tuple>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
 namespace sbe {
-
-MONGO_FAIL_POINT_DEFINE(sleepInSbeGroupSpillMergeLoop);
 
 template <class Derived>
 HashAggBaseStage<Derived>::HashAggBaseStage(std::string_view stageName,
@@ -139,7 +136,6 @@ int64_t HashAggBaseStage<Derived>::spillRowToDisk(const value::MaterializedRow& 
 
 template <class Derived>
 void HashAggBaseStage<Derived>::spill() {
-    invariant(_opCtx);
     auto& ht = derived().ht();
     auto& htIt = derived().htIt();
 
@@ -152,12 +148,9 @@ void HashAggBaseStage<Derived>::spill() {
                     2,
                     "All in memory data has been consumed. HashAgg stage has nothing to spill. "
                     "Clearing memory.");
-        // Destruction cannot usefully check interrupts, so exclude it from delinquency.
-        std::ignore = _opCtx->checkForInterruptNoAssert();
-        _opCtx->runWithoutInterruptionExceptAtGlobalShutdown([&] { ht->clear(); });
+        ht->clear();
         htIt = ht->end();
         _memoryTracker.value().set(0);
-        _opCtx->checkForInterrupt();
         return;
     }
 
@@ -174,9 +167,7 @@ void HashAggBaseStage<Derived>::spill() {
 
     auto [spilledBytes, spilledRecords] = derived().spillImpl(_recordStore.get());
 
-    // Destruction cannot usefully check interrupts, so exclude it from delinquency.
-    std::ignore = _opCtx->checkForInterruptNoAssert();
-    _opCtx->runWithoutInterruptionExceptAtGlobalShutdown([&] { ht->clear(); });
+    ht->clear();
     htIt = ht->end();
     _memoryTracker.value().set(0);
 
@@ -189,7 +180,6 @@ void HashAggBaseStage<Derived>::spill() {
     groupCounters.incrementPerSpilling(
         /*spills=*/1, spilledBytes, spilledRecords, spilledDataStorageIncrease);
     _recordStore->updateSpillStorageStatsForOperation(_opCtx);
-    _opCtx->checkForInterrupt();
 }
 
 template <class Derived>
