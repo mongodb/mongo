@@ -70,11 +70,17 @@ class test_layered_cursor26(
         with wttest.open_cursor(self.session, f'statistics:{uri}', config=config) as cursor:
             return cursor[stat.dsrc.block_size][2]
 
+    def btree_entries(self, uri, config='statistics=(size)'):
+        """Return btree entry count from a statistics cursor on uri."""
+        with wttest.open_cursor(self.session, f'statistics:{uri}', config=config) as cursor:
+            return cursor[stat.dsrc.btree_entries][2]
+
     def assert_size_is_ingest_only(self, uri, config):
         """The table has no stable constituent, so its size is the ingest constituent's alone."""
-        ingest = self.block_size(self.ingest_uri(self.layered_uri), config)
-        # A zero on both sides would satisfy the comparison without proving anything.
-        self.assertGreater(ingest, 0)
+        ingest_uri = self.ingest_uri(self.layered_uri)
+        # Ingest tables are in_memory; block_size stays zero but entries prove the tree has data.
+        self.assertEqual(self.btree_entries(ingest_uri, 'statistics=(all)'), 2)
+        ingest = self.block_size(ingest_uri, config)
         self.assertEqual(self.block_size(uri, config), ingest)
 
     def test_size_stats_on_table_uri(self):

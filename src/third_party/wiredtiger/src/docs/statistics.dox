@@ -129,6 +129,12 @@ The following example opens a cursor that exposes only statistics that do not ha
 If no \c otel_* value is configured, no filtering by OTel type takes place and
 all statistics are exposed.
 
+The \c clear configuration value only clears the statistics that the cursor
+exposes. When \c clear is configured together with \c otel_counters, \c otel_gauges,
+\c otel_histograms, or \c otel_none only statistics of that type are cleared, and
+statistics of every other type keep their values. Without one of these values, \c clear
+clears all statistics.
+
 As with other statistics configuration values, the ::wiredtiger_open function
 sets the default for all statistics cursors, which the configuration passed to
 WT_SESSION::open_cursor then extends.

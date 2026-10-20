@@ -289,7 +289,7 @@ __evict_page_victim_cache_eligible(
      * work below.
      */
     if (S2BT(session)->storage_tier == WT_BTREE_STORAGE_TIER_COLD) {
-        WT_STAT_CONN_INCR(session, block_cache_cold_not_cached);
+        WT_STAT_CONN_INCR(session, disagg_victim_cache_cold_not_cached);
         return (WTI_EVICT_VICTIM_COLD_TIER);
     }
 
@@ -444,17 +444,17 @@ __evict_page_victim_cache(WT_SESSION_IMPL *session, WT_REF *ref)
     __wt_scr_free(session, &cache_buf);
 
     uint64_t elapsed = WT_CLOCKDIFF_US(__wt_clock(session), time_start);
-    WT_STAT_CONN_INCRV(session, block_cache_put_time, elapsed);
+    WT_STAT_CONN_INCRV(session, disagg_victim_cache_put_time, elapsed);
     if (!F_ISSET(session, WT_SESSION_INTERNAL))
-        WT_STAT_CONN_INCRV(session, block_cache_app_thread_put_time, elapsed);
+        WT_STAT_CONN_INCRV(session, disagg_victim_cache_app_thread_put_time, elapsed);
     __wt_atomic_stats_max_uint64(&S2C(session)->evict->evict_max_victim_cache_put_us, elapsed);
 
     if (cached) {
-        WT_STAT_CONN_INCR(session, block_cache_puts);
+        WT_STAT_CONN_INCR(session, disagg_victim_cache_puts);
         if (!F_ISSET(session, WT_SESSION_INTERNAL))
-            WT_STAT_CONN_INCR(session, block_cache_app_thread_puts);
+            WT_STAT_CONN_INCR(session, disagg_victim_cache_app_thread_puts);
     } else
-        WT_STAT_CONN_INCR(session, block_cache_put_failures);
+        WT_STAT_CONN_INCR(session, disagg_victim_cache_put_failures);
 }
 
 /*

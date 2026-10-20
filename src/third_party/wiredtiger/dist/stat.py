@@ -306,28 +306,54 @@ __wt_stat_''' + name + '''_discard(
 }
 ''')
 
+    # Each OTel type has its own clearing function, so clearing everything and clearing one type
+    # share a single copy of every statistic.
+    clear_funcs = {}
+    for otel_type in OTEL_TYPES:
+        typed = [l for l in statlist if l.otel_type == otel_type]
+        if not typed:
+            continue
+        func = '__stat_' + name + '_clear_' + otel_type[len('otel_'):] + \
+            ('s' if otel_type != 'otel_none' else '')
+        clear_funcs[otel_type] = func
+        f.write('\nstatic void\n' + func + '(WT_' + name.upper() + '_STATS *stats)\n{\n')
+        if all('no_clear' in l.flags for l in typed):
+            f.write('\tWT_UNUSED(stats);\n\n')
+        for l in typed:
+            # no_clear: don't clear the value.
+            if 'no_clear' in l.flags:
+                f.write('\t/* not clearing ' + l.name + ' */\n')
+            else:
+                f.write('\tstats->' + l.name + ' = 0;\n')
+        f.write('}\n')
+
+    # Clear the statistics that have been exposed by the cursor.
     f.write('''
 void
-__wt_stat_''' + name + '_clear_single(WT_' + name.upper() + '''_STATS *stats)
+__wt_stat_''' + name + '_clear_single(WT_' + name.upper() + '''_STATS *stats, uint32_t otel_flag)
 {
+\tswitch (otel_flag) {
 ''')
-    for l in statlist:
-        # no_clear: don't clear the value.
-        if 'no_clear' in l.flags:
-            f.write('\t\t/* not clearing ' + l.name + ' */\n')
-        else:
-            f.write('\tstats->' + l.name + ' = 0;\n')
+    for otel_type in OTEL_TYPES:
+        plural = 's' if otel_type != 'otel_none' else ''
+        f.write('\tcase WT_STAT_' + otel_type.upper() + plural.upper() + ':\n')
+        if otel_type in clear_funcs:
+            f.write('\t\t' + clear_funcs[otel_type] + '(stats);\n')
+        f.write('\t\treturn;\n')
+    f.write('\tdefault:\n\t\tbreak;\n\t}\n\n')
+    for func in clear_funcs.values():
+        f.write('\t' + func + '(stats);\n')
     f.write('}\n')
 
     if name != 'session':
         f.write('''
 void
-__wt_stat_''' + name + '_clear_all(WT_' + name.upper() + '''_STATS **stats)
+__wt_stat_''' + name + '_clear_all(WT_' + name.upper() + '''_STATS **stats, uint32_t otel_flag)
 {
 \tu_int i;
 
 \tfor (i = 0; i < WT_STAT_''' + capname + '''_COUNTER_SLOTS; ++i)
-\t\t__wt_stat_''' + name + '''_clear_single(stats[i]);
+\t\t__wt_stat_''' + name + '''_clear_single(stats[i], otel_flag);
 }
 ''')
 

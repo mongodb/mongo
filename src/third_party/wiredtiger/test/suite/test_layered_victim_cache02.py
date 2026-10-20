@@ -84,7 +84,7 @@ class test_layered_victim_cache02(wttest.WiredTigerTestCase):
         cursor = session.open_cursor(filler)
         deadline = time.time() + 30
         i = 0
-        while self.get_stat(stat.conn.block_cache_puts) <= puts_before:
+        while self.get_stat(stat.conn.disagg_victim_cache_puts) <= puts_before:
             self.assertLess(time.time(), deadline,
                 'eviction did not put a page in the victim cache after step-down')
             cursor[i] = 'x' * 1024
@@ -134,7 +134,7 @@ class test_layered_victim_cache02(wttest.WiredTigerTestCase):
         self.assertGreater(self.get_stat(stat.dsrc.rec_page_delta_leaf, uri), 0)
         self.assertEqual(self.get_stat(stat.conn.cache_scrub_restore), scrub_before)
 
-        puts_before = self.get_stat(stat.conn.block_cache_puts)
+        puts_before = self.get_stat(stat.conn.disagg_victim_cache_puts)
         self.conn.reconfigure('disaggregated=(role="follower")')
 
         pin.close()

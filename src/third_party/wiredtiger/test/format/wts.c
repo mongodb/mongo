@@ -962,18 +962,12 @@ stats_victim_cache_print(WT_SESSION *session, FILE *fp)
         return;
     }
 
-    /*
-     * The BLOCK_CACHE names are historical: eviction increments all of these on the page log cache
-     * path, never on the block cache.
-     *
-     * FIXME-WT-18764: read the disagg_victim_cache_* names once the statistics are renamed.
-     */
     wt_wrap_open_cursor(session, "statistics:", NULL, &cursor);
-    puts = stats_conn_value(cursor, WT_STAT_CONN_BLOCK_CACHE_PUTS);
-    app_puts = stats_conn_value(cursor, WT_STAT_CONN_BLOCK_CACHE_APP_THREAD_PUTS);
-    cold_skipped = stats_conn_value(cursor, WT_STAT_CONN_BLOCK_CACHE_COLD_NOT_CACHED);
-    put_failures = stats_conn_value(cursor, WT_STAT_CONN_BLOCK_CACHE_PUT_FAILURES);
-    put_time = stats_conn_value(cursor, WT_STAT_CONN_BLOCK_CACHE_PUT_TIME);
+    puts = stats_conn_value(cursor, WT_STAT_CONN_DISAGG_VICTIM_CACHE_PUTS);
+    app_puts = stats_conn_value(cursor, WT_STAT_CONN_DISAGG_VICTIM_CACHE_APP_THREAD_PUTS);
+    cold_skipped = stats_conn_value(cursor, WT_STAT_CONN_DISAGG_VICTIM_CACHE_COLD_NOT_CACHED);
+    put_failures = stats_conn_value(cursor, WT_STAT_CONN_DISAGG_VICTIM_CACHE_PUT_FAILURES);
+    put_time = stats_conn_value(cursor, WT_STAT_CONN_DISAGG_VICTIM_CACHE_PUT_TIME);
     testutil_check(cursor->close(cursor));
 
     testutil_assert(fprintf(fp,

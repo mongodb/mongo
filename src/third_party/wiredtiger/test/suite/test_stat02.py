@@ -267,7 +267,7 @@ class test_stat_cursor_otel_inherits_default(wttest.WiredTigerTestCase):
         # btree_entries is used across counters, so we open the stat cursor with OTel config first
         # to make sure that it doesn't give a stale value from a previous cursor's walk.
         cursor = self.session.open_cursor(
-            'statistics:' + self.uri, None, 'statistics=(otel_counters)')
+            'statistics:' + self.uri, None, 'statistics=(otel_none)')
         otel_entries = cursor[stat.dsrc.btree_entries][2]
         cursor.close()
 

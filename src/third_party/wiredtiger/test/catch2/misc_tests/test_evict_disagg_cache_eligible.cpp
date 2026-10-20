@@ -151,7 +151,7 @@ struct eligibility_fixture {
     int64_t
     cold_not_cached() const
     {
-        return (conn->stats[session->stat_conn_bucket]->block_cache_cold_not_cached);
+        return (conn->stats[session->stat_conn_bucket]->disagg_victim_cache_cold_not_cached);
     }
 
     WTI_EVICT_VICTIM_REASON

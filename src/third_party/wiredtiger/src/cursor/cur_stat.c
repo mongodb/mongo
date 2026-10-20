@@ -16,6 +16,10 @@
 #define WT_STAT_KEY_MIN(cst) ((cst)->stats_base)
 #define WT_STAT_KEY_OFFSET(cst) ((cst)->key - (cst)->stats_base)
 
+#define WT_STAT_OTEL_SUBSET_FLAGS \
+    (WT_STAT_OTEL_COUNTERS | WT_STAT_OTEL_GAUGES | WT_STAT_OTEL_HISTOGRAMS | WT_STAT_OTEL_NONE)
+#define WT_STAT_OTEL_SUBSET(cst) F_ISSET(cst, WT_STAT_OTEL_SUBSET_FLAGS)
+
 /*
  * __curstat_print_value --
  *     Convert statistics cursor value to printable format.
@@ -183,6 +187,80 @@ __curstat_set_value(WT_CURSOR *cursor, ...)
 }
 
 /*
+ * __curstat_otel_next --
+ *     Move to the next statistic of the cursor's OTel type.
+ */
+static int
+__curstat_otel_next(WT_CURSOR_STAT *cst)
+{
+    if (cst->notpositioned) {
+        if (cst->otel_count == 0)
+            return (WT_NOTFOUND);
+        cst->notpositioned = false;
+        cst->otel_idx = 0;
+    } else if (cst->otel_idx + 1 < cst->otel_count)
+        ++cst->otel_idx;
+    else
+        return (WT_NOTFOUND);
+
+    cst->key = cst->otel_keys[cst->otel_idx];
+    return (0);
+}
+
+/*
+ * __curstat_otel_prev --
+ *     Move to the previous statistic of the cursor's OTel type.
+ */
+static int
+__curstat_otel_prev(WT_CURSOR_STAT *cst)
+{
+    if (cst->notpositioned) {
+        if (cst->otel_count == 0)
+            return (WT_NOTFOUND);
+        cst->notpositioned = false;
+        cst->otel_idx = cst->otel_count - 1;
+    } else if (cst->otel_idx > 0)
+        --cst->otel_idx;
+    else
+        return (WT_NOTFOUND);
+
+    cst->key = cst->otel_keys[cst->otel_idx];
+    return (0);
+}
+
+/*
+ * __curstat_otel_key_cmp --
+ *     Compare two statistics keys.
+ */
+static int
+__curstat_otel_key_cmp(const void *keyp, const void *elemp)
+{
+    int key = *(const int *)keyp;
+    int elem = *(const int *)elemp;
+    return (key < elem ? -1 : (key > elem ? 1 : 0));
+}
+
+/*
+ * __curstat_otel_search --
+ *     Position on the cursor's key if it is a statistic of the cursor's OTel type.
+ */
+static int
+__curstat_otel_search(WT_CURSOR_STAT *cst)
+{
+    /* An empty subset has no keys array to search. */
+    if (cst->otel_count == 0)
+        return (WT_NOTFOUND);
+
+    const int *found =
+      bsearch(&cst->key, cst->otel_keys, cst->otel_count, sizeof(int), __curstat_otel_key_cmp);
+    if (found == NULL)
+        return (WT_NOTFOUND);
+
+    cst->otel_idx = (u_int)(found - cst->otel_keys);
+    return (0);
+}
+
+/*
  * __curstat_next --
  *     WT_CURSOR->next method for the statistics cursor type.
  */
@@ -203,7 +281,9 @@ __curstat_next(WT_CURSOR *cursor)
     }
 
     /* Move to the next item. */
-    if (cst->notpositioned) {
+    if (WT_STAT_OTEL_SUBSET(cst))
+        WT_ERR(__curstat_otel_next(cst));
+    else if (cst->notpositioned) {
         cst->notpositioned = false;
         cst->key = WT_STAT_KEY_MIN(cst);
         if (cst->next_set != NULL)
@@ -246,7 +326,9 @@ __curstat_prev(WT_CURSOR *cursor)
     }
 
     /* Move to the previous item. */
-    if (cst->notpositioned) {
+    if (WT_STAT_OTEL_SUBSET(cst))
+        WT_ERR(__curstat_otel_prev(cst));
+    else if (cst->notpositioned) {
         cst->notpositioned = false;
         cst->key = WT_STAT_KEY_MAX(cst);
         if (cst->next_set != NULL)
@@ -287,7 +369,7 @@ __curstat_reset(WT_CURSOR *cursor)
 
     /* Reset the session statistics to zero. */
     if (strcmp(cursor->uri, "statistics:session") == 0)
-        __wt_stat_session_clear_single(&session->stats);
+        __wt_stat_session_clear_single(&session->stats, F_MASK(cst, WT_STAT_OTEL_SUBSET_FLAGS));
 
 err:
     API_END_RET(session, ret);
@@ -316,7 +398,9 @@ __curstat_search(WT_CURSOR *cursor)
         cst->notinitialized = false;
     }
 
-    if (cst->key < WT_STAT_KEY_MIN(cst) || cst->key > WT_STAT_KEY_MAX(cst))
+    if (WT_STAT_OTEL_SUBSET(cst))
+        WT_ERR(__curstat_otel_search(cst));
+    else if (cst->key < WT_STAT_KEY_MIN(cst) || cst->key > WT_STAT_KEY_MAX(cst))
         WT_ERR(WT_NOTFOUND);
 
     cst->v = (uint64_t)cst->stats[WT_STAT_KEY_OFFSET(cst)];
@@ -375,7 +459,7 @@ __curstat_conn_init(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst)
     __wt_stat_connection_init_single(&cst->u.conn_stats);
     __wt_stat_connection_aggregate(conn->stats, &cst->u.conn_stats);
     if (F_ISSET(cst, WT_STAT_CLEAR))
-        __wt_stat_connection_clear_all(conn->stats);
+        __wt_stat_connection_clear_all(conn->stats, F_MASK(cst, WT_STAT_OTEL_SUBSET_FLAGS));
 
     cst->stats = (int64_t *)&cst->u.conn_stats;
     cst->stats_base = WT_CONNECTION_STATS_BASE;
@@ -398,7 +482,7 @@ __init_layered_constituent_stats(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst)
     if ((ret = __wt_btree_stat_init(session, cst)) == 0) {
         __wt_stat_dsrc_aggregate(dhandle->stats, &cst->u.dsrc_stats);
         if (F_ISSET(cst, WT_STAT_CLEAR))
-            __wt_stat_dsrc_clear_all(dhandle->stats);
+            __wt_stat_dsrc_clear_all(dhandle->stats, F_MASK(cst, WT_STAT_OTEL_SUBSET_FLAGS));
     }
 
     return (ret);
@@ -706,7 +790,7 @@ __curstat_file_init(
         __wt_stat_dsrc_init_single(&cst->u.dsrc_stats);
         __wt_stat_dsrc_aggregate(dhandle->stats, &cst->u.dsrc_stats);
         if (F_ISSET(cst, WT_STAT_CLEAR))
-            __wt_stat_dsrc_clear_all(dhandle->stats);
+            __wt_stat_dsrc_clear_all(dhandle->stats, F_MASK(cst, WT_STAT_OTEL_SUBSET_FLAGS));
         __wt_curstat_dsrc_final(cst);
     }
 
@@ -741,7 +825,7 @@ __curstat_session_init(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst)
      */
     memcpy(&cst->u.session_stats, &session->stats, sizeof(WT_SESSION_STATS));
     if (F_ISSET(cst, WT_STAT_CLEAR))
-        __wt_stat_session_clear_single(&session->stats);
+        __wt_stat_session_clear_single(&session->stats, F_MASK(cst, WT_STAT_OTEL_SUBSET_FLAGS));
 
     cst->stats = (int64_t *)&cst->u.session_stats;
     cst->stats_base = WT_SESSION_STATS_BASE;
@@ -750,11 +834,12 @@ __curstat_session_init(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst)
 }
 
 /*
- * __wt_curstat_init --
- *     Initialize a statistics cursor.
+ * __curstat_init_stats --
+ *     Initialize a statistics cursor's set of keys to expose.
  */
-int
-__wt_curstat_init(WT_SESSION_IMPL *session, const char *uri, const char *cfg[], WT_CURSOR_STAT *cst)
+static int
+__curstat_init_stats(
+  WT_SESSION_IMPL *session, const char *uri, const char *cfg[], WT_CURSOR_STAT *cst)
 {
     if (strcmp(uri, "statistics:") == 0) {
         __curstat_conn_init(session, cst);
@@ -797,6 +882,44 @@ __wt_curstat_init(WT_SESSION_IMPL *session, const char *uri, const char *cfg[], 
         return (__wt_bad_object_type(session, uri));
 
     return (0);
+}
+
+/*
+ * __curstat_otel_init --
+ *     Initialize a statistics cursor's OTel set of keys to expose and related fields.
+ */
+static int
+__curstat_otel_init(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst)
+{
+    cst->otel_keys = NULL;
+    cst->otel_count = 0;
+    cst->otel_idx = 0;
+
+    if (!WT_STAT_OTEL_SUBSET(cst))
+        return (0);
+
+    uint32_t otel_flag = F_MASK(cst, WT_STAT_OTEL_SUBSET_FLAGS);
+    switch (cst->stats_base) {
+    case WT_CONNECTION_STATS_BASE:
+        return (__wt_stat_connection_otel_keys(otel_flag, &cst->otel_keys, &cst->otel_count));
+    case WT_DSRC_STATS_BASE:
+        return (__wt_stat_dsrc_otel_keys(otel_flag, &cst->otel_keys, &cst->otel_count));
+    case WT_SESSION_STATS_BASE:
+        return (__wt_stat_session_otel_keys(otel_flag, &cst->otel_keys, &cst->otel_count));
+    default:
+        return (__wt_illegal_value(session, cst->stats_base));
+    }
+}
+
+/*
+ * __wt_curstat_init --
+ *     Initialize a statistics cursor.
+ */
+int
+__wt_curstat_init(WT_SESSION_IMPL *session, const char *uri, const char *cfg[], WT_CURSOR_STAT *cst)
+{
+    WT_RET(__curstat_init_stats(session, uri, cfg, cst));
+    return (__curstat_otel_init(session, cst));
 }
 
 /*

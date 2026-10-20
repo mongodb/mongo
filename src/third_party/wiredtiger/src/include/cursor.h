@@ -414,6 +414,10 @@ struct __wt_cursor_stat {
     /* Statistics descriptions */
     int (*next_set)(WT_SESSION_IMPL *, WT_CURSOR_STAT *, bool, bool); /* Advance to next set */
 
+    const int *otel_keys; /* Sorted keys of the requested OTel type */
+    u_int otel_count;     /* Count of OTel keys */
+    u_int otel_idx;       /* Current position in the OTel keys */
+
     union { /* Copies of the statistics */
         WT_DSRC_STATS dsrc_stats;
         WT_CONNECTION_STATS conn_stats;

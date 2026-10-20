@@ -243,12 +243,6 @@ conn_stats = [
     ##########################################
     # Block cache statistics
     ##########################################
-    # FIXME-WT-18764: seven of the stats below describe the disaggregated victim cache, not the
-    # block cache: app_thread_put_time, app_thread_puts, cold_not_cached, put_failures, put_time,
-    # put_time_max and puts. Eviction increments them on the page log cache path. That ticket moves
-    # them to the disagg group as disagg_victim_cache_*.
-    BlockCacheStat('block_cache_app_thread_put_time', 'time application threads spent adding pages to the disaggregated victim cache (usecs)'),
-    BlockCacheStat('block_cache_app_thread_puts', 'pages added to the disaggregated victim cache by application threads'),
     BlockCacheStat('block_cache_blocks', 'total blocks'),
     BlockCacheStat('block_cache_blocks_evicted', 'evicted blocks'),
     BlockCacheStat('block_cache_blocks_insert_read', 'total blocks inserted on read path'),
@@ -266,16 +260,11 @@ conn_stats = [
     BlockCacheStat('block_cache_bytes_insert_read', 'total bytes inserted on read path'),
     BlockCacheStat('block_cache_bytes_insert_write', 'total bytes inserted on write path'),
     BlockCacheStat('block_cache_bytes_update', 'cached bytes updated'),
-    BlockCacheStat('block_cache_cold_not_cached', 'cold collection pages not added to the disaggregated victim cache during eviction'),
     BlockCacheStat('block_cache_eviction_passes', 'number of eviction passes'),
     BlockCacheStat('block_cache_hits', 'number of hits'),
     BlockCacheStat('block_cache_lookups', 'lookups'),
     BlockCacheStat('block_cache_misses', 'number of misses'),
     BlockCacheStat('block_cache_not_evicted_overhead', 'number of blocks not evicted due to overhead'),
-    BlockCacheStat('block_cache_put_failures', 'failed page inserts into the disaggregated victim cache'),
-    BlockCacheStat('block_cache_put_time', 'time spent adding pages to the disaggregated victim cache (usecs)'),
-    BlockCacheStat('block_cache_put_time_max', 'maximum time spent adding a single page to the disaggregated victim cache, reset per checkpoint (usecs)', 'no_clear,no_scale'),
-    BlockCacheStat('block_cache_puts', 'pages added to the disaggregated victim cache'),
 
     ##########################################
     # Block manager statistics
@@ -686,6 +675,13 @@ conn_stats = [
     DisaggStat('disagg_step_up_missing_stable_create_time', 'step up missing stable table create most recent time (msecs)'),
     DisaggStat('disagg_step_up_missing_stable_tables_created', 'step up missing stable tables created'),
     DisaggStat('disagg_step_up_time', 'step up most recent time (msecs)'),
+    DisaggStat('disagg_victim_cache_app_thread_put_time', 'time application threads spent adding pages to the victim cache (usecs)'),
+    DisaggStat('disagg_victim_cache_app_thread_puts', 'pages added to the victim cache by application threads'),
+    DisaggStat('disagg_victim_cache_cold_not_cached', 'cold collection pages not added to the victim cache during eviction'),
+    DisaggStat('disagg_victim_cache_put_failures', 'failed page inserts into the victim cache'),
+    DisaggStat('disagg_victim_cache_put_time', 'time spent adding pages to the victim cache (usecs)'),
+    DisaggStat('disagg_victim_cache_put_time_max', 'maximum time spent adding a single page to the victim cache, reset per checkpoint (usecs)', 'no_clear,no_scale'),
+    DisaggStat('disagg_victim_cache_puts', 'pages added to the victim cache'),
 
     ##########################################
     # Dhandle statistics

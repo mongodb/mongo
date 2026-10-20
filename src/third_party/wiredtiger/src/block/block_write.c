@@ -18,6 +18,13 @@ __wti_block_truncate(WT_SESSION_IMPL *session, WT_BLOCK *block, wt_off_t len)
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
 
+    if (block->in_memory) {
+        WT_ASSERT(session, block->fh == NULL && block->size == 0 && block->extend_size == 0);
+        if (len != 0)
+            WT_RET_MSG(session, EINVAL, "%s: no backing file", block->name);
+        return (0);
+    }
+
     conn = S2C(session);
 
     __wt_verbose(
@@ -235,6 +242,10 @@ __block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, wt_of
     *sizep = 0;     /* -Werror=maybe-uninitialized */
     *checksump = 0; /* -Werror=maybe-uninitialized */
 
+    if (block->in_memory) {
+        WT_ASSERT(session, block->fh == NULL);
+        WT_RET_MSG(session, EINVAL, "%s: no backing file", block->name);
+    }
     fh = block->fh;
 
     /*

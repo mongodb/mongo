@@ -88,10 +88,10 @@ class test_layered_victim_cache01(wttest.WiredTigerTestCase):
         self.conn.set_context_uint(wiredtiger.WT_CONTEXT_TYPE_LAST_MATERIALIZED_LSN, last_lsn)
 
         key = f'k{self.nitems // 2:06d}'
-        puts_before = self.get_stat(stat.conn.block_cache_puts)
+        puts_before = self.get_stat(stat.conn.disagg_victim_cache_puts)
         self.evict(uri, key)
         self.evict(uri, key)
-        self.assertGreater(self.get_stat(stat.conn.block_cache_puts), puts_before)
+        self.assertGreater(self.get_stat(stat.conn.disagg_victim_cache_puts), puts_before)
 
         cursor = self.session.open_cursor(uri, None, None)
         self.assertEqual(cursor[key], 'v' * 64)

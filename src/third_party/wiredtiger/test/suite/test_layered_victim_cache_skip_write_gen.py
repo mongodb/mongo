@@ -84,7 +84,7 @@ class test_layered_victim_cache_skip_write_gen(DisaggSizeTestMixin, wttest.Wired
         # eviction keeps the checkpointed block; a second, clean eviction then
         # hands the retained image to the victim cache.
         skips = self.get_conn_stat(stat.conn.rec_skip_write)
-        puts = self.get_conn_stat(stat.conn.block_cache_puts)
+        puts = self.get_conn_stat(stat.conn.disagg_victim_cache_puts)
         for i in range(self.nrows):
             self.session.begin_transaction()
             c = self.session.open_cursor(self.uri)
@@ -95,7 +95,7 @@ class test_layered_victim_cache_skip_write_gen(DisaggSizeTestMixin, wttest.Wired
         for i in range(self.nrows):
             self.evict_page(self.key(i))
         self.assertGreater(self.get_conn_stat(stat.conn.rec_skip_write), skips)
-        self.assertGreater(self.get_conn_stat(stat.conn.block_cache_puts), puts)
+        self.assertGreater(self.get_conn_stat(stat.conn.disagg_victim_cache_puts), puts)
 
         # Verify the checkpoint and read the original values after switching roles.
         self.conn.reconfigure('disaggregated=(role="follower")')

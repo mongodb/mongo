@@ -1313,7 +1313,7 @@ __session_reset(WT_SESSION *wt_session)
 
     /* Reset the session statistics. */
     if (WT_STAT_ENABLED(session))
-        __wt_stat_session_clear_single(&session->stats);
+        __wt_stat_session_clear_single(&session->stats, 0);
 
 err:
     API_END_RET_NOTFOUND_MAP(session, ret);

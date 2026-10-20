@@ -162,6 +162,11 @@ __wti_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, ui
     uint64_t time_start, time_stop;
     bool full_checksum_mismatch;
 
+    if (block->in_memory) {
+        WT_ASSERT(session, block->fh == NULL);
+        WT_RET_MSG(session, EINVAL, "%s: no backing file", block->name);
+    }
+
     time_start = __wt_clock(session);
 
     full_checksum_mismatch = false;

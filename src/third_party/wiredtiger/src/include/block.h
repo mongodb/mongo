@@ -293,6 +293,14 @@ struct __wt_block {
     bool sync_on_checkpoint;    /* fsync the handle after the next checkpoint */
     bool remote;                /* Handle references non-local object */
     bool readonly;              /* Underlying file was opened only for reading */
+    /*
+     * For regular file systems, in_memory indicates that the file was created with the in_memory
+     * configuration, as a result there isn't a backing file. This differs somewhat from when the
+     * connection is opened as in_memory, this boolean would remain false. The distinction is that
+     * connection-level in_memory replaces the file system with an in_memory variant and the backing
+     * file is synthetic, but a file descriptor still exists.
+     */
+    bool in_memory;
 
     /* Configuration information, set when the file is opened. */
     wt_shared uint32_t allocfirst; /* Allocation is first-fit */
