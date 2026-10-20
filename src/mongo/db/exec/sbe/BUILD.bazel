@@ -387,7 +387,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/exec/sbe/expressions:sbe_zip_arrays_test.cpp",
         "//src/mongo/db/exec/sbe/stages:multi_range_clustered_scan_stage_test.cpp",
         "//src/mongo/db/exec/sbe/util:bloom_filter_test.cpp",
-        "//src/mongo/db/exec/sbe/util:debug_print_test.cpp",
         "//src/mongo/db/exec/sbe/util:stage_results_printer_test.cpp",
         "//src/mongo/db/exec/sbe/values:block_test.cpp",
         "//src/mongo/db/exec/sbe/values:bsoncolumn_materializer_test.cpp",

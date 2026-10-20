@@ -1,7 +1,7 @@
 # Golden test output of SBEPrimBinaryTest/FillEmptyWithConstant
 == VARIATION rhs constant: Nothing
 -- INPUT EXPRESSION:
-(s1 ?: Nothing)
+(s1 ?: Nothing) 
 
 -- COMPILED EXPRESSION:
 [0x0000-0x0019] stackSize: 1, maxStackSize: 1
@@ -29,7 +29,7 @@ RESULT: true
 
 == VARIATION rhs constant: null
 -- INPUT EXPRESSION:
-(s2 ?: null)
+(s2 ?: null) 
 
 -- COMPILED EXPRESSION:
 [0x0000-0x000b] stackSize: 1, maxStackSize: 1
@@ -55,7 +55,7 @@ RESULT: true
 
 == VARIATION rhs constant: true
 -- INPUT EXPRESSION:
-(s3 ?: true)
+(s3 ?: true) 
 
 -- COMPILED EXPRESSION:
 [0x0000-0x000b] stackSize: 1, maxStackSize: 1
@@ -81,7 +81,7 @@ RESULT: true
 
 == VARIATION rhs constant: true
 -- INPUT EXPRESSION:
-(s4 ?: true)
+(s4 ?: true) 
 
 -- COMPILED EXPRESSION:
 [0x0000-0x000b] stackSize: 1, maxStackSize: 1

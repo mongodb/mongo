@@ -1,6 +1,6 @@
 # Golden test output of SBEPrimBinaryTest/DivMemory
 -- INPUT EXPRESSION:
-((NumberDecimal(1) + NumberDecimal(1)) / (NumberDecimal(1) - NumberDecimal(1)))
+((NumberDecimal(1) + NumberDecimal(1)) / (NumberDecimal(1) - NumberDecimal(1))) 
 
 -- COMPILED EXPRESSION:
 [0x0000-0x0031] stackSize: 1, maxStackSize: 3

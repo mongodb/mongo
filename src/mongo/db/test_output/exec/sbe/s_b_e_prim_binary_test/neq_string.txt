@@ -1,6 +1,6 @@
 # Golden test output of SBEPrimBinaryTest/NeqString
 -- INPUT EXPRESSION:
-(s1 !=[s3] s2)
+(s1 !=[s3] s2) 
 
 -- COMPILED EXPRESSION:
 [0x0000-0x001f] stackSize: 1, maxStackSize: 3

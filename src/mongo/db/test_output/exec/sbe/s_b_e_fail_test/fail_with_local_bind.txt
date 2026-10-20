@@ -2,9 +2,10 @@
 -- INPUT EXPRESSION:
 
     let [
-        l10.0 = NumberDecimal(123)
-    ]
-    in fail(2, "test")
+        l10.0 = NumberDecimal(123) 
+    ] 
+    in fail(2, "test") 
+
 
 -- COMPILED EXPRESSION:
 [0x0000-0x0021] stackSize: 1, maxStackSize: 3

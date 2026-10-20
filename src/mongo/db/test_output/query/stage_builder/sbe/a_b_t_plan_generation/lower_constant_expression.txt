@@ -5,60 +5,60 @@
 Const ["hello world"]
 
 -- OUTPUT:
-"hello world"
+"hello world" 
 
 ==== VARIATION: int64 ====
 -- INPUT:
 Const [100]
 
 -- OUTPUT:
-100ll
+100ll 
 
 ==== VARIATION: int32 ====
 -- INPUT:
 Const [32]
 
 -- OUTPUT:
-32
+32 
 
 ==== VARIATION: double ====
 -- INPUT:
 Const [3.14]
 
 -- OUTPUT:
-3.1400000000000001L
+3.1400000000000001L 
 
 ==== VARIATION: decimal ====
 -- INPUT:
 Const [3.14]
 
 -- OUTPUT:
-NumberDecimal(3.14)
+NumberDecimal(3.14) 
 
 ==== VARIATION: timestamp ====
 -- INPUT:
 Const [Timestamp(4294967295, 4294967295)]
 
 -- OUTPUT:
-Timestamp(4294967295, 4294967295)
+Timestamp(4294967295, 4294967295) 
 
 ==== VARIATION: date ====
 -- INPUT:
 Const [100]
 
 -- OUTPUT:
-Date(100)
+Date(100) 
 
 ==== VARIATION: boolean true ====
 -- INPUT:
 Const [true]
 
 -- OUTPUT:
-true
+true 
 
 ==== VARIATION: boolean false ====
 -- INPUT:
 Const [false]
 
 -- OUTPUT:
-false
+false 

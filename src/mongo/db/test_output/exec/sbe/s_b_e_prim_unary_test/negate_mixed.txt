@@ -1,6 +1,6 @@
 # Golden test output of SBEPrimUnaryTest/NegateMixed
 -- INPUT EXPRESSION:
--(s1)
+-(s1) 
 
 -- COMPILED EXPRESSION:
 [0x0000-0x000b] stackSize: 1, maxStackSize: 1

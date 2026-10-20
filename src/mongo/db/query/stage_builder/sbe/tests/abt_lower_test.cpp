@@ -74,7 +74,7 @@ TEST_F(ABTPlanGeneration, LowerBinaryOpEqMemberRHSArray) {
         _binary("EqMember", "hello"_cstr, _carray("1"_cdouble, "2"_cdouble, "3"_cdouble))._n);
 
     ASSERT_STR_EQ_AUTO(  // NOLINT
-        "isMember(\"hello\", [1L, 2L, 3L])",
+        "isMember(\"hello\", [1L, 2L, 3L]) ",
         output);
 }
 

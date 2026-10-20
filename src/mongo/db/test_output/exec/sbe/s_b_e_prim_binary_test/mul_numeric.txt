@@ -1,6 +1,6 @@
 # Golden test output of SBEPrimBinaryTest/MulNumeric
 -- INPUT EXPRESSION:
-(s1 * s2)
+(s1 * s2) 
 
 -- COMPILED EXPRESSION:
 [0x0000-0x0015] stackSize: 1, maxStackSize: 2

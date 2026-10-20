@@ -2,48 +2,55 @@
 ExpressionCompareEQ
 
     let [
-        l2.0 = getField(s1, "bar")
-    ]
-    in (((9.25L <=> l2.0) == 0) ?: (mqlComparisonRank(l2.0) == 2))
+        l2.0 = getField(s1, "bar") 
+    ] 
+    in (((9.25L <=> l2.0) == 0) ?: (mqlComparisonRank(l2.0) == 2)) 
+
 # Golden test output of GoldenGenExpressionTest/TestExprCmp
 ExpressionCompareNE
 
     let [
-        l4.0 = getField(s1, "bar")
-    ]
-    in (((9.25L <=> l4.0) != 0) ?: (2 != mqlComparisonRank(l4.0)))
+        l4.0 = getField(s1, "bar") 
+    ] 
+    in (((9.25L <=> l4.0) != 0) ?: (2 != mqlComparisonRank(l4.0))) 
+
 # Golden test output of GoldenGenExpressionTest/TestExprCmp
 ExpressionCompareGT
 
     let [
-        l6.0 = getField(s1, "bar")
-    ]
-    in (((9.25L <=> l6.0) > 0) ?: (2 > mqlComparisonRank(l6.0)))
+        l6.0 = getField(s1, "bar") 
+    ] 
+    in (((9.25L <=> l6.0) > 0) ?: (2 > mqlComparisonRank(l6.0))) 
+
 # Golden test output of GoldenGenExpressionTest/TestExprCmp
 ExpressionCompareGTE
 
     let [
-        l8.0 = getField(s1, "bar")
-    ]
-    in (((9.25L <=> l8.0) >= 0) ?: (2 >= mqlComparisonRank(l8.0)))
+        l8.0 = getField(s1, "bar") 
+    ] 
+    in (((9.25L <=> l8.0) >= 0) ?: (2 >= mqlComparisonRank(l8.0))) 
+
 # Golden test output of GoldenGenExpressionTest/TestExprCmp
 ExpressionCompareLT
 
     let [
-        l10.0 = getField(s1, "bar")
-    ]
-    in (((9.25L <=> l10.0) < 0) ?: (2 < mqlComparisonRank(l10.0)))
+        l10.0 = getField(s1, "bar") 
+    ] 
+    in (((9.25L <=> l10.0) < 0) ?: (2 < mqlComparisonRank(l10.0))) 
+
 # Golden test output of GoldenGenExpressionTest/TestExprCmp
 ExpressionCompareLTE
 
     let [
-        l12.0 = getField(s1, "bar")
-    ]
-    in (((9.25L <=> l12.0) <= 0) ?: (2 <= mqlComparisonRank(l12.0)))
+        l12.0 = getField(s1, "bar") 
+    ] 
+    in (((9.25L <=> l12.0) <= 0) ?: (2 <= mqlComparisonRank(l12.0))) 
+
 # Golden test output of GoldenGenExpressionTest/TestExprCmp
 ExpressionCompareCMP
 
     let [
-        l14.0 = getField(s1, "bar")
-    ]
-    in ((9.25L <=> l14.0) ?: (2 <=> mqlComparisonRank(l14.0)))
+        l14.0 = getField(s1, "bar") 
+    ] 
+    in ((9.25L <=> l14.0) ?: (2 <=> mqlComparisonRank(l14.0))) 
+

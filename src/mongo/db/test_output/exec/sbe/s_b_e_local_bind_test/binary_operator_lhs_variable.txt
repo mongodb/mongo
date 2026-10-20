@@ -2,9 +2,10 @@
 -- INPUT EXPRESSION:
 
     let [
-        l10.0 = 10
-    ]
-    in (l10.0 - 20)
+        l10.0 = 10 
+    ] 
+    in (l10.0 - 20) 
+
 
 -- COMPILED EXPRESSION:
 [0x0000-0x001d] stackSize: 1, maxStackSize: 2

@@ -1,9 +1,10 @@
 # Golden test output of SBEIfTest/IfWithLogicAnd
 -- INPUT EXPRESSION:
 
-    if (s1 && s2)
-    then "then"
-    else "else"
+    if (s1 && s2) 
+    then "then" 
+    else "else" 
+
 
 -- COMPILED EXPRESSION:
 [0x0000-0x004e] stackSize: 1, maxStackSize: 1
