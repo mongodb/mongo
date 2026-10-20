@@ -445,6 +445,15 @@ public:
     virtual void validate(const OperationContext* opCtx) const {};
 
     /**
+     * The top-level fields of this stage's spec that only the server may set. Fields in this list
+     * will be rejected if supplied by an external client and if they appear in view definitions.
+     */
+    virtual const std::vector<std::string_view>& getInternalOnlyFieldNames() const {
+        static const std::vector<std::string_view> kNoInternalOnlyFields;
+        return kNoInternalOnlyFields;
+    }
+
+    /**
      * Returns true if this stage is allowed inside a $lookup sub-pipeline.
      */
     virtual bool isAllowedInLookupPipeline() const {

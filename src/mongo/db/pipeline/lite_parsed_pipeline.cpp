@@ -5,6 +5,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/operation_context.h"
@@ -21,6 +22,15 @@
 
 
 namespace mongo {
+
+namespace {
+
+bool stageSpecHasField(const LiteParsedDocumentSource& stage, std::string_view fieldName) {
+    const auto spec = stage.getOriginalBson();
+    return spec.type() == BSONType::object && spec.embeddedObject().hasField(fieldName);
+}
+
+}  // namespace
 
 boost::optional<BSONArray> LiteParsedPipeline::pipelineToBsonForLog() const {
     const bool noCustomLogs =
@@ -131,6 +141,8 @@ void LiteParsedPipeline::tickGlobalStageCounters() const {
 
 void LiteParsedPipeline::validate(const OperationContext* opCtx,
                                   bool performApiVersionChecks) const {
+    tassert(13687600, "LiteParsedPipeline::validate() requires a non-null OperationContext", opCtx);
+
     for (auto stage_it = _stageSpecs.begin(); stage_it != _stageSpecs.end(); stage_it++) {
         const auto& stage = *stage_it;
         // TODO SERVER-121094 This can be removed once hybrid search views are validated in
@@ -141,6 +153,16 @@ void LiteParsedPipeline::validate(const OperationContext* opCtx,
                   !isRunningAgainstView_ForHybridSearch()));
 
         stage->validate(opCtx);
+
+        // Reject any field the stage declares as internal-only when it came from a user.
+        for (const auto fieldName : stage->getInternalOnlyFieldNames()) {
+            if (stageSpecHasField(*stage, fieldName)) {
+                assertAllowedInternalIfRequired(opCtx,
+                                                str::stream() << "'" << stage->getParseTimeName()
+                                                              << "." << fieldName,
+                                                AllowedWithClientType::kInternal);
+            }
+        }
 
         const auto& stageName = (*stage_it)->getParseTimeName();
         const auto& stageApiStrict = (*stage_it)->getApiStrict();
@@ -216,6 +238,15 @@ void LiteParsedPipeline::checkStagesAllowedInViewDefinition() const {
         uassert(ErrorCodes::OptionNotSupportedOnView,
                 "$score is currently unsupported in a view definition",
                 !(stage->getParseTimeName() == "$score"));
+
+        // Internal fields can never appear in view definitions.
+        for (const auto fieldName : stage->getInternalOnlyFieldNames()) {
+            uassert(ErrorCodes::OptionNotSupportedOnView,
+                    str::stream() << "'" << stage->getParseTimeName() << "." << fieldName
+                                  << "' is an internal field and cannot be used in a view "
+                                     "definition",
+                    !stageSpecHasField(*stage, fieldName));
+        }
 
         if (auto* subPipelines = stage->getSubPipelines()) {
             for (auto&& subPipeline : *subPipelines) {

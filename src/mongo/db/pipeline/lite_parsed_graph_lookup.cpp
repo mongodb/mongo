@@ -11,7 +11,6 @@
 #include "mongo/db/namespace_string_util.h"
 #include "mongo/db/pipeline/document_source_graph_lookup_gen.h"
 #include "mongo/db/pipeline/owned_lite_parsed_pipeline.h"
-#include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/idl/idl_parser.h"
@@ -19,6 +18,7 @@
 #include "mongo/util/str.h"
 
 #include <string_view>
+#include <vector>
 
 namespace mongo {
 
@@ -161,16 +161,8 @@ std::unique_ptr<LiteParsedGraphLookUp> LiteParsedGraphLookUp::parse(
         startWith = sw->getElement().wrap().getOwned();
     }
 
-    // $_internalFromPipeline is an internal field set by mongos when dispatching to shards.
-    // Reject it from external clients.
     boost::optional<OwnedLiteParsedPipeline> fromPipeline;
     if (const auto& fromPipelineStages = parsedSpec.getInternalFromPipeline()) {
-        if (options.opCtx) {
-            assertAllowedInternalIfRequired(
-                options.opCtx,
-                DocumentSourceGraphLookUpSpec::kInternalFromPipelineFieldName,
-                AllowedWithClientType::kInternal);
-        }
         fromPipeline.emplace(foreignNss, *fromPipelineStages, options);
     }
 
@@ -194,6 +186,14 @@ PrivilegeVector LiteParsedGraphLookUp::requiredPrivileges(bool isMongos,
     // the view's underlying pipeline stages are checked at view creation time, not query time.
     tassert(12509600, "Expected foreign namespace to be set for $graphLookup", _foreignNss);
     return {Privilege(ResourcePattern::forExactNamespace(*_foreignNss), ActionType::find)};
+}
+
+const std::vector<std::string_view>& LiteParsedGraphLookUp::getInternalOnlyFieldNames() const {
+    // $_internalFromPipeline carries the resolved pipeline of a view used as 'from'. The router
+    // sets it when it dispatches the rewritten stage to the shards.
+    static const std::vector<std::string_view> kInternalOnlyFieldNames{
+        DocumentSourceGraphLookUpSpec::kInternalFromPipelineFieldName};
+    return kInternalOnlyFieldNames;
 }
 
 Status LiteParsedGraphLookUp::checkShardedForeignCollAllowed(

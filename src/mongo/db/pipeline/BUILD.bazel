@@ -719,7 +719,9 @@ mongo_cc_unit_test(
         ":pipeline",
         ":stage_params",
         "//src/mongo:base",
+        "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/db/commands/query_cmd:update_metrics",
+        "//src/mongo/transport:transport_layer_mock",
         "//src/mongo/unittest",
     ],
 )

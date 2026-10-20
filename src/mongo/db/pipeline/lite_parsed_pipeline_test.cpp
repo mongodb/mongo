@@ -9,10 +9,16 @@
 #include "mongo/db/pipeline/lite_parsed_internal_hybrid_search.h"
 #include "mongo/db/pipeline/owned_lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/test_lite_parsed.h"
+#include "mongo/db/service_context_test_fixture.h"
+#include "mongo/transport/mock_session.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/scopeguard.h"
+
+#include <string_view>
+#include <utility>
+#include <vector>
 
 namespace mongo {
 namespace {
@@ -574,6 +580,60 @@ TEST_F(LiteParsedPipelineViewPolicyTest, PrependWhenDefaultPrependIsTrueForAllSt
     ASSERT_EQ(out[0]->getParseTimeName(), "$match");
     ASSERT_EQ(out[1]->getParseTimeName(), _defaultStageName);
     ASSERT_EQ(out[2]->getParseTimeName(), _defaultStageName);
+}
+
+namespace {
+BSONObj makeGraphLookupWithInternalFromPipeline() {
+    return BSON("$graphLookup" << BSON("from" << "otherCollection"
+                                              << "$_internalFromPipeline"
+                                              << BSON_ARRAY(BSON("$match" << BSON("x" << 1)))
+                                              << "as"
+                                              << "joined"));
+}
+}  // namespace
+
+TEST(LiteParsedPipelineTest, GraphLookupInternalFromPipelineIsRejectedFromExternalClient) {
+    service_context_test::ScopedGlobalServiceContextForTest serviceContext;
+    auto client = serviceContext.getService()->makeClient(
+        "external", transport::MockSession::create(/*tl=*/nullptr));
+    auto opCtx = client->makeOperationContext();
+
+    std::vector<BSONObj> stages = {makeGraphLookupWithInternalFromPipeline()};
+    LiteParsedPipeline pipeline(kTestNss, stages);
+
+    ASSERT_THROWS_CODE(pipeline.validate(opCtx.get()), AssertionException, 5491300);
+}
+
+TEST(LiteParsedPipelineTest, GraphLookupInternalFromPipelineIsAllowedFromInternalClient) {
+    service_context_test::ScopedGlobalServiceContextForTest serviceContext;
+    // A client with no transport session is treated as internal.
+    auto client = serviceContext.getService()->makeClient("internal");
+    auto opCtx = client->makeOperationContext();
+
+    std::vector<BSONObj> stages = {makeGraphLookupWithInternalFromPipeline()};
+    LiteParsedPipeline pipeline(kTestNss, stages);
+
+    ASSERT_DOES_NOT_THROW(pipeline.validate(opCtx.get()));
+}
+
+TEST(LiteParsedPipelineTest, GraphLookupInternalFromPipelineIsRejectedInViewDefinition) {
+    std::vector<BSONObj> stages = {makeGraphLookupWithInternalFromPipeline()};
+    LiteParsedPipeline pipeline(kTestNss, stages);
+
+    // No OperationContext is involved, so the check cannot depend on who is asking: a view
+    // definition is rejected for any client.
+    ASSERT_THROWS_CODE(pipeline.checkStagesAllowedInViewDefinition(),
+                       AssertionException,
+                       ErrorCodes::OptionNotSupportedOnView);
+}
+
+TEST(LiteParsedPipelineTest, GraphLookupWithoutInternalFromPipelineIsAllowedInViewDefinition) {
+    std::vector<BSONObj> stages = {BSON("$graphLookup" << BSON("from" << "otherCollection"
+                                                                      << "as"
+                                                                      << "joined"))};
+    LiteParsedPipeline pipeline(kTestNss, stages);
+
+    ASSERT_DOES_NOT_THROW(pipeline.checkStagesAllowedInViewDefinition());
 }
 
 }  // namespace mongo

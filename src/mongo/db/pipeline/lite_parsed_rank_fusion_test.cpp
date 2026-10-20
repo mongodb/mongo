@@ -169,7 +169,8 @@ TEST_F(LiteParsedRankFusionTest, ErrorsIfRankFusionNotFirstStage) {
         })")};
 
     LiteParsedPipeline lpp(nss, pipeline);
-    ASSERT_THROWS_CODE(lpp.validate(nullptr, false), AssertionException, 10170100);
+    ASSERT_THROWS_CODE(
+        lpp.validate(getExpCtx()->getOperationContext(), false), AssertionException, 10170100);
 }
 
 TEST_F(LiteParsedRankFusionTest, ErrorsIfScoreDetailsWithoutRankFusionFullFF) {
