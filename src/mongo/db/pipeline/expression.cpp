@@ -5179,6 +5179,11 @@ boost::intrusive_ptr<Expression> ExpressionInternalKeyStringValue::parse(
                       << typeName(expr.type()),
         expr.type() == BSONType::object);
 
+    uassert(10131412,
+            "$_internalKeyStringValue is not allowed inside collection validators or profile "
+            "filters",
+            !expCtx->getIsParsingCollectionValidator() && !expCtx->getIsProfileFilter());
+
     boost::intrusive_ptr<Expression> inputExpr;
     boost::intrusive_ptr<Expression> collationExpr;
 
