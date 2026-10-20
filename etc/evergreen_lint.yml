@@ -77,7 +77,7 @@ rules:
           - assigned_to_jira_team_server_execution
           - assigned_to_jira_team_server_storage_engines
           - assigned_to_jira_team_server_programmability
-          - assigned_to_jira_team_server_workload_scheduling
+          - assigned_to_jira_team_server_workload_resilience
           - assigned_to_jira_team_server_networking_and_observability
           - assigned_to_jira_team_server_integration
           - assigned_to_jira_team_server_disagg
