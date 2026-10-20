@@ -115,7 +115,17 @@ mongo_cc_library(
         "wt_config_header",
     ],
     hdrs = WT_PUBLIC_HEADERS,
-    copts = WT_CCFLAGS,
+    copts = WT_CCFLAGS + select({
+        # clang-cl defines both GNU and MSVC architecture macros. Select WT's
+        # Windows implementation and declare its intrinsics even when Evergreen
+        # replaces the vendored sources with the WT-develop module.
+        "//bazel/platforms:windows_cross": [
+            "/U__amd64",
+            "/U__x86_64",
+            "/FIintrin.h",
+        ],
+        "//conditions:default": [],
+    }),
     includes = ["."],
     local_defines = WT_DEFINES,
     srcs_select = [
