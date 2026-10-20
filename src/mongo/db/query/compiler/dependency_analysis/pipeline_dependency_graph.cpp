@@ -8,6 +8,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
+#include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_source_union_with.h"
 #include "mongo/db/pipeline/field_path.h"
@@ -249,15 +250,34 @@ private:
 };
 
 /**
+ * Stages that need special handling.
+ * We amortise the cost of type-checking by setting this once during construction.
+ */
+enum class StageType : uint8_t {
+    kOther,
+    kSingleDocumentTransformation,
+    kMatch,
+};
+
+StageType getStageType(const DocumentSource& documentSource) {
+    if (typeid(documentSource) == typeid(DocumentSourceSingleDocumentTransformation)) {
+        return StageType::kSingleDocumentTransformation;
+    }
+    if (typeid(documentSource) == typeid(DocumentSourceMatch)) {
+        return StageType::kMatch;
+    }
+    return StageType::kOther;
+}
+
+/**
  * Represents a DocumentSource that references or defines fields (or both).
  */
 struct Stage {
     /**
      * Constructs a stage with empty dependencies and no scopes.
      */
-    Stage(boost::intrusive_ptr<DocumentSource> documentSource, bool isSingleDocumentTransformation)
-        : documentSource(std::move(documentSource)),
-          isSingleDocumentTransformation(isSingleDocumentTransformation) {}
+    Stage(boost::intrusive_ptr<DocumentSource> documentSource, StageType type)
+        : documentSource(std::move(documentSource)), type(type) {}
     boost::intrusive_ptr<DocumentSource> documentSource;
     FieldDependencies dependencies;
     // The scope representing visible definitions immediately _after_ this stage. Stages which
@@ -268,7 +288,7 @@ struct Stage {
     // Stage, or to scopes.end(). Used only for finding the scope to invalidate before rebuilding
     // the graph.
     ScopeId nextNewScope;
-    bool isSingleDocumentTransformation;
+    StageType type;
     // If this stage has a subpipeline, points to its metadata; nullptr otherwise.
     SubpipelineInfo* subpipeline = nullptr;
 };
@@ -394,9 +414,7 @@ static_assert(sizeof(Field) - sizeof(FieldDependencies) == 16, "Field size has c
 class DocumentSourceInfo {
 public:
     explicit DocumentSourceInfo(const DocumentSource& documentSource)
-        : _documentSource(documentSource),
-          _isSingleDocumentTransformation(typeid(documentSource) ==
-                                          typeid(DocumentSourceSingleDocumentTransformation)) {
+        : _documentSource(documentSource), _type(getStageType(documentSource)) {
         if (documentSource.getDependencies(&_deps) == DepsTracker::State::NOT_SUPPORTED) {
             _deps.needWholeDocument = true;
         }
@@ -415,15 +433,18 @@ public:
     }
 
     bool isSingleDocumentTransformation() const {
-        return _isSingleDocumentTransformation;
+        return _type == StageType::kSingleDocumentTransformation;
+    }
+
+    StageType getType() const {
+        return _type;
     }
 
 private:
     const DocumentSource& _documentSource;
     // Dependencies.
     DepsTracker _deps;
-    // Is the document source an instance of DocumentSourceSingleDocumentTransformation.
-    bool _isSingleDocumentTransformation;
+    StageType _type;
 };
 
 static_assert(document_transformation::DescribesDocumentTransformation<DocumentSourceInfo>);
@@ -826,10 +847,11 @@ public:
 
         for (StageId stageId = start; stageId <= end; stageId.value++) {
             const Stage& stage = _stages[stageId];
-            const auto* source = stage.documentSource.get();
-            const auto* match = dynamic_cast<const DocumentSourceMatch*>(source);
-            if (match && dependsOnPath(stage) && !cb(*match)) {
-                return;
+            if (stage.type == StageType::kMatch) {
+                const auto& match = checked_cast<const DocumentSourceMatch&>(*stage.documentSource);
+                if (dependsOnPath(stage) && !cb(match)) {
+                    return;
+                }
             }
         }
     }
@@ -1069,7 +1091,8 @@ public:
         auto alive = computeAliveFields();
         std::string pathBuf;
         for (StageId stageId{0}; stageId < _stages.getNextId(); stageId.value++) {
-            if (const auto& stage = _stages[stageId]; stage.isSingleDocumentTransformation) {
+            if (const auto& stage = _stages[stageId];
+                stage.type == StageType::kSingleDocumentTransformation) {
                 walkPotentiallyDeadFields(stage.scope, alive, pathBuf, out);
             }
         }
@@ -1143,7 +1166,7 @@ private:
         // consider everything except single doc transformation stages to be always alive.
         for (StageId stageId{0}; stageId.value < static_cast<int32_t>(_stages.size());
              stageId.value++) {
-            if (!_stages[stageId].isSingleDocumentTransformation) {
+            if (_stages[stageId].type != StageType::kSingleDocumentTransformation) {
                 markDependenciesAlive(_stages[stageId].dependencies, stageId);
             }
         }
@@ -1959,8 +1982,7 @@ private:
 
         // Append the stage node before processing so its dependency set is populated in place.
         // The scopes are assigned once they are known.
-        StageId stageId = _stages.append(
-            Stage{std::move(documentSource), dsInfo.isSingleDocumentTransformation()});
+        StageId stageId = _stages.append(Stage{std::move(documentSource), dsInfo.getType()});
         _dsToStageId[ds] = stageId;
         processStageDependencies(dsInfo, parentScopeId, _stages[stageId].dependencies);
 
