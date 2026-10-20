@@ -229,7 +229,8 @@ public:
     void setUp() override {
         // Initialize HostServices so that aggregation stages will be able to access member
         // functions, e.g. to run assertions.
-        sdk::HostServicesAPI::setHostServices(&host_connector::HostServicesAdapter::get());
+        sdk::HostServicesAPI::setHostServices(&host_connector::HostServicesAdapter::get(),
+                                              CapabilityVersion::legacyCapability());
     }
 };
 

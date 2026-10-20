@@ -79,8 +79,8 @@ void verifyConfigPathPermissions(const std::string& extensionName, const std::st
 #endif
 }
 
-host_connector::ExtensionHandle getMongoExtension(SharedLibrary& extensionLib,
-                                                  const std::string& extensionPath) {
+CapabilityVersion negotiateExtensionVersion(SharedLibrary& extensionLib,
+                                            const std::string& extensionPath) {
     StatusWith<get_mongodb_extension_versions_t> swGetVersionsFn =
         extensionLib.getFunctionAs<get_mongodb_extension_versions_t>(
             GET_MONGODB_EXTENSION_VERSIONS_SYMBOL);
@@ -88,13 +88,6 @@ host_connector::ExtensionHandle getMongoExtension(SharedLibrary& extensionLib,
             str::stream() << "Loading extension '" << extensionPath
                           << "' failed: " << swGetVersionsFn.getStatus().reason(),
             swGetVersionsFn.isOK());
-
-    StatusWith<get_mongo_extension_t> swGetExtensionFn =
-        extensionLib.getFunctionAs<get_mongo_extension_t>(GET_MONGODB_EXTENSION_SYMBOL);
-    uassert(12688600,
-            str::stream() << "Loading extension '" << extensionPath
-                          << "' failed: " << swGetExtensionFn.getStatus().reason(),
-            swGetExtensionFn.isOK());
 
     // Phase 1: extension publishes the API versions it implements. The contract is noexcept;
     // any thrown exception inside the extension is swallowed at its boundary and surfaces here
@@ -106,20 +99,49 @@ host_connector::ExtensionHandle getMongoExtension(SharedLibrary& extensionLib,
     const ::MongoExtensionAPIVersion compatibleVersion =
         selectCompatibleVersion(MONGO_EXTENSION_API_VERSIONS_SUPPORTED, extensionVersions);
 
+    return CapabilityVersion(compatibleVersion.major, compatibleVersion.minor);
+}
+
+host_connector::ExtensionHandle getMongoExtension(SharedLibrary& extensionLib,
+                                                  const std::string& extensionPath,
+                                                  const CapabilityVersion& capabilityVersion) {
+    tassert(13693500,
+            str::stream() << "Loading extension '" << extensionPath
+                          << "' failed: negotiated version " << capabilityVersion.toString()
+                          << " exceeds the maximum supported version "
+                          << CapabilityVersion::latestCapability().toString(),
+            capabilityVersion <= CapabilityVersion::latestCapability());
+
+    StatusWith<get_mongo_extension_t> swGetExtensionFn =
+        extensionLib.getFunctionAs<get_mongo_extension_t>(GET_MONGODB_EXTENSION_SYMBOL);
+    uassert(12688600,
+            str::stream() << "Loading extension '" << extensionPath
+                          << "' failed: " << swGetExtensionFn.getStatus().reason(),
+            swGetExtensionFn.isOK());
+
     // Phase 2: extension instantiates at the chosen version, receiving the matching
     // HostServices. Currently, a single major version is supported, so HostServicesAdapter::get()
     // is guaranteed to be the compatible API.
     const ::MongoExtension* extension = nullptr;
     invokeCAndConvertStatusToException([&]() {
         return swGetExtensionFn.getValue()(
-            compatibleVersion, &host_connector::HostServicesAdapter::get(), &extension);
+            MongoExtensionAPIVersion{capabilityVersion.majorVersion(),
+                                     capabilityVersion.minorVersion()},
+            &host_connector::HostServicesAdapter::get(),
+            &extension);
     });
     uassert(10615503,
             str::stream() << "Failed to load extension '" << extensionPath
                           << "': get_mongodb_extension failed to set an extension",
             extension != nullptr);
-
-    return host_connector::ExtensionHandle{extension};
+    uassert(13693501,
+            str::stream() << "Failed to load extension '" << extensionPath
+                          << "': returned extension version " << extension->version.major << "."
+                          << extension->version.minor << " did not match negotiated version "
+                          << capabilityVersion.toString(),
+            capabilityVersion.majorVersion() == extension->version.major &&
+                capabilityVersion.minorVersion() == extension->version.minor);
+    return host_connector::ExtensionHandle{extension, capabilityVersion};
 }
 }  // namespace
 
@@ -304,8 +326,8 @@ void ExtensionLoader::load(const std::string& name,
     // lifetime of the server.
     loadedExtensions.emplace(name, LoadedExtension{std::move(swExtensionLib.getValue()), config});
     auto& extensionLib = loadedExtensions[name].library;
-
-    host_connector::ExtensionHandle extHandle = getMongoExtension(*extensionLib, extensionPath);
+    const auto capVersion = negotiateExtensionVersion(*extensionLib, extensionPath);
+    auto extHandle = getMongoExtension(*extensionLib, extensionPath, capVersion);
 
     // Get the max wire version of the server. During unit testing, return max wire version 0.
     const auto& maxWireVersion = TestingProctor::instance().isEnabled()
@@ -314,11 +336,9 @@ void ExtensionLoader::load(const std::string& name,
                .getIncomingInternalClient()
                .maxWireVersion);
 
-    std::unique_ptr<HostPortal> hostPortal = std::make_unique<HostPortal>();
-    host_connector::HostPortalAdapter portal{extHandle->getVersion(),
-                                             maxWireVersion,
-                                             YAML::Dump(config.extOptions),
-                                             std::move(hostPortal)};
+    std::unique_ptr<HostPortal> hostPortal = std::make_unique<HostPortal>(capVersion);
+    host_connector::HostPortalAdapter portal{
+        maxWireVersion, YAML::Dump(config.extOptions), std::move(hostPortal)};
     extHandle->initialize(&portal);
 }
 #endif

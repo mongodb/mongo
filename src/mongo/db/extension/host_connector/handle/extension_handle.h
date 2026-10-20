@@ -27,9 +27,7 @@ namespace host_connector {
  */
 class ExtensionAPI : public VTableAPI<::MongoExtension> {
 public:
-    // TODO SERVER-136935: Remove default parameter when we propagate version at load time.
-    ExtensionAPI(::MongoExtension* ext,
-                 const CapabilityVersion& capabilityVersion = CapabilityVersion::legacyCapability())
+    ExtensionAPI(::MongoExtension* ext, const CapabilityVersion& capabilityVersion)
         : VTableAPI<::MongoExtension>(ext, capabilityVersion) {}
 
     /**

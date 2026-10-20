@@ -25,6 +25,10 @@ public:
                                     const ::MongoExtensionPipelineRewriteRule* rules,
                                     size_t numRules) const = 0;
 
+    constexpr CapabilityVersion getCapabilityVersion() const {
+        return _capability;
+    }
+
 protected:
     HostPortalBase(const CapabilityVersion& capVersion) : _capability(capVersion) {}
 
@@ -38,15 +42,20 @@ protected:
  */
 class HostPortalAdapter final : public ::MongoExtensionHostPortal {
 public:
-    HostPortalAdapter(::MongoExtensionAPIVersion apiVersion,
-                      int maxWireVersion,
+    HostPortalAdapter(int maxWireVersion,
                       std::string extensionOptions,
                       std::unique_ptr<HostPortalBase> portal)
-        : ::MongoExtensionHostPortal{&VTABLE, apiVersion, maxWireVersion},
+        : ::MongoExtensionHostPortal{&VTABLE,
+                                     [&]() {
+                                         tassert(11417104,
+                                                 "Provided HostPortalBase is null",
+                                                 portal != nullptr);
+                                         return portal->getCapabilityVersion()
+                                             .toExtensionAPIVersion();
+                                     }(),
+                                     maxWireVersion},
           _extensionOpts(std::move(extensionOptions)),
-          _portal(std::move(portal)) {
-        tassert(11417104, "Provided HostPortalBase is null", _portal != nullptr);
-    }
+          _portal(std::move(portal)) {}
 
     HostPortalAdapter(const HostPortalAdapter&) = delete;
     HostPortalAdapter& operator=(const HostPortalAdapter&) = delete;

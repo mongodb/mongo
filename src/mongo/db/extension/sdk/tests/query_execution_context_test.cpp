@@ -147,7 +147,8 @@ public:
         // Initialize HostServices so that aggregation stages will be able to access member
         // functions, e.g. to run assertions.
         extension::sdk::HostServicesAPI::setHostServices(
-            &extension::host_connector::HostServicesAdapter::get());
+            &extension::host_connector::HostServicesAdapter::get(),
+            CapabilityVersion::legacyCapability());
     }
 };
 
@@ -188,7 +189,8 @@ DEATH_TEST_F(QueryExecutionContextVTableDeathTest, InvalidSetBatchSize, "1315070
 
 TEST_F(QueryExecutionContextTestFixture, ThrowsErrorWhenBatchSizeSetToZero) {
     extension::sdk::HostServicesAPI::setHostServices(
-        &extension::host_connector::HostServicesAdapter::get());
+        &extension::host_connector::HostServicesAdapter::get(),
+        CapabilityVersion::legacyCapability());
     exec::agg::DynamicBatchSize dbs;
     std::unique_ptr<host::QueryExecutionContext> wrappedCtx =
         std::make_unique<host::QueryExecutionContext>(_expCtx.get());
@@ -200,7 +202,8 @@ TEST_F(QueryExecutionContextTestFixture, ThrowsErrorWhenBatchSizeSetToZero) {
 
 TEST_F(QueryExecutionContextTestFixture, AdapterRejectsZeroBatchSize) {
     extension::sdk::HostServicesAPI::setHostServices(
-        &extension::host_connector::HostServicesAdapter::get());
+        &extension::host_connector::HostServicesAdapter::get(),
+        CapabilityVersion::legacyCapability());
     exec::agg::DynamicBatchSize dbs;
     std::unique_ptr<host::QueryExecutionContext> wrappedCtx =
         std::make_unique<host::QueryExecutionContext>(_expCtx.get());

@@ -90,7 +90,8 @@ public:
     void setUp() override {
         AggregationContextFixture::setUp();
         extension::sdk::HostServicesAPI::setHostServices(
-            &extension::host_connector::HostServicesAdapter::get());
+            &extension::host_connector::HostServicesAdapter::get(),
+            CapabilityVersion::legacyCapability());
     }
 
     /**
@@ -159,9 +160,9 @@ TEST_F(DocumentSourceExtensionOptimizableTest, ParseTransformSuccess) {
     ASSERT_THROWS_CODE(buildTestPipeline(testPipeline), AssertionException, 40324);
     // Register the extension stage and try to reparse.
 
-    std::unique_ptr<host::HostPortal> hostPortal = std::make_unique<host::HostPortal>();
-    host_connector::HostPortalAdapter portal{
-        MONGODB_EXTENSION_API_VERSION, 1, "", std::move(hostPortal)};
+    std::unique_ptr<host::HostPortal> hostPortal =
+        std::make_unique<host::HostPortal>(CapabilityVersion::legacyCapability());
+    host_connector::HostPortalAdapter portal{1, "", std::move(hostPortal)};
     portal.getImpl().registerStageDescriptor(&_transformStaticDescriptor);
 
     auto parsedPipeline = buildTestPipeline(testPipeline);
@@ -182,9 +183,9 @@ TEST_F(DocumentSourceExtensionOptimizableTest, ParseTransformSuccess) {
 }
 
 TEST_F(DocumentSourceExtensionOptimizableTest, RegisterInternalStageRestrictsClientType) {
-    std::unique_ptr<host::HostPortal> hostPortal = std::make_unique<host::HostPortal>();
-    host_connector::HostPortalAdapter portal{
-        MONGODB_EXTENSION_API_VERSION, 1, "", std::move(hostPortal)};
+    std::unique_ptr<host::HostPortal> hostPortal =
+        std::make_unique<host::HostPortal>(CapabilityVersion::legacyCapability());
+    host_connector::HostPortalAdapter portal{1, "", std::move(hostPortal)};
     portal.getImpl().registerStageDescriptor(&_internalTransformStaticDescriptor);
 
     BSONObj internalSpec =
@@ -2442,9 +2443,9 @@ DEATH_TEST_F(DocumentSourceExtensionOptimizableTestDeathTest,
              DistributedPlanLogicReturnsErrorWhenGivenDPLWithHostAllocatedExtension,
              "519") {
     // Register "$transformStage" as an extension stage.
-    std::unique_ptr<host::HostPortal> hostPortal = std::make_unique<host::HostPortal>();
-    host_connector::HostPortalAdapter portal{
-        MONGODB_EXTENSION_API_VERSION, 1, "", std::move(hostPortal)};
+    std::unique_ptr<host::HostPortal> hostPortal =
+        std::make_unique<host::HostPortal>(CapabilityVersion::legacyCapability());
+    host_connector::HostPortalAdapter portal{1, "", std::move(hostPortal)};
     portal.getImpl().registerStageDescriptor(&_transformStaticDescriptor);
 
     auto logicalStage = new sdk::ExtensionLogicalAggStageAdapter(
@@ -3206,9 +3207,9 @@ TEST_F(StageRulesTest, UnregisteredStageHasNoRules) {
 }
 
 TEST_F(StageRulesTest, HostPortalRegisterStageRulesConvertsRules) {
-    std::unique_ptr<host::HostPortal> hostPortal = std::make_unique<host::HostPortal>();
-    host_connector::HostPortalAdapter portal{
-        MONGODB_EXTENSION_API_VERSION, 1, "", std::move(hostPortal)};
+    std::unique_ptr<host::HostPortal> hostPortal =
+        std::make_unique<host::HostPortal>(CapabilityVersion::legacyCapability());
+    host_connector::HostPortalAdapter portal{1, "", std::move(hostPortal)};
 
     MongoExtensionPipelineRewriteRule cRules[2] = {
         {.name = {reinterpret_cast<const uint8_t*>(kReorderRule.name.data()),
@@ -3250,9 +3251,9 @@ using TestStageDescriptor =
                              sdk::shared_test_stages::TransformAggStageParseNode>;
 
 TEST_F(StageRulesTest, RegisterStageRulesUassertsOnEmptyRules) {
-    std::unique_ptr<host::HostPortal> hostPortal = std::make_unique<host::HostPortal>();
-    host_connector::HostPortalAdapter portal{
-        MONGODB_EXTENSION_API_VERSION, 1, "", std::move(hostPortal)};
+    std::unique_ptr<host::HostPortal> hostPortal =
+        std::make_unique<host::HostPortal>(CapabilityVersion::legacyCapability());
+    host_connector::HostPortalAdapter portal{1, "", std::move(hostPortal)};
     sdk::HostPortalHandle portalHandle{&portal};
 
     TestExtension ext;
@@ -3262,9 +3263,9 @@ TEST_F(StageRulesTest, RegisterStageRulesUassertsOnEmptyRules) {
 }
 
 TEST_F(StageRulesTest, RegisterStageRulesUassertsOnDuplicateRuleName) {
-    std::unique_ptr<host::HostPortal> hostPortal = std::make_unique<host::HostPortal>();
-    host_connector::HostPortalAdapter portal{
-        MONGODB_EXTENSION_API_VERSION, 1, "", std::move(hostPortal)};
+    std::unique_ptr<host::HostPortal> hostPortal =
+        std::make_unique<host::HostPortal>(CapabilityVersion::legacyCapability());
+    host_connector::HostPortalAdapter portal{1, "", std::move(hostPortal)};
     sdk::HostPortalHandle portalHandle{&portal};
 
     TestExtension ext;

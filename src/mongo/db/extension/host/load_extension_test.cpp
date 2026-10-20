@@ -202,6 +202,24 @@ TEST_F(LoadExtensionsTest, LoadExtensionErrorCases) {
                        AssertionException,
                        10615504);
 
+    // returned_major_version_mismatch_bad_extension advertises a compatible version but the
+    // returned extension reports a mismatched major version.
+    ASSERT_THROWS_CODE(
+        ExtensionLoader::load("returned_major_version_mismatch_bad_extension",
+                              test_util::makeEmptyExtensionConfig(
+                                  "libreturned_major_version_mismatch_bad_extension.so")),
+        AssertionException,
+        13693501);
+
+    // returned_minor_version_mismatch_bad_extension advertises a compatible version but the
+    // returned extension reports a mismatched minor version.
+    ASSERT_THROWS_CODE(
+        ExtensionLoader::load("returned_minor_version_mismatch_bad_extension",
+                              test_util::makeEmptyExtensionConfig(
+                                  "libreturned_minor_version_mismatch_bad_extension.so")),
+        AssertionException,
+        13693501);
+
     // duplicate_stage_descriptor_bad_extension attempts to register the same stage descriptor
     // multiple times.
     ASSERT_THROWS_CODE(ExtensionLoader::load("duplicate_stage_descriptor_bad_extension",

@@ -43,7 +43,8 @@ public:
         // Initialize HostServices so that aggregation stages will be able to access member
         // functions, e.g. to run assertions.
         extension::sdk::HostServicesAPI::setHostServices(
-            &extension::host_connector::HostServicesAdapter::get());
+            &extension::host_connector::HostServicesAdapter::get(),
+            CapabilityVersion::legacyCapability());
         _execCtx = std::make_unique<host_connector::QueryExecutionContextAdapter>(
             std::make_unique<shared_test_stages::MockQueryExecutionContext>());
     }

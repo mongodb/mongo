@@ -25,7 +25,8 @@ namespace {
 class HostServicesTest : public unittest::Test {
 public:
     void setUp() override {
-        sdk::HostServicesAPI::setHostServices(&host_connector::HostServicesAdapter::get());
+        sdk::HostServicesAPI::setHostServices(&host_connector::HostServicesAdapter::get(),
+                                              CapabilityVersion::legacyCapability());
     }
 
     auto getExpCtx() {

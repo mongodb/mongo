@@ -37,6 +37,14 @@ static_assert(CapabilityVersion(1, 1) <= CapabilityVersion(1, 1));
 static_assert(CapabilityVersion::fromPackedValue(0x00010002u).majorVersion() == 1u);
 static_assert(CapabilityVersion::fromPackedValue(0x00010002u).minorVersion() == 2u);
 
+// Component validity: both major and minor must fit in their 16-bit packed halves.
+static_assert(CapabilityVersion::isValidVersionComponent(0u));
+static_assert(CapabilityVersion::isValidVersionComponent(CapabilityVersion::kCapabilityMask));
+static_assert(!CapabilityVersion::isValidVersionComponent(CapabilityVersion::kCapabilityMask + 1u));
+static_assert(CapabilityVersion::isValidVersion(0xFFFFu, 0xFFFFu));
+static_assert(!CapabilityVersion::isValidVersion(0x10000u, 0u));
+static_assert(!CapabilityVersion::isValidVersion(0u, 0x10000u));
+
 // Static factories are usable in constant expressions.
 static_assert(CapabilityVersion::zeroCapability() == CapabilityVersion(0, 0));
 static_assert(CapabilityVersion::legacyCapability() == CapabilityVersion(1, 0));
@@ -125,6 +133,23 @@ DEATH_TEST(CapabilityVersionDeathTest, MinorAtPackedWidthIsRejected, "exceeds pa
 
 DEATH_TEST(CapabilityVersionDeathTest, MaxUint32MinorIsRejected, "exceeds packed width") {
     CapabilityVersion(0, UINT32_MAX);
+}
+
+DEATH_TEST(CapabilityVersionDeathTest, MajorAtPackedWidthIsRejected, "exceeds packed width") {
+    // 2^16 does not fit in the packed major field: the shift would wrap it to major 0.
+    CapabilityVersion(CapabilityVersion::kCapabilityMask + 1u, 0);
+}
+
+DEATH_TEST(CapabilityVersionDeathTest,
+           MajorAliasingToSupportedMajorIsRejected,
+           "exceeds packed width") {
+    // 0x10001 would silently alias to major 1 after the shift, smuggling an unsupported
+    // major into the supported capability range.
+    CapabilityVersion(0x10001u, 0);
+}
+
+DEATH_TEST(CapabilityVersionDeathTest, MaxUint32MajorIsRejected, "exceeds packed width") {
+    CapabilityVersion(UINT32_MAX, 0);
 }
 
 }  // namespace

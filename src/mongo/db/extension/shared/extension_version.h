@@ -17,10 +17,14 @@ public:
 
     constexpr CapabilityVersion(uint32_t majorVersion, uint32_t minorVersion)
         : _capability((majorVersion << kCapabilityShift) | minorVersion) {
+        tassert(13693503,
+                fmt::format(
+                    "Negotiated major {} exceeds packed width 0-{}", majorVersion, kCapabilityMask),
+                isValidVersionComponent(majorVersion));
         tassert(13539200,
                 fmt::format(
                     "Negotiated minor {} exceeds packed width 0-{}", minorVersion, kCapabilityMask),
-                minorVersion <= kCapabilityMask);
+                isValidVersionComponent(minorVersion));
     }
 
     static constexpr CapabilityVersion legacyCapability() {
@@ -38,6 +42,18 @@ public:
 
     static constexpr CapabilityVersion fromPackedValue(uint32_t packedValue) {
         return CapabilityVersion(packedValue);
+    }
+
+    // Both components pack into 16-bit halves of _capability (minor in the low bits, major
+    // shifted into the high bits), so the same bound validates either one. Without this check
+    // a large major would silently wrap on the shift: 0x10000 packs as major 0, and 0x10001
+    // would alias to major 1, smuggling an unsupported major into the supported range.
+    static constexpr bool isValidVersionComponent(uint32_t component) {
+        return component <= kCapabilityMask;
+    }
+
+    static constexpr bool isValidVersion(uint32_t majorVersion, uint32_t minorVersion) {
+        return isValidVersionComponent(majorVersion) && isValidVersionComponent(minorVersion);
     }
 
     constexpr uint32_t majorVersion() const {
@@ -60,8 +76,26 @@ public:
         return fmt::format("{}.{}", majorVersion(), minorVersion());
     }
 
+    ::MongoExtensionAPIVersion toExtensionAPIVersion() const {
+        return {majorVersion(), minorVersion()};
+    }
+
 private:
     constexpr CapabilityVersion(uint32_t packedValue) : _capability(packedValue) {}
     uint32_t _capability;
+};
+
+class CapabilityBounds {
+public:
+    constexpr CapabilityBounds(CapabilityVersion minVersion, CapabilityVersion maxVersion)
+        : _min(minVersion), _max(maxVersion) {}
+
+    constexpr bool isSupported(const CapabilityVersion& version) const {
+        return version >= _min && version <= _max;
+    }
+
+private:
+    CapabilityVersion _min;
+    CapabilityVersion _max;
 };
 }  // namespace mongo::extension

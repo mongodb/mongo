@@ -13,6 +13,7 @@
 #include "mongo/db/extension/shared/handle/pipeline_rewrite_context_handle.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/str.h"
 
 #include <memory>
 
@@ -68,6 +69,9 @@ private:
  */
 class ExtensionAdapter final : public ::MongoExtension {
 public:
+    static constexpr CapabilityBounds kCapabilityBounds = CapabilityBounds(
+        CapabilityVersion::legacyCapability(), CapabilityVersion::latestCapability());
+
     ExtensionAdapter(std::unique_ptr<sdk::Extension> extensionPointer,
                      ::MongoExtensionAPIVersion version)
         : ::MongoExtension{&VTABLE, version}, _extensionPointer(std::move(extensionPointer)) {
@@ -97,11 +101,14 @@ private:
         return wrapCXXAndConvertExceptionToStatus([&]() {
             // The host portal will go out of scope on the host side after initialization, so we
             // should not retain it to avoid a dangling pointer
-            auto hostPortal = HostPortalHandle(portal);
+            auto hostPortal = HostPortalHandle(
+                portal,
+                CapabilityVersion(extensionPtr->version.major, extensionPtr->version.minor));
             static_cast<const sdk::ExtensionAdapter*>(extensionPtr)
                 ->_extensionPointer->initialize(hostPortal);
         });
     }
+
     static constexpr ::MongoExtensionVTable VTABLE = {
         .initialize = &_extInitialize,
     };
@@ -138,9 +145,11 @@ private:
  *     as "extension supports no versions" and rejects in negotiation.
  *
  *   - get_mongodb_extension: instantiates the extension at the host-selected version.
- *     HostServices is delivered with this call and is laid out per the chosen version's
- *     major, so 'setHostServices' is safe before the wrap and sdk_uassert/sdk_tassert
- *     work normally inside the lambda.
+ *     The negotiated version is validated BEFORE the HostServices handle is installed:
+ *     constructing the handle with an unsupported capability version throws, and would let an
+ *     boundary on rejection. Because sdk_uassert/sdk_tassert report through the HostServices
+ *     handle, they are unavailable on the rejection path; rejection instead returns a self-owned
+ *     ExtensionGenericStatus. Once the handle is installed, sdk_uassert/sdk_tassert work normally.
  */
 #define DEFINE_GET_EXTENSION()                                                                     \
     extern "C" {                                                                                   \
@@ -170,14 +179,35 @@ private:
         ::MongoExtensionAPIVersion version,                                                        \
         const ::MongoExtensionHostServices* hostServices,                                          \
         const ::MongoExtension** extension) {                                                      \
-        mongo::extension::sdk::HostServicesAPI::setHostServices(hostServices);                     \
-        return mongo::extension::wrapCXXAndConvertExceptionToStatus([&] {                          \
-            const auto& container =                                                                \
-                mongo::extension::sdk::VersionedExtensionContainer::getInstance();                 \
-            static auto wrapper = std::make_unique<mongo::extension::sdk::ExtensionAdapter>(       \
-                container.getVersionedExtension(version));                                         \
-            *extension = reinterpret_cast<const ::MongoExtension*>(wrapper.get());                 \
-        });                                                                                        \
+        if (mongo::extension::CapabilityVersion::isValidVersion(version.major, version.minor)) {   \
+            const auto capabilityVersion =                                                         \
+                mongo::extension::CapabilityVersion(version.major, version.minor);                 \
+            if (mongo::extension::sdk::HostServicesAPI::isSupported(capabilityVersion)) {          \
+                mongo::extension::sdk::HostServicesAPI::setHostServices(hostServices,              \
+                                                                        capabilityVersion);        \
+                return mongo::extension::wrapCXXAndConvertExceptionToStatus([&] {                  \
+                    const auto& container =                                                        \
+                        mongo::extension::sdk::VersionedExtensionContainer::getInstance();         \
+                    sdk_uassert(                                                                   \
+                        13693502,                                                                  \
+                        (mongo::str::stream()                                                      \
+                         << "Extension rejected host-negotiated API version "                      \
+                         << capabilityVersion.toString()                                           \
+                         << ": outside the extension's supported capability bounds"),              \
+                        mongo::extension::sdk::ExtensionAdapter::kCapabilityBounds.isSupported(    \
+                            capabilityVersion));                                                   \
+                    static auto wrapper =                                                          \
+                        std::make_unique<mongo::extension::sdk::ExtensionAdapter>(                 \
+                            container.getVersionedExtension(version));                             \
+                    *extension = reinterpret_cast<const ::MongoExtension*>(wrapper.get());         \
+                });                                                                                \
+            }                                                                                      \
+        }                                                                                          \
+        return new mongo::extension::ExtensionGenericStatus(                                       \
+            13693502,                                                                              \
+            mongo::str::stream() << "Extension rejected host-negotiated API version "              \
+                                 << version.major << "." << version.minor                          \
+                                 << ": outside the extension's supported capability bounds");      \
     }                                                                                              \
     }
 

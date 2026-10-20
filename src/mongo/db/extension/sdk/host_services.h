@@ -87,9 +87,10 @@ public:
      * sdk_uassert/sdk_tassert are available from the start of extension loading. The host
      * guarantees the pointer remains valid for the lifetime of the extension.
      */
-    static void setHostServices(const ::MongoExtensionHostServices* services) noexcept {
+    static void setHostServices(const ::MongoExtensionHostServices* services,
+                                const CapabilityVersion& capVersion) {
         // The host should only call this function once.
-        _sHostServices = UnownedHandle<const ::MongoExtensionHostServices>{services};
+        _sHostServices = UnownedHandle<const ::MongoExtensionHostServices>{services, capVersion};
     }
 
     AggStageParseNodeHandle createHostAggStageParseNode(BSONObj spec) const {
