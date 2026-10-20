@@ -3,9 +3,12 @@
 #include "mongo/transport/ingress_handshake_metrics.h"
 
 #include "mongo/base/counter.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands/server_status/histogram_server_status_metric.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/connection_health_metrics_parameter_gen.h"
+#include "mongo/db/topology/cluster_role.h"
 #include "mongo/logv2/log.h"
 #include "mongo/otel/metrics/metrics_histogram.h"
 #include "mongo/otel/metrics/metrics_service.h"
@@ -16,6 +19,7 @@
 
 #include <memory>
 #include <utility>
+#include <vector>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
@@ -52,11 +56,45 @@ auto& totalIngressTLSConnections =  //
     *MetricBuilder<Counter64>("network.totalIngressTLSConnections");
 auto& totalIngressTLSHandshakeTimeMillis =  //
     *MetricBuilder<Counter64>("network.totalIngressTLSHandshakeTimeMillis");
-otel::metrics::Histogram<int64_t>& ingressTLSHandshakeTimesMillis =
+
+// {1 μs, 5 μs, 25 μs, 125 μs, 625 μs, ...}
+std::vector<double> handshakeHistogramBounds() {
+    const auto bounds = HistogramServerStatusMetric::pow(10, 1, 5);
+    return {bounds.begin(), bounds.end()};
+}
+
+otel::metrics::Histogram<int64_t>& ingressTLSHandshakeTimesMicros =
     otel::metrics::MetricsService::instance().createInt64Histogram(
         otel::metrics::MetricNames::kIngressTLSHandshakeLatency,
         "The latency of the TLS handshake when establishing a new ingress connection.",
-        otel::metrics::MetricUnit::kMilliseconds);
+        otel::metrics::MetricUnit::kMicroseconds,
+        {.serverStatusOptions =
+             otel::metrics::ServerStatusOptions{.dottedPath = "network.ingressTLSHandshakeMicros",
+                                                .role = ClusterRole::None},
+         .explicitBucketBoundaries = handshakeHistogramBounds(),
+         .serializationFormat = otel::metrics::HistogramSerializationFormat::kBucketCounts});
+
+otel::metrics::Histogram<int64_t>& ingressHelloTimesMicros =
+    otel::metrics::MetricsService::instance().createInt64Histogram(
+        otel::metrics::MetricNames::kIngressHelloLatency,
+        "The latency of the hello command when establishing a new ingress connection.",
+        otel::metrics::MetricUnit::kMicroseconds,
+        {.serverStatusOptions =
+             otel::metrics::ServerStatusOptions{.dottedPath = "network.ingressHelloLatency",
+                                                .role = ClusterRole::None},
+         .explicitBucketBoundaries = handshakeHistogramBounds(),
+         .serializationFormat = otel::metrics::HistogramSerializationFormat::kBucketCounts});
+
+otel::metrics::Histogram<int64_t>& ingressAuthTimesMicros =
+    otel::metrics::MetricsService::instance().createInt64Histogram(
+        otel::metrics::MetricNames::kIngressAuthLatency,
+        "The latency of auth when establishing a new ingress connection.",
+        otel::metrics::MetricUnit::kMicroseconds,
+        {.serverStatusOptions =
+             otel::metrics::ServerStatusOptions{.dottedPath = "network.ingressAuthLatency",
+                                                .role = ClusterRole::None},
+         .explicitBucketBoundaries = handshakeHistogramBounds(),
+         .serializationFormat = otel::metrics::HistogramSerializationFormat::kBucketCounts});
 }  // namespace
 
 IngressHandshakeMetrics& IngressHandshakeMetrics::get(Session& session) {
@@ -79,18 +117,17 @@ void IngressHandshakeMetrics::onTLSHandshakeStarted(TickSource* tickSource) {
 
 void IngressHandshakeMetrics::onTLSHandshakeCompleted() {
     if (_tlsHandshakeTickSource) {
-        const auto durationMillis =
-            _tlsHandshakeTickSource
-                ->ticksTo<Milliseconds>(_tlsHandshakeTickSource->getTicks() -
-                                        _tlsHandshakeStartedTicks)
-                .count();
+        const auto duration = _tlsHandshakeTickSource->ticksTo<Microseconds>(
+            _tlsHandshakeTickSource->getTicks() - _tlsHandshakeStartedTicks);
+        const auto durationMicros = duration.count();
+        const auto durationMillis = duration_cast<Milliseconds>(duration).count();
         if (connHealthMetricsLoggingEnabled()) {
             LOGV2(
                 6723804, "Ingress TLS handshake complete", "durationMillis"_attr = durationMillis);
         }
         totalIngressTLSConnections.increment(1);
         totalIngressTLSHandshakeTimeMillis.increment(durationMillis);
-        ingressTLSHandshakeTimesMillis.record(durationMillis);
+        ingressTLSHandshakeTimesMicros.record(durationMicros);
     }
 
     if (_state == State::kWaitingForSessionStart) {
@@ -107,6 +144,12 @@ void IngressHandshakeMetrics::onTLSHandshakeCompleted() {
 
 void IngressHandshakeMetrics::onCommandReceived(const Command* command) {
     if (_state == State::kDone) {
+        // A non-auth command has already ended the handshake, but the session may still
+        // authenticate afterwards.
+        if (_tickSource && !_authCommandReceivedTicks &&
+            command->handshakeRole() == Command::HandshakeRole::kAuth) {
+            _authCommandReceivedTicks = _tickSource->getTicks();
+        }
         return;
     }
 
@@ -145,9 +188,17 @@ void IngressHandshakeMetrics::onCommandReceived(const Command* command) {
             _state = State::kWaitingForHelloOrNonAuthCommand;
             [[fallthrough]];
         case State::kWaitingForHelloOrNonAuthCommand:
-        case State::kWaitingForNonAuthCommand:
+        case State::kWaitingForNonAuthCommand: {
+            const auto role = command->handshakeRole();
             _mostRecentHandshakeCommandReceivedTicks = now;
+            if (role == Command::HandshakeRole::kHello) {
+                _helloCommandReceivedTicks = now;
+            }
+            if (!_authCommandReceivedTicks && role == Command::HandshakeRole::kAuth) {
+                _authCommandReceivedTicks = now;
+            }
             return;
+        }
         default:
             MONGO_UNREACHABLE;
     }
@@ -166,6 +217,8 @@ void IngressHandshakeMetrics::onCommandProcessed(const Command* command,
             if (command->handshakeRole() == Command::HandshakeRole::kHello) {
                 const auto micros = _tickSource->ticksTo<Microseconds>(now - _sessionStartedTicks);
                 averageTimeToCompletedHelloMicros.addSample(micros.count());
+                ingressHelloTimesMicros.record(
+                    _tickSource->ticksTo<Microseconds>(now - _helloCommandReceivedTicks).count());
                 _state = State::kWaitingForNonAuthCommand;
             }
             [[fallthrough]];
@@ -175,6 +228,27 @@ void IngressHandshakeMetrics::onCommandProcessed(const Command* command,
         default:
             MONGO_UNREACHABLE;
     }
+}
+
+void IngressHandshakeMetrics::onAuthCompleted(const Command* command) {
+    if (_authCompletionRecorded) {
+        // Only record one sample per session.
+        return;
+    }
+    _authCompletionRecorded = true;
+    if (command->handshakeRole() != Command::HandshakeRole::kAuth) {
+        // Authentication completed via a hello carrying speculative authentication; that latency
+        // is already captured by the hello histogram.
+        return;
+    }
+
+    invariant(_tickSource);
+    if (!_authCommandReceivedTicks) {
+        return;
+    }
+    ingressAuthTimesMicros.record(
+        _tickSource->ticksTo<Microseconds>(_tickSource->getTicks() - _authCommandReceivedTicks)
+            .count());
 }
 
 void IngressHandshakeMetrics::onResponseSent(/*processingDuration=*/Microseconds,
@@ -193,8 +267,14 @@ void IngressHandshakeMetricsCommandHooks::onAfterRun(OperationContext* opCtx,
                                                      CommandInvocation* invocation,
                                                      rpc::ReplyBuilderInterface* response) {
     if (const auto& session = opCtx->getClient()->session()) {
-        IngressHandshakeMetrics::get(*session).onCommandProcessed(invocation->definition(),
-                                                                  response);
+        auto& metrics = IngressHandshakeMetrics::get(*session);
+        metrics.onCommandProcessed(invocation->definition(), response);
+
+        // A command finishing while the session is authenticated marks the completion of
+        // authentication on this connection.
+        if (AuthorizationSession::get(opCtx->getClient())->isAuthenticated()) {
+            metrics.onAuthCompleted(invocation->definition());
+        }
     }
 }
 
