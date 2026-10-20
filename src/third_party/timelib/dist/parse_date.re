@@ -32,16 +32,6 @@
 #include <assert.h>
 #include <limits.h>
 
-#if defined(_MSC_VER)
-# define strtoll(s, f, b) _atoi64(s)
-#elif !defined(HAVE_STRTOLL)
-# if defined(HAVE_ATOLL)
-#  define strtoll(s, f, b) atoll(s)
-# else
-#  define strtoll(s, f, b) strtol(s, f, b)
-# endif
-#endif
-
 #define EOI      257
 #define TIME     258
 #define DATE     259
@@ -169,7 +159,14 @@ static const timelib_tz_lookup_table timelib_timezone_utc[] = {
 };
 
 #if defined(_POSIX_TZNAME_MAX)
-# define MAX_ABBR_LEN _POSIX_TZNAME_MAX
+/* Solaris exposes _POSIX_TZNAME_MAX = 3 unless _XPG6 is defined.
+ * That is too small for real-world timezone abbreviations ("EDT", "CEST", ...).
+ */
+# if defined(__sun__) && _POSIX_TZNAME_MAX < 6
+#  define MAX_ABBR_LEN 6
+# else
+#  define MAX_ABBR_LEN _POSIX_TZNAME_MAX
+# endif
 #elif defined(TZNAME_MAX)
 # define MAX_ABBR_LEN TZNAME_MAX
 #else
@@ -509,7 +506,7 @@ static timelib_sll timelib_get_nr(const char **ptr, int max_length)
 
 static void timelib_skip_day_suffix(const char **ptr)
 {
-	if (isspace(**ptr)) {
+	if (isspace((unsigned char)**ptr)) {
 		return;
 	}
 	if (!timelib_strncasecmp(*ptr, "nd", 2) || !timelib_strncasecmp(*ptr, "rd", 2) ||!timelib_strncasecmp(*ptr, "st", 2) || !timelib_strncasecmp(*ptr, "th", 2)) {
@@ -850,7 +847,7 @@ static timelib_long timelib_parse_tz_cor(const char **ptr, int *tz_not_found)
 
 	*tz_not_found = 1;
 
-	while (isdigit(**ptr) || **ptr == ':') {
+	while (isdigit((unsigned char)**ptr) || **ptr == ':') {
 		++*ptr;
 	}
 	end = *ptr;
@@ -915,7 +912,7 @@ static timelib_long timelib_parse_tz_minutes(const char **ptr, timelib_time *t)
 	}
 
 	++*ptr;
-	while (isdigit(**ptr)) {
+	while (isdigit((unsigned char)**ptr)) {
 		++*ptr;
 	}
 
@@ -939,10 +936,12 @@ timelib_long timelib_parse_zone(const char **ptr, int *dst, timelib_time *t, int
 {
 	timelib_tzinfo *res;
 	timelib_long            retval = 0;
+	size_t paren_count = 0;
 
 	*tz_not_found = 0;
 
 	while (**ptr == ' ' || **ptr == '\t' || **ptr == '(') {
+		paren_count += **ptr == '(';
 		++*ptr;
 	}
 	if ((*ptr)[0] == 'G' && (*ptr)[1] == 'M' && (*ptr)[2] == 'T' && ((*ptr)[3] == '+' || (*ptr)[3] == '-')) {
@@ -991,8 +990,9 @@ timelib_long timelib_parse_zone(const char **ptr, int *dst, timelib_time *t, int
 		*tz_not_found = (found == 0);
 		retval = offset;
 	}
-	while (**ptr == ')') {
+	while (paren_count > 0 && **ptr == ')') {
 		++*ptr;
+		paren_count--;
 	}
 	return retval;
 }
@@ -2011,10 +2011,10 @@ timelib_time *timelib_strtotime(const char *s, size_t len, timelib_error_contain
 	in.errors->error_messages = NULL;
 
 	if (len > 0) {
-		while (isspace(*s) && s < e) {
+		while (isspace((unsigned char)*s) && s <= e) {
 			s++;
 		}
-		while (isspace(*e) && e > s) {
+		while (isspace((unsigned char)*e) && e > s) {
 			e--;
 		}
 	}
