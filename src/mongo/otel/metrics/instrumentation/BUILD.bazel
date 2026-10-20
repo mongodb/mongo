@@ -273,6 +273,7 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_fourth_group"],
     deps = [
         ":wiredtiger_metric_registry",
+        "//src/mongo/otel/metrics:metrics_test_util",
         "//src/mongo/otel/metrics:otel_metric_name_validation",
     ],
 )

@@ -110,7 +110,7 @@ namespace {
  * Returns the OTel metric name to register 'statName' under, or none if it should not be
  * registered at alle.
  */
-boost::optional<std::string> resolveOtelName(const std::string& statName) {
+boost::optional<std::string> resolveOtelName(std::string_view statName) {
     if (isHandledByLegacyCollector(statName)) {
         return boost::none;
     }
@@ -129,26 +129,64 @@ boost::optional<std::string> resolveOtelName(const std::string& statName) {
 
 }  // namespace
 
-Counter<int64_t>* WiredTigerMetricRegistry::_createCounter(const std::string& statName) {
+Counter<int64_t>* WiredTigerMetricRegistry::_createCounter(std::string_view statName) {
     const auto name = resolveOtelName(statName);
     if (!name) {
         return nullptr;
     }
     return &MetricsService::instance().createInt64Counter(
         DynamicMetricNameMaker::make(std::string_view{*name}, dyn_metric_passkey()),
-        statName,
+        std::string{statName},
         MetricUnit::kWiredTiger);
 }
 
-Gauge<int64_t>* WiredTigerMetricRegistry::_createGauge(const std::string& statName) {
+Gauge<int64_t>* WiredTigerMetricRegistry::_createGauge(std::string_view statName) {
     const auto name = resolveOtelName(statName);
     if (!name) {
         return nullptr;
     }
     return &MetricsService::instance().createInt64Gauge(
         DynamicMetricNameMaker::make(std::string_view{*name}, dyn_metric_passkey()),
-        statName,
+        std::string{statName},
         MetricUnit::kWiredTiger);
+}
+
+void WiredTigerMetricRegistry::updateCounter(std::string_view statName, int64_t increment) {
+    if (_skipped.contains(statName)) {
+        return;
+    }
+
+    auto it = _counters.find(statName);
+    if (it == _counters.end()) {
+        auto* counter = _createCounter(statName);
+        if (!counter) {
+            _skipped.emplace(statName);
+            LOGV2_DEBUG(
+                13500903, 2, "Skipping update for WiredTiger counter", "stat"_attr = statName);
+            return;
+        }
+        it = _counters.emplace(statName, counter).first;
+    }
+    it->second->add(increment);
+}
+
+void WiredTigerMetricRegistry::updateGauge(std::string_view statName, int64_t currentValue) {
+    if (_skipped.contains(statName)) {
+        return;
+    }
+
+    auto it = _gauges.find(statName);
+    if (it == _gauges.end()) {
+        auto* gauge = _createGauge(statName);
+        if (!gauge) {
+            _skipped.emplace(statName);
+            LOGV2_DEBUG(
+                13500902, 2, "Skipping update for WiredTiger gauge", "stat"_attr = statName);
+            return;
+        }
+        it = _gauges.emplace(statName, gauge).first;
+    }
+    it->second->set(currentValue);
 }
 
 }  // namespace mongo
