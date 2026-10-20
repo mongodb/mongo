@@ -120,6 +120,14 @@ auto& tailerWatermarksSeenCounter = MetricsService::instance().createInt64Counte
     {.serverStatusOptions = ServerStatusOptions{
          .dottedPath = "replicatedFastCount.tailer.watermarksSeen", .role = ClusterRole::None}});
 
+// The number of replicated metadata checkpoints validated during oplog application.
+auto& checkpointsValidatedCounter = MetricsService::instance().createInt64Counter(
+    MetricNames::kReplicatedFastCountCheckpointsValidated,
+    "Total number of replicated fast count checkpoints validated",
+    MetricUnit::kEvents,
+    {.serverStatusOptions = ServerStatusOptions{
+         .dottedPath = "replicatedFastCount.checkpointsValidated", .role = ClusterRole::None}});
+
 // Total time the flusher spent blocked waiting for the oplog tailer to cut a batch at a
 // watermark.
 auto& watermarkAwaitTimeMsTotalCounter = MetricsService::instance().createInt64Counter(
@@ -195,6 +203,10 @@ void incrementWatermarksWrittenCount() {
 
 void incrementTailerWatermarksSeenCount() {
     tailerWatermarksSeenCounter.add(1);
+}
+
+void incrementCheckpointsValidatedCount() {
+    checkpointsValidatedCounter.add(1);
 }
 
 void recordWatermarkAwaitTime(Milliseconds waitTime) {

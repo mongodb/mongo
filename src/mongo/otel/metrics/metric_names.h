@@ -605,6 +605,8 @@ public:
         MetricNameMaker::make(
             "mongodb.serverStatus.metrics.replicatedFastCount.checkpoint."
             "sizeCountEntriesProcessed");
+    static constexpr MetricName kReplicatedFastCountCheckpointsValidated = MetricNameMaker::make(
+        "mongodb.serverStatus.metrics.replicatedFastCount.checkpointsValidated");
     static constexpr MetricName kReplicatedFastCountOplogLagSecs =
         MetricNameMaker::make("mongodb.serverStatus.metrics.replicatedFastCount.oplogLagSecs");
     static constexpr MetricName kReplicatedFastCountTailerIsRunning =

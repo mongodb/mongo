@@ -55,6 +55,7 @@ TEST(ReplicatedFastCountMetricsTest, MetricsInitialization) {
              MetricNames::kReplicatedFastCountWatermarksWritten,
              MetricNames::kReplicatedFastCountTailerWatermarksSeen,
              MetricNames::kReplicatedFastCountWatermarkAwaitTimeMsTotal,
+             MetricNames::kReplicatedFastCountCheckpointsValidated,
          }) {
         EXPECT_EQ(capturer.readInt64Counter(counterName), 0);
     }

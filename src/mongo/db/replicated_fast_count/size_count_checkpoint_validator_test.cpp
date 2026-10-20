@@ -17,6 +17,8 @@
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/otel/metrics/metric_names.h"
+#include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/log_capture.h"
 #include "mongo/unittest/server_parameter_guard.h"
@@ -589,6 +591,58 @@ TEST_F(SizeCountCheckpointValidatorTest, DeltasPastNewestWatermarkStayOutOfCheck
              .uuid = tailUuid,
              .delta = ReplicatedMetadataDelta{
                  .metadata = {.sizeCount = CollectionSizeCount{.size = 30, .count = 3}}}}});
+}
+
+TEST_F(SizeCountCheckpointValidatorTest, CheckpointsValidatedCounterIncrementsWhenParamOn) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        GTEST_SKIP() << "Skipping test due to OTel metrics being unavailable in this build";
+    }
+    const UUID uuid = UUID::gen();
+    const std::vector<repl::OplogEntry> ops{
+        makeWatermarkEntry(kT1),
+        makeCheckpointEntry(kT1,
+                            {{uuid,
+                              CollectionReplicatedMetadata{
+                                  .sizeCount = CollectionSizeCount{.size = 10, .count = 1}}}})};
+    applyBatch(validator,
+               ops,
+               std::vector<ValidatorDeltaRecord>{
+                   {.ts = kT0,
+                    .uuid = uuid,
+                    .delta = ReplicatedMetadataDelta{
+                        .metadata = {.sizeCount = CollectionSizeCount{.size = 10, .count = 1}}}}});
+
+    EXPECT_EQ(capturer.readInt64Counter(
+                  otel::metrics::MetricNames::kReplicatedFastCountCheckpointsValidated),
+              1);
+}
+
+TEST_F(SizeCountCheckpointValidatorTest, CheckpointsValidatedCounterNotIncrementedWhenParamOff) {
+    unittest::ServerParameterGuard enableContinuousInternodePerCollectionValidation{
+        "enableContinuousInternodePerCollectionValidation", false};
+    otel::metrics::OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        GTEST_SKIP() << "Skipping test due to OTel metrics being unavailable in this build";
+    }
+    const UUID uuid = UUID::gen();
+    const std::vector<repl::OplogEntry> ops{
+        makeWatermarkEntry(kT1),
+        makeCheckpointEntry(kT1,
+                            {{uuid,
+                              CollectionReplicatedMetadata{
+                                  .sizeCount = CollectionSizeCount{.size = 10, .count = 1}}}})};
+    applyBatch(validator,
+               ops,
+               std::vector<ValidatorDeltaRecord>{
+                   {.ts = kT0,
+                    .uuid = uuid,
+                    .delta = ReplicatedMetadataDelta{
+                        .metadata = {.sizeCount = CollectionSizeCount{.size = 10, .count = 1}}}}});
+
+    EXPECT_EQ(capturer.readInt64Counter(
+                  otel::metrics::MetricNames::kReplicatedFastCountCheckpointsValidated),
+              0);
 }
 
 class SizeCountCheckpointValidatorDeathTest : public SizeCountCheckpointValidatorTest {};

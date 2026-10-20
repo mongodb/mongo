@@ -8,6 +8,7 @@
 #include "mongo/db/repl/container_oplog_entry_serialization.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_metrics.h"
 #include "mongo/db/replicated_fast_count/size_count_store.h"
 #include "mongo/db/replicated_fast_count/size_count_timestamp_store_oplog.h"
 #include "mongo/db/storage/ident.h"
@@ -296,6 +297,7 @@ void SizeCountCheckpointValidator::mergeAndValidate(const ValidatorBuffers& thre
         // validate/log for now because it will be noisy.
         if (repl::enableContinuousInternodePerCollectionValidation.load()) {
             validateCheckpoint(standby, primary, ReportingStrategy::kFassert);
+            incrementCheckpointsValidatedCount();
         }
 
         // After validating the checkpoint, we consider all intervals with cutoff <= validAsOf

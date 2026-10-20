@@ -41,6 +41,7 @@ void incrementUpdateCount();
 
 void incrementWatermarksWrittenCount();
 void incrementTailerWatermarksSeenCount();
+void incrementCheckpointsValidatedCount();
 /**
  * Accumulates the time the flusher spent blocked in
  * `SizeCountCheckpointBuffer::awaitCheckoutForFlush()` waiting for the oplog tailer to cut a
