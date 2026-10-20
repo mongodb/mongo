@@ -7,6 +7,20 @@ import {assertCatalogListOperationsConsistencyForDb} from "jstests/libs/catalog_
 import {CommandSequenceWithRetries} from "jstests/libs/command_sequence_with_retries.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
+const kMaxValidateAttempts = 5;
+
+// True only if every failure is a replication state change interrupt, so a real validation failure
+// is never masked.
+function isInterruptedByReplStateChange(validateRes) {
+    return (
+        !validateRes.ok &&
+        validateRes.failed_res.length > 0 &&
+        validateRes.failed_res.every(
+            (res) => res.code === ErrorCodes.InterruptedDueToReplStateChange,
+        )
+    );
+}
+
 MongoRunner.validateCollectionsCallback = function (port, options) {
     options = options || {};
     const CommandSequenceWithRetriesImpl =
@@ -33,6 +47,11 @@ MongoRunner.validateCollectionsCallback = function (port, options) {
     // Set secondaryOk=true so that we can run commands against any secondaries.
     conn.setSecondaryOk();
 
+    // TODO(SERVER-112500): Remove this check.
+    const skipStepdown =
+        TestData.doesNotSupportGracefulPlannedStepdown ||
+        TestData.doesNotSupportGracefulUnplannedStepdown;
+
     let dbs;
     let result = new CommandSequenceWithRetriesImpl(conn)
         .then("running the isMaster command", function (conn) {
@@ -54,11 +73,7 @@ MongoRunner.validateCollectionsCallback = function (port, options) {
             }
         })
         .then("best effort to step down node forever", function (conn) {
-            // TODO(SERVER-112500): Remove this check.
-            if (
-                TestData.doesNotSupportGracefulPlannedStepdown ||
-                TestData.doesNotSupportGracefulUnplannedStepdown
-            ) {
+            if (skipStepdown) {
                 jsTest.log.info("Skipping stepdown as it is not supported in this test");
                 return true;
             }
@@ -162,7 +177,22 @@ MongoRunner.validateCollectionsCallback = function (port, options) {
             try {
                 const token = tenant ? _createTenantToken({tenant}) : undefined;
                 conn._setSecurityToken(token);
-                const validate_res = validateCollectionsImpl(conn.getDB(dbName), validateOptions);
+                let validate_res = validateCollectionsImpl(conn.getDB(dbName), validateOptions);
+                // Without the stepdown and freeze above, a node can change state mid-validate and
+                // interrupt it. Retry validation in this case.
+                let attempts = 1;
+                while (
+                    skipStepdown &&
+                    attempts < kMaxValidateAttempts &&
+                    isInterruptedByReplStateChange(validate_res)
+                ) {
+                    jsTest.log.info(
+                        "Retrying validation interrupted by a replica set state change",
+                        {dbName, attempts, failedRes: validate_res.failed_res},
+                    );
+                    validate_res = validateCollectionsImpl(conn.getDB(dbName), validateOptions);
+                    ++attempts;
+                }
                 if (!validate_res.ok) {
                     return {
                         shouldStop: true,
