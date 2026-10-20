@@ -18,8 +18,10 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/internode_validation_hash_utils.h"
+#include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_test_helpers.h"
@@ -32,6 +34,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
+#include "mongo/db/shard_role/shard_catalog/document_validation.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/db/storage/key_string/key_string.h"
@@ -1409,6 +1412,61 @@ INSTANTIATE_TEST_SUITE_P(
                                      BSON("_id" << "x" << "requiredField" << 142)),
                      testing::Values(SchemaViolationTestMode::ExpectFailOnCollectionValidation,
                                      SchemaViolationTestMode::ExpectFailOnDocumentInsert)));
+
+// Creates a 'constraint' validationLevel collection containing a single non-compliant document.
+void insertNonCompliantDocAtConstraintLevel(OperationContext* opCtx,
+                                            repl::StorageInterface* storageInterface,
+                                            const NamespaceString& constraintNss) {
+    const auto validatorDoc = fromjson(R"BSON(
+        { $jsonSchema:
+          {
+            bsonType: "object",
+            required: ["requiredField"],
+            properties: {
+              requiredField: { bsonType: "int", minimum: 1, maximum: 100 }
+            }
+          }
+        }
+        )BSON");
+
+    ASSERT_OK(storageInterface->createCollection(
+        opCtx,
+        constraintNss,
+        {.validator = validatorDoc, .validationLevel = ValidationLevelEnum::constraint}));
+
+    WriteUnitOfWork wuow(opCtx);
+    const AutoGetCollection coll(opCtx, constraintNss, MODE_IX);
+    // Simulate corruption: a non-compliant document can only end up in a constraint-level
+    // collection by bypassing validation as an internal operation.
+    DisableDocumentValidationForInternalOp disableValidation(opCtx);
+    ASSERT_OK(Helpers::insert(opCtx, *coll, BSON("_id" << "x")));
+    wuow.commit();
+}
+
+// At 'constraint' validationLevel a non-compliant document on a primary is data corruption, so
+// validation must fail with an error rather than a warning.
+TEST_F(CollectionValidationTest, SchemaViolationAtConstraintLevelIsError) {
+    auto opCtx = operationContext();
+    const auto constraintNss =
+        NamespaceString::createNamespaceString_forTest("test.constraint_violation");
+    insertNonCompliantDocAtConstraintLevel(opCtx, storageInterface(), constraintNss);
+
+    foregroundValidate(constraintNss, opCtx, {.valid = false, .numRecords = 1, .numErrors = 1});
+}
+
+// A secondary may transiently observe non-compliant documents while applying oplog entries, so at
+// 'constraint' validationLevel such documents are only reported as warnings on a secondary.
+TEST_F(CollectionValidationTest, SchemaViolationAtConstraintLevelOnSecondaryIsWarning) {
+    auto opCtx = operationContext();
+    const auto constraintNss =
+        NamespaceString::createNamespaceString_forTest("test.constraint_violation");
+    insertNonCompliantDocAtConstraintLevel(opCtx, storageInterface(), constraintNss);
+
+    ASSERT_OK(
+        repl::ReplicationCoordinator::get(opCtx)->setFollowerMode(repl::MemberState::RS_SECONDARY));
+
+    foregroundValidate(constraintNss, opCtx, {.valid = true, .numRecords = 1, .numWarnings = 1});
+}
 
 template <class T = BSONObj>
 BSONObj replaceNestedField(const BSONObj& bson,

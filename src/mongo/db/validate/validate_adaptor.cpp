@@ -24,6 +24,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/internode_validation_hash_utils.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/rss/persistence_provider.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -800,6 +801,18 @@ auto ValidateAdaptor::traverseRecordStoreImpl(OperationContext* opCtx,
         const auto& coll = _validateState->getCollection();
         const auto rs = coll->getRecordStore();
 
+        // At 'constraint' validationLevel, bypassDocumentValidation and validator changes are
+        // prohibited, so every document a primary accepts must satisfy the validator. A
+        // non-compliant document therefore represents data corruption rather than a benign
+        // bypassed write, so such documents are reported as errors (which fails validation) instead
+        // of warnings. This is only enforced on primaries (or standalones), since a secondary may
+        // transiently observe non-compliant documents while applying oplog entries.
+        const auto* const replCoord = repl::ReplicationCoordinator::get(opCtx);
+        const bool constraintViolationIsError =
+            validationLevelOrDefault(coll->getValidationLevel()) ==
+                ValidationLevelEnum::constraint &&
+            (!replCoord->getSettings().isReplSet() || replCoord->getMemberState().primary());
+
         for (const auto& indexIdent : indexIdents) {
             indexEntries.push_back(coll->getIndexCatalog()->findIndexByIdent(opCtx, indexIdent));
         }
@@ -1058,6 +1071,16 @@ auto ValidateAdaptor::traverseRecordStoreImpl(OperationContext* opCtx,
                                 "reason"_attr = description,
                                 "status"_attr = schemaValidationStatus);
                             results.validateResults.addError(description);
+                        } else if (constraintViolationIsError) {
+                            LOGV2_ERROR_OPTIONS(
+                                13475800,
+                                {logv2::LogTruncation::Disabled},
+                                "Document is not compliant with the collection's schema at "
+                                "'constraint' validationLevel",
+                                logAttrs(coll->ns()),
+                                "recordId"_attr = record->id,
+                                "reason"_attr = description);
+                            results.validateResults.addError(description, /*stopValidation=*/false);
                         } else {
                             LOGV2_WARNING_OPTIONS(
                                 5363500,
