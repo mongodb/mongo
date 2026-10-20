@@ -180,15 +180,6 @@ inline Atomic<bool>& gKnobNoTableScan = storageGlobalParams.noTableScan;
          kInternalQueryExplainJoinCostComponentsName,                                     \
          internalQueryExplainJoinCostComponents,                                          \
          getExplainJoinCostComponents)                                                    \
-    /* Parallel query */                                                                  \
-    KNOB(kEnableParallelQuery,                                                            \
-         kInternalQueryEnableParallelQueryName,                                           \
-         internalQueryEnableParallelQuery,                                                \
-         isParallelQueryEnabled)                                                          \
-    KNOB(kMaxDegreeOfParallelism,                                                         \
-         kInternalQueryMaxDegreeOfParallelismName,                                        \
-         internalQueryMaxDegreeOfParallelism,                                             \
-         getMaxDegreeOfParallelism)                                                       \
     /* Join optimization */                                                               \
     KNOB(kEnableJoinOptimization,                                                         \
          kInternalEnableJoinOptimizationName,                                             \
