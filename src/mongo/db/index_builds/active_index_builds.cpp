@@ -52,27 +52,42 @@ namespace {
 auto& activeIndexBuildsGauge = otel::metrics::MetricsService::instance().createInt64Gauge(
     otel::metrics::MetricNames::kIndexBuildsActive,
     "Number of index builds currently in progress",
-    otel::metrics::MetricUnit::kOperations);
+    otel::metrics::MetricUnit::kOperations,
+    otel::metrics::GaugeOptions{
+        .serverStatusOptions = otel::metrics::ServerStatusOptions{
+            .dottedPath = "indexBuilds.active", .role = ClusterRole::ShardServer}});
 
 auto& succeededIndexBuildsCounter = otel::metrics::MetricsService::instance().createInt64Counter(
     otel::metrics::MetricNames::kIndexBuildsSucceeded,
     "Number of index builds that completed successfully, including no-op completions",
-    otel::metrics::MetricUnit::kOperations);
+    otel::metrics::MetricUnit::kOperations,
+    otel::metrics::CounterOptions{
+        .serverStatusOptions = otel::metrics::ServerStatusOptions{
+            .dottedPath = "indexBuilds.succeeded", .role = ClusterRole::ShardServer}});
 
 auto& failedIndexBuildsCounter = otel::metrics::MetricsService::instance().createInt64Counter(
     otel::metrics::MetricNames::kIndexBuildsFailed,
     "Number of index builds that did not complete successfully",
-    otel::metrics::MetricUnit::kOperations);
+    otel::metrics::MetricUnit::kOperations,
+    otel::metrics::CounterOptions{
+        .serverStatusOptions = otel::metrics::ServerStatusOptions{
+            .dottedPath = "indexBuilds.failed", .role = ClusterRole::ShardServer}});
 
 auto& toBeResumedIndexBuildsCounter = otel::metrics::MetricsService::instance().createInt64Counter(
     otel::metrics::MetricNames::kIndexBuildsToBeResumed,
     "Number of index builds that were interrupted and will be resumed",
-    otel::metrics::MetricUnit::kOperations);
+    otel::metrics::MetricUnit::kOperations,
+    otel::metrics::CounterOptions{
+        .serverStatusOptions = otel::metrics::ServerStatusOptions{
+            .dottedPath = "indexBuilds.toBeResumed", .role = ClusterRole::ShardServer}});
 
 auto& startedIndexBuildsCounter = otel::metrics::MetricsService::instance().createInt64Counter(
     otel::metrics::MetricNames::kIndexBuildsStarted,
     "Number of index builds started",
-    otel::metrics::MetricUnit::kOperations);
+    otel::metrics::MetricUnit::kOperations,
+    otel::metrics::CounterOptions{
+        .serverStatusOptions = otel::metrics::ServerStatusOptions{
+            .dottedPath = "indexBuilds.started", .role = ClusterRole::ShardServer}});
 
 auto& resumeSucceededCounter =
     otel::metrics::MetricsService::instance().createInt64Counter<std::string_view>(

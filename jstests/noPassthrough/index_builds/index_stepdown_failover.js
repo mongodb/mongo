@@ -118,6 +118,11 @@ if (primaryDriven) {
             metrics.failed === primaryBaselineMetrics.failed,
         "Expected the stepped-down primary to record the index build as to-be-resumed, not failed",
     );
+    assert.eq(
+        primary.getDB("admin").serverStatus().metrics.indexBuilds.toBeResumed,
+        primaryBaselineMetrics.toBeResumed + 1,
+        "Expected serverStatus to also record the index build as to-be-resumed",
+    );
     waitForIndexStatusMetrics(
         metricsDirsByNodeId[secondaryNodeId],
         baselineStart,

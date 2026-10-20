@@ -1,5 +1,6 @@
 /**
- * Validates index build activity, completion, duration, and failure metrics.
+ * Validates index build activity, completion, duration, and failure metrics, as reported by both
+ * OTel and serverStatus.
  *
  * @tags: [requires_otel_build, requires_replication]
  */
@@ -58,16 +59,43 @@ assert.commandWorked(
     ]),
 );
 
-const baselineStart = new Date();
-waitForIndexStatusMetrics(
-    metricsDir,
-    baselineStart,
-    (metrics) =>
-        metrics.active === 0 &&
-        metrics.started === 0 &&
-        metrics.succeeded === 0 &&
-        metrics.failed === 0 &&
-        metrics.lastCommittedMillis === 0,
+const statusFields = [
+    "active",
+    "started",
+    "succeeded",
+    "failed",
+    "toBeResumed",
+    "lastCommittedMillis",
+];
+
+// Waits until OTel reports the expected index build status metrics, then checks that serverStatus
+// reports the same.
+function assertIndexBuildStatusMetrics(afterDate, expectedMetrics, message) {
+    waitForIndexStatusMetrics(
+        metricsDir,
+        afterDate,
+        (metrics) => statusFields.every((field) => metrics[field] === expectedMetrics[field]),
+        message,
+    );
+
+    const indexBuilds = assert.commandWorked(primary.adminCommand({serverStatus: 1})).metrics
+        .indexBuilds;
+
+    // lastCommittedMillis is only reported once it is non-zero.
+    const serverStatusMetrics = {
+        active: Number(indexBuilds.active),
+        started: Number(indexBuilds.started),
+        succeeded: Number(indexBuilds.succeeded),
+        failed: Number(indexBuilds.failed),
+        toBeResumed: Number(indexBuilds.toBeResumed),
+        lastCommittedMillis: Number(indexBuilds.phases?.lastCommittedMillis ?? 0),
+    };
+    assert.docEq(expectedMetrics, serverStatusMetrics, "serverStatus metrics do not match");
+}
+
+assertIndexBuildStatusMetrics(
+    new Date(),
+    {active: 0, started: 0, succeeded: 0, failed: 0, toBeResumed: 0, lastCommittedMillis: 0},
     "Expected index build metrics to start at zero",
 );
 
@@ -77,14 +105,9 @@ const successStart = new Date();
 const awaitSuccess = IndexBuildTest.startIndexBuild(primary, successColl.getFullName(), {a: 1});
 
 IndexBuildTest.waitForIndexBuildToScanCollection(testDB, successCollName, "a_1");
-waitForIndexStatusMetrics(
-    metricsDir,
+assertIndexBuildStatusMetrics(
     successStart,
-    (metrics) =>
-        metrics.active === 1 &&
-        metrics.started === 1 &&
-        metrics.succeeded === 0 &&
-        metrics.failed === 0,
+    {active: 1, started: 1, succeeded: 0, failed: 0, toBeResumed: 0, lastCommittedMillis: 0},
     "Expected active gauge to reflect successful in-progress build",
 );
 
@@ -96,18 +119,13 @@ awaitSuccess();
 const {lastCommittedMillis} = waitForIndexStatusMetrics(
     metricsDir,
     successStart,
-    (metrics) =>
-        metrics.active === 0 &&
-        metrics.started === 1 &&
-        metrics.succeeded === 1 &&
-        metrics.failed === 0 &&
-        metrics.lastCommittedMillis >= 1000,
-    "Expected completed counter and last committed duration to update after successful build",
+    (metrics) => metrics.lastCommittedMillis >= 1000,
+    "Expected last committed duration to be at least a second after successful build",
 );
-assert.eq(
-    lastCommittedMillis,
-    testDB.serverStatus().metrics.indexBuilds.phases.lastCommittedMillis,
-    "OTel and serverStatus should report the same last committed duration",
+assertIndexBuildStatusMetrics(
+    successStart,
+    {active: 0, started: 1, succeeded: 1, failed: 0, toBeResumed: 0, lastCommittedMillis},
+    "Expected completed counter to update after successful build",
 );
 
 jsTest.log.info("Running failing unique index build");
@@ -122,29 +140,18 @@ const awaitFailure = IndexBuildTest.startIndexBuild(
 );
 
 IndexBuildTest.waitForIndexBuildToScanCollection(testDB, failureCollName, "a_1");
-waitForIndexStatusMetrics(
-    metricsDir,
+assertIndexBuildStatusMetrics(
     failureStart,
-    (metrics) =>
-        metrics.active === 1 &&
-        metrics.started === 2 &&
-        metrics.succeeded === 1 &&
-        metrics.failed === 0,
+    {active: 1, started: 2, succeeded: 1, failed: 0, toBeResumed: 0, lastCommittedMillis},
     "Expected active gauge to reflect failing in-progress build",
 );
 
 IndexBuildTest.resumeIndexBuilds(primary);
 awaitFailure();
 
-waitForIndexStatusMetrics(
-    metricsDir,
+assertIndexBuildStatusMetrics(
     failureStart,
-    (metrics) =>
-        metrics.active === 0 &&
-        metrics.started === 2 &&
-        metrics.succeeded === 1 &&
-        metrics.failed === 1 &&
-        metrics.lastCommittedMillis === lastCommittedMillis,
+    {active: 0, started: 2, succeeded: 1, failed: 1, toBeResumed: 0, lastCommittedMillis},
     "Expected failed counter to increment after duplicate-key build failure, without changing the " +
         "last committed duration",
 );
@@ -161,14 +168,9 @@ const awaitAborted = IndexBuildTest.startIndexBuild(
 );
 
 IndexBuildTest.waitForIndexBuildToScanCollection(testDB, abortedCollName, "b_1");
-waitForIndexStatusMetrics(
-    metricsDir,
+assertIndexBuildStatusMetrics(
     abortedStart,
-    (metrics) =>
-        metrics.active === 1 &&
-        metrics.started === 3 &&
-        metrics.succeeded === 1 &&
-        metrics.failed === 1,
+    {active: 1, started: 3, succeeded: 1, failed: 1, toBeResumed: 0, lastCommittedMillis},
     "Expected active gauge to reflect aborted in-progress build",
 );
 
@@ -184,14 +186,9 @@ IndexBuildTest.resumeIndexBuilds(primary);
 awaitAborted();
 awaitDrop();
 
-waitForIndexStatusMetrics(
-    metricsDir,
+assertIndexBuildStatusMetrics(
     abortedStart,
-    (metrics) =>
-        metrics.active === 0 &&
-        metrics.started === 3 &&
-        metrics.succeeded === 1 &&
-        metrics.failed === 2,
+    {active: 0, started: 3, succeeded: 1, failed: 2, toBeResumed: 0, lastCommittedMillis},
     "Expected externally aborted build to increment failed counter",
 );
 
