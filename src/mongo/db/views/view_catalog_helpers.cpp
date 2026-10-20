@@ -55,25 +55,16 @@ namespace mongo {
 namespace view_catalog_helpers {
 
 namespace {
+
+// Lite-parses 'pipeline' (retrying on IFR flag rejections) and validates it for use as a view
+// definition.
 LiteParsedPipeline liteParseAndValidateWithIfrRetry(const OperationContext* opCtx,
                                                     const NamespaceString& nss,
                                                     const std::vector<BSONObj>& pipeline,
                                                     bool performApiVersionChecks) {
-    auto ifrContext = std::make_shared<IncrementalFeatureRolloutContext>();
-
-    return retryOn<ErrorCodes::IFRFlagRetry>(
-        "validateViewPipeline",
-        [&] {
-            LiteParsedPipeline liteParsedPipeline(
-                nss, pipeline, false, LiteParserOptions{.ifrContext = ifrContext});
+    return LiteParsedPipeline::liteParseWithIfrRetry(
+        nss, pipeline, [&](LiteParsedPipeline& liteParsedPipeline) {
             liteParsedPipeline.validate(opCtx, performApiVersionChecks);
-            return liteParsedPipeline;
-        },
-        kDefaultMaxRetries,
-        [&](const ExceptionFor<ErrorCodes::IFRFlagRetry>& ex) {
-            auto* flag = IncrementalRolloutFeatureFlag::findByName(
-                ex.extraInfo<IFRFlagRetryInfo>()->getDisabledFlagName());
-            ifrContext->disableFlag(*flag);
         });
 }
 }  // namespace

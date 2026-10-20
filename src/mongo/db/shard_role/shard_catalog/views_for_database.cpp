@@ -16,6 +16,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/namespace_string_util.h"
+#include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/oplog.h"
@@ -99,6 +100,7 @@ Status ViewsForDatabase::_reload(OperationContext* opCtx,
                                                                               MODE_IS));
 
     auto cursor = systemViews->getCursor(opCtx);
+    Status errorStatus = Status::OK();
     while (auto record = cursor->next()) {
         // Check the document is valid BSON, with only the expected fields.
         // Use the latest BSON validation version. Existing view definitions are allowed to contain
@@ -119,10 +121,26 @@ Status ViewsForDatabase::_reload(OperationContext* opCtx,
             continue;
         }
 
+        try {
+            LiteParsedPipeline::liteParseWithIfrRetry(
+                viewDefinition.getValue()->viewOn(),
+                viewDefinition.getValue()->pipeline(),
+                [](LiteParsedPipeline& liteParsedPipeline) {
+                    liteParsedPipeline.checkStagesAllowedInViewDefinition();
+                });
+        } catch (const ExceptionFor<ErrorCodes::OptionNotSupportedOnView>& ex) {
+            _invalidViewNames.insert(*viewName);
+            if (errorOnInvalid && errorStatus.isOK()) {
+                errorStatus = ex.toStatus();
+            }
+            continue;
+        } catch (const DBException&) {
+        }
+
         _upsertIntoMap(opCtx, std::move(viewDefinition.getValue()));
     }
 
-    return Status::OK();
+    return errorStatus;
 }
 
 Status ViewsForDatabase::reloadAllViews(OperationContext* opCtx, const CollectionPtr& systemViews) {

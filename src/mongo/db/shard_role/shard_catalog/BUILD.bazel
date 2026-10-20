@@ -126,6 +126,7 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
         "//src/mongo/db/collection_crud",
+        "//src/mongo/db/pipeline:lite_parsed_document_source",
         "//src/mongo/db/query/collation:collator_factory_interface",
         "//src/mongo/db/query/query_stats",
         "//src/mongo/db/shard_role:shard_role_api_stor_ex",

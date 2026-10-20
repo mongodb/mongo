@@ -61,6 +61,8 @@ last-patch:
       ticket: SERVER-134555
     - test_file: jstests/core/txns/multi_statement_transaction_command_args.js
       ticket: SERVER-127661
+    - test_file: jstests/core/views/views_internal_only_stages.js
+      ticket: SERVER-137361
     - test_file: jstests/fle2/create_encrypted_collection.js
       ticket: SERVER-130498
     - test_file: jstests/fle2/implicit_ecoc_creation.js
@@ -186,6 +188,8 @@ last-continuous:
       ticket: SERVER-134555
     - test_file: jstests/core/txns/multi_statement_transaction_command_args.js
       ticket: SERVER-127661
+    - test_file: jstests/core/views/views_internal_only_stages.js
+      ticket: SERVER-137361
     - test_file: jstests/fle2/create_encrypted_collection.js
       ticket: SERVER-130498
     - test_file: jstests/fle2/implicit_ecoc_creation.js
@@ -667,6 +671,8 @@ last-lts:
       ticket: SERVER-127661
     - test_file: jstests/core/txns/rename_collection_not_blocked_by_txn.js
       ticket: SERVER-106706
+    - test_file: jstests/core/views/views_internal_only_stages.js
+      ticket: SERVER-137361
     - test_file: jstests/core/write/bypass_empty_ts_replacement.js
       ticket: SERVER-88750
     - test_file: jstests/core/write/bypass_empty_ts_replacement_bulk_write.js

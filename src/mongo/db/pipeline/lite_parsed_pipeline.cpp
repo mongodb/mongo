@@ -8,9 +8,12 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/ifr_flag_retry_info.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/owned_lite_parsed_pipeline.h"
 #include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/query/util/retry.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/stats/counters.h"
@@ -227,6 +230,34 @@ void LiteParsedPipeline::validateTimeseries() const {
     }
 }
 
+LiteParsedPipeline LiteParsedPipeline::liteParseWithIfrRetry(
+    const NamespaceString& nss,
+    const std::vector<BSONObj>& pipelineStages,
+    const std::function<void(LiteParsedPipeline&)>& postParse) {
+    auto ifrContext = std::make_shared<IncrementalFeatureRolloutContext>();
+
+    return retryOn<ErrorCodes::IFRFlagRetry>(
+        "liteParsePipeline",
+        [&] {
+            LiteParsedPipeline liteParsedPipeline(
+                nss, pipelineStages, false, LiteParserOptions{.ifrContext = ifrContext});
+            postParse(liteParsedPipeline);
+            return liteParsedPipeline;
+        },
+        kDefaultMaxRetries,
+        [&](const ExceptionFor<ErrorCodes::IFRFlagRetry>& ex) {
+            auto retryInfo = ex.extraInfo<IFRFlagRetryInfo>();
+            tassert(13736100, "IFR retry is missing its IFRFlagRetryInfo", retryInfo);
+            std::string_view disabledFlagName = retryInfo->getDisabledFlagName();
+            auto* flag = IncrementalRolloutFeatureFlag::findByName(disabledFlagName);
+            tassert(13736101,
+                    str::stream() << "IFR retry referenced an unknown feature flag: "
+                                  << disabledFlagName,
+                    flag);
+            ifrContext->disableFlag(*flag);
+        });
+}
+
 void LiteParsedPipeline::checkStagesAllowedInViewDefinition() const {
     for (auto stage_it = _stageSpecs.begin(); stage_it != _stageSpecs.end(); stage_it++) {
         const auto& stage = *stage_it;
@@ -247,6 +278,12 @@ void LiteParsedPipeline::checkStagesAllowedInViewDefinition() const {
                                      "definition",
                     !stageSpecHasField(*stage, fieldName));
         }
+
+        // Internal-only stages must never be stored in a view definition.
+        uassert(ErrorCodes::OptionNotSupportedOnView,
+                str::stream() << stage->getParseTimeName()
+                              << " is an internal stage and cannot be used in a view definition",
+                stage->getClientType() != AllowedWithClientType::kInternal);
 
         if (auto* subPipelines = stage->getSubPipelines()) {
             for (auto&& subPipeline : *subPipelines) {

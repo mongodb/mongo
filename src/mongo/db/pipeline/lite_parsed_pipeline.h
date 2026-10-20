@@ -88,6 +88,16 @@ public:
     }
 
     /**
+     * Lite-parses 'pipelineStages' (retrying on IFR flag rejections by disabling the corresponding
+     * flags in a fresh IFR context) and runs 'postParse' on the result before returning it.
+     * 'postParse' may throw to reject the pipeline.
+     */
+    static LiteParsedPipeline liteParseWithIfrRetry(
+        const NamespaceString& nss,
+        const std::vector<BSONObj>& pipelineStages,
+        const std::function<void(LiteParsedPipeline&)>& postParse);
+
+    /**
      * Copy constructor. Calls clone on each LiteParsedDocumentSource in the pipeline and copies
      * member variables.
      */
