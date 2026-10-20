@@ -31,6 +31,8 @@ last-patch:
       ticket: SERVER-135492
     - test_file: jstests/auth/apply_ops_uuid_ddl_auth_divergence.js
       ticket: SERVER-130139
+    - test_file: jstests/auth/bulk_write_buckets_nss_confusion.js
+      ticket: SERVER-131411
     - test_file: jstests/change_streams/update_lookup_before_ddl.js
       ticket: SERVER-134745
     - test_file: jstests/concurrency/fsm_workloads/ddl/random_ddl/random_ddl_critical_section_with_replica_set_write_block.js
@@ -109,6 +111,8 @@ last-patch:
       ticket: SERVER-130431
     - test_file: jstests/sharding/timeseries/timeseries_bucket_untracked_premature_optimization.js
       ticket: SERVER-126814
+    - test_file: jstests/sharding/timeseries/timeseries_bulk_write_buckets_nss_confusion.js
+      ticket: SERVER-131411
     - test_file: jstests/sharding/txn_prepared_participant_unauthorized_commit_abort.js
       ticket: SERVER-130544
   suites: null
@@ -136,6 +140,8 @@ last-continuous:
       ticket: SERVER-135492
     - test_file: jstests/auth/apply_ops_uuid_ddl_auth_divergence.js
       ticket: SERVER-130139
+    - test_file: jstests/auth/bulk_write_buckets_nss_confusion.js
+      ticket: SERVER-131411
     - test_file: jstests/change_streams/change_stream_large_event_resumption.js
       ticket: SERVER-134795
     - test_file: jstests/change_streams/change_stream_metrics_update_lookup.js
@@ -282,6 +288,8 @@ last-continuous:
       ticket: SERVER-133988
     - test_file: jstests/sharding/timeseries/timeseries_bucket_untracked_premature_optimization.js
       ticket: SERVER-126814
+    - test_file: jstests/sharding/timeseries/timeseries_bulk_write_buckets_nss_confusion.js
+      ticket: SERVER-131411
     - test_file: jstests/sharding/txn_prepared_participant_unauthorized_commit_abort.js
       ticket: SERVER-130544
     - test_file: jstests/with_mongot/search_mocked/search_executor_shutdown_rejects_new_cursor.js
@@ -315,6 +323,8 @@ last-lts:
       ticket: SERVER-135492
     - test_file: jstests/auth/apply_ops_uuid_ddl_auth_divergence.js
       ticket: SERVER-130139
+    - test_file: jstests/auth/bulk_write_buckets_nss_confusion.js
+      ticket: SERVER-131411
     - test_file: jstests/change_streams/change_stream_large_event_resumption.js
       ticket: SERVER-134795
     - test_file: jstests/change_streams/change_stream_metrics_update_lookup.js
@@ -461,6 +471,8 @@ last-lts:
       ticket: SERVER-133988
     - test_file: jstests/sharding/timeseries/timeseries_bucket_untracked_premature_optimization.js
       ticket: SERVER-126814
+    - test_file: jstests/sharding/timeseries/timeseries_bulk_write_buckets_nss_confusion.js
+      ticket: SERVER-131411
     - test_file: jstests/sharding/txn_prepared_participant_unauthorized_commit_abort.js
       ticket: SERVER-130544
     - test_file: jstests/with_mongot/search_mocked/search_executor_shutdown_rejects_new_cursor.js
