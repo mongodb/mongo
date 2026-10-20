@@ -19,6 +19,9 @@
  *   assumes_stable_shard_list,
  *   # Knobs applied to the config DB time out internal config queries.
  *   config_shard_incompatible,
+ *   # The config fuzzer re-sets internalQueryStatsSampleRate at runtime, which races the exact
+ *   # knob-value assertions in explain output.
+ *   does_not_support_config_fuzzer,
  *   requires_fcv_90,
  * ]
  */
@@ -27,6 +30,7 @@ import {
     assertDropCollection,
 } from "jstests/libs/collection_drop_recreate.js";
 import {getExplainCommand} from "jstests/libs/cmd_object_utils.js";
+import {getCurrentFCV} from "jstests/libs/feature_compatibility_version.js";
 import {buildQueryKnobsModel} from "jstests/libs/property_test_helpers/models/query_knob_models.js";
 import {kPbtInterruptAfterTimeLimitMs} from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
@@ -35,6 +39,10 @@ import {runWithParamsAllNonConfigNodes} from "jstests/noPassthrough/libs/server_
 
 const numRuns = 50;
 const seed = 4;
+
+// How long to wait for query-settings knob overrides to be observable in explain output. Normal
+// convergence is on the order of milliseconds.
+const kKnobPropagationTimeoutMs = 30 * 1000;
 
 const coll = assertDropAndRecreateCollection(db, jsTestName());
 assert.commandWorked(coll.insert({x: 1}));
@@ -77,10 +85,16 @@ const knobSchema = db
     .toArray();
 assert.gt(knobSchema.length, 0, "expected at least one pqsSettable query knob");
 
+const currentFcv = getCurrentFCV(db);
+const eligibleKnobs = knobSchema.filter(
+    (knob) => !knob.minFcv || MongoRunner.compareBinVersions(currentFcv, knob.minFcv) >= 0,
+);
+assert.gt(eligibleKnobs.length, 0, "expected at least one FCV-eligible pqsSettable query knob");
+
 // The knob model is keyed by server parameter name, while setQuerySettings and explain address
 // knobs by their wire name.
-const wireNameByName = Object.fromEntries(knobSchema.map((knob) => [knob.name, knob.wireName]));
-const queryKnobsModel = buildQueryKnobsModel(knobSchema);
+const wireNameByName = Object.fromEntries(eligibleKnobs.map((knob) => [knob.name, knob.wireName]));
+const queryKnobsModel = buildQueryKnobsModel(eligibleKnobs);
 
 function valuesEqual(a, b) {
     return bsonWoCompare({v: a}, {v: b}) === 0;
@@ -108,13 +122,17 @@ function assertKnobValidationParity(knobToVal) {
         const explain = assert.commandWorked(db.runCommand(explainCmd));
         for (const [wireName, expectedValue] of Object.entries(queryKnobs)) {
             const knob = explain.queryKnobs?.[wireName];
-            assert(knob, "expected knob to appear in explain", {wireName, explain});
-            assert.eq(knob.source, expectedSource, "unexpected knob source", {wireName, knob});
-            assert(valuesEqual(knob.value, expectedValue), "unexpected knob value", {
+            assert(knob, `expected knob '${wireName}' to appear in explain`, {wireName, explain});
+            assert.eq(knob.source, expectedSource, `unexpected knob source for '${wireName}'`, {
                 wireName,
                 knob,
-                expectedValue,
             });
+            assert(
+                valuesEqual(knob.value, expectedValue),
+                `unexpected knob value for '${wireName}': expected ` +
+                    `${tojson(expectedValue)}, got ${tojson(knob.value)}`,
+                {wireName, knob, expectedValue},
+            );
         }
     }
 
@@ -132,10 +150,30 @@ function assertKnobValidationParity(knobToVal) {
         assertKnobsInExplain("querySettings", {userFacing: true});
         // The query settings knob values must win over the setParameter ones and be reported with
         // source "querySettings".
+        // TODO(SERVER-136720): remove the retry once the query settings install no longer skips
+        // on an unchanged clusterParameterTime.
         jsTest.log.info("Setting knobs via setQuerySettings: " + tojsononeline(queryKnobs));
-        qsutils.withQuerySettings(representativeQuery, {queryKnobs}, () =>
-            assertKnobsInExplain("querySettings"),
-        );
+        qsutils.withQuerySettings(representativeQuery, {queryKnobs}, () => {
+            let lastError = null;
+            assert.soon(
+                () => {
+                    try {
+                        assertKnobsInExplain("querySettings");
+                        return true;
+                    } catch (error) {
+                        lastError = error;
+                        return false;
+                    }
+                },
+                () =>
+                    `explain never reported source 'querySettings' for all knobs; last failure: ` +
+                    `${lastError?.message ?? lastError}`,
+                kKnobPropagationTimeoutMs,
+                500 /* interval */,
+                {runHangAnalyzer: false},
+                {queryKnobs},
+            );
+        });
     });
     return true;
 }

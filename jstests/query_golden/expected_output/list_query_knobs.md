@@ -13,7 +13,8 @@
 		"$unset" : [
 			"name",
 			"default",
-			"pqsSettable"
+			"pqsSettable",
+			"minFcv"
 		]
 	},
 	{
@@ -33,7 +34,7 @@ The C++ server parameter name, the default value, and pqsSettable are projected 
 they are not part of the PQS wire contract and can change without breaking compatibility.
 
 ## 2. Output
-Number of PQS-settable knobs: 72
+Number of PQS-settable knobs: 73
 
 ### cbrCEMode
 ```json
@@ -699,6 +700,24 @@ Number of PQS-settable knobs: 72
 	],
 	"type" : "long long",
 	"wireName" : "queryMaxSpoolMemoryUsageBytes"
+}
+```
+
+### queryStatsSampleRate
+```json
+{
+	"bounds" : [
+		{
+			"kind" : "lte",
+			"value" : 1
+		},
+		{
+			"kind" : "gte",
+			"value" : 0
+		}
+	],
+	"type" : "double",
+	"wireName" : "queryStatsSampleRate"
 }
 ```
 

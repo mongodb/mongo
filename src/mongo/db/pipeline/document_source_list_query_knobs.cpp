@@ -53,6 +53,9 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceListQueryKnobs::createFromBso
         bob.append("name", entry.param->name());
         bob.append("wireName", entry.wireName);
         bob.append("pqsSettable", entry.pqsSettable);
+        if (entry.minFcv) {
+            bob.append("minFcv", multiversion::toString(*entry.minFcv));
+        }
         entry.appendType(&bob);
         entry.appendConstraints(&bob);
         auto defaultValue = defaults.getValue(entry.id);

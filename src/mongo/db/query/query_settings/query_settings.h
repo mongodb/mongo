@@ -4,11 +4,13 @@
 #pragma once
 
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/query_knobs/query_knob.h"
 #include "mongo/db/query/query_knobs/query_knob_snapshot.h"
 #include "mongo/db/query/query_settings/query_settings_context.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/logv2/attribute_storage.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/overloaded_visitor.h"
 
 #include <variant>
 

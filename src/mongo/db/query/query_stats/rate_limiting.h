@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "mongo/db/query/query_knobs/query_knob.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/clock_source.h"
@@ -18,6 +19,20 @@
 #include <utility>
 
 namespace mongo {
+
+class OperationContext;
+
+/**
+ * Outcome of a rate-limited sampling decision for one request.
+ */
+enum class CollectDecision {
+    kCollected,
+    // Rejected by rate limiting while query stats collection remains enabled. Counts towards
+    // 'queryStatsRateLimitedRequestsMetric'.
+    kRateLimited,
+    // Not collected because query stats collection is disabled; does not count as rate limited.
+    kDisabled,
+};
 
 /*
  * The rate limiting policy is either a sliding window or a sampling based policy. The sliding
@@ -147,11 +162,16 @@ class RateLimiter {
          * A method that ensures a steady rate of requests. This method uses a pseudo random
          * number generator to determine whether the request should be handled or not.
          */
-        bool handle();
+        bool handle(SampleRate rate);
 
     private:
         Atomic<SampleRate> _samplingRate = 0;
-        Atomic<uint64_t> _randomSeed = 0;
+
+        /*
+         * Seeded at construction so the override path in handle(double) draws from a random
+         * stream even when the limiter is configured window-based (which never sets a seed).
+         */
+        Atomic<uint64_t> _randomSeed{static_cast<uint64_t>(SecureRandom().nextInt32())};
     };
 
 public:
@@ -173,6 +193,20 @@ public:
      * See WindowBasedPolicy::handle() & SampleBasedPolicy::handle() for more details.
      */
     bool handle();
+
+    /*
+     * Makes a sampling decision at the given fractional rate instead of consulting the configured
+     * cluster-wide policy.
+     */
+    bool handle(double samplingRate);
+
+    /*
+     * Full per-request decision for the command running on 'opCtx'. If this limiter has a
+     * sampling-rate knob and the operation's resolved query settings override that knob, the
+     * decision is made at the overridden rate. Otherwise the cluster-wide policy decides, with the
+     * caveat that a non-positive rate means collection is disabled entirely.
+     */
+    CollectDecision handle(OperationContext* opCtx);
 
     /*
      * Returns the policy type.
@@ -199,9 +233,17 @@ public:
     RateLimiter() = default;
     ~RateLimiter() = default;
 
+    /*
+     * The query-settings-settable knob whose per-operation override this limiter consults.
+     */
+    void setSamplingRateKnob(const QueryKnob<double>* samplingRateKnob) {
+        _samplingRateKnob.store(samplingRateKnob);
+    }
+
 private:
     SampleBasedPolicy _samplePolicy;
     WindowBasedPolicy _windowPolicy;
     Atomic<PolicyType> _mode = PolicyType::kWindowBasedPolicy;
+    Atomic<const QueryKnob<double>*> _samplingRateKnob{nullptr};
 };
 }  // namespace mongo

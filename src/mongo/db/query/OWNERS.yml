@@ -151,6 +151,9 @@ filters:
   - "query_knob_descriptors_execution.h":
     approvers:
       - 10gen/query-execution
+  - "query_knob_descriptors_integration*":
+    approvers:
+      - 10gen/query-integration
   - "query_execution_knobs*":
     approvers:
       - 10gen/query-execution

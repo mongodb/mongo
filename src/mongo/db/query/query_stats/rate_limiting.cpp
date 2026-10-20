@@ -3,9 +3,11 @@
 
 #include "mongo/db/query/query_stats/rate_limiting.h"
 
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/util/clock_source.h"
-#include "mongo/util/overloaded_visitor.h"
 
+#include <climits>
 #include <mutex>
 namespace mongo {
 
@@ -62,18 +64,54 @@ bool RateLimiter::WindowBasedPolicy::handle() {
     return false;
 }
 
-bool RateLimiter::SampleBasedPolicy::handle() {
-    SampleRate curRate = _samplingRate.load();
+bool RateLimiter::SampleBasedPolicy::handle(SampleRate rate) {
     thread_local PseudoRandom prng{_randomSeed.load()};
-    return prng.nextUInt32(kDenominator) < curRate;
+    return prng.nextUInt32(kDenominator) < rate;
+}
+
+bool RateLimiter::handle(double samplingRate) {
+    const auto rate = roundSampleRateToPerThousand(samplingRate);
+    if (rate <= 0) {
+        return false;
+    }
+    if (rate >= 1000) {
+        return true;
+    }
+    return _samplePolicy.handle(static_cast<SampleBasedPolicy::SampleRate>(rate));
 }
 
 bool RateLimiter::handle() {
     if (_mode.load() == RateLimiter::PolicyType::kWindowBasedPolicy) {
         return _windowPolicy.handle();
     } else {
-        return _samplePolicy.handle();
+        return _samplePolicy.handle(_samplePolicy.getSamplingRate());
     }
+}
+
+CollectDecision RateLimiter::handle(OperationContext* opCtx) {
+    if (const auto* samplingRateKnob = _samplingRateKnob.load()) {
+        // A per-query sampling-rate override (via query settings) takes precedence over the
+        // cluster-wide policy; the decision is made at the overridden rate. Query stats
+        // collection remains globally enabled, so a rejected override counts as rate limited.
+        const auto& knobConfig = QueryKnobConfiguration::get(opCtx);
+        if (knobConfig.getKnobSource(samplingRateKnob->id) == KnobSource::kQuerySettings) {
+            return handle(knobConfig.get(*samplingRateKnob)) ? CollectDecision::kCollected
+                                                             : CollectDecision::kRateLimited;
+        }
+    }
+
+    // Cannot collect queryStats if sampling rate is not greater than 0. Note that we do not
+    // increment queryStatsRateLimitedRequestsMetric here since queryStats is entirely disabled.
+    const auto samplingRate = getSamplingRate();
+    if (samplingRate <= 0) {
+        return CollectDecision::kDisabled;
+    }
+
+    // Check if rate limiting allows us to collect queryStats for this request.
+    if (samplingRate < INT_MAX && !handle()) {
+        return CollectDecision::kRateLimited;
+    }
+    return CollectDecision::kCollected;
 }
 
 RateLimiter::PolicyType RateLimiter::getPolicyType() const {

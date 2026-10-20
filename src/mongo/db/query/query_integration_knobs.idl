@@ -10,7 +10,9 @@ global:
         - "mongo/db/query/query_knob_expressions.h"
         - "mongo/db/query/query_stats/query_stats_on_parameter_change.h"
         - "mongo/platform/atomic.h"
-    mod_visibility: public
+    # Knob server parameters are implementation details of the query.knobs module: read
+    # them via QueryKnobConfiguration. Only the enums are part of the public API.
+    mod_visibility: private
 
 structs:
     InternalVectorSearchStoredSource:
@@ -26,6 +28,7 @@ structs:
 
 server_parameters:
     enableSearchMeta:
+        mod_visibility: needs_replacement
         description: >-
             Exists for backwards compatibility in startup parameters, enabling this was
             required on 4.4 to access SEARCH_META variables. Does not do anything.
@@ -36,6 +39,7 @@ server_parameters:
         redact: false
 
     internalQueryFLERewriteMemoryLimit:
+        mod_visibility: needs_replacement
         description: >-
             Maximum memory available for encrypted field query rewrites in bytes. Must be
             more than zero and less than 16Mb
@@ -50,6 +54,7 @@ server_parameters:
         redact: false
 
     internalQueryFLEAlwaysUseEncryptedCollScanMode:
+        mod_visibility: needs_replacement
         description: "Boolean flag to force FLE to always use low selectivity mode"
         set_at: [startup, runtime]
         cpp_varname: "internalQueryFLEAlwaysUseEncryptedCollScanMode"
@@ -59,6 +64,7 @@ server_parameters:
         redact: false
 
     internalQueryStatsRateLimit:
+        mod_visibility: needs_replacement
         description: >-
             The maximum number of queries per second that are sampled for query stats using window-based rate limiting.
             If the rate of queries goes above this number, then rate limiting will kick in, and any
@@ -78,6 +84,7 @@ server_parameters:
         redact: false
 
     internalQueryStatsSampleRate:
+        mod_visibility: private
         description: >-
             The fractional number representing the rate of the queries that are sampled for query stats using
             sampling-based rate limiting. To sample all queries, this can be set to 1.
@@ -95,10 +102,16 @@ server_parameters:
         validator:
             gte: 0.0
             lte: 1.0
-        on_update: query_stats_util::onQueryStatsSamplingRateUpdate
         redact: false
+        annotations:
+            query_knob:
+                wire_name: queryStatsSampleRate
+                pqs_settable: true
+                fcv:
+                    min: "9.1"
 
     internalQueryStatsWriteCmdSampleRate:
+        mod_visibility: needs_replacement
         description: >-
             The fractional number representing the rate of write operations that are sampled for
             query stats using sample-base rate limiting. To sample all write operations, this can be
@@ -117,6 +130,7 @@ server_parameters:
         redact: false
 
     internalQueryStatsCacheSize:
+        mod_visibility: needs_replacement
         description: >-
             The maximum amount of memory that the system will allocate for the query queryStats
             cache. Disables the query stats store when set to 0. This will accept values in either 
@@ -134,6 +148,7 @@ server_parameters:
         redact: false
 
     internalQueryStatsMaxErrorCodesPerShape:
+        mod_visibility: needs_replacement
         description: >-
             The maximum number of distinct recent error codes tracked per query shape in the query
             stats store. Once this limit is reached, the least recently seen error code entry for
@@ -148,6 +163,7 @@ server_parameters:
         redact: false
 
     internalQueryStatsErrorsAreCommandFatal:
+        mod_visibility: needs_replacement
         description: >-
             Whether errors in the $queryStats stage cause the aggregation pipeline to
             immediately fail and report the error. Note that this is always the case for debug builds.
@@ -182,6 +198,7 @@ server_parameters:
         redact: false
 
     internalQueryGlobalProfilingFilter:
+        mod_visibility: needs_replacement
         description: "Enables the setProfilingFilterGlobally command."
         set_at: [startup, runtime]
         cpp_varname: internalQueryGlobalProfilingFilter
@@ -190,6 +207,7 @@ server_parameters:
         redact: false
 
     internalQueryGlobalProfilingLockDeadlineMs:
+        mod_visibility: needs_replacement
         description: >-
             A number of milliseconds to wait for a lock acquisition to perform writes to the
             system.profile collection.
@@ -202,6 +220,7 @@ server_parameters:
             gte: 0
 
     internalProfilingMaxAbandonedWritesPerSecondPerDb:
+        mod_visibility: needs_replacement
         description: >-
             If there are more than this many lock timeouts per second when trying to profile, we will
             skip all future profiling for a given database. Lasts until profiling is manually
@@ -216,6 +235,7 @@ server_parameters:
             gte: 0
 
     internalQueryCollectOptimizerMetrics:
+        mod_visibility: needs_replacement
         description: "If true, collect query optimizer metrics in queryStats."
         set_at: [startup, runtime]
         cpp_varname: internalQueryCollectOptimizerMetrics
@@ -224,6 +244,7 @@ server_parameters:
         redact: false
 
     internalVectorSearchStoredSource:
+        mod_visibility: needs_replacement
         description: >-
             Controls whether $vectorSearch supports returnStoredSource: true as an option.
         set_at: cluster

@@ -17,6 +17,7 @@
 #include <utility>
 #include <variant>
 
+#include <boost/optional/optional.hpp>
 namespace mongo {
 
 // Removal sentinel (null on wire, used during PQS merge).

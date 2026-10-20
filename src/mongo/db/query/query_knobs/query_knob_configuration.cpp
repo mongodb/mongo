@@ -80,6 +80,10 @@ const QueryKnobConfiguration& QueryKnobConfiguration::get(OperationContext* opCt
     return *instance;
 }
 
+KnobSource QueryKnobConfiguration::getKnobSource(QueryKnobId id) const {
+    return _snapshot.getSource(id);
+}
+
 void QueryKnobConfiguration::reset_forTest(OperationContext* opCtx) {
     decoration(opCtx).reset();
 }

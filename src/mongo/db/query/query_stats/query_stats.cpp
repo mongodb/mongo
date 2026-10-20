@@ -15,6 +15,7 @@
 #include "mongo/db/query/lru_key_value.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
+#include "mongo/db/query/query_knob_descriptors_integration.h"
 #include "mongo/db/query/query_stats/query_stats_failed_to_record_info.h"
 #include "mongo/db/query/query_stats/query_stats_on_parameter_change.h"
 #include "mongo/db/query/query_stats/rate_limiting.h"
@@ -108,6 +109,9 @@ size_t getQueryStatsStoreSize() {
 void configureRateLimiter(ServiceContext* serviceCtx) {
     auto& limiter = QueryStatsStoreManager::getRateLimiter(serviceCtx);
 
+    // This limiter's rate can be overridden per operation via query settings.
+    limiter.setSamplingRateKnob(&query_knobs::kQueryStatsSampleRate);
+
     const auto configuredRateLimit = internalQueryStatsRateLimit.load();
     const auto configuredSamplingRate =
         RateLimiter::roundSampleRateToPerThousand(internalQueryStatsSampleRate.load());
@@ -125,6 +129,10 @@ void configureRateLimiter(ServiceContext* serviceCtx) {
  */
 void configureWriteCmdRateLimiter(ServiceContext* serviceCtx) {
     auto& limiter = QueryStatsStoreManager::getWriteCmdRateLimiter(serviceCtx);
+
+    // TODO(SERVER-134995): set the write limiter's sampling-rate knob via setSamplingRateKnob
+    // once write commands are query-settings-eligible. Until then its handle(opCtx) consults
+    // only the cluster-wide policy.
 
     const auto configuredSamplingRate =
         RateLimiter::roundSampleRateToPerThousand(internalQueryStatsWriteCmdSampleRate.load());
@@ -186,35 +194,6 @@ ServiceContext::ConstructorActionRegisterer queryStatsStoreManagerRegisterer{
  */
 bool isQueryStatsStoreEnabled(const ServiceContext* serviceCtx) {
     return QueryStatsStoreManager::get(serviceCtx)->getMaxSize() > 0;
-}
-
-/**
- * Internal check for whether we should collect metrics. This checks the rate limiting
- * configuration for a global on/off decision and, if enabled, delegates to the rate limiter.
- */
-bool shouldCollect(RateLimiter& limiter) {
-    // Cannot collect queryStats if sampling rate is not greater than 0. Note that we do not
-    // increment queryStatsRateLimitedRequestsMetric here since queryStats is entirely disabled.
-    const auto samplingRate = limiter.getSamplingRate();
-    if (samplingRate <= 0) {
-        LOGV2_DEBUG(8473001,
-                    5,
-                    "sampling rate is <= 0, skipping this request",
-                    "samplingRate"_attr = samplingRate);
-        return false;
-    }
-
-    // Check if rate limiting allows us to collect queryStats for this request.
-    if (samplingRate < INT_MAX && !limiter.handle()) {
-        queryStatsRateLimitedRequestsMetric.increment();
-        LOGV2_DEBUG(8473002,
-                    5,
-                    "rate limited this request",
-                    "samplingRate"_attr = samplingRate,
-                    "totalLimited"_attr = queryStatsRateLimitedRequestsMetric.get());
-        return false;
-    }
-    return true;
 }
 
 void updateCursorStatistics(CursorEntry& cursorEntryToUpdate, const QueryStatsSnapshot& snapshot) {
@@ -369,7 +348,7 @@ void insertQueryStatsEntry(QueryStatsStore::Partition& proofOfLock,
                                               : std::string{});
 }
 
-void registerRequestImpl(const OperationContext* opCtx,
+void registerRequestImpl(OperationContext* opCtx,
                          RateLimiter& rateLimiter,
                          const NamespaceString& collection,
                          const std::function<std::unique_ptr<Key>(void)>& makeKey,
@@ -402,7 +381,23 @@ void registerRequestImpl(const OperationContext* opCtx,
         return;
     }
 
-    if (!shouldCollect(rateLimiter)) {
+    // The rate limiter makes the sampling decision, honoring a per-query sampling-rate override
+    // (via query settings) over the cluster-wide rate limiter when one applies.
+    if (const CollectDecision decision = rateLimiter.handle(opCtx);
+        decision != CollectDecision::kCollected) {
+        if (decision == CollectDecision::kRateLimited) {
+            queryStatsRateLimitedRequestsMetric.increment();
+            LOGV2_DEBUG(8473002,
+                        5,
+                        "rate limited this request",
+                        "samplingRate"_attr = rateLimiter.getSamplingRate(),
+                        "totalLimited"_attr = queryStatsRateLimitedRequestsMetric.get());
+        } else if (decision == CollectDecision::kDisabled) {
+            LOGV2_DEBUG(8473001,
+                        5,
+                        "sampling rate is <= 0, skipping this request",
+                        "samplingRate"_attr = rateLimiter.getSamplingRate());
+        }
         queryStatsInfo.disableForSubqueryExecution = true;
         return;
     }
@@ -585,6 +580,9 @@ void registerWriteRequest(OperationContext* opCtx,
     RateLimiter& rateLimiter =
         QueryStatsStoreManager::getWriteCmdRateLimiter(opCtx->getServiceContext());
     auto& opDebug = CurOp::get(opCtx)->debug();
+    // TODO(SERVER-134995): wire the write limiter's sampling-rate knob (via
+    // 'setSamplingRateKnob') once write commands are query-settings-eligible; its
+    // handle(opCtx) will then honor per-query overrides with no further changes here.
     registerRequestImpl(opCtx, rateLimiter, collection, makeKey, opDebug.getQueryStatsInfo());
 }
 

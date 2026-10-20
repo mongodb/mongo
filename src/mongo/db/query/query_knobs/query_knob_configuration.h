@@ -7,6 +7,7 @@
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_knob_descriptors_execution.h"
+#include "mongo/db/query/query_knob_descriptors_integration.h"
 #include "mongo/db/query/query_knob_descriptors_optimization.h"
 #include "mongo/db/query/query_knobs/query_knob.h"
 #include "mongo/db/query/query_knobs/query_knob_snapshot.h"
@@ -25,6 +26,7 @@ namespace mongo {
 class [[MONGO_MOD_PUBLIC]] QueryKnobConfiguration
     : public query_knobs::AccessorMixinQueryOptimizationKnobs<QueryKnobConfiguration>,
       public query_knobs::AccessorMixinQueryExecutionKnobs<QueryKnobConfiguration>,
+      public query_knobs::AccessorMixinQueryIntegrationKnobs<QueryKnobConfiguration>,
       public query_knobs::AccessorMixinQueryStageMemoryLimitKnobs<QueryKnobConfiguration> {
 public:
     /**
@@ -76,6 +78,14 @@ public:
     // getSbeDisableGroupPushdownForOp(), ...) are generated from the knob tables by the
     // AccessorMixin base classes. Only accessors that compute over a knob rather than returning it
     // directly are declared here.
+
+    /**
+     * Returns where the value of 'id' came from for this operation. A source of
+     * KnobSource::kQuerySettings means the value was overridden via
+     * 'querySettings.queryKnobs' (or the query framework control) rather than a setParameter or
+     * the compiled-in default.
+     */
+    KnobSource getKnobSource(QueryKnobId id) const;
 
     /**
      * Returns true if internal query framework control knob is set to 'forceClassicEngine', false

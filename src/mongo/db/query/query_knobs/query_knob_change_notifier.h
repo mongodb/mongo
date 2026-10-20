@@ -20,7 +20,7 @@ template <typename T, typename U>
 concept HasOnUpdateHook =
     requires(T t) { t.setOnUpdate(std::declval<std::function<Status(const U&)>>()); };
 
-struct QueryKnobChange {
+struct [[MONGO_MOD_PARENT_PRIVATE]] QueryKnobChange {
     QueryKnobId id;
     QueryKnobValue newValue;
 };
@@ -67,7 +67,8 @@ private:
 };
 
 namespace detail {
-void registerQueryKnobListener(QueryKnobChangeNotifier::Listener&& listener);
+[[MONGO_MOD_PARENT_PRIVATE]] void registerQueryKnobListener(
+    QueryKnobChangeNotifier::Listener&& listener);
 }  // namespace detail
 
 // clang-format off

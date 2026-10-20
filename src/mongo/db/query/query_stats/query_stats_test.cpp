@@ -11,6 +11,11 @@
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/parsed_find_command.h"
+#include "mongo/db/query/query_knob_descriptors_integration.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration.h"
+#include "mongo/db/query/query_knobs/query_knob_snapshot.h"
+#include "mongo/db/query/query_settings/query_settings.h"
+#include "mongo/db/query/query_settings/query_settings_context_test_util.h"
 #include "mongo/db/query/query_stats/find_key.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/collection_type.h"
@@ -73,6 +78,59 @@ TEST_F(QueryStatsTest, TwoRegisterRequestsWithSameOpCtxRateLimitedFirstCall) {
     ASSERT(opDebug.getQueryStatsInfo().key == nullptr);
     ASSERT_EQ(opDebug.getQueryStatsInfo().disableForSubqueryExecution, true);
     ASSERT_FALSE(opDebug.getQueryStatsInfo().keyHash.has_value());
+}
+
+TEST_F(QueryStatsTest, QueryStatsSampleRateOverrideDetectedFromQuerySettings) {
+    auto opCtx = makeOperationContext();
+
+    query_settings::QuerySettingsGuardForTest settingsGuard{
+        opCtx.get(), BSON("queryKnobs" << BSON("queryStatsSampleRate" << 1.0))};
+
+    const auto& config = QueryKnobConfiguration::get(opCtx.get());
+    ASSERT_EQ(config.getKnobSource(query_knobs::kQueryStatsSampleRate.id),
+              KnobSource::kQuerySettings);
+    // The overridden value is readable through the generated accessor.
+    ASSERT_EQ(1.0, config.getQueryStatsSampleRate());
+    // An unrelated knob was not overridden.
+    ASSERT_EQ(config.getKnobSource(query_knobs::kPlanEvaluationWorks.id), KnobSource::kDefault);
+}
+
+TEST_F(QueryStatsTest, QueryStatsSampleRateNotOverriddenWithoutSettings) {
+    auto opCtx = makeOperationContext();
+    const auto& config = QueryKnobConfiguration::get(opCtx.get());
+    // With no query settings override, the knob comes from the global snapshot only.
+    ASSERT_NE(config.getKnobSource(query_knobs::kQueryStatsSampleRate.id),
+              KnobSource::kQuerySettings);
+}
+
+TEST_F(QueryStatsTest, QueryStatsSamplingRateOverrideResolvedFromSettingsState) {
+    auto opCtx = makeOperationContext();
+
+    // Settings carrying the knob resolve to the overridden rate through the knob configuration.
+    query_settings::QuerySettingsGuardForTest settingsGuard{
+        opCtx.get(), BSON("queryKnobs" << BSON("queryStatsSampleRate" << 0.25))};
+    const auto& config = QueryKnobConfiguration::get(opCtx.get());
+    ASSERT_EQ(config.getKnobSource(query_knobs::kQueryStatsSampleRate.id),
+              KnobSource::kQuerySettings);
+    ASSERT_EQ(config.get(query_knobs::kQueryStatsSampleRate), 0.25);
+}
+
+TEST_F(QueryStatsTest, QueryStatsSamplingRateOverrideAbsentForOtherKnobs) {
+    auto opCtx = makeOperationContext();
+
+    // Settings that do not carry 'queryStatsSampleRate' leave it at its global source, even when
+    // they carry another PQS-settable knob.
+    query_settings::QuerySettingsGuardForTest settingsGuard{
+        opCtx.get(),
+        BSON("queryKnobs" << BSON("queryMaxMemoryUsageBytesPerOperation" << 1024 * 1024))};
+    const auto& config = QueryKnobConfiguration::get(opCtx.get());
+    ASSERT_NE(config.getKnobSource(query_knobs::kQueryStatsSampleRate.id),
+              KnobSource::kQuerySettings);
+
+    // Reading the other knob through the same configuration observes its own override.
+    ASSERT_EQ(config.getKnobSource(query_knobs::kMaxMemoryUsageBytesPerOperation.id),
+              KnobSource::kQuerySettings);
+    ASSERT_EQ(config.get(query_knobs::kMaxMemoryUsageBytesPerOperation), 1024 * 1024);
 }
 
 TEST_F(QueryStatsTest, TwoRegisterRequestsWithSameOpCtxDisabledBetween) {

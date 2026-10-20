@@ -416,6 +416,7 @@ mongo_cc_library(
         "query_feature_flags_gen",
         "query_integration_knobs_gen",
         "query_knob_descriptors_execution.cpp",
+        "query_knob_descriptors_integration.cpp",
         "query_knob_descriptors_optimization.cpp",
         "query_optimization_knobs_gen",
         "sampling_ce_method.cpp",
@@ -425,6 +426,7 @@ mongo_cc_library(
     ],
     hdrs = [
         "query_knob_descriptors_execution.h",
+        "query_knob_descriptors_integration.h",
         "query_knob_descriptors_optimization.h",
     ],
     deps = [

@@ -155,6 +155,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/query:query_fcv_environment_for_test",
         "//src/mongo/db/query:query_knobs",
+        "//src/mongo/db/query/query_knobs:query_knob_configuration",
         "//src/mongo/db/query/query_knobs:query_knob_test_knobs",
         "//src/mongo/db/sharding_environment:sharding_mongos_test_fixture",
         "//src/mongo/executor:mock_async_rpc",

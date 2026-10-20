@@ -6,6 +6,7 @@
  *      do_not_wrap_aggregations_in_facets,
  * ]
  */
+import {isFCVgte} from "jstests/libs/feature_compatibility_version.js";
 import {describe, it} from "jstests/libs/mochalite.js";
 
 describe("$listQueryKnobs", function () {
@@ -48,6 +49,23 @@ describe("$listQueryKnobs", function () {
                 );
             }
         }
+    });
+
+    const itIfMinFcvReported = isFCVgte(db, "9.1") ? it : it.skip;
+    itIfMinFcvReported("every pqsSettable knob reports a minFcv of the form X.Y", function () {
+        const results = adminDB.aggregate([{$listQueryKnobs: {}}]).toArray();
+        let pqsSettableCount = 0;
+        for (const doc of results) {
+            if (!doc.pqsSettable) {
+                continue;
+            }
+            ++pqsSettableCount;
+            assert.eq(typeof doc.minFcv, "string", "expected minFcv string on pqsSettable knob", {
+                doc,
+            });
+            assert(/^[0-9]+\.[0-9]+$/.test(doc.minFcv), "expected minFcv of the form X.Y", {doc});
+        }
+        assert.gt(pqsSettableCount, 0, "expected at least one pqsSettable knob");
     });
 
     it("rejects a non-empty spec", function () {

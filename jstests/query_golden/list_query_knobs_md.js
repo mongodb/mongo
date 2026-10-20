@@ -21,12 +21,14 @@ const adminDB = db.getSiblingDB("admin");
 // - 'name' (the C++ server parameter name) and 'default': neither is part of the PQS wire
 //   contract asserted here, and both are allowed to change without breaking compatibility.
 // - 'pqsSettable': always true after the $match.
+// - 'minFcv': server-side registration metadata, not persisted in query settings, so it can
+//   change without breaking compatibility (and is absent on pre-9.1 binaries).
 // Sorted by wire name (unique across PQS-settable knobs), so that output is independent of
 // registration order and diffs stay incremental as knobs are added, removed, or changed.
 const pipeline = [
     {$listQueryKnobs: {}},
     {$match: {pqsSettable: true}},
-    {$unset: ["name", "default", "pqsSettable"]},
+    {$unset: ["name", "default", "pqsSettable", "minFcv"]},
     {$sort: {wireName: 1}},
 ];
 
