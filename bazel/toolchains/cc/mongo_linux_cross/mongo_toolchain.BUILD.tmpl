@@ -9,7 +9,7 @@ load(":mongo_toolchain_flags.bzl",
     "COMMON_LINK_FLAGS",
     "GCC_INCLUDE_DIRS",
 )
-load("@s390x_cross_sysroot//:sysroot_info.bzl", "SYSROOT_PATH")
+load("@{sysroot_repo_name}//:sysroot_info.bzl", "SYSROOT_PATH")
 
 load(
     "@//bazel/toolchains/cc:mongo_custom_features.bzl",
@@ -206,8 +206,7 @@ MOLD_BIN_DIR = "./external/{toolchain_repo_name}/mold-2.37.1-aarch64-linux/bin/"
 # v8.3 selects its linker via flags in the BUILD template rather than via
 # linker features in mongo_linux_cc_toolchain_config (as newer branches do).
 LINK_FLAGS = ["-L" + flag for flag in COMMON_LINK_FLAGS] + select({
-    # Keep linking with v8.3's LLVM 19.1.7 while the newer archive supplies
-    # cross GCC and the s390x target runtimes.
+    # Retain v8.3's LLVM 19.1.7 for both s390x and PPC cross builds.
     "@//bazel/config:linker_lld_valid_settings": [
         "-fuse-ld=lld",
         "-Bexternal/mongo_toolchain_v5/stow/llvm-v5/bin/",
@@ -238,7 +237,7 @@ filegroup(
     }) + select ({
         "@//bazel/config:ubsan_enabled": ["@//etc:ubsan_denylist_h"],
         "@//conditions:default": [],
-    }) + ["@s390x_cross_sysroot//:sysroot_files"] + select({
+    }) + ["@{sysroot_repo_name}//:sysroot_files"] + select({
         "@//bazel/config:linker_lld_valid_settings": ["@mongo_toolchain_v5//:lld_files"],
         "@//conditions:default": [],
     })
@@ -262,18 +261,18 @@ mongo_linux_cc_toolchain_config(
         # Note: You might assume that the specification of `compiler_name` (above) would be sufficient to make Bazel
         # use the correct binary. This is incorrect; Bazel appears to unconditionally use the `gcc` tool_path. As a result,
         # we have to conditionally set the value pointed to by `gcc`.
-        "gcc": "stow/gcc-v5/bin/s390x-mongodb-linux-gcc",
-        "g++": "stow/gcc-v5/bin/s390x-mongodb-linux-g++",
-        "cpp": "stow/gcc-v5/bin/s390x-mongodb-linux-cpp",
-        "ar": "stow/gcc-v5/bin/s390x-mongodb-linux-ar",
-        "nm": "stow/gcc-v5/bin/s390x-mongodb-linux-nm",
-        "ld": "stow/gcc-v5/bin/s390x-mongodb-linux-ld",
-        "as": "stow/gcc-v5/bin/s390x-mongodb-linux-as",
+        "gcc": "stow/gcc-v5/bin/{arch}-mongodb-linux-gcc",
+        "g++": "stow/gcc-v5/bin/{arch}-mongodb-linux-g++",
+        "cpp": "stow/gcc-v5/bin/{arch}-mongodb-linux-cpp",
+        "ar": "stow/gcc-v5/bin/{arch}-mongodb-linux-ar",
+        "nm": "stow/gcc-v5/bin/{arch}-mongodb-linux-nm",
+        "ld": "stow/gcc-v5/bin/{arch}-mongodb-linux-ld",
+        "as": "stow/gcc-v5/bin/{arch}-mongodb-linux-as",
         "dwp": "{version}/bin/dwp",
-        "objcopy": "stow/gcc-v5/bin/s390x-mongodb-linux-objcopy",
-        "objdump": "stow/gcc-v5/bin/s390x-mongodb-linux-objdump",
-        "strip": "stow/gcc-v5/bin/s390x-mongodb-linux-strip",
-        "gcov": "stow/gcc-v5/bin/s390x-mongodb-linux-gcov",
+        "objcopy": "stow/gcc-v5/bin/{arch}-mongodb-linux-objcopy",
+        "objdump": "stow/gcc-v5/bin/{arch}-mongodb-linux-objdump",
+        "strip": "stow/gcc-v5/bin/{arch}-mongodb-linux-strip",
+        "gcov": "stow/gcc-v5/bin/{arch}-mongodb-linux-gcov",
         "llvm-cov": "/bin/false",  # /bin/false = we're not using llvm-cov
     },
     toolchain_identifier = "gcc_toolchain",
@@ -332,7 +331,7 @@ toolchain(
     target_compatible_with = [
         "@platforms//os:linux",
         "@platforms//cpu:{bazel_toolchain_cpu}",
-        "@//bazel/platforms:use_mongo_s390x_cross_toolchain",
+        "@//bazel/platforms:use_mongo_{arch}_cross_toolchain",
         "@//bazel/platforms:{distro}",
     ],
     target_settings = [

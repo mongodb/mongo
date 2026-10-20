@@ -14,14 +14,23 @@ setup_mongo_toolchains()
 setup_gdb_toolchains()
 
 load("//bazel/toolchains/cc/mongo_linux:sysroot_dump.bzl", "sysroot_dump")
-load("//bazel/toolchains/cc/mongo_linux_cross:mongo_linux_cross_toolchain.bzl", "setup_s390x_cross_toolchains")
+load("//bazel/toolchains/cc/mongo_linux_cross:mongo_linux_cross_toolchain.bzl", "setup_ppc64le_cross_toolchains", "setup_s390x_cross_toolchains")
 
 sysroot_dump(
     name = "s390x_cross_sysroot",
     cross = True,
+    target_arch = "s390x",
+)
+
+sysroot_dump(
+    name = "ppc64le_cross_sysroot",
+    cross = True,
+    target_arch = "ppc64le",
 )
 
 setup_s390x_cross_toolchains()
+
+setup_ppc64le_cross_toolchains()
 
 http_archive(
     name = "windows_sasl",

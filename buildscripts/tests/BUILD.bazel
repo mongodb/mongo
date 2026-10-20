@@ -13,6 +13,23 @@ py_test(
 )
 
 py_test(
+    name = "test_evergreen_ppc64le_cross",
+    srcs = [
+        "test_evergreen_ppc64le_cross.py",
+        "test_evergreen_s390x_cross.py",
+    ],
+    data = ["//etc:evergreen_s390x_cross_test_data"],
+    main = "test_evergreen_ppc64le_cross.py",
+    deps = [
+        "//bazel/wrapper_hook:release_distro",
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+    ],
+)
+
+py_test(
     name = "test_evergreen_s390x_cross",
     srcs = ["test_evergreen_s390x_cross.py"],
     data = ["//etc:evergreen_s390x_cross_test_data"],

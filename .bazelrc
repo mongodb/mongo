@@ -704,3 +704,28 @@ build:linux-s390x-rhel10-cross-gcc-arm64 --platforms=//bazel/platforms:rhel10_s3
 build:linux-s390x-rhel10-cross-gcc-arm64 --host_platform=//bazel/platforms:rhel10_arm64
 build:linux-s390x-rhel10-cross-gcc-arm64 --extra_execution_platforms=//bazel/platforms:rhel10_arm64
 build:linux-s390x-rhel10-cross-gcc-arm64 --repo_env=MONGO_LINUX_CROSS_TOOLCHAIN=rhel10_s390x_on_rhel10_aarch64
+
+# GCC cross compilation executes compilation, linking and host tools on ARM64.
+# Target tests must be scheduled on native ppc64le machines.
+build:linux-ppc64le-cross-gcc --compiler_type=gcc
+build:linux-ppc64le-cross-gcc --define=MONGO_ARCH=ppc64le
+build:linux-ppc64le-cross-gcc --remote_executor=
+build:linux-ppc64le-cross-gcc --strategy=TestRunner=local
+
+build:linux-ppc64le-rhel8-cross-gcc-arm64 --config=linux-ppc64le-cross-gcc
+build:linux-ppc64le-rhel8-cross-gcc-arm64 --platforms=//bazel/platforms:rhel8_ppc64le_cross
+build:linux-ppc64le-rhel8-cross-gcc-arm64 --host_platform=//bazel/platforms:rhel8_arm64
+build:linux-ppc64le-rhel8-cross-gcc-arm64 --extra_execution_platforms=//bazel/platforms:rhel8_arm64
+build:linux-ppc64le-rhel8-cross-gcc-arm64 --repo_env=MONGO_LINUX_CROSS_TOOLCHAIN=rhel8_ppc64le_on_rhel8_aarch64
+
+build:linux-ppc64le-rhel9-cross-gcc-arm64 --config=linux-ppc64le-cross-gcc
+build:linux-ppc64le-rhel9-cross-gcc-arm64 --platforms=//bazel/platforms:rhel9_ppc64le_cross
+build:linux-ppc64le-rhel9-cross-gcc-arm64 --host_platform=//bazel/platforms:rhel9_arm64
+build:linux-ppc64le-rhel9-cross-gcc-arm64 --extra_execution_platforms=//bazel/platforms:rhel9_arm64
+build:linux-ppc64le-rhel9-cross-gcc-arm64 --repo_env=MONGO_LINUX_CROSS_TOOLCHAIN=rhel9_ppc64le_on_rhel9_aarch64
+
+build:linux-ppc64le-rhel10-cross-gcc-arm64 --config=linux-ppc64le-cross-gcc
+build:linux-ppc64le-rhel10-cross-gcc-arm64 --platforms=//bazel/platforms:rhel10_ppc64le_cross
+build:linux-ppc64le-rhel10-cross-gcc-arm64 --host_platform=//bazel/platforms:rhel10_arm64
+build:linux-ppc64le-rhel10-cross-gcc-arm64 --extra_execution_platforms=//bazel/platforms:rhel10_arm64
+build:linux-ppc64le-rhel10-cross-gcc-arm64 --repo_env=MONGO_LINUX_CROSS_TOOLCHAIN=rhel10_ppc64le_on_rhel10_aarch64

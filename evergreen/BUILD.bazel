@@ -3,6 +3,8 @@ load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 
 package(default_visibility = ["//visibility:public"])
 
+exports_files(["bazel_evergreen_shutils.sh"])
+
 py_binary(
     name = "validate_compile_commands",
     srcs = ["validate_compile_commands.py"],

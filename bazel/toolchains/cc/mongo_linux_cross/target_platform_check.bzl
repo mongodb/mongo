@@ -24,3 +24,13 @@ s390x_target_platform_check = rule(
     attrs = {"_s390x": attr.label(default = "@platforms//cpu:s390x")},
     toolchains = ["@rules_python//python:toolchain_type"],
 )
+
+def _ppc64le_target_platform_check_impl(ctx):
+    if not ctx.target_platform_has_constraint(ctx.attr._ppc64le[platform_common.ConstraintValueInfo]):
+        fail("The cross smoke build requires a ppc64le target platform")
+    return []
+
+ppc64le_target_platform_check = rule(
+    implementation = _ppc64le_target_platform_check_impl,
+    attrs = {"_ppc64le": attr.label(default = "@platforms//cpu:ppc")},
+)

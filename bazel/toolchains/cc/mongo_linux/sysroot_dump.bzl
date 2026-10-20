@@ -9,14 +9,14 @@ exports its filesystem, and extracts it as a sysroot. The toolchain can then
 use --sysroot to point the compiler/linker at this extracted filesystem,
 ensuring local builds use the same system headers and libraries as RBE.
 
-The dump is enabled for opted-in Amazon Linux 2023 native builds and for s390x
+The dump is enabled for opted-in Amazon Linux 2023 native builds and for IBM
 GCC cross builds. Cross builds select the target architecture from
 the multi-architecture pinned image rather than from the machine running Bazel.
 """
 
 load("//bazel:utils.bzl", "get_host_distro_major_version", "retry_execute")
 load("//bazel/platforms:remote_execution_containers.bzl", "REMOTE_EXECUTION_CONTAINERS")
-load("//bazel/toolchains/cc/mongo_linux_cross:sysroot_containers.bzl", "S390X_SYSROOT_CONTAINERS")
+load("//bazel/toolchains/cc/mongo_linux_cross:sysroot_containers.bzl", "PPC64LE_SYSROOT_CONTAINERS", "S390X_SYSROOT_CONTAINERS")
 
 SYSROOT_ENV_VAR = "USE_RBE_SYSROOT"
 LINUX_CROSS_TOOLCHAIN_ENV_VAR = "MONGO_LINUX_CROSS_TOOLCHAIN"
@@ -34,7 +34,8 @@ _CONTAINER_RUNTIME_ENV_VARS = [
     "TEMP",
 ]
 
-_LINUX_CROSS_TARGET_ARCHES = ["s390x"]
+_LINUX_CROSS_TARGET_ARCHES = ["s390x", "ppc64le"]
+_LINUX_CROSS_CONTAINERS = {"s390x": S390X_SYSROOT_CONTAINERS, "ppc64le": PPC64LE_SYSROOT_CONTAINERS}
 _LINUX_CROSS_TARGET_DISTROS = ["rhel8", "rhel9", "rhel10"]
 
 def _linux_cross_sysroot_target(ctx):
@@ -60,7 +61,7 @@ def _linux_cross_sysroot_target(ctx):
 
     return struct(error = "unsupported Linux cross target in '{}'".format(selector))
 
-def sysroot_dump_disabled_reason(ctx, cross = False):
+def sysroot_dump_disabled_reason(ctx, cross = False, target_arch = ""):
     """Returns why the RBE sysroot dump is disabled on this host, or None.
 
     Shared between the sysroot_dump repository rule and the mongo toolchain
@@ -76,7 +77,7 @@ def sysroot_dump_disabled_reason(ctx, cross = False):
     sysroot break at runtime on older minor versions of that distro. Other
     distros keep using the host's system headers and libraries even if
     --//bazel/config:use_rbe_sysroot is set. The separate cross repository
-    opts in with cross = True: its pinned RHEL image supplies the s390x
+    opts in with cross = True: its pinned RHEL image supplies the target
     filesystem, independently of the optional native sysroot flag.
     """
     if ctx.os.name != "linux":
@@ -88,7 +89,9 @@ def sysroot_dump_disabled_reason(ctx, cross = False):
             return "{} is not set".format(LINUX_CROSS_TOOLCHAIN_ENV_VAR)
         if cross_target.error != None:
             return cross_target.error
-        if cross_target.distro not in S390X_SYSROOT_CONTAINERS:
+        if target_arch and cross_target.arch != target_arch:
+            return "cross selector targets {}, not {}".format(cross_target.arch, target_arch)
+        if cross_target.distro not in _LINUX_CROSS_CONTAINERS[cross_target.arch]:
             return "no RBE container found for distro '{}'".format(cross_target.distro)
         return None
 
@@ -162,7 +165,7 @@ def _sysroot_dump_impl(ctx):
     # previously extracted filesystem even after the upstream image is bumped.
     ctx.watch(ctx.path(Label("//bazel/platforms:remote_execution_containers.bzl")))
 
-    disabled_reason = sysroot_dump_disabled_reason(ctx, cross = ctx.attr.cross)
+    disabled_reason = sysroot_dump_disabled_reason(ctx, cross = ctx.attr.cross, target_arch = ctx.attr.target_arch)
     if disabled_reason != None:
         # Only warn when the user explicitly asked for the sysroot; the
         # silent default path is the common case.
@@ -179,7 +182,7 @@ def _sysroot_dump_impl(ctx):
     distro = cross_target.distro if cross_target != None else get_host_distro_major_version(ctx)
     target_arch = cross_target.arch if cross_target != None else None
     container_url = (
-        S390X_SYSROOT_CONTAINERS[distro] if cross_target != None else REMOTE_EXECUTION_CONTAINERS[distro]["container-url"]
+        _LINUX_CROSS_CONTAINERS[cross_target.arch][distro] if cross_target != None else REMOTE_EXECUTION_CONTAINERS[distro]["container-url"]
     )
 
     # Strip the "docker://" prefix to get the image reference.
@@ -360,7 +363,10 @@ filegroup(
 
 sysroot_dump = repository_rule(
     implementation = _sysroot_dump_impl,
-    attrs = {"cross": attr.bool(default = False)},
+    attrs = {
+        "cross": attr.bool(default = False),
+        "target_arch": attr.string(default = "", values = ["", "s390x", "ppc64le"]),
+    },
     environ = [
         SYSROOT_ENV_VAR,
         LINUX_CROSS_TOOLCHAIN_ENV_VAR,
@@ -373,4 +379,5 @@ def setup_sysroot_dump():
     sysroot_dump(name = "rbe_sysroot")
 
     # cfg=exec host tools retain the native sysroot even under --config=local.
-    sysroot_dump(name = "s390x_cross_sysroot", cross = True)
+    sysroot_dump(name = "s390x_cross_sysroot", cross = True, target_arch = "s390x")
+    sysroot_dump(name = "ppc64le_cross_sysroot", cross = True, target_arch = "ppc64le")

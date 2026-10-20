@@ -212,3 +212,26 @@ constraint_value(
         "rhel10",
     ]
 ]
+
+# Cross target toolchains must not compete with native C++ toolchains.
+constraint_value(
+    name = "use_mongo_ppc64le_cross_toolchain",
+    constraint_setting = ":mongo_toolchain",
+)
+
+[
+    platform(
+        name = distro + "_ppc64le_cross",
+        constraint_values = [
+            "@platforms//cpu:ppc",
+            "@platforms//os:linux",
+            ":use_mongo_ppc64le_cross_toolchain",
+            ":" + distro,
+        ],
+    )
+    for distro in [
+        "rhel8",
+        "rhel9",
+        "rhel10",
+    ]
+]
