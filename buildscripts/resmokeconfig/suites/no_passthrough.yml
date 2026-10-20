@@ -16,6 +16,9 @@ selector:
 
     # Self-tests for the Concurrency testing framework are run as part of this test suite.
     - jstests/concurrency/*.js
+
+    # Self-tests for the format testing validation helpers are run as part of this test suite.
+    - src/mongo/db/modules/*/jstests/disagg_storage/format_snapshot/libs/snapshot_validation_helpers_test.js
   exclude_files:
     - jstests/noPassthrough/libs/**/*.js
 
