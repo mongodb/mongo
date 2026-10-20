@@ -935,6 +935,27 @@ public:
     }
 
     /**
+     * If the old path of the rename for the given field is a base document field, returns whether
+     * that field can be an array. Returns true in all other cases.
+     */
+    bool canRenamePrefixBeArray(FieldId fieldId) const {
+        const auto* oldPath = getRenameOldPath(fieldId);
+        if (!oldPath) {
+            // Not a rename.
+            return true;
+        }
+
+        const auto* ds = getDeclaringDocumentSource(_fields[fieldId].declaringScope);
+        if (getPrevModifyingStage(ds, *oldPath)) {
+            // The old path is not a base document field.
+            return true;
+        }
+
+        PathRef prefix = getPathPrefix(*oldPath);
+        return !prefix.empty() && canPathBeArray(ds, prefix);
+    }
+
+    /**
      * Invokes the callback for every path visible in 'scopeId' that is an alias for the base
      * document path 'docPath'.
      */
@@ -954,7 +975,7 @@ public:
                     return FieldVisit::kContinue;
                 }
                 // An array in the rename source prefix means array traversal - bail out.
-                if (canCollectionFieldPrefixBeArray(*alias)) {
+                if (canCollectionFieldPrefixBeArray(*alias) && canRenamePrefixBeArray(fieldId)) {
                     return FieldVisit::kContinue;
                 }
                 cb(buildDottedPath(fieldPath, skipPathComponents(docPath, alias->size())));

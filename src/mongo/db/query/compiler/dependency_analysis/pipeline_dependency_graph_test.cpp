@@ -4179,6 +4179,21 @@ TEST_F(PipelineDependencyGraphTest, NotArrayTypePredicatePreservesSiblingOfLooku
     });
 }
 
+TEST_F(PipelineDependencyGraphTest, GetBaseDocumentFieldAliasDottedSourceNotArrayTypePredicate) {
+    unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", true};
+    setPipeline(R"([
+        {$match: {b: {$not: {$type: 'array'}}}},
+        {$set: {a: '$b.c'}}
+    ])");
+    runTest([&] {
+        assertOrigin(graph->resolveFieldOrigin(nullptr, "a"),
+                     FieldOriginKind::kAlias,
+                     stages[1].get(),
+                     "b.c");
+        ASSERT_EQ(graph->getBaseDocumentFieldAlias(nullptr, "b.c"), FieldPath("a"));
+    });
+}
+
 TEST_F(PipelineDependencyGraphTest, CanPathBeArrayIgnoresTypeWhenFeatureFlagDisabled) {
     unittest::ServerParameterGuard flagGuard{"featureFlagQueryTypeInference", false};
     setPipeline("[{$match: {x: {$not: {$type: 'array'}}}}]");
