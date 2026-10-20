@@ -274,6 +274,14 @@ struct [[MONGO_MOD_NEEDS_REPLACEMENT]] QuerySolutionNode {
     }
 
     /**
+     * True if this node type may appear in a plan run by the parallelism planner. Defaults to
+     * false, so a node type has to opt in explicitly.
+     */
+    virtual bool isParallelEligible() const {
+        return false;
+    }
+
+    /**
      * Returns the id associated with this node. Each node in a 'QuerySolution' tree is assigned a
      * unique identifier, which are assigned as sequential positive integers starting from 1.  An id
      * of 0 means that no id was explicitly assigned during construction of the QuerySolution.
@@ -546,6 +554,10 @@ struct CollectionScanNode : public QuerySolutionNodeWithSortSet {
 
     StageType getType() const override {
         return STAGE_COLLSCAN;
+    }
+
+    bool isParallelEligible() const override {
+        return true;
     }
 
     void computeProperties() override;
@@ -957,6 +969,10 @@ struct MatchNode : public QuerySolutionNode {
         return STAGE_MATCH;
     }
 
+    bool isParallelEligible() const override {
+        return true;
+    }
+
     /**
      * Data from the match node is considered fetched iff the child provides fetched data.
      */
@@ -1140,6 +1156,10 @@ struct ProjectionNodeDefault final : ProjectionNode {
         return STAGE_PROJECTION_DEFAULT;
     }
 
+    bool isParallelEligible() const override {
+        return true;
+    }
+
     std::unique_ptr<QuerySolutionNode> clone() const final;
 
     std::string_view projectionImplementationTypeToString() const final {
@@ -1162,6 +1182,10 @@ struct ProjectionNodeCovered final : ProjectionNode {
         return STAGE_PROJECTION_COVERED;
     }
 
+    bool isParallelEligible() const override {
+        return true;
+    }
+
     std::unique_ptr<QuerySolutionNode> clone() const final;
 
     std::string_view projectionImplementationTypeToString() const final {
@@ -1181,6 +1205,10 @@ struct ProjectionNodeSimple final : ProjectionNode {
 
     StageType getType() const override {
         return STAGE_PROJECTION_SIMPLE;
+    }
+
+    bool isParallelEligible() const override {
+        return true;
     }
 
     std::unique_ptr<QuerySolutionNode> clone() const final;
@@ -1336,6 +1364,10 @@ struct LimitNode : public QuerySolutionNode {
         return STAGE_LIMIT;
     }
 
+    bool isParallelEligible() const override {
+        return true;
+    }
+
     void appendToString(str::stream* ss, int indent) const override;
 
     bool fetched() const override {
@@ -1370,6 +1402,10 @@ struct SkipNode : public QuerySolutionNode {
 
     StageType getType() const override {
         return STAGE_SKIP;
+    }
+
+    bool isParallelEligible() const override {
+        return true;
     }
     void appendToString(str::stream* ss, int indent) const override;
 
@@ -1498,6 +1534,10 @@ struct ShardingFilterNode : public QuerySolutionNode {
 
     StageType getType() const override {
         return STAGE_SHARDING_FILTER;
+    }
+
+    bool isParallelEligible() const override {
+        return true;
     }
     void appendToString(str::stream* ss, int indent) const override;
 

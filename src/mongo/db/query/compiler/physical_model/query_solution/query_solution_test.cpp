@@ -2550,6 +2550,7 @@ TEST(QuerySolutionTest, ShouldCacheEofPlanTree) {
 
     ASSERT_TRUE(solution2->isEligibleForPlanCache());
 }
+
 namespace {
 const NamespaceString kNssA = NamespaceString::createNamespaceString_forTest("db.a");
 const NamespaceString kNssB = NamespaceString::createNamespaceString_forTest("db.b");
@@ -2719,6 +2720,31 @@ TEST(QuerySolutionTest, SummaryStringBracketsMultipleJoinSubtreesUnderAJoinInput
         "HJ( _ = ( NLJ( _ = ( COLLSCAN [db.a] ), out = ( COLLSCAN [db.b] ) ), NLJ( _ = ( "
         "COLLSCAN [db.a] ), out = ( COLLSCAN [db.c] ) ) ), cOut = ( IXSCAN [db.c] { c: 1 } ) )",
         solution.summaryString());
+}
+
+TEST(QuerySolutionTest, ParallelEligibleNodes) {
+    const NamespaceString mainNss = NamespaceString::createNamespaceString_forTest("db.main");
+    auto scan = [] {
+        return std::make_unique<CollectionScanNode>();
+    };
+
+    ASSERT_TRUE(scan()->isParallelEligible());
+    ASSERT_TRUE(LimitNode(scan(), 1, LimitSkipParameterization::Disabled).isParallelEligible());
+    ASSERT_TRUE(SkipNode(scan(), 1, LimitSkipParameterization::Disabled).isParallelEligible());
+    ASSERT_TRUE(ShardingFilterNode().isParallelEligible());
+
+    auto [filter, projection] = createMatchExprAndProjection(BSONObj(), BSON("a" << 1));
+    ASSERT_TRUE(ProjectionNodeDefault(scan(), filter.get(), projection).isParallelEligible());
+    ASSERT_TRUE(ProjectionNodeSimple(scan(), filter.get(), projection).isParallelEligible());
+    ASSERT_TRUE(ProjectionNodeCovered(scan(), filter.get(), projection, BSON("a" << 1))
+                    .isParallelEligible());
+    ASSERT_TRUE(MatchNode(scan(), std::move(filter)).isParallelEligible());
+
+    // Everything else is opted out by default.
+    auto indexScan =
+        std::make_unique<IndexScanNode>(mainNss, buildSimpleIndexEntry(BSON("a" << 1)));
+    ASSERT_FALSE(indexScan->isParallelEligible());
+    ASSERT_FALSE(FetchNode(std::move(indexScan), mainNss).isParallelEligible());
 }
 
 }  // namespace
