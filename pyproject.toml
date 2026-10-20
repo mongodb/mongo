@@ -387,6 +387,10 @@ ignore = [
 # This file needs to support old Python versions, and so it cannot use newer type annotations.
 "buildscripts/evergreen_activate_gen_tasks.py" = ["UP006", "UP035"]
 
+# This file runs inside the container images on the system Python (3.6 on UBI8), so it cannot use
+# newer type annotations.
+"release-container/scripts/docker-entrypoint.py" = ["UP006", "UP035"]
+
 [tool.ruff.lint.isort]
 known-first-party = ["bazel", "buildscripts", "buildscripts/idl", "evergreen", "scripts", "tools"]
 
