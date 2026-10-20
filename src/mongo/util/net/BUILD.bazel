@@ -376,6 +376,23 @@ mongo_cc_library(
 )
 
 mongo_cc_unit_test(
+    name = "http_client_curl_test",
+    srcs = ["http_client_curl_test.cpp"],
+    tags = ["mongo_unittest_first_group"],
+    target_compatible_with = select({
+        ":http_client_enabled_windows": ["@platforms//:incompatible"],
+        "//bazel/config:http_client_enabled": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":http_client",
+        ":http_client_impl",
+        "//src/mongo:base",
+        "//src/mongo/db:service_context",
+    ],
+)
+
+mongo_cc_unit_test(
     name = "util_net_test",
     srcs = [
         "cidr_test.cpp",
