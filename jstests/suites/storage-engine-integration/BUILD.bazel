@@ -22,7 +22,6 @@ resmoke_suite_test(
     ],
     tags = [
         "ci-all-variants",
-        "requires_replicated_fast_count_recovery",
     ],
     target_compatible_with = select({
         "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],

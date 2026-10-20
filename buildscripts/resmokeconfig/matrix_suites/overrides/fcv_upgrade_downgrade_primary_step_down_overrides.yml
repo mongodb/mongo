@@ -170,6 +170,7 @@
           set_parameters:
             enableElectionHandoff: 0
             enableTestCommands: 1
+            failpoint.disableReplicatedFastCount: "{mode: 'alwaysOn'}"
             failpoint.overrideRecordIdsReplicatedFalse: "{mode: 'alwaysOn'}"
         configsvr_options:
           num_nodes: 3

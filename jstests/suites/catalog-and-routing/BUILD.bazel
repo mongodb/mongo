@@ -80,7 +80,6 @@ resmoke_suite_test(
         "common",
         "jscore",
         "requires_large_host_aubsan",
-        "requires_replicated_fast_count_recovery",
         "sharding",
     ],
     target_compatible_with = select({
@@ -694,7 +693,6 @@ resmoke_suite_test(
         "concurrency",
         "incompatible_debug_mode",
         "large",
-        "requires_replicated_fast_count_recovery",
         "sharded",
         "stepdowns",
     ],

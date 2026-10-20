@@ -141,7 +141,6 @@ rules:
           - incompatible_with_bazel_remote_test
           - incompatible_all_feature_flags
           - incompatible_development_variant
-          - requires_replicated_fast_count_recovery
           - incompatible_disaggregated_storage
           - incompatible_disaggregated_storage_tsan
           - incompatible_disaggregated_storage_no_feature_flag

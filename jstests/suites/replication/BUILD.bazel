@@ -679,7 +679,6 @@ resmoke_suite_test(
         "incompatible_inmemory",
         "initsync",
         "large",
-        "requires_replicated_fast_count_recovery",
         "sharded",
         "stepdowns",
     ],
@@ -1187,7 +1186,6 @@ resmoke_suite_test(
         "concurrency",
         "incompatible_debug_mode",
         "kill_terminate",
-        "requires_replicated_fast_count_recovery",
         "sharded",
         "stepdowns",
     ],
@@ -1237,7 +1235,6 @@ resmoke_suite_test(
         "multiversion",
         "no_multiversion_generate_tasks",
         "requires_large_host",
-        "requires_replicated_fast_count_recovery",
     ],
     deps = [
         "//src/mongo/db:mongod",
