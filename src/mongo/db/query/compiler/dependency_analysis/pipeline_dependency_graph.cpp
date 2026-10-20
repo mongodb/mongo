@@ -1418,8 +1418,6 @@ private:
     /**
      * Includes the field from the parent scope into the given scope.
      * This has the semantics of an inclusion projection.
-     *
-     * To be done(SERVER-136153): canPathBeArray to check arrayness here
      */
     void includeField(DeclarationCursor cursor) {
         const ParsedPathView path = cursor.remainingPath();
@@ -1451,7 +1449,11 @@ private:
             }
             FieldMetadata metadata{};
             if (constant && constant->missing()) {
+                // Arrayness based on other constant values is handled later in setConstant().
                 updateMetadataForMissingValue(metadata);
+            } else if (!constant) {
+                const auto* ds = getDeclaringDocumentSource(scope);
+                metadata.canFieldBeArray = canPathBeArray(ds, buildDottedPath(cursor.fullPath));
             }
             declareField(DeclarationCursor{cursor.fullPath, scope, cursor.depth},
                          ModifiedPrefixPolicy::kPreserveArrays,

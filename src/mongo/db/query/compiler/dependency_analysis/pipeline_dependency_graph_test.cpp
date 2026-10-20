@@ -552,6 +552,24 @@ TEST_F(PipelineDependencyGraphTest, CanRenamedSubPipelinePathBeArray) {
     });
 }
 
+TEST_F(PipelineDependencyGraphTest, CanIncludedSubPipelinePathBeArray) {
+    setOptimizedPipeline(R"([
+        {$lookup: {
+            from: "coll_b",
+            as: "docs",
+            pipeline: [{$set: {b_ssn: 42}}]
+        }},
+        {$unwind: "$docs"},
+        {$project: {"docs.b_ssn": 1}}
+    ])");
+
+    runTest([&] {
+        ASSERT_FALSE(graph->canPathBeArray(stages[1].get(), "docs.b_ssn"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "docs"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "docs.b_ssn"));
+    });
+}
+
 TEST_F(PipelineDependencyGraphTest, SubPipelineGetDeclaringStageThenMatch) {
     setPipeline(R"([{$lookup: {
         from: "coll_b",
@@ -1950,6 +1968,18 @@ TEST_F(PipelineDependencyGraphTest, InclusionRedefinedBaseFieldAfterPriorInclusi
     runTest([&] {
         ASSERT_TRUE(graph->canPathBeArray(nullptr, "a"));
         ASSERT_TRUE(graph->canPathBeArray(nullptr, "a.b"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, CanIncludedAliasSubPathBeArray) {
+    pathArrayness->addPath("b.x", {}, true);
+    setPipeline(
+        "[{$set: { a: '$b' }}, "
+        " {$project: { 'a.x': 1 }}]");
+    runTest([&] {
+        ASSERT_FALSE(graph->canPathBeArray(stages[1].get(), "a.x"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.x"));
     });
 }
 
