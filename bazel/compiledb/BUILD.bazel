@@ -1,3 +1,5 @@
-load(":compiledb_aspect_test.bzl", "is_msvc_compiler_test")
+load(":compiledb_aspect_test.bzl", "fuzztest_compile_commands_test_suite", "is_msvc_compiler_test")
 
 is_msvc_compiler_test(name = "compiledb_aspect_test")
+
+fuzztest_compile_commands_test_suite(name = "fuzztest_compile_commands_test")

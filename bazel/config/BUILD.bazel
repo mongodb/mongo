@@ -82,6 +82,27 @@ template_renderer_python_path_analysis_test(
     target_under_test = "//src/mongo/base:error_codes_source",
 )
 
+# Compilation database generation only builds command fragments and their inputs.
+bool_flag(
+    name = "compiledb",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "compiledb_enabled",
+    flag_values = {
+        ":compiledb": "True",
+    },
+)
+
+selects.config_setting_group(
+    name = "fsan_or_compiledb_enabled",
+    match_any = [
+        ":fsan_enabled",
+        ":compiledb_enabled",
+    ],
+)
+
 # --------------------------------------
 # WASI / WebAssembly builds
 # --------------------------------------

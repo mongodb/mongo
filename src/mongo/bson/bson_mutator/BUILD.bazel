@@ -13,7 +13,7 @@ mongo_cc_library(
         "bson_mutator_owned_obj.h",
     ],
     target_compatible_with = select({
-        "//bazel/config:fsan_enabled": [],
+        "//bazel/config:fsan_or_compiledb_enabled": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
     deps = [

@@ -620,6 +620,8 @@ common:mod-scanner --aspects //modules_poc:mod_scanner.bzl%mod_scanner_aspect
 common:mod-scanner --remote_download_regex=.*\.mod_scanner_decls.json$
 
 --config=compiledb
+common:compiledb --//bazel/config:compiledb=True
+common:compiledb --no@fuzztest//fuzztest:use_riegeli
 common:compiledb --aspects //bazel/compiledb:compiledb_aspect.bzl%compiledb_aspect
 common:compiledb --output_groups=compiledb_report
 common:compiledb --keep_going

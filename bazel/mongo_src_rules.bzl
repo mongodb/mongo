@@ -1602,8 +1602,9 @@ def mongo_cc_fuzzer_test_deprecated(
         tags = tags + ["mongo_fuzzer_test"],
         copts = copts + ["-Wno-sign-compare"],
         linkopts = linkopts + ["-fsanitize-coverage=control-flow"],
+        # Compiledb only emits command fragments, so it does not need a fuzzer build.
         target_compatible_with = target_compatible_with + select({
-            "//bazel/config:fsan_enabled": [],
+            "//bazel/config:fsan_or_compiledb_enabled": [],
             "//conditions:default": ["@platforms//:incompatible"],
         }),
         **kwargs
@@ -1633,8 +1634,9 @@ def mongo_cc_fuzztest(
         tags = tags + ["mongo_fuzzer_test"],
         copts = copts + ["-Wno-sign-compare"],
         linkopts = linkopts + ["-fsanitize-coverage=control-flow"],
+        # Compiledb only emits command fragments, so it does not need a fuzzer build.
         target_compatible_with = target_compatible_with + select({
-            "//bazel/config:fsan_enabled": [],
+            "//bazel/config:fsan_or_compiledb_enabled": [],
             "//conditions:default": ["@platforms//:incompatible"],
         }),
         **kwargs
