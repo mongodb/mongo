@@ -37,18 +37,18 @@ namespace [[MONGO_MOD_PUBLIC]] mongo {
 namespace error_details {
 #ifdef MONGO_SOURCE_LOCATION_HAVE_STD
 [[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] MONGO_COMPILER_NORETURN void invariantFailed(
-    const char* expr, WrappedStdSourceLocation loc) noexcept;
+    const char* expr, WrappedStdSourceLocation loc);
 #endif
 
 [[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] MONGO_COMPILER_NORETURN void invariantFailed(
-    const char* expr, SyntheticSourceLocation loc) noexcept;
+    const char* expr, SyntheticSourceLocation loc);
 
 #ifdef MONGO_SOURCE_LOCATION_HAVE_STD
 [[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] MONGO_COMPILER_NORETURN void invariantFailedWithMsg(
-    const char* expr, const std::string& msg, WrappedStdSourceLocation loc) noexcept;
+    const char* expr, const std::string& msg, WrappedStdSourceLocation loc);
 #endif
 [[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] MONGO_COMPILER_NORETURN void invariantFailedWithMsg(
-    const char* expr, const std::string& msg, SyntheticSourceLocation loc) noexcept;
+    const char* expr, const std::string& msg, SyntheticSourceLocation loc);
 
 template <typename T>
 [[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] constexpr void invariantWithLocation(

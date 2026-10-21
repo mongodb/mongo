@@ -765,13 +765,13 @@ void warnIfTripwireAssertionsOccurred();
 
 namespace error_details {
 [[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] MONGO_COMPILER_NORETURN void invariantOKFailed(
-    const char* expr, const Status& status, SourceLocation loc = MONGO_SOURCE_LOCATION()) noexcept;
+    const char* expr, const Status& status, SourceLocation loc = MONGO_SOURCE_LOCATION());
 
 [[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] MONGO_COMPILER_NORETURN void invariantOKFailedWithMsg(
     const char* expr,
     const Status& status,
     const std::string& msg,
-    SourceLocation loc = MONGO_SOURCE_LOCATION()) noexcept;
+    SourceLocation loc = MONGO_SOURCE_LOCATION());
 
 [[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] constexpr void invariantWithLocation(
     const Status& status, const char* expr, SourceLocation loc = MONGO_SOURCE_LOCATION()) {
@@ -814,7 +814,7 @@ template <typename T, typename ContextExpr>
 }
 
 [[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] MONGO_COMPILER_NORETURN void invariantStatusOKFailed(
-    const Status& status, SourceLocation loc = MONGO_SOURCE_LOCATION()) noexcept;
+    const Status& status, SourceLocation loc = MONGO_SOURCE_LOCATION());
 
 [[MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS]] constexpr void invariantStatusOKWithLocation(
     const Status& status, SourceLocation loc = MONGO_SOURCE_LOCATION()) {

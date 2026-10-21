@@ -155,46 +155,53 @@ void DBException::traceIfNeeded(const DBException& e) {
 }
 
 namespace {
-MONGO_COMPILER_NORETURN void invariantFailedImpl(const char* expr, auto loc) noexcept {
-    LOGV2_FATAL_CONTINUE(23079, "Invariant failure", "expr"_attr = expr, "location"_attr = loc);
-    breakpoint();
-    LOGV2_FATAL_CONTINUE(23080, "\n\n***aborting after invariant() failure\n\n");
+MONGO_COMPILER_NORETURN void invariantFailedImpl(const char* expr, auto loc) {
+    try {
+        LOGV2_FATAL_CONTINUE(23079, "Invariant failure", "expr"_attr = expr, "location"_attr = loc);
+        breakpoint();
+        LOGV2_FATAL_CONTINUE(23080, "\n\n***aborting after invariant() failure\n\n");
+    } catch (...) {
+    }
     callAbort();
 }
 
 MONGO_COMPILER_NORETURN void invariantFailedImpl(const char* expr,
                                                  const std::string& msg,
-                                                 auto loc) noexcept {
-    LOGV2_FATAL_CONTINUE(
-        23081, "Invariant failure", "expr"_attr = expr, "msg"_attr = msg, "location"_attr = loc);
-    breakpoint();
-    LOGV2_FATAL_CONTINUE(23082, "\n\n***aborting after invariant() failure\n\n");
+                                                 auto loc) {
+    try {
+        LOGV2_FATAL_CONTINUE(23081,
+                             "Invariant failure",
+                             "expr"_attr = expr,
+                             "msg"_attr = msg,
+                             "location"_attr = loc);
+        breakpoint();
+        LOGV2_FATAL_CONTINUE(23082, "\n\n***aborting after invariant() failure\n\n");
+    } catch (...) {
+    }
     callAbort();
 }
 }  // namespace
 
 namespace error_details {
 #ifdef MONGO_SOURCE_LOCATION_HAVE_STD
-MONGO_COMPILER_NOINLINE void invariantFailed(const char* expr,
-                                             WrappedStdSourceLocation loc) noexcept {
+MONGO_COMPILER_NOINLINE void invariantFailed(const char* expr, WrappedStdSourceLocation loc) {
     invariantFailedImpl(expr, loc);
 }
 
 MONGO_COMPILER_NOINLINE void invariantFailedWithMsg(const char* expr,
                                                     const std::string& msg,
-                                                    WrappedStdSourceLocation loc) noexcept {
+                                                    WrappedStdSourceLocation loc) {
     invariantFailedImpl(expr, msg, loc);
 }
 #endif  // MONGO_SOURCE_LOCATION_HAVE_STD
 
-MONGO_COMPILER_NOINLINE void invariantFailed(const char* expr,
-                                             SyntheticSourceLocation loc) noexcept {
+MONGO_COMPILER_NOINLINE void invariantFailed(const char* expr, SyntheticSourceLocation loc) {
     invariantFailedImpl(expr, loc);
 }
 
 MONGO_COMPILER_NOINLINE void invariantFailedWithMsg(const char* expr,
                                                     const std::string& msg,
-                                                    SyntheticSourceLocation loc) noexcept {
+                                                    SyntheticSourceLocation loc) {
     invariantFailedImpl(expr, msg, loc);
 }
 
@@ -217,7 +224,7 @@ MONGO_COMPILER_NOINLINE void verifyFailed(const char* expr, SourceLocation loc) 
 
 MONGO_COMPILER_NOINLINE void invariantOKFailed(const char* expr,
                                                const Status& status,
-                                               SourceLocation loc) noexcept {
+                                               SourceLocation loc) {
     LOGV2_FATAL_CONTINUE(23083,
                          "Invariant failure",
                          "expr"_attr = expr,
@@ -231,7 +238,7 @@ MONGO_COMPILER_NOINLINE void invariantOKFailed(const char* expr,
 MONGO_COMPILER_NOINLINE void invariantOKFailedWithMsg(const char* expr,
                                                       const Status& status,
                                                       const std::string& msg,
-                                                      SourceLocation loc) noexcept {
+                                                      SourceLocation loc) {
     LOGV2_FATAL_CONTINUE(23085,
                          "Invariant failure",
                          "expr"_attr = expr,
@@ -243,8 +250,7 @@ MONGO_COMPILER_NOINLINE void invariantOKFailedWithMsg(const char* expr,
     callAbort();
 }
 
-MONGO_COMPILER_NOINLINE void invariantStatusOKFailed(const Status& status,
-                                                     SourceLocation loc) noexcept {
+MONGO_COMPILER_NOINLINE void invariantStatusOKFailed(const Status& status, SourceLocation loc) {
     LOGV2_FATAL_CONTINUE(
         23087, "Invariant failure", "error"_attr = redact(status), "location"_attr = loc);
     breakpoint();
