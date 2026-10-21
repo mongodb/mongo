@@ -19,6 +19,7 @@
  *   resource_intensive,
  * ]
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
@@ -224,6 +225,21 @@ describe("serverStatus.transactions internal/external classification on a sharde
     });
 
     it("case 4: classifies a plain shard key change as an internal two-phase commit (transaction API path)", function () {
+        // The flag is gated on latestFCV, so setting it at startup does not enable it in suites
+        // that start the cluster at the last stable FCV (e.g. in disagg suites). Without it, the
+        // shards reject a shard key update that is neither retryable nor in a transaction.
+        if (
+            !FeatureFlagUtil.isEnabled(
+                st2.s.getDB("admin"),
+                "UpdateDocumentShardKeyUsingTransactionApi",
+            )
+        ) {
+            jsTest.log.info(
+                "Skipping case 4: featureFlagUpdateDocumentShardKeyUsingTransactionApi is not enabled",
+            );
+            return;
+        }
+
         assert.commandWorked(st2.s.getDB(dbName)[collName].insert({sk: -100}));
 
         const prev = pollAllNodes(st2, "before transaction API WCOS shard key update");
