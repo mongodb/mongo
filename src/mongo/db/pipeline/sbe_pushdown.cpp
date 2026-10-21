@@ -380,10 +380,11 @@ void removeUnpackBucketFollowedByUnsupportedStages(
  */
 void prunePushdownStages(std::vector<boost::intrusive_ptr<DocumentSource>>& stagesForPushdown,
                          SbeCompatibility minRequiredCompatibility,
-                         bool allStagesPushedDown) {
+                         bool allStagesPushedDown,
+                         bool unpackBucketPruningDisabled) {
     // First, scan the list of stages for pushdown, and remove an unpack bucket (plus anything
-    // following) if it's followed by unsupported stages.
-    if (minRequiredCompatibility > SbeCompatibility::requiresSbeFull) {
+    // following) if it's followed by unsupported stages, unless unpack bucket pruning is disabled.
+    if (!unpackBucketPruningDisabled) {
         removeUnpackBucketFollowedByUnsupportedStages(stagesForPushdown);
     }
 
@@ -668,7 +669,11 @@ bool findSbeCompatibleStagesForPushdown(
     bool allStagesPushedDown = numSbeCompatibleStagesForPushdown == sources.size();
 
     // Remove stage patterns where pushing down may degrade performance.
-    prunePushdownStages(stagesForPushdown, minRequiredCompatibility, allStagesPushedDown);
+    prunePushdownStages(stagesForPushdown,
+                        minRequiredCompatibility,
+                        allStagesPushedDown,
+                        cq->getExpCtx()->getIfrContext()->getSavedFlagValue(
+                            feature_flags::gFeatureFlagSbeDisableUnpackBucketPruning));
 
     return allStagesPushedDown;
 }  // findSbeCompatibleStagesForPushdown

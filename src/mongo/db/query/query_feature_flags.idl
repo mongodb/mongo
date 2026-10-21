@@ -504,3 +504,10 @@ feature_flags:
         cpp_varname: gFeatureFlagClusteredCollScanMultiRange
         fcv_gated: false
         incremental_rollout_phase: release
+
+    featureFlagSbeDisableUnpackBucketPruning:
+        description: "Feature flag to disable removal of $_internalUnpackBucket from SBE pushdown when followed by unsupported stages."
+        cpp_varname: gFeatureFlagSbeDisableUnpackBucketPruning
+        default: false
+        fcv_gated: false
+        incremental_rollout_phase: in_development
