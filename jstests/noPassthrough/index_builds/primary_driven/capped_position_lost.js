@@ -8,6 +8,7 @@
  * when the side writes table is drained.
  *
  * @tags: [
+ *   requires_capped,
  *   requires_replication,
  * ]
  */

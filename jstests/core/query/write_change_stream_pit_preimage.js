@@ -9,10 +9,11 @@
 //  no_selinux,
 //  incompatible_with_preimages_by_default,
 //  # Change stream pre-images are not cloned during initial sync.
-//  incompatible_with_initial_sync
+//  incompatible_with_initial_sync,
 // ]
 import {ClusteredCollectionUtil} from "jstests/libs/clustered_collections/clustered_collection_util.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {
     assertChangeStreamPreAndPostImagesCollectionOptionIsAbsent,
@@ -238,31 +239,39 @@ testPreImageRecording({
     },
 });
 
-// Pre-images must be recorded for "findAndModify" commands, while returning the pre-images.
-testPreImageRecording({
-    updateDocFunc: function (coll) {
-        assert.eq(coll.findAndModify({update: {$inc: {x: 2}}, new: false}), originalDoc);
-    },
-    replaceDocFunc: function (coll) {
-        assert.eq(coll.findAndModify({update: replacedDoc, new: false}), updatedDoc);
-    },
-    removeDocFunc: function (coll) {
-        assert.eq(coll.findAndModify({remove: true, new: false}), replacedDoc);
-    },
-});
+// TODO SERVER-120265: Remove this skip once batched writes can store retryable findAndModify
+// images. Primary-driven index builds batch every write, so the retry finds no image.
+const skipRetryableFindAndModify =
+    db.getSession().getOptions().shouldRetryWrites() &&
+    FeatureFlagUtil.isPresentAndEnabled(db, "PrimaryDrivenIndexBuilds");
 
-// Pre-images must be recorded for "findAndModify" commands, while returning the post-images.
-testPreImageRecording({
-    updateDocFunc: function (coll) {
-        assert.eq(coll.findAndModify({update: {$inc: {x: 2}}, new: true}), updatedDoc);
-    },
-    replaceDocFunc: function (coll) {
-        assert.eq(coll.findAndModify({update: replacedDoc, new: true}), replacedDoc);
-    },
-    removeDocFunc: function (coll) {
-        assert.eq(coll.findAndModify({remove: true}), replacedDoc);
-    },
-});
+if (!skipRetryableFindAndModify) {
+    // Pre-images must be recorded for "findAndModify" commands, while returning the pre-images.
+    testPreImageRecording({
+        updateDocFunc: function (coll) {
+            assert.eq(coll.findAndModify({update: {$inc: {x: 2}}, new: false}), originalDoc);
+        },
+        replaceDocFunc: function (coll) {
+            assert.eq(coll.findAndModify({update: replacedDoc, new: false}), updatedDoc);
+        },
+        removeDocFunc: function (coll) {
+            assert.eq(coll.findAndModify({remove: true, new: false}), replacedDoc);
+        },
+    });
+
+    // Pre-images must be recorded for "findAndModify" commands, while returning the post-images.
+    testPreImageRecording({
+        updateDocFunc: function (coll) {
+            assert.eq(coll.findAndModify({update: {$inc: {x: 2}}, new: true}), updatedDoc);
+        },
+        replaceDocFunc: function (coll) {
+            assert.eq(coll.findAndModify({update: replacedDoc, new: true}), replacedDoc);
+        },
+        removeDocFunc: function (coll) {
+            assert.eq(coll.findAndModify({remove: true}), replacedDoc);
+        },
+    });
+}
 
 // If the test script is run in a passthrough that enforces creation of
 // clustered collections, skip the $merge aggregation stage testing since

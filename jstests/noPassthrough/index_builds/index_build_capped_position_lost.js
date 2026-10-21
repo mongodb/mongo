@@ -3,6 +3,9 @@
  * When this occurs during the collection scan phase of an index build, it will get restarted.
  *
  * @tags: [
+ *   # Primary-driven index builds continue past roll-off instead of restarting the scan. See
+ *   # primary_driven/capped_position_lost.js.
+ *   primary_driven_index_builds_incompatible,
  *   requires_capped,
  * ]
  */
