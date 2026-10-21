@@ -276,7 +276,6 @@ mongo_cc_library(
         "//src/mongo:base",
         "//src/mongo/db:commands",
         "//src/mongo/db:server_feature_flags",
-        "//src/mongo/db/auth",
         "//src/mongo/db/commands/server_status:server_status_core",
         "//src/mongo/otel/metrics:otel_metrics_service",
         "//src/mongo/util:clock_sources",

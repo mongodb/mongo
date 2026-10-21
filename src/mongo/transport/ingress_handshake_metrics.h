@@ -79,14 +79,6 @@ public:
     void onCommandProcessed(const Command* command, rpc::ReplyBuilderInterface* response);
 
     /**
-     * Records the time to complete authentication on this session. Only records one sample per
-     * session; connections that never authenticate via a dedicated auth command never record one.
-     * In particular, sessions that authenticate speculatively via `hello` do not record a sample
-     * here.
-     */
-    void onAuthCompleted(const Command* command);
-
-    /**
      * This function is unused.
      */
     void onResponseSent(Microseconds processingDuration, Microseconds sendingDuration);
@@ -108,12 +100,8 @@ private:
     State _state = State::kWaitingForSessionStart;
     TickSource* _tickSource = nullptr;
     TickSource* _tlsHandshakeTickSource = nullptr;
-    bool _authCompletionRecorded = false;
-
     TickSource::Tick _tlsHandshakeStartedTicks = 0;
     TickSource::Tick _sessionStartedTicks = 0;
-    TickSource::Tick _helloCommandReceivedTicks = 0;
-    TickSource::Tick _authCommandReceivedTicks = 0;
     TickSource::Tick _mostRecentHandshakeCommandReceivedTicks = 0;
     TickSource::Tick _mostRecentHandshakeCommandProcessedTicks = 0;
 };

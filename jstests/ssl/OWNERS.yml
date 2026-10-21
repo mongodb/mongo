@@ -3,6 +3,3 @@ filters:
   - "*":
     approvers:
       - 10gen/server-security
-  - "ingress_tls_handshake_metrics.js":
-    approvers:
-      - 10gen/server-networking-and-observability
