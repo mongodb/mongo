@@ -68,7 +68,7 @@ a notice will be included in
 | [snappy]                                             | BSD-3-Clause                                   | 1.1.10                                   | ✗                    | ✗                               |
 | [Snowball Stemming Algorithms (libstemmer)]          | BSD-3-Clause                                   | 1.0.0                                    | ✗                    | ✗                               |
 | [tcmalloc]                                           | Apache-2.0                                     | f3b20f9a07e175c5d897df7b49d9830d4efa6110 |                      | ✗                               |
-| [timelib]                                            | MIT                                            | 2022.13                                  |                      | ✗                               |
+| [timelib]                                            | MIT                                            | 2026.02                                  |                      | ✗                               |
 | [Unicode Character Database]                         | Unicode-DFS-2016                               | 8.0.0                                    | ✗                    | ✗                               |
 | [valgrind.h]                                         | BSD-4-Clause                                   | 3.17.0                                   |                      | ✗                               |
 | [xxHash]                                             | BSD-2-Clause                                   | 0.8.3                                    | ✗                    | ✗                               |
