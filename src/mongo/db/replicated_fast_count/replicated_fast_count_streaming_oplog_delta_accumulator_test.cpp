@@ -482,6 +482,55 @@ TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_DirectCrudOnFastCountStore_N
     EXPECT_FALSE(result.lastTimestamp);
 }
 
+// ----- Layer 1: classifyForFastLane / ts validation -----
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_MalformedTsCrud_FallsThroughToLayer3) {
+    // SERVER-131366: an entry whose `ts` is not a timestamp must never be processed by a fast
+    // lane. Layer 1 routes it to Layer 3, whose IDL parser rejects the malformed `ts` instead of
+    // silently counting the entry as processed.
+    BSONObjBuilder b;
+    b.append("op", "i");
+    b.append("ns", collA.nss.ns_forTest());
+    collA.uuid.appendToBuilder(&b, "ui");
+    b.append("ts", "notatimestamp");
+    b.append("t", kTestTerm);
+    b.append("v", repl::DurableOplogEntry::kOplogVersion);
+    b.append("wall", Date_t::now());
+    b.append("o", BSON("_id" << 1));
+    b.append("m", BSON("sz" << 10));
+    ASSERT_THROWS(runAccumulatorRaw({b.obj()}), DBException);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_MissingTsNoop_FallsThroughToLayer3) {
+    // Same contract for the kCountedNoDelta lane: a noop entry with no `ts` at all falls to
+    // Layer 3, which surfaces the missing required field.
+    BSONObjBuilder b;
+    b.append("op", "n");
+    b.append("ns", NamespaceString::createNamespaceString_forTest("test", "$cmd").ns_forTest());
+    b.append("t", kTestTerm);
+    b.append("v", repl::DurableOplogEntry::kOplogVersion);
+    b.append("wall", Date_t::now());
+    b.append("o", BSON("msg" << "noop"));
+    ASSERT_THROWS(runAccumulatorRaw({b.obj()}), DBException);
+}
+
+TEST_F(StreamingOplogDeltaAccumulatorTest,
+       FastLane_FastCountStoreSkipWithMalformedTs_FallsThroughToLayer3) {
+    // Even kFastCountStoreSkip is guarded: a container op on the fast-count ident with a
+    // malformed `ts` is no longer silently skipped, it is routed to Layer 3.
+    BSONObjBuilder b;
+    b.append("op", "ci");
+    b.append("ns", collA.nss.ns_forTest());
+    collA.uuid.appendToBuilder(&b, "ui");
+    b.append("ts", 12345);
+    b.append("t", kTestTerm);
+    b.append("v", repl::DurableOplogEntry::kOplogVersion);
+    b.append("wall", Date_t::now());
+    b.append("o", BSONObj());
+    b.append("container", ident::kFastCountMetadataStore);
+    ASSERT_THROWS(runAccumulatorRaw({b.obj()}), DBException);
+}
+
 // ----- Layer 2: tryRecordFastCrud shape handling -----
 
 TEST_F(StreamingOplogDeltaAccumulatorTest, FastLane_CrudMissingM_NoDeltas) {

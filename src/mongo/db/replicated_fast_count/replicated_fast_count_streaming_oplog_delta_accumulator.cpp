@@ -173,6 +173,12 @@ bool isRepairReplicatedMetadataO2(const BSONObj& o2) {
 }
 
 FastDecision classifyForFastLane(const ScanFields& f, const BSONObj& raw) {
+    // A malformed or missing `ts` must never be counted as "processed" by a fast lane: only
+    // entries whose `ts` is a real timestamp may advance `lastTimestamp`. Route anything else
+    // to Layer 3 so `repl::OplogEntry::parse` surfaces the error.
+    if (f.ts.type() != BSONType::timestamp) {
+        return FastDecision::kNeedsParse;
+    }
     if (f.op.type() != BSONType::string) {
         return FastDecision::kNeedsParse;
     }
@@ -651,11 +657,6 @@ void StreamingOplogDeltaAccumulator::consumeRecord(const Record& rec) {
                 }
                 return;
             case FastDecision::kCountedNoDelta:
-                if (fields.ts.type() != BSONType::timestamp) {
-                    // Malformed entry: missing or wrong-typed `ts`. Fall through to Layer 3
-                    // so `repl::OplogEntry::parse` surfaces the error.
-                    break;
-                }
                 _result.lastTimestamp = fields.ts.timestamp();
                 if (_options.isCheckpoint) {
                     recordCheckpointOplogEntryProcessed();
@@ -664,9 +665,7 @@ void StreamingOplogDeltaAccumulator::consumeRecord(const Record& rec) {
                 return;
             case FastDecision::kCrud:
                 if (auto handled = tryRecordFastCrud(fields, raw, _result.deltas)) {
-                    if (fields.ts.type() == BSONType::timestamp) {
-                        _result.lastTimestamp = fields.ts.timestamp();
-                    }
+                    _result.lastTimestamp = fields.ts.timestamp();
                     if (_options.isCheckpoint) {
                         recordCheckpointOplogEntryProcessed();
                         recordCheckpointSizeCountEntryProcessed(*handled);
@@ -685,9 +684,7 @@ void StreamingOplogDeltaAccumulator::consumeRecord(const Record& rec) {
                     }
                     return;
                 }
-                if (fields.ts.type() == BSONType::timestamp) {
-                    _result.lastTimestamp = fields.ts.timestamp();
-                }
+                _result.lastTimestamp = fields.ts.timestamp();
                 if (_options.isCheckpoint) {
                     recordCheckpointOplogEntryProcessed();
                     recordCheckpointSizeCountEntryProcessed(outcome.processed);
@@ -696,9 +693,7 @@ void StreamingOplogDeltaAccumulator::consumeRecord(const Record& rec) {
             }
             case FastDecision::kNoopRepair: {
                 const int handled = tryRecordFastNoopRepair(fields, _result.deltas);
-                if (fields.ts.type() == BSONType::timestamp) {
-                    _result.lastTimestamp = fields.ts.timestamp();
-                }
+                _result.lastTimestamp = fields.ts.timestamp();
                 if (_options.isCheckpoint) {
                     recordCheckpointOplogEntryProcessed();
                     recordCheckpointSizeCountEntryProcessed(handled);
@@ -707,9 +702,7 @@ void StreamingOplogDeltaAccumulator::consumeRecord(const Record& rec) {
             }
             case FastDecision::kCommitTxn:
                 if (auto handled = tryFastCommitTxn(fields, _result.deltas)) {
-                    if (fields.ts.type() == BSONType::timestamp) {
-                        _result.lastTimestamp = fields.ts.timestamp();
-                    }
+                    _result.lastTimestamp = fields.ts.timestamp();
                     if (_options.isCheckpoint) {
                         recordCheckpointOplogEntryProcessed();
                         recordCheckpointSizeCountEntryProcessed(*handled);
