@@ -430,6 +430,22 @@ TEST(ParseCheckpointTest, ContainerInsertMissingValueMasserts) {
     ASSERT_THROWS_CODE(parseCheckpoint(checkpointEntry), DBException, 13647900);
 }
 
+DEATH_TEST(ParseCheckpointDeathTest, TimestampContainerDeleteTasserts, "13647901") {
+    BSONArrayBuilder innerOpsBuilder;
+    innerOpsBuilder.append(BSON(
+        "op" << "cd" << "ns" << NamespaceString::kContainerNamespace.ns_forTest() << "container"
+             << ident::kFastCountMetadataStoreTimestamps << "o" << BSON("k" << UUID::gen())));
+
+    const repl::OplogEntry checkpointEntry = repl::DurableOplogEntry{repl::DurableOplogEntryParams{
+        .opTime = repl::OpTime(Timestamp(1, 1), 1),
+        .opType = repl::OpTypeEnum::kCommand,
+        .nss = NamespaceString::kAdminCommandNamespace,
+        .oField = BSON("applyOps" << innerOpsBuilder.arr()),
+        .wallClockTime = Date_t::now(),
+    }};
+
+    isCheckpointApplyOpsEntry(checkpointEntry);
+}
 
 const Timestamp kT0{Seconds(100), 0};
 const Timestamp kT1{Seconds(200), 0};

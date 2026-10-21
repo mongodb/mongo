@@ -153,15 +153,22 @@ bool isCheckpointApplyOpsEntry(const repl::OplogEntry& entry) {
         return false;
     }
     const auto applyOpsInfo = repl::ApplyOpsCommandInfo::parse(entry.getObject());
-    const auto& ops = applyOpsInfo.getOperations();
-    if (ops.empty()) {
-        return false;
+    for (const auto& innerOpObj : applyOpsInfo.getOperations()) {
+        const auto innerOp = repl::DurableReplOperation::parse(innerOpObj);
+        const bool isContainerWrite = innerOp.getOpType() == repl::OpTypeEnum::kContainerInsert ||
+            innerOp.getOpType() == repl::OpTypeEnum::kContainerUpdate ||
+            innerOp.getOpType() == repl::OpTypeEnum::kContainerDelete;
+        // A timestamp store write is included in every checkpoint, so we check for the existence of
+        // this ident.
+        if (isContainerWrite && innerOp.getContainer() &&
+            *innerOp.getContainer() == ident::kFastCountMetadataStoreTimestamps) {
+            tassert(13647901,
+                    "No container deletes are applied to the timestamp container",
+                    innerOp.getOpType() != repl::OpTypeEnum::kContainerDelete);
+            return true;
+        }
     }
-    const auto firstOp = repl::DurableReplOperation::parse(
-        ops.front(), IDLParserContext("FastCountCheckpointInnerFirstOp"));
-    return firstOp.getContainer() &&
-        (*firstOp.getContainer() == ident::kFastCountMetadataStore ||
-         *firstOp.getContainer() == ident::kFastCountMetadataStoreTimestamps);
+    return false;
 }
 
 CheckpointContents parseCheckpoint(const repl::OplogEntry& entry) {
