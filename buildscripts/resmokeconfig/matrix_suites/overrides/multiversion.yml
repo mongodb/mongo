@@ -577,3 +577,13 @@
         new_binary_set_parameters:
           failpoint.disableReplicatedFastCount:
             mode: alwaysOn
+
+- name: disable_replicated_fast_count_on_test_spawned_new_binary
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              setParameters:
+                "failpoint.disableReplicatedFastCount": "{mode: 'alwaysOn'}"
