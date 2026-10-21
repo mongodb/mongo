@@ -14,6 +14,7 @@ export const sampleDocFieldNames = {
     idField: "_id",
     uuidField: "collectionUuid",
     samplingMethodField: "samplingMethod",
+    requestedSamplingMethodField: "requestedSamplingMethod",
     requestedSampleSizeField: "requestedSampleSize",
     numChunksField: "numChunks",
     createdAtField: "createdAt",
@@ -372,8 +373,8 @@ function validateSamplePage(
     assert.eq(pageNo, page[sampleDocFieldNames.pageNoField], "Unexpected pageNo", {sampleId});
     assert.eq(
         samplingMethod,
-        page[sampleDocFieldNames.samplingMethodField],
-        "Unexpected samplingMethod",
+        page[sampleDocFieldNames.requestedSamplingMethodField],
+        "Unexpected requestedSamplingMethod",
         {sampleId},
     );
     assert.eq(

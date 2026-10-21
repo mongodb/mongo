@@ -147,7 +147,7 @@ TEST_F(SamplingEstimatorTest, SampleManagerLoadsPersistedSample) {
     ASSERT_TRUE(sample.technique() == SamplingTechniqueEnum::kRandom);
 }
 
-TEST_F(SamplingEstimatorTest, PersistedSampleCoveringCollectionReportsFullCollScan) {
+TEST_F(SamplingEstimatorTest, PersistedFullCollScanSampleIsKeyedByRequestedMethod) {
     // TODO SERVER-124372: Remove once featureFlagPersistentStats is enabled by default.
     unittest::ServerParameterGuard persistentStatsFlag{"featureFlagPersistentStats", true};
     insertDocuments(_kTestNss, {BSON("_id" << 1 << "tag" << "live")});
@@ -159,11 +159,24 @@ TEST_F(SamplingEstimatorTest, PersistedSampleCoveringCollectionReportsFullCollSc
                                              BSON("_id" << 11 << "tag" << "persisted")};
     // The sample is keyed on disk by the requested method, so it must still be looked up by
     // kRandom even though the requested size covers the whole collection.
+    const BSONObj sampleDoc =
+        buildPersistentSampleDoc(uuid,
+                                 SamplingTechniqueEnum::kRandom,
+                                 persistedDocs.size(),
+                                 persistedDocs,
+                                 /*numChunks=*/boost::none,
+                                 /*schemaVersion=*/kPersistentSampleSchemaVersion,
+                                 /*overrides=*/
+                                 BSON(PersistentSampleDoc::kSamplingMethodFieldName
+                                      << idlSerialize(SamplingTechniqueEnum::kFullCollScan)));
+    // The _id should be keyed by the requested method, not the actual fullCollScan method.
+    ASSERT_EQ(sampleDoc[PersistentSampleDoc::k_idFieldName].String(),
+              makePersistentSampleId(
+                  uuid, SamplingTechniqueEnum::kRandom, persistedDocs.size(), boost::none));
     createCollAndInsertDocuments(
         operationContext(),
         NamespaceStringUtil::deserialize(_kTestNss.dbName(), kSamplesCollectionName),
-        {buildPersistentSampleDoc(
-            uuid, SamplingTechniqueEnum::kRandom, persistedDocs.size(), persistedDocs)},
+        {sampleDoc},
         /*clustered=*/true);
 
     auto coll = acquireCollectionForSampling(operationContext(), _kTestNss);
@@ -463,6 +476,7 @@ std::vector<BSONObj> makeRandomSamplePageDocs(const std::vector<BSONObj>& sample
                                               size_t requestedSampleSize) {
     return makePersistentSamplePageDocs(UUID::gen(),
                                         SamplingTechniqueEnum::kRandom,
+                                        SamplingTechniqueEnum::kRandom,
                                         requestedSampleSize,
                                         /*numChunks=*/boost::none,
                                         sample,
@@ -679,7 +693,7 @@ TEST(MakePersistentSamplePageDocs, NumDocsDiscardedReservationDefersADocToANewPa
     // Begin the sample with one large document and then enough tiny filler documents so that
     // exactly one page is filled as much as possible (including the space reserved for the
     // `numDocsDiscarded` field).
-    std::vector<BSONObj> sample{makeSizedDoc(0, BSONObjMaxUserSize - 2048)};
+    std::vector<BSONObj> sample{makeSizedDoc(0, BSONObjMaxUserSize - 2084)};
     for (int i = 1; i <= 98; ++i) {
         sample.push_back(BSON("_id" << i));
     }
@@ -769,8 +783,13 @@ TEST(MakePersistentSamplePageDocs, ProducesParseableRandomSampleDoc) {
     const Date_t now = Date_t::now();
     std::vector<BSONObj> sample{BSON("a" << 1), BSON("a" << 2)};
 
-    const auto pages = makePersistentSamplePageDocs(
-        uuid, SamplingTechniqueEnum::kRandom, 1000, boost::none, sample, now);
+    const auto pages = makePersistentSamplePageDocs(uuid,
+                                                    SamplingTechniqueEnum::kRandom,
+                                                    SamplingTechniqueEnum::kRandom,
+                                                    1000,
+                                                    boost::none,
+                                                    sample,
+                                                    now);
     ASSERT_EQ(pages.size(), 1u);
 
     auto swParsed = parsePersistentSample(pages[0]);
@@ -789,8 +808,13 @@ TEST(MakePersistentSamplePageDocs, ProducesParseableChunkSampleDoc) {
     std::vector<BSONObj> sample{BSON("a" << 1), BSON("a" << 2)};
     const boost::optional<int> numChunks{4};
 
-    const auto pages = makePersistentSamplePageDocs(
-        uuid, SamplingTechniqueEnum::kChunk, 1000, numChunks, sample, now);
+    const auto pages = makePersistentSamplePageDocs(uuid,
+                                                    SamplingTechniqueEnum::kChunk,
+                                                    SamplingTechniqueEnum::kChunk,
+                                                    1000,
+                                                    numChunks,
+                                                    sample,
+                                                    now);
     ASSERT_EQ(pages.size(), 1u);
 
     auto swParsed = parsePersistentSample(pages[0]);

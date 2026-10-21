@@ -32,7 +32,7 @@ inline constexpr int kPersistentSampleSchemaVersion = 1;
 /**
  * Builds the `_id` string for a persisted sample page document:
  *
- *     <collectionUuid>_<schemaVersion>_<samplingMethod>_<requestedSampleSize>[_<numChunks>]_<pageNo>
+ *     <collectionUuid>_<schemaVersion>_<requestedSamplingMethod>_<requestedSampleSize>[_<numChunks>]_<pageNo>
  *
  * All pages of a given sample share an identical prefix up to (and including) the separator that
  * precedes the page number, so the pages of one sample - and only that sample - form a contiguous
@@ -89,7 +89,6 @@ protected:
      * Reports the sampling technique used.
      */
     SamplingTechniqueEnum technique(const SampleSpec& spec) const override {
-        // TODO SERVER-136539
         const size_t collectionCard =
             static_cast<size_t>(_collections.lookupCollection(spec.nss)->numRecords(_opCtx));
         return spec.requestedSampleSize >= collectionCard

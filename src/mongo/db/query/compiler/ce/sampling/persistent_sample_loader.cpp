@@ -210,12 +210,12 @@ StatusWith<PersistentSampleDoc> parsePersistentSample(const BSONObj& doc) {
         return ex.toStatus();
     }
 
-    if (parsed.getSamplingMethod() == SamplingTechniqueEnum::kChunk &&
+    if (parsed.getRequestedSamplingMethod() == SamplingTechniqueEnum::kChunk &&
         !parsed.getNumChunks().has_value()) {
         return Status(ErrorCodes::UnsupportedFormat,
                       "persistent sample 'numChunks' is required for chunk-technique samples");
     }
-    if (parsed.getSamplingMethod() != SamplingTechniqueEnum::kChunk &&
+    if (parsed.getRequestedSamplingMethod() != SamplingTechniqueEnum::kChunk &&
         parsed.getNumChunks().has_value()) {
         return Status(ErrorCodes::UnsupportedFormat,
                       "persistent sample 'numChunks' must only be set for chunk-technique samples");
@@ -302,6 +302,7 @@ StatusWith<PersistentSampleDoc> reassemblePersistentSample(std::vector<BSONObj> 
         if (page.getSchemaVersion() != reassembled.getSchemaVersion() ||
             page.getCollectionUuid() != reassembled.getCollectionUuid() ||
             page.getSamplingMethod() != reassembled.getSamplingMethod() ||
+            page.getRequestedSamplingMethod() != reassembled.getRequestedSamplingMethod() ||
             page.getRequestedSampleSize() != reassembled.getRequestedSampleSize() ||
             page.getNumChunks() != reassembled.getNumChunks() ||
             page.getNumDocsDiscarded() != reassembled.getNumDocsDiscarded()) {
@@ -440,7 +441,7 @@ StatusWith<Sample> PersistentSampleLoader::tryLoad(const SampleSpec& spec) {
     }
 
     auto sample = Sample::makePersisted(reassembled.getValue().getDocs(),
-                                        technique(spec),
+                                        reassembled.getValue().getSamplingMethod(),
                                         reassembled.getValue().getCreatedAt(),
                                         pagesRead);
 

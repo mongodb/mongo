@@ -1699,6 +1699,7 @@ TEST_F(PlanExplainerTest, CBRSamplingMetadataReportsPagesForPersistedSample) {
     const std::vector<BSONObj> pages =
         ce::makePersistentSamplePageDocs(collUuid,
                                          ce::SamplingTechniqueEnum::kRandom,
+                                         ce::SamplingTechniqueEnum::kRandom,
                                          kPersistedSampleSize,
                                          /*numChunks=*/boost::none,
                                          sample,

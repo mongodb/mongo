@@ -625,6 +625,7 @@ BSONObj buildPersistentSampleDoc(const UUID& collUuid,
     builder.append(PersistentSampleDoc::kRequestedSampleSizeFieldName,
                    static_cast<long long>(requestedSampleSize));
     builder.append(PersistentSampleDoc::kSamplingMethodFieldName, idlSerialize(method));
+    builder.append(PersistentSampleDoc::kRequestedSamplingMethodFieldName, idlSerialize(method));
     builder.append(PersistentSampleDoc::kNumDocsDiscardedFieldName,
                    static_cast<long long>(numDocsDiscarded));
     if (numChunks) {

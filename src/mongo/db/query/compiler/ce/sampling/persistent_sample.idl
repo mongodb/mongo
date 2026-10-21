@@ -40,6 +40,8 @@ structs:
                 type: string
             samplingMethod:
                 type: SamplingTechnique
+            requestedSamplingMethod:
+                type: SamplingTechnique
             requestedSampleSize:
                 type: long
                 validator: {gt: 0}

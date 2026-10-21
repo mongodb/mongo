@@ -285,6 +285,90 @@ try {
         PersistentSamplesUtils.assertPersistedSampleMetadataPresent(meta);
     }
 
+    // The technique reported for a persisted sample must reflect how the sample was generated, not
+    // the size of the collection at read time.
+    {
+        jsTest.log.info("Testing persisted full coll scan sample after the collection grows");
+        assert.commandWorked(
+            db.adminCommand({
+                setParameter: 1,
+                internalQuerySamplingCEMethod: "random",
+                internalQuerySamplingCEMethodForPersistentSamples: "random",
+            }),
+        );
+        coll.drop();
+        PersistentSamplesUtils.dropSamplesColl(db);
+        assert.commandWorked(
+            coll.insertMany(
+                Array.from({length: kSmallCollSize}, (_, i) => ({_id: i, a: i, tag: "src"})),
+            ),
+        );
+
+        assert.commandWorked(
+            db.runCommand({analyze: collName, mode: "sample", samplingMethod: "random"}),
+        );
+
+        assert.commandWorked(
+            coll.insertMany(
+                Array.from({length: kSourceSize}, (_, i) => ({
+                    _id: kSmallCollSize + i,
+                    a: kSmallCollSize + i,
+                    tag: "src",
+                })),
+            ),
+        );
+        assert.gt(coll.count(), kSampleSize, "collection should now exceed the sample size");
+
+        const meta = getWinningPlanMetadata({a: {$gte: 0}});
+        assert.eq(meta.sampleSource, "persisted", "expected persisted sample hit", {meta});
+        assert.eq(
+            meta.sampleDocCount,
+            kSmallCollSize,
+            "expected the sample persisted before the collection grew",
+            {meta},
+        );
+        assert.eq(
+            meta.sampleTechnique,
+            "fullCollScan",
+            "expected the technique used when the sample was generated",
+            {meta},
+        );
+    }
+
+    {
+        jsTest.log.info("Testing persisted random sample after the collection shrinks");
+        assert.commandWorked(
+            db.adminCommand({
+                setParameter: 1,
+                internalQuerySamplingCEMethod: "random",
+                internalQuerySamplingCEMethodForPersistentSamples: "random",
+            }),
+        );
+        resetCollections();
+
+        assert.commandWorked(
+            db.runCommand({analyze: collName, mode: "sample", samplingMethod: "random"}),
+        );
+
+        assert.commandWorked(coll.deleteMany({_id: {$gte: kSmallCollSize}}));
+        assert.lt(coll.count(), kSampleSize, "collection should now be below the sample size");
+
+        const meta = getWinningPlanMetadata({a: {$gte: 0}});
+        assert.eq(meta.sampleSource, "persisted", "expected persisted sample hit", {meta});
+        assert.eq(
+            meta.sampleDocCount,
+            kSampleSize,
+            "expected the sample persisted before the collection shrank",
+            {meta},
+        );
+        assert.eq(
+            meta.sampleTechnique,
+            "random",
+            "expected the technique used when the sample was generated",
+            {meta},
+        );
+    }
+
     {
         jsTest.log.info(
             "Testing full coll scan technique with a persistent sample miss (small collection)",

@@ -251,6 +251,8 @@ TEST(ParsePersistentSample, RejectsMissingSchemaVersion) {
              static_cast<long long>(kStubSampleDocs.size()));
     b.append(PersistentSampleDoc::kSamplingMethodFieldName,
              idlSerialize(SamplingTechniqueEnum::kRandom));
+    b.append(PersistentSampleDoc::kRequestedSamplingMethodFieldName,
+             idlSerialize(SamplingTechniqueEnum::kRandom));
     b.appendDate(PersistentSampleDoc::kCreatedAtFieldName, Date_t::now());
     b.append(PersistentSampleDoc::kNumDocsDiscardedFieldName, static_cast<long long>(0));
     BSONArrayBuilder arr(b.subarrayStart(PersistentSampleDoc::kDocsFieldName));
@@ -404,6 +406,8 @@ TEST(ParsePersistentSample, RejectsMissingDocsField) {
     b.append(PersistentSampleDoc::kRequestedSampleSizeFieldName,
              static_cast<long long>(kStubSampleDocs.size()));
     b.append(PersistentSampleDoc::kSamplingMethodFieldName,
+             idlSerialize(SamplingTechniqueEnum::kRandom));
+    b.append(PersistentSampleDoc::kRequestedSamplingMethodFieldName,
              idlSerialize(SamplingTechniqueEnum::kRandom));
     b.append(PersistentSampleDoc::kNumDocsDiscardedFieldName, static_cast<long long>(0));
     auto result = parsePersistentSample(b.obj());
