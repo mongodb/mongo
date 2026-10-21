@@ -2361,10 +2361,22 @@ void IndexBuildsCoordinator::_onStepUpAsyncTaskFn(OperationContext* opCtx, long 
             // All other errors must be due to key generation. Abort the build now, instead of
             // failing later during the commit phase retry.
             auto status = ex.toStatus().withContext("Skipped records retry failed on step-up");
-            abortIndexBuildByBuildUUID(opCtx,
-                                       replState->buildUUID,
-                                       IndexBuildAction::kPrimaryAbort,
-                                       Status{ErrorCodes::IndexBuildAborted, status.reason()});
+            if (!abortIndexBuildByBuildUUID(
+                    opCtx,
+                    replState->buildUUID,
+                    IndexBuildAction::kPrimaryAbort,
+                    Status{ErrorCodes::IndexBuildAborted, status.reason()})) {
+                // The index build may already have been signaled to commit or was already torn
+                // down. The step-up skipped-records retry is only an optimisation to fail the build
+                // early. The same records are retried when the build commits, and a failure there
+                // aborts it.
+                LOGV2(13699000,
+                      "Index build: failed to abort index build after skipped records retry failed "
+                      "on step-up",
+                      "buildUUID"_attr = replState->buildUUID,
+                      "collectionUUID"_attr = replState->collectionUUID,
+                      "error"_attr = status);
+            }
         }
     };
 
