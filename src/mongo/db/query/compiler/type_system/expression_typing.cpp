@@ -21,6 +21,14 @@ struct GetOutputTypeExpressionVisitor final
 
     GetOutputTypeExpressionVisitor(const Type& inputType) : inputType(inputType) {}
 
+    void visit(const ExpressionOr* expr) override {
+        returnsBoolean();
+    }
+
+    void returnsBoolean() {
+        outputType = Type(BSONType::boolean, Extent::kSubset);
+    }
+
     const Type& inputType;
     Type outputType{Type::any()};
 };
@@ -35,6 +43,14 @@ struct NarrowTypeExpressionVisitor final
 
     NarrowTypeExpressionVisitor(Type inputType, bool assumeTrue)
         : type(std::move(inputType)), assumeTrue(assumeTrue) {}
+
+    void visit(const ExpressionOr* expr) override {
+        // TODO(SERVER-135985): Implement fully as we do for MatchExpressions.
+        if (expr->getChildren().empty() && assumeTrue) {
+            // An empty $or evaluates to false, so it matches no document.
+            type = Type::never();
+        }
+    }
 
     /// The input type, narrowed by every expression which carries type information so far.
     Type type;

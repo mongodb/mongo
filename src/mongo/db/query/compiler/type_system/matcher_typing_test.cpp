@@ -1470,5 +1470,13 @@ TEST(MatcherTypingTest, NarrowingOnDottedPathAdmitsEveryDocumentMatcherLeavesPos
     }
 }
 
+TEST(MatcherTypingTest, ExprMatchExpressionNarrowing) {
+    auto input = Type::anyObject();
+    auto predicate = "{$expr: {$or: []}}";
+    auto expected = "never";
+    ASSERT_FALSE(matches(predicate, "{}"));
+    ASSERT_EQ(narrowedDebugString(predicate, input), expected);
+}
+
 }  // namespace
 }  // namespace mongo::pipeline::type_system

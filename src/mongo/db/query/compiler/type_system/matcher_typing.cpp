@@ -5,9 +5,11 @@
 
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
+#include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/matcher/expression_type.h"
 #include "mongo/db/matcher/expression_visitor.h"
+#include "mongo/db/query/compiler/type_system/expression_typing.h"
 #include "mongo/util/assert_util.h"
 
 #include <utility>
@@ -134,6 +136,10 @@ struct NarrowTypeMatchExpressionVisitor final : public SelectiveMatchExpressionV
     void visit(const NorMatchExpression* expr) override {
         // $nor is just a negated $or.
         type = narrowByDisjunction(std::move(type), expr, !assumeTrue);
+    }
+
+    void visit(const ExprMatchExpression* expr) override {
+        type = narrowType(std::move(type), expr->getExpression().get(), assumeTrue);
     }
 
     /**
