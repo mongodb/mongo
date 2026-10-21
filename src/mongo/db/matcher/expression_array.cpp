@@ -7,6 +7,10 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_always_boolean.h"
+#include "mongo/db/matcher/expression_leaf.h"
+#include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/query/util/make_data_structure.h"
 
 #include <algorithm>
@@ -111,6 +115,32 @@ void ElemMatchValueMatchExpression::appendSerializedRightHandSide(
         opts.appendLiteral(&emBob, "$nin", arrBob.arr());
     } else {
         for (auto&& child : _subs) {
+            // We recognize the special case of a desugared {$all:[1,2]} which
+            // would naively serialize as {$eq:1, $eq:2}. The naive
+            // serialization is not re-parseable. Here we re-sugar the
+            // expression into a $all.
+            std::vector<BSONElement> rhsSet;
+            if (auto&& andExpr = dynamic_cast<const AndMatchExpression*>(child.get())) {
+                const auto& children = andExpr->getChildren();
+                for (auto&& child : children) {
+                    if (child->matchType() == EQ && child->path().empty()) {
+                        rhsSet.push_back(
+                            checked_cast<const EqualityMatchExpression*>(child.get())->getData());
+                    } else {
+                        break;
+                    }
+                }
+                if (children.size() > 0 && rhsSet.size() == children.size()) {
+                    // All elements in the $and were $eq. Serialize as $all.
+                    BSONArrayBuilder allBob = emBob.subarrayStart("$all");
+                    for (auto&& rhs : rhsSet) {
+                        allBob.append(rhs);
+                    }
+                    allBob.doneFast();
+                    // Break from the default serialization logic.
+                    continue;
+                }
+            }
             child->serialize(&emBob, opts, false);
         }
     }

@@ -857,5 +857,78 @@ TEST(SerializeBasic, SerializesNestedElemMatchCorrectly) {
         })",
         objMatch.getValue()->serialize(opts));
 }
+
+TEST(SerializeBasic, SerializesElemMatchObj) {
+    auto query = fromjson(R"({a: {$elemMatch: {bar:123}}})");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto objMatch = MatchExpressionParser::parse(query, expCtx);
+    ASSERT_OK(objMatch.getStatus());
+    query_shape::SerializationOptions opts;
+    opts.literalPolicy = query_shape::LiteralSerializationPolicy::kToDebugTypeString;
+    ASSERT_BSONOBJ_EQ_AUTO(R"({"a":{"$elemMatch":{"bar":{"$eq":"?number"}}}})",
+                           objMatch.getValue()->serialize(opts));
+}
+
+TEST(SerializeBasic, SerializesElemMatchAllAsAll) {
+    auto query = fromjson(R"({a: {$elemMatch: {$all:[1,2,3,3]}}})");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto objMatch = MatchExpressionParser::parse(query, expCtx);
+    ASSERT_OK(objMatch.getStatus());
+    query_shape::SerializationOptions opts;
+    opts.literalPolicy = query_shape::LiteralSerializationPolicy::kToDebugTypeString;
+    ASSERT_BSONOBJ_EQ_AUTO(R"({"a":{"$elemMatch":{"$all":[1,2,3,3]}}})",
+                           objMatch.getValue()->serialize(opts));
+}
+
+TEST(SerializeBasic, SerializesElemMatchAndWithPathIsNotAll) {
+    auto query = fromjson(R"({a: {$elemMatch: {$and:[{x: 1}, {y: 2}]}}})");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto objMatch = MatchExpressionParser::parse(query, expCtx);
+    ASSERT_OK(objMatch.getStatus());
+    query_shape::SerializationOptions opts;
+    opts.literalPolicy = query_shape::LiteralSerializationPolicy::kToDebugTypeString;
+    ASSERT_BSONOBJ_EQ_AUTO(
+        R"({
+            "a": {
+                "$elemMatch": {
+                    "$and": [
+                        {
+                            "x": {
+                                "$eq": "?number"
+                            }
+                        },
+                        {
+                            "y": {
+                                "$eq": "?number"
+                            }
+                        }
+                    ]
+                }
+            }
+        })",
+        objMatch.getValue()->serialize(opts));
+}
+
+TEST(SerializeBasic, SerializesElemMatchAndIsNotAll) {
+    auto query = fromjson(R"({a: {$elemMatch: {$eq: 1, $lt: 2}}})");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto objMatch = MatchExpressionParser::parse(query, expCtx);
+    ASSERT_OK(objMatch.getStatus());
+    query_shape::SerializationOptions opts;
+    opts.literalPolicy = query_shape::LiteralSerializationPolicy::kToDebugTypeString;
+    ASSERT_BSONOBJ_EQ_AUTO(R"({"a":{"$elemMatch":{"$eq":"?number","$lt":"?number"}}})",
+                           objMatch.getValue()->serialize(opts));
+}
+
+TEST(SerializeBasic, SerializesElemMatchEmptyIsNotAll) {
+    auto query = fromjson(R"({a: {$elemMatch: {}}})");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto objMatch = MatchExpressionParser::parse(query, expCtx);
+    ASSERT_OK(objMatch.getStatus());
+    query_shape::SerializationOptions opts;
+    opts.literalPolicy = query_shape::LiteralSerializationPolicy::kToDebugTypeString;
+    ASSERT_BSONOBJ_EQ_AUTO(R"({"a":{"$elemMatch":{}}})", objMatch.getValue()->serialize(opts));
+}
+
 }  // namespace
 }  // namespace mongo
