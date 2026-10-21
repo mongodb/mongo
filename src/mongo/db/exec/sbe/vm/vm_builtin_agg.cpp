@@ -354,7 +354,7 @@ int32_t aggFirstN(value::Array* state,
 value::TagValueMaybeOwned ByteCode::builtinAggFirstN(ArityType arity) {
     auto stateTagVal = moveOwnedFromStack(0);
 
-    auto [state, array, startIdx, maxSize, memUsage, memLimit, isGroupAccum] =
+    auto [state, array, startIdx, maxSize, memUsage, memLimit] =
         getMultiAccState(stateTagVal.view());
 
     aggFirstN(state, array, maxSize, memUsage, memLimit, moveOwnedFromStack(1));
@@ -367,14 +367,9 @@ value::TagValueMaybeOwned ByteCode::builtinAggFirstNMerge(ArityType arity) {
 
     auto stateTagVal = moveOwnedFromStack(1);
 
-    auto [mergeState,
-          mergeArray,
-          mergeStartIdx,
-          mergeMaxSize,
-          mergeMemUsage,
-          mergeMemLimit,
-          mergeIsGroupAccum] = getMultiAccState(mergeStateTagVal.view());
-    auto [state, array, accStartIdx, accMaxSize, accMemUsage, accMemLimit, accIsGroupAccum] =
+    auto [mergeState, mergeArray, mergeStartIdx, mergeMaxSize, mergeMemUsage, mergeMemLimit] =
+        getMultiAccState(mergeStateTagVal.view());
+    auto [state, array, accStartIdx, accMaxSize, accMemUsage, accMemLimit] =
         getMultiAccState(stateTagVal.view());
     uassert(7548604,
             "Two arrays to merge should have the same MaxSize component",
@@ -399,18 +394,9 @@ value::TagValueMaybeOwned ByteCode::builtinAggFirstNFinalize(ArityType arity) {
     uassert(7548605, "expected an array", stateTagVal.tag() == value::TypeTags::Array);
     auto state = value::getArrayView(stateTagVal.value());
 
-    auto isGroupAccTagVal = state->getAt(static_cast<size_t>(AggMultiElems::kIsGroupAccum));
-    auto isGroupAcc = value::bitcastTo<bool>(isGroupAccTagVal.value);
-
-    if (isGroupAcc) {
-        auto output = state->swapAt(
-            static_cast<size_t>(AggMultiElems::kInternalArr), value::TypeTags::Null, 0);
-        return output;
-    } else {
-        auto arrTagVal = state->getAt(static_cast<size_t>(AggMultiElems::kInternalArr));
-        auto [outputTag, outputVal] = value::copyValue(arrTagVal.tag, arrTagVal.value);
-        return {true, outputTag, outputVal};
-    }
+    auto output =
+        state->swapAt(static_cast<size_t>(AggMultiElems::kInternalArr), value::TypeTags::Null, 0);
+    return output;
 }
 
 namespace {
@@ -448,7 +434,7 @@ std::pair<size_t, int32_t> aggLastN(value::Array* state,
 value::TagValueMaybeOwned ByteCode::builtinAggLastN(ArityType arity) {
     auto stateTagVal = moveOwnedFromStack(0);
 
-    auto [state, array, startIdx, maxSize, memUsage, memLimit, isGroupAccum] =
+    auto [state, array, startIdx, maxSize, memUsage, memLimit] =
         getMultiAccState(stateTagVal.view());
 
     auto fieldTagVal = moveOwnedFromStack(1);
@@ -462,14 +448,9 @@ value::TagValueMaybeOwned ByteCode::builtinAggLastNMerge(ArityType arity) {
 
     auto stateTagVal = moveOwnedFromStack(1);
 
-    auto [mergeState,
-          mergeArray,
-          mergeStartIdx,
-          mergeMaxSize,
-          mergeMemUsage,
-          mergeMemLimit,
-          mergeIsGroupAccum] = getMultiAccState(mergeStateTagVal.view());
-    auto [state, array, startIdx, maxSize, memUsage, memLimit, isGroupAccum] =
+    auto [mergeState, mergeArray, mergeStartIdx, mergeMaxSize, mergeMemUsage, mergeMemLimit] =
+        getMultiAccState(mergeStateTagVal.view());
+    auto [state, array, startIdx, maxSize, memUsage, memLimit] =
         getMultiAccState(stateTagVal.view());
     uassert(7548703,
             "Two arrays to merge should have the same MaxSize component",
@@ -498,17 +479,10 @@ value::TagValueMaybeOwned ByteCode::builtinAggLastNMerge(ArityType arity) {
 value::TagValueMaybeOwned ByteCode::builtinAggLastNFinalize(ArityType arity) {
     auto stateTagVal = moveOwnedFromStack(0);
 
-    auto [state, arr, startIdx, maxSize, memUsage, memLimit, isGroupAccum] =
-        getMultiAccState(stateTagVal.view());
+    auto [state, arr, startIdx, maxSize, memUsage, memLimit] = getMultiAccState(stateTagVal.view());
     if (startIdx == 0) {
-        if (isGroupAccum) {
-            auto out = state->swapAt(0, value::TypeTags::Null, 0);
-            return out;
-        } else {
-            auto arrView = state->getAt(0);
-            auto [outTag, outVal] = value::copyValue(arrView.tag, arrView.value);
-            return {true, outTag, outVal};
-        }
+        auto out = state->swapAt(0, value::TypeTags::Null, 0);
+        return out;
     }
 
     tassert(11093707, "Array size must be equal to maxSize", arr->size() == maxSize);
@@ -516,19 +490,10 @@ value::TagValueMaybeOwned ByteCode::builtinAggLastNFinalize(ArityType arity) {
     auto outArray = value::getArrayView(outArrayTagVal.value());
     outArray->reserve(maxSize);
 
-    if (isGroupAccum) {
-        for (size_t i = 0; i < maxSize; ++i) {
-            auto srcIdx = (i + startIdx) % maxSize;
-            auto elem = arr->swapAt(srcIdx, value::TypeTags::Null, 0);
-            outArray->push_back(std::move(elem));
-        }
-    } else {
-        for (size_t i = 0; i < maxSize; ++i) {
-            auto srcIdx = (i + startIdx) % maxSize;
-            auto elem = arr->getAt(srcIdx);
-            auto [copyTag, copyVal] = value::copyValue(elem.tag, elem.value);
-            outArray->push_back_raw(copyTag, copyVal);
-        }
+    for (size_t i = 0; i < maxSize; ++i) {
+        auto srcIdx = (i + startIdx) % maxSize;
+        auto elem = arr->swapAt(srcIdx, value::TypeTags::Null, 0);
+        outArray->push_back(std::move(elem));
     }
     return outArrayTagVal;
 }
@@ -665,7 +630,7 @@ value::TagValueMaybeOwned ByteCode::builtinAggTopBottomNImpl(ArityType arity) {
 
     auto stateTagVal = moveOwnedFromStack(0);
 
-    auto [state, array, startIdx, maxSize, memUsage, memLimit, isGroupAccum] =
+    auto [state, array, startIdx, maxSize, memUsage, memLimit] =
         getMultiAccState(stateTagVal.view());
 
     size_t numKeys = 1;
@@ -738,14 +703,9 @@ value::TagValueMaybeOwned ByteCode::builtinAggTopBottomNMerge(ArityType arity) {
 
     auto stateTagVal = moveOwnedFromStack(1);
     auto mergeStateTagVal = moveOwnedFromStack(0);
-    auto [mergeState,
-          mergeArray,
-          mergeStartIx,
-          mergeMaxSize,
-          mergeMemUsage,
-          mergeMemLimit,
-          mergeIsGroupAccum] = getMultiAccState(mergeStateTagVal.view());
-    auto [state, array, startIdx, maxSize, memUsage, memLimit, isGroupAccum] =
+    auto [mergeState, mergeArray, mergeStartIx, mergeMaxSize, mergeMemUsage, mergeMemLimit] =
+        getMultiAccState(mergeStateTagVal.view());
+    auto [state, array, startIdx, maxSize, memUsage, memLimit] =
         getMultiAccState(stateTagVal.view());
     tassert(5807008,
             "Two arrays to merge should have the same MaxSize component",
@@ -778,7 +738,7 @@ value::TagValueMaybeOwned ByteCode::builtinAggTopBottomNFinalize(ArityType arity
     auto sortSpec = value::getSortSpecView(sortSpecTagVal.value());
 
     auto stateTagVal = moveOwnedFromStack(0);
-    auto [state, array, startIdx, maxSize, memUsage, memLimit, isGroupAccum] =
+    auto [state, array, startIdx, maxSize, memUsage, memLimit] =
         getMultiAccState(stateTagVal.view());
 
     auto outputArrayTagVal = value::TagValueOwned::fromRaw(value::makeNewArray());
@@ -791,14 +751,8 @@ value::TagValueMaybeOwned ByteCode::builtinAggTopBottomNFinalize(ArityType arity
     std::sort(array->values().begin(), array->values().end(), keyLess);
     for (size_t i = 0; i < array->size(); ++i) {
         auto pair = value::getArrayView(array->getAt(i).value);
-        if (isGroupAccum) {
-            auto out = pair->swapAt(1, value::TypeTags::Null, 0);
-            outputArray->push_back(std::move(out));
-        } else {
-            auto outTagVal = pair->getAt(1);
-            auto [copyTag, copyVal] = value::copyValue(outTagVal.tag, outTagVal.value);
-            outputArray->push_back_raw(copyTag, copyVal);
-        }
+        auto out = pair->swapAt(1, value::TypeTags::Null, 0);
+        outputArray->push_back(std::move(out));
     }
 
     return outputArrayTagVal;
@@ -923,7 +877,7 @@ value::TagValueMaybeOwned ByteCode::builtinAggMinMaxN(ArityType arity) {
         return stateTagVal;
     }
 
-    auto [state, array, startIdx, maxSize, memUsage, memLimit, isGroupAccum] =
+    auto [state, array, startIdx, maxSize, memUsage, memLimit] =
         getMultiAccState(stateTagVal.view());
 
     CollatorInterface* collator = nullptr;
@@ -950,14 +904,9 @@ value::TagValueMaybeOwned ByteCode::builtinAggMinMaxNMerge(ArityType arity) {
 
     auto stateTagVal = moveOwnedFromStack(1);
 
-    auto [mergeState,
-          mergeArray,
-          mergeStartIdx,
-          mergeMaxSize,
-          mergeMemUsage,
-          mergeMemLimit,
-          mergeIsGroupAccum] = getMultiAccState(mergeStateTagVal.view());
-    auto [state, array, startIdx, maxSize, memUsage, memLimit, isGroupAccum] =
+    auto [mergeState, mergeArray, mergeStartIdx, mergeMaxSize, mergeMemUsage, mergeMemLimit] =
+        getMultiAccState(mergeStateTagVal.view());
+    auto [state, array, startIdx, maxSize, memUsage, memLimit] =
         getMultiAccState(stateTagVal.view());
     uassert(7548801,
             "Two arrays to merge should have the same MaxSize component",
@@ -994,7 +943,7 @@ value::TagValueMaybeOwned ByteCode::builtinAggMinMaxNFinalize(ArityType arity) {
     tassert(11080085, "Unexpected arity value", arity == 2 || arity == 1);
     auto stateTagVal = moveOwnedFromStack(0);
 
-    auto [state, array, startIdx, maxSize, memUsage, memLimit, isGroupAccum] =
+    auto [state, array, startIdx, maxSize, memUsage, memLimit] =
         getMultiAccState(stateTagVal.view());
 
     CollatorInterface* collator = nullptr;
@@ -1013,15 +962,9 @@ value::TagValueMaybeOwned ByteCode::builtinAggMinMaxNFinalize(ArityType arity) {
     }();
     value::ValueCompare<less> comp{collator};
     std::sort(array->values().begin(), array->values().end(), comp);
-    if (isGroupAccum) {
-        auto arrayVal = state->swapAt(
-            static_cast<size_t>(AggMultiElems::kInternalArr), value::TypeTags::Null, 0);
-        return arrayVal;
-    } else {
-        auto arrTagVal = state->getAt(0);
-        auto [outTag, outVal] = value::copyValue(arrTagVal.tag, arrTagVal.value);
-        return {true, outTag, outVal};
-    }
+    auto arrayVal =
+        state->swapAt(static_cast<size_t>(AggMultiElems::kInternalArr), value::TypeTags::Null, 0);
+    return arrayVal;
 }
 template value::TagValueMaybeOwned
 ByteCode::builtinAggMinMaxNFinalize<(AccumulatorMinMax::Sense)-1>(ArityType arity);

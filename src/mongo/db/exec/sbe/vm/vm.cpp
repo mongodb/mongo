@@ -723,13 +723,7 @@ ByteCode::MultiAccState ByteCode::getMultiAccState(value::TagValueView state) {
             memLimitTagVal.tag == value::TypeTags::NumberInt32);
     auto memLimit = value::bitcastTo<int32_t>(memLimitTagVal.value);
 
-    auto isGroupAccumTagVal = stateArray->getAt(static_cast<size_t>(AggMultiElems::kIsGroupAccum));
-    uassert(8070611,
-            "IsGroupAccum component should be a boolean",
-            isGroupAccumTagVal.tag == value::TypeTags::Boolean);
-    auto isGroupAccum = value::bitcastTo<bool>(isGroupAccumTagVal.value);
-
-    return {stateArray, array, startIndex, maxSize, memUsage, memLimit, isGroupAccum};
+    return {stateArray, array, startIndex, maxSize, memUsage, memLimit};
 }
 
 int32_t updateAndCheckMemUsage(

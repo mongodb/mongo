@@ -65,7 +65,7 @@ AccumInputsPtr AddBlockTopBottomNInputs::clone() const {
 }
 
 AccumInputsPtr InitAccumNInputs::clone() const {
-    return std::make_unique<InitAccumNInputs>(maxSize.clone(), isGroupAccum.clone());
+    return std::make_unique<InitAccumNInputs>(maxSize.clone());
 }
 
 AccumInputsPtr FinalizeTopBottomNInputs::clone() const {
@@ -1013,10 +1013,8 @@ SbExpr::Vector buildInitializeAccumN(const AccumOp& acc,
     SbExprBuilder b(state);
 
     auto maxSizeExpr = std::move(inputs->maxSize);
-    auto isGroupAccumExpr = std::move(inputs->isGroupAccum);
 
-    // Create an array of four elements [value holder, max size, memory used, memory limit,
-    // isGroupAccum].
+    // Create an array of four elements [value holder, max size, memory used, memory limit].
     auto maxAccumulatorBytes = state.expCtx->getQueryKnobConfiguration().getTopNAccumulatorBytes();
     if (maxSizeExpr.isConstantExpr()) {
         auto [tag, val] = maxSizeExpr.getConstantValue();
@@ -1030,8 +1028,7 @@ SbExpr::Vector buildInitializeAccumN(const AccumOp& acc,
                                               b.makeInt64Constant(0),
                                               b.makeConstant(convert.tag(), convert.value()),
                                               b.makeInt32Constant(0),
-                                              b.makeInt32Constant(maxAccumulatorBytes),
-                                              std::move(isGroupAccumExpr)));
+                                              b.makeInt32Constant(maxAccumulatorBytes)));
     } else {
         auto frameId = state.frameIdGenerator->generate();
         auto binds = SbExpr::makeSeq(
@@ -1047,8 +1044,7 @@ SbExpr::Vector buildInitializeAccumN(const AccumOp& acc,
                            b.makeInt64Constant(0),
                            var,
                            b.makeInt32Constant(0),
-                           b.makeInt32Constant(maxAccumulatorBytes),
-                           std::move(isGroupAccumExpr)),
+                           b.makeInt32Constant(maxAccumulatorBytes)),
             b.makeFail(ErrorCodes::Error{7548607},
                        "parameter 'n' must be coercible to a positive 64-bit integer"));
 

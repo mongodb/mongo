@@ -3221,8 +3221,8 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsFirstNMergeBothArr
     testCombinePartialAggsMultiAccumulator<false>(
         sbe::EFn::kAggFirstNMerge,
         sbe::EFn::kAggFirstNFinalize,
-        BSON_ARRAY(BSON_ARRAY(1 << 2) << 0ll << 3ll << 16 << 1024 << true),
-        BSON_ARRAY(BSON_ARRAY(3 << 4 << 5) << 0ll << 3ll << 24 << 1024 << true),
+        BSON_ARRAY(BSON_ARRAY(1 << 2) << 0ll << 3ll << 16 << 1024),
+        BSON_ARRAY(BSON_ARRAY(3 << 4 << 5) << 0ll << 3ll << 24 << 1024),
         BSON_ARRAY(1 << 2 << 3));
 }
 
@@ -3230,8 +3230,8 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsFirstNNoMerge) {
     testCombinePartialAggsMultiAccumulator<false>(
         sbe::EFn::kAggFirstNMerge,
         sbe::EFn::kAggFirstNFinalize,
-        BSON_ARRAY(BSON_ARRAY(1 << 2 << 6) << 0ll << 3ll << 24 << 1024 << true),
-        BSON_ARRAY(BSON_ARRAY(3 << 4 << 5) << 0ll << 3ll << 24 << 1024 << true),
+        BSON_ARRAY(BSON_ARRAY(1 << 2 << 6) << 0ll << 3ll << 24 << 1024),
+        BSON_ARRAY(BSON_ARRAY(3 << 4 << 5) << 0ll << 3ll << 24 << 1024),
         BSON_ARRAY(1 << 2 << 6));
 }
 
@@ -3239,8 +3239,8 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsFirstNMergeArrayEm
     testCombinePartialAggsMultiAccumulator<false>(
         sbe::EFn::kAggFirstNMerge,
         sbe::EFn::kAggFirstNFinalize,
-        BSON_ARRAY(BSONArrayBuilder().arr() << 0ll << 3ll << 0 << 1024 << true),
-        BSON_ARRAY(BSON_ARRAY(3 << 4 << 5) << 0ll << 3ll << 24 << 1024 << true),
+        BSON_ARRAY(BSONArrayBuilder().arr() << 0ll << 3ll << 0 << 1024),
+        BSON_ARRAY(BSON_ARRAY(3 << 4 << 5) << 0ll << 3ll << 24 << 1024),
         BSON_ARRAY(3 << 4 << 5));
 }
 
@@ -3248,8 +3248,8 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsFirstNInputArrayEm
     testCombinePartialAggsMultiAccumulator<false>(
         sbe::EFn::kAggFirstNMerge,
         sbe::EFn::kAggFirstNFinalize,
-        BSON_ARRAY(BSON_ARRAY(3 << 4 << 5) << 0ll << 3ll << 24 << 1024 << true),
-        BSON_ARRAY(BSONArrayBuilder().arr() << 0ll << 3ll << 0 << 1024 << true),
+        BSON_ARRAY(BSON_ARRAY(3 << 4 << 5) << 0ll << 3ll << 24 << 1024),
+        BSON_ARRAY(BSONArrayBuilder().arr() << 0ll << 3ll << 0 << 1024),
         BSON_ARRAY(3 << 4 << 5));
 }
 
@@ -3257,8 +3257,8 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsLastNMergeBothArra
     testCombinePartialAggsMultiAccumulator<false>(
         sbe::EFn::kAggLastNMerge,
         sbe::EFn::kAggLastNFinalize,
-        BSON_ARRAY(BSON_ARRAY(1 << 2 << 3) << 1ll << 3ll << 24 << 1024 << true),
-        BSON_ARRAY(BSON_ARRAY(4 << 5) << 0ll << 3ll << 16 << 1024 << true),
+        BSON_ARRAY(BSON_ARRAY(1 << 2 << 3) << 1ll << 3ll << 24 << 1024),
+        BSON_ARRAY(BSON_ARRAY(4 << 5) << 0ll << 3ll << 16 << 1024),
         BSON_ARRAY(1 << 4 << 5));
 }
 
@@ -3266,8 +3266,8 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsLastNNoMerge) {
     testCombinePartialAggsMultiAccumulator<false>(
         sbe::EFn::kAggLastNMerge,
         sbe::EFn::kAggLastNFinalize,
-        BSON_ARRAY(BSON_ARRAY(1 << 2 << 6) << 2ll << 3ll << 24 << 1024 << true),
-        BSON_ARRAY(BSON_ARRAY(3 << 4 << 5) << 1ll << 3ll << 24 << 1024 << true),
+        BSON_ARRAY(BSON_ARRAY(1 << 2 << 6) << 2ll << 3ll << 24 << 1024),
+        BSON_ARRAY(BSON_ARRAY(3 << 4 << 5) << 1ll << 3ll << 24 << 1024),
         BSON_ARRAY(4 << 5 << 3));
 }
 
@@ -3275,8 +3275,8 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsLastNInputArrayFul
     testCombinePartialAggsMultiAccumulator<false>(
         sbe::EFn::kAggLastNMerge,
         sbe::EFn::kAggLastNFinalize,
-        BSON_ARRAY(BSON_ARRAY(1 << 2) << 0ll << 3ll << 0 << 1024 << true),
-        BSON_ARRAY(BSON_ARRAY(3 << 4 << 5) << 2ll << 3ll << 24 << 1024 << true),
+        BSON_ARRAY(BSON_ARRAY(1 << 2) << 0ll << 3ll << 0 << 1024),
+        BSON_ARRAY(BSON_ARRAY(3 << 4 << 5) << 2ll << 3ll << 24 << 1024),
         BSON_ARRAY(5 << 3 << 4));
 }
 
@@ -3284,8 +3284,8 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsLastNInputArrayEmp
     testCombinePartialAggsMultiAccumulator<false>(
         sbe::EFn::kAggLastNMerge,
         sbe::EFn::kAggLastNFinalize,
-        BSON_ARRAY(BSON_ARRAY(3 << 4 << 5) << 2ll << 3ll << 24 << 1024 << true),
-        BSON_ARRAY(BSONArrayBuilder().arr() << 0ll << 3ll << 0 << 1024 << true),
+        BSON_ARRAY(BSON_ARRAY(3 << 4 << 5) << 2ll << 3ll << 24 << 1024),
+        BSON_ARRAY(BSONArrayBuilder().arr() << 0ll << 3ll << 0 << 1024),
         BSON_ARRAY(5 << 3 << 4));
 }
 
@@ -3294,9 +3294,9 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsTopN) {
         sbe::EFn::kAggTopNMerge,
         sbe::EFn::kAggTopNFinalize,
         BSON_ARRAY(BSON_ARRAY(BSON_ARRAY(5 << 5) << BSON_ARRAY(3 << 3) << BSON_ARRAY(1 << 1))
-                   << 0ll << 3ll << 0 << INT_MAX << true),
+                   << 0ll << 3ll << 0 << INT_MAX),
         BSON_ARRAY(BSON_ARRAY(BSON_ARRAY(6 << 6) << BSON_ARRAY(4 << 4) << BSON_ARRAY(2 << 2))
-                   << 0ll << 3ll << 0 << INT_MAX << true),
+                   << 0ll << 3ll << 0 << INT_MAX),
         new sbe::SortSpec(BSON("x" << 1)),
         BSON_ARRAY(1 << 2 << 3));
 }
@@ -3306,9 +3306,9 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsBottomN) {
         sbe::EFn::kAggBottomNMerge,
         sbe::EFn::kAggBottomNFinalize,
         BSON_ARRAY(BSON_ARRAY(BSON_ARRAY(1 << 1) << BSON_ARRAY(3 << 3) << BSON_ARRAY(5 << 5))
-                   << 0ll << 3ll << 0 << INT_MAX << true),
+                   << 0ll << 3ll << 0 << INT_MAX),
         BSON_ARRAY(BSON_ARRAY(BSON_ARRAY(2 << 2) << BSON_ARRAY(4 << 4) << BSON_ARRAY(6 << 6))
-                   << 0ll << 3ll << 0 << INT_MAX << true),
+                   << 0ll << 3ll << 0 << INT_MAX),
         new sbe::SortSpec(BSON("x" << 1)),
         BSON_ARRAY(4 << 5 << 6));
 }
@@ -3317,8 +3317,8 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsMinN) {
     testCombinePartialAggsMultiAccumulator<false>(
         sbe::EFn::kAggMinNMerge,
         sbe::EFn::kAggMinNFinalize,
-        BSON_ARRAY(BSON_ARRAY(5 << 3 << 1) << 0ll << 3ll << 24 << 1024 << true),
-        BSON_ARRAY(BSON_ARRAY(6 << 4 << 2) << 0ll << 3ll << 24 << 1024 << true),
+        BSON_ARRAY(BSON_ARRAY(5 << 3 << 1) << 0ll << 3ll << 24 << 1024),
+        BSON_ARRAY(BSON_ARRAY(6 << 4 << 2) << 0ll << 3ll << 24 << 1024),
         BSON_ARRAY(1 << 2 << 3));
 }
 
@@ -3326,8 +3326,8 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsMaxN) {
     testCombinePartialAggsMultiAccumulator<false>(
         sbe::EFn::kAggMaxNMerge,
         sbe::EFn::kAggMaxNFinalize,
-        BSON_ARRAY(BSON_ARRAY(1 << 3 << 5) << 0ll << 3ll << 24 << 1024 << true),
-        BSON_ARRAY(BSON_ARRAY(2 << 4 << 6) << 0ll << 3ll << 24 << 1024 << true),
+        BSON_ARRAY(BSON_ARRAY(1 << 3 << 5) << 0ll << 3ll << 24 << 1024),
+        BSON_ARRAY(BSON_ARRAY(2 << 4 << 6) << 0ll << 3ll << 24 << 1024),
         BSON_ARRAY(6 << 5 << 4));
 }
 
@@ -3336,10 +3336,10 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsMinNCollator) {
                                                  sbe::EFn::kAggMinNFinalize,
                                                  BSON_ARRAY(BSON_ARRAY("az" << "cx"
                                                                             << "ev")
-                                                            << 0ll << 3ll << 24 << 1024 << true),
+                                                            << 0ll << 3ll << 24 << 1024),
                                                  BSON_ARRAY(BSON_ARRAY("by" << "dw"
                                                                             << "fu")
-                                                            << 0ll << 3ll << 24 << 1024 << true),
+                                                            << 0ll << 3ll << 24 << 1024),
                                                  BSON_ARRAY("fu" << "ev"
                                                                  << "dw"));
 }
@@ -3349,10 +3349,10 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsMaxNCollator) {
                                                  sbe::EFn::kAggMaxNFinalize,
                                                  BSON_ARRAY(BSON_ARRAY("ev" << "cx"
                                                                             << "az")
-                                                            << 0ll << 3ll << 24 << 1024 << true),
+                                                            << 0ll << 3ll << 24 << 1024),
                                                  BSON_ARRAY(BSON_ARRAY("fu" << "dw"
                                                                             << "by")
-                                                            << 0ll << 3ll << 24 << 1024 << true),
+                                                            << 0ll << 3ll << 24 << 1024),
                                                  BSON_ARRAY("az" << "by"
                                                                  << "cx"));
 }

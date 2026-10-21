@@ -827,7 +827,7 @@ bool tryArgMinMaxFastPath(TopBottomSense sense,
                           value::ValueBlock* sortKeyBlock,
                           value::ValueBlock* valBlock,
                           const Less& less) {
-    auto [state, mergeArr, startIdx, maxSize, memUsage, memLimit, isGroupAccum] = stateTuple;
+    auto [state, mergeArr, startIdx, maxSize, memUsage, memLimit] = stateTuple;
     if (maxSize == 1 && bitsetBlock->allTrue().get_value_or(false)) {
         boost::optional<size_t> bestIdx;
         // topN with descending sort and bottomN with ascending sort return the same values. The
@@ -909,7 +909,7 @@ void combineBlockNativeAggTopBottomN(const ByteCode::MultiAccState& stateTuple,
                                      std::vector<TopBottomSortKeyAndIdx> newArr,
                                      value::ValueBlock* valBlock,
                                      Less less) {
-    auto [state, mergeArr, startIdx, maxSize, memUsage, memLimit, isGroupAccum] = stateTuple;
+    auto [state, mergeArr, startIdx, maxSize, memUsage, memLimit] = stateTuple;
 
     invariant(mergeArr->size() <= maxSize);
 
@@ -976,7 +976,7 @@ bool tryHomogeneousFastPath(TopBottomSense sense,
                             const value::DeblockedTagVals& sortKeys,
                             value::ValueBlock* valBlock,
                             const Less& less) {
-    auto [state, mergeArr, startIdx, maxSize, memUsage, memLimit, isGroupAccum] = stateTuple;
+    auto [state, mergeArr, startIdx, maxSize, memUsage, memLimit] = stateTuple;
 
     if (maxSize == 1 && sortKeys.isDense() && value::validHomogeneousType(sortKeys.tag()) &&
         sortKeys.tag() != value::TypeTags::Boolean && sortKeys.count() > 0) {
@@ -1067,7 +1067,7 @@ value::TagValueOwned ByteCode::blockNativeAggTopBottomNImpl(value::TagValueOwned
     auto* valBlock = value::getValueBlock(valBlockView.value);
 
     MultiAccState stateTuple = getMultiAccState(state.view());
-    auto [stateArray, mergeArr, startIdx, maxSize, memUsage, memLimit, isGroupAccum] = stateTuple;
+    auto [stateArray, mergeArr, startIdx, maxSize, memUsage, memLimit] = stateTuple;
     tassert(11093700, "maxSize must be greater than zero", maxSize > 0);
 
     tassert(11093701,
@@ -1302,7 +1302,7 @@ value::TagValueOwned ByteCode::builtinValueBlockAggTopBottomNImpl(ArityType arit
         }
     }
 
-    auto [stateArray, array, startIdx, maxSize, memUsage, memLimit, isGroupAccum] =
+    auto [stateArray, array, startIdx, maxSize, memUsage, memLimit] =
         getMultiAccState(state.view());
     tassert(11093703, "maxSize must be greater than zero", maxSize > 0);
 

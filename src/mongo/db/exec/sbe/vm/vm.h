@@ -56,17 +56,8 @@ namespace vm {
  * - The element at index `kMaxSize` is the maximum number entries the data structure holds.
  * - The element at index `kMemUsage` holds the current memory usage
  * - The element at index `kMemLimit` holds the max memory limit allowed
- * - The element at index `kIsGroupAccum` specifies if the accumulator belongs to group-by stage
  */
-enum class AggMultiElems {
-    kInternalArr,
-    kStartIdx,
-    kMaxSize,
-    kMemUsage,
-    kMemLimit,
-    kIsGroupAccum,
-    kSizeOfArray
-};
+enum class AggMultiElems { kInternalArr, kStartIdx, kMaxSize, kMemUsage, kMemLimit, kSizeOfArray };
 
 /**
  * Less than comparison based on a sort pattern.
@@ -316,7 +307,7 @@ public:
      */
     bool runPredicate(const CodeFragment* code);
 
-    typedef std::tuple<value::Array*, value::Array*, size_t, size_t, int32_t, int32_t, bool>
+    typedef std::tuple<value::Array*, value::Array*, size_t, size_t, int32_t, int32_t>
         MultiAccState;
 
     value::TagValueView getField_test(value::TagValueView obj, std::string_view fieldStr) {

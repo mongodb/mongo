@@ -186,7 +186,6 @@ protected:
         state->push_back_raw(makeInt64(maxSize) /* MaxSize */);
         state->push_back_raw(makeInt32(0) /* MemUsage */);
         state->push_back_raw(makeInt32(memLimit) /* MemLimit */);
-        state->push_back_raw(makeBool(true) /* IsGroupAccum */);
 
         return {stateTag, stateVal};
     }

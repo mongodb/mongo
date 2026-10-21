@@ -661,7 +661,6 @@ boost::optional<SbBlockAggExprVector> tryToGenerateOneBlockAccumulator(
     AccumInputsPtr accInputExprs,
     boost::optional<SbSlot> initRootSlot,
     SbSlot bitmapInternalSlot) {
-    SbExprBuilder b(state);
     auto accOp = AccumOp{accStmt};
     boost::optional<SbBlockAggExprVector> sbBlockAggExprs;
     sbBlockAggExprs.emplace();
@@ -692,8 +691,7 @@ boost::optional<SbBlockAggExprVector> tryToGenerateOneBlockAccumulator(
             auto expr =
                 generateExpression(state, accStmt.expr.initializer.get(), initRootSlot, slots);
 
-            initInputs =
-                std::make_unique<InitAccumNInputs>(std::move(expr), b.makeBoolConstant(true));
+            initInputs = std::make_unique<InitAccumNInputs>(std::move(expr));
         }
 
         return accOp.buildInitialize(state, std::move(initInputs));
@@ -817,8 +815,7 @@ SbHashAggAccumulatorVector generateScalarAccumulators(StageBuilderState& state,
                 auto expr =
                     generateExpression(state, accStmt.expr.initializer.get(), initRootSlot, slots);
 
-                initInputs = std::make_unique<InitAccumNInputs>(
-                    std::move(expr), SbExprBuilder{state}.makeBoolConstant(true));
+                initInputs = std::make_unique<InitAccumNInputs>(std::move(expr));
             }
 
             return accOp.buildInitialize(state, std::move(initInputs));

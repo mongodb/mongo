@@ -256,13 +256,11 @@ struct AddBlockTopBottomNInputs : public AccumInputs {
 };
 
 struct InitAccumNInputs : public AccumInputs {
-    InitAccumNInputs(SbExpr maxSize, SbExpr isGroupAccum)
-        : maxSize(std::move(maxSize)), isGroupAccum(std::move(isGroupAccum)) {}
+    InitAccumNInputs(SbExpr maxSize) : maxSize(std::move(maxSize)) {}
 
     AccumInputsPtr clone() const final;
 
     SbExpr maxSize;
-    SbExpr isGroupAccum;
 };
 
 struct FinalizeTopBottomNInputs : public AccumInputs {
