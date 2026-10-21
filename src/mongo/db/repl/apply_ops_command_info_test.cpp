@@ -74,6 +74,22 @@ TEST(ApplyOpsChainHelpersTest, NumOperationsInApplyOpsCountsEntries) {
     ASSERT_EQ(0U, numOperationsInApplyOps(Value()));
 }
 
+TEST(ApplyOpsCommandInfoTest, ParsesAllowEndOfTransactionMarker) {
+    const auto withTrueMarker = ApplyOpsCommandInfo::parse(
+        BSON("applyOps" << BSON_ARRAY(BSON("op" << "i")) << "allowEndOfTransaction" << true));
+    ASSERT_TRUE(withTrueMarker.getAllowEndOfTransaction());
+    ASSERT_TRUE(*withTrueMarker.getAllowEndOfTransaction());
+
+    const auto withFalseMarker = ApplyOpsCommandInfo::parse(
+        BSON("applyOps" << BSON_ARRAY(BSON("op" << "i")) << "allowEndOfTransaction" << false));
+    ASSERT_TRUE(withFalseMarker.getAllowEndOfTransaction());
+    ASSERT_FALSE(*withFalseMarker.getAllowEndOfTransaction());
+
+    const auto withoutMarker =
+        ApplyOpsCommandInfo::parse(BSON("applyOps" << BSON_ARRAY(BSON("op" << "i"))));
+    ASSERT_FALSE(withoutMarker.getAllowEndOfTransaction().has_value());
+}
+
 }  // namespace
 }  // namespace mongo::repl
 

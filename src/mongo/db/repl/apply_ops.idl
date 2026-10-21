@@ -55,3 +55,10 @@ structs:
                 description:
                     "The number of operations contained in this multi-oplog-entry
                     transaction."
+            allowEndOfTransaction:
+                type: bool
+                optional: true
+                description:
+                    "Set on the final applyOps entry of an unprepared transaction (replica set
+                    or single shard) committed while end-of-transaction change stream support
+                    was enabled."
