@@ -61,6 +61,7 @@ assert.commandFailedWithCode(
 assert.commandWorked(
     adminDB.runCommand({setClusterParameter: {defaultMaxTimeMS: {readOperations: 1}}}),
 );
+rst.awaitReplication();
 
 // The read command fails even without specifying a maxTimeMS option.
 assert.commandFailedWithCode(
