@@ -1,0 +1,105 @@
+# Golden test output of DoubleDoubleSumTest/NamedSums
+==== VARIATION non-numeric inputs leave the sum at zero
+aggDoubleDoubleSum(null) -> [0, 0L, 0L]
+aggDoubleDoubleSum(Nothing) -> [0, 0L, 0L]
+aggDoubleDoubleSum(true) -> [0, 0L, 0L]
+doubleDoubleSumFinalize -> 0
+doubleDoublePartialSumFinalize -> [16, 0L, 0L]
+==== VARIATION int32 inputs keep an int32 sum
+aggDoubleDoubleSum(1) -> [0, 1L, 0L]
+aggDoubleDoubleSum(2) -> [0, 3L, 0L]
+doubleDoubleSumFinalize -> 3
+doubleDoublePartialSumFinalize -> [16, 3L, 0L]
+==== VARIATION int32 overflow widens to int64
+aggDoubleDoubleSum(2147483647) -> [0, 2147483647L, 0L]
+aggDoubleDoubleSum(1) -> [0, 2147483648L, 0L]
+doubleDoubleSumFinalize -> 2147483648ll
+doubleDoublePartialSumFinalize -> [16, 2147483648L, 0L]
+==== VARIATION an int64 input widens the sum
+aggDoubleDoubleSum(1ll) -> [0ll, 1L, 0L]
+aggDoubleDoubleSum(2) -> [0ll, 3L, 0L]
+doubleDoubleSumFinalize -> 3ll
+doubleDoublePartialSumFinalize -> [18, 3L, 0L]
+==== VARIATION int64 sums past 2^53 stay exact
+aggDoubleDoubleSum(9007199254740992ll) -> [0ll, 9007199254740992L, 0L]
+aggDoubleDoubleSum(1) -> [0ll, 9007199254740992L, 1L]
+doubleDoubleSumFinalize -> 9007199254740993ll
+doubleDoublePartialSumFinalize -> [18, 9007199254740992L, 1L]
+==== VARIATION int64 overflow widens to double
+aggDoubleDoubleSum(9223372036854775807ll) -> [0ll, 9.2233720368547758e+18L, -1L]
+aggDoubleDoubleSum(9223372036854775807ll) -> [0ll, 1.8446744073709552e+19L, -2L]
+doubleDoubleSumFinalize -> 1.8446744073709552e+19L
+doubleDoublePartialSumFinalize -> [18, 1.8446744073709552e+19L, -2L]
+==== VARIATION double sums are compensated
+aggDoubleDoubleSum(0.10000000000000001L) -> [0L, 0.10000000000000001L, 0L]
+aggDoubleDoubleSum(0.10000000000000001L) -> [0L, 0.20000000000000001L, 0L]
+aggDoubleDoubleSum(0.10000000000000001L) -> [0L, 0.30000000000000004L, -2.7755575615628914e-17L]
+aggDoubleDoubleSum(0.10000000000000001L) -> [0L, 0.40000000000000002L, 0L]
+aggDoubleDoubleSum(0.10000000000000001L) -> [0L, 0.5L, 2.7755575615628914e-17L]
+aggDoubleDoubleSum(0.10000000000000001L) -> [0L, 0.60000000000000009L, -5.5511151231257827e-17L]
+aggDoubleDoubleSum(0.10000000000000001L) -> [0L, 0.70000000000000007L, -2.7755575615628914e-17L]
+aggDoubleDoubleSum(0.10000000000000001L) -> [0L, 0.80000000000000004L, 0L]
+aggDoubleDoubleSum(0.10000000000000001L) -> [0L, 0.90000000000000002L, 2.7755575615628914e-17L]
+aggDoubleDoubleSum(0.10000000000000001L) -> [0L, 1L, 5.5511151231257827e-17L]
+doubleDoubleSumFinalize -> 1L
+doubleDoublePartialSumFinalize -> [1, 1L, 5.5511151231257827e-17L]
+==== VARIATION negative zeros
+aggDoubleDoubleSum(-0L) -> [0L, 0L, 0L]
+aggDoubleDoubleSum(-0L) -> [0L, 0L, 0L]
+doubleDoubleSumFinalize -> 0L
+doubleDoublePartialSumFinalize -> [1, 0L, 0L]
+==== VARIATION denormals
+aggDoubleDoubleSum(4.9406564584124654e-324L) -> [0L, 4.9406564584124654e-324L, 0L]
+aggDoubleDoubleSum(4.9406564584124654e-324L) -> [0L, 9.8813129168249309e-324L, 0L]
+doubleDoubleSumFinalize -> 9.8813129168249309e-324L
+doubleDoublePartialSumFinalize -> [1, 9.8813129168249309e-324L, 0L]
+==== VARIATION double overflow becomes infinity
+aggDoubleDoubleSum(1.7976931348623157e+308L) -> [0L, 1.7976931348623157e+308L, 0L]
+aggDoubleDoubleSum(1.7976931348623157e+308L) -> [0L, infL, nanL]
+doubleDoubleSumFinalize -> infL
+doubleDoublePartialSumFinalize -> [1, infL, nanL]
+==== VARIATION opposite infinities sum to NaN
+aggDoubleDoubleSum(infL) -> [0L, infL, nanL]
+aggDoubleDoubleSum(-infL) -> [0L, nanL, 0L]
+doubleDoubleSumFinalize -> nanL
+doubleDoublePartialSumFinalize -> [1, nanL, 0L]
+==== VARIATION a finite input after infinity
+aggDoubleDoubleSum(infL) -> [0L, infL, nanL]
+aggDoubleDoubleSum(1L) -> [0L, infL, 0L]
+doubleDoubleSumFinalize -> infL
+doubleDoublePartialSumFinalize -> [1, infL, 0L]
+==== VARIATION each add restarts the plain sum from the stored pair
+aggDoubleDoubleSum(1.7976931348623157e+308L) -> [0L, 1.7976931348623157e+308L, 0L]
+aggDoubleDoubleSum(-4.9896007738367995e+291L) -> [0L, 1.7976931348623157e+308L, -4.9896007738367995e+291L]
+aggDoubleDoubleSum(-4.9896007738367995e+291L) -> [0L, 1.7976931348623155e+308L, 9.9792015476735991e+291L]
+aggDoubleDoubleSum(9.9792015476735991e+291L) -> [0L, 1.7976931348623157e+308L, 0L]
+aggDoubleDoubleSum(-infL) -> [0L, -infL, nanL]
+aggDoubleDoubleSum(1L) -> [0L, -infL, 0L]
+doubleDoubleSumFinalize -> -infL
+doubleDoublePartialSumFinalize -> [1, -infL, 0L]
+==== VARIATION a decimal input after a non-decimal input
+aggDoubleDoubleSum(2) -> [0, 2L, 0L]
+aggDoubleDoubleSum(NumberDecimal(1.5)) -> [0, 2L, 0L, NumberDecimal(1.5)]
+doubleDoubleSumFinalize -> NumberDecimal(3.5)
+doubleDoublePartialSumFinalize -> [16, 2L, 0L, NumberDecimal(1.5)]
+==== VARIATION a non-decimal input after a decimal input
+aggDoubleDoubleSum(NumberDecimal(1.5)) -> [0, 0L, 0L, NumberDecimal(1.5)]
+aggDoubleDoubleSum(2) -> [0, 2L, 0L, NumberDecimal(1.5)]
+doubleDoubleSumFinalize -> NumberDecimal(3.5)
+doubleDoublePartialSumFinalize -> [16, 2L, 0L, NumberDecimal(1.5)]
+==== VARIATION decimal and double infinities
+aggDoubleDoubleSum(NumberDecimal(Infinity)) -> [0, 0L, 0L, NumberDecimal(Infinity)]
+aggDoubleDoubleSum(-infL) -> [0L, -infL, nanL, NumberDecimal(Infinity)]
+doubleDoubleSumFinalize -> NumberDecimal(NaN)
+doubleDoublePartialSumFinalize -> [1, -infL, nanL, NumberDecimal(Infinity)]
+==== VARIATION a decimal input after a NaN sum
+aggDoubleDoubleSum(infL) -> [0L, infL, nanL]
+aggDoubleDoubleSum(-infL) -> [0L, nanL, 0L]
+aggDoubleDoubleSum(NumberDecimal(1)) -> [0L, nanL, 0L, NumberDecimal(1)]
+doubleDoubleSumFinalize -> NumberDecimal(NaN)
+doubleDoublePartialSumFinalize -> [1, nanL, 0L, NumberDecimal(1)]
+==== VARIATION decimal NaN
+aggDoubleDoubleSum(NumberDecimal(NaN)) -> [0, 0L, 0L, NumberDecimal(NaN)]
+aggDoubleDoubleSum(1) -> [0, 1L, 0L, NumberDecimal(NaN)]
+doubleDoubleSumFinalize -> NumberDecimal(NaN)
+doubleDoublePartialSumFinalize -> [16, 1L, 0L, NumberDecimal(NaN)]

@@ -1,0 +1,117 @@
+# Golden test output of DoubleDoubleSumTest/SumsOfEdgeValues
+==== VARIATION 1
+aggDoubleDoubleSum(0) -> [0, 0L, 0L]
+doubleDoubleSumFinalize -> 0
+doubleDoublePartialSumFinalize -> [16, 0L, 0L]
+==== VARIATION 2
+aggDoubleDoubleSum(1) -> [0, 1L, 0L]
+doubleDoubleSumFinalize -> 1
+doubleDoublePartialSumFinalize -> [16, 1L, 0L]
+==== VARIATION 3
+aggDoubleDoubleSum(-1) -> [0, -1L, 0L]
+doubleDoubleSumFinalize -> -1
+doubleDoublePartialSumFinalize -> [16, -1L, 0L]
+==== VARIATION 4
+aggDoubleDoubleSum(2147483647) -> [0, 2147483647L, 0L]
+doubleDoubleSumFinalize -> 2147483647
+doubleDoublePartialSumFinalize -> [16, 2147483647L, 0L]
+==== VARIATION 5
+aggDoubleDoubleSum(-2147483648) -> [0, -2147483648L, 0L]
+doubleDoubleSumFinalize -> -2147483648
+doubleDoublePartialSumFinalize -> [16, -2147483648L, 0L]
+==== VARIATION 6
+aggDoubleDoubleSum(9007199254740992ll) -> [0ll, 9007199254740992L, 0L]
+doubleDoubleSumFinalize -> 9007199254740992ll
+doubleDoublePartialSumFinalize -> [18, 9007199254740992L, 0L]
+==== VARIATION 7
+aggDoubleDoubleSum(9007199254740993ll) -> [0ll, 9007199254740992L, 1L]
+doubleDoubleSumFinalize -> 9007199254740993ll
+doubleDoublePartialSumFinalize -> [18, 9007199254740992L, 1L]
+==== VARIATION 8
+aggDoubleDoubleSum(9223372036854775807ll) -> [0ll, 9.2233720368547758e+18L, -1L]
+doubleDoubleSumFinalize -> 9223372036854775807ll
+doubleDoublePartialSumFinalize -> [18, 9.2233720368547758e+18L, -1L]
+==== VARIATION 9
+aggDoubleDoubleSum(-9223372036854775808ll) -> [0ll, -9.2233720368547758e+18L, 0L]
+doubleDoubleSumFinalize -> -9223372036854775808ll
+doubleDoublePartialSumFinalize -> [18, -9.2233720368547758e+18L, 0L]
+==== VARIATION 10
+aggDoubleDoubleSum(0L) -> [0L, 0L, 0L]
+doubleDoubleSumFinalize -> 0L
+doubleDoublePartialSumFinalize -> [1, 0L, 0L]
+==== VARIATION 11
+aggDoubleDoubleSum(-0L) -> [0L, 0L, 0L]
+doubleDoubleSumFinalize -> 0L
+doubleDoublePartialSumFinalize -> [1, 0L, 0L]
+==== VARIATION 12
+aggDoubleDoubleSum(0.10000000000000001L) -> [0L, 0.10000000000000001L, 0L]
+doubleDoubleSumFinalize -> 0.10000000000000001L
+doubleDoublePartialSumFinalize -> [1, 0.10000000000000001L, 0L]
+==== VARIATION 13
+aggDoubleDoubleSum(1e+308L) -> [0L, 1e+308L, 0L]
+doubleDoubleSumFinalize -> 1e+308L
+doubleDoublePartialSumFinalize -> [1, 1e+308L, 0L]
+==== VARIATION 14
+aggDoubleDoubleSum(-1e+308L) -> [0L, -1e+308L, 0L]
+doubleDoubleSumFinalize -> -1e+308L
+doubleDoublePartialSumFinalize -> [1, -1e+308L, 0L]
+==== VARIATION 15
+aggDoubleDoubleSum(1.7976931348623157e+308L) -> [0L, 1.7976931348623157e+308L, 0L]
+doubleDoubleSumFinalize -> 1.7976931348623157e+308L
+doubleDoublePartialSumFinalize -> [1, 1.7976931348623157e+308L, 0L]
+==== VARIATION 16
+aggDoubleDoubleSum(-1.7976931348623157e+308L) -> [0L, -1.7976931348623157e+308L, 0L]
+doubleDoubleSumFinalize -> -1.7976931348623157e+308L
+doubleDoublePartialSumFinalize -> [1, -1.7976931348623157e+308L, 0L]
+==== VARIATION 17
+aggDoubleDoubleSum(4.9406564584124654e-324L) -> [0L, 4.9406564584124654e-324L, 0L]
+doubleDoubleSumFinalize -> 4.9406564584124654e-324L
+doubleDoublePartialSumFinalize -> [1, 4.9406564584124654e-324L, 0L]
+==== VARIATION 18
+aggDoubleDoubleSum(infL) -> [0L, infL, nanL]
+doubleDoubleSumFinalize -> infL
+doubleDoublePartialSumFinalize -> [1, infL, nanL]
+==== VARIATION 19
+aggDoubleDoubleSum(-infL) -> [0L, -infL, nanL]
+doubleDoubleSumFinalize -> -infL
+doubleDoublePartialSumFinalize -> [1, -infL, nanL]
+==== VARIATION 20
+aggDoubleDoubleSum(nanL) -> [0L, nanL, 0L]
+doubleDoubleSumFinalize -> nanL
+doubleDoublePartialSumFinalize -> [1, nanL, 0L]
+==== VARIATION 21
+aggDoubleDoubleSum(NumberDecimal(0.1)) -> [0, 0L, 0L, NumberDecimal(0.1)]
+doubleDoubleSumFinalize -> NumberDecimal(0.1)
+doubleDoublePartialSumFinalize -> [16, 0L, 0L, NumberDecimal(0.1)]
+==== VARIATION 22
+aggDoubleDoubleSum(NumberDecimal(-0)) -> [0, 0L, 0L, NumberDecimal(-0)]
+doubleDoubleSumFinalize -> NumberDecimal(0)
+doubleDoublePartialSumFinalize -> [16, 0L, 0L, NumberDecimal(-0)]
+==== VARIATION 23
+aggDoubleDoubleSum(NumberDecimal(1E+6000)) -> [0, 0L, 0L, NumberDecimal(1E+6000)]
+doubleDoubleSumFinalize -> NumberDecimal(1.000000000000000000000000000000000E+6000)
+doubleDoublePartialSumFinalize -> [16, 0L, 0L, NumberDecimal(1E+6000)]
+==== VARIATION 24
+aggDoubleDoubleSum(NumberDecimal(-1E+6000)) -> [0, 0L, 0L, NumberDecimal(-1E+6000)]
+doubleDoubleSumFinalize -> NumberDecimal(-1.000000000000000000000000000000000E+6000)
+doubleDoublePartialSumFinalize -> [16, 0L, 0L, NumberDecimal(-1E+6000)]
+==== VARIATION 25
+aggDoubleDoubleSum(NumberDecimal(Infinity)) -> [0, 0L, 0L, NumberDecimal(Infinity)]
+doubleDoubleSumFinalize -> NumberDecimal(Infinity)
+doubleDoublePartialSumFinalize -> [16, 0L, 0L, NumberDecimal(Infinity)]
+==== VARIATION 26
+aggDoubleDoubleSum(NumberDecimal(NaN)) -> [0, 0L, 0L, NumberDecimal(NaN)]
+doubleDoubleSumFinalize -> NumberDecimal(NaN)
+doubleDoublePartialSumFinalize -> [16, 0L, 0L, NumberDecimal(NaN)]
+==== VARIATION 27
+aggDoubleDoubleSum("not a number") -> [0, 0L, 0L]
+doubleDoubleSumFinalize -> 0
+doubleDoublePartialSumFinalize -> [16, 0L, 0L]
+==== VARIATION 28
+aggDoubleDoubleSum(null) -> [0, 0L, 0L]
+doubleDoubleSumFinalize -> 0
+doubleDoublePartialSumFinalize -> [16, 0L, 0L]
+==== VARIATION 29
+aggDoubleDoubleSum(Nothing) -> [0, 0L, 0L]
+doubleDoubleSumFinalize -> 0
+doubleDoublePartialSumFinalize -> [16, 0L, 0L]

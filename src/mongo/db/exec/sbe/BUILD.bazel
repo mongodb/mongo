@@ -348,6 +348,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/exec/sbe/expressions:sbe_date_to_parts_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_date_to_string_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_date_trunc_test.cpp",
+        "//src/mongo/db/exec/sbe/expressions:sbe_double_double_sum_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_extract_sub_array_builtin_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_fail_test.cpp",
         "//src/mongo/db/exec/sbe/expressions:sbe_fill_type_test.cpp",
