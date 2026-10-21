@@ -120,6 +120,9 @@ filters:
   - "assertions_core.js":
     approvers:
       - 10gen/devprod-test-infrastructure
+  - "format_test_bson_corpus.js":
+    approvers:
+      - 10gen/server-disagg-storage
   - "log.js":
     approvers:
       - 10gen/query-integration-observability
