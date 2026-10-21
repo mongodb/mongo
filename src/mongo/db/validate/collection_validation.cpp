@@ -40,6 +40,7 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/viewless_timeseries_collection_creation_helpers.h"
+#include "mongo/db/validate/record_store_slicer.h"
 #include "mongo/db/validate/validate_adaptor.h"
 #include "mongo/db/validate/validate_adaptor_factory.h"
 #include "mongo/db/validate/validate_adaptor_serial.h"
@@ -1034,6 +1035,15 @@ BSONObj ValidationMetrics::toBSON(const ValidateResults& results) const {
             indexDataSize += ivr.getKeyBytesTraversed();
         }
         bob.appendNumber("indexDataSize"sv, indexDataSize);
+    }
+    if (const auto& parallel = results.getRecordStoreTraversalParallelMetrics()) {
+        bob.append("parallelRecordStoreTraversal"sv,
+                   BSON("sliceStrategy" << toString(parallel->sliceStrategy) <<  //
+                        "sliceCount" << parallel->sliceCount <<                  //
+                        "minSliceSize" << parallel->minSliceSize <<              //
+                        "maxSliceSize" << parallel->maxSliceSize <<              //
+                        "meanSliceSize" << parallel->meanSliceSize <<            //
+                        "stddevSliceSize" << parallel->stddevSliceSize));
     }
     return bob.obj();
 }

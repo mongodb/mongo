@@ -17,6 +17,9 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/processinfo.h"
 
+#include <algorithm>
+#include <cmath>
+#include <limits>
 #include <memory>
 #include <mutex>
 
@@ -168,12 +171,14 @@ void ValidateAdaptorParallel::traverseRecordStore(OperationContext* opCtx,
         validateState.getRepairMode() == collection_validation::RepairMode::kNone &&
         getKeyBasedIndexConsistency().canMergeResults() && !hashDrillDown && sliceCount > 1;
 
-    const std::vector<RecordId> rsSlicePivots = parallelEligible
+    const auto slicePivotResults = parallelEligible
         ? collection_validation::computeSlicePivots(opCtx,
                                                     *shard_role_details::getRecoveryUnit(opCtx),
                                                     *coll->getRecordStore(),
                                                     sliceCount)
-        : std::vector<RecordId>{};
+        : collection_validation::SlicePivotResults{{},
+                                                   collection_validation::SliceStrategy::kOneSlice};
+    const std::vector<RecordId>& rsSlicePivots = slicePivotResults.pivots;
     if (rsSlicePivots.size() <= 1) {
         traverseRecordStoreSerial(opCtx, validateResults, validationVersion);
         return;
@@ -297,6 +302,28 @@ void ValidateAdaptorParallel::traverseRecordStore(OperationContext* opCtx,
         if (!ir.status.isOK()) {
             sliceFailures.push_back(ir.status);
         }
+    }
+
+    if (!implResults.empty()) {
+        RecordStoreTraversalParallelMetrics parallelMetrics;
+        parallelMetrics.sliceStrategy = slicePivotResults.strategy;
+        parallelMetrics.sliceCount = implResults.size();
+        parallelMetrics.minSliceSize = std::numeric_limits<long long>::max();
+        for (const auto& ir : implResults) {
+            const long long size = ir.validateResults.getNumRecords().value_or(0);
+            parallelMetrics.minSliceSize = std::min(parallelMetrics.minSliceSize, size);
+            parallelMetrics.maxSliceSize = std::max(parallelMetrics.maxSliceSize, size);
+            parallelMetrics.meanSliceSize += size;
+        }
+        parallelMetrics.meanSliceSize /= parallelMetrics.sliceCount;
+        for (const auto& ir : implResults) {
+            const double delta =
+                ir.validateResults.getNumRecords().value_or(0) - parallelMetrics.meanSliceSize;
+            parallelMetrics.stddevSliceSize += delta * delta;
+        }
+        parallelMetrics.stddevSliceSize =
+            std::sqrt(parallelMetrics.stddevSliceSize / parallelMetrics.sliceCount);
+        validateResults.setRecordStoreTraversalParallelMetrics(parallelMetrics);
     }
 
     // Surface every slice's failures.

@@ -27,8 +27,10 @@
 
 namespace mongo {
 namespace collection_validation {
-// forwards declaring RepairMode to avoid adding validate_option to core headers
+// forwards declaring RepairMode and SliceStrategy to avoid adding validate_option and
+// record_store_slicer to core headers
 enum class RepairMode;
+enum class SliceStrategy;
 }  // namespace collection_validation
 
 class ValidateResultsIf {
@@ -148,6 +150,19 @@ private:
 using ValidateResultsMap = std::map<std::string, IndexValidateResults>;
 
 // Validation results for an entire collection.
+/**
+ * Describes how evenly a parallel record store traversal divided the records across its slices.
+ * Sizes are record counts.
+ */
+struct RecordStoreTraversalParallelMetrics {
+    collection_validation::SliceStrategy sliceStrategy{};
+    long long sliceCount = 0;
+    long long minSliceSize = 0;
+    long long maxSliceSize = 0;
+    double meanSliceSize = 0;
+    double stddevSliceSize = 0;
+};
+
 class ValidateResults final : public ValidateResultsIf {
 public:
     bool isValid() const override {
@@ -413,6 +428,15 @@ public:
         return _numRecordStoreSlices;
     }
 
+    const boost::optional<RecordStoreTraversalParallelMetrics>&
+    getRecordStoreTraversalParallelMetrics() const {
+        return _recordStoreTraversalParallelMetrics;
+    }
+
+    void setRecordStoreTraversalParallelMetrics(RecordStoreTraversalParallelMetrics metrics) {
+        _recordStoreTraversalParallelMetrics = metrics;
+    }
+
     void setRepairMode(collection_validation::RepairMode mode);
 
     // Takes a bool that indicates the context of the caller and a BSONObjBuilder to append with
@@ -473,6 +497,8 @@ private:
     // Populate only if parallel record store scan. Reports the number of slices scanned in Phase 1
     // traversal.
     boost::optional<long long> _numRecordStoreSlices;
+    // Populate only if parallel record store scan.
+    boost::optional<RecordStoreTraversalParallelMetrics> _recordStoreTraversalParallelMetrics;
 };
 
 /**

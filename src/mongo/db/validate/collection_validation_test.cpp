@@ -1256,6 +1256,64 @@ TEST_F(CollectionValidationTest, ParallelTraversalAgreesWithSerialTraversal) {
     ASSERT_GT(parallelResults.getNumRecordStoreSlices().value_or(-1), 1);
 }
 
+TEST_F(CollectionValidationTest, ValidateLogsParallelTraversalMetricsWhenTraversalIsParallel) {
+    auto opCtx = operationContext();
+    ASSERT_EQ(kCountDocs, insertDataRange(opCtx, 0, kCountDocs));
+
+    unittest::LogCaptureGuard logs;
+    ValidateResults results;
+    collection_validation::ValidationOptions opts(collection_validation::ValidateMode::kForeground,
+                                                  collection_validation::RepairMode::kNone,
+                                                  /*logDiagnostics=*/false,
+                                                  currentValidationVersion,
+                                                  /*verifyConfigurationOverride=*/boost::none,
+                                                  /*readTimestamp=*/boost::none,
+                                                  /*hashPrefixes=*/boost::none,
+                                                  /*revealHashedIds=*/boost::none,
+                                                  /*targetRecordsPerRecordStoreSlice=*/
+                                                  kTargetRecordsPerSlice);
+    ASSERT_OK(collection_validation::validate(opCtx, kNss, opts, results));
+    logs.stop();
+    const auto numSlices = results.getNumRecordStoreSlices().value_or(-1);
+    ASSERT_GT(numSlices, 1);
+
+    const auto metrics = getLoggedMetrics(logs);
+    ASSERT_EQ(metrics.size(), 1);
+    ASSERT_EQ(metrics[0]["parallelRecordStoreTraversal"].type(), BSONType::object) << metrics[0];
+    const auto parallel = metrics[0]["parallelRecordStoreTraversal"].Obj();
+    EXPECT_EQ(parallel["sliceStrategy"].str(), "arithmeticStride") << parallel;
+    EXPECT_EQ(parallel["sliceCount"].safeNumberLong(), numSlices) << parallel;
+    const auto minSize = parallel["minSliceSize"].safeNumberLong();
+    const auto maxSize = parallel["maxSliceSize"].safeNumberLong();
+    EXPECT_GT(minSize, 0) << parallel;
+    EXPECT_LE(minSize, maxSize) << parallel;
+    for (auto field : {"meanSliceSize", "stddevSliceSize"}) {
+        EXPECT_EQ(parallel[field].type(), BSONType::numberDouble) << parallel;
+    }
+    const auto mean = parallel["meanSliceSize"].Double();
+    EXPECT_GE(mean, minSize) << parallel;
+    EXPECT_LE(mean, maxSize) << parallel;
+    EXPECT_GE(parallel["stddevSliceSize"].Double(), 0) << parallel;
+    EXPECT_DOUBLE_EQ(mean * numSlices, kCountDocs) << parallel;
+}
+
+TEST_F(CollectionValidationTest, ValidateOmitsParallelTraversalMetricsWhenTraversalIsSerial) {
+    auto opCtx = operationContext();
+    ASSERT_EQ(kCountDocs, insertDataRange(opCtx, 0, kCountDocs));
+
+    unittest::LogCaptureGuard logs;
+    foregroundValidate(
+        kNss,
+        opCtx,
+        {.valid = true, .numRecords = kCountDocs, .numInvalidDocuments = 0, .numErrors = 0},
+        {collection_validation::ValidateMode::kForeground});
+    logs.stop();
+
+    const auto metrics = getLoggedMetrics(logs);
+    ASSERT_EQ(metrics.size(), 1);
+    EXPECT_FALSE(metrics[0].hasField("parallelRecordStoreTraversal")) << metrics[0];
+}
+
 // Every in-flight slice holds an index consistency bucket array of its own until the results are
 // merged, so the slice count must stay bounded no matter how small the per-slice target is
 // relative to the collection.

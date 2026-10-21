@@ -53,7 +53,7 @@ protected:
         }
     }
 
-    std::vector<RecordId> pivots(size_t sliceCount) {
+    SlicePivotResults slice(size_t sliceCount) {
         auto* opCtx = operationContext();
         const AutoGetCollection coll(opCtx, kNss, MODE_IS);
         return computeSlicePivots(opCtx,
@@ -61,13 +61,19 @@ protected:
                                   *coll->getRecordStore(),
                                   sliceCount);
     }
+
+    std::vector<RecordId> pivots(size_t sliceCount) {
+        return slice(sliceCount).pivots;
+    }
 };
 
 TEST_F(RecordStoreSlicerTest, EvenlyDivisibleRangeIsStridedEvenly) {
     createCollection();
     // A [1, 101] RecordId range over 4 slices strides by 25.
     insertDocuments(101);
-    EXPECT_THAT(pivots(4), ElementsAre(RecordId(1), RecordId(26), RecordId(51), RecordId(76)));
+    const auto result = slice(4);
+    EXPECT_THAT(result.pivots, ElementsAre(RecordId(1), RecordId(26), RecordId(51), RecordId(76)));
+    EXPECT_EQ(result.strategy, SliceStrategy::kArithmeticStride);
 }
 
 TEST_F(RecordStoreSlicerTest, StrideFloorsAndFinalSliceAbsorbsRemainder) {
@@ -94,27 +100,36 @@ TEST_F(RecordStoreSlicerTest, RangeNarrowerThanSliceCountYieldsSingleSlice) {
     createCollection();
     // A stride that floors to zero cannot separate the slices, so fall back to one slice.
     insertDocuments(4);
-    EXPECT_THAT(pivots(8), ElementsAre(RecordId(1)));
+    const auto result = slice(8);
+    EXPECT_THAT(result.pivots, ElementsAre(RecordId(1)));
+    EXPECT_EQ(result.strategy, SliceStrategy::kOneSlice);
 }
 
 TEST_F(RecordStoreSlicerTest, SingleRecordYieldsSingleSlice) {
     createCollection();
     insertDocuments(1);
-    EXPECT_THAT(pivots(4), ElementsAre(RecordId(1)));
+    const auto result = slice(4);
+    EXPECT_THAT(result.pivots, ElementsAre(RecordId(1)));
+    EXPECT_EQ(result.strategy, SliceStrategy::kOneSlice);
 }
 
 TEST_F(RecordStoreSlicerTest, OneSliceRequestedYieldsSingleSlice) {
     createCollection();
     insertDocuments(100);
-    EXPECT_THAT(pivots(1), ElementsAre(RecordId(1)));
-    EXPECT_THAT(pivots(0), ElementsAre(RecordId(1)));
+    for (size_t sliceCount : {1, 0}) {
+        const auto result = slice(sliceCount);
+        EXPECT_THAT(result.pivots, ElementsAre(RecordId(1))) << "sliceCount: " << sliceCount;
+        EXPECT_EQ(result.strategy, SliceStrategy::kOneSlice) << "sliceCount: " << sliceCount;
+    }
 }
 
 TEST_F(RecordStoreSlicerTest, EmptyRecordStoreYieldsNoPivots) {
     createCollection();
     // The forward cursor comes back empty, which is how the slicer detects an empty record store:
     // there is nothing to traverse, so it describes no slices at all.
-    EXPECT_THAT(pivots(4), IsEmpty());
+    const auto result = slice(4);
+    EXPECT_THAT(result.pivots, IsEmpty());
+    EXPECT_EQ(result.strategy, SliceStrategy::kEmptyStore);
 }
 
 TEST_F(RecordStoreSlicerTest, StringRecordIdsYieldSingleSlice) {
@@ -122,9 +137,10 @@ TEST_F(RecordStoreSlicerTest, StringRecordIdsYieldSingleSlice) {
     // Clustered collections use string-formatted RecordIds, which have no stride arithmetic, so the
     // whole record store needs to traverses as a single slice.
     insertDocuments(100);
-    const auto slicePivots = pivots(8);
-    EXPECT_THAT(slicePivots, SizeIs(1));
-    EXPECT_TRUE(slicePivots.begin()->isStr());
+    const auto result = slice(8);
+    EXPECT_THAT(result.pivots, SizeIs(1));
+    EXPECT_TRUE(result.pivots.begin()->isStr());
+    EXPECT_EQ(result.strategy, SliceStrategy::kOneSlice);
 }
 
 /**
