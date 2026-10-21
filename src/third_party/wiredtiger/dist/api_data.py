@@ -1120,6 +1120,7 @@ connection_runtime_config = [
             'recovery_progress',
             'rts',
             'salvage',
+            'schema_epoch',
             'shared_cache',
             'split',
             'sweep',

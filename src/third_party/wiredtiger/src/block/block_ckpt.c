@@ -110,11 +110,11 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block, const uint
     }
 
     /*
-     * If the checkpoint has an on-disk root page, load it. Otherwise, size the file for an empty
-     * object. In-memory block handles have no backing file.
+     * If the checkpoint has an on-disk root page, load it. Otherwise, size the file past the
+     * description information.
      */
     if (addr == NULL || addr_size == 0)
-        ci->file_size = block->in_memory ? 0 : block->allocsize;
+        ci->file_size = block->allocsize;
     else {
         /* Crack the checkpoint cookie. */
         WT_ERR(__wti_block_ckpt_unpack(session, block, addr, addr_size, ci));

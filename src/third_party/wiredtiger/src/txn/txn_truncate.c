@@ -97,7 +97,8 @@ __layered_table_truncate_gc(
     TAILQ_FOREACH_SAFE(entry, &layered_table->truncate_list.qh, q, next)
     {
         ++examined;
-        const bool is_committed = __wt_atomic_load_bool_acquire(&entry->committed);
+        if (!__wt_atomic_load_bool_acquire(&entry->committed))
+            continue;
 
         /*
          * Committed entries with durable_ts == WT_TS_NONE are never pruned here. Without a
@@ -106,7 +107,7 @@ __layered_table_truncate_gc(
         const bool is_time =
           entry->durable_ts != WT_TS_NONE && entry->durable_ts <= prune_timestamp;
 
-        if (!is_committed || !is_time)
+        if (!is_time)
             continue;
 
         __truncate_entry_remove(session, layered_table, entry);
@@ -153,8 +154,7 @@ err:
 
 /*
  * __txn_insert_truncate_entry_helper --
- *     Register a truncate entry to the latest transaction and store it in the truncate list. This
- *     function will also opportunistically prune the truncate list so it does not grow infinitely.
+ *     Register a truncate entry to the latest transaction and store it in the truncate list.
  */
 static int
 __txn_insert_truncate_entry_helper(
@@ -163,7 +163,6 @@ __txn_insert_truncate_entry_helper(
     WT_DECL_RET;
     WT_TRUNCATE *entry = *tp;
     WT_TRUNCATE_LIST *truncate_list = &layered_table->truncate_list;
-    wt_timestamp_t prune_timestamp = 0;
 
     WT_RET(__wt_session_get_dhandle(session, layered_table->ingest_uri, NULL, NULL, 0));
     WT_ERR(__wt_txn_truncate(session, entry));
@@ -172,9 +171,6 @@ __txn_insert_truncate_entry_helper(
     __log_truncate_entry(session, layered_table, entry);
 
     __wt_writelock(session, &truncate_list->lock);
-
-    prune_timestamp = __wt_atomic_load_uint64_relaxed(&S2BT(session)->prune_timestamp);
-    __layered_table_truncate_gc(session, layered_table, prune_timestamp);
 
     if (TAILQ_EMPTY(&truncate_list->qh))
         WT_DHANDLE_ACQUIRE(&layered_table->iface);
@@ -566,6 +562,21 @@ void
 __wti_layered_table_truncate_rollback(WT_SESSION_IMPL *session, WT_TXN_OP *op)
 {
     __disagg_truncate_apply(session, op, __wti_layered_table_truncate_rollback_apply);
+}
+
+/*
+ * __wt_layered_table_truncate_prune --
+ *     Reap truncate-list entries covered by the table's ingest prune timestamp.
+ */
+void
+__wt_layered_table_truncate_prune(
+  WT_SESSION_IMPL *session, WT_LAYERED_TABLE *layered_table, const wt_timestamp_t prune_timestamp)
+{
+    WT_TRUNCATE_LIST *truncate_list = &layered_table->truncate_list;
+
+    __wt_writelock(session, &truncate_list->lock);
+    __layered_table_truncate_gc(session, layered_table, prune_timestamp);
+    __wt_writeunlock(session, &truncate_list->lock);
 }
 
 /*

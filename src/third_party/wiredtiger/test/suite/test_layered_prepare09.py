@@ -77,6 +77,16 @@ class test_layered_prepare09(wttest.WiredTigerTestCase):
         session.checkpoint()
         session.close()
 
+    def _claim_prepared(self, conn, session, prepared_id):
+        discover_session = conn.open_session()
+        cursor = discover_session.open_cursor('prepared_discover:')
+        self.assertEqual(cursor.next(), 0)
+        self.assertEqual(cursor.get_key(), prepared_id)
+        session.begin_transaction('claim_prepared_id=' + self.prepared_id_str(prepared_id))
+        self.assertEqual(cursor.next(), wiredtiger.WT_NOTFOUND)
+        cursor.close()
+        discover_session.close()
+
     def _step_up(self, conn_follow):
         """Step up the follower to leader and checkpoint."""
         conn_follow.reconfigure('disaggregated=(role="leader")')
@@ -118,23 +128,16 @@ class test_layered_prepare09(wttest.WiredTigerTestCase):
         cursor.close()
         self.conn.close("debug=(skip_checkpoint=true)")
 
-        # Phase 2: Follower picks up the checkpoint and replicates the prepare.
+        # Phase 2: Follower discovers and claims the checkpointed prepare.
         conn_follow = self._open_follower(checkpoint_meta)
 
         session_f = conn_follow.open_session()
-        cursor_f = session_f.open_cursor(self.uri)
-        session_f.begin_transaction()
-        cursor_f[4] = "prepared_value_4"
-        cursor_f[5] = "prepared_value_5"
-        cursor_f[6] = "prepared_value_6"
-        session_f.prepare_transaction('prepare_timestamp=' + self.timestamp_str(100) +
-                                      ',prepared_id=' + self.prepared_id_str(123))
+        self._claim_prepared(conn_follow, session_f, 123)
         if self.commit:
             session_f.commit_transaction("commit_timestamp=" + self.timestamp_str(200) +
                                          ",durable_timestamp=" + self.timestamp_str(210))
         else:
             session_f.rollback_transaction('rollback_timestamp=' + self.timestamp_str(210))
-        cursor_f.close()
         session_f.close()
 
         # Phase 3: Step up and verify.
@@ -202,24 +205,17 @@ class test_layered_prepare09(wttest.WiredTigerTestCase):
         cursor.close()
         self.conn.close("debug=(skip_checkpoint=true)")
 
-        # Phase 2: Follower picks up the checkpoint, replicates the prepare, then commits
+        # Phase 2: Follower claims the checkpointed prepare, then commits
         # a newer update at ts=220 to verify it remains visible regardless of how the prepare resolves.
         conn_follow = self._open_follower(checkpoint_meta)
 
         session_f = conn_follow.open_session()
-        cursor_f = session_f.open_cursor(self.uri)
-        session_f.begin_transaction()
-        cursor_f[1] = "updated_value_1"
-        cursor_f[2] = "updated_value_2"
-        cursor_f[3] = "updated_value_3"
-        session_f.prepare_transaction('prepare_timestamp=' + self.timestamp_str(100) +
-                                      ',prepared_id=' + self.prepared_id_str(123))
+        self._claim_prepared(conn_follow, session_f, 123)
         if self.commit:
             session_f.commit_transaction("commit_timestamp=" + self.timestamp_str(200) +
                                          ",durable_timestamp=" + self.timestamp_str(210))
         else:
             session_f.rollback_transaction('rollback_timestamp=' + self.timestamp_str(210))
-        cursor_f.close()
         session_f.close()
 
         write_session = conn_follow.open_session()
@@ -305,26 +301,16 @@ class test_layered_prepare09(wttest.WiredTigerTestCase):
         cursor.close()
         self.conn.close("debug=(skip_checkpoint=true)")
 
-        # Phase 2: Follower picks up the checkpoint and replicates the prepare.
+        # Phase 2: Follower discovers and claims the checkpointed prepare.
         conn_follow = self._open_follower(checkpoint_meta)
 
         session_f = conn_follow.open_session()
-        cursor_f = session_f.open_cursor(self.uri, None, 'overwrite=false')
-        session_f.begin_transaction()
-        cursor_f.set_key(1)
-        self.assertEqual(0, cursor_f.remove())
-        cursor_f.set_key(2)
-        self.assertEqual(0, cursor_f.remove())
-        cursor_f.set_key(3)
-        self.assertEqual(0, cursor_f.remove())
-        session_f.prepare_transaction('prepare_timestamp=' + self.timestamp_str(100) +
-                                      ',prepared_id=' + self.prepared_id_str(123))
+        self._claim_prepared(conn_follow, session_f, 123)
         if self.commit:
             session_f.commit_transaction("commit_timestamp=" + self.timestamp_str(200) +
                                          ",durable_timestamp=" + self.timestamp_str(210))
         else:
             session_f.rollback_transaction('rollback_timestamp=' + self.timestamp_str(210))
-        cursor_f.close()
         session_f.close()
 
         # Phase 3: Step up and verify.
@@ -391,23 +377,17 @@ class test_layered_prepare09(wttest.WiredTigerTestCase):
         cursor.close()
         self.conn.close("debug=(skip_checkpoint=true)")
 
-        # Phase 2: Follower picks up the checkpoint, replicates the prepare, then commits
+        # Phase 2: Follower claims the checkpointed prepare, then commits
         # value_220 at ts=220 to create the "sandwiched" scenario.
         conn_follow = self._open_follower(checkpoint_meta)
 
         session_f = conn_follow.open_session()
-        prep_cursor = session_f.open_cursor(self.uri, None, 'overwrite=false')
-        session_f.begin_transaction()
-        prep_cursor.set_key(1)
-        self.assertEqual(0, prep_cursor.remove())
-        session_f.prepare_transaction('prepare_timestamp=' + self.timestamp_str(170) +
-                                      ',prepared_id=' + self.prepared_id_str(500))
+        self._claim_prepared(conn_follow, session_f, 500)
         if self.commit:
             session_f.commit_transaction("commit_timestamp=" + self.timestamp_str(200) +
                                          ",durable_timestamp=" + self.timestamp_str(210))
         else:
             session_f.rollback_transaction('rollback_timestamp=' + self.timestamp_str(210))
-        prep_cursor.close()
         session_f.close()
 
         write_session = conn_follow.open_session()
@@ -482,24 +462,16 @@ class test_layered_prepare09(wttest.WiredTigerTestCase):
         cursor.close()
         self.conn.close("debug=(skip_checkpoint=true)")
 
-        # Phase 2 (Follower): Replay the same prepared transaction (same prepared_id, same
-        # sequence of writes) and resolve it.
+        # Phase 2 (Follower): Discover, claim and resolve the checkpointed transaction.
         conn_follow = self._open_follower(checkpoint_meta)
 
         session_f = conn_follow.open_session()
-        cursor_f = session_f.open_cursor(self.uri)
-        session_f.begin_transaction()
-        cursor_f[1] = "value_a"
-        cursor_f[1] = "value_b"
-        cursor_f[1] = "value_c"
-        session_f.prepare_transaction('prepare_timestamp=' + self.timestamp_str(100) +
-                                      ',prepared_id=' + self.prepared_id_str(123))
+        self._claim_prepared(conn_follow, session_f, 123)
         if self.commit:
             session_f.commit_transaction("commit_timestamp=" + self.timestamp_str(200) +
                                          ",durable_timestamp=" + self.timestamp_str(210))
         else:
             session_f.rollback_transaction('rollback_timestamp=' + self.timestamp_str(210))
-        cursor_f.close()
         session_f.close()
 
         # Phase 3: Step up and verify.

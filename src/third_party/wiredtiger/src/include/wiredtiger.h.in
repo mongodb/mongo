@@ -1383,6 +1383,13 @@ struct __wt_session {
     /*!
      * Drop (delete) a table.
      *
+     * An interrupted drop operation or a failure while removing its underlying files can leave
+     * files on disk that are no longer referenced by WiredTiger metadata, even when \c remove_files
+     * is \c true. A successful return does not guarantee that all underlying files were removed.
+     * WiredTiger does not guarantee automatic cleanup of these files, including after a restart.
+     * Applications are responsible for identifying and safely removing such orphaned files, which
+     * may continue to occupy disk space and retain dropped data.
+     *
      * Although the drop operation is non-transactional, if it fails, it will force the current
      * transaction to roll back to avoid potential disruption to the data written by the
      * transaction.
@@ -2541,9 +2548,9 @@ struct __wt_connection {
      * "history_store_activity"\, \c "layered"\, \c "live_restore"\, \c "live_restore_progress"\, \c
      * "log"\, \c "metadata"\, \c "mutex"\, \c "out_of_order"\, \c "overflow"\, \c "page_delta"\, \c
      * "prefetch"\, \c "read"\, \c "reconcile"\, \c "recovery"\, \c "recovery_progress"\, \c "rts"\,
-     * \c "salvage"\, \c "shared_cache"\, \c "split"\, \c "sweep"\, \c "temporary"\, \c
-     * "thread_group"\, \c "timestamp"\, \c "transaction"\, \c "verify"\, \c "version"\, \c "write";
-     * default \c [].}
+     * \c "salvage"\, \c "schema_epoch"\, \c "shared_cache"\, \c "split"\, \c "sweep"\, \c
+     * "temporary"\, \c "thread_group"\, \c "timestamp"\, \c "transaction"\, \c "verify"\, \c
+     * "version"\, \c "write"; default \c [].}
      * @configend
      * @errors
      */
@@ -3604,9 +3611,9 @@ struct __wt_connection {
  * "generation"\, \c "handleops"\, \c "history_store"\, \c "history_store_activity"\, \c "layered"\,
  * \c "live_restore"\, \c "live_restore_progress"\, \c "log"\, \c "metadata"\, \c "mutex"\, \c
  * "out_of_order"\, \c "overflow"\, \c "page_delta"\, \c "prefetch"\, \c "read"\, \c "reconcile"\,
- * \c "recovery"\, \c "recovery_progress"\, \c "rts"\, \c "salvage"\, \c "shared_cache"\, \c
- * "split"\, \c "sweep"\, \c "temporary"\, \c "thread_group"\, \c "timestamp"\, \c "transaction"\,
- * \c "verify"\, \c "version"\, \c "write"; default \c [].}
+ * \c "recovery"\, \c "recovery_progress"\, \c "rts"\, \c "salvage"\, \c "schema_epoch"\, \c
+ * "shared_cache"\, \c "split"\, \c "sweep"\, \c "temporary"\, \c "thread_group"\, \c "timestamp"\,
+ * \c "transaction"\, \c "verify"\, \c "version"\, \c "write"; default \c [].}
  * @config{verify_metadata, open connection and verify any WiredTiger metadata.  Not supported when
  * opening a connection from a backup.  This API allows verification and detection of corruption in
  * WiredTiger metadata., a boolean flag; default \c false.}
@@ -10867,6 +10874,7 @@ typedef enum {
     WT_VERB_RECOVERY_PROGRESS,    /*!< Recovery progress messages. */
     WT_VERB_RTS,                  /*!< RTS messages. */
     WT_VERB_SALVAGE,              /*!< Salvage messages. */
+    WT_VERB_SCHEMA_EPOCH,         /*!< Schema epoch and shared metadata queue messages. */
     WT_VERB_SHARED_CACHE,
     WT_VERB_SPLIT,
     WT_VERB_SWEEP,

@@ -882,6 +882,30 @@ __txn_validate_commit_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t *commit
 }
 
 /*
+ * __txn_check_follower_checkpoint_ts --
+ *     A follower must not accept a timestamp at or below the last adopted checkpoint timestamp.
+ */
+static int
+__txn_check_follower_checkpoint_ts(WT_SESSION_IMPL *session, const char *name, wt_timestamp_t ts)
+{
+    wt_timestamp_t checkpoint_ts;
+    char ts_string[2][WT_TS_INT_STRING_SIZE];
+
+    if (!__wt_conn_is_disagg(session) ||
+      __wt_atomic_load_bool_relaxed(&S2C(session)->layered_table_manager.leader))
+        return (0);
+
+    checkpoint_ts = __wt_atomic_load_uint64_acquire(
+      &S2C(session)->disaggregated_storage.last_checkpoint_timestamp);
+    if (ts <= checkpoint_ts)
+        WT_RET_MSG(session, EINVAL,
+          "%s timestamp %s must be after the last checkpoint timestamp %s", name,
+          __wt_timestamp_to_string(ts, ts_string[0]),
+          __wt_timestamp_to_string(checkpoint_ts, ts_string[1]));
+    return (0);
+}
+
+/*
  * __txn_set_commit_timestamp --
  *     Set the commit timestamp of a transaction.
  */
@@ -904,6 +928,13 @@ __txn_set_commit_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t commit_ts)
      * validate function returns the new commit timestamp based on the configuration.
      */
     WT_RET(__txn_validate_commit_timestamp(session, &commit_ts));
+
+    /*
+     * A prepared transaction may commit at or below the checkpoint, only its durable timestamp
+     * can't.
+     */
+    if (!F_ISSET(txn, WT_TXN_PREPARE))
+        WT_RET(__txn_check_follower_checkpoint_ts(session, "commit", commit_ts));
     txn->time_point.commit_timestamp = commit_ts;
 
     /*
@@ -1055,6 +1086,8 @@ __txn_set_durable_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t durable_ts)
         WT_RET_MSG(
           session, EINVAL, "a commit timestamp is required before setting a durable timestamp");
 
+    WT_RET(__txn_check_follower_checkpoint_ts(session, "durable", durable_ts));
+
     /*
      * When a transaction carries a prepared_id, the durable timestamp must be strictly after the
      * last checkpoint timestamp. During step-up drain the version cursor skips ingest updates whose
@@ -1150,6 +1183,9 @@ __txn_set_prepare_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t prepare_ts)
               __wt_timestamp_to_string(prepare_ts, ts_string[0]),
               __wt_timestamp_to_string(stable_ts, ts_string[1]));
     }
+
+    WT_RET(__txn_check_follower_checkpoint_ts(session, "prepare", prepare_ts));
+
     txn->time_point.prepare_timestamp = prepare_ts;
     F_SET(&txn->time_point, WT_TXN_TIME_POINT_HAS_TS_PREPARE);
 

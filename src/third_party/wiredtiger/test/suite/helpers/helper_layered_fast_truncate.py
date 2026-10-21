@@ -208,4 +208,3 @@ class LayeredFastTruncateConfigMixin:
                     evict_cur.reset()
         finally:
             evict_cur.close()
-

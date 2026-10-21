@@ -8,6 +8,11 @@
 
 #include "wt_internal.h"
 
+/* Schema epoch messages are nested under disaggregated storage. */
+#define WT_VERB_SCHEMA_EPOCH_DISAGG \
+    WT_DECL_VERBOSE_MULTI_CATEGORY( \
+      ((WT_VERBOSE_CATEGORY[]){WT_VERB_SCHEMA_EPOCH, WT_VERB_DISAGGREGATED_STORAGE}))
+
 static void __disagg_shared_metadata_queue_clear(WT_SESSION_IMPL *session);
 
 /*
@@ -338,7 +343,7 @@ __layered_create_missing_stable_tables_helper(WT_SESSION_IMPL *session, uint64_t
 
         /* Check if the table was dropped. */
         if (__layered_create_has_following_remove(session, conn, entry)) {
-            __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE,
+            __wt_verbose_level_multi(session, WT_VERB_SCHEMA_EPOCH_DISAGG, WT_VERBOSE_DEBUG_2,
               "Skip creating missing stable table \"%s\" with schema epoch %" PRIu64
               " from layered config \"%s\" since it is being dropped",
               entry->stable_uri, entry->schema_epoch, entry->layered_value);
@@ -353,7 +358,7 @@ __layered_create_missing_stable_tables_helper(WT_SESSION_IMPL *session, uint64_t
           " from layered config \"%s\"",
           entry->stable_uri, entry->schema_epoch, entry->layered_value);
         ++(*countp);
-        __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE,
+        __wt_verbose_level_multi(session, WT_VERB_SCHEMA_EPOCH_DISAGG, WT_VERBOSE_DEBUG_2,
           "Created missing stable table \"%s\" with schema epoch %" PRIu64 " from \"%s\"",
           entry->stable_uri, entry->schema_epoch, entry->layered_value);
 
@@ -559,20 +564,21 @@ __wt_disagg_enqueue_metadata_operation(WT_SESSION_IMPL *session, const char *sta
      */
     entry->deferred = deferred;
 
-    __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE,
+    __wt_verbose_level_multi(session, WT_VERB_SCHEMA_EPOCH_DISAGG, WT_VERBOSE_DEBUG_2,
       "Scheduled copying disaggregated metadata for table \"%s\" (stable URI \"%s\") with %s "
       "operation to shared "
       "metadata table at next checkpoint:",
       table_name, stable_uri, __wti_disagg_shared_metadata_op_to_string(metadata_op));
-    __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE, "  colgroup: %s",
-      entry->colgroup_value == NULL ? "<none>" : entry->colgroup_value);
-    __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE, "  layered: %s",
-      entry->layered_value == NULL ? "<none>" : entry->layered_value);
-    __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE, "  table: %s",
-      entry->table_value == NULL ? "<none>" : entry->table_value);
-    __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE, "  stable: %s",
-      entry->stable_value == NULL ? "<none>" : entry->stable_value);
-    __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE, "  stable create config: %s",
+    __wt_verbose_level_multi(session, WT_VERB_SCHEMA_EPOCH_DISAGG, WT_VERBOSE_DEBUG_2,
+      "  colgroup: %s", entry->colgroup_value == NULL ? "<none>" : entry->colgroup_value);
+    __wt_verbose_level_multi(session, WT_VERB_SCHEMA_EPOCH_DISAGG, WT_VERBOSE_DEBUG_2,
+      "  layered: %s", entry->layered_value == NULL ? "<none>" : entry->layered_value);
+    __wt_verbose_level_multi(session, WT_VERB_SCHEMA_EPOCH_DISAGG, WT_VERBOSE_DEBUG_2,
+      "  table: %s", entry->table_value == NULL ? "<none>" : entry->table_value);
+    __wt_verbose_level_multi(session, WT_VERB_SCHEMA_EPOCH_DISAGG, WT_VERBOSE_DEBUG_2,
+      "  stable: %s", entry->stable_value == NULL ? "<none>" : entry->stable_value);
+    __wt_verbose_level_multi(session, WT_VERB_SCHEMA_EPOCH_DISAGG, WT_VERBOSE_DEBUG_2,
+      "  stable create config: %s",
       entry->stable_create_config == NULL ? "<none>" : entry->stable_create_config);
 
     /* Cannot fail past this point. */
@@ -738,7 +744,7 @@ __wt_disagg_cancel_unpublished_op(
 
     __wt_spin_unlock(session, &conn->disaggregated_storage.shared_metadata_queue_lock);
 
-    __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE,
+    __wt_verbose_level_multi(session, WT_VERB_SCHEMA_EPOCH_DISAGG, WT_VERBOSE_DEBUG_2,
       "Dequeued unpublished op for table \"%s\" instead of adding its counterpart", table_name);
 }
 
@@ -809,7 +815,7 @@ __disagg_shared_metadata_op_helper(WT_SESSION_IMPL *session, const char *key, co
         break;
     }
 
-    __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE,
+    __wt_verbose_level_multi(session, WT_VERB_SCHEMA_EPOCH_DISAGG, WT_VERBOSE_DEBUG_2,
       "%s disaggregated shared metadata: key=\"%s\" value=\"%s\"",
       __wti_disagg_shared_metadata_op_to_string(metadata_op), key, value);
 
@@ -879,7 +885,7 @@ __disagg_handle_create_remove_pairing(WT_SESSION_IMPL *session, WT_CONNECTION_IM
      * Anything else is an API violation detected below.
      */
     if (entry->metadata_op == WT_SHARED_METADATA_CREATE && entry->stable_value == NULL) {
-        __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE,
+        __wt_verbose_level_multi(session, WT_VERB_SCHEMA_EPOCH_DISAGG, WT_VERBOSE_DEBUG_2,
           "Tracking CREATE for \"%s\" with no stable value (epoch %" PRIu64
           ") for API violation detection",
           entry->stable_uri, entry->schema_epoch);
@@ -904,7 +910,7 @@ __disagg_handle_create_remove_pairing(WT_SESSION_IMPL *session, WT_CONNECTION_IM
             }
         }
         if (found) {
-            __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE,
+            __wt_verbose_level_multi(session, WT_VERB_SCHEMA_EPOCH_DISAGG, WT_VERBOSE_DEBUG_2,
               "Skipping CREATE and REMOVE for \"%s\" (epoch %" PRIu64
               "): table created and dropped before any checkpoint required it to exist",
               entry->stable_uri, entry->schema_epoch);
@@ -995,7 +1001,7 @@ __disagg_check_epoch_deferral(WT_SESSION_IMPL *session, WT_CONNECTION_IMPL *conn
     WT_ASSERT_SPINLOCK_OWNED(session, &conn->disaggregated_storage.shared_metadata_queue_lock);
 
     if (__disagg_remove_is_checkpoint_violation(session, conn, entry, cur_schema_epoch)) {
-        __wt_verbose_error(session, WT_VERB_DISAGGREGATED_STORAGE,
+        __wt_verbose_level_multi(session, WT_VERB_SCHEMA_EPOCH_DISAGG, WT_VERBOSE_ERROR,
           "API violation: table \"%s\" was dropped at schema epoch %" PRIu64
           " and recreated, above the checkpoint's schema epoch %" PRIu64
           ": the checkpoint refers to the dropped generation",
@@ -1004,7 +1010,7 @@ __disagg_check_epoch_deferral(WT_SESSION_IMPL *session, WT_CONNECTION_IMPL *conn
           "API violation: checkpoint schema epoch refers to a dropped and recreated table");
     }
 
-    __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE,
+    __wt_verbose_level_multi(session, WT_VERB_SCHEMA_EPOCH_DISAGG, WT_VERBOSE_DEBUG_2,
       "Defer metadata operation %s for table \"%s\" with schema epoch %" PRIu64,
       __wti_disagg_shared_metadata_op_to_string(entry->metadata_op), entry->table_name,
       entry->schema_epoch);
@@ -1042,7 +1048,7 @@ __disagg_parked_creates_panic(WT_SESSION_IMPL *session, WT_CONNECTION_IMPL *conn
         else
             WT_IGNORE_RET(__wt_snprintf(
               drop_desc, sizeof(drop_desc), "its DROP is at epoch %" PRIu64, drop_epoch));
-        __wt_verbose_error(session, WT_VERB_DISAGGREGATED_STORAGE,
+        __wt_verbose_level_multi(session, WT_VERB_SCHEMA_EPOCH_DISAGG, WT_VERBOSE_ERROR,
           "API violation: Table \"%s\" was published with CREATE at epoch %" PRIu64
           " and %s. This checkpoint must include the table in shared metadata, but the table was "
           "dropped and we have no data to write.",
@@ -1110,7 +1116,7 @@ __wt_disagg_shared_metadata_queue_process(
     {
         /* Defer entries that belong to the next checkpoint. */
         if (entry->deferred) {
-            __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE,
+            __wt_verbose_level_multi(session, WT_VERB_SCHEMA_EPOCH_DISAGG, WT_VERBOSE_DEBUG_2,
               "Defer metadata operation %s for table \"%s\"",
               __wti_disagg_shared_metadata_op_to_string(entry->metadata_op), entry->table_name);
             entry->deferred = false;
@@ -1323,7 +1329,7 @@ __wt_disagg_shared_metadata_queue_publish(
                   "Cannot publish for table \"%s\" at schema epoch %" PRIu64
                   " at or below the last checkpoint schema epoch %" PRIu64,
                   table_name, schema_epoch, last_ckpt_epoch);
-            __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE,
+            __wt_verbose_level_multi(session, WT_VERB_SCHEMA_EPOCH_DISAGG, WT_VERBOSE_DEBUG_2,
               "Publishing metadata operation %s for table \"%s\" to schema epoch %" PRIu64,
               __wti_disagg_shared_metadata_op_to_string(entry->metadata_op), entry->table_name,
               schema_epoch);

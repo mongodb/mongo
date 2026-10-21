@@ -115,6 +115,17 @@ class test_layered_stepup04(wttest.WiredTigerTestCase):
             cursor.close()
         session_f.close()
 
+    def _claim_prepared(self, conn, session, prepared_id):
+        """Discover the checkpointed prepared transaction and claim it on the given session."""
+        discover_session = conn.open_session()
+        cursor = discover_session.open_cursor('prepared_discover:')
+        self.assertEqual(cursor.next(), 0)
+        self.assertEqual(cursor.get_key(), prepared_id)
+        session.begin_transaction('claim_prepared_id=' + self.prepared_id_str(prepared_id))
+        self.assertEqual(cursor.next(), wiredtiger.WT_NOTFOUND)
+        cursor.close()
+        discover_session.close()
+
     # -----------------------------------------------------------------
     # Tests
     # -----------------------------------------------------------------
@@ -178,20 +189,25 @@ class test_layered_stepup04(wttest.WiredTigerTestCase):
         self.conn.close('debug=(skip_checkpoint=true)')
 
         # ---- Phase 2 (Follower) ----
-        # Open a follower loaded from the checkpoint and begin a prepared transaction using the
-        # same prepare_timestamp and prepared_id as the leader.  Leave it active so there is a
+        # Open a follower loaded from the checkpoint. A prepare the checkpoint captured is
+        # discovered and claimed; otherwise begin a prepared transaction using the same
+        # prepare_timestamp and prepared_id as the leader.  Leave it active so there is a
         # live prepared INSERT present when step-up fires in Phase 3.
         conn_follow = self._open_follower(checkpoint_meta)
         session_f = conn_follow.open_session()
-        follower_cursors = [session_f.open_cursor(uri) for uri in uris]
-        session_f.begin_transaction()
-        for c in follower_cursors:
-            c[4] = 'prepared_value_4'
-            c[5] = 'prepared_value_5'
-            c[6] = 'prepared_value_6'
-        session_f.prepare_transaction(
-            'prepare_timestamp=' + self.timestamp_str(100) +
-            ',prepared_id='      + self.prepared_id_str(123))
+        if self.in_checkpoint:
+            follower_cursors = []
+            self._claim_prepared(conn_follow, session_f, 123)
+        else:
+            follower_cursors = [session_f.open_cursor(uri) for uri in uris]
+            session_f.begin_transaction()
+            for c in follower_cursors:
+                c[4] = 'prepared_value_4'
+                c[5] = 'prepared_value_5'
+                c[6] = 'prepared_value_6'
+            session_f.prepare_transaction(
+                'prepare_timestamp=' + self.timestamp_str(100) +
+                ',prepared_id='      + self.prepared_id_str(123))
 
         # ---- Phase 3 (Step-up while prepare is live) ----
         conn_follow.reconfigure('disaggregated=(role="leader")')
@@ -292,20 +308,25 @@ class test_layered_stepup04(wttest.WiredTigerTestCase):
         self.conn.close('debug=(skip_checkpoint=true)')
 
         # ---- Phase 2 (Follower) ----
-        # Open a follower loaded from the checkpoint and begin a prepared transaction using the
-        # same prepare_timestamp and prepared_id as the leader.  Leave it active so there is a
+        # Open a follower loaded from the checkpoint. A prepare the checkpoint captured is
+        # discovered and claimed; otherwise begin a prepared transaction using the same
+        # prepare_timestamp and prepared_id as the leader.  Leave it active so there is a
         # live prepared UPDATE present when step-up fires in Phase 3.
         conn_follow = self._open_follower(checkpoint_meta)
         session_f = conn_follow.open_session()
-        follower_cursors = [session_f.open_cursor(uri) for uri in uris]
-        session_f.begin_transaction()
-        for c in follower_cursors:
-            c[1] = 'updated_value_1'
-            c[2] = 'updated_value_2'
-            c[3] = 'updated_value_3'
-        session_f.prepare_transaction(
-            'prepare_timestamp=' + self.timestamp_str(100) +
-            ',prepared_id='      + self.prepared_id_str(456))
+        if self.in_checkpoint:
+            follower_cursors = []
+            self._claim_prepared(conn_follow, session_f, 456)
+        else:
+            follower_cursors = [session_f.open_cursor(uri) for uri in uris]
+            session_f.begin_transaction()
+            for c in follower_cursors:
+                c[1] = 'updated_value_1'
+                c[2] = 'updated_value_2'
+                c[3] = 'updated_value_3'
+            session_f.prepare_transaction(
+                'prepare_timestamp=' + self.timestamp_str(100) +
+                ',prepared_id='      + self.prepared_id_str(456))
 
         # ---- Phase 3 (Step-up while prepare is live) ----
         conn_follow.reconfigure('disaggregated=(role="leader")')
@@ -404,20 +425,26 @@ class test_layered_stepup04(wttest.WiredTigerTestCase):
         self.conn.close('debug=(skip_checkpoint=true)')
 
         # ---- Phase 2 (Follower) ----
-        # Open a follower loaded from the checkpoint and begin a prepared transaction using the
-        # same prepare_timestamp and prepared_id as the leader.  Leave it active so there is a
+        # Open a follower loaded from the checkpoint. A prepare the checkpoint captured is
+        # discovered and claimed; otherwise begin a prepared transaction using the same
+        # prepare_timestamp and prepared_id as the leader.  Leave it active so there is a
         # live prepared DELETE present when step-up fires in Phase 3.
         conn_follow = self._open_follower(checkpoint_meta)
         session_f = conn_follow.open_session()
-        follower_cursors = [session_f.open_cursor(uri, None, 'overwrite=false') for uri in uris]
-        session_f.begin_transaction()
-        for c in follower_cursors:
-            for i in range(1, 4):
-                c.set_key(i)
-                self.assertEqual(0, c.remove())
-        session_f.prepare_transaction(
-            'prepare_timestamp=' + self.timestamp_str(100) +
-            ',prepared_id='      + self.prepared_id_str(789))
+        if self.in_checkpoint:
+            follower_cursors = []
+            self._claim_prepared(conn_follow, session_f, 789)
+        else:
+            follower_cursors = [
+                session_f.open_cursor(uri, None, 'overwrite=false') for uri in uris]
+            session_f.begin_transaction()
+            for c in follower_cursors:
+                for i in range(1, 4):
+                    c.set_key(i)
+                    self.assertEqual(0, c.remove())
+            session_f.prepare_transaction(
+                'prepare_timestamp=' + self.timestamp_str(100) +
+                ',prepared_id='      + self.prepared_id_str(789))
 
         # ---- Phase 3 (Step-up while prepare is live) ----
         conn_follow.reconfigure('disaggregated=(role="leader")')

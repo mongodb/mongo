@@ -1859,6 +1859,8 @@ extern void __wt_json_close(WT_SESSION_IMPL *session, WT_CURSOR *cursor);
 extern void __wt_layered_table_manager_remove_table(WT_SESSION_IMPL *session, uint32_t ingest_id);
 extern void __wt_layered_table_truncate_clear(
   WT_SESSION_IMPL *session, WT_LAYERED_TABLE *layered_table);
+extern void __wt_layered_table_truncate_prune(
+  WT_SESSION_IMPL *session, WT_LAYERED_TABLE *layered_table, const wt_timestamp_t prune_timestamp);
 extern void __wt_log_data_dump(
   WT_SESSION_IMPL *session, const void *data, size_t size, const char *fmt, ...)
   WT_GCC_FUNC_DECL_ATTRIBUTE((cold)) WT_GCC_FUNC_DECL_ATTRIBUTE((format(printf, 4, 5)));

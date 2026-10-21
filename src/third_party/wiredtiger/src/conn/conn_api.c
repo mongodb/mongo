@@ -2541,11 +2541,12 @@ __wt_get_verbose_categories(const WT_NAME_FLAG **catp, size_t *countp)
       {"out_of_order", WT_VERB_OUT_OF_ORDER}, {"overflow", WT_VERB_OVERFLOW},
       {"page_delta", WT_VERB_PAGE_DELTA}, {"read", WT_VERB_READ}, {"reconcile", WT_VERB_RECONCILE},
       {"recovery", WT_VERB_RECOVERY}, {"recovery_progress", WT_VERB_RECOVERY_PROGRESS},
-      {"rts", WT_VERB_RTS}, {"salvage", WT_VERB_SALVAGE}, {"shared_cache", WT_VERB_SHARED_CACHE},
-      {"split", WT_VERB_SPLIT}, {"sweep", WT_VERB_SWEEP}, {"temporary", WT_VERB_TEMPORARY},
-      {"thread_group", WT_VERB_THREAD_GROUP}, {"timestamp", WT_VERB_TIMESTAMP},
-      {"transaction", WT_VERB_TRANSACTION}, {"verify", WT_VERB_VERIFY},
-      {"version", WT_VERB_VERSION}, {"write", WT_VERB_WRITE}, {NULL, 0}};
+      {"rts", WT_VERB_RTS}, {"salvage", WT_VERB_SALVAGE}, {"schema_epoch", WT_VERB_SCHEMA_EPOCH},
+      {"shared_cache", WT_VERB_SHARED_CACHE}, {"split", WT_VERB_SPLIT}, {"sweep", WT_VERB_SWEEP},
+      {"temporary", WT_VERB_TEMPORARY}, {"thread_group", WT_VERB_THREAD_GROUP},
+      {"timestamp", WT_VERB_TIMESTAMP}, {"transaction", WT_VERB_TRANSACTION},
+      {"verify", WT_VERB_VERIFY}, {"version", WT_VERB_VERSION}, {"write", WT_VERB_WRITE},
+      {NULL, 0}};
 
     WT_ASSERT(NULL, catp != NULL);
     *catp = verbtypes;

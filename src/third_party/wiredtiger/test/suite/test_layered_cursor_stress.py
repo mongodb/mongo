@@ -114,8 +114,8 @@ class RemoveKeyWeights:
 @dataclass(frozen=True)
 class BulkRemoveWeights:
     # scen_bulk_remove deletes a contiguous 40/80/100% range either by per-key remove or range truncate.
-    # FIXME-WT-17841: truncate over-truncates on the follower layered table -- a key re-inserted inside a
-    # prior truncate range is lost once it drains to stable. Disabled (weight 0) until fixed; raise it then.
+    # FIXME-WT-18839: a positioned follower cursor can return a key that a range truncate through another
+    # cursor in the same transaction deleted. Disabled (weight 0) until fixed; raise it then.
     remove: float = 100
     truncate: float = 0
 

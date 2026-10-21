@@ -61,6 +61,10 @@ Ingest Table:
 Layered tables support all the regular tables operations, with exceptions listed here:
 
 - All writes, from all nodes, must be timestamped
+- On followers, the commit timestamp of a non-prepared transaction and the prepare and durable
+  timestamps of a prepared transaction must be after the latest adopted checkpoint timestamp. They
+  are checked when the timestamp is set. Prepare discovery restores checkpointed transactions with
+  their original prepare timestamps and is exempt from the prepare timestamp check.
 - All nodes must use the same URI for the same table
 - All nodes must use byte-wise identical keys, values, and timestamps for the same records.
 - Table compaction is not supported on layered tables

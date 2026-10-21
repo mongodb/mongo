@@ -89,9 +89,16 @@ operation is WT_SESSION::create.
 
 @subsection schema_drop Drop
 
-WT_SESSION::drop operation drops the specified \c uri. The method will delete all related files
-and metadata entries. It is possible to keep the underlying files by specifying
-\c "remove_files=false" in the config string.
+WT_SESSION::drop operation drops the specified \c uri. The method removes the related metadata
+entries and attempts to delete the underlying files. It is possible to keep the underlying files by
+specifying \c "remove_files=false" in the config string.
+
+An interrupted drop operation or a failure while removing its underlying files can leave files
+on disk that are no longer referenced by WiredTiger metadata, even when \c remove_files is \c true.
+A successful return does not guarantee that all underlying files were removed. WiredTiger does not
+guarantee automatic cleanup of these files, including after a restart. Applications are responsible
+for identifying and safely removing such orphaned files, which may continue to occupy disk space
+and retain dropped data.
 
 Although the drop operation is non-transactional, if it fails, it will force the current
 transaction to roll back to avoid potential disruption to the data written by the transaction.
