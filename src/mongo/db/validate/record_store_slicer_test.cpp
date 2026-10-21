@@ -11,8 +11,15 @@
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/storage/devnull/ephemeral_catalog_record_store.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/unittest.h"
+
+#include <algorithm>
+#include <vector>
+
+#include <fmt/format.h>
 
 namespace mongo {
 namespace collection_validation {
@@ -44,12 +51,14 @@ protected:
      * Inserts 'count' documents. A non-clustered collection assigns them consecutive long RecordIds
      * starting at 1, so the resulting RecordId range is [1, count].
      */
-    void insertDocuments(int count) {
+    void insertDocuments(int count, size_t paddingBytes = 0) {
+        const std::string padding(paddingBytes, 'x');
         for (int i = 1; i <= count; ++i) {
-            ASSERT_OK(storageInterface()->insertDocument(operationContext(),
-                                                         kNss,
-                                                         {BSON("_id" << i), Timestamp()},
-                                                         repl::OpTime::kUninitializedTerm));
+            ASSERT_OK(storageInterface()->insertDocument(
+                operationContext(),
+                kNss,
+                {BSON("_id" << i << "pad" << padding), Timestamp()},
+                repl::OpTime::kUninitializedTerm));
         }
     }
 
@@ -132,15 +141,59 @@ TEST_F(RecordStoreSlicerTest, EmptyRecordStoreYieldsNoPivots) {
     EXPECT_EQ(result.strategy, SliceStrategy::kEmptyStore);
 }
 
-TEST_F(RecordStoreSlicerTest, StringRecordIdsYieldSingleSlice) {
+TEST_F(RecordStoreSlicerTest, SinglePageStringRecordIdsStartAtFirstRecord) {
     createClusteredCollection();
-    // Clustered collections use string-formatted RecordIds, which have no stride arithmetic, so the
-    // whole record store needs to traverses as a single slice.
+    // A store that fits in one page cannot be split meaningfully, but the first pivot must still be
+    // the first record so the slices cover everything.
     insertDocuments(100);
-    const auto result = slice(8);
-    EXPECT_THAT(result.pivots, SizeIs(1));
-    EXPECT_TRUE(result.pivots.begin()->isStr());
-    EXPECT_EQ(result.strategy, SliceStrategy::kOneSlice);
+    const auto slicePivots = pivots(8);
+    ASSERT_THAT(slicePivots, SizeIs(testing::Ge(1u)));
+    EXPECT_TRUE(slicePivots.begin()->isStr());
+    EXPECT_TRUE(std::is_sorted(slicePivots.begin(), slicePivots.end()));
+}
+
+TEST_F(RecordStoreSlicerTest, StringRecordIdsSpanningManyPagesYieldMultipleSlices) {
+    createClusteredCollection();
+    // Enough data to span many leaf pages, so a sampled pivot can land on different pages.
+    insertDocuments(5000, /*paddingBytes=*/100);
+    const auto slicePivots = pivots(8);
+    ASSERT_THAT(slicePivots, SizeIs(testing::AllOf(testing::Gt(1u), testing::Le(8u))));
+    EXPECT_TRUE(std::is_sorted(slicePivots.begin(), slicePivots.end()));
+    EXPECT_TRUE(std::all_of(
+        slicePivots.begin(), slicePivots.end(), [](const RecordId& id) { return id.isStr(); }));
+}
+
+TEST_F(RecordStoreSlicerTest, StringRecordIdsWithoutRandomCursorYieldSingleSlice) {
+    auto* opCtx = operationContext();
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+
+    // The ephemeral record store does not support random cursors and keeps whatever RecordIds it is
+    // given, so string RecordIds can be inserted directly.
+    std::shared_ptr<void> data;
+    EphemeralForTestRecordStore store(boost::none, "no_random_cursor", &data);
+    ASSERT_FALSE(store.getRandomCursor(opCtx, ru));
+
+    std::vector<RecordId> ids;
+    {
+        WriteUnitOfWork wuow(opCtx);
+        for (int i = 0; i < 100; ++i) {
+            ids.push_back(RecordId(fmt::format("id{:03}", i)));
+            ASSERT_OK(store.insertRecord(opCtx, ru, ids.back(), "", 0, Timestamp()));
+        }
+        wuow.commit();
+    }
+
+    // Without random sampling there is nothing to place interior pivots with, so the whole record
+    // store is described by a single slice starting at the first record.
+    EXPECT_THAT(computeSlicePivots(opCtx, ru, store, 8).pivots, ElementsAre(ids.front()));
+}
+
+TEST_F(RecordStoreSlicerTest, StringRecordsUseRandomCursorStrategy) {
+    createClusteredCollection();
+    // Enough data to span many leaf pages, so a sampled pivot can land on different pages.
+    insertDocuments(5000, /*paddingBytes=*/100);
+    const auto [_, strategy] = slice(8);
+    ASSERT_EQ(strategy, collection_validation::SliceStrategy::kRandomCursorDistribution);
 }
 
 /**
@@ -259,6 +312,14 @@ TEST_F(RecordStoreSliceCoverageTest, EmptyRecordStoreCoversNothing) {
     createCollection();
     // No pivots means no slices, and nothing to traverse.
     EXPECT_THAT(slicedScan(pivots(8)), IsEmpty());
+}
+
+TEST_F(RecordStoreSliceCoverageTest, StringRecordIdsSpanningManyPagesAreCoveredExactlyOnce) {
+    createClusteredCollection();
+    insertDocuments(5000, /*paddingBytes=*/100);
+    for (size_t sliceCount : {2, 8, 32}) {
+        assertSlicedScanMatchesSerialScan(sliceCount);
+    }
 }
 
 TEST_F(RecordStoreSliceCoverageTest, StringRecordIdsAreCoveredExactlyOnce) {

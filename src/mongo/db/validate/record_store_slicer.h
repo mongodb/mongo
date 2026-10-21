@@ -37,9 +37,9 @@ struct SlicePivotResults {
  * store itself using a forward and reverse cursor.
  *
  * Returns a single pivot - one slice covering the whole record store - when the range cannot be
- * strided: a single-record store, a 'sliceCount' of one, or string-formatted RecordIds, which have
- * no arithmetic to stride over. Returns an empty vector when the record store holds no records at
- * all, since there is then nothing to traverse and no slice to describe.
+ * strided: a record store containing one record, 'sliceCount' of one, or a record store
+ * implementation that does not support slicing. Returns an empty vector when the record store holds
+ * no records at all, since there is then nothing to traverse and no slice to describe.
  */
 [[nodiscard]] SlicePivotResults computeSlicePivots(OperationContext* opCtx,
                                                    RecoveryUnit& ru,

@@ -12,46 +12,6 @@
 
 namespace mongo {
 namespace collection_validation {
-namespace {
-
-SlicePivotResults _computeSlicePivots(const RecordId& firstRecordId,
-                                      const RecordId& lastRecordId,
-                                      size_t sliceCount) {
-    SlicePivotResults oneSlice{{firstRecordId}, SliceStrategy::kOneSlice};
-    std::vector<RecordId> pivots{firstRecordId};
-
-    if (firstRecordId.isNull() || lastRecordId.isNull() || sliceCount <= 1) {
-        return oneSlice;
-    }
-
-    // TODO(SERVER-134015): String-formatted RecordIds, used by clustered collections, have no
-    // arithmetic to stride over, so they traverse as a single slice for now. Interpolating over the
-    // key bytes would restore parallelism for clustered and timeseries collections.
-    if (!firstRecordId.isLong() || !lastRecordId.isLong()) {
-        return oneSlice;
-    }
-
-    const int64_t first = firstRecordId.getLong();
-    const int64_t last = lastRecordId.getLong();
-    if (last <= first) {
-        return oneSlice;
-    }
-
-    const int64_t stride = (last - first) / static_cast<int64_t>(sliceCount);
-    if (stride <= 0) {
-        return oneSlice;
-    }
-
-    pivots.reserve(sliceCount);
-    for (size_t i = 1; i < sliceCount; ++i) {
-        pivots.emplace_back(first + stride * static_cast<int64_t>(i));
-    }
-    std::sort(pivots.begin(), pivots.end());
-    pivots.erase(std::unique(pivots.begin(), pivots.end()), pivots.end());
-    return {std::move(pivots), SliceStrategy::kArithmeticStride};
-}
-
-}  // namespace
 
 std::string_view toString(SliceStrategy strategy) {
     switch (strategy) {
@@ -79,14 +39,49 @@ SlicePivotResults computeSlicePivots(OperationContext* opCtx,
         return {{}, SliceStrategy::kEmptyStore};
     }
 
+    SliceStrategy strategy{SliceStrategy::kOneSlice};
     if (sliceCount <= 1) {
-        return {{firstRecord->id}, SliceStrategy::kOneSlice};
+        return {{firstRecord->id}, strategy};
     }
+    std::vector<RecordId> pivots{firstRecord->id};
 
-    const auto reverseCursor = recordStore.getCursor(opCtx, ru, /*forward=*/false);
-    const auto lastRecord = reverseCursor->next();
-    return _computeSlicePivots(
-        firstRecord->id, lastRecord ? lastRecord->id : RecordId(), sliceCount);
+    if (firstRecord->id.isStr()) {
+        // Attempt to open a random cursor. If the API returns a null cursor, fallthrough to return
+        // only the first recordId as a pivot.
+        if (const auto randomCursor = recordStore.getRandomCursor(opCtx, ru)) {
+            strategy = SliceStrategy::kRandomCursorDistribution;
+            // Ask for one sample per interior boundary so the cursor spreads them across the store
+            // rather than drawing each independently. Samples arrive unordered and may repeat.
+            pivots.reserve(sliceCount);
+            for (size_t i = 1; i < sliceCount; ++i) {
+                if (const auto sample = randomCursor->next()) {
+                    pivots.push_back(sample->id);
+                }
+            }
+        }
+    } else if (firstRecord->id.isLong()) {
+        const int64_t first = firstRecord->id.getLong();
+        const auto reverseCursor = recordStore.getCursor(opCtx, ru, /*forward=*/false);
+        const auto lastRecord = reverseCursor->next();
+        const int64_t last = lastRecord->id.getLong();
+        if (last <= first) {
+            return {pivots, strategy};
+        }
+
+        const int64_t stride = (last - first) / static_cast<int64_t>(sliceCount);
+        if (stride <= 0) {
+            return {pivots, strategy};
+        }
+
+        strategy = SliceStrategy::kArithmeticStride;
+        pivots.reserve(sliceCount);
+        for (size_t i = 1; i < sliceCount; ++i) {
+            pivots.emplace_back(first + stride * static_cast<int64_t>(i));
+        }
+    }
+    std::sort(pivots.begin(), pivots.end());
+    pivots.erase(std::unique(pivots.begin(), pivots.end()), pivots.end());
+    return {pivots, strategy};
 }
 
 }  // namespace collection_validation

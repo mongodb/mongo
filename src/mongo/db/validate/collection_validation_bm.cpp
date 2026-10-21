@@ -275,6 +275,9 @@ const NamespaceString kTsUserNss =
 // One hour per bucket matches the default "seconds" granularity span.
 constexpr int64_t kBucketSpanSeconds = 3600;
 
+// range(2) of the timeseries benchmarks: records per record store slice, 0 = single-threaded.
+constexpr int kParallelTargetRecordsPerSlice = 500;
+
 CollectionOptions makeTimeseriesOptions(const UUID& uuid) {
     CollectionOptions opts;
     opts.uuid = uuid;
@@ -340,6 +343,7 @@ size_t insertTimeseriesBuckets(OperationContext* opCtx,
 void BM_ValidateTimeseries(benchmark::State& state, collection_validation::ValidateMode mode) {
     const int numBuckets = static_cast<int>(state.range(0));
     const int measurementsPerBucket = static_cast<int>(state.range(1));
+    const int64_t targetRecordsPerSlice = state.range(2);
 
     const UUID uuid = UUID::gen();
     ValidateBenchmarkFixture fixture;
@@ -351,18 +355,30 @@ void BM_ValidateTimeseries(benchmark::State& state, collection_validation::Valid
     const size_t totalBytes =
         insertTimeseriesBuckets(opCtx, numBuckets, measurementsPerBucket, opts);
 
+    int64_t numSlices = 1;
     for (auto _ : state) {
         ValidateResults results;
         uassertStatusOK(collection_validation::validate(
             opCtx,
             kTsNss,
             collection_validation::ValidationOptions{
-                mode, collection_validation::RepairMode::kNone, /*logDiagnostics=*/false},
+                mode,
+                collection_validation::RepairMode::kNone,
+                /*logDiagnostics=*/false,
+                currentValidationVersion,
+                /*verifyConfigurationOverride=*/boost::none,
+                /*readTimestamp=*/boost::none,
+                /*hashPrefixes=*/boost::none,
+                /*revealHashedIds=*/boost::none,
+                targetRecordsPerSlice > 0 ? boost::optional<int64_t>(targetRecordsPerSlice)
+                                          : boost::none},
             results));
         invariant(results.isValid());
+        numSlices = results.getNumRecordStoreSlices().value_or(1);
         benchmark::DoNotOptimize(results);
     }
 
+    state.counters["slices"] = numSlices;
     state.SetItemsProcessed(state.iterations() * numBuckets);
     state.SetBytesProcessed(state.iterations() * totalBytes);
     fixture.tearDown();
@@ -371,26 +387,32 @@ void BM_ValidateTimeseries(benchmark::State& state, collection_validation::Valid
 // Sweeps bucket count at fixed 10 measurements/bucket.
 void TimeseriesBucketCountArgs(benchmark::internal::Benchmark* b) {
     for (int buckets : {1'000, 10'000, 50'000}) {
-        b->Args({buckets, 10});
+        for (int targetRecordsPerSlice : {0, kParallelTargetRecordsPerSlice}) {
+            b->Args({buckets, 10, targetRecordsPerSlice});
+        }
     }
 }
 
 // Sweeps measurements/bucket at fixed 10k buckets, stressing BSONColumn decode cost.
 void TimeseriesMeasurementsPerBucketArgs(benchmark::internal::Benchmark* b) {
     for (int measurements : {1, 10, 50, 100}) {
-        b->Args({10'000, measurements});
+        for (int targetRecordsPerSlice : {0, kParallelTargetRecordsPerSlice}) {
+            b->Args({10'000, measurements, targetRecordsPerSlice});
+        }
     }
 }
 
 BENCHMARK_CAPTURE(BM_ValidateTimeseries,
                   ForegroundFull_TS_BucketCount,
                   collection_validation::ValidateMode::kForegroundFull)
-    ->Apply(TimeseriesBucketCountArgs);
+    ->Apply(TimeseriesBucketCountArgs)
+    ->UseRealTime();
 
 BENCHMARK_CAPTURE(BM_ValidateTimeseries,
                   ForegroundFull_TS_MeasurementsPerBucket,
                   collection_validation::ValidateMode::kForegroundFull)
-    ->Apply(TimeseriesMeasurementsPerBucketArgs);
+    ->Apply(TimeseriesMeasurementsPerBucketArgs)
+    ->UseRealTime();
 
 }  // namespace
 }  // namespace mongo
