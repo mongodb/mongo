@@ -502,9 +502,6 @@ TEST_F(ReplicatedFastCountTest, InsertsAndDropToCollectionSameFlush) {
         applyOpsEntry, {{_uuid1, test_helpers::FastCountOpType::kDelete}});
 }
 
-// TODO SERVER-118457: Parameterize test and test variety of operations with different sizes and
-// counts. Test for drop, create.
-
 /**
  * Helpers to build applyOps-style CRUD operations.
  */
