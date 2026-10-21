@@ -95,6 +95,20 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "fuzztest_main",
+    testonly = True,
+    srcs = [
+        "fuzztest_main.cpp",
+    ],
+    deps = [
+        ":unittest_main_core",
+        "@com_google_googletest//:gtest",
+        "@fuzztest//fuzztest",
+        "@fuzztest//fuzztest:init_fuzztest",
+    ],
+)
+
+mongo_cc_library(
     name = "golden_test_base",
     srcs = [
         "golden_test_base.cpp",

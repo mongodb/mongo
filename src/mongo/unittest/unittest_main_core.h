@@ -39,6 +39,22 @@ struct [[MONGO_MOD_PUBLIC]] MainOptions {
 };
 
 /**
+ * Convert the vector to C-style argv to call google init functions. These might consume
+ * some elements, so we rebuild the vector after.
+ */
+void callInitGoogleTest(std::vector<std::string>& argVec);
+
+/**
+ * Perform shared setup for all mongo test binaries.
+ */
+void setupTestEnvironment(MainOptions& options, std::vector<std::string>& argVec);
+
+/**
+ * Perform shared post-test cleanup.
+ */
+void finishTestEnvironment(const MainOptions& options);
+
+/**
  * Tracks the state that must be carried among unit test program execution steps.
  */
 class [[MONGO_MOD_PUBLIC]] MainProgress {
