@@ -1,10 +1,12 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
+#include "mongo/base/initializer.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/compiler/metadata/path_arrayness.h"
+#include "mongo/db/query/query_fcv_environment_for_test.h"
 
 #include <array>
 #include <string>
@@ -16,6 +18,21 @@
 
 namespace mongo {
 namespace {
+
+// FuzzTest's gtest main doesn't run MongoDB's MONGO_INITIALIZERs (e.g. OIDGeneration) and the
+// FCV listener installed by unittest_main_core. Register a gtest Environment so SetUp runs once
+// before any test body, before ExpressionContextForTest construction acquires an FCV snapshot or
+// creates a ServiceContext.
+class MongoInfrastructureEnv : public ::testing::Environment {
+public:
+    void SetUp() override {
+        runGlobalInitializersOrDie({});
+        QueryFCVEnvironmentForTest::setUp();
+    }
+};
+
+[[maybe_unused]] const auto kRegisterMongoInfraEnv =
+    ::testing::AddGlobalTestEnvironment(new MongoInfrastructureEnv);
 
 // Each PathOp encodes one addPath() call:
 //   components  — indices into kNames, joined with '.' to form the FieldPath

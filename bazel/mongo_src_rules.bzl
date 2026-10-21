@@ -1627,7 +1627,7 @@ def mongo_cc_fuzztest(
     mongo_cc_test(
         deps = deps + [
             "@fuzztest//fuzztest",
-            "//src/mongo/unittest:fuzztest_main",
+            "@fuzztest//fuzztest:fuzztest_gtest_main",
             "@com_google_googletest//:gtest",
             "@fuzztest//centipede:centipede_runner_no_main",
         ],

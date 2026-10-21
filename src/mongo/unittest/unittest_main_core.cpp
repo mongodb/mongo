@@ -258,8 +258,10 @@ void installMongoReporter() {
     listeners.Append(new MongoExceptionPrinter);
 }
 
-}  // namespace
-
+/**
+ * Convert the vector to C-style argv to call google init functions. These might consume
+ * some elements, so we rebuild the vector after.
+ */
 void callInitGoogleTest(std::vector<std::string>& argVec) {
     int argc = argVec.size();
     auto ownedArgv = std::make_unique<const char*[]>(argc + 1);
@@ -274,6 +276,8 @@ void callInitGoogleTest(std::vector<std::string>& argVec) {
     argVec.resize(argc);
 }
 
+}  // namespace
+
 std::string gtestFilterForSelection(const std::vector<SelectedTest>& selection) {
     std::string filt;
     std::string_view sep;
@@ -284,23 +288,29 @@ std::string gtestFilterForSelection(const std::vector<SelectedTest>& selection) 
     return filt;
 }
 
-void setupTestEnvironment(MainOptions& options, std::vector<std::string>& argVec) {
+void MainProgress::initialize() {
+    if (auto ec = _parseAndAcceptOptions())
+        quickExit(static_cast<int>(*ec));
+
+    setDefaultMockBehavior(MockBehavior::nice);
+    callInitGoogleTest(_argVec);
+
     clearSignalMask();
     setupSynchronousSignalHandlers();
 
     if (isDeathTestChild()) {
         initializeDeathTestChild();
     } else {
-        if (options.enhancedReporter) {
+        if (_options.enhancedReporter) {
             EnhancedReporter::Options ero;
-            ero.showEachTest = options.showEachTest;
+            ero.showEachTest = _options.showEachTest;
             installEnhancedReporter(ero);
         } else {
             installMongoReporter();
         }
 
         // Start signal processing thread after signal mask cleared.
-        if (options.startSignalProcessingThread) {
+        if (_options.startSignalProcessingThread) {
             // Per SERVER-7434, startSignalProcessingThread must run after any forks (i.e.
             // initialize_server_global_state::forkServerOrDie) and before the creation of any other
             // threads
@@ -330,28 +340,9 @@ void setupTestEnvironment(MainOptions& options, std::vector<std::string>& argVec
         tp.setEnabled(true);
     setTestCommandsEnabled(true);
 
-    if (!options.suppressGlobalInitializers) {
-        runGlobalInitializersOrDie(argVec);
+    if (!_options.suppressGlobalInitializers) {
+        runGlobalInitializersOrDie(_argVec);
     }
-}
-
-void finishTestEnvironment(const MainOptions& options) {
-    if (!options.suppressGlobalInitializers) {
-        if (auto ret = runGlobalDeinitializers(); !ret.isOK()) {
-            std::cerr << "Global deinitialization failed: " << ret.reason() << std::endl;
-        }
-    }
-
-    TestingProctor::instance().exitAbruptlyIfDeferredErrors();
-}
-
-void MainProgress::initialize() {
-    if (auto ec = _parseAndAcceptOptions())
-        quickExit(static_cast<int>(*ec));
-
-    setDefaultMockBehavior(MockBehavior::nice);
-    callInitGoogleTest(_argVec);
-    setupTestEnvironment(_options, _argVec);
 }
 
 boost::optional<ExitCode> MainProgress::_parseAndAcceptOptions() {
@@ -432,7 +423,14 @@ int MainProgress::test() {
     if (auto&& o = _options.filter)
         applyTestFilters(o->suites, o->filter, o->fileNameFilter);
     auto result = RUN_ALL_TESTS();
-    finishTestEnvironment(_options);
+
+    if (!_options.suppressGlobalInitializers) {
+        if (auto ret = runGlobalDeinitializers(); !ret.isOK()) {
+            std::cerr << "Global deinitialization failed: " << ret.reason() << std::endl;
+        }
+    }
+
+    TestingProctor::instance().exitAbruptlyIfDeferredErrors();
 
     return result;
 }

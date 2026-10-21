@@ -1,6 +1,7 @@
 // Copyright (c) MongoDB, Inc.
 // SPDX-License-Identifier: SSPL-1.0
 
+#include "mongo/base/initializer.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/global_catalog/sharding_catalog_client_mock.h"
 #include "mongo/db/namespace_string.h"
@@ -1251,6 +1252,10 @@ private:
 
 public:
     DDLStateMachine() {
+        // TODO SERVER-129585: Get rid of the initializer function call once fuzztest binaries
+        // initialize things properly.
+        runGlobalInitializersOrDie({});
+
         featureFlagGuards.emplace_back("featureFlagAuthoritativeShardsDDL", true);
         featureFlagGuards.emplace_back("featureFlagAuthoritativeShardsCRUD", true);
 
