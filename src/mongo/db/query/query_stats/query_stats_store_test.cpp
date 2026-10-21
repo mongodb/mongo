@@ -436,8 +436,8 @@ public:
         index._erase(keyHash, storeKey);
     }
 
-    static size_t numKeyHashes(const KeyHashIndex& index) {
-        return index._numKeyHashes_forTest();
+    static size_t numUserVisibleHashes(const KeyHashIndex& index) {
+        return index._numUserVisibleHashes_forTest();
     }
 
     static size_t numMappings(KeyHashIndex& index) {
@@ -461,13 +461,13 @@ TEST_F(KeyHashIndexTest, BasicOps) {
 
     ASSERT_TRUE(hasKey(index, userVisibleHashA, 111));
     ASSERT_TRUE(hasKey(index, userVisibleHashB, 222));
-    ASSERT_EQ(numKeyHashes(index), 2);
+    ASSERT_EQ(numUserVisibleHashes(index), 2);
 
     // A second store key under the same keyHash coexists (1:N).
     insert(index, userVisibleHashA, /*storeKey*/ 333);
     ASSERT_TRUE(hasKey(index, userVisibleHashA, 111));
     ASSERT_TRUE(hasKey(index, userVisibleHashA, 333));
-    ASSERT_EQ(numKeyHashes(index), 2);
+    ASSERT_EQ(numUserVisibleHashes(index), 2);
     // The two store keys under 'userVisibleHashA' are two mappings under one keyHash.
     ASSERT_EQ(numMappings(index), 3);
 
@@ -484,7 +484,7 @@ TEST_F(KeyHashIndexTest, BasicOps) {
     // Erasing an absent key is a no-op.
     erase(index, userVisibleHashA, 999);
     ASSERT_TRUE(hasHash(index, userVisibleHashB));
-    ASSERT_EQ(numKeyHashes(index), 1);
+    ASSERT_EQ(numUserVisibleHashes(index), 1);
 }
 
 namespace {
@@ -522,10 +522,8 @@ std::pair<std::string, std::size_t> insertIndexedEntry(QueryStatsStoreManager& m
 bool isIndexed(QueryStatsStoreManager& manager,
                const std::string& userVisibleHash,
                std::size_t storeKey) {
-    auto locations = manager.findStoreKeysByUserHash({userVisibleHash});
-    const auto* groups = std::get_if<std::vector<KeyHashTargetGroup>>(&locations);
-    return groups && groups->size() == 1 &&
-        (*groups)[0].storeKeys == std::vector<std::size_t>{storeKey};
+    const auto locations = manager.findStoreKeysByUserHash({userVisibleHash});
+    return locations.size() == 1 && locations[0].second == storeKey;
 }
 
 /**
@@ -534,11 +532,8 @@ bool isIndexed(QueryStatsStoreManager& manager,
 std::vector<std::size_t> resolvedStoreKeys(QueryStatsStoreManager& manager,
                                            const std::string& userVisibleHash) {
     std::vector<std::size_t> storeKeys;
-    auto locations = manager.findStoreKeysByUserHash({userVisibleHash});
-    if (const auto* groups = std::get_if<std::vector<KeyHashTargetGroup>>(&locations)) {
-        for (const auto& group : *groups) {
-            storeKeys.insert(storeKeys.end(), group.storeKeys.begin(), group.storeKeys.end());
-        }
+    for (const auto& location : manager.findStoreKeysByUserHash({userVisibleHash})) {
+        storeKeys.push_back(location.second);
     }
     std::sort(storeKeys.begin(), storeKeys.end());
     return storeKeys;
@@ -562,7 +557,7 @@ TEST_F(QueryStatsStoreTest, KeyHashIndexRetainsEntriesRetainedByResetSize) {
     manager.resetSize(200000);
     ASSERT_EQ(countAllEntries(manager.getQueryStatsStore()), 1);
     ASSERT_TRUE(isIndexed(manager, userVisibleHash, storeKey));
-    ASSERT_EQ(manager.numKeyHashes_forTest(), 1);
+    ASSERT_EQ(manager.numUserVisibleHashes_forTest(), 1);
 }
 
 TEST_F(QueryStatsStoreTest, KeyHashIndexPrunedForEntriesEvictedByResetSize) {
@@ -580,13 +575,13 @@ TEST_F(QueryStatsStoreTest, KeyHashIndexPrunedForEntriesEvictedByResetSize) {
     manager.resetSize(0);
     ASSERT_EQ(countAllEntries(manager.getQueryStatsStore()), 0);
     ASSERT_FALSE(isIndexed(manager, userVisibleHash, storeKey));
-    ASSERT_EQ(manager.numKeyHashes_forTest(), 0);
+    ASSERT_EQ(manager.numUserVisibleHashes_forTest(), 0);
 }
 
 TEST_F(QueryStatsStoreTest, KeyHashIndexResolvesAndEvictsMultipleStoreKeysPerKeyHash) {
     unittest::ServerParameterGuard knobGuard("internalQueryStatsMatchPushdownOptimizationEnabled",
                                              true);
-    // One partition so both store keys resolve to a single 'KeyHashTargetGroup'.
+    // One partition so both store keys resolve under it.
     QueryStatsStoreManager manager{/*cacheSize*/ 100000, /*numPartitions*/ 1};
 
     // An object-valued '$hint' is redacted in the representative shape (the keyHash) but hashed raw
@@ -609,21 +604,17 @@ TEST_F(QueryStatsStoreTest, KeyHashIndexResolvesAndEvictsMultipleStoreKeysPerKey
     auto expected = std::vector<std::size_t>{storeKeyA, storeKeyB};
     std::sort(expected.begin(), expected.end());
     ASSERT_EQ(resolvedStoreKeys(manager, userVisibleHashA), expected);
-    ASSERT_EQ(manager.numKeyHashes_forTest(), 1);
+    ASSERT_EQ(manager.numUserVisibleHashes_forTest(), 1);
 
     // Evicting one store key leaves the other under the same keyHash.
     manager.getQueryStatsStore().remove(storeKeyA);
     ASSERT_EQ(resolvedStoreKeys(manager, userVisibleHashA), (std::vector<std::size_t>{storeKeyB}));
-    ASSERT_EQ(manager.numKeyHashes_forTest(), 1);
+    ASSERT_EQ(manager.numUserVisibleHashes_forTest(), 1);
 
-    // Evicting the last store key drops the keyHash from the index. The index is still maintained,
-    // so this resolves to an empty result, not a 'FullStoreScanRequired'.
+    // Evicting the last store key drops the keyHash from the index, so this resolves to nothing.
     manager.getQueryStatsStore().remove(storeKeyB);
-    auto locations = manager.findStoreKeysByUserHash({userVisibleHashA});
-    const auto* groups = std::get_if<std::vector<KeyHashTargetGroup>>(&locations);
-    ASSERT_NE(groups, nullptr);
-    ASSERT_TRUE(groups->empty());
-    ASSERT_EQ(manager.numKeyHashes_forTest(), 0);
+    ASSERT_TRUE(manager.findStoreKeysByUserHash({userVisibleHashA}).empty());
+    ASSERT_EQ(manager.numUserVisibleHashes_forTest(), 0);
 }
 
 TEST_F(QueryStatsStoreTest, EvictionKeepsLocalManagerIndexInSync) {
@@ -657,12 +648,10 @@ TEST_F(QueryStatsStoreTest, KeyHashIndexDisabledByKnob) {
         insertIndexedEntry(manager, opCtx.get(), BSON("a" << 1));
     insertIndexedEntry(manager, opCtx.get(), BSON("b" << 1));
 
-    // The store fills normally but no mapping is maintained. findStoreKeysByUserHash reports that a
-    // full scan is required, so callers don't trust an empty result.
+    // The store fills normally but no mapping is maintained, so nothing resolves.
     ASSERT_EQ(countAllEntries(manager.getQueryStatsStore()), 2);
-    ASSERT_EQ(manager.numKeyHashes_forTest(), 0);
-    ASSERT_TRUE(std::holds_alternative<FullStoreScanRequired>(
-        manager.findStoreKeysByUserHash({userVisibleHash})));
+    ASSERT_EQ(manager.numUserVisibleHashes_forTest(), 0);
+    ASSERT_TRUE(manager.findStoreKeysByUserHash({userVisibleHash}).empty());
 }
 
 TEST_F(QueryStatsStoreTest, InsertedEntryCachesKeyHash) {

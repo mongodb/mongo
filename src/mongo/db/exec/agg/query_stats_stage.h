@@ -11,8 +11,11 @@
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/modules.h"
 
+#include <cstddef>
 #include <deque>
+#include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace mongo {
@@ -28,6 +31,7 @@ public:
                     TransformAlgorithmEnum algorithm,
                     std::string hmacKey,
                     BSONObj serializedForDebug,
+                    boost::optional<std::vector<std::string>> keyHashLookupSet,
                     boost::optional<query_stats::TopKSortSpec> topKSortSpec = boost::none);
 
 private:
@@ -68,6 +72,19 @@ private:
     GetNextResult doGetNext() final;
 
     /**
+     * Optimized execution path used when a $match on keyHash was pushed down to avoid full-store
+     * scan. Returns EOF once all requested user-visible hashes have been consumed.
+     */
+    GetNextResult doGetNextViaKeyHashLookup();
+
+    /**
+     * Reads and materializes the next live entry among 'locations', popping the locations it
+     * consumes. Locations whose store key no longer has a live entry, and entries that fail to
+     * serialize, are skipped. Returns boost::none once every location has been read.
+     */
+    boost::optional<Document> _nextKeyHashDocument(std::deque<KeyHashLocation>& locations);
+
+    /**
      * Returns the document for the front entry of 'statsEntries', popping the entries it consumes.
      * Skips over entries that fail to serialize, and returns boost::none once 'statsEntries' is
      * empty.
@@ -75,12 +92,22 @@ private:
     boost::optional<Document> nextDocument(std::deque<QueryStatsEntry>& statsEntries,
                                            const Date_t& readTimestamp) const;
 
+    /**
+     * Materializes 'queryStatsEntry' and logs it as output, or returns boost::none if it fails to
+     * serialize. Callers must go through this so that every emitted document is logged.
+     */
+    boost::optional<Document> _materialize(const Date_t& readTimestamp,
+                                           const QueryStatsEntry& queryStatsEntry) const;
+
     boost::optional<Document> toDocument(const Date_t& readTimestamp,
                                          const QueryStatsEntry& queryStatsEntry) const;
 
     void conditionallyLogOutput(const Document& doc) const;
 
     void conditionallyLogFinished() const;
+
+    // Logs that the stage has finished and returns EOF.
+    GetNextResult _eof() const;
 
     BSONObj computeQueryStatsKey(std::shared_ptr<const Key> key,
                                  const SerializationContext& serializationContext) const;
@@ -117,6 +144,16 @@ private:
     // For-debug serialization of the corresponding 'DocumentSourceQueryStats' instance.
     BSONObj _serializedForDebug;
 
+    // User-visible hashes captured from a pushed-down $match on keyHash. boost::none when the
+    // optimization did not fire, leaving the stage on its default path. There is no fallback: a
+    // hash that resolves to nothing simply contributes no documents.
+    boost::optional<std::vector<std::string>> _keyHashLookupSet;
+
+    // The store locations '_keyHashLookupSet' resolves to. Populated on the first getNext() call
+    // and popped from the front as they are read. boost::none until then; empty once every
+    // location has been read.
+    boost::optional<std::deque<KeyHashLocation>> _resolvedKeyHashLocations;
+
     // Top-K optimization set during optimization if the pattern is recognized.
     boost::optional<query_stats::TopKSortSpec> _topKSortSpec;
 
@@ -124,10 +161,14 @@ private:
     // doGetNext() call and popped from the back as they are materialized. Owning copies means
     // materialization never touches the store and cannot lose entries to eviction.
     boost::optional<std::vector<std::pair<std::size_t, QueryStatsEntry>>> _topKCandidateEntries;
-    Date_t _topKScanTimestamp;
 
-    // Keys of the top-K candidates already processed, whether they were emitted or failed in
-    // 'toDocument'. If any candidate fails, we fall back to the full scan, skipping these keys.
+    // When the optimized scan (top-K or keyHash lookup) began, captured once and reported as the
+    // 'asOf' time of every entry it materializes.
+    Date_t _optimizationTimestamp;
+
+    // Store keys the top-K path has already processed, whether they were emitted or failed in
+    // 'toDocument'. If it falls back to the full scan, these keys are skipped so they are not
+    // re-emitted.
     stdx::unordered_set<std::size_t> _topKConsumedKeys;
     bool _topKCandidateFailed{false};
 };

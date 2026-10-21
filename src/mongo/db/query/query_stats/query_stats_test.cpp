@@ -425,9 +425,7 @@ TEST_F(QueryStatsTest, KeyHashIndexStaysBoundedAfterEviction) {
     size_t evicted = 0;
     for (const auto& shape : shapes) {
         const bool inStore = store.lookup(shape.storeKey).isOK();
-        auto locations = manager->findStoreKeysByUserHash({shape.userVisibleHash});
-        const auto* groups = std::get_if<std::vector<KeyHashTargetGroup>>(&locations);
-        const bool inIndex = groups && !groups->empty();
+        const bool inIndex = !manager->findStoreKeysByUserHash({shape.userVisibleHash}).empty();
         ASSERT_EQ(inIndex, inStore) << "keyHash index and store disagree for a shape";
         inStore ? ++survived : ++evicted;
     }

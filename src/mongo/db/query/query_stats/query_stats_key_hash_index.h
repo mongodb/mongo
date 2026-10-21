@@ -54,7 +54,7 @@ private:
      * The number of distinct user-visible hashes indexed. Not the number of indexed store keys,
      * which can be larger when one user-visible hash maps to several store keys.
      */
-    [[MONGO_MOD_PRIVATE]] size_t _numKeyHashes_forTest() const {
+    [[MONGO_MOD_PRIVATE]] size_t _numUserVisibleHashes_forTest() const {
         return _userVisibleHashToStoreKey.size();
     }
 

@@ -33,7 +33,6 @@
 #include <memory>
 #include <string>
 #include <utility>
-#include <variant>
 #include <vector>
 
 #include <absl/container/flat_hash_map.h>
@@ -517,35 +516,24 @@ void QueryStatsStoreInsertionEvictionListener::onClear(size_t estimatedSize) {
     queryStatsStoreSizeMetric.setToZero();
 }
 
-KeyLocations QueryStatsStoreManager::findStoreKeysByUserHash(
-    const std::vector<std::string>& keyHashes) {
-    // When off, the index is not maintained so must default to a full store scan.
-    if (!hasSecondaryIndex()) {
-        return FullStoreScanRequired{};
-    }
-    absl::flat_hash_map<QueryStatsStore::PartitionId, std::vector<std::size_t>> byPartition;
+std::deque<KeyHashLocation> QueryStatsStoreManager::findStoreKeysByUserHash(
+    const std::vector<std::string>& userVisibleHashes) {
+    std::deque<KeyHashLocation> locations;
     absl::flat_hash_set<std::size_t> seenStoreKeys;
-    for (const auto& keyHash : keyHashes) {
-        auto storeKeys = _keyHashIndex._lookup(keyHash);
+    for (const auto& userVisibleHash : userVisibleHashes) {
+        auto storeKeys = _keyHashIndex._lookup(userVisibleHash);
         if (!storeKeys) {
-            // The store holds no entry for this keyHash (every live entry is indexed).
+            // The store holds no entry with this user-visible hash (every live entry is indexed).
             continue;
         }
         // A store key is reported once even if several requested hashes resolve to it.
         for (auto storeKey : *storeKeys) {
-            if (!seenStoreKeys.insert(storeKey).second) {
-                continue;
+            if (seenStoreKeys.insert(storeKey).second) {
+                locations.emplace_back(_queryStatsStore->partitionOf(storeKey), storeKey);
             }
-            byPartition[_queryStatsStore->partitionOf(storeKey)].push_back(storeKey);
         }
     }
-
-    std::vector<KeyHashTargetGroup> groups;
-    groups.reserve(byPartition.size());
-    for (auto& [partitionId, storeKeys] : byPartition) {
-        groups.push_back(KeyHashTargetGroup{partitionId, std::move(storeKeys)});
-    }
-    return groups;
+    return locations;
 }
 
 BSONObj computeRepresentativeShapeKey(OperationContext* opCtx, const Key& key) {

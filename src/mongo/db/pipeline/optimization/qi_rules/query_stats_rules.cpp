@@ -29,17 +29,21 @@ namespace {
 constexpr std::string_view kKeyHashFieldName = "keyHash";
 
 /**
- * Extracts the keyHashes from a keyHash-only $eq/$in leaf, or boost::none if 'expr' is not one. The
- * keyHash index compares exact keyHashes, so a non-simple collation (and, for $in, a regex) makes
- * the leaf ineligible.
+ * Extracts the user-visible hashes from a keyHash-only $eq/$in leaf, or boost::none if 'expr' is
+ * not one. The keyHash index compares exact user-visible hashes, so a non-simple collation (and,
+ * for $in, a regex) makes the leaf ineligible.
  */
-boost::optional<std::vector<std::string>> extractKeyHashesFromLeaf(const MatchExpression* expr) {
+boost::optional<std::vector<std::string>> extractUserVisibleHashesFromLeaf(
+    const MatchExpression* expr) {
     switch (expr->matchType()) {
         case MatchExpression::EQ: {
             const auto* eq = static_cast<const EqualityMatchExpression*>(expr);
-            if (eq->path() != kKeyHashFieldName || eq->getData().type() != BSONType::string ||
-                eq->getCollator()) {
+            if (eq->path() != kKeyHashFieldName || eq->getCollator()) {
                 return boost::none;
+            }
+            // A non-string element can never equal the keyHash field so it's dropped.
+            if (eq->getData().type() != BSONType::string) {
+                return std::vector<std::string>{};
             }
             return std::vector<std::string>{eq->getData().str()};
         }
@@ -48,14 +52,14 @@ boost::optional<std::vector<std::string>> extractKeyHashesFromLeaf(const MatchEx
             if (in->path() != kKeyHashFieldName || in->hasRegex() || in->getCollator()) {
                 return boost::none;
             }
-            std::vector<std::string> hashes;
+            std::vector<std::string> userVisibleHashes;
             for (const auto& elem : in->getEqualities()) {
-                if (elem.type() != BSONType::string) {
-                    return boost::none;
+                // A non-string element can never equal the keyHash field, so drop it.
+                if (elem.type() == BSONType::string) {
+                    userVisibleHashes.push_back(elem.str());
                 }
-                hashes.push_back(elem.str());
             }
-            return hashes;
+            return userVisibleHashes;
         }
         default:
             return boost::none;
@@ -63,13 +67,15 @@ boost::optional<std::vector<std::string>> extractKeyHashesFromLeaf(const MatchEx
 }
 
 /**
- * The keyHashes present in both 'keyHashSet1' and 'keyHashSet2', in 'keyHashSet1's order.
+ * The user-visible hashes present in both, in the first's order.
  */
-std::vector<std::string> intersectKeyHashes(const std::vector<std::string>& keyHashSet1,
-                                            const std::vector<std::string>& keyHashSet2) {
+std::vector<std::string> intersectUserVisibleHashes(
+    const std::vector<std::string>& userVisibleHashes1,
+    const std::vector<std::string>& userVisibleHashes2) {
     std::vector<std::string> intersection;
-    for (const auto& location : keyHashSet1) {
-        if (std::find(keyHashSet2.begin(), keyHashSet2.end(), location) != keyHashSet2.end()) {
+    for (const auto& location : userVisibleHashes1) {
+        if (std::find(userVisibleHashes2.begin(), userVisibleHashes2.end(), location) !=
+            userVisibleHashes2.end()) {
             intersection.push_back(location);
         }
     }
@@ -92,7 +98,7 @@ boost::optional<std::vector<std::string>> extractKeyHashEqualities(const MatchEx
         return locations;
     }
     if (expr->matchType() != MatchExpression::AND) {
-        return extractKeyHashesFromLeaf(expr);
+        return extractUserVisibleHashesFromLeaf(expr);
     }
 
     // Capture keyHash $eq/$in conjuncts reachable through AND expressions (compound or nested)
@@ -108,7 +114,7 @@ boost::optional<std::vector<std::string>> extractKeyHashEqualities(const MatchEx
             locations = std::move(*childLocations);
             continue;
         }
-        locations = intersectKeyHashes(*locations, *childLocations);
+        locations = intersectUserVisibleHashes(*locations, *childLocations);
         if (locations->empty()) {
             // The keyHash conjuncts are disjoint, so no document can match the $and.
             return std::vector<std::string>{};
@@ -117,9 +123,9 @@ boost::optional<std::vector<std::string>> extractKeyHashEqualities(const MatchEx
     return locations;
 }
 
-bool canExtractMatchKeyHashes(PipelineRewriteContext& ctx) {
+bool canExtractUserVisibleHashes(PipelineRewriteContext& ctx) {
     if (!internalQueryStatsMatchPushdownOptimizationEnabled.load()) {
-        // The runtime knob is off: leave the stage on the default full-scan path.
+        // The optimization is disabled: leave the stage on its default path.
         return false;
     }
     return !ctx.atLastStage() && dynamic_cast<DocumentSourceMatch*>(ctx.nextStage().get());
@@ -254,7 +260,7 @@ bool optimizeQueryStatsTopK(PipelineRewriteContext& ctx) {
 REGISTER_RULES(DocumentSourceQueryStats,
                {
                    .name = "PUSH_MATCH_KEYHASH_LOOKUP_LOCATIONS",
-                   .precondition = canExtractMatchKeyHashes,
+                   .precondition = canExtractUserVisibleHashes,
                    .transform = captureKeyHashLookupLocations,
                    .priority = kDefaultPushdownPriority,
                    .tags = PipelineRewriteContext::Tags::InPlace,

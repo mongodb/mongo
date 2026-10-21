@@ -118,10 +118,32 @@ TEST_F(QueryStatsMatchPushdownOptimizationRulesTest, KeyHashNotCapturedThroughUn
         decisionForMatch(fromjson("{$and: [{$nor: [{keyHash: 'X'}]}, {b: 2}]}")).has_value());
 }
 
-TEST_F(QueryStatsMatchPushdownOptimizationRulesTest, NotPushedDownForOrNonKeyHashOrNonString) {
+TEST_F(QueryStatsMatchPushdownOptimizationRulesTest, NotPushedDownForOrWithNonKeyHashBranch) {
     ASSERT_FALSE(decisionForMatch(fromjson("{$or: [{keyHash: 'X'}, {a: 1}]}")).has_value());
     ASSERT_FALSE(decisionForMatch(fromjson("{a: 1}")).has_value());
-    ASSERT_FALSE(decisionForMatch(fromjson("{keyHash: 5}")).has_value());
+}
+
+TEST_F(QueryStatsMatchPushdownOptimizationRulesTest, NonStringKeyHashOperandMatchesNothing) {
+    // 'keyHash' is always a string on the stage's output, so a non-string operand can never match.
+    auto decision = decisionForMatch(fromjson("{keyHash: 5}"));
+    ASSERT_TRUE(decision.has_value());
+    ASSERT_TRUE(decision->empty());
+
+    // Such a branch drops out of an $or, and zeroes an $and.
+    ASSERT_EQ(decisionForMatch(fromjson("{$or: [{keyHash: 'X'}, {keyHash: 5}]}")),
+              (std::vector<std::string>{"X"}));
+    decision = decisionForMatch(fromjson("{$and: [{keyHash: 'X'}, {keyHash: 5}]}"));
+    ASSERT_TRUE(decision.has_value());
+    ASSERT_TRUE(decision->empty());
+}
+
+TEST_F(QueryStatsMatchPushdownOptimizationRulesTest, NonStringInElementsAreDropped) {
+    ASSERT_EQ(decisionForMatch(fromjson("{keyHash: {$in: ['X', 5]}}")),
+              (std::vector<std::string>{"X"}));
+
+    auto decision = decisionForMatch(fromjson("{keyHash: {$in: [5]}}"));
+    ASSERT_TRUE(decision.has_value());
+    ASSERT_TRUE(decision->empty());
 }
 
 TEST_F(QueryStatsMatchPushdownOptimizationRulesTest, KeyHashDisjunctsCapturedThroughOr) {
@@ -162,7 +184,6 @@ TEST_F(QueryStatsMatchPushdownOptimizationRulesTest, NotPushedDownForUnnarrowabl
         decisionForMatch(fromjson("{$or: [{keyHash: 'X'}, {keyHash: {$ne: 'Y'}}]}")).has_value());
     ASSERT_FALSE(decisionForMatch(fromjson("{$or: [{keyHash: 'X'}, {keyHash: {$in: [/re/]}}]}"))
                      .has_value());
-    ASSERT_FALSE(decisionForMatch(fromjson("{$or: [{keyHash: 'X'}, {keyHash: 5}]}")).has_value());
     ASSERT_FALSE(decisionForMatch(fromjson("{$or: [{keyHash: 'X'}, {$nor: [{keyHash: 'Y'}]}]}"))
                      .has_value());
 }

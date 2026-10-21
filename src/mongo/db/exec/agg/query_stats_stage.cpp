@@ -16,6 +16,7 @@
 #include <deque>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQueryStats
 
@@ -33,6 +34,7 @@ boost::intrusive_ptr<exec::agg::Stage> documentSourceQueryStatsToStageFn(
         queryStatsDS->_algorithm,
         queryStatsDS->_hmacKey,
         queryStatsDS->serialize().getDocument().toBson(),
+        queryStatsDS->_keyHashLookupSet,
         queryStatsDS->_topKSortSpec);
 }
 
@@ -60,12 +62,14 @@ QueryStatsStage::QueryStatsStage(std::string_view stageName,
                                  TransformAlgorithmEnum algorithm,
                                  std::string hmacKey,
                                  BSONObj serializedForDebug,
+                                 boost::optional<std::vector<std::string>> keyHashLookupSet,
                                  boost::optional<query_stats::TopKSortSpec> topKSortSpec)
     : Stage(stageName, expCtx),
       _currentCopiedPartition(0),
       _algorithm{algorithm},
       _hmacKey{hmacKey},
       _serializedForDebug{serializedForDebug.getOwned()},
+      _keyHashLookupSet(std::move(keyHashLookupSet)),
       _topKSortSpec{std::move(topKSortSpec)} {}
 
 BSONObj QueryStatsStage::computeQueryStatsKey(
@@ -104,8 +108,18 @@ void QueryStatsStage::conditionallyLogFinished() const {
     }
 }
 
+GetNextResult QueryStatsStage::_eof() const {
+    conditionallyLogFinished();
+    return GetNextResult::makeEOF();
+}
+
 GetNextResult QueryStatsStage::doGetNext() {
     auto& queryStatsStore = getQueryStatsStore(getContext()->getOperationContext());
+
+    // If we pushed down a subsequent $match, then proceed with the optimized lookup fast-path.
+    if (_keyHashLookupSet) {
+        return doGetNextViaKeyHashLookup();
+    }
 
     // Top-K fast path: do one full cheap scan to identify candidates, then materialize only them.
     if (_topKSortSpec) {
@@ -114,8 +128,7 @@ GetNextResult QueryStatsStage::doGetNext() {
         }
         // Every candidate materialized, so the retained $sort + $limit already has the top K.
         if (!_topKCandidateFailed) {
-            conditionallyLogFinished();
-            return GetNextResult::makeEOF();
+            return _eof();
         }
         // Resort to the full store scan, if we did not materialize enough documents in the top-k
         // optimization. The $sort/$limit that follows this stage will ensure the documents are
@@ -155,8 +168,25 @@ GetNextResult QueryStatsStage::nextFullScanDocument(QueryStatsStore& queryStatsS
         _currentCopiedPartition.incrementPartitionId();
     }
 
-    conditionallyLogFinished();
-    return GetNextResult::makeEOF();
+    return _eof();
+}
+
+GetNextResult QueryStatsStage::doGetNextViaKeyHashLookup() {
+    // Resolution happens once, on the first getNext(), which also stamps the read time reported by
+    // every entry this scan materializes.
+    if (!_resolvedKeyHashLocations) {
+        auto* opCtx = getContext()->getOperationContext();
+        _resolvedKeyHashLocations = QueryStatsStoreManager::get(opCtx->getServiceContext())
+                                        ->findStoreKeysByUserHash(*_keyHashLookupSet);
+        _optimizationTimestamp = Date_t::now();
+    }
+
+    // Materialize the corresponding document.
+    if (auto doc = _nextKeyHashDocument(*_resolvedKeyHashLocations)) {
+        return std::move(*doc);
+    }
+
+    return _eof();
 }
 
 boost::optional<Document> QueryStatsStage::nextDocument(std::deque<QueryStatsEntry>& statsEntries,
@@ -167,12 +197,51 @@ boost::optional<Document> QueryStatsStage::nextDocument(std::deque<QueryStatsEnt
     while (!statsEntries.empty()) {
         const auto& queryStatsEntry = statsEntries.front();
         ON_BLOCK_EXIT([&statsEntries]() { statsEntries.pop_front(); });
-        if (auto doc = toDocument(readTimestamp, queryStatsEntry)) {
-            conditionallyLogOutput(*doc);
+        if (auto doc = _materialize(readTimestamp, queryStatsEntry)) {
             return doc;
         }
     }
     return boost::none;
+}
+
+boost::optional<Document> QueryStatsStage::_nextKeyHashDocument(
+    std::deque<KeyHashLocation>& locations) {
+    auto& queryStatsStore = getQueryStatsStore(getContext()->getOperationContext());
+
+    while (!locations.empty()) {
+        const auto& [partitionId, storeKey] = locations.front();
+        locations.pop_front();
+
+        // Copy the entry out under the partition lock, then materialize it off-lock.
+        const auto partition = queryStatsStore.getPartition(partitionId);
+        auto statusWithMetrics = partition->peek(storeKey);
+        if (!statusWithMetrics.isOK()) {
+            // The index mapped this hash to a store key with no live entry, which means the entry
+            // was concurrently evicted between the index lookup and this read. The hash simply has
+            // no match, so skip it and continue with the remaining locations.
+            LOGV2_DEBUG(13519300,
+                        2,
+                        "Error encountered when copying query stats entry",
+                        "status"_attr = statusWithMetrics.getStatus(),
+                        "hash"_attr = storeKey);
+            continue;
+        }
+
+        const auto& entry = statusWithMetrics.getValue()->second;
+        if (auto doc = _materialize(_optimizationTimestamp, entry)) {
+            return doc;
+        }
+    }
+    return boost::none;
+}
+
+boost::optional<Document> QueryStatsStage::_materialize(
+    const Date_t& readTimestamp, const QueryStatsEntry& queryStatsEntry) const {
+    auto doc = toDocument(readTimestamp, queryStatsEntry);
+    if (doc) {
+        conditionallyLogOutput(*doc);
+    }
+    return doc;
 }
 
 boost::optional<Document> QueryStatsStage::toDocument(
@@ -292,7 +361,7 @@ void QueryStatsStage::computeTopKCandidates(const QueryStatsStore& queryStatsSto
     tassert(12938701, "TopKSortSpec set for unsupported path", accessor);
 
     // The scan locks one partition at a time and only reads the cheap metric.
-    _topKScanTimestamp = Date_t::now();
+    _optimizationTimestamp = Date_t::now();
     _topKCandidateEntries = queryStatsStore.topKCandidateEntries(
         spec.limit,
         *accessor,
@@ -313,8 +382,7 @@ boost::optional<Document> QueryStatsStage::nextTopKDocument(QueryStatsStore& que
         const auto& [key, queryStatsEntry] = _topKCandidateEntries->back();
         _topKConsumedKeys.insert(key);
 
-        if (auto doc = toDocument(_topKScanTimestamp, queryStatsEntry)) {
-            conditionallyLogOutput(*doc);
+        if (auto doc = _materialize(_optimizationTimestamp, queryStatsEntry)) {
             return doc;
         }
         _topKCandidateFailed = true;

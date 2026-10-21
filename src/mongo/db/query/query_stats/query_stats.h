@@ -17,10 +17,11 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <deque>
 #include <functional>
 #include <memory>
 #include <string>
-#include <variant>
+#include <utility>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
@@ -89,21 +90,9 @@ using QueryStatsStore = PartitionedCache<std::size_t,
                                          QueryStatsStoreInsertionEvictionListener>;
 
 /**
- * One store partition, and the store keys within it that the requested keyHashes resolved to.
+ * One resolved lookup target: a store key, and the partition that owns it.
  */
-struct KeyHashTargetGroup {
-    QueryStatsStore::PartitionId partitionId;
-    std::vector<std::size_t> storeKeys;
-};
-
-/**
- * The outcome of resolving keyHashes: either the resolved target groups (which may be empty, when
- * no requested hash is indexed), or a signal that the keyHash index is not maintained so the caller
- * must scan the store instead.
- */
-struct FullStoreScanRequired {};
-
-using KeyLocations = std::variant<std::vector<KeyHashTargetGroup>, FullStoreScanRequired>;
+using KeyHashLocation = std::pair<QueryStatsStore::PartitionId, std::size_t>;
 
 /**
  * A manager for the queryStats store. The usage patterns are as follows:
@@ -147,15 +136,15 @@ public:
     }
 
     /**
-     * Resolves 'keyHashes' to the store keys they are indexed under, grouped by store partition.
-     * Returns a 'FullStoreScanRequired' when the keyHash index is not maintained. Otherwise,
-     * returns the groups, which may be empty when no requested hash is indexed. Unknown hashes are
-     * dropped, and a store key appears once even if several hashes resolve to it.
+     * Resolves 'userVisibleHashes' to the store keys they are indexed under, each paired with the
+     * partition that owns it. Returns an empty deque when no requested hash is indexed. Unknown
+     * hashes are dropped, and a store key appears once even if several hashes resolve to it.
      */
-    KeyLocations findStoreKeysByUserHash(const std::vector<std::string>& keyHashes);
+    std::deque<KeyHashLocation> findStoreKeysByUserHash(
+        const std::vector<std::string>& userVisibleHashes);
 
-    [[MONGO_MOD_PRIVATE]] size_t numKeyHashes_forTest() const {
-        return _keyHashIndex._numKeyHashes_forTest();
+    [[MONGO_MOD_PRIVATE]] size_t numUserVisibleHashes_forTest() const {
+        return _keyHashIndex._numUserVisibleHashes_forTest();
     }
 
     [[MONGO_MOD_PRIVATE]] size_t numMappings_forTest() {

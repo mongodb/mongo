@@ -3,6 +3,7 @@
 
 #include "mongo/db/pipeline/document_source_query_stats.h"
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
@@ -23,13 +24,17 @@
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/query_stats/query_stats_top_k_metrics.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/time_support.h"
 
 #include <algorithm>
+#include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include <absl/hash/hash.h>
@@ -101,6 +106,34 @@ public:
         return getQueryStatsStore(getOpCtx());
     }
 
+    QueryStatsStoreManager& getManager() {
+        return *QueryStatsStoreManager::get(getServiceContext());
+    }
+
+    /**
+     * Stores an entry for the find shape that 'filter' produces under 'storeKey', so the
+     * store and the keyHash index are populated together.
+     */
+    std::string putIndexedEntry(QueryStatsStore& queryStatsStore, size_t storeKey, BSONObj filter) {
+        auto key = makeFindKeyFromQuery(std::move(filter));
+        auto userVisibleHash =
+            computeUserVisibleHash(computeRepresentativeShapeKey(getOpCtx(), *key));
+        queryStatsStore.put(storeKey, makeEntry(std::move(key)));
+        return userVisibleHash;
+    }
+
+    /**
+     * Builds a $queryStats stage that takes the keyHash lookup execution path for 'locations'.
+     */
+    boost::intrusive_ptr<exec::agg::Stage> buildKeyHashLookupStage(
+        std::vector<std::string> locations) {
+        const auto source =
+            DocumentSourceQueryStats::createFromBson(kQueryStatsStage.firstElement(), getExpCtx());
+        checked_cast<DocumentSourceQueryStats*>(source.get())
+            ->setKeyHashLookupLocations(std::move(locations));
+        return exec::agg::buildStage(source);
+    }
+
     // Calls getNext() on the document source and validates the result. Returns the field name of
     // the filter.
     static std::string getNextAndValidateResult(boost::intrusive_ptr<exec::agg::Stage> stage,
@@ -161,6 +194,13 @@ public:
 
     static const BSONObj kQueryStatsStage;
     static const BSONObj kQueryStatsStageWithTransformIdentifiers;
+
+private:
+    // Entries are only indexed, and the keyHash lookup path only taken, while the match pushdown
+    // optimization is enabled.
+    // TODO (SERVER-135371): Remove once knob enabled by default.
+    unittest::ServerParameterGuard _enableMatchPushdown{
+        "internalQueryStatsMatchPushdownOptimizationEnabled", true};
 };
 
 const BSONObj DocumentSourceQueryStatsTest::kQueryStatsStage = fromjson(R"({
@@ -320,6 +360,127 @@ TEST_F(DocumentSourceQueryStatsTest, GetNextOverMultiplePartitions) {
 
     // We should see three unique filters.
     ASSERT_EQ(filters.size(), 3);
+}
+
+TEST_F(DocumentSourceQueryStatsTest, GetNextViaKeyHashLookupResolvesAcrossPartitions) {
+    // Store keys 0 and 3 land in partition 0, store key 1 lands in partition 1.
+    auto& queryStatsStore = setUpQueryStatsStore(3 /* numPartitions */);
+    const auto keyHashA = putIndexedEntry(queryStatsStore, 0, BSON("a" << 5));
+    const auto keyHashB = putIndexedEntry(queryStatsStore, 1, BSON("b" << 10));
+    const auto keyHashC = putIndexedEntry(queryStatsStore, 3, BSON("c" << 15));
+    ASSERT_EQ(queryStatsStore.partitionOf(0), queryStatsStore.partitionOf(3));
+    ASSERT_NE(queryStatsStore.partitionOf(0), queryStatsStore.partitionOf(1));
+
+    auto stage = buildKeyHashLookupStage({keyHashA, keyHashB, keyHashC});
+
+    std::vector<std::pair<std::string, Date_t>> results;
+    for (int i = 0; i < 3; ++i) {
+        auto result = stage->getNext();
+        ASSERT_TRUE(result.isAdvanced());
+        const auto& doc = result.getDocument();
+        results.emplace_back(doc["keyHash"].getString(), doc["asOf"].getDate());
+    }
+    ASSERT_TRUE(stage->getNext().isEOF());
+
+    // Every location is resolved, whatever partition it lives in.
+    ASSERT_EQ(StringSet({results[0].first, results[1].first, results[2].first}),
+              StringSet({keyHashA, keyHashB, keyHashC}));
+
+    // The read time is captured once for the whole optimized scan, so every entry it materializes
+    // reports the same 'asOf' timestamp.
+    ASSERT_EQ(results[0].second, results[1].second);
+    ASSERT_EQ(results[1].second, results[2].second);
+}
+
+TEST_F(DocumentSourceQueryStatsTest, GetNextViaKeyHashLookupReportsEachEntryOnce) {
+    auto& queryStatsStore = setUpQueryStatsStore();
+    const auto keyHashA = putIndexedEntry(queryStatsStore, 0, BSON("a" << 5));
+
+    // A duplicated target should be reported once.
+    auto stage = buildKeyHashLookupStage({keyHashA, keyHashA});
+
+    auto result = stage->getNext();
+    ASSERT_TRUE(result.isAdvanced());
+    ASSERT_EQ(result.getDocument()["keyHash"].getString(), keyHashA);
+    ASSERT_TRUE(stage->getNext().isEOF());
+}
+
+TEST_F(DocumentSourceQueryStatsTest, GetNextViaKeyHashLookupIgnoresUnindexedTarget) {
+    auto& queryStatsStore = setUpQueryStatsStore();
+    const auto keyHashA = putIndexedEntry(queryStatsStore, 0, BSON("a" << 5));
+    // Not a target, so a full scan would return it but the lookup must not.
+    putIndexedEntry(queryStatsStore, 1, BSON("b" << 10));
+    // A keyHash the store holds no entry for.
+    const auto unknownKeyHash = computeUserVisibleHash(
+        computeRepresentativeShapeKey(getOpCtx(), *makeFindKeyFromQuery(BSON("unknown" << 1))));
+
+    // The index drops the unknown hash, so the stage returns only the resolved target rather than
+    // scanning the store.
+    auto stage = buildKeyHashLookupStage({keyHashA, unknownKeyHash});
+
+    StringSet seen;
+    for (auto result = stage->getNext(); !result.isEOF(); result = stage->getNext()) {
+        ASSERT_TRUE(result.isAdvanced());
+        seen.insert(result.getDocument()["keyHash"].getString());
+    }
+    ASSERT_EQ(seen, StringSet({keyHashA}));
+}
+
+/**
+ * A store entry can leave the store while its index mapping lingers, e.g. when the lookup resolves
+ * a store key and the entry is evicted before the partition lock is taken. clear() reproduces that
+ * reader-visible state: it fires onClear, which does not prune the keyHash index.
+ *
+ * The stale mapping is skipped, so the lookup still returns the live locations and does not scan.
+ */
+TEST_F(DocumentSourceQueryStatsTest, GetNextViaKeyHashLookupSkipsEvictedTarget) {
+    auto& queryStatsStore = setUpQueryStatsStore(3 /* numPartitions */);
+    auto& manager = getManager();
+
+    // This entry's mapping outlives the entry itself.
+    const auto evictedKeyHash = putIndexedEntry(queryStatsStore, /*storeKey*/ 0, BSON("gone" << 1));
+    queryStatsStore.clear();
+
+    const auto keyHashA = putIndexedEntry(queryStatsStore, /*storeKey*/ 1, BSON("a" << 5));
+    // Not a target, so a full scan would return it but the lookup must not.
+    putIndexedEntry(queryStatsStore, /*storeKey*/ 2, BSON("b" << 10));
+    ASSERT_NE(queryStatsStore.partitionOf(0), queryStatsStore.partitionOf(1));
+    // All three mappings are still indexed.
+    ASSERT_EQ(manager.numMappings_forTest(), 3);
+
+    auto stage = buildKeyHashLookupStage({evictedKeyHash, keyHashA});
+
+    // The lookup finds store key 0 empty, skips it, and returns only the live target.
+    auto result = stage->getNext();
+    ASSERT_TRUE(result.isAdvanced());
+    ASSERT_EQ(result.getDocument()["keyHash"].getString(), keyHashA);
+    ASSERT_TRUE(stage->getNext().isEOF());
+}
+
+TEST_F(DocumentSourceQueryStatsTest, GetNextViaKeyHashLookupReturnsNothingWhenIndexUnmaintained) {
+    // The knob is startup-only, so the manager has to be built while it is off for the index to be
+    // left unmaintained.
+    std::string keyHashA;
+    {
+        unittest::ServerParameterGuard disable("internalQueryStatsMatchPushdownOptimizationEnabled",
+                                               false);
+        auto& queryStatsStore = setUpQueryStatsStore();
+        keyHashA = putIndexedEntry(queryStatsStore, 0, BSON("a" << 5));
+    }
+
+    // Nothing was indexed, so the lookup resolves to no locations. In production this cannot arise:
+    // the pushdown rule doesn't capture while the knob is off, so the stage scans instead.
+    auto stage = buildKeyHashLookupStage({keyHashA});
+    ASSERT_TRUE(stage->getNext().isEOF());
+}
+
+TEST_F(DocumentSourceQueryStatsTest, GetNextViaKeyHashLookupWithNoKeyHashesIsEOF) {
+    auto& queryStatsStore = setUpQueryStatsStore();
+    putIndexedEntry(queryStatsStore, 0, BSON("a" << 5));
+
+    // An empty $in pushes down an empty keyHash list, which shouldn't fall back to a full scan.
+    auto stage = buildKeyHashLookupStage({});
+    ASSERT_TRUE(stage->getNext().isEOF());
 }
 
 TEST_F(DocumentSourceQueryStatsTest, GetNextForAllowPartialResultsTriState) {
