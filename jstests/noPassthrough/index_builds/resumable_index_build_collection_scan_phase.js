@@ -94,5 +94,13 @@ runTests(
     [{"$**": 1}, {h: 1}],
     "_wildcard",
 );
+runTests(
+    [
+        {a: [1, 2], b: {c: [3, 4]}, d: ""},
+        {a: [5, 6], e: "", f: [[]], g: null, h: 8},
+    ],
+    [{"$**": 1}, {h: 1}],
+    "_wildcard_shared_multikey_path",
+);
 
 rst.stopSet();
