@@ -4,6 +4,8 @@ selector:
   exclude_files:
     # TODO: SERVER-109999 Remove this line.
     - src/mongo/db/modules/enterprise/jstests/external_auth_oidc_azure/oidc_e2e_azure_machine.js
+    # Low signal and very noisy because it fails whenever Microsoft updates their login page.
+    - src/mongo/db/modules/enterprise/jstests/external_auth_oidc_azure/oidc_e2e_azure.js
   roots:
     - src/mongo/db/modules/enterprise/jstests/external_auth_oidc_azure/*.js
 
