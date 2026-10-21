@@ -8,12 +8,17 @@
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {kShardOptionsForDisabledStaleShardVersionRetries} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 const kDbName = "testDb";
 const kCollName = "testColl";
 const kNs = kDbName + "." + kCollName;
 
-const st = new ShardingTest({shards: 1, rs: {nodes: 3}});
+const st = new ShardingTest({
+    shards: 1,
+    rs: {nodes: 3},
+    other: {rsOptions: kShardOptionsForDisabledStaleShardVersionRetries},
+});
 const shard0Rst = st.rs0;
 const shard0Primary = shard0Rst.getPrimary();
 
