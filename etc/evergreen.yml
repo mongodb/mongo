@@ -4136,7 +4136,6 @@ tasks:
           --detect-odr-violations
           --separate-debug
         compiling_for_test: true
-    - func: "run diskstats"
     - func: "monitor process threads"
     - func: "collect system resource info"
     - func: "run tests"
@@ -4206,7 +4205,6 @@ tasks:
           --detect-odr-violations
           --separate-debug
         compiling_for_test: true
-    - func: "run diskstats"
     - func: "monitor process threads"
     - func: "collect system resource info"
     - func: "run tests"
