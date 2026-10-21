@@ -24,12 +24,15 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/storage_oplog_manager.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/time_support.h"
+
+#include <limits>
 
 namespace mongo::replicated_fast_count {
 namespace {
@@ -94,14 +97,6 @@ protected:
     boost::optional<Timestamp> findPersistedTimestampStoreTs() {
         Lock::GlobalLock lk(operationContext(), MODE_IS);
         return manager->findPersistedTimestampStoreTs(operationContext());
-    }
-
-    // Sets the stable timestamp. In the ephemeral unit-test storage engine
-    // getLastStableRecoveryTimestamp() returns the stable timestamp directly, so this controls the
-    // cold-start seed computed by _computeColdStartTimestamp().
-    void setStableTimestamp(Timestamp ts) {
-        operationContext()->getServiceContext()->getStorageEngine()->setStableTimestamp(
-            ts, /*force=*/true);
     }
 
     test_helpers::NsAndUUID collA = {
@@ -266,177 +261,71 @@ protected:
 
 using ReplicatedFastCountManagerStartupTest = ReplicatedFastCountManagerWithOplogTest;
 
-// TODO SERVER-130675 - Remove this test once we no longer skip the oplog scan.
-TEST_F(ReplicatedFastCountManagerStartupTest, StartupSkipsOplogScanWhenOldestEntryFarBehindLatest) {
+TEST_F(ReplicatedFastCountManagerStartupTest,
+       StartupResolvesFiniteVisibilityTimestampToOplogEntry) {
     unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
-    unittest::ServerParameterGuard maxLag("replicatedFastCountMaxOplogScanLagSecs", 600);
+    unittest::ServerParameterGuard skipScan("skipReplicatedMetadataStartupOplogScan", true);
 
     const int64_t sizeDelta = 100;
-    // No persisted valid-as-of timestamp entry, and the oldest oplog entry (the create entries at
-    // Timestamp(0,)) is more than replicatedFastCountMaxOplogScanLagSecs behind the stable
-    // recovery timestamp (Timestamp(700)), so the checkpoint coordinator is seeded from a visible
-    // oplog entry near the stable recovery timestamp instead of scanning from the beginning.
     test_helpers::writeToOplog(operationContext(),
-                               test_helpers::makeCreateOplogEntry(Timestamp(0, 1), collA));
-    test_helpers::writeToOplog(operationContext(),
-                               test_helpers::makeCreateOplogEntry(Timestamp(0, 2), collB));
-    test_helpers::writeToOplog(operationContext(),
-                               test_helpers::makeOplogEntry(
-                                   Timestamp(700, 1), collB, repl::OpTypeEnum::kInsert, sizeDelta));
-    test_helpers::writeToOplog(operationContext(),
-                               test_helpers::makeOplogEntry(
-                                   Timestamp(800, 1), collA, repl::OpTypeEnum::kInsert, sizeDelta));
+                               test_helpers::makeCreateOplogEntry(Timestamp(1, 1), collA));
+    test_helpers::writeToOplog(
+        operationContext(),
+        test_helpers::makeOplogEntry(Timestamp(3, 1), collB, repl::OpTypeEnum::kInsert, sizeDelta));
 
-    // Set the stable recovery timestamp to Timestamp(700,1). The checkpoint tailer should seek to
-    // the visible oplog entry at/after this timestamp (the entry at 700) and then start scanning
-    // from that point onwards; the first entry it should see is the entry at timestamp (800).
-    setStableTimestamp(Timestamp(700, 1));
-
+    auto* oplogManager =
+        operationContext()->getServiceContext()->getStorageEngine()->getEngine()->getOplogManager();
+    ASSERT(oplogManager);
+    oplogManager->setOplogReadTimestamp(Timestamp(3, 1));
     manager->startup(operationContext());
+    // Restore the standalone fixture's unbounded oplog visibility.
+    oplogManager->setOplogReadTimestamp(Timestamp(std::numeric_limits<int64_t>::max()));
 
-    test_helpers::writeToOplog(operationContext(),
-                               test_helpers::makeOplogEntry(
-                                   Timestamp(900, 1), collA, repl::OpTypeEnum::kInsert, sizeDelta));
+    // This entry will be seen by the next flush.
+    test_helpers::writeToOplog(
+        operationContext(),
+        test_helpers::makeOplogEntry(Timestamp(4, 1), collA, repl::OpTypeEnum::kInsert, sizeDelta));
 
     waitForFlush();
 
-    // CollA's size and count should reflect only one write from before startup and one write after
-    // startup.
     const auto persistedA = findPersisted(collA.uuid);
     ASSERT_TRUE(persistedA.has_value());
-    EXPECT_EQ(persistedA->first.sizeCount,
-              (CollectionSizeCount{.size = sizeDelta * 2, .count = 2}));
+    EXPECT_EQ(persistedA->first.sizeCount, (CollectionSizeCount{.size = sizeDelta, .count = 1}));
 
-    // All of the writes to collB are skipped.
     EXPECT_FALSE(findPersisted(collB.uuid).has_value());
 
     manager->shutdown(operationContext());
 }
 
-// TODO SERVER-130675 - Remove this test once we no longer skip the oplog scan.
-TEST_F(ReplicatedFastCountManagerStartupTest, StartupSkipScanTailerThreadFindsRealOplogEntry) {
+TEST_F(ReplicatedFastCountManagerStartupTest,
+       StartupStartsTailerFromLatestOplogTimeWhenSkipParamSet) {
     unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
-    unittest::ServerParameterGuard maxLag("replicatedFastCountMaxOplogScanLagSecs", 600);
+    unittest::ServerParameterGuard skipScan("skipReplicatedMetadataStartupOplogScan", true);
 
     const int64_t sizeDelta = 100;
-
+    // Entries that will be skipped.
     test_helpers::writeToOplog(operationContext(),
                                test_helpers::makeCreateOplogEntry(Timestamp(0, 1), collA));
     test_helpers::writeToOplog(operationContext(),
-                               test_helpers::makeOplogEntry(
-                                   Timestamp(700, 1), collA, repl::OpTypeEnum::kInsert, sizeDelta));
-    test_helpers::writeToOplog(operationContext(),
-                               test_helpers::makeOplogEntry(
-                                   Timestamp(800, 1), collA, repl::OpTypeEnum::kInsert, sizeDelta));
-
-    setStableTimestamp(Timestamp(700, 1));
-
-    // Start the tailer and flusher threads. If startup seeded the tailer thread with an oplog entry
-    // that didn't exist, the thread would tassert.
-    manager->startup(operationContext());
-    ASSERT_TRUE(manager->isRunning_ForTest());
-
-    const Timestamp validAsOf = waitForFlush();
-    ASSERT_EQ(*findPersistedTimestampStoreTs(), validAsOf);
-
-    manager->shutdown(operationContext());
-}
-
-// TODO SERVER-130675 - Remove this test once we no longer skip the oplog scan.
-TEST_F(ReplicatedFastCountManagerStartupTest, StartupSkipScanSeedWithoutExactOplogEntry) {
-    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
-    unittest::ServerParameterGuard maxLag("replicatedFastCountMaxOplogScanLagSecs", 600);
-
-    const int64_t sizeDelta = 100;
-
-    // Oplog entries exist at Timestamp(0) (the create), Timestamp(800) and Timestamp(900), but NOT
-    // at the last applied optime Timestamp(700).
-    test_helpers::writeToOplog(operationContext(),
-                               test_helpers::makeCreateOplogEntry(Timestamp(0, 1), collA));
-    test_helpers::writeToOplog(operationContext(),
-                               test_helpers::makeOplogEntry(
-                                   Timestamp(800, 1), collA, repl::OpTypeEnum::kInsert, sizeDelta));
-    test_helpers::writeToOplog(operationContext(),
-                               test_helpers::makeOplogEntry(
-                                   Timestamp(900, 1), collA, repl::OpTypeEnum::kInsert, sizeDelta));
-
-    // The stable recovery timestamp Timestamp(700,1) has no oplog entry. Seeding the tailer
-    // directly from it would trip tassert 12101812 on seekExact(); instead startup resolves the
-    // seed to the first visible entry at/after it (Timestamp(800)), which the tailer can seek to.
-    setStableTimestamp(Timestamp(700, 1));
+                               test_helpers::makeCreateOplogEntry(Timestamp(0, 2), collB));
+    test_helpers::writeToOplog(
+        operationContext(),
+        test_helpers::makeOplogEntry(Timestamp(1, 1), collA, repl::OpTypeEnum::kInsert, sizeDelta));
 
     manager->startup(operationContext());
+
+    // Entry that will be included.
+    test_helpers::writeToOplog(
+        operationContext(),
+        test_helpers::makeOplogEntry(Timestamp(2, 1), collA, repl::OpTypeEnum::kInsert, sizeDelta));
+
     waitForFlush();
 
-    // The seed resolves to the entry at (800), so only the write after it (Timestamp(900)) is
-    // counted; the entries at (0) and (800) are not.
     const auto persistedA = findPersisted(collA.uuid);
     ASSERT_TRUE(persistedA.has_value());
     EXPECT_EQ(persistedA->first.sizeCount, (CollectionSizeCount{.size = sizeDelta, .count = 1}));
 
-    manager->shutdown(operationContext());
-}
-
-TEST_F(ReplicatedFastCountManagerStartupTest, StartupScansFullOplogWhenWithinLag) {
-    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
-    unittest::ServerParameterGuard maxLag("replicatedFastCountMaxOplogScanLagSecs", 600);
-
-    const int64_t sizeDelta = 100;
-
-    // The oldest entry (the create at (0,)) is within replicatedFastCountMaxOplogScanLagSecs of
-    // the stable recovery timestamp (3), so there is no skip: the tailer scans the whole oplog
-    // from the beginning.
-    test_helpers::writeToOplog(operationContext(),
-                               test_helpers::makeCreateOplogEntry(Timestamp(0, 1), collA));
-    test_helpers::writeToOplog(
-        operationContext(),
-        test_helpers::makeOplogEntry(Timestamp(1, 1), collA, repl::OpTypeEnum::kInsert, sizeDelta));
-    test_helpers::writeToOplog(
-        operationContext(),
-        test_helpers::makeOplogEntry(Timestamp(2, 1), collA, repl::OpTypeEnum::kInsert, sizeDelta));
-    test_helpers::writeToOplog(
-        operationContext(),
-        test_helpers::makeOplogEntry(Timestamp(3, 1), collA, repl::OpTypeEnum::kInsert, sizeDelta));
-
-    setStableTimestamp(Timestamp(3, 1));
-
-    manager->startup(operationContext());
-    waitForFlush();
-
-    // All three writes are counted because the full oplog was scanned.
-    const auto persistedA = findPersisted(collA.uuid);
-    ASSERT_TRUE(persistedA.has_value());
-    EXPECT_EQ(persistedA->first.sizeCount,
-              (CollectionSizeCount{.size = sizeDelta * 3, .count = 3}));
-
-    manager->shutdown(operationContext());
-}
-
-// TODO SERVER-130675 - Remove this test once we no longer skip the oplog scan.
-TEST_F(ReplicatedFastCountManagerStartupTest, StartupWithNoStableTimestampScansFullOplog) {
-    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
-    // A tiny lag threshold would normally take the skip path, but with no applied optime we cannot
-    // compute a seekable seed and must fall back to a full scan instead.
-    unittest::ServerParameterGuard maxLag("replicatedFastCountMaxOplogScanLagSecs", 1);
-
-    const int64_t sizeDelta = 100;
-
-    test_helpers::writeToOplog(
-        operationContext(),
-        test_helpers::makeOplogEntry(Timestamp(1, 1), collA, repl::OpTypeEnum::kInsert, sizeDelta));
-    test_helpers::writeToOplog(operationContext(),
-                               test_helpers::makeOplogEntry(
-                                   Timestamp(800, 1), collA, repl::OpTypeEnum::kInsert, sizeDelta));
-
-    // Intentionally do NOT set an applied optime, so getMyLastAppliedOpTime() is null.
-    manager->startup(operationContext());
-    waitForFlush();
-
-    // Both entries are counted because we scanned from the beginning of the oplog.
-    const auto persistedA = findPersisted(collA.uuid);
-    ASSERT_TRUE(persistedA.has_value());
-    EXPECT_EQ(persistedA->first.sizeCount,
-              (CollectionSizeCount{.size = sizeDelta * 2, .count = 2}));
+    EXPECT_FALSE(findPersisted(collB.uuid).has_value());
 
     manager->shutdown(operationContext());
 }
@@ -506,14 +395,6 @@ protected:
                                    /*uuid=*/boost::none));
     }
 
-    // Sets the stable timestamp. In the ephemeral unit-test storage engine
-    // getLastStableRecoveryTimestamp() returns the stable timestamp directly, so this controls the
-    // cold-start seed computed by _computeColdStartTimestamp().
-    void setStableTimestamp(Timestamp ts) {
-        operationContext()->getServiceContext()->getStorageEngine()->setStableTimestamp(
-            ts, /*force=*/true);
-    }
-
     test_helpers::NsAndUUID collA = {
         .nss = NamespaceString::createNamespaceString_forTest("find_test", "collA"),
         .uuid = UUID::gen()};
@@ -549,78 +430,6 @@ TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, NoStoreData) {
 
     manager->initializeMetadata(operationContext());
 
-    checkCommittedSizeCount(operationContext(), collA.uuid, {.size = 10, .count = 1});
-    checkCommittedSizeCount(operationContext(), collB.uuid, {.size = 100, .count = 1});
-}
-
-// TODO SERVER-130675 - Remove this test once we no longer skip the oplog scan.
-TEST_F(ReplicatedFastCountManagerInitializeMetadataTest,
-       SkipsOplogScanWhenOldestEntryFarBehindLatest) {
-    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
-    unittest::ServerParameterGuard maxLag("replicatedFastCountMaxOplogScanLagSecs", 600);
-
-    ASSERT_OK(storageInterface()->createCollection(
-        operationContext(), collA.nss, CollectionOptions{.uuid = collA.uuid}));
-    ASSERT_OK(storageInterface()->createCollection(
-        operationContext(), collB.nss, CollectionOptions{.uuid = collB.uuid}));
-
-    // No persisted valid-as-of timestamp entry, and the oldest oplog entry (Timestamp(1,)) is more
-    // than replicatedFastCountMaxOplogScanLagSecs behind the stable recovery timestamp (Timestamp
-    // (700)), so initializeMetadata skips the oplog scan entirely.
-    //
-    // Any persisted fast count values should be preserved.
-    test_helpers::insertSizeCountEntry(
-        operationContext(),
-        *sizeCountStore(),
-        collA.uuid,
-        SizeCountStore::Entry{.timestamp = Timestamp::min(), .size = 5, .count = 1});
-
-    test_helpers::writeToOplog(
-        operationContext(),
-        test_helpers::makeOplogEntry(
-            Timestamp(1, 1), collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/10));
-    test_helpers::writeToOplog(
-        operationContext(),
-        test_helpers::makeOplogEntry(
-            Timestamp(700, 1), collB, repl::OpTypeEnum::kInsert, /*sizeDelta=*/100));
-
-    setStableTimestamp(Timestamp(700, 1));
-    manager->initializeMetadata(operationContext());
-
-    // CollA's size and count reflect only the value that was already persisted; since we skipped
-    // the oplog scan, none of the writes in the oplog should be reflected here.
-    checkCommittedSizeCount(operationContext(), collA.uuid, {.size = 5, .count = 1});
-    checkCommittedSizeCount(operationContext(), collB.uuid, {.size = 0, .count = 0});
-}
-
-// TODO SERVER-130675 - Remove this test once we no longer skip the oplog scan.
-TEST_F(ReplicatedFastCountManagerInitializeMetadataTest,
-       RaisingMaxOplogScanLagPerformsScanForOtherwiseSkippedOplog) {
-    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
-    // Set the maximum allowed oplog scan to a threshold that isn't tripped by this set up - no
-    // entries should be skipped.
-    unittest::ServerParameterGuard maxLagGuard("replicatedFastCountMaxOplogScanLagSecs", 1000);
-
-    ASSERT_OK(storageInterface()->createCollection(
-        operationContext(), collA.nss, CollectionOptions{.uuid = collA.uuid}));
-    ASSERT_OK(storageInterface()->createCollection(
-        operationContext(), collB.nss, CollectionOptions{.uuid = collB.uuid}));
-
-    test_helpers::writeToOplog(
-        operationContext(),
-        test_helpers::makeOplogEntry(
-            Timestamp(1, 1), collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/10));
-    test_helpers::writeToOplog(
-        operationContext(),
-        test_helpers::makeOplogEntry(
-            Timestamp(700, 1), collB, repl::OpTypeEnum::kInsert, /*sizeDelta=*/100));
-
-    // Oldest entry (1) is within the raised replicatedFastCountMaxOplogScanLagSecs of the stable
-    // recovery timestamp (700), so there is no skip and the full oplog is scanned.
-    setStableTimestamp(Timestamp(700, 1));
-    manager->initializeMetadata(operationContext());
-
-    // Because the scan was performed, both collections' writes are reflected.
     checkCommittedSizeCount(operationContext(), collA.uuid, {.size = 10, .count = 1});
     checkCommittedSizeCount(operationContext(), collB.uuid, {.size = 100, .count = 1});
 }
@@ -719,6 +528,43 @@ TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, StoreAndOplogData) {
 
     checkCommittedSizeCount(operationContext(), collA.uuid, {.size = 5 + 10, .count = 1 + 1});
     checkCommittedSizeCount(operationContext(), collB.uuid, {.size = 6 + 100, .count = 2 + 1});
+}
+
+TEST_F(ReplicatedFastCountManagerInitializeMetadataTest,
+       InitializeMetadataSkipsOplogScanWhenSkipParamSet) {
+    unittest::ServerParameterGuard featureFlag("featureFlagReplicatedFastCount", true);
+    unittest::ServerParameterGuard skipScan("skipReplicatedMetadataStartupOplogScan", true);
+
+    ASSERT_OK(storageInterface()->createCollection(
+        operationContext(), collA.nss, CollectionOptions{.uuid = collA.uuid}));
+    ASSERT_OK(storageInterface()->createCollection(
+        operationContext(), collB.nss, CollectionOptions{.uuid = collB.uuid}));
+
+    test_helpers::insertSizeCountEntry(
+        operationContext(),
+        *sizeCountStore(),
+        collA.uuid,
+        SizeCountStore::Entry{.timestamp = Timestamp::min(), .size = 5, .count = 1});
+    test_helpers::insertSizeCountEntry(
+        operationContext(),
+        *sizeCountStore(),
+        collB.uuid,
+        SizeCountStore::Entry{.timestamp = Timestamp::min(), .size = 6, .count = 2});
+
+    // Entries that are skipped.
+    test_helpers::writeToOplog(
+        operationContext(),
+        test_helpers::makeOplogEntry(
+            Timestamp(2, 2), collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/10));
+    test_helpers::writeToOplog(
+        operationContext(),
+        test_helpers::makeOplogEntry(
+            Timestamp(3, 3), collB, repl::OpTypeEnum::kInsert, /*sizeDelta=*/100));
+
+    manager->initializeMetadata(operationContext());
+
+    checkCommittedSizeCount(operationContext(), collA.uuid, {.size = 5, .count = 1});
+    checkCommittedSizeCount(operationContext(), collB.uuid, {.size = 6, .count = 2});
 }
 
 TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, SkipsDroppedCollections) {

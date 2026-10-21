@@ -6,13 +6,12 @@
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_advance_checkpoint.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_delta_utils.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
-#include "mongo/db/replicated_fast_count/replicated_fast_count_max_oplog_scan_lag_secs_gen.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_streaming_oplog_delta_accumulator.h"
 #include "mongo/db/replicated_fast_count/size_count_checkpoint_coordinator.h"
+#include "mongo/db/replicated_fast_count/skip_replicated_metadata_startup_oplog_scan_gen.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
@@ -21,7 +20,11 @@
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/storage_oplog_manager.h"
 #include "mongo/logv2/log.h"
+#include "mongo/platform/compiler.h"
+
+#include <limits>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -35,53 +38,46 @@ ReplicatedFastCountManager& ReplicatedFastCountManager::get(ServiceContext* svcC
     return getReplicatedFastCountManager(svcCtx);
 }
 
-std::pair<bool, boost::optional<Timestamp>> ReplicatedFastCountManager::_computeColdStartTimestamp(
-    OperationContext* opCtx, bool returnTimestampToSeekFromIfSkippingScan) {
-    auto* storageInterface = repl::StorageInterface::get(opCtx);
-    const Timestamp oldestTs = storageInterface->getEarliestOplogTimestamp(opCtx);
-    // An empty oplog reports Timestamp::min() as its earliest entry, we should be able to catch up
-    // trivially by scanning from the beginning.
-    if (oldestTs == Timestamp::min()) {
-        return {false, Timestamp::min()};
+boost::optional<Timestamp> ReplicatedFastCountManager::_computeSkipTimestamp(
+    OperationContext* opCtx) {
+    if (!gSkipReplicatedMetadataStartupOplogScan.load()) {
+        return boost::none;
     }
 
-    // Seed from the last stable recovery timestamp.
-    const auto lastStableRecovery =
-        opCtx->getServiceContext()->getStorageEngine()->getLastStableRecoveryTimestamp();
-    if (!lastStableRecovery || *lastStableRecovery <= oldestTs) {
-        // Scan from the beginning.
-        return {false, Timestamp::min()};
-    }
-    const Timestamp seed = *lastStableRecovery;
-
-    const Seconds maxLag{gReplicatedFastCountMaxOplogScanLagSecs.load()};
-    const Seconds lag{static_cast<int64_t>(seed.getSecs()) -
-                      static_cast<int64_t>(oldestTs.getSecs())};
-    if (lag <= maxLag) {
-        // We should be able to catch up from the oldest entry, go ahead and perform the scan.
-        return {false, Timestamp::min()};
+    // Start from the last visible oplog entry.
+    auto* oplogManager =
+        opCtx->getServiceContext()->getStorageEngine()->getEngine()->getOplogManager();
+    if (!oplogManager) {
+        return boost::none;
     }
 
-    LOGV2_WARNING(13060000,
-                  "No persisted valid-as-of timestamp found and the oldest oplog entry is too far "
-                  "behind the last stable recovery timestamp to catch up from.",
-                  "oldestOplogTs"_attr = oldestTs,
-                  "lastStableRecoveryTs"_attr = seed,
-                  "maxOplogScanLagSecs"_attr = maxLag.count());
-
-    if (!returnTimestampToSeekFromIfSkippingScan) {
-        return {true, boost::none};
+    const Timestamp visibilityTs{oplogManager->getOplogReadTimestamp()};
+    if (visibilityTs == Timestamp::min()) {
+        return boost::none;
     }
 
+    // The visibility boundary may not identify an actual oplog entry. Use it to find the last oplog
+    // entry's timestamp.
     AutoGetOplogFastPath oplogRead(opCtx, OplogAccessMode::kRead);
     const auto& oplogColl = oplogRead.getCollection();
-    massert(13060001, "oplog collection not found", oplogColl);
-    auto cursor =
-        oplogColl->getRecordStore()->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
-    auto rec = cursor->seek(uassertStatusOK(record_id_helpers::keyForOptime(seed, KeyFormat::Long)),
-                            SeekableRecordCursor::BoundInclusion::kInclude);
-    invariant(rec);
-    return {true, Timestamp(static_cast<unsigned long long>(rec->id.getLong()))};
+    if (!oplogColl) {
+        return boost::none;
+    }
+
+    auto cursor = oplogColl->getRecordStore()->getCursor(
+        opCtx, *shard_role_details::getRecoveryUnit(opCtx), false);
+    const bool visibilityIsUnbounded = visibilityTs.asULL() ==
+        static_cast<unsigned long long>(std::numeric_limits<int64_t>::max());
+    const boost::optional<Record> record = visibilityIsUnbounded
+        ? cursor->next()
+        : cursor->seek(
+              uassertStatusOK(record_id_helpers::keyForOptime(visibilityTs, KeyFormat::Long)),
+              SeekableRecordCursor::BoundInclusion::kInclude);
+    if (!record) {
+        return boost::none;
+    }
+
+    return Timestamp(static_cast<unsigned long long>(record->id.getLong()));
 }
 
 void ReplicatedFastCountManager::initializeFastCountCommitFn() {
@@ -122,25 +118,17 @@ void ReplicatedFastCountManager::startup(OperationContext* opCtx) {
         return _timestampStore->read(opCtx).value_or(Timestamp{});
     }();
 
-    // If we do not have a persisted valid-as-of timestamp, and if we have to scan a significant
-    // amount of oplog to catch up, we skip the scan and instead start scanning from the last
-    // applied oplog timestamp. Otherwise, scan from the persisted valid-as-of timestamp. This keeps
-    // checkpoints advancing at the cost of potentially incorrect size and count.
-    //
-    // TODO SERVER-130675: Stop skipping the oplog scan once the fast count system can always catch
-    // up in time.
+    // Scan from the persisted valid-as-of timestamp. If 'skipReplicatedMetadataStartupOplogScan' is
+    // set, scan from latest oplog entry's timestamp.
     const Timestamp startCheckpointingAfterTS = [&] {
-        if (lastPersistedCheckpointTS != Timestamp{}) {
-            return lastPersistedCheckpointTS;
+        if (const auto skipTimestamp = _computeSkipTimestamp(opCtx); skipTimestamp) {
+            LOGV2(13060000,
+                  "Skipping replicated metadata startup oplog scan and starting the checkpoint "
+                  "tailer from the latest visible oplog entry",
+                  "startCheckpointingAfterTs"_attr = *skipTimestamp);
+            return *skipTimestamp;
         }
-        const auto [shouldSkip, timestamp] =
-            _computeColdStartTimestamp(opCtx, /*returnTimestampToSeekFromIfSkippingScan=*/true);
-        if (shouldSkip) {
-            LOGV2_WARNING(13060002,
-                          "Skipping the catch-up scan while starting up the fast count manager. "
-                          "Fast size and count may be inaccurate.");
-        }
-        return *timestamp;
+        return lastPersistedCheckpointTS;
     }();
 
     std::lock_guard lock(_checkpointerMutex);
@@ -156,6 +144,7 @@ void ReplicatedFastCountManager::startup(OperationContext* opCtx) {
     if (!_isUnderTest) {
         _checkpointer->startup(opCtx->getServiceContext());
     }
+    gSkipReplicatedMetadataStartupOplogScan.store(false);
 }
 
 void ReplicatedFastCountManager::shutdown(OperationContext* opCtx) {
@@ -293,36 +282,27 @@ void ReplicatedFastCountManager::initializeMetadata(OperationContext* opCtx) {
         return static_cast<bool>(oplogRead.getCollection());
     }();
 
-    // If we do not have a persisted valid-as-of timestamp, and if we have to scan a significant
-    // amount of oplog to catch up, we skip the scan entirely and accept a potentially incorrect
-    // size and count. Otherwise, scan from the persisted valid-as-of timestamp (or from the
-    // beginning of the oplog if we do not need to scan too much oplog). This prevents blocking
-    // startup at the cost of potentialy having inaccurate fast count.
-    //
-    // TODO SERVER-130675: Stop skipping the oplog scan once the fast count system can always catch
-    // up in time.
+    // Ignore the persisted valid-as-of timestamp if 'skipReplicatedMetadataStartupOplogScan' is
+    // set.
     const boost::optional<Timestamp> seekAfterTimestamp = [&]() -> boost::optional<Timestamp> {
         if (!oplogExists) {
+            return boost::none;
+        }
+        if (MONGO_unlikely(gSkipReplicatedMetadataStartupOplogScan.load())) {
+            LOGV2(13060001,
+                  "Skipping replicated metadata startup oplog scan while initializing in-memory "
+                  "metadata; fast size and count may be inaccurate");
             return boost::none;
         }
         if (persistedTimestamp) {
             return *persistedTimestamp;
         }
-        const auto [skipScan, startFrom] =
-            _computeColdStartTimestamp(opCtx, /*returnTimestampToSeekFromIfSkippingScan=*/false);
-        if (skipScan) {
-            LOGV2(
-                13060003,
-                "Skipping fast count oplog scan during initialization; fast size and count may be "
-                "inaccurate");
-            return boost::none;
-        }
-        return *startFrom;
+        return Timestamp::min();
     }();
 
     // Scan the oplog from seekAfterTimestamp and accumulate size and count deltas for every UUID
     // that has been updated since the last checkpoint. If we do not have a timestamp to seek from,
-    // skip this phase entirely
+    // skip this phase entirely.
     if (seekAfterTimestamp) {
         const auto scanResult = [&]() -> OplogScanResult {
             AutoGetOplogFastPath oplogRead(opCtx, OplogAccessMode::kRead);

@@ -1,0 +1,14 @@
+# Copyright (c) MongoDB, Inc.
+# SPDX-License-Identifier: SSPL-1.0
+global:
+    cpp_namespace: "mongo::replicated_fast_count"
+
+server_parameters:
+    skipReplicatedMetadataStartupOplogScan:
+        description: >-
+            When set, skip scanning the oplog entries since the persisted valid-as-of timestamp at startup. This will lead to incorrect replicated metadata, and require a follow-up repair procedure.
+        set_at: [startup]
+        cpp_vartype: "AtomicWord<bool>"
+        cpp_varname: gSkipReplicatedMetadataStartupOplogScan
+        default: false
+        redact: false
