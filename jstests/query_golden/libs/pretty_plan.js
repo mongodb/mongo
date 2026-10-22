@@ -23,7 +23,7 @@ function formatEmbeddingField(field) {
 }
 
 function abbreviate(node) {
-    const abbrev = joinStageAbbreviation(node.stage);
+    const abbrev = joinStageAbbreviation(node);
     if (abbrev == node.stage) {
         if (node.nss) {
             return `${node.stage} [${node.nss}]`;

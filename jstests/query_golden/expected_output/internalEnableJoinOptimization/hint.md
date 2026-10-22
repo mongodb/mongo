@@ -47,7 +47,7 @@ Expected (46):
 { "_id" : 3, "bar" : { "_id" : 7, "idA" : 7, "idB" : 7, "idC" : 3 }, "foo" : { "_id" : 15, "idA" : 15, "idB" : 3, "idC" : 3 }, "idA" : 3, "idB" : 3, "idC" : 3 }
 { "_id" : 3, "bar" : { "_id" : 7, "idA" : 7, "idB" : 7, "idC" : 3 }, "foo" : { "_id" : 3, "idA" : 3, "idB" : 3, "idC" : 3 }, "idA" : 3, "idB" : 3, "idC" : 3 }
 ```
-### Total number of join orders: 72
+### Total number of join orders: 90
 INLJ only, all plans
 ```json
 {
@@ -62,14 +62,20 @@ INLJ only, all plans
 	]
 }
 ```
-Num orders: 6
+Num orders: 12
 ```json
-(INLJ _ = (INLJ _ = COLLSCAN [test.hint_md_c], bar = FETCH [test.hint_md_b]), foo = FETCH [test.hint_md_a])
-(INLJ _ = (INLJ _ = COLLSCAN [test.hint_md_c], foo = FETCH [test.hint_md_a]), bar = FETCH [test.hint_md_b])
-(INLJ _ = (INLJ bar = COLLSCAN [test.hint_md_b], _ = FETCH [test.hint_md_c]), foo = FETCH [test.hint_md_a])
-(INLJ _ = (INLJ bar = COLLSCAN [test.hint_md_b], foo = FETCH [test.hint_md_a]), _ = FETCH [test.hint_md_c])
-(INLJ _ = (INLJ foo = COLLSCAN [test.hint_md_a], _ = FETCH [test.hint_md_c]), bar = FETCH [test.hint_md_b])
-(INLJ _ = (INLJ foo = COLLSCAN [test.hint_md_a], bar = FETCH [test.hint_md_b]), _ = FETCH [test.hint_md_c])
+(INLJ {bar.idC = idA} _ = (INLJ {idB = idC} foo = COLLSCAN [test.hint_md_a], bar = FETCH [test.hint_md_b]), _ = FETCH [test.hint_md_c])
+(INLJ {bar.idC = idA} _ = (INLJ {idC = idB} bar = COLLSCAN [test.hint_md_b], foo = FETCH [test.hint_md_a]), _ = FETCH [test.hint_md_c])
+(INLJ {bar.idC = idB} _ = (INLJ {idA = idC} _ = COLLSCAN [test.hint_md_c], bar = FETCH [test.hint_md_b]), foo = FETCH [test.hint_md_a])
+(INLJ {bar.idC = idB} _ = (INLJ {idC = idA} bar = COLLSCAN [test.hint_md_b], _ = FETCH [test.hint_md_c]), foo = FETCH [test.hint_md_a])
+(INLJ {foo.idB = idA} _ = (INLJ {idB = idC} foo = COLLSCAN [test.hint_md_a], bar = FETCH [test.hint_md_b]), _ = FETCH [test.hint_md_c])
+(INLJ {foo.idB = idA} _ = (INLJ {idC = idB} bar = COLLSCAN [test.hint_md_b], foo = FETCH [test.hint_md_a]), _ = FETCH [test.hint_md_c])
+(INLJ {foo.idB = idC} _ = (INLJ {idA = idB} _ = COLLSCAN [test.hint_md_c], foo = FETCH [test.hint_md_a]), bar = FETCH [test.hint_md_b])
+(INLJ {foo.idB = idC} _ = (INLJ {idB = idA} foo = COLLSCAN [test.hint_md_a], _ = FETCH [test.hint_md_c]), bar = FETCH [test.hint_md_b])
+(INLJ {idA = idB} _ = (INLJ {idA = idC} _ = COLLSCAN [test.hint_md_c], bar = FETCH [test.hint_md_b]), foo = FETCH [test.hint_md_a])
+(INLJ {idA = idB} _ = (INLJ {idC = idA} bar = COLLSCAN [test.hint_md_b], _ = FETCH [test.hint_md_c]), foo = FETCH [test.hint_md_a])
+(INLJ {idA = idC} _ = (INLJ {idA = idB} _ = COLLSCAN [test.hint_md_c], foo = FETCH [test.hint_md_a]), bar = FETCH [test.hint_md_b])
+(INLJ {idA = idC} _ = (INLJ {idB = idA} foo = COLLSCAN [test.hint_md_a], _ = FETCH [test.hint_md_c]), bar = FETCH [test.hint_md_b])
 ```
 
 HJ only, all plans
@@ -166,24 +172,30 @@ Syntactic join order, left-deep, all plans
 	]
 }
 ```
-Num orders: 18
+Num orders: 24
 ```json
 (HJ _ = (HJ _ = COLLSCAN [test.hint_md_c], foo = COLLSCAN [test.hint_md_a]), bar = COLLSCAN [test.hint_md_b])
 (HJ _ = (HJ foo = COLLSCAN [test.hint_md_a], _ = COLLSCAN [test.hint_md_c]), bar = COLLSCAN [test.hint_md_b])
-(HJ _ = (INLJ _ = COLLSCAN [test.hint_md_c], foo = FETCH [test.hint_md_a]), bar = COLLSCAN [test.hint_md_b])
-(HJ _ = (INLJ foo = COLLSCAN [test.hint_md_a], _ = FETCH [test.hint_md_c]), bar = COLLSCAN [test.hint_md_b])
+(HJ _ = (INLJ {idA = idB} _ = COLLSCAN [test.hint_md_c], foo = FETCH [test.hint_md_a]), bar = COLLSCAN [test.hint_md_b])
+(HJ _ = (INLJ {idB = idA} foo = COLLSCAN [test.hint_md_a], _ = FETCH [test.hint_md_c]), bar = COLLSCAN [test.hint_md_b])
 (HJ _ = (NLJ _ = COLLSCAN [test.hint_md_c], foo = COLLSCAN [test.hint_md_a]), bar = COLLSCAN [test.hint_md_b])
 (HJ _ = (NLJ foo = COLLSCAN [test.hint_md_a], _ = COLLSCAN [test.hint_md_c]), bar = COLLSCAN [test.hint_md_b])
-(INLJ _ = (HJ _ = COLLSCAN [test.hint_md_c], foo = COLLSCAN [test.hint_md_a]), bar = FETCH [test.hint_md_b])
-(INLJ _ = (HJ foo = COLLSCAN [test.hint_md_a], _ = COLLSCAN [test.hint_md_c]), bar = FETCH [test.hint_md_b])
-(INLJ _ = (INLJ _ = COLLSCAN [test.hint_md_c], foo = FETCH [test.hint_md_a]), bar = FETCH [test.hint_md_b])
-(INLJ _ = (INLJ foo = COLLSCAN [test.hint_md_a], _ = FETCH [test.hint_md_c]), bar = FETCH [test.hint_md_b])
-(INLJ _ = (NLJ _ = COLLSCAN [test.hint_md_c], foo = COLLSCAN [test.hint_md_a]), bar = FETCH [test.hint_md_b])
-(INLJ _ = (NLJ foo = COLLSCAN [test.hint_md_a], _ = COLLSCAN [test.hint_md_c]), bar = FETCH [test.hint_md_b])
+(INLJ {foo.idB = idC} _ = (HJ _ = COLLSCAN [test.hint_md_c], foo = COLLSCAN [test.hint_md_a]), bar = FETCH [test.hint_md_b])
+(INLJ {foo.idB = idC} _ = (HJ foo = COLLSCAN [test.hint_md_a], _ = COLLSCAN [test.hint_md_c]), bar = FETCH [test.hint_md_b])
+(INLJ {foo.idB = idC} _ = (INLJ {idA = idB} _ = COLLSCAN [test.hint_md_c], foo = FETCH [test.hint_md_a]), bar = FETCH [test.hint_md_b])
+(INLJ {foo.idB = idC} _ = (INLJ {idB = idA} foo = COLLSCAN [test.hint_md_a], _ = FETCH [test.hint_md_c]), bar = FETCH [test.hint_md_b])
+(INLJ {foo.idB = idC} _ = (NLJ _ = COLLSCAN [test.hint_md_c], foo = COLLSCAN [test.hint_md_a]), bar = FETCH [test.hint_md_b])
+(INLJ {foo.idB = idC} _ = (NLJ foo = COLLSCAN [test.hint_md_a], _ = COLLSCAN [test.hint_md_c]), bar = FETCH [test.hint_md_b])
+(INLJ {idA = idC} _ = (HJ _ = COLLSCAN [test.hint_md_c], foo = COLLSCAN [test.hint_md_a]), bar = FETCH [test.hint_md_b])
+(INLJ {idA = idC} _ = (HJ foo = COLLSCAN [test.hint_md_a], _ = COLLSCAN [test.hint_md_c]), bar = FETCH [test.hint_md_b])
+(INLJ {idA = idC} _ = (INLJ {idA = idB} _ = COLLSCAN [test.hint_md_c], foo = FETCH [test.hint_md_a]), bar = FETCH [test.hint_md_b])
+(INLJ {idA = idC} _ = (INLJ {idB = idA} foo = COLLSCAN [test.hint_md_a], _ = FETCH [test.hint_md_c]), bar = FETCH [test.hint_md_b])
+(INLJ {idA = idC} _ = (NLJ _ = COLLSCAN [test.hint_md_c], foo = COLLSCAN [test.hint_md_a]), bar = FETCH [test.hint_md_b])
+(INLJ {idA = idC} _ = (NLJ foo = COLLSCAN [test.hint_md_a], _ = COLLSCAN [test.hint_md_c]), bar = FETCH [test.hint_md_b])
 (NLJ _ = (HJ _ = COLLSCAN [test.hint_md_c], foo = COLLSCAN [test.hint_md_a]), bar = COLLSCAN [test.hint_md_b])
 (NLJ _ = (HJ foo = COLLSCAN [test.hint_md_a], _ = COLLSCAN [test.hint_md_c]), bar = COLLSCAN [test.hint_md_b])
-(NLJ _ = (INLJ _ = COLLSCAN [test.hint_md_c], foo = FETCH [test.hint_md_a]), bar = COLLSCAN [test.hint_md_b])
-(NLJ _ = (INLJ foo = COLLSCAN [test.hint_md_a], _ = FETCH [test.hint_md_c]), bar = COLLSCAN [test.hint_md_b])
+(NLJ _ = (INLJ {idA = idB} _ = COLLSCAN [test.hint_md_c], foo = FETCH [test.hint_md_a]), bar = COLLSCAN [test.hint_md_b])
+(NLJ _ = (INLJ {idB = idA} foo = COLLSCAN [test.hint_md_a], _ = FETCH [test.hint_md_c]), bar = COLLSCAN [test.hint_md_b])
 (NLJ _ = (NLJ _ = COLLSCAN [test.hint_md_c], foo = COLLSCAN [test.hint_md_a]), bar = COLLSCAN [test.hint_md_b])
 (NLJ _ = (NLJ foo = COLLSCAN [test.hint_md_a], _ = COLLSCAN [test.hint_md_c]), bar = COLLSCAN [test.hint_md_b])
 ```
@@ -221,8 +233,8 @@ Num orders: 6
 ```json
 (HJ bar = COLLSCAN [test.hint_md_b], _ = (HJ _ = COLLSCAN [test.hint_md_c], foo = COLLSCAN [test.hint_md_a]))
 (HJ bar = COLLSCAN [test.hint_md_b], _ = (HJ foo = COLLSCAN [test.hint_md_a], _ = COLLSCAN [test.hint_md_c]))
-(HJ bar = COLLSCAN [test.hint_md_b], _ = (INLJ _ = COLLSCAN [test.hint_md_c], foo = FETCH [test.hint_md_a]))
-(HJ bar = COLLSCAN [test.hint_md_b], _ = (INLJ foo = COLLSCAN [test.hint_md_a], _ = FETCH [test.hint_md_c]))
+(HJ bar = COLLSCAN [test.hint_md_b], _ = (INLJ {idA = idB} _ = COLLSCAN [test.hint_md_c], foo = FETCH [test.hint_md_a]))
+(HJ bar = COLLSCAN [test.hint_md_b], _ = (INLJ {idB = idA} foo = COLLSCAN [test.hint_md_a], _ = FETCH [test.hint_md_c]))
 (HJ bar = COLLSCAN [test.hint_md_b], _ = (NLJ _ = COLLSCAN [test.hint_md_c], foo = COLLSCAN [test.hint_md_a]))
 (HJ bar = COLLSCAN [test.hint_md_b], _ = (NLJ foo = COLLSCAN [test.hint_md_a], _ = COLLSCAN [test.hint_md_c]))
 ```
@@ -260,7 +272,7 @@ Reverse-syntactic order, right-deep using 'isLeftChild', all plans
 Num orders: 3
 ```json
 (HJ _ = COLLSCAN [test.hint_md_c], _ = (HJ foo = COLLSCAN [test.hint_md_a], bar = COLLSCAN [test.hint_md_b]))
-(HJ _ = COLLSCAN [test.hint_md_c], _ = (INLJ foo = COLLSCAN [test.hint_md_a], bar = FETCH [test.hint_md_b]))
+(HJ _ = COLLSCAN [test.hint_md_c], _ = (INLJ {idB = idC} foo = COLLSCAN [test.hint_md_a], bar = FETCH [test.hint_md_b]))
 (HJ _ = COLLSCAN [test.hint_md_c], _ = (NLJ foo = COLLSCAN [test.hint_md_a], bar = COLLSCAN [test.hint_md_b]))
 ```
 

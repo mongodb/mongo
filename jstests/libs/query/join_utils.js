@@ -5,6 +5,7 @@ import {
     getQueryPlanner,
     getAllPlanStages,
     getWinningPlanFromExplain,
+    getPlanStage,
 } from "jstests/libs/query/analyze_plan.js";
 import {runWithParamsAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
@@ -163,16 +164,17 @@ export function usedNestedLoopJoinEmbedding(explain) {
  * Returns an abbreviation for a join embedding stage name, or the original name
  * if it is not a join stage.
  */
-export function joinStageAbbreviation(stageName) {
-    switch (stageName) {
+export function joinStageAbbreviation(stage) {
+    switch (stage.stage) {
         case "HASH_JOIN_EMBEDDING":
             return "HJ";
         case "NESTED_LOOP_JOIN_EMBEDDING":
             return "NLJ";
         case "INDEXED_NESTED_LOOP_JOIN_EMBEDDING":
-            return "INLJ";
+            // Note: right child MUST include index probe.
+            return `INLJ {${[...stage.probePredicates].join(", ")}}`;
         default:
-            return stageName;
+            return stage.stage;
     }
 }
 
@@ -214,9 +216,8 @@ export function assertAllJoinsUseMethod(explain, expectedMethod) {
     assert.gt(joinStages.length, 0, "Expected at least one join stage: " + tojson(explain));
 
     for (const stage of joinStages) {
-        assert.eq(
-            joinStageAbbreviation(stage.stage),
-            expectedMethod,
+        assert(
+            joinStageAbbreviation(stage).startsWith(expectedMethod),
             `Expected all joins to be ${expectedMethod}, but found ${stage.stage}`,
         );
     }

@@ -146,13 +146,13 @@ private:
                              JoinSubset& subset);
 
     /**
-     * Helper for enumerating an INLJ plan with the specified left subtree & generating an index
-     * probe on the RHS for the subset 'right'.
+     * Helper for enumerating INLJ plans with the specified left subtree & generating an index
+     * probe on the RHS for the subset 'right', considering all edges between them.
      */
-    void enumerateINLJPlan(EdgeId edge,
-                           JoinPlanNodeId leftPlan,
-                           const JoinSubset& right,
-                           JoinSubset& subset);
+    void enumerateINLJPlans(const std::vector<EdgeId>& edges,
+                            JoinPlanNodeId leftPlan,
+                            const JoinSubset& right,
+                            JoinSubset& subset);
 
     /**
      * Helper to enumerate an NLJ/HJ join plan combining the subtrees identified by 'leftPlan' &
