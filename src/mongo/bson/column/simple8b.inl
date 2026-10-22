@@ -363,7 +363,7 @@ struct ParallelTableDecoder {
             auto index = encoded % entries;
             const auto& entry = table[index];
 
-            decoded = add(decoded, prefix * entry.num + entry.prefixSum);
+            decoded = add(decoded, add(mul(prefix, entry.num), entry.prefixSum));
             prefix = add(prefix, entry.sum);
 
             encoded >>= shift;
@@ -432,7 +432,7 @@ struct OneDecoder {
         for (int i = iters; i; --i) {
             auto num = table[encoded % entries];
 
-            decoded = add(decoded, prefix * num);
+            decoded = add(decoded, mul(prefix, num));
 
             encoded >>= shift;
         };

@@ -403,6 +403,17 @@ inline constexpr int128_t add(int128_t lhs, int128_t rhs) {
     return static_cast<int128_t>(static_cast<uint128_t>(lhs) + static_cast<uint128_t>(rhs));
 }
 
+/**
+ * Helper that performs signed multiplication as unsigned to get the defined wrap-around overflow
+ * behavior rather than overflow, which is undefined behavior.
+ */
+inline constexpr int64_t mul(int64_t lhs, int64_t rhs) {
+    return static_cast<int64_t>(static_cast<uint64_t>(lhs) * static_cast<uint64_t>(rhs));
+}
+inline int128_t mul(int128_t lhs, int128_t rhs) {
+    return static_cast<int128_t>(static_cast<uint128_t>(lhs) * static_cast<uint128_t>(rhs));
+}
+
 }  // namespace simple8b
 
 }  // namespace mongo

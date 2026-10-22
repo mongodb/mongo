@@ -10,6 +10,7 @@
 #include "mongo/bson/bsontypes_util.h"
 #include "mongo/bson/column/bson_element_storage.h"
 #include "mongo/bson/column/bsoncolumn_expressions.h"
+#include "mongo/bson/column/bsoncolumn_fuzzer_impl.h"
 #include "mongo/bson/column/bsoncolumn_fuzzer_util.h"
 #include "mongo/bson/column/bsoncolumn_test_util.h"
 #include "mongo/bson/column/bsoncolumnbuilder.h"
@@ -1612,6 +1613,24 @@ TEST_F(BSONColumnTest, BuilderFuzzerReopenDiscoveredEdgeCases) {
         // Verify binary reopen gives identical state as intermediate
         BSONColumnBuilder reopen(binary.data(), binary.size());
         EXPECT_TRUE(builder.isInternalStateIdentical(reopen));
+    }
+}
+
+TEST_F(BSONColumnTest, ReopenFuzzerDiscoveredEdgeCases) {
+    // This test is a collection of binaries produced by the decompress and reopen fuzzers that
+    // exposed bugs in BSONColumnBuilder reopen. Each is replayed through the reopen fuzzer
+    // implementation, which invariants on any inconsistency.
+    std::vector<std::string_view> binariesBase64 = {
+        // Delta-of-delta prefix sum overflowed a signed multiply in the parallel table decoder.
+        "EQBcCveU+joAUoFYcAD0ntT/ARP6AGLra/8AAA=="sv,
+        // Delta-of-delta prefix sum overflowed a signed multiply in the one-bit decoder.
+        "EQACFQNAyXYAHIILAJQwyk8AYnh4YaysrKutUaisYmknJ3YA"sv,
+    };
+
+    for (auto&& binaryBase64 : binariesBase64) {
+        auto binary = base64::decode(binaryBase64);
+        ASSERT_OK(validateBSONColumn(binary.data(), binary.size()));
+        bsoncolumn::fuzzer(binary.data(), binary.size());
     }
 }
 

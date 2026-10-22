@@ -3,6 +3,8 @@
 
 #include "mongo/bson/column/simple8b.h"
 
+#include "mongo/base/data_type_endian.h"
+#include "mongo/base/data_view.h"
 #include "mongo/bson/column/simple8b_builder.h"
 #include "mongo/bson/column/simple8b_type_util.h"
 #include "mongo/bson/util/builder.h"
@@ -1697,4 +1699,32 @@ TEST(Simple8b, IsDenseMultipleBlocksMissingInMiddle) {
     for (int i = 0; i < 100; ++i)
         vals.push_back(static_cast<uint64_t>(i % 50 + 1));
     EXPECT_FALSE(denseForValues(vals));
+}
+
+template <typename T>
+void testPrefixSumWrapsForSelector(uint64_t selector, int numSlots, T prefix) {
+    std::vector<uint8_t> buffer(sizeof(uint64_t));
+    DataView(reinterpret_cast<char*>(buffer.data())).write<LittleEndian<uint64_t>>(selector);
+
+    T expected = 0;
+    for (int i = 0; i < numSlots; ++i) {
+        expected = add(expected, prefix);
+    }
+
+    T actualPrefix = prefix;
+    uint64_t prev = simple8b::kSingleZero;
+    auto actual = simple8b::prefixSum<T>(
+        reinterpret_cast<const char*>(buffer.data()), buffer.size(), actualPrefix, prev);
+    EXPECT_EQ(actual, expected);
+    EXPECT_EQ(actualPrefix, prefix);
+}
+
+TEST(Simple8b, PrefixSumWrapsOneDecoder) {
+    testPrefixSumWrapsForSelector<int64_t>(1, 60, std::numeric_limits<int64_t>::max() / 2);
+    testPrefixSumWrapsForSelector<int128_t>(1, 60, std::numeric_limits<int128_t>::max() / 2);
+}
+
+TEST(Simple8b, PrefixSumWrapsParallelTableDecoder) {
+    testPrefixSumWrapsForSelector<int64_t>(2, 30, std::numeric_limits<int64_t>::max() / 2);
+    testPrefixSumWrapsForSelector<int128_t>(2, 30, std::numeric_limits<int128_t>::max() / 2);
 }
