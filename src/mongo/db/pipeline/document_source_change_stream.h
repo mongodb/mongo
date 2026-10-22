@@ -109,32 +109,7 @@ public:
             transactionNotSupported(kStageName);
         }
 
-        void assertPermittedInAPIVersion(const APIParameters& apiParameters) const final {
-            if (apiParameters.getAPIVersion() && *apiParameters.getAPIVersion() == "1" &&
-                apiParameters.getAPIStrict().value_or(false)) {
-                uassert(ErrorCodes::APIStrictError,
-                        "The 'showExpandedEvents' parameter to $changeStream is not supported in "
-                        "API Version 1",
-                        _originalBson
-                            .Obj()[DocumentSourceChangeStreamSpec::kShowExpandedEventsFieldName]
-                            .eoo());
-
-                uassert(
-                    ErrorCodes::APIStrictError,
-                    "The 'showRawUpdateDescription' parameter to $changeStream is not supported in "
-                    "API Version 1",
-                    _originalBson
-                        .Obj()[DocumentSourceChangeStreamSpec::kShowRawUpdateDescriptionFieldName]
-                        .eoo());
-
-                uassert(
-                    ErrorCodes::APIStrictError,
-                    "The 'showSystemEvents' parameter to $changeStream is not supported in API "
-                    "Version 1",
-                    _originalBson.Obj()[DocumentSourceChangeStreamSpec::kShowSystemEventsFieldName]
-                        .eoo());
-            }
-        }
+        void assertPermittedInAPIVersion(const APIParameters& apiParameters) const final;
 
     protected:
         const NamespaceString _nss;
@@ -372,6 +347,12 @@ public:
      */
     static Timestamp getStartTimeForNewStream(
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+    /**
+     * Returns whether the user requested endOfTransaction events, i.e. whether the
+     * 'showEndOfTransaction' option was set to a value other than 'off'.
+     */
+    static bool showEndOfTransactionRequested(const DocumentSourceChangeStreamSpec& spec);
 
 private:
     // Determines the change stream reader version (v1 or v2) from the user's change stream request

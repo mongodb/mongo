@@ -4,6 +4,8 @@
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 import {getChangeStreamStage} from "jstests/libs/query/change_stream_util.js";
 
+TestData.implictChangeStreamV1 = true;
+
 // Returns the nested aggregate command if `cmdObj` is a `$changeStream` aggregate (either directly
 // or wrapped in an `explain`), and the $changeStream stage does not already specify a version.
 // Otherwise returns null.

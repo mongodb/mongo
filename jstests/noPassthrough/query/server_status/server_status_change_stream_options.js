@@ -17,6 +17,7 @@ import {
     assertDropAndRecreateCollection,
     assertDropCollection,
 } from "jstests/libs/collection_drop_recreate.js";
+import {isEndOfTransactionUsable} from "jstests/libs/query/change_stream_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -170,6 +171,24 @@ function buildTests(isMongos) {
                     before[option],
                     after[option],
                     `fullDocumentBeforeChange.${option} should not increment for off`,
+                );
+            });
+        });
+    });
+
+    describe("metrics.changeStreams.option.showEndOfTransaction counter", function () {
+        ["whenAvailable", "required"].forEach((option) => {
+            it(`counter increments when showEndOfTransaction=${option}`, function () {
+                if (!isEndOfTransactionUsable(testDB)) {
+                    return;
+                }
+
+                const before = getCsMetrics().option.showEndOfTransaction[option];
+                openAndClose({showEndOfTransaction: option});
+                assert.eq(
+                    before + 1,
+                    getCsMetrics().option.showEndOfTransaction[option],
+                    `showEndOfTransaction.${option} should have incremented`,
                 );
             });
         });

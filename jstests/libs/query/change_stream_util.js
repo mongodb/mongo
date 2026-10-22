@@ -1927,3 +1927,36 @@ export class CursorList {
         }
     }
 }
+
+/**
+ * Returns true if the end-of-transaction change stream feature is enabled, i.e. its feature
+ * flag is enabled on all nodes of the fixture.
+ */
+export function isEndOfTransactionFlagEnabled(db) {
+    const kFlagName = "featureFlagEndOfTransactionChangeEventSynthesis";
+    return FeatureFlagUtil.isPresentAndEnabledOnAllNodes(db, kFlagName);
+}
+
+/**
+ * Returns true if the "showEndOfTransaction" change stream option is available. This is
+ * currently the case only in master, so all multiversion tests are excluded.
+ * TODO SERVER-137680: Remove the multiversion exclusion.
+ */
+export function isShowEndOfTransactionChangeStreamOptionAvailable() {
+    return !isMultiversion;
+}
+
+/**
+ * Returns true if the end-of-transaction change stream feature is usable, i.e. its feature
+ * flag is enabled on all nodes of the fixture and the test is not running in a sharded
+ * passthrough suite that implicitly enables v1 change streams.
+ */
+export function isEndOfTransactionUsable(db) {
+    if (!isShowEndOfTransactionChangeStreamOptionAvailable()) {
+        return false;
+    }
+    if (!isEndOfTransactionFlagEnabled(db)) {
+        return false;
+    }
+    return !FixtureHelpers.isMongos(db) || !TestData.implictChangeStreamV1;
+}

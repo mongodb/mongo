@@ -47,6 +47,21 @@ enums:
             # Selects change stream reader version 2 with precise shard-targeting, as introduced by SPM-1941.
             kV2: "v2"
 
+    ShowEndOfTransactionMode:
+        description:
+            Possible modes for the 'showEndOfTransaction' parameter of the $changeStream
+            stage.
+        type: string
+        values:
+            # Do not emit endOfTransaction events.
+            kOff: "off"
+            # Emit an endOfTransaction event for every eligible transaction, and omit the event for
+            # ineligible transactions.
+            kWhenAvailable: "whenAvailable"
+            # Emit an endOfTransaction event for every eligible transaction, and fail the stream for
+            # ineligible transactions.
+            kRequired: "required"
+
 structs:
     ResumeTokenClusterTime:
         description: The IDL type of cluster time
@@ -232,6 +247,22 @@ structs:
                 # This field is for internal purposes only and not supposed to be set by end users.
                 # The field is not serialized as part of the query shape
                 query_shape: literal
+
+            showEndOfTransaction:
+                cpp_name: showEndOfTransaction
+                type: ShowEndOfTransactionMode
+                optional: true
+                description:
+                    Valid values are "off", "whenAvailable", or "required". If set to "off",
+                    no endOfTransaction events are emitted. If set to "whenAvailable", an
+                    endOfTransaction event is emitted for every eligible transaction and is
+                    silently omitted for ineligible transactions. If set to "required", the
+                    change stream fails when an ineligible transaction is encountered.
+                    This option is omitted from serialization when it is not set or set to
+                    "off", so that a stream with the option unset and a stream with the option
+                    set to "off" produce the same query shape and query shape hash. Setting it
+                    to a value other than "off" changes the query shape and query shape hash.
+                query_shape: parameter
 
     DocumentSourceChangeStreamOplogMatchSpec:
         strict: true

@@ -8,6 +8,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/database_name.h"
+//#include "mongo/db/end_of_transaction_cluster_parameter_gen.h"
 #include "mongo/db/exec/agg/change_stream_transform_stage.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/agg/mock_stage.h"
@@ -3723,6 +3724,178 @@ TEST_F(ChangeStreamStageTest, DocumentSourceChangeStreamTransformParseValidSuppo
                                          .getField("supportedEvents"sv);
         ASSERT_TRUE(actualSupportedEvents.isArray());
         ASSERT_VALUE_EQ(Value(expected), Value(actualSupportedEvents.getArray()));
+    }
+}
+
+TEST_F(ChangeStreamStageTest, ShowEndOfTransactionSerialization) {
+    // The feature flag must be enabled for the option to be accepted.
+    unittest::ServerParameterGuard flagGuard("featureFlagEndOfTransactionChangeEventSynthesis",
+                                             true);
+
+    // We must also enable the feature flags for v2 change streams and install the required v2 mock.
+    unittest::ServerParameterGuard changeStreamReaderV2Enabler("featureFlagChangeStreamReaderV2",
+                                                               true);
+    unittest::ServerParameterGuard preciseShardTargetingEnabler(
+        "featureFlagChangeStreamPreciseShardTargeting", true);
+
+    ScopedChangeStreamReaderBuilderMock readerBuilder(
+        std::make_unique<ChangeStreamReaderBuilderMock>(
+            [](OperationContext* opCtx, const ChangeStream& changeStream) { return nullptr; },
+            [](OperationContext* opCtx, const ChangeStream& changeStream) { return BSONObj(); },
+            [](OperationContext* opCtx, const ChangeStream& changeStream) {
+                return std::set<std::string>{
+                    "moveChunk", "namespacePlacementChanged", "movePrimary"};
+            }));
+
+    auto expCtx = getExpCtx();
+
+    auto checkSerialization = [&](BSONObj changeStreamSpec,
+                                  boost::optional<std::string_view> expectedValue) {
+        ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
+
+        auto spec = BSON(DSChangeStream::kStageName << changeStreamSpec);
+        auto pipeline = DSChangeStream::createFromBson(spec.firstElement(), expCtx);
+
+        bool found = false;
+        for (auto& stage : pipeline) {
+            if (!stage->isInstanceOf<DocumentSourceChangeStreamTransform>()) {
+                continue;
+            }
+
+            std::vector<Value> serialization;
+            stage->serializeToArray(serialization);
+            ASSERT_EQ(serialization.size(), 1UL);
+            ASSERT_EQ(serialization[0].getType(), BSONType::object);
+
+            auto serializedSpec = serialization[0]
+                                      .getDocument()
+                                      .getField(DocumentSourceChangeStreamTransform::kStageName)
+                                      .getDocument();
+            auto actualValue = serializedSpec.getField("showEndOfTransaction"sv);
+            if (expectedValue) {
+                ASSERT_FALSE(actualValue.missing());
+                ASSERT_EQ(*expectedValue, actualValue.getStringData());
+            } else {
+                ASSERT_TRUE(actualValue.missing());
+            }
+            found = true;
+        }
+        ASSERT_TRUE(found);
+    };
+
+    for (auto inRouter : {true, false}) {
+        expCtx->setInRouter(inRouter);
+
+        // The option is not set: it must not be serialized.
+        checkSerialization(BSONObj(), boost::none);
+
+        // Explicitly set to 'off': it must not be serialized.
+        checkSerialization(BSON("showEndOfTransaction" << "off"), boost::none);
+
+        // 'whenAvailable' must be serialized.
+        checkSerialization(BSON("showEndOfTransaction" << "whenAvailable"), "whenAvailable"sv);
+
+        // 'required' must be serialized.
+        checkSerialization(BSON("showEndOfTransaction" << "required"), "required"sv);
+    }
+}
+
+TEST_F(ChangeStreamStageTest, ShowEndOfTransactionGating) {
+    // We must enable the feature flags for v2 change streams and install the required v2 mock.
+    unittest::ServerParameterGuard changeStreamReaderV2Enabler("featureFlagChangeStreamReaderV2",
+                                                               true);
+    unittest::ServerParameterGuard preciseShardTargetingEnabler(
+        "featureFlagChangeStreamPreciseShardTargeting", true);
+
+    ScopedChangeStreamReaderBuilderMock readerBuilder(
+        std::make_unique<ChangeStreamReaderBuilderMock>(
+            [](OperationContext* opCtx, const ChangeStream& changeStream) { return nullptr; },
+            [](OperationContext* opCtx, const ChangeStream& changeStream) { return BSONObj(); },
+            [](OperationContext* opCtx, const ChangeStream& changeStream) {
+                return std::set<std::string>{
+                    "moveChunk", "namespacePlacementChanged", "movePrimary"};
+            }));
+
+    auto makeSpec = [](std::string_view mode, std::string_view version) {
+        return BSON(DSChangeStream::kStageName
+                    << BSON("showEndOfTransaction" << mode << "version" << version));
+    };
+
+    auto expCtx = getExpCtx();
+    for (auto inRouter : {true, false}) {
+        expCtx->setInRouter(inRouter);
+
+        // With the feature flag disabled, a value other than 'off' is rejected, while 'off' and an
+        // unset option are accepted.
+        {
+            unittest::ServerParameterGuard flagGuard(
+                "featureFlagEndOfTransactionChangeEventSynthesis", false);
+            for (auto version : {"v1"sv, "v2"sv}) {
+                for (auto option : {"whenAvailable"sv, "required"sv}) {
+                    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
+
+                    auto spec = makeSpec(option, version);
+                    ASSERT_THROWS_CODE(DSChangeStream::createFromBson(spec.firstElement(), expCtx),
+                                       DBException,
+                                       ErrorCodes::InvalidOptions);
+                }
+
+                {
+                    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
+
+                    auto offSpec = makeSpec("off"sv, version);
+                    ASSERT_DOES_NOT_THROW(
+                        DSChangeStream::createFromBson(offSpec.firstElement(), expCtx));
+                }
+
+                {
+                    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
+
+                    auto unsetSpec = BSON(DSChangeStream::kStageName << BSONObj());
+                    ASSERT_DOES_NOT_THROW(
+                        DSChangeStream::createFromBson(unsetSpec.firstElement(), expCtx));
+                }
+            }
+        }
+
+        // With the feature flag enabled, all values are accepted.
+        {
+            unittest::ServerParameterGuard flagGuard(
+                "featureFlagEndOfTransactionChangeEventSynthesis", true);
+            for (auto version : {"v1"sv, "v2"sv}) {
+                for (auto option : {"whenAvailable"sv, "required"sv}) {
+                    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
+
+                    auto spec = makeSpec(option, version);
+                    if (version == "v1"sv && inRouter) {
+                        // On a router, the v2 change stream reader is required.
+                        ASSERT_THROWS_CODE(
+                            DSChangeStream::createFromBson(spec.firstElement(), expCtx),
+                            DBException,
+                            ErrorCodes::InvalidOptions);
+                    } else {
+                        ASSERT_DOES_NOT_THROW(
+                            DSChangeStream::createFromBson(spec.firstElement(), expCtx));
+                    }
+                }
+
+                {
+                    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
+
+                    auto offSpec = makeSpec("off"sv, version);
+                    ASSERT_DOES_NOT_THROW(
+                        DSChangeStream::createFromBson(offSpec.firstElement(), expCtx));
+                }
+
+                {
+                    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
+
+                    auto unsetSpec = BSON(DSChangeStream::kStageName << BSONObj());
+                    ASSERT_DOES_NOT_THROW(
+                        DSChangeStream::createFromBson(unsetSpec.firstElement(), expCtx));
+                }
+            }
+        }
     }
 }
 

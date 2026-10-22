@@ -414,6 +414,12 @@ public:
         "mongodb.serverStatus.metrics.changeStreams.option.showRawUpdateDescription");
     static constexpr MetricName kChangeStreamOptionIgnoreRemovedShards = MetricNameMaker::make(
         "mongodb.serverStatus.metrics.changeStreams.option.ignoreRemovedShards");
+    static constexpr MetricName kChangeStreamOptionShowEndOfTransactionWhenAvailable =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.option.showEndOfTransaction.whenAvailable");
+    static constexpr MetricName kChangeStreamOptionShowEndOfTransactionRequired =
+        MetricNameMaker::make(
+            "mongodb.serverStatus.metrics.changeStreams.option.showEndOfTransaction.required");
     static constexpr MetricName kChangeStreamOptionMatchCollectionUUIDForUpdateLookup =
         MetricNameMaker::make(
             "mongodb.serverStatus.metrics.changeStreams.option.matchCollectionUUIDForUpdateLookup");

@@ -634,77 +634,34 @@ Mongo.prototype._extractChangeStreamOptions = function (opts) {
     let changeStreamOptions = {fullDocument: options.fullDocument || "default"};
     delete options.fullDocument;
 
-    if (options.hasOwnProperty("resumeAfter")) {
-        changeStreamOptions.resumeAfter = options.resumeAfter;
-        delete options.resumeAfter;
-    }
-
-    if (options.hasOwnProperty("startAfter")) {
-        changeStreamOptions.startAfter = options.startAfter;
-        delete options.startAfter;
-    }
-
-    if (options.hasOwnProperty("startAtOperationTime")) {
-        changeStreamOptions.startAtOperationTime = options.startAtOperationTime;
-        delete options.startAtOperationTime;
-    }
-
-    if (options.hasOwnProperty("fullDocumentBeforeChange")) {
-        changeStreamOptions.fullDocumentBeforeChange = options.fullDocumentBeforeChange;
-        delete options.fullDocumentBeforeChange;
-    }
-
-    if (options.hasOwnProperty("allChangesForCluster")) {
-        changeStreamOptions.allChangesForCluster = options.allChangesForCluster;
-        delete options.allChangesForCluster;
-    }
-
-    if (options.hasOwnProperty("allowToRunOnConfigDB")) {
-        changeStreamOptions.allowToRunOnConfigDB = options.allowToRunOnConfigDB;
-        delete options.allowToRunOnConfigDB;
-    }
-
-    if (options.hasOwnProperty("allowToRunOnSystemNS")) {
-        changeStreamOptions.allowToRunOnSystemNS = options.allowToRunOnSystemNS;
-        delete options.allowToRunOnSystemNS;
-    }
-
-    if (options.hasOwnProperty("showExpandedEvents")) {
-        changeStreamOptions.showExpandedEvents = options.showExpandedEvents;
-        delete options.showExpandedEvents;
-    }
-
-    if (options.hasOwnProperty("showSystemEvents")) {
-        changeStreamOptions.showSystemEvents = options.showSystemEvents;
-        delete options.showSystemEvents;
-    }
-
-    if (options.hasOwnProperty("showRawUpdateDescription")) {
-        changeStreamOptions.showRawUpdateDescription = options.showRawUpdateDescription;
-        delete options.showRawUpdateDescription;
-    }
-
-    if (options.hasOwnProperty("showCommitTimestamp")) {
-        changeStreamOptions.showCommitTimestamp = options.showCommitTimestamp;
-        delete options.showCommitTimestamp;
-    }
-
-    if (options.hasOwnProperty("matchCollectionUUIDForUpdateLookup")) {
-        changeStreamOptions.matchCollectionUUIDForUpdateLookup =
-            options.matchCollectionUUIDForUpdateLookup;
-        delete options.matchCollectionUUIDForUpdateLookup;
-    }
+    const kChangeStreamOptionNames = [
+        "resumeAfter",
+        "startAfter",
+        "startAtOperationTime",
+        "fullDocumentBeforeChange",
+        "allChangesForCluster",
+        "allowToRunOnConfigDB",
+        "allowToRunOnSystemNS",
+        "showExpandedEvents",
+        "showSystemEvents",
+        "showRawUpdateDescription",
+        "showCommitTimestamp",
+        "showEndOfTransaction",
+        "matchCollectionUUIDForUpdateLookup",
+        "version",
+    ];
+    kChangeStreamOptionNames.forEach((option) => {
+        if (options.hasOwnProperty(option)) {
+            changeStreamOptions[option] = options[option];
+            delete options[option];
+        }
+    });
 
     // If no maxAwaitTimeMS is set in the options, we set a high wait timeout, so that there won't
     // be any issues with no data being available on the server side due to limited processing
     // resources during testing.
     if (!options.hasOwnProperty("maxAwaitTimeMS") && TestData && TestData.inEvergreen) {
         options.maxAwaitTimeMS = 15 * 1000;
-    }
-
-    if (options.hasOwnProperty("version")) {
-        changeStreamOptions.version = options.version;
-        delete options.version;
     }
 
     return [{$changeStream: changeStreamOptions}, options];

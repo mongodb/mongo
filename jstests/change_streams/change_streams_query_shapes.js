@@ -10,10 +10,15 @@
 //
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {isFCVgte} from "jstests/libs/feature_compatibility_version.js";
+import {isEndOfTransactionUsable} from "jstests/libs/query/change_stream_util.js";
 import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
 
 const coll = assertDropAndRecreateCollection(db, jsTestName());
 const qsutils = new QuerySettingsUtils(db, coll.getName());
+
+// Expected query hash for a change stream without any options
+const kQueryHashForOptionLessStream =
+    "ABD13DBF8CFAE39BF22941780FFCF8BB111582FB30C6CDC832933EA0E29F1C3D";
 
 // Verifies that the querySettings for 'query' can be applied successfully, and that the query shape
 // hash of the query is identical to 'queryShapeHash'. Also verifies that the representative query
@@ -54,7 +59,7 @@ function checkQueryShapeAndHash(db, query, queryShapeHash) {
 checkQueryShapeAndHash(
     db,
     {aggregate: 1, pipeline: [{$changeStream: {}}], $db: db.getName()},
-    "ABD13DBF8CFAE39BF22941780FFCF8BB111582FB30C6CDC832933EA0E29F1C3D",
+    kQueryHashForOptionLessStream,
 );
 
 // Check shape and hash for pipelines with 'showSystemEvents' flag.
@@ -152,20 +157,20 @@ if (isFCVgte(db, "8.3")) {
     checkQueryShapeAndHash(
         db,
         {aggregate: 1, pipeline: [{$changeStream: {version: "v1"}}], $db: db.getName()},
-        "ABD13DBF8CFAE39BF22941780FFCF8BB111582FB30C6CDC832933EA0E29F1C3D",
+        kQueryHashForOptionLessStream,
     );
 
     checkQueryShapeAndHash(
         db,
         {aggregate: 1, pipeline: [{$changeStream: {version: "v2"}}], $db: db.getName()},
-        "ABD13DBF8CFAE39BF22941780FFCF8BB111582FB30C6CDC832933EA0E29F1C3D",
+        kQueryHashForOptionLessStream,
     );
 
     // Check shape and hash when setting the 'supportedEvents' field.
     checkQueryShapeAndHash(
         db,
         {aggregate: 1, pipeline: [{$changeStream: {supportedEvents: ["foo"]}}], $db: db.getName()},
-        "ABD13DBF8CFAE39BF22941780FFCF8BB111582FB30C6CDC832933EA0E29F1C3D",
+        kQueryHashForOptionLessStream,
     );
 
     // Check shape and hash for a change stream pipeline using the 'ignoreRemovedShards' flag.
@@ -173,5 +178,72 @@ if (isFCVgte(db, "8.3")) {
         db,
         {aggregate: 1, pipeline: [{$changeStream: {ignoreRemovedShards: true}}], $db: db.getName()},
         "796AFF268E3D2A16D9FFCD9F5929CB6C78D704560AC6F19A2BE40DC2B688200D",
+    );
+}
+
+if (isEndOfTransactionUsable(db)) {
+    // Setting 'showEndOfTransaction' to 'off' is equivalent to not setting it at all: the option
+    // is omitted from the serialized spec and from the query shape, so both produce the same query
+    // shape and query shape hash as the basic change stream pipeline above.
+    checkQueryShapeAndHash(
+        db,
+        {
+            aggregate: 1,
+            pipeline: [{$changeStream: {showEndOfTransaction: "off"}}],
+            $db: db.getName(),
+        },
+        kQueryHashForOptionLessStream,
+    );
+
+    checkQueryShapeAndHash(
+        db,
+        {
+            aggregate: coll.getName(),
+            pipeline: [{$changeStream: {showEndOfTransaction: "off"}}],
+            $db: db.getName(),
+        },
+        "FF65C1F81BEB9C930D7C2A94661E1106F77C59809E0B1D7FB2AC3C6232D03A4C",
+    );
+
+    // Setting 'showEndOfTransaction' to a value other than 'off' serializes the option and
+    // therefore changes the query shape and query shape hash.
+    checkQueryShapeAndHash(
+        db,
+        {
+            aggregate: 1,
+            pipeline: [{$changeStream: {showEndOfTransaction: "whenAvailable"}}],
+            $db: db.getName(),
+        },
+        "37478EF31F7D7C5DBCC740A56C01A31400F5FEDCB34A94BE033B7DC016227C99",
+    );
+
+    checkQueryShapeAndHash(
+        db,
+        {
+            aggregate: coll.getName(),
+            pipeline: [{$changeStream: {showEndOfTransaction: "whenAvailable"}}],
+            $db: db.getName(),
+        },
+        "0DBA3272557B116DC1AF298F2F7D3EF12A8A8D2F6CC1EAEAA307F89FDF0390FF",
+    );
+
+    checkQueryShapeAndHash(
+        db,
+        {
+            aggregate: 1,
+            pipeline: [{$changeStream: {showEndOfTransaction: "required"}}],
+            $db: db.getName(),
+        },
+        "946A421D4FE4189DC4C47CD95D3E702BA86D7931BCB8EA4A3F2B61BCF2D30E77",
+    );
+
+    checkQueryShapeAndHash(
+        db,
+        {
+            aggregate: coll.getName(),
+            pipeline: [{$changeStream: {showEndOfTransaction: "required"}}],
+            $db: db.getName(),
+        },
+        "598EC3C06D740A3F259BCC284188AB86F8FA91DD194ACD27E89F41C7939F6484",
     );
 }

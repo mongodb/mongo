@@ -16,6 +16,7 @@
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/db/version_context.h"
@@ -74,6 +75,14 @@ auto& csOptIgnoreRemovedShards =
     makeCsCounter(otel::metrics::MetricNames::kChangeStreamOptionIgnoreRemovedShards,
                   "changeStreams.option.ignoreRemovedShards",
                   "Number of change streams opened with ignoreRemovedShards.");
+auto& csOptShowEndOfTransactionWhenAvailable =
+    makeCsCounter(otel::metrics::MetricNames::kChangeStreamOptionShowEndOfTransactionWhenAvailable,
+                  "changeStreams.option.showEndOfTransaction.whenAvailable",
+                  "Number of change streams opened with showEndOfTransaction=whenAvailable.");
+auto& csOptShowEndOfTransactionRequired =
+    makeCsCounter(otel::metrics::MetricNames::kChangeStreamOptionShowEndOfTransactionRequired,
+                  "changeStreams.option.showEndOfTransaction.required",
+                  "Number of change streams opened with showEndOfTransaction=required.");
 auto& csOptMatchCollectionUUIDForUpdateLookup =
     makeCsCounter(otel::metrics::MetricNames::kChangeStreamOptionMatchCollectionUUIDForUpdateLookup,
                   "changeStreams.option.matchCollectionUUIDForUpdateLookup",
@@ -147,6 +156,19 @@ void incrementFullDocumentBeforeChangeMetric(FullDocumentBeforeChangeModeEnum mo
     }
 }
 
+void incrementShowEndOfTransactionMetric(ShowEndOfTransactionModeEnum mode) {
+    switch (mode) {
+        case ShowEndOfTransactionModeEnum::kWhenAvailable:
+            csOptShowEndOfTransactionWhenAvailable.add(1);
+            break;
+        case ShowEndOfTransactionModeEnum::kRequired:
+            csOptShowEndOfTransactionRequired.add(1);
+            break;
+        case ShowEndOfTransactionModeEnum::kOff:
+            break;
+    }
+}
+
 void incrementScopeMetric(ChangeStreamType type) {
     switch (type) {
         case ChangeStreamType::kAllDatabases:
@@ -160,6 +182,7 @@ void incrementScopeMetric(ChangeStreamType type) {
             break;
     }
 }
+
 }  // namespace
 
 REGISTER_LITE_PARSED_DOCUMENT_SOURCE(changeStream,
@@ -339,6 +362,31 @@ Timestamp DocumentSourceChangeStream::getStartTimeForNewStream(
     return currentTime.addTicks(1).asTimestamp();
 }
 
+bool DocumentSourceChangeStream::showEndOfTransactionRequested(
+    const DocumentSourceChangeStreamSpec& spec) {
+    return spec.getShowEndOfTransaction().value_or(ShowEndOfTransactionModeEnum::kOff) !=
+        ShowEndOfTransactionModeEnum::kOff;
+}
+
+void DocumentSourceChangeStream::LiteParsed::assertPermittedInAPIVersion(
+    const APIParameters& apiParameters) const {
+    if (!apiParameters.getAPIVersion() || *apiParameters.getAPIVersion() != "1" ||
+        !apiParameters.getAPIStrict().value_or(false)) {
+        return;
+    }
+
+    // None of the following $changeStream options are part of API Version 1.
+    for (auto fieldName : {DocumentSourceChangeStreamSpec::kShowExpandedEventsFieldName,
+                           DocumentSourceChangeStreamSpec::kShowRawUpdateDescriptionFieldName,
+                           DocumentSourceChangeStreamSpec::kShowSystemEventsFieldName,
+                           DocumentSourceChangeStreamSpec::kShowEndOfTransactionFieldName}) {
+        uassert(ErrorCodes::APIStrictError,
+                str::stream() << "The '" << fieldName
+                              << "' parameter to $changeStream is not supported in API Version 1",
+                _originalBson.Obj()[fieldName].eoo());
+    }
+}
+
 std::list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(50808,
@@ -451,6 +499,8 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromB
 
         incrementFullDocumentMetric(spec.getFullDocument());
         incrementFullDocumentBeforeChangeMetric(spec.getFullDocumentBeforeChange());
+        incrementShowEndOfTransactionMetric(
+            spec.getShowEndOfTransaction().value_or(ShowEndOfTransactionModeEnum::kOff));
         incrementScopeMetric(changeStream.getChangeStreamType());
 
         // Prevent updating the feature counters again for the same query.
@@ -474,12 +524,24 @@ ChangeStreamReaderVersionEnum DocumentSourceChangeStream::_determineChangeStream
 
     OperationContext* opCtx = expCtx->getOperationContext();
 
+    // On a router, requesting endOfTransaction events forces the V2 reader with precise shard
+    // targeting. There is no V1 fallback for sharded-cluster streams: if the V2 reader cannot be
+    // used, the feature is unavailable and the stream fails rather than silently degrading.
+    const bool requireV2 = showEndOfTransactionRequested(spec);
+    const auto assertV2ReaderAvailableForEndOfTransaction = [&] {
+        uassert(ErrorCodes::InvalidOptions,
+                "The 'showEndOfTransaction' parameter to $changeStream requires the V2 change "
+                "stream reader",
+                !requireV2);
+    };
+
     // Check the IFR kill switch for v2 shard targeting. This is a runtime-toggleable flag that
     // allows emergency rollback of v2.
     const auto& ifrContext = expCtx->getIfrContext();
     const bool v2Enabled = ifrContext &&
         ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagChangeStreamReaderV2);
     if (!v2Enabled) {
+        assertV2ReaderAvailableForEndOfTransaction();
         return ChangeStreamReaderVersionEnum::kV1;
     }
 
@@ -488,13 +550,17 @@ ChangeStreamReaderVersionEnum DocumentSourceChangeStream::_determineChangeStream
     if (!feature_flags::gFeatureFlagChangeStreamPreciseShardTargeting.isEnabled(
             VersionContext::getDecoration(opCtx),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        assertV2ReaderAvailableForEndOfTransaction();
+
         // Feature flag is disabled. Default to v1.
         return ChangeStreamReaderVersionEnum::kV1;
     }
 
-    // If the user explicitly requested v1, honor it.
+    // If the user explicitly requested v1, honor it, unless endOfTransaction events were requested
+    // (which forces the V2 reader).
     const auto& version = spec.getVersion();
     if (version.has_value() && *version == ChangeStreamReaderVersionEnum::kV1) {
+        assertV2ReaderAvailableForEndOfTransaction();
         return ChangeStreamReaderVersionEnum::kV1;
     }
 
@@ -511,6 +577,8 @@ ChangeStreamReaderVersionEnum DocumentSourceChangeStream::_determineChangeStream
 
     if (dataToShardsAllocationQueryService->getAllocationToShardsStatus(opCtx, atClusterTime) ==
         AllocationToShardsStatus::kNotAvailable) {
+        assertV2ReaderAvailableForEndOfTransaction();
+
         // No shard placement information is available. Use v1 change stream reader.
         return ChangeStreamReaderVersionEnum::kV1;
     }
@@ -538,6 +606,17 @@ void DocumentSourceChangeStream::assertIsLegalSpecification(
     // such as during $queryStats.
     if (!expCtx->getMongoProcessInterface()->isExpectedToExecuteQueries()) {
         return;
+    }
+
+    // 'showEndOfTransaction' may only be set to a value other than 'off' when the
+    // end-of-transaction feature is available.
+    if (showEndOfTransactionRequested(spec)) {
+        uassert(
+            ErrorCodes::InvalidOptions,
+            str::stream() << "The 'showEndOfTransaction' parameter to $changeStream requires the "
+                             "'featureFlagEndOfTransactionChangeEventSynthesis' feature flag to be "
+                             "enabled",
+            feature_flags::gFeatureFlagEndOfTransactionChangeEventSynthesis.isEnabled());
     }
 
     // If 'allChangesForCluster' is true, the stream must be opened on the 'admin' database with
