@@ -115,7 +115,7 @@ TEST_CASE("Test WT_UNCOMMITTED_DATA and WT_DIRTY_DATA",
 
     SECTION("Test WT_DIRTY_DATA is thrown (btree is modified, is not bulk, is not metadata)")
     {
-        S2BT(session_impl)->modified = true;
+        __wt_atomic_store_bool_relaxed(&S2BT(session_impl)->modified, true);
 
         FLD_SET(session_impl->lock_flags, WT_SESSION_LOCKED_SCHEMA);
         REQUIRE(__wt_conn_dhandle_close(session_impl, false, false, false) == EBUSY);
@@ -126,7 +126,7 @@ TEST_CASE("Test WT_UNCOMMITTED_DATA and WT_DIRTY_DATA",
 
     SECTION("Test WT_DIRTY_DATA is not thrown (btree is modified, is not bulk, is metadata)")
     {
-        S2BT(session_impl)->modified = true;
+        __wt_atomic_store_bool_relaxed(&S2BT(session_impl)->modified, true);
         F_SET(session_impl->dhandle, WT_DHANDLE_IS_METADATA);
 
         FLD_SET(session_impl->lock_flags, WT_SESSION_LOCKED_SCHEMA);
@@ -138,7 +138,7 @@ TEST_CASE("Test WT_UNCOMMITTED_DATA and WT_DIRTY_DATA",
 
     SECTION("Test WT_DIRTY_DATA is not thrown (btree is modified, is bulk, is not metadata)")
     {
-        S2BT(session_impl)->modified = true;
+        __wt_atomic_store_bool_relaxed(&S2BT(session_impl)->modified, true);
         F_SET(S2BT(session_impl), WT_BTREE_BULK);
 
         FLD_SET(session_impl->lock_flags, WT_SESSION_LOCKED_SCHEMA);
@@ -150,7 +150,7 @@ TEST_CASE("Test WT_UNCOMMITTED_DATA and WT_DIRTY_DATA",
 
     SECTION("Test WT_DIRTY_DATA is not thrown (btree is modified, is bulk, is metadata)")
     {
-        S2BT(session_impl)->modified = true;
+        __wt_atomic_store_bool_relaxed(&S2BT(session_impl)->modified, true);
         F_SET(S2BT(session_impl), WT_BTREE_BULK);
         F_SET(session_impl->dhandle, WT_DHANDLE_IS_METADATA);
 
@@ -163,7 +163,7 @@ TEST_CASE("Test WT_UNCOMMITTED_DATA and WT_DIRTY_DATA",
 
     /* Drop the table once the tests are completed. */
     S2BT(session_impl)->max_upd_txn = 1;
-    S2BT(session_impl)->modified = false;
+    __wt_atomic_store_bool_relaxed(&S2BT(session_impl)->modified, false);
     F_CLR(S2BT(session_impl), WT_BTREE_BULK);
     F_CLR(session_impl->dhandle, WT_DHANDLE_IS_METADATA);
     REQUIRE(__wt_session_release_dhandle(session_impl) == 0);

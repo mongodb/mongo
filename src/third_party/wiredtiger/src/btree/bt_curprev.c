@@ -759,23 +759,22 @@ err:
             F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 #ifdef HAVE_DIAGNOSTIC
         /*
-         * Skip key order check, if next is called after a prev returned a prepare conflict error,
-         * i.e cursor has changed direction at a prepared update, hence current key returned could
-         * be same as earlier returned key.
+         * Restart the key order check if prev is called after a next returned a prepare conflict
+         * error, i.e cursor has changed direction at a prepared update, hence current key returned
+         * could be same as earlier returned key.
          *
-         * eg: Initial data set : (2,3,...10) insert key 1 in a prepare transaction. loop on prev
-         * will return 10,...3,2 and subsequent call to prev will return a prepare conflict. Now if
-         * we call next key 2 will be returned which will be same as earlier returned key.
+         * eg: Initial data set : (1,2,3,...10) insert key 11 in a prepare transaction. loop on next
+         * will return 1,2,3...10 and subsequent call to next will return a prepare conflict. Now if
+         * we call prev key 10 will be returned which will be same as earlier returned key.
          *
-         * Additionally, reset the cursor check when we are using read uncommitted isolation mode
-         * and cross a page boundary. It's possible to see out-of-order keys when the earlier
-         * returned key is removed and new keys are inserted at the end of the page.
+         * Additionally, restart the check when we are using read uncommitted isolation mode and
+         * cross a page boundary. It's possible to see out-of-order keys when the earlier returned
+         * key is removed and new keys are inserted at the end of the page.
          */
-        if (!F_ISSET(cbt, WT_CBT_ITERATE_RETRY_NEXT)) {
-            if (session->txn->isolation == WT_ISO_READ_UNCOMMITTED && newpage)
-                __wt_cursor_key_order_reset(cbt);
-            ret = __wti_cursor_key_order_check(session, cbt, false);
-        }
+        if (F_ISSET(cbt, WT_CBT_ITERATE_RETRY_NEXT) ||
+          (session->txn->isolation == WT_ISO_READ_UNCOMMITTED && newpage))
+            __wt_cursor_key_order_reset(cbt);
+        ret = __wti_cursor_key_order_check(session, cbt, false);
 
         if (need_walk) {
             /*

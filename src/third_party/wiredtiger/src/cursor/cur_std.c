@@ -807,7 +807,8 @@ __wti_cursor_cache_release(WT_SESSION_IMPL *session, WT_CURSOR *cursor, bool *re
     WT_DECL_RET;
 
     *released = false;
-    if (!F_ISSET(cursor, WT_CURSTD_CACHEABLE) || !F_ISSET(session, WT_SESSION_CACHE_CURSORS))
+    if (!F_ISSET(cursor, WT_CURSTD_CACHEABLE) || !F_ISSET(cursor, WT_CURSTD_OPEN) ||
+      !F_ISSET(session, WT_SESSION_CACHE_CURSORS))
         return (0);
 
     WT_ASSERT(session, !F_ISSET(cursor, WT_CURSTD_BULK | WT_CURSTD_CACHED));
@@ -983,6 +984,15 @@ __cursor_reuse_or_init(WT_SESSION_IMPL *session, WT_CURSOR *cursor, const char *
         if (cval.val != 0)
             F_SET(cursor, WT_CURSTD_RAW);
 
+        /* WT_CURSTD_BLIND_REMOVE */
+        WT_RET(__wt_config_gets_def(session, cfg, "blind_remove", 0, &cval));
+        if (cval.val) {
+            if (!WT_PREFIX_MATCH(cursor->internal_uri, "layered:"))
+                WT_RET_MSG(session, ENOTSUP, "%s: blind_remove is only supported on layered tables",
+                  cursor->internal_uri);
+            F_SET(cursor, WT_CURSTD_BLIND_REMOVE);
+        }
+
         /* WT_CURSTD_DEBUG_RESET_EVICT */
         WT_RET(__cursor_config_debug(cursor, cfg));
 
@@ -1096,7 +1106,8 @@ __wt_cursor_cache_get(WT_SESSION_IMPL *session, const char *uri, uint64_t hash_v
              * For these configuration values, there is no difference in the resulting cursor other
              * than flag values, so fix them up according to the given configuration.
              */
-            F_CLR(cursor, WT_CURSTD_APPEND | WT_CURSTD_OVERWRITE | WT_CURSTD_RAW);
+            F_CLR(cursor,
+              WT_CURSTD_APPEND | WT_CURSTD_BLIND_REMOVE | WT_CURSTD_OVERWRITE | WT_CURSTD_RAW);
             F_SET(cursor, overwrite_flag);
             /*
              * If this is a btree cursor, clear its read_once flag.
@@ -1264,8 +1275,18 @@ __wti_cursor_reconfigure(WT_CURSOR *cursor, const char *config)
     WT_CONFIG_ITEM cval;
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
+    bool blind_remove;
 
     CURSOR_API_CALL_CONF(cursor, session, ret, reconfigure, config, cfg, NULL);
+
+    blind_remove = F_ISSET(cursor, WT_CURSTD_BLIND_REMOVE);
+    if ((ret = __wt_config_getones(session, config, "blind_remove", &cval)) == 0) {
+        blind_remove = cval.val;
+        if (blind_remove && !WT_PREFIX_MATCH(cursor->internal_uri, "layered:"))
+            WT_ERR_MSG(session, ENOTSUP, "%s: blind_remove is only supported on layered tables",
+              cursor->internal_uri);
+    } else
+        WT_ERR_NOTFOUND_OK(ret, false);
 
     /* Reconfiguration resets the cursor. */
     WT_ERR(cursor->reset(cursor));
@@ -1282,6 +1303,14 @@ __wti_cursor_reconfigure(WT_CURSOR *cursor, const char *config)
         } else
             WT_ERR_NOTFOUND_OK(ret, false);
     }
+
+    /*
+     * blind_remove
+     */
+    if (blind_remove)
+        F_SET(cursor, WT_CURSTD_BLIND_REMOVE);
+    else
+        F_CLR(cursor, WT_CURSTD_BLIND_REMOVE);
 
     /*
      * overwrite

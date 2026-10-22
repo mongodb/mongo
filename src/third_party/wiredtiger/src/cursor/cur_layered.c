@@ -519,6 +519,7 @@ __clayered_op_init(WTI_CURSOR_LAYERED *clayered, WTI_CLAYERED_OP *op, uint32_t f
   WTI_CLAYERED_OP_MODE mode, WTI_CLAYERED_ROLE role)
 {
     WT_LAYERED_TABLE *table = (WT_LAYERED_TABLE *)clayered->dhandle;
+    WT_SESSION_IMPL *session = CUR2S(clayered);
 
     op->clayered = clayered;
     op->ingest = LF_ISSET(CLAYERED_ENTER_OPEN_INGEST) ? clayered->ingest_cursor : NULL;
@@ -526,6 +527,14 @@ __clayered_op_init(WTI_CURSOR_LAYERED *clayered, WTI_CLAYERED_OP *op, uint32_t f
     op->stable = LF_ISSET(CLAYERED_ENTER_SKIP_STABLE) ? NULL : clayered->stable_cursor;
     op->truncate_list = &table->truncate_list;
     op->collator = table->collator;
+
+    /*
+     * Every operation needs a constituent. A transaction older than a step-down-created table,
+     * reading it while the role change is in flight, can end up with neither: the step-down walk
+     * clears the table's step-down-created mark before it publishes the follower role.
+     */
+    WT_ASSERT_ALWAYS(session, op->ingest != NULL || op->stable != NULL,
+      "layered cursor operation has neither an ingest nor a stable constituent");
 
     op->write_target = __clayered_write_target_for_op(clayered, op, mode, role);
 }
@@ -1223,12 +1232,12 @@ __clayered_open_ingest(WT_SESSION_IMPL *session, WTI_CURSOR_LAYERED *clayered, W
 {
     WT_CURSOR *c, *cursor;
     WT_LAYERED_TABLE *layered;
-    const char *ckpt_cfg[2] = {WT_CONFIG_BASE(session, WT_SESSION_open_cursor), NULL};
+    const char *cfg[2] = {WT_CONFIG_BASE(session, WT_SESSION_open_cursor), NULL};
 
     c = &clayered->iface;
     layered = (WT_LAYERED_TABLE *)clayered->dhandle;
 
-    WT_RET(__wt_open_cursor(session, layered->ingest_uri, c, ckpt_cfg, &cursor));
+    WT_RET(__wt_open_cursor(session, layered->ingest_uri, c, cfg, &cursor));
 
     /*
      * We always open ingest in overwrite mode to be able to rewrite tombstones with insert().
@@ -1361,7 +1370,7 @@ __clayered_update_stable(WTI_CURSOR_LAYERED *clayered, uint32_t flags, WTI_CLAYE
         /* Open stable the first time if needed, unless the constituent does not exist yet. */
         if (!__wt_atomic_load_bool_relaxed(
               &((WT_LAYERED_TABLE *)clayered->dhandle)->step_down_created) &&
-          (role == WTI_CLAYERED_ROLE_LEADER || !LF_ISSET(CLAYERED_ENTER_SKIP_STABLE)))
+          !LF_ISSET(CLAYERED_ENTER_SKIP_STABLE))
             WT_RET(__clayered_open_stable_first(clayered, role, conn_lsn));
     } else if (LF_ISSET(CLAYERED_ENTER_ROLE_CHANGE) ||
       __clayered_can_advance_stable(clayered, conn_lsn, LF_ISSET(CLAYERED_ENTER_ITERATION), role)) {
@@ -3835,7 +3844,8 @@ __clayered_close_int(WT_CURSOR *cursor)
 
     dead = F_ISSET(cursor, WT_CURSTD_DEAD);
     session = CUR2S(cursor);
-    WT_ASSERT_ALWAYS(session, session->dhandle->type == WT_DHANDLE_TYPE_LAYERED,
+    WT_ASSERT_ALWAYS(session,
+      session->dhandle == NULL || session->dhandle->type == WT_DHANDLE_TYPE_LAYERED,
       "Valid layered dhandle is required to close a cursor");
     clayered = (WTI_CURSOR_LAYERED *)cursor;
 
@@ -4391,10 +4401,11 @@ __wt_clayered_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, 
     if (0) {
 err:
         /* Our caller expects to release the data handles if we fail. */
-        clayered->dhandle = NULL;
         __wt_cursor_dhandle_decr_use(session);
-        if (clayered != NULL)
+        if (clayered != NULL) {
+            clayered->dhandle = NULL;
             WT_TRET(__clayered_close(cursor));
+        }
         WT_TRET(__wt_session_release_dhandle(session));
 
         *cursorp = NULL;

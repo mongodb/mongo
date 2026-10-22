@@ -18,7 +18,7 @@ __rts_btree_walk_check_btree_modified(WT_SESSION_IMPL *session, const char *uri,
     WT_DECL_RET;
 
     ret = __wt_conn_dhandle_find(session, uri, NULL);
-    *modified = ret == 0 && S2BT(session)->modified;
+    *modified = ret == 0 && __wt_atomic_load_bool_relaxed(&S2BT(session)->modified);
     return (ret);
 }
 

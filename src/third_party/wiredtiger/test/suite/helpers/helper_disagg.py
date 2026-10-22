@@ -975,15 +975,17 @@ class DisaggSchemaEpochMixin:
         cursor.close()
         session.close()
 
-    def run_panic_subprocess(self, name, expected_message):
+    def run_panic_subprocess(self, name, *expected_messages):
         """
         Run subprocess_<name> in a subprocess and assert it died from the expected panic rather
-        than an unrelated failure. Requires the test class to mix in suite_subprocess.
+        than an unrelated failure, reporting every expected message. Requires the test class to mix
+        in suite_subprocess.
         """
         [returncode, home] = self.run_subprocess_function(f'SUBPROCESS_{name}',
             f'{self.test_name}.{self.test_name}.subprocess_{name}', silent=True)
         self.assertNotEqual(returncode, 0)
-        self.check_file_contains(os.path.join(home, 'stderr.txt'), expected_message)
+        for expected_message in expected_messages:
+            self.check_file_contains(os.path.join(home, 'stderr.txt'), expected_message)
 
 class DisaggSizeTestMixin:
     def conn_extensions(self, extlist):

@@ -786,7 +786,7 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool is_ckpt)
     WT_RET(__wt_rwlock_init(session, &btree->ovfl_lock));
     WT_RET(__wt_spin_init(session, &btree->flush_lock, "btree flush"));
 
-    btree->modified = false; /* Clean */
+    __wt_atomic_store_bool_relaxed(&btree->modified, false); /* Clean */
 
     __wt_atomic_store_enum_relaxed(&btree->syncing, WT_BTREE_SYNC_OFF); /* Not syncing */
     btree->checkpoint_gen = __wt_gen(session, WT_GEN_CHECKPOINT);       /* Checkpoint generation */
@@ -876,7 +876,7 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool is_ckpt)
      * system's runtime write generation.
      */
     if (F_ISSET(session, WT_SESSION_IMPORT))
-        btree->modified = true;
+        __wt_atomic_store_bool_relaxed(&btree->modified, true);
 
     btree->checkpoint_timestamp =
       __wt_atomic_load_uint64_acquire(&conn->disaggregated_storage.last_checkpoint_timestamp);

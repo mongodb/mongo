@@ -763,40 +763,41 @@ struct __wt_cursor {
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_CURSTD_APPEND        0x000000001ull
-#define WT_CURSTD_BOUND_LOWER    0x000000002ull       /* Lower bound. */
-#define WT_CURSTD_BOUND_LOWER_INCLUSIVE 0x000000004ull /* Inclusive lower bound. */
-#define WT_CURSTD_BOUND_UPPER           0x000000008ull /* Upper bound. */
-#define WT_CURSTD_BOUND_UPPER_INCLUSIVE 0x000000010ull /* Inclusive upper bound. */
-#define WT_CURSTD_BULK          0x000000020ull
-#define WT_CURSTD_CACHEABLE     0x000000040ull
-#define WT_CURSTD_CACHED        0x000000080ull
-#define WT_CURSTD_CACHED_WITH_MEM 0x000000100ull /* A cached cursor with allocated memory. */
-#define WT_CURSTD_CONSTITUENT_DEAD 0x000000200ull
-#define WT_CURSTD_DEAD          0x000000400ull
-#define WT_CURSTD_DEBUG_COPY_KEY    0x000000800ull
-#define WT_CURSTD_DEBUG_COPY_VALUE  0x000001000ull
-#define WT_CURSTD_DEBUG_RESET_EVICT 0x000002000ull
-#define WT_CURSTD_DUMP_HEX      0x000004000ull
-#define WT_CURSTD_DUMP_JSON     0x000008000ull
-#define WT_CURSTD_DUMP_PRETTY       0x000010000ull
-#define WT_CURSTD_DUMP_PRINT        0x000020000ull
-#define WT_CURSTD_DUP_NO_VALUE          0x000040000ull
-#define WT_CURSTD_EVICT_REPOSITION     0x000080000ull
-#define WT_CURSTD_HS_READ_ACROSS_BTREE 0x000100000ull
-#define WT_CURSTD_HS_READ_ALL       0x000200000ull
-#define WT_CURSTD_HS_READ_COMMITTED 0x000400000ull
-#define WT_CURSTD_IGNORE_TOMBSTONE  0x000800000ull
-#define WT_CURSTD_KEY_EXT       0x001000000ull /* Key points out of tree. */
-#define WT_CURSTD_KEY_INT       0x002000000ull /* Key points into tree. */
-#define WT_CURSTD_KEY_ONLY      0x004000000ull
-#define WT_CURSTD_META_INUSE        0x008000000ull
-#define WT_CURSTD_OPEN          0x010000000ull
-#define WT_CURSTD_OVERWRITE     0x020000000ull
-#define WT_CURSTD_RAW           0x040000000ull
-#define WT_CURSTD_RAW_SEARCH        0x080000000ull
-#define WT_CURSTD_VALUE_EXT     0x100000000ull /* Value points out of tree. */
-#define WT_CURSTD_VALUE_INT     0x200000000ull /* Value points into tree. */
-#define WT_CURSTD_VERSION_CURSOR    0x400000000ull /* Version cursor. */
+#define WT_CURSTD_BLIND_REMOVE  0x000000002ull /* Remove succeeds whether or not the key exists. */
+#define WT_CURSTD_BOUND_LOWER    0x000000004ull       /* Lower bound. */
+#define WT_CURSTD_BOUND_LOWER_INCLUSIVE 0x000000008ull /* Inclusive lower bound. */
+#define WT_CURSTD_BOUND_UPPER           0x000000010ull /* Upper bound. */
+#define WT_CURSTD_BOUND_UPPER_INCLUSIVE 0x000000020ull /* Inclusive upper bound. */
+#define WT_CURSTD_BULK          0x000000040ull
+#define WT_CURSTD_CACHEABLE     0x000000080ull
+#define WT_CURSTD_CACHED        0x000000100ull
+#define WT_CURSTD_CACHED_WITH_MEM 0x000000200ull /* A cached cursor with allocated memory. */
+#define WT_CURSTD_CONSTITUENT_DEAD 0x000000400ull
+#define WT_CURSTD_DEAD          0x000000800ull
+#define WT_CURSTD_DEBUG_COPY_KEY    0x000001000ull
+#define WT_CURSTD_DEBUG_COPY_VALUE  0x000002000ull
+#define WT_CURSTD_DEBUG_RESET_EVICT 0x000004000ull
+#define WT_CURSTD_DUMP_HEX      0x000008000ull
+#define WT_CURSTD_DUMP_JSON     0x000010000ull
+#define WT_CURSTD_DUMP_PRETTY       0x000020000ull
+#define WT_CURSTD_DUMP_PRINT        0x000040000ull
+#define WT_CURSTD_DUP_NO_VALUE          0x000080000ull
+#define WT_CURSTD_EVICT_REPOSITION     0x000100000ull
+#define WT_CURSTD_HS_READ_ACROSS_BTREE 0x000200000ull
+#define WT_CURSTD_HS_READ_ALL       0x000400000ull
+#define WT_CURSTD_HS_READ_COMMITTED 0x000800000ull
+#define WT_CURSTD_IGNORE_TOMBSTONE  0x001000000ull
+#define WT_CURSTD_KEY_EXT       0x002000000ull /* Key points out of tree. */
+#define WT_CURSTD_KEY_INT       0x004000000ull /* Key points into tree. */
+#define WT_CURSTD_KEY_ONLY      0x008000000ull
+#define WT_CURSTD_META_INUSE        0x010000000ull
+#define WT_CURSTD_OPEN          0x020000000ull
+#define WT_CURSTD_OVERWRITE     0x040000000ull
+#define WT_CURSTD_RAW           0x080000000ull
+#define WT_CURSTD_RAW_SEARCH        0x100000000ull
+#define WT_CURSTD_VALUE_EXT     0x200000000ull /* Value points out of tree. */
+#define WT_CURSTD_VALUE_INT     0x400000000ull /* Value points into tree. */
+#define WT_CURSTD_VERSION_CURSOR    0x800000000ull /* Version cursor. */
 /* AUTOMATIC FLAG VALUE GENERATION STOP 64 */
 #define WT_CURSTD_KEY_SET   (WT_CURSTD_KEY_EXT | WT_CURSTD_KEY_INT)
 #define WT_CURSTD_VALUE_SET (WT_CURSTD_VALUE_EXT | WT_CURSTD_VALUE_INT)
@@ -6669,8 +6670,8 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 /*! cache: eviction server skipped the root pages */
 #define	WT_STAT_CONN_EVICTION_ROOT_PAGES_SKIPPED	1152
 /*!
- * cache: eviction server skips checkpointed stable btrees on followers
- * when not looking for clean pages
+ * cache: eviction server skips btrees that are read-only when looking
+ * only for dirty or update pages and the btree holds none
  */
 #define	WT_STAT_CONN_EVICTION_SERVER_SKIP_TREES_READ_ONLY	1153
 /*!

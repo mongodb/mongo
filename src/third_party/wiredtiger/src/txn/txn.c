@@ -2272,9 +2272,17 @@ __wt_txn_prepare(WT_SESSION_IMPL *session, const char *cfg[])
             }
             break;
         case WT_TXN_OP_REF_DELETE:
+            /* FIXME-WT-17277: allow once a prepared fast truncate can be written to disk. */
+            WT_ASSERT_ALWAYS(session, !F_ISSET(S2C(session), WT_CONN_PRESERVE_PREPARED),
+              "a prepared transaction cannot include a fast truncate when preserve_prepared is "
+              "configured");
             __wt_txn_op_delete_apply_prepare_state(session, op, false);
             break;
         case WT_TXN_OP_FOLLOWER_TRUNCATE:
+            WT_ASSERT_ALWAYS(session, !F_ISSET(S2C(session), WT_CONN_PRESERVE_PREPARED),
+              "a prepared transaction cannot include a truncate entry when preserve_prepared is "
+              "configured");
+            break;
         case WT_TXN_OP_TRUNCATE_COL:
         case WT_TXN_OP_TRUNCATE_ROW:
             /* Other operations don't need timestamps. */
@@ -2297,6 +2305,9 @@ __wt_txn_prepare(WT_SESSION_IMPL *session, const char *cfg[])
      */
     if (F_ISSET(&txn->time_point, WT_TXN_TIME_POINT_HAS_ID))
         __txn_remove_from_global_table(session);
+
+    /* New snapshots now see the prepared updates, so cached snapshots have to be refreshed. */
+    __wt_gen_next(session, WT_GEN_HAS_SNAPSHOT, NULL);
 
     /*
      * Resolving prepared updates is expensive. Sort prepared modifications so all updates for each

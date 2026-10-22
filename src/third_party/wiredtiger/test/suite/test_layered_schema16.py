@@ -98,7 +98,12 @@ class test_layered_schema16(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
             'stable_timestamp=' + self.timestamp_str(1) +
             ',oldest_timestamp=' + self.timestamp_str(1))
         self.run_panic_subprocess('checkpoint_below_published_recreated_drop_panics',
-            'checkpoint schema epoch refers to a dropped and recreated table')
+            'checkpoint schema epoch refers to a dropped and recreated table',
+            f'Queued shared metadata operations for table "{self.test_name}" (2 total, 0 parked): '
+            'REMOVE@4; CREATE@5',
+                'Shared metadata queue (excl. parked): creates=1, removes=1, unpublished=0, '
+                'updates=0; stable schema epoch=3, last checkpoint schema epoch=2, '
+                'step-down schema epoch=0, leader')
 
     def test_recreate_redropped_before_checkpoint_is_legal(self):
         """

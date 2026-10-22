@@ -1274,7 +1274,7 @@ __inmem_deleted_ref_should_dirty_parent(WT_SESSION_IMPL *session)
      * FIXME-WT-18564: local block manager trees rely on this dirtying to reclaim the blocks of
      * deleted children, so the suppression cannot extend to them until that path is covered.
      */
-    return (S2BT(session)->modified &&
+    return (__wt_atomic_load_bool_relaxed(&S2BT(session)->modified) &&
       (!F_ISSET(S2BT(session), WT_BTREE_DISAGGREGATED) ||
         session != S2C(session)->cc_cleanup.session));
 }

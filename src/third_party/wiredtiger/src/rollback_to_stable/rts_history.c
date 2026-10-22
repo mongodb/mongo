@@ -173,7 +173,8 @@ __wti_rts_history_final_pass(WT_SESSION_IMPL *session, wt_timestamp_t rollback_t
      * reasons, the most immediate being that max_durable_ts cannot be none (zero) because it's
      * greater than rollback_timestamp, which is itself greater than zero.
      */
-    if ((S2BT(session)->modified || max_durable_ts > rollback_timestamp) &&
+    if ((__wt_atomic_load_bool_relaxed(&S2BT(session)->modified) ||
+          max_durable_ts > rollback_timestamp) &&
       rollback_timestamp != WT_TS_NONE) {
         __wt_verbose(session, WT_VERB_RECOVERY_PROGRESS,
           "Rollback to stable history store final pass: rolling back with durable_timestamp=%s",

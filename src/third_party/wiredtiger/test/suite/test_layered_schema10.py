@@ -77,9 +77,9 @@ class test_layered_schema10(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
         self.conn.reconfigure('disaggregated=(role="follower")')
         conn_follower.reconfigure('disaggregated=(role="leader")')
 
-    def assert_panicked(self, subdir, funcname, expected):
+    def assert_panicked(self, subdir, funcname, *expected):
         """
-        Run funcname in a subprocess and assert it panicked with the expected message.
+        Run funcname in a subprocess and assert it panicked, reporting every expected message.
 
         Checking the message matters: an abort anywhere earlier in the body also exits non-zero,
         so a return code alone cannot tell a reached panic from a mis-set up test.
@@ -89,7 +89,8 @@ class test_layered_schema10(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
         self.assertNotEqual(returncode, 0)
         with open(os.path.join(home, 'stderr.txt'), 'r') as f:
             stderr = f.read()
-        self.assertIn(expected, stderr)
+        for message in expected:
+            self.assertIn(message, stderr)
 
     def checkpoint_and_advance(self, epoch, stable_ts, conn_leader):
         """
@@ -337,7 +338,12 @@ class test_layered_schema10(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
         self.assert_panicked('SUBPROCESS_create_drop_split_epochs',
             'subprocess_create_drop_split_epochs',
             f'Table "{self.test_name}" was published with CREATE at epoch 20 and its DROP is at '
-            'epoch 30')
+            'epoch 30',
+                f'Queued shared metadata operations for table "{self.test_name}" (2 total, 1 parked): '
+                'CREATE@20 parked no_stable_metadata; REMOVE@30',
+            'Shared metadata queue (excl. parked): creates=0, removes=1, unpublished=0, updates=0; '
+            'stable schema epoch=20, last checkpoint schema epoch=10, step-down schema epoch=0, '
+            'leader')
 
     def subprocess_create_unpublished_drop(self):
         """Subprocess body for the unpublished-drop panic test; expected to panic/abort."""
@@ -413,7 +419,37 @@ class test_layered_schema10(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
         self.assert_panicked('SUBPROCESS_recreated_drop_split_epochs',
             'subprocess_recreated_drop_split_epochs',
             f'Table "{self.test_name}" was published with CREATE at epoch 20 and its DROP is at '
-            'epoch 30')
+            'epoch 30',
+            f'Queued shared metadata operations for table "{self.test_name}" (4 total, 1 parked): '
+            'CREATE@20 parked no_stable_metadata; REMOVE@30; CREATE@40 '
+            'no_stable_metadata; REMOVE@50')
+
+    def subprocess_queue_logging_capped(self):
+        """Subprocess body: queue enough published operations to exceed the diagnostic limit."""
+        self.setup_leader_with_epoch()
+        conn_follow, session_follow = self.open_follower_epoch()
+
+        for generation in range(10):
+            session_follow.create(self.uri, self.table_config)
+            self.publish(self.uri, 20 + generation * 20, session_follow)
+            session_follow.drop(self.uri)
+            self.publish(self.uri, 30 + generation * 20, session_follow)
+        session_follow.close()
+
+        self.swap_roles(conn_follow)
+        self.set_stable_epoch(25, conn_follow)
+        session_ck = conn_follow.open_session('')
+        self.leader_checkpoint(2, conn_follow, session_ck)
+
+    def test_queue_logging_capped(self):
+        """Panic diagnostics count all operations but describe at most sixteen, including parked ones."""
+        self.setup_leader_with_epoch()
+        self.assert_panicked('SUBPROCESS_queue_logging_capped', 'subprocess_queue_logging_capped',
+            f'Table "{self.test_name}" was published with CREATE at epoch 20 and its DROP is at '
+            'epoch 30',
+            f'Queued shared metadata operations for table "{self.test_name}" (20 total, 1 parked): '
+            'CREATE@20 parked no_stable_metadata; REMOVE@30',
+            '; REMOVE@170; 4 more not shown')
 
     def test_create_unpublished_drop(self):
         """
@@ -431,7 +467,9 @@ class test_layered_schema10(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
         self.assert_panicked('SUBPROCESS_create_unpublished_drop',
             'subprocess_create_unpublished_drop',
             f'Table "{self.test_name}" was published with CREATE at epoch 20 and its DROP was '
-            'never published')
+            'never published',
+                f'Queued shared metadata operations for table "{self.test_name}" (2 total, 1 parked): '
+                'CREATE@20 parked no_stable_metadata; REMOVE@<unpublished>')
     def test_unpublished_create_not_flushed(self):
         """
         A table created on a follower but never published does not appear in shared metadata

@@ -919,10 +919,10 @@ __conn_dhandle_close_locked(
      */
     if (removed && !mark_dead && WT_DHANDLE_BTREE(dhandle) && F_ISSET(dhandle, WT_DHANDLE_OPEN)) {
         btree = dhandle->handle;
-        if (!btree->modified) {
+        if (!__wt_atomic_load_bool_relaxed(&btree->modified)) {
             WT_ERR(__wt_evict_file_exclusive_on(session));
             evict_off = true;
-            if (!btree->modified)
+            if (!__wt_atomic_load_bool_relaxed(&btree->modified))
                 mark_dead = true;
         }
     }

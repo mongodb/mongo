@@ -327,10 +327,10 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
          * Writing the leaf pages is done without acquiring a high-level lock, serialize so multiple
          * threads don't walk the tree at the same time.
          */
-        if (!btree->modified)
+        if (!__wt_atomic_load_bool_relaxed(&btree->modified))
             return (0);
         __wt_spin_lock(session, &btree->flush_lock);
-        if (!btree->modified) {
+        if (!__wt_atomic_load_bool_relaxed(&btree->modified)) {
             __wt_spin_unlock(session, &btree->flush_lock);
             return (0);
         }
@@ -597,7 +597,8 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
          * only compared to decide whether to mark the tree dirty. No state published alongside the
          * timestamp is consumed here.
          */
-        if (!btree->modified && !F_ISSET(conn, WT_CONN_RECOVERING) &&
+        if (!__wt_atomic_load_bool_relaxed(&btree->modified) &&
+          !F_ISSET(conn, WT_CONN_RECOVERING) &&
           !F_ISSET_ATOMIC_32(conn, WT_CONN_CLOSING_CHECKPOINT) &&
           (btree->rec_max_txn >= txn->snapshot_data.snap_min ||
             (conn->txn_global.checkpoint_timestamp !=

@@ -69,6 +69,15 @@ def check_otel_type(stat):
                 f"expected one of {', '.join(OTEL_TYPES)}")
 
 ##########################################
+# Check an OTel counter is not exempt from clearing. A cursor configured with otel_counters always
+# clears, so no counter may have the no_clear flag.
+##########################################
+def check_otel_counter_clears(stat):
+    if stat.otel_type == 'otel_counter' and 'no_clear' in stat.flags:
+        raise Exception(f"ERROR: {stat.name} is an OTel counter and must not have the " \
+                "no_clear flag")
+
+##########################################
 # For each stat subclass check the names are sorted in alphabetical order.
 ##########################################
 def check_name_sorted(stat_list):
@@ -90,6 +99,7 @@ for stat_list in all_stat_list:
     for stat in stat_list:
         check_description_format(stat)
         check_otel_type(stat)
+        check_otel_counter_clears(stat)
     check_name_sorted(stat_list)
 
 conn_dsrc_stats.sort(key=attrgetter('desc'))

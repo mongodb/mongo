@@ -27,6 +27,8 @@
 #       otel_gauge     Point-in-time value that can go up and down
 #       otel_histogram Distribution of recorded values
 #       otel_none      Not an OTel metric (the default if otel_type is omitted)
+#
+# An otel_counter cannot have the no_clear flag, as OTel counters must be given in increments.
 
 from operator import attrgetter
 import sys
@@ -460,7 +462,7 @@ conn_stats = [
     EvictStat('eviction_server_skip_stale_disagg_pages', 'eviction server skips pages on an outdated disaggregated read-only btree that a reader still has open'),
     EvictStat('eviction_server_skip_trees_eviction_disabled', 'eviction server skips trees that disable eviction'),
     EvictStat('eviction_server_skip_trees_not_useful_before', 'eviction server skips trees that were not useful before'),
-    EvictStat('eviction_server_skip_trees_read_only', 'eviction server skips checkpointed stable btrees on followers when not looking for clean pages'),
+    EvictStat('eviction_server_skip_trees_read_only', 'eviction server skips btrees that are read-only when looking only for dirty or update pages and the btree holds none'),
     EvictStat('eviction_server_skip_trees_stick_in_cache', 'eviction server skips trees that are configured to stick in cache'),
     EvictStat('eviction_server_skip_trees_too_many_active_walks', 'eviction server skips trees because there are too many active walks'),
     EvictStat('eviction_server_skip_trees_walk_complete', 'eviction server skips resuming trees whose walk already traversed the whole tree'),

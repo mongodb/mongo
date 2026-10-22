@@ -37,6 +37,18 @@ __wt_btree_disable_bulk(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __wt_btree_dhandle_is_outdated_disagg --
+ *     Return whether a btree belongs to an outdated disaggregated generation. The handle is passed
+ *     explicitly for candidates that are not the session's handle.
+ */
+static WT_INLINE bool
+__wt_btree_dhandle_is_outdated_disagg(WT_DATA_HANDLE *dhandle, WT_BTREE *btree)
+{
+    return (F_ISSET(btree, WT_BTREE_DISAGGREGATED) && F_ISSET_ATOMIC_32(btree, WT_BTREE_READONLY) &&
+      __wt_atomic_load_bool_relaxed(&dhandle->outdated));
+}
+
+/*
  * __wt_btree_eviction_enabled --
  *     Return true if page eviction is enabled for the given tree.
  */
@@ -54,9 +66,7 @@ __wt_btree_eviction_enabled(WT_BTREE *btree)
 static WT_INLINE bool
 __wt_btree_is_outdated_disagg(WT_SESSION_IMPL *session)
 {
-    return (F_ISSET(S2BT(session), WT_BTREE_DISAGGREGATED) &&
-      F_ISSET_ATOMIC_32(S2BT(session), WT_BTREE_READONLY) &&
-      __wt_atomic_load_bool_relaxed(&session->dhandle->outdated));
+    return (__wt_btree_dhandle_is_outdated_disagg(session->dhandle, S2BT(session)));
 }
 
 /*
@@ -1279,7 +1289,7 @@ __wt_tree_modify_set(WT_SESSION_IMPL *session)
      * the pages clean, it might result in an extra checkpoint that doesn't do any work but it
      * shouldn't cause problems; regardless, let's play it safe.)
      */
-    if (!btree->modified) {
+    if (!__wt_atomic_load_bool_relaxed(&btree->modified)) {
         /* Assert we never dirty a checkpoint handle. */
         WT_ASSERT(session, !WT_READING_CHECKPOINT(session));
 
@@ -1298,7 +1308,7 @@ __wt_tree_modify_set(WT_SESSION_IMPL *session)
                 !F_ISSET_ATOMIC_32(conn, WT_CONN_CLOSING_CHECKPOINT),
               "%s", "A btree is marked dirty during recovery or shutdown");
         }
-        btree->modified = true;
+        __wt_atomic_store_bool_relaxed(&btree->modified, true);
         WT_FULL_BARRIER();
 
         /*

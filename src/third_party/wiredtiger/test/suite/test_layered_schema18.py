@@ -75,7 +75,9 @@ class test_layered_schema18(wttest.WiredTigerTestCase, suite_subprocess, DisaggS
         """A table created before the stable schema epoch was set never awaited publication."""
         self.run_panic_subprocess('publish_created_before_epoch_panics',
             'Publish requires table "before" to be created after the stable disaggregated schema '
-            'epoch is set')
+            'epoch is set',
+            'Queued shared metadata operations for table "before" (1 total, 0 parked): '
+            'CREATE@<unpublished> deferred before_stable_epoch')
 
     def test_publish_drop_created_before_epoch_succeeds(self):
         """The drop of a table created before the stable schema epoch was set can be published."""
