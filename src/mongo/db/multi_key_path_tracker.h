@@ -28,6 +28,8 @@ struct [[MONGO_MOD_PUBLIC]] MultikeyPathInfo {
     // The oplog entry timestamp of the first write that made the index multikey.
     Timestamp earliestTimestamp;
 
+    bool operator==(const MultikeyPathInfo&) const = default;
+
     /**
      * True when 'info' targets the same collection and index at the same write timestamp as this
      * entry.

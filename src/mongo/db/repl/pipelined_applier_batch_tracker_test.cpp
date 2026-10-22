@@ -25,7 +25,7 @@ TEST(PipelinedApplierBatchTrackerTest, WaitTimesOutWithoutACompletedFrontBatch) 
     ASSERT_FALSE(tracker.popCompletedBatch(maxWaitTime));
     ASSERT_GTE(timer.elapsed(), maxWaitTime);
 
-    tracker.addBatch(batchTime(1), 1);
+    tracker.addBatch(batchTime(1), 1, {}, {}, nullptr);
     timer.reset();
     ASSERT_FALSE(tracker.popCompletedBatch(maxWaitTime));
     ASSERT_GTE(timer.elapsed(), maxWaitTime);
@@ -33,8 +33,8 @@ TEST(PipelinedApplierBatchTrackerTest, WaitTimesOutWithoutACompletedFrontBatch) 
 
 TEST(PipelinedApplierBatchTrackerTest, CountsParticipatingWorkersAndPopsInDispatchOrder) {
     PipelinedApplierBatchTracker tracker;
-    auto first = tracker.addBatch(batchTime(1), /*numWorkers=*/2);
-    auto second = tracker.addBatch(batchTime(2), /*numWorkers=*/1);
+    auto first = tracker.addBatch(batchTime(1), /*numWorkers=*/2, {}, {}, nullptr);
+    auto second = tracker.addBatch(batchTime(2), /*numWorkers=*/1, {}, {}, nullptr);
     // Ensure the pointers to the atomic counters are different.
     ASSERT_NE(first, second);
     ASSERT_EQ(first->load(), 2);
@@ -64,8 +64,8 @@ TEST(PipelinedApplierBatchTrackerTest, CountsParticipatingWorkersAndPopsInDispat
 
 TEST(PipelinedApplierBatchTrackerTest, ZeroWorkerBatchWaitsForEarlierBatch) {
     PipelinedApplierBatchTracker tracker;
-    auto first = tracker.addBatch(batchTime(1), 1);
-    auto empty = tracker.addBatch(batchTime(2), 0);
+    auto first = tracker.addBatch(batchTime(1), 1, {}, {}, nullptr);
+    auto empty = tracker.addBatch(batchTime(2), 0, {}, {}, nullptr);
     ASSERT_EQ(empty->load(), 0);
     ASSERT_FALSE(tracker.popCompletedBatch(Milliseconds(0)));
 
@@ -81,7 +81,7 @@ TEST(PipelinedApplierBatchTrackerTest, ZeroWorkerBatchWaitsForEarlierBatch) {
 
 TEST(PipelinedApplierBatchTrackerTest, CompletionBeforeWaitIsNotLost) {
     PipelinedApplierBatchTracker tracker;
-    auto counter = tracker.addBatch(batchTime(1), 1);
+    auto counter = tracker.addBatch(batchTime(1), 1, {}, {}, nullptr);
     tracker.onWorkerCompletion(counter);
     auto completed = tracker.popCompletedBatch(Milliseconds(0));
     ASSERT_TRUE(completed);
@@ -92,7 +92,7 @@ TEST(PipelinedApplierBatchTrackerTest, CompletionBeforeWaitIsNotLost) {
 // The last worker to finish a batch wakes the waiting consumer before its timeout expires.
 TEST(PipelinedApplierBatchTrackerTest, LastWorkerWakesConsumer) {
     PipelinedApplierBatchTracker tracker;
-    auto counter = tracker.addBatch(batchTime(1), 2);
+    auto counter = tracker.addBatch(batchTime(1), 2, {}, {}, nullptr);
     tracker.onWorkerCompletion(counter);
     std::promise<boost::optional<PipelinedApplierBatchTracker::InflightBatch>> promise;
     auto result = promise.get_future();
@@ -134,7 +134,7 @@ TEST(PipelinedApplierBatchTrackerTest, EnqueuingZeroWorkerBatchWakesConsumer) {
         consumer = stdx::thread([&] { promise.set_value(tracker.popCompletedBatch(Seconds(60))); });
         beforeWait.waitForOneNewEntry();
     }
-    tracker.addBatch(batchTime(1), 0);
+    tracker.addBatch(batchTime(1), 0, {}, {}, nullptr);
     ASSERT_EQ(result.wait_for(Seconds(10).toSystemDuration()), std::future_status::ready);
     auto completed = result.get();
     ASSERT_TRUE(completed);
@@ -144,7 +144,7 @@ TEST(PipelinedApplierBatchTrackerTest, EnqueuingZeroWorkerBatchWakesConsumer) {
 
 TEST(PipelinedApplierBatchTrackerTest, EmptyQueueRemainsBusyUntilPublicationFinishes) {
     PipelinedApplierBatchTracker tracker;
-    tracker.addBatch(batchTime(1), 0);
+    tracker.addBatch(batchTime(1), 0, {}, {}, nullptr);
     ASSERT_TRUE(tracker.popCompletedBatch(Milliseconds(0)));
     std::promise<bool> promise;
     auto idle = promise.get_future();
@@ -173,7 +173,7 @@ TEST(PipelinedApplierBatchTrackerTest, EmptyQueueRemainsBusyUntilPublicationFini
 
 TEST(PipelinedApplierBatchTrackerTest, AbandonedBatchWakesIdleWaitWithoutCompletingTheBatch) {
     PipelinedApplierBatchTracker tracker;
-    auto remaining = tracker.addBatch(batchTime(1), 1);
+    auto remaining = tracker.addBatch(batchTime(1), 1, {}, {}, nullptr);
     std::promise<bool> promise;
     auto idle = promise.get_future();
     stdx::thread waiter;
@@ -197,7 +197,7 @@ TEST(PipelinedApplierBatchTrackerTest, AbandonedBatchWakesIdleWaitWithoutComplet
 
 TEST(PipelinedApplierBatchTrackerTest, ShutdownWakesConsumerWithoutPoppingWork) {
     PipelinedApplierBatchTracker tracker;
-    tracker.addBatch(batchTime(1), 1);
+    tracker.addBatch(batchTime(1), 1, {}, {}, nullptr);
     std::promise<boost::optional<PipelinedApplierBatchTracker::InflightBatch>> promise;
     auto result = promise.get_future();
     stdx::thread consumer;

@@ -6,6 +6,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 
+#include <utility>
 
 namespace mongo::repl {
 namespace {
@@ -19,13 +20,17 @@ std::shared_ptr<std::atomic<uint32_t>> PipelinedApplierBatchTracker::addBatch(
     OpTimeAndWallTime lastOpTime,
     uint32_t numWorkers,
     std::vector<OplogEntry> ops,
-    std::vector<std::vector<OplogEntry>> derivedOps) {
+    std::vector<std::vector<OplogEntry>> derivedOps,
+    std::shared_ptr<std::vector<WorkerMultikeyPathInfo>> multikeyMetadata) {
     auto remainingWorkers = std::make_shared<std::atomic<uint32_t>>(numWorkers);
     {
         std::lock_guard lk(_mutex);
         invariant(!_shutdown);
-        _inflightBatches.push_back(
-            {lastOpTime, remainingWorkers, std::move(ops), std::move(derivedOps)});
+        _inflightBatches.push_back({lastOpTime,
+                                    remainingWorkers,
+                                    std::move(ops),
+                                    std::move(derivedOps),
+                                    std::move(multikeyMetadata)});
     }
     // It's possible to enqueue a batch with zero remaining workers, with the intention of advancing
     // lastApplied immediately.

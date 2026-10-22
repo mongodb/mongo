@@ -4,6 +4,7 @@
 #pragma once
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_or_grouped_inserts.h"
 #include "mongo/platform/atomic.h"
@@ -42,6 +43,8 @@ public:
     struct WorkItem {
         std::vector<ApplierOperation> ops;
         std::shared_ptr<std::atomic<uint32_t>> batchRemainingWorkers;
+        // Points to this worker's slot, owned by the in-flight batch until completion.
+        WorkerMultikeyPathInfo* multikeyPathInfo = nullptr;
     };
 
     /**

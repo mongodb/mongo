@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/stdx/condition_variable.h"
@@ -39,14 +40,17 @@ public:
         // are applying the batch.
         std::vector<OplogEntry> ops;
         std::vector<std::vector<OplogEntry>> derivedOps;
+        // Worker results are visible after remainingWorkers reaches zero.
+        std::shared_ptr<std::vector<WorkerMultikeyPathInfo>> multikeyMetadata;
     };
 
     // Registers a batch before dispatch and returns the counter shared by its worker slices.
     std::shared_ptr<std::atomic<uint32_t>> addBatch(
         OpTimeAndWallTime lastOpTime,
         uint32_t numWorkers,
-        std::vector<OplogEntry> ops = {},
-        std::vector<std::vector<OplogEntry>> derivedOps = {});
+        std::vector<OplogEntry> ops,
+        std::vector<std::vector<OplogEntry>> derivedOps,
+        std::shared_ptr<std::vector<WorkerMultikeyPathInfo>> multikeyMetadata);
 
     // Signals completion of one worker slice and notifies the consumer when its batch is complete.
     // Called from the worker thread.

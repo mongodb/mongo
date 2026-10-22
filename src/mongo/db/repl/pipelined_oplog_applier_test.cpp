@@ -9,6 +9,9 @@
 #include "mongo/db/admission/ticketing/admission_context.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/index/multikey_paths.h"
+#include "mongo/db/index/wildcard_access_method.h"
+#include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/oplog.h"
@@ -24,6 +27,9 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
+#include "mongo/db/shard_role/shard_catalog/index_catalog.h"
+#include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
+#include "mongo/db/shard_role/shard_catalog/set_multikey_metadata_oplog_helpers.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/exceptions.h"
@@ -78,6 +84,34 @@ std::unique_ptr<PipelinedOplogApplier> makeApplier() {
 
 using PipelinedOplogApplierTest = ServiceContextTest;
 using PipelinedOplogApplierDeathTest = ServiceContextTest;
+
+// Creates a collection and index with untimestamped catalog writes.
+UUID createCollectionWithIndex(OperationContext* opCtx,
+                               const NamespaceString& nss,
+                               const BSONObj& key) {
+    UnreplicatedWritesBlock noRep(opCtx);
+    auto uuid = createCollectionWithUuid(opCtx, nss);
+    createIndex(opCtx, nss, uuid, BSON("v" << 2 << "name" << "idx" << "key" << key));
+    return uuid;
+}
+
+// Checks the index's catalog multikey state after application.
+void assertIndexMultikey(OperationContext* opCtx,
+                         const NamespaceString& nss,
+                         const std::string& indexName,
+                         bool expected,
+                         const MultikeyPaths& paths) {
+    const auto coll = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kRead),
+        MODE_IS);
+    ASSERT_TRUE(coll.exists());
+    const auto& collPtr = coll.getCollectionPtr();
+    const auto* entry = collPtr->getIndexCatalog()->findIndexByName(opCtx, indexName);
+    ASSERT_TRUE(entry);
+    ASSERT_EQ(entry->isMultikey(opCtx, collPtr), expected);
+    ASSERT_EQ(entry->getMultikeyPaths(opCtx, collPtr), paths);
+}
 
 TEST_F(PipelinedOplogApplierTest, ConstructsWithSecondaryMode) {
     auto applier = makeApplier();
@@ -144,30 +178,47 @@ protected:
         return client.count(nss);
     }
 
-    // Consumes the items on a single production worker thread, in order, and waits for it to
-    // finish.
-    void consumeOnWorker(const OplogApplier::Options& options, std::vector<OwnedWorkItem> items) {
+    // Consumes items on one worker and reads each slice's results from its completed batch.
+    std::vector<WorkerMultikeyPathInfo> consumeOnWorker(const OplogApplier::Options& options,
+                                                        std::vector<OwnedWorkItem> items,
+                                                        bool deferMultikeyWrites = false) {
         PipelinedApplierBatchTracker tracker;
-        PipelinedApplierWorkerPool pool(/*numWorkers=*/1,
-                                        [&](size_t workerIdx, const WorkItem& item) {
-                                            consumeWorkItem(workerIdx, options, item, tracker);
-                                        });
+        PipelinedApplierWorkerPool pool(
+            /*numWorkers=*/1, [&](size_t workerIdx, const WorkItem& item) {
+                consumeWorkItem(workerIdx, options, item, tracker, deferMultikeyWrites);
+            });
         for (auto& owned : items) {
-            const auto& ops = owned.item.ops;
-            owned.item.batchRemainingWorkers =
-                tracker.addBatch(ops.empty() ? OpTimeAndWallTime{}
-                                             : OpTimeAndWallTime{ops.back()->getOpTime(),
-                                                                 ops.back()->getWallClockTime()},
-                                 1);
-            pool.enqueue(0, std::move(owned.item));
+            auto& item = owned.item;
+            auto multikeyMetadata = std::make_shared<std::vector<WorkerMultikeyPathInfo>>(1);
+            item.multikeyPathInfo = &(*multikeyMetadata)[0];
+            item.batchRemainingWorkers = tracker.addBatch(
+                item.ops.empty() ? OpTimeAndWallTime{}
+                                 : OpTimeAndWallTime{item.ops.back()->getOpTime(),
+                                                     item.ops.back()->getWallClockTime()},
+                1,
+                {},
+                {},
+                multikeyMetadata);
+            pool.enqueue(0, std::move(item));
         }
         pool.shutdownAndJoin();
+        std::vector<WorkerMultikeyPathInfo> multikey;
         // Every successfully consumed item completes its batch exactly once.
         for (size_t i = 0; i < items.size(); ++i) {
-            ASSERT_TRUE(tracker.popCompletedBatch(Milliseconds(0)));
+            auto batch = tracker.popCompletedBatch(Milliseconds(0));
+            ASSERT_TRUE(batch);
+            ASSERT_TRUE(batch->multikeyMetadata);
+            ASSERT_EQ(batch->multikeyMetadata->size(), 1U);
+            multikey.push_back((*batch->multikeyMetadata)[0]);
             tracker.onBatchPublished();
         }
         ASSERT_FALSE(tracker.popCompletedBatch(Milliseconds(0)));
+        return multikey;
+    }
+
+    // Creates an empty indexed collection for multikey tracking tests.
+    UUID createIndexedCollection(const BSONObj& key = BSON("a" << 1)) {
+        return createCollectionWithIndex(_opCtx.get(), kNss, key);
     }
 
     const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test.poa_apply");
@@ -226,6 +277,37 @@ TEST_F(PipelinedWorkItemTest, WriteConflictRetryCompletesBatchOnce) {
 
     ASSERT_EQ(insertAttempts, 2);
     ASSERT_TRUE(docExists(_opCtx.get(), kNss, BSON("_id" << 0)));
+}
+
+TEST_F(PipelinedWorkItemTest, WriteConflictRetryRecordsMultikeyAndCompletesBatchOnce) {
+    auto uuid = createIndexedCollection();
+    const auto options = secondaryOptions();
+    auto doc = BSON("_id" << 0 << "a" << BSON_ARRAY(1 << 2));
+    auto op = insertOp(kNss, doc);
+
+    int insertAttempts = 0;
+    bool failedAttemptTrackedMultikey = false;
+    _opObserver->onInsertsFn =
+        [&](OperationContext* opCtx, const NamespaceString&, const std::vector<BSONObj>&) {
+            if (++insertAttempts == 1) {
+                failedAttemptTrackedMultikey = !MultikeyPathTracker::get(opCtx).isEmpty();
+                throwWriteConflictException("injected write conflict");
+            }
+        };
+
+    auto multikey = consumeOnWorker(options, {makeItem({op})}, /*deferMultikeyWrites=*/true);
+
+    // Retry after multikey discovery must retain one timestamped result and complete the batch
+    // once.
+    ASSERT_EQ(insertAttempts, 2);
+    ASSERT_TRUE(failedAttemptTrackedMultikey);
+    const std::vector<WorkerMultikeyPathInfo> expected{
+        {{kNss, uuid, "idx", {}, {{0U}}, op.getTimestamp()}},
+    };
+    ASSERT_EQ(multikey, expected);
+    ASSERT_TRUE(docExists(_opCtx.get(), kNss, doc));
+    ASSERT_EQ(countDocs(kNss), 1);
+    assertIndexMultikey(_opCtx.get(), kNss, "idx", false, MultikeyPaths({{}}));
 }
 
 TEST_F(PipelinedWorkItemTest, ReturnsErrorWhenCollectionIsMissingInSteadyState) {
@@ -287,6 +369,42 @@ TEST_F(PipelinedWorkItemTest, FallsBackToSingleInsertsWhenAnInjectedGroupedInser
     ASSERT_EQ(countDocs(kNss), 3);
 }
 
+TEST_F(PipelinedWorkItemTest, GroupedInsertFallbackPreservesMultikeyPathsAndTimestamps) {
+    auto uuid = createIndexedCollection(BSON("a" << 1 << "b" << 1));
+    const auto options = secondaryOptions();
+    auto scalar = insertOp(kNss, BSON("_id" << 0 << "a" << 0 << "b" << 0));
+    auto first = insertOp(kNss, BSON("_id" << 1 << "a" << BSON_ARRAY(1 << 2) << "b" << 1));
+    auto second = insertOp(kNss, BSON("_id" << 2 << "a" << 2 << "b" << BSON_ARRAY(3 << 4)));
+
+    std::vector<size_t> insertBatchSizes;
+    bool failedGroupTrackedMultikey = false;
+    _opObserver->onInsertsFn =
+        [&](OperationContext* opCtx, const NamespaceString&, const std::vector<BSONObj>& docs) {
+            insertBatchSizes.push_back(docs.size());
+            if (docs.size() > 1) {
+                failedGroupTrackedMultikey =
+                    MultikeyPathTracker::get(opCtx).getMultikeyPathInfo().size() == 2;
+                uasserted(ErrorCodes::OperationFailed, "injected grouped insert failure");
+            }
+        };
+
+    auto multikey =
+        consumeOnWorker(options, {makeItem({scalar, first, second})}, /*deferMultikeyWrites=*/true);
+
+    // Individual retries must not duplicate paths or use the scalar insert's timestamp.
+    ASSERT_EQ(insertBatchSizes, (std::vector<size_t>{3, 1, 1, 1}));
+    ASSERT_TRUE(failedGroupTrackedMultikey);
+    const std::vector<WorkerMultikeyPathInfo> expected{
+        {
+            {kNss, uuid, "idx", {}, {{0U}, {}}, first.getTimestamp()},
+            {kNss, uuid, "idx", {}, {{}, {0U}}, second.getTimestamp()},
+        },
+    };
+    ASSERT_EQ(multikey, expected);
+    ASSERT_EQ(countDocs(kNss), 3);
+    assertIndexMultikey(_opCtx.get(), kNss, "idx", false, MultikeyPaths({{}, {}}));
+}
+
 TEST_F(PipelinedWorkItemTest, SetsWorkerOpCtxStates) {
     createCollectionWithUuid(_opCtx.get(), kNss);
     const auto options = secondaryOptions();
@@ -333,13 +451,286 @@ TEST_F(PipelinedWorkItemTest, WorkerAppliesItemsInFifoOrder) {
     ASSERT_TRUE(docExists(_opCtx.get(), kNss, BSON("_id" << 0 << "a" << 1)));
 }
 
+TEST_F(PipelinedWorkItemTest, TracksMultikeyWritesPerItemAtTheirOwnTimestamps) {
+    auto uuid = createIndexedCollection();
+    auto scalar = insertOp(kNss, BSON("_id" << 0 << "a" << 1));
+    auto array = insertOp(kNss, BSON("_id" << 1 << "a" << BSON_ARRAY(2 << 3)));
+    auto update = updateOp(kNss, BSON("_id" << 0), BSON("a" << BSON_ARRAY(4 << 5)));
+    auto later = insertOp(kNss, BSON("_id" << 2 << "a" << 6));
+    auto laterArray = insertOp(kNss, BSON("_id" << 3 << "a" << BSON_ARRAY(7 << 8)));
+    std::vector<size_t> insertBatchSizes;
+    _opObserver->onInsertsFn =
+        [&](OperationContext*, const NamespaceString&, const std::vector<BSONObj>& docs) {
+            insertBatchSizes.push_back(docs.size());
+        };
+
+    // The grouped insert and update retain their timestamps; the next item inherits no paths.
+    auto multikey = consumeOnWorker(
+        secondaryOptions(),
+        {makeItem({scalar, array, update}), makeItem({later}), makeItem({laterArray})},
+        /*deferMultikeyWrites=*/true);
+    ASSERT_EQ(insertBatchSizes, (std::vector<size_t>{2, 1, 1}));
+    ASSERT_EQ(countDocs(kNss), 4);
+    const std::vector<WorkerMultikeyPathInfo> expected{
+        {
+            {kNss, uuid, "idx", {}, {{0U}}, array.getTimestamp()},
+            {kNss, uuid, "idx", {}, {{0U}}, update.getTimestamp()},
+        },
+        {},
+        {{kNss, uuid, "idx", {}, {{0U}}, laterArray.getTimestamp()}},
+    };
+    ASSERT_EQ(multikey, expected);
+    assertIndexMultikey(_opCtx.get(), kNss, "idx", false, MultikeyPaths({{}}));
+}
+
+TEST_F(PipelinedWorkItemTest, KeepsMultikeyResultsWithTheirBatchWhenALaterBatchFinishesFirst) {
+    auto uuid = createIndexedCollection(BSON("a" << 1 << "b" << 1));
+    auto first = insertOp(kNss, BSON("_id" << 0 << "a" << BSON_ARRAY(1 << 2) << "b" << 1));
+    auto second = insertOp(kNss, BSON("_id" << 1 << "a" << 1 << "b" << BSON_ARRAY(3 << 4)));
+    auto later = insertOp(kNss, BSON("_id" << 2 << "a" << BSON_ARRAY(5 << 6) << "b" << 2));
+    PipelinedApplierBatchTracker tracker;
+    auto metadata = std::make_shared<std::vector<WorkerMultikeyPathInfo>>(4);
+    std::weak_ptr<std::vector<WorkerMultikeyPathInfo>> weakMetadata = metadata;
+    auto counter =
+        tracker.addBatch({second.getOpTime(), second.getWallClockTime()}, 2, {}, {}, metadata);
+    auto laterMetadata = std::make_shared<std::vector<WorkerMultikeyPathInfo>>(4);
+    std::weak_ptr<std::vector<WorkerMultikeyPathInfo>> weakLaterMetadata = laterMetadata;
+    auto laterCounter =
+        tracker.addBatch({later.getOpTime(), later.getWallClockTime()}, 1, {}, {}, laterMetadata);
+    auto firstOwned = makeItem({first});
+    firstOwned.item.batchRemainingWorkers = counter;
+    firstOwned.item.multikeyPathInfo = &(*metadata)[0];
+    auto secondOwned = makeItem({second});
+    secondOwned.item.batchRemainingWorkers = counter;
+    secondOwned.item.multikeyPathInfo = &(*metadata)[3];
+    auto laterOwned = makeItem({later});
+    laterOwned.item.batchRemainingWorkers = laterCounter;
+    laterOwned.item.multikeyPathInfo = &(*laterMetadata)[3];
+    Notification<void> firstReached;
+    Notification<void> releaseFirst;
+    Notification<void> laterCompleted;
+    Notification<void> firstConsumed;
+    Notification<void> releaseFirstWorker;
+    _opObserver->onInsertsFn =
+        [&](OperationContext*, const NamespaceString&, const std::vector<BSONObj>& docs) {
+            if (docs.front()["_id"].Int() == 0) {
+                if (!firstReached) {
+                    firstReached.set();
+                }
+                releaseFirst.get();
+            }
+        };
+    PipelinedApplierWorkerPool pool(4, [&](size_t workerIdx, const WorkItem& item) {
+        consumeWorkItem(workerIdx, secondaryOptions(), item, tracker, /*deferMultikeyWrites=*/true);
+        if (workerIdx == 0) {
+            firstConsumed.set();
+            releaseFirstWorker.get();
+        }
+        if (item.batchRemainingWorkers == laterCounter) {
+            laterCompleted.set();
+        }
+    });
+    ON_BLOCK_EXIT([&] {
+        if (!releaseFirst) {
+            releaseFirst.set();
+        }
+        if (!releaseFirstWorker) {
+            releaseFirstWorker.set();
+        }
+        pool.shutdownAndJoin();
+    });
+    pool.enqueue(0, std::move(firstOwned.item));
+    pool.enqueue(3, std::move(secondOwned.item));
+    pool.enqueue(3, std::move(laterOwned.item));
+    metadata.reset();
+    laterMetadata.reset();
+
+    // Worker 3 finishes both of its slices while worker 0 still holds the first batch open.
+    ASSERT_TRUE(firstReached.waitFor(_opCtx.get(), Seconds(60)));
+    ASSERT_TRUE(laterCompleted.waitFor(_opCtx.get(), Seconds(60)));
+    ASSERT_EQ(counter->load(), 1U);
+    ASSERT_EQ(laterCounter->load(), 0U);
+    ASSERT_FALSE(tracker.popCompletedBatch(Milliseconds(0)));
+    releaseFirst.set();
+
+    // Reading after batch completion must see both slices without relying on joining the workers.
+    auto completed = tracker.popCompletedBatch(Seconds(60));
+    ASSERT_TRUE(completed);
+    ASSERT_EQ(completed->lastOpTime.opTime, second.getOpTime());
+    ASSERT_TRUE(completed->multikeyMetadata);
+    ASSERT_EQ(counter->load(), 0U);
+    const std::vector<WorkerMultikeyPathInfo> expected{
+        {{kNss, uuid, "idx", {}, {{0U}, {}}, first.getTimestamp()}},
+        {},
+        {},
+        {{kNss, uuid, "idx", {}, {{}, {0U}}, second.getTimestamp()}},
+    };
+    ASSERT_EQ(*completed->multikeyMetadata, expected);
+    tracker.onBatchPublished();
+
+    auto completedLater = tracker.popCompletedBatch(Milliseconds(0));
+    ASSERT_TRUE(completedLater);
+    ASSERT_EQ(completedLater->lastOpTime.opTime, later.getOpTime());
+    ASSERT_TRUE(completedLater->multikeyMetadata);
+    ASSERT_NE(completedLater->multikeyMetadata, completed->multikeyMetadata);
+    const std::vector<WorkerMultikeyPathInfo> expectedLater{
+        {},
+        {},
+        {},
+        {{kNss, uuid, "idx", {}, {{0U}, {}}, later.getTimestamp()}},
+    };
+    ASSERT_EQ(*completedLater->multikeyMetadata, expectedLater);
+    tracker.onBatchPublished();
+    ASSERT_FALSE(tracker.popCompletedBatch(Milliseconds(0)));
+
+    // A completed work item can remain alive after its batch releases the borrowed metadata.
+    ASSERT_TRUE(firstConsumed.waitFor(_opCtx.get(), Seconds(60)));
+    ASSERT_FALSE(weakMetadata.expired());
+    ASSERT_FALSE(weakLaterMetadata.expired());
+    completed.reset();
+    ASSERT_TRUE(weakMetadata.expired());
+    ASSERT_FALSE(weakLaterMetadata.expired());
+    completedLater.reset();
+    ASSERT_TRUE(weakLaterMetadata.expired());
+    releaseFirstWorker.set();
+    pool.shutdownAndJoin();
+}
+
+TEST_F(PipelinedWorkItemTest, ClearsMultikeyTrackingWhenReusingAnOperationContext) {
+    auto uuid = createIndexedCollection();
+    auto op = insertOp(kNss, BSON("_id" << 0 << "a" << BSON_ARRAY(1 << 2)));
+    WorkerMultikeyPathInfo multikey;
+    ASSERT_OK(applyWorkItem(_opCtx.get(), secondaryOptions(), makeItem({op}).item, &multikey));
+    const WorkerMultikeyPathInfo expected{
+        {kNss, uuid, "idx", {}, {{0U}}, op.getTimestamp()},
+    };
+    ASSERT_EQ(multikey, expected);
+    auto& tracker = MultikeyPathTracker::get(_opCtx.get());
+    ASSERT_FALSE(tracker.isTrackingMultikeyPathInfo());
+    ASSERT_TRUE(tracker.isEmpty());
+
+    // Reusing the opCtx for a scalar write must not recapture the previous item's paths.
+    multikey.clear();
+    ASSERT_OK(applyWorkItem(_opCtx.get(),
+                            secondaryOptions(),
+                            makeItem({insertOp(kNss, BSON("_id" << 1 << "a" << 3))}).item,
+                            &multikey));
+    ASSERT_TRUE(multikey.empty());
+    ASSERT_FALSE(tracker.isTrackingMultikeyPathInfo());
+    ASSERT_TRUE(tracker.isEmpty());
+}
+
+TEST_F(PipelinedWorkItemTest, ClearsMultikeyTrackingOnApplicationFailure) {
+    createIndexedCollection();
+    bool hadTrackedPaths = false;
+    _opObserver->onDeleteFn = [&](OperationContext* opCtx,
+                                  const CollectionPtr&,
+                                  StmtId,
+                                  const BSONObj&,
+                                  const OplogDeleteEntryArgs&) {
+        hadTrackedPaths = !MultikeyPathTracker::get(opCtx).isEmpty();
+        uasserted(ErrorCodes::OperationFailed, "injected failure after multikey insert");
+    };
+    WorkerMultikeyPathInfo multikey;
+    auto status =
+        applyWorkItem(_opCtx.get(),
+                      secondaryOptions(),
+                      makeItem({insertOp(kNss, BSON("_id" << 0 << "a" << BSON_ARRAY(1 << 2))),
+                                deleteOp(kNss, BSON("_id" << 0))})
+                          .item,
+                      &multikey);
+
+    // A partially applied item exports no result and leaves no tracker state behind.
+    ASSERT_EQ(status, ErrorCodes::OperationFailed);
+    ASSERT_TRUE(hadTrackedPaths);
+    ASSERT_TRUE(multikey.empty());
+    auto& tracker = MultikeyPathTracker::get(_opCtx.get());
+    ASSERT_FALSE(tracker.isTrackingMultikeyPathInfo());
+    ASSERT_TRUE(tracker.isEmpty());
+}
+
+TEST_F(PipelinedWorkItemTest, PreservesExactWildcardMetadataPathsAtEachTimestamp) {
+    const auto keyPattern = BSON("$**" << 1);
+    const auto ordering = WildcardAccessMethod::makeOrdering(keyPattern);
+    auto uuid = createIndexedCollection(keyPattern);
+    auto first = insertOp(
+        kNss,
+        BSON("_id" << 0 << "a" << BSON_ARRAY(1 << 2) << "b" << BSON("c" << BSON_ARRAY(3 << 4))));
+    auto second =
+        insertOp(kNss, BSON("_id" << 1 << "a" << BSON_ARRAY(5 << 6) << "d" << BSON_ARRAY(7 << 8)));
+    auto multikey = consumeOnWorker(
+        secondaryOptions(), {makeItem({first, second})}, /*deferMultikeyWrites=*/true);
+
+    // Repeated and nested paths must survive the handoff without leaking between write timestamps.
+    ASSERT_EQ(multikey.size(), 1U);
+    ASSERT_EQ(multikey[0].size(), 2U);
+    ASSERT_EQ(multikey[0][0].earliestTimestamp, first.getTimestamp());
+    ASSERT_EQ(multikey[0][1].earliestTimestamp, second.getTimestamp());
+    std::vector<std::vector<std::string>> paths;
+    for (const auto& info : multikey[0]) {
+        ASSERT_EQ(info.collectionUUID, uuid);
+        ASSERT_EQ(info.indexName, "idx");
+        ASSERT_TRUE(info.multikeyPaths.empty());
+        auto fieldPaths = set_multikey_metadata_oplog_helpers::extractFieldPathsFromMetadataKeys(
+            info.multikeyMetadataKeys, ordering);
+        std::sort(fieldPaths.begin(), fieldPaths.end());
+        paths.push_back(std::move(fieldPaths));
+    }
+    ASSERT_EQ(paths[0], (std::vector<std::string>{"a", "b.c"}));
+    ASSERT_EQ(paths[1], (std::vector<std::string>{"a", "d"}));
+}
+
+TEST_F(PipelinedWorkItemTest, AppliesSetMultikeyMetadataWithoutAccumulatingIt) {
+    createIndexedCollection();
+    auto op = makeCommandOplogEntry(nextOpTime(),
+                                    kNss.getCommandNS(),
+                                    BSON("setMultikeyMetadata"
+                                         << kNss.ns_forTest() << "idxName" << "idx" << "paths"
+                                         << multikey_paths::serialize(BSON("a" << 1), {{0U}})));
+    auto multikey =
+        consumeOnWorker(secondaryOptions(), {makeItem({op})}, /*deferMultikeyWrites=*/true);
+
+    // Replicated multikey metadata is applied directly, even when the worker is tracking.
+    ASSERT_EQ(multikey, std::vector<WorkerMultikeyPathInfo>(1));
+    assertIndexMultikey(_opCtx.get(), kNss, "idx", true, MultikeyPaths({{0U}}));
+}
+
+TEST_F(PipelinedWorkItemTest, AppliesMultikeyWithoutDeferredOutput) {
+    createIndexedCollection();
+    ASSERT_OK(applyWorkItem(
+        _opCtx.get(),
+        secondaryOptions(),
+        makeItem({insertOp(kNss, BSON("_id" << 0 << "a" << BSON_ARRAY(1 << 2)))}).item));
+
+    // Without a deferred output, application must finish the catalog write itself.
+    assertIndexMultikey(_opCtx.get(), kNss, "idx", true, MultikeyPaths({{0U}}));
+}
+
+TEST_F(PipelinedWorkItemTest, AppliesMultikeyOnWorkerImmediatelyByDefault) {
+    auto uuid = createIndexedCollection();
+    createIndex(_opCtx.get(),
+                kNss,
+                uuid,
+                BSON("v" << 2 << "name" << "wildcard" << "key" << BSON("$**" << 1)));
+    auto multikey = consumeOnWorker(
+        secondaryOptions(),
+        {makeItem({insertOp(kNss, BSON("_id" << 0 << "a" << BSON_ARRAY(1 << 2)))})});
+
+    // Immediate mode records an empty slice result and finishes the catalog writes on the worker.
+    ASSERT_EQ(multikey, std::vector<WorkerMultikeyPathInfo>(1));
+    assertIndexMultikey(_opCtx.get(), kNss, "idx", true, MultikeyPaths({{0U}}));
+    assertIndexMultikey(_opCtx.get(), kNss, "wildcard", true, {});
+}
+
 TEST_F(PipelinedWorkItemTest, BatchStaysIncompleteUntilTheWholeSliceIsApplied) {
     createCollectionWithUuid(_opCtx.get(), kNss);
     auto owned = makeItem({insertOp(kNss, BSON("_id" << 0)), deleteOp(kNss, BSON("_id" << 0))});
     PipelinedApplierBatchTracker tracker;
     const OpTimeAndWallTime lastOpTime{owned.item.ops.back()->getOpTime(),
                                        owned.item.ops.back()->getWallClockTime()};
-    auto counter = tracker.addBatch(lastOpTime, 1);
+    auto multikeyMetadata = std::make_shared<std::vector<WorkerMultikeyPathInfo>>(1);
+    owned.item.multikeyPathInfo = &(*multikeyMetadata)[0];
+    auto counter = tracker.addBatch(lastOpTime, 1, {}, {}, multikeyMetadata);
     owned.item.batchRemainingWorkers = counter;
     Notification<void> reached;
     Notification<void> release;
@@ -381,6 +772,62 @@ TEST_F(PipelinedWorkItemTest, BatchStaysIncompleteUntilTheWholeSliceIsApplied) {
     ASSERT_EQ(countDocs(kNss), 0);
 }
 
+TEST_F(PipelinedWorkItemTest, RecordsMultikeyAfterTheWholeSliceIsApplied) {
+    auto uuid = createIndexedCollection();
+    auto insert = insertOp(kNss, BSON("_id" << 0 << "a" << BSON_ARRAY(1 << 2)));
+    auto owned = makeItem({insert, deleteOp(kNss, BSON("_id" << 0))});
+    PipelinedApplierBatchTracker tracker;
+    const OpTimeAndWallTime lastOpTime{owned.item.ops.back()->getOpTime(),
+                                       owned.item.ops.back()->getWallClockTime()};
+    auto multikeyMetadata = std::make_shared<std::vector<WorkerMultikeyPathInfo>>(1);
+    owned.item.multikeyPathInfo = &(*multikeyMetadata)[0];
+    auto counter = tracker.addBatch(lastOpTime, 1, {}, {}, multikeyMetadata);
+    owned.item.batchRemainingWorkers = counter;
+    Notification<void> reached;
+    Notification<void> release;
+    _opObserver->onDeleteFn = [&](OperationContext*,
+                                  const CollectionPtr&,
+                                  StmtId,
+                                  const BSONObj&,
+                                  const OplogDeleteEntryArgs&) {
+        if (!reached) {
+            reached.set();
+        }
+        release.get();
+    };
+    PipelinedApplierWorkerPool pool(1, [&](size_t workerIdx, const WorkItem& work) {
+        consumeWorkItem(workerIdx, secondaryOptions(), work, tracker, /*deferMultikeyWrites=*/true);
+    });
+    ON_BLOCK_EXIT([&] {
+        if (!release) {
+            release.set();
+        }
+        pool.shutdownAndJoin();
+    });
+    pool.enqueue(0, std::move(owned.item));
+
+    // If reached is set, the applier has processed the delete operation, but is waiting on release
+    // to be set.
+    ASSERT_TRUE(reached.waitFor(_opCtx.get(), Seconds(60)));
+    ASSERT_EQ(counter->load(), 1);
+    ASSERT_FALSE(tracker.popCompletedBatch(Milliseconds(0)));
+    release.set();
+    // The pool will wait on the worker completing its work item.
+    pool.shutdownAndJoin();
+
+    auto completed = tracker.popCompletedBatch(Milliseconds(0));
+    ASSERT_TRUE(completed);
+    ASSERT_EQ(completed->lastOpTime, lastOpTime);
+    ASSERT_TRUE(completed->multikeyMetadata);
+    const std::vector<WorkerMultikeyPathInfo> expected{
+        {{kNss, uuid, "idx", {}, {{0U}}, insert.getTimestamp()}},
+    };
+    ASSERT_EQ(*completed->multikeyMetadata, expected);
+    tracker.onBatchPublished();
+    ASSERT_EQ(counter->load(), 0);
+    ASSERT_EQ(countDocs(kNss), 0);
+}
+
 TEST_F(PipelinedWorkItemTest, ShutdownAbandonedSliceDoesNotCompleteItsBatch) {
     createCollectionWithUuid(_opCtx.get(), kNss);
     auto owned = makeItem({insertOp(kNss, BSON("_id" << 0))});
@@ -389,14 +836,27 @@ TEST_F(PipelinedWorkItemTest, ShutdownAbandonedSliceDoesNotCompleteItsBatch) {
     PipelinedApplierBatchTracker tracker;
     // owned and peer are slices of the first batch, so they share a counter initialized to two
     // workers.
+    auto firstMetadata = std::make_shared<std::vector<WorkerMultikeyPathInfo>>(2);
     auto counter = tracker.addBatch(
-        {peer.item.ops.back()->getOpTime(), peer.item.ops.back()->getWallClockTime()}, 2);
+        {peer.item.ops.back()->getOpTime(), peer.item.ops.back()->getWallClockTime()},
+        2,
+        {},
+        {},
+        firstMetadata);
     owned.item.batchRemainingWorkers = counter;
+    owned.item.multikeyPathInfo = &(*firstMetadata)[0];
     peer.item.batchRemainingWorkers = counter;
+    peer.item.multikeyPathInfo = &(*firstMetadata)[1];
     // later belongs to a second batch that only needs one worker to finish.
+    auto laterMetadata = std::make_shared<std::vector<WorkerMultikeyPathInfo>>(2);
     auto laterCounter = tracker.addBatch(
-        {later.item.ops.back()->getOpTime(), later.item.ops.back()->getWallClockTime()}, 1);
+        {later.item.ops.back()->getOpTime(), later.item.ops.back()->getWallClockTime()},
+        1,
+        {},
+        {},
+        laterMetadata);
     later.item.batchRemainingWorkers = laterCounter;
+    later.item.multikeyPathInfo = &(*laterMetadata)[1];
     // Interrupt the insert of _id: 0 with a shutdown error; the other inserts are allowed to
     // finish.
     _opObserver->onInsertsFn =
@@ -418,6 +878,65 @@ TEST_F(PipelinedWorkItemTest, ShutdownAbandonedSliceDoesNotCompleteItsBatch) {
     // Only peer decremented the first batch's counter; the abandoned item must leave it at one.
     ASSERT_EQ(counter->load(), 1);
     ASSERT_EQ(laterCounter->load(), 0);
+    // The completed second batch cannot be popped ahead of the incomplete first batch.
+    ASSERT_FALSE(tracker.popCompletedBatch(Milliseconds(0)));
+}
+
+TEST_F(PipelinedWorkItemTest, ShutdownAbandonedSliceDoesNotRecordMultikeyWrites) {
+    createIndexedCollection();
+    auto owned = makeItem({insertOp(kNss, BSON("_id" << 0 << "a" << BSON_ARRAY(1 << 2)))});
+    auto peer = makeItem({insertOp(kNss, BSON("_id" << 1))});
+    auto later = makeItem({insertOp(kNss, BSON("_id" << 2))});
+    PipelinedApplierBatchTracker tracker;
+    // owned and peer are slices of the first batch, so they share a counter initialized to two
+    // workers.
+    auto firstMetadata = std::make_shared<std::vector<WorkerMultikeyPathInfo>>(2);
+    auto counter = tracker.addBatch(
+        {peer.item.ops.back()->getOpTime(), peer.item.ops.back()->getWallClockTime()},
+        2,
+        {},
+        {},
+        firstMetadata);
+    owned.item.batchRemainingWorkers = counter;
+    owned.item.multikeyPathInfo = &(*firstMetadata)[0];
+    peer.item.batchRemainingWorkers = counter;
+    peer.item.multikeyPathInfo = &(*firstMetadata)[1];
+    // later belongs to a second batch that only needs one worker to finish.
+    auto laterMetadata = std::make_shared<std::vector<WorkerMultikeyPathInfo>>(2);
+    auto laterCounter = tracker.addBatch(
+        {later.item.ops.back()->getOpTime(), later.item.ops.back()->getWallClockTime()},
+        1,
+        {},
+        {},
+        laterMetadata);
+    later.item.batchRemainingWorkers = laterCounter;
+    later.item.multikeyPathInfo = &(*laterMetadata)[1];
+    // Interrupt the insert of _id: 0 with a shutdown error; the other inserts are allowed to
+    // finish.
+    _opObserver->onInsertsFn =
+        [](OperationContext*, const NamespaceString&, const std::vector<BSONObj>& docs) {
+            if (docs.front()["_id"].Int() == 0) {
+                uasserted(ErrorCodes::InterruptedAtShutdown, "injected global shutdown");
+            }
+        };
+    PipelinedApplierWorkerPool pool(2, [&](size_t workerIdx, const WorkItem& work) {
+        consumeWorkItem(workerIdx, secondaryOptions(), work, tracker, /*deferMultikeyWrites=*/true);
+    });
+    // Worker 0 abandons owned, while worker 1 applies peer and then later.
+    pool.enqueue(0, std::move(owned.item));
+    pool.enqueue(1, std::move(peer.item));
+    pool.enqueue(1, std::move(later.item));
+    // Wait until both workers have finished handling their queued items.
+    pool.shutdownAndJoin();
+
+    // Only peer decremented the first batch's counter; the abandoned item must leave it at one.
+    ASSERT_EQ(counter->load(), 1);
+    ASSERT_EQ(laterCounter->load(), 0);
+    // An abandoned slice must not export its deferred writes.
+    ASSERT_TRUE((*firstMetadata)[0].empty());
+    ASSERT_TRUE((*firstMetadata)[1].empty());
+    ASSERT_TRUE((*laterMetadata)[0].empty());
+    ASSERT_TRUE((*laterMetadata)[1].empty());
     // The completed second batch cannot be popped ahead of the incomplete first batch.
     ASSERT_FALSE(tracker.popCompletedBatch(Milliseconds(0)));
 }
@@ -1318,6 +1837,46 @@ TEST_F(PipelinedOplogApplierRunTest, FastCountFollowsTheWorkersWrites) {
     // assertCollectionContainsExactly compares the record count against a scan of the documents.
     assertCollectionContainsExactly(kNss, expected);
 }
+
+TEST_F(PipelinedOplogApplierRunTest, PublishesImmediateMultikeyWrites) {
+    createCollectionWithIndex(_opCtx.get(), kNss, BSON("a" << 1));
+    auto insert = insertOp(kNss, BSON("_id" << 0 << "a" << BSON_ARRAY(1 << 2)));
+
+    // The production dispatcher must not defer catalog writes without an advancer flush.
+    applyThroughBuffer({insert});
+    assertPublished(insert);
+    assertIndexMultikey(_opCtx.get(), kNss, "idx", true, MultikeyPaths({{0U}}));
+}
+
+#if 0  // TODO(SERVER-135372): Enable once the advancer combines and flushes worker multikey writes.
+TEST_F(PipelinedOplogApplierRunTest, PublishesMultikeyWritesFromEveryWorker) {
+    createCollectionWithIndex(_opCtx.get(), kNss, BSON("a" << 1 << "b" << 1));
+    auto first = insertOp(
+        kNss, BSON("_id" << idRoutedTo(0) << "a" << BSON_ARRAY(1 << 2) << "b" << 1));
+    auto second = insertOp(
+        kNss, BSON("_id" << idRoutedTo(1) << "a" << 1 << "b" << BSON_ARRAY(3 << 4)));
+
+    applyThroughBuffer({first, second});
+
+    // A published batch must include the catalog changes discovered by both workers.
+    assertPublished(second);
+    assertIndexMultikey(_opCtx.get(), kNss, "idx", true, MultikeyPaths({{0U}, {0U}}));
+}
+
+TEST_F(PipelinedOplogApplierRunTest, PublishesMultikeyWritesFromSuccessiveBatches) {
+    createCollectionWithIndex(_opCtx.get(), kNss, BSON("a" << 1 << "b" << 1));
+    auto first = insertOp(kNss, BSON("_id" << 0 << "a" << BSON_ARRAY(1 << 2) << "b" << 1));
+    applyThroughBuffer({first});
+    assertPublished(first);
+    assertIndexMultikey(_opCtx.get(), kNss, "idx", true, MultikeyPaths({{0U}, {}}));
+
+    // An update in a later batch contributes a new path to an already multikey index.
+    auto second = updateOp(kNss, BSON("_id" << 0), BSON("a" << 1 << "b" << BSON_ARRAY(3 << 4)));
+    applyThroughBuffer({second});
+    assertPublished(second);
+    assertIndexMultikey(_opCtx.get(), kNss, "idx", true, MultikeyPaths({{0U}, {0U}}));
+}
+#endif
 
 // The dispatcher does not wait for a batch to finish: a batch pushed while a worker is still busy
 // with the previous batch is dispatched and applied by the other workers.

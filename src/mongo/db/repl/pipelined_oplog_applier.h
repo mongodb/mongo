@@ -5,6 +5,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/oplog_buffer.h"
@@ -91,19 +92,24 @@ private:
 };
 
 /**
- * Applies the slice of ops in 'item' in order.
+ * Applies the slice of ops in 'item', optionally capturing deferred multikey writes.
  */
 [[nodiscard]] Status applyWorkItem(OperationContext* opCtx,
                                    const OplogApplier::Options& options,
-                                   const PipelinedApplierWorkerPool::WorkItem& item);
+                                   const PipelinedApplierWorkerPool::WorkItem& item,
+                                   WorkerMultikeyPathInfo* multikeyPathInfo = nullptr);
 
 /**
  * Applies 'item' on the current worker thread, fasserting on any failure other than shutdown.
+ * Records multikey changes from the work item.
  */
+// TODO(SERVER-135372): Remove deferMultikeyWrites and always defer once the advancer
+// flushes multikey writes before publishing lastApplied.
 void consumeWorkItem(size_t workerIdx,
                      const OplogApplier::Options& options,
                      const PipelinedApplierWorkerPool::WorkItem& item,
-                     PipelinedApplierBatchTracker& batchTracker);
+                     PipelinedApplierBatchTracker& batchTracker,
+                     bool deferMultikeyWrites = false);
 
 /**
  * Returns whether a batch must be applied serialized ("drain, dispatch, drain") because it

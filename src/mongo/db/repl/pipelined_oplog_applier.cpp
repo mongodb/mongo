@@ -6,6 +6,7 @@
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/admission/ticketing/admission_context.h"
 #include "mongo/db/client.h"
+#include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_applier_batcher.h"
 #include "mongo/db/repl/oplog_applier_dispatch.h"
@@ -23,6 +24,7 @@
 #include "mongo/util/scopeguard.h"
 
 #include <algorithm>
+#include <memory>
 #include <utility>
 #include <vector>
 
@@ -218,12 +220,14 @@ void PipelinedOplogApplier::_dispatchBatchToWorkers(OperationContext* opCtx,
     // guarantee that the oplog entries in the batch are alive for the duration the workers apply
     // the batch. The original batch boundary is registered even when the dispatching routes no
     // operations to any worker, so lastApplied still reaches it.
+    auto multikeyMetadata = std::make_shared<std::vector<WorkerMultikeyPathInfo>>(numWorkers);
     auto remainingWorkers = _batchTracker.addBatch(
-        lastOpTime, participatingWorkers, std::move(ops), std::move(derivedOps));
+        lastOpTime, participatingWorkers, std::move(ops), std::move(derivedOps), multikeyMetadata);
     PipelinedApplyOtelMetrics::addOpsDispatched(opsDispatched);
     for (size_t workerIdx = 0; workerIdx < numWorkers; ++workerIdx) {
         if (!items[workerIdx].ops.empty()) {
             items[workerIdx].batchRemainingWorkers = remainingWorkers;
+            items[workerIdx].multikeyPathInfo = &(*multikeyMetadata)[workerIdx];
             _workerPool.enqueue(workerIdx, std::move(items[workerIdx]));
         }
     }
@@ -251,12 +255,26 @@ void PipelinedOplogApplier::_publishBatch(
 
 Status applyWorkItem(OperationContext* opCtx,
                      const OplogApplier::Options& options,
-                     const PipelinedApplierWorkerPool::WorkItem& item) {
+                     const PipelinedApplierWorkerPool::WorkItem& item,
+                     WorkerMultikeyPathInfo* multikeyPathInfo) {
     // Oplog application must not wait on execution tickets or flow control.
     ScopedAdmissionPriority<ExecutionAdmissionContext> skipTicketAcquisition(
         opCtx, AdmissionContext::Priority::kExempt);
     UnreplicatedWritesBlock uwb(opCtx);
     setWorkerOpCtxStates(opCtx);
+
+    auto& tracker = MultikeyPathTracker::get(opCtx);
+    if (multikeyPathInfo) {
+        invariant(multikeyPathInfo->empty());
+        invariant(tracker.isEmpty());
+        tracker.startTrackingMultikeyPathInfo();
+    }
+    ON_BLOCK_EXIT([&] {
+        if (multikeyPathInfo) {
+            tracker.stopTrackingMultikeyPathInfo();
+            tracker.clear();
+        }
+    });
 
     std::vector<ApplierOperation> ops = item.ops;
     // A DSC node always resumes oplog application from a consistent point: it recovers to the
@@ -271,6 +289,9 @@ Status applyWorkItem(OperationContext* opCtx,
                                                  isDataConsistent,
                                                  &applyOplogEntryOrGroupedInserts);
     if (status.isOK()) {
+        if (multikeyPathInfo) {
+            *multikeyPathInfo = tracker.getMultikeyPathInfo();
+        }
         PipelinedApplyOtelMetrics::addOpsAppliedByWorkers(item.ops.size());
     }
     return status;
@@ -279,14 +300,20 @@ Status applyWorkItem(OperationContext* opCtx,
 void consumeWorkItem(size_t workerIdx,
                      const OplogApplier::Options& options,
                      const PipelinedApplierWorkerPool::WorkItem& item,
-                     PipelinedApplierBatchTracker& batchTracker) {
+                     PipelinedApplierBatchTracker& batchTracker,
+                     bool deferMultikeyWrites) {
     invariant(!item.ops.empty());
     invariant(item.batchRemainingWorkers);
+    invariant(item.multikeyPathInfo);
     Status status = Status::OK();
     try {
         auto opCtx = cc().makeOperationContext();
-        status = opCtx->runWithoutInterruptionExceptAtGlobalShutdown(
-            [&] { return applyWorkItem(opCtx.get(), options, item); });
+        status = opCtx->runWithoutInterruptionExceptAtGlobalShutdown([&] {
+            // TODO(SERVER-135372): Remove deferMultikeyWrites and always defer once the advancer
+            // flushes multikey writes before publishing lastApplied.
+            return applyWorkItem(
+                opCtx.get(), options, item, deferMultikeyWrites ? item.multikeyPathInfo : nullptr);
+        });
     } catch (const DBException& ex) {
         status = ex.toStatus();
     }
