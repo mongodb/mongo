@@ -57,12 +57,6 @@ auto& totalIngressTLSConnections =  //
 auto& totalIngressTLSHandshakeTimeMillis =  //
     *MetricBuilder<Counter64>("network.totalIngressTLSHandshakeTimeMillis");
 
-// {1 μs, 5 μs, 25 μs, 125 μs, 625 μs, ...}
-std::vector<double> handshakeHistogramBounds() {
-    const auto bounds = HistogramServerStatusMetric::pow(10, 1, 5);
-    return {bounds.begin(), bounds.end()};
-}
-
 otel::metrics::Histogram<int64_t>& ingressTLSHandshakeTimesMicros =
     otel::metrics::MetricsService::instance().createInt64Histogram(
         otel::metrics::MetricNames::kIngressTLSHandshakeLatency,
@@ -71,7 +65,7 @@ otel::metrics::Histogram<int64_t>& ingressTLSHandshakeTimesMicros =
         {.serverStatusOptions =
              otel::metrics::ServerStatusOptions{.dottedPath = "network.ingressTLSHandshakeMicros",
                                                 .role = ClusterRole::None},
-         .explicitBucketBoundaries = handshakeHistogramBounds(),
+         .explicitBucketBoundaries = HistogramServerStatusMetric::computeBounds<double>(10, 1, 5),
          .serializationFormat = otel::metrics::HistogramSerializationFormat::kBucketCounts});
 
 otel::metrics::Histogram<int64_t>& ingressHelloTimesMicros =
@@ -82,7 +76,7 @@ otel::metrics::Histogram<int64_t>& ingressHelloTimesMicros =
         {.serverStatusOptions =
              otel::metrics::ServerStatusOptions{.dottedPath = "network.ingressHelloLatency",
                                                 .role = ClusterRole::None},
-         .explicitBucketBoundaries = handshakeHistogramBounds(),
+         .explicitBucketBoundaries = HistogramServerStatusMetric::computeBounds<double>(10, 1, 5),
          .serializationFormat = otel::metrics::HistogramSerializationFormat::kBucketCounts});
 
 otel::metrics::Histogram<int64_t>& ingressAuthTimesMicros =
@@ -93,7 +87,7 @@ otel::metrics::Histogram<int64_t>& ingressAuthTimesMicros =
         {.serverStatusOptions =
              otel::metrics::ServerStatusOptions{.dottedPath = "network.ingressAuthLatency",
                                                 .role = ClusterRole::None},
-         .explicitBucketBoundaries = handshakeHistogramBounds(),
+         .explicitBucketBoundaries = HistogramServerStatusMetric::computeBounds<double>(10, 1, 5),
          .serializationFormat = otel::metrics::HistogramSerializationFormat::kBucketCounts});
 }  // namespace
 

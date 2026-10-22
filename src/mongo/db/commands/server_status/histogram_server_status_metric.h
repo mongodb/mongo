@@ -38,8 +38,9 @@ public:
      * and increase by a ratio of `rate` between successive elements.
      * This is used to make a `bounds` argument for the constructor.
      */
-    static std::vector<uint64_t> pow(size_t sz, uint64_t base, uint64_t rate) {
-        std::vector<uint64_t> v;
+    template <typename T>
+    static std::vector<T> computeBounds(size_t sz, T base, int rate) {
+        std::vector<T> v;
         v.reserve(sz);
         for (; sz--; base *= rate)
             v.push_back(base);

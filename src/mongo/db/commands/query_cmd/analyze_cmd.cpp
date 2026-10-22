@@ -81,12 +81,12 @@ auto& analyzeMicros = *MetricBuilder<DurationCounter64<Microseconds>>{"commands.
 // Histogram produces a vector bounds from 0.256 ms to 268000 ms (268 s)
 auto& analyzeMicrosHistogram =
     *MetricBuilder<HistogramServerStatusMetric>{"commands.analyze.histograms.micros"}.bind(
-        HistogramServerStatusMetric::pow(11, 256, 4));
+        HistogramServerStatusMetric::computeBounds<uint64_t>(11, 256, 4));
 
 // Histogram of pages persisted per analyze run. Bounds are 1 to 32 pages.
 auto& analyzePagesHistogram =
     *MetricBuilder<HistogramServerStatusMetric>{"query.analyze.sample.histograms.pages"}.bind(
-        HistogramServerStatusMetric::pow(6, 1, 2));
+        HistogramServerStatusMetric::computeBounds<uint64_t>(6, 1, 2));
 
 // Bytes persisted per analyze run, summed across all pages. Total and per-run. Bounds are 256
 // bytes to ~268 MB.
@@ -94,7 +94,7 @@ auto& analyzeTotalBytesPersisted =
     *MetricBuilder<Counter64>{"query.analyze.sample.totalBytesPersisted"};
 auto& analyzeBytesPersistedHistogram =
     *MetricBuilder<HistogramServerStatusMetric>{"query.analyze.sample.histograms.bytesPersisted"}
-         .bind(HistogramServerStatusMetric::pow(11, 256, 4));
+         .bind(HistogramServerStatusMetric::computeBounds<uint64_t>(11, 256, 4));
 
 /**
  * Records server status metrics for a sample persisted by analyze's sample mode.

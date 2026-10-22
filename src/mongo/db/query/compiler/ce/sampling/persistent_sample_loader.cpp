@@ -339,7 +339,7 @@ auto& persistentSampleLoadMicros =
 auto& persistentSampleLoadMicrosHistogram =
     *MetricBuilder<HistogramServerStatusMetric>{
         "query.sampling.persistentSample.histograms.loadMicros"}
-         .bind(HistogramServerStatusMetric::pow(11, 256, 4));
+         .bind(HistogramServerStatusMetric::computeBounds<uint64_t>(11, 256, 4));
 
 auto& persistentSampleDocsLoaded =
     *MetricBuilder<Counter64>{"query.sampling.persistentSample.docsLoaded"};
@@ -348,13 +348,13 @@ auto& persistentSampleDocsLoaded =
 auto& persistentSamplePagesReadHistogram =
     *MetricBuilder<HistogramServerStatusMetric>{
         "query.sampling.persistentSample.histograms.pagesRead"}
-         .bind(HistogramServerStatusMetric::pow(6, 1, 2));
+         .bind(HistogramServerStatusMetric::computeBounds<uint64_t>(6, 1, 2));
 
 // How old the sample was, at the moment it was read. Bounds are 1 second to ~388 days.
 auto& persistentSampleAgeAtReadHistogram =
     *MetricBuilder<HistogramServerStatusMetric>{
         "query.sampling.persistentSample.histograms.sampleAgeAtReadMillis"}
-         .bind(HistogramServerStatusMetric::pow(26, 1000, 2));
+         .bind(HistogramServerStatusMetric::computeBounds<uint64_t>(26, 1000, 2));
 
 // Only cases where a sample wasn't found are counted as misses, not cases of malformed
 // content/samples collection.

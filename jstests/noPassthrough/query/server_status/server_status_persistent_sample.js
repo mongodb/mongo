@@ -34,7 +34,7 @@ describe("persistent sample serverStatus metrics", function () {
     let kSampleSize;
 
     // Both commands.analyze.histograms.micros and query.sampling.persistentSample.histograms.
-    // loadMicros use HistogramServerStatusMetric::pow(11, 256, 4).
+    // loadMicros use HistogramServerStatusMetric::computeBounds<uint64_t>(11, 256, 4).
     const kMicrosHistogramBounds = histogramPowBounds(11, 256, 4);
     // query.analyze.sample.histograms.{pages} and query.sampling.persistentSample.histograms.
     // {pagesRead} use pow(6, 1, 2)

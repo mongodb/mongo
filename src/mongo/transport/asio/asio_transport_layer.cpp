@@ -15,6 +15,7 @@
 
 #include "mongo/base/system_error.h"
 #include "mongo/config.h"
+#include "mongo/db/commands/server_status/histogram_server_status_metric.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
@@ -363,21 +364,6 @@ Reactor* AsioTransportLayer::TimerService::_getReactor() {
     return _reactor.get();
 }
 
-namespace {
-
-std::vector<Microseconds> listenerProcessingTimePartitions() {
-    // {1 μs, 5 μs, 25 μs, 125 μs, 625 μs, ...}
-    std::vector<Microseconds> bounds(10);
-    Microseconds upperBound{1};
-    for (Microseconds& bound : bounds) {
-        bound = upperBound;
-        upperBound *= 5;
-    }
-    return bounds;
-}
-
-}  // namespace
-
 AsioTransportLayer::AsioTransportLayer(const AsioTransportLayer::Options& opts,
                                        std::unique_ptr<SessionManager> sessionManager)
     : _ingressReactor(std::make_shared<AsioReactor>()),
@@ -401,7 +387,8 @@ AsioTransportLayer::AsioTransportLayer(const AsioTransportLayer::Options& opts,
       _sessionManager(std::move(sessionManager)),
       _listenerOptions(opts),
       _timerService(std::make_unique<TimerService>()),
-      _listenerProcessingTimes(listenerProcessingTimePartitions()) {
+      _listenerProcessingTimes(
+          HistogramServerStatusMetric::computeBounds<Microseconds>(10, Microseconds{1}, 5)) {
     uassert(ErrorCodes::InvalidOptions,
             "Unable to start AsioTransportLayer for ingress without a SessionManager",
             _sessionManager || !_listenerOptions.isIngress());

@@ -85,7 +85,7 @@ auto& classicNumPlansTotal = *MetricBuilder<Counter64>{"query.multiPlanner.class
  */
 auto& classicMicrosHistogram =
     *MetricBuilder<HistogramServerStatusMetric>{"query.multiPlanner.histograms.classicMicros"}.bind(
-        HistogramServerStatusMetric::pow(11, 1024, 4));
+        HistogramServerStatusMetric::computeBounds<uint64_t>(11, 1024, 4));
 
 /**
  * An element in this histogram is the number of "works" performed during an invocation (of the
@@ -93,7 +93,7 @@ auto& classicMicrosHistogram =
  */
 auto& classicWorksHistogram =
     *MetricBuilder<HistogramServerStatusMetric>{"query.multiPlanner.histograms.classicWorks"}.bind(
-        HistogramServerStatusMetric::pow(9, 128, 2));
+        HistogramServerStatusMetric::computeBounds<uint64_t>(9, 128, 2));
 
 /**
  * An element in this histogram is the number of plans in the candidate set of an invocation (of the
@@ -101,7 +101,7 @@ auto& classicWorksHistogram =
  */
 auto& classicNumPlansHistogram =
     *MetricBuilder<HistogramServerStatusMetric>{"query.multiPlanner.histograms.classicNumPlans"}
-         .bind(HistogramServerStatusMetric::pow(5, 2, 2));
+         .bind(HistogramServerStatusMetric::computeBounds<uint64_t>(5, 2, 2));
 
 /**
  * Total number of times multiplanning stopped because a plan hit EOF.

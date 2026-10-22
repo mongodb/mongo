@@ -52,8 +52,8 @@ private:
 };
 
 // Bounds for histograms over microsecond durations and over unbounded counts, respectively.
-inline const auto kMicrosBounds = HistogramServerStatusMetric::pow(11, 1024, 4);
-inline const auto kCountBounds = HistogramServerStatusMetric::pow(11, 1, 4);
+inline const auto kMicrosBounds = HistogramServerStatusMetric::computeBounds<uint64_t>(11, 1024, 4);
+inline const auto kCountBounds = HistogramServerStatusMetric::computeBounds<uint64_t>(11, 1, 4);
 
 // Bounds for the histogram over join graph node counts. A join graph always has at least 2 nodes.
 // 'internalMaxNodesInJoinGraph' defaults to 10 and is capped at 'kHardMaxNodesInJoin' (64), so use

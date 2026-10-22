@@ -43,8 +43,8 @@ const kStrategies = [
     "express",
 ];
 
-// Bucket count per histogram: HistogramServerStatusMetric::pow(31, 64, 2) yields 31 boundaries,
-// so 32 buckets. Update this if the bounds ever change.
+// Bucket count per histogram: HistogramServerStatusMetric::computeBounds<uint64_t>(31, 64, 2)
+// yields 31 boundaries, so 32 buckets. Update this if the bounds ever change.
 const kExpectedBucketCount = 32;
 
 /**

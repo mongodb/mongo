@@ -47,7 +47,7 @@ auto& numPlansTotal = *MetricBuilder<Counter64>{"query.cbr.numPlans"};
  */
 auto& microsHistogram =
     *MetricBuilder<HistogramServerStatusMetric>{"query.cbr.histograms.micros"}.bind(
-        HistogramServerStatusMetric::pow(11, 1024, 4));
+        HistogramServerStatusMetric::computeBounds<uint64_t>(11, 1024, 4));
 
 /**
  * An element in this histogram is the number of microseconds spent sampling in an invocation of
@@ -55,14 +55,14 @@ auto& microsHistogram =
  */
 auto& samplingMicrosHistogram =
     *MetricBuilder<HistogramServerStatusMetric>{"query.cbr.histograms.samplingMicros"}.bind(
-        HistogramServerStatusMetric::pow(11, 1024, 4));
+        HistogramServerStatusMetric::computeBounds<uint64_t>(11, 1024, 4));
 
 /**
  * An element in this histogram is the number of plans in the candidate set of an invocation of CBR.
  */
 auto& numPlansHistogram =
     *MetricBuilder<HistogramServerStatusMetric>{"query.cbr.histograms.numPlans"}.bind(
-        HistogramServerStatusMetric::pow(5, 2, 2));
+        HistogramServerStatusMetric::computeBounds<uint64_t>(5, 2, 2));
 
 }  // namespace
 

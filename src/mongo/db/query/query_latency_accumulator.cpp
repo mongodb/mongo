@@ -20,7 +20,7 @@ auto getQueryLatencyAccumulator = QueryLifespan::declareOpCtxDecoration<QueryLat
 // also an opLatencies bucket edge, so the two metrics stay comparable. The 64us floor is well
 // below any achievable whole-query time.
 std::vector<uint64_t> queryLatencyBucketBounds() {
-    return HistogramServerStatusMetric::pow(31, 64, 2);
+    return HistogramServerStatusMetric::computeBounds<uint64_t>(31, 64, 2);
 }
 
 // The metrics published in serverStatus for one plan-selection strategy, as the single leaf
