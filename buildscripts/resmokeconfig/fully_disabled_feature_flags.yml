@@ -20,7 +20,6 @@
 # TODO (SERVER-108818): test primary-driven index builds in allFeatureFlag variant.
 - featureFlagPrimaryDrivenIndexBuilds
 - featureFlagResumablePrimaryDrivenIndexBuilds
-- featureFlagContainerWrites
 # TODO (SERVER-133236): Remove once the pipelined oplog applier works end-to-end, so it
 # can bake in the all-feature-flags variants before being enabled by default.
 - featureFlagPipelinedOplogApplier

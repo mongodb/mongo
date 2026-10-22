@@ -1,6 +1,6 @@
 /**
  * Verifies that listCollections with rawData:true emits fastCount fields when
- * featureFlagReplicatedFastCount and featureFlagContainerWrites are manually enabled, and that
+ * featureFlagReplicatedFastCount and featureFlagContainerWrites are enabled, and that
  * timestampStoreTs appears exactly once across all collection entries.
  *
  * @tags: [
@@ -8,6 +8,7 @@
  *   requires_persistence,
  *   requires_fsync,
  *   requires_timeseries,
+ *   featureFlagContainerWrites,
  * ]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
@@ -49,7 +50,6 @@ describe("listCollections fastCount fields", function () {
             nodeOptions: {
                 setParameter: {
                     featureFlagReplicatedFastCount: true,
-                    featureFlagContainerWrites: true,
                 },
             },
         });
@@ -62,13 +62,6 @@ describe("listCollections fastCount fields", function () {
         // tag once the flag is enabled in all feature flag variants.
         if (!FeatureFlagUtil.isPresentAndEnabled(this.db, "ReplicatedFastCount")) {
             jsTest.log.info("Skipping test because featureFlagReplicatedFastCount is disabled");
-            this.rst.stopSet();
-            quit();
-        }
-        // TODO SERVER-108818: Remove this explicit check and use the featureFlagContainerWrites tag
-        // once the flag is enabled in all feature flag variants.
-        if (!FeatureFlagUtil.isPresentAndEnabled(this.db, "ContainerWrites")) {
-            jsTest.log.info("Skipping test because featureFlagContainerWrites is disabled");
             this.rst.stopSet();
             quit();
         }
