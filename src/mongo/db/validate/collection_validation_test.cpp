@@ -2350,7 +2350,8 @@ protected:
     // a checkpoint flush would have written.
     void seedPersistedHash(const UUID& uuid,
                            boost::optional<int64_t> hash,
-                           bool writeBackingOplogEntry = true) {
+                           bool writeBackingOplogEntry = true,
+                           const NamespaceString& nss = kNss) {
         auto& manager = replicated_fast_count::ReplicatedFastCountManager::get(getServiceContext());
         auto [sizeCountStore, timestampStore] = manager.getSizeCountStores_ForTest();
         replicated_fast_count::test_helpers::insertSizeCountEntry(
@@ -2371,7 +2372,7 @@ protected:
             operationContext(),
             replicated_fast_count::test_helpers::makeOplogEntry(
                 kPersistedAt,
-                replicated_fast_count::test_helpers::NsAndUUID{kNss, uuid},
+                replicated_fast_count::test_helpers::NsAndUUID{nss, uuid},
                 repl::OpTypeEnum::kInsert,
                 /*sizeDelta=*/0));
         shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
@@ -2395,13 +2396,13 @@ protected:
         shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
     }
 
-    UUID collectionUuid() {
-        const AutoGetCollection coll(operationContext(), kNss, MODE_IS);
+    UUID collectionUuid(const NamespaceString& nss = kNss) {
+        const AutoGetCollection coll(operationContext(), nss, MODE_IS);
         return coll->uuid();
     }
 
-    void insertDocs(const std::vector<BSONObj>& docs) {
-        const AutoGetCollection coll(operationContext(), kNss, MODE_IX);
+    void insertDocs(const std::vector<BSONObj>& docs, const NamespaceString& nss = kNss) {
+        const AutoGetCollection coll(operationContext(), nss, MODE_IX);
         WriteUnitOfWork wuow(operationContext());
         ASSERT_OK(Helpers::insert(operationContext(), *coll, docs));
         wuow.commit();
@@ -2416,12 +2417,40 @@ protected:
         return hash;
     }
 
-    ValidateResults hashValidate() {
+    // A collection clustered on _id, which is eligible for a collection hash without replicated
+    // record ids.
+    static inline const NamespaceString kEligibleNss =
+        NamespaceString::createNamespaceString_forTest("test.clustered");
+
+    void createEligibleCollection() {
+        CollectionOptions options;
+        options.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex();
+        ASSERT_OK(storageInterface()->createCollection(
+            operationContext(), kEligibleNss, options, /*createIdIndex=*/false));
+        shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+    }
+
+    // A collection that does not replicate its record ids, so it is not eligible for a hash. It is
+    // created explicitly so it stays ineligible when featureFlagRecordIdsReplicated is enabled.
+    static inline const NamespaceString kIneligibleNss =
+        NamespaceString::createNamespaceString_forTest("test.ineligible");
+
+    void createIneligibleCollection() {
+        FailPointEnableBlock overrideRecordIds("overrideRecordIdsReplicatedFalse");
+        ASSERT_OK(storageInterface()->createCollection(operationContext(), kIneligibleNss, {}));
+        shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+    }
+
+    static constexpr int32_t kMissingHashLogId = 13648700;
+    static constexpr std::string_view kMissingHashWarning =
+        "The collection is eligible for a collection hash but it is missing or incomplete";
+
+    ValidateResults hashValidate(const NamespaceString& nss = kNss) {
         ValidateResults results;
         EXPECT_EQ(ErrorCodes::OK,
                   collection_validation::validate(
                       operationContext(),
-                      kNss,
+                      nss,
                       collection_validation::ValidationOptions{
                           collection_validation::ValidateMode::kCollectionHash,
                           collection_validation::RepairMode::kNone,
@@ -2569,14 +2598,19 @@ TEST_F(CollectionHashComparisonTest, ReplaysFromTheGlobalValidAsOfNotTheEntrysOw
 
 TEST_F(CollectionHashComparisonTest, ReportsNoPersistedHashWhenTheEntryCarriesNone) {
     createFastCountContainers();
-    insertDocs({BSON("_id" << 1)});
+    createIneligibleCollection();
+    insertDocs({BSON("_id" << 1)}, kIneligibleNss);
 
     // An entry that predates hash validation, or whose contributions could not all be accounted
     // for, holds size and count but no hash. Absence is sticky, so this is the permanent state for
-    // such a collection rather than a transient one.
-    seedPersistedHash(collectionUuid(), boost::none);
+    // such a collection rather than a transient one. This collection does not replicate its record
+    // ids, so it is not eligible for a hash and no warning is expected.
+    seedPersistedHash(collectionUuid(kIneligibleNss),
+                      boost::none,
+                      /*writeBackingOplogEntry=*/true,
+                      kIneligibleNss);
 
-    const auto results = hashValidate();
+    const auto results = hashValidate(kIneligibleNss);
     ASSERT_TRUE(results.getHashComparison().has_value());
     EXPECT_EQ(toString(*results.getHashComparison()), "noPersistedHash");
     EXPECT_FALSE(results.getExpectedXxh3CollectionHash().has_value());
@@ -2663,6 +2697,7 @@ TEST_F(CollectionHashComparisonTest, SkipsACollectionCreatedSinceTheLastCheckpoi
     // hash from zero. That is deliberately not done: it would compare the oplog against the data
     // rather than the persisted hash against the data, and reporting a match would claim more than
     // was checked.
+    // TODO SERVER-136493: Revisit once a new collection's hash is derived from the oplog.
     seedGlobalValidAsOf(uuid, kPersistedAt);
 
     replicated_fast_count::test_helpers::writeToOplog(
@@ -2688,9 +2723,14 @@ TEST_F(CollectionHashComparisonTest, SkipsACollectionCreatedSinceTheLastCheckpoi
 
 TEST_F(CollectionHashComparisonTest, ReportsIncompleteWhenAReplayedEntryCarriesNoHash) {
     createFastCountContainers();
+    createIneligibleCollection();
     const std::vector<BSONObj> docs = {BSON("_id" << 1)};
-    insertDocs(docs);
-    seedPersistedHash(collectionUuid(), static_cast<int64_t>(xxh3Of(docs)));
+    insertDocs(docs, kIneligibleNss);
+    const auto uuid = collectionUuid(kIneligibleNss);
+    seedPersistedHash(uuid,
+                      static_cast<int64_t>(xxh3Of(docs)),
+                      /*writeBackingOplogEntry=*/true,
+                      kIneligibleNss);
 
     // An entry with a size delta but no per-document hash, which is what a write records when the
     // storage model was not accumulating hashes at the time. One such entry means not every write
@@ -2700,12 +2740,13 @@ TEST_F(CollectionHashComparisonTest, ReportsIncompleteWhenAReplayedEntryCarriesN
         operationContext(),
         replicated_fast_count::test_helpers::makeOplogEntry(
             Timestamp(2, 1),
-            replicated_fast_count::test_helpers::NsAndUUID{kNss, collectionUuid()},
+            replicated_fast_count::test_helpers::NsAndUUID{kIneligibleNss, uuid},
             repl::OpTypeEnum::kInsert,
             /*sizeDelta=*/16));
     shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
 
-    const auto results = hashValidate();
+    // The collection does not replicate its record ids, so it is not eligible for a hash.
+    const auto results = hashValidate(kIneligibleNss);
     ASSERT_TRUE(results.getHashComparison().has_value());
     EXPECT_EQ(toString(*results.getHashComparison()), "incompleteDelta");
     EXPECT_FALSE(results.getExpectedXxh3CollectionHash().has_value());
@@ -2714,11 +2755,12 @@ TEST_F(CollectionHashComparisonTest, ReportsIncompleteWhenAReplayedEntryCarriesN
 
 TEST_F(CollectionHashComparisonTest, ReportsIncompleteWhenAnImportedCollectionHasNoHash) {
     createFastCountContainers();
+    createIneligibleCollection();
     const BSONObj doc = BSON("_id" << 1);
-    insertDocs({doc});
+    insertDocs({doc}, kIneligibleNss);
 
-    const auto uuid = collectionUuid();
-    seedPersistedHash(uuid, 0x1234);
+    const auto uuid = collectionUuid(kIneligibleNss);
+    seedPersistedHash(uuid, 0x1234, /*writeBackingOplogEntry=*/true, kIneligibleNss);
 
     // An import brings in a collection whose documents were never hashed, so its delta carries no
     // hash and nothing folded over that range can be trusted.
@@ -2726,12 +2768,13 @@ TEST_F(CollectionHashComparisonTest, ReportsIncompleteWhenAnImportedCollectionHa
         operationContext(),
         replicated_fast_count::test_helpers::makeImportCollectionOplogEntry(
             Timestamp(2, 1),
-            replicated_fast_count::test_helpers::NsAndUUID{kNss, uuid},
+            replicated_fast_count::test_helpers::NsAndUUID{kIneligibleNss, uuid},
             /*numRecords=*/1,
             /*dataSize=*/doc.objsize()));
     shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
 
-    const auto results = hashValidate();
+    // The collection does not replicate its record ids, so it is not eligible for a hash.
+    const auto results = hashValidate(kIneligibleNss);
     ASSERT_TRUE(results.getHashComparison().has_value());
     EXPECT_EQ(toString(*results.getHashComparison()), "incompleteDelta");
     EXPECT_FALSE(results.getExpectedXxh3CollectionHash().has_value());
@@ -2774,6 +2817,120 @@ TEST_F(CollectionHashComparisonTest, WarnsButStaysValidWhenThePersistedHashDisag
     EXPECT_EQ(results.getWarnings().size(), 1);
     // A divergence is surfaced, but must not by itself declare the collection invalid.
     EXPECT_TRUE(results.isValid());
+}
+
+// An eligible collection with no persisted hash is surfaced, but only as a warning.
+TEST_F(CollectionHashComparisonTest, WarnsWhenAnEligibleCollectionHasNoPersistedHash) {
+    createFastCountContainers();
+    createEligibleCollection();
+    insertDocs({BSON("_id" << 1)}, kEligibleNss);
+    const auto uuid = collectionUuid(kEligibleNss);
+    seedPersistedHash(uuid, boost::none, /*writeBackingOplogEntry=*/true, kEligibleNss);
+
+    unittest::LogCaptureGuard logs;
+    const auto results = hashValidate(kEligibleNss);
+    logs.stop();
+
+    ASSERT_TRUE(results.getHashComparison().has_value());
+    EXPECT_EQ(toString(*results.getHashComparison()), "noPersistedHash");
+    ASSERT_EQ(results.getWarnings().size(), 1);
+    EXPECT_TRUE(results.getWarnings().begin()->starts_with(kMissingHashWarning));
+    EXPECT_TRUE(results.isValid());
+    EXPECT_EQ(
+        logs.countBSONContainingSubset(BSON("id" << kMissingHashLogId << "attr"
+                                                 << BSON("hashComparison" << "noPersistedHash"))),
+        1);
+}
+
+// Nothing has been persisted for a new collection yet, so a missing hash is not surfaced.
+// TODO SERVER-136493: Expect a comparison once a new collection's hash is derived from the oplog.
+TEST_F(CollectionHashComparisonTest, DoesNotWarnWhenAnEligibleCollectionHasNoPersistedEntry) {
+    createFastCountContainers();
+    createEligibleCollection();
+    insertDocs({BSON("_id" << 1)}, kEligibleNss);
+
+    unittest::LogCaptureGuard logs;
+    const auto results = hashValidate(kEligibleNss);
+    logs.stop();
+
+    ASSERT_TRUE(results.getHashComparison().has_value());
+    EXPECT_EQ(toString(*results.getHashComparison()), "noPersistedEntry");
+    EXPECT_TRUE(results.getWarnings().empty());
+    EXPECT_EQ(logs.countBSONContainingSubset(BSON("id" << kMissingHashLogId)), 0);
+}
+
+// A hash lost since the last flush is surfaced the same way, without waiting for the next flush.
+TEST_F(CollectionHashComparisonTest, WarnsWhenAnEligibleCollectionHasAnIncompleteDelta) {
+    createFastCountContainers();
+    createEligibleCollection();
+    const std::vector<BSONObj> docs = {BSON("_id" << 1)};
+    insertDocs(docs, kEligibleNss);
+    const auto uuid = collectionUuid(kEligibleNss);
+    seedPersistedHash(
+        uuid, static_cast<int64_t>(xxh3Of(docs)), /*writeBackingOplogEntry=*/true, kEligibleNss);
+
+    replicated_fast_count::test_helpers::writeToOplog(
+        operationContext(),
+        replicated_fast_count::test_helpers::makeOplogEntry(
+            Timestamp(2, 1),
+            replicated_fast_count::test_helpers::NsAndUUID{kEligibleNss, uuid},
+            repl::OpTypeEnum::kInsert,
+            /*sizeDelta=*/16));
+    shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+
+    unittest::LogCaptureGuard logs;
+    const auto results = hashValidate(kEligibleNss);
+    logs.stop();
+
+    ASSERT_TRUE(results.getHashComparison().has_value());
+    EXPECT_EQ(toString(*results.getHashComparison()), "incompleteDelta");
+    ASSERT_EQ(results.getWarnings().size(), 1);
+    EXPECT_TRUE(results.getWarnings().begin()->starts_with(kMissingHashWarning));
+    EXPECT_TRUE(results.isValid());
+    EXPECT_EQ(
+        logs.countBSONContainingSubset(BSON("id" << kMissingHashLogId << "attr"
+                                                 << BSON("hashComparison" << "incompleteDelta"))),
+        1);
+}
+
+// The replicated metadata system does not track a local collection, so it is not compared.
+TEST_F(CollectionHashComparisonTest, DoesNotWarnForAnUntrackedCollection) {
+    createFastCountContainers();
+    const auto localNss = NamespaceString::createNamespaceString_forTest("local.clustered");
+    CollectionOptions options;
+    options.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex();
+    ASSERT_OK(storageInterface()->createCollection(
+        operationContext(), localNss, options, /*createIdIndex=*/false));
+    insertDocs({BSON("_id" << 1)}, localNss);
+
+    unittest::LogCaptureGuard logs;
+    const auto results = hashValidate(localNss);
+    logs.stop();
+
+    ASSERT_TRUE(results.getHashComparison().has_value());
+    EXPECT_EQ(toString(*results.getHashComparison()), "notTracked");
+    EXPECT_TRUE(results.getWarnings().empty());
+    EXPECT_EQ(logs.countBSONContainingSubset(BSON("id" << kMissingHashLogId)), 0);
+}
+
+// Size-based truncation tracks the oplog in the replicated metadata system, but its record ids are
+// not replicated, so it never carries a hash and is not surfaced.
+TEST_F(CollectionHashComparisonTest, DoesNotWarnForTheOplog) {
+    unittest::ServerParameterGuard trackOplog("featureFlagSizeBasedOplogTruncationForDisagg", true);
+    createFastCountContainers();
+    seedPersistedHash(collectionUuid(NamespaceString::kRsOplogNamespace),
+                      boost::none,
+                      /*writeBackingOplogEntry=*/true,
+                      NamespaceString::kRsOplogNamespace);
+
+    unittest::LogCaptureGuard logs;
+    const auto results = hashValidate(NamespaceString::kRsOplogNamespace);
+    logs.stop();
+
+    ASSERT_TRUE(results.getHashComparison().has_value());
+    EXPECT_EQ(toString(*results.getHashComparison()), "noPersistedHash");
+    EXPECT_TRUE(results.getWarnings().empty());
+    EXPECT_EQ(logs.countBSONContainingSubset(BSON("id" << kMissingHashLogId)), 0);
 }
 
 class CollectionValidationXxh3Test : public CollectionValidationTest {
