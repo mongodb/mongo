@@ -275,11 +275,16 @@ jsTestLog("Running tailable query on the oplog with no results");
         localDb.runCommand({getMore: cursorId, collection: "oplog.rs", maxTimeMS: 100}),
     );
 
-    assert.eq(resGetMore1.cursor.nextBatch.length, 0, resGetMore1);
-
-    // Resume token should be equal to the find command's.
     const resumeToken2 = assertExpectedResumeTokenFormat(resGetMore1);
-    assert.eq(timestampCmp(resumeToken2.ts, resumeToken1.ts), 0);
+    if (resGetMore1.cursor.nextBatch.length === 0) {
+        // Resume token should not be before the find command's. It may be greater if a
+        // non-matching entry was appended to the oplog in between, since the PBRT tracks scan
+        // position rather than matched results.
+        assert.gte(timestampCmp(resumeToken2.ts, resumeToken1.ts), 0, resGetMore1);
+    } else {
+        // A matching entry was appended and returned, so the PBRT must have advanced.
+        assert.gt(timestampCmp(resumeToken2.ts, resumeToken1.ts), 0, resGetMore1);
+    }
 
     // Insert dummy data so the next getMore should have a higher resume token.
     const latestOpTime = assert.commandWorked(
@@ -291,19 +296,25 @@ jsTestLog("Running tailable query on the oplog with no results");
         localDb.runCommand({getMore: cursorId, collection: "oplog.rs", maxTimeMS: 100}),
     );
 
-    assert.eq(resGetMore2.cursor.nextBatch.length, 0, resGetMore2);
-
-    // Resume token should be greater than the last getMore's.
     const resumeToken3 = assertExpectedResumeTokenFormat(resGetMore2);
-    assert.eq(
-        timestampCmp(resumeToken3.ts, resumeToken2.ts),
-        1,
-        tojson({
-            currentResumeToken: resumeToken3,
-            lastResumeToken: resumeToken2,
-            latestOpTime: latestOpTime,
-        }),
-    );
+    if (resGetMore2.cursor.nextBatch.length === 0) {
+        // Resume token should be at least the dummy insert's optime, since the tailable getMore
+        // must have scanned past it.
+        assert.gte(timestampCmp(resumeToken3.ts, latestOpTime.ts), 0, resGetMore2);
+    } else {
+        // A matching entry was appended and returned; its timestamp must be past the dummy
+        // insert, and the PBRT must be at least the last returned entry's.
+        assert.gte(
+            timestampCmp(resGetMore2.cursor.nextBatch[0].ts, latestOpTime.ts),
+            0,
+            resGetMore2,
+        );
+        assert.gte(
+            timestampCmp(resumeToken3.ts, resGetMore2.cursor.nextBatch[0].ts),
+            0,
+            resGetMore2,
+        );
+    }
 
     // Kill the tailable cursor.
     assert.commandWorked(localDb.runCommand({killCursors: "oplog.rs", cursors: [cursorId]}));
