@@ -166,10 +166,9 @@ public:
                         // over BSONColumn's iterator API, and the materialized elements are
                         // discarded, as we only care about whether decoding throws.
                         //
-                        // The decompressor raises its own uasserts, whose messages carry document
-                        // data. Describe them with a single fixed description here, keeping the
-                        // decompressor's own message on the Status (and so in the logs) rather
-                        // than in the validation results.
+                        // The decompressor raises its own uasserts, whose messages are fixed
+                        // strings naming the failing check, with no document data in them. Surface
+                        // them in the description so the results say which check failed.
                         try {
                             bsoncolumn::DiscardingContainer<BSONElement> elements;
                             bsoncolumn::BSONColumnBlockBased(static_cast<const char*>(binData.data),
@@ -178,7 +177,8 @@ public:
                                     elements, new BSONElementStorage());
                         } catch (const ExceptionFor<ErrorCategory::ValidationError>& e) {
                             uassertedBSONValidation(
-                                e.code(), "BSONColumn decompression failed", e.reason());
+                                e.code(),
+                                fmt::format("BSONColumn decompression failed: {}", e.reason()));
                         }
                         break;
                     }

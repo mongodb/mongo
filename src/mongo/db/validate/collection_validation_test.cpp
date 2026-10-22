@@ -2264,6 +2264,30 @@ TEST_F(TimeseriesCollectionValidationTest, ReportInvalidBSONColumnReason) {
                 ::testing::HasSubstr("BSONColumn decompression failed"));
 }
 
+TEST_F(TimeseriesCollectionValidationTest, ReportBSONColumnDecompressionReason) {
+    // An int literal followed by a delta block control byte with an invalid scale index passes the
+    // structural column check but fails decompression; the decompressor's reason must reach the
+    // results under the default validation version.
+    const char kInvalidColumnBytes[] =
+        "\x10\x00\x01\x00\x00\x00"
+        "\x70\x00\x00\x00\x00\x00\x00\x00\x00"
+        "\x00";
+    const BSONBinData invalidColumn{
+        kInvalidColumnBytes, sizeof(kInvalidColumnBytes) - 1, BinDataType::Column};
+    static constexpr std::array dataIdField = {"data"sv, "_id"sv};
+    insertDoc(replaceNestedField(getSampleDoc(), dataIdField, invalidColumn));
+
+    const auto results = foregroundValidate(
+        _nss,
+        _opCtx,
+        {.valid = false, .numRecords = 1, .numInvalidDocuments = 1, .numErrors = 1},
+        {_validateMode});
+
+    ASSERT_EQ(results.size(), 1U);
+    EXPECT_THAT(*results.front().getErrors().begin(),
+                ::testing::HasSubstr("BSONColumn decompression failed: "));
+}
+
 TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationFixedBucketingInconsistency) {
     unittest::ServerParameterGuard fixedBucketingCatalogController(
         "featureFlagFixedBucketingCatalog", true);

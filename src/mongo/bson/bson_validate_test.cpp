@@ -1200,6 +1200,26 @@ TEST(BSONValidateColumn, BSONColumnInBSONRespectsVersion) {
     ASSERT_EQ(status.code(), ErrorCodes::InvalidBSONColumn);
 }
 
+TEST(BSONValidateColumn, BSONColumnDecompressionFailureReason) {
+    // An int literal followed by a delta block control byte with an invalid scale index passes the
+    // structural column check but fails decompression; the description must carry the
+    // decompressor's reason.
+    const char kBadColumn[] =
+        "\x10\x00\x01\x00\x00\x00"
+        "\x70\x00\x00\x00\x00\x00\x00\x00\x00"
+        "\x00";
+    BSONBinData badColumn{kBadColumn, sizeof(kBadColumn) - 1, BinDataType::Column};
+    BSONObj obj = BSON("a" << badColumn);
+
+    boost::optional<std::string> description;
+    Status status =
+        validateBSON(obj, BSONValidateModeEnum::kExtended, mongo::V2_Column, &description);
+    EXPECT_EQ(status.code(), ErrorCodes::InvalidBSONColumn);
+    ASSERT_TRUE(description);
+    EXPECT_NE(description->find("BSONColumn decompression failed: "), std::string::npos)
+        << *description;
+}
+
 TEST(BSONValidateColumn, BSONColumnMissingEOO) {
     BSONColumnBuilder cb;
     cb.append(BSON("a" << "deadbeef").getField("a"));
