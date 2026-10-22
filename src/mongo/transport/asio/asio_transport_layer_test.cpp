@@ -1446,9 +1446,9 @@ TEST_F(AsioTransportLayerTLSHandshakeTest, SuccessfulHandshakes) {
         // The recorded values are verified exactly, with a mocked tick source, in
         // ingress_handshake_metrics_test.cpp. This is only an order-of-magnitude sanity check
         // that the production call site records a plausible per-handshake duration in
-        // milliseconds (rather than e.g. raw ticks or an absolute timestamp), so it is
+        // microseconds (rather than e.g. raw ticks or an absolute timestamp), so it is
         // intentionally far above any latency reachable on a slow test host.
-        EXPECT_LE(histogramData.sum, 20'000);
+        EXPECT_LE(histogramData.sum, 20'000'000);
     }
 }
 #endif  // MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL

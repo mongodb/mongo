@@ -159,6 +159,10 @@ public:
         MetricNameMaker::make("mongodb.metrics.prometheus_file_exporter.write_size");
     static constexpr MetricName kIngressTLSHandshakeLatency =
         MetricNameMaker::make("mongodb.network.ingress_tls_handshake_latency");
+    static constexpr MetricName kIngressHelloLatency =
+        MetricNameMaker::make("mongodb.network.ingress_hello_latency");
+    static constexpr MetricName kIngressAuthLatency =
+        MetricNameMaker::make("mongodb.network.ingress_auth_latency");
     static constexpr MetricName kConnectionsCurrent =
         MetricNameMaker::make("mongodb.serverStatus.connections.current");
     static constexpr MetricName kConnectionsAvailable =
