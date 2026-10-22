@@ -557,6 +557,33 @@ DEATH_TEST_F(LoadExtensionsTestDeathTest,
     registerStubParser("$match", "This should fail since $match is already registered.");
 }
 
+TEST_F(LoadExtensionsTest, BinaryCompatibleFlagGatesExtensionStage) {
+    // Static because the parser map keeps a pointer to the flag until tearDown() unregisters it.
+    static BinaryCompatibleFeatureFlag flag(false);
+    flag.setForServerParameter(false);
+
+    // The fallback must be registered before the extension registers its primary parser.
+    registerStubParser(kTestFooStageName, "The $testFoo stage is gated off.", &flag);
+    ASSERT_DOES_NOT_THROW(ExtensionLoader::load("foo", makeTestFooConfig()));
+
+    std::vector<BSONObj> pipeline = {BSON(kTestFooStageName << BSONObj())};
+
+    // Flag disabled: the fallback stub is selected even though the extension is loaded.
+    ASSERT_THROWS_CODE(
+        pipeline_factory::makePipeline(pipeline, expCtx, pipeline_factory::kOptionsMinimal),
+        AssertionException,
+        10918500);
+
+    // Flag enabled: the extension's primary parser is selected. Since binary-compatible flags are
+    // fixed at startup in production, toggling here lets one load cover both states.
+    flag.setForServerParameter(true);
+    auto parsedPipeline =
+        pipeline_factory::makePipeline(pipeline, expCtx, pipeline_factory::kOptionsMinimal);
+    ASSERT_EQUALS(parsedPipeline->getSources().size(), 1U);
+    ASSERT_TRUE(dynamic_cast<DocumentSourceExtensionForQueryShape*>(
+                    parsedPipeline->getSources().front().get()) != nullptr);
+}
+
 /*
  * Test fixture that loads the "extension_errors" test extension so that tests can be run against
  * it.

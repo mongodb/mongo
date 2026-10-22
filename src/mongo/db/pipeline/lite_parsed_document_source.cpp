@@ -49,10 +49,9 @@ namespace {
 
 ParserMap parserMap;
 
-// Metrics are added to aggStageCounters upon LiteParsedDocumentSource registration. Considering
-// that LiteParsedDocumentSources can be unregistered in tests and metrics cannot be removed from
-// aggStageCounters, we need a data structure to track which metrics have already been registered in
-// order to prevent duplicate registration.
+// Tracks stage names whose aggStageCounters metric has already been added, since adding a metric
+// twice is fatal. This happens when a primary parser is registered after its fallback, and in tests
+// that re-register a stage, since unregistering a parser does not remove its metric.
 StringSet metricsAlreadyRegistered;
 
 }  // namespace
@@ -74,17 +73,18 @@ LiteParsedDocumentSource::LiteParserRegistration::getParserInfo(
         return _fallbackParser;
     }
 
-    // Both a primary and fallback parser have been set. Check the value of the associated feature
-    // flag, prioritizing per-request IFR flag values (from IFRContext) to ensure consistent view of
-    // flag value across query execution.
-    const bool isFeatureEnabled = [&]() -> bool {
-        if (_primaryParserFeatureFlag == nullptr) {
-            return true;
-        }
-        if (options.ifrContext) {
-            return options.ifrContext->getSavedFlagValue(*_primaryParserFeatureFlag);
-        }
-        return _primaryParserFeatureFlag->checkEnabled();
+    // Both a primary and fallback parser have been set. Consult the feature flag's
+    // checkWithContext() so each flag kind applies its own semantics for this operation.
+    const bool isFeatureEnabled = !_primaryParserFeatureFlag || [&] {
+        // Construct and pass a `defaultIfrContext` for non-IFR flag types.
+        IncrementalFeatureRolloutContext defaultIfrContext;
+        // (Generic FCV reference): Fall back to kLastLTS when 'vCtx' is not initialized. The
+        // VersionContext and the FCVSnapshot params only affect the check for FCV-gated feature
+        // flags which are currently unsupported. See TODO(SERVER-114028) for more information.
+        return _primaryParserFeatureFlag->checkWithContext(
+            kVersionContextIgnored_UNSAFE,
+            options.ifrContext ? *options.ifrContext : defaultIfrContext,
+            ServerGlobalParams::FCVSnapshot{multiversion::GenericFCV::kLastLTS});
     }();
 
     return isFeatureEnabled ? _primaryParser : _fallbackParser;
@@ -96,8 +96,17 @@ void LiteParsedDocumentSource::LiteParserRegistration::setPrimaryParser(LitePars
 }
 
 void LiteParsedDocumentSource::LiteParserRegistration::setFallbackParser(
-    LiteParserInfo&& lpi, IncrementalRolloutFeatureFlag* ff) {
+    LiteParserInfo&& lpi, FeatureFlag* ff, std::string_view stageName) {
     _fallbackParser = std::move(lpi);
+    // TODO(SERVER-114028): To support FCV-gated feature flags, parser selection must supply the
+    // operation FCV their checkWithContext() requires. Falling back to the global FCV snapshot
+    // would be unsafe.
+    tassert(13748300,
+            str::stream() << "Fallback parsing only supports IncrementalRolloutFeatureFlag and "
+                             "BinaryCompatibleFeatureFlag"
+                          << stageName,
+            !ff || dynamic_cast<IncrementalRolloutFeatureFlag*>(ff) ||
+                dynamic_cast<BinaryCompatibleFeatureFlag*>(ff));
     _primaryParserFeatureFlag = ff;
     _fallbackIsSet = true;
 }
@@ -150,25 +159,15 @@ void LiteParsedDocumentSource::registerFallbackParser(const std::string& name,
     }
 
     // Initialize a counter for this document source to track how many times it is used.
-    aggStageCounters.addMetric(name);
-    metricsAlreadyRegistered.insert(name);
-
-    // Create a new registration and save the parser as the fallback parser.
-    auto& registration = parserMap[name];
-
-    IncrementalRolloutFeatureFlag* ifrFeatureFlag = nullptr;
-    // If parserFeatureFlag is not set, we are adding a fallback parser for a stub stage that isn't
-    // associated with a feature flag.
-    if (parserFeatureFlag != nullptr) {
-        // TODO SERVER-114028 Remove the following dynamic cast and tassert when fallback parsing
-        // supports all feature flags.
-        ifrFeatureFlag = dynamic_cast<IncrementalRolloutFeatureFlag*>(parserFeatureFlag);
-        tassert(11395101,
-                "Fallback parsing only supports IncrementalRolloutFeatureFlags.",
-                ifrFeatureFlag != nullptr);
+    if (!metricsAlreadyRegistered.contains(name)) {
+        aggStageCounters.addMetric(name);
+        metricsAlreadyRegistered.insert(name);
     }
 
-    registration.setFallbackParser(std::move(parserInfo), ifrFeatureFlag);
+    // Create a new registration and save the parser as the fallback parser. A null
+    // parserFeatureFlag signifies a stub stage that isn't associated with a feature flag.
+    auto& registration = parserMap[name];
+    registration.setFallbackParser(std::move(parserInfo), parserFeatureFlag, name);
 }
 
 void LiteParsedDocumentSource::unregisterParser_forTest(const std::string& name) {

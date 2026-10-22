@@ -35,6 +35,33 @@ std::unique_ptr<LiteParsedDocumentSource> createMockParser(const NamespaceString
     return std::make_unique<MockLiteParsed>(spec);
 }
 
+// Feature flag type that matches none of the supported kinds in setFallbackParser, to exercise
+// the unrecognized-type guard.
+class UnclassifiedMockFeatureFlag : public FeatureFlag {
+public:
+    bool allowRuntimeToggle() const override {
+        return false;
+    }
+
+    void appendFlagValueAndMetadata(BSONObjBuilder& flagBuilder) const override {}
+
+    bool checkWithContext(const VersionContext& vCtx,
+                          IncrementalFeatureRolloutContext& ifrContext,
+                          ServerGlobalParams::FCVSnapshot fcv) override {
+        return false;
+    }
+
+    bool canBeEnabled() const override {
+        return false;
+    }
+
+    bool getForServerParameter() const override {
+        return false;
+    }
+
+    void setForServerParameter(bool enabled) override {}
+};
+
 }  // namespace
 
 class LiteParserRegistrationTest : public unittest::Test {
@@ -178,6 +205,18 @@ TEST_F(LiteParserRegistrationTest, GetParserWithEmptyIfrContextFlag) {
     assertParserIsPrimary(parserInfo);
 }
 
+TEST_F(LiteParserRegistrationTest, GetParserWithBinaryCompatibleFlagIgnoresIfrContext) {
+    LiteParsedDocumentSource::LiteParserRegistration registration;
+
+    BinaryCompatibleFeatureFlag mockFlag(true);
+    registration.setFallbackParser(std::move(fallbackParser), &mockFlag);
+    registration.setPrimaryParser(std::move(primaryParser));
+
+    LiteParserOptions options;
+    options.ifrContext = IncrementalFeatureRolloutContext::forTest({});
+    assertParserIsPrimary(registration.getParserInfo(options));
+}
+
 class LiteParsedDocumentSourceParseTest : public unittest::Test {
 protected:
     void registerPrimaryParser() {
@@ -281,11 +320,38 @@ TEST_F(LiteParsedDocumentSourceParseTest, FirstFallbackParserTakesPrecedenceWith
     ASSERT_EQ(parserInfo.allowedWithClientType, AllowedWithClientType::kInternal);
 }
 
-// TODO SERVER-114028 Remove the following test when fallback parsing supports all feature flags.
-DEATH_TEST_F(LiteParsedDocumentSourceParseDeathTest, IFRFlagIsRequired, "11395101") {
-    _stageName = "$IFRFlagIsRequired";
+TEST_F(LiteParsedDocumentSourceParseTest, BinaryCompatibleFlagEnabledSelectsPrimary) {
+    _stageName = "$binaryCompatibleFlagEnabledSelectsPrimary";
+
+    BinaryCompatibleFeatureFlag mockFlag(true);
+    registerFallbackParser(&mockFlag);
+    registerPrimaryParser();
+
+    ASSERT_EQ(getParserInfo().allowedWithApiStrict, AllowedWithApiStrict::kAlways);
+}
+
+TEST_F(LiteParsedDocumentSourceParseTest, BinaryCompatibleFlagDisabledSelectsFallback) {
+    _stageName = "$binaryCompatibleFlagDisabledSelectsFallback";
 
     BinaryCompatibleFeatureFlag mockFlag(false);
+    registerFallbackParser(&mockFlag);
+    registerPrimaryParser();
+
+    ASSERT_EQ(getParserInfo().allowedWithApiStrict, AllowedWithApiStrict::kNeverInVersion1);
+}
+
+// TODO(SERVER-114028): Replace with selection tests once FCV-gated flags are supported.
+DEATH_TEST_F(LiteParsedDocumentSourceParseDeathTest, FCVGatedFlagIsNotSupported, "13748300") {
+    _stageName = "$fcvGatedFlagIsNotSupported";
+
+    FCVGatedFeatureFlag mockFlag{false /* enabled */, "" /* no version */};
+    registerFallbackParser(&mockFlag);
+}
+
+DEATH_TEST_F(LiteParsedDocumentSourceParseDeathTest, UnclassifiedFlagIsNotSupported, "13748300") {
+    _stageName = "$unclassifiedFlagIsNotSupported";
+
+    UnclassifiedMockFeatureFlag mockFlag;
     registerFallbackParser(&mockFlag);
 }
 

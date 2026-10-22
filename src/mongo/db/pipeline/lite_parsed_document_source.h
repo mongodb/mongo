@@ -11,6 +11,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands/query_cmd/extension_metrics.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/resolved_namespace.h"
 #include "mongo/db/pipeline/stage_params.h"
@@ -159,8 +160,11 @@ public:
 
         void setPrimaryParser(LiteParserInfo&& lpi);
 
-        // TODO SERVER-114028 Update when fallback parsing supports all feature flags.
-        void setFallbackParser(LiteParserInfo&& lpi, IncrementalRolloutFeatureFlag* ff);
+        // 'ff' must be null (no feature flag), an IncrementalRolloutFeatureFlag, or a
+        // BinaryCompatibleFeatureFlag. Parser selection queries it via checkWithContext().
+        void setFallbackParser(LiteParserInfo&& lpi,
+                               FeatureFlag* ff,
+                               std::string_view stageName = {});
 
         bool isPrimarySet() const;
 
@@ -181,10 +185,9 @@ public:
         // disabled, the fallback parser will be used to parse the stage.
         LiteParserInfo _fallbackParser;
 
-        // When enabled, signals to use the primary parser; when disabled, signals to use the
-        // fallback parser.
-        // TODO SERVER-114028 Generalize this to be FeatureFlag*.
-        IncrementalRolloutFeatureFlag* _primaryParserFeatureFlag = nullptr;
+        // When non-null, signals to use the flag-specific enablement logic to determine whether to
+        // use the primary parser. When null, signals to unconditionally use the primary parser.
+        FeatureFlag* _primaryParserFeatureFlag = nullptr;
 
         // Whether or not the primary parser has been registered or not.
         bool _primaryIsSet = false;
@@ -243,6 +246,12 @@ public:
      */
     static void registerParser(const std::string& name, LiteParserInfo parserInfo);
 
+    /**
+     * Registers a fallback parser for 'name' that is used when no primary parser is registered or
+     * when 'parserFeatureFlag' is disabled. Must be called before the primary parser is registered,
+     * and 'parserFeatureFlag' must be null, an IncrementalRolloutFeatureFlag, or a
+     * BinaryCompatibleFeatureFlag.
+     */
     static void registerFallbackParser(const std::string& name,
                                        FeatureFlag* parserFeatureFlag,
                                        LiteParserInfo);
