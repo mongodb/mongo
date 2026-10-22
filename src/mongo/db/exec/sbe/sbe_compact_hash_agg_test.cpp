@@ -101,7 +101,6 @@ void CompactHashAggStageTest::performCompactHashAgg(
     auto stage =
         makeS<CompactHashAggStage>(std::move(scanStage),
                                    makeSV(scanSlot),
-                                   true,
                                    boost::optional<value::SlotId>{shouldUseCollator, collatorSlot},
                                    /*yieldPolicy=*/nullptr,
                                    kEmptyPlanNodeId);
@@ -146,7 +145,6 @@ TEST_F(CompactHashAggStageTest, CompactHashAggBasicNoSpill) {
 
     auto stage = makeS<CompactHashAggStage>(std::move(scanStage),
                                             makeSV(scanSlot),
-                                            true,
                                             boost::none,
                                             /*yieldPolicy=*/nullptr,
                                             kEmptyPlanNodeId);
@@ -180,7 +178,6 @@ TEST_F(CompactHashAggStageTest, CompactHashAggNoGroupByProducesSingleGroup) {
     // Build a CompactHashAggStage with an empty group-by slot list.
     auto stage = makeS<CompactHashAggStage>(std::move(scanStage),
                                             makeSV(),
-                                            true,
                                             boost::none,
                                             /*yieldPolicy=*/nullptr,
                                             kEmptyPlanNodeId);
@@ -220,7 +217,6 @@ TEST_F(CompactHashAggStageTest, CompactHashAggCloneTest) {
 
     auto stage = makeS<CompactHashAggStage>(std::move(scanStage),
                                             makeSV(scanSlot),
-                                            true,
                                             boost::none,
                                             /*yieldPolicy=*/nullptr,
                                             kEmptyPlanNodeId);
@@ -258,7 +254,6 @@ TEST_F(CompactHashAggStageTest, CompactHashAggWithRecordIds) {
 
     auto stage = makeS<CompactHashAggStage>(std::move(scanStage),
                                             makeSV(scanSlot),
-                                            true,
                                             boost::none,
                                             /*yieldPolicy=*/nullptr,
                                             kEmptyPlanNodeId);
@@ -303,7 +298,6 @@ TEST_F(CompactHashAggStageTest, CompactHashAggMemoryLimitNoDiskUse) {
 
     auto stage = makeS<CompactHashAggStage>(std::move(scanStage),
                                             makeSV(scanSlot),
-                                            true,
                                             boost::none,
                                             /*yieldPolicy=*/nullptr,
                                             kEmptyPlanNodeId);

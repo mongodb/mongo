@@ -24,7 +24,7 @@
 namespace mongo {
 namespace sbe {
 /**
- * Performs a hash-based grouping. Appears as the "compactGroup" stage in debug output. Groups
+ * Performs a hash-based grouping. Appears as the "compact_group" stage in debug output. Groups
  * the input based on the provided vector of group-by slots, 'gbs'.
  *
  * This cut of the stage is a skeleton. The hash table maps each group-by key (still a
@@ -47,12 +47,9 @@ namespace sbe {
  * 'QueryExceededMemoryLimitNoDiskUseAllowed' rather than spilling. This is acceptable only
  * because nothing constructs the stage in production yet; spilling is follow-up work.
  *
- * The 'optimizedClose' flag controls whether we can close the child subtree right after building
- * the hash table. If true it means that we do not expect the subtree to be reopened.
- *
  * Debug string representation:
  *
- *  compactGroup [<group by slots>] reopen? collatorSlot?
+ *  compact_group [<group by slots>] collatorSlot?
  *      childStage
  */
 class CompactHashAggStage final : public HashAggBaseStage<CompactHashAggStage> {
@@ -61,7 +58,6 @@ class CompactHashAggStage final : public HashAggBaseStage<CompactHashAggStage> {
 public:
     CompactHashAggStage(std::unique_ptr<PlanStage> input,
                         value::SlotVector gbs,
-                        bool optimizedClose,
                         boost::optional<value::SlotId> collatorSlot,
                         PlanYieldPolicySBE* yieldPolicy,
                         PlanNodeId planNodeId,
@@ -139,10 +135,6 @@ private:
     const value::SlotVector _gbs;
 
     const boost::optional<value::SlotId> _collatorSlot;
-
-    // When this operator does not expect to be reopened (almost always) then it can close the
-    // child early.
-    const bool _optimizedClose{true};
 
     value::SlotAccessorMap _outAccessors;
 

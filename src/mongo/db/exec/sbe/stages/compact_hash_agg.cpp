@@ -23,12 +23,11 @@ namespace sbe {
 using namespace std::literals::string_view_literals;
 CompactHashAggStage::CompactHashAggStage(std::unique_ptr<PlanStage> input,
                                          value::SlotVector gbs,
-                                         bool optimizedClose,
                                          boost::optional<value::SlotId> collatorSlot,
                                          PlanYieldPolicySBE* yieldPolicy,
                                          PlanNodeId planNodeId,
                                          bool participateInTrialRunTracking)
-    : HashAggBaseStage("compactGroup"sv,
+    : HashAggBaseStage("compact_group"sv,
                        yieldPolicy,
                        planNodeId,
                        /*_collatorAccessor=*/nullptr,
@@ -36,15 +35,13 @@ CompactHashAggStage::CompactHashAggStage(std::unique_ptr<PlanStage> input,
                        false /* allowDiskUse; the compact stage does not spill */,
                        /*forceIncreasedSpilling=*/false),
       _gbs(std::move(gbs)),
-      _collatorSlot(collatorSlot),
-      _optimizedClose(optimizedClose) {
+      _collatorSlot(collatorSlot) {
     _children.emplace_back(std::move(input));
 }
 
 std::unique_ptr<PlanStage> CompactHashAggStage::clone() const {
     return std::make_unique<CompactHashAggStage>(_children[0]->clone(),
                                                  _gbs,
-                                                 _optimizedClose,
                                                  _collatorSlot,
                                                  _yieldPolicy,
                                                  _commonStats.nodeId,
@@ -160,10 +157,8 @@ void CompactHashAggStage::open(bool reOpen) {
         }
     }  // while child's getNext advanced
 
-    if (_optimizedClose) {
-        _children[0]->close();
-        _childOpened = false;
-    }
+    _children[0]->close();
+    _childOpened = false;
 
     _htIt = _ht->end();
 }
@@ -246,10 +241,6 @@ void CompactHashAggStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
         DebugPrinter::addIdentifier(ret, _gbs[idx]);
     }
     ret.emplace_back(DebugPrinter::Block("`]"));
-
-    if (!_optimizedClose) {
-        ret.emplace_back("reopen");
-    }
 
     if (_collatorSlot) {
         DebugPrinter::addIdentifier(ret, *_collatorSlot);
