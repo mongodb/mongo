@@ -5,8 +5,11 @@ file covers the resolution policy, the configuration parsing and the CLI; the
 discovery-route implementations are tested in test_dsc_release_sources.py.
 
 The test matrix runs with fake sources and no network: newest-wins,
-skip-unpublished, cross-boundary, at/descending-HEAD excluded, empty -> skip
-signal, and override precedence.
+skip-unpublished, cross-boundary, same-series rc passes the sanity gate,
+sanity failure on a result not older than the version under test, empty ->
+skip signal, and override precedence. The "older than the code under test"
+bound itself is git topology, owned by the sources (their at/descending-HEAD
+exclusion, tested in test_dsc_release_sources.py).
 """
 
 import contextlib
@@ -32,13 +35,11 @@ class FakeSource(under_test.VersionSource):
         name="fake",
         candidates=None,
         published=(),
-        implemented=True,
         list_error=None,
     ):
         self.name = name
         self._candidates = list(candidates or [])
         self._published = set(published)
-        self.implemented = implemented
         self._list_error = list_error
         self.probed = []
         self.listed = False
@@ -61,7 +62,6 @@ class TestResolverConfig(unittest.TestCase):
                 "multiversion_platform": "amazon2023",
                 "multiversion_architecture": "aarch64",
                 "multiversion_edition": "enterprise",
-                "DB_CONTRIB_TOOL_RELEASE_FEED_SOURCE": "atlas",
             }
         )
         self.assertEqual(
@@ -153,34 +153,63 @@ class TestResolvePolicy(unittest.TestCase):
         self.assertEqual(source.probed, ["9.1.0-rc1021", "9.0.0-rc1020"])
 
     def test_published_same_series_rc_is_chosen_once_published(self):
-        # Per the plan's cross-train semantics: once the 9.1 DSC binaries are
-        # published, the old side moves up to them even though master still
-        # targets 9.1.0 -- an rc is strictly older than the GA version it
-        # precedes.
+        # Last-patch semantics: once the 9.1 DSC binaries are published, the
+        # old side moves up to them -- that is what production runs -- even
+        # though master still targets 9.1.0. That an rc sorts below the GA
+        # version it precedes (``9.1.0-rc1021 < 9.1.0``) is a packaging
+        # artifact; it passes the sanity gate.
         source = FakeSource(
             candidates=["9.1.0-rc1021", "9.0.0-rc1020"],
             published=["9.1.0-rc1021", "9.0.0-rc1020"],
         )
         self.assertEqual(under_test.resolve([source], "9.1.0"), "9.1.0-rc1021")
 
-    def test_candidates_at_or_after_the_version_under_test_are_excluded(self):
+    def test_same_release_rc_is_chosen_for_an_alpha_version_under_test(self):
+        # Master targets 9.2.0-alpha0 while the same release's DSC train tags
+        # r9.2.0-rc1050. Topologically the train tag is older than HEAD (the
+        # train forked before it), so it is the correct old side. That the rc
+        # channel sorts above the alpha channel is a packaging artifact, not
+        # release ordering: the sanity gate compares releases, not channels.
         source = FakeSource(
-            candidates=["9.2.0-rc0", "9.1.0", "9.0.0-rc1020"],
-            published=["9.2.0-rc0", "9.1.0", "9.0.0-rc1020"],
+            candidates=["9.2.0-rc1050", "9.1.0-rc1021"],
+            published=["9.2.0-rc1050", "9.1.0-rc1021"],
         )
-        self.assertEqual(under_test.resolve([source], "9.1.0"), "9.0.0-rc1020")
-        self.assertEqual(source.probed, ["9.0.0-rc1020"])
+        self.assertEqual(under_test.resolve([source], "9.2.0-alpha0"), "9.2.0-rc1050")
+
+    def test_ga_tag_of_the_version_under_test_fails_the_sanity_gate(self):
+        # A GA tag carrying the release the build targets is the build itself
+        # leaking through the topology bound: refused even though the version
+        # under test is a pre-release of that same release.
+        source = FakeSource(candidates=["9.2.0"], published=["9.2.0"])
+        with self.assertRaises(under_test.SanityError):
+            under_test.resolve([source], "9.2.0-alpha0")
+
+    def test_result_not_older_than_the_version_under_test_is_a_sanity_failure(self):
+        # The MONGO_VERSION comparison is a sanity assertion on the result: a
+        # published candidate is selected even when its version string is not
+        # older than the version under test, and the violation surfaces as the
+        # sanity failure.
+        source = FakeSource(
+            candidates=["9.2.0-rc0", "9.0.0-rc1020"],
+            published=["9.2.0-rc0", "9.0.0-rc1020"],
+        )
+        with self.assertRaises(under_test.SanityError):
+            under_test.resolve([source], "9.1.0")
+        # Selected newest-first, then refused by the gate.
+        self.assertEqual(source.probed, ["9.2.0-rc0"])
+
+    def test_equal_version_is_also_a_sanity_failure(self):
+        # "Older than the version under test" is strict: a tag carrying the
+        # version under test itself (e.g. the build under test leaking through
+        # the topology bound) must fail the gate.
+        source = FakeSource(candidates=["9.1.0"], published=["9.1.0"])
+        with self.assertRaises(under_test.SanityError):
+            under_test.resolve([source], "9.1.0")
 
     def test_nothing_published_resolves_to_none(self):
         source = FakeSource(candidates=["9.0.0-rc1020"], published=[])
         self.assertIsNone(under_test.resolve([source], "9.1.0"))
         self.assertEqual(source.probed, ["9.0.0-rc1020"])
-
-    def test_unimplemented_source_is_skipped(self):
-        unimplemented = FakeSource(implemented=False, candidates=["9.0.0-rc1020"], published=[])
-        working = FakeSource(candidates=["9.0.0-rc1020"], published=["9.0.0-rc1020"])
-        self.assertEqual(under_test.resolve([unimplemented, working], "9.1.0"), "9.0.0-rc1020")
-        self.assertFalse(unimplemented.listed)
 
     def test_failing_source_falls_through_to_the_next_source(self):
         broken = FakeSource(name="feed", list_error=RuntimeError("no credentials"))
@@ -208,23 +237,9 @@ class TestResolvePolicy(unittest.TestCase):
         )
         self.assertEqual(under_test.resolve([source], "9.1.0"), "9.0.0-rc1020")
 
-    def test_unimplemented_probe_moves_to_the_next_source(self):
-        # A source whose probe is not implemented cannot verify any candidate,
-        # so resolution moves on to the next source instead of stepping down
-        # pointlessly within it.
-        unimplemented_probe = FakeSource(name="tags", candidates=["9.0.0-rc1020"], published=[])
-        unimplemented_probe.has_published_binary = mock.Mock(
-            side_effect=NotImplementedError("feed layout unknown")
-        )
-        working = FakeSource(name="feed", candidates=["9.0.0-rc1020"], published=["9.0.0-rc1020"])
-        self.assertEqual(
-            under_test.resolve([unimplemented_probe, working], "9.1.0"), "9.0.0-rc1020"
-        )
-        unimplemented_probe.has_published_binary.assert_called_once()
-
     def test_unparseable_candidates_are_ignored(self):
-        # An unparseable candidate in the middle must not abort the step-down:
-        # the resolution must traverse it to reach the older published one.
+        # The step-down traverses unparseable candidates to reach the older
+        # published one.
         source = FakeSource(
             candidates=["9.0.0-rc1020", "garbage", "9.0.0-rc1013"],
             published=["9.0.0-rc1013"],
@@ -233,11 +248,11 @@ class TestResolvePolicy(unittest.TestCase):
         self.assertEqual(source.probed, ["9.0.0-rc1020", "9.0.0-rc1013"])
 
     def test_config_error_propagates_out_of_resolve(self):
-        # A configuration error (e.g. an unknown platform) must surface as the
-        # usage error it is, not be swallowed as a probe failure.
+        # A ConfigError propagates out of resolve() as the usage error it is
+        # (exit 2).
         source = FakeSource(candidates=["9.0.0-rc1020"], published=[])
         source.has_published_binary = mock.Mock(
-            side_effect=under_test.ConfigError("no atlas build variant known")
+            side_effect=under_test.ConfigError("unusable probe configuration")
         )
         with self.assertRaises(under_test.ConfigError):
             under_test.resolve([source], "9.1.0")
@@ -247,7 +262,6 @@ TASK_ENV = {
     under_test.PLATFORM_ENV_VAR: "amazon2023",
     under_test.ARCHITECTURE_ENV_VAR: "aarch64",
     under_test.EDITION_ENV_VAR: "enterprise",
-    "DB_CONTRIB_TOOL_RELEASE_FEED_SOURCE": "atlas",
 }
 
 
@@ -301,6 +315,19 @@ class CLITestCase(unittest.TestCase):
         self.assertEqual(out, "")
         self.assertTrue(err)
 
+    def test_sanity_failure_is_exit_1_with_empty_stdout(self):
+        # A resolved release that is not older than the version under test
+        # refuses the result: same signal as nothing-resolvable (the caller
+        # decides fail vs. skip), with the reason on stderr.
+        source = FakeSource(candidates=["9.2.0-rc0"], published=["9.2.0-rc0"])
+        code, out, err = self.run_main(
+            ["--version-under-test", "9.1.0"],
+            sources=[source],
+        )
+        self.assertEqual(code, under_test.EXIT_NOTHING_RESOLVABLE)
+        self.assertEqual(out, "")
+        self.assertIn("sanity check failed", err)
+
     def test_missing_env_is_a_usage_error(self):
         code, out, _ = self.run_main(
             ["--version-under-test", "9.1.0"],
@@ -353,11 +380,11 @@ class CLITestCase(unittest.TestCase):
         self.assertEqual(out, "9.0.0-rc1020\n")
 
     def test_config_error_from_probe_is_a_usage_error(self):
-        # An unusable configuration (e.g. unknown platform) is exit 2, not the
+        # A ConfigError from a probe exits 2 (usage error), distinct from the
         # "nothing resolvable" signal of exit 1.
         source = FakeSource(candidates=["9.0.0-rc1020"], published=[])
         source.has_published_binary = mock.Mock(
-            side_effect=under_test.ConfigError("no atlas build variant known")
+            side_effect=under_test.ConfigError("unusable probe configuration")
         )
         code, out, _ = self.run_main(
             ["--version-under-test", "9.1.0"],
@@ -378,44 +405,31 @@ class CLITestCase(unittest.TestCase):
         self.assertIn("Enumerated candidates", err)
 
     def test_print_candidates_outputs_each_source(self):
-        unimplemented = FakeSource(name="evg", implemented=False)
         broken = FakeSource(name="feed", list_error=RuntimeError("boom"))
         working = FakeSource(name="tags", candidates=["9.0.0-rc1020"], published=["9.0.0-rc1020"])
         code, out, err = self.run_main(
             ["--print-candidates", "--version-under-test", "9.1.0"],
-            sources=[unimplemented, broken, working],
+            sources=[broken, working],
         )
         self.assertEqual(code, under_test.EXIT_RESOLVED)
         # Sources that cannot be examined are logged by the traversal, not
         # printed: stdout carries only the examinable sources' candidates.
-        self.assertNotIn("[evg]", out)
         self.assertNotIn("[feed]", out)
         self.assertIn("[tags] 9.0.0-rc1020 eligible=True published=True", out)
-        self.assertIn("Discovery source is not implemented yet; skipping", err)
         self.assertIn("Discovery source failed; falling through to the next source", err)
 
     def test_print_candidates_with_no_candidates_is_exit_1(self):
         code, out, _ = self.run_main(
             ["--print-candidates", "--version-under-test", "9.1.0"],
-            sources=[FakeSource(name="evg", implemented=False)],
+            sources=[FakeSource(name="tags", candidates=[])],
         )
         self.assertEqual(code, under_test.EXIT_NOTHING_RESOLVABLE)
 
-    def test_requested_source_resolves_or_reports_nothing(self):
-        # All discovery sources are implemented; an explicit choice either
-        # resolves or reports nothing-resolvable (exit 1), never a usage error.
-        code, out, _ = self.run_main(
-            ["--source", "feed", "--version-under-test", "9.1.0"], patch_sources=False
-        )
-        self.assertIn(code, (under_test.EXIT_RESOLVED, under_test.EXIT_NOTHING_RESOLVABLE))
-        self.assertEqual(out, "")
-
-    def test_requested_unresolvable_source_is_exit_1(self):
-        # An implemented source that resolves nothing is "nothing resolvable",
-        # not a usage error.
-        code, out, _ = self.run_main(
-            ["--source", "tags", "--version-under-test", "9.1.0"], patch_sources=False
-        )
+    def test_unresolvable_real_invocation_is_exit_1(self):
+        # A real invocation that resolves nothing is "nothing resolvable"
+        # (exit 1, stdout empty), not a usage error. In the test sandbox the
+        # feed probe cannot succeed, so this exercises the full real chain.
+        code, out, _ = self.run_main(["--version-under-test", "9.1.0"], patch_sources=False)
         self.assertEqual(code, under_test.EXIT_NOTHING_RESOLVABLE)
         self.assertEqual(out, "")
 
@@ -426,22 +440,12 @@ class TestBuildSources(unittest.TestCase):
             query=under_test.DscBinaryQuery(platform="p", architecture="a", edition="e"),
         )
 
-    def test_auto_order_is_feed_then_evg_then_tags(self):
-        sources = under_test._build_sources("auto", self.config)
-        self.assertEqual([source.name for source in sources], ["feed", "evg", "tags"])
-
-    def test_explicit_choice_builds_only_that_source(self):
-        for choice, name in (("feed", "feed"), ("evg", "evg"), ("tags", "tags")):
-            sources = under_test._build_sources(choice, self.config)
-            self.assertEqual([source.name for source in sources], [name])
-
-    def test_tags_source_probes_through_the_feed(self):
-        sources = under_test._build_sources("tags", self.config)
+    def test_builds_the_tag_topology_route_with_a_feed_probe(self):
+        # The tag-topology path is authoritative: git-tag candidates, the feed
+        # only as the publication probe.
+        sources = under_test._build_sources(self.config)
+        self.assertEqual([source.name for source in sources], ["tags"])
         self.assertIsInstance(sources[0].probe, under_test_sources.FeedSource)
-
-    def test_unknown_choice_is_a_config_error(self):
-        with self.assertRaises(under_test.ConfigError):
-            under_test._build_sources("bogus", self.config)
 
 
 if __name__ == "__main__":

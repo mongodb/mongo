@@ -33,15 +33,10 @@ class VersionSource(ABC):
     """One discovery route for DSC releases.
 
     All network (and git) I/O lives behind the two methods, so the resolution
-    policy can be tested with fake sources and no network. A source sets
-    ``implemented = False`` while its route is not wired up yet;
-    :func:`resolve <buildscripts.resmokelib.multiversion.dsc_release.resolve>`
-    skips those loudly, and the CLI turns an explicitly requested unimplemented
-    route into a usage error.
+    policy can be tested with fake sources and no network.
     """
 
     name = "source"
-    implemented = True
 
     @abstractmethod
     def candidate_versions(self) -> list[str]:

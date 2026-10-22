@@ -1,46 +1,57 @@
 """Resolve the old-side DSC release for the disagg multiversion suites.
 
-Instead of hard-coding a release in the variant YAML, resolve automatically
-and verifiably:
+The disagg multiversion suites test the build under development against the
+DSC release that production is running -- the **last published DSC train
+tag**. The resolver computes it:
 
-> the newest release whose DSC binary is published in the configured feed, and
-> strictly older than the version under test
+> the newest DSC train tag that is not at or descending from the commit under
+> test, and whose DSC binary is published in the configured feed
 
-DSC release trains are branches ``dsc-release-N`` in 10gen/mongo whose builds
-are tagged with a continuing rc counter (``dsc-release-5`` -> ``r9.0.0-rc1013``
-.. ``r9.0.0-rc1020``, ``dsc-release-6`` -> ``r9.1.0-rc1021``). A tag existing is
-not sufficient -- a DSC binary is not necessarily published for every tag -- so
-every candidate is checked for a published binary for the requested
-platform/architecture/edition, stepping down (across train boundaries) until
-one qualifies.
+"Older than the code under test" means **git topology**, not version-string
+ordering (``9.1.0-rc1022 < 9.1.0`` is a packaging artifact, not release
+ordering). DSC release trains are branches ``dsc-release-N`` in 10gen/mongo
+whose builds are tagged with a continuing rc counter (``dsc-release-5`` ->
+``r9.0.0-rc1013`` .. ``r9.0.0-rc1020``, ``dsc-release-6`` -> ``r9.1.0-rc1021``).
+Candidates are those train tags, enumerated newest first by the shared
+previous_release_tag machinery (git versionsort) and filtered to exclude tags
+at or descending from HEAD -- in the task checkout HEAD is the commit being
+built, so the build under test and anything built from its future can never be
+the old side, however its version string compares. The probe walk is anchored
+at the **base**: the train tag closest in history to the commit under test
+(``find_previous_release_tag`` with the DSC glob -- git merge-base fork
+distance, ties by symmetric distance and version), so a superseded train that
+kept tagging cannot be probed ahead of the topologically-closest one. A tag
+existing is not sufficient -- a DSC binary is not necessarily published for
+every tag -- so every candidate is probed against the atlas release feed for
+the requested platform/architecture/edition, stepping down (across train
+boundaries) until one qualifies. The feed is the publication probe for those
+candidates; candidate order comes from git topology alone.
+
+The MONGO_VERSION comparison is a sanity assertion on the result, not a
+selection rule: the resolved release must not be newer than the version the
+build targets -- release-level "newer": the release under test's own
+pre-releases (the DSC trains among them) qualify, its plain GA and anything
+from a later release do not -- and a violation fails with
+:class:`SanityError` (exit 1, stdout empty).
 
 Contract:
 
 * stdout carries exactly one line: the resolved version string. The caller
   (evergreen/multiversion_selection.sh) appends ``=last-patch`` and hands
   the result to db-contrib-tool. Every diagnostic goes to stderr.
-* Exit codes: 0 = resolved; 1 = nothing resolvable (stdout stays empty; the
-  caller decides fail vs. skip); 2 = usage/config error.
+* Exit codes: 0 = resolved; 1 = nothing resolvable or a failed sanity check
+  (stdout stays empty; the caller decides fail vs. skip); 2 = usage/config
+  error.
 * All network I/O is behind :class:`VersionSource` implementations -- the same
   injected-client pattern as ``MultiversionService.last_patch_resolver`` --
   which is what makes the policy unit-testable with fake sources, no network.
   The implementations live in
-  :mod:`buildscripts.resmokelib.multiversion.dsc_release_sources`.
+  :mod:`buildscripts.resmokelib.multiversion.dsc_release_sources`: ``tags``
+  enumerates the candidates from git, ``feed`` answers publication.
 * An explicit override (``--override``) bypasses discovery entirely and is
   echoed verbatim. The ``multiversion_dsc_release`` expansion is the *shell's*
   emergency pin -- the resolver never reads it, so the shell can compare
   discovery against the pin.
-
-Discovery sources, in ``--source auto`` order (documented in detail in the
-sources module):
-
-* ``feed`` (authoritative): the atlas release feed's JSON manifest, which
-  directly answers both enumeration and publication;
-* ``evg``: git-tag candidates with an Evergreen build-status publication
-  proxy -- needs ``viewTasks`` on the DSC projects, which task credentials do
-  not have, so it currently 404s everywhere;
-* ``tags``: git-tag candidates with the feed's existence probe as the
-  publication check.
 
 This script runs inside ``activate_venv`` with a full checkout (see the
 "do multiversion selection" function in
@@ -68,8 +79,6 @@ from buildscripts.resmokelib.multiversion.dsc_release_base import (
     VersionSource,
 )
 from buildscripts.resmokelib.multiversion.dsc_release_sources import (
-    DSC_EVG_PROJECTS,
-    EvgVersionSource,
     FeedSource,
     TagSource,
 )
@@ -98,9 +107,8 @@ EXIT_USAGE_ERROR = 2
 class ResolverConfig:
     """Inputs gathered from the task environment (expansions are plain env vars).
 
-    Deliberately excludes the version pin: the shell owns
-    ``multiversion_dsc_release`` (the emergency pin) and the resolver always
-    discovers, so the shell can compare discovery against the pin.
+    The shell owns the version pin (``multiversion_dsc_release``): discovery
+    always runs, so the shell can compare its result against the pin.
     """
 
     query: DscBinaryQuery
@@ -142,29 +150,18 @@ def read_version_under_test(path: str = MONGO_VERSION_FILE) -> str:
 
 
 class _Eligibility(Enum):
-    """Whether a candidate may be resolved -- explicit instead of True/False/None.
+    """Whether a candidate may be resolved.
 
-    UNPARSEABLE and TOO_NEW candidates are still reported (and shown by
-    --print-candidates) but are never resolved. The value is the form
-    --print-candidates renders, so the printed vocabulary has one definition.
+    UNPARSEABLE candidates are reported (and shown by --print-candidates);
+    only ELIGIBLE ones are resolved. The "older than the code under test"
+    bound is git topology -- the sources' at/descending-HEAD exclusion; the
+    version comparison is a sanity assertion on the resolved result. The value
+    is the form --print-candidates renders, so the printed vocabulary has one
+    definition.
     """
 
     ELIGIBLE = "True"
     UNPARSEABLE = "unparseable"
-    TOO_NEW = "False"
-
-
-class _ProbeAnswer(Enum):
-    """The probe's answer to "does this candidate have a published DSC binary?".
-
-    PUBLISHED / UNPUBLISHED are the probe's verdicts. CANNOT_DETERMINE means
-    the probe cannot verify any candidate of this source, so resolution moves
-    to the next source.
-    """
-
-    PUBLISHED = "published"
-    UNPUBLISHED = "unpublished"
-    CANNOT_DETERMINE = "cannot-determine"
 
 
 @dataclass(frozen=True)
@@ -181,13 +178,11 @@ class _Examined:
     eligibility: _Eligibility
 
 
-def _examine_candidates(
-    source: VersionSource, candidates: Sequence[str], limit: Version, version_under_test: str
-) -> Iterator[_Examined]:
-    """Examine each candidate: parseable, and strictly older than the version under test."""
+def _examine_candidates(source: VersionSource, candidates: Sequence[str]) -> Iterator[_Examined]:
+    """Examine each candidate for parseability; unparseable ones are reported as such."""
     for version in candidates:
         try:
-            parsed = Version(version)
+            Version(version)
         except InvalidVersion:
             LOGGER.warning(
                 "Ignoring candidate with unparseable version",
@@ -196,32 +191,20 @@ def _examine_candidates(
             )
             eligibility = _Eligibility.UNPARSEABLE
         else:
-            if parsed >= limit:
-                LOGGER.info(
-                    "Candidate is not older than the version under test; excluded",
-                    source=source.name,
-                    version=version,
-                    version_under_test=version_under_test,
-                )
-                eligibility = _Eligibility.TOO_NEW
-            else:
-                eligibility = _Eligibility.ELIGIBLE
+            eligibility = _Eligibility.ELIGIBLE
         yield _Examined(source=source, version=version, eligibility=eligibility)
 
 
 def _examined_sources(
-    sources: Sequence[VersionSource], limit: Version, version_under_test: str
+    sources: Sequence[VersionSource],
 ) -> Iterator[tuple[VersionSource, Iterator[_Examined]]]:
     """Walk the discovery chain source by source, examining every candidate.
 
-    Sources that cannot be examined -- not implemented, or failed to enumerate
-    -- are logged here (once) and skipped: they yield nothing. Lazily:
-    --print-candidates consumes everything, resolve() short-circuits.
+    Sources that fail to enumerate (no git repository, ...) are logged here
+    (once) and skipped: they yield nothing. Lazily: --print-candidates
+    consumes everything, resolve() short-circuits.
     """
     for source in sources:
-        if not source.implemented:
-            LOGGER.warning("Discovery source is not implemented yet; skipping", source=source.name)
-            continue
         try:
             candidates = source.candidate_versions()
         except Exception as exc:
@@ -232,29 +215,18 @@ def _examined_sources(
             )
             continue
         LOGGER.debug("Enumerated candidates", source=source.name, candidates=candidates)
-        yield source, _examine_candidates(source, candidates, limit, version_under_test)
+        yield source, _examine_candidates(source, candidates)
 
 
-def _published(source: VersionSource, version: str) -> _ProbeAnswer:
+def _published(source: VersionSource, version: str) -> bool:
     """Ask the source whether ``version`` has a published DSC binary.
 
-    ConfigError propagates: a configuration error (e.g. an unknown platform)
-    would fail for every source and candidate alike and must surface as the
-    usage error it is instead of being swallowed as "unpublished".
+    Probe failures (network errors, unavailable services) count as
+    "unpublished": selection steps down. ConfigError propagates -- it is a
+    usage error (exit 2).
     """
     try:
-        return (
-            _ProbeAnswer.PUBLISHED
-            if source.has_published_binary(version)
-            else _ProbeAnswer.UNPUBLISHED
-        )
-    except NotImplementedError as exc:
-        LOGGER.warning(
-            "Availability probe not implemented; source cannot resolve anything",
-            source=source.name,
-            error=str(exc),
-        )
-        return _ProbeAnswer.CANNOT_DETERMINE
+        return source.has_published_binary(version)
     except ConfigError:
         raise
     except Exception as exc:
@@ -264,81 +236,96 @@ def _published(source: VersionSource, version: str) -> _ProbeAnswer:
             version=version,
             error=str(exc),
         )
-        return _ProbeAnswer.UNPUBLISHED
+        return False
+
+
+class SanityError(Exception):
+    """The resolved release violates a sanity invariant and cannot be trusted."""
+
+
+def _assert_sanity(resolved: str, version_under_test: str) -> None:
+    """Assert the resolved release is not newer than the version under test.
+
+    "Older" is release-level: the release's own pre-releases -- the alpha,
+    beta and rc trains (the DSC trains among them) -- are genuinely older than
+    the code under test however their channels compare ("rc" sorting above
+    "alpha" is a packaging artifact, not release ordering), so a same-release
+    pre-release resolves. What cannot be trusted is a candidate from a newer
+    release, or the plain GA of the release under test itself (the build
+    leaking through the topology bound).
+    """
+    resolved_version = Version(resolved)
+    under_test_version = Version(version_under_test)
+    if resolved_version.release > under_test_version.release or (
+        resolved_version.release == under_test_version.release
+        and not resolved_version.is_prerelease
+    ):
+        raise SanityError(
+            f"sanity check failed: resolved DSC release {resolved} is not older"
+            f" than the version under test {version_under_test}"
+        )
 
 
 def resolve(sources: Sequence[VersionSource], version_under_test: str) -> Optional[str]:
-    """Return the newest published candidate strictly older than the version under test.
+    """Return the newest published DSC train tag not at/descending from the commit under test.
 
-    Steps down candidate by candidate, newest first, across train boundaries,
-    until one qualifies; ``None`` when nothing does. This is the testable
+    The tag-topology bound is the authoritative "older than the code under
+    test": candidates arrive anchored at the base -- the train tag closest in
+    history to HEAD, with tags at or descending from HEAD already excluded by
+    the source -- git topology, not version-string ordering
+    (``9.1.0-rc1022 < 9.1.0`` is a packaging artifact). This is the testable
     policy core:
 
-    * candidates are consumed newest-first in the order the source returns
-      them -- ordering is the source's responsibility (for git tags, git's
-      versioncmp, the same ordering the last-patch machinery trusts);
-    * unimplemented sources are skipped (loudly);
-    * a source that fails to enumerate (missing credentials, no git repository,
-      ...) falls through to the next source -- a discovery route being
-      unavailable must not take the whole task down;
-    * a candidate at or newer than ``version_under_test`` is excluded, so a
-      build is never tested against itself or something newer;
+    * candidates are consumed in the order the source returns them -- anchored
+      at the base and stepping down (versionsort order from there); ordering
+      is the source's responsibility;
+    * a source that fails to enumerate (no git repository, ...) is skipped:
+      discovery moves to the next source;
     * an availability probe failure steps down to the next candidate;
-      a probe that is not implemented moves to the next source, since no
-      candidate of that source can be verified.
+    * the first published candidate wins -- normally the base itself; the
+      probe covers "tagged but not yet published" and steps down.
 
-    The traversal itself is shared with --print-candidates, which reports
-    every candidate instead of stopping at the first published one.
+    The version-under-test comparison is a sanity assertion on the result: a
+    resolved release that is not older than the version under test (release
+    level: a same-release pre-release is older, the plain GA and any later
+    release are not) means the topology bound and the version file disagree,
+    and fails with :class:`SanityError`.
+
+    The traversal is shared with --print-candidates, which reports every
+    candidate; resolve() stops at the first published one.
     """
-    limit = Version(version_under_test)
-    for source, candidates in _examined_sources(sources, limit, version_under_test):
+    resolved = None
+    for source, candidates in _examined_sources(sources):
         for record in candidates:
             if record.eligibility is not _Eligibility.ELIGIBLE:
                 continue
-            answer = _published(source, record.version)
-            if answer is _ProbeAnswer.CANNOT_DETERMINE:
-                # The probe cannot verify any candidate of this source: stop
-                # probing and move to the next source.
-                break
-            if answer is _ProbeAnswer.PUBLISHED:
+            if _published(source, record.version):
                 LOGGER.info("Resolved DSC release", source=source.name, version=record.version)
-                return record.version
+                resolved = record.version
+                break
             LOGGER.info(
                 "Candidate has no published binary; stepping down",
                 source=source.name,
                 version=record.version,
             )
+        if resolved is not None:
+            break
         LOGGER.info("Source exhausted without a qualifying candidate", source=source.name)
-    return None
+    if resolved is None:
+        return None
+    _assert_sanity(resolved, version_under_test)
+    return resolved
 
 
-def _build_sources(
-    choice: str, config: ResolverConfig, evg_projects: Optional[Sequence[str]] = None
-) -> list[VersionSource]:
-    """Build the discovery chain for ``choice``; auto tries feed, then EVG, then tags."""
-    feed = FeedSource(config.query)
-    projects = evg_projects or DSC_EVG_PROJECTS
-    if choice == "auto":
-        return [feed, EvgVersionSource(config.query, projects=projects), TagSource(probe=feed)]
-    if choice == "feed":
-        return [feed]
-    if choice == "evg":
-        return [EvgVersionSource(config.query, projects=projects)]
-    if choice == "tags":
-        return [TagSource(probe=feed)]
-    raise ConfigError(f"unknown --source choice: {choice}")
+def _build_sources(config: ResolverConfig) -> list[VersionSource]:
+    """Build the discovery chain: the tag-topology route, probed against the feed."""
+    return [TagSource(probe=FeedSource(config.query))]
 
 
 def _parse_args(argv: Optional[Sequence[str]]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Resolve the newest published DSC release for multiversion testing."
         " Prints exactly one line -- the version -- on stdout.",
-    )
-    parser.add_argument(
-        "--source",
-        choices=("auto", "feed", "evg", "tags"),
-        default="auto",
-        help="discovery route; auto tries feed, then EVG, then git tags + feed probe",
     )
     parser.add_argument(
         "--override",
@@ -350,13 +337,6 @@ def _parse_args(argv: Optional[Sequence[str]]) -> argparse.Namespace:
         "--version-under-test",
         default=None,
         help=f"version the current build targets; defaults to MONGO_VERSION in {MONGO_VERSION_FILE}",
-    )
-    parser.add_argument(
-        "--evg-project",
-        action="append",
-        default=None,
-        help="Evergreen project to check for DSC builds; repeatable. Defaults to the known"
-        " dsc-release trains",
     )
     parser.add_argument("--debug", action="store_true", help="decision trace on stderr")
     parser.add_argument(
@@ -383,19 +363,17 @@ def _configure_logging(debug: bool) -> None:
     )
 
 
-def _print_candidates(sources: Sequence[VersionSource], version_under_test: str) -> int:
+def _print_candidates(sources: Sequence[VersionSource]) -> int:
     """List each source's candidates with publication status (incident triage).
 
-    Consumes the same traversal as resolve(), but reports every candidate
-    (including the ineligible ones) and renders probe failures instead of
-    acting on them. Sources that cannot be examined are logged by the
-    traversal, not printed. The exit code is EXIT_RESOLVED only when at least
-    one probe actually answered: an invocation that learned nothing -- nothing
-    enumerated, or every probe failed -- exits EXIT_NOTHING_RESOLVABLE.
+    Consumes the same traversal as resolve(), reporting every candidate
+    (including unparseable ones) and rendering probe failures. The exit code
+    is EXIT_RESOLVED when at least one probe answered; an invocation that
+    learned nothing -- nothing enumerated, or every probe failed -- exits
+    EXIT_NOTHING_RESOLVABLE.
     """
-    limit = Version(version_under_test)
     answered_any = False
-    for source, candidates in _examined_sources(sources, limit, version_under_test):
+    for source, candidates in _examined_sources(sources):
         for record in candidates:
             try:
                 published = source.has_published_binary(record.version)
@@ -435,8 +413,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     try:
         version_under_test = args.version_under_test or read_version_under_test()
-        # Validate early so a malformed version is a usage error rather than a
-        # crash inside resolve().
+        # Validate early: a malformed version is a usage error (exit 2).
         Version(version_under_test)
     except ConfigError as exc:
         LOGGER.error(str(exc))
@@ -449,25 +426,26 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         )
         return EXIT_USAGE_ERROR
 
-    sources = _build_sources(args.source, config, evg_projects=args.evg_project)
+    sources = _build_sources(config)
 
     if args.print_candidates:
-        return _print_candidates(sources, version_under_test)
-
-    if args.source != "auto" and not any(source.implemented for source in sources):
-        LOGGER.error("Requested discovery source is not implemented yet", source=args.source)
-        return EXIT_USAGE_ERROR
+        return _print_candidates(sources)
 
     try:
         resolved = resolve(sources, version_under_test)
     except ConfigError as exc:
-        # E.g. a platform/architecture with no known atlas build variant: a
-        # configuration error, not "nothing resolvable".
+        # A configuration error is a usage error (exit 2), distinct from the
+        # "nothing resolvable" signal (exit 1).
         LOGGER.error(str(exc))
         return EXIT_USAGE_ERROR
+    except SanityError as exc:
+        # The topology bound and MONGO_VERSION disagree: refuse the result
+        # (exit 1, stdout empty).
+        LOGGER.error(str(exc))
+        return EXIT_NOTHING_RESOLVABLE
     if resolved is None:
         # Nothing resolvable: stdout stays empty and the caller decides fail
-        # vs. skip (Inc 4 extends this with an explicit skip signal).
+        # vs. skip.
         LOGGER.error("No DSC release qualifies", version_under_test=version_under_test)
         return EXIT_NOTHING_RESOLVABLE
 
