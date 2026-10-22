@@ -1,7 +1,6 @@
 /**
  * Tests that the duration of an index build, and the number of keys and bytes it wrote to the
- * index tables, are recorded in the completion metrics by the start phase and outcome of the
- * build.
+ * index tables, are recorded in the completion metrics, in the expected histogram bucket.
  * @tags: [
  *   requires_otel_build,
  *   requires_replication,
@@ -17,7 +16,6 @@ import {
     PrimaryDrivenResumableIndexBuildTest,
 } from "jstests/noPassthrough/libs/index_builds/primary_driven.js";
 import {
-    assertHistogramCountAcrossFilesSoon,
     assertHistogramSingleObservation,
     getHistogramByAttributeAcrossFiles,
     otelFileExportParams,
@@ -31,7 +29,8 @@ const kBytesWrittenMetric = "mongodb.index_builds.completed.data_written";
 
 const kCompletionMetrics = [kDurationMetric, kKeysWrittenMetric, kBytesWrittenMetric];
 
-// The bucket boundaries of the keys and bytes written histograms.
+// The bucket boundaries of the duration, keys written and bytes written histograms.
+const kDurationBounds = [60000, 3600000, 28800000, 86400000, 259200000];
 const kKeysWrittenBounds = [1e6, 5e7, 5e8, 1e9, 5e9, 1e10, 1e11];
 const kBytesWrittenBounds = [
     16777216, 1073741824, 8589934592, 17179869184, 68719476736, 137438953472, 1099511627776,
@@ -41,17 +40,46 @@ const kBytesWrittenBounds = [
 const kKeyStringBytesPerKey = 5;
 
 /**
- * Waits for every completion metric to have recorded `expected` observations for this attribute
- * value, across every metrics file in `metricsDir`. The first describe gives each node its own
- * directory and passes only the primary's, so there this reads a single node. The resumed test
- * shares one directory (`_pdibMetricsDir`) between the nodes, because the resumed build completes
- * on whichever node steps up, so its observation lands in a different file than the interrupted
- * build's.
+ * Reads every completion metric, aggregated across every metrics file in `metricsDir`.
  */
-function assertAllCompletionMetricsCountSoon(metricsDir, attrKey, attrValue, expected) {
+function readCompletionMetrics(metricsDir) {
+    const metrics = {};
     for (const metricName of kCompletionMetrics) {
-        assertHistogramCountAcrossFilesSoon({metricsDir, metricName, attrKey, attrValue, expected});
+        metrics[metricName] = getHistogramByAttributeAcrossFiles(metricsDir, metricName, null);
     }
+    return metrics;
+}
+
+/**
+ * Returns what was recorded to the histogram `metricName` between the `before` and `after`
+ * snapshots of metrics.
+ */
+function diffHistogram(metricName, before, after) {
+    const [b, a] = [before[metricName], after[metricName]];
+    return {
+        count: a.count - b.count,
+        sum: a.sum - b.sum,
+        bucketCounts: a.bucketCounts.map((c, i) => c - (b.bucketCounts[i] ?? 0)),
+        explicitBounds: a.explicitBounds,
+    };
+}
+
+/**
+ * Waits for every completion metric to have recorded `expected` observations since `before`,
+ * across every metrics file in `metricsDir`, and returns the snapshot taken once they have.
+ */
+function waitForCompletionMetrics(metricsDir, before, expected) {
+    let after;
+    assert.soon(
+        () => {
+            after = readCompletionMetrics(metricsDir);
+            return kCompletionMetrics.every(
+                (metricName) => diffHistogram(metricName, before, after).count == expected,
+            );
+        },
+        () => `expected ${expected} new observations of every completion metric in ${metricsDir}`,
+    );
+    return after;
 }
 
 describe("index build completion metrics", function () {
@@ -88,39 +116,26 @@ describe("index build completion metrics", function () {
 
     it("successful index build", () => {
         assert.commandWorked(this.coll.insert([{a: 1}, {a: 2}, {a: 3}]));
-        for (const metricName of kCompletionMetrics) {
-            assert.eq(
-                getHistogramByAttributeAcrossFiles(
-                    this.metricsDir,
-                    metricName,
-                    "outcome",
-                    "success",
-                ).count,
-                0,
-            );
-        }
+        const before = readCompletionMetrics(this.metricsDir);
 
         assert.commandWorked(this.coll.createIndex({a: 1}));
 
-        assertAllCompletionMetricsCountSoon(this.metricsDir, "outcome", "success", 1);
+        const after = waitForCompletionMetrics(this.metricsDir, before, 1);
+
+        // A build in this test finishes well within the first duration bucket.
+        assertHistogramSingleObservation(
+            diffHistogram(kDurationMetric, before, after),
+            kDurationBounds,
+            0,
+        );
 
         // One key per document is bulk loaded into the index table. Nothing writes to the
         // collection while the build runs, so the side writes drain contributes nothing.
-        const keys = getHistogramByAttributeAcrossFiles(
-            this.metricsDir,
-            kKeysWrittenMetric,
-            "outcome",
-            "success",
-        );
+        const keys = diffHistogram(kKeysWrittenMetric, before, after);
         assert.eq(keys.sum, 3, "keys written by the successful build", {keys});
         assertHistogramSingleObservation(keys, kKeysWrittenBounds, 3);
 
-        const bytes = getHistogramByAttributeAcrossFiles(
-            this.metricsDir,
-            kBytesWrittenMetric,
-            "outcome",
-            "success",
-        );
+        const bytes = diffHistogram(kBytesWrittenMetric, before, after);
         assert.eq(bytes.sum, 3 * kKeyStringBytesPerKey, "bytes written by the successful build", {
             bytes,
         });
@@ -130,45 +145,34 @@ describe("index build completion metrics", function () {
     it("failed index build", () => {
         // Fail a unique index build by inserting duplicate keys.
         assert.commandWorked(this.coll.insert([{a: 1}, {a: 1}]));
-        for (const metricName of kCompletionMetrics) {
-            assert.eq(
-                getHistogramByAttributeAcrossFiles(
-                    this.metricsDir,
-                    metricName,
-                    "outcome",
-                    "failure",
-                ).count,
-                0,
-            );
-        }
+        const before = readCompletionMetrics(this.metricsDir);
 
         assert.commandFailedWithCode(
             this.coll.createIndex({a: 1}, {unique: true}),
             ErrorCodes.DuplicateKey,
         );
 
-        assertAllCompletionMetricsCountSoon(this.metricsDir, "outcome", "failure", 1);
+        const after = waitForCompletionMetrics(this.metricsDir, before, 1);
+
+        // A build in this test finishes well within the first duration bucket.
+        assertHistogramSingleObservation(
+            diffHistogram(kDurationMetric, before, after),
+            kDurationBounds,
+            0,
+        );
 
         // A build that fails still reports the work it did before failing. The bulk load allows
         // duplicates and records them, and they are only rejected when the build checks its
         // constraints before committing, so both keys have been written by then.
-        const keys = getHistogramByAttributeAcrossFiles(
-            this.metricsDir,
-            kKeysWrittenMetric,
-            "outcome",
-            "failure",
-        );
+        const keys = diffHistogram(kKeysWrittenMetric, before, after);
         assert.eq(keys.sum, 2, "keys written by the failed build", {keys});
+        assertHistogramSingleObservation(keys, kKeysWrittenBounds, 2);
 
-        const bytes = getHistogramByAttributeAcrossFiles(
-            this.metricsDir,
-            kBytesWrittenMetric,
-            "outcome",
-            "failure",
-        );
+        const bytes = diffHistogram(kBytesWrittenMetric, before, after);
         assert.eq(bytes.sum, 2 * kKeyStringBytesPerKey, "bytes written by the failed build", {
             bytes,
         });
+        assertHistogramSingleObservation(bytes, kBytesWrittenBounds, 2 * kKeyStringBytesPerKey);
     });
 });
 
@@ -183,7 +187,7 @@ describe("resumed index build completion metrics", function () {
         PrimaryDrivenResumableIndexBuildTest.tearDown(this.rst);
     });
 
-    it("attributes a resumed build to the phase it resumed from", () => {
+    it("records the work done by a resumed build", () => {
         const db = this.rst.getPrimary().getDB(dbName);
         if (
             !FeatureFlagUtil.isPresentAndEnabled(db, "ContainerWrites") ||
@@ -194,17 +198,7 @@ describe("resumed index build completion metrics", function () {
             return;
         }
 
-        for (const metricName of kCompletionMetrics) {
-            assert.eq(
-                getHistogramByAttributeAcrossFiles(
-                    this.rst._pdibMetricsDir,
-                    metricName,
-                    "start_phase",
-                    "collection scan",
-                ).count,
-                0,
-            );
-        }
+        const before = readCompletionMetrics(this.rst._pdibMetricsDir);
 
         // Resume an index build from the middle. Arbitrary, this was just to choose one resume to
         // test. Every document has the same small integer in each indexed field and there are no
@@ -219,31 +213,23 @@ describe("resumed index build completion metrics", function () {
             sideWrites: [],
         });
 
-        assertAllCompletionMetricsCountSoon(
+        // When graceful stepdown is not enabled and a failover kills the old primary, only the resumed build is observed; otherwise both attempts are observed.
+        const expectedObservations = PrimaryDrivenResumableIndexBuildTest.failoverStopsOldPrimary()
+            ? 1
+            : 2;
+        const after = waitForCompletionMetrics(
             this.rst._pdibMetricsDir,
-            "start_phase",
-            "collection scan",
-            1,
+            before,
+            expectedObservations,
         );
-        assertAllCompletionMetricsCountSoon(this.rst._pdibMetricsDir, "outcome", "success", 1);
 
         // The counters live on the MultiIndexBlock, which is rebuilt when the build resumes, so
         // these report only what was written after resuming. The build was interrupted before it
         // bulk loaded anything, so the resumed build loads every key of all three indexes.
-        const keys = getHistogramByAttributeAcrossFiles(
-            this.rst._pdibMetricsDir,
-            kKeysWrittenMetric,
-            "start_phase",
-            "collection scan",
-        );
+        const keys = diffHistogram(kKeysWrittenMetric, before, after);
         assert.eq(keys.sum, 3 * docCount, "keys written by the resumed build", {keys});
 
-        const bytes = getHistogramByAttributeAcrossFiles(
-            this.rst._pdibMetricsDir,
-            kBytesWrittenMetric,
-            "start_phase",
-            "collection scan",
-        );
+        const bytes = diffHistogram(kBytesWrittenMetric, before, after);
         assert.eq(
             bytes.sum,
             3 * docCount * kKeyStringBytesPerKey,

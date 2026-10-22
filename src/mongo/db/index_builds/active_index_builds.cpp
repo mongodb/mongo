@@ -156,59 +156,30 @@ const std::vector<double> kIndexBuildBytesWrittenBuckets = {
     1'099'511'627'776,  // 1 TiB
 };
 
-otel::metrics::AttributeDefinition<std::string_view> makeStartPhaseAttribute() {
-    return {.name = "start_phase",
-            .values = {
-                idl::serialize(IndexBuildPhaseEnum::kInitialized),
-                idl::serialize(IndexBuildPhaseEnum::kCollectionScan),
-                idl::serialize(IndexBuildPhaseEnum::kBulkLoad),
-                idl::serialize(IndexBuildPhaseEnum::kDrainWrites),
-            }};
-}
-
-otel::metrics::AttributeDefinition<std::string_view> makeOutcomeAttribute() {
-    return {.name = "outcome",
-            .values = {
-                toString(IndexBuildOutcome::kSuccess),
-                toString(IndexBuildOutcome::kFailure),
-                toString(IndexBuildOutcome::kToBeResumed),
-            }};
-}
-
+// TODO SERVER-137679: Revisit adding start phase and outcome dimensions to the index build
+// histogram metrics.
 auto& indexBuildsCompletedDurationMillisHistogram =
-    otel::metrics::MetricsService::instance()
-        .createInt64Histogram<std::string_view, std::string_view>(
-            otel::metrics::MetricNames::kIndexBuildCompletedDurationMillis,
-            "Duration of index builds on this node, by the phase they were "
-            "started or resumed from and by their outcome",
-            otel::metrics::MetricUnit::kMilliseconds,
-            makeStartPhaseAttribute(),
-            makeOutcomeAttribute(),
-            {.explicitBucketBoundaries = kIndexBuildDurationBucketsMillis});
+    otel::metrics::MetricsService::instance().createInt64Histogram(
+        otel::metrics::MetricNames::kIndexBuildCompletedDurationMillis,
+        "Duration of index builds on this node",
+        otel::metrics::MetricUnit::kMilliseconds,
+        {.explicitBucketBoundaries = kIndexBuildDurationBucketsMillis});
 
 auto& indexBuildsCompletedKeysWrittenHistogram =
-    otel::metrics::MetricsService::instance()
-        .createInt64Histogram<std::string_view, std::string_view>(
-            otel::metrics::MetricNames::kIndexBuildCompletedKeysWritten,
-            "Number of index keys written to the index tables by index builds on this node, "
-            "including deletions, by the phase they were started or resumed from and by their "
-            "outcome",
-            otel::metrics::MetricUnit::kCount,
-            makeStartPhaseAttribute(),
-            makeOutcomeAttribute(),
-            {.explicitBucketBoundaries = kIndexBuildKeysWrittenBuckets});
+    otel::metrics::MetricsService::instance().createInt64Histogram(
+        otel::metrics::MetricNames::kIndexBuildCompletedKeysWritten,
+        "Number of index keys written to the index tables by index builds on this node, "
+        "including deletions",
+        otel::metrics::MetricUnit::kCount,
+        {.explicitBucketBoundaries = kIndexBuildKeysWrittenBuckets});
 
 auto& indexBuildsCompletedBytesWrittenHistogram =
-    otel::metrics::MetricsService::instance()
-        .createInt64Histogram<std::string_view, std::string_view>(
-            otel::metrics::MetricNames::kIndexBuildCompletedBytesWritten,
-            "Number of key string bytes written to the index tables by index builds on this "
-            "node, including deletions, by the phase they were started or resumed from and by "
-            "their outcome",
-            otel::metrics::MetricUnit::kBytes,
-            makeStartPhaseAttribute(),
-            makeOutcomeAttribute(),
-            {.explicitBucketBoundaries = kIndexBuildBytesWrittenBuckets});
+    otel::metrics::MetricsService::instance().createInt64Histogram(
+        otel::metrics::MetricNames::kIndexBuildCompletedBytesWritten,
+        "Number of key string bytes written to the index tables by index builds on this node, "
+        "including deletions",
+        otel::metrics::MetricUnit::kBytes,
+        {.explicitBucketBoundaries = kIndexBuildBytesWrittenBuckets});
 
 bool includesPrimaryDriven(std::initializer_list<IndexBuildProtocol> protocols) {
     return std::find(protocols.begin(), protocols.end(), IndexBuildProtocol::kPrimaryDriven) !=
@@ -406,15 +377,11 @@ void ActiveIndexBuilds::unregisterIndexBuild(
     // A build that was never set up did no index build work, so it is left out of the completion
     // histograms rather than recorded as a zero.
     if (writeStats) {
-        const auto histogramAttrs =
-            std::tuple{idl::serialize(metrics.startPhase), toString(outcome)};
-        indexBuildsCompletedDurationMillisHistogram.record(durationMillis, histogramAttrs);
-        indexBuildsCompletedKeysWrittenHistogram.record(
-            writeStats->numKeysWrittenBulkLoad + writeStats->numKeysWrittenSideWritesDrain,
-            histogramAttrs);
+        indexBuildsCompletedDurationMillisHistogram.record(durationMillis);
+        indexBuildsCompletedKeysWrittenHistogram.record(writeStats->numKeysWrittenBulkLoad +
+                                                        writeStats->numKeysWrittenSideWritesDrain);
         indexBuildsCompletedBytesWrittenHistogram.record(
-            writeStats->numBytesWrittenBulkLoad + writeStats->numBytesWrittenSideWritesDrain,
-            histogramAttrs);
+            writeStats->numBytesWrittenBulkLoad + writeStats->numBytesWrittenSideWritesDrain);
     }
     activeIndexBuildsGauge.set(_allIndexBuilds.size());
     indexBuildsManager->tearDownAndUnregisterIndexBuild(replIndexBuildState->buildUUID);

@@ -24,8 +24,6 @@
 #include <algorithm>
 #include <memory>
 #include <string>
-#include <string_view>
-#include <tuple>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
@@ -63,13 +61,11 @@ public:
 
 protected:
     /**
-     * Reads the histogram data for a given combination of start phase and outcome.
+     * Reads the duration histogram data.
      */
-    otel::metrics::HistogramData<int64_t> readDuration(IndexBuildPhaseEnum startPhase,
-                                                       IndexBuildOutcome outcome) {
+    otel::metrics::HistogramData<int64_t> readDuration() {
         return _capturer.readInt64Histogram(
-            otel::metrics::MetricNames::kIndexBuildCompletedDurationMillis,
-            std::tuple{idl::serialize(startPhase), toString(outcome)});
+            otel::metrics::MetricNames::kIndexBuildCompletedDurationMillis);
     }
 
     /**
@@ -153,12 +149,12 @@ struct DurationTestCase {
 class IndexBuildsDurationHistogramTest : public IndexBuildsDurationTest,
                                          public testing::WithParamInterface<DurationTestCase> {};
 
-TEST_P(IndexBuildsDurationHistogramTest, RecordsDurationByStartPhaseAndOutcome) {
+TEST_P(IndexBuildsDurationHistogramTest, RecordsDurationInExpectedBucket) {
     const auto& testCase = GetParam();
 
     runIndexBuild(testCase.startPhase, testCase.outcome, testCase.duration);
 
-    const auto data = readDuration(testCase.startPhase, testCase.outcome);
+    const auto data = readDuration();
     EXPECT_EQ(data.count, 1UL);
     // Assert that the duration of the index build was at least as long as the provided duration,
     // with some wiggle room. An upper bound on the wiggle room is provided by the check below that
@@ -205,16 +201,8 @@ INSTANTIATE_TEST_SUITE_P(AllStartPhasesAndOutcomes,
 TEST_F(IndexBuildsDurationTest, UsesExplicitBucketBoundaries) {
     runIndexBuild(IndexBuildPhaseEnum::kInitialized, IndexBuildOutcome::kSuccess, Milliseconds(0));
 
-    const auto data = readDuration(IndexBuildPhaseEnum::kInitialized, IndexBuildOutcome::kSuccess);
+    const auto data = readDuration();
     EXPECT_EQ(data.boundaries, kHistogramBucketBoundaries);
-}
-
-TEST_F(IndexBuildsDurationTest, DefaultsToInitializedStartPhase) {
-    // A build that is never resumed leaves 'setIndexBuildStartPhase' uncalled.
-    runIndexBuild(IndexBuildPhaseEnum::kInitialized, IndexBuildOutcome::kSuccess, Milliseconds(0));
-
-    EXPECT_EQ(readDuration(IndexBuildPhaseEnum::kInitialized, IndexBuildOutcome::kSuccess).count,
-              1UL);
 }
 
 TEST_F(IndexBuildsDurationTest, ClampsDurationWhenStartTimeIsInTheFuture) {
@@ -223,21 +211,17 @@ TEST_F(IndexBuildsDurationTest, ClampsDurationWhenStartTimeIsInTheFuture) {
     runIndexBuild(
         IndexBuildPhaseEnum::kInitialized, IndexBuildOutcome::kFailure, Milliseconds(-60'000));
 
-    const auto data = readDuration(IndexBuildPhaseEnum::kInitialized, IndexBuildOutcome::kFailure);
+    const auto data = readDuration();
     EXPECT_EQ(data.count, 1UL);
     EXPECT_EQ(data.sum, 0);
     EXPECT_EQ(data.counts[0], 1UL);
 }
 
 TEST_F(IndexBuildsDurationTest, BuildThatIsNeverSetUpIsNotRecordedInCompletionHistograms) {
-    // The capturer throws KeyNotFound for an attribute combination that was never recorded.
-    const auto readFailureCount = [&](otel::metrics::MetricName name) -> uint64_t {
+    // The capturer throws KeyNotFound for a histogram that was never recorded to.
+    const auto readCount = [&](otel::metrics::MetricName name) -> uint64_t {
         try {
-            return _capturer
-                .readInt64Histogram(name,
-                                    std::tuple{idl::serialize(IndexBuildPhaseEnum::kInitialized),
-                                               toString(IndexBuildOutcome::kFailure)})
-                .count;
+            return _capturer.readInt64Histogram(name).count;
         } catch (const ExceptionFor<ErrorCodes::KeyNotFound>&) {
             return 0;
         }
@@ -256,7 +240,7 @@ TEST_F(IndexBuildsDurationTest, BuildThatIsNeverSetUpIsNotRecordedInCompletionHi
     for (auto name : {otel::metrics::MetricNames::kIndexBuildCompletedDurationMillis,
                       otel::metrics::MetricNames::kIndexBuildCompletedKeysWritten,
                       otel::metrics::MetricNames::kIndexBuildCompletedBytesWritten}) {
-        EXPECT_EQ(readFailureCount(name), 0UL) << name.getName();
+        EXPECT_EQ(readCount(name), 0UL) << name.getName();
     }
 }
 
