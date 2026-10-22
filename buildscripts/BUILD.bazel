@@ -757,6 +757,24 @@ py_binary(
 )
 
 py_binary(
+    name = "task_artifacts",
+    srcs = ["task_artifacts.py"],
+    main = "task_artifacts.py",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/util:download_utils",
+        dependency(
+            "boto3",
+            group = "aws",
+        ),
+        dependency(
+            "botocore",
+            group = "aws",
+        ),
+    ],
+)
+
+py_binary(
     name = "coverity_linter",
     srcs = ["coverity_linter.py"],
     main = "coverity_linter.py",
