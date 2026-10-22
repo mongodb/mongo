@@ -42,6 +42,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/log_and_backoff.h"
 #include "mongo/util/observable_mutex_registry.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
@@ -131,6 +132,28 @@ Milliseconds calculateAwaitDataTimeout(const ReplSetConfig& config) {
     // timeout. This enables the sync source to communicate liveness of the primary to secondaries.
     // We never wait longer than 30 seconds.
     return std::min((config.getElectionTimeoutPeriod() / 2), maximumAwaitDataTimeoutMS);
+}
+
+const int firstOplogEntryQueryMaxAttempts = 10;
+
+/**
+ * Returns true(after logging and backing off) if the query for first oplog entry fails
+ * with a retryable error, up to the set `firstOplogEntryQueryMaxAttempts`.
+ */
+bool retryFirstOplogEntryQuery(const Status& status, int attempt) {
+    if (!ErrorCodes::isRetriableError(status.code()) ||
+        attempt >= firstOplogEntryQueryMaxAttempts) {
+        return false;
+    }
+    logAndBackoff(11403200,
+                  MONGO_LOGV2_DEFAULT_COMPONENT,
+                  logv2::LogSeverity::Warning(),
+                  attempt,
+                  "Retrying query for first oplog entry from the sync source due to retriable "
+                  "error",
+                  "remainingAttempts"_attr = firstOplogEntryQueryMaxAttempts - attempt,
+                  "error"_attr = status);
+    return true;
 }
 }  // namespace
 
@@ -1023,16 +1046,31 @@ Status OplogFetcher::_checkTooStaleToSyncFromSource(const OpTime lastFetched,
     // Check to see if the sync source's first oplog entry is later than 'lastFetched'. If it is, we
     // are too stale to sync from this node. If it isn't, we should go into rollback instead.
     BSONObj remoteFirstOplogEntry;
-    try {
-        // Query for the first oplog entry in the sync source's oplog.
-        FindCommandRequest findRequest{_nss};
-        findRequest.setSort(BSON("$natural" << 1));
-        // Since this function is called after the first batch, the exhaust stream has not been
-        // started yet. As a result, using the same connection is safe.
-        remoteFirstOplogEntry = _conn->findOne(std::move(findRequest));
-    } catch (DBException& e) {
-        // If an error occurs with the query, throw an error.
-        return Status(ErrorCodes::TooStaleToSyncFromSource, e.reason());
+
+    for (int attempts = 1;; ++attempts) {
+        try {
+            // Query for the first oplog entry in the sync source's oplog.
+            FindCommandRequest findRequest{_nss};
+            findRequest.setSort(BSON("$natural" << 1));
+            // Since this function is called after the first batch, the exhaust stream has not been
+            // started yet. As a result, using the same connection is safe.
+            remoteFirstOplogEntry = _conn->findOne(std::move(findRequest));
+            break;
+        } catch (DBException& e) {
+            if (retryFirstOplogEntryQuery(e.toStatus(), attempts)) {
+                continue;
+            }
+            LOGV2(11403201,
+                  "No longer retrying query for first oplog entry from the sync source",
+                  "syncSource"_attr = _config.source,
+                  "attempts"_attr = attempts,
+                  "error"_attr = e.toStatus());
+            // If an error occurs with the query, throw an error.
+            return Status(ErrorCodes::InvalidSyncSource,
+                          fmt::format("failed to query the first oplog entry from sync"
+                                      "source: {}",
+                                      e.reason()));
+        }
     }
 
     StatusWith<OpTime> remoteFirstOpTimeResult = OpTime::parseFromOplogEntry(remoteFirstOplogEntry);

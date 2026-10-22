@@ -1085,6 +1085,80 @@ TEST_F(OplogFetcherTest, TooStaleToSyncFromSyncSource) {
         processSingleBatch(makeFirstBatch(cursorId, {entry}, {metadataObj}))->getStatus());
 }
 
+TEST_F(OplogFetcherTest, TooStaleToSyncFromSyncSourceRetriesOnceOnNetworkError) {
+    ShutdownState shutdownState;
+    auto oplogFetcher = getOplogFetcherAfterConnectionCreated(std::ref(shutdownState));
+
+    auto waitForFailPoint = globalFailPointRegistry().find("hangBeforeProcessingSuccessfulBatch");
+    auto timesEnteredFailPoint = waitForFailPoint->setMode(FailPoint::alwaysOn, 0);
+
+    CursorId cursorId = 22LL;
+    auto metadataObj = makeOplogBatchMetadata(replSetMetadata, oqMetadata);
+    auto entry = makeNoopOplogEntry(Seconds(456));
+
+    // Set the remote node's first oplog entry to be later than lastFetched, so that once the
+    // query succeeds we are genuinely too stale to sync from this source.
+    auto remoteFirstOplogEntry = makeNoopOplogEntry(Seconds(200));
+    _mockServer->insert(nss, remoteFirstOplogEntry);
+    lastFetched = oplogFetcher->getLastOpTimeFetched();
+
+    auto m = processSingleRequestResponse(oplogFetcher->getDBClientConnection_forTest(),
+                                          makeFirstBatch(cursorId, {entry}, {metadataObj}));
+    validateFindCommand(
+        m, lastFetched, durationCount<Milliseconds>(oplogFetcher->getInitialFindMaxTime_forTest()));
+
+    // Pause once the first batch has been received but not yet processed.
+    waitForFailPoint->waitForTimesEntered(timesEnteredFailPoint + 1);
+    // Simulate sync source restarting; oplog entry query should fail, then succeed on retry.
+    _mockServer->reboot();
+
+    unittest::LogCaptureGuard logs;
+    waitForFailPoint->setMode(FailPoint::off);
+    oplogFetcher->join();
+    logs.stop();
+
+    // Server reboot triggers one query retry.
+    ASSERT_EQUALS(1, logs.countBSONContainingSubset(BSON("id" << 11403200)));
+    // The retried query succeeded, returning a TooStaleToSyncFromSource error.
+    ASSERT_EQUALS(ErrorCodes::TooStaleToSyncFromSource, shutdownState.getStatus());
+}
+
+TEST_F(OplogFetcherTest, TooStaleToSyncFromSyncSourceRetriesOnNetworkErrorAndExceedsMaxAttempts) {
+    ShutdownState shutdownState;
+    auto oplogFetcher = getOplogFetcherAfterConnectionCreated(std::ref(shutdownState));
+
+    auto waitForFailPoint = globalFailPointRegistry().find("hangBeforeProcessingSuccessfulBatch");
+    auto timesEnteredFailPoint = waitForFailPoint->setMode(FailPoint::alwaysOn, 0);
+
+    CursorId cursorId = 22LL;
+    auto metadataObj = makeOplogBatchMetadata(replSetMetadata, oqMetadata);
+    auto entry = makeNoopOplogEntry(Seconds(456));
+
+    // Set the remote node's first oplog entry to be earlier than lastFetched, so we have not fallen
+    // off the sync source's oplog.
+    auto remoteFirstOplogEntry = makeNoopOplogEntry(Seconds(1));
+    _mockServer->insert(nss, remoteFirstOplogEntry);
+    lastFetched = oplogFetcher->getLastOpTimeFetched();
+
+    auto m = processSingleRequestResponse(oplogFetcher->getDBClientConnection_forTest(),
+                                          makeFirstBatch(cursorId, {entry}, {metadataObj}));
+    validateFindCommand(
+        m, lastFetched, durationCount<Milliseconds>(oplogFetcher->getInitialFindMaxTime_forTest()));
+
+    // Pause once the first batch has been received but not yet processed.
+    waitForFailPoint->waitForTimesEntered(timesEnteredFailPoint + 1);
+    // Mock the first oplog entry query failing with a network error
+    _mockServer->shutdown();
+
+    unittest::LogCaptureGuard logs;
+    waitForFailPoint->setMode(FailPoint::off);
+    oplogFetcher->join();
+    logs.stop();
+
+    ASSERT_EQUALS(ErrorCodes::InvalidSyncSource, shutdownState.getStatus());
+    ASSERT_EQUALS(9, logs.countBSONContainingSubset(BSON("id" << 11403200)));
+}
+
 TEST_F(OplogFetcherTest, NotTooStaleShouldReturnOplogStartMissing) {
     CursorId cursorId = 22LL;
     auto metadataObj = makeOplogBatchMetadata(replSetMetadata, oqMetadata);
