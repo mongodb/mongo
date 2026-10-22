@@ -274,6 +274,7 @@
         - backport_required_multiversion
         - replica_sets_multiversion_backport_required_multiversion
         - DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE
+        - disables_test_commands
       exclude_files:
         - jstests/replsets/initial_sync_rename_collection.js
         - jstests/replsets/initial_sync_drop_collection.js
@@ -284,9 +285,7 @@
 - name: replica_sets_multiversion_last_continuous_selector
   value:
     exclude_files:
-      - jstests/replsets/test_only_repl_commands.js
       - jstests/replsets/transactions_only_allowed_on_primaries.js
-      - jstests/replsets/prepare_conflict_read_concern_behavior.js
 
 - name: replica_sets_multiversion_testdata_last_lts
   value:
