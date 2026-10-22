@@ -11,6 +11,17 @@ exports_files([
 py_library(
     name = "container_action",
     srcs = ["container_action.py"],
+    data = [":container_action_scripts"],
+)
+
+filegroup(
+    name = "container_action_scripts",
+    srcs = [
+        "scripts/action_supervisor.sh",
+        "scripts/input_probe.sh",
+        "scripts/input_probe_setup.sh",
+        "scripts/mount_windows_drives.sh",
+    ],
 )
 
 py_library(

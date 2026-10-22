@@ -1,4 +1,4 @@
-load("@rules_python//python:defs.bzl", "py_binary", "py_test")
+load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 
 package(default_visibility = ["//visibility:public"])
@@ -9,6 +9,7 @@ exports_files([
     "windows_cross_lib_aliases.py",
     "write_case_insensitive_vfs.py",
     "windows_cross_action_wrapper.py",
+    "windows_container_action_wrapper.py",
 ])
 
 sh_binary(
@@ -58,4 +59,25 @@ py_test(
         "//bazel/platforms:platform_util.bzl",
     ],
     main = "windows_cross_toolchain_test.py",
+)
+
+py_library(
+    name = "windows_container_action_wrapper_lib",
+    srcs = ["windows_container_action_wrapper.py"],
+    data = [
+        "scripts/action.sh",
+        "scripts/diagnostics.sh",
+        "scripts/mount_probe.sh",
+    ],
+    deps = [
+        "//bazel:container_paths",
+        "//bazel/toolchains/cc:container_runtime",
+    ],
+)
+
+py_test(
+    name = "windows_container_action_wrapper_test",
+    srcs = ["windows_container_action_wrapper_test.py"],
+    main = "windows_container_action_wrapper_test.py",
+    deps = [":windows_container_action_wrapper_lib"],
 )

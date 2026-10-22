@@ -86,9 +86,12 @@ from .cross.macos import (
 )
 from .cross.windows import (
     _bazel_args_with_default_windows_cross_config,
+    _prepare_windows_container_actions,
     _prepare_windows_cross_env,
     _run_windows_cross_host_binary,
     _should_default_windows_hermetic_container,
+    _windows_container_actions_config,
+    _windows_container_actions_requested,
     _windows_cross_config_requested,
     _windows_cross_host_run_plan,
     _windows_cross_host_run_requested,
@@ -887,6 +890,12 @@ def run_hermetic_container(
 
                 _info("building Windows cross target through host Bazel with RBE actions")
                 _write_cross_host_action_config(host_build_args, env, system)
+                if _windows_container_actions_requested(host_build_args):
+                    host_build_args, prepare_rc = _prepare_windows_container_actions(
+                        host_build_args, env
+                    )
+                    if prepare_rc:
+                        return prepare_rc
                 build_result = _run_direct(bazel_real, host_build_args)
                 if build_result:
                     return build_result
@@ -899,6 +908,15 @@ def run_hermetic_container(
                         {
                             "windows_cross_host_wrapper_actions": {
                                 "args": host_args,
+                                **(
+                                    {
+                                        "container_config": _windows_container_actions_config(
+                                            host_args, env
+                                        )
+                                    }
+                                    if _windows_container_actions_requested(host_args)
+                                    else {}
+                                ),
                             },
                         },
                         sort_keys=True,
@@ -906,8 +924,12 @@ def run_hermetic_container(
                 )
                 return 0
 
-            _info("running Windows cross compile/IDL/link actions on RBE through host Bazel")
+            _info("running Windows cross actions through host Bazel with remote compilation")
             _write_cross_host_action_config(host_args, env, system)
+            if _windows_container_actions_requested(host_args):
+                host_args, prepare_rc = _prepare_windows_container_actions(host_args, env)
+                if prepare_rc:
+                    return prepare_rc
             return _run_direct(bazel_real, host_args)
 
         return _run_direct(bazel_real, args)

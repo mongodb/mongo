@@ -171,7 +171,7 @@ class WindowsCrossSysrootTest(unittest.TestCase):
         dry_run = json.loads(stdout.getvalue().splitlines()[-1])
         self.assertNotIn("hermetic_container_config", dry_run)
         self.assertIn("windows_cross_host_wrapper_run", dry_run)
-        self.assertEqual(dry_run["windows_cross_host_wrapper_run"]["build_args"][0], "build")
+        self.assertIn("build", dry_run["windows_cross_host_wrapper_run"]["build_args"])
         self.assertIn(
             f"--config={cross_windows.WINDOWS_CROSS_CONFIG}",
             dry_run["windows_cross_host_wrapper_run"]["build_args"],
@@ -221,7 +221,7 @@ class WindowsCrossSysrootTest(unittest.TestCase):
             },
         )
 
-        self.assertEqual(args[0], "build")
+        self.assertEqual(args[cross_windows._bazel_command_index(args)], "build")
         self.assertIn("--//bazel/config:windows_cross_local_container_actions=True", args)
         self.assertIn("--//bazel/config:idl_use_linux_python=True", args)
         self.assertIn("--//bazel/config:disable_warnings_as_errors=True", args)
@@ -237,10 +237,10 @@ class WindowsCrossSysrootTest(unittest.TestCase):
         )
         self.assertIn("--remote_default_exec_properties=dockerNetwork=standard", args)
         self.assertIn("--remote_default_exec_properties=Pool=x86_64", args)
-        self.assertIn("--//bazel/config:remote_link=True", args)
+        self.assertNotIn("--//bazel/config:remote_link=True", args)
         self.assertIn("--spawn_strategy=local", args)
         self.assertIn("--strategy=CppCompile=remote", args)
-        self.assertIn("--strategy=CppLink=remote", args)
+        self.assertIn("--strategy=CppLink=persistent-container", args)
         self.assertIn("--strategy=CppArchive=remote", args)
         self.assertIn("--strategy=ConfigHeaderGen=remote", args)
         self.assertIn("--strategy=IdlcGenerator=remote", args)
@@ -1235,6 +1235,12 @@ class WindowsCrossSysrootTest(unittest.TestCase):
                 return_value=containers,
             ),
             mock.patch.object(runner, "_docker_daemon_status") as docker_status,
+            mock.patch.object(runner, "_write_cross_host_action_config"),
+            mock.patch.object(
+                runner,
+                "_prepare_windows_container_actions",
+                side_effect=lambda args, env: (args, 0),
+            ) as prepare,
             mock.patch.object(runner, "_run_direct", return_value=0) as run_direct,
         ):
             rc = runner.run_hermetic_container(
@@ -1253,12 +1259,13 @@ class WindowsCrossSysrootTest(unittest.TestCase):
         run_direct.assert_called_once()
         self.assertEqual(run_direct.call_args.args[0], "C:/bazel.exe")
         host_args = run_direct.call_args.args[1]
-        self.assertEqual(host_args[0], "build")
+        self.assertEqual(host_args[cross_windows._bazel_command_index(host_args)], "build")
         self.assertIn(f"--config={cross_windows.WINDOWS_CROSS_CONFIG}", host_args)
         self.assertIn("install-dist-test", host_args)
         self.assertIn("--remote_executor=grpcs://sodalite.cluster.engflow.com", host_args)
         self.assertIn("--strategy=CppCompile=remote", host_args)
-        self.assertIn("--strategy=CppLink=remote", host_args)
+        self.assertIn("--strategy=CppLink=persistent-container", host_args)
+        prepare.assert_called_once()
         self.assertIn("--strategy=IdlcGenerator=remote", host_args)
         self.assertIn("--strategy=WindowsRC=remote", host_args)
 
@@ -1316,7 +1323,7 @@ class WindowsCrossSysrootTest(unittest.TestCase):
             self.assertIn(f"winsdk-{sdk_version}", sysroot_path.name)
             self.assertEqual(prepared["BAZEL_VC_FULL_VERSION"], vc_version)
             self.assertEqual(prepared["BAZEL_WINSDK_FULL_VERSION"], sdk_version)
-            self.assertEqual(prepared["MONGO_HERMETIC_CONTAINER_DOCKER_HOST_MODE"], "wsl")
+            self.assertEqual(prepared["MONGO_HERMETIC_CONTAINER_DOCKER_HOST_MODE"], "")
             for relative in spec.sources:
                 self.assertTrue((sysroot_path / relative / "sentinel.txt").is_file())
 
@@ -1409,6 +1416,220 @@ class WindowsCrossSysrootTest(unittest.TestCase):
             )
 
             self.assertNotIn("MONGO_WINDOWS_CROSS_SYSROOT_PATH", prepared)
+
+
+class WindowsPersistentContainerPlanningTest(unittest.TestCase):
+    containers = {"ubuntu24": {"container-url": "docker://example.com/image@sha256:abc"}}
+
+    def test_unix_root_preserves_startup_options_and_is_idempotent(self):
+        original = [
+            "--host_jvm_args=-Xmx2g",
+            "build",
+            "//target",
+            "--repo_env=MONGO_BAZEL_WINDOWS_UNIX_ROOT=C:/old-root",
+        ]
+        planned = cross_windows._windows_cross_host_wrapper_action_args(
+            original, {}, self.containers
+        )
+        repeated = cross_windows._windows_cross_host_wrapper_action_args(
+            planned, {}, self.containers
+        )
+        option = "--host_jvm_args=-Dbazel.windows_unix_root=C:/bazel-linux"
+        self.assertIn(original[0], repeated)
+        self.assertEqual(repeated.count(option), 1)
+        self.assertLess(repeated.index(option), repeated.index("build"))
+        self.assertEqual(
+            cross_windows._repo_env_overrides_from_args(repeated)["MONGO_BAZEL_WINDOWS_UNIX_ROOT"],
+            cross_windows.WINDOWS_CROSS_UNIX_ROOT,
+        )
+
+    def test_local_git_layer_is_rejected_before_planning_remote_actions(self):
+        for source in ("environment", "repo_env"):
+            with self.subTest(source=source):
+                args = ["build", "//target"]
+                env = {"MONGO_HERMETIC_CONTAINER_DRY_RUN": "1"}
+                if source == "environment":
+                    env[constants.HERMETIC_CONTAINER_GIT_LAYER_ENV] = "1"
+                else:
+                    args.append(f"--repo_env={constants.HERMETIC_CONTAINER_GIT_LAYER_ENV}=1")
+                with self.assertRaisesRegex(RuntimeError, "published.*image"):
+                    cross_windows._windows_cross_host_wrapper_action_args(
+                        args, env, self.containers
+                    )
+
+    def test_remote_link_bypasses_container_preflight(self):
+        args = cross_windows._windows_cross_host_wrapper_action_args(
+            ["build", "--config=remote_link", "//target"],
+            {},
+            self.containers,
+        )
+        self.assertIn("--strategy=CppLink=remote", args)
+        self.assertFalse(cross_windows._windows_container_actions_requested(args))
+        self.assertFalse(any(a.startswith("--experimental_persistent_container_") for a in args))
+
+    def test_explicit_strategy_override_bypasses_container_preflight(self):
+        args = cross_windows._windows_cross_host_wrapper_action_args(
+            ["build", "--strategy=CppLink=remote", "//target"], {}, self.containers
+        )
+        self.assertFalse(cross_windows._windows_container_actions_requested(args))
+        self.assertFalse(
+            cross_windows._windows_container_actions_requested(
+                ["run", "//target", "--", "--strategy=CppLink=persistent-container"]
+            )
+        )
+
+    def test_two_token_strategy_override_preserves_last_value_precedence(self):
+        args = cross_windows._windows_cross_host_wrapper_action_args(
+            ["build", "--strategy", "CppLink=remote", "//target"], {}, self.containers
+        )
+        self.assertFalse(cross_windows._windows_container_actions_requested(args))
+        self.assertTrue(
+            cross_windows._windows_container_actions_requested(
+                [*args, "--strategy", "CppLink=persistent-container,remote"]
+            )
+        )
+        self.assertFalse(
+            cross_windows._windows_container_actions_requested(
+                [*args, "--", "--strategy", "CppLink=persistent-container"]
+            )
+        )
+
+    def test_repository_path_overrides_are_mounted(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config = cross_windows._windows_container_actions_config(
+                [
+                    f"--output_base={temp_dir}/output",
+                    "build",
+                    "--repo_env=MONGO_WINDOWS_CROSS_LLVM_PATH=D:/llvm",
+                ],
+                {"MONGO_WINDOWS_CROSS_LLVM_PATH": "C:/old-llvm"},
+                self.containers,
+                pathlib.Path(temp_dir),
+            )
+        self.assertIn("D:/llvm", config["mount_paths"])
+        self.assertNotIn("C:/old-llvm", config["mount_paths"])
+        self.assertIn(
+            "d", cross_windows.windows_action_runner._drive_letters(config["mount_paths"])
+        )
+
+    def test_execution_platform_uses_selected_image_and_pool(self):
+        args = cross_windows._windows_cross_host_wrapper_action_args(
+            [
+                "build",
+                "--repo_env=MONGO_WINDOWS_CROSS_RBE_CONTAINER_IMAGE=docker://example.com/custom@sha256:def",
+                "--repo_env=MONGO_WINDOWS_CROSS_RBE_POOL=custom-x64-pool",
+            ],
+            {},
+            self.containers,
+        )
+        self.assertIn("--host_platform=@internal_platforms_do_not_use//windows_cross:exec", args)
+        self.assertIn(
+            "--extra_execution_platforms=@internal_platforms_do_not_use//windows_cross:exec,//bazel/platforms:windows_x86_64_cross",
+            args,
+        )
+        self.assertIn(
+            "--repo_env=MONGO_WINDOWS_CROSS_RBE_PLATFORM_IMAGE=docker://example.com/custom@sha256:def",
+            args,
+        )
+        self.assertIn("--repo_env=MONGO_WINDOWS_CROSS_RBE_PLATFORM_DISTRO=ubuntu24", args)
+        self.assertIn("--repo_env=MONGO_WINDOWS_CROSS_RBE_POOL=custom-x64-pool", args)
+
+    def test_platform_specific_options_cannot_override_cross_routing(self):
+        args = cross_windows._windows_cross_host_wrapper_action_args(
+            ["run", "//target", "--enable_platform_specific_config", "--", "program-arg"],
+            {},
+            self.containers,
+        )
+        self.assertLess(
+            args.index("--enable_platform_specific_config"),
+            args.index("--noenable_platform_specific_config"),
+        )
+        self.assertLess(args.index("--noenable_platform_specific_config"), args.index("--"))
+        self.assertEqual(args[-1], "program-arg")
+
+    def test_config_uses_command_line_image_and_recorded_host_environment(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config = cross_windows._windows_container_actions_config(
+                [
+                    f"--output_base={temp_dir}/output",
+                    "build",
+                    "--repo_env=MONGO_WINDOWS_CROSS_RBE_CONTAINER_IMAGE=docker://example.com/override@sha256:def",
+                ],
+                {
+                    "SYSTEMROOT": "C:/Windows",
+                    "PATH": "host-tools",
+                    "MONGO_WINDOWS_CROSS_SYSROOT_PATH": "C:/sysroot",
+                },
+                self.containers,
+                pathlib.Path(temp_dir),
+            )
+        self.assertEqual(config["image"], "example.com/override@sha256:def")
+        self.assertEqual(config["runner_environment"]["SYSTEMROOT"], "C:/Windows")
+        self.assertEqual(config["host_path"], "host-tools")
+        self.assertIn("C:/sysroot", config["mount_paths"])
+        self.assertTrue(config["sandbox_base"].endswith("-mongo-action-sandbox"))
+
+    def test_failed_preflight_prevents_bazel_invocation(self):
+        env = {
+            "MONGO_HERMETIC_CONTAINER_GIT_LAYER": "0",
+            "MONGO_WINDOWS_CROSS_DEFAULT_CONFIG": "1",
+            "MONGO_WINDOWS_CROSS_SYSROOT_URL": "https://example.invalid/sysroot.tar.xz",
+            "MONGO_WINDOWS_CROSS_SYSROOT_SHA256": "abc",
+        }
+        with (
+            mock.patch.object(platform, "system", return_value="Windows"),
+            mock.patch.object(
+                cross_windows, "load_remote_execution_containers", return_value=self.containers
+            ),
+            mock.patch.object(runner, "_write_cross_host_action_config"),
+            mock.patch.object(
+                runner,
+                "_prepare_windows_container_actions",
+                side_effect=lambda args, env: (args, 1),
+            ),
+            mock.patch.object(runner, "_run_direct") as run_direct,
+        ):
+            rc = runner.run_hermetic_container("bazel", ["build", "//target"], env)
+        self.assertEqual(rc, 1)
+        run_direct.assert_not_called()
+
+    def test_preflight_runs_under_shared_publication_lock(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            args = [f"--output_base={temp_dir}/output", "build", "//target"]
+            with (
+                mock.patch.object(
+                    cross_windows, "load_remote_execution_containers", return_value=self.containers
+                ),
+                mock.patch.object(
+                    container_actions, "ensure_container_image", return_value=True
+                ) as pull,
+                mock.patch.object(
+                    cross_windows.windows_action_runner,
+                    "prepare_runner_config",
+                    side_effect=lambda config: {
+                        **config,
+                        "docker_command": "selected-linux-docker",
+                    },
+                ) as select_engine,
+                mock.patch.object(
+                    cross_windows, "_ensure_windows_action_container", return_value=(True, "")
+                ) as preflight,
+            ):
+                planned, rc = cross_windows._prepare_windows_container_actions(
+                    args, {"MONGO_HERMETIC_CONTAINER_GIT_LAYER": "0"}
+                )
+            config_path = preflight.call_args.args[0]
+            config = json.loads(config_path.read_text())
+            self.assertEqual(rc, 0)
+            self.assertEqual(config["image"], "example.com/image@sha256:abc")
+            self.assertEqual(config["docker_command"], "selected-linux-docker")
+            select_engine.assert_called_once()
+            pull.assert_called_once_with("selected-linux-docker", "example.com/image@sha256:abc")
+            self.assertIn("output_base_generation", config)
+            self.assertIn(f"--output_base={config_path.parent}", planned)
+            self.assertTrue(
+                (config_path.parent / container_actions.CONTAINER_ACTIONS_LOCK_FILENAME).exists()
+            )
 
 
 if __name__ == "__main__":

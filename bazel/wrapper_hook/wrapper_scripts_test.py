@@ -27,12 +27,19 @@ class WrapperScriptsProtocolTest(unittest.TestCase):
         capture = self.windows.index('set "exit_code=!ERRORLEVEL!"', invocation)
         handled = self.windows.index('if "!handled!"=="1"', capture)
         propagated_exit = self.windows.index("exit /b !quality_checks_exit!", handled)
-        normal_bazel = self.windows.index('"%BAZEL_REAL%" !new_args!', handled)
+        normal_bazel = self.windows.index(
+            'hermetic_container_integration.py" "%BAZEL_REAL%" !new_args!', handled
+        )
         self.assertLess(invocation, capture)
         self.assertLess(propagated_exit, normal_bazel)
         self.assertIn("MONGO_BAZEL_WRAPPER_STATUS", self.windows)
         self.assertIn('set "handled_exit_code="', self.windows)
         self.assertIn('set "fallback_exit=!ERRORLEVEL!"', self.windows)
+
+    def test_windows_integration_keeps_default_opt_in(self):
+        self.assertIn("hermetic_container_integration.py", self.windows)
+        self.assertNotIn('set "MONGO_BAZEL_USE_HERMETIC_CONTAINER=1"', self.windows)
+        self.assertNotIn("export MONGO_BAZEL_USE_HERMETIC_CONTAINER=1", self.bash)
 
 
 if __name__ == "__main__":

@@ -62,49 +62,21 @@ ACTION_CANCEL_SUFFIX = ".cancel"
 ACTION_LEASE_SECONDS = 30
 ACTION_HEARTBEAT_INTERVAL_SECONDS = 5
 ACTION_TERMINATION_GRACE_SECONDS = 1
+# Opt-in scratch ownership stays with the supervisor, outside the tool process group.
+# It can therefore remove link temporary files even after killing an unresponsive tool.
+ACTION_PRIVATE_SCRATCH_ENV = "MONGO_CROSS_ACTION_PRIVATE_SCRATCH"
 # Bash job control gives only this tool and its descendants a fresh process group. The
 # supervisor stays outside that group so it can stop and reap the tool before acknowledging
 # cancellation. A renewable lease also stops actions when Windows terminates the host runner
 # without giving Python a chance to run a signal handler or finally block.
-ACTION_OUTPUT_CAPTURE_SCRIPT = f"""
-log="${ACTION_OUTPUT_LOG_ENV}"
-/bin/mkdir -p "${{log%/*}}" || exit 125
-set -m
-"$0" "$@" >"$log" 2>&1 &
-tool_pid=$!
-set +m
-terminate_tool() {{
-    trap '' INT TERM HUP
-    kill -TERM -- "-$tool_pid" 2>/dev/null || true
-    /bin/sleep {ACTION_TERMINATION_GRACE_SECONDS}
-    kill -KILL -- "-$tool_pid" 2>/dev/null || true
-    wait "$tool_pid" 2>/dev/null || true
-}}
-trap 'terminate_tool; printf "125\\n" >"$log{ACTION_EXIT_FILE_SUFFIX}"; exit 125' INT TERM HUP
-heartbeat=""
-renewed=$SECONDS
-while kill -0 "$tool_pid" 2>/dev/null; do
-    current=""
-    if [ -f "$log{ACTION_HEARTBEAT_SUFFIX}" ]; then
-        IFS= read -r current <"$log{ACTION_HEARTBEAT_SUFFIX}" || true
-    fi
-    if [ -n "$current" ] && [ "$current" != "$heartbeat" ]; then
-        heartbeat="$current"
-        renewed=$SECONDS
-    fi
-    if [ -f "$log{ACTION_CANCEL_SUFFIX}" ] || (( SECONDS - renewed >= {ACTION_LEASE_SECONDS} )); then
-        terminate_tool
-        printf "125\\n" >"$log{ACTION_EXIT_FILE_SUFFIX}"
-        exit 125
-    fi
-    /bin/sleep 0.1
-done
-wait "$tool_pid"
-status=$?
-# A tool that finishes before a background child must not leave that child in the container.
-kill -KILL -- "-$tool_pid" 2>/dev/null || true
-printf '%s\\n' "$status" >"$log{ACTION_EXIT_FILE_SUFFIX}"
-"""
+# Only policy values are rendered; the shell program is a standalone source file.
+ACTION_OUTPUT_CAPTURE_SCRIPT = (
+    f"lease_seconds={ACTION_LEASE_SECONDS}\n"
+    f"termination_grace_seconds={ACTION_TERMINATION_GRACE_SECONDS}\n"
+    + (pathlib.Path(__file__).parent / "scripts" / "action_supervisor.sh").read_text(
+        encoding="utf-8"
+    )
+)
 ACTION_COMPLETION_TIMEOUT_ENV = "MONGO_CROSS_ACTION_TIMEOUT_SECONDS"
 ACTION_COMPLETION_TIMEOUT_DEFAULT_SECONDS = 10800.0
 ACTION_COMPLETION_POLL_SECONDS = 0.25
@@ -156,34 +128,18 @@ def _request_timeout(deadline: float) -> float:
     return max(0.001, min(ACTION_HEARTBEAT_INTERVAL_SECONDS, deadline - time.monotonic()))
 
 
-CONTAINER_INPUT_PROBE_SETUP_SCRIPT = r"""
-probe=$1
-owner=$2
-umask 077
-/bin/chmod 700 "$probe" &&
-    /bin/chmod 600 "$probe/manifest" &&
-    /bin/chown -- "$owner" "$probe/manifest" &&
-    : >"$probe/ready" &&
-    /bin/chown -- "$owner" "$probe"
-"""
+CONTAINER_INPUT_PROBE_SETUP_SCRIPT = (
+    pathlib.Path(__file__).parent / "scripts" / "input_probe_setup.sh"
+).read_text(encoding="utf-8")
 
-CONTAINER_INPUT_PROBE_SCRIPT = r"""
-probe=$1
-budget=$2
-count=$3
-/usr/bin/timeout --kill-after=1s "${budget}s" /bin/bash -c '
-    while [ ! -e "$1/ready" ]; do /bin/sleep 0.05; done
-    exec >"$1/result.tmp" || exit 1
-    index=0
-    while IFS= read -r -d "" path; do
-        [ -e "$path" ] || printf "%s\n" "$index"
-        index=$((index + 1))
-    done <"$1/manifest"
-    [ "$index" -eq "$2" ] || exit 1
-    printf "done %s\n" "$index"
-' _ "$probe" "$count" &&
-    /bin/mv "$probe/result.tmp" "$probe/result"
-"""
+CONTAINER_INPUT_PROBE_SCRIPT = (
+    pathlib.Path(__file__).parent / "scripts" / "input_probe.sh"
+).read_text(encoding="utf-8")
+
+
+WINDOWS_DRIVE_MOUNT_SCRIPT = (
+    pathlib.Path(__file__).parent / "scripts" / "mount_windows_drives.sh"
+).read_text(encoding="utf-8")
 
 
 def missing_container_path_indices(
@@ -451,17 +407,22 @@ def mount_windows_drives_in_docker_vm(
     """
     if not drives:
         return True, "no drives to mount"
-    steps = []
-    for drive in drives:
-        mountpoint = f"{prefix}/{drive}"
-        steps.append(
-            f"mkdir -p {mountpoint}; "
-            f"mountpoint -q {mountpoint} || mount -t drvfs {drive.upper()}: {mountpoint} || "
-            f"echo mount of {drive.upper()}: at {mountpoint} failed"
-        )
-    script = "; ".join(steps) + "; grep -E ' /mnt/[a-z]+ ' /proc/mounts; ls -la /mnt"
     exit_code, logs = _run_helper_container(
-        docker, image, ["nsenter", "-t", "1", "-m", "--", "sh", "-c", script]
+        docker,
+        image,
+        [
+            "nsenter",
+            "-t",
+            "1",
+            "-m",
+            "--",
+            "sh",
+            "-c",
+            WINDOWS_DRIVE_MOUNT_SCRIPT,
+            "mount-windows-drives",
+            prefix,
+            *drives,
+        ],
     )
     ok = exit_code == 0 and "failed" not in logs
     return ok, f"exit {exit_code}\n{logs}"

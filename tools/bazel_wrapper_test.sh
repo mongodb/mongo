@@ -9,10 +9,8 @@ if [[ ! -f "$source_root/tools/bazel.bat" ]]; then
     echo "Windows Bazel wrapper is missing from the test runfiles" >&2
     exit 1
 fi
-if grep -Eq \
-    'run_hermetic_container_or_bazel|hermetic_container_integration\.py|MONGO_BAZEL_USE_HERMETIC_CONTAINER' \
-    "$source_root/tools/bazel.bat"; then
-    echo "Windows Bazel wrapper must invoke Bazel natively" >&2
+if ! grep -q 'hermetic_container_integration\.py' "$source_root/tools/bazel.bat"; then
+    echo "Windows Bazel wrapper must invoke the integration selector" >&2
     exit 1
 fi
 
@@ -239,7 +237,7 @@ env \
 [[ "$bazel_exit" -eq 23 ]]
 
 rm -f "$marker"
-for simulated_ostype in darwin23 msys; do
+for simulated_ostype in darwin23; do
     integration_marker="$test_root/${simulated_ostype}-integration-called"
     env \
         OSTYPE="$simulated_ostype" \
@@ -254,6 +252,21 @@ for simulated_ostype in darwin23 msys; do
     grep -qx "$native_build_args" "$marker"
     [[ ! -e "$integration_marker" ]]
 done
+
+integration_marker="$test_root/msys-integration-called"
+rm -f "$marker" "$integration_marker"
+env \
+    OSTYPE=msys \
+    BAZELISK_SKIP_WRAPPER=1 \
+    BAZEL_REAL="$fake_bin/bazel-real" \
+    FAKE_BAZEL_MARKER="$marker" \
+    FAKE_INTEGRATION_MARKER="$integration_marker" \
+    FAKE_PYTHON_VERSION_OK=0 \
+    MONGO_BAZEL_USE_HERMETIC_CONTAINER=1 \
+    PATH="$fake_bin:$PATH" \
+    "$repo_root/tools/bazel" build //:format
+grep -qx "build" "$integration_marker"
+grep -qx "//:format" "$integration_marker"
 
 mkdir -p "$repo_root/python3-venv/bin"
 cp "$fake_bin/python3" "$repo_root/python3-venv/bin/python"

@@ -14,6 +14,7 @@ sh_binary(
     data = [
         "//bazel:hermetic_container/container_paths.py",
         "//bazel/toolchains/cc:container_action.py",
+        "//bazel/toolchains/cc:container_action_scripts",
         "//bazel/toolchains/cc:container_engine.py",
         "//bazel/toolchains/cc:container_mounts.py",
     ],

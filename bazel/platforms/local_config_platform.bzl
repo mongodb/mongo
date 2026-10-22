@@ -3,6 +3,31 @@ load("//bazel/platforms:normalize.bzl", "ARCH_NORMALIZE_MAP", "ARCH_TO_PLATFORM_
 load("//bazel/toolchains/cc/mongo_linux:mongo_toolchain_version.bzl", "TOOLCHAIN_MAP")
 load("//bazel:utils.bzl", "get_host_distro_major_version")
 
+def _write_windows_cross_execution_platform(ctx):
+    # Only the opted-in Windows wrapper supplies these values. Keep the normal
+    # host platform unchanged, and override inherited remote properties on the
+    # cross execution platform itself rather than remote-default properties.
+    image = ctx.os.environ.get("MONGO_WINDOWS_CROSS_RBE_PLATFORM_IMAGE")
+    if not image:
+        return
+    distro = ctx.os.environ.get("MONGO_WINDOWS_CROSS_RBE_PLATFORM_DISTRO")
+    if distro not in REMOTE_EXECUTION_CONTAINERS:
+        fail("Unsupported Windows cross execution distro: %s" % distro)
+    pool = ctx.os.environ.get("MONGO_WINDOWS_CROSS_RBE_POOL") or "x86_64"
+    if pool.lower() in ["arm64", "aarch64", "default"]:
+        fail("Windows cross execution requires an x86_64 pool")
+    ctx.file("windows_cross/BUILD.bazel", """
+package(default_visibility = ["//visibility:public"])
+platform(
+    name = "exec",
+    parents = [%s],
+    exec_properties = %s,
+)
+""" % (
+        json.encode("@//bazel/platforms:%s_amd64_windows_cross_exec" % distro),
+        json.encode({"container-image": image, "Pool": pool, "dockerNetwork": "standard"}),
+    ))
+
 def _setup_local_config_platform(ctx):
     """
     Generates our own local_config_platform, overriding bazel's built in generation.
@@ -10,6 +35,8 @@ def _setup_local_config_platform(ctx):
     This allows is to setup the exec_properties on this platform so a user can use remote execution
     without need to specify a specific platform.
     """
+
+    _write_windows_cross_execution_platform(ctx)
 
     if "win" in ctx.os.name:
         os = "windows"
@@ -137,9 +164,25 @@ setup_local_config_platform = repository_rule(
             doc = "Template modeling the builtin local config platform constraints file.",
         ),
     },
+    # Track these inputs so Bazel regenerates the platforms when their values change.
     environ = [
+        # User override for the detected distro used to configure the normal host platform.
+        # The Windows-cross wrapper also uses it when selecting its Linux execution distro.
         "MONGO_HERMETIC_CONTAINER_DISTRO",
+        # User override for the RBE image on the normal host platform. Also serves as the
+        # Windows-cross image fallback when MONGO_WINDOWS_CROSS_RBE_CONTAINER_IMAGE is unset.
         "MONGO_HERMETIC_CONTAINER_IMAGE",
+        # Resolved docker:// image supplied by the Windows-cross wrapper. Its presence
+        # enables the separate Linux execution platform used for Windows-cross actions.
+        "MONGO_WINDOWS_CROSS_RBE_PLATFORM_IMAGE",
+        # Resolved Linux distro supplied by that wrapper; selects the execution platform's
+        # parent constraints and compiler flags while preserving the Windows host platform.
+        "MONGO_WINDOWS_CROSS_RBE_PLATFORM_DISTRO",
+        # EngFlow worker pool for Windows-cross actions. Defaults to x86_64; custom pools
+        # must provide Linux x86_64 workers for the cross toolchain.
+        "MONGO_WINDOWS_CROSS_RBE_POOL",
+        # Set to 1 to select the native toolchain for the normal host platform instead of
+        # configuring the managed MongoDB toolchain and its remote container image.
         "USE_NATIVE_TOOLCHAIN",
     ],
 )

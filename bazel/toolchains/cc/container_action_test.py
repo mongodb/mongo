@@ -453,9 +453,7 @@ class ContainerActionTest(unittest.TestCase):
                             _, capture = shared._action_output_capture(
                                 pathlib.PurePosixPath(root / "lost.log"), command
                             )
-                            capture[2] = capture[2].replace(
-                                "SECONDS - renewed >= 30", "SECONDS - renewed >= 1"
-                            )
+                            capture[2] = capture[2].replace("lease_seconds=30", "lease_seconds=1")
                             environment = dict(
                                 os.environ, MONGO_CROSS_ACTION_OUTPUT_LOG=str(root / "lost.log")
                             )
@@ -934,12 +932,46 @@ class ContainerActionTest(unittest.TestCase):
         self.assertEqual(
             run_call[image_index + 1 : image_index + 7], ["nsenter", "-t", "1", "-m", "--", "sh"]
         )
-        script = run_call[-1]
-        self.assertIn("mount -t drvfs C: /mnt/c", script)
-        self.assertIn("mount -t drvfs Z: /mnt/z", script)
-        self.assertIn("mountpoint -q /mnt/z", script)
+        self.assertEqual(
+            run_call[image_index + 7 :],
+            ["-c", shared.WINDOWS_DRIVE_MOUNT_SCRIPT, "mount-windows-drives", "/mnt", "c", "z"],
+        )
         # The helper container is always removed again.
         self.assertTrue(any("rm" in call and "-f" in call for call in calls))
+
+    @unittest.skipIf(os.name == "nt", "The mount helper executes inside Linux containers")
+    def test_drive_mount_script_preserves_prefix_and_uppercases_drives(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            for name in ("mkdir", "mountpoint", "mount", "grep", "ls"):
+                command = root / name
+                command.write_text(
+                    "#!/bin/sh\n"
+                    'printf "%s\\0" "${0##*/}" "$@" >>"$COMMAND_LOG"\n'
+                    'printf "\\n" >>"$COMMAND_LOG"\n'
+                    '[ "${0##*/}" != "mountpoint" ]\n',
+                    encoding="utf-8",
+                )
+                command.chmod(0o755)
+            log = root / "commands"
+            prefix = "/drive mounts;literal'"
+            result = subprocess.run(
+                ["/bin/sh", "-c", shared.WINDOWS_DRIVE_MOUNT_SCRIPT, "_", prefix, "c", "z"],
+                env={**os.environ, "PATH": f"{root}:/usr/bin:/bin", "COMMAND_LOG": str(log)},
+                capture_output=True,
+                timeout=5,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            calls = [
+                line.decode().rstrip("\0").split("\0") for line in log.read_bytes().splitlines()
+            ]
+            self.assertEqual(
+                [call for call in calls if call[0] == "mount"],
+                [
+                    ["mount", "-t", "drvfs", "C:", f"{prefix}/c"],
+                    ["mount", "-t", "drvfs", "Z:", f"{prefix}/z"],
+                ],
+            )
 
     def test_mount_windows_drives_in_docker_vm_reports_failures(self):
         def fake_run(args, *, stdout=None, stderr=None, timeout=None):

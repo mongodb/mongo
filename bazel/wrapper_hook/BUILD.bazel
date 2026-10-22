@@ -68,11 +68,14 @@ py_library(
     data = [
         "bazel_commands.commands",
         "//bazel/toolchains/cc/mongo_linux:linux_container_action_wrapper.py",
+        "//bazel/toolchains/cc/mongo_windows_cross:windows_container_action_wrapper.py",
     ],
     visibility = ["//visibility:public"],
     deps = [
         ":release_distro",
         "//bazel:container_paths",
+        "//bazel/toolchains/cc:container_runtime",
+        "//bazel/toolchains/cc/mongo_windows_cross:windows_container_action_wrapper_lib",
         "//buildscripts:bazel_custom_formatter",
         "//buildscripts:setup_clang_tidy",
     ],

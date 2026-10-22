@@ -14,18 +14,43 @@ import subprocess
 import sys
 from collections.abc import Mapping, Sequence
 
-from ..bazelrc import _config_requested, _repo_env_overrides_from_args
+from bazel.toolchains.cc.mongo_windows_cross import (
+    windows_container_action_wrapper as windows_action_runner,
+)
+
+from .. import container_actions
+from ..bazelrc import (
+    _bazel_output_base,
+    _config_requested,
+    _remote_link_requested,
+    _replace_bazel_startup_option,
+    _repo_env_overrides_from_args,
+)
 from ..constants import (
     HERMETIC_CONTAINER_GIT_LAYER_ENV,
     REPO_ROOT,
     WINDOWS_CROSS_PASSTHROUGH_ENVS,
+    WINDOWS_CROSS_PATH_ENVS,
     WINDOWS_CROSS_SDK_ROOT_ENVS,
     WINDOWS_TOOLCHAIN_PIN_ENVS,
 )
-from ..distro import _safe_name, load_remote_execution_containers, parse_docker_image, select_distro
-from ..docker import WSL_DOCKER_HOST_MODE
+from ..distro import (
+    DockerImage,
+    _safe_name,
+    load_remote_execution_containers,
+    parse_docker_image,
+    select_distro,
+)
+from ..docker import (
+    WSL_DOCKER_API_VERSION_DEFAULT,
+    WSL_DOCKER_API_VERSION_ENV,
+    WSL_DOCKER_HOST_ENV,
+    WSL_DRIVE_MOUNT_PREFIX_ENV,
+    _use_wsl_docker,
+)
 from ..env import (
     _append_bazel_command_options,
+    _append_bazel_command_options_last,
     _bazel_command,
     _bazel_command_index,
     _bazel_run_target,
@@ -36,13 +61,15 @@ from ..env import (
     _platforms_requested,
 )
 from ..fsutil import (
+    _container_user,
     _hardlink_or_copy,
     _hermetic_container_state_dir,
     _is_relative_to,
+    _linux_action_sandbox_base,
+    _linux_shared_install_dir,
     _parse_repo_env_assignment,
     _symlink_target,
 )
-from ..volumes import _hermetic_container_image_with_git_layer
 from .common import (
     MacOSCrossHostRunPlan,
     _cross_host_run_plan,
@@ -84,6 +111,31 @@ WINDOWS_CROSS_DEFAULT_COMMANDS = frozenset(
         "cquery",
         "fetch",
     ]
+)
+
+
+WINDOWS_CONTAINER_ACTION_WRAPPER_SCRIPT = (
+    REPO_ROOT / "bazel/toolchains/cc/mongo_windows_cross/windows_container_action_wrapper.py"
+)
+WINDOWS_CONTAINER_ACTIONS_LAYOUT_VERSION = "v1"
+WINDOWS_CROSS_UNIX_ROOT = "C:/bazel-linux"
+WINDOWS_LOCAL_CONTAINER_MNEMONICS = ("CppLink",)
+WINDOWS_CONTAINER_PREFLIGHT_TIMEOUT_SECONDS = 900
+WINDOWS_CONTAINER_RUNNER_ENVIRONMENT_KEYS = (
+    "APPDATA",
+    "DOCKER_API_VERSION",
+    "DOCKER_CERT_PATH",
+    "DOCKER_CONFIG",
+    "DOCKER_TLS_VERIFY",
+    "HOMEDRIVE",
+    "HOMEPATH",
+    "LOCALAPPDATA",
+    "PROGRAMDATA",
+    "SYSTEMDRIVE",
+    "SYSTEMROOT",
+    "USERPROFILE",
+    windows_action_runner.engine.WSL_DISTRIBUTION_ENV,
+    windows_action_runner.engine.WSL_DOCKER_SOCKET_ENV,
 )
 
 
@@ -418,7 +470,7 @@ def _prepare_windows_cross_env(
 
     values = _windows_cross_repo_env_values(args, env, repo_root)
     prepared_env = dict(env)
-    prepared_env.setdefault("MONGO_HERMETIC_CONTAINER_DOCKER_HOST_MODE", WSL_DOCKER_HOST_MODE)
+    prepared_env.setdefault("MONGO_HERMETIC_CONTAINER_DOCKER_HOST_MODE", "")
     for key in [*WINDOWS_TOOLCHAIN_PIN_ENVS, *WINDOWS_CROSS_SDK_ROOT_ENVS]:
         if values.get(key):
             prepared_env[key] = values[key]
@@ -526,19 +578,10 @@ def _windows_cross_rbe_exec_properties(
     containers: Mapping[str, Mapping[str, str]] | None = None,
 ) -> list[str]:
     _windows_cross_execution_arch(env)
-    image = env.get(WINDOWS_CROSS_RBE_CONTAINER_IMAGE_ENV)
-    if not image:
-        containers = containers or load_remote_execution_containers()
-        distro = (
-            WINDOWS_CROSS_DEFAULT_EXEC_DISTRO
-            if not env.get("MONGO_HERMETIC_CONTAINER_DISTRO")
-            and WINDOWS_CROSS_DEFAULT_EXEC_DISTRO in containers
-            else select_distro(containers, env=env, arch="x86_64")
-        )
-        image = containers[distro]["container-url"]
+    _, image = _windows_cross_action_image(env, containers)
 
     return [
-        f"container-image={image}",
+        f"container-image=docker://{image.full_name}",
         "dockerNetwork=standard",
         f"Pool={env.get(WINDOWS_CROSS_RBE_POOL_ENV, WINDOWS_CROSS_RBE_POOL)}",
     ]
@@ -548,44 +591,19 @@ def _windows_cross_action_container_env_options(
     env: Mapping[str, str],
     containers: Mapping[str, Mapping[str, str]] | None = None,
 ) -> list[str]:
-    containers = containers or load_remote_execution_containers()
-    arch = _windows_cross_execution_arch(env)
-    distro = (
-        WINDOWS_CROSS_DEFAULT_EXEC_DISTRO
-        if not env.get("MONGO_HERMETIC_CONTAINER_DISTRO")
-        and WINDOWS_CROSS_DEFAULT_EXEC_DISTRO in containers
-        else select_distro(containers, env=env, arch=arch)
-    )
-    image_override = env.get(WINDOWS_CROSS_RBE_CONTAINER_IMAGE_ENV) or env.get(
-        "MONGO_HERMETIC_CONTAINER_IMAGE"
-    )
-    container_url = image_override or containers[distro]["container-url"]
-    docker_image = parse_docker_image(container_url)
-    if _env_is_true(env.get(HERMETIC_CONTAINER_GIT_LAYER_ENV)):
-        docker_image, _ = _hermetic_container_image_with_git_layer(
-            REPO_ROOT,
-            docker_image,
-            docker_command=(
-                None
-                if env.get("MONGO_HERMETIC_CONTAINER_DRY_RUN") == "1"
-                else env.get("HERMETIC_CONTAINER_DOCKER_COMMAND", "docker")
-            ),
-        )
-
-    image_hash = hashlib.sha256(docker_image.full_name.encode()).hexdigest()[:12]
-    env_values = {
+    distro, image = _windows_cross_action_image(env, containers)
+    values = {
         "MONGO_WINDOWS_CROSS_ACTION_WRAPPER": "1",
-        "MONGO_WINDOWS_CROSS_ACTION_CONTAINER_PREFIX": _safe_name(
-            f"mongo_windows_cross_action_{distro}_{arch}_{image_hash}"
+        "MONGO_WINDOWS_CROSS_ACTION_CONTAINER_PREFIX": _windows_cross_action_container_prefix(
+            distro, image.full_name
         ),
-        "MONGO_WINDOWS_CROSS_ACTION_IMAGE": docker_image.full_name,
+        "MONGO_WINDOWS_CROSS_ACTION_IMAGE": image.full_name,
     }
     if env.get("MONGO_HERMETIC_CONTAINER_DOCKER_PLATFORM"):
-        env_values["MONGO_WINDOWS_CROSS_ACTION_PLATFORM"] = env[
+        values["MONGO_WINDOWS_CROSS_ACTION_PLATFORM"] = env[
             "MONGO_HERMETIC_CONTAINER_DOCKER_PLATFORM"
         ]
-
-    return [f"--action_env={key}={value}" for key, value in sorted(env_values.items())]
+    return [f"--action_env={key}={value}" for key, value in sorted(values.items())]
 
 
 def _windows_cross_host_wrapper_action_args(
@@ -593,10 +611,21 @@ def _windows_cross_host_wrapper_action_args(
     env: Mapping[str, str],
     containers: Mapping[str, Mapping[str, str]] | None = None,
 ) -> list[str]:
+    command_index = _bazel_command_index(args)
+    if command_index is not None:
+        unix_root_option = f"--host_jvm_args=-Dbazel.windows_unix_root={WINDOWS_CROSS_UNIX_ROOT}"
+        startup = [arg for arg in args[:command_index] if arg != unix_root_option]
+        args = [*startup, unix_root_option, *args[command_index:]]
     selection_env = {**env, **_repo_env_overrides_from_args(args)}
     arch = _windows_cross_execution_arch(selection_env)
     exec_properties = _windows_cross_rbe_exec_properties(selection_env, containers=containers)
-    return _append_bazel_command_options(
+    platform_properties = dict(prop.split("=", 1) for prop in exec_properties)
+    output_base = _bazel_output_base(args, env)
+    if _remote_link_requested(args, env=env, repo_root=REPO_ROOT):
+        link_options = ["--//bazel/config:remote_link=True", "--strategy=CppLink=remote"]
+    else:
+        link_options = _windows_container_action_options(output_base)
+    host_args = _append_bazel_command_options(
         args,
         [
             "--//bazel/config:windows_cross_local_container_actions=True",
@@ -605,6 +634,8 @@ def _windows_cross_host_wrapper_action_args(
             *_macos_cross_linux_python_options(arch),
             f"--repo_env=MONGO_WINDOWS_CROSS_EXEC_ARCH={arch}",
             f"--repo_env=MONGO_WINDOWS_CROSS_RBE_POOL={selection_env.get(WINDOWS_CROSS_RBE_POOL_ENV, WINDOWS_CROSS_RBE_POOL)}",
+            f"--repo_env=MONGO_WINDOWS_CROSS_RBE_PLATFORM_IMAGE={platform_properties['container-image']}",
+            f"--repo_env=MONGO_WINDOWS_CROSS_RBE_PLATFORM_DISTRO={_windows_cross_rbe_distro(selection_env, containers)}",
             *[
                 f"--repo_env={var_name}={env[var_name]}"
                 for var_name in sorted(WINDOWS_CROSS_PASSTHROUGH_ENVS)
@@ -620,16 +651,33 @@ def _windows_cross_host_wrapper_action_args(
                 f"--remote_default_exec_properties={exec_property}"
                 for exec_property in exec_properties
             ],
-            "--//bazel/config:remote_link=True",
+            "--enable_runfiles",
+            "--action_env=MSYS=winsymlinks:nativestrict",
+            "--@rules_python//python/config_settings:build_python_zip=false",
+            f"--host_platform={_windows_cross_rbe_execution_platform(selection_env, containers)}",
+            "--extra_execution_platforms="
+            + ",".join(
+                [
+                    _windows_cross_rbe_execution_platform(selection_env, containers),
+                    "//bazel/platforms:windows_x86_64_cross",
+                ]
+            ),
+            "--repo_env=MONGO_BAZEL_TOOLCHAIN_OS=linux",
+            "--repo_env=MONGO_BAZEL_TOOLCHAIN_ARCH=x86_64",
+            f"--repo_env=MONGO_BAZEL_TOOLCHAIN_DISTRO={_windows_cross_rbe_distro(selection_env, containers)}",
+            "--shell_executable=/bin/bash",
+            f"--action_env=PATH={_windows_cross_action_path(env)}",
+            f"--host_action_env=PATH={_windows_cross_action_path(env)}",
+            "--strategy=MongoInstallRule=local",
             "--spawn_strategy=local",
             "--strategy=CppCompile=remote",
-            "--strategy=CppLink=remote",
+            *link_options,
             "--strategy=CppArchive=remote",
-            "--strategy=SolibSymlink=remote",
-            "--strategy=ExtractDebugInfo=remote",
-            "--strategy=StripDebugInfo=remote",
-            "--strategy=CcGenerateIntermediateDwp=remote",
-            "--strategy=CcGenerateDwp=remote",
+            "--strategy=SolibSymlink=local",
+            "--strategy=ExtractDebugInfo=local",
+            "--strategy=StripDebugInfo=local",
+            "--strategy=CcGenerateIntermediateDwp=local",
+            "--strategy=CcGenerateDwp=local",
             "--strategy=ConfigHeaderGen=remote",
             "--strategy=IdlcGenerator=remote",
             "--strategy=WindowsRC=remote",
@@ -637,6 +685,15 @@ def _windows_cross_host_wrapper_action_args(
             "--test_strategy=standalone",
             "--strategy=TestRunner=standalone",
             *_windows_cross_action_container_env_options(selection_env, containers=containers),
+        ],
+    )
+    return _append_bazel_command_options_last(
+        host_args,
+        [
+            # Dependency aliases must match the JVM root even when the caller supplied
+            # an old repository override. Both values are owned by this execution route.
+            f"--repo_env=MONGO_BAZEL_WINDOWS_UNIX_ROOT={WINDOWS_CROSS_UNIX_ROOT}",
+            "--noenable_platform_specific_config",
         ],
     )
 
@@ -667,3 +724,242 @@ def _run_windows_cross_host_binary(
         cwd=repo_root,
         env=_host_binary_env(executable),
     ).returncode
+
+
+def _windows_cross_action_image(
+    env: Mapping[str, str],
+    containers: Mapping[str, Mapping[str, str]] | None = None,
+) -> tuple[str, DockerImage]:
+    """Select the same pinned image for remote and persistent local actions."""
+    if _env_is_true(env.get(HERMETIC_CONTAINER_GIT_LAYER_ENV)):
+        raise RuntimeError(
+            "Windows cross actions require a published container image for both RBE and "
+            "local linking; disable MONGO_HERMETIC_CONTAINER_GIT_LAYER and use "
+            "MONGO_WINDOWS_CROSS_RBE_CONTAINER_IMAGE to select a published image"
+        )
+    containers = containers or load_remote_execution_containers()
+    _windows_cross_execution_arch(env)
+    distro = _windows_cross_rbe_distro(env, containers)
+    image_override = env.get(WINDOWS_CROSS_RBE_CONTAINER_IMAGE_ENV) or env.get(
+        "MONGO_HERMETIC_CONTAINER_IMAGE"
+    )
+    container_url = image_override or containers[distro]["container-url"]
+    docker_image = parse_docker_image(container_url)
+    return distro, docker_image
+
+
+def _windows_cross_action_container_prefix(distro: str, image: str) -> str:
+    image_hash = hashlib.sha256(image.encode()).hexdigest()[:12]
+    return _safe_name(f"mongo_windows_cross_action_{distro}_x86_64_{image_hash}")
+
+
+def _windows_container_action_options(output_base: pathlib.Path) -> list[str]:
+    """Bazel options that route Windows link actions through the persistent Linux container.
+
+    These mirror _linux_host_container_action_args: Bazel sandboxes each action's declared
+    inputs on the host and invokes the Windows runner, which executes the tool at the same
+    location inside the container built from the pinned RBE image.
+    """
+    return [
+        *container_actions.persistent_container_options(
+            output_base, WINDOWS_CONTAINER_ACTION_WRAPPER_SCRIPT
+        ),
+        *[
+            f"--strategy={mnemonic}=persistent-container"
+            for mnemonic in WINDOWS_LOCAL_CONTAINER_MNEMONICS
+        ],
+    ]
+
+
+def _windows_container_actions_requested(args: Sequence[str]) -> bool:
+    """Returns whether the planned Bazel arguments route any action to the local container."""
+    strategies: dict[str, str] = {}
+    tokens = iter(args)
+    for arg in tokens:
+        if arg == "--":
+            break
+        assignment = None
+        if arg == "--strategy":
+            assignment = next(tokens, "")
+            if assignment == "--":
+                break
+        elif arg.startswith("--strategy="):
+            assignment = arg.removeprefix("--strategy=")
+        if assignment is not None:
+            mnemonic, separator, strategy = assignment.partition("=")
+            if separator:
+                strategies[mnemonic] = strategy
+    return any(
+        "persistent-container" in strategies.get(mnemonic, "").split(",")
+        for mnemonic in WINDOWS_LOCAL_CONTAINER_MNEMONICS
+    )
+
+
+def _windows_container_actions_config(
+    args: Sequence[str],
+    env: Mapping[str, str],
+    containers: Mapping[str, Mapping[str, str]] | None = None,
+    repo_root: pathlib.Path = REPO_ROOT,
+) -> dict:
+    """Returns the persistent-container config consumed by the Windows action runner.
+
+    It has the shape of the Linux runner's config plus the Windows host details the runner
+    needs: how to reach the Linux Docker Engine, where the WSL distribution mounts the host
+    drives, and the toolchain locations that must be visible inside the container.
+    """
+    selection_env = {**env, **_repo_env_overrides_from_args(args)}
+    distro, docker_image = _windows_cross_action_image(selection_env, containers=containers)
+    image = docker_image.full_name
+    docker_command = env.get("HERMETIC_CONTAINER_DOCKER_COMMAND") or "docker"
+    docker_argv = shlex.split(docker_command)
+    if len(docker_argv) == 1 and "/" not in docker_argv[0] and "\\" not in docker_argv[0]:
+        docker_executable = shutil.which(docker_argv[0], path=env.get("PATH"))
+        if docker_executable:
+            # Windows installs Docker below "Program Files"; the runner splits the command
+            # with shlex, so keep the path a single token.
+            docker_command = shlex.quote(docker_executable)
+    output_base = _bazel_output_base(args, env, repo_root=repo_root)
+    runner_environment = {
+        key: env[key] for key in WINDOWS_CONTAINER_RUNNER_ENVIRONMENT_KEYS if env.get(key)
+    }
+    if _use_wsl_docker(env):
+        runner_environment["DOCKER_HOST"] = (
+            env.get(WSL_DOCKER_HOST_ENV) or env.get("DOCKER_HOST") or "tcp://127.0.0.1:2375"
+        )
+        runner_environment.setdefault(
+            "DOCKER_API_VERSION",
+            env.get(WSL_DOCKER_API_VERSION_ENV) or WSL_DOCKER_API_VERSION_DEFAULT,
+        )
+    else:
+        for key in ("DOCKER_HOST", "DOCKER_CONTEXT"):
+            if env.get(key):
+                runner_environment[key] = env[key]
+    return {
+        "image": image,
+        "docker_command": docker_command,
+        # The interpreter Bazel starts the runner with; compile-command replays reuse it.
+        "runner_python": sys.executable,
+        "network": env.get("HERMETIC_CONTAINER_NETWORK", "host"),
+        "user": _container_user("Windows"),
+        "repo_root": str(repo_root),
+        "state_dir": str(container_actions.state_dir(repo_root)),
+        "container_layout_version": WINDOWS_CONTAINER_ACTIONS_LAYOUT_VERSION,
+        "container_prefix": _windows_cross_action_container_prefix(distro, image),
+        "host_system": "Windows",
+        "docker_host_mode": env.get("MONGO_HERMETIC_CONTAINER_DOCKER_HOST_MODE", ""),
+        "drive_mount_prefix": env.get(WSL_DRIVE_MOUNT_PREFIX_ENV, "/mnt"),
+        "mount_paths": [
+            selection_env[name] for name in WINDOWS_CROSS_PATH_ENVS if selection_env.get(name)
+        ],
+        "runner_environment": runner_environment,
+        # Only used to locate a bare `docker` command; never forwarded into the container.
+        "host_path": env.get("PATH", ""),
+        "sandbox_base": str(_linux_action_sandbox_base(output_base)),
+        # Writable sibling of the output base, as on Linux hosts; compile-command replays
+        # (evergreen/validate_compile_commands.py) write their outputs there.
+        "shared_install_dir": str(_linux_shared_install_dir(output_base)),
+    }
+
+
+def _ensure_windows_action_container(config_path: pathlib.Path) -> tuple[bool, str]:
+    """Starts the Windows action container and verifies its bind mounts before Bazel runs."""
+    return container_actions.preflight_container_runner(
+        WINDOWS_CONTAINER_ACTION_WRAPPER_SCRIPT,
+        config_path,
+        timeout=WINDOWS_CONTAINER_PREFLIGHT_TIMEOUT_SECONDS,
+        report_output=True,
+    )
+
+
+def _prepare_windows_container_actions(
+    host_args: Sequence[str], env: Mapping[str, str]
+) -> tuple[list[str], int]:
+    """Publishes the runner config and starts the action container for a Windows cross build.
+
+    Returns the (possibly adjusted) Bazel arguments and a non-zero status when the container
+    cannot be used. The build must then fail rather than run Linux tools natively on Windows.
+    """
+    host_args = list(host_args)
+    from ..runner import _prepare_hermetic_container_process_env
+
+    _prepare_hermetic_container_process_env(env)
+    config = _windows_container_actions_config(host_args, env)
+    try:
+        config = windows_action_runner.prepare_runner_config(config)
+    except (OSError, subprocess.TimeoutExpired, SystemExit):
+        _info("could not select a Linux engine for Windows link actions")
+        return host_args, 1
+    if not container_actions.ensure_container_image(
+        str(config["docker_command"]), str(config["image"])
+    ):
+        _info(
+            f"could not pull build container image {config['image']}; "
+            "refusing to run Windows link actions natively"
+        )
+        return host_args, 1
+
+    output_base = _bazel_output_base(host_args, env)
+    # Publish the action config and establish the container under the output-base lock, then
+    # release it before Bazel runs so nested Bazel invocations cannot deadlock.
+    with container_actions.lock(output_base):
+        generation, _ = container_actions.output_base_generation(output_base)
+        config_path, config = container_actions.publish_container_actions_config(
+            config, output_base, generation, "mongo_windows_cross_action"
+        )
+        host_args = _replace_bazel_startup_option(host_args, "--output_base", str(output_base))
+        container_ready, detail = _ensure_windows_action_container(config_path)
+    if not container_ready:
+        # The runner's own report was already echoed above; keep this line short.
+        detail_suffix = "" if detail else " (the runner produced no output)"
+        _info(
+            f"could not start or verify the Windows action container "
+            f"{config['container_name']}{detail_suffix}; refusing to run link actions natively"
+        )
+        return host_args, 1
+
+    image_identifier = str(config["image"]).rsplit("@", 1)[-1]
+    _info(
+        f"Container image {image_identifier} is running in the background to execute "
+        "Windows link actions; compile actions execute on RBE in the same image."
+    )
+    return host_args, 0
+
+
+def _windows_cross_action_path(env: Mapping[str, str]) -> str:
+    """Returns an action PATH usable by both Linux RBE and native Windows actions.
+
+    Bazel computes the action PATH from the client OS (see BazelRuleClassProvider
+    pathOrDefault), so a Windows client bakes semicolon-separated Windows entries
+    into actions that run on Linux RBE workers, which breaks PATH lookups there.
+    POSIX entries come first for Linux workers; the Windows system directories
+    mirror Bazel's own Windows defaults so local host actions keep working.
+    """
+    system_root = (env.get("SYSTEMROOT") or env.get("SystemRoot") or "C:\\Windows").rstrip("\\")
+    return ";".join(
+        (
+            "/bin:/usr/bin:/usr/local/bin",
+            system_root,
+            system_root + "\\System32",
+            system_root + "\\System32\\WindowsPowerShell\\v1.0",
+        )
+    )
+
+
+def _windows_cross_rbe_distro(
+    env: Mapping[str, str],
+    containers: Mapping[str, Mapping[str, str]] | None = None,
+) -> str:
+    containers = containers or load_remote_execution_containers()
+    if (
+        not env.get("MONGO_HERMETIC_CONTAINER_DISTRO")
+        and WINDOWS_CROSS_DEFAULT_EXEC_DISTRO in containers
+    ):
+        return WINDOWS_CROSS_DEFAULT_EXEC_DISTRO
+    return select_distro(containers, env=env, arch="x86_64")
+
+
+def _windows_cross_rbe_execution_platform(
+    env: Mapping[str, str],
+    containers: Mapping[str, Mapping[str, str]] | None = None,
+) -> str:
+    return "@internal_platforms_do_not_use//windows_cross:exec"

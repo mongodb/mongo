@@ -1,9 +1,16 @@
 # Define supported build platforms.
 load("//bazel/platforms:platform_util.bzl", "setup_platform")
+load("@rules_python//python:defs.bzl", "py_test")
 
 package(default_visibility = ["//visibility:public"])
 
 exports_files(["platform_util.bzl"])
+
+py_test(
+    name = "local_config_platform_test",
+    srcs = ["local_config_platform_test.py"],
+    data = ["local_config_platform.bzl"],
+)
 
 constraint_setting(name = "mongo_toolchain")
 

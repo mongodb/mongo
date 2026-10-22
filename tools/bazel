@@ -94,11 +94,9 @@ else
   os="unknown"
 fi
 
-# Container integration is currently supported only on Linux. Keep macOS and
-# Windows on native Bazel even when a user's environment or a cross-platform
-# config opts into hermetic containers; this also prevents the wrapper from
-# attempting to start Docker on those platforms.
-if [[ "$os" == "macos" || "$os" == "windows" ]]; then
+# macOS keeps its native wrapper behavior. Windows may opt into cross-host
+# integration; the integration layer keeps native execution as its default.
+if [[ "$os" == "macos" ]]; then
   export MONGO_BAZEL_USE_HERMETIC_CONTAINER=0
 fi
 

@@ -277,8 +277,8 @@ if !exit_code! NEQ 0 (
         call :cleanup_logfile
         exit /b !exit_code!
     )
-    echo wrapper script failed; retrying the final native Bazel invocation... 1>&2
-    "%BAZEL_REAL%" %*
+    echo wrapper script failed; retrying the final Bazel invocation... 1>&2
+    "!hook_python!" "%REPO_ROOT%\bazel\wrapper_hook\hermetic_container_integration.py" "%BAZEL_REAL%" %*
     set "fallback_exit=!ERRORLEVEL!"
     call :cleanup_logfile
     exit /b !fallback_exit!
@@ -300,9 +300,8 @@ if "%MONGO_BAZEL_WRAPPER_DEBUG%"=="1" (
     echo [WRAPPER_HOOK_DEBUG]: wrapper hook script took %mm%m and %ss%.%cc%s 1>&2
 )
 
-rem Windows builds are native-only. Container integration is intentionally not
-rem invoked from this wrapper.
-"%BAZEL_REAL%" !new_args!
+rem The integration selector keeps native execution unless Windows cross mode is requested.
+"!hook_python!" "%REPO_ROOT%\bazel\wrapper_hook\hermetic_container_integration.py" "%BAZEL_REAL%" !new_args!
 set "bazel_exit=!ERRORLEVEL!"
 rem Windows did not run the post-hook before compiledb support was added. Keep
 rem its flag-sync behavior unchanged while still running the local post-hook.
