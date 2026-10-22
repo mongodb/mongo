@@ -16,6 +16,7 @@ load("//bazel/resmoke:resmoke.bzl", "resmoke_suite_test")
 
 resmoke_suite_test(
     name = "concurrency_replication_primary_driven_index_builds",
+    size = "large",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/concurrency_replication_primary_driven_index_builds.yml",
     tags = [
         "ci-all-variants",
