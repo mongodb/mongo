@@ -91,5 +91,78 @@ TEST_F(ShardsvrResolveViewCommandTest, ValidCommandWithMatchingDBVersion) {
     ASSERT_EQ(response["resolvedView"].Obj()["ns"].str(), nssView.toString_forTest());
 }
 
+/**
+ * Tests that ShardsvrResolveView reports, via the isTimeseries reply field, when the namespace
+ * resolves to a timeseries collection. The router uses this to reject search index commands
+ * on timeseries.
+ */
+TEST_F(ShardsvrResolveViewCommandTest, ViewOverTimeseriesReportsIsTimeseriesTrue) {
+    OperationContext* opCtx = operationContext();
+
+    const NamespaceString nssTsColl =
+        NamespaceString::createNamespaceString_forTest(dbNameTestDb, "ts");
+    const NamespaceString nssTsView =
+        NamespaceString::createNamespaceString_forTest(dbNameTestDb, "tsview");
+
+    DBDirectClient client(opCtx);
+    BSONObj response;
+    ASSERT_TRUE(client.runCommand(
+        dbNameTestDb,
+        BSON("create" << nssTsColl.coll() << "timeseries" << BSON("timeField" << "t")),
+        response));
+    ASSERT_TRUE(client.runCommand(dbNameTestDb,
+                                  BSON("create" << nssTsView.coll() << "viewOn" << nssTsColl.coll()
+                                                << "pipeline" << BSONArray()),
+                                  response));
+
+    // Resolving a view onto a timeseries collection succeeds, resolves to the timeseries
+    // collection namespace, and reports that the resolved namespace is a timeseries
+    // collection.
+    ShardsvrResolveView cmd(nssTsView);
+    ASSERT_TRUE(client.runCommand(nssTsView.dbName(), cmd.toBSON(), response));
+    ASSERT_EQ(response["resolvedView"].Obj()["ns"].str(), nssTsColl.toString_forTest());
+    ASSERT(response.hasField("isTimeseries"));
+    ASSERT_TRUE(response["isTimeseries"].trueValue());
+
+    // The timeseries collection namespace itself is also reported as a timeseries collection.
+    ShardsvrResolveView cmdTsColl(nssTsColl);
+    ASSERT_TRUE(client.runCommand(nssTsColl.dbName(), cmdTsColl.toBSON(), response));
+    ASSERT(response.hasField("isTimeseries"));
+    ASSERT_TRUE(response["isTimeseries"].trueValue());
+}
+
+/**
+ * Tests that ShardsvrResolveView reports isTimeseries false for a view that resolves to a
+ * normal (non-timeseries) collection.
+ */
+TEST_F(ShardsvrResolveViewCommandTest, ViewOverNormalCollectionReportsIsTimeseriesFalse) {
+    OperationContext* opCtx = operationContext();
+
+    const NamespaceString nssNormalColl =
+        NamespaceString::createNamespaceString_forTest(dbNameTestDb, "normal");
+    const NamespaceString nssNormalView =
+        NamespaceString::createNamespaceString_forTest(dbNameTestDb, "normalview");
+
+    DBDirectClient client(opCtx);
+    BSONObj response;
+    ASSERT_TRUE(client.runCommand(dbNameTestDb, BSON("create" << nssNormalColl.coll()), response));
+    ASSERT_TRUE(
+        client.runCommand(dbNameTestDb,
+                          BSON("create" << nssNormalView.coll() << "viewOn" << nssNormalColl.coll()
+                                        << "pipeline" << BSONArray()),
+                          response));
+
+    ShardsvrResolveView cmd(nssNormalView);
+    ASSERT_TRUE(client.runCommand(nssNormalView.dbName(), cmd.toBSON(), response));
+    ASSERT_EQ(response["resolvedView"].Obj()["ns"].str(), nssNormalColl.toString_forTest());
+    ASSERT(response.hasField("isTimeseries"));
+    ASSERT_FALSE(response["isTimeseries"].trueValue());
+
+    ShardsvrResolveView cmdColl(nssNormalColl);
+    ASSERT_TRUE(client.runCommand(nssNormalColl.dbName(), cmdColl.toBSON(), response));
+    ASSERT(response.hasField("isTimeseries"));
+    ASSERT_FALSE(response["isTimeseries"].trueValue());
+}
+
 }  // namespace
 }  // namespace mongo

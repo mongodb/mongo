@@ -38,7 +38,10 @@ namespace {
 // eliminate this race condition and get a single/locked instance of the view graph for each search
 // index command.
 StatusWith<std::pair<boost::optional<UUID>, boost::optional<ResolvedNamespace>>> resolveViewHelper(
-    OperationContext* opCtx, const CachedDatabaseInfo& cdb, NamespaceString nss) {
+    OperationContext* opCtx,
+    const CachedDatabaseInfo& cdb,
+    NamespaceString nss,
+    bool failOnTsColl) {
 
     BSONObjBuilder bob;
     bob.append("_shardsvrResolveView", 1);
@@ -65,6 +68,13 @@ StatusWith<std::pair<boost::optional<UUID>, boost::optional<ResolvedNamespace>>>
     if (data.hasField("collectionUUID")) {
         uuid = boost::make_optional(uassertStatusOK(UUID::parse(data["collectionUUID"])));
     }
+
+    // Apply the timeseries ban to the resolved namespace, not just the namespace named in the
+    // request.
+    uassert(13717000,
+            "search index commands are not allowed on timeseries collections",
+            !(failOnTsColl && data.hasField("isTimeseries") && data["isTimeseries"].trueValue()));
+
     return std::make_pair(uuid, resolvedView);
 }
 }  // namespace
@@ -105,7 +115,7 @@ SearchIndexProcessRouter::fetchCollectionUUIDAndResolveView(OperationContext* op
 
             if (bsonDoc["type"].String() == "view") {
                 auto sourceCollection = bsonDoc["options"]["viewOn"].String();
-                auto status = resolveViewHelper(opCtx, cdb, nss);
+                auto status = resolveViewHelper(opCtx, cdb, nss, failOnTsColl);
                 return uassertStatusOK(status);
             }
 

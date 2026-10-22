@@ -70,9 +70,12 @@ public:
                 view_catalog_helpers::resolveView(opCtx, catalog, nss, boost::none));
             Response res;
             res.setResolvedView(resolvedView);
-            if (auto uuid = catalog->lookupUUIDByNSS(opCtx, resolvedView.getResolvedNamespace())) {
-                res.setCollectionUUID(
-                    catalog->lookupUUIDByNSS(opCtx, resolvedView.getResolvedNamespace()));
+            if (auto coll = catalog->lookupCollectionByNamespace(
+                    opCtx, resolvedView.getResolvedNamespace())) {
+                res.setCollectionUUID(coll->uuid());
+                // Report whether the resolved namespace is a timeseries. This is used by the router
+                // so it can enforce the ban on search index commands on timeseries collections.
+                res.setIsTimeseries(coll->isTimeseriesCollection());
             }
 
             return res;

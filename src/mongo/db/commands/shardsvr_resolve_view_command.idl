@@ -28,6 +28,10 @@ structs:
             collectionUUID:
                 type: uuid
                 optional: true
+            isTimeseries:
+                description: "Whether the resolved namespace is a timeseries collection."
+                type: bool
+                optional: true
             resolvedView:
                 type: resolved_view
                 optional: true

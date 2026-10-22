@@ -41,9 +41,22 @@ SearchIndexProcessShard::fetchCollectionUUIDAndResolveView(OperationContext* opC
     } else {
         auto resolvedView =
             view_catalog_helpers::resolveView(opCtx, catalog, nss, boost::none).getValue();
+        auto resolvedNss = resolvedView.getResolvedNamespace();
+        auto resolvedColl = catalog->lookupCollectionByNamespace(opCtx, resolvedNss);
 
-        return std::make_pair(catalog->lookupUUIDByNSS(opCtx, resolvedView.getResolvedNamespace()),
-                              boost::make_optional(resolvedView));
+        // Double-check the timeseries collection ban now that we've resolved the namespace
+        // (otherwise views could get around it).
+        if (failOnTsColl) {
+            uassert(13717001,
+                    "search index commands are not allowed on timeseries collections",
+                    !(resolvedColl && resolvedColl->isTimeseriesCollection()));
+        }
+
+        boost::optional<UUID> resolvedUuid;
+        if (resolvedColl) {
+            resolvedUuid = resolvedColl->uuid();
+        }
+        return std::make_pair(resolvedUuid, boost::make_optional(resolvedView));
     }
 }
 

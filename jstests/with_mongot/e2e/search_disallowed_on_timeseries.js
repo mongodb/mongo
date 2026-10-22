@@ -7,6 +7,7 @@
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {
     expectCreateSearchIndexFails,
     expectDropSearchIndexFails,
@@ -204,6 +205,75 @@ assert.commandWorked(bulk.execute());
     // 4. $listSearchIndexes (should return an empty array for timeseries collections).
     const results = tsColl.aggregate([{$listSearchIndexes: {}}]).toArray();
     assert.eq(results, [], "Expected no search indexes for timeseries collection");
+})();
+
+// The timeseries ban on search index commands must also apply when the command is
+// addressed to a view that resolves to a timeseries collection. The ban should be
+// evaluated against the resolved namespace, not just the namespace named in the request.
+(function testSearchIndexCommandsDisallowedOnViewOverTsCollection() {
+    const viewName = "viewon_" + timeseriesCollName;
+    assertDropCollection(db, viewName);
+    assert.commandWorked(db.createView(viewName, timeseriesCollName, []));
+    const viewColl = db.getCollection(viewName);
+
+    const tsSearchIndexName = "tsSearchIndexViaView";
+    let searchIndexDef = {
+        mappings: {dynamic: true, fields: {}},
+    };
+
+    // Which component rejects depends on the topology: through a mongos the router rejects
+    // via the isTimeseries field of the _shardsvrResolveView reply, while on a mongod the
+    // ban is enforced by the shard after resolving the view.
+    const expectedCodes = FixtureHelpers.isMongos(db) ? [13717000] : [13717001];
+
+    expectCreateSearchIndexFails(
+        viewColl,
+        {name: tsSearchIndexName, definition: searchIndexDef},
+        expectedCodes,
+    );
+
+    searchIndexDef.storedSource = {
+        exclude: [metaFieldName],
+    };
+    expectUpdateSearchIndexFails(
+        viewColl,
+        {name: tsSearchIndexName, definition: searchIndexDef},
+        expectedCodes,
+    );
+
+    expectDropSearchIndexFails(viewColl, {name: tsSearchIndexName}, expectedCodes);
+
+    // The ban must survive a multi-hop view chain: a view on top of the view above must be
+    // rejected just like the direct view.
+    const nestedViewName = "nestedviewon_" + timeseriesCollName;
+    assertDropCollection(db, nestedViewName);
+    assert.commandWorked(db.createView(nestedViewName, viewName, []));
+    const nestedViewColl = db.getCollection(nestedViewName);
+
+    expectCreateSearchIndexFails(
+        nestedViewColl,
+        {name: tsSearchIndexName, definition: searchIndexDef},
+        expectedCodes,
+    );
+
+    expectUpdateSearchIndexFails(
+        nestedViewColl,
+        {name: tsSearchIndexName, definition: searchIndexDef},
+        expectedCodes,
+    );
+
+    expectDropSearchIndexFails(nestedViewColl, {name: tsSearchIndexName}, expectedCodes);
+
+    // $listSearchIndexes should still return an empty array through a view (or a nested view)
+    // on a timeseries collection (the ban does not apply to listing).
+    const results = viewColl.aggregate([{$listSearchIndexes: {}}]).toArray();
+    assert.eq(results, [], "Expected no search indexes via a view on a timeseries collection");
+    const nestedResults = nestedViewColl.aggregate([{$listSearchIndexes: {}}]).toArray();
+    assert.eq(
+        nestedResults,
+        [],
+        "Expected no search indexes via a nested view on a timeseries collection",
+    );
 })();
 
 // Validates that a $search stage works in a subpipeline when the inner collection is non-timeseries, but the outer collection is timeseries.
