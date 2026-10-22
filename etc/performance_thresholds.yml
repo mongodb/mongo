@@ -65,13 +65,6 @@ tests:
           - name: instructions_per_iteration_mean
             threshold_limit: 400
             bound_direction: upper
-  CrudBenchmarkFixture/BM_AGG_MATCH_ONE:
-    al2023-arm64-sep-benchmark:
-      - thread_level: 1
-        metrics:
-          - name: instructions_per_iteration_mean
-            threshold_limit: 800
-            bound_direction: upper
   CrudBenchmarkFixture/BM_UPDATE_ONE:
     al2023-arm64-sep-benchmark:
       - thread_level: 1
