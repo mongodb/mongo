@@ -50,6 +50,7 @@ mongo_cc_library(
         "//src/mongo/db/exec/sbe/util:pcre.cpp",
         "//src/mongo/db/exec/sbe/util:spilling.cpp",
         "//src/mongo/db/exec/sbe/util:stage_results_printer.cpp",
+        "//src/mongo/db/exec/sbe/values:double_double_sum_state.cpp",
         "//src/mongo/db/exec/sbe/vm:code_fragment.cpp",
         "//src/mongo/db/exec/sbe/vm:vm.cpp",
         "//src/mongo/db/exec/sbe/vm:vm_arith.cpp",
