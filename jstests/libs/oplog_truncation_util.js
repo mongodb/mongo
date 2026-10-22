@@ -14,6 +14,9 @@ export function verifyOplogCapMaintainerThreadNotStarted(log) {
 
 /**
  * Returns true if running in disaggregated storage mode
+ *
+ * Keep in sync with `isDisaggregatedStorage` in `src/libfuzz/fuzzer_process_manager.ts`
+ * from jstestfuzz repo.
  */
 export function isDisagg(primary) {
     const disaggRes = assert.commandWorkedOrFailedWithCode(
