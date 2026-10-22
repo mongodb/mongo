@@ -10,7 +10,14 @@ import unittest
 
 from buildscripts.sbom.config import get_semver_from_release_version, regex_semver
 from buildscripts.sbom.endorctl_utils import EndorCtl
-from buildscripts.sbom.sbom_utils import is_valid_purl, reconcile_dependency_refs
+from buildscripts.sbom.sbom_utils import (
+    SOURCE_METADATA,
+    add_team_responsible,
+    is_valid_purl,
+    propagate_team_ownership,
+    reconcile_dependency_refs,
+    tag_unsourced_team_owner,
+)
 from buildscripts.tests.sbom_linter.sbom_linter import load_metadata
 
 logging.basicConfig(level=logging.INFO, stream=sys.stdout)
@@ -304,6 +311,195 @@ class TestReconcileDependencyRefs(unittest.TestCase):
         self.assertEqual(root["dependsOn"], ["pkg:npm/foo@1.0"])
         foo = next(d for d in meta_bom["dependencies"] if d["ref"] == "pkg:npm/foo@1.0")
         self.assertEqual(foo["dependsOn"], [])
+
+
+class TestPropagateTeamOwnership(unittest.TestCase):
+    """propagate_team_ownership() inherits owners only where unambiguous."""
+
+    TEAM = "internal:team_responsible"
+    SOURCE = "internal:team_responsible_source"
+    CONSUMERS = "internal:team_consumers"
+
+    @staticmethod
+    def _bom(owners: dict[str, str | list[str]], edges: dict[str, list[str]]) -> dict:
+        refs = set(owners) | set(edges) | {r for deps in edges.values() for r in deps}
+        components = []
+        for ref in sorted(refs):
+            component = {"bom-ref": ref, "name": ref}
+            teams = owners.get(ref, [])
+            for team in [teams] if isinstance(teams, str) else teams:
+                component.setdefault("properties", []).append(
+                    {"name": "internal:team_responsible", "value": team}
+                )
+            components.append(component)
+        dependencies = [{"ref": r, "dependsOn": edges.get(r, [])} for r in sorted(refs)]
+        return {"components": components, "dependencies": dependencies}
+
+    def _teams(self, bom: dict, ref: str) -> list[str]:
+        component = next(c for c in bom["components"] if c["bom-ref"] == ref)
+        return [p["value"] for p in component.get("properties", []) if p["name"] == self.TEAM]
+
+    def _values(self, bom: dict, ref: str, name: str) -> list[str]:
+        component = next(c for c in bom["components"] if c["bom-ref"] == ref)
+        return [p["value"] for p in component.get("properties", []) if p["name"] == name]
+
+    def _sources(self, bom: dict, ref: str) -> list[str]:
+        return self._values(bom, ref, self.SOURCE)
+
+    def test_linear_chain_inherits(self):
+        bom = self._bom({"owned": "A"}, {"owned": ["a"], "a": ["b"]})
+        assigned = propagate_team_ownership(bom)
+        self.assertEqual(assigned, {"a": "A", "b": "A"})
+        self.assertEqual(self._teams(bom, "b"), ["A"])
+        self.assertEqual(self._sources(bom, "b"), ["inherited:owned"])
+        self.assertEqual(self._sources(bom, "owned"), [])
+
+    def test_inherited_source_is_the_versionless_purl_of_the_owned_ancestor(self):
+        bom = self._bom({"pkg:maven/g/owner@1.0": "A"}, {"pkg:maven/g/owner@1.0": ["pkg:x/y@2"]})
+        propagate_team_ownership(bom)
+        self.assertEqual(self._sources(bom, "pkg:x/y@2"), ["inherited:pkg:maven/g/owner"])
+
+    def test_source_is_deterministic_when_owners_share_a_team(self):
+        bom = self._bom({"o2": "A", "o1": "A"}, {"o1": ["shared"], "o2": ["shared"]})
+        propagate_team_ownership(bom)
+        self.assertEqual(self._sources(bom, "shared"), ["inherited:o1"])
+
+    def test_diamond_with_same_team_is_tagged(self):
+        bom = self._bom(
+            {"o1": "A", "o2": "A"},
+            {"o1": ["shared"], "o2": ["shared"]},
+        )
+        self.assertEqual(propagate_team_ownership(bom), {"shared": "A"})
+
+    def test_shared_dependency_of_two_teams_records_consumers_only(self):
+        bom = self._bom({"o1": "B", "o2": "A"}, {"o1": ["shared"], "o2": ["shared"]})
+        with self.assertLogs("generate_sbom", level="INFO") as logs:
+            self.assertEqual(propagate_team_ownership(bom), {})
+        self.assertEqual(self._teams(bom, "shared"), [])
+        self.assertEqual(self._sources(bom, "shared"), [])
+        self.assertEqual(self._values(bom, "shared", self.CONSUMERS), ["A|B"])
+        self.assertTrue(any("multiple teams" in line for line in logs.output))
+
+    def test_child_of_multi_consumer_node_stays_without_owner(self):
+        bom = self._bom(
+            {"o1": "A", "o2": "B"},
+            {"o1": ["shared"], "o2": ["shared"], "shared": ["child"]},
+        )
+        self.assertEqual(propagate_team_ownership(bom), {})
+        self.assertEqual(self._teams(bom, "child"), [])
+        self.assertEqual(self._values(bom, "child", self.CONSUMERS), ["A|B"])
+
+    def test_explicit_owner_is_kept_and_reseeds_its_children(self):
+        bom = self._bom(
+            {"o1": "A", "o2": "B"},
+            {"o1": ["o2"], "o2": ["leaf"]},
+        )
+        self.assertEqual(propagate_team_ownership(bom), {"leaf": "B"})
+        self.assertEqual(self._teams(bom, "o2"), ["B"])
+
+    def test_multi_team_owner_passes_teams_to_children_as_consumers(self):
+        bom = self._bom({"o1": ["B", "A"]}, {"o1": ["leaf"]})
+        self.assertEqual(propagate_team_ownership(bom), {})
+        self.assertEqual(self._teams(bom, "leaf"), [])
+        self.assertEqual(self._values(bom, "leaf", self.CONSUMERS), ["A|B"])
+
+    def test_cycle_terminates(self):
+        bom = self._bom({"o1": "A"}, {"o1": ["a"], "a": ["b"], "b": ["a", "o1"]})
+        self.assertEqual(propagate_team_ownership(bom), {"a": "A", "b": "A"})
+
+    def test_unowned_root_is_not_a_source(self):
+        bom = self._bom({}, {"root": ["a"], "a": ["b"]})
+        self.assertEqual(propagate_team_ownership(bom), {})
+
+    def test_dependency_ref_without_component_is_ignored(self):
+        bom = self._bom({"o1": "A"}, {"o1": ["a"]})
+        bom["dependencies"][0]["dependsOn"].append("pkg:missing@1")
+        self.assertEqual(propagate_team_ownership(bom), {"a": "A"})
+
+    def test_idempotent_and_recomputes_inherited_values(self):
+        bom = self._bom({"o1": "A"}, {"o1": ["a"]})
+        propagate_team_ownership(bom)
+        # A new consumer from another team appears; the stale inherited owner must not stick.
+        bom["components"].append(
+            {"bom-ref": "o2", "properties": [{"name": self.TEAM, "value": "B"}]}
+        )
+        bom["dependencies"].append({"ref": "o2", "dependsOn": ["a"]})
+        self.assertEqual(propagate_team_ownership(bom), {})
+        self.assertEqual(self._teams(bom, "a"), [])
+        # Re-running on a stable graph gives the same single owner without duplicating properties.
+        bom["dependencies"][-1]["dependsOn"] = []
+        self.assertEqual(propagate_team_ownership(bom), {"a": "A"})
+        self.assertEqual(propagate_team_ownership(bom), {"a": "A"})
+        self.assertEqual(self._teams(bom, "a"), ["A"])
+        self.assertEqual(self._sources(bom, "a"), ["inherited:o1"])
+        self.assertEqual(self._values(bom, "a", self.CONSUMERS), [])
+
+    def test_explicit_owner_source_is_never_dropped_on_rerun(self):
+        bom = self._bom({}, {"o1": ["a"]})
+        add_team_responsible(bom["components"][1], "A", "CODEOWNERS:master")
+        propagate_team_ownership(bom)
+        propagate_team_ownership(bom)
+        self.assertEqual(self._teams(bom, "o1"), ["A"])
+        self.assertEqual(self._sources(bom, "o1"), ["CODEOWNERS:master"])
+        self.assertEqual(self._sources(bom, "a"), ["inherited:o1"])
+
+
+class TestTeamOwnerSource(unittest.TestCase):
+    """Provenance recorded next to internal:team_responsible."""
+
+    @staticmethod
+    def _values(component: dict, name: str) -> list[str]:
+        return [p["value"] for p in component.get("properties", []) if p["name"] == name]
+
+    def test_codeowners_owner_records_its_source(self):
+        component = {"bom-ref": "c"}
+        add_team_responsible(component, "A", "CODEOWNERS:v8.0-staging")
+        self.assertEqual(self._values(component, "internal:team_responsible"), ["A"])
+        self.assertEqual(
+            self._values(component, "internal:team_responsible_source"),
+            ["CODEOWNERS:v8.0-staging"],
+        )
+
+    def test_same_source_is_recorded_once_for_several_teams(self):
+        component = {"bom-ref": "c"}
+        add_team_responsible(component, "A", "CODEOWNERS:master")
+        add_team_responsible(component, "B", "CODEOWNERS:master")
+        self.assertEqual(self._values(component, "internal:team_responsible"), ["A", "B"])
+        self.assertEqual(
+            self._values(component, "internal:team_responsible_source"), ["CODEOWNERS:master"]
+        )
+
+    def test_same_team_from_same_source_is_not_duplicated(self):
+        component = {"bom-ref": "c"}
+        add_team_responsible(component, "A", "CODEOWNERS:master")
+        add_team_responsible(component, "A", "CODEOWNERS:master")
+        self.assertEqual(self._values(component, "internal:team_responsible"), ["A"])
+        self.assertEqual(
+            self._values(component, "internal:team_responsible_source"), ["CODEOWNERS:master"]
+        )
+
+    def test_pre_existing_owner_is_attributed_to_metadata(self):
+        component = {
+            "bom-ref": "c",
+            "properties": [{"name": "internal:team_responsible", "value": "M"}],
+        }
+        add_team_responsible(component, "A", "CODEOWNERS:master")
+        self.assertEqual(
+            self._values(component, "internal:team_responsible_source"),
+            [SOURCE_METADATA, "CODEOWNERS:master"],
+        )
+
+    def test_tag_unsourced_owner_is_idempotent_and_ignores_unowned(self):
+        owned = {
+            "bom-ref": "c",
+            "properties": [{"name": "internal:team_responsible", "value": "M"}],
+        }
+        tag_unsourced_team_owner(owned)
+        tag_unsourced_team_owner(owned)
+        self.assertEqual(self._values(owned, "internal:team_responsible_source"), [SOURCE_METADATA])
+        unowned = {"bom-ref": "u"}
+        tag_unsourced_team_owner(unowned)
+        self.assertNotIn("properties", unowned)
 
 
 if __name__ == "__main__":
