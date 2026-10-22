@@ -238,6 +238,7 @@ TEST(ValidateCheckpointTest, MissingRemovalLogsError) {
 }
 
 using test_helpers::getOplogEntriesMatching;
+using test_helpers::makeWatermarkEntry;
 
 class CheckpointOplogParsingTest : public CatalogTestFixture {
 public:
@@ -413,6 +414,50 @@ TEST_F(CheckpointOplogParsingTest, ParseCheckpointReadsRealFlushedCheckpoints) {
     }
 }
 
+TEST_F(CheckpointOplogParsingTest, SplitFlushEntriesAreNotClassifiedAsCheckpoints) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    unittest::ServerParameterGuard enableContinuousInternodePerCollectionValidation{
+        "enableContinuousInternodePerCollectionValidation", true};
+    // When this server parameter is set to 1, the replicated metadata checkpoint is split into two
+    // applyOps entries: one for the metadata store container write, and one for the timestamp store
+    // container write.
+    unittest::ServerParameterGuard maxOpsPerOplogEntry{
+        "maxNumberOfBatchedOperationsInSingleOplogEntry", 1};
+
+    const UUID uuid = UUID::gen();
+    const OplogScanResult batch{
+        .deltas = {{uuid,
+                    ReplicatedMetadataDelta{
+                        .metadata = {.sizeCount = CollectionSizeCount{.size = 30, .count = 2}}}}},
+        .lastTimestamp = Timestamp(1, 2)};
+    ASSERT_TRUE(
+        flusher::flush(operationContext(), *sizeCountStore, *timestampStore, batch).has_value());
+
+    const std::vector<repl::OplogEntry> applyOpsEntries =
+        getOplogEntriesMatching(operationContext(), [](const repl::OplogEntry& entry) {
+            return entry.getCommandType() == repl::CommandTypeEnum::kApplyOps;
+        });
+    ASSERT_EQ(applyOpsEntries.size(), 2);
+    for (const auto& entry : applyOpsEntries) {
+        ASSERT_FALSE(isCheckpointApplyOpsEntry(entry));
+    }
+
+    SizeCountCheckpointValidator validator;
+    validator.preprocessOplogEntry(makeWatermarkEntry(*batch.lastTimestamp));
+    for (const auto& entry : applyOpsEntries) {
+        validator.preprocessOplogEntry(entry);
+    }
+    validator.mergeAndValidate({});
+
+    if (capturer.canReadMetrics()) {
+        // mergeAndValidate() should validate zero checkpoints because no checkpoint oplog entries
+        // were found.
+        EXPECT_EQ(capturer.readInt64Counter(
+                      otel::metrics::MetricNames::kReplicatedFastCountCheckpointsValidated),
+                  0);
+    }
+}
+
 TEST(ParseCheckpointTest, ContainerInsertMissingValueMasserts) {
     BSONArrayBuilder innerOpsBuilder;
     innerOpsBuilder.append(BSON(
@@ -447,6 +492,26 @@ DEATH_TEST(ParseCheckpointDeathTest, TimestampContainerDeleteTasserts, "13647901
     isCheckpointApplyOpsEntry(checkpointEntry);
 }
 
+DEATH_TEST(ParseCheckpointDeathTest, NonContainerOpInFastCountLedEntryTasserts, "13722400") {
+    BSONArrayBuilder innerOpsBuilder;
+    innerOpsBuilder.append(BSON(
+        "op" << "ci" << "ns" << NamespaceString::kContainerNamespace.ns_forTest() << "container"
+             << ident::kFastCountMetadataStore << "o" << BSON("k" << UUID::gen())));
+    innerOpsBuilder.append(BSON("op" << "i"
+                                     << "ns" << NamespaceString::kContainerNamespace.ns_forTest()
+                                     << "o" << BSON("_id" << 1)));
+
+    const repl::OplogEntry checkpointEntry = repl::DurableOplogEntry{repl::DurableOplogEntryParams{
+        .opTime = repl::OpTime(Timestamp(1, 1), 1),
+        .opType = repl::OpTypeEnum::kCommand,
+        .nss = NamespaceString::kAdminCommandNamespace,
+        .oField = BSON("applyOps" << innerOpsBuilder.arr()),
+        .wallClockTime = Date_t::now(),
+    }};
+
+    isCheckpointApplyOpsEntry(checkpointEntry);
+}
+
 const Timestamp kT0{Seconds(100), 0};
 const Timestamp kT1{Seconds(200), 0};
 const Timestamp kT2{Seconds(250), 0};
@@ -454,7 +519,6 @@ const Timestamp kT3{Seconds(300), 0};
 const Timestamp kEnd{Seconds(1000), 0};
 
 using test_helpers::makeCheckpointEntry;
-using test_helpers::makeWatermarkEntry;
 
 class SizeCountCheckpointValidatorTest : public unittest::Test {
 protected:

@@ -291,16 +291,29 @@ DEATH_TEST_F(CheckpointValidationDeathTest,
     const NamespaceString nss =
         NamespaceString::createNamespaceString_forTest("test.checkpointCrud");
     createCollection(_opCtx.get(), nss, {});
-    const UUID uuid = getCollectionUUID(_opCtx.get(), nss);
+    const UUID uuidA = getCollectionUUID(_opCtx.get(), nss);
+    const NamespaceString missingNss =
+        NamespaceString::createNamespaceString_forTest("test.checkpointCrudMissing");
+    createCollection(_opCtx.get(), missingNss, {});
+    const UUID uuidB = getCollectionUUID(_opCtx.get(), missingNss);
 
-    const BSONObj doc = BSON("_id" << 1);
+    const BSONObj docA = BSON("_id" << 1);
+    const BSONObj docB = BSON("_id" << 2);
     std::vector<OplogEntry> oplog;
-    oplog.push_back(
-        makeInsertOplogEntryWithRecordIdAndSizeMetadata(nextOpTime(), nss, uuid, doc, RecordId(1)));
+    oplog.push_back(makeInsertOplogEntryWithRecordIdAndSizeMetadata(
+        nextOpTime(), nss, uuidA, docA, RecordId(1)));
+    oplog.push_back(makeInsertOplogEntryWithRecordIdAndSizeMetadata(
+        nextOpTime(), missingNss, uuidB, docB, RecordId(2)));
     const Timestamp watermarkTs = nextOpTime().getTimestamp();
     oplog.push_back(makeWatermarkEntry(watermarkTs));
-    // Checkpoint is empty, so the standby applied an oplog entry the primary did not.
-    oplog.push_back(makeCheckpointEntry(watermarkTs, {}));
+    // Checkpoint is missing an entry for uuidB, so the standby applied an oplog entry the primary
+    // did not.
+    oplog.push_back(makeCheckpointEntry(
+        watermarkTs,
+        {{.uuid = uuidA,
+          .metadata = CollectionReplicatedMetadata{
+              .sizeCount = CollectionSizeCount{.size = docA.objsize(), .count = 1},
+              .hash = boost::none}}}));
     ASSERT_OK(runThroughApplyOplogBatch(std::move(oplog)));
 }
 

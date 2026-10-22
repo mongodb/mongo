@@ -153,22 +153,46 @@ bool isCheckpointApplyOpsEntry(const repl::OplogEntry& entry) {
         return false;
     }
     const auto applyOpsInfo = repl::ApplyOpsCommandInfo::parse(entry.getObject());
-    for (const auto& innerOpObj : applyOpsInfo.getOperations()) {
+    const auto& ops = applyOpsInfo.getOperations();
+    if (ops.empty()) {
+        return false;
+    }
+
+    // Check that the first applyOps entry is a container write to either the metadata store or the
+    // timestamp store. If not, this entry is not a checkpoint.
+    const auto firstOp = repl::DurableReplOperation::parse(
+        ops.front(), IDLParserContext("FastCountCheckpointInnerFirstOp"));
+    if (!firstOp.getContainer() ||
+        (*firstOp.getContainer() != ident::kFastCountMetadataStore &&
+         *firstOp.getContainer() != ident::kFastCountMetadataStoreTimestamps)) {
+        return false;
+    }
+
+    // Check that the checkpoint contains at least one container write to both the metadata
+    // store and the timestamps store. The checkpoint (one metadata store write per updated
+    // collection and one timestamp store write) may be split across multiple applyOps entries if
+    // the size of the entry exceeds maxSizeOfBatchedOperationsInSingleOplogEntryBytes (default
+    // 16MB) OR if maxNumberOfBatchedOperationsInSingleOplogEntry is set to a value <  the # of
+    // metadata store writes + 1 (the timestamp store write).
+    // TODO(SERVER-136501): Validate checkpoints with applyOps entries exceeding 16MB.
+    bool hasMetadataStoreWrite = false;
+    bool hasTimestampStoreWrite = false;
+    for (const auto& innerOpObj : ops) {
         const auto innerOp = repl::DurableReplOperation::parse(innerOpObj);
-        const bool isContainerWrite = innerOp.getOpType() == repl::OpTypeEnum::kContainerInsert ||
-            innerOp.getOpType() == repl::OpTypeEnum::kContainerUpdate ||
-            innerOp.getOpType() == repl::OpTypeEnum::kContainerDelete;
-        // A timestamp store write is included in every checkpoint, so we check for the existence of
-        // this ident.
-        if (isContainerWrite && innerOp.getContainer() &&
-            *innerOp.getContainer() == ident::kFastCountMetadataStoreTimestamps) {
+        tassert(13722400,
+                "Fast count checkpoint applyOps entry contains a non-container operation",
+                innerOp.getContainer().has_value());
+
+        if (*innerOp.getContainer() == ident::kFastCountMetadataStore) {
+            hasMetadataStoreWrite = true;
+        } else if (*innerOp.getContainer() == ident::kFastCountMetadataStoreTimestamps) {
             tassert(13647901,
                     "No container deletes are applied to the timestamp container",
                     innerOp.getOpType() != repl::OpTypeEnum::kContainerDelete);
-            return true;
+            hasTimestampStoreWrite = true;
         }
     }
-    return false;
+    return hasMetadataStoreWrite && hasTimestampStoreWrite;
 }
 
 CheckpointContents parseCheckpoint(const repl::OplogEntry& entry) {
