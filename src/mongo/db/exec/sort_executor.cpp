@@ -14,7 +14,7 @@ std::unique_ptr<Sorter<Value, T>> SortExecutor<T>::makeSorter() {
     auto opts = makeSortOptions();
     return Sorter<Value, T>::template make<Comparator>(
         opts,
-        Comparator(_sortPattern),
+        Comparator(_sortPattern, _interruptChecker.get()),
         _diskUseAllowed
             ? std::make_shared<sorter::FileBasedSpiller<Value, T, Comparator>>(
                   _tempDir,

@@ -23,6 +23,20 @@
 #include <boost/filesystem.hpp>
 
 namespace mongo {
+class OperationContextSortInterruptChecker final : public SortInterruptChecker {
+public:
+    explicit OperationContextSortInterruptChecker(OperationContext* opCtx) : _opCtx(opCtx) {
+        invariant(_opCtx);
+    }
+
+private:
+    void checkForInterrupt() final {
+        _opCtx->checkForInterrupt();
+    }
+
+    OperationContext* _opCtx;
+};
+
 /**
  * The SortExecutor class is the internal implementation of sorting for query execution. The
  * caller should provide input documents by repeated calls to the add() function, and then
@@ -41,13 +55,18 @@ public:
     using DocumentSorter = Sorter<Value, T>;
     class Comparator {
     public:
-        Comparator(const SortPattern& sortPattern) : _sortKeyComparator(sortPattern) {}
+        Comparator(const SortPattern& sortPattern, SortInterruptChecker* interruptChecker)
+            : _sortKeyComparator(sortPattern), _interruptChecker(interruptChecker) {}
         int operator()(const Value& lhs, const Value& rhs) const {
+            if (_interruptChecker) {
+                _interruptChecker->amortizedCheckForInterrupt();
+            }
             return _sortKeyComparator(lhs, rhs);
         }
 
     private:
         SortKeyComparator _sortKeyComparator;
+        SortInterruptChecker* _interruptChecker;
     };
 
     /**
@@ -59,12 +78,17 @@ public:
                  MemoryUsageLimit maxMemoryUsageBytes,
                  boost::filesystem::path tempDir,
                  bool allowDiskUse,
-                 bool moveSortedDataIntoIterator = false)
+                 bool moveSortedDataIntoIterator = false,
+                 std::unique_ptr<SortInterruptChecker> interruptChecker = nullptr)
         : _sortPattern(std::move(sortPattern)),
           _tempDir(std::move(tempDir)),
           _diskUseAllowed(allowDiskUse),
           _moveSortedDataIntoIterator(moveSortedDataIntoIterator),
-          _maxAllowedMemoryUsageBytes(maxMemoryUsageBytes) {
+          _maxAllowedMemoryUsageBytes(maxMemoryUsageBytes),
+          _interruptChecker(interruptChecker ? std::move(interruptChecker)
+                                : opCtx
+                                ? std::make_unique<OperationContextSortInterruptChecker>(opCtx)
+                                : nullptr) {
         _stats.sortPattern =
             _sortPattern.serialize(SortPattern::SortKeySerialization::kForExplain).toBson();
         _stats.limit = limit;
@@ -265,7 +289,7 @@ private:
         _output.reset();
     }
 
-    SortOptions makeSortOptions() const {
+    SortOptions makeSortOptions() {
         SortOptions opts;
         opts.MoveSortedDataIntoIterator(_moveSortedDataIntoIterator);
         if (_stats.limit) {
@@ -273,6 +297,7 @@ private:
         }
 
         opts.MaxMemoryUsageBytes(_stats.maxMemoryUsageBytes);
+        opts.interruptChecker = _interruptChecker.get();
         return opts;
     }
 
@@ -291,6 +316,8 @@ private:
     const bool _moveSortedDataIntoIterator;
 
     MemoryUsageLimit _maxAllowedMemoryUsageBytes;
+
+    std::unique_ptr<SortInterruptChecker> _interruptChecker;
 
     std::unique_ptr<SorterFileStats> _sorterFileStats;
     std::unique_ptr<DocumentSorter> _sorter;

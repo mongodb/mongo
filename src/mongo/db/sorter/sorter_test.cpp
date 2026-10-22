@@ -48,6 +48,33 @@ using test::ContainerTraits;
 using test::FileTraits;
 using test::makeFileSpiller;
 
+TEST_F(InMemIterTest, IntermediateMergeChecksInterruptWithOneRemainingRun) {
+    class InterruptingChecker final : public SortInterruptChecker {
+        void checkForInterrupt() final {
+            uasserted(ErrorCodes::Interrupted, "cancel intermediate merge");
+        }
+    };
+    auto spillDir = makeSpillDir();
+    SortOptions opts;
+    auto spiller = makeFileSpiller(opts, spillDir.path(), nullptr);
+    std::vector<IWPair> data;
+    for (int i = 0; i < 16384; ++i) {
+        data.emplace_back(i, -i);
+    }
+    spiller->spill(opts, IWSorter::Settings{}, data);
+    data.clear();
+    data.emplace_back(-1, 1);
+    spiller->spill(opts, IWSorter::Settings{}, data);
+
+    InterruptingChecker checker;
+    opts.interruptChecker = &checker;
+    SorterStats stats(nullptr);
+    ASSERT_THROWS_CODE(
+        spiller->mergeSpills(opts, IWSorter::Settings{}, stats, IWComparator{}, 1, 2),
+        DBException,
+        ErrorCodes::Interrupted);
+}
+
 TEST_F(InMemIterTest, Empty) {
     EmptyIterator empty;
     sorter::InMemIterator<IntWrapper, IntWrapper, IWComparator> inMem;

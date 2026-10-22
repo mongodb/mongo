@@ -11,6 +11,7 @@
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/scopeguard.h"
 
 #include <cstddef>
 #include <memory>
@@ -19,7 +20,128 @@
 
 namespace mongo::sbe {
 
-using SortStageTest = PlanStageTestFixture;
+namespace {
+
+class InterruptAtEOFStage final : public PlanStage {
+public:
+    InterruptAtEOFStage(std::unique_ptr<PlanStage> child, bool cancel)
+        : PlanStage("interrupt_at_eof", nullptr, kEmptyPlanNodeId, false), _cancel(cancel) {
+        _children.emplace_back(std::move(child));
+    }
+
+    std::unique_ptr<PlanStage> clone() const final {
+        return std::make_unique<InterruptAtEOFStage>(_children[0]->clone(), _cancel);
+    }
+
+    void prepare(CompileCtx& ctx) final {
+        _children[0]->prepare(ctx);
+    }
+
+    value::SlotAccessor* getAccessor(CompileCtx& ctx, value::SlotId slot) final {
+        return _children[0]->getAccessor(ctx, slot);
+    }
+
+    void open(bool reOpen) final {
+        _children[0]->open(reOpen);
+    }
+
+    PlanState getNext() final {
+        auto state = _children[0]->getNext();
+        if (state == PlanState::IS_EOF) {
+            _checksAtEOF = _opCtx->numInterruptChecks();
+            if (_cancel) {
+                _opCtx->markKilled();
+            }
+        }
+        return trackPlanState(state);
+    }
+
+    void close() final {
+        trackClose();
+        _children[0]->close();
+    }
+
+    std::unique_ptr<PlanStageStats> getStats(bool includeDebugInfo) const final {
+        auto stats = std::make_unique<PlanStageStats>(_commonStats);
+        stats->children.emplace_back(_children[0]->getStats(includeDebugInfo));
+        return stats;
+    }
+
+    const SpecificStats* getSpecificStats() const final {
+        return nullptr;
+    }
+
+    void doDebugPrint(std::vector<DebugPrinter::Block>&, DebugPrintInfo&) const final {}
+
+    size_t estimateCompileTimeSize() const final {
+        return sizeof(*this) + _children[0]->estimateCompileTimeSize();
+    }
+
+    int64_t checksAtEOF() const {
+        return _checksAtEOF;
+    }
+
+private:
+    bool _cancel;
+    int64_t _checksAtEOF = 0;
+};
+
+}  // namespace
+
+class SortStageTest : public PlanStageTestFixture {
+protected:
+    void assertSortFinalizationIsInterruptible(int64_t limit, bool cancel = true) {
+        auto input = value::TagValueOwned::fromRaw(value::makeNewArray());
+        auto* array = value::getArrayView(input.value());
+        for (int i = 16384; i > 0; --i) {
+            array->push_back(value::TagValueOwned::fromRaw(value::TypeTags::NumberInt32,
+                                                           value::bitcastFrom<int32_t>(i)));
+        }
+        auto [inputTag, inputVal] = input.releaseToRaw();
+        auto [slot, scan] =
+            generateVirtualScan(value::TagValueMaybeOwned::fromRaw(true, inputTag, inputVal));
+        auto child = std::make_unique<InterruptAtEOFStage>(std::move(scan), cancel);
+        auto* childPtr = child.get();
+        auto sort =
+            makeS<SortStage>(std::move(child),
+                             makeSV(slot),
+                             std::vector<value::SortDirection>{value::SortDirection::Ascending},
+                             value::SlotVector{},
+                             limit ? makeE<EConstant>(value::TypeTags::NumberInt64,
+                                                      value::bitcastFrom<int64_t>(limit))
+                                   : nullptr,
+                             16 * 1024 * 1024,
+                             false,
+                             nullptr,
+                             kEmptyPlanNodeId);
+        auto ctx = makeCompileCtx();
+        ScopeGuard close([&] { sort->close(); });
+        if (cancel) {
+            // The child marks cancellation only after its final interruptible input call.
+            ASSERT_THROWS_CODE(
+                prepareTree(ctx.get(), sort.get()), DBException, ErrorCodes::Interrupted);
+        } else {
+            prepareTree(ctx.get(), sort.get());
+            ASSERT_GT(operationContext()->numInterruptChecks() - childPtr->checksAtEOF(), 1);
+        }
+    }
+};
+
+TEST_F(SortStageTest, FullSortFinalizationIsInterruptible) {
+    assertSortFinalizationIsInterruptible(0);
+}
+
+TEST_F(SortStageTest, TopKSortFinalizationIsInterruptible) {
+    assertSortFinalizationIsInterruptible(8192);
+}
+
+TEST_F(SortStageTest, FullSortFinalizationChecksInterruptRepeatedly) {
+    assertSortFinalizationIsInterruptible(0, false);
+}
+
+TEST_F(SortStageTest, TopKSortFinalizationChecksInterruptRepeatedly) {
+    assertSortFinalizationIsInterruptible(8192, false);
+}
 
 TEST_F(SortStageTest, SortNumbersTest) {
     value::TagValueOwned input = value::TagValueOwned::fromRaw(stage_builder::makeValue(

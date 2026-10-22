@@ -45,6 +45,20 @@ namespace mongo {
 using namespace std::literals::string_view_literals;
 
 namespace {
+class ExpressionContextSortInterruptChecker final : public SortInterruptChecker {
+public:
+    explicit ExpressionContextSortInterruptChecker(ExpressionContext* expCtx) : _expCtx(expCtx) {}
+
+private:
+    void checkForInterrupt() final {
+        auto* opCtx = _expCtx->getOperationContext();
+        invariant(opCtx);
+        opCtx->checkForInterrupt();
+    }
+
+    ExpressionContext* _expCtx;
+};
+
 struct BoundMakerMin {
     const long long offset;  // Offset in millis
 
@@ -122,7 +136,9 @@ DocumentSourceSort::DocumentSourceSort(const boost::intrusive_ptr<ExpressionCont
           options.limit,
           loadMemoryLimit(StageMemoryLimit::QueryMaxBlockingSortMemoryUsageBytes),
           pExpCtx->getTempDir(),
-          pExpCtx->getAllowDiskUse())),
+          pExpCtx->getAllowDiskUse(),
+          false,
+          std::make_unique<ExpressionContextSortInterruptChecker>(pExpCtx.get()))),
       _outputSortKeyMetadata(options.outputSortKeyMetadata) {
     uassert(15976,
             "$sort stage must have at least one sort key",

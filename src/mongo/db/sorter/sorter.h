@@ -75,6 +75,24 @@
 
 namespace [[MONGO_MOD_PUBLIC]] mongo {
 
+class [[MONGO_MOD_OPEN]] SortInterruptChecker {
+public:
+    virtual ~SortInterruptChecker() = default;
+
+    void amortizedCheckForInterrupt() {
+        if (MONGO_unlikely(--_remaining == 0)) {
+            _remaining = kInterruptCheckPeriod;
+            checkForInterrupt();
+        }
+    }
+
+private:
+    virtual void checkForInterrupt() = 0;
+
+    static constexpr uint32_t kInterruptCheckPeriod = 4096;
+    uint32_t _remaining = kInterruptCheckPeriod;
+};
+
 /**
  * Runtime options that control the Sorter's behavior
  */
@@ -99,6 +117,9 @@ struct SortOptions {
     // If set to true and sorted data fits into memory, sorted data will be moved into iterator
     // instead of copying.
     bool moveSortedDataIntoIterator;
+
+    // Must outlive the sorter, its spiller, and the returned output iterator.
+    SortInterruptChecker* interruptChecker = nullptr;
 
     SortOptions()
         : limit(0),

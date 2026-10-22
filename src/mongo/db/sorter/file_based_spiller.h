@@ -516,6 +516,9 @@ private:
             this->_storage->makeWriter(opts, settings);
 
         for (size_t i = 0; i < data.size(); ++i) {
+            if (opts.interruptChecker) {
+                opts.interruptChecker->amortizedCheckForInterrupt();
+            }
             writer->addAlreadySorted(data[i].first, data[i].second);
         }
         return std::move(writer);
@@ -574,6 +577,10 @@ void FileBasedSpiller<Key, Value, Comparator>::mergeSpills(const SortOptions& op
                 sorterStorage.makeWriter(opts, settings);
             uint64_t pairCount = 0;
             while (mergeIterator->more()) {
+                // The last remaining run can drain without invoking the comparator.
+                if (opts.interruptChecker) {
+                    opts.interruptChecker->amortizedCheckForInterrupt();
+                }
                 auto pair = mergeIterator->next();
                 writer->addAlreadySorted(pair.first, pair.second);
                 ++pairCount;

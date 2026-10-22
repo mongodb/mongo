@@ -185,9 +185,11 @@ private:
     using SorterData = std::pair<KeyRow, ValueRow>;
     class Comparator {
     public:
-        explicit Comparator(const std::vector<value::SortDirection>& sortDirections)
-            : _sortDirections(sortDirections) {}
+        Comparator(const std::vector<value::SortDirection>& sortDirections,
+                   SortInterruptChecker* interruptChecker)
+            : _sortDirections(sortDirections), _interruptChecker(interruptChecker) {}
         int operator()(const KeyRow& lhs, const KeyRow& rhs) const {
+            _interruptChecker->amortizedCheckForInterrupt();
             auto size = lhs.size();
             for (size_t idx = 0; idx < size; ++idx) {
                 auto [lhsTag, lhsVal] = lhs.getViewOfValue(idx);
@@ -205,6 +207,7 @@ private:
 
     private:
         std::vector<value::SortDirection> _sortDirections;
+        SortInterruptChecker* _interruptChecker;
     };
 
     int64_t _runLimitCode() {
@@ -222,6 +225,7 @@ private:
                        ? _stage._specificStats.limit
                        : 0);
         opts.MoveSortedDataIntoIterator(true);
+        opts.interruptChecker = &_interruptChecker;
         if (_stage._allowDiskUse) {
             if (!_sorterFileStats) {
                 _sorterFileStats = std::make_unique<SorterFileStats>(nullptr);
@@ -234,7 +238,7 @@ private:
         auto opts = _makeSortOptions();
         _sorter = Sorter<KeyRow, ValueRow>::template make<Comparator>(
             opts,
-            Comparator(_stage._dirs),
+            Comparator(_stage._dirs, &_interruptChecker),
             (_stage._allowDiskUse)
                 ? std::make_shared<mongo::sorter::FileBasedSpiller<KeyRow, ValueRow, Comparator>>(
                       boost::filesystem::path(storageGlobalParams.dbpath) / "_tmp",
@@ -247,7 +251,21 @@ private:
         _outputIt.reset();
     }
 
+    class SbeStageSortInterruptChecker final : public SortInterruptChecker {
+    public:
+        explicit SbeStageSortInterruptChecker(SortStage& stage) : _stage(stage) {}
+
+    private:
+        void checkForInterrupt() final {
+            invariant(_stage._opCtx);
+            _stage._opCtx->checkForInterrupt();
+        }
+
+        SortStage& _stage;
+    };
+
     SortStage& _stage;
+    SbeStageSortInterruptChecker _interruptChecker{_stage};
     std::vector<value::SlotAccessor*> _inKeyAccessors;
     std::vector<value::SlotAccessor*> _inValueAccessors;
     value::SlotMap<std::unique_ptr<value::SlotAccessor>> _outAccessors;

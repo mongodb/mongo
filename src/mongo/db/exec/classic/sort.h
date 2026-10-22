@@ -73,6 +73,20 @@ public:
     }
 
 protected:
+    class ClassicStageSortInterruptChecker final : public SortInterruptChecker {
+    public:
+        explicit ClassicStageSortInterruptChecker(SortStage* stage) : _stage(stage) {}
+
+    private:
+        void checkForInterrupt() final {
+            auto* opCtx = _stage->opCtx();
+            invariant(opCtx);
+            opCtx->checkForInterrupt();
+        }
+
+        SortStage* _stage;
+    };
+
     // Not owned by us.
     WorkingSet* _ws;
 

@@ -91,6 +91,28 @@ protected:
         return dynamic_cast<DocumentSourceSort*>(_sort.get());
     }
 
+    void assertSortFinalizationIsInterruptible(uint64_t limit, bool cancel = true) {
+        DocumentSourceSort::SortStageOptions options;
+        options.limit = limit;
+        setSort(DocumentSourceSort::create(
+            getExpCtx(), SortPattern{BSON("a" << 1), getExpCtx()}, options));
+        createSortStage();
+        for (int i = 16384; i > 0; --i) {
+            _sortStage->loadDocument(Document{{"a", i}});
+        }
+
+        // Bypass upstream getNext checks to isolate the sort's finalization work.
+        if (cancel) {
+            getOpCtx()->markKilled();
+            ASSERT_THROWS_CODE(_sortStage->loadingDone(), DBException, ErrorCodes::Interrupted);
+        } else {
+            auto checksBefore = getOpCtx()->numInterruptChecks();
+            _sortStage->loadingDone();
+            ASSERT_GT(getOpCtx()->numInterruptChecks() - checksBefore, 1);
+        }
+        _sortStage->dispose();
+    }
+
     intrusive_ptr<exec::agg::SortStage> _sortStage;
 
 private:
@@ -115,6 +137,59 @@ TEST_F(DocumentSourceSortTest, RejectsNonObjectSpec) {
     BSONObj spec = BSON("$sort" << 1);
     BSONElement specElement = spec.firstElement();
     ASSERT_THROWS(DocumentSourceSort::createFromBson(specElement, getExpCtx()), AssertionException);
+}
+
+TEST_F(DocumentSourceSortTest, FullSortFinalizationIsInterruptible) {
+    assertSortFinalizationIsInterruptible(0);
+}
+
+TEST_F(DocumentSourceSortTest, TopKSortFinalizationIsInterruptible) {
+    assertSortFinalizationIsInterruptible(8192);
+}
+
+TEST_F(DocumentSourceSortTest, FullSortFinalizationChecksInterruptRepeatedly) {
+    assertSortFinalizationIsInterruptible(0, false);
+}
+
+TEST_F(DocumentSourceSortTest, TopKSortFinalizationChecksInterruptRepeatedly) {
+    assertSortFinalizationIsInterruptible(8192, false);
+}
+
+TEST_F(DocumentSourceSortTest, SortedOutputSpillIsInterruptible) {
+    getExpCtx()->setAllowDiskUse(true);
+    createSort();
+    createSortStage();
+    for (int i = 16384; i > 0; --i) {
+        _sortStage->loadDocument(Document{{"a", i}});
+    }
+    _sortStage->loadingDone();
+    getOpCtx()->markKilled();
+    // Already-sorted output spilling performs no comparisons or upstream checks.
+    ASSERT_THROWS_CODE(
+        sort()->getSortExecutor()->forceSpill(), DBException, ErrorCodes::Interrupted);
+    _sortStage->dispose();
+}
+
+TEST_F(DocumentSourceSortTest, SortedOutputSpillUsesReattachedOperationContext) {
+    getExpCtx()->setAllowDiskUse(true);
+    createSort();
+    createSortStage();
+    for (int i = 16384; i > 0; --i) {
+        _sortStage->loadDocument(Document{{"a", i}});
+    }
+    _sortStage->loadingDone();
+    auto newClient = getServiceContext()->getService()->makeClient("sort-getmore");
+    auto newOpCtx = newClient->makeOperationContext();
+    _sortStage->detachFromOperationContext();
+    getExpCtx()->setOperationContext(newOpCtx.get());
+    _sortStage->reattachToOperationContext(newOpCtx.get());
+    newOpCtx->markKilled();
+    ASSERT_THROWS_CODE(
+        sort()->getSortExecutor()->forceSpill(), DBException, ErrorCodes::Interrupted);
+    _sortStage->dispose();
+    _sortStage->detachFromOperationContext();
+    getExpCtx()->setOperationContext(getOpCtx());
+    _sortStage->reattachToOperationContext(getOpCtx());
 }
 
 TEST_F(DocumentSourceSortTest, RejectsEmptyObjectSpec) {

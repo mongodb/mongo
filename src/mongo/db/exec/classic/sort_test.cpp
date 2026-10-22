@@ -55,6 +55,56 @@ public:
         return _opCtx.get();
     }
 
+    void assertSortFinalizationIsInterruptible(uint64_t limit,
+                                               bool cancel = true,
+                                               bool reattach = false) {
+        WorkingSet ws;
+        auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx()).ns(kNss).build();
+        auto input = std::make_unique<QueuedDataStage>(expCtx.get(), &ws);
+        constexpr int kDocuments = 16384;
+        for (int i = kDocuments; i > 0; --i) {
+            auto id = ws.allocate();
+            auto* member = ws.get(id);
+            member->doc = {SnapshotId(), Document{{"a", i}}};
+            member->transitionToOwnedObj();
+            input->pushBack(id);
+        }
+        SortStageDefault sort(expCtx,
+                              &ws,
+                              SortPattern{BSON("a" << 1), expCtx},
+                              limit,
+                              16 * 1024 * 1024,
+                              false,
+                              std::move(input));
+        WorkingSetID id = WorkingSet::INVALID_ID;
+        for (int i = 0; i < kDocuments; ++i) {
+            ASSERT_EQ(sort.work(&id), PlanStage::NEED_TIME);
+        }
+
+        if (reattach) {
+            auto client = getServiceContext()->getService()->makeClient("sort-getmore");
+            auto newOpCtx = client->makeOperationContext();
+            sort.detachFromOperationContext();
+            sort.reattachToOperationContext(newOpCtx.get());
+            newOpCtx->markKilled();
+            ASSERT_THROWS_CODE(sort.work(&id), DBException, ErrorCodes::Interrupted);
+            sort.detachFromOperationContext();
+            sort.reattachToOperationContext(opCtx());
+            return;
+        }
+
+        if (cancel) {
+            // Cancellation arrives after loading, so only final sorting can acknowledge it.
+            opCtx()->markKilled();
+            ASSERT_THROWS_CODE(sort.work(&id), DBException, ErrorCodes::Interrupted);
+        } else {
+            auto checksBefore = opCtx()->numInterruptChecks();
+            ASSERT_EQ(sort.work(&id), PlanStage::NEED_TIME);
+            // A boundary check alone would still leave the bulk sort check-free.
+            ASSERT_GT(opCtx()->numInterruptChecks() - checksBefore, 1);
+        }
+    }
+
     /**
      * Test function to verify sort stage. SortStageDefault will be initialized using 'patternStr',
      * 'collator', and 'limit;.
@@ -187,6 +237,26 @@ TEST_F(SortStageDefaultTest, SortEmptyWorkingSet) {
     ASSERT_EQUALS(state, PlanStage::IS_EOF);
 
     ASSERT_TRUE(sort.isEOF());
+}
+
+TEST_F(SortStageDefaultTest, FullSortFinalizationIsInterruptible) {
+    assertSortFinalizationIsInterruptible(0);
+}
+
+TEST_F(SortStageDefaultTest, TopKSortFinalizationIsInterruptible) {
+    assertSortFinalizationIsInterruptible(8192);
+}
+
+TEST_F(SortStageDefaultTest, FinalizationUsesReattachedOperationContext) {
+    assertSortFinalizationIsInterruptible(0, true, true);
+}
+
+TEST_F(SortStageDefaultTest, FullSortFinalizationChecksInterruptRepeatedly) {
+    assertSortFinalizationIsInterruptible(0, false);
+}
+
+TEST_F(SortStageDefaultTest, TopKSortFinalizationChecksInterruptRepeatedly) {
+    assertSortFinalizationIsInterruptible(8192, false);
 }
 
 //
