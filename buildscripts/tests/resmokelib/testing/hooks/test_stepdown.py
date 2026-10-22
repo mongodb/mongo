@@ -4,6 +4,7 @@ import logging
 import unittest
 
 import mock
+import pymongo.errors
 
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.testing.hooks import lifecycle as lifecycle_interface
@@ -131,6 +132,106 @@ class TestStepdownThread(unittest.TestCase):
                 "secondaryCatchUpPeriodSecs": 120,
             }
         )
+
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.stepdown.fixture_interface.build_hook_client"
+    )
+    def test_step_down_via_command_skips_round_when_no_handoff_target(self, build_hook_client):
+        old_primary = mock.MagicMock(port=27017)
+        secondary = mock.MagicMock(port=27019)
+
+        rs_fixture = mock.MagicMock()
+        rs_fixture.removeshard_teardown_marker = False
+        rs_fixture.replset_name = "rs0"
+        rs_fixture.AWAIT_REPL_TIMEOUT_MINS = 5
+        rs_fixture.get_primary.return_value = old_primary
+        rs_fixture.get_secondaries.return_value = [secondary]
+
+        client = mock.MagicMock()
+        client.admin.command.side_effect = pymongo.errors.OperationFailure(
+            "No replica set member is eligible for primary handoff", code=74
+        )
+        build_hook_client.return_value = client
+
+        stepdown_thread = _stepdown._StepdownThread(
+            logger=logging.getLogger("hook_logger"),
+            mongos_fixtures=[],
+            rs_fixtures=[rs_fixture],
+            stepdown_interval_secs=8,
+            terminate=False,
+            kill=False,
+            randomize_kill=False,
+            stepdown_lifecycle=lifecycle_interface.FlagBasedThreadLifecycle(),
+            background_reconfig=False,
+            fixture=rs_fixture,
+            use_stepdown_command=True,
+        )
+
+        stepdown_thread._step_down(rs_fixture)
+
+        client.admin.command.assert_called_once_with(
+            {"replSetStepDown": stepdown_thread._stepdown_duration_secs}
+        )
+        rs_fixture.get_primary.assert_called_once()
+        self.assertEqual(sum(stepdown_thread._step_up_stats.values()), 0)
+
+    @mock.patch(
+        "buildscripts.resmokelib.testing.hooks.stepdown.fixture_interface.build_hook_client"
+    )
+    def test_step_down_via_command_raises_on_other_errors(self, build_hook_client):
+        rs_fixture = mock.MagicMock()
+        rs_fixture.removeshard_teardown_marker = False
+        rs_fixture.replset_name = "rs0"
+        rs_fixture.get_primary.return_value = mock.MagicMock(port=27017)
+
+        client = mock.MagicMock()
+        client.admin.command.side_effect = pymongo.errors.OperationFailure(
+            "not primary", code=10107
+        )
+        build_hook_client.return_value = client
+
+        stepdown_thread = _stepdown._StepdownThread(
+            logger=logging.getLogger("hook_logger"),
+            mongos_fixtures=[],
+            rs_fixtures=[rs_fixture],
+            stepdown_interval_secs=8,
+            terminate=False,
+            kill=False,
+            randomize_kill=False,
+            stepdown_lifecycle=lifecycle_interface.FlagBasedThreadLifecycle(),
+            background_reconfig=False,
+            fixture=rs_fixture,
+            use_stepdown_command=True,
+        )
+
+        with self.assertRaises(pymongo.errors.OperationFailure):
+            stepdown_thread._step_down(rs_fixture)
+
+    def test_await_primaries_skips_shards_being_removed(self):
+        removed_rs_fixture = mock.MagicMock()
+        removed_rs_fixture.removeshard_teardown_marker = True
+        active_rs_fixture = mock.MagicMock()
+        active_rs_fixture.removeshard_teardown_marker = False
+
+        stepdown_thread = _stepdown._StepdownThread(
+            logger=logging.getLogger("hook_logger"),
+            mongos_fixtures=[],
+            rs_fixtures=[removed_rs_fixture, active_rs_fixture],
+            stepdown_interval_secs=8,
+            terminate=False,
+            kill=False,
+            randomize_kill=False,
+            stepdown_lifecycle=lifecycle_interface.FlagBasedThreadLifecycle(),
+            background_reconfig=False,
+            fixture=active_rs_fixture,
+        )
+
+        stepdown_thread._await_primaries()
+
+        removed_rs_fixture.get_primary.assert_not_called()
+        active_rs_fixture.get_primary.assert_called_once()
+        removed_rs_fixture.removeshard_teardown_mutex.__enter__.assert_called_once()
+        active_rs_fixture.removeshard_teardown_mutex.__enter__.assert_called_once()
 
 
 if __name__ == "__main__":

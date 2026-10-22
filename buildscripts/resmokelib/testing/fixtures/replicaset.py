@@ -1617,7 +1617,9 @@ def get_last_optime(client, fixturelib):
     This function is derived from _getLastOpTime() in ReplSetTest.
     """
     repl_set_status = client.admin.command({"replSetGetStatus": 1})
-    conn_status = [m for m in repl_set_status["members"] if "self" in m][0]
+    # Some replication coordinators (e.g. disaggregated storage) report 'self: false' on the other
+    # members, so check the value rather than the presence of the field.
+    conn_status = [m for m in repl_set_status["members"] if m.get("self")][0]
     optime = conn_status["optime"]
 
     optime_is_empty = False

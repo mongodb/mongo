@@ -190,6 +190,8 @@ class ContinuousStepdown(interface.Hook):
 
 
 class _StepdownThread(threading.Thread):
+    _NODE_NOT_FOUND = 74
+
     def __init__(
         self,
         logger,
@@ -342,7 +344,12 @@ class _StepdownThread(threading.Thread):
 
     def _await_primaries(self):
         for fixture in self._rs_fixtures:
-            fixture.get_primary()
+            # Hold the mutex so ContinuousAddRemoveShard cannot tear down the shard while we wait,
+            # and skip shards that have been torn down since they have no primary to wait for.
+            with fixture.removeshard_teardown_mutex:
+                if fixture.removeshard_teardown_marker:
+                    continue
+                fixture.get_primary()
 
     def _wait(self, timeout):
         # Retry backoff used in step-up retry loops, interruptible by stop.
@@ -529,7 +536,22 @@ class _StepdownThread(threading.Thread):
             client.admin.command(cmd)
         except pymongo.errors.AutoReconnect:
             pass
-        except pymongo.errors.PyMongoError:
+        except pymongo.errors.PyMongoError as err:
+            # In disaggregated storage, replSetStepDown refuses to step down when no standby is
+            # eligible for primary handoff (e.g. a standby still catching up after a restart). The
+            # primary is left unchanged, so skip this round and try again on the next interval.
+            if (
+                isinstance(err, pymongo.errors.OperationFailure)
+                and err.code == self._NODE_NOT_FOUND
+            ):
+                self.logger.info(
+                    "Skipping stepdown of the primary on port %d of replica set '%s' because no"
+                    " member is eligible for primary handoff: %s",
+                    old_primary.port,
+                    rs_fixture.replset_name,
+                    err,
+                )
+                return
             self.logger.exception(
                 "Error while stepping down the primary on port %d of replica set '%s' via"
                 " replSetStepDown.",
