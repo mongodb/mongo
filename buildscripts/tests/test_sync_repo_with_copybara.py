@@ -7272,7 +7272,7 @@ class TestGenerateCopybaraEvergreen(CopybaraTestCase):
             self.assertIn(
                 "  - name: copybara-test-sync-between-repos\n"
                 '    display_name: "* Copybara Test Sync Between Repos"\n'
-                '    tags: ["suggested"]\n'
+                '    tags: ["suggested", "non_release_variant"]\n'
                 "    activate: false\n"
                 "    patchable: true",
                 test_variant,
