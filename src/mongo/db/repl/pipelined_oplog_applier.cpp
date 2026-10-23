@@ -119,7 +119,13 @@ void PipelinedOplogApplier::_run(OplogBuffer* oplogBuffer) {
                 return;
             }
             if (batch.termWhenExhausted()) {
-                MONGO_UNIMPLEMENTED;
+                // We need to wait for all in-flight work to finish before signaling that the
+                // applier has drained.
+                if (!_drainWorkers()) {
+                    // TODO(SERVER-136053): Propagate shutdown failure to `_run`.
+                    continue;
+                }
+                _replCoord->signalApplierDrainComplete(opCtx, *batch.termWhenExhausted());
             }
             continue;
         }
