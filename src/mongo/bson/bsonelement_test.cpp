@@ -446,7 +446,7 @@ TEST(BSONElementTryCoeceToLongLongTest, CoerceFails) {
 }
 
 TEST(BSONElementTrustedInitTag, EOOElement) {
-    const char buffer[] = {stdx::to_underlying(BSONType::eoo)};
+    const std::array buffer{static_cast<char>(BSONType::eoo)};
 
     BSONElement eoo(buffer, 0, BSONElement::TrustedInitTag{});
     ASSERT_EQ(BSONType::eoo, eoo.type());
@@ -455,7 +455,8 @@ TEST(BSONElementTrustedInitTag, EOOElement) {
 }
 
 TEST(BSONElementTrustedInitTag, EmptyFieldName) {
-    const char buffer[] = {stdx::to_underlying(BSONType::string), '\0', 'x', '\0'};
+    const std::array buffer{
+        static_cast<char>(BSONType::string), '\0', '\2', '\0', '\0', '\0', 'x', '\0'};
 
     BSONElement elem(buffer, 1, BSONElement::TrustedInitTag{});
     ASSERT_EQ(BSONType::string, elem.type());
@@ -465,8 +466,18 @@ TEST(BSONElementTrustedInitTag, EmptyFieldName) {
 }
 
 TEST(BSONElementTrustedInitTag, NonEmptyFieldName) {
-    const char buffer[] = {
-        stdx::to_underlying(BSONType::string), 'f', 'o', 'x', 'x', '\0', 'x', '\0'};
+    const std::array buffer{static_cast<char>(BSONType::string),
+                            'f',
+                            'o',
+                            'x',
+                            'x',
+                            '\0',
+                            '\2',
+                            '\0',
+                            '\0',
+                            '\0',
+                            'x',
+                            '\0'};
 
     BSONElement elem(buffer, 5, BSONElement::TrustedInitTag{});
     ASSERT_EQ(BSONType::string, elem.type());

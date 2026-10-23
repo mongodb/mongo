@@ -10,6 +10,7 @@
 #include "mongo/bson/column/bson_element_storage.h"
 #include "mongo/util/modules.h"
 
+#include <span>
 #include <string_view>
 
 #include <boost/container/small_vector.hpp>
@@ -72,7 +73,7 @@ private:
 };
 
 struct NoopSubObjectFinisher {
-    void finish(const char* elemBytes, int fieldNameSize) {}
+    void finish(std::span<const char> elemBytes, int fieldNameSize) {}
     void finishMissing() {}
 };
 
@@ -171,7 +172,7 @@ public:
             if (_contiguousBlock) {
                 // If we started contiguous mode upon construction, finish the object.
                 auto [ptr, size] = _contiguousBlock->done();
-                _finisher.finish(ptr, _fieldNameSize + 1);
+                _finisher.finish(std::span{ptr, static_cast<size_t>(size)}, _fieldNameSize + 1);
             }
         }
     }

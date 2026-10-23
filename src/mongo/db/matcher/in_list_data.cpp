@@ -359,10 +359,11 @@ requires std::same_as<typename C::value_type, BSONElement> && requires(C c) {
     { std::begin(c) } -> std::same_as<typename C::iterator>;
     { std::end(c) } -> std::same_as<typename C::iterator>;
 }
-void remapElements(C& elements, const char* previousBuffer, const char* newBuffer) {
+void remapElements(C& elements, const char* previousBuffer, std::span<const char> newBuffer) {
     for (auto& e : elements) {
-        const char* newAddress = newBuffer + (e.rawdata() - previousBuffer);
-        e = BSONElement(newAddress, e.fieldNameSize(), BSONElement::TrustedInitTag{});
+        e = BSONElement(newBuffer.subspan(e.rawdata() - previousBuffer),
+                        e.fieldNameSize(),
+                        BSONElement::TrustedInitTag{});
     }
 }
 }  // namespace
@@ -377,7 +378,7 @@ void InListData::makeArrOwned() {
 
     // Copy _arr's BSON data into a new owned buffer.
     _arr->makeOwned();
-    const char* newBuf = _arr->objdata();
+    auto newBuf = std::span{_arr->objdata(), static_cast<size_t>(_arr->objsize())};
 
     // Update each BSONElement in '_originalElements' to refer to the new buffer.
     remapElements(_originalElements, oldBuf, newBuf);

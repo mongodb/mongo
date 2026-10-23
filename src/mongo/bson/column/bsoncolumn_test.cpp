@@ -1127,10 +1127,11 @@ public:
         return false;
     }
 
-    static bool isDataOnlyInterleaved(const char* binary, size_t size) {
+    static bool isDataOnlyInterleaved(std::span<const char> buffer) {
         using namespace mongo;
-        const char* pos = binary;
-        const char* end = binary + size;
+        const auto start = buffer.data();
+        const char* pos = start;
+        const char* end = start + buffer.size();
 
         // Must start with interleaved data.
         if (!bsoncolumn::isInterleavedStartControlByte(*pos)) {
@@ -1151,7 +1152,7 @@ public:
             }
 
             if (bsoncolumn::isUncompressedLiteralControlByte(control)) {
-                BSONElement literal(pos, 1, BSONElement::TrustedInitTag{});
+                BSONElement literal(buffer.subspan(pos - start), 1, BSONElement::TrustedInitTag{});
                 pos += literal.size();
                 continue;
             }
@@ -1347,7 +1348,7 @@ TEST_F(BSONColumnTest, PathFuzzerDiscoveredEdgeCases) {
         }
 
         // Skip inputs that do not start with interleaved data, or require exiting interleaved mode.
-        if (!isDataOnlyInterleaved(binary.data(), binary.size())) {
+        if (!isDataOnlyInterleaved(binary)) {
             continue;
         }
 

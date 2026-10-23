@@ -194,8 +194,7 @@ public:
 
             // Loads current control byte
             LoadControlResult loadControl(BSONElementStorage& allocator,
-                                          const char* buffer,
-                                          const char* end);
+                                          std::span<const char> buffer);
 
             // Loads delta value
             BSONElement loadDelta(BSONElementStorage& allocator, Decoder64& decoder);
@@ -323,8 +322,7 @@ private:
      */
     void _initialValidate();
 
-    const char* _binary;
-    int _size;
+    std::span<const char> _binary;
 
     // Reference counted allocator, used to allocate memory when materializing BSONElements.
     boost::intrusive_ptr<BSONElementStorage> _allocator;
@@ -507,7 +505,7 @@ public:
     requires Appendable<Buffer>
     void decompressIterative(Buffer& buffer,
                              boost::intrusive_ptr<BSONElementStorage> allocator) const {
-        BSONColumn::Iterator it(allocator, _binary, _binary + _size);
+        BSONColumn::Iterator it(allocator, _binary.data(), _binary.data() + _binary.size());
         for (; it.more(); ++it) {
             buffer.appendPreallocated(*it);
         }
@@ -554,8 +552,7 @@ public:
     bool contains(BSONType type) const;
 
 private:
-    const char* _binary;
-    size_t _size;
+    std::span<const char> _binary;
 };
 
 /**
@@ -585,8 +582,8 @@ void BSONColumnBlockBased::decompress(boost::intrusive_ptr<BSONElementStorage> a
         pathCollectors.push_back({p.first, ownedCollectors.back()});
     }
 
-    const char* ptr = _binary;
-    const char* end = _binary + _size;
+    const char* ptr = _binary.data();
+    const char* end = _binary.data() + _binary.size();
     const uint64_t lastNonRLEBlock = simple8b::kSingleZero;
 
     // If there are any leading simple8b blocks, they are all skips. Handle them first.
@@ -613,8 +610,8 @@ void BSONColumnBlockBased::decompress(boost::intrusive_ptr<BSONElementStorage> a
             break;
         } else if (isUncompressedLiteralControlByte(control)) {
             // The BSONColumn encoding guarantees that the field name is just a single null byte.
-            BSONElement literal(ptr, 1, BSONElement::TrustedInitTag{});
-            dassert(BSONElement{ptr}.fieldNameSize() == 1,  // size includes null byte
+            BSONElement literal(std::span{ptr, end}, 1, BSONElement::TrustedInitTag{});
+            dassert((BSONElement{std::span{ptr, end}}).fieldNameSize() == 1,  // includes null
                     "Unexpected field name in top-level BSONColumn element");
             BSONType type = literal.type();
             ptr += literal.size();

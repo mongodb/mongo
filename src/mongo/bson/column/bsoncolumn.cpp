@@ -94,7 +94,9 @@ int BSONElementStorage::Element::size() const {
 }
 
 BSONElement BSONElementStorage::Element::element() const {
-    return {_buffer, _nameSize + 1, BSONElement::TrustedInitTag{}};
+    return {std::span{_buffer, static_cast<size_t>(1 + _nameSize + 1 + _valueSize)},
+            _nameSize + 1,
+            BSONElement::TrustedInitTag{}};
 }
 
 BSONElementStorage::ContiguousBlock::ContiguousBlock(BSONElementStorage& storage)
@@ -278,7 +280,7 @@ void BSONColumn::Iterator::_incrementRegular(Regular& regular) {
         _initializeInterleaving();
         return;
     }
-    auto result = state.loadControl(*_allocator, _control, _end);
+    auto result = state.loadControl(*_allocator, {_control, _end});
     _decompressed = result.element;
     _control += result.size;
 }
@@ -334,7 +336,8 @@ void BSONColumn::Iterator::_incrementInterleaved(Interleaved& interleaved) {
     }
 
     // Root objects always have an empty field name and we already know the total object size.
-    BSONElement obj(objdata, 1, BSONElement::TrustedInitTag{});
+    BSONElement obj(
+        std::span{objdata, static_cast<size_t>(objsize)}, 1, BSONElement::TrustedInitTag{});
 
     _decompressed = obj;
 }
@@ -361,7 +364,7 @@ bool BSONColumn::Iterator::_processScalar(DecodingState& state, std::string_view
     } else {
         // Decoders are exhausted so we need to load the next control byte that by
         // definition belong to this decoder state as we iterate in the same known order.
-        auto result = state.loadControl(*_allocator, _control, _end);
+        auto result = state.loadControl(*_allocator, {_control, _end});
         _control += result.size;
         elem = result.element;
 
@@ -481,10 +484,9 @@ void BSONColumn::Iterator::DecodingState::loadUncompressed(const BSONElement& el
 
 BSONColumn::Iterator::DecodingState::LoadControlResult
 BSONColumn::Iterator::DecodingState::loadControl(BSONElementStorage& allocator,
-                                                 const char* buffer,
-                                                 const char* end) {
+                                                 std::span<const char> buffer) {
     // Load current control byte, it can be either a literal or Simple-8b deltas
-    uint8_t control = *buffer;
+    uint8_t control = buffer.front();
     if (bsoncolumn::isUncompressedLiteralControlByte(control)) {
         // Load BSONElement from the literal and set last encoded in case we need to calculate
         // deltas from this literal
@@ -495,10 +497,10 @@ BSONColumn::Iterator::DecodingState::loadControl(BSONElementStorage& allocator,
 
     // Setup decoder for this range of Simple-8b blocks
     uint8_t blocks = bsoncolumn::numSimple8bBlocksForControlByte(control);
-    int size = sizeof(uint64_t) * blocks;
+    auto size = sizeof(uint64_t) * blocks;
     uassert(ErrorCodes::InvalidBSONColumn,
             "Control block would overflow buffer",
-            buffer + size + 1 < end);
+            buffer.size() > size + 1);
 
     // Instantiate decoder and load first value, every Simple-8b block should have at least one
     // value
@@ -529,7 +531,7 @@ BSONColumn::Iterator::DecodingState::loadControl(BSONElementStorage& allocator,
                   // We can read the last known value from the decoder iterator even as it has
                   // reached end.
                   boost::optional<uint64_t> lastSimple8bValue = d64.pos.valid() ? *d64.pos : 0;
-                  d64.pos = Simple8b<uint64_t>(buffer + 1, size, lastSimple8bValue).begin();
+                  d64.pos = Simple8b<uint64_t>(buffer.data() + 1, size, lastSimple8bValue).begin();
                   deltaElem = loadDelta(allocator, d64);
               },
               [&](DecodingState::Decoder128& d128) {
@@ -542,12 +544,13 @@ BSONColumn::Iterator::DecodingState::loadControl(BSONElementStorage& allocator,
                   // reached end.
                   boost::optional<uint128_t> lastSimple8bValue =
                       d128.pos.valid() ? *d128.pos : uint128_t(0);
-                  d128.pos = Simple8b<uint128_t>(buffer + 1, size, lastSimple8bValue).begin();
+                  d128.pos =
+                      Simple8b<uint128_t>(buffer.data() + 1, size, lastSimple8bValue).begin();
                   deltaElem = loadDelta(allocator, d128);
               }},
           decoder);
 
-    return {deltaElem, size + 1};
+    return {deltaElem, static_cast<int>(size + 1)};
 }
 
 BSONElement BSONColumn::Iterator::DecodingState::loadDelta(BSONElementStorage& allocator,
@@ -705,7 +708,7 @@ BSONColumn::Iterator::Interleaved::Interleaved(BSONObj refObj,
     : referenceObj(std::move(refObj)), arrays(interleavedArrays), rootType(referenceObjType) {}
 
 BSONColumn::BSONColumn(const char* buffer, size_t size)
-    : _binary(buffer), _size(size), _allocator(new BSONElementStorage()) {
+    : _binary(buffer, size), _allocator(new BSONElementStorage()) {
     _initialValidate();
 }
 
@@ -714,7 +717,9 @@ BSONColumn::BSONColumn(BSONElement bin) {
             "Invalid BSON type for column",
             bin.type() == BSONType::binData && bin.binDataType() == BinDataType::Column);
 
-    _binary = bin.binData(_size);
+    int size;
+    const char* buffer = bin.binData(size);
+    _binary = std::span{buffer, static_cast<size_t>(size)};
     _allocator = new BSONElementStorage();
     _initialValidate();
 }
@@ -727,11 +732,11 @@ BSONColumn::BSONColumn(BSONBinData bin)
 }
 
 void BSONColumn::_initialValidate() {
-    uassert(ErrorCodes::InvalidBSONColumn, "BSON Column encoding is empty", _size > 0);
+    uassert(ErrorCodes::InvalidBSONColumn, "BSON Column encoding is empty", _binary.size() > 0);
 }
 
 BSONColumn::Iterator BSONColumn::begin() const {
-    return {_allocator, _binary, _binary + _size};
+    return {_allocator, _binary.data(), _binary.data() + _binary.size()};
 }
 
 BSONColumn::Iterator BSONColumn::end() const {
@@ -758,8 +763,8 @@ size_t BSONColumn::size() const {
 }
 
 bool BSONColumn::contains_forTest(BSONType elementType) const {
-    const char* byteIter = _binary;
-    const char* columnEnd = _binary + _size;
+    const char* byteIter = _binary.data();
+    const char* columnEnd = _binary.data() + _binary.size();
 
     uint8_t control;
     while (byteIter != columnEnd) {
@@ -773,7 +778,8 @@ bool BSONColumn::contains_forTest(BSONType elementType) const {
                 return false;
             }
 
-            BSONElement literalElem(byteIter, 1, BSONElement::TrustedInitTag{});
+            BSONElement literalElem(
+                std::span{byteIter, columnEnd}, 1, BSONElement::TrustedInitTag{});
             byteIter += literalElem.size();
         } else if (bsoncolumn::isInterleavedStartControlByte(*byteIter)) {
 
@@ -804,7 +810,7 @@ boost::intrusive_ptr<BSONElementStorage> BSONColumn::release() {
 namespace bsoncolumn {
 
 BSONColumnBlockBased::BSONColumnBlockBased(const char* buffer, size_t size)
-    : _binary(buffer), _size(size) {}
+    : _binary(buffer, size) {}
 
 BSONColumnBlockBased::BSONColumnBlockBased(BSONBinData bin)
     : BSONColumnBlockBased(static_cast<const char*>(bin.data), bin.length) {

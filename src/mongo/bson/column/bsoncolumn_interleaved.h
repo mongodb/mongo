@@ -26,7 +26,7 @@ using BufferVector = boost::container::small_vector<T, 1>;
 template <typename Buffer>
 struct BlockBasedSubObjectFinisher {
     BlockBasedSubObjectFinisher(const BufferVector<Buffer*>& buffers) : _buffers(buffers) {}
-    void finish(const char* elemBytes, int fieldNameSize);
+    void finish(std::span<const char> elemBytes, int fieldNameSize);
     void finishMissing();
 
     const BufferVector<Buffer*>& _buffers;
@@ -135,7 +135,7 @@ private:
          * In both cases, the "size" field will contain the number of bytes to the next control
          * byte.
          */
-        LoadControlResult loadControl(BSONElementStorage& allocator, const char* buffer);
+        LoadControlResult loadControl(BSONElementStorage& allocator, std::span<const char> buffer);
 
         /**
          * Apply a delta or delta of delta to an encoded representation to get a new element value.
@@ -203,8 +203,7 @@ private:
     static void flushPositionsToBuffers(absl::flat_hash_map<Buffer*, int32_t>& bufferToPositions);
 
     BSONElementStorage& _allocator;
-    const char* const _control;
-    const char* const _end;
+    std::span<const char> _buffer;
     const BSONType _rootType;
     const bool _traverseArrays;
 };
@@ -214,7 +213,8 @@ inline BlockBasedInterleavedDecompressor::DecodingState::DecodingState() = defau
 inline BlockBasedInterleavedDecompressor::DecodingState::Decoder64::Decoder64() = default;
 
 template <typename Buffer>
-void BlockBasedSubObjectFinisher<Buffer>::finish(const char* elemBytes, int fieldNameSize) {
+void BlockBasedSubObjectFinisher<Buffer>::finish(std::span<const char> elemBytes,
+                                                 int fieldNameSize) {
     BSONElement elem{elemBytes, fieldNameSize, BSONElement::TrustedInitTag{}};
     for (auto&& buffer : _buffers) {
         // use preallocated method here to indicate that the element does not need to be
@@ -243,7 +243,7 @@ const char* BlockBasedInterleavedDecompressor::decompress(
 
     // The reference object will appear right after the control byte that starts interleaved
     // mode.
-    BSONObj refObj{_control + 1};
+    BSONObj refObj{_buffer.data() + 1};
 
     // find all the scalar elements in the reference object.
     absl::flat_hash_set<const void*> scalarElems;
@@ -321,7 +321,9 @@ const char* BlockBasedInterleavedDecompressor::decompress(
 template <typename Buffer>
 const char* BlockBasedInterleavedDecompressor::decompressGeneral(
     absl::flat_hash_map<const void*, BufferVector<Buffer*>>&& elemToBuffer) {
-    const char* control = _control;
+    const auto start = _buffer.data();
+    const auto end = start + _buffer.size();
+    auto control = start;
 
     // The reference object will appear right after the control byte that starts interleaved
     // mode.
@@ -395,10 +397,13 @@ const char* BlockBasedInterleavedDecompressor::decompressGeneral(
     }
 
     // Advance past the reference object to the compressed data of the first field.
+    uassert(ErrorCodes::InvalidBSONColumn,
+            "Advancing past the reference object went past end of buffer",
+            end - control > refObj.objsize() + 1);
     control += refObj.objsize() + 1;
     uassert(ErrorCodes::InvalidBSONColumn,
             "Advancing past the reference object went past end of buffer",
-            control < _end && *control != stdx::to_underlying(BSONType::eoo));
+            *control != stdx::to_underlying(BSONType::eoo));
 
     using SOAlloc = BSONSubObjectAllocator<BlockBasedSubObjectFinisher<Buffer>>;
     using OptionalSOAlloc = boost::optional<SOAlloc>;
@@ -480,11 +485,11 @@ const char* BlockBasedInterleavedDecompressor::decompressGeneral(
 
                 // No more deltas for this scalar field. The next control byte is guaranteed
                 // to belong to this scalar field, since traversal order is fixed.
-                auto result = state.loadControl(_allocator, control);
-                control += result.size;
+                auto result = state.loadControl(_allocator, _buffer.subspan(control - start));
                 uassert(ErrorCodes::InvalidBSONColumn,
                         "Expecting a next control byte, but buffer has ended",
-                        _control < _end);
+                        end - control > result.size);
+                control += result.size;
                 decodingStateElem = result.element;
             }
 
@@ -1013,15 +1018,20 @@ void BlockBasedInterleavedDecompressor::dispatchDecompressionForType(
 template <typename Buffer>
 const char* BlockBasedInterleavedDecompressor::decompressFast(
     absl::flat_hash_map<const void*, BufferVector<Buffer*>>&& elemToBuffer) {
-    const char* control = _control;
+    const auto begin = _buffer.data();
+    const auto end = begin + _buffer.size();
+    const char* control = begin;
 
     // The reference object will appear right after the control byte that starts interleaved
     // mode.
     BSONObj refObj{control + 1};
+    uassert(ErrorCodes::InvalidBSONColumn,
+            "Reading past end of buffer while advancing past reference object in decompressFast",
+            end - control > refObj.objsize() + 1);
     control += refObj.objsize() + 1;
     uassert(ErrorCodes::InvalidBSONColumn,
             "Reading past end of buffer while advancing past reference object in decompressFast",
-            control < _end && *control != stdx::to_underlying(BSONType::eoo));
+            *control != stdx::to_underlying(BSONType::eoo));
 
     /**
      * The code below uses std::make_heap(), etc such that the element at the top of the heap always
@@ -1070,7 +1080,8 @@ const char* BlockBasedInterleavedDecompressor::decompressFast(
         std::pop_heap(heap.begin(), heap.end(), std::greater<>());
         FastDecodingState<Buffer>& state = heap.back();
         if (isUncompressedLiteralControlByte(*control)) {
-            state._refElem = BSONElement{control, 1, BSONElement::TrustedInitTag{}};
+            state._refElem =
+                BSONElement{_buffer.subspan(control - begin), 1, BSONElement::TrustedInitTag{}};
             for (auto&& b : state._buffers) {
                 b->template append<BSONElement>(state._refElem);
             }

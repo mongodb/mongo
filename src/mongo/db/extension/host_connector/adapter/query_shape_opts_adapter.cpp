@@ -53,7 +53,8 @@ MongoExtensionStatus* QueryShapeOptsAdapter::_extSerializeLiteral(
 
         // Parse a BSONElement out of the ptr passed from the extension. Note that the caller must
         // ensure that underlying BSONObj remains valid.
-        BSONElement rawLiteral(reinterpret_cast<const char*>(bsonElement.data));
+        BSONElement rawLiteral(
+            std::span{reinterpret_cast<const char*>(bsonElement.data), bsonElement.len});
 
         // Serialize the literal and then copy it into a BSON object. The BSON serialization is
         // necessary because the Value returned can be any valid Value type, and the easiest way to

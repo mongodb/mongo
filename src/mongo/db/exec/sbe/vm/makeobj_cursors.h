@@ -66,7 +66,8 @@ public:
 private:
     MONGO_COMPILER_ALWAYS_INLINE BSONElement bsonElement() const {
         auto fieldNameLenWithNull = _name.size() + 1;
-        return BSONElement(_be, fieldNameLenWithNull, BSONElement::TrustedInitTag{});
+        return BSONElement(
+            std::span{_be, _last + 1}, fieldNameLenWithNull, BSONElement::TrustedInitTag{});
     }
 
     const char* _be{nullptr};

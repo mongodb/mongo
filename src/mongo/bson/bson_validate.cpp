@@ -27,6 +27,7 @@
 #include <array>
 #include <cstring>
 #include <memory>
+#include <span>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -141,7 +142,9 @@ MONGO_COMPILER_NORETURN void uassertedBSONValidation(ErrorCodes::Error code,
 
 class DefaultValidator {
 public:
-    void checkNonConformantElem(const char* ptr, uint32_t offsetToValue, const int8_t type) {}
+    void checkNonConformantElem(std::span<const char> buf,
+                                uint32_t offsetToValue,
+                                const int8_t type) {}
 
     void checkDuplicateFieldName() {}
 
@@ -154,9 +157,11 @@ public:
 
 class ExtendedValidator {
 public:
-    void checkNonConformantElem(const char* ptr, uint32_t offsetToValue, const int8_t type) {
+    void checkNonConformantElem(std::span<const char> buf,
+                                uint32_t offsetToValue,
+                                const int8_t type) {
         // Increments the pointer to the actual element value.
-        BSONElementValue bsonElemVal(ptr + offsetToValue);
+        BSONElementValue bsonElemVal(buf.data() + offsetToValue);
         switch (type) {
             case stdx::to_underlying(BSONType::binData): {
                 const auto binData = bsonElemVal.BinData();
@@ -265,14 +270,16 @@ public:
         _objFrames.push_back({.type = BSONType::object, .indexCounter = 0});
     }
 
-    void checkNonConformantElem(const char* ptr, uint32_t offsetToValue, const int8_t type) {
+    void checkNonConformantElem(std::span<const char> buf,
+                                uint32_t offsetToValue,
+                                const int8_t type) {
         // Validate that array indices are monotonically increasing base-10 strings, and field
         // names are UTF8 strings.
-        _checkFieldName(ptr);
+        _checkFieldName(buf.data());
 
-        ExtendedValidator::checkNonConformantElem(ptr, offsetToValue, type);
+        ExtendedValidator::checkNonConformantElem(buf, offsetToValue, type);
         // Increments the pointer to the actual element value.
-        const BSONElementValue bsonElemVal(ptr + offsetToValue);
+        const BSONElementValue bsonElemVal(buf.data() + offsetToValue);
         switch (type) {
             case stdx::to_underlying(BSONType::array):
             case stdx::to_underlying(BSONType::object):
@@ -494,7 +501,7 @@ public:
         _currElem = _data;
         const int8_t type = ConstDataView(_data).read<int8_t>();
         const char* ptr = _validateElem<false>(Cursor{_data + 2, _data + _maxLength}, type);
-        _validator.checkNonConformantElem(_data, 2, type);
+        _validator.checkNonConformantElem({_data, _maxLength}, 2, type);
 
         if (_firstFrameUpdated) {
             // We know that type was kObject/kArray/kCodeWScope
@@ -734,12 +741,13 @@ private:
 
                 // Check if the data is compliant to other BSON specifications if the element is
                 // structurally correct.
-                _validator.checkNonConformantElem(elemStart, len + 1, type);
+                _validator.checkNonConformantElem({elemStart, cursor.end}, len + 1, type);
 
                 if constexpr (precise) {
                     // See if the _id field was just validated. If so, capture it for error context.
                     if (_currFrame == _frames.begin() && std::string_view(_currElem + 1) == "_id"sv)
-                        _id = BSONElement(_currElem);  // This is fully validated now.
+                        // This is fully validated now.
+                        _id = BSONElement({_currElem, cursor.end});
                 }
                 dassert(cursor.ptr < cursor.end);
             }

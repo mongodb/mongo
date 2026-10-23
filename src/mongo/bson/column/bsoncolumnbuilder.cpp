@@ -455,8 +455,10 @@ bool BSONColumnBuilder<Allocator>::BinaryReopen::scan(const char* binary, int si
     // Scan the BSONColumn binary and collect all encountered control blocks without performing
     // decompression.
     scannedBinary = binary;
-    const char* pos = binary;
-    const char* end = binary + size;
+    std::span buffer{binary, static_cast<size_t>(size)};
+    const auto start = binary;
+    const char* pos = start;
+    const char* end = start + size;
     double lastAtEndOfBlock = 0.0;
 
     // Last encountered non-RLE block during binary scan
@@ -491,7 +493,7 @@ bool BSONColumnBuilder<Allocator>::BinaryReopen::scan(const char* binary, int si
         // Uncompressed literal detected. We record its state and clear our collected control blocks
         // as we will never need to reopen past this point.
         if (isUncompressedLiteralControlByte(control)) {
-            BSONElement element(pos, 1, BSONElement::TrustedInitTag{});
+            BSONElement element(buffer.subspan(pos - start), 1, BSONElement::TrustedInitTag{});
 
             // Previous control blocks are no longer needed. Reopen only needs to consider data
             // after the last uncompressed literal.
@@ -1338,7 +1340,7 @@ BSONElement BSONColumnBuilder<Allocator>::last() const {
     return visit(OverloadedVisitor{
                      [](const typename InternalState::Regular& regular) {
                          return BSONElement{
-                             regular._prev.data(),
+                             regular._prev,
                              /*field name size including null terminator*/
                              *regular._prev.data() == stdx::to_underlying(BSONType::eoo) ? 0 : 1,
                              BSONElement::TrustedInitTag{}};

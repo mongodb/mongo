@@ -11,8 +11,7 @@ BlockBasedInterleavedDecompressor::BlockBasedInterleavedDecompressor(BSONElement
                                                                      const char* control,
                                                                      const char* end)
     : _allocator(allocator),
-      _control(control),
-      _end(end),
+      _buffer(control, end - control),
       _rootType(*control == bsoncolumn::kInterleavedStartArrayRootControlByte ? BSONType::array
                                                                               : BSONType::object),
       _traverseArrays(*control == bsoncolumn::kInterleavedStartControlByte ||
@@ -199,8 +198,8 @@ void BlockBasedInterleavedDecompressor::DecodingState::loadUncompressed(const BS
  */
 BlockBasedInterleavedDecompressor::DecodingState::LoadControlResult
 BlockBasedInterleavedDecompressor::DecodingState::loadControl(BSONElementStorage& allocator,
-                                                              const char* buffer) {
-    uint8_t control = *buffer;
+                                                              std::span<const char> buffer) {
+    uint8_t control = buffer.front();
     if (isUncompressedLiteralControlByte(control)) {
         BSONElement literalElem(buffer, 1, BSONElement::TrustedInitTag{});
         loadUncompressed(literalElem);
@@ -248,7 +247,7 @@ BlockBasedInterleavedDecompressor::DecodingState::loadControl(BSONElementStorage
                   // We can read the last known value from the decoder iterator even as it has
                   // reached end.
                   boost::optional<uint64_t> lastSimple8bValue = d64.pos.valid() ? *d64.pos : 0;
-                  d64.pos = Simple8b<uint64_t>(buffer + 1, size, lastSimple8bValue).begin();
+                  d64.pos = Simple8b<uint64_t>(buffer.data() + 1, size, lastSimple8bValue).begin();
                   deltaElem = loadDelta(allocator, d64);
                   ++d64.pos;
               },
@@ -262,7 +261,8 @@ BlockBasedInterleavedDecompressor::DecodingState::loadControl(BSONElementStorage
 
                   boost::optional<uint128_t> lastSimple8bValue =
                       d128.pos.valid() ? *d128.pos : uint128_t(0);
-                  d128.pos = Simple8b<uint128_t>(buffer + 1, size, lastSimple8bValue).begin();
+                  d128.pos =
+                      Simple8b<uint128_t>(buffer.data() + 1, size, lastSimple8bValue).begin();
                   deltaElem = loadDelta(allocator, d128);
                   ++d128.pos;
               }},

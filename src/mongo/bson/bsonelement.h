@@ -28,6 +28,7 @@
 #include <cstdint>
 #include <cstring>  // strlen
 #include <limits>
+#include <span>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -62,6 +63,9 @@ class LegacyStrictGenerator;
     -fieldNameSize-
     value()
     type()
+
+    Construction of a BSONElement should only occur when the BSONElement is structurally valid
+    and guaranteed to reside within an allocated buffer.
 */
 class BSONElement {
 public:
@@ -99,6 +103,39 @@ public:
                                ComparisonRulesSet rules,
                                const StringDataComparator* comparator);
 
+    constexpr BSONElement() = default;
+
+    /**
+     * Constructs a BSONElement from part of an allocated buffer.
+     *
+     * The passed span starts at the start of the element and extends to one past the last byte
+     * of the allocated buffer the element may occupy.
+     */
+    explicit BSONElement(std::span<const char> buffer) : _data(buffer.data()) {
+        const char* d = _data;
+        // While we should skip the type, and add 1 for the terminating null byte, just include
+        // the type byte in the strlen loop: the extra byte cancels out. As an extra bonus, this
+        // also handles the EOO case, where the type byte is 0.
+        while (*d)
+            ++d;
+        _fieldNameSize = d - _data;
+    }
+
+    /**
+     * Constructs a known length BSONElement from part of an allocated buffer.
+     *
+     * The passed span starts at the start of the element and extends to one past the last byte
+     * of the allocated buffer the element may occupy.
+     *
+     * The fieldNameSize must match 'BSONElement(d).fieldNameSize()'. In particular,
+     * - it includes the NUL terminator
+     * - 'fieldNameSize == 0' iff *d == EOO
+     */
+    constexpr BSONElement(std::span<const char> buffer, int fieldNameSize, TrustedInitTag)
+        : _data(buffer.data()), _fieldNameSize(fieldNameSize) {
+        // TODO SERVER-104907: enable validation here once all callers have been adjusted/fixed.
+        // dassert((*buffer.data() == stdx::to_underlying(BSONType::eoo)) != bool(fieldNameSize));
+    }
 
     /**
      * These functions, which start with a capital letter, throw if the
@@ -857,29 +894,6 @@ public:
         const char* start = value();
         start += 4 + ConstDataView(start).read<LittleEndian<int>>();
         return mongo::OID::from(start);
-    }
-
-    constexpr BSONElement() = default;
-
-    explicit BSONElement(const char* d) : _data(d) {
-        // While we should skip the type, and add 1 for the terminating null byte, just include
-        // the type byte in the strlen loop: the extra byte cancels out. As an extra bonus, this
-        // also handles the EOO case, where the type byte is 0.
-        while (*d)
-            ++d;
-        _fieldNameSize = d - _data;
-    }
-
-    /**
-     * Construct a BSONElement where you already know the length of the name.
-     * The fieldNameSize must match 'BSONElement(d).fieldNameSize()'. In particular,
-     * - it includes the NUL terminator
-     * - 'fieldNameSize == 0' iff *d == EOO
-     */
-    constexpr BSONElement(const char* d, int fieldNameSize, TrustedInitTag)
-        : _data(d), _fieldNameSize(fieldNameSize) {
-        // TODO SERVER-104907: enable validation here once all callers have been adjusted/fixed.
-        // dassert((static_cast<BSONType>(*_data) == BSONType::eoo) == (_fieldNameSize == 0));
     }
 
     std::string _asCode() const;

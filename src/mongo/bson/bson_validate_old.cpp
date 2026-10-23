@@ -123,6 +123,10 @@ public:
         return _buffer;
     }
 
+    const char* getEndPtr() const {
+        return _buffer + _maxLength;
+    }
+
     /**
      * WARNING: only pass in a non-EOO idElem if it has been fully validated already!
      */
@@ -309,7 +313,8 @@ Status validateBSONIterative(Buffer* buffer) {
                 const bool atTopLevel = frames.size() == 1;
                 // check if we've finished validating idElem and are at start of next element.
                 if (atTopLevel && idElemStartPos) {
-                    idElem = BSONElement(buffer->getBasePtr() + idElemStartPos);
+                    idElem = BSONElement(
+                        std::span{buffer->getBasePtr() + idElemStartPos, buffer->getEndPtr()});
                     buffer->setIdElem(idElem);
                     idElemStartPos = 0;
                 }

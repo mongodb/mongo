@@ -6,6 +6,7 @@
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/bson/unordered_fields_bsonelement_comparator.h"
 
+#include <span>
 #include <string_view>
 
 #include <boost/container/small_vector.hpp>
@@ -44,7 +45,7 @@ void normalizeObject(const BSONObj& obj, allocator_aware::BSONObjBuilder<Allocat
     // the same BSONElement from.
     struct Field {
         BSONElement element() const {
-            return BSONElement(fieldName.data() - 1,  // Include type byte before field name
+            return BSONElement(buffer,
                                fieldName.size() + 1,  // Include null terminator after field name
                                BSONElement::TrustedInitTag{});
         }
@@ -52,6 +53,7 @@ void normalizeObject(const BSONObj& obj, allocator_aware::BSONObjBuilder<Allocat
             return fieldName < rhs.fieldName;
         }
         std::string_view fieldName;
+        std::span<const char> buffer;
     };
 
     // Put all elements in a buffer, sort it and then continue normalize in sorted order
@@ -60,16 +62,14 @@ void normalizeObject(const BSONObj& obj, allocator_aware::BSONObjBuilder<Allocat
     boost::container::small_vector<Field, kNumStaticFields> fields;
     fields.resize(num);
     BSONObjIterator bsonIt(obj);
-    int i = 0;
+    size_t i = 0;
     while (bsonIt.more()) {
         auto elem = bsonIt.next();
-        fields[i++] = {elem.fieldNameStringData()};
+        fields[i++] = {elem.fieldNameStringData(), {elem.rawdata(), obj.objdata() + obj.objsize()}};
     }
-    auto it = fields.begin();
-    auto end = fields.end();
-    std::sort(it, end);
-    for (; it != end; ++it) {
-        auto elem = it->element();
+    std::sort(fields.begin(), fields.end());
+    for (const auto& field : fields) {
+        auto elem = field.element();
         if (elem.type() == BSONType::array) {
             allocator_aware::BSONArrayBuilder<Allocator> subArray(
                 builder.subarrayStart(elem.fieldNameStringData()));

@@ -707,7 +707,7 @@ BSONElementValueBuffer::BSONElementValueBuffer(tracking::Context& trackingContex
     : _buffer(tracking::make_vector<char>(trackingContext)) {}
 
 BSONElement BSONElementValueBuffer::get() const {
-    return BSONElement(_buffer.data(), 1, BSONElement::TrustedInitTag{});
+    return BSONElement(std::span{_buffer.data(), _size}, 1, BSONElement::TrustedInitTag{});
 }
 
 void BSONElementValueBuffer::set(const BSONElement& elem) {

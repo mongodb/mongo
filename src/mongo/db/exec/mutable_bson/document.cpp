@@ -19,6 +19,7 @@
 
 #include <limits>
 #include <new>
+#include <span>
 #include <string_view>
 #include <type_traits>
 #include <vector>
@@ -461,9 +462,11 @@ struct ElementRep {
     }
 
     BSONElement toSerializedElement(const BSONObj& holder) const {
-        return _fieldNameSize > 0
-            ? BSONElement(holder.objdata() + offset, _fieldNameSize, BSONElement::TrustedInitTag{})
-            : BSONElement(holder.objdata() + offset);
+        const char* bufferEnd = holder.objdata() + holder.objsize();
+        return _fieldNameSize > 0 ? BSONElement(std::span{holder.objdata() + offset, bufferEnd},
+                                                _fieldNameSize,
+                                                BSONElement::TrustedInitTag{})
+                                  : BSONElement(std::span{holder.objdata() + offset, bufferEnd});
     }
 
 private:
@@ -821,8 +824,9 @@ public:
         }
 
         // The first child of an object is always exactly 4 bytes after the start of the object.
+        const BSONObj& backing = getObject(rep->objIdx);
         const int64_t childOffset = thisObjectOffset + 4;
-        const int32_t objsize = getObject(rep->objIdx).objsize();
+        const int32_t objsize = backing.objsize();
         if (MONGO_unlikely(childOffset >= objsize)) {
             LOGV2_FATAL(12987901,
                         "mutable bson child begins outside its backing BSONObj",
@@ -831,7 +835,8 @@ public:
                         "childOffset"_attr = childOffset,
                         "objsize"_attr = objsize);
         }
-        BSONElement childElt(getObject(rep->objIdx).objdata() + childOffset);
+        BSONElement childElt(
+            std::span{backing.objdata() + childOffset, backing.objdata() + objsize});
 
         if (!childElt.eoo()) {
             // Do this now before other writes so compiler can exploit knowing
@@ -917,7 +922,8 @@ public:
                         "objsize"_attr = backing.objsize());
         }
 
-        BSONElement rightElt(backing.objdata() + nextOffset);
+        const char* bufferEnd = backing.objdata() + backing.objsize();
+        BSONElement rightElt(std::span{backing.objdata() + nextOffset, bufferEnd});
 
         if (!rightElt.eoo()) {
             // Do this now before other writes so compiler can exploit knowing

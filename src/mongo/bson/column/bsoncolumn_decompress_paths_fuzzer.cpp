@@ -34,7 +34,7 @@ static bool isDataOnlyInterleaved(const char* binary, size_t size) {
         }
 
         if (bsoncolumn::isUncompressedLiteralControlByte(control)) {
-            BSONElement literal(pos, 1, BSONElement::TrustedInitTag{});
+            BSONElement literal(std::span{pos, end}, 1, BSONElement::TrustedInitTag{});
             pos += literal.size();
             continue;
         }

@@ -790,7 +790,7 @@ typename CMaterializer::Element first(const char* buffer,
             return CMaterializer{}.materializeMissing(*allocator);
         } else if (isUncompressedLiteralControlByte(control)) {
             // Uncompressed literal found, it cannot be skip so return as our first value.
-            BSONElement literal(ptr, 1, BSONElement::TrustedInitTag{});
+            BSONElement literal(std::span{ptr, end}, 1, BSONElement::TrustedInitTag{});
             return CMaterializer{}.template materialize<BSONElement>(*allocator, literal);
         } else if (isInterleavedStartControlByte(control)) {
             // TODO SERVER-90962: Implement optimized version of first() in the presence of
@@ -840,7 +840,7 @@ typename CMaterializer::Element last(const char* buffer,
         } else if (isUncompressedLiteralControlByte(control)) {
             // Uncompressed literal found, calculate delta to last for this type then check if we
             // are at end of stream which means we can materialize our value and return.
-            BSONElement literal(ptr, 1, BSONElement::TrustedInitTag{});
+            BSONElement literal(std::span{ptr, end}, 1, BSONElement::TrustedInitTag{});
             ptr += literal.size();
             switch (literal.type()) {
                 case BSONType::boolean: {

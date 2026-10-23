@@ -585,7 +585,7 @@ BSONElement BSONObj::getField(std::string_view name) const {
 
         // If the field name is found and complete, return the element.
         if (!*++ptr)
-            return BSONElement(elem, ptr - elem, BSONElement::TrustedInitTag{});
+            return BSONElement(std::span{elem, _end()}, ptr - elem, BSONElement::TrustedInitTag{});
 
         // The name is found, but the field name is not yet complete, so there's no match.
         ++ptr;
@@ -594,7 +594,8 @@ next:
         while (*ptr)
             ++ptr;
 
-        elem += BSONElement(elem, ptr - elem, BSONElement::TrustedInitTag{}).size();
+        elem +=
+            BSONElement(std::span{elem, _end()}, ptr - elem, BSONElement::TrustedInitTag{}).size();
     }
     return BSONElement();
 }
@@ -812,7 +813,7 @@ bool BSONIteratorSorted::FieldNameCmp::operator()(std::string_view lhs,
 }
 
 BSONIteratorSorted::BSONIteratorSorted(const BSONObj& o, const FieldNameCmp& cmp)
-    : _fields(o.nFields()) {
+    : _fields(o.nFields()), _bufferEnd(o.objdata() + o.objsize()) {
     int x = 0;
     BSONObjIterator i(o);
     while (i.more()) {

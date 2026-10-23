@@ -68,7 +68,8 @@ void QueryShapeOptsAPI::appendLiteral(BSONObjBuilder& builder,
     // structure. It would be ideal to return something like void() or void_t() but that does not
     // exist.
     auto transformViewToReturn = [&](MongoExtensionByteView bv) {
-        BSONElement element(reinterpret_cast<const char*>(bv.data));
+        auto data = reinterpret_cast<const char*>(bv.data);
+        BSONElement element(std::span{data, bv.len});
         builder.appendAs(element, fieldName);
         return true;
     };

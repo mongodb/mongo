@@ -52,7 +52,7 @@ const char* walkControlBytes(const char* pos, const char* end, Visitor&& visitor
         if (control == stdx::to_underlying(BSONType::eoo)) {
             return pos + 1;
         } else if (bsoncolumn::isUncompressedLiteralControlByte(control)) {
-            BSONElement elem(pos, 1, BSONElement::TrustedInitTag{});
+            BSONElement elem(std::span{pos, end}, 1, BSONElement::TrustedInitTag{});
             visitor.template onLiteral<interleaved>(elem);
             pos += elem.size();
         } else if (bsoncolumn::isInterleavedStartControlByte(control)) {

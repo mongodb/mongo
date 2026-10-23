@@ -605,7 +605,7 @@ public:
      * @return first field of the object
      */
     BSONElement firstElement() const {
-        return BSONElement(objdata() + 4);
+        return BSONElement(std::span{objdata() + 4, _end()});
     }
 
     /**
@@ -723,6 +723,10 @@ private:
                     BSONType::eoo);
     }
 
+    const char* _end() const {
+        return objdata() + objsize();
+    }
+
     const char* _objdata;
     ConstSharedBuffer _ownedBuffer;
 };
@@ -770,36 +774,38 @@ public:
      * Constructs an iterator pointing to the first element in obj or EOO if it is empty.
      */
     explicit BSONObjStlIterator(const BSONObj& obj) {
-        auto ptr = obj.objdata() + sizeof(int32_t);
-        _cur._data = ptr;
+        _end = obj._end();
+        auto start = obj.objdata() + sizeof(int32_t);
+        auto ptr = start;
+        auto buffer = std::span{obj.objdata() + sizeof(int32_t), _end};
         while (*ptr)
             ++ptr;
-        _cur._fieldNameSize = ptr - _cur._data;
+        _cur = BSONElement(buffer, ptr - start, BSONElement::TrustedInitTag{});
     }
 
     /**
      * Returns an iterator pointing to the EOO element in obj.
      */
     static BSONObjStlIterator endOf(const BSONObj& obj) {
-        auto eooElem = BSONElement();
-        eooElem._data = obj.objdata() + obj.objsize() - 1;
+        const char* eooPtr = obj._end() - 1;
+        auto eooElem = BSONElement(std::span{eooPtr, 1}, 0, BSONElement::TrustedInitTag{});
         dassert(eooElem.eoo());  // This is checked in the BSONObj constructor.
-        return BSONObjStlIterator(eooElem);
+        return BSONObjStlIterator(eooElem, obj._end());
     }
 
     /**
      * pre-increment
      */
     BSONObjStlIterator& operator++() {
-        dassert(*_cur._data);                          // Must not be EOO
+        dassert(*_cur._data);  // Must not be EOO
+        const auto start = _cur._data + _cur.size();
         auto ptr = _cur._data + _cur.fieldNameSize();  // ptr points to the 0 byte ending the name
 
         ptr += _cur.valuesize() + 1;  // Skip the value and the 0 byte
-        _cur._data = ptr;
         while (*ptr)
             ++ptr;
 
-        _cur._fieldNameSize = ptr - _cur._data;
+        _cur = BSONElement(std::span{start, _end}, ptr - start, BSONElement::TrustedInitTag{});
         return *this;
     }
 
@@ -827,9 +833,10 @@ public:
     }
 
 private:
-    explicit BSONObjStlIterator(BSONElement elem) : _cur(elem) {}
+    explicit BSONObjStlIterator(BSONElement elem, const char* end) : _cur(elem), _end(end) {}
 
     BSONElement _cur;
+    const char* _end = nullptr;
 };
 
 /**
@@ -867,7 +874,7 @@ public:
      * current element '_pos' is at.
      */
     void advance(const BSONElement& currentElement) {
-        dassert(BSONElement(_pos).size() == currentElement.size());
+        dassert(BSONElement(std::span{_pos, _theend + 1}).size() == currentElement.size());
         _pos += currentElement.size();
     }
 
@@ -888,7 +895,7 @@ public:
 
     BSONElement next() {
         dassert(_pos <= _theend);
-        BSONElement e(_pos);
+        BSONElement e(std::span{_pos, _theend + 1});
         _pos += e.size();
         return e;
     }
@@ -912,7 +919,7 @@ public:
 
     BSONElement operator*() {
         dassert(_pos <= _theend);
-        return BSONElement(_pos);
+        return BSONElement(std::span{_pos, _theend + 1});
     }
 
     bool operator==(const BSONObjIterator& other) {
@@ -944,7 +951,7 @@ public:
     BSONElement next() {
         if (_cur < static_cast<int>(_fields.size())) {
             const auto& fieldName = _fields.at(_cur++);
-            return BSONElement(fieldName.data() - 1,  // Include type byte
+            return BSONElement(std::span{fieldName.data() - 1, _bufferEnd},
                                fieldName.size() + 1,  // Add null terminator
                                BSONElement::TrustedInitTag{});
         }
@@ -959,6 +966,7 @@ protected:
 private:
     std::vector<std::string_view> _fields;
     int _cur;
+    const char* _bufferEnd;
 };
 
 /**

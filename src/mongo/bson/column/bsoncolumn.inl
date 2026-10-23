@@ -8,8 +8,9 @@ namespace mongo::bsoncolumn {
 template <class Buffer>
 requires Appendable<Buffer>
 MONGO_COMPILER_ALWAYS_INLINE_GCC14 void BSONColumnBlockBased::decompress(Buffer& buffer) const {
-    const char* ptr = _binary;
-    const char* end = _binary + _size;
+    const auto begin = _binary.data();
+    const auto end = begin + _binary.size();
+    const char* ptr = begin;
     BSONType type = BSONType::eoo;  // needs to be set as something else before deltas are parsed
 
     // If first block(s) are simple8B, these should all be skips.
@@ -24,7 +25,7 @@ MONGO_COMPILER_ALWAYS_INLINE_GCC14 void BSONColumnBlockBased::decompress(Buffer&
             buffer.eof();
             return;
         } else if (isUncompressedLiteralControlByte(control)) {
-            BSONElement literal(ptr, 1, BSONElement::TrustedInitTag{});
+            BSONElement literal(_binary.subspan(ptr - begin), 1, BSONElement::TrustedInitTag{});
             type = literal.type();
             ptr += literal.size();
             switch (type) {

@@ -282,7 +282,8 @@ CompressionResult _compressBucket(const BSONObj& bucketDoc,
                 tamperedData.reset(new char[elem.size()]);
                 memcpy(tamperedData.get(), elem.rawdata(), elem.size());
 
-                BSONElement tampered(tamperedData.get());
+                BSONElement tampered(
+                    std::span{tamperedData.get(), tamperedData.get() + elem.size()});
                 ++(*const_cast<char*>(tampered.value()));
                 measurements.front().timeField = tampered;
             }
