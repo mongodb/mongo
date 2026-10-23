@@ -60,7 +60,6 @@ void logSnapshotUnavailableRetry(std::string_view checkName, size_t attempt, con
 /**
  * Retries `check` if it fails with SnapshotUnavailable, which may be transiently returned if the
  * targeted node has not yet set a committed snapshot.
- * TODO(SERVER-132541): consider removing this retry loop once repl. waits for a committed snapshot.
  */
 template <typename Callable>
 auto snapshotUnavailableRetry(OperationContext* opCtx,
