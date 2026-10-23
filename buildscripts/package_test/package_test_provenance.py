@@ -528,14 +528,13 @@ def validate_release_binary_provenance_against_archive(
     archive_path: Path,
     expected_build_id: str | None = None,
     binary_names: Iterable[str] = RELEASE_BINARY_NAMES,
-) -> dict[str, str]:
-    """Validate archive provenance and return the verified hashes for package installation checks."""
+) -> None:
+    """Validate command provenance and hashes for release binaries in an archive."""
 
     actual_binaries = hash_release_binaries_in_archive(archive_path, binary_names)
     validate_release_binary_provenance_hashes(
         provenance_text, actual_binaries, expected_build_id, binary_names
     )
-    return {name: binary["sha256"] for name, binary in actual_binaries.items()}
 
 
 def validate_release_binary_provenance_hashes(

@@ -578,7 +578,6 @@ class Test:
     python_command: str = dataclasses.field(default="", repr=False)
     packages_urls: list[str] = dataclasses.field(default_factory=list)
     package_kind: str = "server"
-    release_binary_hashes: dict[str, str] | None = dataclasses.field(default=None, repr=False)
     packages_paths: list[Path] = dataclasses.field(default_factory=list)
     attempts: int = dataclasses.field(default=0)
 
@@ -768,9 +767,6 @@ def run_test(test: Test, client: DockerClient) -> Result:
             detach=True,
             user="root",
             volumes=volumes,
-            environment={"MONGO_RELEASE_BINARY_HASHES": json.dumps(test.release_binary_hashes)}
-            if test.release_binary_hashes is not None
-            else {},
         )
         for log in container.logs(stream=True):
             result["log_raw"] += log.decode("UTF-8")
@@ -1138,7 +1134,6 @@ if args.command == "branch":
     download_dir = Path(__file__).parent / "downloaded_packages"
     local_packages_path: Optional[Path] = None
     release_binary_provenance: Optional[str] = None
-    release_binary_hashes: dict[str, str] | None = None
     release_execution_logs: list[tuple[str, Path]] = []
     should_validate_provenance = (
         should_validate_package_build_provenance() and not args.skip_release_binary_provenance_check
@@ -1162,7 +1157,7 @@ if args.command == "branch":
             args.evg_binary_provenance_archive_artifact_name,
             download_dir,
         )
-        release_binary_hashes = validate_release_binary_provenance_against_archive(
+        validate_release_binary_provenance_against_archive(
             release_binary_provenance,
             release_binary_archive,
             args.evg_build_id,
@@ -1265,7 +1260,6 @@ if args.command == "branch":
                     version=args.server_version,
                     packages_urls=urls,
                     package_kind=args.package_kind,
-                    release_binary_hashes=release_binary_hashes,
                 )
             )
 
