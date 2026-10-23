@@ -1,5 +1,8 @@
 #Release builds have no debug symbols, and this prevents packaging errors on RHEL 8
 %global   debug_package %{nil}
+
+# Release archives already contain finalized binaries; preserve their provenance hashes.
+%global __strip /bin/true
 %define   _name mongodb-enterprise-unstable
 %define   _crypto_pkg_name %{_name}-crypt-v1
 
@@ -36,6 +39,8 @@ This package contains MongoDB Enterprise Field Level Encryption Crypto v1 librar
 %setup
 
 %install
+# SUSE's separate strip pass does not use the __strip macro.
+export NO_BRP_STRIP_DEBUG=true
 mkdir -p $RPM_BUILD_ROOT%{_includedir}/mongo_crypt/v1/mongo_crypt
 cp include/mongo_crypt/v1/mongo_crypt/mongo_crypt.h $RPM_BUILD_ROOT%{_includedir}/mongo_crypt/v1/mongo_crypt/
 

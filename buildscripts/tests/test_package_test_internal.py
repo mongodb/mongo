@@ -1,4 +1,7 @@
 import gzip
+import hashlib
+import json
+import os
 import pathlib
 import sys
 import tempfile
@@ -9,6 +12,210 @@ from buildscripts.package_test import package_test_internal as under_test
 
 
 class PackageTestInternalHelpersTest(unittest.TestCase):
+    def test_installed_release_binaries_match_archive_hashes(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            binary_dir = pathlib.Path(temporary_directory)
+            hashes = {}
+            for name in ("mongod", "mongos"):
+                contents = (name + " release binary").encode()
+                (binary_dir / name).write_bytes(contents)
+                hashes[name] = hashlib.sha256(contents).hexdigest()
+
+            under_test.validate_installed_release_binaries(hashes, binary_dir)
+            for name in hashes:
+                with self.subTest(binary=name):
+                    original = (binary_dir / name).read_bytes()
+                    (binary_dir / name).write_bytes(original + b"changed metadata")
+                    with self.assertRaisesRegex(ValueError, "hash mismatch for " + name):
+                        under_test.validate_installed_release_binaries(hashes, binary_dir)
+                    (binary_dir / name).write_bytes(original)
+
+    def test_installed_release_binaries_accept_custom_binary_names(self):
+        for names in (("mongod",), ("mongos",), ("mongod", "mongos", "mongocryptd")):
+            with (
+                self.subTest(names=names),
+                tempfile.TemporaryDirectory() as temporary_directory,
+            ):
+                binary_dir = pathlib.Path(temporary_directory)
+                hashes = {}
+                for name in names:
+                    contents = (name + " release binary").encode()
+                    (binary_dir / name).write_bytes(contents)
+                    hashes[name] = hashlib.sha256(contents).hexdigest()
+
+                under_test.validate_installed_release_binaries(hashes, binary_dir)
+                changed_binary = names[-1]
+                with (binary_dir / changed_binary).open("ab") as binary:
+                    binary.write(b"changed metadata")
+                with self.assertRaisesRegex(ValueError, "hash mismatch for " + changed_binary):
+                    under_test.validate_installed_release_binaries(hashes, binary_dir)
+
+    def test_installed_release_binaries_require_nonempty_hashes(self):
+        with self.assertRaisesRegex(ValueError, "at least one binary hash"):
+            under_test.validate_installed_release_binaries({})
+
+    def test_installed_release_binaries_match_custom_names_case_insensitively(self):
+        for filename in ("mongod", "mongos", "mongo_crypt_v1.so", "CustomBinary"):
+            with (
+                self.subTest(filename=filename),
+                tempfile.TemporaryDirectory() as temporary_directory,
+            ):
+                binary_dir = pathlib.Path(temporary_directory)
+                binary = binary_dir / filename
+                contents = b"finalized release binary"
+                binary.write_bytes(contents)
+                selected_name = filename.swapcase()
+                hashes = {selected_name: hashlib.sha256(contents).hexdigest()}
+                under_test.validate_installed_release_binaries(hashes, binary_dir)
+
+                binary.write_bytes(contents + b"modified")
+                with self.assertRaisesRegex(ValueError, "hash mismatch for " + selected_name):
+                    under_test.validate_installed_release_binaries(hashes, binary_dir)
+
+    def test_installed_release_binaries_reject_ambiguous_case_insensitive_match(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            binary_dir = pathlib.Path(temporary_directory)
+            for filename in ("mongod", "MongoD"):
+                (binary_dir / filename).write_bytes(b"release binary")
+            with self.assertRaisesRegex(ValueError, "Ambiguous installed release binary name"):
+                under_test.validate_installed_release_binaries({"MONGOD": "0" * 64}, binary_dir)
+
+    def test_installed_release_binaries_reject_missing_binary(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            with self.assertRaises(FileNotFoundError):
+                under_test.validate_installed_release_binaries(
+                    {"mongod": "0" * 64, "mongos": "0" * 64}, pathlib.Path(temporary_directory)
+                )
+
+    def test_package_install_checks_hashes_before_running_binaries(self):
+        for package_manager in ("apt", "yum", "zypper"):
+            with self.subTest(package_manager=package_manager):
+                hashes = {"mongod": "0" * 64, "mongos": "1" * 64}
+                calls = mock.Mock()
+                with (
+                    mock.patch.object(
+                        sys, "argv", ["test.py", "test.log", "--edition", "org", "packages.tgz"]
+                    ),
+                    mock.patch.dict(
+                        os.environ, {"MONGO_RELEASE_BINARY_HASHES": json.dumps(hashes)}
+                    ),
+                    mock.patch.object(under_test, "configure_logging"),
+                    mock.patch.object(
+                        under_test, "download_extract_all_packages", return_value=["server.pkg"]
+                    ),
+                    mock.patch.object(
+                        under_test,
+                        "run_and_log",
+                        side_effect=lambda command, **kwargs: mock.Mock(
+                            returncode=0 if command.startswith(package_manager) else 1
+                        ),
+                    ),
+                    mock.patch.object(
+                        under_test, "run_" + package_manager + "_test", calls.install
+                    ),
+                    mock.patch.object(
+                        under_test, "validate_installed_release_binaries", calls.validate
+                    ),
+                    mock.patch.object(under_test, "get_test_args", calls.get_args),
+                ):
+                    calls.validate.side_effect = ValueError("hash mismatch for mongod")
+                    with self.assertRaisesRegex(ValueError, "hash mismatch for mongod"):
+                        under_test.main()
+                    self.assertEqual(
+                        [mock.call.install(packages=["server.pkg"]), mock.call.validate(hashes)],
+                        calls.mock_calls,
+                    )
+
+    def test_crypt_package_install_validates_library_hash(self):
+        for package_manager in ("apt", "yum", "zypper"):
+            for library_state in ("matching", "modified", "missing"):
+                with (
+                    self.subTest(package_manager=package_manager, library_state=library_state),
+                    tempfile.TemporaryDirectory() as temporary_directory,
+                ):
+                    library_dir = pathlib.Path(temporary_directory)
+                    contents = b"finalized crypt library"
+                    hashes = {"mongo_crypt_v1.so": hashlib.sha256(contents).hexdigest()}
+
+                    def install(packages):
+                        if library_state != "missing":
+                            (library_dir / "mongo_crypt_v1.so").write_bytes(
+                                contents if library_state == "matching" else contents + b"modified"
+                            )
+
+                    with (
+                        mock.patch.object(
+                            sys,
+                            "argv",
+                            [
+                                "test.py",
+                                "test.log",
+                                "--edition",
+                                "enterprise",
+                                "--package-kind",
+                                "crypt_v1",
+                                "packages.tgz",
+                            ],
+                        ),
+                        mock.patch.dict(
+                            os.environ,
+                            {"MONGO_RELEASE_BINARY_HASHES": json.dumps(hashes)},
+                            clear=True,
+                        ),
+                        mock.patch.object(under_test, "configure_logging"),
+                        mock.patch.object(
+                            under_test, "download_extract_all_packages", return_value=["crypt.pkg"]
+                        ),
+                        mock.patch.object(
+                            under_test,
+                            "run_and_log",
+                            side_effect=lambda command, **kwargs: mock.Mock(
+                                returncode=0 if command.startswith(package_manager) else 1
+                            ),
+                        ),
+                        mock.patch.object(
+                            under_test, "run_" + package_manager + "_test", side_effect=install
+                        ),
+                        mock.patch.object(
+                            under_test,
+                            "get_package_library_dir",
+                            return_value=str(library_dir),
+                        ) as get_library_dir,
+                        mock.patch.object(
+                            under_test, "get_test_args", return_value={"package_kind": "crypt_v1"}
+                        ) as get_args,
+                        mock.patch.object(under_test, "run_server_package_tests") as check_server,
+                        mock.patch.object(under_test, "test_install_is_complete") as check_install,
+                        mock.patch.object(under_test, "test_uninstall"),
+                        mock.patch.object(under_test, "test_uninstall_is_complete"),
+                    ):
+                        if library_state == "matching":
+                            self.assertEqual(0, under_test.main())
+                            check_install.assert_called_once()
+                        else:
+                            error = ValueError if library_state == "modified" else FileNotFoundError
+                            with self.assertRaises(error):
+                                under_test.main()
+                            get_args.assert_not_called()
+                            check_install.assert_not_called()
+                        get_library_dir.assert_called_once_with(package_manager)
+                        check_server.assert_not_called()
+
+    def test_package_library_dir_uses_rpm_macro_on_rpm_systems(self):
+        for package_manager in ("yum", "zypper"):
+            with (
+                self.subTest(package_manager=package_manager),
+                mock.patch.object(
+                    under_test, "run_and_log", return_value=mock.Mock(stdout=b"/usr/lib64\n")
+                ) as run,
+            ):
+                self.assertEqual("/usr/lib64", under_test.get_package_library_dir(package_manager))
+                run.assert_called_once_with("rpm --eval '%{_libdir}'")
+
+        with mock.patch.object(under_test, "run_and_log") as run:
+            self.assertEqual("/usr/lib", under_test.get_package_library_dir("apt"))
+            run.assert_not_called()
+
     def test_writes_compressed_text_file(self):
         contents = "source_one.cpp\nsource_two.h\n"
         with tempfile.TemporaryDirectory() as temporary_directory:

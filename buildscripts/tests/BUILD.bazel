@@ -492,7 +492,10 @@ py_test(
 py_test(
     name = "test_package_test_provenance",
     srcs = ["test_package_test_provenance.py"],
-    data = ["//:.bazelversion"],
+    data = [
+        "//:.bazelversion",
+        "//buildscripts/package_test:all_python_files",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         "//buildscripts:generate_bazel_spawn_pb2",

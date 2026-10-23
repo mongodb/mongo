@@ -267,6 +267,9 @@ This package provides the MongoDB static library and header files needed to deve
 #Release builds have no debug symbols, and this prevents packaging errors on RHEL 8
 %global debug_package %{nil}
 
+# Release archives already contain finalized binaries; preserve their provenance hashes.
+%global __strip /bin/true
+
 %prep
 %setup -n %{_name}-%{version}
 %if 0%{?rhel} >= 8 || 0%{?fedora} >= 30
@@ -276,6 +279,8 @@ This package provides the MongoDB static library and header files needed to deve
 %build
 
 %install
+# SUSE's separate strip pass does not use the __strip macro.
+export NO_BRP_STRIP_DEBUG=true
 mkdir -p $RPM_BUILD_ROOT%{_prefix}
 cp -rv bin $RPM_BUILD_ROOT%{_prefix}
 mkdir -p $RPM_BUILD_ROOT%{_mandir}/man1

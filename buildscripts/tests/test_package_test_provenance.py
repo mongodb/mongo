@@ -1,3 +1,4 @@
+import ast
 import json
 import os
 import tarfile
@@ -133,6 +134,128 @@ class PackageTestProvenanceTest(unittest.TestCase):
                     under_test.make_release_binary_provenance(
                         command, Path("unused"), toolchain_provenance_file=toolchain_file
                     )
+
+    def test_archive_validation_returns_verified_hashes_for_installed_packages(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            archive = root / "release.tgz"
+            binaries = {}
+            with tarfile.open(archive, "w:gz") as output:
+                for name in under_test.RELEASE_BINARY_NAMES:
+                    binary = root / name
+                    binary.write_bytes((name + " release binary").encode())
+                    output.add(binary, arcname="release/bin/" + name)
+                    binaries[name] = {"sha256": under_test.hash_file(binary)}
+            provenance = json.dumps(
+                {
+                    "distro_id": "release-build-host",
+                    "build_id": "build_id",
+                    "build_command": f"bazel build archive-dist-stripped {release_local_suffix()}",
+                    "binaries": binaries,
+                }
+            )
+            self.assertEqual(
+                {name: binary["sha256"] for name, binary in binaries.items()},
+                under_test.validate_release_binary_provenance_against_archive(
+                    provenance, archive, "build_id"
+                ),
+            )
+            binaries["mongos"]["sha256"] = "0" * 64
+            with self.assertRaisesRegex(ValueError, "hash mismatch for mongos"):
+                under_test.validate_release_binary_provenance_against_archive(
+                    json.dumps({**json.loads(provenance), "binaries": binaries}),
+                    archive,
+                    "build_id",
+                )
+
+    def test_package_container_receives_release_hashes_only_when_provenance_was_validated(self):
+        # Import the container runner without the script's network requests and argument parsing.
+        source = workspace_file_path("buildscripts/package_test/package_test.py").read_text()
+        runner = next(
+            node
+            for node in ast.parse(source).body
+            if isinstance(node, ast.FunctionDef) and node.name == "run_test"
+        )
+        namespace = {
+            "__file__": str(workspace_file_path("buildscripts/package_test/package_test.py")),
+            "os": os,
+            "Path": Path,
+            "json": json,
+            "time": mock.Mock(time=mock.Mock(return_value=0)),
+            "uuid": mock.Mock(uuid4=mock.Mock(return_value=types.SimpleNamespace(hex="test"))),
+            "logging": mock.Mock(),
+            "Test": object,
+            "DockerClient": object,
+            "Result": dict,
+            "urlparse": mock.Mock(),
+            "RHEL7_OS_NAMES": (),
+            "build_os_setup_commands": mock.Mock(return_value=[]),
+            "build_python_setup_commands": mock.Mock(return_value=[]),
+            "build_package_test_internal_args": mock.Mock(return_value=[]),
+            "join_commands": mock.Mock(return_value=""),
+            "args": types.SimpleNamespace(skip_system_library_check=False),
+            "get_image": mock.Mock(return_value="image"),
+        }
+        exec(
+            compile(ast.Module(body=[runner], type_ignores=[]), "package_test.py", "exec"),
+            namespace,
+        )
+        client = mock.Mock()
+        client.containers.run.return_value.logs.return_value = []
+        client.containers.run.return_value.wait.return_value = {"StatusCode": 1}
+        test = types.SimpleNamespace(
+            name=lambda: "provenance",
+            version="9.1",
+            os_name="ubuntu2204",
+            edition="org",
+            update_command="update",
+            install_command="install {}",
+            base_packages=[],
+            python_command="python3",
+            packages_urls=[],
+            package_kind="server",
+        )
+        for package_kind, hashes in (
+            ("server", None),
+            ("server", {"mongod": "0" * 64, "mongos": "1" * 64}),
+            ("crypt_v1", None),
+            ("crypt_v1", {"mongo_crypt_v1.so": "2" * 64}),
+        ):
+            with (
+                self.subTest(package_kind=package_kind, hashes=hashes),
+                mock.patch.dict(os.environ, {}, clear=True),
+                mock.patch("os.makedirs"),
+            ):
+                test.release_binary_hashes = hashes
+                test.package_kind = package_kind
+                namespace["run_test"](test, client)
+                expected = (
+                    {} if hashes is None else {"MONGO_RELEASE_BINARY_HASHES": json.dumps(hashes)}
+                )
+                self.assertEqual(expected, client.containers.run.call_args.kwargs["environment"])
+
+    def test_branch_package_tests_keep_verified_crypt_hashes(self):
+        source = workspace_file_path("buildscripts/package_test/package_test.py").read_text()
+        construction = next(
+            node
+            for node in ast.walk(ast.parse(source))
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "Test"
+            and any(keyword.arg == "release_binary_hashes" for keyword in node.keywords)
+        )
+        hashes = {"mongo_crypt_v1.so": "2" * 64}
+        namespace = {
+            "Test": types.SimpleNamespace,
+            "args": types.SimpleNamespace(
+                edition="enterprise", server_version="9.1", package_kind="crypt_v1"
+            ),
+            "test_os": "ubuntu2204",
+            "urls": ["crypt.pkg"],
+            "release_binary_hashes": hashes,
+        }
+        test = eval(compile(ast.Expression(construction), "package_test.py", "eval"), namespace)
+        self.assertEqual(hashes, test.release_binary_hashes)
 
     def test_archive_fallback_checks_captured_distro_against_task(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

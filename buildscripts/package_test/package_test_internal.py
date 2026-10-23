@@ -5,6 +5,7 @@ operating systems. For example, Ubuntu 16.04 uses Python 3.5.
 """
 
 import gzip
+import hashlib
 import json
 import logging
 import os
@@ -53,6 +54,43 @@ ARCHITECTURE_LOADER_RE = re.compile(r"^ld-linux-[^.]+\.so\.[0-9.]+$")
 _LOGGING_CONFIGURED = False
 
 SERVER_BINARY_NAMES = ("mongod", "mongos")
+
+
+def validate_installed_release_binaries(
+    expected_hashes: Dict[str, str], binary_dir: pathlib.Path = pathlib.Path("/usr/bin")
+) -> None:
+    """Require each host-selected installed binary to match the validated release archive."""
+    if not expected_hashes:
+        raise ValueError("Installed package provenance must contain at least one binary hash")
+    for name, expected_hash in expected_hashes.items():
+        binary_path = binary_dir / name
+        if not binary_path.exists():
+            # Match custom provenance names using the host's case-insensitive selection rules.
+            matching_binaries = [
+                path
+                for path in binary_dir.iterdir()
+                if path.name.lower() == name.lower() and path.is_file()
+            ]
+            if len(matching_binaries) > 1:
+                raise ValueError("Ambiguous installed release binary name: {}".format(name))
+            if matching_binaries:
+                binary_path = matching_binaries[0]
+        digest = hashlib.sha256()
+        with binary_path.open("rb") as binary:
+            for chunk in iter(lambda: binary.read(1024 * 1024), b""):
+                digest.update(chunk)
+        actual_hash = digest.hexdigest()
+        if actual_hash != expected_hash:
+            raise ValueError(
+                "Installed release binary hash mismatch for {}: {} != {}".format(
+                    name, actual_hash, expected_hash
+                )
+            )
+    logging.info(
+        "Installed binaries match the validated release binary provenance: %s",
+        ", ".join(sorted(expected_hashes)),
+    )
+
 
 # These baselines were verified against the 9.1.0 Linux nightly published on
 # 2026-08-19, with the 8.3.8 Linux release archives used for enterprise and
@@ -786,6 +824,13 @@ def parse_ulimits(pid: int) -> Dict[str, Tuple[int, int, Optional[str]]]:
     return result
 
 
+def get_package_library_dir(package_manager: str) -> str:
+    """Return the library install directory used by the package manager."""
+    if package_manager in ("yum", "zypper"):
+        return run_and_log("rpm --eval '%{_libdir}'").stdout.decode("utf-8").strip()
+    return "/usr/lib"
+
+
 def get_test_args(
     package_manager: str, package_files: List[str], package_platform: str = ""
 ) -> TestArgs:
@@ -795,6 +840,7 @@ def get_test_args(
     test_args["package_manager"] = package_manager
     test_args["package_files"] = package_files
     test_args["platform"] = package_platform
+    test_args["lib_dir"] = get_package_library_dir(package_manager)
 
     os_name, os_version_major, os_version_minor = get_os_release()
     test_args["os_name"] = os_name
@@ -818,13 +864,11 @@ def get_test_args(
         test_args["mongo_home_dir"] = "/var/lib/mongo"
         test_args["mongo_work_dir"] = "/var/lib/mongo"
         test_args["mongo_user_shell"] = "/bin/false"
-        test_args["lib_dir"] = run_and_log("rpm --eval '%{_libdir}'").stdout.decode("utf-8").strip()
     else:
         test_args["mongo_username"] = "mongodb"
         test_args["mongo_groupname"] = "mongodb"
         test_args["mongo_home_dir"] = "/home/mongodb"
         test_args["mongo_work_dir"] = "/var/lib/mongodb"
-        test_args["lib_dir"] = "/usr/lib"
 
         if (os_name == "debian" and os_version_major >= 10) or (
             os_name == "ubuntu" and os_version_major >= 18
@@ -1148,6 +1192,15 @@ def main() -> int:
     else:
         logging.error("Found no supported package manager...Failing Test\n")
         return 1
+
+    if "MONGO_RELEASE_BINARY_HASHES" in os.environ:
+        expected_hashes = json.loads(os.environ["MONGO_RELEASE_BINARY_HASHES"])
+        if expected_package_kind == "crypt_v1":
+            validate_installed_release_binaries(
+                expected_hashes, pathlib.Path(get_package_library_dir(package_manager))
+            )
+        else:
+            validate_installed_release_binaries(expected_hashes)
 
     test_args = get_test_args(package_manager, package_files, package_platform)
     logging.info("Test Args:\n%s", json.dumps(test_args, sort_keys=True, indent=4))
