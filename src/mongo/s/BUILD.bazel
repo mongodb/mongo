@@ -476,6 +476,7 @@ mongo_cc_library(
         "//src/mongo/db/commands/server_status:server_status_servers",
         "//src/mongo/db:dbdirectclient",
         "//src/mongo/db:default_max_time_ms_cluster_parameter",
+        "//src/mongo/db:end_of_transaction_parameter",
         "//src/mongo/db:incremental_rollout_metrics",
         "//src/mongo/db:landlock_init",
         "//src/mongo/db:metrics_policy_manager_mongos",

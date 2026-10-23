@@ -175,6 +175,9 @@ filters:
   - "/cluster_auth_mode_option*":
     approvers:
       - 10gen/server-security
+  - "end_of_transaction*":
+    approvers:
+      - 10gen/query-execution-change-streams
   - "fle*":
     approvers:
       - 10gen/server-security

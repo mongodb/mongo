@@ -194,6 +194,7 @@ query:
     - src/mongo/db/commands/set_profiling_*
     - src/mongo/db/commands/shardsvr_resolve_view_command*
     - src/mongo/db/commands/top_command*
+    - src/mongo/db/end_of_transaction*
     - src/mongo/db/exec/
     - src/mongo/db/extension/
     - src/mongo/db/change_stream*

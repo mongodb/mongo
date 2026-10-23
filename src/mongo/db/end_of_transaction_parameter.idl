@@ -1,0 +1,22 @@
+# Copyright (c) MongoDB, Inc.
+# SPDX-License-Identifier: SSPL-1.0
+
+global:
+    mod_visibility: public
+    cpp_namespace: "mongo"
+
+imports:
+    - "mongo/db/basic_types.idl"
+
+server_parameters:
+    allowEndOfTransaction:
+        description: >-
+            Kill switch for the end-of-transaction (EOT) change stream feature. When enabled,
+            transaction commits write end-of-transaction accounting metadata into the oplog,
+            which change streams use to synthesize endOfTransaction change events. When disabled,
+            no accounting metadata is written, so no endOfTransaction events can be produced.
+        set_at: [startup, runtime]
+        cpp_varname: gAllowEndOfTransaction
+        cpp_vartype: Atomic<bool>
+        default: true
+        redact: false
