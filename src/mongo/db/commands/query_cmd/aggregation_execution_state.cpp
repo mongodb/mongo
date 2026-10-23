@@ -1030,6 +1030,24 @@ boost::intrusive_ptr<ExpressionContext> AggCatalogState::createExpressionContext
 
     auto expCtx = builder.build();
 
+    if (feature_flags::gFeatureFlagQueryTypeInference.checkEnabled()) {
+        const auto& mainColl = getCollections().getMainCollection();
+        // For change streams, the acquired main collection is the oplog, not the user-facing
+        // namespace in `mainNss`, so its validator-derived schema must not be registered for
+        // `mainNss`.
+        if (mainColl && !_aggExState.hasChangeStream()) {
+            expCtx->setSchemaTypeInfoForNss(mainNss,
+                                            CollectionQueryInfo::get(mainColl).getSchemaTypeInfo());
+        }
+        for (const auto& [nss, acq] : getCollections().getSecondaryCollectionAcquisitions()) {
+            const auto& coll = acq.getCollectionPtr();
+            if (coll) {
+                expCtx->setSchemaTypeInfoForNss(nss,
+                                                CollectionQueryInfo::get(coll).getSchemaTypeInfo());
+            }
+        }
+    }
+
     if (_aggExState.getRequest().getIsHybridSearch()) {
         expCtx->setIsHybridSearch();
     }

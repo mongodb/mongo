@@ -25,7 +25,7 @@ RequiresCollectionStage::RequiresCollectionStage(std::string_view stageType,
                             .prevEpoch = boost::none} {
     if (_checkSchemaMetadata) {
         auto schemaTypeInfo = CollectionQueryInfo::get(coll.getCollectionPtr()).getSchemaTypeInfo();
-        _collectionSchemaChecker.uassertIfInvalidatedAndSyncSchema(*schemaTypeInfo);
+        _collectionSchemaChecker.uassertIfInvalidatedAndSyncSchema(*schemaTypeInfo, _nss);
     }
 }
 
@@ -81,7 +81,7 @@ void RequiresCollectionStage::doRestoreState(const RestoreContext& context) {
 
     if (_checkSchemaMetadata) {
         auto current = CollectionQueryInfo::get(coll).getSchemaTypeInfo();
-        _collectionSchemaChecker.uassertIfInvalidatedAndSyncSchema(*current);
+        _collectionSchemaChecker.uassertIfInvalidatedAndSyncSchema(*current, coll->ns());
     }
 
     doRestoreStateRequiresCollection();

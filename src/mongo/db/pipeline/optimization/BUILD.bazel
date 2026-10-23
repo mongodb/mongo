@@ -28,6 +28,7 @@ mongo_cc_library(
         "//src/mongo/db/query/compiler/dependency_analysis:document_transformation",
         "//src/mongo/db/query/compiler/dependency_analysis:pipeline_dependency_graph",
         "//src/mongo/db/query/compiler/metadata:path_arrayness",
+        "//src/mongo/db/query/compiler/metadata:schema_type_info",
     ],
 )
 

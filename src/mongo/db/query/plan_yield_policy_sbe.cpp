@@ -93,7 +93,7 @@ void PlanYieldPolicySBE::MultipleCollectionSchemaChecker::uassertIfInvalidatedAn
         }
         auto current = getSchemaTypeInfo(coll);
         tassert(12567301, "Expected schema type info to be set on CollectionQueryInfo", current);
-        it->second.uassertIfInvalidatedAndSyncSchema(*current);
+        it->second.uassertIfInvalidatedAndSyncSchema(*current, coll->ns());
     });
 }
 

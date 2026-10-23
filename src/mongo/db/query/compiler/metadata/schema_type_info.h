@@ -4,6 +4,7 @@
 #pragma once
 
 #include "mongo/db/field_ref.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/query/compiler/type_system/type.h"
 
 namespace mongo {
@@ -72,7 +73,8 @@ struct CollectionSchemaChecker {
 public:
     CollectionSchemaChecker() = default;
 
-    void uassertIfInvalidatedAndSyncSchema(const SchemaTypeInfo& current);
+    void uassertIfInvalidatedAndSyncSchema(const SchemaTypeInfo& current,
+                                           const NamespaceString& nss);
 
 private:
     boost::optional<pipeline::type_system::Type> _prevRootType;

@@ -14,7 +14,14 @@ import {getAggPlanStages, getEngine} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 const kNumDocs = 20;
-const kLookupPipeline = [{$lookup: {from: "foreign", localField: "a", foreignField: "a", as: "m"}}];
+const kKilledMsg = "collection schema metadata changed during yield";
+
+// The $match consumes the inferred type of 'a' on the main collection, and the $lookup join fields
+// consume it on the foreign collection.
+const kLookupPipeline = [
+    {$match: {a: {$type: "number"}}},
+    {$lookup: {from: "foreign", localField: "a", foreignField: "a", as: "m"}},
+];
 
 describe("schema type info yield invalidation", function () {
     let conn, testDb, local, foreign, other;
@@ -23,7 +30,10 @@ describe("schema type info yield invalidation", function () {
         coll.drop();
         assert.commandWorked(
             testDb.createCollection(coll.getName(), {
-                validator: {a: {$type: "number"}},
+                // The '$not: {$type: array}' conjunct is what proves 'a' can never be an array (a
+                // plain '$type' predicate still matches arrays of that type). Only then does a
+                // query consuming 'a's inferred type become schema-dependent.
+                validator: {$and: [{a: {$type: "number"}}, {a: {$not: {$type: "array"}}}]},
                 validationLevel: "constraint",
                 validationAction: "error",
             }),
@@ -45,14 +55,22 @@ describe("schema type info yield invalidation", function () {
         );
     }
 
+    // Advances the schema epoch without changing any inferred type.
+    function changeValidationActionOnly(coll) {
+        assert.commandWorked(
+            testDb.runCommand({collMod: coll.getName(), validationAction: "errorAndLog"}),
+        );
+    }
+
     function setFrameworkControl(value) {
         assert.commandWorked(
             testDb.adminCommand({setParameter: 1, internalQueryFrameworkControl: value}),
         );
     }
 
-    // Runs 'fn' with internal yields disabled, so a getMore restores the plan without one. Otherwise
-    // the restore inside the yield runs the checks and the external restore path is never reached.
+    // Runs 'fn' with internal yields disabled, so a getMore restores the plan without one.
+    // Otherwise the restore inside the yield runs the checks and the PlanExecutor restore path is
+    // never reached.
     function withoutInternalYields(fn) {
         assert.commandWorked(
             testDb.adminCommand({
@@ -74,21 +92,49 @@ describe("schema type info yield invalidation", function () {
         }
     }
 
-    // Hangs 'cmdObj' on its first yield, runs 'duringYieldFn', then releases it.
-    function runWithYieldHang({cmdObj, duringYieldFn}) {
+    // Opens a cursor, runs 'betweenBatchesFn', then asserts the getMore outcome.
+    function runWithGetMore({cmdObj, collName, betweenBatchesFn, killedNss}) {
+        withoutInternalYields(() => {
+            const res = assert.commandWorked(testDb.runCommand(cmdObj));
+            assert.neq(NumberLong(0), res.cursor.id, res);
+
+            betweenBatchesFn();
+
+            const getMoreRes = testDb.runCommand({getMore: res.cursor.id, collection: collName});
+            if (killedNss) {
+                assert.commandFailedWithCode(getMoreRes, ErrorCodes.QueryPlanKilled);
+                assert(getMoreRes.errmsg.includes(kKilledMsg), getMoreRes);
+                assert(getMoreRes.errmsg.includes(killedNss), getMoreRes);
+            } else {
+                assert.commandWorked(getMoreRes);
+            }
+        });
+    }
+
+    // Hangs 'cmdObj' on its first yield, runs 'duringYieldFn', then releases it. If 'killedNss' is
+    // set, asserts the command is killed because that namespace's schema metadata changed.
+    function runWithYieldHang({cmdObj, duringYieldFn, killedNss, expectedCount = kNumDocs}) {
         const fp = configureFailPoint(testDb, "setYieldAllLocksHang", {
             namespace: local.getFullName(),
         });
         const awaitShell = startParallelShell(
             funWithArgs(
-                function (dbName, cmdObj, kNumDocs) {
+                function (dbName, cmdObj, killedNss, kKilledMsg, expectedCount) {
                     const res = db.getSiblingDB(dbName).runCommand(cmdObj);
-                    assert.commandWorked(res);
-                    assert.eq(res.cursor.firstBatch.length, kNumDocs, res);
+                    if (killedNss) {
+                        assert.commandFailedWithCode(res, ErrorCodes.QueryPlanKilled);
+                        assert(res.errmsg.includes(kKilledMsg), res.errmsg);
+                        assert(res.errmsg.includes(killedNss), res.errmsg);
+                    } else {
+                        assert.commandWorked(res);
+                        assert.eq(res.cursor.firstBatch.length, expectedCount, res);
+                    }
                 },
                 testDb.getName(),
                 cmdObj,
-                kNumDocs,
+                killedNss,
+                kKilledMsg,
+                expectedCount,
             ),
             conn.port,
         );
@@ -124,6 +170,11 @@ describe("schema type info yield invalidation", function () {
 
     describe("SBE", function () {
         const lookupCmd = {aggregate: "local", pipeline: kLookupPipeline, cursor: {}};
+        const lookupGetMoreCmd = {
+            aggregate: "local",
+            pipeline: kLookupPipeline,
+            cursor: {batchSize: 1},
+        };
 
         beforeEach(function () {
             setFrameworkControl("trySbeEngine");
@@ -148,47 +199,41 @@ describe("schema type info yield invalidation", function () {
             });
         });
 
-        it("does not kill the query when the main collection's constraint validator is dropped", function () {
+        it("kills the query when the main collection's constraint validator is dropped", function () {
             if (!checkSbeRestrictedOrFullyEnabled(testDb)) {
                 return;
             }
             runWithYieldHang({
                 cmdObj: lookupCmd,
                 duringYieldFn: () => dropConstraintValidator(local),
+                killedNss: local.getFullName(),
             });
         });
 
-        it("does not kill the query when the secondary collection's constraint validator is dropped", function () {
+        // SBE registers a checker for every collection the plan reads, so a change to the foreign
+        // collection's schema invalidates the plan too.
+        it("kills the query when the secondary collection's constraint validator is dropped", function () {
             if (!checkSbeRestrictedOrFullyEnabled(testDb)) {
                 return;
             }
             runWithYieldHang({
                 cmdObj: lookupCmd,
                 duringYieldFn: () => dropConstraintValidator(foreign),
+                killedNss: foreign.getFullName(),
             });
         });
 
         // A getMore restores the plan without going through an internal yield, so it exercises
         // PlanExecutorSBE::restoreState rather than PlanYieldPolicySBE::restoreState.
-        it("does not kill a cursor on getMore when the constraint validator is dropped between batches", function () {
+        it("kills a cursor on getMore when the constraint validator is dropped between batches", function () {
             if (!checkSbeRestrictedOrFullyEnabled(testDb)) {
                 return;
             }
-            withoutInternalYields(() => {
-                const res = assert.commandWorked(
-                    testDb.runCommand({
-                        aggregate: "local",
-                        pipeline: kLookupPipeline,
-                        cursor: {batchSize: 1},
-                    }),
-                );
-                assert.neq(NumberLong(0), res.cursor.id, res);
-
-                dropConstraintValidator(local);
-
-                assert.commandWorked(
-                    testDb.runCommand({getMore: res.cursor.id, collection: "local"}),
-                );
+            runWithGetMore({
+                cmdObj: lookupGetMoreCmd,
+                collName: "local",
+                betweenBatchesFn: () => dropConstraintValidator(local),
+                killedNss: local.getFullName(),
             });
         });
 
@@ -196,34 +241,43 @@ describe("schema type info yield invalidation", function () {
             if (!checkSbeRestrictedOrFullyEnabled(testDb)) {
                 return;
             }
-            withoutInternalYields(() => {
-                const res = assert.commandWorked(
-                    testDb.runCommand({
-                        aggregate: "local",
-                        pipeline: kLookupPipeline,
-                        cursor: {batchSize: 1},
-                    }),
-                );
-                assert.neq(NumberLong(0), res.cursor.id, res);
+            runWithGetMore({
+                cmdObj: lookupGetMoreCmd,
+                collName: "local",
+                betweenBatchesFn: () => dropConstraintValidator(other),
+            });
+        });
 
-                dropConstraintValidator(other);
-
-                assert.commandWorked(
-                    testDb.runCommand({getMore: res.cursor.id, collection: "local"}),
-                );
+        // Republishing identical metadata must not kill: the checker compares inferred types, not
+        // a version counter.
+        it("does not kill a cursor when only validationAction changes between batches", function () {
+            if (!checkSbeRestrictedOrFullyEnabled(testDb)) {
+                return;
+            }
+            runWithGetMore({
+                cmdObj: lookupGetMoreCmd,
+                collName: "local",
+                betweenBatchesFn: () => changeValidationActionOnly(local),
             });
         });
     });
 
     describe("classic", function () {
-        const findCmd = {find: "local", filter: {}, hint: {$natural: 1}, batchSize: kNumDocs + 1};
+        const findCmd = {find: "local", filter: {a: {$type: "number"}}, batchSize: kNumDocs + 1};
+        // SBE's filter generator is currently the only production consumer of the inferred type,
+        // so no classic query is marked schema-dependent and none registers a schema checker.
+        // These cases pin that: classic must survive a validator change, including on its own
+        // collection. Add a kill case here when a classic consumer lands.
+        const aggPipeline = [{$match: {a: {$type: "number"}}}];
+        const aggCmd = {aggregate: "local", pipeline: aggPipeline, cursor: {}};
+        const aggGetMoreCmd = {aggregate: "local", pipeline: aggPipeline, cursor: {batchSize: 1}};
 
         beforeEach(function () {
             setFrameworkControl("forceClassicEngine");
         });
 
         it("uses the classic engine", function () {
-            const explain = local.find({}).hint({$natural: 1}).explain();
+            const explain = local.find({a: {$type: "number"}}).explain();
             assert.eq("classic", getEngine(explain), explain);
         });
 
@@ -234,48 +288,51 @@ describe("schema type info yield invalidation", function () {
             });
         });
 
-        it("does not kill the query when the collection's constraint validator is dropped", function () {
+        // A classic find never consults the inferred type, so it is not schema-dependent and must
+        // survive even a change to its own collection's validator.
+        it("does not kill a find when the collection's constraint validator is dropped", function () {
             runWithYieldHang({
                 cmdObj: findCmd,
                 duringYieldFn: () => dropConstraintValidator(local),
             });
         });
 
+        it("does not kill an aggregation when the collection's constraint validator is dropped", function () {
+            runWithYieldHang({
+                cmdObj: aggCmd,
+                duringYieldFn: () => dropConstraintValidator(local),
+            });
+        });
+
+        it("does not kill an aggregation when an unrelated constraint validator is dropped", function () {
+            runWithYieldHang({
+                cmdObj: aggCmd,
+                duringYieldFn: () => dropConstraintValidator(other),
+            });
+        });
+
         it("does not kill a cursor on getMore when the constraint validator is dropped between batches", function () {
-            withoutInternalYields(() => {
-                const res = assert.commandWorked(testDb.runCommand({...findCmd, batchSize: 1}));
-                assert.neq(NumberLong(0), res.cursor.id, res);
-
-                dropConstraintValidator(local);
-
-                assert.commandWorked(
-                    testDb.runCommand({getMore: res.cursor.id, collection: "local"}),
-                );
+            runWithGetMore({
+                cmdObj: aggGetMoreCmd,
+                collName: "local",
+                betweenBatchesFn: () => dropConstraintValidator(local),
             });
         });
 
         it("does not kill a cursor on getMore when an unrelated constraint validator is dropped", function () {
-            withoutInternalYields(() => {
-                const res = assert.commandWorked(testDb.runCommand({...findCmd, batchSize: 1}));
-                assert.neq(NumberLong(0), res.cursor.id, res);
-
-                dropConstraintValidator(other);
-
-                assert.commandWorked(
-                    testDb.runCommand({getMore: res.cursor.id, collection: "local"}),
-                );
+            runWithGetMore({
+                cmdObj: aggGetMoreCmd,
+                collName: "local",
+                betweenBatchesFn: () => dropConstraintValidator(other),
             });
         });
 
         it("does not kill a cursor when only validationAction changes between batches", function () {
-            const res = assert.commandWorked(testDb.runCommand({...findCmd, batchSize: 1}));
-            assert.neq(NumberLong(0), res.cursor.id, res);
-
-            assert.commandWorked(
-                testDb.runCommand({collMod: local.getName(), validationAction: "errorAndLog"}),
-            );
-
-            assert.commandWorked(testDb.runCommand({getMore: res.cursor.id, collection: "local"}));
+            runWithGetMore({
+                cmdObj: aggGetMoreCmd,
+                collName: "local",
+                betweenBatchesFn: () => changeValidationActionOnly(local),
+            });
         });
     });
 });
@@ -284,7 +341,12 @@ describe("schema type info yield invalidation with the feature flag disabled", f
     let conn, testDb, coll;
 
     before(function () {
-        conn = MongoRunner.runMongod({setParameter: {featureFlagQueryTypeInference: false}});
+        conn = MongoRunner.runMongod({
+            setParameter: {
+                featureFlagQueryTypeInference: false,
+                internalQueryExecYieldIterations: 1,
+            },
+        });
         assert.neq(null, conn, "mongod was unable to start up");
         testDb = conn.getDB(jsTestName());
         coll = testDb.local;
@@ -294,6 +356,8 @@ describe("schema type info yield invalidation with the feature flag disabled", f
         MongoRunner.stopMongod(conn);
     });
 
+    // With the flag off no schema metadata is registered, so even a query that would otherwise
+    // consume the inferred type is never marked and must survive a validator change.
     it("does not kill a cursor when the validator changes between batches", function () {
         coll.drop();
         assert.commandWorked(
@@ -309,10 +373,9 @@ describe("schema type info yield invalidation with the feature flag disabled", f
 
         const res = assert.commandWorked(
             testDb.runCommand({
-                find: coll.getName(),
-                filter: {},
-                hint: {$natural: 1},
-                batchSize: 1,
+                aggregate: coll.getName(),
+                pipeline: [{$match: {a: {$type: "number"}}}],
+                cursor: {batchSize: 1},
             }),
         );
         assert.neq(NumberLong(0), res.cursor.id, res);

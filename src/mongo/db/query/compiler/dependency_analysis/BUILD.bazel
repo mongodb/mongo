@@ -78,6 +78,7 @@ mongo_cc_library(
         ":dependency_analysis",
         "//src/mongo/db/query:query_knobs",
         "//src/mongo/db/query/compiler/metadata:path_arrayness",
+        "//src/mongo/db/query/compiler/metadata:schema_type_info",
         "//src/mongo/db/query/compiler/type_system",
     ],
 )

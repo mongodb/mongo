@@ -28,7 +28,8 @@ Type SchemaTypeInfo::getPathType(const FieldRef& path) const {
     return pipeline::type_system::getPathType(_rootType, path);
 }
 
-void CollectionSchemaChecker::uassertIfInvalidatedAndSyncSchema(const SchemaTypeInfo& current) {
+void CollectionSchemaChecker::uassertIfInvalidatedAndSyncSchema(const SchemaTypeInfo& current,
+                                                                const NamespaceString& nss) {
     const auto& currentRootType = current.getRootType();
     if (_prevRootType && *_prevRootType == currentRootType) {
         return;
@@ -40,7 +41,9 @@ void CollectionSchemaChecker::uassertIfInvalidatedAndSyncSchema(const SchemaType
     if (hadPrevRootType) {
         uasserted(ErrorCodes::QueryPlanKilled,
                   str::stream()
-                      << "query plan killed :: collection schema metadata changed during yield");
+                      << "query plan killed :: collection schema metadata changed during yield: "
+                         "namespace="
+                      << nss.toStringForErrorMsg());
     }
 }
 

@@ -398,6 +398,14 @@ ExpressionContextBuilder& ExpressionContextBuilder::nonArrayPathsForNssFrom(
     return *this;
 }
 
+ExpressionContextBuilder& ExpressionContextBuilder::schemaTypeInfoFrom(
+    const ExpressionContext& other) {
+    // ExpressionContextBuilder is a friend of ExpressionContext,
+    // so this can access other._params directly.
+    params.schemaTypeInfoForNss = other._params.schemaTypeInfoForNss;
+    return *this;
+}
+
 ExpressionContextBuilder& ExpressionContextBuilder::schemaTypeInfoUsageFrom(
     ExpressionContext& other) {
     params.schemaTypeInfoUsed = other.getOrCreateSchemaTypeInfoUsed();
@@ -646,6 +654,13 @@ boost::intrusive_ptr<ExpressionContext> makeCopyFromExpressionContext(
     // chained call.
     if (feature_flags::gFeatureFlagPathArrayness.isEnabled()) {
         builder.pathArraynessFrom(*other).nonArrayPathsForNssFrom(*other);
+    }
+
+    // Sub-pipeline contexts ($lookup, $unionWith) must observe the same validator-derived schema
+    // type information as the parent so that type-driven rewrites remain consistent across the
+    // whole query.
+    if (feature_flags::gFeatureFlagQueryTypeInference.checkEnabled()) {
+        builder.schemaTypeInfoFrom(*other);
     }
 
     auto expCtx = builder.build();

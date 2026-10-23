@@ -17,6 +17,7 @@
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
+#include "mongo/db/query/compiler/metadata/schema_type_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_test_fixture.h"
@@ -25,8 +26,10 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/string_map.h"
 #include "mongo/util/time_support.h"
 
+#include <algorithm>
 #include <utility>
 
 
@@ -65,6 +68,153 @@ TEST_F(ExpressionContextTest, BindsToOpCtxPerOperationIFRContext) {
     ASSERT(expCtx->getIfrContext());
     ASSERT_EQ(expCtx->getIfrContext().get(),
               IncrementalFeatureRolloutContext::get(opCtx.get()).get());
+}
+
+TEST_F(ExpressionContextTest, CanPathBeArrayForNssDefaultsToTrueWithNoMetadata) {
+    auto opCtx = makeOperationContext();
+    auto nss = NamespaceString::createNamespaceString_forTest("test"sv, "namespace"sv);
+    auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx.get()).ns(nss).build();
+
+    ASSERT_TRUE(expCtx->canPathBeArrayForNss(FieldPath("a"), nss));
+    // Namespaces with no registered metadata at all are also conservatively treated as arrays.
+    ASSERT_TRUE(expCtx->canPathBeArrayForNss(
+        FieldPath("a"), NamespaceString::createNamespaceString_forTest("test"sv, "other"sv)));
+}
+
+TEST_F(ExpressionContextTest, CanPathBeArrayForNssUsesSchemaTypeInfoWhenPathArraynessAbsent) {
+    using namespace pipeline::type_system;
+
+    auto opCtx = makeOperationContext();
+    auto nss = NamespaceString::createNamespaceString_forTest("test"sv, "namespace"sv);
+    auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx.get()).ns(nss).build();
+
+    auto schemaTypeInfo = std::make_shared<SchemaTypeInfo>(
+        Type::object({{"a", Type(BSONType::string, Extent::kAll)}}, Open::kYes));
+    expCtx->setSchemaTypeInfoForNss(nss, schemaTypeInfo);
+
+    // The validator-derived type guarantees 'a' is a string, so it cannot be an array.
+    ASSERT_FALSE(expCtx->canPathBeArrayForNss(FieldPath("a"), nss));
+    ASSERT_TRUE(expCtx->hasUsedSchemaTypeInfo());
+    // Only the validator proved this, so the PathArraynessChecker must not monitor the path.
+    ASSERT_FALSE(expCtx->getNonArrayPathsForNss().contains(nss));
+
+    // An unnamed field defaults to open/any, so it could still be an array.
+    ASSERT_TRUE(expCtx->canPathBeArrayForNss(FieldPath("b"), nss));
+}
+
+TEST_F(ExpressionContextTest, CanPathBeArrayForNssRecordsPathArraynessConsumptionSeparately) {
+    using namespace pipeline::type_system;
+
+    auto opCtx = makeOperationContext();
+    auto nss = NamespaceString::createNamespaceString_forTest("test"sv, "namespace"sv);
+    auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx.get()).ns(nss).build();
+
+    auto pathArrayness = std::make_shared<PathArrayness>();
+    pathArrayness->addPathsFromIndexKeyPattern(
+        BSON("a" << 1), MultikeyPaths{{}}, true /* isFullRebuild */);
+    expCtx->setPathArraynessForNss(nss, pathArrayness);
+
+    // 'a' is proven non-array by the index, so the schema must not be credited for it.
+    ASSERT_FALSE(expCtx->canPathBeArrayForNss(FieldPath("a"), nss));
+    ASSERT_FALSE(expCtx->hasUsedSchemaTypeInfo());
+    const auto& nonArrayPaths = expCtx->nonArrayPathsForNss(nss);
+    ASSERT(std::any_of(nonArrayPaths.begin(), nonArrayPaths.end(), [](const FieldPath& path) {
+        return path.fullPath() == "a";
+    }));
+}
+
+TEST_F(ExpressionContextTest, CanPathBeArrayForNssReturnsTrueWhenSchemaTypeInfoAllowsArray) {
+    using namespace pipeline::type_system;
+
+    auto opCtx = makeOperationContext();
+    auto nss = NamespaceString::createNamespaceString_forTest("test"sv, "namespace"sv);
+    auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx.get()).ns(nss).build();
+
+    // No PathArrayness registered for 'nss', so only SchemaTypeInfo can rule out an array.
+    auto schemaTypeInfo = std::make_shared<SchemaTypeInfo>(
+        Type::object({{"a", Type(BSONType::array, Extent::kAll)}}, Open::kYes));
+    expCtx->setSchemaTypeInfoForNss(nss, schemaTypeInfo);
+
+    // The validator-derived type says 'a' can be an array, so the combined result must too.
+    ASSERT_TRUE(expCtx->canPathBeArrayForNss(FieldPath("a"), nss));
+    // A conservative "can be an array" answer drives no rewrite, so the schema is not marked used
+    // and the query does not become schema-dependent.
+    ASSERT_FALSE(expCtx->hasUsedSchemaTypeInfo());
+}
+
+TEST_F(ExpressionContextTest, CanPathBeArrayForNssFallsBackToSchemaWhenPathArraynessCannotProveIt) {
+    using namespace pipeline::type_system;
+
+    auto opCtx = makeOperationContext();
+    auto nss = NamespaceString::createNamespaceString_forTest("test"sv, "namespace"sv);
+    auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx.get()).ns(nss).build();
+
+    // The index covers 'b', so PathArrayness knows nothing about 'a' and cannot rule out an array.
+    auto pathArrayness = std::make_shared<PathArrayness>();
+    pathArrayness->addPathsFromIndexKeyPattern(
+        BSON("b" << 1), MultikeyPaths{{}}, true /* isFullRebuild */);
+    expCtx->setPathArraynessForNss(nss, pathArrayness);
+    expCtx->setSchemaTypeInfoForNss(
+        nss,
+        std::make_shared<SchemaTypeInfo>(
+            Type::object({{"a", Type(BSONType::string, Extent::kAll)}}, Open::kYes)));
+
+    ASSERT_FALSE(expCtx->canPathBeArrayForNss(FieldPath("a"), nss));
+    ASSERT_TRUE(expCtx->hasUsedSchemaTypeInfo());
+    // Only the validator proved this, so the PathArraynessChecker must not monitor the path.
+    const auto& nonArrayPaths = expCtx->nonArrayPathsForNss(nss);
+    ASSERT(std::none_of(nonArrayPaths.begin(), nonArrayPaths.end(), [](const FieldPath& path) {
+        return path.fullPath() == "a";
+    }));
+}
+
+TEST_F(ExpressionContextTest, CopiedContextInheritsSchemaTypeInfoAndSharesUsage) {
+    using namespace pipeline::type_system;
+
+    unittest::ServerParameterGuard typeInferenceFlag{"featureFlagQueryTypeInference", true};
+
+    auto opCtx = makeOperationContext();
+    auto nss = NamespaceString::createNamespaceString_forTest("test"sv, "namespace"sv);
+    auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx.get()).ns(nss).build();
+    expCtx->setSchemaTypeInfoForNss(
+        nss,
+        std::make_shared<SchemaTypeInfo>(
+            Type::object({{"a", Type(BSONType::string, Extent::kAll)}}, Open::kYes)));
+
+    // Sub-pipeline contexts ($lookup, $unionWith) must see the same validator-derived metadata.
+    auto copy = makeCopyFromExpressionContext(expCtx, nss);
+    ASSERT_TRUE(copy->hasSchemaTypeInfoForNss(nss));
+    ASSERT_FALSE(copy->canPathBeArrayForNss(FieldPath("a"), nss));
+
+    // Consumption on the copy must be visible to the parent, which owns plan invalidation.
+    ASSERT_TRUE(copy->hasUsedSchemaTypeInfo());
+    ASSERT_TRUE(expCtx->hasUsedSchemaTypeInfo());
+}
+
+TEST_F(ExpressionContextTest, MergeSchemaTypeInfoUsageFromPropagatesAcrossUnrelatedContexts) {
+    auto opCtx = makeOperationContext();
+    auto nss = NamespaceString::createNamespaceString_forTest("test"sv, "namespace"sv);
+    auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx.get()).ns(nss).build();
+    auto joinExpCtx = ExpressionContextBuilder{}.opCtx(opCtx.get()).ns(nss).build();
+
+    // Independently built contexts do not share the flag, so the join context's consumption is
+    // only visible after an explicit merge.
+    joinExpCtx->markSchemaTypeInfoUsed();
+    ASSERT_FALSE(expCtx->hasUsedSchemaTypeInfo());
+
+    expCtx->mergeSchemaTypeInfoUsageFrom(*joinExpCtx);
+    ASSERT_TRUE(expCtx->hasUsedSchemaTypeInfo());
+}
+
+TEST_F(ExpressionContextTest, MergeSchemaTypeInfoUsageFromNeverClearsExistingUsage) {
+    auto opCtx = makeOperationContext();
+    auto nss = NamespaceString::createNamespaceString_forTest("test"sv, "namespace"sv);
+    auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx.get()).ns(nss).build();
+    auto joinExpCtx = ExpressionContextBuilder{}.opCtx(opCtx.get()).ns(nss).build();
+
+    expCtx->markSchemaTypeInfoUsed();
+    expCtx->mergeSchemaTypeInfoUsageFrom(*joinExpCtx);
+    ASSERT_TRUE(expCtx->hasUsedSchemaTypeInfo());
 }
 
 TEST_F(ExpressionContextTest, ExpressionContextSummonsMissingTimeValues) {

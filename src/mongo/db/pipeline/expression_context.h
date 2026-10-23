@@ -25,6 +25,7 @@
 #include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/compiler/metadata/path_arrayness.h"
+#include "mongo/db/query/compiler/metadata/schema_type_info.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/plan_summary_stats.h"
@@ -1082,21 +1083,47 @@ public:
         _params.pathArraynessForNss.emplace(nss, std::move(pathArrayness));
     }
 
+    bool hasPathArraynessForNss(const NamespaceString& nss) const {
+        return _params.pathArraynessForNss.contains(nss);
+    }
+
+    void setSchemaTypeInfoForNss(const NamespaceString& nss,
+                                 std::shared_ptr<const SchemaTypeInfo> schemaTypeInfo) {
+        tassert(13516201, "SchemaTypeInfo must not be null", schemaTypeInfo);
+        _params.schemaTypeInfoForNss.emplace(nss, std::move(schemaTypeInfo));
+    }
+
+    bool hasSchemaTypeInfoForNss(const NamespaceString& nss) const {
+        return _params.schemaTypeInfoForNss.contains(nss);
+    }
+
     /**
      * Returns whether a field path can be an array for the given namespace. Returns true
-     * (conservative) when PathArrayness information for 'nss' is unavailable (e.g. on mongos).
+     * (conservative) when neither PathArrayness nor SchemaTypeInfo information for 'nss' is
+     * available (e.g. on mongos). Either source independently guaranteeing the path cannot be an
+     * array is sufficient to conclude it cannot be.
      */
     bool canPathBeArrayForNss(const FieldPath& path, const NamespaceString& nss) {
-        auto it = _params.pathArraynessForNss.find(nss);
-        if (it == _params.pathArraynessForNss.end()) {
-            return true;
+        if (auto it = _params.pathArraynessForNss.find(nss);
+            it != _params.pathArraynessForNss.end()) {
+            tassert(12502304, "PathArrayness entry must not be null", it->second);
+            if (!it->second->canPathBeArray(path, this)) {
+                _params.nonArrayPathsForNss[nss].insert(path);
+                return false;
+            }
         }
-        tassert(12502304, "PathArrayness entry must not be null", it->second);
-        bool result = it->second->canPathBeArray(path, this);
-        if (!result) {
-            _params.nonArrayPathsForNss[nss].insert(path);
+        if (auto it = _params.schemaTypeInfoForNss.find(nss);
+            it != _params.schemaTypeInfoForNss.end()) {
+            tassert(13516202, "SchemaTypeInfo entry must not be null", it->second);
+            if (!it->second->canPathBeArray(FieldRef(path.fullPath()))) {
+                // Only a proven "cannot be an array" result enables a rewrite, so mark the schema
+                // used (making the query schema-dependent) only in that case. A conservative "can
+                // be an array" answer drives no rewrite, so it creates no dependency to invalidate.
+                markSchemaTypeInfoUsed();
+                return false;
+            }
         }
-        return result;
+        return true;
     }
 
     bool canPathBeArrayForNss(const FieldRef& ref, const NamespaceString& nss) {
@@ -1129,6 +1156,12 @@ public:
             for (const auto& path : paths) {
                 dest.insert(path);
             }
+        }
+    }
+
+    void mergeSchemaTypeInfoUsageFrom(const ExpressionContext& other) {
+        if (other.hasUsedSchemaTypeInfo()) {
+            markSchemaTypeInfoUsed();
         }
     }
 
@@ -1311,6 +1344,11 @@ protected:
         // acquisition is not possible, e.g. when running on mongos.
         stdx::unordered_map<NamespaceString, std::shared_ptr<const PathArrayness>>
             pathArraynessForNss;
+        // SchemaTypeInfo, derived from each namespace's document validator, keyed by namespace.
+        // An entry is absent if a collection acquisition is not possible, e.g. when running on
+        // mongos.
+        stdx::unordered_map<NamespaceString, std::shared_ptr<const SchemaTypeInfo>>
+            schemaTypeInfoForNss;
         NonArrayPathsForNss nonArrayPathsForNss;
 
         // Tracks whether validator-derived type information affected planning for this query.

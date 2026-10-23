@@ -87,6 +87,7 @@ public:
             pathArraynessForNss);
     ExpressionContextBuilder& pathArraynessFrom(const ExpressionContext& other);
     ExpressionContextBuilder& nonArrayPathsForNssFrom(const ExpressionContext& other);
+    ExpressionContextBuilder& schemaTypeInfoFrom(const ExpressionContext& other);
     ExpressionContextBuilder& schemaTypeInfoUsageFrom(ExpressionContext& other);
 
     /**

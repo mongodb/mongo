@@ -210,22 +210,24 @@ TEST(SchemaTypeInfoTest, CanPathBeArrayChecksEveryPathComponent) {
     ASSERT_TRUE(info.canPathBeArray(FieldRef("a.b.c")));
 }
 
+const NamespaceString kTestNss = NamespaceString::createNamespaceString_forTest("test.schema");
+
 TEST(CollectionSchemaCheckerTest, DoesNotKillWhenTypeIsUnchanged) {
     SchemaTypeInfo current(Type::anyObject());
     CollectionSchemaChecker checker;
-    checker.uassertIfInvalidatedAndSyncSchema(current);
+    checker.uassertIfInvalidatedAndSyncSchema(current, kTestNss);
 
-    checker.uassertIfInvalidatedAndSyncSchema(current);
+    checker.uassertIfInvalidatedAndSyncSchema(current, kTestNss);
 }
 
 TEST(CollectionSchemaCheckerTest, KillsPlanWhenTypeChanges) {
     SchemaTypeInfo current(Type::anyObject());
     CollectionSchemaChecker checker;
-    checker.uassertIfInvalidatedAndSyncSchema(current);
+    checker.uassertIfInvalidatedAndSyncSchema(current, kTestNss);
 
     current =
         SchemaTypeInfo(Type::object({{"x", Type(BSONType::string, Extent::kAll)}}, Open::kYes));
-    ASSERT_THROWS_CODE(checker.uassertIfInvalidatedAndSyncSchema(current),
+    ASSERT_THROWS_CODE(checker.uassertIfInvalidatedAndSyncSchema(current, kTestNss),
                        DBException,
                        ErrorCodes::QueryPlanKilled);
 }
@@ -233,30 +235,33 @@ TEST(CollectionSchemaCheckerTest, KillsPlanWhenTypeChanges) {
 TEST(CollectionSchemaCheckerTest, SyncsTypeAfterKill) {
     SchemaTypeInfo current(Type::anyObject());
     CollectionSchemaChecker checker;
-    checker.uassertIfInvalidatedAndSyncSchema(current);
+    checker.uassertIfInvalidatedAndSyncSchema(current, kTestNss);
 
     current =
         SchemaTypeInfo(Type::object({{"x", Type(BSONType::string, Extent::kAll)}}, Open::kYes));
-    ASSERT_THROWS_CODE(checker.uassertIfInvalidatedAndSyncSchema(current),
+    ASSERT_THROWS_CODE(checker.uassertIfInvalidatedAndSyncSchema(current, kTestNss),
                        DBException,
                        ErrorCodes::QueryPlanKilled);
 
-    checker.uassertIfInvalidatedAndSyncSchema(current);
+    checker.uassertIfInvalidatedAndSyncSchema(current, kTestNss);
 }
 
 TEST(CollectionSchemaCheckerTest, DoesNotKillWhenRebuiltTypeIsEqual) {
     CollectionSchemaChecker checker;
     checker.uassertIfInvalidatedAndSyncSchema(
-        SchemaTypeInfo(Type::object({{"x", Type(BSONType::string, Extent::kAll)}}, Open::kYes)));
+        SchemaTypeInfo(Type::object({{"x", Type(BSONType::string, Extent::kAll)}}, Open::kYes)),
+        kTestNss);
     checker.uassertIfInvalidatedAndSyncSchema(
-        SchemaTypeInfo(Type::object({{"x", Type(BSONType::string, Extent::kAll)}}, Open::kYes)));
+        SchemaTypeInfo(Type::object({{"x", Type(BSONType::string, Extent::kAll)}}, Open::kYes)),
+        kTestNss);
 }
 
 TEST(CollectionSchemaCheckerTest, KillsPlanWhenTypeBecomesUnconstrained) {
     CollectionSchemaChecker checker;
     checker.uassertIfInvalidatedAndSyncSchema(
-        SchemaTypeInfo(Type::object({{"x", Type(BSONType::string, Extent::kAll)}}, Open::kYes)));
-    ASSERT_THROWS_CODE(checker.uassertIfInvalidatedAndSyncSchema(SchemaTypeInfo()),
+        SchemaTypeInfo(Type::object({{"x", Type(BSONType::string, Extent::kAll)}}, Open::kYes)),
+        kTestNss);
+    ASSERT_THROWS_CODE(checker.uassertIfInvalidatedAndSyncSchema(SchemaTypeInfo(), kTestNss),
                        DBException,
                        ErrorCodes::QueryPlanKilled);
 }
@@ -267,11 +272,30 @@ TEST(CollectionSchemaCheckerTest, KillsPlanWhenNestedFieldTypeChanges) {
             {{"x", Type::object({{"y", Type(fieldType, Extent::kAll)}}, Open::kYes)}}, Open::kYes));
     };
     CollectionSchemaChecker checker;
-    checker.uassertIfInvalidatedAndSyncSchema(schemaWithNestedField(BSONType::string));
-    ASSERT_THROWS_WHAT(
-        checker.uassertIfInvalidatedAndSyncSchema(schemaWithNestedField(BSONType::numberInt)),
-        DBException,
-        "query plan killed :: collection schema metadata changed during yield");
+    checker.uassertIfInvalidatedAndSyncSchema(schemaWithNestedField(BSONType::string), kTestNss);
+    ASSERT_THROWS_WHAT(checker.uassertIfInvalidatedAndSyncSchema(
+                           schemaWithNestedField(BSONType::numberInt), kTestNss),
+                       DBException,
+                       "query plan killed :: collection schema metadata changed during yield: "
+                       "namespace=test.schema");
+}
+
+TEST(CollectionSchemaCheckerTest, EachCheckerTracksItsOwnNamespaceIndependently) {
+    const auto otherNss = NamespaceString::createNamespaceString_forTest("test.other");
+    const SchemaTypeInfo constrained(
+        Type::object({{"x", Type(BSONType::string, Extent::kAll)}}, Open::kYes));
+
+    CollectionSchemaChecker first;
+    CollectionSchemaChecker second;
+    first.uassertIfInvalidatedAndSyncSchema(constrained, kTestNss);
+    second.uassertIfInvalidatedAndSyncSchema(constrained, otherNss);
+
+    // Only the checker whose schema changed kills, and it names its own namespace.
+    ASSERT_THROWS_WHAT(first.uassertIfInvalidatedAndSyncSchema(SchemaTypeInfo(), kTestNss),
+                       DBException,
+                       "query plan killed :: collection schema metadata changed during yield: "
+                       "namespace=test.schema");
+    second.uassertIfInvalidatedAndSyncSchema(constrained, otherNss);
 }
 
 TEST(SchemaTypeInfoTest, GetPathTypeOfEmptyPathIsTheRootType) {

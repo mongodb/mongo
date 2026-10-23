@@ -256,7 +256,7 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
                 auto [it, inserted] = perNss.emplace(coll->ns(), CollectionSchemaChecker{});
                 invariant(inserted);
                 it->second.uassertIfInvalidatedAndSyncSchema(
-                    *CollectionQueryInfo::get(coll).getSchemaTypeInfo());
+                    *CollectionQueryInfo::get(coll).getSchemaTypeInfo(), coll->ns());
             }
         });
         yieldPolicy->setMultipleCollectionSchemaChecker(

@@ -504,7 +504,8 @@ TEST_F(MultipleCollectionSchemaCheckerTest, KillsWhenTheSchemaChanges) {
     info = infoWithX(BSONType::numberInt);
     ASSERT_THROWS_WHAT(checker.uassertIfInvalidatedAndSyncSchema(),
                        DBException,
-                       "query plan killed :: collection schema metadata changed during yield");
+                       "query plan killed :: collection schema metadata changed during yield: "
+                       "namespace=TestDB.TestColl");
 }
 
 TEST_F(MultipleCollectionSchemaCheckerTest, KillsWhenTheSchemaBecomesUnconstrained) {

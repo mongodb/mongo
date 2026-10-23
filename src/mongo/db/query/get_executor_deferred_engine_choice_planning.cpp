@@ -375,10 +375,17 @@ PlanRankingResult planRanking(OperationContext* opCtx,
     // Do not invoke if it has been already initialized.
     // TODO SERVER-123955 Consider moving it to a different location
     const auto& collection = collections.getMainCollection();
-    if (feature_flags::gFeatureFlagPathArrayness.isEnabled() && collection) {
+    const auto& nss = canonicalQuery->getExpCtx()->getNamespaceString();
+    if (feature_flags::gFeatureFlagPathArrayness.isEnabled() &&
+        !canonicalQuery->getExpCtx()->hasPathArraynessForNss(nss) && collection) {
         canonicalQuery->getExpCtx()->setPathArraynessForNss(
-            canonicalQuery->getExpCtx()->getNamespaceString(),
-            CollectionQueryInfo::get(collection).getPathArrayness());
+            nss, CollectionQueryInfo::get(collection).getPathArrayness());
+    }
+
+    if (feature_flags::gFeatureFlagQueryTypeInference.checkEnabled() &&
+        !canonicalQuery->getExpCtx()->hasSchemaTypeInfoForNss(nss) && collection) {
+        canonicalQuery->getExpCtx()->setSchemaTypeInfoForNss(
+            nss, CollectionQueryInfo::get(collection).getSchemaTypeInfo());
     }
 
     auto makePlannerHelper = [&](std::unique_ptr<QueryPlannerParams> plannerParams)

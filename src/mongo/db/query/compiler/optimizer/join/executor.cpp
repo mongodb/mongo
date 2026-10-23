@@ -603,6 +603,10 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> checkPlanCacheForPlan(
         .accessPathAt(hit->baseNode)
         ->getExpCtx()
         ->mergeNonArrayPathsForNss(model.getJoinExpCtx()->getNonArrayPathsForNss());
+    model.getGraph()
+        .accessPathAt(hit->baseNode)
+        ->getExpCtx()
+        ->mergeSchemaTypeInfoUsageFrom(*model.getJoinExpCtx());
 
     auto [planStagesAndData, sbeYieldPolicy] = lowerToSbePlanStageTree(opCtx,
                                                                        model.getGraph(),
@@ -939,6 +943,7 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
     // PathArraynessChecker monitors them during execution yields.
     baseNodeCQ.getExpCtx()->mergeNonArrayPathsForNss(
         model.getJoinExpCtx()->getNonArrayPathsForNss());
+    baseNodeCQ.getExpCtx()->mergeSchemaTypeInfoUsageFrom(*model.getJoinExpCtx());
 
     // Lower to SBE.
     auto [planStagesAndData, sbeYieldPolicy] = lowerToSbePlanStageTree(opCtx,
