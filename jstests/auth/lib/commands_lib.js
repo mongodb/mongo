@@ -2135,11 +2135,10 @@ export const authCommandsLib = {
             testname: "aggregate_joinPlanCacheStats",
             command: {aggregate: 1, pipeline: [{$joinPlanCacheStats: {}}], cursor: {}},
             // $joinPlanCacheStats dumps the node-global join plan cache. It is collectionless on
-            // 'admin' and is gated behind the internalEnableJoinOptimization/
-            // internalEnableJoinPlanCache knobs which are off by default -- so an authorized user
-            // still fails with QueryFeatureNotAllowed after the authorization check passes. This
-            // holds on both a standalone and a router, since the router authorizes and applies the
-            // knob gate before dispatching to the shards.
+            // 'admin' and is gated behind the internalEnableJoinOptimization knob which is off by
+            // default -- so an authorized user still fails with QueryFeatureNotAllowed after the
+            // authorization check passes. This holds on both a standalone and a router, since the
+            // router authorizes and applies the knob gate before dispatching to the shards.
             testcases: [
                 {
                     runOnDb: adminDbName,
@@ -2155,11 +2154,10 @@ export const authCommandsLib = {
             testname: "clearJoinPlanCache",
             command: {clearJoinPlanCache: 1},
             // 'clearJoinPlanCache' drops the node-global join plan cache. It is admin-only and
-            // collectionless, and is gated behind the internalEnableJoinOptimization/
-            // internalEnableJoinPlanCache knobs which are off by default -- so an authorized user
-            // still fails with QueryFeatureNotAllowed after the authorization check passes. This
-            // holds on both a standalone and a router, since the router applies the knob gate
-            // before broadcasting to the shards.
+            // collectionless, and is gated behind the internalEnableJoinOptimization knob which is
+            // off by default -- so an authorized user still fails with QueryFeatureNotAllowed
+            // after the authorization check passes. This holds on both a standalone and a router,
+            // since the router applies the knob gate before broadcasting to the shards.
             testcases: [
                 {
                     runOnDb: adminDbName,
