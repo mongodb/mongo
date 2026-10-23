@@ -641,7 +641,7 @@ bool addFuzzedElements(const char*& ptr,
                     if (encoding > absl::Int128Max() - delta)
                         return false;
                 } else {
-                    if (encoding > absl::Int128Min() - delta)
+                    if (encoding < absl::Int128Min() - delta)
                         return false;
                 }
                 encoding += delta;

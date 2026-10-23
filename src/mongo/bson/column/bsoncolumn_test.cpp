@@ -30,6 +30,7 @@
 #include <limits>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include <absl/numeric/int128.h>
 #include <boost/cstdint.hpp>
@@ -1297,6 +1298,33 @@ TEST_F(BSONColumnTest, FuzzerDiscoveredEdgeCases) {
         // Validate that reopening BSONColumnBuilder from this binary produces the same state as-if
         // values were uncompressed and re-appended.
         verifyColumnReopenFromBinary(binary.data(), binary.size());
+    }
+}
+
+TEST_F(BSONColumnTest, AddFuzzedElementsRejectsStringDeltaUnderflow) {
+    // A leading 0xac byte encodes to an int128 below Int128Min() / 2, so adding a full negative
+    // delta would overflow.
+    std::string str(16, '\xac');
+    auto element = createElementString(str);
+    const char factor = '\xff';
+    const char* ptr = &factor;
+    std::forward_list<BSONObj> elementMemory;
+    std::vector<BSONElement> generatedElements;
+    EXPECT_FALSE(
+        bsoncolumn::addFuzzedElements(ptr, ptr + 1, elementMemory, element, 2, generatedElements));
+}
+
+TEST_F(BSONColumnTest, AddFuzzedElementsAcceptsZeroStringDelta) {
+    auto element = createElementString("mongo");
+    const char factor = 0;
+    const char* ptr = &factor;
+    std::forward_list<BSONObj> elementMemory;
+    std::vector<BSONElement> generatedElements;
+    EXPECT_TRUE(
+        bsoncolumn::addFuzzedElements(ptr, ptr + 1, elementMemory, element, 3, generatedElements));
+    EXPECT_EQ(generatedElements.size(), 3);
+    for (auto&& generated : generatedElements) {
+        EXPECT_TRUE(element.binaryEqualValues(generated));
     }
 }
 
