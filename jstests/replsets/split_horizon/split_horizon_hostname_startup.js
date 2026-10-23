@@ -31,6 +31,11 @@ let rsConfig1 = mongod.adminCommand({replSetGetConfig: 1});
 jsTestLog("rsConfig1: " + tojson(rsConfig1));
 assert.commandWorked(rsConfig1);
 
+// Wait for the node to finish stepping up (transition to primary complete) before shutting it
+// down. Stopping the node mid-step-up is legitimate but would race with the step-up work, such as
+// creating the replicated fast count containers, and fail shutdown validation.
+assert.soon(() => mongod.adminCommand({isMaster: 1}).ismaster, "Node failed to finish stepping up");
+
 MongoRunner.stopMongod(mongod);
 
 // Restart mongod without override setting and see that it will still work because it was previously
