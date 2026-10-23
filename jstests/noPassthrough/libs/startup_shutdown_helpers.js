@@ -141,12 +141,15 @@ function forkThenShutdownMongoProgram(program, args) {
     }
     jsTestLog("Forked process exited with code " + exitCode);
     assert.eq(0, exitCode);
+
+    return rawOutput;
 }
 
 /**
  * Starts mongod with the given arguments plus --fork, sets a failpoint that will cause the forked
  * process to shutdown immediately after startup completes, and asserts that both the parent and
- * child process exit with a code of 0.
+ * child process exit with a code of 0. Returns the raw output i.e., stdout and stderr merged into
+ * a single stream (unfortunately).
  */
 export function forkThenShutdownMongod(args = {}) {
     const defaultArgs = {
@@ -159,13 +162,14 @@ export function forkThenShutdownMongod(args = {}) {
     };
 
     const testArgs = MongoRunner.mongodOptions({...defaultArgs, ...args});
-    forkThenShutdownMongoProgram("mongod", testArgs);
+    return forkThenShutdownMongoProgram("mongod", testArgs);
 }
 
 /**
  * Starts mongos with the given config server and arguments (plus --fork) sets a failpoint that
  * will cause the forked process to shutdown immediately after startup completes, and asserts that
- * both the parent and child process exit with a code of 0.
+ * both the parent and child process exit with a code of 0. Returns the raw output i.e., stdout and
+ * stderr merged into a single stream (unfortunately).
  */
 export function forkThenShutdownMongos(configRS, args = {}) {
     const defaultArgs = {
@@ -179,5 +183,5 @@ export function forkThenShutdownMongos(configRS, args = {}) {
     };
 
     const testArgs = MongoRunner.mongosOptions({...defaultArgs, ...args});
-    forkThenShutdownMongoProgram("mongos", testArgs);
+    return forkThenShutdownMongoProgram("mongos", testArgs);
 }

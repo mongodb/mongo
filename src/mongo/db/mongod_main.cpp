@@ -135,6 +135,7 @@
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_lifecycle_monitor.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/server_options_base.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_entry_point_shard_role.h"
 #include "mongo/db/session/kill_sessions_local.h"
@@ -1195,6 +1196,8 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
         LOGV2(20555, "Service running");
     }
 #endif
+
+    handleStartupStreamsFailPoint();
 
     if (MONGO_unlikely(shutdownAtStartup.shouldFail())) {
         LOGV2(20556, "Starting clean exit via failpoint");

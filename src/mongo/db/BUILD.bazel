@@ -284,6 +284,7 @@ mongo_cc_library(
         ":connection_health_metrics_parameter",
         ":server_base",
         "//src/mongo/db/auth:cluster_auth_mode",
+        "//src/mongo/util:fail_point",
         "//src/mongo/util/options_parser",
     ],
 )

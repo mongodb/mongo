@@ -1,5 +1,8 @@
 version: 1.0.0
 filters:
+  - "*startup_shutdown*":
+    approvers:
+      - 10gen/server-programmability
   - "*server_parameter*":
     approvers:
       - 10gen/server-programmability

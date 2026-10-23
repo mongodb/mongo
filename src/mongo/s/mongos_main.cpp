@@ -46,6 +46,7 @@
 #include "mongo/db/router_role/routing_cache/config_server_catalog_cache_loader.h"
 #include "mongo/db/router_role/routing_cache/config_server_catalog_cache_loader_impl.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/server_options_base.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/kill_sessions.h"
 #include "mongo/db/session/kill_sessions_remote.h"
@@ -953,6 +954,8 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
 #endif
 
     logStartupStats = {};
+
+    handleStartupStreamsFailPoint();
 
     if (MONGO_unlikely(shutdownAtStartup.shouldFail())) {
         LOGV2(9494000, "Starting clean exit via failpoint");

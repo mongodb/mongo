@@ -276,10 +276,12 @@ static bool forkServer() {
     };
     if (!stdioDetach(stdin, "r", "stdin"))
         return false;
-    if (!stdioDetach(stderr, "w", "stderr"))
-        return false;
-    if (!stdioDetach(stdout, "w", "stdout"))
-        return false;
+    if (serverGlobalParams.forkDetachesOutputStreams) {
+        if (!stdioDetach(stderr, "w", "stderr"))
+            return false;
+        if (!stdioDetach(stdout, "w", "stdout"))
+            return false;
+    }
     return true;
 #endif  // !defined(_WIN32)
 }

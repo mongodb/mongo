@@ -124,6 +124,9 @@ struct [[MONGO_MOD_PUBLIC]] ServerGlobalParams {
     bool logWithSyslog = false;     // True if logging to syslog; must not be set if logpath is set.
     int syslogFacility;             // Facility used when appending messages to the syslog.
 
+    // True means we detach stdout and stderr in a forked child process.
+    bool forkDetachesOutputStreams = true;
+
 #ifndef _WIN32
     int forkReadyFd = -1;  // for `--fork`. Write to it and close it when daemon service is up.
 #endif

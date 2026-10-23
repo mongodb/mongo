@@ -5,19 +5,25 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/cluster_auth_mode.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_options_base_gen.h"
 #include "mongo/db/server_options_general_gen.h"
+#include "mongo/logv2/log.h"
 #include "mongo/logv2/log_component.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_description.h"
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/options_parser/value.h"
 #include "mongo/util/str.h"
 
+#include <iostream>
 #include <ostream>
 #include <string_view>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
 namespace moe = mongo::optionenvironment;
 
@@ -88,6 +94,20 @@ Status validateSecurityClusterAuthModeSetting(const std::string& value) {
     }
 
     return Status::OK();
+}
+
+MONGO_FAIL_POINT_DEFINE(writeToStandardStreamsAtStartup);
+
+void handleStartupStreamsFailPoint() {
+    writeToStandardStreamsAtStartup.execute([](const BSONObj& data) {
+        LOGV2(13536002, "writeToStandardStreamsAtStartup is active", "data"_attr = data);
+        if (auto message = data.getStringField("stdout"); !message.empty()) {
+            std::cout << message << std::endl;
+        }
+        if (auto message = data.getStringField("stderr"); !message.empty()) {
+            std::cerr << message << std::endl;
+        }
+    });
 }
 
 Status canonicalizeNetBindIpAll(moe::Environment* env) {

@@ -53,6 +53,7 @@
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/options_parser/options_parser.h"
 #include "mongo/util/options_parser/value.h"
+#include "mongo/util/scoped_value_guard.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 
@@ -627,7 +628,7 @@ TEST(SetupOptions, PriorityPortParsingFromYAMLConfigFile) {
     const std::vector<std::string> argv = {"binaryname", "--config", "config.yaml"};
 
     parser.setConfig("config.yaml",
-                     R"(net:  
+                     R"(net:
                             priorityPort: 345)");
 
     ASSERT_OK(parser.run(options, argv, &environment));
@@ -1095,7 +1096,134 @@ TEST(SetupOptions, NonNumericSlowWaitMsYAMLConfigOptionFailsToParse) {
     ASSERT_NOT_OK(parser.run(options, argv, &environment));
 }
 
-#if !defined(_WIN32) && !defined(__APPLE__)
+#ifdef __linux__
+/**
+ * Sets each environment variable in 'env' on construction and restores the previous value
+ * (or absence) of each key on destruction. Unsafe to use when multi-threaded due to usage
+ * of setenv/unsetenv and getenv.
+ */
+class ScopedEnvVar {
+public:
+    explicit ScopedEnvVar(const std::vector<std::pair<std::string, std::string>>& env) {
+        for (auto&& [envKey, envValue] : env) {
+            boost::optional<std::string> saved;
+            if (const char* oldValue = getenv(envKey.c_str()))
+                saved.emplace(oldValue);
+            _capturedEnv.emplace_back(envKey, std::move(saved));
+            setenv(envKey.c_str(), envValue.c_str(), 1);
+        }
+    }
+
+    ScopedEnvVar(ScopedEnvVar&&) = default;
+    ScopedEnvVar& operator=(ScopedEnvVar&&) = default;
+
+    ~ScopedEnvVar() {
+        for (auto&& [envKey, oldValue] : _capturedEnv) {
+            if (oldValue) {
+                setenv(envKey.c_str(), oldValue->c_str(), 1);
+            } else {
+                unsetenv(envKey.c_str());
+            }
+        }
+    }
+
+private:
+    std::vector<std::pair<std::string, boost::optional<std::string>>> _capturedEnv;
+};
+
+class StartupOptionsTest : public unittest::Test {
+public:
+    void setUp() override {
+        ASSERT_OK(addGeneralServerOptions(&_options));
+        ASSERT_OK(addNonGeneralServerOptions(&_options));
+    }
+
+    Status parseOptions(const SetupOptionsTestConfig& config) {
+        scopedEnvVar = ScopedEnvVar{config.envVars()};
+        if (!config.configFileName().empty()) {
+            _parser.setConfig(config.configFileName(), config.configFileContents());
+        }
+
+        return _parser.run(_options, config.binaryArgs(), &_environment);
+    }
+
+    void loadOptions(const SetupOptionsTestConfig& config) {
+        SCOPED_TRACE(config.toString());
+        ASSERT_OK(_environment.validate(/*setValue=*/false));
+        ASSERT_OK(validateServerOptions(_environment));
+        ASSERT_OK(canonicalizeServerOptions(&_environment));
+        ASSERT_OK(_environment.validate());
+        ASSERT_OK(setupServerOptions(config.binaryArgs()));
+        ASSERT_OK(storeServerOptions(_environment));
+    }
+
+    void parseAndLoadOptions(const SetupOptionsTestConfig& config) {
+        ASSERT_OK(parseOptions(config));
+        loadOptions(config);
+    }
+
+    moe::OptionSection& options() {
+        return _options;
+    }
+
+    moe::Environment& environment() {
+        return _environment;
+    }
+
+    auto makeForkDetachesOutputStreamsGuard() {
+        return ScopedValueRestore{serverGlobalParams.forkDetachesOutputStreams};
+    }
+
+private:
+    OptionsParserTester _parser;
+    moe::OptionSection _options;
+    moe::Environment _environment;
+    boost::optional<ScopedEnvVar> scopedEnvVar;
+};
+
+TEST_F(StartupOptionsTest, ForkDetachesOutputStreamsFalseParsedFromCLI) {
+    auto restore = makeForkDetachesOutputStreamsGuard();
+
+    const SetupOptionsTestConfig config{{"--forkDetachesOutputStreams=false"}, "", {}, {}};
+    parseAndLoadOptions(config);
+
+    ASSERT_FALSE(serverGlobalParams.forkDetachesOutputStreams);
+}
+
+TEST_F(StartupOptionsTest, ForkDetachesOutputStreamsFalseParsedFromYAML) {
+    auto restore = makeForkDetachesOutputStreamsGuard();
+
+    const SetupOptionsTestConfig config{
+        {}, "config.yaml", {{"processManagement.forkDetachesOutputStreams", "false"}}, {}};
+    parseAndLoadOptions(config);
+
+    ASSERT_FALSE(serverGlobalParams.forkDetachesOutputStreams);
+}
+
+TEST_F(StartupOptionsTest, ForkDetachesOutputStreamsTrueParsedFromCLI) {
+    auto restore = makeForkDetachesOutputStreamsGuard();
+
+    const SetupOptionsTestConfig config{{"--forkDetachesOutputStreams=true"}, "", {}, {}};
+    parseAndLoadOptions(config);
+
+    ASSERT_TRUE(serverGlobalParams.forkDetachesOutputStreams);
+}
+
+TEST_F(StartupOptionsTest, ForkDetachesOutputStreamsTrueParsedFromYAML) {
+    auto restore = makeForkDetachesOutputStreamsGuard();
+
+    const SetupOptionsTestConfig config{
+        {}, "config.yaml", {{"processManagement.forkDetachesOutputStreams", "true"}}, {}};
+    parseAndLoadOptions(config);
+
+    ASSERT_TRUE(serverGlobalParams.forkDetachesOutputStreams);
+}
+
+TEST_F(StartupOptionsTest, InvalidForkDetachesOutputStreamsRejected) {
+    const SetupOptionsTestConfig config{{"--forkDetachesOutputStreams=notabool"}, "", {}, {}};
+    ASSERT_EQ(parseOptions(config), ErrorCodes::BadValue) << config.toString();
+}
+
 class ForkTestSpec {
 public:
     enum Value {
@@ -1189,18 +1317,10 @@ public:
     }
 
     void run() {
+        ScopedValueRestore restoreDoFork{serverGlobalParams.doFork};
+        ScopedEnvVar envGuard{spec_.config().envVars()};
+
         auto&& argv = spec_.config().binaryArgs();
-
-        for (auto&& [envKey, envValue] : spec_.config().envVars()) {
-            setenv(envKey.c_str(), envValue.c_str(), 1);
-        }
-
-        ScopeGuard sg = [&] {
-            serverGlobalParams.doFork = false;
-            for (auto&& [envKey, envValue] : spec_.config().envVars()) {
-                unsetenv(envKey.c_str());
-            }
-        };
 
         ASSERT_OK(parser_.run(options_, argv, &environment_)) << spec_.toString();
 
@@ -1235,7 +1355,31 @@ TEST(SetupOptions, ForkOptionAlwaysFalseWithNoforkEnvVar) {
     ForkTest{ForkTestSpec::CONFIG_WITH_ENV, false}.run();
     ForkTest{ForkTestSpec::BOTH_WITH_ENV, false}.run();
 }
-#endif
+#else
+// --fork is rejected with BadValue on platforms where it's not supported.
+TEST(SetupOptions, ForkRejectedOnNonLinuxPlatforms) {
+    ScopedValueRestore restoreDoFork{serverGlobalParams.doFork};
+
+    OptionsParserTester parser;
+    moe::Environment environment;
+    moe::OptionSection options;
+
+    ASSERT_OK(addGeneralServerOptions(&options));
+    ASSERT_OK(addNonGeneralServerOptions(&options));
+
+    std::vector<std::string> argv{"binaryname", "--fork"};
+
+    ASSERT_OK(parser.run(options, argv, &environment));
+
+    ASSERT_OK(validateServerOptions(environment));
+    ASSERT_OK(canonicalizeServerOptions(&environment));
+    ASSERT_OK(setupServerOptions(argv));
+
+    Status status = storeServerOptions(environment);
+    ASSERT_NOT_OK(status);
+    ASSERT_EQ(status, ErrorCodes::BadValue);
+}
+#endif  // __linux__
 
 TEST(ClusterRole, MonoRole) {
     const ClusterRole noRole{ClusterRole::None};

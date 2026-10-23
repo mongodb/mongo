@@ -18,21 +18,6 @@ namespace transport {
 
 using ReactorHandle = std::shared_ptr<Reactor>;
 
-/** Scope guard to set and restore an object value. */
-template <typename T>
-class ScopedValueOverride {
-public:
-    ScopedValueOverride(T& target, T v)
-        : _target{target}, _saved{std::exchange(_target, std::move(v))} {}
-    ~ScopedValueOverride() {
-        _target = std::move(_saved);
-    }
-
-private:
-    T& _target;
-    T _saved;
-};
-
 class CallbackMockSession : public MockSessionBase {
 public:
     CallbackMockSession() = default;

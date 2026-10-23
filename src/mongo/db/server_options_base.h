@@ -31,4 +31,10 @@ Status canonicalizeNetBindIpAll(optionenvironment::Environment*);
 
 std::string getUnixDomainSocketFilePermissionsHelpText();
 
+/**
+ * Executes a failpoint that writes to stdout or stderr (or both), which is useful
+ * for testing our handling of the child's streams when forking the server.
+ */
+[[MONGO_MOD_PUBLIC]] void handleStartupStreamsFailPoint();
+
 }  // namespace mongo

@@ -136,11 +136,22 @@ configs:
         condition:
             preprocessor: "!defined(_WIN32)"
     "processManagement.fork":
-        description: "Fork server process"
+        description: "Fork server process. Only supported on linux."
         short_name: fork
         arg_vartype: Switch
-        condition:
-            preprocessor: "!defined(_WIN32)"
+    "processManagement.forkDetachesOutputStreams":
+        description: >-
+            If true, when the server forks, the child's stdout and stderr are redirected to
+            /dev/null. If false, they are kept attached to the same destination as the process
+            that started the server. That process must keep both streams valid and safe for the
+            daemon to write to throughout its lifetime. Otherwise, output written to those streams
+            may be lost (such as when a stream is connected to a terminal whose session has ended),
+            or writes may block indefinitely (such as when a stream is connected to a pipe that is
+            not being read). stdin is always connected to /dev/null.
+        default: true
+        implicit: true
+        short_name: forkDetachesOutputStreams
+        arg_vartype: Bool
     "processManagement.loadExtensions":
         description: "Specify extension names to load"
         short_name: loadExtensions

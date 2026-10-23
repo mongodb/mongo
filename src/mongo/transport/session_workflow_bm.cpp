@@ -43,8 +43,6 @@
 #include <vector>
 
 #include <benchmark/benchmark.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
 #include <boost/smart_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kExecutor
@@ -204,9 +202,6 @@ public:
                     "exhaustRounds"_attr = exhaustRounds,
                     "reserved"_attr = reserved);
 
-#if TRANSITIONAL_SERVICE_EXECUTOR_SYNCHRONOUS_HAS_RESERVE
-        _savedDefaultReserved.emplace(ServiceExecutorSynchronous::defaultReserved, reserved);
-#endif
         setGlobalServiceContext(ServiceContext::make());
         auto sc = getGlobalServiceContext();
         _coordinator = std::make_unique<MockCoordinator>(sc, exhaustRounds + 1);
@@ -245,7 +240,6 @@ public:
         getGlobalServiceContext()->getTransportLayerManager()->shutdown();
         ServiceExecutor::shutdownAll(getGlobalServiceContext(), Seconds(1));
         setGlobalServiceContext({});
-        _savedDefaultReserved.reset();
     }
 
     void run(benchmark::State& state) {
@@ -268,7 +262,6 @@ public:
 private:
     std::mutex _setupMutex;
     int _configuredThreads = 0;
-    boost::optional<ScopedValueOverride<size_t>> _savedDefaultReserved;
     std::unique_ptr<MockCoordinator> _coordinator;
     AsioSessionManager* _sessionManager;
     test::TransportLayerMockWithReactor* _transportLayer{nullptr};
@@ -319,9 +312,6 @@ constexpr std::array exhaustRounds{0, 1, 8};
 
 static void benchmarkExhaustInnerLoop(benchmark::internal::Benchmark* b, int exhaust) {
     std::vector<int> res{0};
-#if TRANSITIONAL_SERVICE_EXECUTOR_SYNCHRONOUS_HAS_RESERVE
-    res = {0, 1, 4, 16};
-#endif
     for (int reserved : res)
         b->Args({exhaust, reserved});
 }

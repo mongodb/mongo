@@ -381,18 +381,24 @@ Status storeServerOptions(const moe::Environment& params) {
         serverGlobalParams.unixSocketPermissions =
             params["net.unixDomainSocket.filePermissions"].as<int>();
     }
+#endif  // _WIN32
+
     if (shouldFork(params)) {
         serverGlobalParams.doFork = true;
     }
-#endif  // _WIN32
 
-#ifdef __APPLE__
+    if (params.count("processManagement.forkDetachesOutputStreams")) {
+        serverGlobalParams.forkDetachesOutputStreams =
+            params["processManagement.forkDetachesOutputStreams"].as<bool>();
+    }
+
+#if !defined(__linux__)
     if (serverGlobalParams.doFork) {
         return Status(ErrorCodes::BadValue,
                       "Server fork+exec via `--fork` or `processManagement.fork` "
-                      "is incompatible with macOS");
+                      "is not supported on this platform");
     }
-#endif  // Apple
+#endif  // !defined(__linux__)
 
     if (serverGlobalParams.doFork && serverGlobalParams.logpath.empty() &&
         !serverGlobalParams.logWithSyslog) {
