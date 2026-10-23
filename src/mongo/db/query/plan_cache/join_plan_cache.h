@@ -142,12 +142,28 @@ struct NodeFingerprint {
     size_t estimateObjectSizeInBytes() const;
 };
 
+/** Execution statistics from a plan's first execution; the replanning baseline for its entry. */
+struct JoinPlanBaseline {
+    // Storage cursor advances (collection scans, index scans, fetches) during the trial window.
+    size_t numReads = 0;
+    // Rows produced by join stages during the trial window.
+    size_t numIntermediateRows = 0;
+    // Whether the plan spilled to disk during the trial window.
+    bool spilled = false;
+    size_t numResults = 0;
+
+    bool operator==(const JoinPlanBaseline&) const = default;
+
+    BSONObj toBSON() const;
+};
+
 // A full join plan cache entry: a reconstructable plan tree and its invalidation metadata.
 struct JoinPlanCacheEntry {
     JoinPlanCacheEntry(std::unique_ptr<CachedJoinPlan> joinTree,
                        join_ordering::NodeId baseNode,
                        std::vector<CollectionTag> collections,
-                       std::vector<NodeFingerprint> nodeFingerprints);
+                       std::vector<NodeFingerprint> nodeFingerprints,
+                       JoinPlanBaseline baseline);
 
     // Estimated memory footprint of this entry. Declared first so it can be computed from the
     // constructor's arguments before they are moved into the members below.
@@ -162,6 +178,9 @@ struct JoinPlanCacheEntry {
     // and compared against freshly computed fingerprints when the collection tags no longer
     // validate, so that an index DDL irrelevant to this plan does not force a replan.
     std::vector<NodeFingerprint> nodeFingerprints;
+
+    // The replanning baseline, recorded from the plan's first execution.
+    const JoinPlanBaseline baseline;
 
     /*
      * Returns a copy of this entry's collection tags. A copy rather than a reference because the

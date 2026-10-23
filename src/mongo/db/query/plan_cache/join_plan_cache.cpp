@@ -158,7 +158,8 @@ size_t NodeFingerprint::estimateObjectSizeInBytes() const {
 JoinPlanCacheEntry::JoinPlanCacheEntry(std::unique_ptr<CachedJoinPlan> joinTree,
                                        join_ordering::NodeId baseNode,
                                        std::vector<CollectionTag> collections,
-                                       std::vector<NodeFingerprint> nodeFingerprints)
+                                       std::vector<NodeFingerprint> nodeFingerprints,
+                                       JoinPlanBaseline baseline)
     : estimatedEntrySizeBytes(
           sizeof(JoinPlanCacheEntry) + (joinTree ? joinTree->estimateObjectSizeInBytes() : 0) +
           container_size_helper::estimateObjectSizeInBytes(collections) +
@@ -169,7 +170,14 @@ JoinPlanCacheEntry::JoinPlanCacheEntry(std::unique_ptr<CachedJoinPlan> joinTree,
       joinTree(std::move(joinTree)),
       baseNode(baseNode),
       nodeFingerprints(std::move(nodeFingerprints)),
+      baseline(baseline),
       _collections(std::move(collections)) {}
+
+BSONObj JoinPlanBaseline::toBSON() const {
+    return BSON("numReads" << static_cast<long long>(numReads) << "numIntermediateRows"
+                           << static_cast<long long>(numIntermediateRows) << "spilled" << spilled
+                           << "numResults" << static_cast<long long>(numResults));
+}
 
 std::vector<CollectionTag> JoinPlanCacheEntry::getCollectionTags() const {
     std::lock_guard lk(_collectionsMutex);
@@ -304,6 +312,7 @@ BSONObj joinPlanCacheEntryToBSON(const JoinPlanCacheKey& key, const JoinPlanCach
     if (entry.joinTree) {
         bob.append("plan", entry.joinTree->toBSON());
     }
+    bob.append("baseline", entry.baseline.toBSON());
     return bob.obj();
 }
 
