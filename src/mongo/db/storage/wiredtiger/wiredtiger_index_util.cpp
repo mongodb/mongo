@@ -66,7 +66,7 @@ bool WiredTigerIndexUtil::appendCustomStats(WiredTigerRecoveryUnit& ru,
     std::stringstream ss;
     ss << "statistics=(" << wiredTigerGlobalOptions.statisticsSetting << ")";
     Status status =
-        WiredTigerUtil::exportTableToBSON(*session, "statistics:" + uri, ss.str(), *output);
+        WiredTigerUtil::exportStatsBSONAndOTel(*session, "statistics:" + uri, ss.str(), *output);
     if (!status.isOK()) {
         output->append("error", "unable to retrieve statistics");
         output->append("code", static_cast<int>(status.code()));

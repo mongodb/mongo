@@ -12,7 +12,9 @@
 #include "mongo/util/modules.h"
 
 #include <cstdint>
+#include <functional>
 #include <span>
+#include <string>
 #include <string_view>
 
 namespace mongo {
@@ -28,6 +30,7 @@ class WiredTigerKVEngineBase;
 class WiredTigerKVEngine;
 class WiredTigerConnection;
 class WiredTigerSession;
+class WiredTigerMetricRegistry;
 
 /**
  * A wrapper for WT_ITEM to make it more convenient to work with from C++.
@@ -114,7 +117,7 @@ public:
     static bool historyStoreStatistics(WiredTigerKVEngine& engine, BSONObjBuilder& bob);
 
     /**
-     * Dictates how filters passed to exportTableToBSON will behave.
+     * Dictates how filters passed to exportStatsBSONAndOTel will behave.
      */
     enum class FilterBehavior {
         /* Fields that are in the categories listed will be skipped */
@@ -129,16 +132,17 @@ public:
      *
      * The filterBehavior dictates how the filter will be used.
      */
-    static Status exportTableToBSON(WiredTigerSession& session,
-                                    const std::string& uri,
-                                    const std::string& config,
-                                    BSONObjBuilder& bob);
-    static Status exportTableToBSON(WiredTigerSession& session,
-                                    const std::string& uri,
-                                    const std::string& config,
-                                    BSONObjBuilder& bob,
-                                    const std::vector<std::string>& filter,
-                                    FilterBehavior filterBehavior);
+    static Status exportStatsBSONAndOTel(WiredTigerSession& session,
+                                         const std::string& uri,
+                                         const std::string& config,
+                                         BSONObjBuilder& bob);
+    static Status exportStatsBSONAndOTel(WiredTigerSession& session,
+                                         const std::string& uri,
+                                         const std::string& config,
+                                         BSONObjBuilder& bob,
+                                         const std::vector<std::string>& filter,
+                                         FilterBehavior filterBehavior,
+                                         WiredTigerMetricRegistry* registry = nullptr);
 
     /**
      * Creates an import configuration string suitable for the 'config' parameter in
@@ -431,6 +435,29 @@ public:
      * Must be called in a WriteUnitOfWork.
      */
     static Status createTable(WiredTigerRecoveryUnit& ru, const char* uri, const char* config);
+
+    /**
+     * Which kind of OTel instrument a WT statistic maps to. Each type has its own statistics
+     * cursor.
+     */
+    enum class OTelStatType { kNone, kCounter, kGauge };
+
+    /**
+     * Callback invoked for each statistic read from a cursor, with its WT description and value.
+     */
+    using StatVisitor = std::function<void(std::string_view desc, long long value)>;
+
+    /**
+     * Returns a visitor that forwards stats to 'registry' as the instrument matching 't'. The
+     * visitor does nothing if 'registry' is null or there is no instrument for 't'.
+     */
+    static StatVisitor visitorFor(OTelStatType t, WiredTigerMetricRegistry* registry);
+
+    /**
+     * Given some existing WT_CURSOR::open config, adds 'otelType' to its `statistics=()` subconfig,
+     * creating that subconfig if it doesn't already exist.
+     */
+    static std::string extendCursorTypeConfig(std::string_view existing, std::string_view otelType);
 
 private:
     /**

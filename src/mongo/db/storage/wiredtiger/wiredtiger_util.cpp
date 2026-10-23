@@ -17,13 +17,16 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_prepare_conflict.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
+#include "mongo/otel/metrics/instrumentation/wiredtiger_metric_registry.h"
 #include "mongo/util/pcre.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/testing_proctor.h"
 
 #include <algorithm>
 #include <array>
+#include <functional>
 #include <string_view>
+#include <utility>
 
 #include <boost/filesystem/directory.hpp>
 #include <boost/filesystem/operations.hpp>
@@ -1159,7 +1162,7 @@ bool WiredTigerUtil::collectConnectionStatistics(WiredTigerKVEngineBase& engine,
 
     std::stringstream ss;
     ss << "statistics=(" << wiredTigerGlobalOptions.statisticsSetting << ")";
-    Status status = WiredTigerUtil::exportTableToBSON(
+    Status status = WiredTigerUtil::exportStatsBSONAndOTel(
         *session,
         "statistics:",
         ss.str(),
@@ -1194,7 +1197,7 @@ bool WiredTigerUtil::historyStoreStatistics(WiredTigerKVEngine& engine, BSONObjB
     std::stringstream ss;
     ss << "statistics=(" << wiredTigerGlobalOptions.statisticsSetting << ")";
     Status status =
-        WiredTigerUtil::exportTableToBSON(*session, historyStorageStatUri, ss.str(), bob);
+        WiredTigerUtil::exportStatsBSONAndOTel(*session, historyStorageStatUri, ss.str(), bob);
     if (!status.isOK()) {
         bob.append("error", "unable to retrieve statistics");
         bob.append("code", static_cast<int>(status.code()));
@@ -1203,43 +1206,62 @@ bool WiredTigerUtil::historyStoreStatistics(WiredTigerKVEngine& engine, BSONObjB
     return true;
 }
 
-Status WiredTigerUtil::exportTableToBSON(WiredTigerSession& session,
-                                         const std::string& uri,
-                                         const std::string& config,
-                                         BSONObjBuilder& bob) {
-    return exportTableToBSON(session, uri, config, bob, {}, FilterBehavior::kExcludeCategories);
+Status WiredTigerUtil::exportStatsBSONAndOTel(WiredTigerSession& session,
+                                              const std::string& uri,
+                                              const std::string& config,
+                                              BSONObjBuilder& bob) {
+    return exportStatsBSONAndOTel(
+        session, uri, config, bob, {}, FilterBehavior::kExcludeCategories);
 }
 
-Status WiredTigerUtil::exportTableToBSON(WiredTigerSession& session,
-                                         const std::string& uri,
-                                         const std::string& config,
-                                         BSONObjBuilder& bob,
-                                         const std::vector<std::string>& filter,
-                                         FilterBehavior filterBehavior) {
-    WT_CURSOR* cursor = nullptr;
-    const char* cursorConfig = config.empty() ? nullptr : config.c_str();
+namespace {
+constexpr std::array kOTelStatTypes{WiredTigerUtil::OTelStatType::kNone,
+                                    WiredTigerUtil::OTelStatType::kCounter,
+                                    WiredTigerUtil::OTelStatType::kGauge};
 
-    // Attempt to open a statistics cursor on the provided URI.
-    int ret = session.open_cursor(uri.c_str(), nullptr, cursorConfig, &cursor);
-    if (ret != 0) {
-        return Status(ErrorCodes::CursorNotFound,
-                      str::stream() << "unable to open cursor at URI " << uri
-                                    << ". reason: " << wiredtiger_strerror(ret));
+constexpr const char* toCursorConfig(WiredTigerUtil::OTelStatType t) {
+    switch (t) {
+        case WiredTigerUtil::OTelStatType::kNone:
+            return "otel_none";
+        // The registry expects counters as the increase since the last reading, so have WT reset
+        // them each time they are read.
+        case WiredTigerUtil::OTelStatType::kCounter:
+            return "otel_counters,clear";
+        case WiredTigerUtil::OTelStatType::kGauge:
+            return "otel_gauges";
     }
-    bob.append("uri", uri);
-    bob.append("version", wiredtiger_version(NULL, NULL, NULL));
-    invariant(cursor);
-    ON_BLOCK_EXIT([&] { cursor->close(cursor); });
+    MONGO_UNREACHABLE;
+}
 
-    // measurementsMappedByCategory is used to organize the table's nested BSON structure as we
-    // iterate through the WT table. We keep track of each category's measurements in this format:
-    // { "cache":
-    //       {"bytes read into cache": 30.000, "bytes written from cache": 20.000, ...},
-    //   "category":
-    //       {"measurement1": value, "measurement2": value, ...},
-    //   ...
-    // }
-    std::map<string, BSONObjBuilder> measurementsMappedByCategory;
+// The visitors below forward each stat to the OTel registry. A null registry means nothing is
+// listening for OTel updates (e.g. BSON-only callers), so they do nothing.
+WiredTigerUtil::StatVisitor ignore() {
+    return [](std::string_view, long long) {
+    };
+}
+
+WiredTigerUtil::StatVisitor setCounter(WiredTigerMetricRegistry* registry) {
+    return [registry](std::string_view desc, long long v) {
+        if (registry) {
+            registry->updateCounter(desc, v);
+        }
+    };
+}
+
+WiredTigerUtil::StatVisitor setGauge(WiredTigerMetricRegistry* registry) {
+    return [registry](std::string_view desc, long long v) {
+        if (registry) {
+            registry->updateGauge(desc, v);
+        }
+    };
+}
+
+void appendCursorToBSONAndOTel(WT_CURSOR* cursor,
+                               BSONObjBuilder& bob,
+                               std::map<string, BSONObjBuilder>& measurementsMappedByCategory,
+                               const std::vector<std::string>& filter,
+                               WiredTigerUtil::FilterBehavior filterBehavior,
+                               const WiredTigerUtil::StatVisitor& onStat) {
     const char* statisticDescription;
     uint64_t statisticValue;
     while (cursor->next(cursor) == 0 &&
@@ -1261,11 +1283,12 @@ Status WiredTigerUtil::exportTableToBSON(WiredTigerSession& session,
             measurement = "num";
         }
 
-        long long value = castStatisticsValue<long long>(statisticValue);
+        long long value = WiredTigerUtil::castStatisticsValue<long long>(statisticValue);
 
         switch (filterBehavior) {
-            case FilterBehavior::kExcludeCategories: {
+            case WiredTigerUtil::FilterBehavior::kExcludeCategories: {
                 if (category.size() == 0) {
+                    onStat(statisticDescription, value);
                     bob.appendNumber(statisticDescription, value);
                     break;
                 }
@@ -1276,14 +1299,16 @@ Status WiredTigerUtil::exportTableToBSON(WiredTigerSession& session,
                     continue;
                 }
 
+                onStat(statisticDescription, value);
                 measurementsMappedByCategory[std::string{category}].appendNumber(
                     str::ltrim(std::string{measurement}), value);
                 break;
             }
-            case FilterBehavior::kIncludeStats: {
+            case WiredTigerUtil::FilterBehavior::kIncludeStats: {
                 bool shouldIncludeField =
                     std::find(filter.begin(), filter.end(), statisticDescription) != filter.end();
                 if (shouldIncludeField) {
+                    onStat(statisticDescription, value);
                     measurementsMappedByCategory[std::string{category}].appendNumber(
                         str::ltrim(std::string{measurement}), value);
                 }
@@ -1291,10 +1316,103 @@ Status WiredTigerUtil::exportTableToBSON(WiredTigerSession& session,
             }
         }
     }
+}
+
+}  // namespace
+
+WiredTigerUtil::StatVisitor WiredTigerUtil::visitorFor(WiredTigerUtil::OTelStatType t,
+                                                       WiredTigerMetricRegistry* registry) {
+    switch (t) {
+        case WiredTigerUtil::OTelStatType::kNone:
+            return ignore();
+        case WiredTigerUtil::OTelStatType::kCounter:
+            return setCounter(registry);
+        case WiredTigerUtil::OTelStatType::kGauge:
+            return setGauge(registry);
+    }
+    MONGO_UNREACHABLE;
+}
+
+/*
+ * Given some existing WT_CURSOR::open config, add otelType to the `statistics=()`
+ * subconfig (creating that subconfig if it doesn't already exist).
+ */
+std::string WiredTigerUtil::extendCursorTypeConfig(std::string_view existing,
+                                                   std::string_view otelType) {
+    WT_CONFIG_ITEM value;
+    int ret = WiredTigerConfigParser(existing).get("statistics", &value);
+    if (ret == WT_NOTFOUND) {
+        return fmt::format("{},statistics=({})", existing, otelType);
+    }
+    invariantWTOK(ret, nullptr);
+
+    // value.str points into `existing`, so edit it in-place
+    size_t start = value.str - existing.data();
+    std::string result(existing);
+    if (value.type == WT_CONFIG_ITEM::WT_CONFIG_ITEM_STRUCT) {
+        // We already have a list, e.g. "statistics=(foo, bar)". Lists come back from the parser
+        // with brackets, e.g. "(fast)". Insert before the closing one.
+        result.insert(start + value.len - 1, fmt::format(",{}", otelType));
+    } else {
+        // A single value, e.g. "statistics=fast". Turn it into a list.
+        result.replace(start,
+                       value.len,
+                       fmt::format("({},{})", std::string_view(value.str, value.len), otelType));
+    }
+    return result;
+}
+
+Status WiredTigerUtil::exportStatsBSONAndOTel(WiredTigerSession& session,
+                                              const std::string& uri,
+                                              const std::string& config,
+                                              BSONObjBuilder& bob,
+                                              const std::vector<std::string>& filter,
+                                              FilterBehavior filterBehavior,
+                                              WiredTigerMetricRegistry* registry) {
+    std::vector<std::pair<WiredTigerUtil::OTelStatType, WT_CURSOR*>> cursors;
+    ON_BLOCK_EXIT([&] {
+        for (auto& [type, cursor] : cursors) {
+            cursor->close(cursor);
+        }
+    });
+    for (auto type : kOTelStatTypes) {
+        WT_CURSOR* cursor = nullptr;
+        std::string typeConfig = toCursorConfig(type);
+        std::string cursorConfig = WiredTigerUtil::extendCursorTypeConfig(config, typeConfig);
+
+        // Attempt to open a statistics cursor on the provided URI.
+        int ret = session.open_cursor(uri.c_str(), nullptr, cursorConfig.c_str(), &cursor);
+        if (ret != 0) {
+            return Status(ErrorCodes::CursorNotFound,
+                          str::stream() << "unable to open cursor at URI " << uri
+                                        << ". reason: " << wiredtiger_strerror(ret));
+        }
+        invariant(cursor);
+        cursors.emplace_back(type, cursor);
+    }
+    bob.append("uri", uri);
+    bob.append("version", wiredtiger_version(NULL, NULL, NULL));
+
+    // measurementsMappedByCategory is used to organize the table's nested BSON structure as we
+    // iterate through the WT table. We keep track of each category's measurements in this format:
+    // { "cache":
+    //       {"bytes read into cache": 30.000, "bytes written from cache": 20.000, ...},
+    //   "category":
+    //       {"measurement1": value, "measurement2": value, ...},
+    //   ...
+    // }
+    std::map<string, BSONObjBuilder> measurementsMappedByCategory;
+    for (auto& [type, cursor] : cursors) {
+        appendCursorToBSONAndOTel(cursor,
+                                  bob,
+                                  measurementsMappedByCategory,
+                                  filter,
+                                  filterBehavior,
+                                  WiredTigerUtil::visitorFor(type, registry));
+    }
 
     // Attach the table statistics to the BSONObjBuilder provided in the function arguments.
-    for (std::map<string, BSONObjBuilder>::iterator it = measurementsMappedByCategory.begin();
-         it != measurementsMappedByCategory.end();
+    for (auto it = measurementsMappedByCategory.begin(); it != measurementsMappedByCategory.end();
          ++it) {
         const std::string& category = it->first;
         bob.append(category, it->second.obj());

@@ -12,6 +12,8 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options_gen.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_severity.h"
+#include "mongo/otel/metrics/instrumentation/wiredtiger_metric_registry.h"
+#include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/temp_dir.h"
@@ -618,11 +620,11 @@ TEST_F(WiredTigerUtilTest, SkipPreparedUpdateNoBound) {
     ASSERT_EQ(0, cursor2->next(cursor2));
 }
 
-TEST_F(WiredTigerUtilTest, ExportTableToBSONFilter) {
+TEST_F(WiredTigerUtilTest, ExportStatsBSONAndOtelFilter) {
     const std::string uri = "table:test";
     const std::vector<std::string> categoryFilter{"autocommit"};
     const std::vector<std::string> statFilter{"autocommit: retries for readonly operations"};
-    // exportTableToBSON will always return the uri and version fields.
+    // exportStatsBSONAndOTel will always return the uri and version fields.
     const int baseNumFields = 2;
 
     // Initialize WiredTiger.
@@ -632,14 +634,15 @@ TEST_F(WiredTigerUtilTest, ExportTableToBSONFilter) {
 
     // No filter
     BSONObjBuilder bob0;
-    Status status =
-        WiredTigerUtil::exportTableToBSON(session, "statistics:" + uri, "statistics=(fast)", bob0);
+    Status status = WiredTigerUtil::exportStatsBSONAndOTel(
+        session, "statistics:" + uri, "statistics=(fast)", bob0);
     ASSERT_OK(status);
     auto totalNumFields = bob0.obj().nFields();
 
     // Correctly excludes categories
     BSONObjBuilder bob1;
-    status = WiredTigerUtil::exportTableToBSON(session,
+    status =
+        WiredTigerUtil::exportStatsBSONAndOTel(session,
                                                "statistics:" + uri,
                                                "statistics=(fast)",
                                                bob1,
@@ -652,23 +655,23 @@ TEST_F(WiredTigerUtilTest, ExportTableToBSONFilter) {
 
     // Filters that are not stats are not included
     BSONObjBuilder bob2;
-    status = WiredTigerUtil::exportTableToBSON(session,
-                                               "statistics:" + uri,
-                                               "statistics=(fast)",
-                                               bob2,
-                                               categoryFilter,
-                                               WiredTigerUtil::FilterBehavior::kIncludeStats);
+    status = WiredTigerUtil::exportStatsBSONAndOTel(session,
+                                                    "statistics:" + uri,
+                                                    "statistics=(fast)",
+                                                    bob2,
+                                                    categoryFilter,
+                                                    WiredTigerUtil::FilterBehavior::kIncludeStats);
     ASSERT_OK(status);
     ASSERT_EQ(bob2.obj().nFields(), baseNumFields);
 
     // Correctly includes only stats in filter
     BSONObjBuilder bob3;
-    status = WiredTigerUtil::exportTableToBSON(session,
-                                               "statistics:" + uri,
-                                               "statistics=(fast)",
-                                               bob3,
-                                               statFilter,
-                                               WiredTigerUtil::FilterBehavior::kIncludeStats);
+    status = WiredTigerUtil::exportStatsBSONAndOTel(session,
+                                                    "statistics:" + uri,
+                                                    "statistics=(fast)",
+                                                    bob3,
+                                                    statFilter,
+                                                    WiredTigerUtil::FilterBehavior::kIncludeStats);
     ASSERT_OK(status);
     auto insertFilterRes = bob3.obj();
     ASSERT_TRUE(insertFilterRes.getField("autocommit")["retries for readonly operations"].ok());
@@ -676,7 +679,8 @@ TEST_F(WiredTigerUtilTest, ExportTableToBSONFilter) {
 
     // Filters that are not categories are not excluded
     BSONObjBuilder bob4;
-    status = WiredTigerUtil::exportTableToBSON(session,
+    status =
+        WiredTigerUtil::exportStatsBSONAndOTel(session,
                                                "statistics:" + uri,
                                                "statistics=(fast)",
                                                bob4,
@@ -1362,6 +1366,173 @@ TEST(SimpleWiredTigerUtilTest, CheckConfigStringBannedKeysIgnoresMalformedConfig
     // Malformed config strings are caught earlier, by wiredtiger_config_validate in
     // checkTableCreationOptions, so this just needs to not fassert or throw.
     ASSERT_OK(WiredTigerUtil::checkConfigStringBannedKeys("key=\"unterminated"));
+}
+
+TEST(ExtendCursorTypeConfigTest, NoStatisticsKeyAppendsSubconfig) {
+    ASSERT_EQ(WiredTigerUtil::extendCursorTypeConfig("", "otel_counters"),
+              ",statistics=(otel_counters)");
+    ASSERT_EQ(WiredTigerUtil::extendCursorTypeConfig("foo=bar", "otel_counters"),
+              "foo=bar,statistics=(otel_counters)");
+}
+
+TEST(ExtendCursorTypeConfigTest, ExistingListInsertsBeforeClosingParen) {
+    ASSERT_EQ(WiredTigerUtil::extendCursorTypeConfig("statistics=(fast)", "otel_gauges"),
+              "statistics=(fast,otel_gauges)");
+}
+
+TEST(ExtendCursorTypeConfigTest, SingleValueBecomesList) {
+    ASSERT_EQ(WiredTigerUtil::extendCursorTypeConfig("statistics=fast", "otel_gauges"),
+              "statistics=(fast,otel_gauges)");
+}
+
+TEST(ExtendCursorTypeConfigTest, NeighbouringKeysArePreserved) {
+    ASSERT_EQ(WiredTigerUtil::extendCursorTypeConfig("a=1,statistics=(fast),b=2", "otel_gauges"),
+              "a=1,statistics=(fast,otel_gauges),b=2");
+}
+
+TEST_F(WiredTigerUtilTest, ExtendedCursorConfigOpensStatCursor) {
+    WiredTigerUtilHarnessHelper harnessHelper("statistics=(all)");
+    WiredTigerSession session(harnessHelper.getConnection());
+
+    for (auto otelType : {"otel_none", "otel_counters", "otel_gauges"}) {
+        auto config = WiredTigerUtil::extendCursorTypeConfig("statistics=(fast)", otelType);
+        WT_CURSOR* cursor;
+        ASSERT_EQ(0, session.open_cursor("statistics:", nullptr, config.c_str(), &cursor));
+        ASSERT_EQ(0, cursor->close(cursor));
+    }
+}
+
+class StatVisitorTest : public unittest::Test {
+protected:
+    void setUp() override {
+        if (!otel::metrics::OtelMetricsCapturer::canReadMetrics()) {
+            GTEST_SKIP() << "Skipping test: OTel metrics unavailable on this platform";
+        }
+    }
+
+    int64_t readCounter(const std::string& statName) {
+        auto name = wtStatNameToOtelName(statName);
+        return _capturer.readInt64Counter(otel::metrics::DynamicMetricNameMaker::make(
+            std::string_view{name}, otel::metrics::DynamicMetricNameTestPasskeyMaker::make()));
+    }
+
+    int64_t readGauge(const std::string& statName) {
+        auto name = wtStatNameToOtelName(statName);
+        return _capturer.readInt64Gauge(otel::metrics::DynamicMetricNameMaker::make(
+            std::string_view{name}, otel::metrics::DynamicMetricNameTestPasskeyMaker::make()));
+    }
+
+    otel::metrics::OtelMetricsCapturer _capturer;
+    WiredTigerMetricRegistry _registry;
+};
+
+TEST_F(StatVisitorTest, CounterVisitorAccumulatesIncrements) {
+    const std::string stat = "test-visitor: counter";
+    auto visit = WiredTigerUtil::visitorFor(WiredTigerUtil::OTelStatType::kCounter, &_registry);
+
+    visit(stat, 10);
+    visit(stat, 0);
+    visit(stat, 15);
+
+    ASSERT_EQ(readCounter(stat), 25);
+}
+
+TEST_F(StatVisitorTest, GaugeVisitorReportsLatestValue) {
+    const std::string stat = "test-visitor: gauge";
+    auto visit = WiredTigerUtil::visitorFor(WiredTigerUtil::OTelStatType::kGauge, &_registry);
+
+    visit(stat, 7);
+    visit(stat, 9);
+
+    ASSERT_EQ(readGauge(stat), 9);
+}
+
+TEST_F(StatVisitorTest, ExportExcludeCategoriesSkipsOTelUpdatesForExcludedStats) {
+    const std::string gauge = "cache: pages currently held in the cache";
+    const std::string counter = "cursor: cursor insert calls";
+
+    WiredTigerUtilHarnessHelper harnessHelper("statistics=(all)");
+    WiredTigerSession session(harnessHelper.getConnection());
+
+    BSONObjBuilder bob;
+    ASSERT_OK(
+        WiredTigerUtil::exportStatsBSONAndOTel(session,
+                                               "statistics:",
+                                               "statistics=(fast)",
+                                               bob,
+                                               {"cache"},
+                                               WiredTigerUtil::FilterBehavior::kExcludeCategories,
+                                               &_registry));
+
+    ASSERT_GTE(readCounter(counter), 0);
+    ASSERT_THROWS_CODE(readGauge(gauge), DBException, ErrorCodes::KeyNotFound);
+}
+
+TEST_F(StatVisitorTest, ExportIncludeStatsOnlyUpdatesOTelForIncludedStats) {
+    const std::string gauge = "cache: pages currently held in the cache";
+    const std::string counter = "cursor: cursor insert calls";
+
+    WiredTigerUtilHarnessHelper harnessHelper("statistics=(all)");
+    WiredTigerSession session(harnessHelper.getConnection());
+
+    BSONObjBuilder bob;
+    ASSERT_OK(WiredTigerUtil::exportStatsBSONAndOTel(session,
+                                                     "statistics:",
+                                                     "statistics=(fast)",
+                                                     bob,
+                                                     {counter},
+                                                     WiredTigerUtil::FilterBehavior::kIncludeStats,
+                                                     &_registry));
+
+    ASSERT_GTE(readCounter(counter), 0);
+    ASSERT_THROWS_CODE(readGauge(gauge), DBException, ErrorCodes::KeyNotFound);
+}
+
+TEST_F(StatVisitorTest, ExportReportsCounterIncrementsNotTotals) {
+    const std::string counter = "cursor: cursor insert calls";
+
+    WiredTigerUtilHarnessHelper harnessHelper("statistics=(all)");
+    WiredTigerSession session(harnessHelper.getConnection());
+    ASSERT_OK(wtRCToStatus(session.create("table:test", "key_format=S,value_format=S"), session));
+    WT_CURSOR* cursor;
+    ASSERT_EQ(0, session.open_cursor("table:test", nullptr, nullptr, &cursor));
+    cursor->set_key(cursor, "abc");
+    cursor->set_value(cursor, "test");
+    ASSERT_EQ(0, cursor->insert(cursor));
+    ASSERT_EQ(0, cursor->close(cursor));
+
+    auto exportCounters = [&] {
+        BSONObjBuilder bob;
+        ASSERT_OK(
+            WiredTigerUtil::exportStatsBSONAndOTel(session,
+                                                   "statistics:",
+                                                   "statistics=(fast)",
+                                                   bob,
+                                                   {counter},
+                                                   WiredTigerUtil::FilterBehavior::kIncludeStats,
+                                                   &_registry));
+    };
+
+    exportCounters();
+    const auto afterFirst = readCounter(counter);
+    ASSERT_GT(afterFirst, 0);
+
+    // The first export cleared the stat, so nothing has happened since and the counter must not
+    // grow. Without clear it would be incremented by the lifetime total again.
+    exportCounters();
+    ASSERT_EQ(readCounter(counter), afterFirst);
+}
+
+TEST_F(StatVisitorTest, NullRegistryIsNoOp) {
+    WiredTigerUtil::visitorFor(WiredTigerUtil::OTelStatType::kCounter,
+                               nullptr)("test-visitor: null counter", 1);
+    WiredTigerUtil::visitorFor(WiredTigerUtil::OTelStatType::kGauge,
+                               nullptr)("test-visitor: null gauge", 1);
+}
+
+TEST_F(StatVisitorTest, NoneIsNoOp) {
+    WiredTigerUtil::visitorFor(WiredTigerUtil::OTelStatType::kNone,
+                               &_registry)("test-visitor: none", 1);
 }
 
 }  // namespace

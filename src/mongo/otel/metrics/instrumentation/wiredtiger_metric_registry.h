@@ -32,7 +32,7 @@ namespace mongo {
  * This is not thread-safe. It relies on the collection job only ever invoking it from a single
  * thread. Concurrent calls are not supported.
  */
-class WiredTigerMetricRegistry {
+class [[MONGO_MOD_PUBLIC]] WiredTigerMetricRegistry {
 public:
     /**
      * Records an increase in an OTel counter metric. WiredTiger reports counters as the increment
