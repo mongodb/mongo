@@ -142,6 +142,20 @@ private:
         bool keepOpen{false};
     };
 
+    struct PendingSetup {
+        explicit PendingSetup(const CancellationToken& token) : cancellationSource(token) {}
+
+        CancellationSource cancellationSource;
+        std::list<std::shared_ptr<PendingSetup>>::iterator iterator;
+    };
+
+    struct FinishingClientState {
+        FinishingClientState(std::shared_ptr<AsyncDBClient> c) : client(std::move(c)) {}
+
+        std::shared_ptr<AsyncDBClient> client;
+        boost::optional<std::list<FinishingClientState>::iterator> it;
+    };
+
     Future<std::shared_ptr<AsyncClientHandle>> _get(bool lease,
                                                     const HostAndPort& target,
                                                     transport::ConnectSSLMode sslMode,
@@ -154,8 +168,10 @@ private:
 
     bool _shutdownComplete(WithLock lk) {
         return _state == State::kShutdown && _numActiveHandles == 0 &&
-            _finishingClientList.size() == 0;
+            _finishingClientList.empty() && _pendingSetups.empty();
     }
+
+    void _unregisterSetup(WithLock lk, PendingSetup& setup);
 
     std::string _instanceName;
 
@@ -173,12 +189,9 @@ private:
     Counter64 _totalStreamUsageTimeMs;
     stdx::unordered_map<HostAndPort, EndpointState> _endpoints;
 
-    struct FinishingClientState {
-        FinishingClientState(std::shared_ptr<AsyncDBClient> c) : client(std::move(c)) {}
-
-        std::shared_ptr<AsyncDBClient> client;
-        boost::optional<std::list<FinishingClientState>::iterator> it;
-    };
+    // Transient states that must be carefully handled during shutdown. std::list is necessary for
+    // iterator stability.
+    std::list<std::shared_ptr<PendingSetup>> _pendingSetups;
     std::list<FinishingClientState> _finishingClientList;
 
     GRPCTransportLayer* _tl = nullptr;

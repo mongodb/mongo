@@ -12,6 +12,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/ssl_types.h"
 
+#include <functional>
 #include <memory>
 
 namespace mongo::transport::grpc {
@@ -31,22 +32,20 @@ public:
         Client::start();
     }
 
-    void appendStats(GRPCConnectionStats& stats) const override {
-        MONGO_UNIMPLEMENTED;
-    }
+    /**
+      Populates only the following fields in GRPCConnectionStats: TotalOpenChannels,
+      TotalActiveStreams, TotalSuccessfulStreams, TotalFailedStreams
+    */
+    void appendStats(GRPCConnectionStats& stats) const override;
 
     Status rotateCertificates(const SSLConfiguration& sslConfig,
                               const SSLManagerInterface& sslManager) override {
         MONGO_UNIMPLEMENTED;
     }
 
-    void dropConnections(const Status& status) override {
-        MONGO_UNIMPLEMENTED;
-    }
+    void dropConnections(const Status& status) override;
 
-    void dropConnections(const HostAndPort& target, const Status& status) override {
-        MONGO_UNIMPLEMENTED;
-    }
+    void dropConnections(const HostAndPort& target, const Status& status) override;
 
     void setKeepOpen(const HostAndPort& hostAndPort, bool keepOpen) override {
         MONGO_UNIMPLEMENTED;

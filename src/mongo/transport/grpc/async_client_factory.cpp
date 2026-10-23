@@ -15,7 +15,9 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/version.h"
 
 #include <mutex>
@@ -23,6 +25,16 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
 namespace mongo::transport::grpc {
+namespace {
+Status shutdownStatus() {
+    return Status(ErrorCodes::ShutdownInProgress, "gRPC client factory was shut down");
+}
+}  // namespace
+
+MONGO_FAIL_POINT_DEFINE(grpcAsyncClientFactoryHangBeforeTimeoutDiagnostics);
+MONGO_FAIL_POINT_DEFINE(grpcAsyncClientFactoryHangBeforeHandleRegistration);
+MONGO_FAIL_POINT_DEFINE(grpcAsyncClientFactoryHangBeforeConnect);
+MONGO_FAIL_POINT_DEFINE(grpcAsyncClientFactoryHangBeforeShutdownWait);
 
 GRPCAsyncClientFactory::GRPCAsyncClientFactory(std::string instanceName)
     : _instanceName(std::move(instanceName)) {}
@@ -90,15 +102,24 @@ void GRPCAsyncClientFactory::shutdown() {
 
     _dropConnections(lk);
 
+    auto pendingSetupsSnapshot = _pendingSetups;
+    lk.unlock();
     executor::EgressConnectionCloserManager::get(_svcCtx).remove(this);
+    for (const auto& setup : pendingSetupsSnapshot) {
+        setup->cancellationSource.cancel();
+    }
+    grpcAsyncClientFactoryHangBeforeShutdownWait.pauseWhileSet();
+    lk.lock();
 
     LOGV2_DEBUG(9936106,
                 kDiagnosticLogLevel,
                 "Waiting for outstanding streams to terminate",
                 "numActiveHandles"_attr = _numActiveHandles,
+                "numPendingSetups"_attr = _pendingSetups.size(),
                 "numFinishingStreams"_attr = _finishingClientList.size());
     _cv.wait(lk, [&]() { return _shutdownComplete(lk); });
 
+    lk.unlock();
     _client->shutdown();
 }
 
@@ -166,6 +187,7 @@ Future<std::shared_ptr<GRPCAsyncClientFactory::AsyncClientHandle>> GRPCAsyncClie
     Milliseconds timeout,
     const CancellationToken& token) {
 
+    std::shared_ptr<PendingSetup> setup;
     {
         std::lock_guard lk(_mutex);
         if (_state == State::kShutdown) {
@@ -175,7 +197,14 @@ Future<std::shared_ptr<GRPCAsyncClientFactory::AsyncClientHandle>> GRPCAsyncClie
             return Status(ErrorCodes::NotYetInitialized,
                           "Cannot create new gRPC clients, factory not yet started");
         }
+        setup = std::make_shared<PendingSetup>(token);
+        setup->iterator = _pendingSetups.insert(_pendingSetups.end(), setup);
     }
+
+    auto cleanup = ScopeGuard([&] {
+        std::lock_guard lk(_mutex);
+        _unregisterSetup(lk, *setup);
+    });
 
     // In the case of no timeout, set a default timeout to ensure we don't queue streams
     // indefinitely if they cannot connect.
@@ -190,68 +219,112 @@ Future<std::shared_ptr<GRPCAsyncClientFactory::AsyncClientHandle>> GRPCAsyncClie
                 "timeout"_attr = timeout);
 
     auto connMetrics = std::make_shared<ConnectionMetrics>(_svcCtx->getFastClockSource());
-    return _client
-        ->connect(target,
-                  checked_pointer_cast<GRPCReactor>(_reactor),
-                  timeout,
-                  {boost::none /**authToken */, sslMode},
-                  token,
-                  connMetrics)
-        .then([target, reactor = _reactor, svcCtx = _svcCtx](
-                  std::shared_ptr<transport::Session> session) {
-            return AsyncDBClient::create(target, std::move(session), svcCtx, reactor);
-        })
-        .tapError([target](Status s) {
-            LOGV2_DEBUG(9936103,
-                        kDiagnosticLogLevel,
-                        "gRPC stream establishment failed",
-                        "hostAndPort"_attr = target,
-                        "error"_attr = s);
-        })
-        .onError<ErrorCodes::ExceededTimeLimit>([this, target, timeout](Status s) mutable
-                                                    -> StatusWith<std::shared_ptr<AsyncDBClient>> {
-            if (gEnableDetailedConnectionHealthMetricLogLines.load()) {
-                size_t activeCalls;
-                {
-                    std::lock_guard lk(_mutex);
-                    activeCalls = _endpoints[target].handles.size();
-                }
-
-                // TODO SERVER-100262: Remove this log line or add diagnostics about how many calls
-                // are on the specific channel used by the stream.
-                LOGV2(10026101,
-                      "Exceeded time limit while starting gRPC call",
-                      "hostAndPort"_attr = target,
-                      "timeout"_attr = timeout,
-                      "error"_attr = s,
-                      "activeStreamEstablishmentAttempts"_attr =
-                          _client->getPendingStreamEstablishments(target),
-                      "activeCalls"_attr = activeCalls);
-            }
-
-            return s;
-        })
-        .then([this, target, lease, connMetrics](std::shared_ptr<AsyncDBClient> client)
-                  -> std::shared_ptr<AsyncClientFactory::AsyncClientHandle> {
-            LOGV2_DEBUG(9936102,
-                        kDiagnosticLogLevel,
-                        "gRPC stream establishment succeeded",
-                        "hostAndPort"_attr = target,
-                        "duration"_attr = connMetrics->total());
-            auto handle = std::make_shared<Handle>(this, _svcCtx, std::move(client), lease);
-
+    grpcAsyncClientFactoryHangBeforeConnect.pauseWhileSet();
+    auto result = [&]()
+        -> Future<std::shared_ptr<EgressSession>> {
+        {
             std::lock_guard lk(_mutex);
-            auto& handlesList = _endpoints[target].handles;
-            handlesList.push_front({&handle->getClient()});
-            handle->_it = handlesList.begin();
-            _numStreamsCreated.increment();
-            _numActiveHandles++;
-            if (lease) {
-                _numLeasedStreams.increment();
+            if (_state == State::kShutdown) {
+                return shutdownStatus();
             }
+        }
+        return _client->connect(target,
+                                checked_pointer_cast<GRPCReactor>(_reactor),
+                                timeout,
+                                {boost::none /**authToken */, sslMode},
+                                setup->cancellationSource.token(),
+                                connMetrics);
+    }()
+               .then([target, reactor = _reactor, svcCtx = _svcCtx](
+                         std::shared_ptr<transport::Session> session) {
+                   return AsyncDBClient::create(target, std::move(session), svcCtx, reactor);
+               })
+               .tapError([target](Status s) {
+                   LOGV2_DEBUG(9936103,
+                               kDiagnosticLogLevel,
+                               "gRPC stream establishment failed",
+                               "hostAndPort"_attr = target,
+                               "error"_attr = s);
+               })
+               .onError<ErrorCodes::ExceededTimeLimit>(
+                   [this, target, timeout](
+                       Status s) mutable -> StatusWith<std::shared_ptr<AsyncDBClient>> {
+                       grpcAsyncClientFactoryHangBeforeTimeoutDiagnostics.pauseWhileSet();
+                       if (gEnableDetailedConnectionHealthMetricLogLines.load()) {
+                           size_t activeCalls;
+                           {
+                               std::lock_guard lk(_mutex);
+                               activeCalls = _endpoints[target].handles.size();
+                           }
 
-            return handle;
-        });
+                           // TODO SERVER-100262: Remove this log line or add diagnostics about how
+                           // many calls are on the specific channel used by the stream.
+                           LOGV2(10026101,
+                                 "Exceeded time limit while starting gRPC call",
+                                 "hostAndPort"_attr = target,
+                                 "timeout"_attr = timeout,
+                                 "error"_attr = s,
+                                 "activeStreamEstablishmentAttempts"_attr =
+                                     _client->getPendingStreamEstablishments(target),
+                                 "activeCalls"_attr = activeCalls);
+                       }
+
+                       return s;
+                   })
+               .then([this, target, lease, connMetrics](std::shared_ptr<AsyncDBClient> client)
+                         -> StatusWith<std::shared_ptr<AsyncClientFactory::AsyncClientHandle>> {
+                   grpcAsyncClientFactoryHangBeforeHandleRegistration.pauseWhileSet();
+                   auto ownedClient = std::move(client);
+                   std::unique_lock lk(_mutex);
+                   if (_state == State::kShutdown) {
+                       lk.unlock();
+                       checked_cast<EgressSession&>(ownedClient->getTransportSession())
+                           .cancel(shutdownStatus());
+                       ownedClient.reset();
+                       return shutdownStatus();
+                   }
+                   LOGV2_DEBUG(9936102,
+                               kDiagnosticLogLevel,
+                               "gRPC stream establishment succeeded",
+                               "hostAndPort"_attr = target,
+                               "duration"_attr = connMetrics->total());
+                   auto handle =
+                       std::make_shared<Handle>(this, _svcCtx, std::move(ownedClient), lease);
+
+                   auto& handlesList = _endpoints[target].handles;
+                   handlesList.push_front({&handle->getClient()});
+                   handle->_it = handlesList.begin();
+                   _numStreamsCreated.increment();
+                   _numActiveHandles++;
+                   if (lease) {
+                       _numLeasedStreams.increment();
+                   }
+
+                   return std::shared_ptr<AsyncClientHandle>(std::move(handle));
+               })
+               .onCompletion(
+                   [this, setup, token](StatusWith<std::shared_ptr<AsyncClientHandle>> result) {
+                       std::lock_guard lk(_mutex);
+                       const Status& tokenCancellation = Client::tokenCancellationStatus();
+                       // The conditions here preserve non-Shutdown statuses, e.g. if a timeout or
+                       // client cancellation won't be replaced by a shutdown status.
+                       if (_state == State::kShutdown && !token.isCanceled() &&
+                           result.getStatus().code() == tokenCancellation.code() &&
+                           result.getStatus().reason() == tokenCancellation.reason()) {
+                           result = shutdownStatus();
+                       }
+                       _unregisterSetup(lk, *setup);
+                       return result;
+                   });
+    cleanup.dismiss();
+    return result;
+}
+
+void GRPCAsyncClientFactory::_unregisterSetup(WithLock lk, PendingSetup& setup) {
+    _pendingSetups.erase(setup.iterator);
+    if (_shutdownComplete(lk)) {
+        _cv.notify_all();
+    }
 }
 
 void GRPCAsyncClientFactory::_destroyHandle(Handle& handle) {

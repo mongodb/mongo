@@ -20,17 +20,50 @@
 #include "mongo/transport/session_workflow_test_util.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/unittest/log_test.h"
+#include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/cancellation.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/periodic_runner_factory.h"
 #include "mongo/util/scopeguard.h"
 
+#include <tuple>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo::transport::grpc {
+namespace {
+using unittest::match::AllOf;
+using unittest::match::Eq;
+using unittest::match::Property;
+using unittest::match::StatusIs;
+
+MATCHER_P(SuccessfulStreamCount, successfulStreams, "") {
+    return ExplainMatchResult(Property("successful streams",
+                                       &GRPCConnectionStats::getTotalSuccessfulStreams,
+                                       Eq(successfulStreams)),
+                              arg,
+                              result_listener);
+}
+
+MATCHER_P(FailedStreamCount, failedStreams, "") {
+    return ExplainMatchResult(
+        Property("failed streams", &GRPCConnectionStats::getTotalFailedStreams, Eq(failedStreams)),
+        arg,
+        result_listener);
+}
+
+MATCHER(HasNoRegisteredStreams, "") {
+    return ExplainMatchResult(
+        AllOf(Property("created streams", &GRPCConnectionStats::getTotalStreamsCreated, Eq(0)),
+              Property("in-use streams", &GRPCConnectionStats::getTotalInUseStreams, Eq(0)),
+              Property("leased streams", &GRPCConnectionStats::getTotalLeasedStreams, Eq(0))),
+        arg,
+        result_listener);
+}
 
 // TODO SERVER-100051: share this setup logic with other tests using GRPCTransportLayer.
 class GRPCAsyncClientFactoryTest : public ServiceContextTest {
@@ -322,9 +355,10 @@ TEST_F(GRPCAsyncClientFactoryTest, DropConnectionsWhileConnecting) {
         getFactory().dropConnections();
         auto status = connAttempt.getNoThrow().getStatus();
         ASSERT_NOT_OK(status);
-        ASSERT_EQ(status.code(), ErrorCodes::CallbackCanceled);
-        ASSERT_EQ(status.reason(),
-                  "Cancelled stream establishment due to dropping the associated connection");
+        ASSERT_THAT(status,
+                    StatusIs(ErrorCodes::CallbackCanceled,
+                             "Cancelled stream establishment due to dropping the associated "
+                             "connection"));
     }
 
     shutdownAndAssertOnTransportStats(0 /*successful streams*/, 0 /*failed streams*/);
@@ -349,8 +383,9 @@ TEST_F(GRPCAsyncClientFactoryTest, DropConnectionsWhileConnectingWithKeepOpen) {
         cancelSource.cancel();
         auto status = connAttempt.getNoThrow().getStatus();
         ASSERT_NOT_OK(status);
-        ASSERT_EQ(status.code(), ErrorCodes::CallbackCanceled);
-        ASSERT_EQ(status.reason(), "gRPC stream establishment was cancelled");
+        ASSERT_THAT(
+            status,
+            StatusIs(ErrorCodes::CallbackCanceled, "gRPC stream establishment was cancelled"));
     }
 
     shutdownAndAssertOnTransportStats(0 /*successful streams*/, 0 /*failed streams*/);
@@ -520,6 +555,326 @@ TEST_F(GRPCAsyncClientFactoryTest, CumulativeStatsTest) {
     }
     // And we also count 2 successful streams at the TL level.
     shutdownAndAssertOnTransportStats(2 /*successful streams*/, 0 /*failed streams*/);
+}
+
+/** Adds a reactor and client factory on top of MockGRPCTransportLayerTest. */
+class DirectMockGRPCAsyncClientFactoryTest : public MockGRPCTransportLayerTest {
+public:
+    using Handle = std::shared_ptr<executor::AsyncClientFactory::AsyncClientHandle>;
+    enum class Acquisition { kGet, kLease };
+    enum class CancellationCause { kCaller, kConnectionDrop };
+
+    void setUp() override {
+        MockGRPCTransportLayerTest::setUp();
+        _tl = checked_cast<GRPCTransportLayerMock*>(
+            getServiceContext()->getTransportLayerManager()->getTransportLayer(
+                TransportProtocol::GRPC));
+        _reactor = _tl->getReactor(TransportLayer::WhichReactor::kNewReactor);
+        _reactorThread = stdx::thread([this] {
+            _reactor->run();
+            _reactor->drain();
+        });
+        _factory = std::make_unique<GRPCAsyncClientFactory>("DirectMockGRPCAsyncClientFactoryTest");
+        _factory->startup(getServiceContext(), _tl, _reactor);
+    }
+
+    void tearDown() override {
+        if (_factory) {
+            _factory->shutdown();
+            _factory.reset();
+        }
+        _reactor->stop();
+        _reactorThread.join();
+        MockGRPCTransportLayerTest::tearDown();
+    }
+
+    GRPCAsyncClientFactory& getFactory() {
+        return *_factory;
+    }
+
+    void destroyFactory() {
+        _factory.reset();
+    }
+
+    const ReactorHandle& getReactor() {
+        return _reactor;
+    }
+
+private:
+    GRPCTransportLayerMock* _tl = nullptr;
+    std::unique_ptr<GRPCAsyncClientFactory> _factory;
+    ReactorHandle _reactor;
+    stdx::thread _reactorThread;
+};
+
+class LateAcquisitionTest
+    : public DirectMockGRPCAsyncClientFactoryTest,
+      public testing::WithParamInterface<DirectMockGRPCAsyncClientFactoryTest::Acquisition> {};
+
+TEST_P(LateAcquisitionTest, RejectAfterShutdown) {
+    runTestWithMockServer([&] {
+        boost::optional<FailPointEnableBlock> registration(
+            "grpcAsyncClientFactoryHangBeforeHandleRegistration");
+        boost::optional<FailPointEnableBlock> shutdownWait(
+            "grpcAsyncClientFactoryHangBeforeShutdownWait");
+        auto acquisition = makePromiseFuture<Handle>();
+        auto acquisitionThread = stdx::thread([&] {
+            acquisition.promise.setFrom(
+                (GetParam() == Acquisition::kLease
+                     ? getFactory().lease(
+                           kServerHostAndPort, ConnectSSLMode::kGlobalSSLMode, Milliseconds::max())
+                     : getFactory().get(
+                           kServerHostAndPort, ConnectSSLMode::kGlobalSSLMode, Milliseconds::max()))
+                    .getNoThrow());
+        });
+        stdx::thread shutdownThread;
+        ON_BLOCK_EXIT([&] {
+            shutdownWait.reset();
+            registration.reset();
+            acquisitionThread.join();
+            if (shutdownThread.joinable()) {
+                shutdownThread.join();
+            }
+        });
+        registration->waitForOneNewEntry();
+        shutdownThread = stdx::thread([&] { getFactory().shutdown(); });
+        shutdownWait->waitForOneNewEntry();
+        shutdownWait.reset();
+        registration.reset();
+        auto result = acquisition.future.getNoThrow();
+        EXPECT_EQ(result.getStatus(), ErrorCodes::ShutdownInProgress);
+        shutdownThread.join();
+        EXPECT_THAT(
+            getFactory().getStats(),
+            AllOf(HasNoRegisteredStreams(), SuccessfulStreamCount(0), FailedStreamCount(1)));
+    });
+}
+
+INSTANTIATE_TEST_SUITE_P(Acquisition,
+                         LateAcquisitionTest,
+                         testing::Values(DirectMockGRPCAsyncClientFactoryTest::Acquisition::kGet,
+                                         DirectMockGRPCAsyncClientFactoryTest::Acquisition::kLease),
+                         [](const auto& info) {
+                             return info.param ==
+                                     DirectMockGRPCAsyncClientFactoryTest::Acquisition::kGet
+                                 ? "Get"
+                                 : "Lease";
+                         });
+
+class PendingCancellationTest : public DirectMockGRPCAsyncClientFactoryTest,
+                                public testing::WithParamInterface<std::string_view> {};
+
+TEST_P(PendingCancellationTest, ShutdownCancelsIndefiniteEstablishment) {
+    runTestWithMockServer([&] {
+        FailPointEnableBlock pending(GetParam());
+        auto acquisition = getFactory().get(kServerHostAndPort,
+                                            ConnectSSLMode::kGlobalSSLMode,
+                                            Milliseconds::max(),
+                                            CancellationToken::uncancelable());
+        pending.waitForOneNewEntry();
+        getFactory().shutdown();
+        ASSERT_EQ(acquisition.getNoThrow().getStatus(), ErrorCodes::ShutdownInProgress);
+        EXPECT_THAT(
+            getFactory().getStats(),
+            AllOf(HasNoRegisteredStreams(), SuccessfulStreamCount(0), FailedStreamCount(0)));
+    });
+}
+
+INSTANTIATE_TEST_SUITE_P(Establishment,
+                         PendingCancellationTest,
+                         testing::Values("grpcHangOnChannelEstablishment",
+                                         "grpcHangOnStreamEstablishment"),
+                         [](const auto& info) {
+                             return info.param == "grpcHangOnChannelEstablishment" ? "Channel"
+                                                                                   : "Stream";
+                         });
+
+class CancellationPreservationTest
+    : public DirectMockGRPCAsyncClientFactoryTest,
+      public testing::WithParamInterface<
+          std::tuple<DirectMockGRPCAsyncClientFactoryTest::CancellationCause, std::string_view>> {};
+
+TEST_P(CancellationPreservationTest, PreservesReasonDuringShutdown) {
+    const auto& [cause, hook] = GetParam();
+    runTestWithMockServer([&] {
+        FailPointEnableBlock pending(hook);
+        boost::optional<FailPointEnableBlock> shutdownWait(
+            "grpcAsyncClientFactoryHangBeforeShutdownWait");
+        CancellationSource caller;
+        auto acquisition = getFactory().get(kServerHostAndPort,
+                                            ConnectSSLMode::kGlobalSSLMode,
+                                            Milliseconds::max(),
+                                            caller.token());
+        pending.waitForOneNewEntry();
+        // entered and release ensure that the test remains lock-step with the reactor, in
+        // particular it ensures that cancellation can't run on the reactor before shutdown has
+        // been called.
+        auto entered = makePromiseFuture<void>();
+        auto release = makePromiseFuture<void>();
+        getReactor()->schedule([&](Status) {
+            entered.promise.emplaceValue();
+            release.future.get();
+        });
+        stdx::thread shutdownThread;
+        bool released = false;
+        ON_BLOCK_EXIT([&] {
+            shutdownWait.reset();
+            if (!released) {
+                release.promise.emplaceValue();
+            }
+            if (shutdownThread.joinable()) {
+                shutdownThread.join();
+            }
+        });
+        entered.future.get();
+        if (cause == CancellationCause::kConnectionDrop) {
+            static_cast<executor::AsyncClientFactory&>(getFactory()).dropConnections();
+        } else {
+            caller.cancel();
+        }
+        shutdownThread = stdx::thread([&] { getFactory().shutdown(); });
+        shutdownWait->waitForOneNewEntry();
+        shutdownWait.reset();
+        release.promise.emplaceValue();
+        released = true;
+        auto status = acquisition.getNoThrow().getStatus();
+        shutdownThread.join();
+        EXPECT_THAT(
+            status,
+            StatusIs(
+                ErrorCodes::CallbackCanceled,
+                cause == CancellationCause::kConnectionDrop
+                    ? "Cancelled stream establishment due to dropping the associated connection"
+                    : "gRPC stream establishment was cancelled"));
+        EXPECT_THAT(
+            getFactory().getStats(),
+            AllOf(HasNoRegisteredStreams(), SuccessfulStreamCount(0), FailedStreamCount(0)));
+    });
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    Cancellation,
+    CancellationPreservationTest,
+    testing::Combine(
+        testing::Values(DirectMockGRPCAsyncClientFactoryTest::CancellationCause::kCaller,
+                        DirectMockGRPCAsyncClientFactoryTest::CancellationCause::kConnectionDrop),
+        testing::Values("grpcHangOnStreamEstablishment", "grpcHangOnChannelEstablishment")),
+    [](const auto& info) {
+        const auto cause = std::get<0>(info.param);
+        const auto hook = std::get<1>(info.param);
+        return std::string(cause == DirectMockGRPCAsyncClientFactoryTest::CancellationCause::kCaller
+                               ? "Caller"
+                               : "ConnectionDrop") +
+            (hook == "grpcHangOnStreamEstablishment" ? "DuringStreamEstablishment"
+                                                     : "DuringChannelEstablishment");
+    });
+
+TEST_F(DirectMockGRPCAsyncClientFactoryTest, ShutdownWaitsForTimeoutDiagnostics) {
+    unittest::ServerParameterGuard detailedLogging("enableDetailedConnectionHealthMetricLogLines",
+                                                   true);
+    runTestWithMockServer([&] {
+        FailPointEnableBlock pending("grpcHangOnStreamEstablishment");
+        boost::optional<FailPointEnableBlock> diagnostics(
+            "grpcAsyncClientFactoryHangBeforeTimeoutDiagnostics");
+        boost::optional<FailPointEnableBlock> shutdownWait(
+            "grpcAsyncClientFactoryHangBeforeShutdownWait");
+        auto acquisition =
+            getFactory().get(kServerHostAndPort, ConnectSSLMode::kGlobalSSLMode, Milliseconds(1));
+        auto shutdown = makePromiseFuture<void>();
+        stdx::thread shutdownThread;
+        ON_BLOCK_EXIT([&] {
+            shutdownWait.reset();
+            diagnostics.reset();
+            if (shutdownThread.joinable()) {
+                shutdownThread.join();
+            }
+        });
+        diagnostics->waitForOneNewEntry();
+        shutdownThread = stdx::thread([&] {
+            getFactory().shutdown();
+            shutdown.promise.emplaceValue();
+        });
+        shutdownWait->waitForOneNewEntry();
+        shutdownWait.reset();
+        auto client = getServiceContext()->getService()->makeClient("ShutdownWaitTest");
+        // Creating an OperationContext with a deadline is the simplest way to ensure
+        // shutdown.future get's a value within a reasonable amount of time.
+        auto opCtx = client->makeOperationContext();
+        opCtx->setDeadlineAfterNowBy(Milliseconds(500), ErrorCodes::ExceededTimeLimit);
+        auto waitStatus = shutdown.future.getNoThrow(opCtx.get());
+        diagnostics.reset();
+        shutdownThread.join();
+        auto acquisitionStatus = acquisition.getNoThrow().getStatus();
+        EXPECT_THAT(getFactory().getStats(), AllOf(SuccessfulStreamCount(0), FailedStreamCount(0)));
+        destroyFactory();
+        EXPECT_EQ(waitStatus, ErrorCodes::ExceededTimeLimit);
+        EXPECT_EQ(acquisitionStatus, ErrorCodes::ExceededTimeLimit);
+    });
+}
+
+TEST_F(DirectMockGRPCAsyncClientFactoryTest, RejectAdmittedSetupBeforeConnect) {
+    boost::optional<FailPointEnableBlock> beforeConnect("grpcAsyncClientFactoryHangBeforeConnect");
+    boost::optional<FailPointEnableBlock> shutdownWait(
+        "grpcAsyncClientFactoryHangBeforeShutdownWait");
+    FailPointEnableBlock channel("grpcHangOnChannelEstablishment");
+    auto acquisition = makePromiseFuture<Handle>();
+    auto acquisitionThread = stdx::thread([&] {
+        acquisition.promise.setFrom(
+            getFactory()
+                .get(kServerHostAndPort, ConnectSSLMode::kGlobalSSLMode, Milliseconds::max())
+                .getNoThrow());
+    });
+    stdx::thread shutdownThread;
+    ON_BLOCK_EXIT([&] {
+        shutdownWait.reset();
+        beforeConnect.reset();
+        acquisitionThread.join();
+        if (shutdownThread.joinable()) {
+            shutdownThread.join();
+        }
+    });
+    beforeConnect->waitForOneNewEntry();
+    shutdownThread = stdx::thread([&] { getFactory().shutdown(); });
+    shutdownWait->waitForOneNewEntry();
+    shutdownWait.reset();
+    beforeConnect.reset();
+    EXPECT_EQ(acquisition.future.getNoThrow().getStatus(), ErrorCodes::ShutdownInProgress);
+    shutdownThread.join();
+    ASSERT_EQ(channel.waitForNNewEntries(0), 0);
+    EXPECT_THAT(getFactory().getStats(),
+                AllOf(HasNoRegisteredStreams(), SuccessfulStreamCount(0), FailedStreamCount(0)));
+}
+
+TEST_F(DirectMockGRPCAsyncClientFactoryTest, SynchronousStreamFactoryExceptionDrainsSetupTracking) {
+    runTestWithMockServer([&] {
+        FailPointEnableBlock failure("grpcThrowOnChannelEstablishment");
+        auto acquisition = getFactory().get(
+            kServerHostAndPort, ConnectSSLMode::kGlobalSSLMode, Milliseconds::max());
+        failure.waitForOneNewEntry();
+        auto status = acquisition.getNoThrow().getStatus();
+        EXPECT_THAT(status,
+                    StatusIs(ErrorCodes::HostUnreachable,
+                             "throwing during channel establishment due to failpoint"));
+        getFactory().shutdown();
+        EXPECT_THAT(
+            getFactory().getStats(),
+            AllOf(HasNoRegisteredStreams(), SuccessfulStreamCount(0), FailedStreamCount(0)));
+    });
+}
+
+TEST_F(DirectMockGRPCAsyncClientFactoryTest, ConnectionFailureDrainsSetupTracking) {
+    runTestWithMockServer([&] {
+        FailPointEnableBlock failure("grpcFailChannelEstablishment");
+        auto result =
+            getFactory()
+                .get(kServerHostAndPort, ConnectSSLMode::kGlobalSSLMode, Milliseconds::max())
+                .getNoThrow();
+        ASSERT_EQ(result.getStatus(), ErrorCodes::HostUnreachable);
+        getFactory().shutdown();
+        EXPECT_THAT(
+            getFactory().getStats(),
+            AllOf(HasNoRegisteredStreams(), SuccessfulStreamCount(0), FailedStreamCount(0)));
+    });
 }
 
 class MockGRPCAsyncClientFactoryTest : public MockGRPCTransportLayerTest {
@@ -700,4 +1055,5 @@ TEST_F(MockGRPCAsyncClientFactoryTest, TimeoutStreamEstablishment) {
 TEST_F(MockGRPCAsyncClientFactoryTest, TimeoutStreamEstablishmentCustomCode) {
     runStreamEstablishmentTimeoutTest(ErrorCodes::MaxTimeMSExpired);
 }
+}  // namespace
 }  // namespace mongo::transport::grpc

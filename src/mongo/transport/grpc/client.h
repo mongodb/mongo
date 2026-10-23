@@ -36,6 +36,13 @@ class Client : public std::enable_shared_from_this<Client> {
 public:
     static constexpr auto kDefaultChannelTimeout = Minutes(30);
 
+    /** The status futures return when a gRPC stream establishment is cancelled. */
+    static const Status& tokenCancellationStatus() {
+        static StaticImmortal<Status> status(ErrorCodes::CallbackCanceled,
+                                             "gRPC stream establishment was cancelled");
+        return *status;
+    }
+
     /**
      * State related to an invocation of one of CommandService's methods.
      */
@@ -108,6 +115,8 @@ public:
     virtual void setKeepOpen(const HostAndPort& hostAndPort, bool keepOpen) = 0;
 
 protected:
+    void _dropPendingStreamEstablishments(std::function<bool(const HostAndPort&)> shouldDrop);
+
     /**
      * Adds entries to the provided `ClientContext's` metadata as defined in the MongoDB gRPC
      * Protocol.
@@ -283,8 +292,6 @@ private:
                                        boost::optional<Date_t> deadline,
                                        const ConnectOptions& connectOptions,
                                        const CancellationToken& token) override;
-
-    void _dropPendingStreamEstablishments(std::function<bool(const HostAndPort&)> shouldDrop);
 
     std::unique_ptr<StubFactory> _stubFactory;
 };

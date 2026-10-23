@@ -156,12 +156,15 @@ Future<std::shared_ptr<EgressSession>> Client::connect(
         streamState->setDeadline(reactor->now() + timeout);
     }
 
-    return _streamFactory(remote,
-                          reactor,
-                          streamState->getDeadline() ? streamState->getDeadline().get()
-                                                     : Date_t::max(),
-                          options,
-                          streamState->getCancellationToken())
+    return Future<void>::makeReady()
+        .then([this, remote, reactor, streamState, options] {
+            return _streamFactory(remote,
+                                  reactor,
+                                  streamState->getDeadline() ? streamState->getDeadline().get()
+                                                             : Date_t::max(),
+                                  options,
+                                  streamState->getCancellationToken());
+        })
         .then([this, reactor, streamState](CallContext call) -> Future<CallContext> {
             LOGV2_DEBUG(9715300,
                         3,
@@ -255,20 +258,22 @@ Future<std::shared_ptr<EgressSession>> Client::connect(
             _numActiveStreams.increment();
 
             session->setCleanupCallback(
-                [this, client = weak_from_this(), it = std::move(it)](Status terminationStatus) {
-                    if (terminationStatus.isOK()) {
-                        _numSuccessfulStreams.increment();
-                    } else {
-                        _numFailedStreams.increment();
+                [client = weak_from_this(), it = std::move(it)](Status terminationStatus) {
+                    auto anchor = client.lock();
+                    if (!anchor) {
+                        return;
                     }
-                    if (auto anchor = client.lock()) {
-                        std::lock_guard lk(_mutex);
-                        _sessions.erase(it);
-                        _numActiveStreams.decrement();
+                    if (terminationStatus.isOK()) {
+                        anchor->_numSuccessfulStreams.increment();
+                    } else {
+                        anchor->_numFailedStreams.increment();
+                    }
+                    std::lock_guard lk(anchor->_mutex);
+                    anchor->_sessions.erase(it);
+                    anchor->_numActiveStreams.decrement();
 
-                        if (MONGO_unlikely(_isShutdownComplete_inlock())) {
-                            _shutdownCV.notify_one();
-                        }
+                    if (MONGO_unlikely(anchor->_isShutdownComplete_inlock())) {
+                        anchor->_shutdownCV.notify_one();
                     }
                 });
 
@@ -343,7 +348,7 @@ Status Client::PendingStreamState::getCancellationReason() {
     if (!_cancellationReason.isOK()) {
         return _cancellationReason;
     }
-    return Status(ErrorCodes::CallbackCanceled, "gRPC stream establishment was cancelled");
+    return tokenCancellationStatus();
 }
 
 size_t Client::getPendingStreamEstablishments(const HostAndPort& target) {
@@ -861,8 +866,7 @@ void GRPCClient::dropConnections(const HostAndPort& target, const Status& status
     static_cast<StubFactoryImpl&>(*_stubFactory).getChannelPool()->dropChannelsByTarget(target);
 }
 
-void GRPCClient::_dropPendingStreamEstablishments(
-    std::function<bool(const HostAndPort&)> shouldDrop) {
+void Client::_dropPendingStreamEstablishments(std::function<bool(const HostAndPort&)> shouldDrop) {
     std::lock_guard lk(_mutex);
     // Cancel all outstanding connect timers and stream establishment attempts.
     for (auto&& it : _remoteStates) {

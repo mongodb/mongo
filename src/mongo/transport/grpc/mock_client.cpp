@@ -9,6 +9,7 @@ namespace mongo::transport::grpc {
 
 MONGO_FAIL_POINT_DEFINE(grpcHangOnChannelEstablishment);
 MONGO_FAIL_POINT_DEFINE(grpcFailChannelEstablishment);
+MONGO_FAIL_POINT_DEFINE(grpcThrowOnChannelEstablishment);
 
 MockClient::MockClient(TransportLayer* tl,
                        ServiceContext* svcCtx,
@@ -25,6 +26,24 @@ MockClient::MockClient(TransportLayer* tl,
         [](std::shared_ptr<MockChannel>& channel) { return MockStub(channel); });
 }
 
+void MockClient::appendStats(GRPCConnectionStats& stats) const {
+    stats.setTotalOpenChannels(_pool->size());
+    stats.setTotalActiveStreams(_numActiveStreams.get());
+    stats.setTotalSuccessfulStreams(_numSuccessfulStreams.get());
+    stats.setTotalFailedStreams(_numFailedStreams.get());
+}
+
+void MockClient::dropConnections(const Status& status) {
+    _dropPendingStreamEstablishments([](const HostAndPort& remote) { return true; });
+    _pool->dropAllChannels();
+}
+
+void MockClient::dropConnections(const HostAndPort& target, const Status& status) {
+    _dropPendingStreamEstablishments(
+        [target](const HostAndPort& remote) { return remote == target; });
+    _pool->dropChannelsByTarget(target);
+}
+
 Future<Client::CallContext> MockClient::_streamFactory(const HostAndPort& remote,
                                                        const std::shared_ptr<GRPCReactor>& reactor,
                                                        boost::optional<Date_t> deadline,
@@ -33,16 +52,21 @@ Future<Client::CallContext> MockClient::_streamFactory(const HostAndPort& remote
     if (MONGO_unlikely(grpcHangOnChannelEstablishment.shouldFail())) {
         // When this failpoint is set, take advantage of the cancellation token to block the future
         // until it has been cancelled, which ensures that we will hit the connect timeout codepath.
-        return token.onCancel().unsafeToInlineFuture().onCompletion(
-            [](Status s) -> StatusWith<Client::CallContext> {
+        return token.onCancel()
+            .thenRunOn(reactor)
+            .onCompletion([](Status) -> StatusWith<Client::CallContext> {
                 return Status(ErrorCodes::CallbackCanceled,
                               "hanging channel establishment attempt due to failpoint");
-            });
+            })
+            .unsafeToInlineFuture();
     } else if (MONGO_unlikely(grpcFailChannelEstablishment.shouldFail())) {
         return Future<Client::CallContext>::makeReady(
             Status(grpc::util::statusToErrorCode(::grpc::StatusCode::UNAVAILABLE),
                    "failing channel establishment due to fail point"));
     }
+    uassert(ErrorCodes::HostUnreachable,
+            "throwing during channel establishment due to failpoint",
+            !grpcThrowOnChannelEstablishment.shouldFail());
     auto stub = _pool->createStub(remote, options.sslMode);
     auto ctx = std::make_shared<MockClientContext>();
     setMetadataOnClientContext(*ctx, options);

@@ -499,6 +499,30 @@ TEST_F(GRPCClientTest, GRPCClientAppendStatsFailedSession) {
     CommandServiceTestFixtures::runWithServer(serverHandler, clientThreadBody, std::move(options));
 }
 
+TEST_F(GRPCClientTest, SessionCleanupAfterClientDestruction) {
+    auto clientThreadBody = [&](auto& server, auto&) {
+        auto client = makeClient();
+        client->start();
+        auto session = client
+                           ->connect(server.getListeningAddresses().at(0),
+                                     getReactor(),
+                                     CommandServiceTestFixtures::kDefaultConnectTimeout,
+                                     {})
+                           .get();
+        ASSERT_OK(session->finish());
+        ASSERT_EQ(getClientStats(client).getTotalActiveStreams(), 1);
+
+        std::weak_ptr<GRPCClient> weakClient = client;
+        client.reset();
+        ASSERT_TRUE(weakClient.expired());
+
+        // Cleanup must not attempt to modify the destroyed client.
+        session.reset();
+    };
+
+    CommandServiceTestFixtures::runWithServer(/*callback=*/[](auto) {}, clientThreadBody);
+}
+
 TEST_F(GRPCClientTest, UniqueChannelIds) {
     auto serverHandler = [&](std::shared_ptr<IngressSession>) {
     };
