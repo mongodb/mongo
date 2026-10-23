@@ -11,6 +11,9 @@
 #include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
+
+#include <tuple>
 
 namespace mongo {
 namespace sbe {
@@ -742,8 +745,10 @@ std::pair<int64_t, int64_t> BlockHashAggStage::spillImpl(SpillingStore* recordSt
     int64_t spilledBytes = 0;
     int64_t spilledRecords = 0;
 
-    // Spill only the records that have not been already consumed.
+    // Spill only the records that have not been already consumed. Check for interrupt
+    // every kInterruptCheckPeriod rows.
     for (; _htIt != _ht->end(); ++_htIt) {
+        checkForInterruptNoYield(_opCtx);
         spilledBytes += spillRowToDisk(_htIt->first, _htIt->second);
         spilledRecords++;
     }
@@ -779,6 +784,14 @@ bool BlockHashAggStage::getNextSpilledHelper() {
     // Find additional partial aggregates for the same key and merge them in order to compute the
     // final output.
     for (auto nextRecord = _rsCursor->next(); nextRecord; nextRecord = _rsCursor->next()) {
+        // Merging a spilled partial can be arbitrarily expensive, and the amortized checker only
+        // fires every kInterruptCheckPeriod calls -- check directly, every iteration (no yield).
+        _opCtx->checkForInterrupt();
+        if (MONGO_unlikely(sleepInSbeGroupSpillMergeLoop.shouldFail())) {
+            sleepInSbeGroupSpillMergeLoop.execute(
+                [&](const BSONObj& data) { sleepmillis(data["millis"].numberLong()); });
+        }
+
         auto recoveredRow = recoverSpilledRecord(*nextRecord, _stashedBuffer);
         // If we found a different key, then we're done accumulating the current key. Since there's
         // no peek API, we have to stash `recoveredRow` for next time.
@@ -865,7 +878,9 @@ PlanState BlockHashAggStage::getNext() {
 
         if (_htIt == _ht->end()) {
             // All records have been processed.
-            _ht->clear();
+            // Destruction cannot usefully check interrupts, so exclude it from delinquency.
+            std::ignore = _opCtx->checkForInterruptNoAssert();
+            _opCtx->runWithoutInterruptionExceptAtGlobalShutdown([&] { _ht->clear(); });
             _htIt = _ht->end();
             _done = true;
             if (numRows == 0) {
@@ -993,21 +1008,33 @@ void BlockHashAggStage::close() {
     trackClose();
     _children[0]->close();
 
-    _ht = boost::none;
-    if (_recordStore && _opCtx) {
-        _recordStore->resetCursor(_opCtx, _rsCursor);
+    // Destruction cannot usefully check interrupts, so exclude it from delinquency.
+    auto teardownSpillState = [&] {
+        _ht = boost::none;
+        if (_recordStore && _opCtx) {
+            _recordStore->resetCursor(_opCtx, _rsCursor);
+        }
+        _rsCursor.reset();
+        _recordStore.reset();
+
+        _currentBlockSize = 0;
+        _bitmapBlock = nullptr;
+        _tokenInfos.clear();
+        _monoBlocks.clear();
+    };
+    if (_opCtx) {
+        // Account for any check-free execution span leading up to teardown (NoAssert: close() is a
+        // cleanup path where throwing is unsafe).
+        std::ignore = _opCtx->checkForInterruptNoAssert();
+        _opCtx->runWithoutInterruptionExceptAtGlobalShutdown(teardownSpillState);
+    } else {
+        teardownSpillState();
     }
-    _rsCursor.reset();
-    _recordStore.reset();
+
     _outKeyRowRecordStore = {0};
     _outAggRowRecordStore = {0};
     _spilledAggRow = {0};
     _stashedNextRow = boost::none;
-
-    _currentBlockSize = 0;
-    _bitmapBlock = nullptr;
-    _tokenInfos.clear();
-    _monoBlocks.clear();
 
     _specificStats.peakTrackedMemBytes = _memoryTracker.value().peakTrackedMemoryBytes();
     _memoryTracker.value().set(0);

@@ -100,6 +100,8 @@ enum class [[MONGO_MOD_PUBLIC]] ExpressionContextCollationMatchesDefault { kYes,
 
 class [[MONGO_MOD_PUBLIC]] ExpressionContext : public RefCountable {
 public:
+    static constexpr int32_t kInterruptCheckPeriod = 128;
+
     /**
      * An RAII type that will temporarily change the ExpressionContext's collator. Resets the
      * collator to the previous value upon destruction.
@@ -1418,7 +1420,6 @@ protected:
         // Evaluates the query-memory load-shed decision.
         void checkForQueryMemoryLoadShedding(OperationContext* opCtx);
 
-        static constexpr int32_t kInterruptCheckPeriod = 128;
         static constexpr int32_t kVerySlowInterruptCheckPeriod = 8;  // Runs every 1024 ticks
 
         ExpressionContext* _expressionContext;

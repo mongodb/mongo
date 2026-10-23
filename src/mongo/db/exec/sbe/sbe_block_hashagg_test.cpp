@@ -11,10 +11,12 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/unittest/server_parameter_guard.h"
+#include "mongo/util/tick_source_mock.h"
 
 #include <algorithm>
 #include <functional>
 #include <map>
+#include <tuple>
 #include <vector>
 
 
@@ -48,6 +50,8 @@ using AccNamesVector = std::vector<std::tuple<EFn, EFn, EFn>>;
 
 class BlockHashAggStageTest : public PlanStageTestFixture {
 public:
+    using PlanStageTestFixture::PlanStageTestFixture;
+
     void setUp() override {
         PlanStageTestFixture::setUp();
         _globalLock = std::make_unique<Lock::GlobalLock>(operationContext(), MODE_IS);
@@ -151,15 +155,16 @@ public:
         ASSERT(expectedMap.empty());
     }
 
-    void runBlockHashAggTestHelper(
-        const std::vector<Bucket>& inputData,
-        AccNamesVector accNames,
-        TestResultType expectedResultsMap,
-        std::vector<size_t> expectedOutputBlockSizes,
-        bool allowDiskUse,
-        bool forceIncreasedSpilling,
-        const AssertStageStatsFn& assertStageStats = AssertStageStatsFn{}) {
+    struct BlockAggStageSetup {
+        size_t numScanSlots;
+        TypedValue inputData;
+        MakeStageFn<value::SlotVector> makeFn;
+    };
 
+    BlockAggStageSetup prepareBlockAggStageSetup(const std::vector<Bucket>& inputData,
+                                                 AccNamesVector accNames,
+                                                 bool allowDiskUse,
+                                                 bool forceIncreasedSpilling) {
         // The user may specify a list of block IDs or a 'scalarId'.
         for (auto& bucket : inputData) {
             invariant(bucket.ids.empty() != /* XOR */
@@ -178,7 +183,7 @@ public:
             numScanSlots = keySize + 1 /* bitset */ + inputData[0].dataBlocks.size();
         }
 
-        auto makeFn = [&](value::SlotVector scanSlots, std::unique_ptr<PlanStage> scanStage) {
+        auto makeFn = [=, this](value::SlotVector scanSlots, std::unique_ptr<PlanStage> scanStage) {
             value::SlotVector idSlots;
             value::SlotVector outputSlots;
             for (size_t i = 0; i < keySize; ++i) {
@@ -282,13 +287,27 @@ public:
 
         TypedValue inputDataArray = makeArray(std::move(bucketVals));
 
+        return {numScanSlots, inputDataArray, std::move(makeFn)};
+    }
+
+    void runBlockHashAggTestHelper(
+        const std::vector<Bucket>& inputData,
+        AccNamesVector accNames,
+        TestResultType expectedResultsMap,
+        std::vector<size_t> expectedOutputBlockSizes,
+        bool allowDiskUse,
+        bool forceIncreasedSpilling,
+        const AssertStageStatsFn& assertStageStats = AssertStageStatsFn{}) {
+        auto setup = prepareBlockAggStageSetup(
+            inputData, std::move(accNames), allowDiskUse, forceIncreasedSpilling);
+
         // Test forceSpill when allowDiskUse is set to true and forceIncreasedSpilling is set to
         // false.
         bool forceSpill = allowDiskUse && !forceIncreasedSpilling;
-        auto result = runTestMulti(numScanSlots,
-                                   inputDataArray.first,
-                                   inputDataArray.second,
-                                   makeFn,
+        auto result = runTestMulti(setup.numScanSlots,
+                                   setup.inputData.first,
+                                   setup.inputData.second,
+                                   setup.makeFn,
                                    forceSpill,
                                    assertStageStats);
         value::TagValueOwned resultOwner = value::TagValueOwned::fromRaw(result);
@@ -1138,5 +1157,165 @@ TEST_F(BlockHashAggStageTest, MultipleAccumulatorsDifferentPartitionSizes) {
                          {EFn::kValueBlockAggMin, EFn::kMin, EFn::kMin}},
                         expected,
                         {highPartitionSize - lowPartitionSize + 2});
+}
+
+TEST_F(BlockHashAggStageTest, SpillWriteLoopChecksForInterrupt) {
+    constexpr int kGroups = 2000;
+    std::vector<int32_t> keys;
+    for (int i = 0; i < kGroups; ++i) {
+        keys.push_back(i);
+    }
+    std::vector<Bucket> buckets{
+        Bucket{.ids = {makeInt32sBlock(keys)}, .bitset = std::vector<bool>(kGroups, true)}};
+    auto setup = prepareBlockAggStageSetup(
+        buckets, {{EFn::kValueBlockAggCount, EFn::kCount, EFn::kSum}}, true, false);
+    auto ctx = makeCompileCtx();
+    auto [scanSlots, scanStage] =
+        generateVirtualScanMulti(setup.numScanSlots, setup.inputData.first, setup.inputData.second);
+    auto [outputSlots, stage] = setup.makeFn(scanSlots, std::move(scanStage));
+    std::ignore = prepareTree(ctx.get(), stage.get(), outputSlots);
+    ASSERT_EQ(stage->getNext(), PlanState::ADVANCED);
+    stage->saveState();
+
+    auto* opCtx = operationContext();
+    const auto checksBefore = opCtx->numInterruptChecks();
+    stage->forceSpill(nullptr);
+    const auto checksDelta = opCtx->numInterruptChecks() - checksBefore;
+    const auto* stats = static_cast<const BlockHashAggStats*>(stage->getSpecificStats());
+    ASSERT_EQ(stats->spillingStats.getSpilledRecords(), kGroups - BlockHashAggStage::kBlockOutSize);
+    const auto spilledRecords = stats->spillingStats.getSpilledRecords();
+    // Store writes already check once per row; require the spill loop's amortized checks too.
+    ASSERT_GTE(checksDelta, spilledRecords + spilledRecords / PlanStage::kInterruptCheckPeriod / 2);
+    stage->restoreState();
+    stage->close();
+}
+
+TEST_F(BlockHashAggStageTest, EmptySpillPropagatesInterruptAfterCleanup) {
+    std::vector<Bucket> buckets{Bucket{.ids = {makeInt32sBlock({0})}, .bitset = {true}}};
+    auto setup = prepareBlockAggStageSetup(
+        buckets, {{EFn::kValueBlockAggCount, EFn::kCount, EFn::kSum}}, true, false);
+    auto ctx = makeCompileCtx();
+    auto [scanSlots, scanStage] =
+        generateVirtualScanMulti(setup.numScanSlots, setup.inputData.first, setup.inputData.second);
+    auto [outputSlots, stage] = setup.makeFn(scanSlots, std::move(scanStage));
+    std::ignore = prepareTree(ctx.get(), stage.get(), outputSlots);
+    ASSERT_EQ(stage->getNext(), PlanState::ADVANCED);
+    stage->saveState();
+    operationContext()->markKilled();
+    ASSERT_THROWS_CODE(stage->forceSpill(nullptr), DBException, ErrorCodes::Interrupted);
+    ASSERT_EQ(stage->getMemoryTracker()->inUseTrackedMemoryBytes(), 0);
+    stage->close();
+}
+
+TEST_F(BlockHashAggStageTest, SpilledMergeLoopChecksForInterruptEveryIteration) {
+    // Repeated spills create many partials for the same key.
+    constexpr size_t kBuckets = 300;
+    std::vector<Bucket> buckets;
+    for (size_t i = 0; i < kBuckets; ++i) {
+        buckets.push_back(Bucket{
+            .ids = {makeInt32sBlock({0})}, .bitset = {true}, .dataBlocks = {makeInt32sBlock({1})}});
+    }
+
+    auto setup = prepareBlockAggStageSetup(buckets,
+                                           {{EFn::kValueBlockAggSum, EFn::kSum, EFn::kSum}},
+                                           /*allowDiskUse=*/true,
+                                           /*forceIncreasedSpilling=*/true);
+
+    auto ctx = makeCompileCtx();
+    auto [scanSlots, scanStage] =
+        generateVirtualScanMulti(setup.numScanSlots, setup.inputData.first, setup.inputData.second);
+    auto [outputSlots, stage] = setup.makeFn(scanSlots, std::move(scanStage));
+    std::ignore = prepareTree(ctx.get(), stage.get(), outputSlots);
+
+    auto* opCtx = operationContext();
+    int64_t maxCallChecks = 0;
+    int64_t prevChecks = opCtx->numInterruptChecks();
+    while (stage->getNext() == PlanState::ADVANCED) {
+        const auto now = opCtx->numInterruptChecks();
+        maxCallChecks = std::max(maxCallChecks, now - prevChecks);
+        prevChecks = now;
+    }
+
+    auto* blockStats = static_cast<const BlockHashAggStats*>(stage->getSpecificStats());
+    const auto spilledRecords = blockStats->spillingStats.getSpilledRecords();
+
+    // All partials for this key merge within one getNext() call.
+    ASSERT_GTE(spilledRecords, static_cast<int64_t>(kBuckets) - 1);
+    ASSERT_GTE(maxCallChecks, spilledRecords - 1);
+
+    stage->close();
+}
+
+class BlockHashAggDelinquencyTest : public BlockHashAggStageTest {
+public:
+    Options makeServiceContextOptions() override {
+        return BlockHashAggStageTest::makeServiceContextOptions().useMockTickSource(true);
+    }
+
+    void assertTeardownExcluded(const std::function<void()>& teardown) {
+        auto* opCtx = operationContext();
+        auto* ticks = static_cast<TickSourceMock<>*>(getServiceContext()->getTickSource());
+        opCtx->trackOverdueInterruptChecks(ticks->getTicks());
+        const auto* stats = opCtx->overdueInterruptCheckStats();
+        ticks->advance(Milliseconds{20});
+        const auto before = ticks->getTicks();
+
+        // Advance time after the pre-teardown check, so an exit-window reset is required.
+        ticks->setAdvanceOnRead(Milliseconds{5});
+        teardown();
+        ticks->setAdvanceOnRead(Milliseconds{0});
+        ASSERT_EQ(stats->overdueInterruptChecks.loadRelaxed(), 1);
+        ASSERT_EQ(stats->overdueAccumulator.loadRelaxed(), Milliseconds{10});
+        ASSERT_GT(stats->interruptCheckWindowStartTime, before);
+        ASSERT_EQ(stats->interruptCheckWindowStartTime, ticks->getTicks() - 5);
+        std::ignore = opCtx->checkForInterruptNoAssert();
+        ASSERT_EQ(stats->overdueInterruptChecks.loadRelaxed(), 1);
+    }
+};
+
+TEST_F(BlockHashAggDelinquencyTest, GroupTeardownIsExcludedFromInterruptDelinquency) {
+    unittest::ServerParameterGuard interval("overdueInterruptCheckIntervalMillis", 10);
+
+    constexpr size_t kBuckets = 8;
+    std::vector<Bucket> buckets;
+    for (size_t i = 0; i < kBuckets; ++i) {
+        buckets.push_back(Bucket{
+            .ids = {makeInt32sBlock({0})}, .bitset = {true}, .dataBlocks = {makeInt32sBlock({1})}});
+    }
+
+    auto setup = prepareBlockAggStageSetup(buckets,
+                                           {{EFn::kValueBlockAggSum, EFn::kSum, EFn::kSum}},
+                                           /*allowDiskUse=*/true,
+                                           /*forceIncreasedSpilling=*/true);
+
+    auto ctx = makeCompileCtx();
+    auto [scanSlots, scanStage] =
+        generateVirtualScanMulti(setup.numScanSlots, setup.inputData.first, setup.inputData.second);
+    auto [outputSlots, stage] = setup.makeFn(scanSlots, std::move(scanStage));
+    std::ignore = prepareTree(ctx.get(), stage.get(), outputSlots);
+
+    while (stage->getNext() == PlanState::ADVANCED) {
+    }
+    auto* blockStats = static_cast<const BlockHashAggStats*>(stage->getSpecificStats());
+    ASSERT_TRUE(blockStats->usedDisk);
+
+    assertTeardownExcluded([&] { stage->close(); });
+}
+
+TEST_F(BlockHashAggDelinquencyTest, EndOfInputTeardownIsExcludedFromInterruptDelinquency) {
+    unittest::ServerParameterGuard interval("overdueInterruptCheckIntervalMillis", 10);
+    std::vector<Bucket> buckets{Bucket{
+        .ids = {makeInt32sBlock({0})}, .bitset = {true}, .dataBlocks = {makeInt32sBlock({1})}}};
+    auto setup = prepareBlockAggStageSetup(
+        buckets, {{EFn::kValueBlockAggSum, EFn::kSum, EFn::kSum}}, false, false);
+    auto ctx = makeCompileCtx();
+    auto [scanSlots, scanStage] =
+        generateVirtualScanMulti(setup.numScanSlots, setup.inputData.first, setup.inputData.second);
+    auto [outputSlots, stage] = setup.makeFn(scanSlots, std::move(scanStage));
+    std::ignore = prepareTree(ctx.get(), stage.get(), outputSlots);
+
+    // The first call emits the only group and clears the exhausted hash table.
+    assertTeardownExcluded([&] { ASSERT_EQ(stage->getNext(), PlanState::ADVANCED); });
+    stage->close();
 }
 }  // namespace mongo::sbe
