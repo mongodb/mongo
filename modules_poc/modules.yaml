@@ -1191,6 +1191,7 @@ replication.utils:
     - src/mongo/db/repl/*wait_for_majority_service*
     - src/mongo/db/repl/*idempotency*
     - src/mongo/db/repl/*task_runner*
+    - src/mongo/db/repl/*serial_processor*
     - src/mongo/db/repl/*task_executor_mock*
     - src/mongo/db/repl/*replication_auth*
     - src/mongo/db/repl/*replication_process*

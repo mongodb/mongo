@@ -2553,6 +2553,16 @@ mongo_cc_unit_test(
     ],
 )
 
+mongo_cc_unit_test(
+    name = "serial_processor_test",
+    srcs = ["serial_processor_test.cpp"],
+    private_hdrs = [":serial_processor.h"],
+    tags = ["mongo_unittest_third_group"],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
 mongo_cc_benchmark(
     name = "internode_validation_hash_bm",
     srcs = [
