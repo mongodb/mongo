@@ -14,12 +14,6 @@ import {
     assertPlanHasIxScanStage,
 } from "jstests/libs/query/analyze_plan.js";
 import {getPlanRankerConfig, setPlanRankerConfig} from "jstests/libs/query/cbr_utils.js";
-import {checkSbeFullyEnabled, isDeferredGetExecutorEnabled} from "jstests/libs/query/sbe_util.js";
-
-// CBR cannot rank plans for SBE-targeted queries when the deferred engine choice is disabled:
-// PlanRanker::rankPlans() forces such queries onto the multiplanner, so the CBR fallback
-// strategies below are never exercised and their expectations would not hold.
-const canRunCbrPhases = !checkSbeFullyEnabled(db) || isDeferredGetExecutorEnabled(db);
 
 const collName = jsTestName();
 const coll = db[collName];
@@ -199,31 +193,25 @@ try {
     runReplanningTest(true /* isMultiplanning */);
 
     // 2: Run with CBR fallback strategies.
-    if (canRunCbrPhases) {
+    db.adminCommand({
+        setParameter: 1,
+        featureFlagCostBasedRanker: true,
+        internalQueryPlanRanker: "mixed",
+        internalQueryCBRCEMode: "samplingCE",
+    });
+
+    const cbrFallbackStrategies = ["NoMultiplanningResults", "EstimateRankingEffort"];
+
+    for (const cbrFallbackStrategy of cbrFallbackStrategies) {
+        jsTest.log.info("Running runInitialCacheTest", {cbrFallbackStrategy});
         db.adminCommand({
             setParameter: 1,
-            featureFlagCostBasedRanker: true,
-            internalQueryPlanRanker: "mixed",
-            internalQueryCBRCEMode: "samplingCE",
+            internalQueryMixedPlanRankingStrategy: cbrFallbackStrategy,
         });
+        runInitialCacheTest(false /* isMultiplanning */);
 
-        const cbrFallbackStrategies = ["NoMultiplanningResults", "EstimateRankingEffort"];
-
-        for (const cbrFallbackStrategy of cbrFallbackStrategies) {
-            jsTest.log.info("Running runInitialCacheTest", {cbrFallbackStrategy});
-            db.adminCommand({
-                setParameter: 1,
-                internalQueryMixedPlanRankingStrategy: cbrFallbackStrategy,
-            });
-            runInitialCacheTest(false /* isMultiplanning */);
-
-            jsTest.log.info("Running replanningTest", {cbrFallbackStrategy});
-            runReplanningTest(false /* isMultiplanning */);
-        }
-    } else {
-        jsTest.log.info(
-            "Skipping CBR fallback strategies: SBE is enabled without deferred engine choice",
-        );
+        jsTest.log.info("Running replanningTest", {cbrFallbackStrategy});
+        runReplanningTest(false /* isMultiplanning */);
     }
 
     // TODO SERVER-116989: Run tests under the non-release CBR configurations (e.g. sampling).

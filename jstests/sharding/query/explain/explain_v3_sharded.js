@@ -29,11 +29,7 @@ import {
     kPlannerStatsVerbosities,
     kPlanPhaseGroups,
 } from "jstests/libs/query/explain_v3_helpers.js";
-import {
-    checkSbeCompletelyDisabled,
-    checkSbeFullyEnabled,
-    isDeferredGetExecutorEnabled,
-} from "jstests/libs/query/sbe_util.js";
+import {checkSbeCompletelyDisabled, checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const kV3Verbosities = ["plannerChoice", "plannerStats", "execStats"];
@@ -99,8 +95,7 @@ function aggExecutionStatsNReturned(shardSection) {
  * cases against the active 'mode'.
  */
 function describeUnderEachRankerMode(testCallback) {
-    for (const configuredMode of kRankerModes) {
-        const mode = {...configuredMode};
+    for (const mode of kRankerModes) {
         describe(mode.name, function () {
             let savedRankerConfig;
             let cbrUnsupported = false;
@@ -108,12 +103,6 @@ function describeUnderEachRankerMode(testCallback) {
 
             before(function () {
                 classicEngineForced = checkSbeCompletelyDisabled(st.shard0.getDB(dbName));
-                // TODO SERVER-136210: The SBE explainer does not record the ranker choice reason
-                // when deferred engine choice is off, so only the chosen ranker can be checked.
-                const shardDB = st.shard0.getDB(dbName);
-                if (checkSbeFullyEnabled(shardDB) && !isDeferredGetExecutorEnabled(shardDB)) {
-                    mode.reason = undefined;
-                }
                 if (mode.skipOnFullSbe && checkSbeFullyEnabled(st.shard0.getDB(dbName))) {
                     cbrUnsupported = true;
                     return;
@@ -637,14 +626,12 @@ describe("V3 explain in a sharded cluster", function () {
                                 "expected every shard to agree on the chosen ranker",
                                 {explain},
                             );
-                            if (mode.reason !== undefined) {
-                                assert.eq(
-                                    queryPlanner.rankerChoice.reason,
-                                    mode.reason,
-                                    "expected every shard to agree on the reason",
-                                    {explain},
-                                );
-                            }
+                            assert.eq(
+                                queryPlanner.rankerChoice.reason,
+                                mode.reason,
+                                "expected every shard to agree on the reason",
+                                {explain},
+                            );
                             assertCostBasedGroups(queryPlanner.plans, verbosity, {explain});
                             assert.eq(
                                 aggHasExecutionStats(shardSection),

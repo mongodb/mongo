@@ -9,7 +9,6 @@
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
-import {checkSbeFullyEnabled, isDeferredGetExecutorEnabled} from "jstests/libs/query/sbe_util.js";
 
 const conn = MongoRunner.runMongod({setParameter: {featureFlagPathArrayness: true}});
 const db = conn.getDB(`${jsTestName()}_db`);
@@ -108,15 +107,9 @@ setServerParameters({
     // Make sure that the results are still correct.
     assertJoinPlanResults(coll, pipeline, noJoinOptResults);
 
-    // Due to the limit one $lookup stages is expected to be left unoptimized.
-    assertNonOptimizedLookups(
-        coll,
-        pipeline,
-        // $lookup+$unwind suffix is pushed down to SBE as an EQ_LOOKUP_UNWIND stage when either the
-        // deferred get executor is enabled or the full SBE engine is in use. Otherwise, the suffix
-        // is executed in document sources.
-        isDeferredGetExecutorEnabled(db) || checkSbeFullyEnabled(db) ? 1 : 0,
-    );
+    // Due to the limit one $lookup stages is expected to be left unoptimized. The $lookup+$unwind
+    // suffix is pushed down to SBE as an EQ_LOOKUP_UNWIND stage.
+    assertNonOptimizedLookups(coll, pipeline, 1);
 }
 
 // 4. Join optimization enabled: number of edges limit hit.
@@ -129,15 +122,9 @@ setServerParameters({
     // Make sure that the results are still correct.
     assertJoinPlanResults(coll, pipeline, noJoinOptResults);
 
-    // Due to the limit one $lookup stages is expected to be left unoptimized.
-    assertNonOptimizedLookups(
-        coll,
-        pipeline,
-        // $lookup+$unwind suffix is pushed down to SBE as an EQ_LOOKUP_UNWIND stage when either the
-        // deferred get executor is enabled or the full SBE engine is in use. Otherwise, the suffix
-        // is executed in document sources.
-        isDeferredGetExecutorEnabled(db) || checkSbeFullyEnabled(db) ? 1 : 0,
-    );
+    // Due to the limit one $lookup stages is expected to be left unoptimized. The $lookup+$unwind
+    // suffix is pushed down to SBE as an EQ_LOOKUP_UNWIND stage.
+    assertNonOptimizedLookups(coll, pipeline, 1);
 }
 
 MongoRunner.stopMongod(conn);

@@ -25,15 +25,9 @@ import {
     getQueryInfoAtTopLevelOrFirstStage,
     getSbePlanStages,
 } from "jstests/libs/query/sbe_explain_helpers.js";
-import {
-    checkSbeFullyEnabled,
-    checkSbeRestrictedOrFullyEnabled,
-    isDeferredGetExecutorEnabled,
-} from "jstests/libs/query/sbe_util.js";
+import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
-const isSBEFullyEnabled = checkSbeFullyEnabled(db);
 const isSBELookupEnabled = checkSbeRestrictedOrFullyEnabled(db);
-const deferredGetExecutorEnabled = isDeferredGetExecutorEnabled(db);
 const eqLookupUnwindCollscanEnabled = FeatureFlagUtil.isPresentAndEnabled(
     db,
     "SbeEqLookupUnwindLocalCollscan",
@@ -150,7 +144,7 @@ let checkExplainOutputForVerLevel = function (
     withUnwind,
 ) {
     // Only make SBE specific assertions when we know that our $lookup has been pushed down.
-    if (isSBEFullyEnabled || (isSBELookupEnabled && (deferredGetExecutorEnabled || !withUnwind))) {
+    if (isSBELookupEnabled) {
         // If the SBE lookup is enabled, the "$lookup" stage is pushed down to the SBE and it's
         // not visible in 'stages' field of the explain output. Instead, 'queryPlan.stage' must be
         // "EQ_LOOKUP" or "EQ_LOOKUP_UNWIND".
@@ -341,10 +335,7 @@ let testQueryExecutorStatsWithCollectionScan = function (params) {
     // There is no index in the collection.
     assert.eq(0, curScannedKeys);
 
-    if (
-        isSBEFullyEnabled ||
-        (isSBELookupEnabled && (deferredGetExecutorEnabled || !params.withUnwind))
-    ) {
+    if (isSBELookupEnabled) {
         checkExplainOutputForAllVerbosityLevels(
             localColl,
             fromColl,
@@ -460,10 +451,7 @@ let testQueryExecutorStatsWithIndexScan = function (params) {
     // match with the local collection
     assert.eq(foreignDocMatchIndex, curScannedKeys);
 
-    if (
-        isSBEFullyEnabled ||
-        (isSBELookupEnabled && (deferredGetExecutorEnabled || !params.withUnwind))
-    ) {
+    if (isSBELookupEnabled) {
         checkExplainOutputForAllVerbosityLevels(
             localColl,
             fromColl,
@@ -548,10 +536,7 @@ let testQueryExecutorStatsWithDynamicIndexedLoopJoin = function (params) {
     // collection that are match using an index
     assert.eq(foreignDocMatchIndex, curScannedKeys);
 
-    if (
-        isSBEFullyEnabled ||
-        (isSBELookupEnabled && (deferredGetExecutorEnabled || !params.withUnwind))
-    ) {
+    if (isSBELookupEnabled) {
         checkExplainOutputForAllVerbosityLevels(
             localColl,
             fromColl,

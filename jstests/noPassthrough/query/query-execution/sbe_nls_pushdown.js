@@ -5,10 +5,7 @@
  *
  */
 import {aggPlanHasStage, getEngine} from "jstests/libs/query/analyze_plan.js";
-import {
-    checkSbeFullFeatureFlagEnabled,
-    isDeferredGetExecutorEnabled,
-} from "jstests/libs/query/sbe_util.js";
+import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/query/sbe_util.js";
 import {runWithParamsAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 const conn = MongoRunner.runMongod({
@@ -75,7 +72,6 @@ const assertPlan = (label, explainResult, expected, ctx) => {
 
 function runAllExamples() {
     const sbeFull = checkSbeFullFeatureFlagEnabled(db);
-    const isDeferredGetExecutor = isDeferredGetExecutorEnabled(db);
 
     for (const flags of [
         {

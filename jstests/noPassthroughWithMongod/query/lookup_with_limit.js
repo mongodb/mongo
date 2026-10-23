@@ -5,7 +5,6 @@ import {flattenQueryPlanTree, getWinningPlanFromExplain} from "jstests/libs/quer
 import {
     checkSbeFullyEnabled,
     checkSbeRestrictedOrFullyEnabled,
-    isDeferredGetExecutorEnabled,
 } from "jstests/libs/query/sbe_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
@@ -21,9 +20,7 @@ const isFeatureFlagSbeFullEnabled =
 const isSbeEnabled = checkSbeFullyEnabled(db);
 const isSbeGroupLookupOnly = checkSbeRestrictedOrFullyEnabled(db);
 const isLookupUnwindPushdownEnabled =
-    isDeferredGetExecutorEnabled(db) &&
-    FeatureFlagUtil.isPresentAndEnabled(db, "SbeEqLookupUnwindHashJoin") &&
-    !forceClassicEngineSet;
+    FeatureFlagUtil.isPresentAndEnabled(db, "SbeEqLookupUnwindHashJoin") && !forceClassicEngineSet;
 const isSbeTransformStagesEnabled =
     FeatureFlagUtil.isPresentAndEnabled(db, "SbeTransformStages") && !forceClassicEngineSet;
 

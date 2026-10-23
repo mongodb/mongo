@@ -14,11 +14,7 @@ import {
     planHasStage,
     getEngine,
 } from "jstests/libs/query/analyze_plan.js";
-import {
-    checkSbeRestrictedOrFullyEnabled,
-    checkSbeRestricted,
-    isDeferredGetExecutorEnabled,
-} from "jstests/libs/query/sbe_util.js";
+import {checkSbeRestrictedOrFullyEnabled, checkSbeRestricted} from "jstests/libs/query/sbe_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -41,12 +37,10 @@ const viewName = "view_lookup_pushdown";
 let db = conn.getDB(name);
 const sbeEnabled = checkSbeRestrictedOrFullyEnabled(db);
 const sbeRestricted = checkSbeRestricted(db);
-const ffSbeEqLookupUnwindHashJoin = FeatureFlagUtil.isPresentAndEnabled(
+const sbeEqLookupUnwindPushdownEnabled = FeatureFlagUtil.isPresentAndEnabled(
     db,
     "SbeEqLookupUnwindHashJoin",
 );
-const sbeEqLookupUnwindPushdownEnabled =
-    isDeferredGetExecutorEnabled(db) && ffSbeEqLookupUnwindHashJoin;
 
 if (!sbeEnabled) {
     jsTest.log.info("Skipping test because SBE is disabled");
@@ -66,8 +60,8 @@ function verifyEqLookupNodeStrategy(
     expectedStrategy,
     indexKeyPattern = {},
 ) {
-    // Collect both EQ_LOOKUP and EQ_LOOKUP_UNWIND nodes. The latter appears when
-    // featureFlagGetExecutorDeferredEngineChoice is enabled and $lookup absorbs a subsequent $unwind.
+    // Collect both EQ_LOOKUP and EQ_LOOKUP_UNWIND nodes. The latter appears when $lookup absorbs a
+    // subsequent $unwind.
     const eqLookupNodes = [
         ...getAggPlanStages(explain, "EQ_LOOKUP"),
         ...getAggPlanStages(explain, "EQ_LOOKUP_UNWIND"),
@@ -338,8 +332,8 @@ function setLookupPushdownDisabled(value) {
         JoinAlgorithm.Classic /* expectedJoinAlgorithm */,
     );
 
-    // $lookup that absorbs $unwind. When featureFlagGetExecutorDeferredEngineChoice is enabled, this is
-    // SBE-compatible even in restricted mode and will use hash join (small collection, no index).
+    // $lookup that absorbs $unwind. This is SBE-compatible even in restricted mode and will use hash
+    // join (small collection, no index).
     runTest(
         coll,
         [
@@ -351,8 +345,8 @@ function setLookupPushdownDisabled(value) {
             : JoinAlgorithm.Classic /* expectedJoinAlgorithm */,
     );
 
-    // $lookup that absorbs $match. When featureFlagGetExecutorDeferredEngineChoice is enabled, the absorbed
-    // $unwind makes this SBE-compatible even in restricted mode and will use hash join.
+    // $lookup that absorbs $match. The absorbed $unwind makes this SBE-compatible even in restricted
+    // mode and will use hash join.
     runTest(
         coll,
         [

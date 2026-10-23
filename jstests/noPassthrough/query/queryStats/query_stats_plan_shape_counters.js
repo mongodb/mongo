@@ -14,23 +14,14 @@ import {
     resetQueryStatsStore,
     withQueryStatsEnabled,
 } from "jstests/libs/query/query_stats_utils.js";
-import {
-    checkSbeStatus,
-    isDeferredGetExecutorEnabled,
-    kSbeRestricted,
-} from "jstests/libs/query/sbe_util.js";
+import {checkSbeStatus, kSbeRestricted} from "jstests/libs/query/sbe_util.js";
 
 function runPlanShapeCounterTest(coll) {
-    const deferredEngineChoiceEnabled = isDeferredGetExecutorEnabled(coll.getDB());
     const sbeStatus = checkSbeStatus(coll.getDB());
 
-    // Plan shape counters are only populated on the deferred engine-selection path.
-    // This test also asserts on the execution engine used.
-    if (!deferredEngineChoiceEnabled || sbeStatus !== kSbeRestricted) {
-        jsTest.log.info("Skipping plan shape counter test", {
-            deferredEngineChoiceEnabled,
-            sbeStatus,
-        });
+    // This test asserts on the execution engine used.
+    if (sbeStatus !== kSbeRestricted) {
+        jsTest.log.info("Skipping plan shape counter test", {sbeStatus});
         return;
     }
 

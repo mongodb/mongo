@@ -4,20 +4,13 @@
  * ]
  */
 import {resultsEq} from "jstests/aggregation/extras/utils.js";
-import {
-    checkSbeStatus,
-    kSbeDisabled,
-    isDeferredGetExecutorEnabled,
-} from "jstests/libs/query/sbe_util.js";
+import {checkSbeStatus, kSbeDisabled} from "jstests/libs/query/sbe_util.js";
 import {
     getPlanRankerConfig,
     setPlanRankerConfig,
     isPlanCosted,
 } from "jstests/libs/query/cbr_utils.js";
 import {getEngine} from "jstests/libs/query/analyze_plan.js";
-
-// TODO SERVER-117707 after this ticket, we should always expect that CBR is supported for SBE-targeted queries.
-const cbrSupportedForSbeQueries = isDeferredGetExecutorEnabled(db);
 
 const collName = jsTestName();
 const coll = db[collName];
@@ -88,7 +81,7 @@ function assertSbeWithCbrFallbackBehavior() {
         assert.eq(getEngine(explain), "sbe", explain);
 
         const rejectedPlans = explain.queryPlanner.rejectedPlans;
-        const queryShouldUseCbr = cbrEnabled && cbrSupportedForSbeQueries && queryReturnsNoResults;
+        const queryShouldUseCbr = cbrEnabled && queryReturnsNoResults;
         if (queryShouldUseCbr) {
             // If CBR is used, at least one of the rejected plans should have costs. This doesn't apply to
             // all rejected plans because when MP with CBR fallback is enabled, half of the plans will have

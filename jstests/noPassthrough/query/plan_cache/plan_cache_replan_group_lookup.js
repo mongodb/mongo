@@ -5,12 +5,9 @@
  * ]
  */
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
-import {getAggPlanStages, getEngine, getPlanStage} from "jstests/libs/query/analyze_plan.js";
+import {getAggPlanStages, getPlanStage} from "jstests/libs/query/analyze_plan.js";
 import {assertCacheUsage, setUpActiveCacheEntry} from "jstests/libs/query/plan_cache_utils.js";
-import {
-    isDeferredGetExecutorEnabled,
-    checkSbeRestrictedOrFullyEnabled,
-} from "jstests/libs/query/sbe_util.js";
+import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 const conn = MongoRunner.runMongod();
 const db = conn.getDB("test");
@@ -541,10 +538,6 @@ testReplanningAndCacheInvalidationOnForeignCollSizeIncrease(false /* singleSolut
     // Now we check whether the cache entry used for the $lookup run above can be re-used after
     // disabling lookup pushdown.
 
-    // Check whether the $lookup uses SBE.
-    let explain = coll.explain().aggregate(avoidReplanLookupPipeline);
-    const lookupUsedSbeByDefault = getAggPlanStages(explain, "EQ_LOOKUP").length > 0;
-
     // Disable $lookup pushdown. This should not invalidate the cache entry, but it should prevent
     // $lookup from being pushed down.
     assert.commandWorked(
@@ -555,70 +548,30 @@ testReplanningAndCacheInvalidationOnForeignCollSizeIncrease(false /* singleSolut
     );
 
     // Verify via explain that $lookup was NOT lowered.
-    explain = coll.explain().aggregate(avoidReplanLookupPipeline);
+    const explain = coll.explain().aggregate(avoidReplanLookupPipeline);
     const eqLookupNodes = getAggPlanStages(explain, "EQ_LOOKUP");
     assert.eq(eqLookupNodes.length, 0, "expected no EQ_LOOKUP nodes; got " + tojson(explain));
-    let engineAfterDisableLookupPushdown = getEngine(explain);
 
-    if (
-        lookupUsedSbeByDefault &&
-        engineAfterDisableLookupPushdown == "classic" &&
-        !isDeferredGetExecutorEnabled(db)
-    ) {
-        // If the lookup used SBE by default, then we cannot re-use the cache entry when we re-run
-        // it in classic.
-        runLookupQuery();
-        assertCacheUsage({
-            queryColl: coll,
-            pipeline: avoidReplanLookupPipeline,
-            fromMultiPlanning: true,
-            cacheEntryVersion: 1,
-            cacheEntryIsActive: false,
-            cachedIndexName: "b_1",
-        });
-        runLookupQuery();
-        assertCacheUsage({
-            queryColl: coll,
-            pipeline: avoidReplanLookupPipeline,
-            fromMultiPlanning: true,
-            cacheEntryVersion: 1,
-            cacheEntryIsActive: true,
-            cachedIndexName: "b_1",
-        });
-        runLookupQuery();
-        assertCacheUsage({
-            queryColl: coll,
-            pipeline: avoidReplanLookupPipeline,
-            fromMultiPlanning: false,
-            cacheEntryVersion: 1,
-            cacheEntryIsActive: true,
-            cachedIndexName: "b_1",
-        });
-    } else {
-        // Otherwise, either:
-        //   - We did not use SBE for the $lookup pipeline by default.
-        //   - The deferred get_executor path is enabled, so the classic cache entries are shared between
-        //     queries that use SBE and queries that use classic.
-        // So we can re-use the cache entry that was created earlier.
-        runLookupQuery();
-        assertCacheUsage({
-            queryColl: coll,
-            pipeline: avoidReplanLookupPipeline,
-            fromMultiPlanning: false,
-            cacheEntryVersion: 1,
-            cacheEntryIsActive: true,
-            cachedIndexName: "b_1",
-        });
-        runLookupQuery();
-        assertCacheUsage({
-            queryColl: coll,
-            pipeline: avoidReplanLookupPipeline,
-            fromMultiPlanning: false,
-            cacheEntryVersion: 1,
-            cacheEntryIsActive: true,
-            cachedIndexName: "b_1",
-        });
-    }
+    // The classic cache entries are shared between queries that use SBE and queries that use
+    // classic, so we can re-use the cache entry that was created earlier.
+    runLookupQuery();
+    assertCacheUsage({
+        queryColl: coll,
+        pipeline: avoidReplanLookupPipeline,
+        fromMultiPlanning: false,
+        cacheEntryVersion: 1,
+        cacheEntryIsActive: true,
+        cachedIndexName: "b_1",
+    });
+    runLookupQuery();
+    assertCacheUsage({
+        queryColl: coll,
+        pipeline: avoidReplanLookupPipeline,
+        fromMultiPlanning: false,
+        cacheEntryVersion: 1,
+        cacheEntryIsActive: true,
+        cachedIndexName: "b_1",
+    });
 }
 
 // Verify that disabling $group pushdown into SBE does not trigger a replan, and uses the
@@ -673,9 +626,6 @@ assertCacheUsage({
     cachedIndexName: "b_1",
 });
 
-explain = coll.explain().aggregate(avoidReplanGroupPipeline);
-const groupUsedSbeByDefault = getEngine(explain) === "sbe";
-
 // Disable $group pushdown. This should not invalidate the cache entry, but it should prevent $group
 // from being pushed down.
 assert.commandWorked(
@@ -685,63 +635,26 @@ assert.commandWorked(
 explain = coll.explain().aggregate(avoidReplanGroupPipeline);
 groupNodes = getAggPlanStages(explain, "GROUP");
 assert.eq(groupNodes.length, 0);
-const engineUsedAfterGroupPushdownDisabled = getEngine(explain);
 
-if (
-    groupUsedSbeByDefault &&
-    engineUsedAfterGroupPushdownDisabled === "classic" &&
-    !isDeferredGetExecutorEnabled(db)
-) {
-    // In other cases, we will NOT be able to re-use the same cache entry, since the group query
-    // ran in SBE, and now that group pushdown is disabled, it will be marked as SBE incompatible.
-    runGroupQuery();
-    assertCacheUsage({
-        queryColl: coll,
-        pipeline: avoidReplanGroupPipeline,
-        fromMultiPlanning: true,
-        cacheEntryVersion: 1,
-        cacheEntryIsActive: false,
-        cachedIndexName: "b_1",
-    });
-    runGroupQuery();
-    assertCacheUsage({
-        queryColl: coll,
-        pipeline: avoidReplanGroupPipeline,
-        fromMultiPlanning: true,
-        cacheEntryVersion: 1,
-        cacheEntryIsActive: true,
-        cachedIndexName: "b_1",
-    });
-
-    runGroupQuery();
-    assertCacheUsage({
-        queryColl: coll,
-        pipeline: avoidReplanGroupPipeline,
-        fromMultiPlanning: false,
-        cacheEntryVersion: 1,
-        cacheEntryIsActive: true,
-        cachedIndexName: "b_1",
-    });
-} else {
-    // When the SBE is completely disabled, we will be able to reuse the same cache entry.
-    runGroupQuery();
-    assertCacheUsage({
-        queryColl: coll,
-        pipeline: avoidReplanGroupPipeline,
-        fromMultiPlanning: false,
-        cacheEntryVersion: 1,
-        cacheEntryIsActive: true,
-        cachedIndexName: "b_1",
-    });
-    runGroupQuery();
-    assertCacheUsage({
-        queryColl: coll,
-        pipeline: avoidReplanGroupPipeline,
-        fromMultiPlanning: false,
-        cacheEntryVersion: 1,
-        cacheEntryIsActive: true,
-        cachedIndexName: "b_1",
-    });
-}
+// The classic cache entries are shared between queries that use SBE and queries that use classic,
+// so we can re-use the same cache entry.
+runGroupQuery();
+assertCacheUsage({
+    queryColl: coll,
+    pipeline: avoidReplanGroupPipeline,
+    fromMultiPlanning: false,
+    cacheEntryVersion: 1,
+    cacheEntryIsActive: true,
+    cachedIndexName: "b_1",
+});
+runGroupQuery();
+assertCacheUsage({
+    queryColl: coll,
+    pipeline: avoidReplanGroupPipeline,
+    fromMultiPlanning: false,
+    cacheEntryVersion: 1,
+    cacheEntryIsActive: true,
+    cachedIndexName: "b_1",
+});
 
 MongoRunner.stopMongod(conn);

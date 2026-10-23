@@ -13,9 +13,8 @@ import {
     getRejectedPlans,
     getWinningPlanFromExplain,
 } from "jstests/libs/query/analyze_plan.js";
-import {assertPlanCosted, assertPlanNotCosted} from "jstests/libs/query/cbr_utils.js";
+import {assertPlanCosted} from "jstests/libs/query/cbr_utils.js";
 import {hasCostBasedGroup} from "jstests/libs/query/explain_v3_helpers.js";
-import {isDeferredGetExecutorEnabled} from "jstests/libs/query/sbe_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {setParameterOnAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
@@ -45,8 +44,6 @@ st.shardColl(coll, {_id: 1} /* key */, {_id: 10} /* split */, {_id: 10} /* move 
 assert.commandWorked(coll.insert(Array.from({length: 20}, (_, i) => ({_id: i, a: 1, b: 2}))));
 assert.commandWorked(coll.createIndexes([{a: 1}, {b: 1}]));
 
-const deferredEngineOn = isDeferredGetExecutorEnabled(db);
-
 for (const frameworkControl of ["forceClassicEngine", "trySbeEngine"]) {
     setParameterOnAllNonConfigNodes(st.s, "internalQueryFrameworkControl", frameworkControl);
     const explain = coll.find({a: 1, b: 1}).explain();
@@ -59,31 +56,21 @@ for (const frameworkControl of ["forceClassicEngine", "trySbeEngine"]) {
         const winningPlan = getWinningPlanFromExplain(explain);
         const rejected = getRejectedPlans(explain);
         assert.gt(rejected.length, 0, `Expected at least one rejected plan: ${tojson(explain)}`);
-        // TODO SERVER-117707. Remove this conditional once CBR fully supports SBE.
-        if (deferredEngineOn) {
-            assertPlanCosted(winningPlan);
-            rejected.forEach(assertPlanCosted);
-        } else {
-            assertPlanNotCosted(winningPlan);
-            rejected.forEach(assertPlanNotCosted);
-        }
+        assertPlanCosted(winningPlan);
+        rejected.forEach(assertPlanCosted);
     }
 
-    // Without deferred engine choice, SBE V3 explain does not carry the cost estimates.
-    // TODO SERVER-136210 Remove this check once V3 supports deferred engine off.
-    if (deferredEngineOn) {
-        const explain = assert.commandWorked(
-            db.runCommand({
-                explain: {find: collName, filter: {a: 1, b: 1}},
-                verbosity: "plannerStats",
-            }),
-        );
-        const plans = explain.queryPlanner.winningPlan.shards.flatMap((shard) => shard.plans);
-        assert.gt(plans.length, 1, `Expected at least one rejected plan: ${tojson(explain)}`);
-        plans.forEach((plan) =>
-            assert(hasCostBasedGroup(plan), `Expected V3 plan to be costed: ${tojson(plan)}`),
-        );
-    }
+    const v3Explain = assert.commandWorked(
+        db.runCommand({
+            explain: {find: collName, filter: {a: 1, b: 1}},
+            verbosity: "plannerStats",
+        }),
+    );
+    const plans = v3Explain.queryPlanner.winningPlan.shards.flatMap((shard) => shard.plans);
+    assert.gt(plans.length, 1, `Expected at least one rejected plan: ${tojson(v3Explain)}`);
+    plans.forEach((plan) =>
+        assert(hasCostBasedGroup(plan), `Expected V3 plan to be costed: ${tojson(plan)}`),
+    );
 }
 
 st.stop();

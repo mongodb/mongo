@@ -162,11 +162,6 @@ export function checkSbeNonLeadingMatchEnabled(theDB) {
     }
 }
 
-export function isDeferredGetExecutorEnabled(theDB) {
-    // TODO SERVER-137028 delete this function.
-    return true;
-}
-
 /**
  * Check if featureFlagSbeTransformStages is enabled in the cluster.
  *

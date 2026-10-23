@@ -6,13 +6,11 @@ import {
     queryPlannerAlwaysFails,
     runWithFailpoint,
 } from "jstests/libs/query/command_diagnostic_utils.js";
-import {isDeferredGetExecutorEnabled} from "jstests/libs/query/sbe_util.js";
 
 const hasEnterpriseModule = getBuildInfo().modules.includes("enterprise");
 
 const dbName = "test";
 const collName = jsTestName();
-const otherCollName = collName + "_other";
 
 function setup(conn) {
     const db = conn.getDB(dbName);
@@ -23,12 +21,6 @@ function setup(conn) {
     assert.commandWorked(coll.createIndex({a: 1}, {sparse: true, collation: {locale: "en"}}));
     assert.commandWorked(coll.createIndex({b: 1}, {partialFilterExpression: {b: {$gte: 0}}}));
     coll.insert({a: 1, b: [1]});
-
-    // Setup other collection
-    const otherColl = db[otherCollName];
-    otherColl.drop();
-    assert.commandWorked(otherColl.createIndex({c: 1}, {unique: true}));
-    otherColl.insert({c: 1});
     return db;
 }
 
@@ -39,16 +31,8 @@ function setup(conn) {
  * command - The command to run.
  * redact - Whether to enable log redaction before dumping diagnostic info.
  * expectedDiagnosticInfo -  List of strings that are expected to be in the diagnostic log.
- * expectedSecondaryDiagnosticInfo - List of diagnostics relating to secondary collections
  */
-function runTest({
-    description,
-    command,
-    redact,
-    expectedDiagnosticInfo,
-    expectedSecondaryDiagnosticInfo,
-    skipIfDeferredGetExecutor,
-}) {
+function runTest({description, command, redact, expectedDiagnosticInfo}) {
     // Can't run cases that depend on log redaction without the enterprise module.
     if (!hasEnterpriseModule && redact) {
         return;
@@ -57,11 +41,6 @@ function runTest({
     // Each test case needs to start a new mongod to clear the previous logs.
     const conn = MongoRunner.runMongod({useLogFiles: true});
     const db = setup(conn);
-
-    if (skipIfDeferredGetExecutor && isDeferredGetExecutorEnabled(db)) {
-        MongoRunner.stopMongod(conn);
-        return;
-    }
 
     if (hasEnterpriseModule) {
         assert.commandWorked(db.adminCommand({setParameter: 1, redactClientLogData: redact}));
@@ -78,21 +57,6 @@ function runTest({
         logFile: conn.fullOptions.logFile,
         expectedDiagnosticInfo: expectedDiagnosticInfo,
     });
-
-    // Only SBE fills out planner params for external collections.
-    const framework = assert.commandWorked(
-        db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1}),
-    );
-    if (
-        framework.internalQueryFrameworkControl != "forceClassicEngine" &&
-        expectedSecondaryDiagnosticInfo
-    ) {
-        assertOnDiagnosticLogContents({
-            description: description,
-            logFile: conn.fullOptions.logFile,
-            expectedDiagnosticInfo: expectedSecondaryDiagnosticInfo,
-        });
-    }
 
     // We expect a non-zero exit code due to tassert triggered.
     MongoRunner.stopMongod(conn, null, {allowedExitCode: MongoRunner.EXIT_ABRUPT});
@@ -126,26 +90,6 @@ runTest({
     description: "agg with a simple $match",
     command: {aggregate: collName, pipeline: [{$match: {a: 1, b: 1}}], cursor: {}},
     expectedDiagnosticInfo: [...expectedLogContents],
-});
-runTest({
-    description: "agg with multiple collections",
-    command: {
-        aggregate: collName,
-        pipeline: [
-            {$lookup: {from: "nonExistentColl", as: "res", localField: "a", foreignField: "b"}},
-            {$lookup: {from: otherCollName, as: "res2", localField: "a", foreignField: "c"}},
-        ],
-        cursor: {},
-    },
-    expectedDiagnosticInfo: [...expectedLogContents],
-    expectedSecondaryDiagnosticInfo: [
-        "nonExistentColl",
-        "exists: false",
-        "indexes: []",
-        otherCollName,
-        "{ c: 1.0 } unique",
-    ],
-    skipIfDeferredGetExecutor: true,
 });
 
 // Test the count command.
