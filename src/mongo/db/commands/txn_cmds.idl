@@ -58,9 +58,43 @@ structs:
 
     EndOfTransactionScopesInfo:
         description: >-
-            Currently not used, but declared here for forward-compatibility with proposed
-            changes in an upcoming update adding change stream endOfTransaction (EOT) support.
+            Commit-time accounting metadata attached to each write participant's
+            'commitTransaction' oplog entry while end-of-transaction (EOT) change stream
+            support is enabled. Kept strict: false so that fields can be added later without
+            breaking older binaries, which ignore unknown sub-fields.
         strict: false
+        fields:
+            shardId:
+                description: "The shard that wrote this commitTransaction entry."
+                type: shard_id
+                optional: false
+                stability: internal
+            commitFloor:
+                description: >-
+                    Stable lower bound on the oplog timestamp of every commitTransaction
+                    entry of this transaction.
+                type: timestamp
+                optional: false
+                stability: internal
+            collectionParticipants:
+                description: >-
+                    Map from collection namespace to the array of shard ids that wrote that
+                    namespace.
+                type: object_owned
+                optional: false
+                stability: internal
+            databaseParticipants:
+                description: >-
+                    Map from database name to the array of shard ids that wrote at least one
+                    namespace in that database.
+                type: object_owned
+                optional: false
+                stability: internal
+            clusterParticipants:
+                description: "All shards that wrote transaction data."
+                type: array<shard_id>
+                optional: false
+                stability: internal
 
     CommitTransactionOplogObject:
         description: A document representing the 'o' field of a 'commitTransaction' oplog entry.
@@ -85,8 +119,8 @@ structs:
                 type: EndOfTransactionScopesInfo
                 optional: true
                 description:
-                    "Currently not used, but declared here for forward-compatibility with proposed
-                    changes in an upcoming update adding change stream endOfTransaction (EOT) support."
+                    "Commit-time accounting metadata for end-of-transaction change stream
+                    support. Present only while the feature is enabled at commit time."
 
     AbortTransactionOplogObject:
         description: A document representing the 'o' field of an 'abortTransaction' oplog entry.
@@ -120,6 +154,14 @@ commands:
                 optional: true
                 type: TxnRecoveryToken
                 stability: stable
+            endOfTransactionScopes:
+                description:
+                    "Commit-time accounting metadata for end-of-transaction change stream
+                    support. Attached by the coordinator only while the feature is enabled;
+                    participants echo it into their commitTransaction oplog entries."
+                optional: true
+                type: EndOfTransactionScopesInfo
+                stability: internal
         reply_type: OkReply
 
     abortTransaction:
