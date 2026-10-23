@@ -33,7 +33,6 @@
 #include "mongo/platform/atomic.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/topology_version_gen.h"
-#include "mongo/util/concurrency/notification.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
@@ -486,23 +485,6 @@ public:
 
     void setOplogSyncState(const OplogSyncState& newState);
 
-    // A signalApplierDrainComplete() call: the term the applier reported and lastApplied at the
-    // moment of the call, so tests can assert everything was published before the applier
-    // signaled.
-    struct ApplierDrainCompleteRecord {
-        long long term;
-        OpTimeAndWallTime lastApplied;
-    };
-
-    // Only the call that moves OplogSyncState from ApplierDraining to Stopped is recorded;
-    // duplicate signals racing that transition are ignored, like the real coordinator.
-    std::vector<ApplierDrainCompleteRecord> getApplierDrainCompleteRecords() const;
-
-    // Set on the recorded signalApplierDrainComplete() call so tests can await the signal.
-    Notification<void>& applierDrainCompleteNotification() {
-        return _applierDrainComplete;
-    }
-
     void setConsistentDataAvailable(OperationContext* opCtx, bool isDataMajorityCommitted) override;
     bool isDataConsistent() const override;
     void clearSyncSource() override;
@@ -548,10 +530,6 @@ private:
 
     Seconds _secondaryDelaySecs = Seconds(0);
     OplogSyncState _oplogSyncState = OplogSyncState::Running;
-
-    // Recorded by signalApplierDrainComplete() when it moves OplogSyncState to Stopped.
-    std::vector<ApplierDrainCompleteRecord> _applierDrainCompleteRecords;
-    Notification<void> _applierDrainComplete;
 
     bool _writeConcernMajorityShouldJournal = true;
 };

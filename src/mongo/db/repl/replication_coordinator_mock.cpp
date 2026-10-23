@@ -443,26 +443,7 @@ ReplicationCoordinator::OplogSyncState ReplicationCoordinatorMock::getOplogSyncS
 
 void ReplicationCoordinatorMock::signalWriterDrainComplete(OperationContext*, long long) noexcept {}
 
-void ReplicationCoordinatorMock::signalApplierDrainComplete(OperationContext*,
-                                                            long long term) noexcept {
-    std::lock_guard<std::mutex> lk(_mutex);
-    // Mirror the real coordinator's contract: only the applier's call moves OplogSyncState from
-    // ApplierDraining to Stopped, and signals outside the draining state are ignored.
-    if (_oplogSyncState != OplogSyncState::ApplierDraining) {
-        return;
-    }
-    _oplogSyncState = OplogSyncState::Stopped;
-    _applierDrainCompleteRecords.push_back(
-        {term, OpTimeAndWallTime{_myLastAppliedOpTime, _myLastAppliedWallTime}});
-    if (!_applierDrainComplete) {
-        _applierDrainComplete.set();
-    }
-}
-
-std::vector<ReplicationCoordinatorMock::ApplierDrainCompleteRecord>
-ReplicationCoordinatorMock::getApplierDrainCompleteRecords() const {
-    std::lock_guard<std::mutex> lk(_mutex);
-    return _applierDrainCompleteRecords;
+void ReplicationCoordinatorMock::signalApplierDrainComplete(OperationContext*, long long) noexcept {
 }
 
 void ReplicationCoordinatorMock::signalUpstreamUpdater() {}

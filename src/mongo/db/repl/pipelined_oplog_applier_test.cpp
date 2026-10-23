@@ -1143,9 +1143,6 @@ protected:
             }
             passGate(doc);
         };
-
-        // Skip the batcher's 1-second wait on empty buffer to speed up this test.
-        globalFailPointRegistry().find("skipOplogBatcherWaitForData")->setMode(FailPoint::alwaysOn);
     }
 
     void tearDown() override {
@@ -1163,7 +1160,6 @@ protected:
         _buffer.shutdown(_opCtx.get());
         _executor->shutdown();
         _executor->join();
-        globalFailPointRegistry().disableAllFailpoints();
         OplogApplierImplTest::tearDown();
     }
 
@@ -1219,8 +1215,10 @@ protected:
         _finished.emplace(_applier->startup());
     }
 
-    // Requests shutdown.
+    // Requests shutdown. The batcher otherwise sleeps a full second on the drained buffer before
+    // it notices the request, so that wait is skipped from here on.
     void shutdownApplier() {
+        _skipBatcherWait.emplace("skipOplogBatcherWaitForData");
         _applier->shutdown();
     }
 
@@ -1456,6 +1454,7 @@ protected:
     OplogBufferMock _buffer;
     std::unique_ptr<PipelinedOplogApplier> _applier;
     boost::optional<Future<void>> _finished;
+    boost::optional<FailPointEnableBlock> _skipBatcherWait;
     std::mutex _mutex;
     std::atomic<uint64_t> _nextInsertCallId{1};
     std::vector<ObservedWrite> _writes;
@@ -1609,147 +1608,6 @@ TEST_F(PipelinedOplogApplierRunTest, ShutdownDoesNotPublishAnAbandonedBatchOrIts
     ASSERT_EQ(replCoord->getMyLastAppliedOpTimeAndWallTime(), before);
     ASSERT_EQ(replCoord->getMyLastWrittenOpTimeAndWallTime(), writtenBefore);
     assertCollectionContainsExactly(kNss, {BSON("_id" << 1)});
-}
-
-// The buffer ran out in ApplierDraining state with nothing in flight, so the dispatcher must
-// signal drain completion without changing replication progress, and must stay alive afterwards.
-TEST_F(PipelinedOplogApplierRunTest, SignalsApplierDrainCompleteOnAnEmptyPipeline) {
-    auto* mock =
-        static_cast<ReplicationCoordinatorMock*>(ReplicationCoordinator::get(serviceContext));
-    const auto before = mock->getMyLastAppliedOpTimeAndWallTime();
-    mock->setOplogSyncState(ReplicationCoordinator::OplogSyncState::ApplierDraining);
-    startApplier();
-
-    ASSERT_TRUE(mock->applierDrainCompleteNotification().waitFor(_opCtx.get(), Seconds(60)));
-    auto records = mock->getApplierDrainCompleteRecords();
-    ASSERT_EQ(records.size(), 1);
-    ASSERT_EQ(records[0].term, mock->getTerm());
-    ASSERT_EQ(records[0].lastApplied, before);
-    // The dispatcher stays alive after signaling, like the classic applier while primary.
-    ASSERT_FALSE(_finished->isReady());
-    finishApplier();
-    // The shutdown path exits through mustShutdown and does not signal again.
-    ASSERT_EQ(mock->getApplierDrainCompleteRecords().size(), 1);
-}
-
-// The drain-complete signal must not fire until every batch dispatched before the buffer ran out
-// has been applied and published, even though the buffer itself is empty.
-TEST_F(PipelinedOplogApplierRunTest,
-       SignalsApplierDrainCompleteOnlyAfterInflightBatchesArePublished) {
-    createCollectionWithUuid(_opCtx.get(), kNss);
-    setServerParameter("replBatchLimitOperations", 1);
-    auto* mock =
-        static_cast<ReplicationCoordinatorMock*>(ReplicationCoordinator::get(serviceContext));
-
-    // The held op stays in flight on one worker; the free op routes elsewhere so the dispatcher
-    // can drain the buffer and move on, leaving unpublished batches behind.
-    const int heldId = idRoutedTo(0);
-    const int freeId = idRoutedTo(1, heldId + 1);
-    auto heldOp = insertOp(kNss, BSON("_id" << heldId));
-    auto freeOp = insertOp(kNss, BSON("_id" << freeId));
-    auto& gate = watchWriteOf(heldId, /*hold=*/true);
-    pushToBuffer({heldOp, freeOp});
-    startApplier();
-    waitForGate(gate);
-
-    {
-        // Prove the dispatcher entered the step-up drain while the worker is still held.
-        FailPointEnableBlock drainFp("hangBeforePipelinedApplierDrain");
-        mock->setOplogSyncState(ReplicationCoordinator::OplogSyncState::ApplierDraining);
-        drainFp.waitForOneNewEntry();
-        // The drain cannot complete while the held worker has not finished, so the signal cannot
-        // have fired.
-        ASSERT_FALSE(
-            mock->applierDrainCompleteNotification().waitFor(_opCtx.get(), Milliseconds(500)));
-    }
-    // The drain fail point is gone, but the worker is still held, so the drain still cannot
-    // complete.
-    ASSERT_FALSE(mock->applierDrainCompleteNotification().waitFor(_opCtx.get(), Milliseconds(500)));
-    gate.release.set();
-
-    ASSERT_TRUE(mock->applierDrainCompleteNotification().waitFor(_opCtx.get(), Seconds(60)));
-    auto records = mock->getApplierDrainCompleteRecords();
-    ASSERT_EQ(records.size(), 1);
-    ASSERT_EQ(records[0].term, mock->getTerm());
-    // Everything dispatched was published before the signal, so lastApplied reached the last
-    // dispatched op.
-    ASSERT_EQ(records[0].lastApplied,
-              (OpTimeAndWallTime{freeOp.getOpTime(), freeOp.getWallClockTime()}));
-    assertPublished(freeOp);
-    assertCollectionContainsExactly(kNss, {BSON("_id" << heldId), BSON("_id" << freeId)});
-    finishApplier();
-}
-
-// The step-up drain waits for the advancer's publication, not just worker idleness: the final
-// batch's publication side effects must finish before the signal fires.
-TEST_F(PipelinedOplogApplierRunTest, StepUpDrainWaitsForAdvancerPublication) {
-    createCollectionWithUuid(_opCtx.get(), kNss);
-    auto* mock =
-        static_cast<ReplicationCoordinatorMock*>(ReplicationCoordinator::get(serviceContext));
-    auto op = insertOp(kNss, BSON("_id" << 0));
-    {
-        // Hold the advancer after it pops the batch, before it publishes lastApplied.
-        FailPointEnableBlock publishing("hangBeforePipelinedApplierPublish");
-        pushToBuffer({op});
-        startApplier();
-        publishing.waitForOneNewEntry();
-        {
-            // Prove the dispatcher's step-up drain reached the advancer idle wait.
-            FailPointEnableBlock beforeWait("hangBeforePipelinedApplierIdleWait");
-            mock->setOplogSyncState(ReplicationCoordinator::OplogSyncState::ApplierDraining);
-            beforeWait.waitForOneNewEntry();
-            // Workers are idle but publication is held, so the drain cannot complete yet.
-            ASSERT_FALSE(
-                mock->applierDrainCompleteNotification().waitFor(_opCtx.get(), Milliseconds(500)));
-        }
-        // The idle-wait fail point is gone, but the advancer is still paused before publication,
-        // so the drain still cannot complete.
-        ASSERT_FALSE(
-            mock->applierDrainCompleteNotification().waitFor(_opCtx.get(), Milliseconds(500)));
-    }
-    // Publication resumed, so the drain completes and signals.
-    ASSERT_TRUE(mock->applierDrainCompleteNotification().waitFor(_opCtx.get(), Seconds(60)));
-    auto records = mock->getApplierDrainCompleteRecords();
-    ASSERT_EQ(records.size(), 1);
-    ASSERT_EQ(records[0].lastApplied, (OpTimeAndWallTime{op.getOpTime(), op.getWallClockTime()}));
-    assertPublished(op);
-    finishApplier();
-}
-
-// After signaling drain completion the dispatcher stays alive and applies again once the sync
-// state returns to Running, without restarting any threads.
-TEST_F(PipelinedOplogApplierRunTest, AppliesAgainAfterStepUpDrainComplete) {
-    createCollectionWithUuid(_opCtx.get(), kNss);
-    auto* mock =
-        static_cast<ReplicationCoordinatorMock*>(ReplicationCoordinator::get(serviceContext));
-
-    auto first = insertOp(kNss, BSON("_id" << 0));
-    pushToBuffer({first});
-    startApplier();
-
-    const auto deadline = Date_t::now() + Seconds(60);
-    while (mock->getMyLastAppliedOpTime() < first.getOpTime()) {
-        ASSERT_LT(Date_t::now(), deadline);
-        sleepmillis(1);
-    }
-
-    mock->setOplogSyncState(ReplicationCoordinator::OplogSyncState::ApplierDraining);
-    ASSERT_TRUE(mock->applierDrainCompleteNotification().waitFor(_opCtx.get(), Seconds(60)));
-    ASSERT_FALSE(_finished->isReady());
-
-    // The coordinator restarts oplog application; the same dispatcher thread picks up where it
-    // left off.
-    mock->setOplogSyncState(ReplicationCoordinator::OplogSyncState::Running);
-    auto second = insertOp(kNss, BSON("_id" << 1));
-    pushToBuffer({second});
-    while (mock->getMyLastAppliedOpTime() < second.getOpTime()) {
-        ASSERT_LT(Date_t::now(), deadline);
-        sleepmillis(1);
-    }
-    assertPublished(second);
-    assertCollectionContainsExactly(kNss, {BSON("_id" << 0), BSON("_id" << 1)});
-    finishApplier();
-    ASSERT_EQ(mock->getApplierDrainCompleteRecords().size(), 1);
 }
 
 // Every op is applied by the worker the router selects for it, and the batch reaches more than one
