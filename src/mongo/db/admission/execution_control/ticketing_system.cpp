@@ -54,6 +54,7 @@ Status updateSettings(const std::string& op, Updater&& updater) {
         return updater(client, ticketingSystem);
     }
 
+    warnIfSetWithoutClient(op);
     return Status::OK();
 }
 

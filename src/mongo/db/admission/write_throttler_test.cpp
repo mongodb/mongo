@@ -6,6 +6,8 @@
 #include "mongo/db/admission/write_throttler_admission_context.h"
 #include "mongo/db/admission/write_throttler_parameters_gen.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/unittest/log_capture.h"
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 
@@ -410,6 +412,38 @@ TEST_F(WriteThrottlerTest, OnUpdateMaxQueueDepthPreservesRate) {
     // Changing the queue depth at runtime applies immediately without disturbing the current rate.
     ASSERT_OK(WriteThrottler::onUpdateMaxQueueDepth(50));
     ASSERT_EQ(throttler->generateSection().getIntField("targetRateLimit"), 1000);
+}
+
+TEST_F(WriteThrottlerTest, OnUpdateWarnsWhenSetWithoutClient) {
+    installThrottler();
+    unittest::LogCaptureGuard logs;
+
+    // A plain thread has no Client, so the on_update action is skipped and a warning is logged
+    // on every such update. Asserting on the joining thread keeps a failure from terminating the
+    // test binary.
+    auto onUpdateWithoutClient = [](auto&& onUpdate) {
+        Status status = Status::OK();
+        stdx::thread([&] { status = onUpdate(); }).join();
+        return status;
+    };
+
+    ASSERT_OK(onUpdateWithoutClient([] { return WriteThrottler::onUpdateEnabled(true); }));
+    ASSERT_EQ(
+        logs.countBSONContainingSubset(BSON(
+            "id" << 11204900 << "attr" << BSON("parameterName" << kWriteThrottlerEnabledName))),
+        1);
+
+    ASSERT_OK(onUpdateWithoutClient([] { return WriteThrottler::onUpdateBurstCapacitySecs(1.0); }));
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << 11204900)), 2);
+}
+
+TEST(WriteThrottlerServerParameterTest, NoWarningBeforeServiceContextExists) {
+    // Startup options are applied before the global ServiceContext exists; skipping the on_update
+    // action is expected then, so nothing is logged.
+    ASSERT_FALSE(hasGlobalServiceContext());
+    unittest::LogCaptureGuard logs;
+    ASSERT_OK(WriteThrottler::onUpdateEnabled(true));
+    ASSERT_EQ(logs.countBSONContainingSubset(BSON("id" << 11204900)), 0);
 }
 
 }  // namespace

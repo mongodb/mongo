@@ -81,6 +81,8 @@ Status EgressResponseRateLimiter::onUpdateRatePerSec(std::int32_t refreshRatePer
         get(client->getServiceContext())
             .updateRateParameters(refreshRatePerSec,
                                   gEgressResponseRateLimiterBurstCapacitySecs.load());
+    } else {
+        warnIfSetWithoutClient(kEgressResponseRateLimiterRatePerSecName);
     }
     return Status::OK();
 }
@@ -89,6 +91,8 @@ Status EgressResponseRateLimiter::onUpdateBurstCapacitySecs(double burstCapacity
     if (auto* client = Client::getCurrent()) {
         get(client->getServiceContext())
             .updateRateParameters(gEgressResponseRateLimiterRatePerSec.load(), burstCapacitySecs);
+    } else {
+        warnIfSetWithoutClient(kEgressResponseRateLimiterBurstCapacitySecsName);
     }
     return Status::OK();
 }
@@ -96,6 +100,8 @@ Status EgressResponseRateLimiter::onUpdateBurstCapacitySecs(double burstCapacity
 Status EgressResponseRateLimiter::onUpdateMaxQueueDepth(std::int64_t maxQueueDepth) {
     if (auto* client = Client::getCurrent()) {
         get(client->getServiceContext()).updateMaxQueueDepth(maxQueueDepth);
+    } else {
+        warnIfSetWithoutClient(kEgressResponseRateLimiterMaxQueueDepthName);
     }
     return Status::OK();
 }

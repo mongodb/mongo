@@ -12,6 +12,7 @@
 #include "mongo/db/admission/rate_limiter_otel_metrics_recorder.h"
 #include "mongo/db/admission/ticketing/admission_context.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
 #include "mongo/otel/metrics/metric_names.h"
 #include "mongo/rpc/metadata/client_metadata.h"
@@ -283,6 +284,8 @@ Status IngressRequestRateLimiter::onUpdateAdmissionRatePerSec(std::int32_t refre
         auto& instance = getIngressRequestRateLimiter(client->getServiceContext());
         instance->updateRateParameters(refreshRatePerSec,
                                        gIngressRequestRateLimiterBurstCapacitySecs.load());
+    } else {
+        warnIfSetWithoutClient(kIngressRequestAdmissionRatePerSecName);
     }
 
     return Status::OK();
@@ -292,6 +295,8 @@ Status IngressRequestRateLimiter::onUpdateAdmissionBurstCapacitySecs(double burs
     if (auto client = Client::getCurrent()) {
         getIngressRequestRateLimiter(client->getServiceContext())
             ->updateRateParameters(gIngressRequestRateLimiterRatePerSec.load(), burstCapacitySecs);
+    } else {
+        warnIfSetWithoutClient(kIngressRequestAdmissionBurstCapacitySecsName);
     }
 
     return Status::OK();
@@ -305,6 +310,8 @@ Status IngressRequestRateLimiter::onUpdateAdmissionMaxQueueDepth(std::int64_t ma
     if (auto client = Client::getCurrent()) {
         getIngressRequestRateLimiter(client->getServiceContext())
             ->updateMaxQueueDepth(maxQueueDepth);
+    } else {
+        warnIfSetWithoutClient(kIngressRequestAdmissionMaxQueueDepthName);
     }
 
     return Status::OK();

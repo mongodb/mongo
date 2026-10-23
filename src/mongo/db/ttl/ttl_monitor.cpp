@@ -397,6 +397,8 @@ Status TTLMonitor::onUpdateTTLMonitorSleepSeconds(int newSleepSeconds) {
         if (auto ttlMonitor = TTLMonitor::get(client->getServiceContext())) {
             ttlMonitor->updateSleepSeconds(Seconds{newSleepSeconds});
         }
+    } else {
+        warnIfSetWithoutClient(kTtlMonitorSleepSecsName);
     }
     return Status::OK();
 }

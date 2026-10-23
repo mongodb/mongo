@@ -3,6 +3,7 @@
 
 #include "mongo/db/sharding_environment/shard_shared_state_cache.h"
 
+#include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/sharding_environment/shard_retry_server_parameters_gen.h"
 
@@ -34,6 +35,8 @@ Status ShardSharedStateCache::updateRetryBudgetReturnRate(double returnRate) {
 
         const auto capacity = gShardRetryTokenBucketCapacity.load();
         shardSharedStateCache._updateRetryBudgetRateParameters(returnRate, capacity);
+    } else {
+        warnIfSetWithoutClient(kShardRetryTokenReturnRateName);
     }
 
     return Status::OK();
@@ -46,6 +49,8 @@ Status ShardSharedStateCache::updateRetryBudgetCapacity(std::int32_t capacity) {
 
         const auto returnRate = gShardRetryTokenReturnRate.load();
         shardSharedStateCache._updateRetryBudgetRateParameters(returnRate, capacity);
+    } else {
+        warnIfSetWithoutClient(kShardRetryTokenBucketCapacityName);
     }
 
     return Status::OK();

@@ -170,6 +170,8 @@ Status WriteThrottler::onUpdateTargetRatePerSec(int32_t targetRatePerSec) {
         if (auto* t = WriteThrottler::get(client->getServiceContext())) {
             t->updateRate(targetRatePerSec);
         }
+    } else {
+        warnIfSetWithoutClient(kWriteThrottlerTargetRatePerSecName);
     }
     return Status::OK();
 }
@@ -185,6 +187,8 @@ Status WriteThrottler::onUpdateEnabled(bool enabled) {
                 t->updateRate(kMaxRate);
             }
         }
+    } else {
+        warnIfSetWithoutClient(kWriteThrottlerEnabledName);
     }
     return Status::OK();
 }
@@ -199,6 +203,8 @@ Status WriteThrottler::onUpdateBurstCapacitySecs(double burstCapacitySecs) {
             t->_rateLimiter->updateRateParametersPreservingBalance(t->_rateLimiter->refreshRate(),
                                                                    burstCapacitySecs);
         }
+    } else {
+        warnIfSetWithoutClient(kWriteThrottlerBurstCapacitySecsName);
     }
     return Status::OK();
 }
@@ -211,6 +217,8 @@ Status WriteThrottler::onUpdateMaxQueueDepth(long long maxQueueDepth) {
         if (auto* t = WriteThrottler::get(client->getServiceContext())) {
             t->_rateLimiter->setMaxQueueDepth(maxQueueDepth);
         }
+    } else {
+        warnIfSetWithoutClient(kWriteThrottlerMaxQueueDepthName);
     }
     return Status::OK();
 }

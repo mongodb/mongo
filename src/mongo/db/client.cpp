@@ -12,6 +12,7 @@
 #include "mongo/db/operation_cpu_timer.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/topology/cluster_role.h"
+#include "mongo/logv2/log.h"
 #include "mongo/logv2/log_service.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/concurrency/thread_name.h"
@@ -25,6 +26,8 @@
 #include <string_view>
 
 #include <boost/functional/hash.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo {
 namespace {
@@ -258,6 +261,17 @@ bool Client::isInternalClient() {
 
 void Client::setCheckAuthForInternalClient(std::function<bool(Client*)> fn) {
     checkAuthForInternalClient = std::move(fn);
+}
+
+void warnIfSetWithoutClient(std::string_view parameterName) {
+    if (!hasGlobalServiceContext()) {
+        return;
+    }
+    LOGV2_WARNING(11204900,
+                  "Server parameter was set from a thread without a Client. The new value was "
+                  "stored but not applied, and will take effect the next time the parameter is "
+                  "set from a thread with a Client",
+                  "parameterName"_attr = parameterName);
 }
 
 }  // namespace mongo

@@ -586,4 +586,12 @@ bool haveClient();
  */
 bool isProcessInternalClient(const Client& client);
 
+/**
+ * Called from a server parameter's on_update callback that skipped its action because the current
+ * thread has no Client. Warns that the new value was stored but not applied, unless the global
+ * ServiceContext does not exist yet: startup options are applied before then, and components read
+ * those values when they are constructed.
+ */
+void warnIfSetWithoutClient(std::string_view parameterName);
+
 }  // namespace mongo

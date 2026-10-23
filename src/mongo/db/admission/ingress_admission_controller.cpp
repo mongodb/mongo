@@ -5,6 +5,7 @@
 
 #include "mongo/db/admission/ingress_admission_context.h"
 #include "mongo/db/admission/ingress_admission_control_gen.h"
+#include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/decorable.h"
 
@@ -77,6 +78,8 @@ Status IngressAdmissionController::onUpdateTicketPoolSize(int32_t newValue) try 
         auto opCtx = client->getOperationContext();
         getIngressAdmissionController(client->getServiceContext())
             .resizeTicketPool(opCtx, newValue);
+    } else {
+        warnIfSetWithoutClient(kIngressAdmissionControllerTicketPoolSizeName);
     }
 
     return Status::OK();
@@ -88,6 +91,8 @@ Status IngressAdmissionController::onUpdateMaxQueueDepth(std::int32_t newMaxQueu
     if (auto const client = Client::getCurrent()) {
         getIngressAdmissionController(client->getServiceContext())
             .setMaxQueueDepth(newMaxQueueDepth);
+    } else {
+        warnIfSetWithoutClient(kIngressAdmissionControllerMaxQueueDepthName);
     }
 
     return Status::OK();
