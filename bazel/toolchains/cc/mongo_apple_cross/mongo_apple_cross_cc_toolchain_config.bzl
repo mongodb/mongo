@@ -653,19 +653,6 @@ def _impl(ctx):
         ],
     )
 
-    disable_warnings_for_third_party_libraries_clang_feature = feature(
-        name = "disable_warnings_for_third_party_libraries_clang",
-        enabled = ctx.attr.compiler == "clang",
-        flag_sets = [
-            flag_set(
-                actions = all_compile_actions,
-                flag_groups = [flag_group(flags = [
-                    "-Wno-character-conversion",
-                ])],
-            ),
-        ],
-    )
-
     # Collect all features. get_common_features() supplies the per-warning
     # -Wno-* suppressions (unused-function, defaulted-function-deleted,
     # unused-private-field, etc.), the warnings_as_errors_compile feature
@@ -703,7 +690,6 @@ def _impl(ctx):
         macos_fsized_deallocation_feature,
     ] + get_common_features(ctx) + [
         user_compile_flags_feature,
-        disable_warnings_for_third_party_libraries_clang_feature,
     ] + ([supports_start_end_lib_feature] if ctx.attr.supports_start_end_lib else [])
 
     # Artifact name patterns for macOS

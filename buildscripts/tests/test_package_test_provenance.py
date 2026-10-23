@@ -68,6 +68,72 @@ def compact_log_with_spawns(*spawns: tuple[str, bool]) -> bytes:
 
 
 class PackageTestProvenanceTest(unittest.TestCase):
+    def test_toolchain_provenance_checks_recorded_versions(self) -> None:
+        toolchain = {
+            "target_os": "linux",
+            "target_arch": "aarch64",
+            "toolchain_mode": "cross",
+            "production_release": True,
+            "compiler": "clang",
+            "compiler_version": "19.1.7",
+            "linker": "lld",
+            "linker_version": "19.1.7",
+        }
+        under_test.validate_release_toolchain_provenance(json.dumps({"toolchain": toolchain}), True)
+        for key in ("compiler", "compiler_version", "linker", "linker_version"):
+            with self.subTest(key=key), self.assertRaisesRegex(RuntimeError, key):
+                under_test.validate_release_toolchain_provenance(
+                    json.dumps({"toolchain": toolchain | {key: "unknown"}})
+                )
+        dev = toolchain | {"production_release": False, "compiler_version": "22.1.1"}
+        under_test.validate_release_toolchain_provenance(json.dumps({"toolchain": dev}))
+        with self.assertRaisesRegex(ValueError, "missing production"):
+            under_test.validate_release_toolchain_provenance(json.dumps({"toolchain": dev}), True)
+        for provenance in ({}, {"toolchain": None}, {"toolchain": {"production_release": "true"}}):
+            with self.assertRaises(ValueError):
+                under_test.validate_release_toolchain_provenance(json.dumps(provenance), True)
+        under_test.validate_release_toolchain_provenance(
+            json.dumps({"binaries": {"mongod": {"path": "bin/mongod.exe"}}}), True
+        )
+
+    def test_release_provenance_includes_capture_and_rejects_stale_versions(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            command = root / "command"
+            command.write_text(f"bazel build archive-dist-stripped {release_local_suffix()}")
+            Path(f"{command}.distro_id").write_text("release-build-host")
+            toolchain_file = root / "tools.json"
+            captured = {"production_release": False, "compiler_version": "22.1.1"}
+            toolchain_file.write_text(json.dumps(captured))
+            with mock.patch.object(
+                under_test,
+                "hash_release_binaries_in_archive",
+                return_value={"mongod": {"path": "bin/mongod"}},
+            ):
+                provenance = under_test.make_release_binary_provenance(
+                    command, Path("unused"), toolchain_provenance_file=toolchain_file
+                )
+                self.assertEqual(captured, provenance["toolchain"])
+                toolchain_file.write_text(
+                    json.dumps(
+                        captured
+                        | {
+                            "production_release": True,
+                            "target_os": "linux",
+                            "target_arch": "aarch64",
+                        }
+                    )
+                )
+                with self.assertRaises(RuntimeError):
+                    under_test.make_release_binary_provenance(
+                        command, Path("unused"), toolchain_provenance_file=toolchain_file
+                    )
+                toolchain_file.unlink()
+                with self.assertRaises(FileNotFoundError):
+                    under_test.make_release_binary_provenance(
+                        command, Path("unused"), toolchain_provenance_file=toolchain_file
+                    )
+
     def test_archive_fallback_checks_captured_distro_against_task(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -75,10 +141,15 @@ class PackageTestProvenanceTest(unittest.TestCase):
             command.write_text(f"bazel build archive-dist-stripped {release_local_suffix()}")
             distro = Path(f"{command}.distro_id")
             distro.write_text("release-build-host\n")
+            toolchain = root / under_test.TOOLCHAIN_PROVENANCE_PATH
+            toolchain.write_text(
+                json.dumps({"production_release": False, "compiler_version": "22.1.1"})
+            )
             artifacts_path = root / "artifacts.tgz"
             with tarfile.open(artifacts_path, "w:gz") as artifacts:
                 artifacts.add(command, f"src/{command.name}")
                 artifacts.add(distro, f"src/{distro.name}")
+                artifacts.add(toolchain, f"src/{toolchain.name}")
             task = types.SimpleNamespace(
                 display_name="archive_dist_test",
                 task_id="archive_task",
@@ -97,6 +168,7 @@ class PackageTestProvenanceTest(unittest.TestCase):
                 )
                 self.assertEqual(task.distro_id, provenance["distro_id"])
                 self.assertEqual(task.task_id, provenance["task_id"])
+                self.assertEqual("22.1.1", provenance["toolchain"]["compiler_version"])
                 task.distro_id = "release-other"
                 with self.assertRaisesRegex(ValueError, "distro_id does not match"):
                     under_test.create_release_binary_provenance_from_archive_dist_test(

@@ -52,6 +52,8 @@ feature_attrs = get_common_features_attrs()
         name = "llvm_" + arch,
         cpu = "darwin",
         compiler = "clang",
+        compile_flags = ["-isystem", "%{config_override_exec_path}"],
+        link_flags = ["--ld-path=%{lld_exec_path}/bin/ld64.lld"],
         toolchain_identifier = "apple_llvm_clang_toolchain_" + arch,
         target_libc = "macosx",
         abi_version = "darwin_" + arch,

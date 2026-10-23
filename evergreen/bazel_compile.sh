@@ -32,7 +32,8 @@ fi
 # These files are generated only for tasks that consume a provenance invocation. Remove any
 # leftover copies before deciding whether this compile should create one.
 rm -f .bazel_provenance_build_invocation .bazel_crypt_build_invocation \
-    .bazel_provenance_build_invocation.distro_id .bazel_crypt_build_invocation.distro_id
+    .bazel_provenance_build_invocation.distro_id .bazel_crypt_build_invocation.distro_id \
+    .bazel_toolchain_provenance.json
 
 # if build_patch_id is passed, try to download binaries from specified
 # evergreen patch.
@@ -214,6 +215,17 @@ if [[ -f "${BEP_FULL}" ]]; then
 fi
 
 set -o errexit
+
+if [[ "$RET" == "0" ]] && bazel_evergreen_shutils::should_capture_toolchain_provenance ${targets} ${BASE_FLAGS}; then
+    # Materialize provenance even when the primary build selects only aspect
+    # reports or filtered targets. Preserve compiler/linker settings and the
+    # release-local safety suffix, without rewriting the primary target scope.
+    bazel_evergreen_shutils::retry_bazel_cmd 3 "$BAZEL_BINARY" \
+        build ${BASE_FLAGS}${GDB_INDEX_FLAGS} \
+        --aspects= --output_groups=default --build_tag_filters= \
+        //bazel/config:toolchain_provenance ${RELEASE_LOCAL_SAFETY_FLAGS}
+    cp bazel-bin/bazel/config/toolchain_provenance.json .bazel_toolchain_provenance.json
+fi
 
 if [[ "$RET" -eq 124 ]]; then
     echo "Bazel build timed out after ${build_timeout_seconds:-<unspecified>} seconds."

@@ -9,6 +9,7 @@ load(
 # Only visible in the build system.
 visibility([
     "//bazel",
+    "//bazel/config",
     "//src/mongo/util",
 ])
 

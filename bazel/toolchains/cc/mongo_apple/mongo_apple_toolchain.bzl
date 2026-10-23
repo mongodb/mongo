@@ -1,27 +1,27 @@
 load("@build_bazel_apple_support//configs:platforms.bzl", "APPLE_PLATFORMS_CONSTRAINTS")
+load("//bazel/toolchains/cc:libcxx_config.bzl", "enable_libcxx_vendor_availability")
+load("//bazel/toolchains/cc:toolchain_versions.bzl", "production_llvm_version")
 
 # Pre-built LLVM toolchains for native macOS builds. These are the official
 # LLVM release archives from https://github.com/llvm/llvm-project/releases,
 # stripped down with package_llvm.sh and mirrored to S3.
 _S3_BUCKET = "https://mdb-build-public.s3.us-east-1.amazonaws.com"
 _S3_PREFIX = "toolchains"
-_LLVM_VERSION = "19.1.7"
 
 # Keyed by repository_ctx.os.arch of the macOS host.
-_LLVM_ARCHIVES = {
-    "aarch64": struct(
-        url = _S3_BUCKET + "/" + _S3_PREFIX + "/llvm-" + _LLVM_VERSION + "-macos-arm64.tar.xz",
-        sha256 = "5cf56b2f90c5ec48196c653e9abb0589c894c86166caa5d7553cad040ee83f70",
-        strip_prefix = "llvm-" + _LLVM_VERSION + "-macos-arm64",
-    ),
-    "x86_64": struct(
-        url = _S3_BUCKET + "/" + _S3_PREFIX + "/llvm-" + _LLVM_VERSION + "-macos-x86_64.tar.xz",
-        sha256 = "77f8d6727c045342fe0b2381900c5b09cf644de1c273b483173612266fbe655e",
-        strip_prefix = "llvm-" + _LLVM_VERSION + "-macos-x86_64",
-    ),
-}
-_LLVM_ARCHIVES["arm64"] = _LLVM_ARCHIVES["aarch64"]
-_LLVM_ARCHIVES["amd64"] = _LLVM_ARCHIVES["x86_64"]
+def _llvm_archives(version):
+    return {
+        "aarch64": struct(
+            url = _S3_BUCKET + "/" + _S3_PREFIX + "/llvm-" + version + "-macos-arm64.tar.xz",
+            sha256 = "5cf56b2f90c5ec48196c653e9abb0589c894c86166caa5d7553cad040ee83f70",
+            strip_prefix = "llvm-" + version + "-macos-arm64",
+        ),
+        "x86_64": struct(
+            url = _S3_BUCKET + "/" + _S3_PREFIX + "/llvm-" + version + "-macos-x86_64.tar.xz",
+            sha256 = "77f8d6727c045342fe0b2381900c5b09cf644de1c273b483173612266fbe655e",
+            strip_prefix = "llvm-" + version + "-macos-x86_64",
+        ),
+    }
 
 # Directory within this repository that the LLVM archive is extracted to.
 _LLVM_DIR = "llvm"
@@ -29,11 +29,13 @@ _LLVM_DIR = "llvm"
 def _download_llvm(repository_ctx):
     """Downloads the LLVM toolchain for the host architecture into _LLVM_DIR."""
     arch = repository_ctx.os.arch
-    archive = _LLVM_ARCHIVES.get(arch)
+    arch = {"arm64": "aarch64", "amd64": "x86_64"}.get(arch, arch)
+    version = production_llvm_version(repository_ctx, "macOS/{}".format("arm64" if arch == "aarch64" else arch))
+    archive = _llvm_archives(version).get(arch)
     if not archive:
-        return False, "No pre-built macOS LLVM toolchain is available for host architecture '{}'. Set LLVM_PATH to a local LLVM {} installation.".format(arch, _LLVM_VERSION)
+        return False, "No pre-built macOS LLVM toolchain is available for host architecture '{}'. Set LLVM_PATH to a local LLVM {} installation.".format(arch, version)
 
-    repository_ctx.report_progress("Downloading LLVM {} for macOS {}".format(_LLVM_VERSION, arch))
+    repository_ctx.report_progress("Downloading LLVM {} for macOS {}".format(version, arch))
     repository_ctx.download_and_extract(
         url = archive.url,
         sha256 = archive.sha256,
@@ -93,6 +95,17 @@ def _configure_oss_clang_toolchain(repository_ctx):
 
     lld_path = repository_ctx.os.environ.get("LLD_PATH") or llvm_path
 
+    # Use LLVM's C++20 headers with Apple's system libc++ runtime. The upstream
+    # archive disables vendor availability guards, which would reference newer
+    # runtime symbols such as exception_ptr::__from_native_exception_pointer.
+    # Keep the override in this repository instead of modifying LLVM_PATH.
+    config_override = "include/config_override"
+    repository_ctx.file(
+        config_override + "/__config_site",
+        enable_libcxx_vendor_availability(repository_ctx.read(llvm_abs_path + "/include/c++/v1/__config_site")),
+    )
+    config_override_exec_path = "external/{}/{}".format(repository_ctx.name, config_override)
+
     # clang resolves its own real path to locate builtin headers, so they are
     # reported under the absolute path. Includes found relative to the execroot
     # show up under the repository-relative path.
@@ -102,6 +115,7 @@ def _configure_oss_clang_toolchain(repository_ctx):
     elif llvm_path != llvm_abs_path:
         include_paths.append(llvm_path)
     include_dirs = _get_llvm_clang_include_dirs(repository_ctx, include_paths)
+    include_dirs.append('            "{}",'.format(config_override_exec_path))
 
     repository_ctx.report_progress("Generating Apple OSS LLVM Clang Toolchain build file")
     build_template = Label("@//bazel/toolchains/cc/mongo_apple:BUILD.tmpl")
@@ -111,6 +125,8 @@ def _configure_oss_clang_toolchain(repository_ctx):
         {
             "%{llvm_path}": llvm_path,
             "%{lld_path}": lld_path,
+            "%{lld_exec_path}": lld_path if lld_path.startswith("/") else "external/{}/{}".format(repository_ctx.name, lld_path),
+            "%{config_override_exec_path}": config_override_exec_path,
             "%{cxx_builtin_include_directories}": "\n".join(include_dirs),
         },
     )
