@@ -226,11 +226,11 @@ void PathArraynessChecker::uassertIfInvalidatedAndSyncEpoch(const PathArrayness&
     prevEpoch = currentEpoch;
     if (auto invalidated = PathArrayness::getFirstInvalidatedPath(nonArrayPaths, current, ns)) {
         pathArraynessCounters.incrementInvalidation();
-        uasserted(
-            ErrorCodes::QueryPlanKilled,
-            str::stream() << "query plan killed :: non-array path became multikey while the query "
-                             "was suspended: namespace="
-                          << ns.toStringForErrorMsg() << ", path=" << invalidated->fullPath());
+        uasserted(ErrorCodes::QueryPlanKilled,
+                  str::stream() << "query plan killed :: non-array path became multikey or index "
+                                   "dropped while the query was suspended: namespace="
+                                << ns.toStringForErrorMsg()
+                                << ", path=" << invalidated->fullPath());
     }
 }
 

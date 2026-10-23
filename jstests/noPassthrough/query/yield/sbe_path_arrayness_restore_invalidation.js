@@ -19,7 +19,7 @@ import {getAggPlanStages, getEngine} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 const kNumDocs = 100;
-const kKilledMsg = "non-array path became multikey while the query was suspended";
+const kKilledMsg = "non-array path became multikey or index dropped while the query was suspended";
 // The array document sorts after every existing document in natural order, so the scan reaches
 // it only after the restore under test.
 const kArrayDoc = {_id: kNumDocs, a: [5]};

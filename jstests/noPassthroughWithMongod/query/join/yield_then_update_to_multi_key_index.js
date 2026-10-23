@@ -68,7 +68,9 @@ function runPipelineThroughAllJoinMethods({pipeline, localColl, foreignColl}) {
         });
         assert.eq(err.code, ErrorCodes.QueryPlanKilled, "expected QueryPlanKilled", {err});
         assert(
-            err.message.includes("non-array path became multikey while the query was suspended"),
+            err.message.includes(
+                "non-array path became multikey or index dropped while the query was suspended",
+            ),
             "expected path arrayness kill message",
             {err},
         );

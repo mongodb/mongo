@@ -59,7 +59,7 @@ function runAndExpectPathArraynessKill(dbName, pipelineArg, port) {
                 });
                 assert(
                     err.message.includes(
-                        "non-array path became multikey while the query was suspended",
+                        "non-array path became multikey or index dropped while the query was suspended",
                     ),
                     "expected path arrayness kill, not another QueryPlanKilled reason",
                     {err},
