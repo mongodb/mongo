@@ -1013,6 +1013,15 @@ protected:
         return MutableOplogEntry::makeInsertOperation(nss, kUuid, doc, doc);
     }
 
+    // A command op suitable for nesting in a transaction's applyOps.
+    ReplOperation innerCommand(const NamespaceString& nss, const BSONObj& command) {
+        ReplOperation op;
+        op.setOpType(OpTypeEnum::kCommand);
+        op.setNss(nss);
+        op.setObject(command);
+        return op;
+    }
+
     static OperationSessionInfo makeSessionInfo() {
         OperationSessionInfo sessionInfo;
         sessionInfo.setSessionId(makeLogicalSessionIdForTest());
@@ -1058,6 +1067,49 @@ TEST_F(PipelinedBatchSerializationTest, SerializesCommands) {
         serialized({makeCreateIndexOplogEntry(nextOpTime(), kNss, "a_1", BSON("a" << 1), kUuid)}));
 }
 
+// A single-entry transaction whose applyOps embeds a DDL command applies serialized
+// (isSingleOplogEntryTransactionWithCommand), while a CRUD-only single-entry transaction stays
+// pipelined: it is the command inside the applyOps, not the transaction itself, that forces
+// serialization.
+TEST_F(PipelinedBatchSerializationTest, SerializesASingleEntryTransactionContainingACommand) {
+    auto sessionInfo = makeSessionInfo();
+    auto commitWithCommand =
+        transactionApplyOpsOp({innerInsert(kNss, BSON("_id" << 0)),
+                               innerCommand(kOtherNss, BSON("create" << kOtherNss.coll()))},
+                              sessionInfo,
+                              OpTime() /* prevWriteOpTimeInTransaction: first entry */,
+                              ApplyOpsType::kTerminal);
+    ASSERT_TRUE(serialized({commitWithCommand, insertOp(kNss, BSON("_id" << 1))}));
+
+    auto commitCrudOnly =
+        transactionApplyOpsOp({innerInsert(kNss, BSON("_id" << 0))},
+                              sessionInfo,
+                              OpTime() /* prevWriteOpTimeInTransaction: first entry */,
+                              ApplyOpsType::kTerminal);
+    ASSERT_FALSE(serialized({commitCrudOnly, insertOp(kNss, BSON("_id" << 1))}));
+}
+
+// The partial entries of a multi-entry transaction chain stay pipelined, but the terminal entry,
+// which reassembles the chain, applies serialized (isEndOfLargeTransaction).
+TEST_F(PipelinedBatchSerializationTest, SerializesTheTerminalEntryOfATransactionChain) {
+    auto sessionInfo = makeSessionInfo();
+    auto partial1 = transactionApplyOpsOp({innerInsert(kNss, BSON("_id" << 0))},
+                                          sessionInfo,
+                                          OpTime() /* prevWriteOpTimeInTransaction: first entry */,
+                                          ApplyOpsType::kPartial);
+    auto partial2 = transactionApplyOpsOp({innerInsert(kNss, BSON("_id" << 1))},
+                                          sessionInfo,
+                                          partial1.getOpTime(),
+                                          ApplyOpsType::kPartial);
+    auto terminal = transactionApplyOpsOp({innerInsert(kNss, BSON("_id" << 2))},
+                                          sessionInfo,
+                                          partial2.getOpTime(),
+                                          ApplyOpsType::kTerminal);
+
+    ASSERT_FALSE(serialized({partial1, partial2, insertOp(kNss, BSON("_id" << 3))}));
+    ASSERT_TRUE(serialized({terminal, insertOp(kNss, BSON("_id" << 3))}));
+}
+
 // Runs the applier over a mock oplog buffer: the batcher pulls from the buffer, _run dispatches
 // each batch, and the workers apply it to real collections. Each write is attributed to the worker
 // thread that made it via the thread name the pool assigns,
@@ -1074,7 +1126,7 @@ protected:
         ASSERT_EQ(replCoord->getMyLastAppliedOpTimeAndWallTime(), expected);
     }
 
-    enum class WriteKind { kInsert, kDelete };
+    enum class WriteKind { kInsert, kDelete, kUpdate };
 
     // Tracks metadata about writes in tests, used to make correctness assertions.
     struct ObservedWrite {
@@ -1119,12 +1171,28 @@ protected:
         _opObserver->onInsertsFn = [&](OperationContext*,
                                        const NamespaceString& nss,
                                        const std::vector<BSONObj>& docs) {
+            // Writes the tests themselves make into the oplog (see writeToOplog) happen on this
+            // thread, not a worker, so skip them like the classic applier's test observer does.
+            if (nss.isOplog()) {
+                return;
+            }
             auto workerIdx = currentWorkerIdx();
             auto callId = _nextInsertCallId++;
             {
                 std::lock_guard lk(_mutex);
                 for (const auto& doc : docs) {
                     _writes.push_back({workerIdx, WriteKind::kInsert, nss, doc.getOwned(), callId});
+                }
+            }
+            // The derived config.transactions session updates are gated by namespace rather than
+            // by _id (session records are keyed by the session id, not a number), so tests can
+            // hold the worker that owns a session's record mid-write.
+            if (nss == NamespaceString::kSessionTransactionsTableNamespace) {
+                if (!_txnTableGate.reached) {
+                    _txnTableGate.reached.set();
+                }
+                if (_txnTableGate.hold) {
+                    _txnTableGate.release.get();
                 }
             }
             for (const auto& doc : docs) {
@@ -1143,6 +1211,26 @@ protected:
             }
             passGate(doc);
         };
+        // Derived config.transactions session updates are upserts: the first write to a session's
+        // record goes through the insert path, later ones through this update path, so both
+        // hooks gate and record them.
+        _opObserver->onUpdateFn = [&](OperationContext*, const OplogUpdateEntryArgs& args) {
+            const auto& nss = args.coll->ns();
+            auto workerIdx = currentWorkerIdx();
+            {
+                std::lock_guard lk(_mutex);
+                _writes.push_back(
+                    {workerIdx, WriteKind::kUpdate, nss, args.updateArgs->updatedDoc.getOwned()});
+            }
+            if (nss == NamespaceString::kSessionTransactionsTableNamespace) {
+                if (!_txnTableGate.reached) {
+                    _txnTableGate.reached.set();
+                }
+                if (_txnTableGate.hold) {
+                    _txnTableGate.release.get();
+                }
+            }
+        };
 
         // Skip the batcher's 1-second wait on empty buffer to speed up this test.
         globalFailPointRegistry().find("skipOplogBatcherWaitForData")->setMode(FailPoint::alwaysOn);
@@ -1154,6 +1242,9 @@ protected:
             if (!gate.release) {
                 gate.release.set();
             }
+        }
+        if (!_txnTableGate.release) {
+            _txnTableGate.release.set();
         }
         if (_finished) {
             shutdownApplier();
@@ -1452,6 +1543,166 @@ protected:
         ASSERT_EQ(numRecords(nss), static_cast<long long>(actual.size()));
     }
 
+    ////////////////////////////////////////////////////////////////////////////
+    // Transaction and retryable-write helpers.
+    ////////////////////////////////////////////////////////////////////////////
+
+    // Creates the collections transaction and retryable-write tests write to: the data
+    // collection, whose UUID the inner ops must carry, and the config.transactions session
+    // table the derived session updates target.
+    UUID createTxnCollections() {
+        auto uuid = createCollectionWithUuid(_opCtx.get(), kNss);
+        createCollectionWithUuid(_opCtx.get(), NamespaceString::kSessionTransactionsTableNamespace);
+        return uuid;
+    }
+
+    static OperationSessionInfo makeSessionInfo(TxnNumber txnNumber) {
+        OperationSessionInfo sessionInfo;
+        sessionInfo.setSessionId(makeLogicalSessionIdForTest());
+        sessionInfo.setTxnNumber(txnNumber);
+        return sessionInfo;
+    }
+
+    static ReplOperation innerInsertOp(const NamespaceString& nss, const UUID& uuid, int id) {
+        return MutableOplogEntry::makeInsertOperation(
+            nss, uuid, BSON("_id" << id), BSON("_id" << id));
+    }
+
+    // An applyOps entry of an unprepared multi-entry transaction: a partial entry, or the
+    // terminal commit entry of the chain.
+    OplogEntry txnApplyOpsOp(std::vector<ReplOperation> innerOps,
+                             const OperationSessionInfo& sessionInfo,
+                             OpTime prevOpTime,
+                             ApplyOpsType applyOpsType) {
+        return makeApplyOpsOplogEntry(nextOpTime(),
+                                      std::move(innerOps),
+                                      sessionInfo,
+                                      Date_t::now(),
+                                      {} /* stmtIds */,
+                                      prevOpTime,
+                                      boost::none /* multiOpType */,
+                                      applyOpsType);
+    }
+
+    // An unprepared transaction complete in a single applyOps entry, committing 'innerOps'.
+    OplogEntry singleEntryTxnCommitOp(std::vector<ReplOperation> innerOps,
+                                      const OperationSessionInfo& sessionInfo) {
+        return txnApplyOpsOp(std::move(innerOps),
+                             sessionInfo,
+                             OpTime() /* prevWriteOpTimeInTransaction */,
+                             ApplyOpsType::kTerminal);
+    }
+
+    // A single-statement retryable write, logged as an atomically-applied applyOps entry.
+    OplogEntry retryableWriteOp(std::vector<ReplOperation> innerOps,
+                                const OperationSessionInfo& sessionInfo) {
+        return makeApplyOpsOplogEntry(nextOpTime(),
+                                      std::move(innerOps),
+                                      sessionInfo,
+                                      Date_t::now(),
+                                      {0} /* stmtIds */,
+                                      OpTime() /* prevWriteOpTimeInTransaction */,
+                                      MultiOplogEntryType::kApplyOpsAppliedAtomically,
+                                      ApplyOpsType::kTerminal);
+    }
+
+    // A retryable-write applyOps entry of the batched-writes format whose entries apply
+    // separately: the inner ops carry their own stmtIds and the entry carries no top-level
+    // stmtIds. 'prevOpTime' chains the entry to the previous one, but the applier does not walk
+    // that chain: each entry is extracted and applied standalone.
+    OplogEntry separatelyAppliedRetryableOp(std::vector<ReplOperation> innerOps,
+                                            const OperationSessionInfo& sessionInfo,
+                                            OpTime prevOpTime) {
+        return makeApplyOpsOplogEntry(nextOpTime(),
+                                      std::move(innerOps),
+                                      sessionInfo,
+                                      Date_t::now(),
+                                      {} /* stmtIds live on the inner ops */,
+                                      prevOpTime,
+                                      MultiOplogEntryType::kApplyOpsAppliedSeparately,
+                                      ApplyOpsType::kTerminal);
+    }
+
+    static ReplOperation innerInsertOpWithStmtId(const NamespaceString& nss,
+                                                 const UUID& uuid,
+                                                 int id,
+                                                 StmtId stmtId) {
+        auto op = innerInsertOp(nss, uuid, id);
+        op.setStatementIds({stmtId});
+        return op;
+    }
+
+    // A 'create' collection command suitable for nesting in a transaction's applyOps.
+    static ReplOperation innerCreateOp(const NamespaceString& nss, const UUID& uuid) {
+        ReplOperation op;
+        op.setOpType(OpTypeEnum::kCommand);
+        op.setNss(nss);
+        op.setUuid(uuid);
+        op.setObject(MutableOplogEntry::makeCreateCollObject(
+            nss, CollectionOptions{.uuid = uuid}, BSONObj() /* idIndex */));
+        return op;
+    }
+
+    // Writes 'op' into the local oplog, simulating the write the fetch path makes of a fetched
+    // entry: the pipelined applier itself does not persist fetched entries, but a transaction
+    // terminal entry's chain walk re-reads the earlier partial entries from here.
+    void writeToOplog(const OplogEntry& op) {
+        ASSERT_OK(getStorageInterface()->insertDocument(
+            _opCtx.get(),
+            NamespaceString::kRsOplogNamespace,
+            {op.getEntry().toBSON(), op.getOpTime().getTimestamp()},
+            op.getOpTime().getTerm()));
+    }
+
+    // Checks the config.transactions record of 'sessionInfo' once its session was last advanced
+    // by 'lastWrite'.
+    void assertTxnTable(const OperationSessionInfo& sessionInfo,
+                        const OplogEntry& lastWrite,
+                        boost::optional<DurableTxnStateEnum> state = boost::none,
+                        boost::optional<OpTime> startOpTime = boost::none) {
+        checkTxnTable(_opCtx.get(),
+                      *sessionInfo.getSessionId(),
+                      *sessionInfo.getTxnNumber(),
+                      lastWrite.getOpTime(),
+                      lastWrite.getWallClockTime(),
+                      startOpTime,
+                      state);
+    }
+
+    // Holds the worker applying a derived config.transactions session update inside its write,
+    // so tests can assert on pipeline state while the update is applied but not committed.
+    void holdTxnTableWrites() {
+        _txnTableGate.hold = true;
+    }
+
+    void releaseTxnTableWrites() {
+        _txnTableGate.release.set();
+    }
+
+    // The worker that owns the config.transactions record of 'lsid': derived session updates
+    // route by hash of (config.transactions, session id), like any other write.
+    size_t txnTableWorkerFor(const LogicalSessionId& lsid) {
+        return expectedWorker(
+            makeInsertOplogEntry(nextOpTime(),
+                                 NamespaceString::kSessionTransactionsTableNamespace,
+                                 UUID::gen(),
+                                 BSON("_id" << lsid.toBSON())));
+    }
+
+    // The first _id at or above 'startFrom' of a kNss document that does not route to
+    // 'workerIdx', so a test can put a data write on a worker other than the one owning a
+    // session's record. The session id is random per run, so which worker owns a session's
+    // record is not knowable in advance: tests that hold a session update mid-write must pick
+    // their data _ids this way or risk a data write queuing behind the held update.
+    int idNotRoutedTo(size_t workerIdx, int startFrom = 0) {
+        for (int id = startFrom;; ++id) {
+            if (expectedWorker(makeInsertDocumentOplogEntry(
+                    OpTime(Timestamp(1, 1), 1), kNss, BSON("_id" << id))) != workerIdx) {
+                return id;
+            }
+        }
+    }
+
     std::shared_ptr<executor::ThreadPoolTaskExecutor> _executor;
     OplogBufferMock _buffer;
     std::unique_ptr<PipelinedOplogApplier> _applier;
@@ -1460,6 +1711,9 @@ protected:
     std::atomic<uint64_t> _nextInsertCallId{1};
     std::vector<ObservedWrite> _writes;
     std::map<int, Gate> _gates;
+    // The gate on writes to config.transactions, set from onInsertsFn. Gated by namespace
+    // rather than by _id because session records are keyed by the session id.
+    Gate _txnTableGate;
     std::unique_ptr<RecordStore> _container;
 
     const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test.poa_run");
@@ -2393,6 +2647,459 @@ TEST_F(PipelinedOplogApplierRunTest, AppliesAndPublishesABatchLedByANewPrimaryNo
 
     assertCollectionContainsExactly(kNss, {BSON("_id" << 0), BSON("_id" << 1)});
     assertPublished(ins1);
+}
+
+// An unprepared transaction with two inserts in a single applyOps entry. config.transactions
+// should have been updated.
+TEST_F(PipelinedOplogApplierRunTest, AppliesAndPublishesAnUnpreparedTransactionCommitBatch) {
+    auto uuid = createTxnCollections();
+    auto sessionInfo = makeSessionInfo(1);
+
+    // A single-entry transaction committing two inserts, with a CRUD neighbor in the batch.
+    auto commit = singleEntryTxnCommitOp(
+        {innerInsertOp(kNss, uuid, 0), innerInsertOp(kNss, uuid, 1)}, sessionInfo);
+    auto neighbor = insertOp(kNss, BSON("_id" << 2));
+
+    applyThroughBuffer({commit, neighbor});
+
+    assertCollectionContainsExactly(kNss, {BSON("_id" << 0), BSON("_id" << 1), BSON("_id" << 2)});
+    assertTxnTable(sessionInfo, commit, DurableTxnStateEnum::kCommitted);
+    assertPublished(neighbor);
+}
+
+// A single-statement retryable write touches config.transactions.
+TEST_F(PipelinedOplogApplierRunTest, AppliesAndPublishesADirectlyLoggedRetryableWrite) {
+    auto uuid = createTxnCollections();
+    auto sessionInfo = makeSessionInfo(1);
+
+    auto retryable = makeInsertDocumentOplogEntryWithSessionInfoAndStmtIds(
+        nextOpTime(),
+        kNss,
+        uuid,
+        BSON("_id" << 0),
+        *sessionInfo.getSessionId(),
+        *sessionInfo.getTxnNumber(),
+        {0} /* stmtIds */,
+        OpTime() /* prevWriteOpTimeInTransaction: first write of this session */);
+    auto neighbor = insertOp(kNss, BSON("_id" << 1));
+
+    applyThroughBuffer({retryable, neighbor});
+
+    assertCollectionContainsExactly(kNss, {BSON("_id" << 0), BSON("_id" << 1)});
+    assertTxnTable(sessionInfo, retryable);
+    assertPublished(neighbor);
+}
+
+// A single-statement retryable within an applyOps updates config.transactions.
+TEST_F(PipelinedOplogApplierRunTest, AppliesAndPublishesARetryableWriteBatch) {
+    auto uuid = createTxnCollections();
+    auto sessionInfo = makeSessionInfo(1);
+
+    auto retryable = retryableWriteOp({innerInsertOp(kNss, uuid, 0)}, sessionInfo);
+    auto neighbor = insertOp(kNss, BSON("_id" << 1));
+
+    applyThroughBuffer({retryable, neighbor});
+
+    assertCollectionContainsExactly(kNss, {BSON("_id" << 0), BSON("_id" << 1)});
+    assertTxnTable(sessionInfo, retryable);
+    assertPublished(neighbor);
+}
+
+// Two transactions on one session committing in the same batch both apply in that batch; the
+// session record ends at the later transaction, committed at its optime.
+TEST_F(PipelinedOplogApplierRunTest, AppliesTwoUnpreparedTransactionCommitsInOneBatch) {
+    auto uuid = createTxnCollections();
+    auto sessionInfo = makeSessionInfo(1);
+
+    auto commit1 = singleEntryTxnCommitOp({innerInsertOp(kNss, uuid, 0)}, sessionInfo);
+    sessionInfo.setTxnNumber(2);
+    auto commit2 = singleEntryTxnCommitOp({innerInsertOp(kNss, uuid, 1)}, sessionInfo);
+
+    applyThroughBuffer({commit1, commit2});
+
+    assertCollectionContainsExactly(kNss, {BSON("_id" << 0), BSON("_id" << 1)});
+    assertTxnTable(sessionInfo, commit2, DurableTxnStateEnum::kCommitted);
+    assertPublished(commit2);
+}
+
+// Two transactions on one session in consecutive batches: both derived session updates route to
+// the same worker by hash of the session id, so the record ends at the later transaction however
+// the batches pipeline.
+TEST_F(PipelinedOplogApplierRunTest, AppliesConsecutiveTransactionCommitsOnOneSession) {
+    auto uuid = createTxnCollections();
+    auto sessionInfo = makeSessionInfo(1);
+
+    auto commit1 = singleEntryTxnCommitOp({innerInsertOp(kNss, uuid, 0)}, sessionInfo);
+    applyThroughBuffer({commit1});
+    assertTxnTable(sessionInfo, commit1, DurableTxnStateEnum::kCommitted);
+    assertPublished(commit1);
+
+    sessionInfo.setTxnNumber(2);
+    auto commit2 = singleEntryTxnCommitOp({innerInsertOp(kNss, uuid, 1)}, sessionInfo);
+    applyThroughBuffer({commit2});
+
+    assertCollectionContainsExactly(kNss, {BSON("_id" << 0), BSON("_id" << 1)});
+    assertTxnTable(sessionInfo, commit2, DurableTxnStateEnum::kCommitted);
+    assertPublished(commit2);
+}
+
+// A large unprepared transaction with partial oplog entries forming an oplog chain.
+// Tests that config.transactions is updated correctly and that the pipelined applier reassembles
+// the chain by fetching the partial entries from the local oplog when the terminal entry is
+// applied.
+TEST_F(PipelinedOplogApplierRunTest, ReassemblesALargeUnpreparedTransactionFromTheOplog) {
+    auto uuid = createTxnCollections();
+    auto sessionInfo = makeSessionInfo(1);
+
+    // A transaction of three inserts: two in partial entries, the last in the terminal commit.
+    auto partial1 = txnApplyOpsOp(
+        {innerInsertOp(kNss, uuid, 0)}, sessionInfo, OpTime(), ApplyOpsType::kPartial);
+    auto partial2 = txnApplyOpsOp(
+        {innerInsertOp(kNss, uuid, 1)}, sessionInfo, partial1.getOpTime(), ApplyOpsType::kPartial);
+    auto terminal = txnApplyOpsOp(
+        {innerInsertOp(kNss, uuid, 2)}, sessionInfo, partial2.getOpTime(), ApplyOpsType::kTerminal);
+
+    // The partial entries apply no data and leave the session record in-progress at the first
+    // partial's optime, with that optime as the record's start optime.
+    applyThroughBuffer({partial1, partial2});
+    assertCollectionContainsExactly(kNss, {});
+    assertTxnTable(sessionInfo, partial1, DurableTxnStateEnum::kInProgress, partial1.getOpTime());
+    assertPublished(partial2);
+
+    // The terminal entry arrives in its own serialized batch and reassembles the chain by
+    // re-reading the partials from the local oplog. The pipelined applier does not itself
+    // persist fetched entries, so simulate the fetch path's oplog writes here.
+    writeToOplog(partial1);
+    writeToOplog(partial2);
+    applyThroughBuffer({terminal});
+
+    // The whole chain applied at the commit, with the session record committed at the terminal
+    // entry's optime.
+    assertCollectionContainsExactly(kNss, {BSON("_id" << 0), BSON("_id" << 1), BSON("_id" << 2)});
+    assertTxnTable(sessionInfo, terminal, DurableTxnStateEnum::kCommitted);
+    assertPublished(terminal);
+}
+
+// A retryable write followed by a transaction on the same session: the transaction's session
+// updates replace the retryable write's, leaving the record committed at the transaction's
+// terminal optime rather than stalled at the retryable write's.
+TEST_F(PipelinedOplogApplierRunTest, UpdatesTheTxnTableForARetryableWriteFollowedByATransaction) {
+    auto uuid = createTxnCollections();
+    auto sessionInfo = makeSessionInfo(3);
+
+    auto retryable = retryableWriteOp({innerInsertOp(kNss, uuid, 1)}, sessionInfo);
+    sessionInfo.setTxnNumber(4);
+    auto partial = txnApplyOpsOp(
+        {innerInsertOp(kNss, uuid, 2)}, sessionInfo, OpTime(), ApplyOpsType::kPartial);
+    auto terminal = txnApplyOpsOp({}, sessionInfo, partial.getOpTime(), ApplyOpsType::kTerminal);
+    writeToOplog(partial);
+
+    applyThroughBuffer({retryable, partial, terminal});
+
+    assertCollectionContainsExactly(kNss, {BSON("_id" << 1), BSON("_id" << 2)});
+    assertTxnTable(sessionInfo, terminal, DurableTxnStateEnum::kCommitted);
+    assertPublished(terminal);
+}
+
+// A batch publishes only once its derived config.transactions session update is applied: the
+// retryable write's data lands on another worker and finishes first, but lastApplied must not
+// advance past the write while its session update is still outstanding.
+TEST_F(PipelinedOplogApplierRunTest, PublishesABatchOnlyAfterItsDerivedSessionUpdateIsApplied) {
+    auto uuid = createTxnCollections();
+    auto sessionInfo = makeSessionInfo(1);
+    auto* replCoord = ReplicationCoordinator::get(serviceContext);
+
+    // A data _id whose worker is not the one owning this session's record.
+    auto dataId = idNotRoutedTo(txnTableWorkerFor(*sessionInfo.getSessionId()));
+    auto& dataGate = watchWriteOf(dataId, false /* hold */);
+
+    auto retryable = retryableWriteOp({innerInsertOp(kNss, uuid, dataId)}, sessionInfo);
+
+    holdTxnTableWrites();
+    pushToBuffer({retryable});
+    startApplier();
+    waitForGate(_txnTableGate);
+    waitForGate(dataGate);
+
+    // The data write has been made, but the batch cannot publish without its session update.
+    ASSERT_EQ(writesTo(kNss).size(), 1U);
+    ASSERT_LT(replCoord->getMyLastAppliedOpTime(), retryable.getOpTime());
+
+    releaseTxnTableWrites();
+    finishApplier();
+
+    assertCollectionContainsExactly(kNss, {BSON("_id" << dataId)});
+    assertTxnTable(sessionInfo, retryable);
+    assertPublished(retryable);
+}
+
+// Session updates for one session apply in oplog order: every derived config.transactions update
+// routes to the same worker by hash of the session id, and that worker drains its queue in FIFO
+// order. Holding the first update mid-write proves the second cannot overtake it, since each
+// batch flushes its own update (one entry per batch).
+TEST_F(PipelinedOplogApplierRunTest, AppliesSessionUpdatesForOneSessionInOplogOrder) {
+    auto uuid = createTxnCollections();
+    auto sessionInfo = makeSessionInfo(5);
+    auto* replCoord = ReplicationCoordinator::get(serviceContext);
+
+    // Split the two retryable writes into their own batches, so each flushes its own session
+    // update rather than coalescing the session's updates into one. Put the data writes on
+    // workers other than the one owning this session's record, since the held session update
+    // would otherwise hold its own batch's data write behind it.
+    setServerParameter("replBatchLimitOperations", 1);
+    const auto sessionWorker = txnTableWorkerFor(*sessionInfo.getSessionId());
+    const auto dataId0 = idNotRoutedTo(sessionWorker);
+    const auto dataId1 = idNotRoutedTo(sessionWorker, dataId0 + 1);
+
+    auto retryable1 = retryableWriteOp({innerInsertOp(kNss, uuid, dataId0)}, sessionInfo);
+    sessionInfo.setTxnNumber(6);
+    auto retryable2 = retryableWriteOp({innerInsertOp(kNss, uuid, dataId1)}, sessionInfo);
+    auto& dataGate0 = watchWriteOf(dataId0, false /* hold */);
+    auto& dataGate1 = watchWriteOf(dataId1, false /* hold */);
+
+    // Hold the first session update to open a window to allow the second to overtake it
+    // on the worker (this shouldn't happen).
+    holdTxnTableWrites();
+    pushToBuffer({retryable1, retryable2});
+    startApplier();
+    waitForGate(_txnTableGate);
+    waitForGate(dataGate0);
+    waitForGate(dataGate1);
+
+    // Both data writes are applied, but neither batch can publish past the held session update.
+    ASSERT_EQ(writesTo(kNss).size(), 2U);
+    ASSERT_LT(replCoord->getMyLastAppliedOpTime(), retryable2.getOpTime());
+
+    releaseTxnTableWrites();
+    finishApplier();
+
+    assertCollectionContainsExactly(kNss, {BSON("_id" << dataId0), BSON("_id" << dataId1)});
+    // Both session updates were applied by one worker, in oplog order by transaction number.
+    auto updates = writesTo(NamespaceString::kSessionTransactionsTableNamespace);
+    ASSERT_EQ(updates.size(), 2U);
+    ASSERT_EQ(updates[0].workerIdx, updates[1].workerIdx);
+    ASSERT_EQ(updates[0].doc["txnNum"].safeNumberLong(), 5);
+    ASSERT_EQ(updates[1].doc["txnNum"].safeNumberLong(), 6);
+    assertTxnTable(sessionInfo, retryable2);
+    assertPublished(retryable2);
+}
+
+// An unprepared transaction committing no operations: the terminal entry still derives the
+// session update and publishes, with no data writes in the batch.
+TEST_F(PipelinedOplogApplierRunTest, AppliesAndPublishesAnEmptyUnpreparedTransactionCommit) {
+    createTxnCollections();
+    auto sessionInfo = makeSessionInfo(1);
+
+    auto commit = singleEntryTxnCommitOp({}, sessionInfo);
+    applyThroughBuffer({commit});
+
+    assertCollectionContainsExactly(kNss, {});
+    assertTxnTable(sessionInfo, commit, DurableTxnStateEnum::kCommitted);
+    assertPublished(commit);
+}
+
+// A transaction with a DDL command takes the drain-dispatch-drain path.
+TEST_F(PipelinedOplogApplierRunTest, SerializesTheBatchOfATransactionContainingADDLCommand) {
+    auto uuid = createTxnCollections();
+    auto sessionInfo = makeSessionInfo(1);
+
+    // Hold a pipelined insert that precedes the transaction, and hold the create inside it.
+    auto& held = watchWriteOf(10, true /* hold */);
+    const int kCreateGateId = -1;
+    auto& createGate = watchWriteOf(kCreateGateId, true /* hold */);
+    _opObserver->onCreateCollectionFn =
+        [&](auto*, const auto&, const auto&, const auto&, const auto&, auto) {
+            createGate.reached.set();
+            createGate.release.get();
+        };
+    // Gate (no hold) to learn when the batch following the transaction is applied.
+    auto& insGate = watchWriteOf(100, false /* hold */);
+
+    // The transaction inserts into kNss and creates kOtherNss. Entries are built in oplog order:
+    // the held pipelined insert precedes the transaction, which precedes the following batch.
+    auto heldIns = insertOp(kNss, BSON("_id" << 10));
+    auto commitWithDdl = singleEntryTxnCommitOp(
+        {innerInsertOp(kNss, uuid, 0), innerCreateOp(kOtherNss, UUID::gen())}, sessionInfo);
+    auto ins100 = insertOp(kOtherNss, BSON("_id" << 100));
+    auto ins101 = insertOp(kOtherNss, BSON("_id" << 101));
+
+    pushToBuffer({heldIns});
+    startApplier();
+    waitForGate(held);
+
+    // The transaction's batch is serialized behind the held pipelined batch, so the DDL inside
+    // it must not run while the insert is still in flight.
+    pushToBuffer({commitWithDdl, ins100, ins101});
+    ASSERT_FALSE(createGate.reached.waitFor(_opCtx.get(), Milliseconds(500)));
+    ASSERT_FALSE(collectionExists(_opCtx.get(), kOtherNss));
+
+    // Releasing the insert lets the pipeline drain; the transaction's batch dispatches and a
+    // worker reaches the create, which is held inside the observer.
+    held.release.set();
+    waitForGate(createGate);
+
+    // The batch following the transaction must not apply until the transaction's batch has
+    // applied and published.
+    ASSERT_FALSE(insGate.reached.waitFor(_opCtx.get(), Milliseconds(500)));
+    ASSERT_TRUE(writesTo(kOtherNss).empty());
+
+    createGate.release.set();
+    finishApplier();
+
+    ASSERT_TRUE(collectionExists(_opCtx.get(), kOtherNss));
+    assertCollectionContainsExactly(kNss, {BSON("_id" << 0), BSON("_id" << 10)});
+    assertCollectionContainsExactly(kOtherNss, {BSON("_id" << 100), BSON("_id" << 101)});
+    assertTxnTable(sessionInfo, commitWithDdl, DurableTxnStateEnum::kCommitted);
+    assertPublished(ins101);
+}
+
+// The terminal entry of a transaction oplog chain applies serialized, with the same
+// drain-dispatch-drain barrier: a held pipelined batch blocks the terminal's dispatch, and the
+// batch after the terminal waits for the reassembled chain to apply and publish. The chain's
+// partial entries pipeline: they apply no data and only advance the session record.
+TEST_F(PipelinedOplogApplierRunTest, SerializesTheTerminalBatchOfATransactionOplogChain) {
+    auto uuid = createTxnCollections();
+    auto sessionInfo = makeSessionInfo(1);
+
+    auto partial1 = txnApplyOpsOp(
+        {innerInsertOp(kNss, uuid, 0)}, sessionInfo, OpTime(), ApplyOpsType::kPartial);
+    auto partial2 = txnApplyOpsOp(
+        {innerInsertOp(kNss, uuid, 1)}, sessionInfo, partial1.getOpTime(), ApplyOpsType::kPartial);
+
+    // The partial entries apply no data and leave the session record in-progress. They share a
+    // pipelined batch with a CRUD neighbor, which applies alongside them.
+    auto neighbor = insertOp(kNss, BSON("_id" << 3));
+    applyThroughBuffer({partial1, partial2, neighbor});
+    assertCollectionContainsExactly(kNss, {BSON("_id" << 3)});
+    assertTxnTable(sessionInfo, partial1, DurableTxnStateEnum::kInProgress, partial1.getOpTime());
+    assertPublished(neighbor);
+
+    // The pipelined applier does not itself persist fetched entries, so simulate the fetch path's
+    // oplog writes here: the terminal's chain walk re-reads the partials from the local oplog.
+    writeToOplog(partial1);
+    writeToOplog(partial2);
+
+    // Hold a pipelined insert preceding the terminal, and the terminal's own inner insert.
+    auto& held = watchWriteOf(10, true /* hold */);
+    auto& chainDataGate = watchWriteOf(2, true /* hold */);
+    auto& insGate = watchWriteOf(100, false /* hold */);
+
+    // Built in oplog order: the held pipelined insert precedes the terminal, which precedes the
+    // following batch.
+    auto heldIns = insertOp(kNss, BSON("_id" << 10));
+    auto terminal = txnApplyOpsOp(
+        {innerInsertOp(kNss, uuid, 2)}, sessionInfo, partial2.getOpTime(), ApplyOpsType::kTerminal);
+    auto ins100 = insertOp(kNss, BSON("_id" << 100));
+    auto ins101 = insertOp(kNss, BSON("_id" << 101));
+
+    pushToBuffer({heldIns});
+    startApplier();
+    waitForGate(held);
+
+    // The terminal's batch is serialized behind the held pipelined batch, so none of the chain's
+    // data may apply yet.
+    pushToBuffer({terminal, ins100, ins101});
+    ASSERT_FALSE(chainDataGate.reached.waitFor(_opCtx.get(), Milliseconds(500)));
+
+    // Releasing the insert lets the pipeline drain; the terminal's batch dispatches, reassembles
+    // the chain from the oplog, and a worker is held on the terminal's own insert.
+    held.release.set();
+    waitForGate(chainDataGate);
+
+    // The batch after the terminal must not apply until the reassembled chain has applied and
+    // published.
+    ASSERT_FALSE(insGate.reached.waitFor(_opCtx.get(), Milliseconds(500)));
+
+    chainDataGate.release.set();
+    finishApplier();
+
+    assertCollectionContainsExactly(kNss,
+                                    {BSON("_id" << 0),
+                                     BSON("_id" << 1),
+                                     BSON("_id" << 2),
+                                     BSON("_id" << 3),
+                                     BSON("_id" << 10),
+                                     BSON("_id" << 100),
+                                     BSON("_id" << 101)});
+    assertTxnTable(sessionInfo, terminal, DurableTxnStateEnum::kCommitted);
+    assertPublished(ins101);
+}
+
+// A retryable write whose single atomically-applied applyOps entry packs multiple operations:
+// the inner ops expand and route to different workers by hash, and the batch publishes once they
+// and the derived session update have all applied.
+TEST_F(PipelinedOplogApplierRunTest, AppliesAndPublishesAMultiOperationRetryableWriteBatch) {
+    auto uuid = createTxnCollections();
+    auto sessionInfo = makeSessionInfo(1);
+
+    // Inner ops deliberately routed to two different workers.
+    const auto idA = idRoutedTo(0);
+    const auto idB = idRoutedTo(1);
+    auto retryable = retryableWriteOp(
+        {innerInsertOp(kNss, uuid, idA), innerInsertOp(kNss, uuid, idB)}, sessionInfo);
+
+    applyThroughBuffer({retryable});
+
+    // Both inner ops applied, each by its own worker.
+    auto writes = writesTo(kNss);
+    ASSERT_EQ(writes.size(), 2U);
+    ASSERT_NE(writes[0].workerIdx, writes[1].workerIdx);
+    assertCollectionContainsExactly(kNss, {BSON("_id" << idA), BSON("_id" << idB)});
+    assertTxnTable(sessionInfo, retryable);
+    assertPublished(retryable);
+}
+
+// A multi-statement retryable write logged directly: one oplog entry per statement, chained by
+// prevWriteOpTimeInTransaction. The applier does not consume that chain - each entry is a plain
+// CRUD op routed by hash - and the statements' session updates coalesce into a single
+// config.transactions update at the last statement's optime.
+TEST_F(PipelinedOplogApplierRunTest,
+       AppliesAndPublishesAMultiStatementDirectlyLoggedRetryableWrite) {
+    auto uuid = createTxnCollections();
+    auto sessionInfo = makeSessionInfo(1);
+    const auto lsid = *sessionInfo.getSessionId();
+    const auto txnNumber = *sessionInfo.getTxnNumber();
+
+    // Three statements with distinct stmtIds; every entry after the first carries the previous
+    // statement's optime.
+    auto stmt0 = makeInsertDocumentOplogEntryWithSessionInfoAndStmtIds(
+        nextOpTime(), kNss, uuid, BSON("_id" << 0), lsid, txnNumber, {0}, OpTime());
+    auto stmt1 = makeInsertDocumentOplogEntryWithSessionInfoAndStmtIds(
+        nextOpTime(), kNss, uuid, BSON("_id" << 1), lsid, txnNumber, {1}, stmt0.getOpTime());
+    auto stmt2 = makeInsertDocumentOplogEntryWithSessionInfoAndStmtIds(
+        nextOpTime(), kNss, uuid, BSON("_id" << 2), lsid, txnNumber, {2}, stmt1.getOpTime());
+
+    applyThroughBuffer({stmt0, stmt1, stmt2});
+
+    assertCollectionContainsExactly(kNss, {BSON("_id" << 0), BSON("_id" << 1), BSON("_id" << 2)});
+    // The three statements coalesce into one session update, at the LAST statement's optime.
+    ASSERT_EQ(writesTo(NamespaceString::kSessionTransactionsTableNamespace).size(), 1U);
+    assertTxnTable(sessionInfo, stmt2);
+    assertPublished(stmt2);
+}
+
+// A retryable write split across multiple applyOps entries that apply separately (the
+// batched-writes format): each entry stands alone - the prevOpTime chain between entries is not
+// walked - so the entries pipeline like any other CRUD. The inner ops carry their own stmtIds,
+// and the entries' session updates coalesce to the last entry.
+TEST_F(PipelinedOplogApplierRunTest,
+       AppliesAndPublishesARetryableWriteSplitAcrossSeparatelyAppliedEntries) {
+    auto uuid = createTxnCollections();
+    auto sessionInfo = makeSessionInfo(1);
+
+    auto entry1 = separatelyAppliedRetryableOp(
+        {innerInsertOpWithStmtId(kNss, uuid, 0, 0), innerInsertOpWithStmtId(kNss, uuid, 1, 1)},
+        sessionInfo,
+        OpTime() /* prevOpTime: null on the batch's first entry */);
+    auto entry2 = separatelyAppliedRetryableOp(
+        {innerInsertOpWithStmtId(kNss, uuid, 2, 2)}, sessionInfo, entry1.getOpTime());
+
+    applyThroughBuffer({entry1, entry2});
+
+    assertCollectionContainsExactly(kNss, {BSON("_id" << 0), BSON("_id" << 1), BSON("_id" << 2)});
+    ASSERT_EQ(writesTo(NamespaceString::kSessionTransactionsTableNamespace).size(), 1U);
+    assertTxnTable(sessionInfo, entry2);
+    assertPublished(entry2);
 }
 
 TEST_F(PipelinedWorkItemTest, OpsAppliedByWorkersCounterIncrementsPerAppliedOp) {
