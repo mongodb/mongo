@@ -346,7 +346,6 @@ void ReplicatedFastCountManager::initializeMetadata(OperationContext* opCtx) {
                 // the accumulator will not contain an entry for this node's oplog UUID because the
                 // UUID will not be tracked in the fast count store or the oplog.
                 if (coll->ns() != NamespaceString::kRsOplogNamespace) {
-                    // TODO(SERVER-126350): Investigate why this log is sometimes emitted.
                     LOGV2_WARNING(
                         12580001,
                         "Replicated fast count eligible namespace found in the collection "
