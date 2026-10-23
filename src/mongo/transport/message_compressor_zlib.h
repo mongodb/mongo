@@ -21,9 +21,10 @@ public:
 
     boost::optional<std::size_t> getMaxDecompressedSize(ConstDataRange input) override;
 
-    StatusWith<std::size_t> compressData(ConstDataRange input, DataRange output) override;
+protected:
+    StatusWith<std::size_t> doCompressData(ConstDataRange input, DataRange output) override;
 
-    StatusWith<std::size_t> decompressData(ConstDataRange input, DataRange output) override;
+    StatusWith<std::size_t> doDecompressData(ConstDataRange input, DataRange output) override;
 };
 
 

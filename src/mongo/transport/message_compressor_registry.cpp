@@ -30,22 +30,6 @@ namespace {
 constexpr auto kDisabledConfigValue = "disabled"sv;
 }  // namespace
 
-std::string_view getMessageCompressorName(MessageCompressor id) {
-    switch (id) {
-        case MessageCompressor::kNoop:
-            return "noop"sv;
-        case MessageCompressor::kSnappy:
-            return "snappy"sv;
-        case MessageCompressor::kZlib:
-            return "zlib"sv;
-        case MessageCompressor::kZstd:
-            return "zstd"sv;
-        default:
-            fasserted(40269);  // Invalid message compressor ID
-    }
-    MONGO_UNREACHABLE;
-}
-
 MessageCompressorRegistry& MessageCompressorRegistry::get() {
     static MessageCompressorRegistry globalRegistry;
     return globalRegistry;

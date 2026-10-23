@@ -11,6 +11,7 @@
 #include "mongo/otel/metrics/metric_names.h"
 #include "mongo/otel/metrics/metric_unit.h"
 #include "mongo/otel/metrics/metrics_service.h"
+#include "mongo/transport/message_compressor_name.h"
 #include "mongo/util/static_immortal.h"
 
 #include <string_view>
@@ -27,6 +28,18 @@ using ::mongo::otel::metrics::MetricNames;
 using ::mongo::otel::metrics::MetricsService;
 using ::mongo::otel::metrics::MetricUnit;
 using ::mongo::otel::metrics::ServerStatusOptions;
+
+namespace {
+// Attribute values are the closed set from kMessageCompressorNames.
+const otel::metrics::AttributeDefinition<std::string_view>& compressorNameAttribute() {
+    static StaticImmortal def = [] {
+        return otel::metrics::AttributeDefinition<std::string_view>{
+            .name = "compressor",
+            .values = {kMessageCompressorNames.begin(), kMessageCompressorNames.end()}};
+    }();
+    return *def;
+}
+}  // namespace
 
 NetworkCounter::NetworkCounter()
     : _replicationSecondaryPhysicalBytesIn(MetricsService::instance().createInt64Counter(
@@ -79,7 +92,55 @@ NetworkCounter::NetworkCounter()
       _numSlowSSLOperations(MetricsService::instance().createInt64Counter(
           MetricNames::kNetworkNumSlowSSLOperations,
           "Total number of slow SSL handshake operations.",
-          MetricUnit::kCount)) {}
+          MetricUnit::kCount)),
+      _ingressCompressorBytesIn(MetricsService::instance().createInt64Counter<std::string_view>(
+          MetricNames::kNetworkCompressionIngressCompressorBytesIn,
+          "Total number of uncompressed bytes of wire-protocol messages compressed and sent "
+          "to ingress (wire-protocol) clients.",
+          MetricUnit::kBytes,
+          compressorNameAttribute())),
+      _ingressCompressorBytesOut(MetricsService::instance().createInt64Counter<std::string_view>(
+          MetricNames::kNetworkCompressionIngressCompressorBytesOut,
+          "Total number of compressed bytes of wire-protocol messages sent to ingress "
+          "(wire-protocol) clients.",
+          MetricUnit::kBytes,
+          compressorNameAttribute())),
+      _ingressDecompressorBytesIn(MetricsService::instance().createInt64Counter<std::string_view>(
+          MetricNames::kNetworkCompressionIngressDecompressorBytesIn,
+          "Total number of compressed bytes of wire-protocol messages received from ingress "
+          "(wire-protocol) clients.",
+          MetricUnit::kBytes,
+          compressorNameAttribute())),
+      _ingressDecompressorBytesOut(MetricsService::instance().createInt64Counter<std::string_view>(
+          MetricNames::kNetworkCompressionIngressDecompressorBytesOut,
+          "Total number of uncompressed bytes of wire-protocol messages received from "
+          "ingress (wire-protocol) clients.",
+          MetricUnit::kBytes,
+          compressorNameAttribute())),
+      _egressCompressorBytesIn(MetricsService::instance().createInt64Counter<std::string_view>(
+          MetricNames::kNetworkCompressionEgressCompressorBytesIn,
+          "Total number of uncompressed bytes of wire-protocol messages compressed and sent on "
+          "egress (outbound client) connections.",
+          MetricUnit::kBytes,
+          compressorNameAttribute())),
+      _egressCompressorBytesOut(MetricsService::instance().createInt64Counter<std::string_view>(
+          MetricNames::kNetworkCompressionEgressCompressorBytesOut,
+          "Total number of compressed bytes of wire-protocol messages sent on egress (outbound "
+          "client) connections.",
+          MetricUnit::kBytes,
+          compressorNameAttribute())),
+      _egressDecompressorBytesIn(MetricsService::instance().createInt64Counter<std::string_view>(
+          MetricNames::kNetworkCompressionEgressDecompressorBytesIn,
+          "Total number of compressed bytes of wire-protocol messages received on egress "
+          "(outbound client) connections.",
+          MetricUnit::kBytes,
+          compressorNameAttribute())),
+      _egressDecompressorBytesOut(MetricsService::instance().createInt64Counter<std::string_view>(
+          MetricNames::kNetworkCompressionEgressDecompressorBytesOut,
+          "Total number of uncompressed bytes of wire-protocol messages received on egress "
+          "(outbound client) connections.",
+          MetricUnit::kBytes,
+          compressorNameAttribute())) {}
 
 
 void NetworkCounter::hitPhysicalIn(ConnectionType connectionType,
@@ -159,6 +220,32 @@ void NetworkCounter::hitLogicalOut(ConnectionType connectionType,
         _ingressLogicalBytesOut.add(bytes);
     } else {
         _egressLogicalBytesOut.add(bytes);
+    }
+}
+
+void NetworkCounter::hitCompressor(ConnectionType connectionType,
+                                   std::string_view compressor,
+                                   long long logicalBytesIn,
+                                   long long physicalBytesOut) {
+    if (connectionType == ConnectionType::kIngress) {
+        _ingressCompressorBytesIn.add(logicalBytesIn, {compressor});
+        _ingressCompressorBytesOut.add(physicalBytesOut, {compressor});
+    } else {
+        _egressCompressorBytesIn.add(logicalBytesIn, {compressor});
+        _egressCompressorBytesOut.add(physicalBytesOut, {compressor});
+    }
+}
+
+void NetworkCounter::hitDecompressor(ConnectionType connectionType,
+                                     std::string_view compressor,
+                                     long long physicalBytesIn,
+                                     long long logicalBytesOut) {
+    if (connectionType == ConnectionType::kIngress) {
+        _ingressDecompressorBytesIn.add(physicalBytesIn, {compressor});
+        _ingressDecompressorBytesOut.add(logicalBytesOut, {compressor});
+    } else {
+        _egressDecompressorBytesIn.add(physicalBytesIn, {compressor});
+        _egressDecompressorBytesOut.add(logicalBytesOut, {compressor});
     }
 }
 

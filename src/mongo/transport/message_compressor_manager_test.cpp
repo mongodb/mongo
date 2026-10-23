@@ -13,6 +13,8 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/otel/metrics/metric_names.h"
+#include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/op_compressed.h"
 #include "mongo/rpc/op_msg.h"
@@ -87,7 +89,7 @@ void checkNegotiationResult(const BSONObj& result, const std::vector<std::string
 void checkServerNegotiation(const boost::optional<std::vector<std::string_view>>& input,
                             const std::vector<std::string>& expected) {
     auto registry = buildRegistry();
-    MessageCompressorManager manager(&registry);
+    MessageCompressorManager manager(MessageCompressionDirection::kIngress, &registry);
 
     BSONObjBuilder serverOutput;
     manager.serverNegotiate(input, &serverOutput);
@@ -104,7 +106,7 @@ void checkFidelity(const Message& msg, std::unique_ptr<MessageCompressorBase> co
     registry.registerImplementation(std::move(compressor));
     registry.finalizeSupportedCompressors().transitional_ignore();
 
-    MessageCompressorManager mgr(&registry);
+    MessageCompressorManager mgr(MessageCompressionDirection::kIngress, &registry);
     BSONObjBuilder negotiatorOut;
     std::vector<std::string_view> negotiator({compressorName});
     mgr.serverNegotiate(negotiator, &negotiatorOut);
@@ -177,7 +179,7 @@ void checkUndersize(const Message& compressedMsg,
     registry.registerImplementation(std::move(compressor));
     registry.finalizeSupportedCompressors().transitional_ignore();
 
-    MessageCompressorManager mgr(&registry);
+    MessageCompressorManager mgr(MessageCompressionDirection::kIngress, &registry);
     BSONObjBuilder negotiatorOut;
     std::vector<std::string_view> negotiator({compressorName});
     mgr.serverNegotiate(negotiator, &negotiatorOut);
@@ -244,8 +246,8 @@ boost::optional<std::vector<std::string_view>> parseBSON(BSONObj input) {
 
 TEST(MessageCompressorManager, FullNormalCompression) {
     auto registry = buildRegistry();
-    MessageCompressorManager clientManager(&registry);
-    MessageCompressorManager serverManager(&registry);
+    MessageCompressorManager clientManager(MessageCompressionDirection::kEgress, &registry);
+    MessageCompressorManager serverManager(MessageCompressionDirection::kIngress, &registry);
 
     BSONObjBuilder clientOutput;
     clientManager.clientBegin(&clientOutput);
@@ -363,8 +365,8 @@ TEST(MessageCompressorManager, SERVER_28008) {
     registry.registerImplementation(std::move(snappyCompressor));
     ASSERT_OK(registry.finalizeSupportedCompressors());
 
-    MessageCompressorManager clientManager(&registry);
-    MessageCompressorManager serverManager(&registry);
+    MessageCompressorManager clientManager(MessageCompressionDirection::kEgress, &registry);
+    MessageCompressorManager serverManager(MessageCompressionDirection::kIngress, &registry);
 
     // Do negotiation
     BSONObjBuilder clientOutput;
@@ -410,7 +412,7 @@ TEST(MessageCompressorManager, SERVER_28008) {
 
 TEST(MessageCompressorManager, MessageSizeTooLarge) {
     auto registry = buildRegistry();
-    MessageCompressorManager compManager(&registry);
+    MessageCompressorManager compManager(MessageCompressionDirection::kIngress, &registry);
 
     auto badMessageBuffer = SharedBuffer::allocate(128);
     MsgData::View badMessage(badMessageBuffer.get());
@@ -430,7 +432,7 @@ TEST(MessageCompressorManager, MessageSizeTooLarge) {
 
 TEST(MessageCompressorManager, MessageSizeMax32Bit) {
     auto registry = buildRegistry();
-    MessageCompressorManager compManager(&registry);
+    MessageCompressorManager compManager(MessageCompressionDirection::kIngress, &registry);
 
     auto badMessageBuffer = SharedBuffer::allocate(128);
     MsgData::View badMessage(badMessageBuffer.get());
@@ -450,7 +452,7 @@ TEST(MessageCompressorManager, MessageSizeMax32Bit) {
 
 TEST(MessageCompressorManager, MessageSizeTooSmall) {
     auto registry = buildRegistry();
-    MessageCompressorManager compManager(&registry);
+    MessageCompressorManager compManager(MessageCompressionDirection::kIngress, &registry);
 
     auto badMessageBuffer = SharedBuffer::allocate(128);
     MsgData::View badMessage(badMessageBuffer.get());
@@ -470,7 +472,7 @@ TEST(MessageCompressorManager, MessageSizeTooSmall) {
 
 TEST(MessageCompressorManager, RuntMessage) {
     auto registry = buildRegistry();
-    MessageCompressorManager compManager(&registry);
+    MessageCompressorManager compManager(MessageCompressionDirection::kIngress, &registry);
 
     auto badMessageBuffer = SharedBuffer::allocate(128);
     MsgData::View badMessage(badMessageBuffer.get());
@@ -491,6 +493,14 @@ TEST(MessageCompressorManager, RuntMessage) {
 
 class ZlibDecompressTest : public unittest::Test {
 public:
+    void SetUp() override {
+        auto owned = std::make_unique<ZlibMessageCompressor>();
+        compressor = owned.get();
+        registry.setSupportedCompressors({compressor->getName()});
+        registry.registerImplementation(std::move(owned));
+        ASSERT_OK(registry.finalizeSupportedCompressors());
+    }
+
     Status doDecompress(const std::vector<uint8_t>& in, std::vector<uint8_t>& out) {
         ConstDataRange inRange(in.data(), in.size());
         DataRange outRange(out.data(), out.size());
@@ -518,7 +528,8 @@ public:
         return std::vector<uint8_t>(s.begin(), s.end());
     }
 
-    std::unique_ptr<ZlibMessageCompressor> compressor{std::make_unique<ZlibMessageCompressor>()};
+    MessageCompressorRegistry registry;
+    ZlibMessageCompressor* compressor = nullptr;  // Owned by registry after SetUp.
 };
 
 TEST_F(ZlibDecompressTest, RejectsEmptyPayload) {
@@ -550,30 +561,169 @@ TEST_F(ZlibDecompressTest, RoundTripShortData) {
     ASSERT_EQ(out, data);
 }
 
+TEST_F(ZlibDecompressTest, DirectCallsCountByDirection) {
+    const auto data = strVec("Hello, MongoDB!");
+
+    std::vector<uint8_t> compressed(compressor->getMaxCompressedSize(data.size()));
+    auto swCompressed = compressor->compressData(data,
+                                                 DataRange(compressed.data(), compressed.size()),
+                                                 MessageCompressionDirection::kEgress);
+    ASSERT_OK(swCompressed);
+    compressed.resize(swCompressed.getValue());
+
+    ASSERT_EQ(compressor->getCompressorBytesIn(MessageCompressionDirection::kEgress), data.size());
+    ASSERT_EQ(compressor->getCompressorBytesOut(MessageCompressionDirection::kEgress),
+              compressed.size());
+    ASSERT_EQ(compressor->getCompressorBytesIn(MessageCompressionDirection::kIngress), 0);
+    ASSERT_EQ(compressor->getCompressorBytesOut(MessageCompressionDirection::kIngress), 0);
+    ASSERT_EQ(compressor->getCompressorBytesIn(), data.size());
+
+    std::vector<uint8_t> out(1024);
+    auto swOut = compressor->decompressData(
+        compressed, DataRange(out.data(), out.size()), MessageCompressionDirection::kIngress);
+    ASSERT_OK(swOut);
+
+    ASSERT_EQ(compressor->getDecompressorBytesIn(MessageCompressionDirection::kIngress),
+              compressed.size());
+    ASSERT_EQ(compressor->getDecompressorBytesOut(MessageCompressionDirection::kIngress),
+              data.size());
+    ASSERT_EQ(compressor->getDecompressorBytesIn(MessageCompressionDirection::kEgress), 0);
+    ASSERT_EQ(compressor->getDecompressorBytesOut(MessageCompressionDirection::kEgress), 0);
+
+    // A failed call must not move any counter: sum over both directions before and after.
+    const auto compressorInBefore = compressor->getCompressorBytesIn();
+    const auto compressorOutBefore = compressor->getCompressorBytesOut();
+    const auto decompressorInBefore = compressor->getDecompressorBytesIn();
+    const auto decompressorOutBefore = compressor->getDecompressorBytesOut();
+
+    std::array<uint8_t, 2> tooSmall;
+    ASSERT_NOT_OK(compressor->compressData(
+        data, DataRange(tooSmall.data(), tooSmall.size()), MessageCompressionDirection::kEgress));
+
+    ConstDataRange truncated(compressed.data(), compressed.size() / 2);
+    std::vector<uint8_t> scratch(1024);
+    ASSERT_NOT_OK(compressor->decompressData(truncated,
+                                             DataRange(scratch.data(), scratch.size()),
+                                             MessageCompressionDirection::kEgress));
+
+    ASSERT_EQ(compressor->getCompressorBytesIn(), compressorInBefore);
+    ASSERT_EQ(compressor->getCompressorBytesOut(), compressorOutBefore);
+    ASSERT_EQ(compressor->getDecompressorBytesIn(), decompressorInBefore);
+    ASSERT_EQ(compressor->getDecompressorBytesOut(), decompressorOutBefore);
+}
+
 TEST_F(ZlibDecompressTest, ByteCounts) {
-    const auto data = strVec("Hello, MongoDB! Compression hardening test.");
-    uint64_t compressIn = 0;
-    uint64_t compressOut = 0;
-    uint64_t decompressIn = 0;
-    uint64_t decompressOut = 0;
+    MessageCompressorManager manager(MessageCompressionDirection::kIngress, &registry);
+    const auto compressorId = compressor->getId();
+
+    OpMsgBuilder msgBuilder;
+    msgBuilder.setBody(BSON("ping" << 1));
+    Message originalMsg = msgBuilder.finishWithoutSizeChecking();
+    const size_t dataLen = originalMsg.header().dataLen();
+
     for (int i = 0;; ++i) {
-        ASSERT_EQ(compressor->getCompressorBytesIn(), compressIn);
-        ASSERT_EQ(compressor->getCompressorBytesOut(), compressOut);
-        ASSERT_EQ(compressor->getDecompressorBytesIn(), decompressIn);
-        ASSERT_EQ(compressor->getDecompressorBytesOut(), decompressOut);
+        ASSERT_EQ(compressor->getCompressorBytesIn(), dataLen * i);
+        ASSERT_EQ(compressor->getDecompressorBytesOut(), dataLen * i);
+        ASSERT_EQ(compressor->getCompressorBytesOut(), compressor->getDecompressorBytesIn());
         if (i >= 5)
             break;
 
-        std::vector<uint8_t> compressed = doCompress(data);
-        compressIn += data.size();
-        compressOut += compressed.size();
+        auto swCompressed = manager.compressMessage(originalMsg, &compressorId);
+        ASSERT_OK(swCompressed);
+        ASSERT_EQ(compressor->getCompressorBytesIn(MessageCompressionDirection::kIngress),
+                  dataLen * (i + 1));
+        ASSERT_EQ(compressor->getCompressorBytesIn(MessageCompressionDirection::kEgress), 0);
+        const Message compressedMsg = std::move(swCompressed.getValue());
 
-        std::vector<uint8_t> out(data.size() + 100);
-        ASSERT_OK(doDecompress(compressed, out));
-        ASSERT_EQ(out, data);
-        decompressIn += compressed.size();
-        decompressOut += data.size();
+        auto swDecompressed = manager.decompressMessage(compressedMsg);
+        ASSERT_OK(swDecompressed);
+        ASSERT_EQ(compressor->getDecompressorBytesOut(MessageCompressionDirection::kIngress),
+                  dataLen * (i + 1));
+        ASSERT_EQ(compressor->getDecompressorBytesOut(MessageCompressionDirection::kEgress), 0);
     }
+}
+
+TEST_F(ZlibDecompressTest, UncountedManagerDoesNotRecordBytes) {
+    MessageCompressorManager manager(MessageCompressionDirection::kUncounted, &registry);
+    const auto compressorId = compressor->getId();
+
+    OpMsgBuilder msgBuilder;
+    msgBuilder.setBody(BSON("ping" << 1));
+    Message originalMsg = msgBuilder.finishWithoutSizeChecking();
+
+    auto swCompressed = manager.compressMessage(originalMsg, &compressorId);
+    ASSERT_OK(swCompressed);
+    ASSERT_EQ(compressor->getCompressorBytesIn(), 0);
+    ASSERT_EQ(compressor->getCompressorBytesOut(), 0);
+
+    auto swDecompressed = manager.decompressMessage(swCompressed.getValue());
+    ASSERT_OK(swDecompressed);
+    ASSERT_EQ(compressor->getDecompressorBytesIn(), 0);
+    ASSERT_EQ(compressor->getDecompressorBytesOut(), 0);
+}
+
+TEST_F(ZlibDecompressTest, IngressCountsSumAcrossManagers) {
+    MessageCompressorManager ingressManager1(MessageCompressionDirection::kIngress, &registry);
+    MessageCompressorManager ingressManager2(MessageCompressionDirection::kIngress, &registry);
+    MessageCompressorManager egressManager(MessageCompressionDirection::kEgress, &registry);
+    const auto compressorId = compressor->getId();
+
+    OpMsgBuilder msgBuilder;
+    msgBuilder.setBody(BSON("ping" << 1));
+    Message originalMsg = msgBuilder.finishWithoutSizeChecking();
+    const size_t dataLen = originalMsg.header().dataLen();
+
+    auto swIngressCompressed1 = ingressManager1.compressMessage(originalMsg, &compressorId);
+    ASSERT_OK(swIngressCompressed1);
+    auto swIngressCompressed2 = ingressManager2.compressMessage(originalMsg, &compressorId);
+    ASSERT_OK(swIngressCompressed2);
+    auto swEgressCompressed = egressManager.compressMessage(originalMsg, &compressorId);
+    ASSERT_OK(swEgressCompressed);
+
+    // Two ingress managers recorded twice as much as the one egress manager.
+    ASSERT_EQ(compressor->getCompressorBytesIn(MessageCompressionDirection::kIngress), dataLen * 2);
+    ASSERT_EQ(compressor->getCompressorBytesIn(MessageCompressionDirection::kEgress), dataLen);
+    ASSERT_EQ(compressor->getCompressorBytesIn(MessageCompressionDirection::kIngress),
+              2 * compressor->getCompressorBytesIn(MessageCompressionDirection::kEgress));
+    ASSERT_EQ(compressor->getCompressorBytesIn(), dataLen * 3);
+}
+
+TEST_F(ZlibDecompressTest, ManagerBumpsOtelNetworkCompressionCounters) {
+    // Create before recording: on OTel platforms collection starts empty, so the absolute
+    // values read below contain only this test's bumps.
+    otel::metrics::OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        GTEST_SKIP() << "OTel not available";
+    }
+
+    MessageCompressorManager manager(MessageCompressionDirection::kIngress, &registry);
+    const auto compressorId = compressor->getId();
+
+    OpMsgBuilder msgBuilder;
+    msgBuilder.setBody(BSON("ping" << 1));
+    Message originalMsg = msgBuilder.finishWithoutSizeChecking();
+    const size_t dataLen = originalMsg.header().dataLen();
+
+    auto swCompressed = manager.compressMessage(originalMsg, &compressorId);
+    ASSERT_OK(swCompressed);
+    auto swDecompressed = manager.decompressMessage(swCompressed.getValue());
+    ASSERT_OK(swDecompressed);
+
+    const auto zlibBytes = std::make_tuple(std::string_view{"zlib"});
+    ASSERT_EQ(
+        capturer.readInt64Counter(
+            otel::metrics::MetricNames::kNetworkCompressionIngressCompressorBytesIn, zlibBytes),
+        dataLen);
+    ASSERT_EQ(
+        capturer.readInt64Counter(
+            otel::metrics::MetricNames::kNetworkCompressionIngressDecompressorBytesOut, zlibBytes),
+        dataLen);
+    // The compressed size isn't fixed, but both sides of the wire must agree.
+    ASSERT_EQ(
+        capturer.readInt64Counter(
+            otel::metrics::MetricNames::kNetworkCompressionIngressCompressorBytesOut, zlibBytes),
+        capturer.readInt64Counter(
+            otel::metrics::MetricNames::kNetworkCompressionIngressDecompressorBytesIn, zlibBytes));
 }
 
 void checkWrongUncompressedSize(std::unique_ptr<MessageCompressorBase> compressor,
@@ -585,7 +735,7 @@ void checkWrongUncompressedSize(std::unique_ptr<MessageCompressorBase> compresso
     registry.setSupportedCompressors(std::move(compressorList));
     registry.registerImplementation(std::move(compressor));
     ASSERT_OK(registry.finalizeSupportedCompressors());
-    MessageCompressorManager manager(&registry);
+    MessageCompressorManager manager(MessageCompressionDirection::kIngress, &registry);
 
     OpMsgBuilder msgBuilder;
     msgBuilder.setBody(BSON("ping" << 1));

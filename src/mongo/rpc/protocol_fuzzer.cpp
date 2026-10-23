@@ -18,7 +18,7 @@
 namespace mongo {
 
 struct CompressionInfrastructure {
-    CompressionInfrastructure() : manager(&registry) {
+    CompressionInfrastructure() : manager(MessageCompressionDirection::kUncounted, &registry) {
         registry.setSupportedCompressors({"noop", "snappy", "zlib", "zstd"});
         registry.registerImplementation(std::make_unique<NoopMessageCompressor>());
         registry.registerImplementation(std::make_unique<SnappyMessageCompressor>());

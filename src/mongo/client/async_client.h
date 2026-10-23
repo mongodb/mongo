@@ -208,6 +208,7 @@ private:
         : _peer(std::move(peer)),
           _session(std::move(session)),
           _svcCtx(svcCtx),
+          _compressorManager(MessageCompressionDirection::kEgress),
           _reactor(std::move(reactor)) {}
 
     Future<rpc::UniqueReply> _runCommand(

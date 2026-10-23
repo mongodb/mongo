@@ -14,6 +14,35 @@ namespace {
 using namespace std::literals::string_view_literals;
 const auto kBytesIn = "bytesIn"sv;
 const auto kBytesOut = "bytesOut"sv;
+const auto kIngress = "ingress"sv;
+const auto kEgress = "egress"sv;
+const auto kCompressor = "compressor"sv;
+const auto kDecompressor = "decompressor"sv;
+
+void appendBytesSection(BSONObjBuilder& parent,
+                        std::string_view fieldName,
+                        int64_t bytesIn,
+                        int64_t bytesOut) {
+    BSONObjBuilder section(parent.subobjStart(fieldName));
+    section << kBytesIn << bytesIn << kBytesOut << bytesOut;
+    section.doneFast();
+}
+
+void appendDirectionStats(BSONObjBuilder& base,
+                          const MessageCompressorBase& compressor,
+                          MessageCompressionDirection direction,
+                          std::string_view fieldName) {
+    BSONObjBuilder directionSection(base.subobjStart(fieldName));
+    appendBytesSection(directionSection,
+                       kCompressor,
+                       compressor.getCompressorBytesIn(direction),
+                       compressor.getCompressorBytesOut(direction));
+    appendBytesSection(directionSection,
+                       kDecompressor,
+                       compressor.getDecompressorBytesIn(direction),
+                       compressor.getDecompressorBytesOut(direction));
+    directionSection.doneFast();
+}
 }  // namespace
 
 void appendMessageCompressionStats(BSONObjBuilder* b) {
@@ -28,15 +57,17 @@ void appendMessageCompressionStats(BSONObjBuilder* b) {
         auto&& compressor = registry.getCompressor(name);
         BSONObjBuilder base(compressionSection.subobjStart(name));
 
-        BSONObjBuilder compressorSection(base.subobjStart("compressor"));
-        compressorSection << kBytesIn << compressor->getCompressorBytesIn() << kBytesOut
-                          << compressor->getCompressorBytesOut();
-        compressorSection.doneFast();
+        appendBytesSection(base,
+                           kCompressor,
+                           compressor->getCompressorBytesIn(),
+                           compressor->getCompressorBytesOut());
+        appendBytesSection(base,
+                           kDecompressor,
+                           compressor->getDecompressorBytesIn(),
+                           compressor->getDecompressorBytesOut());
 
-        BSONObjBuilder decompressorSection(base.subobjStart("decompressor"));
-        decompressorSection << kBytesIn << compressor->getDecompressorBytesIn() << kBytesOut
-                            << compressor->getDecompressorBytesOut();
-        decompressorSection.doneFast();
+        appendDirectionStats(base, *compressor, MessageCompressionDirection::kIngress, kIngress);
+        appendDirectionStats(base, *compressor, MessageCompressionDirection::kEgress, kEgress);
         base.doneFast();
     }
     compressionSection.doneFast();

@@ -6,24 +6,17 @@
 #include "mongo/base/data_range.h"
 #include "mongo/base/status_with.h"
 #include "mongo/platform/atomic.h"
+#include "mongo/transport/message_compressor_name.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
+#include <array>
+#include <string>
 #include <string_view>
-#include <type_traits>
 
 #include <boost/optional/optional.hpp>
 
 namespace [[MONGO_MOD_PUBLIC]] mongo {
-enum class MessageCompressor : uint8_t {
-    kNoop = 0,
-    kSnappy = 1,
-    kZlib = 2,
-    kZstd = 3,
-    kExtended = 255,
-};
-
-std::string_view getMessageCompressorName(MessageCompressor id);
-using MessageCompressorId = std::underlying_type<MessageCompressor>::type;
 
 class MessageCompressorBase {
     MessageCompressorBase(const MessageCompressorBase&) = delete;
@@ -55,16 +48,24 @@ public:
     /*
      * This method compresses the data in the input ConstDataRange into the output DataRange.
      * It returns the number of bytes actually compressed into the output range, or an error
-     * status.
+     * status. The byte counts are attributed to 'direction', which may be kUncounted for
+     * compression that is not wire-protocol traffic.
      */
-    virtual StatusWith<std::size_t> compressData(ConstDataRange input, DataRange output) = 0;
+    StatusWith<std::size_t> compressData(
+        ConstDataRange input,
+        DataRange output,
+        MessageCompressionDirection direction = MessageCompressionDirection::kUncounted);
 
     /*
      * This method decompresses the data in the input ConstDataRange into the output DataRange.
      * It returns the number of bytes actually decompressed into the output range, or an error
-     * status.
+     * status. The byte counts are attributed to 'direction', which may be kUncounted for
+     * decompression that is not wire-protocol traffic.
      */
-    virtual StatusWith<std::size_t> decompressData(ConstDataRange input, DataRange output) = 0;
+    StatusWith<std::size_t> decompressData(
+        ConstDataRange input,
+        DataRange output,
+        MessageCompressionDirection direction = MessageCompressionDirection::kUncounted);
 
     /*
      * Returns the max uncompressed length of the data in the input ConstDataRange as given by the
@@ -73,33 +74,40 @@ public:
     virtual boost::optional<std::size_t> getMaxDecompressedSize(ConstDataRange input) = 0;
 
     /*
-     * This returns the number of bytes passed in the input for compressData
+     * Returns the number of bytes passed in the input to compressData. With no direction,
+     * returns the total across all counted directions.
      */
-    int64_t getCompressorBytesIn() const {
-        return _compressBytesIn.loadRelaxed();
+    int64_t getCompressorBytesIn(
+        boost::optional<MessageCompressionDirection> direction = boost::none) const {
+        return _sum(_compressBytesIn, direction);
     }
 
     /*
-     * This returns the number of bytes written to output for compressData
+     * Returns the number of bytes written to the output by compressData. With no direction,
+     * returns the total across all counted directions.
      */
-    int64_t getCompressorBytesOut() const {
-        return _compressBytesOut.loadRelaxed();
+    int64_t getCompressorBytesOut(
+        boost::optional<MessageCompressionDirection> direction = boost::none) const {
+        return _sum(_compressBytesOut, direction);
     }
 
     /*
-     * This returns the number of bytes passed in the input for decompressData
+     * Returns the number of bytes passed in the input to decompressData. With no direction,
+     * returns the total across all counted directions.
      */
-    int64_t getDecompressorBytesIn() const {
-        return _decompressBytesIn.loadRelaxed();
+    int64_t getDecompressorBytesIn(
+        boost::optional<MessageCompressionDirection> direction = boost::none) const {
+        return _sum(_decompressBytesIn, direction);
     }
 
     /*
-     * This returns the number of bytes written to output for decompressData
+     * Returns the number of bytes written to the output by decompressData. With no direction,
+     * returns the total across all counted directions.
      */
-    int64_t getDecompressorBytesOut() const {
-        return _decompressBytesOut.loadRelaxed();
+    int64_t getDecompressorBytesOut(
+        boost::optional<MessageCompressionDirection> direction = boost::none) const {
+        return _sum(_decompressBytesOut, direction);
     }
-
 
 protected:
     /*
@@ -110,29 +118,56 @@ protected:
           _name{std::string{getMessageCompressorName(id)}} {}
 
     /*
-     * Called by sub-classes to bump their bytesIn/bytesOut counters for compression
+     * Sub-classes implement the actual (de)compression here; called by the public
+     * compressData/decompressData.
      */
-    void counterHitCompress(int64_t bytesIn, int64_t bytesOut) {
-        _compressBytesIn.addAndFetch(bytesIn);
-        _compressBytesOut.addAndFetch(bytesOut);
+    virtual StatusWith<std::size_t> doCompressData(ConstDataRange input, DataRange output) = 0;
+    virtual StatusWith<std::size_t> doDecompressData(ConstDataRange input, DataRange output) = 0;
+
+private:
+    using DirectionCounters = std::array<Atomic<long long>, kNumCountedCompressionDirections>;
+
+    /*
+     * Bumps the compress byte counters for one compression.
+     */
+    void _counterHitCompress(MessageCompressionDirection direction,
+                             int64_t bytesIn,
+                             int64_t bytesOut) {
+        _compressBytesIn[size_t(direction)].addAndFetch(bytesIn);
+        _compressBytesOut[size_t(direction)].addAndFetch(bytesOut);
     }
 
     /*
-     * Called by sub-classes to bump their bytesIn/bytesOut counters for decompression
+     * Bumps the decompress byte counters for one decompression.
      */
-    void counterHitDecompress(int64_t bytesIn, int64_t bytesOut) {
-        _decompressBytesIn.addAndFetch(bytesIn);
-        _decompressBytesOut.addAndFetch(bytesOut);
+    void _counterHitDecompress(MessageCompressionDirection direction,
+                               int64_t bytesIn,
+                               int64_t bytesOut) {
+        _decompressBytesIn[size_t(direction)].addAndFetch(bytesIn);
+        _decompressBytesOut[size_t(direction)].addAndFetch(bytesOut);
     }
 
-private:
+    int64_t _sum(const DirectionCounters& counters,
+                 boost::optional<MessageCompressionDirection> direction) const {
+        if (direction) {
+            invariant(size_t(*direction) < kNumCountedCompressionDirections);
+            return counters[size_t(*direction)].loadRelaxed();
+        }
+        int64_t total = 0;
+        for (auto&& c : counters) {
+            total += c.loadRelaxed();
+        }
+        return total;
+    }
+
     const MessageCompressorId _id;
     const std::string _name;
 
-    Atomic<long long> _compressBytesIn;
-    Atomic<long long> _compressBytesOut;
+    // All four counter arrays are indexed by MessageCompressionDirection.
+    DirectionCounters _compressBytesIn;
+    DirectionCounters _compressBytesOut;
 
-    Atomic<long long> _decompressBytesIn;
-    Atomic<long long> _decompressBytesOut;
+    DirectionCounters _decompressBytesIn;
+    DirectionCounters _decompressBytesOut;
 };
 }  // namespace mongo

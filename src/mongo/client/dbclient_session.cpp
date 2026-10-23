@@ -504,6 +504,7 @@ DBClientSession::DBClientSession(bool autoReconnect,
       _autoReconnect(autoReconnect),
       _rpcLocalTimingTickSource(globalSystemTickSource()),
       _hook(hook),
+      _compressorManager(MessageCompressionDirection::kEgress),
       _uri(std::move(uri)) {}
 
 std::pair<rpc::UniqueReply, DBClientBase*> DBClientSession::runCommandWithTarget(

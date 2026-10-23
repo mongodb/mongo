@@ -26,8 +26,8 @@ std::size_t ZstdMessageCompressor::getMaxCompressedSize(size_t inputSize) {
     return ZSTD_compressBound(inputSize);
 }
 
-StatusWith<std::size_t> ZstdMessageCompressor::compressData(ConstDataRange input,
-                                                            DataRange output) {
+StatusWith<std::size_t> ZstdMessageCompressor::doCompressData(ConstDataRange input,
+                                                              DataRange output) {
     size_t ret = ZSTD_compress(const_cast<char*>(output.data()),
                                output.length(),
                                input.data(),
@@ -38,12 +38,11 @@ StatusWith<std::size_t> ZstdMessageCompressor::compressData(ConstDataRange input
         return Status{ErrorCodes::BadValue,
                       str::stream() << "Could not compress input: " << ZSTD_getErrorName(ret)};
     }
-    counterHitCompress(input.length(), ret);
     return {ret};
 }
 
-StatusWith<std::size_t> ZstdMessageCompressor::decompressData(ConstDataRange input,
-                                                              DataRange output) {
+StatusWith<std::size_t> ZstdMessageCompressor::doDecompressData(ConstDataRange input,
+                                                                DataRange output) {
     size_t ret = ZSTD_decompress(
         const_cast<char*>(output.data()), output.length(), input.data(), input.length());
 
@@ -52,7 +51,6 @@ StatusWith<std::size_t> ZstdMessageCompressor::decompressData(ConstDataRange inp
                       str::stream() << "Could not decompress message: " << ZSTD_getErrorName(ret)};
     }
 
-    counterHitDecompress(input.length(), ret);
     return {ret};
 }
 

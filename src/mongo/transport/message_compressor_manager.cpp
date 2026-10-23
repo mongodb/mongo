@@ -32,15 +32,18 @@
 
 namespace mongo {
 namespace {
-const transport::Session::Decoration<MessageCompressorManager> getForSession =
-    transport::Session::declareDecoration<MessageCompressorManager>();
+
+const transport::Session::Decoration<boost::optional<MessageCompressorManager>> getForSession =
+    transport::Session::declareDecoration<boost::optional<MessageCompressorManager>>();
+
 }  // namespace
 
-MessageCompressorManager::MessageCompressorManager()
-    : MessageCompressorManager(&MessageCompressorRegistry::get()) {}
+MessageCompressorManager::MessageCompressorManager(MessageCompressionDirection direction)
+    : MessageCompressorManager(direction, &MessageCompressorRegistry::get()) {}
 
-MessageCompressorManager::MessageCompressorManager(MessageCompressorRegistry* factory)
-    : _registry{factory} {}
+MessageCompressorManager::MessageCompressorManager(MessageCompressionDirection direction,
+                                                   MessageCompressorRegistry* factory)
+    : _registry{factory}, _direction{direction} {}
 
 StatusWith<Message> MessageCompressorManager::compressMessage(
     const Message& msg, const MessageCompressorId* compressorId) {
@@ -85,7 +88,7 @@ StatusWith<Message> MessageCompressorManager::compressMessage(
     compressionHeader.serialize(&output);
     ConstDataRange input(inputHeader.data(), inputHeader.data() + inputHeader.dataLen());
 
-    auto sws = compressor->compressData(input, output);
+    auto sws = compressor->compressData(input, output, _direction);
 
     if (!sws.isOK())
         return sws.getStatus();
@@ -146,7 +149,7 @@ StatusWith<Message> MessageCompressorManager::decompressMessage(const Message& m
 
     DataRangeCursor output(outMessage.data(), outMessage.data() + outMessage.dataLen());
 
-    auto sws = compressor->decompressData(input, output);
+    auto sws = compressor->decompressData(input, output, _direction);
 
     if (!sws.isOK())
         return sws.getStatus();
@@ -268,7 +271,13 @@ const std::vector<MessageCompressorBase*>& MessageCompressorManager::getNegotiat
 
 MessageCompressorManager& MessageCompressorManager::forSession(
     const std::shared_ptr<transport::Session>& session) {
-    return getForSession(session.get());
+    // Decorations are default-constructed, so emplace on first use; race-free because a
+    // session's messages are processed one at a time. Sessions are always ingress.
+    auto& manager = getForSession(session.get());
+    if (!manager) {
+        manager.emplace(MessageCompressionDirection::kIngress);
+    }
+    return *manager;
 }
 
 }  // namespace mongo

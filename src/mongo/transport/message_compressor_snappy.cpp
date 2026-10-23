@@ -33,20 +33,19 @@ boost::optional<std::size_t> SnappyMessageCompressor::getMaxDecompressedSize(Con
     return boost::none;
 }
 
-StatusWith<std::size_t> SnappyMessageCompressor::compressData(ConstDataRange input,
-                                                              DataRange output) {
+StatusWith<std::size_t> SnappyMessageCompressor::doCompressData(ConstDataRange input,
+                                                                DataRange output) {
     size_t outLength = output.length();
     if (output.length() < getMaxCompressedSize(input.length())) {
         return {ErrorCodes::BadValue, "Output too small for max size of compressed input"};
     }
     snappy::RawCompress(input.data(), input.length(), const_cast<char*>(output.data()), &outLength);
 
-    counterHitCompress(input.length(), outLength);
     return {outLength};
 }
 
-StatusWith<std::size_t> SnappyMessageCompressor::decompressData(ConstDataRange input,
-                                                                DataRange output) {
+StatusWith<std::size_t> SnappyMessageCompressor::doDecompressData(ConstDataRange input,
+                                                                  DataRange output) {
     size_t expectedLength = 0;
     if (!snappy::GetUncompressedLength(input.data(), input.length(), &expectedLength) ||
         expectedLength != output.length()) {
@@ -57,7 +56,6 @@ StatusWith<std::size_t> SnappyMessageCompressor::decompressData(ConstDataRange i
         return Status{ErrorCodes::BadValue, "Compressed message was invalid or corrupted"};
     }
 
-    counterHitDecompress(input.length(), output.length());
     return output.length();
 }
 

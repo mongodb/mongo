@@ -142,6 +142,46 @@ TEST(NetworkCounterOtelTest, SlowSSLOperationsAreExported) {
     EXPECT_EQ(2, capturer.readInt64Counter(MetricNames::kNetworkNumSlowSSLOperations));
 }
 
+TEST(NetworkCounterOtelTest, CompressedCountersAreExportedWithCompressorAttribute) {
+    OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        GTEST_SKIP() << "OTel not available";
+    }
+
+    NetworkCounter nc;
+
+    nc.hitCompressor(NetworkCounter::ConnectionType::kIngress, "snappy", 100, 60);
+    nc.hitCompressor(NetworkCounter::ConnectionType::kIngress, "snappy", 50, 30);
+    nc.hitDecompressor(NetworkCounter::ConnectionType::kIngress, "snappy", 60, 100);
+    nc.hitCompressor(NetworkCounter::ConnectionType::kEgress, "zstd", 30, 25);
+    nc.hitDecompressor(NetworkCounter::ConnectionType::kEgress, "zstd", 25, 30);
+
+    EXPECT_EQ(150,
+              capturer.readInt64Counter(MetricNames::kNetworkCompressionIngressCompressorBytesIn,
+                                        std::make_tuple(std::string_view{"snappy"})));
+    EXPECT_EQ(90,
+              capturer.readInt64Counter(MetricNames::kNetworkCompressionIngressCompressorBytesOut,
+                                        std::make_tuple(std::string_view{"snappy"})));
+    EXPECT_EQ(60,
+              capturer.readInt64Counter(MetricNames::kNetworkCompressionIngressDecompressorBytesIn,
+                                        std::make_tuple(std::string_view{"snappy"})));
+    EXPECT_EQ(100,
+              capturer.readInt64Counter(MetricNames::kNetworkCompressionIngressDecompressorBytesOut,
+                                        std::make_tuple(std::string_view{"snappy"})));
+    EXPECT_EQ(30,
+              capturer.readInt64Counter(MetricNames::kNetworkCompressionEgressCompressorBytesIn,
+                                        std::make_tuple(std::string_view{"zstd"})));
+    EXPECT_EQ(25,
+              capturer.readInt64Counter(MetricNames::kNetworkCompressionEgressCompressorBytesOut,
+                                        std::make_tuple(std::string_view{"zstd"})));
+    EXPECT_EQ(25,
+              capturer.readInt64Counter(MetricNames::kNetworkCompressionEgressDecompressorBytesIn,
+                                        std::make_tuple(std::string_view{"zstd"})));
+    EXPECT_EQ(30,
+              capturer.readInt64Counter(MetricNames::kNetworkCompressionEgressDecompressorBytesOut,
+                                        std::make_tuple(std::string_view{"zstd"})));
+}
+
 TEST(NetworkCounterBsonTest, IngressBytesInAndNumRequests) {
     NetworkCounter nc;
 

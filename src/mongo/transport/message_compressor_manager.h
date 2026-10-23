@@ -31,15 +31,16 @@ class [[MONGO_MOD_PUBLIC]] MessageCompressorManager {
 
 public:
     /*
-     * Default constructor. Uses the global MessageCompressorRegistry.
+     * Constructs a manager that resolves compressor implementations against the global
+     * MessageCompressorRegistry.
      */
-    MessageCompressorManager();
+    explicit MessageCompressorManager(MessageCompressionDirection direction);
 
     /*
-     * Constructs a manager from a specific MessageCompressorRegistry - used by the unit tests
-     * to test various registry configurations.
+     * Same as above, but resolves compressors against a specific MessageCompressorRegistry.
      */
-    explicit MessageCompressorManager(MessageCompressorRegistry* factory);
+    MessageCompressorManager(MessageCompressionDirection direction,
+                             MessageCompressorRegistry* factory);
 
     MessageCompressorManager(MessageCompressorManager&&) = default;
     MessageCompressorManager& operator=(MessageCompressorManager&&) = default;
@@ -112,6 +113,7 @@ public:
 private:
     std::vector<MessageCompressorBase*> _negotiated;
     MessageCompressorRegistry* _registry;
+    MessageCompressionDirection _direction;
 };
 
 }  // namespace mongo

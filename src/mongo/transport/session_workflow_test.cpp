@@ -1006,7 +1006,7 @@ public:
     }
 
     auto compressMessage(Message message) -> Message {
-        MessageCompressorManager compressorManager{};
+        MessageCompressorManager compressorManager(MessageCompressionDirection::kUncounted);
         const auto cid = static_cast<MessageCompressorId>(MessageCompressor::kSnappy);
         return uassertStatusOK(compressorManager.compressMessage(message, &cid));
     }

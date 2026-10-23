@@ -19,17 +19,16 @@ public:
         return boost::none;
     }
 
-    StatusWith<std::size_t> compressData(ConstDataRange input, DataRange output) override try {
+protected:
+    StatusWith<std::size_t> doCompressData(ConstDataRange input, DataRange output) override try {
         output.write(input);
-        counterHitCompress(input.length(), input.length());
         return {input.length()};
     } catch (const DBException& e) {
         return e.toStatus();
     }
 
-    StatusWith<std::size_t> decompressData(ConstDataRange input, DataRange output) override try {
+    StatusWith<std::size_t> doDecompressData(ConstDataRange input, DataRange output) override try {
         output.write(input);
-        counterHitDecompress(input.length(), input.length());
         return {input.length()};
     } catch (const DBException& e) {
         return e.toStatus();

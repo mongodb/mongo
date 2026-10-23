@@ -230,7 +230,8 @@ public:
                 !_lastExhaustRequestId ||
                     response.header().getResponseToMsgId() == _lastExhaustRequestId);
         if (response.operation() == dbCompressed) {
-            MessageCompressorManager compressorManager;
+            // Bridge decompressions are neither ingress nor egress traffic of this process.
+            MessageCompressorManager compressorManager(MessageCompressionDirection::kUncounted);
             response = uassertStatusOK(compressorManager.decompressMessage(response));
         }
         _inExhaust = OpMsg::isFlagSet(response, OpMsg::kMoreToCome);

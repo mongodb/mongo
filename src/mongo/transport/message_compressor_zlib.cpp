@@ -30,8 +30,8 @@ boost::optional<std::size_t> ZlibMessageCompressor::getMaxDecompressedSize(Const
     return boost::none;
 }
 
-StatusWith<std::size_t> ZlibMessageCompressor::compressData(ConstDataRange input,
-                                                            DataRange output) {
+StatusWith<std::size_t> ZlibMessageCompressor::doCompressData(ConstDataRange input,
+                                                              DataRange output) {
     size_t outLength = output.length();
     int ret = ::compress2(const_cast<Bytef*>(reinterpret_cast<const Bytef*>(output.data())),
                           reinterpret_cast<uLongf*>(&outLength),
@@ -42,12 +42,11 @@ StatusWith<std::size_t> ZlibMessageCompressor::compressData(ConstDataRange input
     if (ret != Z_OK) {
         return Status{ErrorCodes::BadValue, "Could not compress input"};
     }
-    counterHitCompress(input.length(), outLength);
     return {outLength};
 }
 
-StatusWith<std::size_t> ZlibMessageCompressor::decompressData(ConstDataRange input,
-                                                              DataRange output) {
+StatusWith<std::size_t> ZlibMessageCompressor::doDecompressData(ConstDataRange input,
+                                                                DataRange output) {
     if (input.length() < 8)  // header + minimal data + checksum
         return Status{ErrorCodes::BadValue, "Compressed data too small"};
     // Per RFC1950, validate first two bytes: CMF, FLG.
@@ -73,7 +72,6 @@ StatusWith<std::size_t> ZlibMessageCompressor::decompressData(ConstDataRange inp
         return Status{ErrorCodes::BadValue, "Compressed message was invalid or corrupted"};
     }
 
-    counterHitDecompress(input.length(), length);
     return {length};
 }
 

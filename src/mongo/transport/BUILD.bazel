@@ -195,9 +195,20 @@ idl_generator(
     src = "session_manager_common.idl",
 )
 
+# Header-only; split out from :message_compressor so //src/mongo/db/stats:counters can name the
+# compressors without the dependency cycle that :message_compressor would create.
+mongo_cc_library(
+    name = "message_compressor_name",
+    hdrs = ["message_compressor_name.h"],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
 mongo_cc_library(
     name = "message_compressor",
     srcs = [
+        "message_compressor_base.cpp",
         "message_compressor_manager.cpp",
         "message_compressor_metrics.cpp",
         "message_compressor_registry.cpp",
@@ -206,7 +217,9 @@ mongo_cc_library(
         "message_compressor_zstd.cpp",
     ],
     deps = [
+        ":message_compressor_name",
         "//src/mongo:base",
+        "//src/mongo/db/stats:counters",
         "//src/mongo/rpc:message",
         "//src/mongo/util/options_parser",
         "//src/third_party/snappy",

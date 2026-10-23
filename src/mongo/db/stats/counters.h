@@ -67,6 +67,16 @@ public:
                        ConnectionPurpose connectionPurpose = ConnectionPurpose::kDefault,
                        boost::optional<int64_t> replicationId = boost::none);
 
+    // Byte counters for wire-protocol message compression, by compressor algorithm.
+    void hitCompressor(ConnectionType connectionType,
+                       std::string_view compressor,
+                       long long logicalBytesIn,
+                       long long physicalBytesOut);
+    void hitDecompressor(ConnectionType connectionType,
+                         std::string_view compressor,
+                         long long physicalBytesIn,
+                         long long logicalBytesOut);
+
     // Increment the counter for the number of slow dns resolution operations.
     void incrementNumSlowDNSOperations();
 
@@ -115,6 +125,16 @@ private:
 
     otel::metrics::Counter<int64_t>& _numSlowDNSOperations;
     otel::metrics::Counter<int64_t>& _numSlowSSLOperations;
+
+    // Attributed by compressor algorithm.
+    otel::metrics::Counter<int64_t, std::string_view>& _ingressCompressorBytesIn;
+    otel::metrics::Counter<int64_t, std::string_view>& _ingressCompressorBytesOut;
+    otel::metrics::Counter<int64_t, std::string_view>& _ingressDecompressorBytesIn;
+    otel::metrics::Counter<int64_t, std::string_view>& _ingressDecompressorBytesOut;
+    otel::metrics::Counter<int64_t, std::string_view>& _egressCompressorBytesIn;
+    otel::metrics::Counter<int64_t, std::string_view>& _egressCompressorBytesOut;
+    otel::metrics::Counter<int64_t, std::string_view>& _egressDecompressorBytesIn;
+    otel::metrics::Counter<int64_t, std::string_view>& _egressDecompressorBytesOut;
 
     // Counter of inbound connections at runtime.
     // TODO SERVER-127423: Replace this with an OTel-exported counter.

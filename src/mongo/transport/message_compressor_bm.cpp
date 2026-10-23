@@ -87,7 +87,8 @@ void setCompressor(MessageCompressorRegistry& registry,
 
 void runCompressBM(benchmark::State& state, std::unique_ptr<MessageCompressorBase> compressorType) {
     MessageCompressorRegistry registry;
-    MessageCompressorManager manager(&registry);
+    // kUncounted keeps counting out of the measured path.
+    MessageCompressorManager manager(MessageCompressionDirection::kUncounted, &registry);
 
     auto compId = compressorType->getId();
     setCompressor(registry, std::move(compressorType));
@@ -105,7 +106,8 @@ void runCompressBM(benchmark::State& state, std::unique_ptr<MessageCompressorBas
 void runDecompressBM(benchmark::State& state,
                      std::unique_ptr<MessageCompressorBase> compressorType) {
     MessageCompressorRegistry registry;
-    MessageCompressorManager manager(&registry);
+    // kUncounted keeps counting out of the measured path.
+    MessageCompressorManager manager(MessageCompressionDirection::kUncounted, &registry);
 
     auto compId = compressorType->getId();
     setCompressor(registry, std::move(compressorType));
