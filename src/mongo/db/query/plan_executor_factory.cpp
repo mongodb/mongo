@@ -171,8 +171,6 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
     std::unique_ptr<RemoteExplainVector> remoteExplains,
     boost::optional<size_t> cachedPlanHash,
     boost::optional<PlanSelectionStrategy> planSelectionStrategy) {
-    const bool usedJoinOpt = planSelectionStrategy == PlanSelectionStrategy::kJoinOptimization ||
-        planSelectionStrategy == PlanSelectionStrategy::kJoinCachedPlan;
     sbe::DebugPrintInfo debugPrintInfo{};
     LOGV2_DEBUG(4822861,
                 5,
@@ -192,7 +190,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(
                                 std::move(remoteExplains),
                                 /*classicRuntimePlannerStage=*/nullptr,
                                 collections,
-                                usedJoinOpt,
+                                /*usedJoinOpt=*/false,
                                 /*rejectedJoinPlans=*/{},
                                 /*maybeExplainData=*/boost::none,
                                 planSelectionStrategy),

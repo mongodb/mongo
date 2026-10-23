@@ -58,8 +58,7 @@ std::unique_ptr<JoinPlanCacheEntry> makeCacheEntry() {
     return std::make_unique<JoinPlanCacheEntry>(nullptr,
                                                 join_ordering::NodeId{0},
                                                 std::vector<CollectionTag>{},
-                                                std::vector<NodeFingerprint>{},
-                                                JoinPlanBaseline{});
+                                                std::vector<NodeFingerprint>{});
 }
 
 NamespaceString adminCollectionlessNss() {

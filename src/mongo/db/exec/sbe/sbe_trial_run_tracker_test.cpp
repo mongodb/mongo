@@ -677,16 +677,4 @@ TEST_F(TrialRunTrackerTest, DisallowedSpillFromMarkedHashJoinTerminatesTrial) {
         DBException,
         ErrorCodes::QueryTrialRunCompleted);
 }
-
-TEST(TrialRunTrackerUncappedTest, RecordsEveryMetricWithoutEndingTheTrial) {
-    auto tracker = TrialRunTracker::makeUncapped();
-    ASSERT_FALSE(tracker->trackProgress<TrialRunTracker::kNumResults>(1000000));
-    ASSERT_FALSE(tracker->trackProgress<TrialRunTracker::kNumReads>(1000000));
-    ASSERT_FALSE(tracker->trackProgress<TrialRunTracker::kNumIntermediateRows>(1000000));
-    ASSERT_FALSE(tracker->trackProgress<TrialRunTracker::kNumSpills>(1000000));
-    ASSERT_EQ(tracker->getMetric<TrialRunTracker::kNumResults>(), 1000000);
-    ASSERT_EQ(tracker->getMetric<TrialRunTracker::kNumReads>(), 1000000);
-    ASSERT_EQ(tracker->getMetric<TrialRunTracker::kNumIntermediateRows>(), 1000000);
-    ASSERT_EQ(tracker->getMetric<TrialRunTracker::kNumSpills>(), 1000000);
-}
 }  // namespace mongo::sbe

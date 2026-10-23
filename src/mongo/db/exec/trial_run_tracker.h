@@ -8,8 +8,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
-#include <limits>
-#include <memory>
 #include <type_traits>
 
 #include <boost/optional/optional.hpp>
@@ -55,14 +53,6 @@ public:
                     boost::optional<size_t> maxNumIntermediateRows,
                     boost::optional<size_t> maxNumSpills)
         : _maxMetrics{maxNumResults, maxNumReads, maxNumIntermediateRows, maxNumSpills} {}
-
-    /**
-     * Makes a tracker that records every metric but never ends the trial.
-     */
-    static std::unique_ptr<TrialRunTracker> makeUncapped() {
-        constexpr auto kUncapped = std::numeric_limits<size_t>::max();
-        return std::make_unique<TrialRunTracker>(kUncapped, kUncapped, kUncapped, kUncapped);
-    }
 
     /**
      * Constructs a 'TrialRunTracker' that also has an '_onMetricReached' function, which gets

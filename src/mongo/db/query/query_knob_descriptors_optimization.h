@@ -230,14 +230,6 @@ inline Atomic<bool>& gKnobNoTableScan = storageGlobalParams.noTableScan;
          kInternalEnableJoinPlanCacheName,                                                \
          internalEnableJoinPlanCache,                                                     \
          getEnableJoinPlanCache)                                                          \
-    KNOB(kJoinPlanCacheTrialWindow, \
-         kInternalQueryJoinPlanCacheTrialWindowName, \
-         internalQueryJoinPlanCacheTrialWindow, \
-         getJoinPlanCacheTrialWindow) \
-    KNOB(kJoinPlanCacheMaxReadsAndIntermediateRows, \
-         kInternalQueryJoinPlanCacheMaxReadsAndIntermediateRowsName, \
-         internalQueryJoinPlanCacheMaxReadsAndIntermediateRows, \
-         getJoinPlanCacheMaxReadsAndIntermediateRows) \
     /* Sampling / cardinality estimation */                                               \
     KNOB(kSamplingMarginOfError,                                                          \
          kSamplingMarginOfErrorName,                                                      \

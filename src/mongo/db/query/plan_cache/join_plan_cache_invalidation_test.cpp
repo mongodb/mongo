@@ -71,11 +71,8 @@ TEST_F(JoinPlanCacheInvalidationTest, MakeCollectionTagsCapturesCurrentTags) {
     ASSERT_EQ(liveTag.collectionVersion, tags[0].versionTag.collectionVersion);
     ASSERT_EQ(0, tags[0].versionTag.sampleVersion);
 
-    auto entry = std::make_unique<JoinPlanCacheEntry>(nullptr,
-                                                      join_ordering::NodeId{0},
-                                                      tags,
-                                                      std::vector<NodeFingerprint>{},
-                                                      JoinPlanBaseline{});
+    auto entry = std::make_unique<JoinPlanCacheEntry>(
+        nullptr, join_ordering::NodeId{0}, tags, std::vector<NodeFingerprint>{});
     auto entryTags = entry->getCollectionTags();
     ASSERT_EQ(1, entryTags.size());
     ASSERT_EQ(coll.uuid(), entryTags[0].uuid);
@@ -88,11 +85,8 @@ TEST_F(JoinPlanCacheInvalidationTest, RefreshCollectionTagsAdoptsTheCurrentColle
     auto coll = createAndAcquireCollection(nss);
     MultipleCollectionAccessor mca(coll);
 
-    auto entry = std::make_unique<JoinPlanCacheEntry>(nullptr,
-                                                      join_ordering::NodeId{0},
-                                                      makeCollectionTags(mca),
-                                                      std::vector<NodeFingerprint>{},
-                                                      JoinPlanBaseline{});
+    auto entry = std::make_unique<JoinPlanCacheEntry>(
+        nullptr, join_ordering::NodeId{0}, makeCollectionTags(mca), std::vector<NodeFingerprint>{});
     const auto baseVersion = entry->getCollectionTags()[0].versionTag.collectionVersion;
 
     bumpCatalogVersion(coll);
@@ -109,28 +103,6 @@ TEST_F(JoinPlanCacheInvalidationTest, RefreshCollectionTagsAdoptsTheCurrentColle
               classifyCollectionTags(entry->getCollectionTags(), mca).status);
 }
 
-TEST_F(JoinPlanCacheInvalidationTest, RefreshCollectionTagsKeepsTheBaseline) {
-    auto nss = NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
-    auto coll = createAndAcquireCollection(nss);
-    MultipleCollectionAccessor mca(coll);
-
-    const JoinPlanBaseline baseline{
-        .numReads = 11, .numIntermediateRows = 22, .spilled = true, .numResults = 101};
-    auto entry = std::make_unique<JoinPlanCacheEntry>(nullptr,
-                                                      join_ordering::NodeId{0},
-                                                      makeCollectionTags(mca),
-                                                      std::vector<NodeFingerprint>{},
-                                                      baseline);
-
-    // A revalidated entry is still compared against the baseline from its first execution.
-    bumpCatalogVersion(coll);
-    entry->refreshCollectionTags(makeCollectionTags(mca));
-
-    ASSERT_EQ(CollectionTagStatus::kCurrent,
-              classifyCollectionTags(entry->getCollectionTags(), mca).status);
-    ASSERT_BSONOBJ_EQ(baseline.toBSON(), entry->baseline.toBSON());
-}
-
 DEATH_TEST_F(
     JoinPlanCacheInvalidationDeathTest,
     RefreshCollectionTagsRejectsADifferentCollectionCount,
@@ -139,11 +111,8 @@ DEATH_TEST_F(
     auto coll = createAndAcquireCollection(nss);
     MultipleCollectionAccessor mca(coll);
 
-    auto entry = std::make_unique<JoinPlanCacheEntry>(nullptr,
-                                                      join_ordering::NodeId{0},
-                                                      makeCollectionTags(mca),
-                                                      std::vector<NodeFingerprint>{},
-                                                      JoinPlanBaseline{});
+    auto entry = std::make_unique<JoinPlanCacheEntry>(
+        nullptr, join_ordering::NodeId{0}, makeCollectionTags(mca), std::vector<NodeFingerprint>{});
 
     // A refresh covering a different number of collections would mean the tags were snapshotted
     // from a different join graph than the one this entry was cached for.
@@ -160,8 +129,7 @@ TEST_F(JoinPlanCacheInvalidationTest, RefreshCollectionTagsNeverMovesAVersionBac
         join_ordering::NodeId{0},
         std::vector<CollectionTag>{
             CollectionTag{uuid, CollectionVersionTag{.collectionVersion = 1, .sampleVersion = 0}}},
-        std::vector<NodeFingerprint>{},
-        JoinPlanBaseline{});
+        std::vector<NodeFingerprint>{});
 
     entry->refreshCollectionTags(std::vector<CollectionTag>{
         CollectionTag{uuid, CollectionVersionTag{.collectionVersion = 6, .sampleVersion = 0}}});
@@ -184,11 +152,8 @@ TEST_F(JoinPlanCacheInvalidationTest, RefreshCollectionTagsPairsUpTagsByUuid) {
         CollectionTag{secondUuid,
                       CollectionVersionTag{.collectionVersion = 2, .sampleVersion = 0}}};
 
-    auto entry = std::make_unique<JoinPlanCacheEntry>(nullptr,
-                                                      join_ordering::NodeId{0},
-                                                      cachedTags,
-                                                      std::vector<NodeFingerprint>{},
-                                                      JoinPlanBaseline{});
+    auto entry = std::make_unique<JoinPlanCacheEntry>(
+        nullptr, join_ordering::NodeId{0}, cachedTags, std::vector<NodeFingerprint>{});
 
     // The same two collections, reversed, each with a bumped version.
     std::vector<CollectionTag> refreshedTags{
@@ -217,11 +182,8 @@ DEATH_TEST_F(JoinPlanCacheInvalidationDeathTest,
     auto coll = createAndAcquireCollection(nss);
     MultipleCollectionAccessor mca(coll);
 
-    auto entry = std::make_unique<JoinPlanCacheEntry>(nullptr,
-                                                      join_ordering::NodeId{0},
-                                                      makeCollectionTags(mca),
-                                                      std::vector<NodeFingerprint>{},
-                                                      JoinPlanBaseline{});
+    auto entry = std::make_unique<JoinPlanCacheEntry>(
+        nullptr, join_ordering::NodeId{0}, makeCollectionTags(mca), std::vector<NodeFingerprint>{});
 
     // Right number of tags, wrong collection: with nothing to pair the incoming tag up with, the
     // versions of one collection must never end up recorded against another.

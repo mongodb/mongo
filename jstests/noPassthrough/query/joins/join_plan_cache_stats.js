@@ -79,7 +79,7 @@ function redactEntry(entry) {
 
 // Asserts that 'entry' has the expected shape of a join plan cache entry.
 function assertIsJoinPlanCacheEntry(entry) {
-    for (const field of ["planCacheKey", "estimatedSizeBytes", "collections", "plan", "baseline"]) {
+    for (const field of ["planCacheKey", "estimatedSizeBytes", "collections", "plan"]) {
         assert(entry.hasOwnProperty(field), `entry missing '${field}'`, {entry});
     }
     assert.eq(typeof entry.planCacheKey, "string", {entry});
@@ -216,12 +216,6 @@ describe("$joinPlanCacheStats output shape", function () {
             `[
 	{
 		"baseNode" : 0,
-		"baseline" : {
-			"numIntermediateRows" : NumberLong(3),
-			"numReads" : NumberLong(6),
-			"numResults" : NumberLong(3),
-			"spilled" : false
-		},
 		"collections" : [
 			{
 				"collectionVersion" : NumberLong(2),

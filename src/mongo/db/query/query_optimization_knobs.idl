@@ -1540,38 +1540,6 @@ server_parameters:
             query_knob:
                 wire_name: enableJoinPlanCache
 
-    internalQueryJoinPlanCacheTrialWindow:
-        description: >-
-            Number of documents the winning join plan is driven to produce when establishing its
-            execution-statistics baseline for the join plan cache.
-        set_at: [startup, runtime]
-        cpp_varname: "internalQueryJoinPlanCacheTrialWindow"
-        cpp_vartype: Atomic<int>
-        default: 101
-        validator:
-            gt: 0
-        redact: false
-        annotations:
-            query_knob:
-                wire_name: joinPlanCacheTrialWindow
-
-    internalQueryJoinPlanCacheMaxReadsAndIntermediateRows:
-        description: >-
-            Maximum observed work (storage engine reads plus intermediate results produced by join
-            operators) for a winning plan to be cached in the join plan cache. A plan whose first
-            execution exceeds this is never cached.
-        set_at: [startup, runtime]
-        cpp_varname: "internalQueryJoinPlanCacheMaxReadsAndIntermediateRows"
-        cpp_vartype: Atomic<long long>
-        # TODO(SERVER-136738) : calibrate this default with replanning.
-        default: 10000000
-        validator:
-            gte: 0
-        redact: false
-        annotations:
-            query_knob:
-                wire_name: joinPlanCacheMaxReadsAndIntermediateRows
-
     internalQueryJoinPlanCacheSize:
         # Marked as public as this knob cannot be accessed via the QueryKnobConfiguration framework.
         # It is accessed only during startup during global initialization of the server at which
