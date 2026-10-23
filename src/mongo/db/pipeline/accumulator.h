@@ -253,6 +253,10 @@ public:
     explicit AccumulatorInternalConstructStats(ExpressionContext* expCtx,
                                                InternalConstructStatsAccumulatorParams);
 
+    Document serialize(boost::intrusive_ptr<Expression> initializer,
+                       boost::intrusive_ptr<Expression> argument,
+                       const query_shape::SerializationOptions& options) const final;
+
     void processInternal(const Value& input, bool merging) final;
     Value getValue(bool toBeMerged) final;
     void reset() final;

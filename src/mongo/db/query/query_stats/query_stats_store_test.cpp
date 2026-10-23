@@ -1956,6 +1956,129 @@ TEST_F(QueryStatsStoreTest, AggKeyWithInternalOnlyExpressionIsSerializableByExte
         shapified);
 }
 
+TEST_F(QueryStatsStoreTest, AggKeyWithInternalConstructStatsIsSerializableByExternalClient) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>(kDefaultTestNss.nss());
+    AggregateCommandRequest acr(kDefaultTestNss.nss());
+    auto rawPipeline = {fromjson(R"({
+            $group: {
+                _id: "$a",
+                statistics: {
+                    $_internalConstructStats: {
+                        val: "$$ROOT",
+                        sampleRate: 1.0,
+                        numberBuckets: 10
+                    }
+                }
+            }
+        })")};
+    acr.setPipeline(rawPipeline);
+    auto pipeline =
+        pipeline_factory::makePipeline(rawPipeline, expCtx, pipeline_factory::kOptionsMinimal);
+
+    auto aggShape = std::make_unique<query_shape::AggCmdShape>(
+        acr, acr.getNamespace(), pipeline->getInvolvedCollections(), *pipeline, expCtx);
+
+    // Assert the stored form explicitly, so the shape that gets re-parsed below is pinned down.
+    auto stored = aggShape->toBson(
+        expCtx->getOperationContext(),
+        query_shape::SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+        SerializationContext::stateDefault());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT (test auto-update)
+        R"({
+            "cmdNs": {
+                "db": "testDB",
+                "coll": "testColl"
+            },
+            "command": "aggregate",
+            "pipeline": [
+                {
+                    "$group": {
+                        "_id": "$a",
+                        "statistics": {
+                            "$_internalConstructStats": {
+                                "val": "$$ROOT",
+                                "sampleRate": 1,
+                                "numberBuckets": 10
+                            }
+                        }
+                    }
+                }
+            ]
+        })",
+        stored);
+
+    auto aggKey = std::make_unique<AggKey>(
+        expCtx, acr, std::move(aggShape), pipeline->getInvolvedCollections(), collectionType);
+
+    // A client with a transport session and no internal tag is an external (user) client.
+    auto readClient = getServiceContext()->getService()->makeClient(
+        "external", transport::MockSession::create(/*transportLayer=*/nullptr));
+    auto readOpCtx = readClient->makeOperationContext();
+    auto shapified =
+        aggKey->toBson(readOpCtx.get(),
+                       query_shape::SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                       SerializationContext::stateDefault());
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT (test auto-update)
+        R"({
+            "queryShape": {
+                "cmdNs": {
+                    "db": "HASH<testDB>",
+                    "coll": "HASH<testColl>"
+                },
+                "command": "aggregate",
+                "pipeline": [
+                    {
+                        "$group": {
+                            "_id": "$HASH<a>",
+                            "HASH<statistics>": {
+                                "$_internalConstructStats": {
+                                    "HASH<val>": "$$ROOT",
+                                    "HASH<sampleRate>": "?number",
+                                    "HASH<numberBuckets>": "?number"
+                                }
+                            }
+                        }
+                    }
+                ]
+            },
+            "collectionType": "collection"
+        })",
+        shapified);
+
+    auto debugShapified =
+        aggKey->toBson(readOpCtx.get(),
+                       query_shape::SerializationOptions::kDebugQueryShapeSerializeOptions,
+                       SerializationContext::stateDefault());
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT (test auto-update)
+        R"({
+            "queryShape": {
+                "cmdNs": {
+                    "db": "testDB",
+                    "coll": "testColl"
+                },
+                "command": "aggregate",
+                "pipeline": [
+                    {
+                        "$group": {
+                            "_id": "$a",
+                            "statistics": {
+                                "$_internalConstructStats": {
+                                    "val": "$$ROOT",
+                                    "sampleRate": "?number",
+                                    "numberBuckets": "?number"
+                                }
+                            }
+                        }
+                    }
+                ]
+            },
+            "collectionType": "collection"
+        })",
+        debugShapified);
+}
+
 TEST_F(QueryStatsStoreTest,
        CorrectlyTokenizesAggregateCommandRequestPipelineWithSecondaryNamespaces) {
     auto expCtx = make_intrusive<ExpressionContextForTest>(kDefaultTestNss.nss());

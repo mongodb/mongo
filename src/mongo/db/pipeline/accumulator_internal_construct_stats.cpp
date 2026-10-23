@@ -54,9 +54,38 @@ REGISTER_ACCUMULATOR(_internalConstructStats, parseInternalConstructStats);
 AccumulatorInternalConstructStats::AccumulatorInternalConstructStats(
     ExpressionContext* const expCtx, InternalConstructStatsAccumulatorParams params)
     : AccumulatorState(expCtx), _count(0.0), _params(params) {
-    assertAllowedInternalIfRequired(
-        expCtx->getOperationContext(), "_internalConstructStats", AllowedWithClientType::kInternal);
+    if (!expCtx->getIsReparsingRepresentativeQueryShape()) {
+        assertAllowedInternalIfRequired(expCtx->getOperationContext(),
+                                        "_internalConstructStats",
+                                        AllowedWithClientType::kInternal);
+    }
     _memUsageTracker.set(sizeof(*this));
+}
+
+Document AccumulatorInternalConstructStats::serialize(
+    boost::intrusive_ptr<Expression> initializer,
+    boost::intrusive_ptr<Expression> argument,
+    const query_shape::SerializationOptions& options) const {
+    // Expression serialization wraps constant expressions as {$const: <n>}, which the IDL schema
+    // rejects. Emit them as raw scalars here so that the statement round-trips through a reparse.
+    auto serializedArg = argument->serialize(options).getDocument();
+
+    MutableDocument args;
+    for (auto&& elem : serializedArg.toBson()) {
+        auto fieldName = elem.fieldNameStringData();
+        auto fieldValue = Value(elem);
+        if (fieldName == InternalConstructStatsAccumulatorParams::kSampleRateFieldName) {
+            // The representative value must stay parseable by the IDL schema, which requires a
+            // double here, so the actual value is passed as the representative value.
+            fieldValue = options.serializeLiteral(Value(_params.getSampleRate()),
+                                                  Value(_params.getSampleRate()));
+        } else if (fieldName == InternalConstructStatsAccumulatorParams::kNumberBucketsFieldName) {
+            fieldValue = options.serializeLiteral(Value(_params.getNumberBuckets()),
+                                                  Value(_params.getNumberBuckets()));
+        }
+        args.setField(fieldName, std::move(fieldValue));
+    }
+    return DOC(getOpName() << args.freeze());
 }
 
 void AccumulatorInternalConstructStats::processInternal(const Value& input, bool merging) {
