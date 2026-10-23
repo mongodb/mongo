@@ -29,19 +29,21 @@ const mongos = st.s;
 const mongosAdminDB = mongos.getDB("admin");
 const testDB = mongos.getDB(jsTestName());
 
+// Only count the shard's pools: mongos can lazily open connections to config server nodes at any
+// point (e.g. for nearest-read-preference catalog reads), which is unrelated to the operation under
+// test.
+const shardHosts = st.rs0.nodes.map((node) => node.host);
+
 function getShardHostPoolStats() {
     const poolStats = assert.commandWorked(mongosAdminDB.runCommand({connPoolStats: 1}));
     let totalCreated = 0;
     let totalAvailable = 0;
     let totalInUse = 0;
-    if (poolStats.hosts) {
-        for (const host in poolStats.hosts) {
-            if (poolStats.hosts.hasOwnProperty(host)) {
-                totalCreated += poolStats.hosts[host].created || 0;
-                totalAvailable += poolStats.hosts[host].available || 0;
-                totalInUse += poolStats.hosts[host].inUse || 0;
-            }
-        }
+    for (const host of shardHosts) {
+        const hostStats = poolStats.hosts?.[host] ?? {};
+        totalCreated += hostStats.created || 0;
+        totalAvailable += hostStats.available || 0;
+        totalInUse += hostStats.inUse || 0;
     }
     return {totalCreated, totalAvailable, totalInUse, totalInPool: totalAvailable + totalInUse};
 }
