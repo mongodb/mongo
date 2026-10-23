@@ -6,6 +6,46 @@
 export const IndexType = Object.freeze({REGULAR: "regular", WILDCARD: "wildcard"});
 
 /**
+ * Returns true if the error is transient — e.g. caused by failover/chaos hooks killing, stepping
+ * down, or adding/removing shards or config servers while the check runs — in which case the
+ * caller should abort the current iteration (it is retried on the next one) rather than fail.
+ *
+ * The numeric code can be lost on the way out: shell helpers throw plain `Error`s whose message
+ * embeds the server response, and errors rethrown across `Thread` workers surface as
+ * JSInterpreterFailure, so the message is inspected as well, including any `"code" : <n>` fields
+ * of embedded server responses. Divergence assertions never use these codes or message fragments,
+ * so real divergences still fail.
+ */
+export function isTransientError(e) {
+    if (e.code !== undefined && isTransientErrorCode(e.code)) {
+        return true;
+    }
+    if (isNetworkError(e)) {
+        return true;
+    }
+    const message = e.message || String(e);
+    for (const [, code] of message.matchAll(/"code"\s*:\s*(\d+)/g)) {
+        if (isTransientErrorCode(Number(code))) {
+            return true;
+        }
+    }
+
+    return /interrupted|shutdown in progress|not primary|not in primary|primary stepped down|connection (refused|closed|reset)|callback was canceled/i.test(
+        message,
+    );
+}
+
+function isTransientErrorCode(code) {
+    return (
+        ErrorCodes.isRetriableError(code) ||
+        ErrorCodes.isInterruption(code) ||
+        ErrorCodes.isNetworkTimeoutError(code) ||
+        code === ErrorCodes.ShardNotFound ||
+        code === ErrorCodes.FailedToSatisfyReadPreference
+    );
+}
+
+/**
  * Collection-scoped $listCatalog snapshot-read at `atClusterTime`. Collection scope (rather
  * than admin scope) avoids traversing sibling collections/views; tests that intentionally
  * create invalid views (e.g. InvalidViewDefinition) won't fail the scan.

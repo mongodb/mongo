@@ -25,6 +25,7 @@
  *
  * Failure: any divergence throws an assertion.
  */
+import {isTransientError} from "jstests/libs/multikey_consistency_check.js";
 import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 
@@ -44,7 +45,7 @@ async function checkMultikeyConsistencyForReplicaSet(hosts) {
     // scope with no access to the module's imports, top-level consts, or sibling functions, so
     // everything the check needs is resolved inside: config from TestData, shared-lib primitives
     // via dynamic import, and the comparison helpers as nested declarations.
-    const {ReplSetTest} = await import("jstests/libs/replsettest.js");
+    const {injectHookAppName} = await import("jstests/libs/hook_appname.js");
     const {findIndexByName, readCatalogIndexesAtClusterTime, readWildcardMultikeyPaths} =
         await import("jstests/libs/multikey_consistency_check.js");
 
@@ -190,41 +191,46 @@ async function checkMultikeyConsistencyForReplicaSet(hosts) {
         }
     }
 
-    // Suppress the noisy ReplSetTest constructor output.
-    const quietly = (func) => {
-        const printOriginal = print;
+    // Connect to each member directly rather than through `new ReplSetTest(seed)`: that constructor
+    // retries for minutes while any member in the config is unreachable, which stalls the hook
+    // whenever a failover hook has a node down. An unreachable member is skipped for this
+    // iteration instead.
+    const conns = [];
+    for (const host of hosts) {
         try {
-            print = Function.prototype;
-            func();
-        } finally {
-            print = printOriginal;
+            const conn = new Mongo(injectHookAppName(host), undefined, {gRPC: false});
+            // The per-member reads must be served by secondaries too. Without this they fail with
+            // NotPrimaryNoSecondaryOk, which the read helpers treat as a soft failure, so the
+            // member would be silently left out of the comparison.
+            conn.setSecondaryOk();
+            conns.push(conn);
+        } catch (e) {
+            if (!isNetworkError(e)) {
+                throw e;
+            }
+            jsTest.log.info("Skipping unreachable member for multikey consistency check", {
+                host,
+                error: e,
+            });
         }
-    };
-
-    let rst;
-    quietly(() => {
-        rst = new ReplSetTest(hosts[0]);
-    });
-
-    const primary = rst.getPrimary();
-    if (!primary.adminCommand({serverStatus: 1}).storageEngine.supportsSnapshotReadConcern) {
-        print(
-            "Skipping multikey consistency check: storage engine does not support snapshot reads " +
-                "on " +
-                rst.getURL(),
-        );
-        return {ok: 1};
     }
 
     // Filter to currently-readable members. Initial sync and recovering members are expected to
     // diverge; arbiters have no data.
-    const statusByHost = {};
+    let primary = null;
+    let primaryOptime = null;
     const members = [];
-    for (const conn of [primary, ...rst.getSecondaries()]) {
+    for (const conn of conns) {
         const status = assert.commandWorked(conn.adminCommand({replSetGetStatus: 1}));
         const self = status.members.find((m) => m.self);
-        statusByHost[conn.host] = self;
-        if (self.stateStr !== "PRIMARY" && self.stateStr !== "SECONDARY") {
+        if (self.stateStr === "PRIMARY") {
+            if (primary !== null) {
+                print("Skipping multikey consistency check: more than one primary in " + hosts);
+                return {ok: 1};
+            }
+            primary = conn;
+            primaryOptime = self.optime;
+        } else if (self.stateStr !== "SECONDARY") {
             continue;
         }
         if (conn.adminCommand({isMaster: 1}).arbiterOnly) {
@@ -233,16 +239,28 @@ async function checkMultikeyConsistencyForReplicaSet(hosts) {
         members.push(conn);
     }
 
-    if (members.length < 2) {
+    if (primary === null) {
+        print("Skipping multikey consistency check: no reachable primary in " + hosts);
+        return {ok: 1};
+    }
+
+    if (!primary.adminCommand({serverStatus: 1}).storageEngine.supportsSnapshotReadConcern) {
         print(
-            "Skipping multikey consistency check: fewer than 2 readable members on " + rst.getURL(),
+            "Skipping multikey consistency check: storage engine does not support snapshot reads " +
+                "on " +
+                hosts,
         );
+        return {ok: 1};
+    }
+
+    if (members.length < 2) {
+        print("Skipping multikey consistency check: fewer than 2 readable members in " + hosts);
         return {ok: 1};
     }
 
     // Use primary's lastApplied as the snapshot timestamp. Secondaries receiving the snapshot
     // read at this T will block until they catch up.
-    const T = statusByHost[primary.host].optime.ts;
+    const T = primaryOptime.ts;
     if (!T) {
         return {ok: 1};
     }
@@ -308,51 +326,92 @@ async function checkMultikeyConsistencyForReplicaSet(hosts) {
 
 // ---- Topology entry point ---------------------------------------------------------
 
-const topology = DiscoverTopology.findConnectedNodes(db.getMongo());
-
-if (topology.type === Topology.kReplicaSet) {
-    const res = await checkMultikeyConsistencyForReplicaSet(topology.nodes);
-    assert.commandWorked(res, () => "multikey consistency check failed: " + tojson(res));
-} else if (topology.type === Topology.kShardedCluster) {
-    const threads = [];
-    try {
-        if (topology.configsvr && topology.configsvr.nodes && topology.configsvr.nodes.length > 1) {
-            const thread = new Thread(
-                checkMultikeyConsistencyForReplicaSet,
-                topology.configsvr.nodes,
-            );
-            threads.push(thread);
-            thread.start();
-        }
-        for (const shardName of Object.keys(topology.shards)) {
-            const shard = topology.shards[shardName];
-            if (shard.type !== Topology.kReplicaSet) continue;
-            if (shard.nodes.length < 2) continue;
-            const thread = new Thread(checkMultikeyConsistencyForReplicaSet, shard.nodes);
-            threads.push(thread);
-            thread.start();
-        }
-    } finally {
-        let exception;
-        const returnData = threads.map((thread) => {
-            try {
-                thread.join();
-                return thread.returnData();
-            } catch (e) {
-                if (!exception) exception = e;
+const runMultikeyConsistencyCheck = async function (topology) {
+    if (topology.type === Topology.kReplicaSet) {
+        try {
+            const res = await checkMultikeyConsistencyForReplicaSet(topology.nodes);
+            assert.commandWorked(res, () => "multikey consistency check failed: " + tojson(res));
+        } catch (e) {
+            if (!isTransientError(e)) {
+                throw e;
             }
-        });
-        if (exception) {
-            // eslint-disable-next-line
-            throw exception;
+            // Skip this iteration; the next iteration retries.
+            jsTest.log.info("Aborted multikey consistency check due to a transient error", {
+                error: e,
+            });
         }
-        returnData.forEach((res) => {
-            assert.commandWorked(
-                res,
-                () => "multikey consistency check (point-in-time) failed: " + tojson(res),
-            );
-        });
+    } else if (topology.type === Topology.kShardedCluster) {
+        const threads = [];
+        try {
+            if (
+                topology.configsvr &&
+                topology.configsvr.nodes &&
+                topology.configsvr.nodes.length > 1
+            ) {
+                const thread = new Thread(
+                    checkMultikeyConsistencyForReplicaSet,
+                    topology.configsvr.nodes,
+                );
+                threads.push(thread);
+                thread.start();
+            }
+            for (const shardName of Object.keys(topology.shards)) {
+                const shard = topology.shards[shardName];
+                if (shard.type !== Topology.kReplicaSet) continue;
+                if (shard.nodes.length < 2) continue;
+                const thread = new Thread(checkMultikeyConsistencyForReplicaSet, shard.nodes);
+                threads.push(thread);
+                thread.start();
+            }
+        } finally {
+            let exception;
+            const returnData = threads.map((thread) => {
+                try {
+                    thread.join();
+                    return thread.returnData();
+                } catch (e) {
+                    if (isTransientError(e)) {
+                        // Skip this replica set for this iteration; the next iteration retries.
+                        jsTest.log.info(
+                            "Aborted multikey consistency check of a replica set due to a transient error",
+                            {error: e},
+                        );
+                        return undefined;
+                    }
+                    if (!exception) exception = e;
+                }
+            });
+            if (exception) {
+                // eslint-disable-next-line
+                throw exception;
+            }
+            returnData.forEach((res) => {
+                if (res === undefined) return;
+                assert.commandWorked(
+                    res,
+                    () => "multikey consistency check (point-in-time) failed: " + tojson(res),
+                );
+            });
+        }
+    } else {
+        throw new Error("Unsupported topology configuration: " + tojson(topology));
     }
-} else {
-    throw new Error("Unsupported topology configuration: " + tojson(topology));
+};
+
+let topology;
+try {
+    topology = DiscoverTopology.findConnectedNodes(db.getMongo());
+} catch (e) {
+    if (isTransientError(e)) {
+        jsTest.log.info(
+            "Aborted multikey consistency check due to a transient error during topology discovery",
+            {error: e},
+        );
+    } else {
+        throw e;
+    }
+}
+
+if (topology) {
+    await runMultikeyConsistencyCheck(topology);
 }

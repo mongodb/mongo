@@ -30,7 +30,9 @@
 import {rewriteCatalogTable} from "jstests/disk/libs/wt_file_helper.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {describe, it} from "jstests/libs/mochalite.js";
+import {isTransientError} from "jstests/libs/multikey_consistency_check.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {Thread} from "jstests/libs/parallelTester.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -41,6 +43,11 @@ const kHookConfig = Object.freeze({
 
 const kWriteConcern = Object.freeze({w: "majority"});
 const kFeatureFlagParameter = Object.freeze({featureFlagReplicateMultikeynessInTransactions: true});
+
+// A hook iteration finishes in seconds. The bound is well above that but well below the minutes a
+// hook spends stalled on an unreachable member, so a regression fails here rather than at the task
+// timeout.
+const kMaxHookDurationMS = 5 * 60 * 1000;
 
 function startMultikeyConsistencyHook(conn) {
     return startParallelShell(
@@ -61,9 +68,19 @@ function startMultikeyConsistencyHook(conn) {
 }
 
 function runMultikeyConsistencyHook(conn, topologyName) {
+    const start = Date.now();
     const awaitShell = startMultikeyConsistencyHook(conn);
     const exitCode = awaitShell({checkExitSuccess: false});
     assert.eq(0, exitCode, `${topologyName} multikey consistency hook exited non-zero`);
+    const durationMS = Date.now() - start;
+    assert.lt(
+        durationMS,
+        kMaxHookDurationMS,
+        `${topologyName} multikey consistency hook was slow`,
+        {
+            durationMS,
+        },
+    );
 }
 
 function createIndexedCollections(testDB, collNamePrefix) {
@@ -119,6 +136,31 @@ function shardIndexedCollections(st, testDB, collNamePrefix) {
 }
 
 describe("multikey consistency hook self-test", () => {
+    it("treats a retryable error rethrown from a Thread worker as transient", () => {
+        // A Thread worker's exception reaches the parent as JSInterpreterFailure with the original
+        // server response only embedded in the message. "node is not in primary or recovering
+        // state" (NotPrimaryOrSecondary) is what a shard node returns mid-restart under the
+        // failover hooks.
+        const thread = new Thread(function () {
+            assert.commandWorked({
+                ok: 0,
+                errmsg: "node is not in primary or recovering state",
+                code: 13436,
+                codeName: "NotPrimaryOrSecondary",
+            });
+        });
+        thread.start();
+        const error = assert.throws(() => {
+            thread.join();
+            thread.returnData();
+        });
+        assert(isTransientError(error), "expected Thread-wrapped error to be transient", {error});
+
+        const divergence = new Error("multikey divergence (regular index)");
+        divergence.code = ErrorCodes.JSInterpreterFailure;
+        assert(!isTransientError(divergence), "divergence must not be transient", {divergence});
+    });
+
     it("passes against a healthy replica set through the direct replica-set path", () => {
         const rst = new ReplSetTest({nodes: 2, nodeOptions: {setParameter: kFeatureFlagParameter}});
         rst.startSet();
@@ -189,6 +231,64 @@ describe("multikey consistency hook self-test", () => {
             createIndexedCollections(testDB, "sharded");
 
             runMultikeyConsistencyHook(st.s, "sharded cluster");
+        } finally {
+            st.stop();
+        }
+    });
+
+    it("tolerates an unreachable member in the replica set", () => {
+        const rst = new ReplSetTest({nodes: 2, nodeOptions: {setParameter: kFeatureFlagParameter}});
+        rst.startSet();
+        rst.initiate();
+
+        try {
+            const primary = rst.getPrimary();
+            const testDB = primary.getDB(`${jsTestName()}_unreachable`);
+            assert.commandWorked(testDB.dropDatabase());
+
+            createIndexedCollections(testDB, "unreachable");
+            rst.awaitReplication();
+
+            // Stop the secondary the same way the failover hooks do: it is down, but expected to
+            // come back. The hook must abort its current iteration (fewer than 2 readable
+            // members) instead of failing on the network error.
+            const secondary = rst.getSecondary();
+            rst.stop(secondary, undefined, undefined, {forRestart: true});
+
+            runMultikeyConsistencyHook(primary, "replica set with an unreachable member");
+
+            rst.start(secondary, {}, true /* restart */);
+        } finally {
+            rst.stopSet(undefined, false, {skipCheckDBHashes: true, skipValidation: true});
+        }
+    });
+
+    it("tolerates an unreachable shard node in the sharded cluster", () => {
+        const st = new ShardingTest({
+            mongos: 1,
+            mongosOptions: {setParameter: kFeatureFlagParameter},
+            shards: 2,
+            rs: {nodes: 2},
+            rsOptions: {setParameter: kFeatureFlagParameter},
+            config: 2,
+            configOptions: {setParameter: kFeatureFlagParameter},
+        });
+
+        try {
+            const testDB = st.s.getDB(`${jsTestName()}_sharded_unreachable`);
+            assert.commandWorked(testDB.dropDatabase());
+
+            shardIndexedCollections(st, testDB, "sharded_unreachable");
+            createIndexedCollections(testDB, "sharded_unreachable");
+
+            // Stop one node of shard 0. The hook must skip the unreachable shard for this
+            // iteration instead of failing on the network error.
+            const stoppedMember = st.rs0.getSecondary();
+            st.rs0.stop(stoppedMember, undefined, undefined, {forRestart: true});
+
+            runMultikeyConsistencyHook(st.s, "sharded cluster with an unreachable shard node");
+
+            st.rs0.start(stoppedMember, {}, true /* restart */);
         } finally {
             st.stop();
         }
