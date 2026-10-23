@@ -100,8 +100,8 @@ AccumulatorInternalConstructNdvSketch::AccumulatorInternalConstructNdvSketch(
         _fieldPaths.emplace_back(field);
     }
     // One folding variant per sketch: a single field needs only the strict one, n >= 2 fields
-    // add one folded variant per field (see the class comment).
-    const size_t numSketches = _fieldPaths.size() == 1 ? 1 : _fieldPaths.size() + 1;
+    // add one folded variant per field and an all-match variant (see the class comment).
+    const size_t numSketches = _fieldPaths.size() == 1 ? 1 : _fieldPaths.size() + 2;
     _sketches.reserve(numSketches);
     for (size_t i = 0; i < numSketches; ++i) {
         _sketches.push_back(makeSketch());
@@ -180,15 +180,28 @@ void AccumulatorInternalConstructNdvSketch::processInternal(const Value& input, 
     // sketches[i + 1]: field i folded, missing counted as null. Folding only changes the
     // encoding when the value actually is missing; otherwise the strict hash is the same bytes.
     static const BSONObj kNullValueObj = BSON("" << BSONNULL);
+    size_t numMissing = 0;
+    uint64_t allMatchHash = strictHash;
     for (size_t i = 0; i < elements.size(); ++i) {
-        if (!elements[i].eoo()) {
-            _sketches[i + 1].addHash(strictHash);
-            continue;
+        uint64_t hash = strictHash;
+        if (elements[i].eoo()) {
+            ++numMissing;
+            const BSONElement original = std::exchange(elements[i], kNullValueObj.firstElement());
+            hash = allMatchHash = ce::hashValuesForNdv(elements);
+            elements[i] = original;
         }
-        const BSONElement original = std::exchange(elements[i], kNullValueObj.firstElement());
-        _sketches[i + 1].addHash(ce::hashValuesForNdv(elements));
-        elements[i] = original;
+        _sketches[i + 1].addHash(hash);
     }
+    // With at most one missing field, all-match reuses a hash computed above.
+    if (numMissing > 1) {
+        for (auto& element : elements) {
+            if (element.eoo()) {
+                element = kNullValueObj.firstElement();
+            }
+        }
+        allMatchHash = ce::hashValuesForNdv(elements);
+    }
+    _sketches.back().addHash(allMatchHash);
 }
 
 Value AccumulatorInternalConstructNdvSketch::getValue(bool toBeMerged) {
@@ -197,7 +210,7 @@ Value AccumulatorInternalConstructNdvSketch::getValue(bool toBeMerged) {
 
     // One sketch document per null/missing folding variant, in the positional convention
     // described in the class comment: the strict sketch first, then one folded variant per
-    // (canonically sorted) field for composite statistics.
+    // (canonically sorted) field, then all-match for composite statistics.
     std::vector<Value> sketchDocs;
     sketchDocs.reserve(_sketches.size());
     for (const auto& hll : _sketches) {

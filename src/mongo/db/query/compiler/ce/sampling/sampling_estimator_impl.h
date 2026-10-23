@@ -221,7 +221,7 @@ public:
      * Serves the NDV from persisted field statistics (built by analyze mode "ndv") when
      * eligible: 'persistentNDVStatsEnabled()' and at most 'kNdvMaxFields' fields. The request's
      * equality semantics select the persisted folding variant; composite requests folding
-     * several fields have none and are ineligible. Loaded documents are cached per sorted path
+     * several but not all fields have none and are ineligible. Documents are cached per sorted path
      * set and results, including misses, are memoized per path set and variant.
      */
     boost::optional<CardinalityEstimate> tryEstimateNDVFromPersistentStats(
@@ -411,8 +411,9 @@ private:
 
     /**
      * Picks the persisted sketch variant a request's equality semantics need: 0 for the strict
-     * tuple sketch, i + 1 for the variant folding the i-th sorted field. Returns boost::none
-     * when no persisted variant can serve the request (several folded fields).
+     * tuple sketch, i + 1 for the variant folding the i-th sorted field, and n + 1 for the variant
+     * folding all n fields. Returns boost::none when no persisted variant can serve the request
+     * (several but not all folded fields).
      */
     boost::optional<size_t> selectPersistedNDVSketchIndex(
         const std::vector<std::pair<std::string, bool>>& sortedFields,

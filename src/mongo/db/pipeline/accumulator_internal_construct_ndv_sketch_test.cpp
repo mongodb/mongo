@@ -205,11 +205,11 @@ TEST_F(InternalConstructNdvSketchTest, ResetClearsState) {
 
 // --- Composite NDV (SERVER-131763) ---
 
-TEST_F(InternalConstructNdvSketchTest, CompositeEmitsOnePlusNSketches) {
-    // n >= 2 fields emit n+1 folding variants; a single field stays at exactly one.
+TEST_F(InternalConstructNdvSketchTest, CompositeEmitsNPlusTwoSketches) {
+    // n >= 2 fields emit n+2 folding variants; a single field stays at exactly one.
     ASSERT_EQ(sketches(*makeAccumulator({"a"})).getArrayLength(), 1);
-    ASSERT_EQ(sketches(*makeAccumulator({"a", "b"})).getArrayLength(), 3);
-    ASSERT_EQ(sketches(*makeAccumulator({"a", "b", "c"})).getArrayLength(), 4);
+    ASSERT_EQ(sketches(*makeAccumulator({"a", "b"})).getArrayLength(), 4);
+    ASSERT_EQ(sketches(*makeAccumulator({"a", "b", "c"})).getArrayLength(), 5);
 }
 
 TEST_F(InternalConstructNdvSketchTest, CompositeCountsTuples) {
@@ -256,6 +256,35 @@ TEST_F(InternalConstructNdvSketchTest, ThreeFieldFoldingVariants) {
     ASSERT_EQ(ndvAt(*accumulator, 1), 11);  // Folding "a" merges one pair.
     ASSERT_EQ(ndvAt(*accumulator, 2), 10);  // Folding "b" merges two pairs.
     ASSERT_EQ(ndvAt(*accumulator, 3), 9);   // Folding "c" merges three pairs.
+}
+
+TEST_F(InternalConstructNdvSketchTest, AllMatchVariantFoldsOneMissingField) {
+    auto accumulator = makeAccumulator({"a", "b"});
+    addDoc(*accumulator, Document{{"b", 1}});
+    addDoc(*accumulator, Document{{"a", Value(BSONNULL)}, {"b", 1}});
+    ASSERT_EQ(ndvAt(*accumulator, 3), 1);
+}
+
+TEST_F(InternalConstructNdvSketchTest, AllMatchVariantFoldsAllMissingFields) {
+    auto accumulator = makeAccumulator({"a", "b", "c"});
+    addDoc(*accumulator, Document{});
+    addDoc(*accumulator,
+           Document{{"a", Value(BSONNULL)}, {"b", Value(BSONNULL)}, {"c", Value(BSONNULL)}});
+    ASSERT_EQ(ndvAt(*accumulator, 4), 1);
+}
+
+TEST_F(InternalConstructNdvSketchTest, AllMatchVariantMatchesStrictSketchWithoutMissingFields) {
+    auto accumulator = makeAccumulator({"a", "b"});
+    addDoc(*accumulator, Document{{"a", 1}, {"b", 2}});
+    const auto result = sketches(*accumulator);
+    ASSERT_BSONOBJ_EQ(result[0].getDocument().toBson(), result[3].getDocument().toBson());
+}
+
+TEST_F(InternalConstructNdvSketchTest, AllMatchVariantFoldsTwoMissingFieldsWithAnotherPresent) {
+    auto accumulator = makeAccumulator({"a", "b", "c"});
+    addDoc(*accumulator, Document{{"c", 1}});
+    addDoc(*accumulator, Document{{"a", Value(BSONNULL)}, {"b", Value(BSONNULL)}, {"c", 1}});
+    ASSERT_EQ(ndvAt(*accumulator, 4), 1);
 }
 
 TEST_F(InternalConstructNdvSketchTest, CompositeExtractsDottedPaths) {
@@ -309,8 +338,8 @@ TEST_F(InternalConstructNdvSketchTest, CompositeRoundTripsEverySketch) {
         addDoc(*accumulator, Document{{"a", i}, {"b", i % 10}});
     }
     const auto result = sketches(*accumulator);
-    ASSERT_EQ(result.getArrayLength(), 3);
-    for (size_t i = 0; i < 3; ++i) {
+    ASSERT_EQ(result.getArrayLength(), 4);
+    for (size_t i = 0; i < 4; ++i) {
         const auto sketch =
             NdvSketch::parse(result[i].getDocument().toBson(), IDLParserContext("NdvSketch"));
         const auto registers = sketch.getRegisters();
@@ -328,9 +357,9 @@ TEST_F(InternalConstructNdvSketchTest, CompositeRoundTripsEverySketch) {
 
 TEST_F(InternalConstructNdvSketchTest, CompositeTracksConstantSketchMemory) {
     auto accumulator = makeAccumulator({"a", "b"});
-    // Three variants own 2^14 single-byte registers each.
+    // Four variants own 2^14 single-byte registers each.
     const auto initial = accumulator->getMemUsage();
-    ASSERT_GTE(initial, 3 * 16384);
+    ASSERT_GTE(initial, 4 * 16384);
 
     for (int i = 0; i < 10'000; ++i) {
         addDoc(*accumulator, Document{{"a", i}, {"b", i}});
@@ -342,7 +371,7 @@ TEST_F(InternalConstructNdvSketchTest, CompositeResetClearsState) {
     auto accumulator = makeAccumulator({"a", "b"});
     addDoc(*accumulator, Document{{"a", 1}, {"b", 2}});
     accumulator->reset();
-    for (size_t i = 0; i < 3; ++i) {
+    for (size_t i = 0; i < 4; ++i) {
         ASSERT_EQ(ndvAt(*accumulator, i), 0);
     }
 }

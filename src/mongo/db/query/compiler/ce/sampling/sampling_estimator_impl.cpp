@@ -604,7 +604,7 @@ boost::optional<size_t> SamplingEstimatorImpl::selectPersistedNDVSketchIndex(
     // equality semantics (the two answers differ by at most one distinct value). A composite
     // statistic persists sketches[0], where every field counts null and missing separately,
     // plus sketches[i + 1] for each sorted field i, where that one field counts null and
-    // missing as the same value. No sketch merges null and missing for more than one field.
+    // missing as the same value. The final sketch merges null and missing for all fields.
     if (sortedFields.size() == 1) {
         return 0;
     }
@@ -617,11 +617,16 @@ boost::optional<size_t> SamplingEstimatorImpl::selectPersistedNDVSketchIndex(
             sketchIndex = i + 1;
         }
     }
+    if (foldedCount == sortedFields.size()) {
+        return sortedFields.size() + 1;
+    }
     if (foldedCount > 1) {
-        // No persisted variant folds several fields; the caller falls back to the sample.
+        // Several fields were folded, but not all, so no persisted variant applies; the caller
+        // falls back to the sample.
         LOGV2_DEBUG(13176600,
                     5,
-                    "Persisted NDV statistics cannot serve a request folding several fields",
+                    "Persisted NDV statistics cannot serve a request folding several but not all "
+                    "fields",
                     logAttrs(_nss),
                     "paths"_attr = sortedPaths,
                     "numFoldedFields"_attr = foldedCount);
@@ -688,11 +693,10 @@ boost::optional<PersistedNDVEntry> SamplingEstimatorImpl::loadPersistedNDVStats(
         return boost::none;
     }
 
-    // A single-field statistic carries exactly one sketch, a composite one carries one
-    // per folding variant. Any other shape was written by a version that disagrees with
-    // ours, so fall back to the sample rather than asserting on stored data.
+    // A single-field statistic carries exactly one sketch, a composite one carries n+2.
+    // Fall back to the sample rather than asserting on stored data with any other shape.
     const auto& sketches = swDoc.getValue().getNdv().getSketches();
-    const size_t expectedNumSketches = numFields == 1 ? 1 : numFields + 1;
+    const size_t expectedNumSketches = numFields == 1 ? 1 : numFields + 2;
     if (sketches.size() != expectedNumSketches) {
         LOGV2_DEBUG(13176002,
                     5,

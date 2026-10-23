@@ -167,8 +167,8 @@ describe("analyze mode: ndv", function () {
         assert.eq(dottedDoc.ndv.sketches[0].ndv, NumberLong(2), "unexpected ndv", {dottedDoc});
     });
 
-    it("persists a composite document with n+1 sketches for a tuple key", function () {
-        // Four extra documents make all three sketches produce pairwise different counts, so a
+    it("persists a composite document with n+2 sketches for a tuple key", function () {
+        // Four extra documents make all four sketches produce pairwise different counts, so a
         // duplicated or misordered sketch in the persisted array cannot go unnoticed. Tuples of
         // (a, other): (7, missing) x2, (8, missing), ({b: 1}, missing), (missing, true),
         // (null, missing), (missing, missing), (7, null) and (null, true).
@@ -192,14 +192,15 @@ describe("analyze mode: ndv", function () {
         );
         assert.eq(doc.sortedFieldPaths, ["a", "other"], "unexpected doc", {doc});
 
-        // n+1 sketches for n = 2 fields, positionally keyed off the sorted paths: the strict
+        // n+2 sketches for n = 2 fields, positionally keyed off the sorted paths: the strict
         // tuple sketch first, then the variant folding "a" (which merges two tuple pairs), then
-        // the variant folding "other" (which merges one).
+        // the variant folding "other" (which merges one), then all-match (which merges three).
         const sketches = doc.ndv.sketches;
-        assert.eq(sketches.length, 3, "expected n+1 sketches", {doc});
+        assert.eq(sketches.length, 4, "expected n+2 sketches", {doc});
         assert.eq(sketches[0].ndv, NumberLong(8), "unexpected strict ndv", {doc});
         assert.eq(sketches[1].ndv, NumberLong(6), "unexpected ndv folding 'a'", {doc});
         assert.eq(sketches[2].ndv, NumberLong(7), "unexpected ndv folding 'other'", {doc});
+        assert.eq(sketches[3].ndv, NumberLong(5), "unexpected all-match ndv", {doc});
         for (const sketch of sketches) {
             assert.eq(sketch.precision, kExpectedPrecision, "unexpected precision", {doc});
             assert(sketch.registers instanceof BinData, "registers must be BinData", {doc});

@@ -137,9 +137,10 @@ protected:
     }
 
     /**
-     * Persists a composite field-stats document over 'paths' whose n+1 sketches carry
+     * Persists a composite field-stats document over 'paths' whose n+2 sketches carry
      * distinguishable NDVs: 'baseNdv' in the strict tuple sketch and baseNdv + 1 + i in the
-     * variant folding the i-th sorted path, so tests can tell exactly which sketch was served.
+     * variant folding the i-th sorted path, followed by baseNdv + n + 1 in the all-match
+     * variant, so tests can tell exactly which sketch was served.
      * 'sketchCountOverride' produces a malformed document with that many sketches instead.
      */
     void persistCompositeNDV(std::vector<std::string> paths,
@@ -150,7 +151,7 @@ protected:
 
         NdvStats ndvStats;
         std::vector<NdvSketch> sketches;
-        const size_t numSketches = sketchCountOverride.value_or(paths.size() + 1);
+        const size_t numSketches = sketchCountOverride.value_or(paths.size() + 2);
         for (size_t i = 0; i < numSketches; ++i) {
             NdvSketch sketch;
             sketch.setNdv(baseNdv + static_cast<long long>(i));
@@ -400,7 +401,8 @@ TEST_F(PersistentNDVTest, MissingNdvSectionFallsBack) {
 // --- Composite NDV (SERVER-131766) ---
 
 // The composite sketch layout persisted by persistCompositeNDV({"a", "b"}, 200):
-// sketches[0] = 200 (all strict), sketches[1] = 201 (fold "a"), sketches[2] = 202 (fold "b").
+// sketches[0] = 200 (all strict), sketches[1] = 201 (fold "a"), sketches[2] = 202 (fold "b"),
+// sketches[3] = 203 (all-match).
 constexpr long long kCompositeBase = 200;
 
 TEST_F(PersistentNDVTest, ServesCompositeStrictVariant) {
@@ -429,6 +431,11 @@ TEST_F(PersistentNDVTest, ServesCompositeFoldedVariants) {
                 .estimateNDV({{.path = "a", .isExprEq = true}, {.path = "b", .isExprEq = false}})
                 .toDouble(),
             kCompositeBase + 2);
+        ASSERT_EQ(
+            estimator
+                .estimateNDV({{.path = "a", .isExprEq = false}, {.path = "b", .isExprEq = false}})
+                .toDouble(),
+            kCompositeBase + 3);
     });
 }
 
@@ -482,23 +489,19 @@ TEST_F(PersistentNDVTest, PathSetsWithEqualConcatenationDoNotCollide) {
     });
 }
 
-TEST_F(PersistentNDVTest, CompositeFallsBackWhenSeveralFieldsFolded) {
-    persistCompositeNDV({"a", "b"}, kCompositeBase);
+TEST_F(PersistentNDVTest, CompositeFallsBackWhenOnlyTwoOfThreeFieldsFolded) {
+    persistCompositeNDV({"a", "b", "c"}, kCompositeBase);
     withEstimator([&](SamplingEstimatorForTesting& estimator) {
-        // Two regular-eq fields have no persisted variant; the sample answers instead.
-        const auto estimate =
-            estimator
-                .estimateNDV({{.path = "a", .isExprEq = false}, {.path = "b", .isExprEq = false}})
-                .toDouble();
-        for (long long persisted = kCompositeBase; persisted <= kCompositeBase + 2; ++persisted) {
-            ASSERT_NE(estimate, persisted);
-        }
+        ASSERT_FALSE(
+            estimator.tryEstimateNDVFromPersistentStats({{.path = "a", .isExprEq = false},
+                                                         {.path = "b", .isExprEq = false},
+                                                         {.path = "c", .isExprEq = true}}));
     });
 }
 
 TEST_F(PersistentNDVTest, CompositeWrongSketchCountFallsBack) {
-    // Two fields require exactly three sketches; a two-sketch document is malformed.
-    persistCompositeNDV({"a", "b"}, kCompositeBase, /*sketchCountOverride=*/2);
+    // Two fields require exactly four sketches; a document missing all-match is malformed.
+    persistCompositeNDV({"a", "b"}, kCompositeBase, /*sketchCountOverride=*/3);
     withEstimator([&](SamplingEstimatorForTesting& estimator) {
         ASSERT_NE(
             estimator
@@ -521,8 +524,8 @@ TEST_F(PersistentNDVTest, CompositeMetadataRecordsAllPaths) {
 }
 
 TEST_F(PersistentNDVTest, ServesThreeFieldVariants) {
-    // persistCompositeNDV({"a", "b", "c"}, base) persists sketches [base .. base + 3]:
-    // all-strict first, then one folded variant per sorted field.
+    // persistCompositeNDV({"a", "b", "c"}, base) persists sketches [base .. base + 4]:
+    // all-strict first, then one folded variant per sorted field, then all-match.
     persistCompositeNDV({"a", "b", "c"}, kCompositeBase);
     withEstimator([&](SamplingEstimatorForTesting& estimator) {
         ASSERT_EQ(estimator
@@ -549,6 +552,12 @@ TEST_F(PersistentNDVTest, ServesThreeFieldVariants) {
                                     {.path = "c", .isExprEq = false}})
                       .toDouble(),
                   kCompositeBase + 3);
+        ASSERT_EQ(estimator
+                      .estimateNDV({{.path = "a", .isExprEq = false},
+                                    {.path = "b", .isExprEq = false},
+                                    {.path = "c", .isExprEq = false}})
+                      .toDouble(),
+                  kCompositeBase + 4);
     });
 }
 

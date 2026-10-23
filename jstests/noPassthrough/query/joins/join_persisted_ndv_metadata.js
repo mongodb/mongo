@@ -11,7 +11,7 @@
  */
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
 import {getQueryPlanner} from "jstests/libs/query/analyze_plan.js";
-import {joinTestWrapper} from "jstests/libs/query/join_utils.js";
+import {assertAllJoinsUseMethod, joinTestWrapper} from "jstests/libs/query/join_utils.js";
 
 describe("persistedNdv in join explain", function () {
     before(function () {
@@ -168,6 +168,66 @@ describe("persistedNdv in join explain", function () {
                 persistedNdv,
             });
         });
+    });
+
+    it("serves the all-match composite statistic when costing an index scan for INLJ", function () {
+        const orders = this.db[jsTestName() + "_orders_inlj"];
+        const products = this.db[jsTestName() + "_products_inlj"];
+        assert.commandWorked(orders.insertMany([{productId: 1}, {productId: 2}]));
+        assert.commandWorked(
+            products.insertMany([
+                {sku: 1},
+                {sku: 1, region: null},
+                {sku: 2, region: 1},
+                {sku: 2, region: 1},
+            ]),
+        );
+        assert.commandWorked(orders.createIndex({productId: 1}));
+        assert.commandWorked(products.createIndex({sku: 1, region: 1}));
+        assert.commandWorked(
+            this.db.runCommand({analyze: products.getName(), mode: "ndv", key: ["sku", "region"]}),
+        );
+
+        // SERVER-134537: estimating the cost of scanning {sku: 1, region: 1} needs the
+        // distinct index-key count, treating missing as null in both fields.
+        // The join only compares "sku", so the two-field persisted statistic is used by index costing.
+        const pipeline = [
+            {$match: {sku: {$gte: 1}}},
+            {
+                $lookup: {
+                    from: orders.getName(),
+                    localField: "sku",
+                    foreignField: "productId",
+                    as: "order",
+                },
+            },
+            {$unwind: "$order"},
+        ];
+
+        joinTestWrapper(this.db, () => {
+            assert.commandWorked(
+                this.db.adminCommand({
+                    setParameter: 1,
+                    internalEnableJoinOptimization: true,
+                    internalJoinMethod: "INLJ",
+                    internalJoinEnumerateCollScanPlans: false,
+                }),
+            );
+            const explain = products.explain().aggregate(pipeline);
+            assertAllJoinsUseMethod(explain, "INLJ");
+
+            const queryPlanner = getQueryPlanner(explain);
+            const persistedNdv = queryPlanner.fieldStatsMetadata?.[products.getFullName()]?.ndv;
+            assert(persistedNdv, "expected persisted NDV metadata", {queryPlanner});
+            assert.eq(
+                persistedNdv[0].fieldPaths,
+                ["region", "sku"],
+                "expected persisted composite NDV",
+                {queryPlanner},
+            );
+        });
+        assert(orders.drop());
+        assert(products.drop());
     });
 
     it("serves the composite statistic for mixed equality semantics", function () {
