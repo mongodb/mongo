@@ -90,6 +90,9 @@ const excludeKnobs = [
     "internalQueryMaxSingleExpressionMemoryUsageBytes",
     // Operation-wide memory cap: a small value fails every query outright.
     "internalQueryMaxMemoryUsageBytesPerOperation",
+    // These knobs are not consumed by the planner yet, so there is nothing for this test to check.
+    "internalQueryEnableParallelQuery",
+    "internalQueryMaxDegreeOfParallelism",
     // TODO SERVER-131322: remove this exclusion once the resharding invariant (BF-44347) is fixed.
     "internalQueryPlannerUseMultiplannerForSingleSolutions",
 ];

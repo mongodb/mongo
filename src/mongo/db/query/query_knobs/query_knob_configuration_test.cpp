@@ -38,6 +38,25 @@ QueryKnobConfiguration makeConfig() {
 }
 
 // ---------------------------------------------------------------------------
+// Parallel query knobs
+// ---------------------------------------------------------------------------
+
+TEST_F(QueryKnobConfigurationTest, ParallelQueryIsDisabledAndSerialByDefault) {
+    auto config = makeConfig();
+    ASSERT_FALSE(config.isParallelQueryEnabled());
+    ASSERT_EQ(config.getMaxDegreeOfParallelism(), 1);
+}
+
+TEST_F(QueryKnobConfigurationTest, ParallelQueryKnobsFollowSetParameter) {
+    unittest::ServerParameterGuard enableGuard{"internalQueryEnableParallelQuery", true};
+    unittest::ServerParameterGuard maxDegreeOfParallelismGuard{
+        "internalQueryMaxDegreeOfParallelism", 8};
+    auto config = makeConfig();
+    ASSERT_TRUE(config.isParallelQueryEnabled());
+    ASSERT_EQ(config.getMaxDegreeOfParallelism(), 8);
+}
+
+// ---------------------------------------------------------------------------
 // getPlanRanker()
 // ---------------------------------------------------------------------------
 
