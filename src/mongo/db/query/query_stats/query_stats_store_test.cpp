@@ -26,8 +26,10 @@
 #include "mongo/db/query/query_stats/aggregated_metric.h"
 #include "mongo/db/query/query_stats/find_key.h"
 #include "mongo/db/query/query_stats/key.h"
+#include "mongo/db/query/query_stats/optimizer_metrics_stats_entry.h"
 #include "mongo/db/query/query_stats/plan_shape_counters/plan_shape_counts.h"
 #include "mongo/db/query/query_stats/query_stats.h"
+#include "mongo/db/query/query_stats/supplemental_metrics_stats.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/collection_type.h"
 #include "mongo/platform/decimal128.h"
@@ -415,6 +417,58 @@ TEST_F(QueryStatsStoreTest, UpdateStatisticsGatesErrorCollectionBehindFeatureFla
             ASSERT_TRUE(entry.recentErrors.hasKey(ErrorCodes::BadValue));
         }
     }
+}
+
+TEST_F(QueryStatsStoreTest, WriteQueryStatsRecordsSupplementalMetrics) {
+    // writeQueryStats() must apply supplemental metrics on both the insert and the update path.
+    // Test catches scenarios where supplemental metrics isn't correctly copied or updated.
+    auto opCtx = makeOperationContext();
+    auto makeMutableFindKey = [&]() -> std::unique_ptr<Key> {
+        auto expCtx = make_intrusive<ExpressionContextForTest>();
+        auto fcr = std::make_unique<FindCommandRequest>(kDefaultTestNss);
+        fcr->setFilter(BSON("query" << 1));
+        auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(fcr)}));
+        auto findShape = std::make_unique<query_shape::FindCmdShape>(*parsedFind, expCtx);
+        return std::make_unique<FindKey>(
+            expCtx, *parsedFind->findCommandRequest, std::move(findShape), collectionType);
+    };
+    auto makeSupplementalMetrics = [](double optimizationTimeMicros) {
+        std::vector<std::unique_ptr<SupplementalStatsEntry>> metrics;
+        metrics.push_back(
+            std::make_unique<OptimizerMetricsClassicStatsEntry>(optimizationTimeMicros));
+        return metrics;
+    };
+    const auto keyHash = absl::HashOf(*makeMutableFindKey());
+
+    // The first write inserts a new entry; the second updates it.
+    query_stats::writeQueryStats(opCtx.get(),
+                                 keyHash,
+                                 makeMutableFindKey(),
+                                 QueryStatsSnapshot{},
+                                 makeSupplementalMetrics(1));
+    query_stats::writeQueryStats(opCtx.get(),
+                                 keyHash,
+                                 makeMutableFindKey(),
+                                 QueryStatsSnapshot{},
+                                 makeSupplementalMetrics(10));
+
+    auto lookupResult = getQueryStatsStore(opCtx.get()).lookup(keyHash);
+    ASSERT_OK(lookupResult);
+    auto& entry = *lookupResult.getValue();
+    ASSERT_TRUE(entry.supplementalStatsMap.get());
+    // A metric dropped on either path shows up as an 'updateCount' of 1 instead of 2.
+    ASSERT_BSONOBJ_EQ(fromjson(R"({
+        "Classic": {
+            "updateCount": 2,
+            "optimizationTimeMicros": {
+                "sum": 11,
+                "max": 10,
+                "min": 1,
+                "sumOfSquares": {"$numberDecimal": "101.0000000000000000000000000000"}
+            }
+        }
+    })"),
+                      entry.supplementalStatsMap->toBSON());
 }
 
 class KeyHashIndexTest : public QueryStatsStoreTest {

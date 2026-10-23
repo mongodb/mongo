@@ -666,24 +666,6 @@ QueryStatsSnapshot captureMetrics(const OperationContext* opCtx,
 namespace {
 
 /**
- * Looks up the entry for 'storeKey' and, if present, updates its metrics. When no entry exists,
- * returns the locked partition so the caller can insert into it.
- */
-boost::optional<QueryStatsStore::Partition> updateExistingEntryOrLock(
-    QueryStatsStore& queryStatsStore,
-    std::size_t storeKey,
-    const QueryStatsSnapshot& snapshot,
-    std::vector<std::unique_ptr<SupplementalStatsEntry>>& supplementalMetrics) {
-    auto&& [statusWithMetrics, partitionLock] = queryStatsStore.getWithPartitionLock(storeKey);
-    if (!statusWithMetrics.isOK()) {
-        return std::move(partitionLock);
-    }
-    updateStatistics(
-        partitionLock, *statusWithMetrics.getValue(), snapshot, std::move(supplementalMetrics));
-    return boost::none;
-}
-
-/**
  * Serializes 'key's representative shape, or returns boost::none when it cannot be serialized. Such
  * a key can be neither indexed nor emitted by $queryStats, so the caller should not store it.
  */
@@ -740,7 +722,12 @@ void writeQueryStats(OperationContext* opCtx,
     {
         // Look up the existing entry while holding its partition lock, but release the lock before
         // the userVisibleHash computation below. Return early if entry was found and updated.
-        if (!updateExistingEntryOrLock(queryStatsStore, *storeKey, snapshot, supplementalMetrics)) {
+        auto&& [statusWithMetrics, partitionLock] = queryStatsStore.getWithPartitionLock(*storeKey);
+        if (statusWithMetrics.isOK()) {
+            updateStatistics(partitionLock,
+                             *statusWithMetrics.getValue(),
+                             snapshot,
+                             std::move(supplementalMetrics));
             return;
         }
     }
@@ -759,15 +746,16 @@ void writeQueryStats(OperationContext* opCtx,
 
     // Re-acquire the partition lock and re-check whether an entry exists. Another writer may have
     // inserted an entry while the partition lock was briefly released.
-    auto result =
-        updateExistingEntryOrLock(queryStatsStore, *storeKey, snapshot, supplementalMetrics);
-    if (!result) {
+    auto&& [statusWithMetrics, partitionLock] = queryStatsStore.getWithPartitionLock(*storeKey);
+    if (statusWithMetrics.isOK()) {
         // Another writer created the entry after our first miss.
+        updateStatistics(
+            partitionLock, *statusWithMetrics.getValue(), snapshot, std::move(supplementalMetrics));
         return;
     }
 
     // Otherwise we still didn't find an existing entry. Try to create one.
-    return insertQueryStatsEntry(*result,
+    return insertQueryStatsEntry(partitionLock,
                                  queryStatsStore,
                                  manager.hasSecondaryIndex(),
                                  storeKey,
