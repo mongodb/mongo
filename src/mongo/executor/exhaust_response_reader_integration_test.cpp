@@ -152,7 +152,7 @@ TEST_F(ExhaustResponseReaderIntegrationFixture, ReceiveMultipleResponses) {
     auto conn = getConnection();
     auto& client = conn->getClient();
 
-    auto request = makeExhaustHello(Milliseconds(150));
+    auto request = makeExhaustHello(Milliseconds(25));
     auto rdr = std::make_shared<ExhaustResponseReaderTL>(
         request,
         assertOK(client.beginExhaustCommandRequest(request).getNoThrow()),
@@ -161,14 +161,16 @@ TEST_F(ExhaustResponseReaderIntegrationFixture, ReceiveMultipleResponses) {
         getReactor(),
         cancelSource.token());
 
-    for (int i = 0; i < 3; i++) {
+    // Exercise the long-lived stream path across many reads before cancellation.
+    for (int i = 0; i < 32; i++) {
         auto next = assertReadOK(*rdr);
         ASSERT(next.moreToCome);
     }
 
+    auto pendingResponse = rdr->next();
     cancelSource.cancel();
 
-    ASSERT_EQ(rdr->next().get().status, ErrorCodes::CallbackCanceled);
+    ASSERT_EQ(pendingResponse.get().status, ErrorCodes::CallbackCanceled);
     ASSERT_EQ(rdr->next().get().status, ErrorCodes::ExhaustCommandFinished);
 
     rdr.reset();
@@ -368,9 +370,9 @@ TEST_F(ExhaustResponseReaderIntegrationFixture, LocalTimeout) {
     auto conn = getConnection();
     auto& client = conn->getClient();
 
-    // Use a maxAwaitTimeMS longer than the local timeout.
-    auto request = makeExhaustHello(Milliseconds(60000));
-    request.timeout = Milliseconds(500);
+    // Use a maxAwaitTimeMS much longer than the local timeout.
+    auto request = makeExhaustHello(Seconds(5));
+    request.timeout = Milliseconds(100);
 
     auto rdr = std::make_shared<ExhaustResponseReaderTL>(
         request,
@@ -382,10 +384,13 @@ TEST_F(ExhaustResponseReaderIntegrationFixture, LocalTimeout) {
     // The initial response wil be available immediately.
     assertReadOK(*rdr);
 
-    // The next one will not be received until maxAwaitTimeMS is hit, so the 500ms local timeout
+    // The next one will not be received until maxAwaitTimeMS is hit, so the 100ms local timeout
     // will cancel the operation early.
+    auto start = Date_t::now();
     auto resp = rdr->next().get();
+    auto elapsed = Date_t::now() - start;
     ASSERT_EQ(resp.status, ErrorCodes::CallbackCanceled);
+    ASSERT_LT(elapsed, Seconds(2));
     rdr.reset();
     assertConnectionStatsSoon(
         getPool(),

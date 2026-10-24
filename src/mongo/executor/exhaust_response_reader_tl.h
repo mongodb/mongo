@@ -36,9 +36,11 @@ public:
     SemiFuture<RemoteCommandResponse> next() final;
 
 private:
+    struct ReadCancellationState;
+
     void _recordConnectionOutcome(Status outcome);
 
-    Future<RemoteCommandResponse> _read();
+    Future<RemoteCommandResponse> _read(const CancellationToken& token);
 
     RemoteCommandRequest _originatingRequest;
     boost::optional<RemoteCommandResponse> _initialResponse;
@@ -49,6 +51,7 @@ private:
     std::shared_ptr<Baton> _baton;
     std::shared_ptr<transport::Reactor> _reactor;
     CancellationSource _cancelSource;
+    std::shared_ptr<ReadCancellationState> _readCancellationState;
     std::unique_ptr<transport::ReactorTimer> _timer;
 };
 }  // namespace mongo::executor
