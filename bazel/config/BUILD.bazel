@@ -1,9 +1,5 @@
 load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@rules_python//python:defs.bzl", "py_binary")
-load("@rules_cc//cc/toolchains:cc_toolchain.bzl", "cc_toolchain")
-load(":toolchain_provenance.bzl", "toolchain_provenance")
-load("//bazel/toolchains/cc:mongo_compiler_flags.bzl", "MONGO_GLOBAL_LINKFLAGS")
-load(":toolchain_versions_test.bzl", "disabled_linker_features_analysis_test", "local_cross_link_inputs_analysis_test", "macos_cross_compile_flags_analysis_test", "macos_cross_local_link_runtime_analysis_test", "macos_cross_remote_link_runtime_analysis_test", "macos_cross_toolchain_versions_analysis_test", "requested_linker_features_analysis_test", "toolchain_versions_analysis_test")
 load(
     "@bazel_skylib//rules:common_settings.bzl",
     "bool_flag",
@@ -78,107 +74,6 @@ load(
 load(":py_action_env_test.bzl", "runtime_pythonpath_test", "template_renderer_python_path_analysis_test")
 
 package(default_visibility = ["//visibility:public"])
-
-toolchain_provenance(
-    name = "toolchain_provenance",
-    cpp_linkflags = MONGO_GLOBAL_LINKFLAGS,
-    local_cross_link = select({
-        ":local_cross_link_version_probe": True,
-        "//conditions:default": False,
-    }),
-    production_release = select({
-        ":production_release": True,
-        "//conditions:default": False,
-    }),
-)
-
-toolchain_versions_analysis_test(
-    name = "toolchain_versions_analysis_test",
-    target_compatible_with = ["@platforms//os:linux"],
-    target_under_test = "//bazel/config:toolchain_provenance",
-)
-
-macos_cross_toolchain_versions_analysis_test(
-    name = "macos_cross_toolchain_versions_analysis_test",
-    tags = ["manual"],
-    target_under_test = "//bazel/config:toolchain_provenance",
-)
-
-macos_cross_compile_flags_analysis_test(
-    name = "macos_cross_compile_flags_analysis_test",
-    tags = ["manual"],
-    target_under_test = "//bazel/toolchains/cc/mongo_linux/testdata/container_boundary:libvoidstar_cc_link_fixture",
-)
-
-macos_cross_remote_link_runtime_analysis_test(
-    name = "macos_cross_remote_link_runtime_analysis_test",
-    tags = ["manual"],
-    target_under_test = "//bazel/config:toolchain_provenance",
-)
-
-macos_cross_local_link_runtime_analysis_test(
-    name = "macos_cross_local_link_runtime_analysis_test",
-    tags = ["manual"],
-    target_under_test = "//bazel/config:toolchain_provenance",
-)
-
-filegroup(
-    name = "linker_features_fixture",
-    testonly = True,
-    srcs = [
-        "//bazel/config:toolchain_provenance",
-        "//bazel/toolchains/cc/mongo_linux/testdata/container_boundary:libvoidstar_cc_link_fixture",
-    ],
-    tags = ["manual"],
-)
-
-requested_linker_features_analysis_test(
-    name = "requested_linker_features_analysis_test",
-    target_compatible_with = ["@platforms//os:linux"],
-    target_under_test = ":linker_features_fixture",
-)
-
-disabled_linker_features_analysis_test(
-    name = "disabled_linker_features_analysis_test",
-    target_compatible_with = ["@platforms//os:linux"],
-    target_under_test = ":linker_features_fixture",
-)
-
-# A minimal toolchain whose all_files excludes the native host linker archive.
-# Analysis-only tests never execute its tools.
-cc_toolchain(
-    name = "probe_test_cc_toolchain",
-    all_files = ":generate_config_header.bzl",
-    ar_files = ":generate_config_header.bzl",
-    compiler_files = ":generate_config_header.bzl",
-    dwp_files = ":generate_config_header.bzl",
-    linker_files = "@mongo_toolchain_v5//:linker_files",
-    objcopy_files = ":generate_config_header.bzl",
-    strip_files = ":generate_config_header.bzl",
-    tags = ["manual"],
-    toolchain_config = "@mongo_toolchain_v5//:cc_clang_toolchain_config",
-)
-
-toolchain(
-    name = "probe_test_toolchain",
-    exec_compatible_with = ["@platforms//os:linux"],
-    target_compatible_with = ["@platforms//os:linux"],
-    toolchain = ":probe_test_cc_toolchain",
-    toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",
-)
-
-toolchain_provenance(
-    name = "local_cross_link_fixture",
-    testonly = True,
-    local_cross_link = True,
-    tags = ["manual"],
-)
-
-local_cross_link_inputs_analysis_test(
-    name = "local_cross_link_inputs_analysis_test",
-    target_compatible_with = ["@platforms//os:linux"],
-    target_under_test = ":local_cross_link_fixture",
-)
 
 runtime_pythonpath_test(name = "runtime_pythonpath_test")
 
@@ -264,17 +159,6 @@ config_setting(
     define_values = {
         "MONGO_IBM_CROSS": "1",
     },
-)
-
-config_setting(
-    name = "local_cross_link_version_probe",
-    constraint_values = ["//bazel/platforms:use_mongo_linux_cross_toolchain"],
-    flag_values = {"//bazel/config:remote_link": "False"},
-)
-
-config_setting(
-    name = "production_release",
-    define_values = {"MONGO_PRODUCTION_RELEASE": "1"},
 )
 
 selects.config_setting_group(

@@ -669,7 +669,6 @@ common:no-remote-exec --jobs=auto
 # Common settings for all types of release builds
 --config=public-release
 common:public-release --//bazel/config:release=True
-common:public-release --define=MONGO_PRODUCTION_RELEASE=1
 common:public-release --//bazel/config:extensions_signature_verification_secure=True
 common:public-release --remote_instance_name=release
 common:public-release --bes_instance_name=release

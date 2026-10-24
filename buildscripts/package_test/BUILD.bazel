@@ -1,18 +1,6 @@
 load("//bazel/uv:defs.bzl", "dependency")
 load("@rules_python//python:defs.bzl", "py_library")
 
-exports_files(["toolchain_versions.json"])
-
-py_library(
-    name = "toolchain_versions",
-    srcs = [
-        "__init__.py",
-        "toolchain_versions.py",
-    ],
-    data = ["toolchain_versions.json"],
-    visibility = ["//visibility:public"],
-)
-
 py_library(
     name = "all_python_files",
     srcs = glob(["*.py"]),
@@ -45,7 +33,6 @@ py_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
-        ":toolchain_versions",
         "//bazel/wrapper_hook:release_distro",
         "//buildscripts:bazel_spawn_pb2",
         dependency(

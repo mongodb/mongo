@@ -121,44 +121,6 @@ bazel_evergreen_shutils::get_provenance_build_invocation_file() {
     esac
 }
 
-# Skip compiler-command generation and builds that disable the C++ toolchain.
-bazel_evergreen_shutils::should_capture_toolchain_provenance() {
-    if bazel_evergreen_shutils::is_windows; then
-        return 1
-    fi
-    local option
-    local previous=""
-    # Match the repository rule: any nonempty value selects the noop toolchain.
-    # Explicit --repo_env overrides take precedence over the inherited value.
-    local inherited_skip_toolchain
-    inherited_skip_toolchain="$(printenv 'no_c++_toolchain' || true)"
-    local skip_toolchain="$inherited_skip_toolchain"
-    for option in "$@"; do
-        case "$option" in
-        compiledb | :compiledb | //:compiledb | compiledb_only | :compiledb_only | //:compiledb_only | --config=compiledb | --config=compiledb-aspect)
-            return 1
-            ;;
-        --repo_env=no_c++_toolchain=*)
-            skip_toolchain="${option#--repo_env=no_c++_toolchain=}"
-            ;;
-        --repo_env=no_c++_toolchain)
-            skip_toolchain="$inherited_skip_toolchain"
-            ;;
-        esac
-        if [[ "$previous" == "--config" && ("$option" == "compiledb" || "$option" == "compiledb-aspect") ]]; then
-            return 1
-        fi
-        if [[ "$previous" == "--repo_env" ]]; then
-            case "$option" in
-            no_c++_toolchain=*) skip_toolchain="${option#no_c++_toolchain=}" ;;
-            no_c++_toolchain) skip_toolchain="$inherited_skip_toolchain" ;;
-            esac
-        fi
-        previous="$option"
-    done
-    [[ -z "$skip_toolchain" ]]
-}
-
 # Requires: evergreen_remote_exec, task_name (for tests), bazel_args vars optionally.
 bazel_evergreen_shutils::compute_local_arg() {
     local mode="${1:-build}" # build|test|run

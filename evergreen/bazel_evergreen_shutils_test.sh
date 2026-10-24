@@ -732,51 +732,6 @@ test_retry_bazel_cmd_does_not_retry_or_sleep_after_final_failure() {
     assert_not_contains "$RETRY_OUTPUT" "next attempt" "final server-death failure should not claim that another retry will run"
 }
 
-test_toolchain_capture_preserves_analysis_only_target_modes() {
-    stub_function bazel_evergreen_shutils::is_windows 'return 1;'
-    local target
-    for target in compiledb :compiledb //:compiledb compiledb_only :compiledb_only //:compiledb_only; do
-        if bazel_evergreen_shutils::should_capture_toolchain_provenance "$target"; then
-            fail "${target} must not trigger toolchain capture"
-        fi
-    done
-    if bazel_evergreen_shutils::should_capture_toolchain_provenance //src/... --config=compiledb; then
-        fail "compiledb configuration must not trigger toolchain capture"
-    fi
-    if bazel_evergreen_shutils::should_capture_toolchain_provenance //src/... --config compiledb-aspect; then
-        fail "compiledb-aspect configuration must not trigger toolchain capture"
-    fi
-    local value
-    for value in 1 true 0; do
-        if bazel_evergreen_shutils::should_capture_toolchain_provenance //buildscripts/resmokeconfig/... "--repo_env=no_c++_toolchain=${value}"; then
-            fail "a nonempty no_c++_toolchain value must skip toolchain capture"
-        fi
-        if bazel_evergreen_shutils::should_capture_toolchain_provenance //buildscripts/resmokeconfig/... --repo_env "no_c++_toolchain=${value}"; then
-            fail "split --repo_env syntax must skip toolchain capture"
-        fi
-    done
-    if ! bazel_evergreen_shutils::should_capture_toolchain_provenance //src/... --repo_env=no_c++_toolchain=; then
-        fail "an empty no_c++_toolchain value leaves the C++ toolchain enabled"
-    fi
-    if ! bazel_evergreen_shutils::should_capture_toolchain_provenance //src/... --repo_env=no_c++_toolchain=1 --repo_env no_c++_toolchain=; then
-        fail "the final repository environment override should determine capture"
-    fi
-    if env 'no_c++_toolchain=1' bash -c 'source "$1"; bazel_evergreen_shutils::should_capture_toolchain_provenance //src/...' bash "${TEST_SRCDIR}/${TEST_WORKSPACE}/evergreen/bazel_evergreen_shutils.sh"; then
-        fail "an inherited no_c++_toolchain value must skip toolchain capture"
-    fi
-    local config
-    for config in opt clang-tidy symbol-checker public-release-local; do
-        if ! bazel_evergreen_shutils::should_capture_toolchain_provenance //src/... "--config=${config}"; then
-            fail "${config} should capture tools separately from the primary build"
-        fi
-    done
-    stub_function bazel_evergreen_shutils::is_windows 'return 0;'
-    if bazel_evergreen_shutils::should_capture_toolchain_provenance archive-dist-stripped; then
-        fail "Windows capture remains deferred"
-    fi
-    restore_stubbed_functions
-}
-
 test_pid_is_live_detects_live_and_dead_pids_on_posix
 test_pid_is_live_uses_tasklist_on_windows
 test_pid_is_live_reports_unknown_when_it_cannot_check
@@ -787,7 +742,6 @@ test_should_disable_gdb_index_for_all_ci_builds
 test_remote_unittest_wrapper_is_test_scoped
 test_query_resmoke_configs_filters_target_universe
 test_provenance_build_invocation_file_selection
-test_toolchain_capture_preserves_analysis_only_target_modes
 test_timeout_prefix_uses_the_expected_fallback_for_each_execution_mode
 test_retry_bazel_cmd_does_not_retry_test_timeouts
 test_compute_local_arg_keeps_cross_rbe_for_ibm_run_mode

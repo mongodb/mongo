@@ -1,11 +1,6 @@
-load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
-load(":libcxx_config_test.bzl", "libcxx_vendor_availability_test")
+load("@rules_python//python:defs.bzl", "py_library", "py_test")
 
 package(default_visibility = ["//visibility:public"])
-
-libcxx_vendor_availability_test(
-    name = "libcxx_vendor_availability_test",
-)
 
 exports_files([
     "container_action.py",
@@ -60,35 +55,4 @@ py_test(
     srcs = ["container_action_test.py"],
     main = "container_action_test.py",
     deps = [":container_action"],
-)
-
-py_binary(
-    name = "toolchain_version_probe",
-    srcs = ["toolchain_version_probe.py"],
-    visibility = ["//visibility:public"],
-)
-
-py_binary(
-    name = "toolchain_version_manifest",
-    srcs = ["toolchain_version_manifest.py"],
-    deps = ["//buildscripts/package_test:toolchain_versions"],
-)
-
-py_test(
-    name = "toolchain_version_probe_test",
-    size = "small",
-    srcs = [
-        "toolchain_version_probe.py",
-        "toolchain_version_probe_test.py",
-    ],
-)
-
-py_test(
-    name = "toolchain_version_manifest_test",
-    size = "small",
-    srcs = [
-        "toolchain_version_manifest.py",
-        "toolchain_version_manifest_test.py",
-    ],
-    deps = ["//buildscripts/package_test:toolchain_versions"],
 )

@@ -35,13 +35,11 @@ from buildscripts.package_test.package_test_commands import (
 from buildscripts.package_test.package_test_internal import write_compressed_text_file
 from buildscripts.package_test.package_test_provenance import (
     RELEASE_BINARY_NAMES,
-    TOOLCHAIN_PROVENANCE_ARTIFACT_NAME,
     combine_execution_log_validation_summaries,
     create_release_binary_provenance_from_archive_dist_test,
     extract_file_from_tar_by_basename,
     fetch_release_binary_provenance_from_tasks,
     fetch_release_execution_log_from_tasks,
-    fetch_task_artifact_text,
     fetch_task_artifact_to_file,
     find_build_task,
     find_task_artifact_url_with_retry,
@@ -51,9 +49,7 @@ from buildscripts.package_test.package_test_provenance import (
     validate_compact_execution_log_file,
     validate_release_binary_provenance_against_archive,
     validate_release_binary_provenance_distro,
-    validate_release_toolchain_provenance,
 )
-from buildscripts.package_test.toolchain_versions import should_require_production_toolchain
 from buildscripts.resmokelib.utils import evergreen_conn
 from buildscripts.simple_report import Report, Result
 
@@ -1163,9 +1159,6 @@ if args.command == "branch":
             args.evg_build_id,
             release_binary_names,
         )
-        validate_release_toolchain_provenance(
-            release_binary_provenance, should_require_production_toolchain(os.environ)
-        )
         logging.info(
             "Validated release binary provenance from %s hash(es) in %s",
             ", ".join(release_binary_names),
@@ -1191,29 +1184,6 @@ if args.command == "branch":
             )
 
         combine_execution_log_validation_summaries(execution_log_summaries)
-
-    elif not args.skip_release_binary_provenance_check:
-        # Ordinary patches do not create release binary/hash provenance. They still
-        # capture tool versions, including patches using a production release profile.
-        if args.binary_provenance_file:
-            validate_release_toolchain_provenance(
-                Path(args.binary_provenance_file).read_text(),
-                should_require_production_toolchain(os.environ),
-            )
-        elif args.evg_build_id:
-            tasks = evergreen_conn.get_evergreen_api().tasks_by_build(args.evg_build_id)
-            build_task = find_build_task(tasks, args.evg_binary_provenance_task_name)
-            toolchain = json.loads(
-                fetch_task_artifact_text(build_task, TOOLCHAIN_PROVENANCE_ARTIFACT_NAME)
-            )
-            validate_release_toolchain_provenance(
-                json.dumps({"toolchain": toolchain}),
-                should_require_production_toolchain(os.environ),
-            )
-        else:
-            raise RuntimeError(
-                "Toolchain provenance validation requires --binary-provenance-file or --evg-build-id"
-            )
 
     for test_pair in args.test:
         test_os = test_pair[0]
