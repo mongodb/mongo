@@ -151,7 +151,7 @@ export function isSUSE16() {
 
 export function isUbuntu() {
     // Ubuntu 18.04 and later compiles openldap against gnutls which does not
-    // support SHA1 signed certificates. ldaptest.10gen.cc uses a SHA1 cert.
+    // support SHA1 signed certificates.
     return isDistro("ubuntu");
 }
 
