@@ -30,6 +30,7 @@ namespace mongo {
 class BSONObjBuilder;
 
 class OperationContext;
+class Interruptible;
 
 /**
  * The PrepareConflictBehavior specifies how operations should behave when encountering prepare
@@ -225,6 +226,36 @@ public:
      */
     virtual PrepareConflictBehavior getPrepareConflictBehavior() const {
         return PrepareConflictBehavior::kEnforce;
+    }
+
+    /**
+     * Returns the number of prepared transactions that have committed or aborted, for use as a
+     * generation counter with waitForPrepareConflictResolution below.
+     */
+    virtual uint64_t getPrepareCommitOrAbortCount() const {
+        uasserted(ErrorCodes::CommandNotSupported,
+                  "Storage engine does not support prepare-conflict notifications");
+    }
+
+    /**
+     * Waits for a prepare-resolution notification newer than 'generation'. A notification may
+     * concern an unrelated transaction; callers must retry their read. This wait does not mark the
+     * operation as storage-blocked on a prepare conflict.
+     *
+     * Capture 'generation' before the storage operation that encounters the conflict; sampling it
+     * afterward can miss the resolving notification and wait indefinitely. Before waiting, unwind
+     * any WriteUnitOfWork, abandon the storage transaction, and release locks/intents or other
+     * resources that could prevent the prepared transaction from resolving. Retry with a fresh
+     * snapshot after waking.
+     *
+     * Requires no active storage transaction. Throws WriteConflict if blocking is disallowed.
+     * This check does not establish that all conflicting resources have been released; callers
+     * remain responsible for releasing them rather than retrying under the same locks.
+     */
+    virtual void waitForPrepareConflictResolution(Interruptible& interruptible,
+                                                  uint64_t generation) {
+        uasserted(ErrorCodes::CommandNotSupported,
+                  "Storage engine does not support prepare-conflict notifications");
     }
 
     /**

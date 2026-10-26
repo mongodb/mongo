@@ -1213,6 +1213,20 @@ PrepareConflictBehavior WiredTigerRecoveryUnit::getPrepareConflictBehavior() con
     return _prepareConflictBehavior;
 }
 
+uint64_t WiredTigerRecoveryUnit::getPrepareCommitOrAbortCount() const {
+    return _connection->getPrepareCommitOrAbortCount();
+}
+
+void WiredTigerRecoveryUnit::waitForPrepareConflictResolution(Interruptible& interruptible,
+                                                              uint64_t generation) {
+    invariant(!_isActive());
+    if (!getBlockingAllowed()) {
+        throwWriteConflictException(
+            "Cannot wait for prepare-conflict resolution when blocking is disallowed");
+    }
+    _connection->waitUntilPreparedUnitOfWorkCommitsOrAborts(interruptible, generation);
+}
+
 void WiredTigerRecoveryUnit::setTimestampReadSource(ReadSource readSource,
                                                     boost::optional<Timestamp> provided) {
     tassert(5863604, "Cannot change ReadSource as it is pinned.", !isReadSourcePinned());

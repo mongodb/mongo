@@ -115,6 +115,11 @@ public:
 
     PrepareConflictBehavior getPrepareConflictBehavior() const override;
 
+    uint64_t getPrepareCommitOrAbortCount() const override;
+
+    void waitForPrepareConflictResolution(Interruptible& interruptible,
+                                          uint64_t generation) override;
+
     /**
      * Set pre-fetching capabilities for this session. This allows pre-loading of a set of pages
      * into the cache and is an optional optimization.

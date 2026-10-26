@@ -132,5 +132,42 @@ TEST_F(WiredTigerPrepareConflictTest, ThrowNonBlocking) {
     ASSERT_EQ(tracker.getThisOpPrepareConflictCount(), 0);
 }
 
+TEST_F(WiredTigerPrepareConflictTest, NotificationBeforeWaitIsNotLost) {
+    auto generation = recoveryUnit->getPrepareCommitOrAbortCount();
+    auto& connection = *WiredTigerRecoveryUnit::get(*recoveryUnit).getConnection();
+    connection.notifyPreparedUnitOfWorkHasCommittedOrAborted();
+    EXPECT_GT(recoveryUnit->getPrepareCommitOrAbortCount(), generation);
+    recoveryUnit->waitForPrepareConflictResolution(interruptible, generation);
+}
+
+TEST_F(WiredTigerPrepareConflictTest, NotificationWaitThrowsWhenBlockingDisallowed) {
+    auto generation = recoveryUnit->getPrepareCommitOrAbortCount();
+    recoveryUnit->setBlockingAllowed(false);
+    EXPECT_THAT([&] { recoveryUnit->waitForPrepareConflictResolution(interruptible, generation); },
+                testing::Throws<StorageUnavailableException>(
+                    unittest::match::CodeIs(ErrorCodes::WriteConflict)));
+}
+
+TEST_F(WiredTigerPrepareConflictTest, UnrelatedNotificationsAllowReadRecheck) {
+    auto& connection = *WiredTigerRecoveryUnit::get(*recoveryUnit).getConnection();
+    auto generation = recoveryUnit->getPrepareCommitOrAbortCount();
+    for (int attempt = 0; attempt < 2; ++attempt) {
+        connection.notifyPreparedUnitOfWorkHasCommittedOrAborted();
+        recoveryUnit->waitForPrepareConflictResolution(interruptible, generation);
+        auto nextGeneration = recoveryUnit->getPrepareCommitOrAbortCount();
+        EXPECT_GT(nextGeneration, generation);
+        generation = nextGeneration;
+    }
+}
+
+TEST_F(WiredTigerPrepareConflictTest, NotificationWaitPropagatesInterruption) {
+    EXPECT_THAT(
+        [&] {
+            recoveryUnit->waitForPrepareConflictResolution(
+                interruptible, recoveryUnit->getPrepareCommitOrAbortCount());
+        },
+        testing::Throws<DBException>(unittest::match::CodeIs(ErrorCodes::Interrupted)));
+}
+
 }  // namespace
 }  // namespace mongo
