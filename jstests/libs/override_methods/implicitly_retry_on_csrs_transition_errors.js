@@ -1,5 +1,5 @@
 /**
- * Overrides runCommand to retry write operations that fail while a replica set is being demoted
+ * Overrides runCommand to retry certain operations that fail while a replica set is being demoted
  * from a config server replica set (CSRS) back to a plain replica set.
  *
  * During a rolling demotion, some members have already been restarted without --configsvr while
@@ -10,7 +10,7 @@
  * This is an accepted side effect of SPM-4300; this override retries it so it does not flake the
  * replica_sets_transition_to_csrs suite.
  *
- * Only retryable write commands are retried. Transactions are left to their own retry logic.
+ * Only collMod and retryable write commands are retried. Transactions are left to their own retry logic.
  */
 
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
@@ -64,7 +64,7 @@ function responseHasCsrsTransitionMismatch(res) {
 }
 
 function shouldRetry(cmdName, cmdObj, res) {
-    if (!RetryableWritesUtil.isRetryableWriteCmdName(cmdName)) {
+    if (cmdName !== "collMod" && !RetryableWritesUtil.isRetryableWriteCmdName(cmdName)) {
         return false;
     }
 
@@ -95,7 +95,7 @@ function runCommandWithRetries(conn, dbName, cmdName, cmdObj, func, makeFuncArgs
             } catch (e) {
                 if (shouldRetry(cmdName, cmdObj, e)) {
                     jsTest.log.info(
-                        "Retrying write '" +
+                        "Retrying command '" +
                             cmdName +
                             "' after CSRS transition mismatch. Attempt: " +
                             attempt,
@@ -109,7 +109,7 @@ function runCommandWithRetries(conn, dbName, cmdName, cmdObj, func, makeFuncArgs
 
             if (shouldRetry(cmdName, cmdObj, res)) {
                 jsTest.log.info(
-                    "Retrying write '" +
+                    "Retrying command '" +
                         cmdName +
                         "' after CSRS transition mismatch. Attempt: " +
                         attempt,
