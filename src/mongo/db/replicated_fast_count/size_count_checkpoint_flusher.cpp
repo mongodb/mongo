@@ -58,7 +58,6 @@ boost::optional<FlushResult> flush(OperationContext* opCtx,
         }
         Lock::GlobalLock writeLock(opCtx, MODE_IX);
 
-        // Source of truth for the last durable checkpoint, replacing batch.startAfter.
         const Timestamp currentValidAsOf = timestampStore.read(opCtx).value_or(Timestamp{});
         const auto checkpoint =
             materializeCheckpointSnapshot(opCtx, sizeCountStore, batch, currentValidAsOf);
