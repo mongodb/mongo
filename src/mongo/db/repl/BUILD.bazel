@@ -1327,6 +1327,7 @@ mongo_cc_library(
     ],
     deps = [
         ":optime",
+        ":repl_server_parameters",
         "//src/mongo:base",
         "//src/mongo/db:multi_key_path_tracker",
         "//src/mongo/stdx",
@@ -2308,6 +2309,7 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_second_group"],
     deps = [
         ":pipelined_applier_batch_tracker",
+        ":repl_server_parameters",
         "//src/mongo:base",
         "//src/mongo/stdx",
         "//src/mongo/unittest",

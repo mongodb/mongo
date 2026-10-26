@@ -3,13 +3,17 @@
 
 #include "mongo/db/repl/pipelined_applier_batch_tracker.h"
 
+#include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/platform/waitable_atomic.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/unittest/join_thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/timer.h"
 
 #include <future>
+#include <limits>
 
 namespace mongo::repl {
 namespace {
@@ -18,6 +22,30 @@ OpTimeAndWallTime batchTime(uint32_t timestamp) {
     return {OpTime(Timestamp(timestamp, 1), 1), Date_t::fromMillisSinceEpoch(timestamp * 1000)};
 }
 
+// RAII helper to override the pipelined applier server parameters for a scope, restoring the
+// previous values on destruction so tests don't leak state to one another.
+class ScopedBackpressureParams {
+public:
+    ScopedBackpressureParams(long long maxBatches, long long maxBytes, double hysteresisFactor)
+        : _prevMaxBatches(pipelinedApplierMaxInflightBatches.load()),
+          _prevMaxBytes(pipelinedApplierMaxInflightBytes.load()),
+          _prevHysteresis(pipelinedApplierHysteresisFactor.load()) {
+        pipelinedApplierMaxInflightBatches.store(maxBatches);
+        pipelinedApplierMaxInflightBytes.store(maxBytes);
+        pipelinedApplierHysteresisFactor.store(hysteresisFactor);
+    }
+    ~ScopedBackpressureParams() {
+        pipelinedApplierMaxInflightBatches.store(_prevMaxBatches);
+        pipelinedApplierMaxInflightBytes.store(_prevMaxBytes);
+        pipelinedApplierHysteresisFactor.store(_prevHysteresis);
+    }
+
+private:
+    long long _prevMaxBatches;
+    long long _prevMaxBytes;
+    double _prevHysteresis;
+};
+
 TEST(PipelinedApplierBatchTrackerTest, WaitTimesOutWithoutACompletedFrontBatch) {
     PipelinedApplierBatchTracker tracker;
     const auto maxWaitTime = Milliseconds(100);
@@ -25,7 +53,7 @@ TEST(PipelinedApplierBatchTrackerTest, WaitTimesOutWithoutACompletedFrontBatch) 
     ASSERT_FALSE(tracker.popCompletedBatch(maxWaitTime));
     ASSERT_GTE(timer.elapsed(), maxWaitTime);
 
-    tracker.addBatch(batchTime(1), 1, {}, {}, nullptr);
+    tracker.addBatch(batchTime(1), 1, {}, {}, nullptr, 0);
     timer.reset();
     ASSERT_FALSE(tracker.popCompletedBatch(maxWaitTime));
     ASSERT_GTE(timer.elapsed(), maxWaitTime);
@@ -33,8 +61,8 @@ TEST(PipelinedApplierBatchTrackerTest, WaitTimesOutWithoutACompletedFrontBatch) 
 
 TEST(PipelinedApplierBatchTrackerTest, CountsParticipatingWorkersAndPopsInDispatchOrder) {
     PipelinedApplierBatchTracker tracker;
-    auto first = tracker.addBatch(batchTime(1), /*numWorkers=*/2, {}, {}, nullptr);
-    auto second = tracker.addBatch(batchTime(2), /*numWorkers=*/1, {}, {}, nullptr);
+    auto first = tracker.addBatch(batchTime(1), /*numWorkers=*/2, {}, {}, nullptr, 0);
+    auto second = tracker.addBatch(batchTime(2), /*numWorkers=*/1, {}, {}, nullptr, 0);
     // Ensure the pointers to the atomic counters are different.
     ASSERT_NE(first, second);
     ASSERT_EQ(first->load(), 2);
@@ -64,8 +92,8 @@ TEST(PipelinedApplierBatchTrackerTest, CountsParticipatingWorkersAndPopsInDispat
 
 TEST(PipelinedApplierBatchTrackerTest, ZeroWorkerBatchWaitsForEarlierBatch) {
     PipelinedApplierBatchTracker tracker;
-    auto first = tracker.addBatch(batchTime(1), 1, {}, {}, nullptr);
-    auto empty = tracker.addBatch(batchTime(2), 0, {}, {}, nullptr);
+    auto first = tracker.addBatch(batchTime(1), 1, {}, {}, nullptr, 0);
+    auto empty = tracker.addBatch(batchTime(2), 0, {}, {}, nullptr, 0);
     ASSERT_EQ(empty->load(), 0);
     ASSERT_FALSE(tracker.popCompletedBatch(Milliseconds(0)));
 
@@ -81,7 +109,7 @@ TEST(PipelinedApplierBatchTrackerTest, ZeroWorkerBatchWaitsForEarlierBatch) {
 
 TEST(PipelinedApplierBatchTrackerTest, CompletionBeforeWaitIsNotLost) {
     PipelinedApplierBatchTracker tracker;
-    auto counter = tracker.addBatch(batchTime(1), 1, {}, {}, nullptr);
+    auto counter = tracker.addBatch(batchTime(1), 1, {}, {}, nullptr, 0);
     tracker.onWorkerCompletion(counter);
     auto completed = tracker.popCompletedBatch(Milliseconds(0));
     ASSERT_TRUE(completed);
@@ -92,7 +120,7 @@ TEST(PipelinedApplierBatchTrackerTest, CompletionBeforeWaitIsNotLost) {
 // The last worker to finish a batch wakes the waiting consumer before its timeout expires.
 TEST(PipelinedApplierBatchTrackerTest, LastWorkerWakesConsumer) {
     PipelinedApplierBatchTracker tracker;
-    auto counter = tracker.addBatch(batchTime(1), 2, {}, {}, nullptr);
+    auto counter = tracker.addBatch(batchTime(1), 2, {}, {}, nullptr, 0);
     tracker.onWorkerCompletion(counter);
     std::promise<boost::optional<PipelinedApplierBatchTracker::InflightBatch>> promise;
     auto result = promise.get_future();
@@ -134,7 +162,7 @@ TEST(PipelinedApplierBatchTrackerTest, EnqueuingZeroWorkerBatchWakesConsumer) {
         consumer = stdx::thread([&] { promise.set_value(tracker.popCompletedBatch(Seconds(60))); });
         beforeWait.waitForOneNewEntry();
     }
-    tracker.addBatch(batchTime(1), 0, {}, {}, nullptr);
+    tracker.addBatch(batchTime(1), 0, {}, {}, nullptr, 0);
     ASSERT_EQ(result.wait_for(Seconds(10).toSystemDuration()), std::future_status::ready);
     auto completed = result.get();
     ASSERT_TRUE(completed);
@@ -144,7 +172,7 @@ TEST(PipelinedApplierBatchTrackerTest, EnqueuingZeroWorkerBatchWakesConsumer) {
 
 TEST(PipelinedApplierBatchTrackerTest, EmptyQueueRemainsBusyUntilPublicationFinishes) {
     PipelinedApplierBatchTracker tracker;
-    tracker.addBatch(batchTime(1), 0, {}, {}, nullptr);
+    tracker.addBatch(batchTime(1), 0, {}, {}, nullptr, 0);
     ASSERT_TRUE(tracker.popCompletedBatch(Milliseconds(0)));
     std::promise<bool> promise;
     auto idle = promise.get_future();
@@ -173,7 +201,7 @@ TEST(PipelinedApplierBatchTrackerTest, EmptyQueueRemainsBusyUntilPublicationFini
 
 TEST(PipelinedApplierBatchTrackerTest, AbandonedBatchWakesIdleWaitWithoutCompletingTheBatch) {
     PipelinedApplierBatchTracker tracker;
-    auto remaining = tracker.addBatch(batchTime(1), 1, {}, {}, nullptr);
+    auto remaining = tracker.addBatch(batchTime(1), 1, {}, {}, nullptr, 0);
     std::promise<bool> promise;
     auto idle = promise.get_future();
     stdx::thread waiter;
@@ -197,7 +225,7 @@ TEST(PipelinedApplierBatchTrackerTest, AbandonedBatchWakesIdleWaitWithoutComplet
 
 TEST(PipelinedApplierBatchTrackerTest, ShutdownWakesConsumerWithoutPoppingWork) {
     PipelinedApplierBatchTracker tracker;
-    tracker.addBatch(batchTime(1), 1, {}, {}, nullptr);
+    tracker.addBatch(batchTime(1), 1, {}, {}, nullptr, 0);
     std::promise<boost::optional<PipelinedApplierBatchTracker::InflightBatch>> promise;
     auto result = promise.get_future();
     stdx::thread consumer;
@@ -216,6 +244,168 @@ TEST(PipelinedApplierBatchTrackerTest, ShutdownWakesConsumerWithoutPoppingWork) 
     ASSERT_EQ(result.wait_for(Seconds(10).toSystemDuration()), std::future_status::ready);
     ASSERT_FALSE(result.get());
     ASSERT_TRUE(tracker.isShutdown());
+}
+
+TEST(PipelinedApplierBatchTrackerTest, BackpressureNecessaryReportsCorrectly) {
+    ASSERT_FALSE(PipelinedApplierBatchTracker::backpressureNecessary(
+        0 /* batchCount */, 0 /* byteCount */, 10 /* maxBatches */, 100 /* maxBytes */));
+    ASSERT_FALSE(PipelinedApplierBatchTracker::backpressureNecessary(
+        10 /* batchCount */, 0 /* byteCount */, 10 /* maxBatches */, 100 /* maxBytes */));
+    ASSERT_FALSE(PipelinedApplierBatchTracker::backpressureNecessary(
+        0 /* batchCount */, 100 /* byteCount */, 10 /* maxBatches */, 100 /* maxBytes */));
+    ASSERT_FALSE(PipelinedApplierBatchTracker::backpressureNecessary(
+        10 /* batchCount */, 100 /* byteCount */, 10 /* maxBatches */, 100 /* maxBytes */));
+
+    {
+        auto reason = PipelinedApplierBatchTracker::backpressureNecessary(
+            12 /* batchCount */, 100 /* byteCount */, 10 /* maxBatches */, 100 /* maxBytes */);
+        ASSERT_TRUE(reason);
+        ASSERT_EQ(reason->batchesOverThreshold, 2);
+        ASSERT_EQ(reason->bytesOverThreshold, 0);
+    }
+    {
+        auto reason = PipelinedApplierBatchTracker::backpressureNecessary(
+            5 /* batchCount */, 116 /* byteCount */, 10 /* maxBatches */, 100 /* maxBytes */);
+        ASSERT_TRUE(reason);
+        ASSERT_EQ(reason->batchesOverThreshold, 0);
+        ASSERT_EQ(reason->bytesOverThreshold, 16);
+    }
+    {
+        auto reason = PipelinedApplierBatchTracker::backpressureNecessary(
+            12 /* batchCount */, 116 /* byteCount */, 10 /* maxBatches */, 100 /* maxBytes */);
+        ASSERT_TRUE(reason);
+        ASSERT_EQ(reason->batchesOverThreshold, 2);
+        ASSERT_EQ(reason->bytesOverThreshold, 16);
+    }
+}
+
+// Tests that adding a batch that pushes us over our limit(s) blocks and we only unblock once we
+// drop under our lower limit (limit * hysteresis_factor). We configure the limits so that we can
+// test the following situations for the byte and batch limits independently, and then together:
+//
+// (ops_limit=3 and/or bytes_limit=900)
+// (lower_ops_limit=floor(3*0.5)=1, lower_bytes_limit=floor(900*0.5)=450)
+// 1. under limit (ops=2 and bytes=600)
+// 2. on limit (ops=3 and bytes=900)
+// 3. over limit, will block on next push (ops=4 and bytes=1200)
+// 4. blocks (dispatcher waits before pushing; inflight stays at ops=4, bytes=1200)
+// 5. back on limit, still blocked (ops=3 and bytes=900)
+// 6. below limit, over lower limit, still blocked (ops=2 and bytes=600)
+// 7. on/below lower limit, unblocked (ops=1 and bytes=300)
+TEST(PipelinedApplierBatchTrackerTest, AddBatchBlocksAndHysteresisUnblocks) {
+    constexpr long long perBatchBytes = 300;
+    constexpr double hysteresisFactor = 0.5;
+
+    auto run = [&](std::string_view scenario, long long maxBatches, long long maxBytes) {
+        ScopedBackpressureParams params(maxBatches, maxBytes, hysteresisFactor);
+        PipelinedApplierBatchTracker tracker;
+
+        // Case 1: under limit
+        tracker.addBatch(batchTime(1), 0 /* numWorkers */, {}, {}, nullptr, perBatchBytes);
+        tracker.addBatch(batchTime(2), 0 /* numWorkers */, {}, {}, nullptr, perBatchBytes);
+
+        // Case 2: on limit
+        tracker.addBatch(batchTime(3), 0 /* numWorkers */, {}, {}, nullptr, perBatchBytes);
+
+        // Case 3: over limit, will block on next push
+        tracker.addBatch(batchTime(4), 0 /* numWorkers */, {}, {}, nullptr, perBatchBytes);
+
+        std::shared_ptr<std::atomic<uint32_t>> fifth;
+        WaitableAtomic<bool> done{false};
+        unittest::JoinThread dispatch;
+        {
+            FailPointEnableBlock beforeCapacityWait("hangBeforePipelinedApplierCapacityWait");
+            // Case 4: blocks due to limit
+            dispatch = unittest::JoinThread{[&] {
+                fifth = tracker.addBatch(batchTime(5), 1, {}, {}, nullptr, perBatchBytes);
+                done.store(true);
+                done.notifyAll();
+            }};
+            beforeCapacityWait->waitForTimesEntered(beforeCapacityWait.initialTimesEntered() + 1);
+        }
+        ASSERT_FALSE(done.waitFor(false, Milliseconds(200))) << scenario;
+
+        // Case 5: back on limit
+        auto pop1 = tracker.popCompletedBatch(Seconds(10));
+        ASSERT_TRUE(pop1) << scenario;
+        tracker.onBatchPublished();
+        // still blocked
+        ASSERT_FALSE(done.waitFor(false, Milliseconds(200))) << scenario;
+
+        // Case 6: below limit, above lower limit
+        auto pop2 = tracker.popCompletedBatch(Seconds(10));
+        ASSERT_TRUE(pop2) << scenario;
+        tracker.onBatchPublished();
+        // still blocked
+        ASSERT_FALSE(done.waitFor(false, Milliseconds(200))) << scenario;
+
+        // Case 7: on/below lower limit
+        auto pop3 = tracker.popCompletedBatch(Seconds(10));
+        ASSERT_TRUE(pop3) << scenario;
+        tracker.onBatchPublished();
+        // unblocked
+        ASSERT_TRUE(done.waitFor(false, Seconds(10))) << scenario;
+
+        ASSERT(fifth) << scenario;
+        ASSERT_EQ(fifth->load(), 1) << scenario;
+
+        // Drain the remaining batches to leave the tracker idle
+        auto pop4 = tracker.popCompletedBatch(Seconds(10));
+        ASSERT_TRUE(pop4) << scenario;
+        tracker.onBatchPublished();
+
+        tracker.onWorkerCompletion(fifth);
+        auto pop5 = tracker.popCompletedBatch(Seconds(10));
+        ASSERT_TRUE(pop5) << scenario;
+        ASSERT_EQ(pop5->lastOpTime, batchTime(5)) << scenario;
+        tracker.onBatchPublished();
+
+        ASSERT_FALSE(tracker.popCompletedBatch(Milliseconds(250)));
+    };
+
+    // Tight batch cap, no byte cap: trips on batch count.
+    run("batches", 3, std::numeric_limits<long long>::max());
+
+    // No batch cap, tight byte cap: trips on bytes.
+    run("bytes", std::numeric_limits<long long>::max(), 3 * perBatchBytes);
+
+    // Both caps tight: must re-check both dimensions on wakeup.
+    run("both", 3, 3 * perBatchBytes);
+}
+
+// A shutdown while a dispatcher is blocked on capacity must wake it and cause addBatch to return
+// nullptr rather than a live counter.
+TEST(PipelinedApplierBatchTrackerTest, ShutdownWakesDispatcherBlockedOnCapacity) {
+    ScopedBackpressureParams params(
+        1 /* maxBatches */, std::numeric_limits<long long>::max() /* maxBytes */, 0.5);
+    PipelinedApplierBatchTracker tracker;
+
+    // Add one batch to hit the threshold, and another batch to push us over the threshold.
+    auto first =
+        tracker.addBatch(batchTime(1), 0 /* numWorkers */, {}, {}, nullptr, 0 /* batchBytes */);
+    auto second =
+        tracker.addBatch(batchTime(2), 0 /* numWorkers */, {}, {}, nullptr, 0 /* batchBytes */);
+
+    WaitableAtomic<bool> done{false};
+    std::shared_ptr<std::atomic<uint32_t>> result;
+    unittest::JoinThread dispatcher;
+    {
+        FailPointEnableBlock beforeCapacityWait("hangBeforePipelinedApplierCapacityWait");
+        dispatcher = unittest::JoinThread{[&] {
+            result = tracker.addBatch(batchTime(3), 1, {}, {}, nullptr, 0 /* batchBytes */);
+            done.store(true);
+            done.notifyAll();
+        }};
+        beforeCapacityWait->waitForTimesEntered(beforeCapacityWait.initialTimesEntered() + 1);
+    }
+    ASSERT_FALSE(done.waitFor(false, Milliseconds(200)));
+
+    tracker.shutdown();
+    ASSERT_TRUE(done.waitFor(false, Seconds(10)));
+    ASSERT_EQ(result, nullptr);
+    ASSERT_TRUE(tracker.isShutdown());
+
+    tracker.onWorkerAbandonment();
 }
 
 }  // namespace

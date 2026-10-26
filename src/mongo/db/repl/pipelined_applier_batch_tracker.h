@@ -40,17 +40,33 @@ public:
         // are applying the batch.
         std::vector<OplogEntry> ops;
         std::vector<std::vector<OplogEntry>> derivedOps;
+        // Serialized byte size of the batch's ops, contributed to _inflightBytes at addBatch and
+        // released at popCompletedBatch.
+        uint64_t batchBytes = 0;
         // Worker results are visible after remainingWorkers reaches zero.
         std::shared_ptr<std::vector<WorkerMultikeyPathInfo>> multikeyMetadata;
     };
 
     // Registers a batch before dispatch and returns the counter shared by its worker slices.
+    // Blocks if either the length of the queue or the total size of the queue in bytes is over the
+    // server parameter thresholds. Returns nullptr if a shutdown was requested while the dispatcher
+    // was waiting.
     std::shared_ptr<std::atomic<uint32_t>> addBatch(
         OpTimeAndWallTime lastOpTime,
         uint32_t numWorkers,
         std::vector<OplogEntry> ops,
         std::vector<std::vector<OplogEntry>> derivedOps,
-        std::shared_ptr<std::vector<WorkerMultikeyPathInfo>> multikeyMetadata);
+        std::shared_ptr<std::vector<WorkerMultikeyPathInfo>> multikeyMetadata,
+        uint64_t batchBytes);
+
+    struct BackpressureReason {
+        uint64_t batchesOverThreshold;
+        uint64_t bytesOverThreshold;
+    };
+    static boost::optional<BackpressureReason> backpressureNecessary(uint64_t batchCount,
+                                                                     uint64_t byteCount,
+                                                                     uint64_t batchLimit,
+                                                                     uint64_t byteLimit);
 
     // Signals completion of one worker slice and notifies the consumer when its batch is complete.
     // Called from the worker thread.
@@ -82,7 +98,9 @@ private:
     mutable std::mutex _mutex;
     stdx::condition_variable _cv;
     stdx::condition_variable _idleCv;
+    stdx::condition_variable _capacityCv;
     std::deque<InflightBatch> _inflightBatches;  // (M)
+    uint64_t _inflightBytes = 0;                 // (M)
     bool _advancerBusy = false;                  // (M)
     bool _hasAbandonedBatch = false;             // (M)
     bool _shutdown = false;                      // (M)

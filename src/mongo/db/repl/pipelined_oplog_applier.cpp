@@ -214,21 +214,36 @@ void PipelinedOplogApplier::_dispatchBatchToWorkers(OperationContext* opCtx,
     std::vector<WorkItem> items(numWorkers);
     uint32_t participatingWorkers = 0;
     int64_t opsDispatched = 0;
+    // Tracks the total serialized byte size of the ops dispatched in this batch, used by the batch
+    // tracker to apply byte-based backpressure.
+    uint64_t batchBytes = 0;
     for (size_t workerIdx = 0; workerIdx < numWorkers; ++workerIdx) {
         if (writerVectors[workerIdx].empty())
             continue;
         ++participatingWorkers;
         opsDispatched += writerVectors[workerIdx].size();
+        for (const auto& applierOp : writerVectors[workerIdx]) {
+            batchBytes += applierOp->getRawObjSizeBytes();
+        }
         items[workerIdx].ops = std::move(writerVectors[workerIdx]);
     }
 
     // Register the batch and move "ops" and "derivedOps" into the batch tracker. This is to
     // guarantee that the oplog entries in the batch are alive for the duration the workers apply
     // the batch. The original batch boundary is registered even when the dispatching routes no
-    // operations to any worker, so lastApplied still reaches it.
+    // operations to any worker, so lastApplied still reaches it. addBatch may also block here if
+    // the tracker is applying backpressure due to the inflight-batches or inflight-bytes caps.
     auto multikeyMetadata = std::make_shared<std::vector<WorkerMultikeyPathInfo>>(numWorkers);
-    auto remainingWorkers = _batchTracker.addBatch(
-        lastOpTime, participatingWorkers, std::move(ops), std::move(derivedOps), multikeyMetadata);
+    auto remainingWorkers = _batchTracker.addBatch(lastOpTime,
+                                                   participatingWorkers,
+                                                   std::move(ops),
+                                                   std::move(derivedOps),
+                                                   multikeyMetadata,
+                                                   batchBytes);
+    if (!remainingWorkers) {
+        // Batch tracker shut down while we were waiting for capacity.
+        return;
+    }
     PipelinedApplyOtelMetrics::addOpsDispatched(opsDispatched);
     for (size_t workerIdx = 0; workerIdx < numWorkers; ++workerIdx) {
         if (!items[workerIdx].ops.empty()) {

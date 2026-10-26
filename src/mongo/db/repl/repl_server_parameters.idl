@@ -320,6 +320,50 @@ server_parameters:
                 expr: 100 * 1024 * 1024
         redact: false
 
+    pipelinedApplierMaxInflightBatches:
+        description: >-
+            Pipelined applier inflight batch count threshold. The dispatcher blocks when
+            the queue length exceeds this threshold and resumes as the advancer pops
+            completed batches.
+        set_at: [startup, runtime]
+        cpp_vartype: Atomic<long long>
+        cpp_varname: pipelinedApplierMaxInflightBatches
+        default: 256
+        validator:
+            gte: 1
+        redact: false
+
+    pipelinedApplierMaxInflightBytes:
+        description: >-
+            Pipelined applier inflight byte count threshold. The dispatcher blocks when
+            the cumulative byte count of each op in the queue exceeds this threshold and
+            resumes as the advancer pops completed batches.
+        set_at: [startup, runtime]
+        cpp_vartype: Atomic<long long>
+        cpp_varname: pipelinedApplierMaxInflightBytes
+        default:
+            expr: 1024LL * 1024 * 1024
+        validator:
+            gte: 1
+        redact: false
+
+    pipelinedApplierHysteresisFactor:
+        description: >-
+            Hysteresis factor applied to the pipelined applier's in-flight thresholds.
+            When the dispatcher blocks after tipping over a threshold, it remains blocked
+            until the corresponding in-flight value dips below (threshold * factor) before
+            unblocking. This is to avoid the batch counts repeatedly flipping over and
+            under the threshold.
+            Must be in the range (0, 1].
+        set_at: [startup, runtime]
+        cpp_vartype: Atomic<double>
+        cpp_varname: pipelinedApplierHysteresisFactor
+        default: 0.5
+        validator:
+            gt: 0.0
+            lte: 1.0
+        redact: false
+
     recoverFromOplogAsStandalone:
         description: Tells the server to perform replication recovery as a standalone.
         set_at: startup
