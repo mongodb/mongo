@@ -1303,9 +1303,7 @@ bool ReplicationCoordinatorExternalStateImpl::isCWWCSetOnConfigShard(
 
 void ReplicationCoordinatorExternalStateImpl::_stopReplicatedFastCountThread() {
     auto opCtx = cc().getOperationContext();
-    if (isReplicatedFastCountEnabled(opCtx)) {
-        replicated_fast_count::ReplicatedFastCountManager::get(_service).shutdown(opCtx);
-    }
+    replicated_fast_count::ReplicatedFastCountManager::get(_service).shutdown(opCtx);
 }
 }  // namespace repl
 }  // namespace mongo
