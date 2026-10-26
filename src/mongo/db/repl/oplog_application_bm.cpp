@@ -580,6 +580,11 @@ public:
             auto opCtx = opCtxRaii.get();
             repl::UnreplicatedWritesBlock noRep(opCtx);
 
+            // This test applies oplog entries in _oplogEntries, not the oplog itself, but the oplog
+            // must exist in the catalog to perform checkpoint validation during oplog application,
+            // so we create it here.
+            repl::createOplog(opCtx);
+
             const bool allowRename = false;
             Lock::GlobalLock lk(opCtx, LockMode::MODE_X);
             auto storageInterface = repl::StorageInterface::get(opCtx);
