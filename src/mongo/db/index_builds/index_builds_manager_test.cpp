@@ -209,11 +209,12 @@ TEST_F(IndexBuildsManagerTest, CommitIndexBuildMultikeysAreResetWhenWceFiresAfte
         opCtx, collection, indexes, _buildUUID, MultiIndexBlock::kNoopOnInitFn));
     ASSERT_OK(
         _indexBuildsManager.startBuildingIndex(opCtx, _nss.dbName(), collectionUUID, _buildUUID));
-    ASSERT_OK(_indexBuildsManager.drainBackgroundWrites(
-        opCtx,
-        _buildUUID,
-        RecoveryUnit::ReadSource::kNoTimestamp,
-        IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+    ASSERT_OK(
+        _indexBuildsManager.drainBackgroundWrites(opCtx,
+                                                  _buildUUID,
+                                                  RecoveryUnit::ReadSource::kNoTimestamp,
+                                                  IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
+                                                  IndexBuildInterceptor::DrainPhase::kFinal));
 
     int commitAttempts = 0;
     size_t multikeysAtCommit = 0;

@@ -3790,7 +3790,8 @@ void IndexBuildsCoordinator::_resumeHybridIndexBuildFromPhase(
         _insertSortedKeysIntoIndexForResume(opCtx, replState);
     }
 
-    _insertKeysFromSideTablesWithoutBlockingWrites(opCtx, replState);
+    _insertKeysFromSideTablesWithoutBlockingWrites(
+        opCtx, replState, IndexBuildInterceptor::DrainPhase::kBeforeReadiness);
     _signalPrimaryForCommitReadiness(opCtx, replState);
     _waitForNextIndexBuildActionAndCommit(opCtx, replState, indexBuildOptions);
 }
@@ -3917,7 +3918,8 @@ void IndexBuildsCoordinator::_buildHybridIndex(OperationContext* opCtx,
     // The collection scan might read with a kMajorityCommitted read source, but will restore
     // kNoTimestamp afterwards.
     _scanCollectionAndInsertSortedKeysIntoIndex(opCtx, replState);
-    _insertKeysFromSideTablesWithoutBlockingWrites(opCtx, replState);
+    _insertKeysFromSideTablesWithoutBlockingWrites(
+        opCtx, replState, IndexBuildInterceptor::DrainPhase::kBeforeReadiness);
     _signalPrimaryForCommitReadiness(opCtx, replState);
     _waitForNextIndexBuildActionAndCommit(opCtx, replState, indexBuildOptions);
 }
@@ -3983,7 +3985,8 @@ void IndexBuildsCoordinator::_buildPrimaryDrivenIndex(
         // The collection scan might read with a kMajorityCommitted read source, but will restore
         // kNoTimestamp afterwards.
         _scanCollectionAndInsertSortedKeysIntoIndex(opCtx, replState);
-        _insertKeysFromSideTablesWithoutBlockingWrites(opCtx, replState);
+        _insertKeysFromSideTablesWithoutBlockingWrites(
+            opCtx, replState, IndexBuildInterceptor::DrainPhase::kBeforeReadiness);
         _signalPrimaryForCommitReadiness(opCtx, replState);
         _waitForNextIndexBuildActionAndCommit(opCtx, replState, indexBuildOptions);
     } else {
@@ -4094,7 +4097,9 @@ void IndexBuildsCoordinator::_insertSortedKeysIntoIndexForResume(
  * Third phase is catching up on all the writes that occurred during the first two phases.
  */
 void IndexBuildsCoordinator::_insertKeysFromSideTablesWithoutBlockingWrites(
-    OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
+    OperationContext* opCtx,
+    std::shared_ptr<ReplIndexBuildState> replState,
+    IndexBuildInterceptor::DrainPhase drainPhase) {
     indexBuildsSSS.drainSideWritesTable.addAndFetch(1);
 
     // Perform the first drain while holding an intent lock.
@@ -4113,7 +4118,8 @@ void IndexBuildsCoordinator::_insertKeysFromSideTablesWithoutBlockingWrites(
             opCtx,
             replState->buildUUID,
             getReadSourceForDrainBeforeCommitQuorum(*replState),
-            IndexBuildInterceptor::DrainYieldPolicy::kYield));
+            IndexBuildInterceptor::DrainYieldPolicy::kYield,
+            drainPhase));
     }
 
     if (MONGO_unlikely(hangAfterIndexBuildFirstDrain.shouldFail())) {
@@ -4193,11 +4199,12 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
     indexBuildsSSS.drainSideWritesTableOnCommit.addAndFetch(1);
     // Perform the third and final drain after releasing a shared lock and reacquiring an
     // exclusive lock on the collection.
-    uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(
-        opCtx,
-        replState->buildUUID,
-        RecoveryUnit::ReadSource::kNoTimestamp,
-        IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+    uassertStatusOK(
+        _indexBuildsManager.drainBackgroundWrites(opCtx,
+                                                  replState->buildUUID,
+                                                  RecoveryUnit::ReadSource::kNoTimestamp,
+                                                  IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
+                                                  IndexBuildInterceptor::DrainPhase::kFinal));
 
     try {
         failIndexBuildOnCommit.execute(
@@ -4390,7 +4397,8 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::_runIndexReb
             opCtx,
             replState->buildUUID,
             RecoveryUnit::ReadSource::kNoTimestamp,
-            IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+            IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
+            IndexBuildInterceptor::DrainPhase::kFinal));
 
         if (auto status = _indexBuildsManager.checkIndexConstraintViolations(
                 opCtx, collection.get(), replState->buildUUID);

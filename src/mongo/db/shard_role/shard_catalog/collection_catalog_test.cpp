@@ -1458,7 +1458,8 @@ public:
             ASSERT_OK(multiIndexBlock.drainBackgroundWrites(
                 opCtx,
                 RecoveryUnit::ReadSource::kNoTimestamp,
-                IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+                IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
+                IndexBuildInterceptor::DrainPhase::kFinal));
         }
 
         _concurrentDDLOperationAndEstablishConsistentCollection(

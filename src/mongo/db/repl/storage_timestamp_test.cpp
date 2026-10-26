@@ -3546,7 +3546,8 @@ TEST_F(StorageTimestampTest, IndexBuildsResolveErrorsDuringStateChangeToPrimary)
     ASSERT_FALSE(buildingIndex->indexBuildInterceptor()->areAllWritesApplied(_opCtx));
     ASSERT_OK(indexer.drainBackgroundWrites(_opCtx,
                                             RecoveryUnit::ReadSource::kNoTimestamp,
-                                            IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+                                            IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
+                                            IndexBuildInterceptor::DrainPhase::kFinal));
 
 
     // This succeeds because the bad documents are now either valid or removed.

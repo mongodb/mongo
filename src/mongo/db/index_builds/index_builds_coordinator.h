@@ -812,7 +812,9 @@ protected:
      * Third phase is catching up on all the writes that occurred during the first two phases.
      */
     void _insertKeysFromSideTablesWithoutBlockingWrites(
-        OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState);
+        OperationContext* opCtx,
+        std::shared_ptr<ReplIndexBuildState> replState,
+        IndexBuildInterceptor::DrainPhase drainPhase);
 
     /**
      * Reads the commit ready members list for index build UUID in 'replState' from

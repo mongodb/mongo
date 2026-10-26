@@ -330,10 +330,11 @@ Status IndexBuildsManager::drainBackgroundWrites(
     OperationContext* opCtx,
     const UUID& buildUUID,
     RecoveryUnit::ReadSource readSource,
-    IndexBuildInterceptor::DrainYieldPolicy drainYieldPolicy) {
+    IndexBuildInterceptor::DrainYieldPolicy drainYieldPolicy,
+    IndexBuildInterceptor::DrainPhase drainPhase) {
     auto builder = invariant(_getBuilder(buildUUID));
 
-    return builder->drainBackgroundWrites(opCtx, readSource, drainYieldPolicy);
+    return builder->drainBackgroundWrites(opCtx, readSource, drainYieldPolicy, drainPhase);
 }
 
 Status IndexBuildsManager::retrySkippedRecords(OperationContext* opCtx,

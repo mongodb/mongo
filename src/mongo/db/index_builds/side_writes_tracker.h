@@ -38,6 +38,18 @@ public:
     enum class DrainYieldPolicy { kNoYield, kYield };
 
     /**
+     * Identifies which phase of draining the build is performing.
+     */
+    enum class DrainPhase {
+        // Draining before the build is ready to commit.
+        kBeforeReadiness,
+        // Draining after the build is ready to commit.
+        kAfterReadiness,
+        // Draining during commit of the build.
+        kFinal,
+    };
+
+    /**
      * Invoked once per drained batch, inside the transaction that applies that batch's keys and
      * deletes its records.
      */
@@ -81,7 +93,8 @@ public:
                                 const InsertDeleteOptions& options,
                                 const IndexAccessMethod::KeyHandlerFn& onDuplicateKeyFn,
                                 const OnBatchAppliedFn& onBatchApplied,
-                                DrainYieldPolicy drainYieldPolicy);
+                                DrainYieldPolicy drainYieldPolicy,
+                                DrainPhase drainPhase);
 
     /**
      * Check whether all writes have been applied. This will be true after a successful call to

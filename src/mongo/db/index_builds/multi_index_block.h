@@ -189,7 +189,8 @@ public:
      */
     Status drainBackgroundWrites(OperationContext* opCtx,
                                  RecoveryUnit::ReadSource readSource,
-                                 IndexBuildInterceptor::DrainYieldPolicy drainYieldPolicy);
+                                 IndexBuildInterceptor::DrainYieldPolicy drainYieldPolicy,
+                                 IndexBuildInterceptor::DrainPhase drainPhase);
 
 
     /**

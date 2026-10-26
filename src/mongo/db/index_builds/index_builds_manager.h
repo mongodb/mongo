@@ -112,7 +112,8 @@ public:
     Status drainBackgroundWrites(OperationContext* opCtx,
                                  const UUID& buildUUID,
                                  RecoveryUnit::ReadSource readSource,
-                                 IndexBuildInterceptor::DrainYieldPolicy drainYieldPolicy);
+                                 IndexBuildInterceptor::DrainYieldPolicy drainYieldPolicy,
+                                 IndexBuildInterceptor::DrainPhase drainPhase);
 
     /**
      * By default, retries the key generation and insertion of records that were skipped during the

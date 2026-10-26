@@ -846,7 +846,8 @@ TEST_F(IndexBuilderInterceptorTest, DrainRecoversMultikeyPathsFromSideWriteRecor
                                                 InsertDeleteOptions{.dupsAllowed = true},
                                                 /*onMultikeyPathsRecovered=*/{},
                                                 IndexBuildInterceptor::TrackDuplicates::kNoTrack,
-                                                IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+                                                IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
+                                                IndexBuildInterceptor::DrainPhase::kFinal));
 
     // The drain must have consumed the record, otherwise the assertion below would be vacuous.
     ASSERT_EQ(getSideWritesTableContents(indexBuildInfo).size(), 0);
@@ -898,7 +899,8 @@ TEST_F(IndexBuilderInterceptorTest, DrainIgnoresMultikeySideWriteRecord) {
                                                 InsertDeleteOptions{.dupsAllowed = true},
                                                 /*onMultikeyPathsRecovered=*/{},
                                                 IndexBuildInterceptor::TrackDuplicates::kNoTrack,
-                                                IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+                                                IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
+                                                IndexBuildInterceptor::DrainPhase::kFinal));
 
     // Both records are consumed, and the key from the second one reached the index.
     EXPECT_EQ(getSideWritesTableContents(indexBuildInfo).size(), 0);
@@ -906,6 +908,65 @@ TEST_F(IndexBuilderInterceptorTest, DrainIgnoresMultikeySideWriteRecord) {
     auto indexCursor = entry->accessMethod()->asSortedData()->newCursor(operationContext(), ru);
     ASSERT(indexCursor->seekForKeyString(ru, keyString.getView()));
     EXPECT_FALSE(indexCursor->nextKeyString(ru));
+}
+
+class IndexBuilderInterceptorDrainPhaseTest
+    : public IndexBuilderInterceptorTest,
+      public testing::WithParamInterface<IndexBuildInterceptor::DrainPhase> {};
+
+INSTANTIATE_TEST_SUITE_P(AllDrainPhases,
+                         IndexBuilderInterceptorDrainPhaseTest,
+                         testing::Values(IndexBuildInterceptor::DrainPhase::kBeforeReadiness,
+                                         IndexBuildInterceptor::DrainPhase::kAfterReadiness,
+                                         IndexBuildInterceptor::DrainPhase::kFinal),
+                         [](const testing::TestParamInfo<IndexBuildInterceptor::DrainPhase>& info) {
+                             switch (info.param) {
+                                 case IndexBuildInterceptor::DrainPhase::kBeforeReadiness:
+                                     return "BeforeReadiness";
+                                 case IndexBuildInterceptor::DrainPhase::kAfterReadiness:
+                                     return "AfterReadiness";
+                                 case IndexBuildInterceptor::DrainPhase::kFinal:
+                                     return "Final";
+                             }
+                             MONGO_UNREACHABLE;
+                         });
+
+TEST_P(IndexBuilderInterceptorDrainPhaseTest, DrainPhases) {
+    auto info = buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}}"));
+    auto interceptor = createIndexBuildInterceptor(info, LazyRecordStore::CreateMode::immediate);
+    auto* entry = getIndexEntry("a_1");
+    auto& ru = *shard_role_details::getRecoveryUnit(operationContext());
+
+    ru.abandonSnapshot();
+    auto behavior = ru.getPrepareConflictBehavior();
+    auto key = makeKeyString(1, RecordId{1});
+    {
+        WriteUnitOfWork wuow{operationContext()};
+        int64_t numKeys = 0;
+        ASSERT_OK(interceptor->sideWrite(operationContext(),
+                                         _coll->getCollectionPtr(),
+                                         entry,
+                                         {key},
+                                         {},
+                                         {},
+                                         IndexBuildInterceptor::Op::kInsert,
+                                         &numKeys));
+        wuow.commit();
+    }
+    ASSERT_OK(interceptor->drainWritesIntoIndex(operationContext(),
+                                                _coll->getCollectionPtr(),
+                                                entry,
+                                                InsertDeleteOptions{.dupsAllowed = true},
+                                                {},
+                                                IndexBuildInterceptor::TrackDuplicates::kNoTrack,
+                                                IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
+                                                GetParam()));
+    EXPECT_EQ(ru.getPrepareConflictBehavior(), behavior);
+    EXPECT_TRUE(getSideWritesTableContents(info).empty());
+
+    auto cursor = entry->accessMethod()->asSortedData()->newCursor(operationContext(), ru);
+    EXPECT_TRUE(cursor->seekForKeyString(ru, key.getView()));
+    EXPECT_EQ(interceptor->getNumKeysAndBytesWritten().keysWritten, 1);
 }
 
 TEST_F(IndexBuilderInterceptorTest, SingleInsertIsDrainedIntoIndexPrimaryDriven) {
@@ -973,7 +1034,8 @@ TEST_F(IndexBuilderInterceptorTest, SingleInsertIsDrainedIntoIndexPrimaryDriven)
                                                 InsertDeleteOptions{.dupsAllowed = true},
                                                 /*onMultikeyPathsRecovered=*/{},
                                                 IndexBuildInterceptor::TrackDuplicates::kNoTrack,
-                                                IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+                                                IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
+                                                IndexBuildInterceptor::DrainPhase::kFinal));
 
     auto& ru = *shard_role_details::getRecoveryUnit(operationContext());
     auto indexCursor = entry->accessMethod()->asSortedData()->newCursor(operationContext(), ru);
@@ -1100,7 +1162,8 @@ TEST_F(IndexBuilderInterceptorTest, SingleDeleteIsDrainedIntoIndexPrimaryDriven)
                                                 InsertDeleteOptions{.dupsAllowed = true},
                                                 /*onMultikeyPathsRecovered=*/{},
                                                 IndexBuildInterceptor::TrackDuplicates::kNoTrack,
-                                                IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+                                                IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
+                                                IndexBuildInterceptor::DrainPhase::kFinal));
 
     // Check that the index is now empty since the key was removed.
     auto indexCursor = indexAccessMethod->newCursor(operationContext(), ru);
@@ -1168,7 +1231,8 @@ TEST_F(IndexBuilderInterceptorTest, RecoveredMultikeyPathsSurviveThrowingBatchCa
                     uasserted(ErrorCodes::InternalError, "Injected batch callback failure");
                 },
                 IndexBuildInterceptor::TrackDuplicates::kNoTrack,
-                IndexBuildInterceptor::DrainYieldPolicy::kNoYield);
+                IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
+                IndexBuildInterceptor::DrainPhase::kFinal);
         },
         unittest::match::Throws<ExceptionFor<ErrorCodes::InternalError>>());
     EXPECT_EQ(getSideWritesTableContents(info).size(), 2);
@@ -1193,7 +1257,8 @@ TEST_F(IndexBuilderInterceptorTest, RecoveredMultikeyPathsSurviveThrowingBatchCa
             return Status::OK();
         },
         IndexBuildInterceptor::TrackDuplicates::kNoTrack,
-        IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+        IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
+        IndexBuildInterceptor::DrainPhase::kFinal));
     EXPECT_TRUE(recovered);
     EXPECT_TRUE(getSideWritesTableContents(info).empty());
     EXPECT_EQ(interceptor->getNumKeysAndBytesWritten().keysWritten, 2);
@@ -1265,7 +1330,8 @@ TEST_F(IndexBuilderInterceptorTest, DrainWritesIntoIndexSurvivesWriteConflict) {
                                               InsertDeleteOptions{.dupsAllowed = true},
                                               /*onMultikeyPathsRecovered=*/{},
                                               IndexBuildInterceptor::TrackDuplicates::kNoTrack,
-                                              IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+                                              IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
+                                              IndexBuildInterceptor::DrainPhase::kFinal));
         // Exactly one WCE fired during the drain.
         EXPECT_EQ(1, failPoint->waitForOneNewEntry());
     }
@@ -1368,7 +1434,8 @@ TEST_F(IndexBuilderInterceptorTest, DrainWritesIntoIndexSurvivesWriteConflictMul
                                               InsertDeleteOptions{.dupsAllowed = true},
                                               /*onMultikeyPathsRecovered=*/{},
                                               IndexBuildInterceptor::TrackDuplicates::kNoTrack,
-                                              IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+                                              IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
+                                              IndexBuildInterceptor::DrainPhase::kFinal));
         EXPECT_EQ(1, failPoint->waitForOneNewEntry());
     }
 
@@ -1462,7 +1529,8 @@ TEST_F(IndexBuilderInterceptorTest, DrainWritesIntoIndexRollbackAfterPartialBatc
                                           InsertDeleteOptions{.dupsAllowed = true},
                                           /*onMultikeyPathsRecovered=*/{},
                                           IndexBuildInterceptor::TrackDuplicates::kNoTrack,
-                                          IndexBuildInterceptor::DrainYieldPolicy::kNoYield),
+                                          IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
+                                          IndexBuildInterceptor::DrainPhase::kFinal),
         DBException,
         ErrorCodes::Interrupted);
 }
@@ -1754,7 +1822,8 @@ TEST_F(IndexBuilderInterceptorTest, DrainSideWriteGeneratesNoContainerOpsWithout
                                                 InsertDeleteOptions{.dupsAllowed = true},
                                                 /*onMultikeyPathsRecovered=*/{},
                                                 IndexBuildInterceptor::TrackDuplicates::kNoTrack,
-                                                IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+                                                IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
+                                                IndexBuildInterceptor::DrainPhase::kFinal));
 
     // Verify the key was still inserted into the index.
     auto& ru = *shard_role_details::getRecoveryUnit(operationContext());
@@ -1809,7 +1878,8 @@ TEST_F(IndexBuilderInterceptorTest, DrainInsertSideWriteGeneratesContainerOpsPri
                                                 InsertDeleteOptions{.dupsAllowed = true},
                                                 /*onMultikeyPathsRecovered=*/{},
                                                 IndexBuildInterceptor::TrackDuplicates::kNoTrack,
-                                                IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+                                                IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
+                                                IndexBuildInterceptor::DrainPhase::kFinal));
 
     // Expect exactly one container insert (index) and one container delete (side writes table).
     EXPECT_EQ(observer->countInsertsFor(entry->getIdent(), insertsBefore), 1u);
@@ -1881,7 +1951,8 @@ TEST_F(IndexBuilderInterceptorTest, DrainDeleteSideWriteGeneratesContainerOpsPri
                                                 InsertDeleteOptions{.dupsAllowed = true},
                                                 /*onMultikeyPathsRecovered=*/{},
                                                 IndexBuildInterceptor::TrackDuplicates::kNoTrack,
-                                                IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+                                                IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
+                                                IndexBuildInterceptor::DrainPhase::kFinal));
 
     // No container inserts should be fired for a delete-only drain.
     EXPECT_EQ(observer->countInsertsFor(entry->getIdent(), insertsBefore), 0u);
@@ -1917,7 +1988,8 @@ TEST_F(IndexBuilderInterceptorTest, DrainEmptySideWritesTableGeneratesNoContaine
                                                 InsertDeleteOptions{.dupsAllowed = true},
                                                 /*onMultikeyPathsRecovered=*/{},
                                                 IndexBuildInterceptor::TrackDuplicates::kNoTrack,
-                                                IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+                                                IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
+                                                IndexBuildInterceptor::DrainPhase::kFinal));
 
     // No container operations should be fired for an empty drain.
     EXPECT_EQ(observer->inserts.size(), insertsBefore);
@@ -1964,7 +2036,8 @@ TEST_F(IndexBuilderInterceptorTest, DrainMultipleSideWritesGeneratesContainerOps
                                                 InsertDeleteOptions{.dupsAllowed = true},
                                                 /*onMultikeyPathsRecovered=*/{},
                                                 IndexBuildInterceptor::TrackDuplicates::kNoTrack,
-                                                IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+                                                IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
+                                                IndexBuildInterceptor::DrainPhase::kFinal));
 
     // Each side write should produce one index insert and one side-table delete.
     EXPECT_EQ(observer->countInsertsFor(entry->getIdent(), insertsBefore),
@@ -2061,7 +2134,8 @@ TEST_F(IndexBuilderInterceptorTest,
                                                 InsertDeleteOptions{.dupsAllowed = true},
                                                 /*onMultikeyPathsRecovered=*/{},
                                                 IndexBuildInterceptor::TrackDuplicates::kNoTrack,
-                                                IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+                                                IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
+                                                IndexBuildInterceptor::DrainPhase::kFinal));
 
     std::string indexIdent = entry->getIdent();
 
@@ -2121,7 +2195,8 @@ TEST_F(IndexBuilderInterceptorTest, DrainMultipleBatchesGeneratesCorrectContaine
                                                 InsertDeleteOptions{.dupsAllowed = true},
                                                 /*onMultikeyPathsRecovered=*/{},
                                                 IndexBuildInterceptor::TrackDuplicates::kNoTrack,
-                                                IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+                                                IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
+                                                IndexBuildInterceptor::DrainPhase::kFinal));
 
     // Each side write should produce one index insert and one side-table delete.
     EXPECT_EQ(observer->countInsertsFor(entry->getIdent(), insertsBefore),
@@ -2204,7 +2279,8 @@ TEST_F(IndexBuilderInterceptorTest,
                                                 InsertDeleteOptions{.dupsAllowed = true},
                                                 /*onMultikeyPathsRecovered=*/{},
                                                 IndexBuildInterceptor::TrackDuplicates::kTrack,
-                                                IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+                                                IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
+                                                IndexBuildInterceptor::DrainPhase::kFinal));
 
     // Verify the drain produced the expected container operations:
     //   - 2 inserts: one into the index, one into the constraint violations table
@@ -2268,7 +2344,8 @@ TEST_F(IndexBuilderInterceptorTest,
                                                 InsertDeleteOptions{.dupsAllowed = true},
                                                 /*onMultikeyPathsRecovered=*/{},
                                                 IndexBuildInterceptor::TrackDuplicates::kTrack,
-                                                IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+                                                IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
+                                                IndexBuildInterceptor::DrainPhase::kFinal));
 
     // Same as non-unique: one CI for the index, one CD for the side writes table.
     EXPECT_EQ(observer->countInsertsFor(entry->getIdent(), insertsBefore), 1u);
@@ -2341,7 +2418,8 @@ TEST_F(IndexBuilderInterceptorTest, DrainDeleteOnUniqueIndexGeneratesContainerOp
                                                 InsertDeleteOptions{.dupsAllowed = true},
                                                 /*onMultikeyPathsRecovered=*/{},
                                                 IndexBuildInterceptor::TrackDuplicates::kTrack,
-                                                IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+                                                IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
+                                                IndexBuildInterceptor::DrainPhase::kFinal));
 
     // Expect two container deletes: one for the index key, one for the side writes table.
     EXPECT_EQ(observer->countDeletesFor(entry->getIdent(), deletesBefore), 1u);
@@ -2414,7 +2492,8 @@ TEST_F(IndexBuilderInterceptorTest,
                                                 InsertDeleteOptions{.dupsAllowed = true},
                                                 /*onMultikeyPathsRecovered=*/{},
                                                 IndexBuildInterceptor::TrackDuplicates::kNoTrack,
-                                                IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+                                                IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
+                                                IndexBuildInterceptor::DrainPhase::kFinal));
 
     // The duplicate key is still inserted into the index, but not recorded as a violation.
     EXPECT_EQ(observer->countInsertsFor(entry->getIdent(), insertsBefore), 1u);
@@ -2494,7 +2573,8 @@ TEST_F(IndexBuilderInterceptorTest,
                                           InsertDeleteOptions{.dupsAllowed = true},
                                           /*onMultikeyPathsRecovered=*/{},
                                           IndexBuildInterceptor::TrackDuplicates::kTrack,
-                                          IndexBuildInterceptor::DrainYieldPolicy::kNoYield);
+                                          IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
+                                          IndexBuildInterceptor::DrainPhase::kFinal);
     EXPECT_EQ(status.code(), ErrorCodes::DuplicateKey);
 
     // No container ops should have been generated for the failed drain — the error is returned
@@ -2570,7 +2650,8 @@ TEST_F(IndexBuilderInterceptorTest,
                                                 InsertDeleteOptions{.dupsAllowed = true},
                                                 /*onMultikeyPathsRecovered=*/{},
                                                 IndexBuildInterceptor::TrackDuplicates::kTrack,
-                                                IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+                                                IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
+                                                IndexBuildInterceptor::DrainPhase::kFinal));
 
     // The container_write::insert returns KeyExists (the exact key+RecordId is already present),
     // which is silently converted to OK. No actual index insert op is generated because the key
@@ -2650,7 +2731,8 @@ TEST_F(IndexBuilderInterceptorTest,
                                           InsertDeleteOptions{.dupsAllowed = true},
                                           /*onMultikeyPathsRecovered=*/{},
                                           IndexBuildInterceptor::TrackDuplicates::kNoTrack,
-                                          IndexBuildInterceptor::DrainYieldPolicy::kNoYield);
+                                          IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
+                                          IndexBuildInterceptor::DrainPhase::kFinal);
     EXPECT_EQ(status.code(), ErrorCodes::DuplicateKey);
 
     // No container ops — error fires before any writes.

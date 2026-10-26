@@ -184,7 +184,8 @@ protected:
         uassertStatusOK(
             indexer.drainBackgroundWrites(&_opCtx,
                                           RecoveryUnit::ReadSource::kNoTimestamp,
-                                          IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+                                          IndexBuildInterceptor::DrainYieldPolicy::kNoYield,
+                                          IndexBuildInterceptor::DrainPhase::kFinal));
         uassertStatusOK(indexer.checkConstraints(&_opCtx, collection.get()));
         {
             WriteUnitOfWork wunit(&_opCtx);

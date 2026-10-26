@@ -206,7 +206,8 @@ Status SideWritesTracker::drainWritesIntoIndex(
     const InsertDeleteOptions& options,
     const IndexAccessMethod::KeyHandlerFn& onDuplicateKeyFn,
     const OnBatchAppliedFn& onBatchApplied,
-    DrainYieldPolicy drainYieldPolicy) {
+    DrainYieldPolicy drainYieldPolicy,
+    DrainPhase drainPhase) {
     invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
     auto& rs = _table.getTableOrThrow();

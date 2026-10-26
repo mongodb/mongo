@@ -922,11 +922,13 @@ IndexBuildAction IndexBuildsCoordinatorMongod::_waitForNextIndexBuildAction(
     // allows the critical section of committing, which must drain the remainder of the side writes,
     // to be as short as possible.
     while (!waitUntilNextActionIsReady()) {
-        _insertKeysFromSideTablesWithoutBlockingWrites(opCtx, replState);
+        _insertKeysFromSideTablesWithoutBlockingWrites(
+            opCtx, replState, IndexBuildInterceptor::DrainPhase::kAfterReadiness);
     }
 
     // Final chance to catch up before taking an X lock.
-    _insertKeysFromSideTablesWithoutBlockingWrites(opCtx, replState);
+    _insertKeysFromSideTablesWithoutBlockingWrites(
+        opCtx, replState, IndexBuildInterceptor::DrainPhase::kAfterReadiness);
 
     return nextAction;
 }

@@ -122,7 +122,8 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(
     const InsertDeleteOptions& options,
     const OnMultikeyPathsRecoveredFn& onMultikeyPathsRecovered,
     TrackDuplicates trackDuplicates,
-    DrainYieldPolicy drainYieldPolicy) {
+    DrainYieldPolicy drainYieldPolicy,
+    DrainPhase drainPhase) {
     // Sorted index types may choose to disallow duplicates (enforcing an unique index).
     // Only sorted indexes will use this lambda passed through the IndexAccessMethod interface.
     auto onDuplicateKeyFn = [=, this](const CollectionPtr& coll,
@@ -164,7 +165,8 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(
                                                    options,
                                                    onDuplicateKeyFn,
                                                    onBatchApplied,
-                                                   drainYieldPolicy);
+                                                   drainYieldPolicy,
+                                                   drainPhase);
 }
 
 bool IndexBuildInterceptor::areAllWritesApplied(OperationContext* opCtx) const {

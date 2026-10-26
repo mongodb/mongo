@@ -1455,7 +1455,8 @@ void MultiIndexBlock::_releaseReplicatedSorters() {
 Status MultiIndexBlock::drainBackgroundWrites(
     OperationContext* opCtx,
     RecoveryUnit::ReadSource readSource,
-    IndexBuildInterceptor::DrainYieldPolicy drainYieldPolicy) {
+    IndexBuildInterceptor::DrainYieldPolicy drainYieldPolicy,
+    IndexBuildInterceptor::DrainPhase drainPhase) {
     invariant(!_buildIsCleanedUp);
     invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
@@ -1523,7 +1524,8 @@ Status MultiIndexBlock::drainBackgroundWrites(
                                                         _indexes[i].options,
                                                         onMultikeyPathsRecovered,
                                                         trackDups,
-                                                        drainYieldPolicy);
+                                                        drainYieldPolicy,
+                                                        drainPhase);
         if (!status.isOK()) {
             return status;
         }

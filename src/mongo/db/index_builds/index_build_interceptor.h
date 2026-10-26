@@ -33,6 +33,7 @@ class IndexBuildInterceptor {
 public:
     using RetrySkippedRecordMode = SkippedRecordTracker::RetrySkippedRecordMode;
     using DrainYieldPolicy = SideWritesTracker::DrainYieldPolicy;
+    using DrainPhase = SideWritesTracker::DrainPhase;
 
     // Field names of the multikey state a side write record carries.
     static constexpr std::string_view kSideWriteMultikeyFieldName = "multikey";
@@ -110,7 +111,8 @@ public:
                                 const InsertDeleteOptions& options,
                                 const OnMultikeyPathsRecoveredFn& onMultikeyPathsRecovered,
                                 TrackDuplicates trackDups,
-                                DrainYieldPolicy drainYieldPolicy);
+                                DrainYieldPolicy drainYieldPolicy,
+                                DrainPhase drainPhase);
 
     /**
      * Returns the cumulative number of keys and key bytes this interceptor's drains have written to
