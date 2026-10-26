@@ -75,6 +75,7 @@ mongo_cc_library(
     ],
     deps = [
         "estimates",
+        "//src/mongo/db/query/compiler/physical_model/query_solution",
     ],
 )
 

@@ -1305,6 +1305,46 @@ TEST(TopLevelSampleFieldsTest, MergeNeedsAllFieldsIfEitherSideDoes) {
     ASSERT_TRUE(fields.needsAllFields());
 }
 
+// The number of distinct sampled documents is counted from _id, so a projected sample must carry
+// it.
+TEST(TopLevelSampleFieldsTest, EnsureIdIncludedAddsIdToProjectedFields) {
+    ce::TopLevelSampleFields fields{StringSet{"a", "b"}};
+    fields.ensureIdIncluded();
+    ASSERT_EQ(fields.fieldNames(), (StringSet{"a", "b", "_id"}));
+}
+
+TEST(TopLevelSampleFieldsTest, EnsureIdIncludedIsIdempotent) {
+    ce::TopLevelSampleFields fields{StringSet{"a", "_id"}};
+    fields.ensureIdIncluded();
+    ASSERT_EQ(fields.fieldNames(), (StringSet{"a", "_id"}));
+}
+
+// An empty field set is sampled without a projection, which already contains _id. Adding _id here
+// would turn it into a projection that drops every other field.
+TEST(TopLevelSampleFieldsTest, EnsureIdIncludedLeavesEmptyFieldSetAlone) {
+    ce::TopLevelSampleFields fields{StringSet{}};
+    fields.ensureIdIncluded();
+    ASSERT_FALSE(fields.needsAllFields());
+    ASSERT_TRUE(fields.fieldNames().empty());
+}
+
+TEST(TopLevelSampleFieldsTest, EnsureIdIncludedLeavesAllFieldsAlone) {
+    ce::TopLevelSampleFields fields = ce::TopLevelSampleFields::allFields();
+    fields.ensureIdIncluded();
+    ASSERT_TRUE(fields.needsAllFields());
+}
+
+// Deciding whether _id is needed walks the candidate plans, so callers check this first. Only a
+// projected sample that does not already carry _id can be changed; a sample of all fields and an
+// unprojected sample both already contain it.
+TEST(TopLevelSampleFieldsTest, IsProjectedWithoutId) {
+    ASSERT_TRUE((ce::TopLevelSampleFields{StringSet{"a", "b"}}).isProjectedWithoutId());
+    ASSERT_FALSE((ce::TopLevelSampleFields{StringSet{"a", "_id"}}).isProjectedWithoutId());
+    ASSERT_FALSE((ce::TopLevelSampleFields{StringSet{"_id"}}).isProjectedWithoutId());
+    ASSERT_FALSE((ce::TopLevelSampleFields{StringSet{}}).isProjectedWithoutId());
+    ASSERT_FALSE(ce::TopLevelSampleFields::allFields().isProjectedWithoutId());
+}
+
 TEST(TopLevelSampleFieldsTest, RelevantIndexOutputWritesThroughToFieldNames) {
     ce::TopLevelSampleFields fields{StringSet{"a"}};
     auto out = fields.relevantIndexOutput();

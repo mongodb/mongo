@@ -1204,4 +1204,24 @@ TEST(CountNDVMultiKey, DeeplyNestedSharedArrayPrefix) {
     }
 }
 
+TEST(CountUniqueDocuments, CountsDistinctIds) {
+    // Sampling with replacement produces exact duplicates; they must count as one document.
+    const std::vector<BSONObj> docs = {fromjson("{_id: 1, a: 1}"),
+                                       fromjson("{_id: 1, a: 1}"),
+                                       fromjson("{_id: 2, a: 1}"),
+                                       fromjson("{_id: 3, a: 2}")};
+    ASSERT_EQ(3, countUniqueDocuments(docs));
+}
+
+TEST(CountUniqueDocuments, EmptySample) {
+    ASSERT_EQ(0, countUniqueDocuments({}));
+}
+
+DEATH_TEST(CountUniqueDocumentsDeathTest,
+           RequiresIdToCountUniqueDocuments,
+           "Sample must contain _id to count unique documents") {
+    // A sample projected without _id would silently collapse to a unique count of one.
+    countUniqueDocuments({fromjson("{a: 1}"), fromjson("{a: 2}")});
+}
+
 }  // namespace mongo::ce

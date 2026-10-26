@@ -4,18 +4,24 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator.h"
+#include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_test_utils.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/cbr_test_utils.h"
+#include "mongo/db/query/compiler/optimizer/cost_based_ranker/ce_utils.h"
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
 #include "mongo/unittest/unittest.h"
 
 #include <limits>
+#include <string>
 #include <string_view>
 
 #include <gmock/gmock.h>
 
 namespace mongo::cost_based_ranker {
 namespace {
+
+const NamespaceString kTestNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
+
 
 // Subclass of CardinalityEstimator that exposes protected methods for unit tests.
 class CardinalityEstimatorForTest : public CardinalityEstimator {
@@ -35,15 +41,13 @@ CEResult estimateIndexSeeks(ce::SamplingEstimator& samplingEstimator,
 }
 
 TEST(CardinalityEstimator, PointInterval) {
-    auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
     std::vector<std::string> indexFields = {"a"};
     auto plan =
-        makeIndexScanFetchPlan(testNss, makePointIntervalBounds(5.0, indexFields[0]), indexFields);
+        makeIndexScanFetchPlan(kTestNss, makePointIntervalBounds(5.0, indexFields[0]), indexFields);
     ASSERT_EQ(getPlanHeuristicCE(*plan, 100.0), makeCard(10.0));
 }
 
 TEST(CardinalityEstimator, ManyPointIntervals) {
-    auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
     std::vector<std::string> indexFields = {"a"};
     OrderedIntervalList oil(indexFields[0]);
     for (size_t i = 0; i < 5; ++i) {
@@ -51,12 +55,11 @@ TEST(CardinalityEstimator, ManyPointIntervals) {
     }
     IndexBounds bounds;
     bounds.fields.push_back(oil);
-    auto plan = makeIndexScanFetchPlan(testNss, std::move(bounds), indexFields);
+    auto plan = makeIndexScanFetchPlan(kTestNss, std::move(bounds), indexFields);
     ASSERT_EQ(getPlanHeuristicCE(*plan, 100.0), makeCard(50.0));
 }
 
 TEST(CardinalityEstimator, CompoundIndex) {
-    auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
     IndexBounds bounds;
     std::vector<std::string> indexFields = {"a", "b", "c", "d", "e"};
     for (size_t i = 0; i < indexFields.size(); ++i) {
@@ -66,33 +69,31 @@ TEST(CardinalityEstimator, CompoundIndex) {
         }
         bounds.fields.push_back(oil);
     }
-    auto plan = makeIndexScanFetchPlan(testNss, std::move(bounds), indexFields);
+    auto plan = makeIndexScanFetchPlan(kTestNss, std::move(bounds), indexFields);
     ASSERT_EQ(getPlanHeuristicCE(*plan, 100.0), makeCard(51.2341));
 }
 
 TEST(CardinalityEstimator, PointMoreSelectiveThanRange) {
-    auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
     std::vector<std::string> indexFields = {"a"};
     auto pointPlan =
-        makeIndexScanFetchPlan(testNss, makePointIntervalBounds(5.0, indexFields[0]), indexFields);
+        makeIndexScanFetchPlan(kTestNss, makePointIntervalBounds(5.0, indexFields[0]), indexFields);
 
     IndexBounds rangeBounds = makeRangeIntervalBounds(
         BSON("" << 5 << " " << 6), BoundInclusion::kIncludeBothStartAndEndKeys, indexFields[0]);
-    auto rangePlan = makeIndexScanFetchPlan(testNss, std::move(rangeBounds), indexFields);
+    auto rangePlan = makeIndexScanFetchPlan(kTestNss, std::move(rangeBounds), indexFields);
 
     ASSERT_TRUE(
         approxLt(getPlanHeuristicCE(*pointPlan, 100.0), getPlanHeuristicCE(*rangePlan, 100.0)));
 }
 
 TEST(CardinalityEstimator, CompoundBoundsMoreSelectiveThanSingleField) {
-    auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
     std::vector<std::string> indexFields = {"a", "b"};
     OrderedIntervalList oil1(indexFields[0]);
     oil1.intervals.push_back(IndexBoundsBuilder::makePointInterval(5));
 
     IndexBounds singleField;
     singleField.fields.push_back(oil1);
-    auto singleFieldPlan = makeIndexScanFetchPlan(testNss, std::move(singleField), indexFields);
+    auto singleFieldPlan = makeIndexScanFetchPlan(kTestNss, std::move(singleField), indexFields);
 
     IndexBounds compoundBounds;
     compoundBounds.fields.push_back(oil1);
@@ -100,28 +101,26 @@ TEST(CardinalityEstimator, CompoundBoundsMoreSelectiveThanSingleField) {
     oil2.name = indexFields[1];
     compoundBounds.fields.push_back(oil2);
     auto compoundBoundsPlan =
-        makeIndexScanFetchPlan(testNss, std::move(compoundBounds), indexFields);
+        makeIndexScanFetchPlan(kTestNss, std::move(compoundBounds), indexFields);
 
     ASSERT_TRUE(approxLt(getPlanHeuristicCE(*compoundBoundsPlan, 100.0),
                          getPlanHeuristicCE(*singleFieldPlan, 100.0)));
 }
 
 TEST(CardinalityEstimator, PointIntervalSelectivityDependsOnInputCard) {
-    auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
     std::vector<std::string> indexFields = {"a"};
     auto plan =
-        makeIndexScanFetchPlan(testNss, makePointIntervalBounds(5.0, indexFields[0]), indexFields);
+        makeIndexScanFetchPlan(kTestNss, makePointIntervalBounds(5.0, indexFields[0]), indexFields);
 
     ASSERT_LT(getPlanHeuristicCE(*plan, 10000.0).toDouble() / 10000.0,
               getPlanHeuristicCE(*plan, 100.0).toDouble() / 100.0);
 }
 
 TEST(CardinalityEstimator, EqualityMatchesIndexPointInterval) {
-    auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
     std::vector<std::string> indexFields = {"a"};
     // Bounds for [5,5]
     auto indexPlan =
-        makeIndexScanFetchPlan(testNss, makePointIntervalBounds(5.0, indexFields[0]), indexFields);
+        makeIndexScanFetchPlan(kTestNss, makePointIntervalBounds(5.0, indexFields[0]), indexFields);
 
     // Expression for a = 5
     BSONObj query = fromjson("{a: 5}");
@@ -133,14 +132,13 @@ TEST(CardinalityEstimator, EqualityMatchesIndexPointInterval) {
 }
 
 TEST(CardinalityEstimator, InequalityMatchesRangeOpenInterval) {
-    auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
     std::vector<std::string> indexFields = {"a"};
     // Bounds for (5,inf]
     IndexBounds bounds =
         makeRangeIntervalBounds(BSON("" << 5.0 << " " << std::numeric_limits<double>::infinity()),
                                 BoundInclusion::kIncludeEndKeyOnly,
                                 indexFields[0]);
-    auto indexPlan = makeIndexScanFetchPlan(testNss, bounds, indexFields);
+    auto indexPlan = makeIndexScanFetchPlan(kTestNss, bounds, indexFields);
 
     // Expression for a > 5
     BSONObj query = fromjson("{a: {$gt: 5}}");
@@ -152,14 +150,13 @@ TEST(CardinalityEstimator, InequalityMatchesRangeOpenInterval) {
 }
 
 TEST(CardinalityEstimator, InequalityMatchesRangeClosedInterval) {
-    auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
     std::vector<std::string> indexFields = {"a"};
     // Bounds for [5,inf]
     IndexBounds bounds =
         makeRangeIntervalBounds(BSON("" << 5 << " " << std::numeric_limits<double>::infinity()),
                                 BoundInclusion::kIncludeBothStartAndEndKeys,
                                 indexFields[0]);
-    auto indexPlan = makeIndexScanFetchPlan(testNss, bounds, indexFields);
+    auto indexPlan = makeIndexScanFetchPlan(kTestNss, bounds, indexFields);
 
     // Expression for a >= 5
     BSONObj query = fromjson("{a: {$gte: 5}}");
@@ -171,7 +168,6 @@ TEST(CardinalityEstimator, InequalityMatchesRangeClosedInterval) {
 }
 
 TEST(CardinalityEstimator, InExpressionMatchesIntervals) {
-    auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
     std::vector<std::string> indexFields = {"a"};
     // Interval for [[1,1], [2,2], [3,3]]
     OrderedIntervalList oil;
@@ -180,7 +176,7 @@ TEST(CardinalityEstimator, InExpressionMatchesIntervals) {
     }
     IndexBounds bounds;
     bounds.fields.push_back(oil);
-    auto indexPlan = makeIndexScanFetchPlan(testNss, bounds, indexFields);
+    auto indexPlan = makeIndexScanFetchPlan(kTestNss, bounds, indexFields);
 
     BSONObj query = fromjson("{a: {$in: [1,2,3]}}");
     auto expr = parse(query);
@@ -191,7 +187,6 @@ TEST(CardinalityEstimator, InExpressionMatchesIntervals) {
 }
 
 TEST(CardinalityEstimator, TypeExpressionMatchesIntervals) {
-    auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
     std::vector<std::string> indexFields = {"a"};
     OrderedIntervalList oil(indexFields[0]);
     oil.intervals.push_back(
@@ -201,7 +196,7 @@ TEST(CardinalityEstimator, TypeExpressionMatchesIntervals) {
         BSON("" << false << " " << true), BoundInclusion::kIncludeBothStartAndEndKeys));
     IndexBounds bounds;
     bounds.fields.push_back(oil);
-    auto indexPlan = makeIndexScanFetchPlan(testNss, bounds, indexFields);
+    auto indexPlan = makeIndexScanFetchPlan(kTestNss, bounds, indexFields);
 
     BSONObj query = fromjson("{a: {$type: ['date', 'bool']}}");
     auto expr = parse(query);
@@ -212,7 +207,6 @@ TEST(CardinalityEstimator, TypeExpressionMatchesIntervals) {
 }
 
 TEST(CardinalityEstimator, ThreeOrsWithImplicitAnd) {
-    auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
     std::vector<std::string> indexFields = {"a", "b", "c"};
     // Interval for [[1,1], [2,2]]
     OrderedIntervalList oil(indexFields[0]);
@@ -229,12 +223,11 @@ TEST(CardinalityEstimator, ThreeOrsWithImplicitAnd) {
     auto fetchExpr = parse(indexCond);
 
     auto indexPlan = makeIndexScanFetchPlan(
-        testNss, bounds, indexFields, std::move(indexExpr), std::move(fetchExpr));
+        kTestNss, bounds, indexFields, std::move(indexExpr), std::move(fetchExpr));
     ASSERT_EQ(getPlanHeuristicCE(*indexPlan, 1000), makeCard(10.6626));
 }
 
 TEST(CardinalityEstimator, ThreeOrsWithAndChildrenImplicitAnd) {
-    auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
     std::vector<std::string> indexFields = {"a", "b", "c"};
     IndexBounds bounds = makePointIntervalBounds(13.0, indexFields[0]);
     constexpr const char* orWithAndChildren =
@@ -248,17 +241,16 @@ TEST(CardinalityEstimator, ThreeOrsWithAndChildrenImplicitAnd) {
     auto fetchExpr = indexExpr->clone();
 
     auto indexPlan = makeIndexScanFetchPlan(
-        testNss, bounds, indexFields, std::move(indexExpr), std::move(fetchExpr));
+        kTestNss, bounds, indexFields, std::move(indexExpr), std::move(fetchExpr));
     ASSERT_EQ(getPlanHeuristicCE(*indexPlan, 1000), makeCard(10.0423));
 }
 
 TEST(CardinalityEstimator, IndexIntersectionWithFetchFilter) {
-    auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
     std::vector<std::string> indexFields1 = {"a"};
     // First index scan
     IndexBounds rangeBounds = makeRangeIntervalBounds(
         BSON("" << 5 << " " << 6), BoundInclusion::kIncludeBothStartAndEndKeys, indexFields1[0]);
-    auto indexScan1 = makeIndexScan(testNss, rangeBounds, indexFields1);
+    auto indexScan1 = makeIndexScan(kTestNss, rangeBounds, indexFields1);
 
     // Second index scan
     std::vector<std::string> indexFields2 = {"a", "b", "c"};
@@ -270,7 +262,7 @@ TEST(CardinalityEstimator, IndexIntersectionWithFetchFilter) {
 
     BSONObj indexCond2 = fromjson(orWithAndChildren);
     auto indexExpr2 = parse(indexCond2);
-    auto indexScan2 = makeIndexScan(testNss,
+    auto indexScan2 = makeIndexScan(kTestNss,
                                     makePointIntervalBounds(13.0, indexFields2[0]),
                                     indexFields2,
                                     std::move(indexExpr2));
@@ -288,8 +280,8 @@ TEST(CardinalityEstimator, IndexIntersectionWithFetchFilter) {
     // Make two complete intersection plans that only differ in the order of child index scans
     BSONObj fetchCond = fromjson("{$or: [{x: 'abc'}, {y: 42}]}");
     auto fetchExpr = parse(fetchCond);
-    auto fetch1 = std::make_unique<FetchNode>(std::move(andHashNode1), testNss);
-    auto fetch2 = std::make_unique<FetchNode>(std::move(andHashNode2), testNss);
+    auto fetch1 = std::make_unique<FetchNode>(std::move(andHashNode1), kTestNss);
+    auto fetch2 = std::make_unique<FetchNode>(std::move(andHashNode2), kTestNss);
     fetch1->filter = fetchExpr->clone();
     fetch2->filter = std::move(fetchExpr);
     auto intersectionPlan1 = std::make_unique<QuerySolution>();
@@ -305,12 +297,11 @@ TEST(CardinalityEstimator, IndexIntersectionWithFetchFilter) {
 }
 
 TEST(CardinalityEstimator, IndexUnionWithFetchFilter) {
-    auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
     std::vector<std::string> indexFields1 = {"a"};
     // First index scan
     IndexBounds rangeBounds = makeRangeIntervalBounds(
         BSON("" << 5 << " " << 6), BoundInclusion::kIncludeBothStartAndEndKeys, indexFields1[0]);
-    auto indexScan1 = makeIndexScan(testNss, rangeBounds, indexFields1);
+    auto indexScan1 = makeIndexScan(kTestNss, rangeBounds, indexFields1);
 
     // Second index scan
     std::vector<std::string> indexFields2 = {"a", "b", "c"};
@@ -322,7 +313,7 @@ TEST(CardinalityEstimator, IndexUnionWithFetchFilter) {
 
     BSONObj indexCond2 = fromjson(andWithAndChildren);
     auto indexExpr2 = parse(indexCond2);
-    auto indexScan2 = makeIndexScan(testNss,
+    auto indexScan2 = makeIndexScan(kTestNss,
                                     makePointIntervalBounds(13.0, indexFields2[0]),
                                     indexFields2,
                                     std::move(indexExpr2));
@@ -340,8 +331,8 @@ TEST(CardinalityEstimator, IndexUnionWithFetchFilter) {
     // Make two complete union plans that only differ in the order of child index scans
     BSONObj fetchCond = fromjson("{$or: [{x: 'abc'}, {y: 42}]}");
     auto fetchExpr = parse(fetchCond);
-    auto fetch1 = std::make_unique<FetchNode>(std::move(orNode1), testNss);
-    auto fetch2 = std::make_unique<FetchNode>(std::move(orNode2), testNss);
+    auto fetch1 = std::make_unique<FetchNode>(std::move(orNode1), kTestNss);
+    auto fetch2 = std::make_unique<FetchNode>(std::move(orNode2), kTestNss);
     fetch1->filter = fetchExpr->clone();
     fetch2->filter = std::move(fetchExpr);
     auto unionPlan1 = std::make_unique<QuerySolution>();
@@ -357,12 +348,11 @@ TEST(CardinalityEstimator, IndexUnionWithFetchFilter) {
 }
 
 TEST(CardinalityEstimator, IntersectionOfUnionsFallback) {
-    auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
 
     // IXSCAN over 'a' with bounds a: [0, 10].
     std::vector<std::string> indexFieldsA = {"a"};
     auto indexScanA =
-        makeIndexScan(testNss,
+        makeIndexScan(kTestNss,
                       makeRangeIntervalBounds(BSON("" << 0 << " " << 10),
                                               BoundInclusion::kIncludeBothStartAndEndKeys,
                                               indexFieldsA[0]),
@@ -371,7 +361,7 @@ TEST(CardinalityEstimator, IntersectionOfUnionsFallback) {
     // IXSCAN over 'b' with bounds b: [13, 13].
     std::vector<std::string> indexFieldsB = {"b"};
     auto indexScanB =
-        makeIndexScan(testNss, makePointIntervalBounds(13.0, indexFieldsB[0]), indexFieldsB);
+        makeIndexScan(kTestNss, makePointIntervalBounds(13.0, indexFieldsB[0]), indexFieldsB);
 
     // Build a union of the two index scans, either as an OR or as a merge-sort (a union which
     // provides a sort).
@@ -403,7 +393,7 @@ TEST(CardinalityEstimator, IntersectionOfUnionsFallback) {
         andHash->children.push_back(unionFirst ? unionNode.clone() : indexScanA->clone());
         andHash->children.push_back(unionFirst ? indexScanA->clone() : unionNode.clone());
         auto plan = std::make_unique<QuerySolution>();
-        plan->setRoot(std::make_unique<FetchNode>(std::move(andHash), testNss));
+        plan->setRoot(std::make_unique<FetchNode>(std::move(andHash), kTestNss));
         return plan;
     };
 
@@ -429,16 +419,15 @@ TEST(CardinalityEstimator, BatchedFetchFallsBack) {
 }
 
 TEST(CardinalityEstimator, TopLevelUnionIsCosted) {
-    auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
     std::vector<std::string> indexFields = {"a"};
     auto indexScan1 =
-        makeIndexScan(testNss,
+        makeIndexScan(kTestNss,
                       makeRangeIntervalBounds(BSON("" << 0 << " " << 10),
                                               BoundInclusion::kIncludeBothStartAndEndKeys,
                                               indexFields[0]),
                       indexFields);
     auto indexScan2 =
-        makeIndexScan(testNss,
+        makeIndexScan(kTestNss,
                       makeRangeIntervalBounds(BSON("" << 20 << " " << 30),
                                               BoundInclusion::kIncludeBothStartAndEndKeys,
                                               indexFields[0]),
@@ -448,7 +437,7 @@ TEST(CardinalityEstimator, TopLevelUnionIsCosted) {
     auto orNode = std::make_unique<OrNode>();
     orNode->children.push_back(std::move(indexScan1));
     orNode->children.push_back(std::move(indexScan2));
-    auto fetch = std::make_unique<FetchNode>(std::move(orNode), testNss);
+    auto fetch = std::make_unique<FetchNode>(std::move(orNode), kTestNss);
 
     auto plan = std::make_unique<QuerySolution>();
     plan->setRoot(std::move(fetch));
@@ -457,7 +446,6 @@ TEST(CardinalityEstimator, TopLevelUnionIsCosted) {
 }
 
 TEST(CardinalityEstimator, HistogramIndexedAndNonIndexedSolutionHaveSameCardinality) {
-    auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
     // Plan 1: Ixscan(a: (5, inf]) -> Fetch
     std::vector<std::string> indexFields = {"a"};
     auto histFields = indexFields;
@@ -465,7 +453,7 @@ TEST(CardinalityEstimator, HistogramIndexedAndNonIndexedSolutionHaveSameCardinal
         makeRangeIntervalBounds(BSON("" << 5 << " " << std::numeric_limits<double>::infinity()),
                                 BoundInclusion::kIncludeEndKeyOnly,
                                 indexFields[0]);
-    auto plan1 = makeIndexScanFetchPlan(testNss, std::move(bounds), std::move(indexFields));
+    auto plan1 = makeIndexScanFetchPlan(kTestNss, std::move(bounds), std::move(indexFields));
 
     // Plan 2: CollScan(a > 5)
     BSONObj query = fromjson("{a: {$gt: 5}}");
@@ -479,7 +467,6 @@ TEST(CardinalityEstimator, HistogramIndexedAndNonIndexedSolutionHaveSameCardinal
 }
 
 TEST(CardinalityEstimator, HistogramIndexedAndNonIndexedSolutionConjunctionHaveSameCardinality) {
-    auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
 
     // Plan 1: Ixscan(a: [5, 5], b: [6, 6]) -> Fetch
     std::vector<std::string> indexFields = {"a", "b"};
@@ -487,7 +474,7 @@ TEST(CardinalityEstimator, HistogramIndexedAndNonIndexedSolutionConjunctionHaveS
     IndexBounds bounds;
     bounds.fields.push_back(makePointInterval(5, indexFields[0]));
     bounds.fields.push_back(makePointInterval(6, indexFields[1]));
-    auto plan1 = makeIndexScanFetchPlan(testNss, std::move(bounds), std::move(indexFields));
+    auto plan1 = makeIndexScanFetchPlan(kTestNss, std::move(bounds), std::move(indexFields));
 
     // Plan 2: CollScan(a == 5 AND b == 6)
     BSONObj query = fromjson("{a: 5, b: 6}");
@@ -636,7 +623,6 @@ TEST(CardinalityEstimator, NAryXOR) {
 
 // Cardinality estimator with sampling.
 TEST(CardinalityEstimator, CompareCardinalityEstimatesForIndexScans) {
-    auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
 
     size_t collCard = 5000;
     ce::SamplingEstimatorTest samplingEstimatorTest;
@@ -652,7 +638,7 @@ TEST(CardinalityEstimator, CompareCardinalityEstimatesForIndexScans) {
     oilRange.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
         BSON("" << 0 << "" << 6), BoundInclusion::kIncludeBothStartAndEndKeys));
     bounds.fields.push_back(oilRange);
-    auto indexedPlan = makeIndexScanFetchPlan(testNss, std::move(bounds), std::move(indexFields));
+    auto indexedPlan = makeIndexScanFetchPlan(kTestNss, std::move(bounds), std::move(indexFields));
     auto estIndexedPlan = getPlanSamplingCE(*indexedPlan, collCard, &samplingEstimator);
 
     // Create collection scan plan with match expression equivalent to the index bounds.
@@ -665,7 +651,6 @@ TEST(CardinalityEstimator, CompareCardinalityEstimatesForIndexScans) {
 }
 
 TEST(CardinalityEstimator, CompareCardinalityEstimatesForIndexScanAndFetch) {
-    auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
 
     size_t collCard = 5000;
     ce::SamplingEstimatorTest samplingEstimatorTest;
@@ -678,7 +663,7 @@ TEST(CardinalityEstimator, CompareCardinalityEstimatesForIndexScanAndFetch) {
     // 'b' is 0 in every sampled document where 'a' is 50, so this filter matches some documents.
     BSONObj fetchCond = fromjson("{$or: [{b: 0}, {c: 'xyz'}]}");
     auto fetchExpr = parse(fetchCond);
-    auto indexedPlan = makeIndexScanFetchPlan(testNss,
+    auto indexedPlan = makeIndexScanFetchPlan(kTestNss,
                                               makePointIntervalBounds(50.0, indexFields[0]),
                                               indexFields,
                                               nullptr,
@@ -696,7 +681,6 @@ TEST(CardinalityEstimator, CompareCardinalityEstimatesForIndexScanAndFetch) {
 }
 
 TEST(CardinalityEstimator, CompareCardinalityEstimatesForIndexScanIndexKeyOptimization) {
-    auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
 
     size_t collCard = 1000;
     ce::SamplingEstimatorTest samplingEstimatorTest;
@@ -721,7 +705,7 @@ TEST(CardinalityEstimator, CompareCardinalityEstimatesForIndexScanIndexKeyOptimi
         IndexBounds bounds;
         bounds.fields.push_back(makePointInterval(50, indexFields[0]));
 
-        auto plan = makeIndexScanFetchPlan(testNss, std::move(bounds), std::move(indexFields));
+        auto plan = makeIndexScanFetchPlan(kTestNss, std::move(bounds), std::move(indexFields));
         indexScanNonMultiKeyNoFilterPoint = getPlanSamplingCE(*plan, collCard, &samplingEstimator);
     }
 
@@ -740,7 +724,7 @@ TEST(CardinalityEstimator, CompareCardinalityEstimatesForIndexScanIndexKeyOptimi
             BSON("" << 0 << "" << 6), BoundInclusion::kIncludeBothStartAndEndKeys));
         bounds.fields.push_back(oilRange);
 
-        auto plan = makeIndexScanFetchPlan(testNss, std::move(bounds), std::move(indexFields));
+        auto plan = makeIndexScanFetchPlan(kTestNss, std::move(bounds), std::move(indexFields));
         indexScanNonMultiKeyNoFilterRange = getPlanSamplingCE(*plan, collCard, &samplingEstimator);
     }
 
@@ -755,8 +739,8 @@ TEST(CardinalityEstimator, CompareCardinalityEstimatesForIndexScanIndexKeyOptimi
         IndexBounds bounds;
         bounds.fields.push_back(makePointInterval(50, indexFields[0]));
 
-        auto plan =
-            makeMultiKeyIndexScanFetchPlan(testNss, std::move(bounds), std::move(indexFields), "a");
+        auto plan = makeMultiKeyIndexScanFetchPlan(
+            kTestNss, std::move(bounds), std::move(indexFields), "a");
         // Use cardinalityEstimator that uses index bounds.
         indexScanMultiKey = getPlanSamplingCE(*plan, collCard, &samplingEstimator);
     }
@@ -765,7 +749,6 @@ TEST(CardinalityEstimator, CompareCardinalityEstimatesForIndexScanIndexKeyOptimi
 }
 
 TEST(CardinalityEstimator, CompareCardinalityEstimatesForIndexScanWithFetchNoFilter) {
-    auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
 
     size_t collCard = 100;
     ce::SamplingEstimatorTest samplingEstimatorTest;
@@ -778,7 +761,7 @@ TEST(CardinalityEstimator, CompareCardinalityEstimatesForIndexScanWithFetchNoFil
     std::vector<std::string> indexFields = {"a"};
     BSONObj fetchCond = fromjson("{}");
     auto fetchExpr = parse(fetchCond);
-    auto indexPlan = makeIndexScanFetchPlan(testNss,
+    auto indexPlan = makeIndexScanFetchPlan(kTestNss,
                                             makePointIntervalBounds(50.0, indexFields[0]),
                                             indexFields,
                                             nullptr,
@@ -794,7 +777,6 @@ TEST(CardinalityEstimator, CompareCardinalityEstimatesForIndexScanWithFetchNoFil
 }
 
 TEST(CardinalityEstimator, SamplingCEInvokesEstimateCardinality) {
-    auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
 
     // Constant settings
     size_t collCard = 10000;
@@ -893,7 +875,7 @@ TEST(CardinalityEstimator, SamplingCEInvokesEstimateCardinality) {
         auto bounds = makePointIntervalBounds(88.0, indexFields[0]);
 
         std::unique_ptr<IndexScanNode> indexScan =
-            makeIndexScan(testNss, bounds, indexFields, std::move(residualFilter));
+            makeIndexScan(kTestNss, bounds, indexFields, std::move(residualFilter));
 
         auto indexPlan = std::make_unique<QuerySolution>();
         indexPlan->setRoot(std::move(indexScan));
@@ -919,7 +901,7 @@ TEST(CardinalityEstimator, SamplingCEInvokesEstimateCardinality) {
         bounds.fields.emplace_back(makePointInterval(35, indexFields[3]));
 
         std::unique_ptr<IndexScanNode> indexScan =
-            makeIndexScan(testNss, bounds, indexFields, std::move(residualFilter));
+            makeIndexScan(kTestNss, bounds, indexFields, std::move(residualFilter));
 
         auto indexPlan = std::make_unique<QuerySolution>();
         indexPlan->setRoot(std::move(indexScan));
@@ -942,7 +924,7 @@ TEST(CardinalityEstimator, SamplingCEInvokesEstimateCardinality) {
                                               indexFields[0]);
 
         std::unique_ptr<IndexScanNode> indexScan =
-            makeIndexScan(testNss, bounds, indexFields, std::move(residualFilter));
+            makeIndexScan(kTestNss, bounds, indexFields, std::move(residualFilter));
 
         auto indexPlan = std::make_unique<QuerySolution>();
         indexPlan->setRoot(std::move(indexScan));
@@ -977,7 +959,7 @@ TEST(CardinalityEstimator, SamplingCEInvokesEstimateCardinality) {
         bounds.fields.emplace_back(makePointInterval(937, indexFields[3]));
 
         std::unique_ptr<IndexScanNode> indexScan =
-            makeIndexScan(testNss, bounds, indexFields, std::move(residualFilter));
+            makeIndexScan(kTestNss, bounds, indexFields, std::move(residualFilter));
 
         auto indexPlan = std::make_unique<QuerySolution>();
         indexPlan->setRoot(std::move(indexScan));
@@ -1171,12 +1153,11 @@ TEST(CardinalityEstimator, CachesEstimateWhenTotalIntervalsAtOrBelowLimit) {
     // OIL "a": 1 interval, OIL "b": 999 intervals → total = 1000 == kMaxNumIntervalsCached.
     // Estimating the same bounds twice should hit the cache on the second evaluation,
     // so estimateRIDs is called only once across both plan estimations.
-    auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
     std::vector<std::string> indexFields = {"a", "b"};
     IndexBounds bounds = makeTwoFieldBounds(kMaxNumIntervalsCached - 1);
 
-    auto plan1 = makeIndexScanFetchPlan(testNss, bounds, indexFields);
-    auto plan2 = makeIndexScanFetchPlan(testNss, bounds, indexFields);
+    auto plan1 = makeIndexScanFetchPlan(kTestNss, bounds, indexFields);
+    auto plan2 = makeIndexScanFetchPlan(kTestNss, bounds, indexFields);
 
     CountingEstimator mockEstimator;
     const CollectionInfo collInfo = buildCollectionInfo({}, makeCollStats(100.0));
@@ -1195,12 +1176,11 @@ TEST(CardinalityEstimator, DoesNotCacheEstimateWhenTotalIntervalsAboveLimit) {
     // OIL "a": 1 interval, OIL "b": 1000 intervals → total = 1001 > kMaxNumIntervalsCached.
     // The cache is bypassed every time, so estimateRIDs is called on every ridsEstFunct
     // invocation: 2 per plan estimation (main + equality-prefix inCE) × 2 plans = 4.
-    auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
     std::vector<std::string> indexFields = {"a", "b"};
     IndexBounds bounds = makeTwoFieldBounds(kMaxNumIntervalsCached);
 
-    auto plan1 = makeIndexScanFetchPlan(testNss, bounds, indexFields);
-    auto plan2 = makeIndexScanFetchPlan(testNss, bounds, indexFields);
+    auto plan1 = makeIndexScanFetchPlan(kTestNss, bounds, indexFields);
+    auto plan2 = makeIndexScanFetchPlan(kTestNss, bounds, indexFields);
 
     CountingEstimator mockEstimator;
     const CollectionInfo collInfo = buildCollectionInfo({}, makeCollStats(100.0));
@@ -1253,8 +1233,7 @@ std::unique_ptr<QuerySolution> makeEqualityPrefixPlan(IndexBounds bounds) {
     for (const auto& oil : bounds.fields) {
         indexFields.push_back(oil.name);
     }
-    const auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
-    return makeIndexScanFetchPlan(testNss, std::move(bounds), indexFields);
+    return makeIndexScanFetchPlan(kTestNss, std::move(bounds), indexFields);
 }
 }  // namespace
 
@@ -1916,6 +1895,46 @@ TEST(CardinalityEstimator, ShardFilterIsPassThrough) {
     ASSERT_EQ(getPlanHeuristicCE(*shardFilterPlan, collCard), collScanCE);
 }
 
+// Single-field index scan never needs the unique document count for index seek estimate.
+TEST(CardinalityEstimatorTest, SingleFieldIndexScanDoesNotNeedId) {
+    std::vector<std::string> indexFields = {"a"};
+    auto plan =
+        makeIndexScanFetchPlan(kTestNss, makePointIntervalBounds(5.0, indexFields[0]), indexFields);
+
+    QuerySolutionVector solutions;
+    solutions.push_back(std::move(plan));
+    ce::TopLevelSampleFields fields(StringSet{"a"});
+    ce::ensureIdForUniqueDocumentCount(fields, solutions);
+    ASSERT_TRUE(fields.isProjectedWithoutId());
+}
+
+TEST(CardinalityEstimatorTest, MultiFieldIndexScanNeedsId) {
+    std::vector<std::string> indexFields = {"a", "b"};
+    IndexBounds bounds;
+    bounds.fields.push_back(makePointInterval(5.0, indexFields[0]));
+    OrderedIntervalList oilRange(indexFields[1]);
+    oilRange.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        BSON("" << 5 << " " << 10), BoundInclusion::kIncludeBothStartAndEndKeys));
+    bounds.fields.push_back(oilRange);
+    auto plan = makeIndexScanFetchPlan(kTestNss, std::move(bounds), indexFields);
+
+    QuerySolutionVector solutions;
+    solutions.push_back(std::move(plan));
+    ce::TopLevelSampleFields fields(StringSet{"a", "b"});
+    ce::ensureIdForUniqueDocumentCount(fields, solutions);
+    ASSERT_FALSE(fields.isProjectedWithoutId());
+}
+
+TEST(CardinalityEstimatorTest, CollectionScanDoesNotNeedId) {
+    QuerySolutionVector solutions;
+    solutions.push_back(makeCollScanPlan(nullptr));
+    ce::TopLevelSampleFields fields(StringSet{"a"});
+    ce::ensureIdForUniqueDocumentCount(fields, solutions);
+    ASSERT_TRUE(fields.isProjectedWithoutId());
+}
+
+// An approximate-source (histogram) zero estimate for a node aborts plan estimation with a
+// ZeroCEEstimate error: the zero means "not observed", so ranking cannot trust it.
 TEST(CardinalityEstimator, ZeroCEEstimateFromHistogramIsClamped) {
     auto testNss = NamespaceString::createNamespaceString_forTest("testdb.coll");
     // The histogram fixture's bucket frequencies total 1000, so collCard must match.

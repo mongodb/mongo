@@ -16,6 +16,7 @@
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
+#include "mongo/db/query/compiler/optimizer/cost_based_ranker/ce_utils.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/mock_yield_policies.h"
@@ -137,6 +138,10 @@ std::vector<std::unique_ptr<QuerySolution>> cbrRankPlans(
     auto statusWithMultiPlanSolns =
         QueryPlanner::plan(*cq, plannerParams, topLevelSampleFieldNames.relevantIndexOutput());
 
+    if (statusWithMultiPlanSolns.isOK()) {
+        ce::ensureIdForUniqueDocumentCount(topLevelSampleFieldNames,
+                                           statusWithMultiPlanSolns.getValue());
+    }
     if (originalPlanHashes) {
         ASSERT(statusWithMultiPlanSolns.isOK());
         for (const auto& soln : statusWithMultiPlanSolns.getValue()) {

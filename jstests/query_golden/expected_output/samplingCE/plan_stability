@@ -7956,9 +7956,9 @@
     "rows" :  49322},
 
 {">>>pipeline": [{"$match":{"c_compound":{"$nin":[11,10]},"d_compound":{"$nin":[2,14,17,11]}}},{"$skip":20},{"$project":{"_id":0,"a_compound":1}}],
-    "winningPlan": {"stage":"PROJECTION_SIMPLE","inputStage":{"stage":"SKIP","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"d_compound_1","indexBounds":{"d_compound":["[MinKey, 2.0)","(2.0, 11.0)","(11.0, 14.0)","(14.0, 17.0)","(17.0, MaxKey]"]}}}}},
+    "winningPlan": {"stage":"PROJECTION_SIMPLE","inputStage":{"stage":"FETCH","inputStage":{"stage":"SKIP","inputStage":{"stage":"IXSCAN","indexName":"c_compound_1_d_compound_1","indexBounds":{"c_compound":["[MinKey, 10.0)","(10.0, 11.0)","(11.0, MaxKey]"],"d_compound":["[MinKey, 2.0)","(2.0, 11.0)","(11.0, 14.0)","(14.0, 17.0)","(17.0, MaxKey]"]}}}}},
     "keys" :  90001,
-    "docs" :  90000,
+    "docs" :  89980,
     "sorts":      0,
     "plans":      4,
     "rows" :  89980},
@@ -8044,9 +8044,9 @@
     "rows" :    186},
 
 {">>>pipeline": [{"$match":{"c_compound":{"$ne":15},"d_compound":{"$nin":[18,8,18,3,11]}}},{"$skip":22}],
-    "winningPlan": {"stage":"SKIP","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"d_compound_1","indexBounds":{"d_compound":["[MinKey, 3.0)","(3.0, 8.0)","(8.0, 11.0)","(11.0, 18.0)","(18.0, MaxKey]"]}}}},
+    "winningPlan": {"stage":"FETCH","inputStage":{"stage":"SKIP","inputStage":{"stage":"IXSCAN","indexName":"c_compound_1_d_compound_1","indexBounds":{"c_compound":["[MinKey, 15.0)","(15.0, MaxKey]"],"d_compound":["[MinKey, 3.0)","(3.0, 8.0)","(8.0, 11.0)","(11.0, 18.0)","(18.0, MaxKey]"]}}}},
     "keys" :  80002,
-    "docs" :  80000,
+    "docs" :  79978,
     "sorts":      0,
     "plans":      4,
     "rows" :  79978},
@@ -8380,7 +8380,7 @@
     "rows" :  20000}
 
 ],
-">>>totals": {"pipelines": 1043, "plans": 10395, "keys": 85039188, "docs": 52976757, "sorts": 78897837, "rows": 38020022, "errors":      0},
+">>>totals": {"pipelines": 1043, "plans": 10395, "keys": 85039188, "docs": 52976715, "sorts": 78897837, "rows": 38020022, "errors":      0},
 ">>>parameters": {"featureFlagCostBasedRanker":{"value":true,"fcv_gated":false,"currentlyEnabled":true},"internalQueryPlanRanker":"costBased","internalQueryCBRCEMode":"samplingCE","samplingMarginOfError":5,"samplingConfidenceInterval":"95","internalQuerySamplingCEMethod":"chunk","internalQuerySamplingBySequentialScan":false,"internalQuerySamplingByStrides":true}}
 
 

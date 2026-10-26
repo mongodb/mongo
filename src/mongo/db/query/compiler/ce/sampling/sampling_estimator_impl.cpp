@@ -22,6 +22,8 @@
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
+#include "mongo/db/query/query_planner_params.h"
+#include "mongo/db/query/query_solution_analyzer.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/stats/counters.h"
@@ -172,11 +174,54 @@ boost::optional<StringSet&> TopLevelSampleFields::relevantIndexOutput() {
     return !needsAllFields() ? boost::optional<StringSet&>(_fieldNames.value()) : boost::none;
 }
 
+bool TopLevelSampleFields::isProjectedWithoutId() const {
+    return !needsAllFields() && !_fieldNames->empty() && !_fieldNames->contains("_id");
+}
+
+void TopLevelSampleFields::ensureIdIncluded() {
+    if (!needsAllFields() && !_fieldNames->empty()) {
+        _fieldNames->insert("_id");
+    }
+}
+
 ProjectionParams TopLevelSampleFields::toProjectionParams() && {
     if (needsAllFields() || _fieldNames->empty()) {
         return NoProjection{};
     }
     return TopLevelFieldsProjection{std::move(_fieldNames.value())};
+}
+
+namespace {
+
+// Matches an index scan whose bounds span more than one field. It is a conservative check
+// for index nodes that would need index seek estimates and therefore the _id field in the sample.
+class MultiFieldIndexScanRule {
+public:
+    // Index scans are the only nodes this rule inspects: for every other node it is a no-op.
+    void preVisit(query_solution_analyzer::RuleEngine& engine,
+                  const IndexScanNode& node,
+                  size_t /*index*/) {
+        if (node.bounds.fields.size() >= 2) {
+            engine.match(&node);
+        }
+    }
+};
+}  // namespace
+
+void ensureIdForUniqueDocumentCount(TopLevelSampleFields& fields,
+                                    const QuerySolutionVector& solutions) {
+    if (!fields.isProjectedWithoutId()) {
+        return;
+    }
+    // An index scan whose bounds span more than one field may need the number of distinct documents
+    // in the sample to estimate its seeks.
+    if (std::any_of(solutions.begin(), solutions.end(), [](const auto& solution) {
+            return solution->root() &&
+                query_solution_analyzer::treeMatchesAny(
+                       solution->root(), true /* allowEarlyExit */, MultiFieldIndexScanRule{});
+        })) {
+        fields.ensureIdIncluded();
+    }
 }
 
 void SamplingEstimatorImpl::generateSample(ce::ProjectionParams projectionParams) {
@@ -829,14 +874,13 @@ CardinalityEstimate SamplingEstimatorImpl::estimateNDV(
     }
 
     // Obtain the NDV for the sample. Compare against the number of unique documents. If they are
-    // equal, skip NR iteration since it is likely to diverge. The best guess is that each element
-    // in the collection is unique. We compare sampleNDV against uniqueDocCount instead of
-    // sampleSize because we sample with replacement. This can produce duplicate documents, which
+    // equal, skip Newton-Raphson iteration since it is likely to diverge. The best guess is that
+    // each element in the collection is unique. We compare sampleNDV against uniqueDocCount instead
+    // of sampleSize because we sample with replacement. This can produce duplicate documents, which
     // may result in us oscillating in and out of NR for defacto unique fields. The unique doc count
     // is lazily computed and cached.
     size_t sampleNDV = countNDV(fields, _sample->docs(), bounds);
     if (!_uniqueDocCount) {
-        // TODO SERVER-135986: Fix unique document count for projected samples
         _uniqueDocCount = countUniqueDocuments(_sample->docs());
     }
     if (sampleNDV == *_uniqueDocCount) {

@@ -119,7 +119,8 @@ KeyCountResult countNDVMultiKey(
  * Returns the number of unique documents in the given vector by counting distinct _id values.
  * This detects duplicate documents produced by sampling with replacement, where the same
  * physical document may appear multiple times.
- * This function assumes that every document passed to it contains an _id field.
+ * This function requires that every document passed to it contains an _id field; an _id-less
+ * sample would silently collapse to a unique count of one and cause estimation errors.
  */
 size_t countUniqueDocuments(const std::vector<BSONObj>& docs);
 

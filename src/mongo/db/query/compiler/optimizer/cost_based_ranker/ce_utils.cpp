@@ -3,6 +3,8 @@
 
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/ce_utils.h"
 
+#include <algorithm>
+
 namespace mongo::cost_based_ranker {
 
 /**

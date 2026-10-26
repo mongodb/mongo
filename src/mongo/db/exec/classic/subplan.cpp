@@ -199,6 +199,12 @@ Status SubplanStage::pickBestPlan(const QueryPlannerParams& plannerParams,
         planRanker == QueryPlanRankerEnum::kMixed;
     if (!useMultiplanner && subplanningStatus.isOK()) {
         if (rankerMode == QueryCBRCEModeEnum::kSamplingCE) {
+            // Any branch's index scan may need the number of distinct documents in the sample to
+            // estimate its seeks, and that count is computed from _id. Always
+            // include _id in a projected sample to avoid analyzing large plan spaces for rooted $or
+            // queries.
+            topLevelSampleFieldNames.ensureIdIncluded();
+
             // If we do not have any fields that we want to sample then we just include all the
             // fields in the sample. This can occur if we encounter a find all query with no
             // project or sort specified.

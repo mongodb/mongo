@@ -1886,9 +1886,9 @@
     "rows" :      5},
 
 {">>>pipeline": [{"$match":{"$or":[{"$or":[{"field23_dict_idx":{"$gte":{"j":1,"c":1,"b":1,"d":1}},"field32_dict_idx":{"$ne":{"d":3,"b":1}}},{"field40_list":{"$ne":"j"},"field17_int_idx":{"$lt":603},"field24_mixed_idx":{"$regex":{"$regex":"^t","$options":""}}}]},{"field34_str_idx":{"$lte":"I"},"field16_str_idx":{"$eq":"hD"},"field27_bool_idx":{"$lt":false},"field4_list_idx":{"$elemMatch":{"$eq":14,"$ne":1,"$all":["l","y","g","r","d","n","h","j"]}},"field35_int_idx":{"$gt":95}},{"field34_str_idx":{"$exists":false},"field31_list_idx":{"$lt":11},"field13_list_idx":{"$in":[]}}],"field9_bool_idx":{"$ne":false},"field21_Decimal128_idx":{"$gte":{"$numberDecimal":"1.29"}}}},{"$sort":{"field17_int_idx":-1}}],
-    "winningPlan": {"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"field9_bool_idx_-1_field35_int_idx_1","indexBounds":{"field9_bool_idx":["[MaxKey, false)","(false, MinKey]"],"field35_int_idx":["[MinKey, MaxKey]"]}}}},
-    "keys" :  11752,
-    "docs" :  11751,
+    "winningPlan": {"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"OR","inputStages":[{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"field9_bool_idx_-1_field35_int_idx_1","indexBounds":{"field9_bool_idx":["[MaxKey, false)","(false, MinKey]"],"field35_int_idx":["(95.0, inf]"]}}},{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"field23_dict_idx_1","indexBounds":{"field23_dict_idx":["[{ j: 1.0, c: 1.0, b: 1.0, d: 1.0 }, [])"]}}},{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"field24_mixed_idx_-1_field28_datetime_idx_1","indexBounds":{"field24_mixed_idx":["[/^t/, /^t/]","(\"u\", \"t\"]"],"field28_datetime_idx":["[MinKey, MaxKey]"]}}}]}}},
+    "keys" :   3086,
+    "docs" :   4073,
     "sorts":    211,
     "plans":     15,
     "rows" :     44},
@@ -8262,7 +8262,7 @@
     "rows" :  96224}
 
 ],
-">>>totals": {"pipelines": 1032, "plans": 8774, "keys": 32164003, "docs": 31840728, "sorts": 7325762, "rows": 10011323, "errors":      0},
+">>>totals": {"pipelines": 1032, "plans": 8774, "keys": 32155337, "docs": 31833050, "sorts": 7325762, "rows": 10011323, "errors":      0},
 ">>>parameters": {"featureFlagCostBasedRanker":{"value":true,"fcv_gated":false,"currentlyEnabled":true},"internalQueryPlanRanker":"mixed","internalQueryCBRCEMode":"samplingCE","internalQueryMixedPlanRankingStrategy":"NoMultiplanningResults","samplingMarginOfError":5,"samplingConfidenceInterval":"95","internalQuerySamplingCEMethod":"chunk","internalQuerySamplingBySequentialScan":false,"internalQuerySamplingByStrides":true}}
 
 

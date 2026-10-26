@@ -10,6 +10,7 @@
 #include "mongo/db/query/compiler/ce/sampling/sample.h"
 #include "mongo/db/query/compiler/ce/sampling/sample_spec.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
@@ -35,6 +36,8 @@ public:
 
     explicit TopLevelSampleFields(StringSet fieldNames) : _fieldNames(std::move(fieldNames)) {}
 
+    // TODO SERVER-136695 Consolidate the code for samples without projection
+    // Include also the case of empty string set.
     bool needsAllFields() const {
         return _fieldNames == kAllFields;
     }
@@ -56,6 +59,17 @@ public:
     boost::optional<StringSet&> relevantIndexOutput();
 
     /**
+     * Returns true if the sample is projected and does not already contain '_id'.
+     */
+    bool isProjectedWithoutId() const;
+
+    /**
+     * Adds '_id' to the sampled fields, so the number of distinct sampled documents can be counted
+     * from it.
+     */
+    void ensureIdIncluded();
+
+    /**
      * Helper to construct projection params from these top level fields.
      */
     ProjectionParams toProjectionParams() &&;
@@ -73,6 +87,14 @@ private:
  * Helper function to extract the top level fields from a given MatchExpression.
  */
 TopLevelSampleFields extractTopLevelFieldsFromMatchExpression(const MatchExpression* expr);
+
+/**
+ * Adds '_id' to 'fields' if it is a projected sample without '_id' and any of 'solutions' contains
+ * an index scan whose bounds span more than one field. Only such a scan needs the number of unique
+ * documents, which is computed from _id.
+ */
+void ensureIdForUniqueDocumentCount(TopLevelSampleFields& fields,
+                                    const QuerySolutionVector& solutions);
 
 /**
  * The canonically (lexicographically) sorted field paths a persisted NDV statistic describes.

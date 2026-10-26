@@ -336,6 +336,9 @@ KeyCountResult countNDVMultiKey(const std::vector<FieldPathAndEqSemantics>& fiel
 }
 
 size_t countUniqueDocuments(const std::vector<BSONObj>& docs) {
+    const bool sampleHasId = docs.empty() || docs.front().hasField("_id");
+    tassert(13598601, "Sample must contain _id to count unique documents", sampleHasId);
+
     auto uniqueIds = kIgnoreFieldNameComparator.makeBSONEltUnorderedSet();
     uniqueIds.reserve(docs.size());
     for (const auto& doc : docs) {

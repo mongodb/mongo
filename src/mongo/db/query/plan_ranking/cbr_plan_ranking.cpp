@@ -10,6 +10,7 @@
 #include "mongo/db/query/compiler/ce/exact/exact_cardinality_impl.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
+#include "mongo/db/query/compiler/optimizer/cost_based_ranker/ce_utils.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 #include "mongo/db/query/plan_ranking/plan_ranker_reason.h"
 #include "mongo/db/query/planner_analysis.h"
@@ -145,6 +146,8 @@ StatusWith<PlanRankingResult> CBRPlanRankingStrategy::rankPlans(
 
         // Start timer for sampling server status metrics
         auto startSamplingTicks = tickSource->getTicks();
+
+        ce::ensureIdForUniqueDocumentCount(topLevelSampleFieldNames, solutions);
 
         // If we do not have any fields that we want to sample then we just include all the
         // fields in the sample. This can occur for primary match expressions which are
