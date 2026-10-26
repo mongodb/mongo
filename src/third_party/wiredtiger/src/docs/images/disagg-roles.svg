@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 380" role="img" aria-labelledby="title desc">
+  <title id="title">Disaggregated leader and follower</title>
+  <desc id="desc">The leader writes live stable data and shared checkpoints. Application replication
+    supplies changes to follower ingest. The follower reads ingest over a shared checkpoint view.
+    Step-up incorporates local changes into the shared writer; step-down retains later changes locally.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0 0 L8 4 L0 8" fill="none" stroke="#555"/>
+    </marker>
+  </defs>
+  <rect width="900" height="380" fill="#fff"/>
+  <g font-family="Arial, sans-serif" font-size="17" fill="#222">
+    <rect x="25" y="65" width="325" height="145" rx="8" fill="#eaf4ee" stroke="#557b60"/>
+    <rect x="550" y="65" width="325" height="145" rx="8" fill="#edf3fa" stroke="#55739b"/>
+    <text x="187" y="96" text-anchor="middle" font-weight="bold">Leader</text>
+    <text x="187" y="128" text-anchor="middle">Stable table: live shared writer</text>
+    <text x="187" y="159" text-anchor="middle">Ingest table: empty in steady state</text>
+    <text x="187" y="190" text-anchor="middle">Produces shared checkpoints</text>
+    <text x="712" y="96" text-anchor="middle" font-weight="bold">Follower</text>
+    <text x="712" y="128" text-anchor="middle">Stable table: checkpoint view</text>
+    <text x="712" y="159" text-anchor="middle">Ingest table: local recent changes</text>
+    <text x="712" y="190" text-anchor="middle">Reads the combined view</text>
+    <path d="M352 112 H545" stroke="#555" fill="none" marker-end="url(#arrow)"/>
+    <text x="450" y="91" text-anchor="middle" font-size="14">Application replication</text>
+    <rect x="290" y="290" width="320" height="65" rx="8" fill="#f5f5f5" stroke="#777"/>
+    <text x="450" y="317" text-anchor="middle" font-weight="bold">Shared storage</text>
+    <text x="450" y="342" text-anchor="middle">Checkpointed data and history</text>
+    <path d="M187 215 V322 H282" stroke="#555" fill="none" marker-end="url(#arrow)"/>
+    <text x="187" y="256" dx="8" font-size="14">Write checkpoint</text>
+    <path d="M615 322 H712 V217" stroke="#555" fill="none" marker-end="url(#arrow)"/>
+    <text x="712" y="256" dx="8" font-size="14">Adopt checkpoint</text>
+    <path d="M550 27 H350" stroke="#555" fill="none" marker-end="url(#arrow)"/>
+    <text x="450" y="19" text-anchor="middle" font-size="14">Step-up: become the shared writer</text>
+    <path d="M350 238 H545" stroke="#555" fill="none" marker-end="url(#arrow)"/>
+    <text x="450" y="261" text-anchor="middle" font-size="14">Step-down: become a follower</text>
+  </g>
+</svg>

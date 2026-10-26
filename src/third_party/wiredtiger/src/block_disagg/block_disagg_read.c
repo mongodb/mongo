@@ -280,9 +280,9 @@ __block_disagg_read_multiple(WT_SESSION_IMPL *session, WT_BLOCK_DISAGG *block_di
          */
         if (from_cache ? swap.previous_checksum == checksum : swap.checksum == checksum) {
             blk->checksum = 0;
-            if (__wt_checksum_match(current->data,
-                  F_ISSET(&swap, WT_BLOCK_DATA_CKSUM) ? size : WT_MIN(size, WT_BLOCK_COMPRESS_SKIP),
-                  swap.checksum)) {
+            size_t cksum_len =
+              F_ISSET(&swap, WT_BLOCK_DATA_CKSUM) ? size : WT_MIN(size, WT_BLOCK_COMPRESS_SKIP);
+            if (__wt_checksum_match(current->data, cksum_len, swap.checksum)) {
                 expected_magic =
                   (is_delta ? WT_BLOCK_DISAGG_MAGIC_DELTA : WT_BLOCK_DISAGG_MAGIC_BASE);
                 if (swap.magic != expected_magic) {
@@ -359,10 +359,19 @@ __block_disagg_read_multiple(WT_SESSION_IMPL *session, WT_BLOCK_DISAGG *block_di
                 continue;
             }
 
+            /*
+             * Unfortunately, we can't figure out calculated above, then use it for both that check,
+             * and here. The checksum match function is a little bit special, because it knows how
+             * to use the alternate implementation on Windows to work around an old bug. There may
+             * still be blocks floating around with those checksums, so we can't just drop the alt
+             * version. But at the same time, I imagine it's pretty rare that we'd need to report a
+             * mismatch on such a block. So for logging we can just be lazy and use one checksum.
+             */
+            uint32_t calculated = __wt_checksum(current->data, cksum_len);
             __block_disagg_read_err(session, block_disagg->name, block_disagg->tableid, size,
               page_id, lsn, is_delta, result,
               "calculated checksum of %" PRIx32 " doesn't match expected checksum of %" PRIx32,
-              swap.checksum, checksum);
+              calculated, checksum);
         } else
             __block_disagg_read_err(session, block_disagg->name, block_disagg->tableid, size,
               page_id, lsn, is_delta, result,

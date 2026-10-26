@@ -149,9 +149,11 @@ __sweep_close_dhandle_locked(WT_SESSION_IMPL *session)
 {
     WT_BTREE *btree;
     WT_DATA_HANDLE *dhandle;
+    bool redundant_ingest;
 
     dhandle = session->dhandle;
     btree = WT_DHANDLE_BTREE(dhandle) ? dhandle->handle : NULL;
+    redundant_ingest = false;
 
     /* This method expects dhandle write lock. */
     WT_ASSERT(session, FLD_ISSET(dhandle->lock_flags, WT_DHANDLE_LOCK_WRITE));
@@ -191,6 +193,7 @@ __sweep_close_dhandle_locked(WT_SESSION_IMPL *session)
           max_write_ts >
             __wt_atomic_load_uint64_acquire(&S2C(session)->txn_global.last_ckpt_timestamp))
             return (0);
+        redundant_ingest = true;
     }
 
     /*
@@ -199,7 +202,10 @@ __sweep_close_dhandle_locked(WT_SESSION_IMPL *session)
      * For btree handles, closing the handle decrements the open file count, meaning the close loop
      * won't overrun the configured minimum.
      */
-    return (__wt_conn_dhandle_close(session, false, true, false));
+    WT_RET(__wt_conn_dhandle_close(session, false, true, false));
+    if (redundant_ingest)
+        WT_STAT_CONN_INCR(session, dh_sweep_ingest_close);
+    return (0);
 }
 
 /*

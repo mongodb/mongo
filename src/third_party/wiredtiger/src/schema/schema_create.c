@@ -86,6 +86,11 @@ __create_file_block_manager(WT_SESSION_IMPL *session, const char *uri, const cha
 
     npage_log = NULL;
 
+    /* in_memory objects don't have a data file, skip create and file-op rollback tracking below. */
+    WT_RET(__wt_config_gets(session, cfg, "in_memory", &page_log_item));
+    if (page_log_item.val != 0)
+        return (0);
+
     WT_RET(__wt_config_gets(session, cfg, "block_manager", &bm_item));
     /* FIXME-WT-18866: Drop the name check once no database has legacy entries. */
     if (WT_URI_IS_STABLE(uri) || WT_CONFIG_LIT_MATCH("disagg", bm_item)) {

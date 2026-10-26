@@ -217,7 +217,7 @@ CONFIG configuration_list[] = {
 
 {"disagg.stepdown_async", "use async step-down instead of synchronous", C_IGNORE | C_BOOL, 0, 0, 0}
 
-{"disagg.stepdown_write_mirroring", "mirror leader step-down-window writes to both constituents", C_BOOL, 50, 0, 0}
+{"disagg.stepdown_write_mirroring", "mirror leader step-down-window writes to both constituents", C_BOOL, 80, 0, 0}
 
 {"disagg.snapshot_read", "run background transactions checking snapshot isolation on a follower", C_IGNORE | C_BOOL, 0, 0, 0}
 

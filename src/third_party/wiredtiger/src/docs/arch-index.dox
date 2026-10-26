@@ -197,6 +197,7 @@ of the documentation.
     - @ref arch-fs-os
 
 - @subpage arch-toc-disaggregated-storage
+    - @ref arch-disagg-roles
     - @ref arch-page-delta
     - @ref arch-disagg-cross-checkpoint-caching
     - @ref arch-disagg-layered
@@ -375,6 +376,7 @@ operation.
 
 /*! @page arch-toc-disaggregated-storage Disaggregated Storage
 
+@subpage arch-disagg-roles
 @subpage arch-page-delta
 @subpage arch-disagg-cross-checkpoint-caching
 @subpage arch-disagg-layered

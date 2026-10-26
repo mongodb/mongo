@@ -204,7 +204,7 @@ CONFIG configuration_list[] = {{"assert.read_timestamp", "assert read_timestamp"
     0, V_GLOBAL_DISAGG_STEPDOWN_ASYNC},
 
   {"disagg.stepdown_write_mirroring", "mirror leader step-down-window writes to both constituents",
-    C_BOOL, 50, 0, 0, V_GLOBAL_DISAGG_STEPDOWN_WRITE_MIRRORING},
+    C_BOOL, 80, 0, 0, V_GLOBAL_DISAGG_STEPDOWN_WRITE_MIRRORING},
 
   {"disagg.snapshot_read", "run background transactions checking snapshot isolation on a follower",
     C_IGNORE | C_BOOL, 0, 0, 0, V_GLOBAL_DISAGG_SNAPSHOT_READ},

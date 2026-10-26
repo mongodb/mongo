@@ -700,6 +700,7 @@ conn_stats = [
     # dh_sweep_dead_close formerly called dh_sweep_close.
     DhandleStat('dh_sweep_dead_close', 'connection sweep dead dhandles closed'),
     DhandleStat('dh_sweep_expired_close', 'connection sweep expired dhandles closed'),
+    DhandleStat('dh_sweep_ingest_close', 'connection sweep ingest dhandles closed after checkpoint coverage'),
     # Note dh_sweep_total_close = dh_sweep_dead_close + dh_sweep_expired_close
     DhandleStat('dh_sweep_ref', 'connection sweep candidate became referenced'),
     DhandleStat('dh_sweep_remove', 'connection sweep dhandles removed from hash list'),

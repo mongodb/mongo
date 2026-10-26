@@ -132,6 +132,11 @@ __wt_block_read_off_blind(
     *sizep = 0;
     *checksump = 0;
 
+    if (block->in_memory) {
+        WT_ASSERT(session, block->fh == NULL);
+        WT_RET_MSG(session, EINVAL, "%s: no backing file", block->name);
+    }
+
     /*
      * Make sure the buffer is large enough for the header and read the first allocation-size block.
      */
@@ -161,6 +166,11 @@ __wti_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, ui
     size_t bufsize, check_size;
     uint64_t time_start, time_stop;
     bool full_checksum_mismatch;
+
+    if (block->in_memory) {
+        WT_ASSERT(session, block->fh == NULL);
+        WT_RET_MSG(session, EINVAL, "%s: no backing file", block->name);
+    }
 
     time_start = __wt_clock(session);
 

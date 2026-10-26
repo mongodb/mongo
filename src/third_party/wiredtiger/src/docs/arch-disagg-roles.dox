@@ -1,0 +1,126 @@
+/*! @arch_page arch-disagg-roles Disaggregated Storage Roles and Role Changes
+
+Disaggregated storage allows multiple WiredTiger nodes to read shared data while a single node
+persists it to shared storage. A connection's role determines its access to shared storage, the
+view it reads, and the work it performs on behalf of the cluster. Changing that role affects
+the whole storage engine, not only individual tables or cursors.
+
+@section disagg-roles-steady-state Leader and follower
+
+The <b>leader</b> is the sole writer of shared tables and produces the checkpoints that other
+nodes read. A <b>follower</b> reads a checkpointed view of those tables and applies recent changes
+locally, without writing them back to shared storage.
+
+For application data, @ref arch-disagg-layered "a layered table" combines a shared <b>stable
+table</b> with a node-local, in-memory <b>ingest table</b>. These have different uses in the two
+steady-state roles:
+
+| Responsibility | Leader | Follower |
+|----------------|--------|----------|
+| Stable table view | Live, writable shared btree | Read-only shared checkpoint |
+| Ingest table content | Empty | Recent local changes, including covered content awaiting safe removal |
+| Layered-table writes | Shared stable table | Local ingest table |
+| Shared checkpoints | Produces them | Adopts checkpoints produced by the leader |
+
+A follower accepts writes to apply changes replicated from the leader. It writes those changes
+to the local ingest table, and read operations merge the stable table and ingest table views.
+For a key visible in both tables, the ingest table content always takes precedence.
+
+Followers eventually adopt new checkpoints produced by the leader. Adopting a checkpoint makes
+covered ingest table content eligible for removal once it is safe for readers. See
+@ref arch-disagg-layered-cursor for the merged view.
+
+The table above describes steady state; the rules can differ during role transitions.
+
+@htmlonly
+<style>@media print { .disagg-role-example { display:none; } }</style>
+<div class="disagg-role-example">
+<iframe src="disagg-roles-animation.html" title="Leader and follower checkpoint example"
+  style="width:100%;height:580px;border:0;"></iframe>
+</div>
+@endhtmlonly
+
+@section disagg-roles-coordination Coordinating a role change
+
+The application decides which node owns shared writes and coordinates elections, replication,
+and the handoff between nodes. It asks each connection to assume the appropriate role through
+WT_CONNECTION::reconfigure with <code>disaggregated=(role=leader)</code> or
+<code>disaggregated=(role=follower)</code>.
+
+<b>Step-up</b> changes a follower into a leader; <b>step-down</b> changes a leader into a follower.
+Reconfiguration performs the local storage-engine transition, not the election or replication
+of changes to another node. The application must prevent competing shared writers and satisfy
+the transition's transaction and checkpoint requirements.
+
+These transitions are asymmetric. Step-up incorporates recent local changes into the shared
+writer's state. Step-down switches to a checkpointed stable table view, retaining any later
+changes in the ingest table. Reconfiguration coordinates these changes with ongoing engine
+work; it does more than select a different destination for new writes.
+
+@section disagg-roles-effects Effects across WiredTiger
+
+The role applies to all shared state on the connection. The following responsibilities must
+change together:
+
+| Area | Effect of the role |
+|------|--------------------|
+| Shared checkpoints | The leader writes the shared checkpoint; followers adopt it as a new base for reads. |
+| Shared metadata | The leader populates shared metadata with schema changes during checkpointing; followers adopt the published schema with the checkpoint. Local schema state is distinct from shared publication. |
+| Shared history store | The leader writes historical versions to shared storage. Followers read the history associated with their checkpoint. |
+| Encryption key-provider metadata | The leader persists encryption key-provider metadata with shared checkpoints; followers read the published metadata. |
+| Shared table views | Step-up switches from checkpoint views to live writable tables; step-down switches to read-only checkpoint views. |
+| Eviction | A leader can reconcile shared pages. A follower reclaims covered ingest table content without writing it back to shared storage. |
+| Background work | Checkpoint cleanup is leader-only work; the deferred checkpoint pickup server runs on followers. Step-up and step-down stop or restart these services. |
+
+The table above shows how a role transition coordinates different parts of WiredTiger. See
+@ref arch-disagg-layered for layered tables, @ref arch-hs for historical versions,
+@ref arch-disagg-key-provider for encryption key metadata, and @ref arch-eviction for page reclamation.
+
+@section disagg-roles-transitions Role transitions diagram
+
+@htmlonly
+<img src="disagg-roles.svg" alt="The leader writes shared checkpoints; the follower applies local
+changes and adopts checkpoints. Step-up and step-down change these responsibilities." />
+@endhtmlonly
+
+@section disagg-roles-step-up Step-up
+
+Before step-up, a follower already has a shared checkpoint view and recent changes in its
+ingest tables. Step-up adopts any pending checkpoints, creates missing stable tables, and
+incorporates the remaining ingest table changes into the stable tables. After successful
+reconfiguration, the connection can perform normal leader writes and produce shared checkpoints
+from that base.
+
+Step-up does more than allow writes to the follower's existing view: it combines checkpointed
+data and local changes into a consistent live shared tree. Transactions and positioned cursors
+must not span step-up. The application must finish transactions and reset or close positioned
+cursors before the step-up reconfiguration; it can start new work after the transition completes.
+
+@section disagg-roles-step-down Step-down
+
+Step-down transfers shared-write responsibility without restarting the old leader. There are
+two ways to prepare for the transition:
+
+- <b>Blocking step-down:</b> the application no longer initiates new write transactions, finishes
+  existing write transactions, advances the stable timestamp to cover their changes, and takes
+  the concluding checkpoint. Writes remain stopped until it reconfigures the connection as a
+  follower. No step-down timestamp is set;
+  the application must ensure that the checkpoint contains all changes being handed off.
+- <b>Asynchronous step-down:</b> the application sets a step-down timestamp to define the boundary
+  for the concluding checkpoint. Once the step-down timestamp is set, new write transactions
+  write to local ingest tables, allowing writes to continue during checkpoint preparation.
+  Write transactions already in progress when the timestamp is set, including those that span
+  the transition, are rolled back to prevent an inconsistent state.
+
+In both cases, the application coordinates checkpoint handoff and finishes all write
+transactions before reconfiguring the old leader as a follower. The connection then reads
+stable tables through read-only views of the concluding checkpoint and merges them with any
+newer changes in its local ingest tables.
+
+Asynchronous step-down does not allow writers to run during or span the step-down reconfiguration.
+Read transactions are allowed at all times, but those without read timestamps are rolled back
+if they span reconfiguration. See
+WT_CONNECTION::set_timestamp for the step-down timestamp API and @ref error_handling for
+rollback handling.
+
+*/

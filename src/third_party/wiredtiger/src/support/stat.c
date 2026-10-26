@@ -3373,6 +3373,7 @@ static const char *const __stats_connection_desc[] = {
   "data-handle: connection sweep dead dhandles closed",
   "data-handle: connection sweep dhandles removed from hash list",
   "data-handle: connection sweep expired dhandles closed",
+  "data-handle: connection sweep ingest dhandles closed after checkpoint coverage",
   "data-handle: connection sweep time-of-death sets",
   "data-handle: connection sweeps",
   "data-handle: connection sweeps skipped due to checkpoint gathering handles",
@@ -4533,6 +4534,7 @@ static const int __stats_connection_otel_none[] = {
   WT_STAT_CONN_DH_SWEEP_DEAD_CLOSE,
   WT_STAT_CONN_DH_SWEEP_REMOVE,
   WT_STAT_CONN_DH_SWEEP_EXPIRED_CLOSE,
+  WT_STAT_CONN_DH_SWEEP_INGEST_CLOSE,
   WT_STAT_CONN_DH_SWEEP_TOD,
   WT_STAT_CONN_DH_SWEEPS,
   WT_STAT_CONN_DH_SWEEP_SKIP_CKPT,
@@ -5718,6 +5720,7 @@ __stat_connection_clear_none(WT_CONNECTION_STATS *stats)
     stats->dh_sweep_dead_close = 0;
     stats->dh_sweep_remove = 0;
     stats->dh_sweep_expired_close = 0;
+    stats->dh_sweep_ingest_close = 0;
     stats->dh_sweep_tod = 0;
     stats->dh_sweeps = 0;
     stats->dh_sweep_skip_ckpt = 0;
@@ -7029,6 +7032,7 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->dh_sweep_dead_close += WT_STAT_CONN_READ(from, dh_sweep_dead_close);
     to->dh_sweep_remove += WT_STAT_CONN_READ(from, dh_sweep_remove);
     to->dh_sweep_expired_close += WT_STAT_CONN_READ(from, dh_sweep_expired_close);
+    to->dh_sweep_ingest_close += WT_STAT_CONN_READ(from, dh_sweep_ingest_close);
     to->dh_sweep_tod += WT_STAT_CONN_READ(from, dh_sweep_tod);
     to->dh_sweeps += WT_STAT_CONN_READ(from, dh_sweeps);
     to->dh_sweep_skip_ckpt += WT_STAT_CONN_READ(from, dh_sweep_skip_ckpt);

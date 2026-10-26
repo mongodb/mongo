@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lifecycle of a write</title>
+  <style>
+    :root { color-scheme: light dark; --bg: #fff; --text: #333; --line: #999;
+      --leader: #97522e; --follower: #277c77; --stable: #35754a; --ingest: #7250a5;
+      --log: #a34b80; --storage: #306f96; --panel: #f8f8f8; }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: var(--text); background: var(--bg);
+      font: 16px/1.5 "Calibri", "Helvetica Neue", Arial, sans-serif; }
+    main { max-width: 1100px; margin: auto; padding: 12px; }
+    h1 { font-size: 18px; margin: 0 0 8px; }
+    .scroll { overflow-x: auto; }
+    .diagram { position: relative; height: 340px; min-width: 660px; }
+    .box { position: absolute; padding: 10px; border: 1px solid currentColor;
+      border-radius: 10px; background: var(--panel); }
+    .box h2 { font-size: 17px; text-align: center; margin: 0; }
+    .leader { left: 14%; top: 5%; width: 25%; height: 55%; color: var(--leader); }
+    .log { left: 44%; top: 16%; width: 15%; height: 34%; color: var(--log); }
+    .follower { left: 64%; top: 3%; width: 35%; height: 51%; color: var(--follower); }
+    .storage { left: 42%; top: 69%; width: 31%; height: 30%; color: var(--storage); }
+    .write { left: 0; top: 38%; width: 12%; color: var(--text); }
+    .tables { display: flex; gap: 8px; height: calc(100% - 35px); margin-top: 10px; }
+    .table { flex: 1; min-width: 0; padding: 8px; border: 1px solid currentColor;
+      border-radius: 6px; display: flex; flex-direction: column; }
+    .table h3 { font-size: 15px; margin: 0; }
+    .stable { color: var(--stable); }
+    .ingest { color: var(--ingest); }
+    .entry { display: inline-block; margin-top: auto; border: 1px solid currentColor;
+      border-radius: 4px; padding: 0 7px; align-self: flex-start; font-weight: bold; }
+    .entry[hidden] { display: none; }
+    .log .entry, .storage .entry { margin-top: 8px; }
+    .write .entry { margin-top: 2px; }
+    .paths { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .couriers { pointer-events: none; }
+    .wire { fill: none; stroke: var(--line); stroke-width: 1.5; stroke-dasharray: 5 5; }
+    .courier { fill: var(--bg); stroke: var(--stable); stroke-width: 1.5; }
+    .packet text { fill: var(--text); font: bold 16px Arial, sans-serif; text-anchor: middle; }
+    .packet { opacity: 0; }
+    .active { box-shadow: 0 0 0 2px currentColor; }
+    .caption { min-height: 3em; margin: 12px 0; }
+    .controls:not([hidden]) { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    button { font: inherit; padding: 4px 12px; cursor: pointer; }
+    .note { font-size: 13px; margin: 8px 0 0; }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #0a100e; --text: #e4ebe7; --line: #68736e; --panel: #151d19;
+        --leader: #f3a27c; --follower: #7ad4ca; --stable: #7bce96; --ingest: #b9a0f3;
+        --log: #ed98c6; --storage: #98d1f0; }
+    }
+    @media (prefers-reduced-motion: reduce) { .packet { display: none; } }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Lifecycle of a write</h1>
+    <div class="scroll" tabindex="0" aria-label="Write lifecycle diagram; scroll horizontally on narrow screens">
+      <div class="diagram">
+        <svg class="paths" viewBox="0 0 1000 340" preserveAspectRatio="none" aria-hidden="true">
+          <path class="wire" d="M65 160 H315"/>
+          <path class="wire" d="M315 125 Q400 125 515 125"/>
+          <path class="wire" d="M515 125 Q620 125 730 125"/>
+          <path class="wire" d="M315 160 Q315 290 575 290"/>
+          <path class="wire" d="M575 290 Q915 290 915 130"/>
+          <path class="eviction-path" d="M730 130 V220" fill="none" stroke="none"/>
+        </svg>
+        <section class="box write"><h2>Write</h2><span class="entry">A</span></section>
+        <section class="box leader" id="leader"><h2>Leader</h2>
+          <div class="tables">
+            <div class="table ingest"><h3>Ingest table</h3></div>
+            <div class="table stable" id="leader-stable"><h3>Stable table</h3><span class="entry" data-entry="leader">A</span></div>
+          </div>
+        </section>
+        <section class="box log" id="log"><h2>Log service</h2><span class="entry" data-entry="log">A</span></section>
+        <section class="box follower" id="follower"><h2>Follower</h2>
+          <div class="tables">
+            <div class="table ingest" id="follower-ingest"><h3>Ingest table</h3><span class="entry" data-entry="ingest" hidden>A</span></div>
+            <div class="table stable" id="follower-stable"><h3>Stable table</h3><span class="entry" data-entry="stable">A</span></div>
+          </div>
+        </section>
+        <section class="box storage" id="storage"><h2>Storage</h2><span>Checkpoint</span><br><span class="entry" data-entry="checkpoint">A</span></section>
+        <svg class="paths couriers" viewBox="0 0 1000 340" preserveAspectRatio="none" aria-hidden="true">
+          <g class="packet"><rect class="courier" x="-12" y="-13" width="24" height="26" rx="4"/>
+            <text y="6">A</text></g>
+        </svg>
+      </div>
+    </div>
+    <p class="caption" id="caption" aria-live="polite" aria-atomic="true">The leader's write is
+      checkpointed and adopted by the follower. Its covered ingest table copy can be removed
+      when no longer needed by readers.</p>
+    <div class="controls" hidden>
+      <button type="button" id="prev">Prev</button>
+      <button type="button" id="next">Next</button>
+      <button type="button" id="loop" aria-pressed="false">Loop</button>
+      <span id="position"></span>
+    </div>
+    <p class="note">Each loop repeats an independent write. Checkpoint adoption makes the ingest
+      table copy eligible for eviction; removal waits until it is safe.</p>
+  </main>
+  <script>
+    (() => {
+      "use strict";
+      const frames = [
+        {entries: [], target: "leader-stable", path: 0, text: "The user write reaches the leader's stable table."},
+        {entries: ["leader"], target: "log", path: 1, text: "The change is recorded in the log service by the application."},
+        {entries: ["leader", "log"], target: "follower-ingest", path: 2, text: "The application replicates the write into the follower's ingest table."},
+        {entries: ["leader", "log", "ingest"], target: "storage", path: 3, text: "The leader checkpoints the write to storage."},
+        {entries: ["leader", "log", "ingest", "checkpoint"], target: "follower-stable", path: 4, text: "The follower adopts the checkpoint as its stable table view."},
+        {entries: ["leader", "log", "ingest", "checkpoint", "stable"], target: "follower-ingest", path: 5, text: "When safe for readers, eviction removes the covered ingest table copy."},
+        {entries: ["leader", "log", "checkpoint", "stable"], text: "The write remains in the checkpoint. Its ingest table copy has been reclaimed."}
+      ];
+      const paths = [...document.querySelectorAll(".wire, .eviction-path")];
+      const packet = document.querySelector(".packet");
+      const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
+      const loop = document.getElementById("loop");
+      const duration = 6500;
+      let index = motion.matches ? frames.length - 1 : 0;
+      let running = !motion.matches;
+      let timer = null;
+      let flight = null;
+
+      function paint() {
+        flight?.cancel();
+        const frame = frames[index];
+        document.querySelectorAll("[data-entry]").forEach(entry => {
+          entry.hidden = !frame.entries.includes(entry.dataset.entry);
+        });
+        document.querySelectorAll(".active").forEach(node => node.classList.remove("active"));
+        if (frame.target) document.getElementById(frame.target).classList.add("active");
+        document.getElementById("caption").textContent = frame.text;
+        document.getElementById("position").textContent = `Step ${index + 1} of ${frames.length}`;
+        loop.textContent = running ? "Pause loop" : "Loop";
+        loop.setAttribute("aria-pressed", String(running));
+        packet.style.opacity = "0";
+        if (!running || motion.matches || frame.path === undefined) return;
+        const path = paths[frame.path];
+        const length = path.getTotalLength();
+        const keyframes = Array.from({length: 41}, (_, at) => {
+          const point = path.getPointAtLength(length * at / 40);
+          return {transform: `translate(${point.x}px, ${point.y}px)`, opacity: at === 40 ? 0 : 1};
+        });
+        flight = packet.animate(keyframes, {duration: 3200, delay: 400, fill: "none"});
+      }
+
+      function pause() {
+        running = false;
+        clearTimeout(timer);
+        timer = null;
+        paint();
+      }
+
+      function tick() {
+        index = (index + 1) % frames.length;
+        paint();
+        if (running) timer = setTimeout(tick, duration);
+      }
+
+      document.getElementById("next").addEventListener("click", () => {
+        pause(); index = (index + 1) % frames.length; paint();
+      });
+      document.getElementById("prev").addEventListener("click", () => {
+        pause(); index = (index + frames.length - 1) % frames.length; paint();
+      });
+      loop.addEventListener("click", () => {
+        if (running) pause();
+        else { running = true; paint(); timer = setTimeout(tick, duration); }
+      });
+      motion.addEventListener("change", () => { pause(); loop.hidden = motion.matches; });
+      document.addEventListener("visibilitychange", () => { if (document.hidden) pause(); });
+      document.querySelector(".controls").hidden = false;
+      loop.hidden = motion.matches;
+      paint();
+      if (running) timer = setTimeout(tick, duration);
+    })();
+  </script>
+</body>
+</html>
