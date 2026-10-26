@@ -69,6 +69,27 @@ See
 and
 [IndexBuildInterceptor::drainWritesIntoIndex](https://github.com/mongodb/mongo/blob/e0efdcfb5020b802da043b955e922d0995109619/src/mongo/db/index_builds/index_build_interceptor.cpp#L150).
 
+#### Prepared Transactions
+
+Scanning the collection loading the index ignore prepare conflicts, but draining side writes does
+account for them. Drains must not skip prepared entries and apply later entries out of order, which
+could leave stale index keys when the transaction commits.
+
+Drain behavior depends on the build's progress:
+
+- Before signaling readiness, capture a fixed initial tail for every index's side-writes table
+  before draining any index. Conflicts within these initial prefixes require waiting; conflicts
+  beyond them stop that index's drain attempt, so newer prepared writes cannot indefinitely delay
+  readiness.
+- After signaling readiness, any prepare conflict stops the drain attempt, allowing the builder to
+  continue waiting for a commit or abort signal.
+- The final drain must apply all remaining writes before the index can become ready.
+
+A conflicting batch is rolled back. When waiting is required, the builder releases its locks and
+storage snapshot first, then retries after transaction resolution. This allows transaction
+resolution and replication state transitions to proceed without being blocked by the builder's
+locks.
+
 ### Internal Table For Duplicate Key Violations
 
 Unique indexes created with `{unique: true}` enforce a constraint that there are no duplicate keys

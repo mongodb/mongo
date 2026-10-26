@@ -817,6 +817,14 @@ protected:
         IndexBuildInterceptor::DrainPhase drainPhase);
 
     /**
+     * Waits with no builder locks or storage transaction. The caller must reacquire resources and
+     * retry with a fresh snapshot.
+     */
+    void _waitForPrepareConflict(OperationContext* opCtx,
+                                 const std::shared_ptr<ReplIndexBuildState>& replState,
+                                 uint64_t generation);
+
+    /**
      * Reads the commit ready members list for index build UUID in 'replState' from
      * "config.system.indexBuilds" collection. And, signals the index builder thread on primary to
      * commit the index build if the number of voters have satisfied the commit quorum for that

@@ -1,6 +1,6 @@
 /**
- * Tests that index builds don't block on operations that conflict because they are in a prepared
- * state.
+ * Tests that index-build collection scans ignore prepared updates, while side write drains release
+ * their locks before waiting for prepared transactions.
  *
  * @tags: [
  *   requires_replication,
@@ -35,7 +35,7 @@ let setUp = function (coll) {
 
 /**
  * Run a background index build, and depending on the provided node, 'conn', ensure that a
- * prepared update does not introduce prepare conflicts on the index builder.
+ * prepared update does not make the index builder wait while holding locks.
  */
 let runTest = function (conn) {
     const testDB = conn.getDB("test");
@@ -54,47 +54,35 @@ let runTest = function (conn) {
     // fail with a LockTimeout error.
     assert.commandWorked(coll.insert({i: numDocs++}));
 
-    // Start a session and introduce a document that is in a prepared state, but should be
-    // ignored by the index build, at least until the transaction commits.
+    // Start a session and prepare an update. The collection scan ignores it, but the side write
+    // drain must release its locks before waiting for the transaction to resolve.
     const session = primaryDB.getMongo().startSession();
     const sessionDB = session.getDatabase("test");
     const sessionColl = sessionDB.getCollection(collName);
     session.startTransaction();
     assert.commandWorked(sessionColl.update({i: 0}, {i: "prepared"}));
-    // Use w:1 because the secondary will be unable to replicate the prepare while an index
-    // build is running.
     const prepareTimestamp = PrepareHelpers.prepareTransaction(session, {w: 1});
+    // The resumable drain may read using a majority snapshot. Advance it through prepare before
+    // unpausing, so the prepared side writes conflict rather than being timestamp-invisible.
+    replSetTest.awaitLastOpCommitted(undefined, [conn]);
 
-    // Let the index build continue until just before it completes. Set the failpoint just
-    // before the second drain, which would take lock that conflicts with the prepared
-    // transaction and prevent the index build from completing entirely.
-    const failPointName = "hangAfterIndexBuildFirstDrain";
-    clearRawMongoProgramOutput();
-    assert.commandWorked(conn.adminCommand({configureFailPoint: failPointName, mode: "alwaysOn"}));
-
-    // Unpause the index build from the first failpoint so that it can resume and pause at the
-    // next failpoint.
+    // The unresolved transaction keeps the drain from completing.
     IndexBuildTest.resumeIndexBuilds(conn);
-    assert.soon(
-        () => rawMongoProgramOutput(".*").indexOf("Hanging after index build first drain") >= 0,
-    );
-
-    // Right before the index build completes, ensure no prepare conflicts were hit.
-    IndexBuildTest.assertIndexBuildCurrentOpContents(testDB, opId, (op) => {
-        printjson(op);
-        assert.eq(undefined, op.prepareReadConflicts);
+    assert.soon(() => {
+        const [op] = testDB.currentOp({opid: opId, $all: true}).inprog;
+        return op && op.prepareReadConflicts > 0 && Object.keys(op.locks || {}).length === 0;
     });
 
-    // Because prepare uses w:1, ensure it is majority committed before committing the
-    // transaction.
-    PrepareHelpers.awaitMajorityCommitted(replSetTest, prepareTimestamp);
+    // Scanning completed without a storage-level prepare wait. The drain also does not mark
+    // the builder as storage-blocked, which would be unsafe during stepdown.
+    IndexBuildTest.assertIndexBuildCurrentOpContents(testDB, opId, (op) => {
+        printjson(op);
+        assert.gt(op.prepareReadConflicts, 0);
+    });
 
     // Commit the transaction before completing the index build, releasing locks which will
     // allow the index build to complete.
     assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp));
-
-    // Allow the index build to complete.
-    assert.commandWorked(conn.adminCommand({configureFailPoint: failPointName, mode: "off"}));
 
     awaitBuild();
     IndexBuildTest.waitForIndexBuildToStop(testDB, collName, "i_1");

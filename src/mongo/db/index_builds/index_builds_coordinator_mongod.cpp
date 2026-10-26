@@ -38,6 +38,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/storage/prepare_conflict_info.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/topology/user_write_block/global_user_write_block_state.h"
@@ -1007,8 +1008,16 @@ void IndexBuildsCoordinatorMongod::_waitForNextIndexBuildActionAndCommit(
                 return;
         }
 
-        auto result = _insertKeysFromSideTablesAndCommit(
-            opCtx, replState, nextAction, indexBuildOptions, commitTimestamp);
+        auto result = [&] {
+            while (true) {
+                try {
+                    return _insertKeysFromSideTablesAndCommit(
+                        opCtx, replState, nextAction, indexBuildOptions, commitTimestamp);
+                } catch (const ExceptionFor<ErrorCodes::PrepareConflict>& ex) {
+                    _waitForPrepareConflict(opCtx, replState, ex->generation());
+                }
+            }
+        }();
         switch (result) {
             case CommitResult::kNoLongerPrimary:
                 invariant(nextAction != IndexBuildAction::kOplogCommit);

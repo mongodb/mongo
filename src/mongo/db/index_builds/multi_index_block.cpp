@@ -1509,6 +1509,10 @@ Status MultiIndexBlock::drainBackgroundWrites(
         _writeAllStateToContainer(opCtx);
     }
 
+    if (drainPhase == IndexBuildInterceptor::DrainPhase::kBeforeReadiness) {
+        captureInitialDrainTails(opCtx, coll);
+    }
+
     // Drain side-writes table for each index. This only drains what is visible. Assuming intent
     // locks are held on the user collection, more writes can come in after this drain completes.
     // Callers are responsible for stopping writes by holding an S or X lock while draining before

@@ -91,8 +91,12 @@ public:
      * from the underlying IndexAccessMethod. This will only insert as many records as are visible
      * in the current snapshot.
      *
-     * This is resumable, so subsequent calls will start the scan at the record immediately
-     * following the last inserted record from a previous call to drainWritesIntoIndex.
+     * Before readiness, prepare conflicts within the captured initial prefix roll back the batch
+     * and propagate to the caller for an outside-lock wait. Conflicts beyond that prefix roll back
+     * the batch and end the drain, leaving the remaining writes for later. After readiness, every
+     * conflict rolls back and ends the attempt. The final drain throws on every conflict.
+     *
+     * Previously-committed batches remain applied; retries scan the remaining table from the start.
      */
     Status drainWritesIntoIndex(OperationContext* opCtx,
                                 const CollectionPtr& coll,
@@ -104,8 +108,7 @@ public:
                                 DrainPhase drainPhase);
 
     /**
-     * Check whether all writes have been applied. This will be true after a successful call to
-     * `drainWritesIntoIndex()`.
+     * Checks whether all writes have been applied.
      */
     bool checkAllWritesApplied(OperationContext* opCtx, bool fatal) const;
 

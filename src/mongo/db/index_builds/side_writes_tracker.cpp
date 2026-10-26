@@ -21,6 +21,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
+#include "mongo/db/shard_role/shard_catalog/db_raii.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -217,6 +218,17 @@ Status SideWritesTracker::drainWritesIntoIndex(
     DrainYieldPolicy drainYieldPolicy,
     DrainPhase drainPhase) {
     invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
+    uassert(13741400,
+            "Initial side-write tail must be captured before pre-readiness draining",
+            drainPhase != DrainPhase::kBeforeReadiness || _initialDrainTail.has_value());
+
+    // Enforce prepare conflicts while draining, in order to ensure that side writes associated with
+    // prepared transactions are drained in the correct order. Use the throwing behavior so that the
+    // caller can release resources before waiting for the conflict to resolve.
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+    ru.abandonSnapshot();
+    EnforcePrepareConflictsBlock enforcePrepareConflicts{
+        opCtx, EnforcePrepareConflictsBlock::Behavior::kThrow};
 
     auto& rs = _table.getTableOrThrow();
 
@@ -271,11 +283,16 @@ Status SideWritesTracker::drainWritesIntoIndex(
     bool primaryDrivenIndexBuildEnabled = index_builds::primary_driven::enabled(
         opCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 
+    // Track whether the batch is opportunistic, meaning it occurs beyond the initial prefix and
+    // should end the drain if it encounters a prepare conflict.
+    bool opportunisticBatch = false;
+
     // In a single WriteUnitOfWork, scan the side table up to the batch or memory limit, apply
     // the keys to the index, and delete the side table records. Returns true if the cursor has
     // reached the end of the table, false if there are more records, and an error Status
     // otherwise.
     auto applySingleBatch = [&]() -> StatusWith<bool> {
+        opportunisticBatch = false;
         // This write is performed without a durable/commit timestamp. This transaction trips
         // the ordered assertion for the side-table documents which are inserted with a
         // timestamp and, in here, being deleted without a timestamp. Because the data being
@@ -291,6 +308,21 @@ Status SideWritesTracker::drainWritesIntoIndex(
         int64_t batchKeyBytesDeleted = 0;
 
         WriteUnitOfWork wuow(opCtx);
+
+        boost::optional<RecordId> lastRequiredRecord;
+        if (drainPhase == DrainPhase::kBeforeReadiness) {
+            if (!_initialDrainTail->isNull()) {
+                // Find the highest remaining record at or below the captured tail. The tail record
+                // itself may have been aborted; records beyond that point must not be included in
+                // this lookup.
+                auto prefixCursor = rs.getCursor(opCtx, ru, false);
+                if (auto last = prefixCursor->seek(
+                        *_initialDrainTail, SeekableRecordCursor::BoundInclusion::kInclude)) {
+                    lastRequiredRecord = last->id;
+                }
+            }
+            opportunisticBatch = !lastRequiredRecord;
+        }
 
         int32_t batchSize = 0;
         int64_t batchSizeBytes = 0;
@@ -348,8 +380,10 @@ Status SideWritesTracker::drainWritesIntoIndex(
             // later. We can't delete records while holding a positioned cursor.
             recordsAddedToIndex.emplace_back(std::move(currentRecordId));
 
-            // Don't continue if the batch is full. Allow the transaction to commit.
-            if (batchSize == kBatchMaxSize) {
+            // Commit the batch when full or when the prefix is exhausted. Process subsequent side
+            // writes in a separate opportunistic batch.
+            if (batchSize == kBatchMaxSize ||
+                (lastRequiredRecord && recordsAddedToIndex.back() == *lastRequiredRecord)) {
                 break;
             }
 
@@ -435,12 +469,26 @@ Status SideWritesTracker::drainWritesIntoIndex(
     bool atEof = false;
 
     // Apply batches of side writes until the last record in the table is seen.
+    bool deferredPrepareConflict = false;
     while (!atEof) {
-        auto swAtEof = writeConflictRetry(opCtx, "index build drain", coll->ns(), applySingleBatch);
-        if (!swAtEof.isOK()) {
-            return swAtEof.getStatus();
+        try {
+            auto swAtEof =
+                writeConflictRetry(opCtx, "index build drain", coll->ns(), applySingleBatch);
+            if (!swAtEof.isOK()) {
+                return swAtEof.getStatus();
+            }
+            atEof = swAtEof.getValue();
+        } catch (const ExceptionFor<ErrorCodes::PrepareConflict>&) {
+            // The batch rolled back, leaving its side writes unapplied. If this was an
+            // opportunistic batch, fall through so that the build can proceed to the final drain.
+            // Otherwise, throw the exception so that the build can handle the conflict
+            // appropriately.
+            if (drainPhase != DrainPhase::kAfterReadiness && !opportunisticBatch) {
+                throw;
+            }
+            deferredPrepareConflict = true;
+            break;
         }
-        atEof = swAtEof.getValue();
     }
 
     {
@@ -448,7 +496,7 @@ Status SideWritesTracker::drainWritesIntoIndex(
         progress.get(lk)->finished();
     }
 
-    int logLevel = (_numApplied - appliedAtStart > 0) ? 0 : 1;
+    int logLevel = (_numApplied - appliedAtStart > 0 || deferredPrepareConflict) ? 0 : 1;
     LOGV2_DEBUG(20689,
                 logLevel,
                 "Index build: drained side writes",
@@ -458,6 +506,8 @@ Status SideWritesTracker::drainWritesIntoIndex(
                 "numApplied"_attr = (_numApplied - appliedAtStart),
                 "totalInserted"_attr = totalInserted,
                 "totalDeleted"_attr = totalDeleted,
+                "deferredPrepareConflict"_attr = deferredPrepareConflict,
+                "afterReadiness"_attr = drainPhase == DrainPhase::kAfterReadiness,
                 "durationMillis"_attr = timer.millis());
     sideWritesDrainDurationHistogram.record(timer.millis());
     sideWritesDrainBytesHistogram.record(totalBytesDrained);

@@ -56,6 +56,7 @@
 #include "mongo/db/storage/disk_space_util.h"
 #include "mongo/db/storage/lazy_record_store.h"
 #include "mongo/db/storage/mdb_catalog.h"
+#include "mongo/db/storage/prepare_conflict_info.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_options.h"
@@ -4100,26 +4101,34 @@ void IndexBuildsCoordinator::_insertKeysFromSideTablesWithoutBlockingWrites(
     OperationContext* opCtx,
     std::shared_ptr<ReplIndexBuildState> replState,
     IndexBuildInterceptor::DrainPhase drainPhase) {
+    invariant(drainPhase != IndexBuildInterceptor::DrainPhase::kFinal);
     indexBuildsSSS.drainSideWritesTable.addAndFetch(1);
 
     // Perform the first drain while holding an intent lock.
     const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
-    {
-        // Primary-driven index builds need to replicate container writes.
-        auto intent = index_builds::primary_driven::enabled(
-                          opCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot())
-            ? rss::consensus::IntentRegistry::Intent::Write
-            : rss::consensus::IntentRegistry::Intent::LocalWrite;
-        auto autoGetCollOptions = auto_get_collection::Options{}.globalLockOptions(
-            Lock::GlobalLockOptions{.explicitIntent = intent});
-        AutoGetCollection autoGetColl(opCtx, dbAndUUID, MODE_IX, autoGetCollOptions);
+    while (true) {
+        opCtx->checkForInterrupt();
+        try {
+            // Primary-driven index builds need to replicate container writes.
+            auto intent = index_builds::primary_driven::enabled(
+                              opCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot())
+                ? rss::consensus::IntentRegistry::Intent::Write
+                : rss::consensus::IntentRegistry::Intent::LocalWrite;
+            auto autoGetCollOptions = auto_get_collection::Options{}.globalLockOptions(
+                Lock::GlobalLockOptions{.explicitIntent = intent});
+            AutoGetCollection autoGetColl(opCtx, dbAndUUID, MODE_IX, autoGetCollOptions);
 
-        uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(
-            opCtx,
-            replState->buildUUID,
-            getReadSourceForDrainBeforeCommitQuorum(*replState),
-            IndexBuildInterceptor::DrainYieldPolicy::kYield,
-            drainPhase));
+            uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(
+                opCtx,
+                replState->buildUUID,
+                getReadSourceForDrainBeforeCommitQuorum(*replState),
+                IndexBuildInterceptor::DrainYieldPolicy::kYield,
+                drainPhase));
+            break;
+        } catch (const ExceptionFor<ErrorCodes::PrepareConflict>& ex) {
+            invariant(drainPhase == IndexBuildInterceptor::DrainPhase::kBeforeReadiness);
+            _waitForPrepareConflict(opCtx, replState, ex->generation());
+        }
     }
 
     if (MONGO_unlikely(hangAfterIndexBuildFirstDrain.shouldFail())) {
@@ -4129,6 +4138,21 @@ void IndexBuildsCoordinator::_insertKeysFromSideTablesWithoutBlockingWrites(
         hangAfterIndexBuildFirstDrain.pauseWhileSet(opCtx);
     }
 }
+void IndexBuildsCoordinator::_waitForPrepareConflict(
+    OperationContext* opCtx,
+    const std::shared_ptr<ReplIndexBuildState>& replState,
+    uint64_t generation) {
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
+    auto* ru = shard_role_details::getRecoveryUnit(opCtx);
+    invariant(!ru->isActive());
+    invariant(!ru->inUnitOfWork());
+    opCtx->checkForInterrupt();
+    LOGV2(13651900,
+          "Index build: waiting for a prepared transaction outside locks",
+          "buildUUID"_attr = replState->buildUUID);
+    ru->waitForPrepareConflictResolution(*opCtx, generation);
+}
+
 /**
  * Continue the third phase of catching up on all remaining writes that occurred and then commit.
  * Accepts a commit timestamp for the index (null if not available).
