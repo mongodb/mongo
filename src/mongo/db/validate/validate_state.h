@@ -76,6 +76,11 @@ public:
     }
 
     /**
+     * Whether this validation may split the record store into slices for parallel traversal.
+     */
+    bool isRecordStoreSlicingEnabled() const;
+
+    /**
      * Returns true if fast count is being validated, and the collection supports fast
      * count.
      *

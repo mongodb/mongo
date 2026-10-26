@@ -727,15 +727,11 @@ void validateHashes(const std::vector<std::string>& hashPrefixes, bool equalLeng
 }
 
 boost::optional<int64_t> getTargetRecordsPerRecordStoreSlice() {
-    if (!gFeatureFlagParallelCollectionValidation.isEnabled()) {
+    // Disable for validate command unless the feature flag is enabled.
+    if (!storageGlobalParams.validate && !gFeatureFlagParallelCollectionValidation.isEnabled()) {
         return boost::none;
     }
     return gValidateParallelTargetRecordsPerSlice.load();
-}
-
-bool isRecordStoreSlicingEnabled(const boost::optional<int64_t>& targetRecordsPerSlice) {
-    return targetRecordsPerSlice && *targetRecordsPerSlice > 0 &&
-        gValidateParallelMaxRecordStoreSlices.load() > 1;
 }
 
 ValidationOptions parseValidateOptions(OperationContext* opCtx,

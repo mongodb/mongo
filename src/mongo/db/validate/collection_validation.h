@@ -69,12 +69,6 @@ struct [[MONGO_MOD_FILE_PRIVATE]] ValidationMetrics {
 boost::optional<int64_t> getTargetRecordsPerRecordStoreSlice();
 
 /**
- * Whether a validation given 'targetRecordsPerSlice' may split the record store into slices for
- * parallel traversal.
- */
-bool isRecordStoreSlicingEnabled(const boost::optional<int64_t>& targetRecordsPerSlice);
-
-/**
  * Parses and checks the command object and returns a 'ValidationOptions' object used for collection
  * validation.
  * Optionally skips parsing 'atClusterTime' for unreplicated collections, which is desired with

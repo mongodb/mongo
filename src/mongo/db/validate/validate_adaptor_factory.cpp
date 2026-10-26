@@ -14,10 +14,9 @@ namespace collection_validation {
 std::unique_ptr<ValidateAdaptor> ValidateAdaptorFactory::create(
     OperationContext* opCtx, collection_validation::ValidateState& validateState) {
 
-    const auto& targetRecordsPerSlice = validateState.getTargetRecordsPerRecordStoreSlice();
-    if (isRecordStoreSlicingEnabled(targetRecordsPerSlice)) {
+    if (validateState.isRecordStoreSlicingEnabled()) {
         return std::make_unique<ValidateAdaptorParallel>(
-            opCtx, validateState, targetRecordsPerSlice);
+            opCtx, validateState, validateState.getTargetRecordsPerRecordStoreSlice());
     }
     return std::make_unique<ValidateAdaptorSerial>(opCtx, validateState);
 }

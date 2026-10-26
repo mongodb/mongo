@@ -81,7 +81,7 @@ const dbName = jsTestName();
 const collName = jsTestName();
 
 // Enough sizeable documents to span many leaf pages and force an internal page.
-const kNumDocs = 20_000;
+const kNumDocs = 100_000;
 const padding = "x".repeat(120);
 {
     const coll = conn.getDB(dbName).getCollection(collName);
@@ -116,8 +116,8 @@ MongoRunner.stopMongod(conn);
 
 // Runs 'mongod --validate' scoped to our collection with the given inner options, asserts a clean
 // exit, and returns the emitted size-metrics log 'attr' objects.
-function runModalValidate(innerOptions) {
-    const exitCode = runModalValidateWithExitCode(innerOptions);
+function runModalValidate(innerOptions, parallelRecordStoreSlices = 1) {
+    const exitCode = runModalValidateWithExitCode(innerOptions, parallelRecordStoreSlices);
     assert.eq(
         MongoRunner.EXIT_CLEAN,
         exitCode,
@@ -126,7 +126,7 @@ function runModalValidate(innerOptions) {
     return getSizeMetricAttrsFromRawLog();
 }
 
-function runModalValidateWithExitCode(innerOptions, ...extraArgs) {
+function runModalValidateWithExitCode(innerOptions, parallelRecordStoreSlices, ...extraArgs) {
     clearRawMongoProgramOutput();
     return runMongoProgram(
         "mongod",
@@ -141,6 +141,8 @@ function runModalValidateWithExitCode(innerOptions, ...extraArgs) {
         `validateCollectionName=${collName}`,
         "--setParameter",
         `collectionValidateOptions={options: ${innerOptions}}`,
+        "--setParameter",
+        `validateParallelMaxRecordStoreSlices=${parallelRecordStoreSlices}`,
         ...extraArgs,
     );
 }
@@ -226,11 +228,7 @@ assert.eq(
 // validation still succeeds but emits no size metrics.
 assert.eq(
     MongoRunner.EXIT_CLEAN,
-    runModalValidateWithExitCode(
-        "{collHash: true}",
-        "--setParameter",
-        "featureFlagParallelCollectionValidation=true",
-    ),
+    runModalValidateWithExitCode("{collHash: true}", /*parallelRecordStoreSlices=*/ 2),
     "collHash startup validation with parallel validation enabled should succeed",
 );
 assert.eq(
@@ -246,8 +244,7 @@ assert.eq(
     MongoRunner.EXIT_CLEAN,
     runModalValidateWithExitCode(
         "{collHash: true}",
-        "--setParameter",
-        "featureFlagParallelCollectionValidation=true",
+        /*maxParallelRecordStoreSlices=*/ 256,
         "--setParameter",
         "validateParallelTargetRecordsPerSlice=0",
     ),
@@ -259,16 +256,10 @@ assert.eq(
     "expected a collection size-metrics line with slicing disabled",
 );
 
-// Disable with max slices
+// Disable with max slices set to 1
 assert.eq(
     MongoRunner.EXIT_CLEAN,
-    runModalValidateWithExitCode(
-        "{collHash: true}",
-        "--setParameter",
-        "featureFlagParallelCollectionValidation=true",
-        "--setParameter",
-        "validateParallelMaxRecordStoreSlices=1",
-    ),
+    runModalValidateWithExitCode("{collHash: true}", /*maxParallelRecordStoreSlices=*/ 1),
     "collHash startup validation with slicing disabled should succeed",
 );
 assert.eq(

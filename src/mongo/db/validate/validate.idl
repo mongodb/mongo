@@ -27,7 +27,7 @@ server_parameters:
         cpp_varname: gValidateParallelTargetRecordsPerSlice
         cpp_vartype: Atomic<int>
         validator: {gte: 0}
-        default: 5000
+        default: 50000
         redact: false
 
     validateParallelMaxRecordStoreSlices:

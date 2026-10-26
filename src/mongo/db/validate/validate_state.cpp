@@ -24,6 +24,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/timeseries/catalog_helper.h"
+#include "mongo/db/validate/collection_validation.h"
 #include "mongo/db/validate/validate_gen.h"
 #include "mongo/db/views/view.h"
 #include "mongo/logv2/log.h"
@@ -343,6 +344,12 @@ Status ValidateState::initializeCollection(OperationContext* opCtx) {
     return Status::OK();
 }
 
+bool ValidateState::isRecordStoreSlicingEnabled() const {
+    const auto& targetRecordsPerSlice = getTargetRecordsPerRecordStoreSlice();
+    return targetRecordsPerSlice && *targetRecordsPerSlice > 0 &&
+        gValidateParallelMaxRecordStoreSlices.load() > 1;
+}
+
 void ValidateState::initializeCursors(OperationContext* opCtx) {
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
 
@@ -350,7 +357,8 @@ void ValidateState::initializeCursors(OperationContext* opCtx) {
     // and each index cursor). Opening a size-stats cursor resets its counters, so the flag is
     // left off for the seek cursor and every other cursor. Opt-in only; results are logged after
     // the scans complete.
-    const bool collectSizeStats = isCollHashValidation() && sizeStats();
+    const bool collectSizeStats =
+        isCollHashValidation() && sizeStats() && !isRecordStoreSlicingEnabled();
 
     {
         if (collectSizeStats) {
