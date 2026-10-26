@@ -67,6 +67,12 @@ public:
                        ConnectionPurpose connectionPurpose = ConnectionPurpose::kDefault,
                        boost::optional<int64_t> replicationId = boost::none);
 
+    // Increment the counter for the number of total host resolution operations.
+    void incrementEgressResolutionOperations();
+
+    // Increment the counter for the number of total ssl handshake operations.
+    void incrementEgressSSLOperations();
+
     // Byte counters for wire-protocol message compression, by compressor algorithm.
     void hitCompressor(ConnectionType connectionType,
                        std::string_view compressor,
@@ -122,6 +128,9 @@ private:
     otel::metrics::Counter<int64_t>& _replicationSecondaryLogicalBytesIn;
     otel::metrics::Counter<int64_t>& _egressNumRequests;
     otel::metrics::Counter<int64_t>& _egressLogicalBytesOut;
+
+    otel::metrics::Counter<int64_t>& _egressResolutionOperations;
+    otel::metrics::Counter<int64_t>& _egressSSLOperations;
 
     otel::metrics::Counter<int64_t>& _numSlowDNSOperations;
     otel::metrics::Counter<int64_t>& _numSlowSSLOperations;

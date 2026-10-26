@@ -908,6 +908,7 @@ StatusWith<std::shared_ptr<Session>> AsioTransportLayer::connect(
     }
 
     WrappedResolver resolver(*_egressReactor);
+    globalNetworkCounter().incrementEgressResolutionOperations();
     Date_t timeBefore = Date_t::now();
     auto swEndpoints = resolver.resolve(peer, _listenerOptions.enableIPv6);
     Milliseconds dnsResolveLatency = Date_t::now() - timeBefore;
@@ -978,6 +979,7 @@ StatusWith<std::shared_ptr<Session>> AsioTransportLayer::connect(
         }
 #endif
 
+        globalNetworkCounter().incrementEgressSSLOperations();
         Date_t timeBefore = Date_t::now();
         auto sslStatus = session->handshakeSSLForEgress(peer).getNoThrow();
         Date_t timeAfter = Date_t::now();
@@ -1178,10 +1180,12 @@ Future<std::shared_ptr<Session>> AsioTransportLayer::asyncConnect(
                 return delayTimer->waitUntil(deadline).then(
                     [delayTimer, connector, enableIPv6 = _listenerOptions.enableIPv6] {
                         LOGV2(6885901, "finished delaying the connection");
+                        globalNetworkCounter().incrementEgressResolutionOperations();
                         return connector->resolver.asyncResolve(connector->peer, enableIPv6);
                     });
             }
         }
+        globalNetworkCounter().incrementEgressResolutionOperations();
         return connector->resolver.asyncResolve(connector->peer, _listenerOptions.enableIPv6);
     }();
 
@@ -1252,6 +1256,7 @@ Future<std::shared_ptr<Session>> AsioTransportLayer::asyncConnect(
                     !sslStatus.isOK()) {
                     return sslStatus;
                 }
+                globalNetworkCounter().incrementEgressSSLOperations();
                 Date_t timeBefore = Date_t::now();
                 return connector->session->handshakeSSLForEgress(connector->peer)
                     .then([connector, timeBefore, connectionMetrics] {

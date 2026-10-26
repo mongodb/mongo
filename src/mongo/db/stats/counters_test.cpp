@@ -142,6 +142,35 @@ TEST(NetworkCounterOtelTest, SlowSSLOperationsAreExported) {
     EXPECT_EQ(2, capturer.readInt64Counter(MetricNames::kNetworkNumSlowSSLOperations));
 }
 
+TEST(NetworkCounterOtelTest, ResolutionOperationsAreExported) {
+    OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        GTEST_SKIP() << "OTel not available";
+    }
+
+    NetworkCounter nc;
+
+    nc.incrementEgressResolutionOperations();
+    nc.incrementEgressResolutionOperations();
+    nc.incrementEgressResolutionOperations();
+
+    EXPECT_EQ(3, capturer.readInt64Counter(MetricNames::kNetworkEgressResolutionOperations));
+}
+
+TEST(NetworkCounterOtelTest, SSLOperationsAreExported) {
+    OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        GTEST_SKIP() << "OTel not available";
+    }
+
+    NetworkCounter nc;
+
+    nc.incrementEgressSSLOperations();
+    nc.incrementEgressSSLOperations();
+
+    EXPECT_EQ(2, capturer.readInt64Counter(MetricNames::kNetworkEgressSSLOperations));
+}
+
 TEST(NetworkCounterOtelTest, CompressedCountersAreExportedWithCompressorAttribute) {
     OtelMetricsCapturer capturer;
     if (!capturer.canReadMetrics()) {
@@ -247,6 +276,19 @@ TEST(NetworkCounterBsonTest, NumSlowSSLOperations) {
 
     BSONObj obj = getNetworkBson(nc);
     EXPECT_EQ(1, obj["numSlowSSLOperations"].numberLong());
+}
+
+TEST(NetworkCounterServerStatusTest, EgressResolutionAndSSLOperationsAreExported) {
+    NetworkCounter nc;
+    long long resolutionBase = readServerStatusMetric("network.egress.resolutionOperations");
+    long long sslBase = readServerStatusMetric("network.egress.sslOperations");
+
+    nc.incrementEgressResolutionOperations();
+    nc.incrementEgressSSLOperations();
+    nc.incrementEgressSSLOperations();
+
+    EXPECT_EQ(resolutionBase + 1, readServerStatusMetric("network.egress.resolutionOperations"));
+    EXPECT_EQ(sslBase + 2, readServerStatusMetric("network.egress.sslOperations"));
 }
 
 TEST(PlanCacheCountersOtelTest, ClassicCountersAreExported) {

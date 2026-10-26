@@ -4,6 +4,7 @@
 #include "mongo/db/stats/counters.h"
 
 #include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/client/authenticate.h"
 #include "mongo/db/commands/server_status/server_status.h"
@@ -85,13 +86,28 @@ NetworkCounter::NetworkCounter()
           MetricNames::kNetworkEgressBytesOut,
           "Total number of logical bytes sent on egress (outbound client) connections.",
           MetricUnit::kBytes)),
+      _egressResolutionOperations(MetricsService::instance().createInt64Counter(
+          MetricNames::kNetworkEgressResolutionOperations,
+          "Total number of host resolution operations on egress (outbound client) connections. ",
+          MetricUnit::kCount,
+          CounterOptions{
+              .serverStatusOptions =
+                  ServerStatusOptions{.dottedPath = "network.egress.resolutionOperations",
+                                      .role = ClusterRole::None}})),
+      _egressSSLOperations(MetricsService::instance().createInt64Counter(
+          MetricNames::kNetworkEgressSSLOperations,
+          "Total number of SSL handshake operations on egress (outbound client) connections.",
+          MetricUnit::kCount,
+          CounterOptions{.serverStatusOptions =
+                             ServerStatusOptions{.dottedPath = "network.egress.sslOperations",
+                                                 .role = ClusterRole::None}})),
       _numSlowDNSOperations(MetricsService::instance().createInt64Counter(
           MetricNames::kNetworkNumSlowDNSOperations,
-          "Total number of slow DNS resolution operations.",
+          "Total number of slow DNS resolution operations on egress (outbound client) connections.",
           MetricUnit::kCount)),
       _numSlowSSLOperations(MetricsService::instance().createInt64Counter(
           MetricNames::kNetworkNumSlowSSLOperations,
-          "Total number of slow SSL handshake operations.",
+          "Total number of slow SSL handshake operations on egress (outbound client) connections.",
           MetricUnit::kCount)),
       _ingressCompressorBytesIn(MetricsService::instance().createInt64Counter<std::string_view>(
           MetricNames::kNetworkCompressionIngressCompressorBytesIn,
@@ -223,6 +239,14 @@ void NetworkCounter::hitLogicalOut(ConnectionType connectionType,
     }
 }
 
+void NetworkCounter::incrementEgressResolutionOperations() {
+    _egressResolutionOperations.add(1);
+}
+
+void NetworkCounter::incrementEgressSSLOperations() {
+    _egressSSLOperations.add(1);
+}
+
 void NetworkCounter::hitCompressor(ConnectionType connectionType,
                                    std::string_view compressor,
                                    long long logicalBytesIn,
@@ -304,6 +328,10 @@ void NetworkCounter::append(BSONObjBuilder& b) {
 NetworkCounter& globalNetworkCounter() {
     static StaticImmortal<NetworkCounter> instance;
     return *instance;
+}
+
+MONGO_INITIALIZER(ForceNetworkCounterInit)(InitializerContext*) {
+    globalNetworkCounter();
 }
 
 void AuthCounter::initializeMechanismMap(const std::vector<std::string>& ingressMechanisms) {

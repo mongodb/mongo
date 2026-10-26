@@ -46,4 +46,12 @@ describe("OTel metrics reported under serverStatus", function () {
             );
         }
     });
+
+    it("reports the egress resolution and SSL operation counters under metrics.network.egress", function () {
+        // A standalone mongod never dials a peer, so these must be present and zero.
+        const egress = this.mongod.getDB(jsTestName()).serverStatus().metrics.network.egress;
+        for (const counter of ["resolutionOperations", "sslOperations"]) {
+            assert.eq(egress[counter], 0, `Expected ${counter} to be present and zero`, {egress});
+        }
+    });
 });

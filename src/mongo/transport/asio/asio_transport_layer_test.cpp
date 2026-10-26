@@ -1333,6 +1333,39 @@ TEST_F(AsioTransportLayerWithServiceContextTest, TransportStartAfterShutDown) {
     ASSERT_EQ(tla().start(), TransportLayer::ShutdownStatus);
 }
 
+TEST_F(AsioTransportLayerWithServiceContextTest, AsyncConnectCountsFailedEgressResolutionAttempts) {
+    otel::metrics::OtelMetricsCapturer capturer;
+
+    auto reactor = tla().getReactor(TransportLayer::kNewReactor);
+    stdx::thread reactorThread([&] {
+        reactor->run();
+        reactor->drain();
+    });
+    ScopeGuard stopReactor = [&] {
+        reactor->stop();
+        reactorThread.join();
+    };
+
+    // A name under the reserved ".invalid" TLD is guaranteed to fail resolution, so the connect
+    // attempt fails without ever reaching TCP.
+    HostAndPort unresolvable("does-not-exist.invalid", tla().listenerMainPort());
+    auto session = tla()
+                       .asyncConnect(unresolvable,
+                                     ConnectSSLMode::kDisableSSL,
+                                     reactor,
+                                     Milliseconds{10 * 1000},
+                                     std::make_shared<ConnectionMetrics>(
+                                         getServiceContext()->getFastClockSource()),
+                                     nullptr)
+                       .getNoThrow();
+    ASSERT_NOT_OK(session);
+
+    // The resolution attempt is counted even though it failed.
+    if (capturer.canReadMetrics()) {
+        ASSERT_GE(capturer.readInt64Counter(MetricNames::kNetworkEgressResolutionOperations), 1);
+    }
+}
+
 #ifdef MONGO_CONFIG_SSL
 // TODO SERVER-62035: enable the following on Windows.
 #if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
@@ -1361,6 +1394,57 @@ TEST_F(AsioTransportLayerWithServiceContextTest, ShutdownDuringSSLHandshake) {
     ASSERT_THROWS_CODE(conn.connectNoHello({testHostName(), port}, std::move(transientParams)),
                        DBException,
                        ErrorCodes::HostUnreachable);
+}
+
+/**
+ * Fixture whose ingress side ends sessions without ever speaking TLS, so that an egress TLS
+ * handshake against the listener fails promptly.
+ */
+class AsioTransportLayerFailedSSLHandshakeTest : public AsioTransportLayerWithServiceContextTest {
+public:
+    void setUp() override {
+        onStartSession = [](test::SessionThread& sessionThread) {
+            sessionThread.schedule([](Session& session) { session.end(); });
+        };
+        AsioTransportLayerWithServiceContextTest::setUp();
+    }
+};
+
+TEST_F(AsioTransportLayerFailedSSLHandshakeTest,
+       AsyncConnectCountsFailedEgressSSLHandshakeAttempts) {
+    otel::metrics::OtelMetricsCapturer capturer;
+
+    auto reactor = tla().getReactor(TransportLayer::kNewReactor);
+    stdx::thread reactorThread([&] {
+        reactor->run();
+        reactor->drain();
+    });
+    ScopeGuard stopReactor = [&] {
+        reactor->stop();
+        reactorThread.join();
+    };
+
+    ClusterConnection clusterConnection;
+    clusterConnection.targetedClusterConnectionString = ConnectionString::forLocal();
+    clusterConnection.sslClusterPEMPayload = loadFile("jstests/libs/client.pem");
+    auto transientContext =
+        uassertStatusOK(tla().createTransientSSLContext(TransientSSLParams(clusterConnection)));
+
+    auto session = tla()
+                       .asyncConnect({testHostName(), tla().listenerMainPort()},
+                                     ConnectSSLMode::kEnableSSL,
+                                     reactor,
+                                     Milliseconds{10 * 1000},
+                                     std::make_shared<ConnectionMetrics>(
+                                         getServiceContext()->getFastClockSource()),
+                                     std::move(transientContext))
+                       .getNoThrow();
+    ASSERT_NOT_OK(session);
+
+    // The handshake attempt is counted even though it failed.
+    if (capturer.canReadMetrics()) {
+        ASSERT_GE(capturer.readInt64Counter(MetricNames::kNetworkEgressSSLOperations), 1);
+    }
 }
 /**
  * Fixture for tests around performing a TLS handshake. `serverHandshakeDone` can be used to be
