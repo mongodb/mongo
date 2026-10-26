@@ -34,6 +34,7 @@
 #include "mongo/otel/metrics/metrics_counter.h"
 #include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 
 #include <cstdint>
@@ -144,11 +145,14 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(
                 }
                 recovered = _multikeyPaths;
             }
-            auto status = onMultikeyPathsRecovered(opCtx, recovered.value_or(MultikeyPaths{}));
-            if (!status.isOK()) {
+            ScopeGuard restoreRecovered{[&] {
                 // Leave the state flagged so a later batch reports it again.
-                std::unique_lock<std::mutex> lk(_multikeyPathMutex);
+                std::unique_lock<std::mutex> lk{_multikeyPathMutex};
                 _multikeyPathsRecovered = true;
+            }};
+            auto status = onMultikeyPathsRecovered(opCtx, recovered.value_or(MultikeyPaths{}));
+            if (status.isOK()) {
+                restoreRecovered.dismiss();
             }
             return status;
         };

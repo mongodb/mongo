@@ -1137,6 +1137,68 @@ TEST_F(IndexBuilderInterceptorTest, SingleDeleteIsDrainedIntoIndexPrimaryDriven)
     }
 }
 
+TEST_F(IndexBuilderInterceptorTest, RecoveredMultikeyPathsSurviveThrowingBatchCallback) {
+    auto info = buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}}"));
+    auto interceptor = createIndexBuildInterceptor(info, LazyRecordStore::CreateMode::immediate);
+    auto* entry = getIndexEntry("a_1");
+    {
+        WriteUnitOfWork wuow{operationContext()};
+        for (int i = 0; i < 2; ++i) {
+            int64_t numKeys = 0;
+            ASSERT_OK(interceptor->sideWrite(operationContext(),
+                                             _coll->getCollectionPtr(),
+                                             entry,
+                                             {makeKeyString(i, RecordId{i + 1})},
+                                             {},
+                                             {},
+                                             IndexBuildInterceptor::Op::kInsert,
+                                             &numKeys));
+        }
+        wuow.commit();
+    }
+    interceptor->recordDrainedMultikeyPaths(MultikeyPaths{{0}});
+    EXPECT_THAT(
+        [&] {
+            return interceptor->drainWritesIntoIndex(
+                operationContext(),
+                _coll->getCollectionPtr(),
+                entry,
+                InsertDeleteOptions{.dupsAllowed = true},
+                [](OperationContext*, const MultikeyPaths&) -> Status {
+                    uasserted(ErrorCodes::InternalError, "Injected batch callback failure");
+                },
+                IndexBuildInterceptor::TrackDuplicates::kNoTrack,
+                IndexBuildInterceptor::DrainYieldPolicy::kNoYield);
+        },
+        unittest::match::Throws<ExceptionFor<ErrorCodes::InternalError>>());
+    EXPECT_EQ(getSideWritesTableContents(info).size(), 2);
+    EXPECT_EQ(interceptor->getNumKeysAndBytesWritten().keysWritten, 0);
+
+    auto& ru = *shard_role_details::getRecoveryUnit(operationContext());
+    auto cursor = entry->accessMethod()->asSortedData()->newCursor(operationContext(), ru);
+    EXPECT_FALSE(cursor->nextKeyString(ru));
+    cursor.reset();
+    ru.abandonSnapshot();
+
+    bool recovered = false;
+    EXPECT_OK(interceptor->drainWritesIntoIndex(
+        operationContext(),
+        _coll->getCollectionPtr(),
+        entry,
+        InsertDeleteOptions{.dupsAllowed = true},
+        [&](OperationContext*, const MultikeyPaths& paths) {
+            EXPECT_EQ(multikey_paths::toString(paths),
+                      multikey_paths::toString(MultikeyPaths{{0}}));
+            recovered = true;
+            return Status::OK();
+        },
+        IndexBuildInterceptor::TrackDuplicates::kNoTrack,
+        IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+    EXPECT_TRUE(recovered);
+    EXPECT_TRUE(getSideWritesTableContents(info).empty());
+    EXPECT_EQ(interceptor->getNumKeysAndBytesWritten().keysWritten, 2);
+}
+
 // Verifies that the writeConflictRetry block wrapping applySingleBatch in
 // SideWritesTracker::drainWritesIntoIndex tolerates a write conflict during the drain.
 TEST_F(IndexBuilderInterceptorTest, DrainWritesIntoIndexSurvivesWriteConflict) {
