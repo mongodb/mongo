@@ -336,7 +336,10 @@ py_binary(
 py_test(
     name = "remote_execution_containers_generator_test",
     srcs = ["remote_execution_containers_generator_test.py"],
-    data = ["remote_execution_containers_generator.py"],
+    data = [
+        "remote_execution_containers_generator.py",
+        "//evergreen:remote_execution_containers_generate.sh",
+    ],
 )
 
 py_binary(

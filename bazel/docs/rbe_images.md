@@ -12,3 +12,26 @@ bazel run //bazel/remote_execution_container:repin_dockerfiles --config=local
 ```
 
 To change the image contents, edit [repin_dockerfiles.sh](./repin_dockerfiles.sh).
+
+The `update_remote_execution_containers` Evergreen task also exports a sysroot from each
+architecture of every rebuilt image and publishes it to `s3://mdb-build-public/rbe-sysroots/`. The
+archives contain `usr/include`, `usr/lib`, `usr/lib64`, `lib`, and `lib64` at the archive root.
+Absolute library symlinks are made relative, and links outside these directories are omitted.
+
+Each archive is named `rbe-sysroot-<distro>-<architecture>-<sha256>.tar.gz`, where `sha256` is the
+full hash of the archive contents. Rebuilds with different contents therefore get new URLs and
+preserve archives pinned by older release branches. The task records the public download URL and
+hash as `sysroot-<architecture>-url` and `sysroot-<architecture>-sha256` in
+`bazel/platforms/remote_execution_containers.bzl`. Architectures use Docker names (`amd64`, `arm64`,
+`ppc64le`, and `s390x`). Release branches can pin these values independently of their execution
+container images.
+
+For manual publication, pass `--sysroot-s3-bucket=mdb-build-public` to the container generator. S3
+uploads use `aws_key_build` and `aws_secret_build` when provided by Evergreen, or the AWS CLI's
+normal credential chain otherwise. A distro's container and sysroot pins are updated together only
+after every upload for that distro succeeds.
+
+Evergreen patch runs pass `--sysroot-dry-run`: they still extract and hash every sysroot, print the
+proposed S3 URLs, and include those URLs and hashes in the dry-run container mapping, but skip S3
+uploads. Directory modes, ownership, and timestamps in archives are normalized so the same rootfs
+produces the same archive hash across publisher umasks.

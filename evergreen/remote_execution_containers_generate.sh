@@ -5,8 +5,8 @@ set -o errexit
 set -o verbose
 
 # The generator builds every remote execution container image with buildx, pushes the
-# multi-arch manifests to ECR, and rewrites bazel/platforms/remote_execution_containers.bzl
-# with the resulting digests.
+# multi-arch manifests to ECR, uploads per-architecture sysroots to S3, and rewrites
+# bazel/platforms/remote_execution_containers.bzl with the resulting URLs and hashes.
 
 ECR_REGISTRY="public.ecr.aws"
 
@@ -40,10 +40,17 @@ git diff -- bazel/remote_execution_container/
 
 activate_venv
 
+sysroot_args=(--sysroot-s3-bucket=mdb-build-public)
+if [ "${is_patch:-false}" = "true" ]; then
+    # Exercise archive extraction and hashing without leaving patch artifacts in the public bucket.
+    sysroot_args+=(--sysroot-dry-run)
+fi
+
 # ppc64le and s390x images are built under QEMU, which --install-binfmt sets up.
 # 'y' answers the prompt confirming that docker state may be purged between distros.
 echo y | $python bazel/platforms/remote_execution_containers_generator.py \
-    --install-binfmt --continue-on-error $distro_arg
+    --install-binfmt --continue-on-error \
+    "${sysroot_args[@]}" $distro_arg
 
 # The container map is loaded by bazel/bzlmod.bzl, so rewriting it changes the
 # bazel_features_deps extension's bzlTransitiveDigest and MODULE.bazel.lock no longer matches.

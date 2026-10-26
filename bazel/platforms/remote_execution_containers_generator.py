@@ -2,10 +2,16 @@
 # the dockerfiles listed in bazel/remote_execution_container/.
 
 import argparse
+import gzip
+import hashlib
+import json
 import os
 import pathlib
 import platform
+import posixpath
 import subprocess
+import tarfile
+import tempfile
 from datetime import datetime
 
 from retry import retry
@@ -25,6 +31,157 @@ MACHINE_ARCHITECTURES = {
     "aarch64": "arm64",
     "x86_64": "amd64",
 }
+SYSROOT_PATHS = ("usr/include", "usr/lib", "usr/lib64", "lib", "lib64")
+
+
+def _is_sysroot_path(path: str) -> bool:
+    return any(path == root or path.startswith(root + "/") for root in SYSROOT_PATHS)
+
+
+def create_sysroot_archive(rootfs: pathlib.Path, archive: pathlib.Path) -> str:
+    """Package headers/libraries with portable links and return the archive's SHA-256."""
+
+    def extract_filter(member: tarfile.TarInfo, destination: str) -> tarfile.TarInfo | None:
+        name = posixpath.normpath(member.name.removeprefix("./"))
+        if not _is_sysroot_path(name):
+            return None
+        member = member.replace(name=name)
+        if member.issym():
+            target = posixpath.normpath(
+                member.linkname
+                if member.linkname.startswith("/")
+                else posixpath.join(posixpath.dirname(name), member.linkname)
+            ).lstrip("/")
+            if not _is_sysroot_path(target):
+                return None
+            member = member.replace(linkname=posixpath.relpath(target, posixpath.dirname(name)))
+        elif member.islnk() and not _is_sysroot_path(member.linkname):
+            raise ValueError(f"Sysroot hard link points outside the archive: {name}")
+        return tarfile.data_filter(member, destination)
+
+    def archive_filter(member: tarfile.TarInfo) -> tarfile.TarInfo:
+        # data_filter leaves directory modes to the publisher's umask, including implicit parents.
+        return member.replace(
+            uid=0,
+            gid=0,
+            uname="",
+            gname="",
+            mtime=0,
+            mode=0o755 if member.isdir() else member.mode,
+            deep=False,
+        )
+
+    with tempfile.TemporaryDirectory(dir=rootfs.parent) as temp_dir:
+        sysroot = pathlib.Path(temp_dir)
+        with tarfile.open(rootfs) as exported:
+            exported.extractall(sysroot, filter=extract_filter)
+        if not (sysroot / "usr/include").is_dir():
+            raise ValueError("Extracted sysroot does not contain usr/include")
+        with (
+            archive.open("wb") as output,
+            gzip.GzipFile(filename="", fileobj=output, mode="wb", mtime=0) as compressed,
+            tarfile.open(fileobj=compressed, mode="w") as packaged,
+        ):
+            for path in sorted(sysroot.rglob("*")):
+                packaged.add(
+                    path,
+                    arcname=path.relative_to(sysroot).as_posix(),
+                    recursive=False,
+                    filter=archive_filter,
+                )
+    with archive.open("rb") as output:
+        return hashlib.file_digest(output, "sha256").hexdigest()
+
+
+def sysroot_upload_environment() -> dict[str, str]:
+    """Use Evergreen's public-build S3 credentials independently of the ECR role."""
+    environment = os.environ.copy()
+    access_key = environment.get("aws_key_build")
+    secret_key = environment.get("aws_secret_build")
+    if access_key or secret_key:
+        if not access_key or not secret_key:
+            raise ValueError("Both aws_key_build and aws_secret_build are required for S3 uploads")
+        environment["AWS_ACCESS_KEY_ID"] = access_key
+        environment["AWS_SECRET_ACCESS_KEY"] = secret_key
+        environment.pop("AWS_SESSION_TOKEN", None)
+    return environment
+
+
+def publish_sysroots(
+    image: str, distro: str, bucket: str, prefix: str, *, dry_run: bool = False
+) -> dict[str, str]:
+    """Export each platform and prepare its S3 metadata; skip uploads during patch dry runs."""
+    result = log_subprocess_run(
+        ["docker", "buildx", "imagetools", "inspect", "--raw", image],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    manifests = json.loads(result.stdout).get("manifests", [])
+    metadata = {}
+    for build_platform in platforms_for_distro(distro):
+        architecture = build_platform.split("/")[1]
+        manifest = next(
+            (
+                manifest
+                for manifest in manifests
+                if manifest.get("platform", {}).get("os") == "linux"
+                and manifest["platform"].get("architecture") == architecture
+            ),
+            None,
+        )
+        if manifest is None:
+            raise ValueError(f"Image {image} has no linux/{architecture} manifest")
+        # Use the child digest: Docker cannot cache multiple architectures under one index digest.
+        platform_image = image.split("@")[0] + "@" + manifest["digest"]
+        log_subprocess_run(
+            ["docker", "pull", "--platform", build_platform, platform_image], check=True
+        )
+        container_id = ""
+        try:
+            result = log_subprocess_run(
+                ["docker", "create", "--platform", build_platform, platform_image, "/bin/true"],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            container_id = result.stdout.strip()
+            if not container_id:
+                raise ValueError("docker create did not return a container ID for sysroot export")
+            # Keep one architecture on disk at a time, beside the repo on the large CI data volume.
+            with tempfile.TemporaryDirectory(prefix="rbe-sysroot-", dir=".") as temp_dir:
+                directory = pathlib.Path(temp_dir)
+                rootfs = directory / "rootfs.tar"
+                log_subprocess_run(
+                    ["docker", "export", "--output", str(rootfs), container_id], check=True
+                )
+                archive = directory / "sysroot.tar.gz"
+                sha256 = create_sysroot_archive(rootfs, archive)
+                filename = f"rbe-sysroot-{distro}-{architecture}-{sha256}.tar.gz"
+                key = "/".join(part for part in (prefix.strip("/"), filename) if part)
+                if dry_run:
+                    print(f"Dry run: would upload {archive} to s3://{bucket}/{key}")
+                else:
+                    log_subprocess_run(
+                        [
+                            "aws",
+                            "s3",
+                            "cp",
+                            str(archive),
+                            f"s3://{bucket}/{key}",
+                            "--acl",
+                            "public-read",
+                        ],
+                        env=sysroot_upload_environment(),
+                        check=True,
+                    )
+                metadata[f"sysroot-{architecture}-url"] = f"https://{bucket}.s3.amazonaws.com/{key}"
+                metadata[f"sysroot-{architecture}-sha256"] = sha256
+        finally:
+            if container_id:
+                log_subprocess_run(["docker", "rm", "--force", container_id], check=False)
+            log_subprocess_run(["docker", "image", "rm", platform_image], check=False)
+    return metadata
 
 
 def platforms_for_distro(distro: str) -> tuple[str, ...]:
@@ -91,6 +248,18 @@ def web_url_for_image(image: str) -> str:
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--distro", type=str, help="Restrict to only update a single distro.")
+    parser.add_argument(
+        "--sysroot-s3-bucket",
+        help="Also export and publish a sysroot for each architecture to this public S3 bucket.",
+    )
+    parser.add_argument(
+        "--sysroot-s3-prefix", default="rbe-sysroots", help="S3 key prefix for sysroot archives."
+    )
+    parser.add_argument(
+        "--sysroot-dry-run",
+        action="store_true",
+        help="Extract and hash sysroots and print proposed S3 URLs without uploading archives.",
+    )
     parser.add_argument(
         "--skip-cleanup",
         action="store_true",
@@ -200,7 +369,20 @@ Your docker images, volumes and containers will be purged if you continue. Enter
                 text=True,
                 check=True,
             )
-        except (subprocess.CalledProcessError, OSError) as exc:
+            # The output is a list of strings, ex. ['URL']; strip the brackets and quotes.
+            image = result.stdout.strip()[2:-2]
+            sysroot_metadata = (
+                publish_sysroots(
+                    image,
+                    distro,
+                    args.sysroot_s3_bucket,
+                    args.sysroot_s3_prefix,
+                    dry_run=args.sysroot_dry_run,
+                )
+                if args.sysroot_s3_bucket
+                else {}
+            )
+        except (subprocess.CalledProcessError, OSError, ValueError, tarfile.TarError) as exc:
             if not args.continue_on_error:
                 raise
             print(f"Failed to update {distro}: {exc}")
@@ -210,10 +392,13 @@ Your docker images, volumes and containers will be purged if you continue. Enter
         finally:
             log_subprocess_run(["docker", "buildx", "rm", "--force", builder_name], check=False)
 
-        # The output of this command is a list of strings, ex. ['URL'] so we need to strip off the brackets and quotes.
-        image = result.stdout.strip()[2:-2]
+        # Record the new pins together only once every requested sysroot upload has succeeded.
+        for key in list(re_container):
+            if key.startswith("sysroot-"):
+                del re_container[key]
         re_container["container-url"] = "docker://" + image
         re_container["web-url"] = web_url_for_image(image)
+        re_container.update(sysroot_metadata)
 
         print(f"Finished updating {distro}")
         print("************************************\n")
