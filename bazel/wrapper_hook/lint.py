@@ -375,8 +375,6 @@ class LintRunner:
         # are contained within targets.
 
         exempt_list = {
-            # TODO(SERVER-101360): Remove the exemptions below once resolved.
-            "src/mongo/crypto/fle_options.cpp",
             # TODO(SERVER-101368): Remove the exemptions below once resolved.
             "src/mongo/db/modules/enterprise/src/streams/commands/update_connection.cpp",
             # TODO(SERVER-101371): Remove the exemptions below once resolved.
