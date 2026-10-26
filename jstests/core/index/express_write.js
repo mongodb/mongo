@@ -238,3 +238,70 @@ runExpressTest({
     usesExpress: true,
     expectedDocs: [docs[0], docs[1], {_id: 2, arr: [99, 100, 100]}],
 });
+
+// A DBRef is a legal '_id' value, and it is the one common case where the '_id' sub-object of a
+// query has a dollar-prefixed first field name. For the {_id: {$eq: <dbref>}} shape the express
+// write path unwraps the '$eq' before checking the filter's shape, so it must not then mistake the
+// leading '$ref' for a query operator.
+const dbref = {$ref: "other", $id: 1};
+docs.push({_id: dbref, a: 3});
+
+runExpressTest({
+    command: {delete: collName, deletes: [{q: {_id: {$eq: dbref}}, limit: 1}]},
+    usesExpress: true,
+    expectedDocs: [docs[0], docs[1], docs[2]],
+});
+runExpressTest({
+    command: {findAndModify: collName, query: {_id: {$eq: dbref}}, update: {$set: {c: 1}}},
+    usesExpress: true,
+    expectedDocs: [docs[0], docs[1], docs[2], {_id: dbref, a: 3, c: 1}],
+});
+runExpressTest({
+    command: {update: collName, updates: [{q: {_id: {$eq: dbref}}, u: {$set: {c: 1}}}]},
+    usesExpress: true,
+    expectedDocs: [docs[0], docs[1], docs[2], {_id: dbref, a: 3, c: 1}],
+});
+
+// The same predicate without the '$eq' wrapper has more than one field in its '_id' sub-object, so
+// it is not eligible for the express path, but it must still return the right result.
+runExpressTest({
+    command: {delete: collName, deletes: [{q: {_id: dbref}, limit: 1}]},
+    usesExpress: false,
+    expectedDocs: [docs[0], docs[1], docs[2]],
+});
+
+// An ObjectId is another legal '_id' value
+const objId = ObjectId("6799556f337feea725bf9839");
+docs.push({_id: objId, a: 3});
+
+runExpressTest({
+    command: {delete: collName, deletes: [{q: {_id: {$eq: objId}}, limit: 1}]},
+    usesExpress: true,
+    expectedDocs: [docs[0], docs[1], docs[2], docs[3]],
+});
+runExpressTest({
+    command: {findAndModify: collName, query: {_id: {$eq: objId}}, update: {$set: {c: 1}}},
+    usesExpress: true,
+    expectedDocs: [docs[0], docs[1], docs[2], docs[3], {_id: objId, a: 3, c: 1}],
+});
+runExpressTest({
+    command: {update: collName, updates: [{q: {_id: {$eq: objId}}, u: {$set: {c: 1}}}]},
+    usesExpress: true,
+    expectedDocs: [docs[0], docs[1], docs[2], docs[3], {_id: objId, a: 3, c: 1}],
+});
+// Should be the same result without the extra $eq
+runExpressTest({
+    command: {delete: collName, deletes: [{q: {_id: objId}, limit: 1}]},
+    usesExpress: true,
+    expectedDocs: [docs[0], docs[1], docs[2], docs[3]],
+});
+runExpressTest({
+    command: {findAndModify: collName, query: {_id: objId}, update: {$set: {c: 1}}},
+    usesExpress: true,
+    expectedDocs: [docs[0], docs[1], docs[2], docs[3], {_id: objId, a: 3, c: 1}],
+});
+runExpressTest({
+    command: {update: collName, updates: [{q: {_id: objId}, u: {$set: {c: 1}}}]},
+    usesExpress: true,
+    expectedDocs: [docs[0], docs[1], docs[2], docs[3], {_id: objId, a: 3, c: 1}],
+});

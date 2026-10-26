@@ -574,6 +574,16 @@ bool isExactMatchOnId(const BSONObj& queryObj) {
     return false;
 }
 
+// Returns true if 'queryObj' is of the shape {_id: <value>}, without checking whether the
+// '_id' value is an object whose first field name is dollar-prefixed. Intended for filters that
+// have already been through 'getQueryFilterMaybeUnwrapEq': once the '$eq' is unwrapped, a
+// dollar-prefixed first field name denotes a literal value such as a
+// DBRef ({_id: {$ref: <ns>, $id: <id>}}) or ObjectId ({_id: {$oid: <id>}}) rather than a query
+// operator, so 'isExactMatchOnId' is too strict here.
+bool isIdOnlyFilter(const BSONObj& queryObj) {
+    return queryObj.nFields() == 1 && queryObj.hasField("_id");
+}
+
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForFindById(
     OperationContext* opCtx,
     std::unique_ptr<CanonicalQuery> cq,
@@ -722,7 +732,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForUpdat
                 str::stream()
                     << "Expected the input to be of the shape {_id: <value>}, but the input is "
                     << queryFilter,
-                isExactMatchOnId(queryFilter));
+                isIdOnlyFilter(queryFilter));
 
         bool isClusteredOnId =
             clustered_util::isClusteredOnId(collection.getCollectionPtr()->getClusteredInfo());
@@ -788,7 +798,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForDelet
                 str::stream()
                     << "Expected the input to be of the shape {_id: <value>}, but the input is "
                     << queryFilter,
-                isExactMatchOnId(queryFilter));
+                isIdOnlyFilter(queryFilter));
 
         bool isClusteredOnId =
             clustered_util::isClusteredOnId(collection.getCollectionPtr()->getClusteredInfo());
