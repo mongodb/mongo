@@ -17,6 +17,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/oplog_applier_batcher_test_fixture.h"
+#include "mongo/db/repl/oplog_applier_dispatch.h"
 #include "mongo/db/repl/oplog_applier_impl_test_fixture.h"
 #include "mongo/db/repl/oplog_applier_utils.h"
 #include "mongo/db/repl/oplog_entry.h"
@@ -25,6 +26,7 @@
 #include "mongo/db/repl/pipelined_applier_otel_metrics.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
@@ -57,6 +59,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -180,12 +183,11 @@ protected:
 
     // Consumes items on one worker and reads each slice's results from its completed batch.
     std::vector<WorkerMultikeyPathInfo> consumeOnWorker(const OplogApplier::Options& options,
-                                                        std::vector<OwnedWorkItem> items,
-                                                        bool deferMultikeyWrites = false) {
+                                                        std::vector<OwnedWorkItem> items) {
         PipelinedApplierBatchTracker tracker;
         PipelinedApplierWorkerPool pool(
             /*numWorkers=*/1, [&](size_t workerIdx, const WorkItem& item) {
-                consumeWorkItem(workerIdx, options, item, tracker, deferMultikeyWrites);
+                consumeWorkItem(workerIdx, options, item, tracker);
             });
         for (auto& owned : items) {
             auto& item = owned.item;
@@ -235,7 +237,8 @@ TEST_F(PipelinedWorkItemTest, AppliesOpsInWorkItemOrder) {
                            updateOp(kNss, BSON("_id" << 0), BSON("a" << 2)),
                            insertOp(kNss, BSON("_id" << 1)),
                            deleteOp(kNss, BSON("_id" << 1))});
-    ASSERT_OK(applyWorkItem(_opCtx.get(), options, owned.item));
+    WorkerMultikeyPathInfo multikey;
+    ASSERT_OK(applyWorkItem(_opCtx.get(), options, owned.item, &multikey));
 
     ASSERT_EQ(countDocs(kNss), 1);
     ASSERT_TRUE(docExists(_opCtx.get(), kNss, BSON("_id" << 0 << "a" << 2)));
@@ -254,7 +257,8 @@ TEST_F(PipelinedWorkItemTest, GroupsConsecutiveInsertsOnTheSameCollection) {
     auto item = makeItem({insertOp(kNss, BSON("_id" << 0)),
                           insertOp(kNss, BSON("_id" << 1)),
                           insertOp(kNss, BSON("_id" << 2))});
-    ASSERT_OK(applyWorkItem(_opCtx.get(), options, item.item));
+    WorkerMultikeyPathInfo multikey;
+    ASSERT_OK(applyWorkItem(_opCtx.get(), options, item.item, &multikey));
 
     // Exactly one insert call, carrying all three documents: the shared apply path groups
     // consecutive inserts to one collection.
@@ -296,7 +300,7 @@ TEST_F(PipelinedWorkItemTest, WriteConflictRetryRecordsMultikeyAndCompletesBatch
             }
         };
 
-    auto multikey = consumeOnWorker(options, {makeItem({op})}, /*deferMultikeyWrites=*/true);
+    auto multikey = consumeOnWorker(options, {makeItem({op})});
 
     // Retry after multikey discovery must retain one timestamped result and complete the batch
     // once.
@@ -315,8 +319,9 @@ TEST_F(PipelinedWorkItemTest, ReturnsErrorWhenCollectionIsMissingInSteadyState) 
     createDatabase(_opCtx.get(), kNss.db_forTest());
     const auto options = secondaryOptions();
 
-    auto status =
-        applyWorkItem(_opCtx.get(), options, makeItem({insertOp(kNss, BSON("_id" << 0))}).item);
+    WorkerMultikeyPathInfo multikey;
+    auto status = applyWorkItem(
+        _opCtx.get(), options, makeItem({insertOp(kNss, BSON("_id" << 0))}).item, &multikey);
 
     ASSERT_EQ(status, ErrorCodes::NamespaceNotFound);
     ASSERT_FALSE(collectionExists(_opCtx.get(), kNss));
@@ -327,8 +332,9 @@ TEST_F(PipelinedWorkItemTest, IgnoresMissingCollectionWhenOptionsAllowIt) {
     // kInitialSync is the mode whose Options set allowNamespaceNotFoundErrorsOnCrudOps.
     const OplogApplier::Options options(OplogApplication::Mode::kInitialSync);
 
-    ASSERT_OK(
-        applyWorkItem(_opCtx.get(), options, makeItem({insertOp(kNss, BSON("_id" << 0))}).item));
+    WorkerMultikeyPathInfo multikey;
+    ASSERT_OK(applyWorkItem(
+        _opCtx.get(), options, makeItem({insertOp(kNss, BSON("_id" << 0))}).item, &multikey));
     ASSERT_FALSE(collectionExists(_opCtx.get(), kNss));
 }
 
@@ -336,8 +342,11 @@ TEST_F(PipelinedWorkItemTest, AppliesCommands) {
     const auto options = secondaryOptions();
     auto createOp = makeCreateCollectionOplogEntry(_opCtx.get(), nextOpTime(), kNss);
 
-    ASSERT_OK(applyWorkItem(
-        _opCtx.get(), options, makeItem({createOp, insertOp(kNss, BSON("_id" << 0))}).item));
+    WorkerMultikeyPathInfo multikey;
+    ASSERT_OK(applyWorkItem(_opCtx.get(),
+                            options,
+                            makeItem({createOp, insertOp(kNss, BSON("_id" << 0))}).item,
+                            &multikey));
 
     ASSERT_TRUE(collectionExists(_opCtx.get(), kNss));
     ASSERT_TRUE(docExists(_opCtx.get(), kNss, BSON("_id" << 0)));
@@ -358,12 +367,14 @@ TEST_F(PipelinedWorkItemTest, FallsBackToSingleInsertsWhenAnInjectedGroupedInser
         uassert(ErrorCodes::OperationFailed, "injected grouped insert failure", docs.size() == 1);
     };
 
+    WorkerMultikeyPathInfo multikey;
     ASSERT_OK(applyWorkItem(_opCtx.get(),
                             options,
                             makeItem({insertOp(kNss, BSON("_id" << 0)),
                                       insertOp(kNss, BSON("_id" << 1)),
                                       insertOp(kNss, BSON("_id" << 2))})
-                                .item));
+                                .item,
+                            &multikey));
 
     // The grouped attempt, then each op individually.
     ASSERT_EQ(insertBatchSizes, (std::vector<size_t>{3, 1, 1, 1}));
@@ -389,8 +400,7 @@ TEST_F(PipelinedWorkItemTest, GroupedInsertFallbackPreservesMultikeyPathsAndTime
             }
         };
 
-    auto multikey =
-        consumeOnWorker(options, {makeItem({scalar, first, second})}, /*deferMultikeyWrites=*/true);
+    auto multikey = consumeOnWorker(options, {makeItem({scalar, first, second})});
 
     // Individual retries must not duplicate paths or use the scalar insert's timestamp.
     ASSERT_EQ(insertBatchSizes, (std::vector<size_t>{3, 1, 1, 1}));
@@ -427,8 +437,9 @@ TEST_F(PipelinedWorkItemTest, SetsWorkerOpCtxStates) {
             admissionPriority = ExecutionAdmissionContext::get(opCtx).getPriority();
         };
 
-    ASSERT_OK(
-        applyWorkItem(_opCtx.get(), options, makeItem({insertOp(kNss, BSON("_id" << 0))}).item));
+    WorkerMultikeyPathInfo multikey;
+    ASSERT_OK(applyWorkItem(
+        _opCtx.get(), options, makeItem({insertOp(kNss, BSON("_id" << 0))}).item, &multikey));
 
     ASSERT_TRUE(observed);
     ASSERT_FALSE(writesReplicated);
@@ -468,8 +479,7 @@ TEST_F(PipelinedWorkItemTest, TracksMultikeyWritesPerItemAtTheirOwnTimestamps) {
     // The grouped insert and update retain their timestamps; the next item inherits no paths.
     auto multikey = consumeOnWorker(
         secondaryOptions(),
-        {makeItem({scalar, array, update}), makeItem({later}), makeItem({laterArray})},
-        /*deferMultikeyWrites=*/true);
+        {makeItem({scalar, array, update}), makeItem({later}), makeItem({laterArray})});
     ASSERT_EQ(insertBatchSizes, (std::vector<size_t>{2, 1, 1}));
     ASSERT_EQ(countDocs(kNss), 4);
     const std::vector<WorkerMultikeyPathInfo> expected{
@@ -522,7 +532,7 @@ TEST_F(PipelinedWorkItemTest, KeepsMultikeyResultsWithTheirBatchWhenALaterBatchF
             }
         };
     PipelinedApplierWorkerPool pool(4, [&](size_t workerIdx, const WorkItem& item) {
-        consumeWorkItem(workerIdx, secondaryOptions(), item, tracker, /*deferMultikeyWrites=*/true);
+        consumeWorkItem(workerIdx, secondaryOptions(), item, tracker);
         if (workerIdx == 0) {
             firstConsumed.set();
             releaseFirstWorker.get();
@@ -659,8 +669,7 @@ TEST_F(PipelinedWorkItemTest, PreservesExactWildcardMetadataPathsAtEachTimestamp
         BSON("_id" << 0 << "a" << BSON_ARRAY(1 << 2) << "b" << BSON("c" << BSON_ARRAY(3 << 4))));
     auto second =
         insertOp(kNss, BSON("_id" << 1 << "a" << BSON_ARRAY(5 << 6) << "d" << BSON_ARRAY(7 << 8)));
-    auto multikey = consumeOnWorker(
-        secondaryOptions(), {makeItem({first, second})}, /*deferMultikeyWrites=*/true);
+    auto multikey = consumeOnWorker(secondaryOptions(), {makeItem({first, second})});
 
     // Repeated and nested paths must survive the handoff without leaking between write timestamps.
     ASSERT_EQ(multikey.size(), 1U);
@@ -688,39 +697,42 @@ TEST_F(PipelinedWorkItemTest, AppliesSetMultikeyMetadataWithoutAccumulatingIt) {
                                     BSON("setMultikeyMetadata"
                                          << kNss.ns_forTest() << "idxName" << "idx" << "paths"
                                          << multikey_paths::serialize(BSON("a" << 1), {{0U}})));
-    auto multikey =
-        consumeOnWorker(secondaryOptions(), {makeItem({op})}, /*deferMultikeyWrites=*/true);
+    auto multikey = consumeOnWorker(secondaryOptions(), {makeItem({op})});
 
     // Replicated multikey metadata is applied directly, even when the worker is tracking.
     ASSERT_EQ(multikey, std::vector<WorkerMultikeyPathInfo>(1));
     assertIndexMultikey(_opCtx.get(), kNss, "idx", true, MultikeyPaths({{0U}}));
 }
 
-TEST_F(PipelinedWorkItemTest, AppliesMultikeyWithoutDeferredOutput) {
-    createIndexedCollection();
-    ASSERT_OK(applyWorkItem(
-        _opCtx.get(),
-        secondaryOptions(),
-        makeItem({insertOp(kNss, BSON("_id" << 0 << "a" << BSON_ARRAY(1 << 2)))}).item));
+TEST_F(PipelinedWorkItemTest, WorkerAlwaysDefersCompoundAndWildcardMultikey) {
+    const auto uuid = createIndexedCollection();
+    const auto wildcardKey = BSON("$**" << 1);
+    createIndex(
+        _opCtx.get(), kNss, uuid, BSON("v" << 2 << "name" << "wildcard" << "key" << wildcardKey));
+    const auto op = insertOp(kNss, BSON("_id" << 0 << "a" << BSON_ARRAY(1 << 2)));
+    const auto multikey = consumeOnWorker(secondaryOptions(), {makeItem({op})});
 
-    // Without a deferred output, application must finish the catalog write itself.
-    assertIndexMultikey(_opCtx.get(), kNss, "idx", true, MultikeyPaths({{0U}}));
-}
-
-TEST_F(PipelinedWorkItemTest, AppliesMultikeyOnWorkerImmediatelyByDefault) {
-    auto uuid = createIndexedCollection();
-    createIndex(_opCtx.get(),
-                kNss,
-                uuid,
-                BSON("v" << 2 << "name" << "wildcard" << "key" << BSON("$**" << 1)));
-    auto multikey = consumeOnWorker(
-        secondaryOptions(),
-        {makeItem({insertOp(kNss, BSON("_id" << 0 << "a" << BSON_ARRAY(1 << 2)))})});
-
-    // Immediate mode records an empty slice result and finishes the catalog writes on the worker.
-    ASSERT_EQ(multikey, std::vector<WorkerMultikeyPathInfo>(1));
-    assertIndexMultikey(_opCtx.get(), kNss, "idx", true, MultikeyPaths({{0U}}));
-    assertIndexMultikey(_opCtx.get(), kNss, "wildcard", true, {});
+    // The worker exports both indexes' metadata without changing their catalog multikey state.
+    ASSERT_EQ(multikey.size(), 1U);
+    ASSERT_EQ(multikey[0].size(), 2U);
+    std::set<std::string> indexes;
+    for (const auto& info : multikey[0]) {
+        indexes.insert(info.indexName);
+        ASSERT_EQ(info.collectionUUID, uuid);
+        ASSERT_EQ(info.earliestTimestamp, op.getTimestamp());
+        if (info.indexName == "idx") {
+            ASSERT_EQ(info.multikeyPaths, MultikeyPaths({{0U}}));
+        } else {
+            ASSERT_EQ(info.indexName, "wildcard");
+            ASSERT_EQ(
+                set_multikey_metadata_oplog_helpers::extractFieldPathsFromMetadataKeys(
+                    info.multikeyMetadataKeys, WildcardAccessMethod::makeOrdering(wildcardKey)),
+                (std::vector<std::string>{"a"}));
+        }
+    }
+    ASSERT_EQ(indexes, (std::set<std::string>{"idx", "wildcard"}));
+    assertIndexMultikey(_opCtx.get(), kNss, "idx", false, MultikeyPaths({{}}));
+    assertIndexMultikey(_opCtx.get(), kNss, "wildcard", false, {});
 }
 
 TEST_F(PipelinedWorkItemTest, BatchStaysIncompleteUntilTheWholeSliceIsApplied) {
@@ -797,7 +809,7 @@ TEST_F(PipelinedWorkItemTest, RecordsMultikeyAfterTheWholeSliceIsApplied) {
         release.get();
     };
     PipelinedApplierWorkerPool pool(1, [&](size_t workerIdx, const WorkItem& work) {
-        consumeWorkItem(workerIdx, secondaryOptions(), work, tracker, /*deferMultikeyWrites=*/true);
+        consumeWorkItem(workerIdx, secondaryOptions(), work, tracker);
     });
     ON_BLOCK_EXIT([&] {
         if (!release) {
@@ -925,7 +937,7 @@ TEST_F(PipelinedWorkItemTest, ShutdownAbandonedSliceDoesNotRecordMultikeyWrites)
             }
         };
     PipelinedApplierWorkerPool pool(2, [&](size_t workerIdx, const WorkItem& work) {
-        consumeWorkItem(workerIdx, secondaryOptions(), work, tracker, /*deferMultikeyWrites=*/true);
+        consumeWorkItem(workerIdx, secondaryOptions(), work, tracker);
     });
     // Worker 0 abandons owned, while worker 1 applies peer and then later.
     pool.enqueue(0, std::move(owned.item));
@@ -1303,13 +1315,13 @@ protected:
         ASSERT_TRUE(gate.reached.waitFor(_opCtx.get(), Seconds(60)));
     }
 
-    void startApplier() {
+    void startApplier(StorageInterface* storageInterface = nullptr) {
         _applier = std::make_unique<PipelinedOplogApplier>(
             _executor.get(),
             &_buffer,
             &noopOplogApplierObserver,
             ReplicationCoordinator::get(serviceContext),
-            getStorageInterface(),
+            storageInterface ? storageInterface : getStorageInterface(),
             OplogApplier::Options(OplogApplication::Mode::kSecondary),
             kNumWorkers);
         _finished.emplace(_applier->startup());
@@ -1338,9 +1350,10 @@ protected:
     }
 
     // Runs a fresh applier over 'ops' until the workers have applied all of them.
-    void applyThroughBuffer(const std::vector<OplogEntry>& ops) {
+    void applyThroughBuffer(const std::vector<OplogEntry>& ops,
+                            StorageInterface* storageInterface = nullptr) {
         pushToBuffer(ops);
-        startApplier();
+        startApplier(storageInterface);
         finishApplier();
     }
 
@@ -2243,19 +2256,18 @@ TEST_F(PipelinedOplogApplierRunTest, PublishesImmediateMultikeyWrites) {
     createCollectionWithIndex(_opCtx.get(), kNss, BSON("a" << 1));
     auto insert = insertOp(kNss, BSON("_id" << 0 << "a" << BSON_ARRAY(1 << 2)));
 
-    // The production dispatcher must not defer catalog writes without an advancer flush.
+    // Publication must include the multikey catalog write.
     applyThroughBuffer({insert});
     assertPublished(insert);
     assertIndexMultikey(_opCtx.get(), kNss, "idx", true, MultikeyPaths({{0U}}));
 }
 
-#if 0  // TODO(SERVER-135372): Enable once the advancer combines and flushes worker multikey writes.
 TEST_F(PipelinedOplogApplierRunTest, PublishesMultikeyWritesFromEveryWorker) {
     createCollectionWithIndex(_opCtx.get(), kNss, BSON("a" << 1 << "b" << 1));
-    auto first = insertOp(
-        kNss, BSON("_id" << idRoutedTo(0) << "a" << BSON_ARRAY(1 << 2) << "b" << 1));
-    auto second = insertOp(
-        kNss, BSON("_id" << idRoutedTo(1) << "a" << 1 << "b" << BSON_ARRAY(3 << 4)));
+    auto first =
+        insertOp(kNss, BSON("_id" << idRoutedTo(0) << "a" << BSON_ARRAY(1 << 2) << "b" << 1));
+    auto second =
+        insertOp(kNss, BSON("_id" << idRoutedTo(1) << "a" << 1 << "b" << BSON_ARRAY(3 << 4)));
 
     applyThroughBuffer({first, second});
 
@@ -2277,7 +2289,363 @@ TEST_F(PipelinedOplogApplierRunTest, PublishesMultikeyWritesFromSuccessiveBatche
     assertPublished(second);
     assertIndexMultikey(_opCtx.get(), kNss, "idx", true, MultikeyPaths({{0U}, {0U}}));
 }
-#endif
+
+// Records the advancer's catalog writes while applying them through the real storage interface.
+class PipelinedMultikeyPublishTest : public PipelinedOplogApplierRunTest {
+protected:
+    class RecordingStorageInterface : public StorageInterfaceImpl {
+    public:
+        Status setIndexIsMultikey(OperationContext* opCtx,
+                                  const NamespaceString& nss,
+                                  const UUID& uuid,
+                                  const std::string& indexName,
+                                  const KeyStringSet& keys,
+                                  const MultikeyPaths& paths,
+                                  Timestamp ts) override {
+            MultikeyPathInfo info{nss, uuid, indexName, keys, paths, ts};
+            if (beforeFlush) {
+                auto status = beforeFlush(opCtx, info);
+                if (!status.isOK()) {
+                    return status;
+                }
+            }
+            auto status = StorageInterfaceImpl::setIndexIsMultikey(
+                opCtx, nss, uuid, indexName, keys, paths, ts);
+            if (status.isOK()) {
+                std::lock_guard lk(_mutex);
+                _writes.push_back(std::move(info));
+            }
+            return status;
+        }
+
+        WorkerMultikeyPathInfo writes() {
+            std::lock_guard lk(_mutex);
+            return _writes;
+        }
+
+        // Set before starting the applier and reset only after it has finished.
+        std::function<Status(OperationContext*, const MultikeyPathInfo&)> beforeFlush;
+
+    private:
+        std::mutex _mutex;
+        WorkerMultikeyPathInfo _writes;
+    };
+
+    RecordingStorageInterface _storage;
+};
+
+TEST_F(PipelinedMultikeyPublishTest, SharedFlushMergesEqualTimestampsAndPreservesLaterPaths) {
+    const auto uuid =
+        createCollectionWithIndex(_opCtx.get(), kNss, BSON("a" << 1 << "b" << 1 << "c" << 1));
+    const auto lastApplied = nextOpTime().getTimestamp();
+    const auto first = nextOpTime().getTimestamp();
+    const auto later = nextOpTime().getTimestamp();
+    std::vector<WorkerMultikeyPathInfo> metadata{
+        {{kNss, uuid, "idx", {}, {{}, {}, {0U}}, later}},
+        {},
+        {{kNss, uuid, "idx", {}, {{0U}, {}, {}}, Timestamp()}},
+        {{kNss, uuid, "idx", {}, {{}, {0U}, {}}, first}},
+        {{kNss, uuid, "idx", {}, {{0U}, {}, {}}, first}},
+    };
+
+    // Equal recorded timestamps merge; legacy null timestamps use the fallback only when flushed.
+    UnreplicatedWritesBlock noRep(_opCtx.get());
+    ASSERT_OK(flushMultikeyPathInfo(_opCtx.get(), &_storage, metadata, first, later, lastApplied));
+    const WorkerMultikeyPathInfo expected{
+        {kNss, uuid, "idx", {}, {{0U}, {}, {}}, first},
+        {kNss, uuid, "idx", {}, {{0U}, {0U}, {}}, first},
+        {kNss, uuid, "idx", {}, {{}, {}, {0U}}, later},
+    };
+    ASSERT_EQ(_storage.writes(), expected);
+    assertIndexMultikey(_opCtx.get(), kNss, "idx", true, MultikeyPaths({{0U}, {0U}, {0U}}));
+}
+
+TEST_F(PipelinedMultikeyPublishTest, SharedFlushSkipsEmptyMetadataAndStopsOnStorageError) {
+    const auto uuid = createCollectionWithIndex(_opCtx.get(), kNss, BSON("a" << 1 << "b" << 1));
+    const auto lastApplied = nextOpTime().getTimestamp();
+    const auto first = nextOpTime().getTimestamp();
+    const auto later = nextOpTime().getTimestamp();
+    size_t attempts = 0;
+    _storage.beforeFlush = [&](OperationContext*, const MultikeyPathInfo&) {
+        ++attempts;
+        return Status(ErrorCodes::IndexNotFound, "injected multikey catalog failure");
+    };
+
+    UnreplicatedWritesBlock noRep(_opCtx.get());
+    std::vector<WorkerMultikeyPathInfo> metadata(3);
+    ASSERT_OK(flushMultikeyPathInfo(_opCtx.get(), &_storage, metadata, first, later, lastApplied));
+    ASSERT_EQ(attempts, 0U);
+
+    // A failure must be returned to the caller without attempting the next timestamp's write.
+    metadata[0] = {{kNss, uuid, "idx", {}, {{0U}, {}}, first}};
+    metadata[1] = {{kNss, uuid, "idx", {}, {{}, {0U}}, later}};
+    ASSERT_EQ(flushMultikeyPathInfo(_opCtx.get(), &_storage, metadata, first, later, lastApplied),
+              ErrorCodes::IndexNotFound);
+    ASSERT_EQ(attempts, 1U);
+    ASSERT_TRUE(_storage.writes().empty());
+    assertIndexMultikey(_opCtx.get(), kNss, "idx", false, MultikeyPaths({{}, {}}));
+}
+
+TEST_F(PipelinedMultikeyPublishTest, FlushesWorkerResultsInTimestampOrderWithoutBackdatingPaths) {
+    const auto uuid = createCollectionWithIndex(_opCtx.get(), kNss, BSON("a" << 1 << "b" << 1));
+    // Worker slots are visited in the opposite order to these writes' timestamps.
+    const auto first =
+        insertOp(kNss, BSON("_id" << idRoutedTo(3) << "a" << BSON_ARRAY(1 << 2) << "b" << 1));
+    const auto second =
+        insertOp(kNss, BSON("_id" << idRoutedTo(0) << "a" << 1 << "b" << BSON_ARRAY(3 << 4)));
+    applyThroughBuffer({first, second}, &_storage);
+
+    const auto writes = _storage.writes();
+    ASSERT_EQ(writes.size(), 2U);
+    ASSERT_EQ(writes[0].earliestTimestamp, first.getTimestamp());
+    ASSERT_EQ(writes[0].multikeyPaths, MultikeyPaths({{0U}, {}}));
+    ASSERT_EQ(writes[1].earliestTimestamp, second.getTimestamp());
+    ASSERT_EQ(writes[1].multikeyPaths, MultikeyPaths({{}, {0U}}));
+    for (const auto& info : writes) {
+        ASSERT_EQ(info.collectionUUID, uuid);
+        ASSERT_EQ(info.indexName, "idx");
+    }
+    assertPublished(second);
+    assertIndexMultikey(_opCtx.get(), kNss, "idx", true, MultikeyPaths({{0U}, {0U}}));
+}
+
+TEST_F(PipelinedMultikeyPublishTest, MergesSameTimestampPathsAndWildcardKeysAcrossWorkers) {
+    // An applyOps larger than the limit must still publish as one batch at its single timestamp.
+    setServerParameter("replBatchLimitOperations", 1);
+    const auto uuid = createCollectionWithIndex(_opCtx.get(), kNss, BSON("a" << 1 << "b" << 1));
+    const auto wildcardKey = BSON("$**" << 1);
+    {
+        UnreplicatedWritesBlock noRep(_opCtx.get());
+        createIndex(_opCtx.get(),
+                    kNss,
+                    uuid,
+                    BSON("v" << 2 << "name" << "wildcard" << "key" << wildcardKey));
+    }
+    const auto op = applyOpsInsertingOp(
+        kNss,
+        uuid,
+        {BSON("_id" << idRoutedTo(0) << "a" << BSON_ARRAY(1 << 2) << "b" << 1),
+         BSON("_id" << idRoutedTo(1) << "a" << 1 << "b" << BSON_ARRAY(3 << 4))});
+    applyThroughBuffer({op}, &_storage);
+
+    // One write per index at the applyOps timestamp must contain contributions from both workers.
+    const auto writes = _storage.writes();
+    ASSERT_EQ(writes.size(), 2U);
+    for (const auto& info : writes) {
+        ASSERT_EQ(info.collectionUUID, uuid);
+        ASSERT_EQ(info.earliestTimestamp, op.getTimestamp());
+        if (info.indexName == "idx") {
+            ASSERT_EQ(info.multikeyPaths, MultikeyPaths({{0U}, {0U}}));
+        } else {
+            ASSERT_EQ(info.indexName, "wildcard");
+            auto paths = set_multikey_metadata_oplog_helpers::extractFieldPathsFromMetadataKeys(
+                info.multikeyMetadataKeys, WildcardAccessMethod::makeOrdering(wildcardKey));
+            std::sort(paths.begin(), paths.end());
+            ASSERT_EQ(paths, (std::vector<std::string>{"a", "b"}));
+        }
+    }
+    assertPublished(op);
+    assertIndexMultikey(_opCtx.get(), kNss, "idx", true, MultikeyPaths({{0U}, {0U}}));
+    assertIndexMultikey(_opCtx.get(), kNss, "wildcard", true, {});
+}
+
+TEST_F(PipelinedMultikeyPublishTest, KeepsSameNamedIndexesInDifferentCollectionsSeparate) {
+    const auto firstUuid = createCollectionWithIndex(_opCtx.get(), kNss, BSON("a" << 1));
+    const auto secondUuid = createCollectionWithIndex(_opCtx.get(), kOtherNss, BSON("a" << 1));
+    const auto doc = BSON("_id" << 0 << "a" << BSON_ARRAY(1 << 2));
+    const auto op =
+        applyOpsOp({MutableOplogEntry::makeInsertOperation(kNss, firstUuid, doc, doc),
+                    MutableOplogEntry::makeInsertOperation(kOtherNss, secondUuid, doc, doc)});
+    applyThroughBuffer({op}, &_storage);
+
+    const auto writes = _storage.writes();
+    ASSERT_EQ(writes.size(), 2U);
+    std::set<UUID> uuids;
+    for (const auto& info : writes) {
+        uuids.insert(info.collectionUUID);
+        ASSERT_EQ(info.indexName, "idx");
+        ASSERT_EQ(info.earliestTimestamp, op.getTimestamp());
+    }
+    ASSERT_EQ(uuids, (std::set<UUID>{firstUuid, secondUuid}));
+    assertIndexMultikey(_opCtx.get(), kNss, "idx", true, MultikeyPaths({{0U}}));
+    assertIndexMultikey(_opCtx.get(), kOtherNss, "idx", true, MultikeyPaths({{0U}}));
+}
+
+TEST_F(PipelinedMultikeyPublishTest, EmptyWorkerMetadataAndZeroWorkerBatchesDoNotWriteCatalog) {
+    createCollectionWithIndex(_opCtx.get(), kNss, BSON("a" << 1));
+    setServerParameter("replBatchLimitOperations", 1);
+    const auto scalar = insertOp(kNss, BSON("_id" << 0 << "a" << 1));
+    const auto empty = applyOpsOp({});
+    applyThroughBuffer({scalar, empty}, &_storage);
+
+    ASSERT_TRUE(_storage.writes().empty());
+    assertPublished(empty);
+    assertIndexMultikey(_opCtx.get(), kNss, "idx", false, MultikeyPaths({{}}));
+}
+
+TEST_F(PipelinedMultikeyPublishTest, FlushCompletesAboveStableBeforePublicationAndDrain) {
+    createCollectionWithIndex(_opCtx.get(), kNss, BSON("a" << 1));
+    const auto previous = nextOpTime();
+    auto* replCoord = ReplicationCoordinator::get(serviceContext);
+    replCoord->setMyLastAppliedOpTimeAndWallTimeForward({previous, Date_t::now()});
+    serviceContext->getStorageEngine()->setStableTimestamp(previous.getTimestamp());
+    const auto op = insertOp(kNss, BSON("_id" << 0 << "a" << BSON_ARRAY(1 << 2)));
+    Notification<void> flushing;
+    Notification<void> release;
+    _storage.beforeFlush = [&](OperationContext* opCtx, const MultikeyPathInfo& info) {
+        ASSERT_GT(info.earliestTimestamp, serviceContext->getStorageEngine()->getStableTimestamp());
+        ASSERT_EQ(replCoord->getMyLastAppliedOpTime(), previous);
+        ASSERT_FALSE(opCtx->writesAreReplicated());
+        ASSERT_FALSE(opCtx->isEnforcingConstraints());
+        ASSERT_FALSE(MultikeyPathTracker::get(opCtx).isTrackingMultikeyPathInfo());
+        ASSERT_EQ(ExecutionAdmissionContext::get(opCtx).getPriority(),
+                  AdmissionContext::Priority::kExempt);
+        flushing.set();
+        release.get();
+        return Status::OK();
+    };
+    ON_BLOCK_EXIT([&] {
+        if (!release) {
+            release.set();
+        }
+        if (_finished) {
+            finishApplier();
+        }
+        _storage.beforeFlush = {};
+    });
+    pushToBuffer({op});
+    startApplier(&_storage);
+    ASSERT_TRUE(flushing.waitFor(_opCtx.get(), Seconds(60)));
+    {
+        FailPointEnableBlock waiting("hangBeforePipelinedApplierIdleWait");
+        shutdownApplier();
+        waiting.waitForOneNewEntry();
+        ASSERT_FALSE(_finished->isReady());
+        ASSERT_EQ(replCoord->getMyLastAppliedOpTime(), previous);
+        assertIndexMultikey(_opCtx.get(), kNss, "idx", false, MultikeyPaths({{}}));
+    }
+    release.set();
+    finishApplier();
+
+    ASSERT_EQ(_storage.writes().size(), 1U);
+    assertPublished(op);
+    assertIndexMultikey(_opCtx.get(), kNss, "idx", true, MultikeyPaths({{0U}}));
+}
+
+TEST_F(PipelinedMultikeyPublishTest, LaterCompletedBatchCannotFlushAheadOfEarlierBatch) {
+    createCollectionWithIndex(_opCtx.get(), kNss, BSON("a" << 1 << "b" << 1));
+    setServerParameter("replBatchLimitOperations", 1);
+    const auto heldId = idRoutedTo(0);
+    const auto laterId = idRoutedTo(1);
+    const auto markerId = idRoutedTo(1, laterId + 1);
+    auto& held = watchWriteOf(heldId, true);
+    auto& marker = watchWriteOf(markerId, false);
+    const auto before = ReplicationCoordinator::get(serviceContext)->getMyLastAppliedOpTime();
+    const auto first =
+        insertOp(kNss, BSON("_id" << heldId << "a" << BSON_ARRAY(1 << 2) << "b" << 1));
+    pushToBuffer({first});
+    startApplier(&_storage);
+    waitForGate(held);
+
+    const auto later =
+        insertOp(kNss, BSON("_id" << laterId << "a" << 1 << "b" << BSON_ARRAY(3 << 4)));
+    const auto markerOp = insertOp(kNss, BSON("_id" << markerId << "a" << 1 << "b" << 1));
+    pushToBuffer({later, markerOp});
+    // The next slice on the same worker proves the later batch has reported completion.
+    waitForGate(marker);
+    ASSERT_TRUE(_storage.writes().empty());
+    ASSERT_EQ(ReplicationCoordinator::get(serviceContext)->getMyLastAppliedOpTime(), before);
+    held.release.set();
+    finishApplier();
+
+    const auto writes = _storage.writes();
+    ASSERT_EQ(writes.size(), 2U);
+    ASSERT_EQ(writes[0].earliestTimestamp, first.getTimestamp());
+    ASSERT_EQ(writes[1].earliestTimestamp, later.getTimestamp());
+    assertPublished(markerOp);
+    assertIndexMultikey(_opCtx.get(), kNss, "idx", true, MultikeyPaths({{0U}, {0U}}));
+}
+
+TEST_F(PipelinedMultikeyPublishTest, LegacyNullTimestampUsesFirstTimestampOfItsBatch) {
+    const auto uuid = createCollectionWithIndex(_opCtx.get(), kNss, BSON("a" << 1));
+    const auto first = insertOp(kNss, BSON("_id" << idRoutedTo(0) << "a" << 1));
+    const auto last = insertOp(kNss, BSON("_id" << idRoutedTo(1) << "a" << 1));
+    // Model metadata returned by legacy prepared transaction application without a timestamp.
+    _opObserver->onInsertsFn =
+        [&](OperationContext* opCtx, const NamespaceString&, const std::vector<BSONObj>&) {
+            MultikeyPathTracker::get(opCtx).addMultikeyPathInfo(
+                {kNss, uuid, "idx", {}, {{0U}}, Timestamp()});
+        };
+    applyThroughBuffer({first, last}, &_storage);
+
+    const auto writes = _storage.writes();
+    ASSERT_EQ(writes.size(), 1U);
+    ASSERT_EQ(writes[0].earliestTimestamp, first.getTimestamp());
+    assertPublished(last);
+}
+
+TEST_F(PipelinedMultikeyPublishTest, SerializedBatchFlushesBeforeFollowingDDL) {
+    const auto nss = NamespaceString::kServerConfigurationNamespace;
+    createCollectionWithIndex(_opCtx.get(), nss, BSON("a" << 1));
+    const auto insert = insertOp(nss, BSON("_id" << 0 << "a" << BSON_ARRAY(1 << 2)));
+    ASSERT_TRUE(batchMustBeAppliedSerialized(OplogApplication::Mode::kSecondary, {insert}));
+    const auto drop =
+        makeCommandOplogEntry(nextOpTime(), nss.getCommandNS(), BSON("drop" << nss.coll()));
+    applyThroughBuffer({insert, drop}, &_storage);
+
+    // The real catalog write must succeed before the serialized drop removes its collection.
+    const auto writes = _storage.writes();
+    ASSERT_EQ(writes.size(), 1U);
+    ASSERT_EQ(writes[0].earliestTimestamp, insert.getTimestamp());
+    assertPublished(drop);
+}
+
+using PipelinedMultikeyPublishDeathTest = PipelinedMultikeyPublishTest;
+
+DEATH_TEST_REGEX_F(PipelinedMultikeyPublishDeathTest,
+                   SharedFlushRejectsTimestampBeforeBatch,
+                   "Deferred multikey writes must belong to the unpublished batch") {
+    std::vector<WorkerMultikeyPathInfo> metadata{
+        {{kNss, UUID::gen(), "idx", {}, {{0U}}, Timestamp(2, 0)}},
+    };
+    // Being above lastApplied is insufficient if the write predates this batch.
+    ASSERT_OK(flushMultikeyPathInfo(
+        _opCtx.get(), &_storage, metadata, Timestamp(3, 0), Timestamp(5, 0), Timestamp(1, 0)));
+}
+
+DEATH_TEST_REGEX_F(PipelinedMultikeyPublishDeathTest,
+                   SharedFlushRejectsTimestampAfterBatch,
+                   "Deferred multikey writes must belong to the unpublished batch") {
+    std::vector<WorkerMultikeyPathInfo> metadata{
+        {{kNss, UUID::gen(), "idx", {}, {{0U}}, Timestamp(6, 0)}},
+    };
+    // A batch must not flush metadata belonging to a later write.
+    ASSERT_OK(flushMultikeyPathInfo(
+        _opCtx.get(), &_storage, metadata, Timestamp(3, 0), Timestamp(5, 0), Timestamp(1, 0)));
+}
+
+DEATH_TEST_REGEX_F(PipelinedMultikeyPublishDeathTest,
+                   SharedFlushRejectsAlreadyPublishedTimestamp,
+                   "Deferred multikey writes must belong to the unpublished batch") {
+    std::vector<WorkerMultikeyPathInfo> metadata{
+        {{kNss, UUID::gen(), "idx", {}, {{0U}}, Timestamp(3, 0)}},
+    };
+    // Even a write within the batch must be strictly newer than lastApplied.
+    ASSERT_OK(flushMultikeyPathInfo(
+        _opCtx.get(), &_storage, metadata, Timestamp(3, 0), Timestamp(5, 0), Timestamp(3, 0)));
+}
+
+DEATH_TEST_REGEX_F(PipelinedMultikeyPublishDeathTest,
+                   CatalogWriteFailurePreventsPublication,
+                   "Pipelined oplog applier advancer failed") {
+    createCollectionWithIndex(_opCtx.get(), kNss, BSON("a" << 1));
+    const auto before = ReplicationCoordinator::get(serviceContext)->getMyLastAppliedOpTime();
+    _storage.beforeFlush = [&](OperationContext*, const MultikeyPathInfo&) {
+        ASSERT_EQ(ReplicationCoordinator::get(serviceContext)->getMyLastAppliedOpTime(), before);
+        return Status(ErrorCodes::IndexNotFound, "injected multikey catalog failure");
+    };
+    applyThroughBuffer({insertOp(kNss, BSON("_id" << 0 << "a" << BSON_ARRAY(1 << 2)))}, &_storage);
+}
 
 // The dispatcher does not wait for a batch to finish: a batch pushed while a worker is still busy
 // with the previous batch is dispatched and applied by the other workers.
@@ -3119,16 +3487,20 @@ TEST_F(PipelinedWorkItemTest, OpsAppliedByWorkersCounterIncrementsPerAppliedOp) 
     const auto options = secondaryOptions();
 
     // Two work items totaling 5 ops. The counter should grow by exactly 5 on the happy path.
+    WorkerMultikeyPathInfo firstMultikey;
     ASSERT_OK(applyWorkItem(_opCtx.get(),
                             options,
                             makeItem({insertOp(kNss, BSON("_id" << 0)),
                                       insertOp(kNss, BSON("_id" << 1)),
                                       updateOp(kNss, BSON("_id" << 0), BSON("a" << 1))})
-                                .item));
+                                .item,
+                            &firstMultikey));
+    WorkerMultikeyPathInfo secondMultikey;
     ASSERT_OK(applyWorkItem(
         _opCtx.get(),
         options,
-        makeItem({insertOp(kNss, BSON("_id" << 2)), deleteOp(kNss, BSON("_id" << 1))}).item));
+        makeItem({insertOp(kNss, BSON("_id" << 2)), deleteOp(kNss, BSON("_id" << 1))}).item,
+        &secondMultikey));
 
     const int64_t after =
         capturer.readInt64Counter(otel::metrics::MetricNames::kPipelinedApplyOpsAppliedByWorkers);

@@ -270,6 +270,21 @@ bool PipelinedOplogApplier::_waitForAdvancerIdle() {
 void PipelinedOplogApplier::_publishBatch(
     const PipelinedApplierBatchTracker::InflightBatch& batch) {
     hangBeforePipelinedApplierPublish.pauseWhileSet();
+    invariant(batch.multikeyMetadata);
+    invariant(!batch.ops.empty());
+
+    // Use the advancer's Client so the dispatcher can create its next batch's operation context.
+    const auto opCtx = cc().getServiceContext()->makeKillOpsExemptOperationContext(&cc());
+    ScopedAdmissionPriority<ExecutionAdmissionContext> priority(
+        opCtx.get(), AdmissionContext::Priority::kExempt);
+    UnreplicatedWritesBlock noRep(opCtx.get());
+    setWorkerOpCtxStates(opCtx.get());
+    uassertStatusOK(flushMultikeyPathInfo(opCtx.get(),
+                                          _storageInterface,
+                                          *batch.multikeyMetadata,
+                                          batch.ops.front().getTimestamp(),
+                                          batch.lastOpTime.opTime.getTimestamp(),
+                                          _replCoord->getMyLastAppliedOpTime().getTimestamp()));
     _replCoord->setMyLastAppliedOpTimeAndWallTimeForward(batch.lastOpTime);
     signalOplogWaiters();
 }
@@ -278,6 +293,7 @@ Status applyWorkItem(OperationContext* opCtx,
                      const OplogApplier::Options& options,
                      const PipelinedApplierWorkerPool::WorkItem& item,
                      WorkerMultikeyPathInfo* multikeyPathInfo) {
+    invariant(multikeyPathInfo);
     // Oplog application must not wait on execution tickets or flow control.
     ScopedAdmissionPriority<ExecutionAdmissionContext> skipTicketAcquisition(
         opCtx, AdmissionContext::Priority::kExempt);
@@ -285,16 +301,12 @@ Status applyWorkItem(OperationContext* opCtx,
     setWorkerOpCtxStates(opCtx);
 
     auto& tracker = MultikeyPathTracker::get(opCtx);
-    if (multikeyPathInfo) {
-        invariant(multikeyPathInfo->empty());
-        invariant(tracker.isEmpty());
-        tracker.startTrackingMultikeyPathInfo();
-    }
+    invariant(multikeyPathInfo->empty());
+    invariant(tracker.isEmpty());
+    tracker.startTrackingMultikeyPathInfo();
     ON_BLOCK_EXIT([&] {
-        if (multikeyPathInfo) {
-            tracker.stopTrackingMultikeyPathInfo();
-            tracker.clear();
-        }
+        tracker.stopTrackingMultikeyPathInfo();
+        tracker.clear();
     });
 
     std::vector<ApplierOperation> ops = item.ops;
@@ -310,9 +322,7 @@ Status applyWorkItem(OperationContext* opCtx,
                                                  isDataConsistent,
                                                  &applyOplogEntryOrGroupedInserts);
     if (status.isOK()) {
-        if (multikeyPathInfo) {
-            *multikeyPathInfo = tracker.getMultikeyPathInfo();
-        }
+        *multikeyPathInfo = tracker.getMultikeyPathInfo();
         PipelinedApplyOtelMetrics::addOpsAppliedByWorkers(item.ops.size());
     }
     return status;
@@ -321,20 +331,15 @@ Status applyWorkItem(OperationContext* opCtx,
 void consumeWorkItem(size_t workerIdx,
                      const OplogApplier::Options& options,
                      const PipelinedApplierWorkerPool::WorkItem& item,
-                     PipelinedApplierBatchTracker& batchTracker,
-                     bool deferMultikeyWrites) {
+                     PipelinedApplierBatchTracker& batchTracker) {
     invariant(!item.ops.empty());
     invariant(item.batchRemainingWorkers);
     invariant(item.multikeyPathInfo);
     Status status = Status::OK();
     try {
         auto opCtx = cc().makeOperationContext();
-        status = opCtx->runWithoutInterruptionExceptAtGlobalShutdown([&] {
-            // TODO(SERVER-135372): Remove deferMultikeyWrites and always defer once the advancer
-            // flushes multikey writes before publishing lastApplied.
-            return applyWorkItem(
-                opCtx.get(), options, item, deferMultikeyWrites ? item.multikeyPathInfo : nullptr);
-        });
+        status = opCtx->runWithoutInterruptionExceptAtGlobalShutdown(
+            [&] { return applyWorkItem(opCtx.get(), options, item, item.multikeyPathInfo); });
     } catch (const DBException& ex) {
         status = ex.toStatus();
     }

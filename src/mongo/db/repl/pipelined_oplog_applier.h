@@ -92,24 +92,21 @@ private:
 };
 
 /**
- * Applies the slice of ops in 'item', optionally capturing deferred multikey writes.
+ * Applies the slice of ops in 'item' and captures deferred multikey writes in the supplied output.
  */
 [[nodiscard]] Status applyWorkItem(OperationContext* opCtx,
                                    const OplogApplier::Options& options,
                                    const PipelinedApplierWorkerPool::WorkItem& item,
-                                   WorkerMultikeyPathInfo* multikeyPathInfo = nullptr);
+                                   WorkerMultikeyPathInfo* multikeyPathInfo);
 
 /**
  * Applies 'item' on the current worker thread, fasserting on any failure other than shutdown.
  * Records multikey changes from the work item.
  */
-// TODO(SERVER-135372): Remove deferMultikeyWrites and always defer once the advancer
-// flushes multikey writes before publishing lastApplied.
 void consumeWorkItem(size_t workerIdx,
                      const OplogApplier::Options& options,
                      const PipelinedApplierWorkerPool::WorkItem& item,
-                     PipelinedApplierBatchTracker& batchTracker,
-                     bool deferMultikeyWrites = false);
+                     PipelinedApplierBatchTracker& batchTracker);
 
 /**
  * Returns whether a batch must be applied serialized ("drain, dispatch, drain") because it
