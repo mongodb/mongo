@@ -258,20 +258,21 @@ PlanState UniqueRoaringStage::getNext() {
         }
 
         ++_specificStats.dupsTested;
-        auto inserted = _seen.addChecked(roaringVal);
-        if (inserted) {
-            size_t newSeenSizeBytes = _seen.getApproximateSize();
-            _memoryTracker->add(newSeenSizeBytes - _prevSeenSizeBytes);
-            _dedupReporter.add(newSeenSizeBytes - _prevSeenSizeBytes);
-            _prevSeenSizeBytes = newSeenSizeBytes;
-            uassert(11130300,
-                    "Exceeded memory limit in record id deduplicator for unique_roaring stage",
-                    _memoryTracker->withinMemoryLimit(_opCtx));
-            return trackPlanState(PlanState::ADVANCED);
-        } else {
+        if (_seen.contains(roaringVal)) {
             // This row has been seen already, so we skip it.
             ++_specificStats.dupsDropped;
+            continue;
         }
+
+        _seen.addChecked(roaringVal);
+        size_t newSeenSizeBytes = _seen.getApproximateSize();
+        _memoryTracker->add(newSeenSizeBytes - _prevSeenSizeBytes);
+        _dedupReporter.add(newSeenSizeBytes - _prevSeenSizeBytes);
+        _prevSeenSizeBytes = newSeenSizeBytes;
+        uassert(11130300,
+                "Exceeded memory limit in record id deduplicator for unique_roaring stage",
+                _memoryTracker->withinMemoryLimit(_opCtx));
+        return trackPlanState(PlanState::ADVANCED);
     }
 
     return trackPlanState(PlanState::IS_EOF);

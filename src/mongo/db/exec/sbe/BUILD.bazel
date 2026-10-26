@@ -565,6 +565,20 @@ mongo_cc_benchmark(
 )
 
 mongo_cc_benchmark(
+    name = "sbe_unique_roaring_bm",
+    srcs = [
+        "sbe_unique_roaring_bm.cpp",
+    ],
+    deps = [
+        ":query_sbe_stages",
+        ":sbe_plan_stage_test",
+        ":sbe_unittest_base",
+        "//src/mongo/db/query:query_knobs",
+        "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_benchmark(
     name = "sbe_hash_lookup_bm",
     srcs = [
         "sbe_hash_lookup_shared_test.cpp",
