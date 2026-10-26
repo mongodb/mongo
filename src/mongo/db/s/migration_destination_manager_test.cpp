@@ -8,11 +8,13 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/index/index_constants.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache_test_fixture.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -22,6 +24,7 @@
 #include "mongo/unittest/server_parameter_guard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/executor_test_util.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/str.h"
 
@@ -610,6 +613,238 @@ TEST_F(MigrationDestinationManagerTest, EnsurePITHistoryPreservedProceedsWithEsc
     const auto nss = NamespaceString::createNamespaceString_forTest("test.foo");
     MigrationDestinationManager::ensurePITHistoryPreserved(
         operationContext(), collUuid, kRecipientShard, ChunkRange(k0, k50), nss, UUID::gen());
+}
+
+class FakeRetryStrategy : public RetryStrategy {
+public:
+    explicit FakeRetryStrategy(Milliseconds delay, int maxRetries = 100)
+        : _delay(delay), _maxRetries(maxRetries) {}
+
+    bool recordFailureAndEvaluateShouldRetry(Status s,
+                                             const boost::optional<HostAndPort>&,
+                                             std::span<const std::string>,
+                                             boost::optional<Milliseconds>) override {
+        failures.push_back(std::move(s));
+        return static_cast<int>(failures.size()) <= _maxRetries;
+    }
+
+    void recordSuccess(const boost::optional<HostAndPort>&) override {
+        ++successes;
+    }
+
+    Milliseconds getNextRetryDelay() const override {
+        return _delay;
+    }
+
+    const TargetingMetadata& getTargetingMetadata() const override {
+        return _targetingMetadata;
+    }
+
+    void recordBackoff(Milliseconds backoff) override {
+        backoffs.push_back(backoff);
+    }
+
+    std::vector<Status> failures;
+    std::vector<Milliseconds> backoffs;
+    int successes = 0;
+
+private:
+    Milliseconds _delay;
+    int _maxRetries;
+    TargetingMetadata _targetingMetadata;
+};
+
+class MigrateThreadAttemptsWithBackoffTest : public ServiceContextTest {
+protected:
+    std::unique_ptr<CancelableOperationContext> makeOpCtx() {
+        return std::make_unique<CancelableOperationContext>(
+            makeOperationContext(), CancellationToken::uncancelable(), _executor);
+    }
+
+    // Runs the attempts with this fixture's OperationContexts.
+    void run(const CancellationToken& cancellationToken,
+             RetryStrategy& retryStrategy,
+             const std::function<void(OperationContext*, Milliseconds)>& sleep,
+             const std::function<void(OperationContext*, bool isRetry)>& attempt,
+             const std::function<void(const Status&)>& onError) {
+        runMigrateThreadAttemptsWithBackoff(
+            cancellationToken,
+            retryStrategy,
+            [this] { return makeOpCtx(); },
+            sleep,
+            attempt,
+            onError);
+    }
+
+private:
+    ExecutorPtr _executor = InlineRecursiveCountingExecutor::make();
+};
+
+TEST_F(MigrateThreadAttemptsWithBackoffTest, FirstAttemptSucceedsWithoutSleeping) {
+    FakeRetryStrategy retryStrategy(Milliseconds(100));
+    std::vector<Milliseconds> sleeps;
+    std::vector<bool> attempts;
+    std::vector<Status> errors;
+
+    run(
+        CancellationToken::uncancelable(),
+        retryStrategy,
+        [&](OperationContext*, Milliseconds delay) { sleeps.push_back(delay); },
+        [&](OperationContext*, bool isRetry) { attempts.push_back(isRetry); },
+        [&](const Status& status) { errors.push_back(status); });
+
+    ASSERT_EQ(std::vector<bool>{false}, attempts);
+    ASSERT_TRUE(sleeps.empty());
+    ASSERT_TRUE(errors.empty());
+    ASSERT_TRUE(retryStrategy.failures.empty());
+    ASSERT_EQ(1, retryStrategy.successes);
+}
+
+TEST_F(MigrateThreadAttemptsWithBackoffTest, BacksOffBeforeEachRetry) {
+    FakeRetryStrategy retryStrategy(Milliseconds(100));
+    std::vector<Milliseconds> sleeps;
+    std::vector<bool> attempts;
+    std::vector<Status> errors;
+
+    run(
+        CancellationToken::uncancelable(),
+        retryStrategy,
+        [&](OperationContext*, Milliseconds delay) {
+            // The backoff is recorded only after sleeping.
+            ASSERT_EQ(sleeps.size(), retryStrategy.backoffs.size());
+            sleeps.push_back(delay);
+        },
+        [&](OperationContext*, bool isRetry) {
+            attempts.push_back(isRetry);
+            if (attempts.size() < 3) {
+                uasserted(ErrorCodes::NotWritablePrimary, "not primary");
+            }
+        },
+        [&](const Status& status) { errors.push_back(status); });
+
+    ASSERT_EQ((std::vector<bool>{false, true, true}), attempts);
+    ASSERT_EQ((std::vector<Milliseconds>{Milliseconds(100), Milliseconds(100)}), sleeps);
+    ASSERT_EQ(sleeps, retryStrategy.backoffs);
+    ASSERT_EQ(2U, errors.size());
+    for (const auto& error : errors) {
+        ASSERT_EQ(ErrorCodes::NotWritablePrimary, error);
+    }
+    ASSERT_EQ(errors, retryStrategy.failures);
+    ASSERT_EQ(1, retryStrategy.successes);
+}
+
+TEST_F(MigrateThreadAttemptsWithBackoffTest, SleepsOnTheOperationContextOfTheNextAttempt) {
+    FakeRetryStrategy retryStrategy(Milliseconds(100));
+    std::vector<OperationContext*> sleepOpCtxs;
+    std::vector<OperationContext*> attemptOpCtxs;
+
+    run(
+        CancellationToken::uncancelable(),
+        retryStrategy,
+        [&](OperationContext* opCtx, Milliseconds) { sleepOpCtxs.push_back(opCtx); },
+        [&](OperationContext* opCtx, bool) {
+            ASSERT(opCtx);
+            attemptOpCtxs.push_back(opCtx);
+            if (attemptOpCtxs.size() < 2) {
+                uasserted(ErrorCodes::NotWritablePrimary, "not primary");
+            }
+        },
+        [&](const Status&) {});
+
+    ASSERT_EQ(2U, attemptOpCtxs.size());
+    ASSERT_EQ(std::vector<OperationContext*>{attemptOpCtxs.back()}, sleepOpCtxs);
+}
+
+TEST_F(MigrateThreadAttemptsWithBackoffTest, DoesNotSleepWhenDelayIsZero) {
+    FakeRetryStrategy retryStrategy(Milliseconds(0));
+    int sleeps = 0;
+    int attempts = 0;
+
+    run(
+        CancellationToken::uncancelable(),
+        retryStrategy,
+        [&](OperationContext*, Milliseconds) { ++sleeps; },
+        [&](OperationContext*, bool) {
+            if (++attempts < 2) {
+                uasserted(ErrorCodes::NotWritablePrimary, "not primary");
+            }
+        },
+        [&](const Status&) {});
+
+    ASSERT_EQ(2, attempts);
+    ASSERT_EQ(0, sleeps);
+    ASSERT_TRUE(retryStrategy.backoffs.empty());
+}
+
+TEST_F(MigrateThreadAttemptsWithBackoffTest, StopsWhenCanceled) {
+    FakeRetryStrategy retryStrategy(Milliseconds(100));
+    CancellationSource cancellationSource;
+    int sleeps = 0;
+    int attempts = 0;
+    std::vector<Status> errors;
+
+    run(
+        cancellationSource.token(),
+        retryStrategy,
+        [&](OperationContext*, Milliseconds) { ++sleeps; },
+        [&](OperationContext*, bool) {
+            ++attempts;
+            cancellationSource.cancel();
+            uasserted(ErrorCodes::InterruptedDueToReplStateChange, "stepped down");
+        },
+        [&](const Status& status) { errors.push_back(status); });
+
+    ASSERT_EQ(1, attempts);
+    ASSERT_EQ(0, sleeps);
+    ASSERT_EQ(1U, errors.size());
+    ASSERT_EQ(ErrorCodes::InterruptedDueToReplStateChange, errors.front());
+    ASSERT_TRUE(retryStrategy.failures.empty());
+}
+
+TEST_F(MigrateThreadAttemptsWithBackoffTest, StopsWhenSleepIsInterrupted) {
+    FakeRetryStrategy retryStrategy(Milliseconds(100));
+    CancellationSource cancellationSource;
+    int attempts = 0;
+    std::vector<Status> errors;
+
+    run(
+        cancellationSource.token(),
+        retryStrategy,
+        [&](OperationContext*, Milliseconds) {
+            cancellationSource.cancel();
+            uasserted(ErrorCodes::CallbackCanceled, "canceled");
+        },
+        [&](OperationContext*, bool) {
+            ++attempts;
+            uasserted(ErrorCodes::NotWritablePrimary, "not primary");
+        },
+        [&](const Status& status) { errors.push_back(status); });
+
+    ASSERT_EQ(1, attempts);
+    ASSERT_EQ(2U, errors.size());
+    ASSERT_EQ(ErrorCodes::CallbackCanceled, errors.back());
+    ASSERT_TRUE(retryStrategy.backoffs.empty());
+}
+
+TEST_F(MigrateThreadAttemptsWithBackoffTest, StopsWhenRetryStrategyGivesUp) {
+    FakeRetryStrategy retryStrategy(Milliseconds(100), /*maxRetries=*/2);
+    int sleeps = 0;
+    int attempts = 0;
+
+    run(
+        CancellationToken::uncancelable(),
+        retryStrategy,
+        [&](OperationContext*, Milliseconds) { ++sleeps; },
+        [&](OperationContext*, bool) {
+            ++attempts;
+            uasserted(ErrorCodes::NotWritablePrimary, "not primary");
+        },
+        [&](const Status&) {});
+
+    ASSERT_EQ(3, attempts);
+    ASSERT_EQ(2, sleeps);
+    ASSERT_EQ(3U, retryStrategy.failures.size());
+    ASSERT_EQ(0, retryStrategy.successes);
 }
 
 }  // namespace

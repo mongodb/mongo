@@ -44,6 +44,8 @@
 #include "mongo/db/s/migration_batch_fetcher.h"
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/move_timing_helper.h"
+#include "mongo/db/s/primary_only_service_helpers/primary_only_service_retry_strategy.h"
+#include "mongo/db/s/primary_only_service_helpers/with_automatic_retry.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/s/start_chunk_clone_request.h"
@@ -1326,30 +1328,74 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(
         opCtx, nss, collectionOptionsAndIndexes, /* strictIndexSync = */ true);
 }
 
+void runMigrateThreadAttemptsWithBackoff(
+    const CancellationToken& cancellationToken,
+    RetryStrategy& retryStrategy,
+    const std::function<std::unique_ptr<CancelableOperationContext>()>& makeOpCtx,
+    const std::function<void(OperationContext*, Milliseconds)>& sleep,
+    const std::function<void(OperationContext*, bool isRetry)>& attempt,
+    const std::function<void(const Status&)>& onError) {
+    for (bool isRetry = false;; isRetry = true) {
+        const auto uniqueOpCtx = makeOpCtx();
+        auto opCtx = uniqueOpCtx->get();
+
+        try {
+            if (isRetry) {
+                if (const auto delay = retryStrategy.getNextRetryDelay(); delay > Milliseconds{0}) {
+                    sleep(opCtx, delay);
+                    retryStrategy.recordBackoff(delay);
+                }
+            }
+
+            attempt(opCtx, isRetry);
+            retryStrategy.recordSuccess(boost::none);
+            return;
+        } catch (...) {
+            const auto status = exceptionToStatus();
+            onError(status);
+
+            if (cancellationToken.isCanceled() ||
+                !retryStrategy.recordFailureAndEvaluateShouldRetry(
+                    status, boost::none, {}, boost::none)) {
+                return;
+            }
+        }
+    }
+}
+
 void MigrationDestinationManager::_migrateThread(CancellationToken cancellationToken,
                                                  bool skipToCritSecTaken) {
     invariant(_sessionId);
 
     Client::initThread("migrateThread", getGlobalServiceContext()->getService());
     auto client = Client::getCurrent();
-    bool recovering = false;
-    while (true) {
-        const auto executor =
-            Grid::get(client->getServiceContext())->getExecutorPool()->getFixedExecutor();
-        auto uniqueOpCtx =
-            CancelableOperationContext(client->makeOperationContext(), cancellationToken, executor);
-        auto opCtx = uniqueOpCtx.get();
-
-        if (AuthorizationManager::get(opCtx->getService())->isAuthEnabled()) {
-            AuthorizationSession::get(opCtx->getClient())->grantInternalAuthorization();
+    const auto executor =
+        Grid::get(client->getServiceContext())->getExecutorPool()->getFixedExecutor();
+    auto makeOpCtx = [&] {
+        auto opCtx = std::make_unique<CancelableOperationContext>(
+            client->makeOperationContext(), cancellationToken, executor);
+        if (AuthorizationManager::get((*opCtx)->getService())->isAuthEnabled()) {
+            AuthorizationSession::get((*opCtx)->getClient())->grantInternalAuthorization();
         }
+        return opCtx;
+    };
 
-        try {
-            if (recovering) {
-                if (!migrationRecipientRecoveryDocumentExists(opCtx, *_sessionId)) {
-                    // No need to run any recovery.
-                    break;
-                }
+    // Errors such as NotWritablePrimary can persist until the node steps down (canceling the
+    // token) or becomes writable, so back off between attempts instead of spinning.
+    primary_only_service_helpers::PrimaryOnlyServiceRetryStrategy retryStrategy(
+        primary_only_service_helpers::kAlwaysRetryPredicate,
+        [](const Status&) {},
+        [](const Status&) {});
+
+    runMigrateThreadAttemptsWithBackoff(
+        cancellationToken,
+        retryStrategy,
+        makeOpCtx,
+        [](OperationContext* opCtx, Milliseconds delay) { opCtx->sleepFor(delay); },
+        [&](OperationContext* opCtx, bool isRetry) {
+            if (isRetry && !migrationRecipientRecoveryDocumentExists(opCtx, *_sessionId)) {
+                // No need to run any recovery.
+                return;
             }
 
             // The outer OperationContext is used to hold the session checked out for the
@@ -1375,23 +1421,16 @@ void MigrationDestinationManager::_migrateThread(CancellationToken cancellationT
                                            {*opCtx->getTxnNumber()},
                                            /*autocommit=*/boost::none,
                                            TransactionParticipant::TransactionActions::kNone);
-            if (skipToCritSecTaken || recovering) {
+            // A failed attempt may have left work behind, so retries always run recovery.
+            if (skipToCritSecTaken || isRetry) {
                 _recoverMigration(opCtx);
             } else {
                 _migrateDriver(opCtx);
             }
-        } catch (...) {
-            _setStateFail(str::stream() << "migrate failed: " << redact(exceptionToStatus()));
-
-            if (!cancellationToken.isCanceled()) {
-                // Run recovery if needed.
-                recovering = true;
-                continue;
-            }
-        }
-
-        break;
-    }
+        },
+        [&](const Status& status) {
+            _setStateFail(str::stream() << "migrate failed: " << redact(status));
+        });
 
     std::lock_guard<std::mutex> lk(_mutex);
     _sessionId.reset();
