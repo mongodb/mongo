@@ -27,6 +27,8 @@
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/lazy_record_store.h"
 #include "mongo/db/storage/record_store_write_conflict_fail_points.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/otel/metrics/metric_names.h"
 #include "mongo/otel/metrics/metrics_test_util.h"
@@ -246,6 +248,103 @@ void IndexBuilderInterceptorTest::testSingleOpIsSavedToSideWritesTable(
             capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDeleted),
             deletedBefore + (op == IndexBuildInterceptor::Op::kDelete ? 1 : 0));
     }
+}
+
+TEST_F(IndexBuilderInterceptorTest, InitiallyEmptyDrainTailDoesNotAdvance) {
+    auto info = buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}}"));
+    auto interceptor = createIndexBuildInterceptor(info, LazyRecordStore::CreateMode::immediate);
+    EXPECT_TRUE(interceptor->captureInitialDrainTail(operationContext()).isNull());
+    auto doc = BSON("value" << 1);
+    auto table = getTable(*info.sideWritesIdent);
+    auto& ru = *shard_role_details::getRecoveryUnit(operationContext());
+    RecordId inserted;
+    {
+        WriteUnitOfWork wuow{operationContext()};
+        inserted = unittest::assertGet(
+            table->insertRecord(operationContext(), ru, doc.objdata(), doc.objsize(), Timestamp()));
+        wuow.commit();
+    }
+    EXPECT_FALSE(inserted.isNull());
+    EXPECT_EQ(table->getLargestKey(operationContext(), ru), inserted);
+    EXPECT_TRUE(interceptor->captureInitialDrainTail(operationContext()).isNull());
+}
+
+TEST_F(IndexBuilderInterceptorTest, InitialDrainTailDoesNotAdvanceAfterLaterWrites) {
+    auto info = buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}}"));
+    auto interceptor = createIndexBuildInterceptor(info, LazyRecordStore::CreateMode::immediate);
+    auto doc = BSON("value" << 1);
+    auto table = getTable(*info.sideWritesIdent);
+    auto& ru = *shard_role_details::getRecoveryUnit(operationContext());
+    RecordId first;
+    {
+        WriteUnitOfWork wuow{operationContext()};
+        first = unittest::assertGet(
+            table->insertRecord(operationContext(), ru, doc.objdata(), doc.objsize(), Timestamp()));
+        wuow.commit();
+    }
+    EXPECT_EQ(interceptor->captureInitialDrainTail(operationContext()), first);
+    RecordId later;
+    {
+        WriteUnitOfWork wuow{operationContext()};
+        later = unittest::assertGet(
+            table->insertRecord(operationContext(), ru, doc.objdata(), doc.objsize(), Timestamp()));
+        wuow.commit();
+    }
+    EXPECT_GT(later, first);
+    EXPECT_EQ(table->getLargestKey(operationContext(), ru), later);
+    EXPECT_EQ(interceptor->captureInitialDrainTail(operationContext()), first);
+}
+
+class IndexBuilderInterceptorDrainTailTest : public IndexBuilderInterceptorTest,
+                                             public testing::WithParamInterface<bool> {};
+
+INSTANTIATE_TEST_SUITE_P(InvisibleTails,
+                         IndexBuilderInterceptorDrainTailTest,
+                         testing::Bool(),
+                         [](const testing::TestParamInfo<bool>& info) {
+                             return info.param ? "Prepared" : "Uncommitted";
+                         });
+
+TEST_P(IndexBuilderInterceptorDrainTailTest, CapturePhysicalTailAndRetainAfterAbort) {
+    auto info = buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}}"));
+    auto interceptor = createIndexBuildInterceptor(info, LazyRecordStore::CreateMode::immediate);
+    auto table = getTable(*info.sideWritesIdent);
+    auto& reader = *shard_role_details::getRecoveryUnit(operationContext());
+    reader.abandonSnapshot();
+    auto doc = BSON("value" << 1);
+    RecordId committed;
+    {
+        WriteUnitOfWork wuow{operationContext()};
+        committed = unittest::assertGet(table->insertRecord(
+            operationContext(), reader, doc.objdata(), doc.objsize(), Timestamp()));
+        wuow.commit();
+    }
+    reader.setPrepareConflictBehavior(PrepareConflictBehavior::kIgnoreConflicts);
+    auto writer = operationContext()->getServiceContext()->getStorageEngine()->newRecoveryUnit();
+    StorageWriteTransaction txn{*writer};
+    auto invisible = unittest::assertGet(table->insertRecord(
+        operationContext(), *writer, doc.objdata(), doc.objsize(), Timestamp()));
+    if (GetParam()) {
+        writer->setPrepareTimestamp(Timestamp(1, 1));
+        txn.prepare();
+    }
+    EXPECT_GT(invisible, committed);
+    {
+        auto cursor = table->getCursor(operationContext(), reader);
+        auto visible = cursor->next();
+        ASSERT_TRUE(visible);
+        EXPECT_EQ(visible->id, committed);
+        EXPECT_FALSE(cursor->next());
+    }
+    reader.abandonSnapshot();
+    EXPECT_EQ(interceptor->captureInitialDrainTail(operationContext()), invisible);
+
+    txn.abort();
+    reader.abandonSnapshot();
+
+    RecordData unused;
+    EXPECT_FALSE(table->findRecord(operationContext(), reader, invisible, &unused));
+    EXPECT_EQ(interceptor->captureInitialDrainTail(operationContext()), invisible);
 }
 
 TEST_F(IndexBuilderInterceptorTest, SingleInsertIsSavedToSideWritesTable) {

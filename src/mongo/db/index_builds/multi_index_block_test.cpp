@@ -679,6 +679,77 @@ TEST_F(MultiIndexBlockTest, InitMultipleSpecs) {
     indexer->abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
 }
 
+TEST_F(MultiIndexBlockTest, CaptureInitialDrainTailsForAllIndexes) {
+    auto* indexer = getIndexer();
+    auto* opCtx = operationContext();
+    auto acq = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, getNSS(), AcquisitionPrerequisites::kWrite),
+        MODE_X);
+    CollectionWriter coll{opCtx, &acq};
+    auto* storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    std::vector<IndexBuildInfo> infos{
+        IndexBuildInfo(BSON("v" << 2 << "name" << "a_1" << "key" << BSON("a" << 1)),
+                       "index-1",
+                       *storageEngine),
+        IndexBuildInfo(BSON("v" << 2 << "name" << "b_1" << "key" << BSON("b" << 1)),
+                       "index-2",
+                       *storageEngine)};
+    ASSERT_OK(indexer
+                  ->init(opCtx,
+                         coll,
+                         infos,
+                         MultiIndexBlock::kNoopOnInitFn,
+                         MultiIndexBlock::InitMode::SteadyState,
+                         boost::none)
+                  .getStatus());
+    ON_BLOCK_EXIT(
+        [&] { indexer->abortIndexBuild(opCtx, coll, MultiIndexBlock::kNoopOnCleanUpFn); });
+    auto getInterceptor = [&](const char* name) {
+        auto* entry = coll->getIndexCatalog()->findIndexByName(
+            opCtx, name, IndexCatalog::InclusionPolicy::kAll);
+        ASSERT(entry);
+        auto interceptor = entry->indexBuildInterceptor();
+        ASSERT(interceptor);
+        return interceptor;
+    };
+    auto first = getInterceptor("a_1");
+    auto second = getInterceptor("b_1");
+    {
+        WriteUnitOfWork wuow{opCtx};
+        first->createDeferredTables(opCtx);
+        second->createDeferredTables(opCtx);
+        wuow.commit();
+    }
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+    auto firstTable = storageEngine->getEngine()->getInternalRecordStore(
+        ru, *infos[0].sideWritesIdent, KeyFormat::Long);
+    auto secondTable = storageEngine->getEngine()->getInternalRecordStore(
+        ru, *infos[1].sideWritesIdent, KeyFormat::Long);
+
+    auto doc = BSON("value" << 1);
+    auto insert = [&](RecordStore& table) {
+        WriteUnitOfWork wuow{opCtx};
+        const auto id = unittest::assertGet(
+            table.insertRecord(opCtx, ru, doc.objdata(), doc.objsize(), Timestamp()));
+        wuow.commit();
+        return id;
+    };
+    // The first index starts empty while the second already side writes.
+    auto originalSecond = insert(*secondTable);
+    indexer->captureInitialDrainTails(opCtx, coll.get());
+
+    auto laterFirst = insert(*firstTable);
+    auto laterSecond = insert(*secondTable);
+    indexer->captureInitialDrainTails(opCtx, coll.get());
+
+    EXPECT_TRUE(first->captureInitialDrainTail(opCtx).isNull());
+    EXPECT_EQ(second->captureInitialDrainTail(opCtx), originalSecond);
+    EXPECT_EQ(firstTable->getLargestKey(opCtx, ru), laterFirst);
+    EXPECT_EQ(secondTable->getLargestKey(opCtx, ru), laterSecond);
+    EXPECT_GT(laterSecond, originalSecond);
+}
+
 TEST_F(MultiIndexBlockTest, AddDocumentBetweenInitAndInsertAll) {
     auto indexer = getIndexer();
 

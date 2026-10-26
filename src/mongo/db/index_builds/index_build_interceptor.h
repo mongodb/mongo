@@ -122,6 +122,13 @@ public:
         return _sideWritesTracker.getNumKeysAndBytesWritten();
     }
 
+    /**
+     * Returns this index's initial side write tail.
+     */
+    RecordId captureInitialDrainTail(OperationContext* opCtx) {
+        return _sideWritesTracker.captureInitialDrainTail(opCtx);
+    }
+
     [[MONGO_MOD_PRIVATE]] SkippedRecordTracker& getSkippedRecordTracker() {
         return _skippedRecordTracker;
     }

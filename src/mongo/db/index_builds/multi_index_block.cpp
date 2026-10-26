@@ -411,6 +411,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
     _collectionUUID = collection->uuid();
 
     _buildIsCleanedUp = false;
+    _initialDrainTailsCaptured = false;
 
     invariant(_indexes.empty());
     // Reserve the indexes upfront so that any references to them remain valid.
@@ -1450,6 +1451,30 @@ void MultiIndexBlock::_releaseReplicatedSorters() {
             index.bulk->releaseSorter();
         }
     }
+}
+
+void MultiIndexBlock::captureInitialDrainTails(OperationContext* opCtx,
+                                               const CollectionPtr& collection) {
+    invariant(!_buildIsCleanedUp);
+    invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
+    invariant(collection->uuid() == _collectionUUID);
+    invariant(
+        shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(collection->ns(), MODE_IX));
+
+    if (_initialDrainTailsCaptured) {
+        return;
+    }
+
+    writeConflictRetry(opCtx, "capture side write drain tails", collection->ns(), [&] {
+        for (auto&& index : _indexes) {
+            if (auto interceptor =
+                    index.block->getEntry(opCtx, collection)->indexBuildInterceptor()) {
+                interceptor->captureInitialDrainTail(opCtx);
+            }
+        }
+    });
+
+    _initialDrainTailsCaptured = true;
 }
 
 Status MultiIndexBlock::drainBackgroundWrites(

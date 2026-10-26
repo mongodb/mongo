@@ -192,6 +192,12 @@ public:
                                  IndexBuildInterceptor::DrainYieldPolicy drainYieldPolicy,
                                  IndexBuildInterceptor::DrainPhase drainPhase);
 
+    /**
+     * Capture every intercepted index's initial side write tail before any index drains. The caller
+     * must hold collection locks and must not be in a storage transaction. Write conflicts are
+     * retried, retaining any per-index boundaries already captured. Subsequent calls are no-ops.
+     */
+    void captureInitialDrainTails(OperationContext* opCtx, const CollectionPtr& collection);
 
     /**
      * By default, retries key generation and insertion for all records skipped during the
@@ -489,6 +495,8 @@ private:
     // Set to true when no work remains to be done, the object can safely destruct without leaving
     // incorrect state set anywhere.
     bool _buildIsCleanedUp = true;
+
+    bool _initialDrainTailsCaptured = false;
 
     // A unique identifier associating this index build with a two-phase index build within a
     // replica set.

@@ -75,6 +75,13 @@ public:
      */
     void createDeferredTable(OperationContext* opCtx);
 
+    /**
+     * Captures and return the initial tail, including invisible and prepared records. Repeated
+     * calls return the original boundary, even if the table changes. A null RecordId records an
+     * initially empty table. The backing table must exist.
+     */
+    RecordId captureInitialDrainTail(OperationContext* opCtx);
+
     uint64_t count() const {
         return _counter->load();
     }
@@ -143,6 +150,7 @@ private:
                                    long long iteration) const;
 
     LazyRecordStore _table;
+    boost::optional<RecordId> _initialDrainTail;
 
     // This allows the counter to be used in a RecoveryUnit rollback handler where the
     // IndexBuildInterceptor is no longer available (e.g. due to index build cleanup). If there

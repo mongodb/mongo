@@ -142,6 +142,14 @@ void SideWritesTracker::createDeferredTable(OperationContext* opCtx) {
     _table.getOrCreateTable(opCtx);
 }
 
+RecordId SideWritesTracker::captureInitialDrainTail(OperationContext* opCtx) {
+    if (!_initialDrainTail) {
+        _initialDrainTail = _table.getTableOrThrow().getLargestKey(
+            opCtx, *shard_role_details::getRecoveryUnit(opCtx));
+    }
+    return *_initialDrainTail;
+}
+
 void SideWritesTracker::_checkDrainPhaseFailPoint(OperationContext* opCtx,
                                                   const IndexCatalogEntry* indexCatalogEntry,
                                                   FailPoint* fp,
