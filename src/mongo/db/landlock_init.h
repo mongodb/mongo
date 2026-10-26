@@ -12,6 +12,7 @@
 // the sandbox is and for the ruleset API the rules below are handed to.
 
 #include "mongo/util/landlock/landlock.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 #include <vector>
@@ -77,8 +78,30 @@ void addGlobalLandlockRules(const std::vector<LandlockFilesystemRule>& rules);
  */
 namespace landlock_policy {
 
-/** A configured path, made absolute against the startup cwd and canonical. */
-std::string resolvedConfigPath(const std::string& path);
+/**
+ * The directory a relative configured path is resolved against.
+ */
+enum class PathBase {
+    /**
+     * The process's own working directory, for when a relative path is used verbatim.
+     * The kernel resolves it against the cwd at open(2) time and Landlock checks the result
+     * of that resolution, so the rule has to be built the same way.
+     */
+    kProcessCwd,
+
+    /**
+     * serverGlobalParams.cwd, the cwd saved before the server forks and changes its working
+     * directory to '/'. Use only for paths that some other code has already resolved against
+     * that same saved cwd. (e.g. serverGlobalParams.logpath, which logv2 stores as
+     * absolute(logpath, serverGlobalParams.cwd) and reopens by that absolute path on rotation.
+     */
+    kStartupCwd,
+};
+
+/**
+ * A configured path, made absolute against `base` and canonicalized.
+ */
+std::string resolvedConfigPath(const std::string& path, PathBase base);
 
 /**
  * The parent directory of a configured file path, for files the server creates,
@@ -86,13 +109,13 @@ std::string resolvedConfigPath(const std::string& path);
  * cannot bind to a file that does not exist yet, and one that binds to the file
  * would go stale on the first rename-and-recreate rotation.
  */
-std::string configParentDir(const std::string& path);
+std::string configParentDir(const std::string& path, PathBase base);
 
 /**
  * A configured directory the server creates itself when missing: the directory
  * when it exists, otherwise its parent, so that the creation is permitted too.
  */
-std::string configDirCreatedIfMissing(const std::string& path);
+std::string configDirCreatedIfMissing(const std::string& path, PathBase base);
 
 /**
  * The value of a string-valued startup option, or empty when unset -- including

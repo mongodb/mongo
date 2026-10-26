@@ -7,6 +7,8 @@
 
 #include <string>
 
+[[MONGO_MOD_PUBLIC]];
+
 namespace mongo {
 
 class SharedObjectMapInfo {
@@ -15,7 +17,7 @@ public:
 
     const BSONObj& obj() const;
 
-    void setObj(BSONObj obj);
+    [[MONGO_MOD_PRIVATE]] void setObj(BSONObj obj);
 
 private:
     BSONObj _obj;

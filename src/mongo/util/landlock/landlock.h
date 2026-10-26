@@ -12,10 +12,10 @@
 // read-only) and the kernel denies every other filesystem access for the
 // lifetime of the process and its descendants.
 //
-// The kernel-facing details (the Landlock uAPI struct layouts, access-right bits
-// and syscall numbers, and the mapping from ABI version to supported rights) are
-// deliberately confined to landlock.cpp: callers describe what they need with
-// the LandlockFilesystemRule factories below and never handle raw rights.
+// Users describe what filesystem permissions they need by creating a
+// LandlockFilesystemRule containing the path and the bit set of filesystem access rights
+// (LANDLOCK_ACCESS_FS_*) that shall be granted that path, and adding it to
+// the global LandlockRuleset.
 #if defined(__linux__)
 
 #include "mongo/base/status_with.h"
@@ -27,27 +27,114 @@
 #include <string_view>
 #include <vector>
 
+#include <boost/filesystem/path.hpp>
+
+// Landlock filesystem access rights constants, mirrored from <linux/landlock.h>.
+// #ifndef keeps these compatible with any header that may already define them.
+#ifndef LANDLOCK_ACCESS_FS_EXECUTE
+#define LANDLOCK_ACCESS_FS_EXECUTE (1ULL << 0)
+#endif
+#ifndef LANDLOCK_ACCESS_FS_WRITE_FILE
+#define LANDLOCK_ACCESS_FS_WRITE_FILE (1ULL << 1)
+#endif
+#ifndef LANDLOCK_ACCESS_FS_READ_FILE
+#define LANDLOCK_ACCESS_FS_READ_FILE (1ULL << 2)
+#endif
+#ifndef LANDLOCK_ACCESS_FS_READ_DIR
+#define LANDLOCK_ACCESS_FS_READ_DIR (1ULL << 3)
+#endif
+#ifndef LANDLOCK_ACCESS_FS_REMOVE_DIR
+#define LANDLOCK_ACCESS_FS_REMOVE_DIR (1ULL << 4)
+#endif
+#ifndef LANDLOCK_ACCESS_FS_REMOVE_FILE
+#define LANDLOCK_ACCESS_FS_REMOVE_FILE (1ULL << 5)
+#endif
+#ifndef LANDLOCK_ACCESS_FS_MAKE_CHAR
+#define LANDLOCK_ACCESS_FS_MAKE_CHAR (1ULL << 6)
+#endif
+#ifndef LANDLOCK_ACCESS_FS_MAKE_DIR
+#define LANDLOCK_ACCESS_FS_MAKE_DIR (1ULL << 7)
+#endif
+#ifndef LANDLOCK_ACCESS_FS_MAKE_REG
+#define LANDLOCK_ACCESS_FS_MAKE_REG (1ULL << 8)
+#endif
+#ifndef LANDLOCK_ACCESS_FS_MAKE_SOCK
+#define LANDLOCK_ACCESS_FS_MAKE_SOCK (1ULL << 9)
+#endif
+#ifndef LANDLOCK_ACCESS_FS_MAKE_FIFO
+#define LANDLOCK_ACCESS_FS_MAKE_FIFO (1ULL << 10)
+#endif
+#ifndef LANDLOCK_ACCESS_FS_MAKE_BLOCK
+#define LANDLOCK_ACCESS_FS_MAKE_BLOCK (1ULL << 11)
+#endif
+#ifndef LANDLOCK_ACCESS_FS_MAKE_SYM
+#define LANDLOCK_ACCESS_FS_MAKE_SYM (1ULL << 12)
+#endif
+#ifndef LANDLOCK_ACCESS_FS_REFER
+#define LANDLOCK_ACCESS_FS_REFER (1ULL << 13)  // ABI 2 (Linux 5.19)
+#endif
+#ifndef LANDLOCK_ACCESS_FS_TRUNCATE
+#define LANDLOCK_ACCESS_FS_TRUNCATE (1ULL << 14)  // ABI 3 (Linux 6.2)
+#endif
+#ifndef LANDLOCK_ACCESS_FS_IOCTL_DEV
+#define LANDLOCK_ACCESS_FS_IOCTL_DEV (1ULL << 15)  // ABI 5 (Linux 6.10)
+#endif
 
 namespace [[MONGO_MOD_PUBLIC]] mongo {
+
+/**
+ * Resolves `path` the way Landlock will see it, in the two steps a caller must always
+ * take together, and returns the path a rule should be built from.
+ *
+ * First absolute, against `base`: a configured path may be relative, and the process may
+ * have chdir'd since it was written (the server does, when it forks), so the base has to
+ * be supplied rather than read from the current directory. Then canonical, so symlinks,
+ * "." and ".." are resolved -- a rule binds to the inode its path resolves to, so this is
+ * the path the grant actually lands on. Trailing components need not exist.
+ *
+ * A trailing separator, which is how a directory is usually written in a config file
+ * ("/var/log/ftdc/"), is carried by boost as a trailing dot element and is stripped here.
+ * That matters most for a caller taking parent_path(): left in place, the dot element
+ * shifts the parent down a level and the caller would name the wrong directory.
+ *
+ * An empty path resolves to an empty path, so a caller can pass an unset option straight
+ * through -- the policy treats an empty path as a feature not in use. A path that does not
+ * exist yet resolves too: its longest existing prefix is canonicalized and the remainder
+ * normalized, which is what lets a policy name a file the server has still to create.
+ *
+ * Throws (OperationFailed) when the path cannot be resolved at all -- an ancestor that cannot
+ * be searched, a symlink loop, a component that is not a directory. There is no best-effort
+ * result in that case: the inode a rule would bind to is unknown, so any path this could
+ * return instead risks granting a hierarchy nobody configured.
+ */
+boost::filesystem::path canonicalizePathForLandlock(const std::string& path,
+                                                    const boost::filesystem::path& base);
 
 /**
  * A single filesystem grant: every filesystem object beneath `path` may be
  * accessed with the rights in `accessMask`. Rules are inert descriptions; they
  * take effect when passed to LandlockRuleset::addPathRule().
  *
- * Only constructible through the named factories, so every grantable access
- * profile is a vetted constant rather than an ad-hoc bit mask. Rules carry no
- * ABI knowledge (they may be built before any ruleset exists); rights the
+ * Rules carry no ABI knowledge (they may be built before any ruleset exists); rights the
  * running kernel does not support are dropped when the rule is added to a
  * ruleset, which is the only place that can know the ABI.
  */
 class LandlockFilesystemRule {
 public:
-    /** Read files and list directories beneath `path`. */
-    static LandlockFilesystemRule readOnly(std::string path);
+    LandlockFilesystemRule(std::string path, uint64_t accessMask)
+        : _path(std::move(path)), _accessMask(accessMask) {}
 
-    /** Full read and mutate rights, for data hierarchies. */
-    static LandlockFilesystemRule readWrite(std::string path);
+    /** Helper factory for granting READ_FILE and READ_DIR rights on `path`. */
+    static LandlockFilesystemRule readOnly(std::string path,
+                                           boost::optional<uint64_t> extraRights = boost::none);
+
+    /**
+     * Helper factory for granting the following rights on `path`:
+     * WRITE_FILE, TRUNCATE, REMOVE_DIR, REMOVE_FILE, MAKE_DIR, MAKE_REG, MAKE_SOCK, MAKE_CHAR,
+     * MAKE_FIFO, MAKE_BLOCK, MAKE_SYM.
+     */
+    static LandlockFilesystemRule readWrite(std::string path,
+                                            boost::optional<uint64_t> extraRights = boost::none);
 
     /**
      * Parses one security.landlock.additionalPathRules entry, `<access>:<path>`, where
@@ -62,6 +149,29 @@ public:
      */
     static StatusWith<LandlockFilesystemRule> fromConfigString(std::string_view entry);
 
+    /**
+     * Returns a copy of this rule that asks for the path it resolves to to be pinned, by holding
+     * the descriptor open for the life of the ruleset.
+     *
+     * A rule binds to the inode its path resolves to, and Landlock keeps that inode alive. What it
+     * does not keep is the kernel's cached record of which name maps to that inode (a "dentry").
+     * The kernel throws those records away whenever it wants the memory back, which on a durable
+     * filesystem is harmless: the mapping is also recorded on disk, so the next lookup of the path
+     * finds the same inode again. Under procfs there is no such second copy; that cached dentry
+     * is the only thing that ever said which inode this path meant. Once it is gone, the next
+     * lookup of the path invents a brand new inode, which carries no rule, and the rule silently
+     * stops applying. Holding the descriptor open keeps the record in use, so the kernel will not
+     * throw it away.
+     *
+     * So use this only on a pseudo filesystem, and only where the rule must keep working for the
+     * life of the process.
+     */
+    LandlockFilesystemRule withPinnedPath() const {
+        LandlockFilesystemRule pinned = *this;
+        pinned._pinPath = true;
+        return pinned;
+    }
+
     const std::string& path() const {
         return _path;
     }
@@ -70,12 +180,15 @@ public:
         return _accessMask;
     }
 
-private:
-    LandlockFilesystemRule(std::string path, uint64_t accessMask)
-        : _path(std::move(path)), _accessMask(accessMask) {}
+    /** Whether this rule asked for its path to be pinned. */
+    bool pinsPath() const {
+        return _pinPath;
+    }
 
+private:
     std::string _path;
     uint64_t _accessMask;
+    bool _pinPath = false;
 };
 
 /**
@@ -176,6 +289,11 @@ private:
     const uint64_t _requestedFsAccess;
     const uint64_t _handledFsAccess;
     bool _restricted = false;
+    // O_PATH descriptors held open for the life of this object, one per rule on a pseudo
+    // filesystem, so the inode a rule is attached to cannot be reclaimed and regenerated
+    // underneath it. See addPathRule. Closed only by the destructor, and the enforcing
+    // ruleset is never destroyed, so in practice these last as long as the process.
+    std::vector<int> _pinnedPathFds;
 };
 
 // Probe the running kernel's Landlock ABI version, via landlock_create_ruleset(2)'s

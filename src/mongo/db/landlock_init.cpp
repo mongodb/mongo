@@ -45,8 +45,11 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/landlock/landlock.h"
+#include "mongo/util/net/socket_utils.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/options_parser/startup_options.h"
+#include "mongo/util/stacktrace.h"
+#include "mongo/util/stacktrace_somap.h"
 
 #include <cstdint>
 #include <map>
@@ -64,6 +67,7 @@
 #include <sys/prctl.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
+#include <yaml-cpp/yaml.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
 
@@ -162,27 +166,30 @@ void addGlobalLandlockRules(const std::vector<LandlockFilesystemRule>& rules) {
 namespace landlock_policy {
 namespace {
 
-// Resolves a configured path the way Landlock will see it, in two steps that
-// the helpers below must always take together.
-//
-// First absolute: config paths may be relative, but with --fork the process has
-// chdir("/")'d by the time this runs, so the base is the saved startup cwd,
-// exactly like the log-file machinery does. Then canonical, so symlinks, "."
-// and ".." are resolved -- a rule binds to the inode the path resolves to, so
-// this is the path the grant actually lands on. It matters most for the callers
-// that take parent_path(): absolute() does no normalization, so a trailing
-// slash or a ".." component would otherwise silently yield the wrong parent
-// directory. Trailing components need not exist ("weakly"), which is required
-// here because the log and pid files are only created later.
-//
-// The lexical form is computed first because it doubles as the fallback.
-// Canonicalization touches the filesystem and, unlike absolute(), can fail: an
-// intermediate directory this process cannot traverse, a symlink loop.
-boost::filesystem::path canonicalStartupPath(const std::string& path) {
-    const auto absolutePath = boost::filesystem::absolute(path, serverGlobalParams.cwd);
-    boost::system::error_code ec;
-    const auto canonicalPath = boost::filesystem::weakly_canonical(absolutePath, ec);
-    return ec ? absolutePath : canonicalPath;
+// Every helper below resolves a configured path against the specified PathBase. See PathBase in
+// landlock_init.h for which base a given path needs.
+boost::filesystem::path canonicalStartupPath(const std::string& path, PathBase base) {
+    boost::filesystem::path basePath;
+    if (base == PathBase::kProcessCwd) {
+        boost::system::error_code ec;
+        basePath = boost::filesystem::current_path(ec);
+        if (ec) {
+            LOGV2_FATAL(13444800,
+                        "Failed to obtain the process current working directory path",
+                        "error"_attr = ec.message());
+        }
+    } else {
+        basePath = boost::filesystem::path(serverGlobalParams.cwd);
+    }
+    try {
+        return canonicalizePathForLandlock(path, basePath);
+    } catch (const DBException& ex) {
+        LOGV2_FATAL(13444801,
+                    "Failed to resolve a path for Landlock",
+                    "path"_attr = path,
+                    "base"_attr = basePath.string(),
+                    "error"_attr = ex);
+    }
 }
 
 std::vector<std::string> startupOptionList(const std::string& key) {
@@ -194,11 +201,8 @@ std::vector<std::string> startupOptionList(const std::string& key) {
 
 // A configured path resolved for a rule (see canonicalStartupPath). Empty stays
 // empty (option not in use).
-std::string resolvedConfigPath(const std::string& path) {
-    if (path.empty()) {
-        return {};
-    }
-    return canonicalStartupPath(path).string();
+std::string resolvedConfigPath(const std::string& path, PathBase base) {
+    return canonicalStartupPath(path, base).string();
 }
 
 // The parent directory of a configured file path, for files the server
@@ -208,11 +212,8 @@ std::string resolvedConfigPath(const std::string& path) {
 // itself would go stale on the first rename-and-recreate rotation; a grant on
 // the directory covers the entry regardless of which inode backs it (Landlock
 // checks at open(2) time). Empty stays empty (option not in use).
-std::string configParentDir(const std::string& path) {
-    if (path.empty()) {
-        return {};
-    }
-    return canonicalStartupPath(path).parent_path().string();
+std::string configParentDir(const std::string& path, PathBase base) {
+    return canonicalStartupPath(path, base).parent_path().string();
 }
 
 // A configured directory the server creates itself when missing (e.g. an FTDC
@@ -222,11 +223,8 @@ std::string configParentDir(const std::string& path) {
 // missing too, the rule is skipped (see addPathRule) and the operator must
 // grant an existing ancestor via additional path rules rather than this
 // policy silently widening towards "/". Empty stays empty.
-std::string configDirCreatedIfMissing(const std::string& path) {
-    if (path.empty()) {
-        return {};
-    }
-    const auto resolved = canonicalStartupPath(path);
+std::string configDirCreatedIfMissing(const std::string& path, PathBase base) {
+    const auto resolved = canonicalStartupPath(path, base);
     return (boost::filesystem::exists(resolved) ? resolved : resolved.parent_path()).string();
 }
 
@@ -258,6 +256,75 @@ namespace {
 
 using namespace landlock_policy;
 
+std::vector<LandlockFilesystemRule> dynamicFilesystemRules() {
+    std::vector<LandlockFilesystemRule> rules;
+
+    // Unless the cwd is the root directory (e.g. mongodb running as a systemd
+    // service), grant limited write access to it so the server can write core dumps.
+    if (auto path = resolvedConfigPath(".", PathBase::kProcessCwd); path != "/") {
+        rules.push_back(LandlockFilesystemRule::readOnly(
+            path, LANDLOCK_ACCESS_FS_WRITE_FILE | LANDLOCK_ACCESS_FS_MAKE_REG));
+    }
+
+    // Add read-only permission to this executable itself and its linked .so files so that
+    // libunwind can read them. This assumes the first entry in the globalSharedObjectMapInfo
+    // object contains the path to this executable itself (read from /proc/self/exe).
+    if (const auto& soMap = globalSharedObjectMapInfo().obj().getField("somap");
+        soMap.type() == BSONType::array) {
+        for (auto&& entry : soMap.Array()) {
+            if (!entry.isABSONObj()) {
+                continue;
+            }
+            // note: empty rule if "path" field does not exist.
+            // if "path" is relative, resolve it based on where the symbolizer will access it,
+            // which is relative to the process cwd.
+            rules.push_back(LandlockFilesystemRule::readOnly(resolvedConfigPath(
+                std::string(entry.Obj().getStringField("path")), PathBase::kProcessCwd)));
+        }
+    }
+
+    // A --bind_ip entry may be a UNIX domain socket path rather than an address, mixed freely
+    // with addresses in the same list. Such an entry is bound verbatim, at the path given, which
+    // means a relative path is resolved relative to the post-fork cwd ('/').
+    // The parent directory gets the grant, for the same reason as the log and pid files: the
+    // socket does not exist when the ruleset is built, and binding first unlinks any stale one,
+    // so a rule on the socket itself would have nothing to attach to.
+    for (const auto& bindAddr : serverGlobalParams.bind_ips) {
+        if (isUnixDomainSocket(bindAddr)) {
+            rules.push_back(LandlockFilesystemRule::readWrite(
+                configParentDir(bindAddr, PathBase::kProcessCwd)));
+        }
+    }
+
+    // Query extensions
+    if (getTestCommandsEnabled()) {
+        rules.push_back(LandlockFilesystemRule::readOnly(
+            resolvedConfigPath("src/mongo/db/extension/test_examples", PathBase::kProcessCwd)));
+    }
+
+    if (!serverGlobalParams.extensionsConfigPath.empty()) {
+        const auto confDir = boost::filesystem::path(serverGlobalParams.extensionsConfigPath);
+
+        for (const auto& name : serverGlobalParams.extensions) {
+            const auto confPath = confDir / (name + ".conf");
+            try {
+                const auto root = YAML::LoadFile(confPath.string());
+                if (const auto& sharedLibraryPath = root["sharedLibraryPath"]) {
+                    auto soPath = sharedLibraryPath.as<std::string>();
+                    rules.push_back(LandlockFilesystemRule::readOnly(
+                        resolvedConfigPath(soPath, PathBase::kProcessCwd)));
+
+                    rules.push_back(LandlockFilesystemRule::readOnly(
+                        resolvedConfigPath(soPath + ".sig", PathBase::kProcessCwd)));
+                }
+            } catch (const YAML::Exception&) {
+                continue;  // ignore invalid extension configs
+            }
+        }
+    }
+    return rules;
+}
+
 /**
  * The filesystem policy for mongod and mongos: every hierarchy the server
  * needs, as narrowly as feasible. An entry with an empty path describes a
@@ -267,7 +334,7 @@ using namespace landlock_policy;
  * /etc/lsb-release for OS info) are deliberately unlisted: those reads fail
  * gracefully.
  */
-std::vector<LandlockFilesystemRule> sandboxFilesystemRules() {
+std::vector<LandlockFilesystemRule> staticFilesystemRules() {
     // mongos never touches the storage layer; every other flavor of server
     // (including a mongod embedding a router) needs its data directory.
     const bool isRouterOnly =
@@ -307,11 +374,11 @@ std::vector<LandlockFilesystemRule> sandboxFilesystemRules() {
 
         // glibc's pthread_setname_np() writes the thread name to
         // /proc/self/task/<tid>/comm for every thread spawned after the
-        // sandbox engages. readWrite over-describes what is wanted (WRITE_FILE),
-        // but the surplus rights are inert here: procfs itself rejects
-        // creation, removal and truncation. Writes to sensitive pseudo-files
-        // elsewhere under /proc (e.g. /proc/sys) stay denied.
-        LandlockFilesystemRule::readWrite("/proc/self/task"),
+        // sandbox engages.
+        //
+        // Pinned, because on procfs this path can come to resolve to a different inode, so without
+        // it, the grant quietly stops applying partway through the process's life.
+        LandlockFilesystemRule::readWrite(std::string("/proc/self/task")).withPinnedPath(),
 
         // /dev/null is opened read-write by various subsystems at runtime;
         // /dev/urandom backs SecureRandom when getrandom(2) is unavailable.
@@ -323,48 +390,107 @@ std::vector<LandlockFilesystemRule> sandboxFilesystemRules() {
 
         // The data directory: WiredTiger's files, the lock file, and FTDC's
         // diagnostic.data live beneath it.
+        // mongod_options.cpp:storeMongodOptions() already prepends the startup cwd to a
+        // non-absolute dbpath in case of a forked server, so the PathBase doesn't matter.
+        // Grants REFER on top of readWrite, because FCBIS moves files from the '.initialsync'
+        // subdirectory up into dbpath itself. Renames that reparent a file require REFER.
         LandlockFilesystemRule::readWrite(
-            isRouterOnly ? "" : resolvedConfigPath(storageGlobalParams.dbpath)),
+            isRouterOnly ? ""
+                         : resolvedConfigPath(storageGlobalParams.dbpath, PathBase::kProcessCwd),
+            LANDLOCK_ACCESS_FS_REFER),
 
         // The directory the UNIX domain socket (mongodb-<port>.sock) is
         // created in and unlinked from; net.unixDomainSocket.pathPrefix,
         // default /tmp.
         LandlockFilesystemRule::readWrite(
-            serverGlobalParams.noUnixSocket ? "" : resolvedConfigPath(serverGlobalParams.socket)),
+            serverGlobalParams.noUnixSocket
+                ? ""
+                : resolvedConfigPath(serverGlobalParams.socket, PathBase::kProcessCwd)),
 
         // Proxy-protocol ingress (net.proxyPort) creates and unlinks its own
         // UNIX domain sockets under this prefix directory.
-        LandlockFilesystemRule::readWrite(resolvedConfigPath(serverGlobalParams.proxySocketPrefix)),
+        LandlockFilesystemRule::readWrite(
+            resolvedConfigPath(serverGlobalParams.proxySocketPrefix, PathBase::kProcessCwd)),
 
         // FTDC's directory defaults beneath dbpath (mongod) or beside the log
         // file (mongos), both covered by other rules; an explicit override
         // needs its own grant. FTDC creates the directory when missing.
         LandlockFilesystemRule::readWrite(configDirCreatedIfMissing(
-            setParameterStartupValue("diagnosticDataCollectionDirectoryPath"))),
+            setParameterStartupValue("diagnosticDataCollectionDirectoryPath"),
+            PathBase::kProcessCwd)),
+
+        // Traffic recording writes a per-recording subdirectory of files under
+        // trafficRecordingDirectory, on the startTrafficRecording command. The
+        // directory must already exist (the parameter's validator requires it),
+        // so the grant lands on it directly rather than on its parent. Unset
+        // means recording is unavailable and nothing is granted. Note this is
+        // the value configured at startup: the parameter is also settable at
+        // runtime, but the ruleset is fixed before any command can run, so
+        // repointing it outside this grant leaves recording unable to write.
+        LandlockFilesystemRule::readWrite(resolvedConfigPath(
+            setParameterStartupValue("trafficRecordingDirectory"), PathBase::kProcessCwd)),
+
+        // OpenTelemetry's file exporters.
+        LandlockFilesystemRule::readWrite(resolvedConfigPath(
+            setParameterStartupValue("openTelemetryMetricsDirectory"), PathBase::kProcessCwd)),
+        LandlockFilesystemRule::readWrite(resolvedConfigPath(
+            setParameterStartupValue("opentelemetryTraceDirectory"), PathBase::kProcessCwd)),
+        LandlockFilesystemRule::readWrite(
+            resolvedConfigPath(setParameterStartupValue("openTelemetryPrometheusMetricsDirectory"),
+                               PathBase::kProcessCwd)),
+        // This setParameter names the file itself, so its parent gets the grant:
+        // a ".tmp" sibling is created and renamed beside it, and the target file is
+        // replaced rather than rewritten in place.
+        LandlockFilesystemRule::readWrite(configParentDir(
+            setParameterStartupValue("openTelemetryPrometheusMetricsPath"), PathBase::kProcessCwd)),
 
         // The time zone database (processManagement.timeZoneInfo) is loaded
         // during startup, after the sandbox engages.
-        LandlockFilesystemRule::readOnly(resolvedConfigPath(serverGlobalParams.timeZoneInfoPath)),
+        LandlockFilesystemRule::readOnly(
+            resolvedConfigPath(serverGlobalParams.timeZoneInfoPath, PathBase::kProcessCwd)),
 
         // Log, pid and (test-only) backtrace files are created, rewritten and
         // rotated after the sandbox engages, so their parent directories get
         // the grant; the files themselves may not exist yet. This also covers
         // mongos's FTDC directory, which defaults to a sibling of the log
         // file.
-        LandlockFilesystemRule::readWrite(configParentDir(serverGlobalParams.logpath)),
-        LandlockFilesystemRule::readWrite(configParentDir(serverGlobalParams.pidFile)),
         LandlockFilesystemRule::readWrite(
-            configParentDir(initialize_server_global_state::gBacktraceLogFile)),
+            configParentDir(serverGlobalParams.logpath, PathBase::kStartupCwd)),
+        LandlockFilesystemRule::readWrite(
+            configParentDir(serverGlobalParams.pidFile, PathBase::kProcessCwd)),
+        LandlockFilesystemRule::readWrite(configParentDir(
+            initialize_server_global_state::gBacktraceLogFile, PathBase::kStartupCwd)),
 
         // Credential files are re-read on rotation, which conventionally
         // replaces them by rename, so the containing directory gets the grant
         // (same inode rationale as configParentDir).
-        LandlockFilesystemRule::readOnly(configParentDir(serverGlobalParams.keyFile)),
-        LandlockFilesystemRule::readOnly(configParentDir(sslGlobalParams.sslPEMKeyFile)),
-        LandlockFilesystemRule::readOnly(configParentDir(sslGlobalParams.sslClusterFile)),
-        LandlockFilesystemRule::readOnly(configParentDir(sslGlobalParams.sslCAFile)),
-        LandlockFilesystemRule::readOnly(configParentDir(sslGlobalParams.sslClusterCAFile)),
-        LandlockFilesystemRule::readOnly(configParentDir(sslGlobalParams.sslCRLFile)),
+        LandlockFilesystemRule::readOnly(
+            configParentDir(serverGlobalParams.keyFile, PathBase::kProcessCwd)),
+        LandlockFilesystemRule::readOnly(
+            configParentDir(sslGlobalParams.sslPEMKeyFile, PathBase::kProcessCwd)),
+        LandlockFilesystemRule::readOnly(
+            configParentDir(sslGlobalParams.sslClusterFile, PathBase::kProcessCwd)),
+        LandlockFilesystemRule::readOnly(
+            configParentDir(sslGlobalParams.sslCAFile, PathBase::kProcessCwd)),
+        LandlockFilesystemRule::readOnly(
+            configParentDir(sslGlobalParams.sslClusterCAFile, PathBase::kProcessCwd)),
+        LandlockFilesystemRule::readOnly(
+            configParentDir(sslGlobalParams.sslCRLFile, PathBase::kProcessCwd)),
+
+        // The Diffie-Hellman parameters file (opensslDiffieHellmanParameters)
+        // is read wherever an SSL context is built, which includes the rebuild
+        // that rotateCertificates performs, so it too outlives startup and gets
+        // the same directory grant as the files above.
+        LandlockFilesystemRule::readOnly(
+            configParentDir(sslGlobalParams.sslPEMTempDHParam, PathBase::kProcessCwd)),
+
+    // Paths accessed for loading query extensions
+#ifndef MONGO_CONFIG_EXT_SIG_SECURE
+        LandlockFilesystemRule::readOnly(resolvedConfigPath(
+            serverGlobalParams.extensionsSignaturePublicKeyPath, PathBase::kProcessCwd)),
+#endif
+        LandlockFilesystemRule::readOnly(
+            resolvedConfigPath(serverGlobalParams.extensionsConfigPath, PathBase::kProcessCwd)),
     };
 }
 
@@ -505,7 +631,8 @@ MONGO_INITIALIZER_GENERAL(BeginLandlockSandboxInitialization,
           "Applying Landlock filesystem sandbox",
           "abiVersion"_attr = gLandlockRuleset->abiVersion());
 
-    addGlobalLandlockRules(sandboxFilesystemRules());
+    addGlobalLandlockRules(staticFilesystemRules());
+    addGlobalLandlockRules(dynamicFilesystemRules());
 }
 
 // The point of no return: enforces whatever policy the initializers above
@@ -519,7 +646,7 @@ MONGO_INITIALIZER_GENERAL(EndLandlockSandboxInitialization,
                           ("BeginLandlockSandboxInitialization"),
                           ("default"))
 (InitializerContext*) {
-    if (!gLandlockRuleset) {
+    if (!gLandlockRuleset || gLandlockMode == LandlockMode::kDisabled) {
         return;
     }
     auto& ruleset = *gLandlockRuleset;

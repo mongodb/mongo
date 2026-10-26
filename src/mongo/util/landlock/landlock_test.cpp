@@ -15,9 +15,11 @@
 #include <utility>
 #include <vector>
 
+#include <dirent.h>
 #include <fcntl.h>
 #include <unistd.h>
 
+#include <boost/filesystem/operations.hpp>
 #include <sys/wait.h>
 
 namespace mongo {
@@ -78,12 +80,30 @@ TEST(LandlockFilesystemRule, ReadWriteAddsMutationToReads) {
     ASSERT_NE(0u, readWrite & kMakeReg);
 }
 
-// The policy promises these three stay denied for the life of the process: the ruleset
-// handles them, but no rule may grant them back.
-TEST(LandlockFilesystemRule, NoProfileGrantsExecuteReferOrIoctl) {
-    const uint64_t forbidden = kExecute | kRefer | kIoctlDev;
+// Execute and device ioctls stay denied for the life of the process: the ruleset handles
+// them, and no default profile grants them back.
+TEST(LandlockFilesystemRule, NoProfileGrantsExecuteOrIoctl) {
+    const uint64_t forbidden = kExecute | kIoctlDev;
     ASSERT_EQ(0u, LandlockFilesystemRule::readOnly("/x").accessMask() & forbidden);
     ASSERT_EQ(0u, LandlockFilesystemRule::readWrite("/x").accessMask() & forbidden);
+}
+
+// Moving a file to a different directory is denied unless a rule asks for it, so that the
+// hierarchies where it is allowed are named one by one rather than by default. dbpath asks,
+// for file-copy-based initial sync.
+TEST(LandlockFilesystemRule, ReferIsGrantedOnlyWhenAskedFor) {
+    ASSERT_EQ(0u, LandlockFilesystemRule::readOnly("/x").accessMask() & kRefer);
+    ASSERT_EQ(0u, LandlockFilesystemRule::readWrite("/x").accessMask() & kRefer);
+    ASSERT_NE(0u, LandlockFilesystemRule::readWrite("/x", kRefer).accessMask() & kRefer);
+}
+
+// An extra right is added to the profile, not substituted for it: asking for one must not
+// quietly drop the rest.
+TEST(LandlockFilesystemRule, ExtraRightsAreAddedToTheProfile) {
+    ASSERT_EQ(LandlockFilesystemRule::readWrite("/x").accessMask() | kRefer,
+              LandlockFilesystemRule::readWrite("/x", kRefer).accessMask());
+    ASSERT_EQ(LandlockFilesystemRule::readOnly("/x").accessMask() | kRefer,
+              LandlockFilesystemRule::readOnly("/x", kRefer).accessMask());
 }
 
 TEST(LandlockFilesystemRule, PathIsStoredVerbatim) {
@@ -181,6 +201,149 @@ TEST(LandlockConfigString, ValidatorReportsTheOffendingEntry) {
     ASSERT_STRING_CONTAINS(status.reason(), "'nonsense'");
 }
 
+// Path resolution tests. What a configured path turns into is what a rule ends up bound to, so
+// these cover the shapes an operator may write.
+
+TEST(LandlockPath, EmptyStaysEmpty) {
+    auto resolved = canonicalizePathForLandlock("", "/base");
+    ASSERT_EQ("", resolved.string());
+    ASSERT_EQ("", resolved.parent_path().string());
+}
+
+TEST(LandlockPath, RelativePathResolvesAgainstTheBase) {
+    ASSERT_EQ("/base/data/log", canonicalizePathForLandlock("data/log", "/base").string());
+}
+
+TEST(LandlockPath, AbsolutePathIgnoresTheBase) {
+    auto resolved = canonicalizePathForLandlock("/var/log/mongodb", "/base");
+    ASSERT_EQ("/var/log/mongodb", resolved.string());
+    ASSERT_EQ("/var/log", resolved.parent_path().string());
+}
+
+TEST(LandlockPath, RootHasNoFilenameToStrip) {
+    auto resolved = canonicalizePathForLandlock("/", "/base");
+    ASSERT_EQ("/", resolved.string());
+    ASSERT_EQ("", resolved.parent_path().string());
+}
+
+// Only "." is dropped. ".." is a real component and must resolve, not be mistaken for a
+// trailing separator.
+TEST(LandlockPath, DotDotResolvesRatherThanBeingStripped) {
+    unittest::TempDir tempDir("landlock_path_test");
+    const std::string viaParent = tempDir.path() + "/ftdc/..";
+    ASSERT_EQ(tempDir.path(), canonicalizePathForLandlock(viaParent, "/base").string());
+}
+
+// Test symlinks are resolved to the right path
+TEST(LandlockPath, SymbolicLinksResolveCorrectly) {
+    namespace fs = boost::filesystem;
+    boost::system::error_code ec;
+
+    // create .../landlock_path_test
+    unittest::TempDir tempDir("landlock_path_test");
+    const auto absTempPath = fs::absolute(tempDir.path(), ec);
+    ASSERT(!ec);
+
+    const auto target = absTempPath / "symlink_target";
+    const auto symlinkParent = absTempPath / "foo" / "bar";
+    const auto symlink = symlinkParent / "symlink";
+
+    // .../landlock_path_test/symlink_target/
+    // .../landlock_path_test/foo/bar/symlink -> .../landlock_path_test/symlink_target/
+    ASSERT_DOES_NOT_THROW(fs::create_directory(target));
+    ASSERT_DOES_NOT_THROW(fs::create_directories(symlinkParent));
+    ASSERT_DOES_NOT_THROW(fs::create_directory_symlink(target, symlink));
+
+    // .../landlock_path_test/symlink_target/ resolves to itself
+    ASSERT_EQ(target.string(), canonicalizePathForLandlock(target.string(), "/").string());
+
+    // .../landlock_path_test/foo/bar/symlink resolves to .../landlock_path_test/symlink_target/
+    ASSERT_EQ(target.string(), canonicalizePathForLandlock(symlink.string(), "/").string());
+
+    // .../landlock_path_test/foo/bar/symlink/.. resolves to .../landlock_path_test/
+    ASSERT_EQ(absTempPath.string(),
+              canonicalizePathForLandlock((symlink / "..").string(), "/").string());
+
+    // .../landlock_path_test/foo/bar/symlink/../foo/bar resolves to .../landlock_path_test/foo/bar
+    ASSERT_EQ(symlinkParent.string(),
+              canonicalizePathForLandlock((symlink / ".." / "foo" / "bar").string(), "/").string());
+}
+
+// A path that cannot be resolved is a path the policy cannot describe, so it fails rather than
+// falling back on a lexical normalization -- which, wherever a symlink is involved, would name a
+// different hierarchy than the one the server will actually open.
+//
+// Provoked with a symlink loop rather than an unsearchable directory: ELOOP is refused for root
+// too, so this does not quietly skip itself wherever the tests run privileged.
+TEST(LandlockPath, UnresolvablePathThrows) {
+    namespace fs = boost::filesystem;
+
+    unittest::TempDir tempDir("landlock_path_test");
+    const auto loop = fs::path(tempDir.path()) / "loop";
+    ASSERT_DOES_NOT_THROW(fs::create_symlink("loop", loop));
+
+    // The loop is an interior component, which is the shape an operator would actually hit: a
+    // configured file whose parent directory is a broken symlink.
+    const auto beneath = (loop / "data").string();
+
+    ASSERT_THROWS_CODE(
+        canonicalizePathForLandlock(beneath, "/"), DBException, ErrorCodes::OperationFailed);
+
+    // The message has to name the configured path: this runs for every path in the policy, so it
+    // is the only thing telling an operator which option to go and fix.
+    try {
+        canonicalizePathForLandlock(beneath, "/");
+        FAIL("expected canonicalizePathForLandlock to throw");
+    } catch (const DBException& ex) {
+        ASSERT_STRING_CONTAINS(ex.reason(), beneath);
+    }
+}
+
+// A path whose components do not exist is not a failure: the policy names files the server has
+// yet to create, and only the existing prefix can be canonicalized.
+TEST(LandlockPath, MissingPathResolvesRatherThanThrowing) {
+    unittest::TempDir tempDir("landlock_path_test");
+    const auto missing = tempDir.path() + "/not/created/yet";
+    ASSERT_EQ(missing, canonicalizePathForLandlock(missing, "/base").string());
+}
+
+TEST(LandlockPath, TrailingElementsAreStripped) {
+    namespace fs = boost::filesystem;
+    boost::system::error_code ec;
+
+    unittest::TempDir tempDir("landlock_path_test");
+    auto absTempPath = fs::absolute(tempDir.path(), ec);
+    const auto existingDir = absTempPath.string();
+    const auto missingDir = (absTempPath / "ftdc").string();
+
+    // test parent_path behavior on dir paths that end with a "/"
+    ASSERT_EQ("/data/foo", fs::path("/data/foo/").parent_path().string());
+
+    // test weakly_canonical behavior on dir paths that end with a "/"
+    // the "/" is stripped only if the directory exists
+    auto resolved = fs::weakly_canonical(fs::path(existingDir + "/"), ec);
+    ASSERT(!ec);
+    ASSERT_EQ(existingDir, resolved.string());
+    resolved = fs::weakly_canonical(fs::path(missingDir + "/"), ec);
+    ASSERT(!ec);
+    ASSERT_EQ(missingDir + "/", resolved.string());
+
+    // test that canonicalizePathForLandlock can handle trailing separators &
+    // redundant path elements on missing paths where weakly_canonicalize cannot.
+    const auto suffixes = {"/", "/.", "/./", "/.//", "/foo/..", "/foo//bar/.././../"};
+    for (const auto& sfx : suffixes) {
+        const auto path = missingDir + sfx;
+        ASSERT_EQ(missingDir, canonicalizePathForLandlock(path, "/base").string())
+            << "for '" << path << "'";
+    }
+    // test that canonicalizePathForLandlock can handle redundant path elements for existing paths.
+    for (const auto& sfx : suffixes) {
+        const auto path = existingDir + sfx;
+        ASSERT_EQ(existingDir, canonicalizePathForLandlock(path, "/base").string())
+            << "for '" << path << "'";
+    }
+}
+
 //
 // Ruleset construction. These need a kernel that provides Landlock.
 //
@@ -246,6 +409,93 @@ TEST(LandlockRuleset, AddPathRuleAcceptsFilesAndDirectories) {
     auto ruleset = unittest::assertGet(LandlockRuleset::create());
     ASSERT_OK(ruleset->addPathRule(LandlockFilesystemRule::readWrite(tempDir.path())));
     ASSERT_OK(ruleset->addPathRule(LandlockFilesystemRule::readWrite(filePath)));
+}
+
+//
+// Pinning the inode a rule resolved to.
+//
+
+// The number of descriptors this process holds open.
+size_t openDescriptorCount() {
+    size_t count = 0;
+    // Counted through /proc rather than by scanning fd numbers, so an unrelated descriptor
+    // opened elsewhere in the test binary cannot be mistaken for one of ours.
+    if (DIR* dir = ::opendir("/proc/self/fd")) {
+        while (const dirent* entry = ::readdir(dir)) {
+            if (entry->d_name[0] != '.') {
+                ++count;
+            }
+        }
+        ::closedir(dir);
+    }
+    return count;
+}
+
+// withPinnedPath() is what asks for the pin, and it is the only thing that does. A rule binds to
+// the inode its path resolved to, and on procfs that path can come to resolve to a different
+// inode, silently leaving the rule behind; see addPathRule for the failure this prevents.
+TEST(LandlockFilesystemRule, PinningIsOffUntilAskedFor) {
+    ASSERT_FALSE(LandlockFilesystemRule::readWrite("/proc/self").pinsPath());
+    ASSERT_TRUE(LandlockFilesystemRule::readWrite("/proc/self").withPinnedPath().pinsPath());
+}
+
+// Asking for the pin changes nothing else about the rule.
+TEST(LandlockFilesystemRule, PinningLeavesThePathAndRightsAlone) {
+    const auto plain = LandlockFilesystemRule::readWrite("/proc/self", kRefer);
+    const auto pinned = plain.withPinnedPath();
+    ASSERT_EQ(plain.path(), pinned.path());
+    ASSERT_EQ(plain.accessMask(), pinned.accessMask());
+}
+
+// A rule that asked for the pin keeps its O_PATH descriptor open.
+TEST(LandlockRuleset, PinnedRuleHoldsItsDescriptorOpen) {
+    if (!kernelHasLandlock()) {
+        return;
+    }
+    auto ruleset = unittest::assertGet(LandlockRuleset::create());
+
+    const auto before = openDescriptorCount();
+    ASSERT_OK(
+        ruleset->addPathRule(LandlockFilesystemRule::readWrite("/proc/self").withPinnedPath()));
+    ASSERT_EQ(before + 1, openDescriptorCount());
+}
+
+// A rule that did not ask keeps none, which is the default for every rule the policy has apart
+// from the one on /proc/<pid>: an open descriptor pins the mount as well as the inode, so
+// pinning dbpath would keep its filesystem busy for the life of the server, guarding against a
+// reclaim that cannot happen there.
+TEST(LandlockRuleset, UnpinnedRuleHoldsNoDescriptor) {
+    if (!kernelHasLandlock()) {
+        return;
+    }
+    unittest::TempDir tempDir("landlock_test_pinning");
+    auto ruleset = unittest::assertGet(LandlockRuleset::create());
+
+    const auto before = openDescriptorCount();
+    ASSERT_OK(ruleset->addPathRule(LandlockFilesystemRule::readWrite(tempDir.path())));
+    ASSERT_EQ(before, openDescriptorCount());
+    // Nothing about procfs pins on its own; only the request does.
+    ASSERT_OK(ruleset->addPathRule(LandlockFilesystemRule::readWrite("/proc/self")));
+    ASSERT_EQ(before, openDescriptorCount());
+}
+
+// Destroying an unenforced ruleset releases what it pinned. The enforcing one is never
+// destroyed, so this only matters for a startup failure or a test -- but a leak here would
+// accumulate a descriptor per rule per ruleset built.
+TEST(LandlockRuleset, DestroyingARulesetReleasesPinnedDescriptors) {
+    if (!kernelHasLandlock()) {
+        return;
+    }
+    const auto before = openDescriptorCount();
+    {
+        auto ruleset = unittest::assertGet(LandlockRuleset::create());
+        ASSERT_OK(
+            ruleset->addPathRule(LandlockFilesystemRule::readWrite("/proc/self").withPinnedPath()));
+        ASSERT_OK(ruleset->addPathRule(
+            LandlockFilesystemRule::readOnly("/proc/self/task").withPinnedPath()));
+        ASSERT_GT(openDescriptorCount(), before);
+    }
+    ASSERT_EQ(before, openDescriptorCount());
 }
 
 //

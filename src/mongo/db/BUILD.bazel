@@ -4104,7 +4104,9 @@ mongo_cc_library(
         "//src/mongo/db/commands/server_status:server_status_core",
         "//src/mongo/db/storage:storage_options",
         "//src/mongo/util/landlock",
+        "//src/mongo/util/net:network",
         "//src/mongo/util/net:ssl_options",
         "//src/mongo/util/options_parser",
+        "//src/third_party/yaml-cpp:yaml",
     ],
 )

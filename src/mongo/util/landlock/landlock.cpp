@@ -28,6 +28,7 @@
 
 #include <fcntl.h>
 
+#include <boost/filesystem/operations.hpp>
 #include <sys/prctl.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
@@ -55,58 +56,6 @@
 // instead of creating a ruleset.
 #ifndef LANDLOCK_CREATE_RULESET_VERSION
 #define LANDLOCK_CREATE_RULESET_VERSION (1U << 0)
-#endif
-
-// Filesystem access rights (landlock_ruleset_attr.handled_access_fs and
-// landlock_path_beneath_attr.allowed_access), with the ABI that introduced
-// each right past the initial set.
-#ifndef LANDLOCK_ACCESS_FS_EXECUTE
-#define LANDLOCK_ACCESS_FS_EXECUTE (1ULL << 0)
-#endif
-#ifndef LANDLOCK_ACCESS_FS_WRITE_FILE
-#define LANDLOCK_ACCESS_FS_WRITE_FILE (1ULL << 1)
-#endif
-#ifndef LANDLOCK_ACCESS_FS_READ_FILE
-#define LANDLOCK_ACCESS_FS_READ_FILE (1ULL << 2)
-#endif
-#ifndef LANDLOCK_ACCESS_FS_READ_DIR
-#define LANDLOCK_ACCESS_FS_READ_DIR (1ULL << 3)
-#endif
-#ifndef LANDLOCK_ACCESS_FS_REMOVE_DIR
-#define LANDLOCK_ACCESS_FS_REMOVE_DIR (1ULL << 4)
-#endif
-#ifndef LANDLOCK_ACCESS_FS_REMOVE_FILE
-#define LANDLOCK_ACCESS_FS_REMOVE_FILE (1ULL << 5)
-#endif
-#ifndef LANDLOCK_ACCESS_FS_MAKE_CHAR
-#define LANDLOCK_ACCESS_FS_MAKE_CHAR (1ULL << 6)
-#endif
-#ifndef LANDLOCK_ACCESS_FS_MAKE_DIR
-#define LANDLOCK_ACCESS_FS_MAKE_DIR (1ULL << 7)
-#endif
-#ifndef LANDLOCK_ACCESS_FS_MAKE_REG
-#define LANDLOCK_ACCESS_FS_MAKE_REG (1ULL << 8)
-#endif
-#ifndef LANDLOCK_ACCESS_FS_MAKE_SOCK
-#define LANDLOCK_ACCESS_FS_MAKE_SOCK (1ULL << 9)
-#endif
-#ifndef LANDLOCK_ACCESS_FS_MAKE_FIFO
-#define LANDLOCK_ACCESS_FS_MAKE_FIFO (1ULL << 10)
-#endif
-#ifndef LANDLOCK_ACCESS_FS_MAKE_BLOCK
-#define LANDLOCK_ACCESS_FS_MAKE_BLOCK (1ULL << 11)
-#endif
-#ifndef LANDLOCK_ACCESS_FS_MAKE_SYM
-#define LANDLOCK_ACCESS_FS_MAKE_SYM (1ULL << 12)
-#endif
-#ifndef LANDLOCK_ACCESS_FS_REFER
-#define LANDLOCK_ACCESS_FS_REFER (1ULL << 13)  // ABI 2 (Linux 5.19)
-#endif
-#ifndef LANDLOCK_ACCESS_FS_TRUNCATE
-#define LANDLOCK_ACCESS_FS_TRUNCATE (1ULL << 14)  // ABI 3 (Linux 6.2)
-#endif
-#ifndef LANDLOCK_ACCESS_FS_IOCTL_DEV
-#define LANDLOCK_ACCESS_FS_IOCTL_DEV (1ULL << 15)  // ABI 5 (Linux 6.10)
 #endif
 
 // landlock_restrict_self() audit-logging flags, ABI 7 (Linux 6.15). With audit
@@ -176,18 +125,23 @@ constexpr uint64_t kAccessMutate = LANDLOCK_ACCESS_FS_WRITE_FILE | LANDLOCK_ACCE
 
 constexpr uint64_t kAccessReadWrite = kAccessRead | kAccessMutate;
 
-// Everything the ruleset handles (denies by default). Deliberately broader
-// than any grantable mask, so three rights stay denied everywhere for the
-// life of the process:
-//  - EXECUTE: mongod and mongos never execve(2) files (config-file __exec
+// Everything the ruleset handles (denies by default). Broader than the mask any
+// rule grants, so these rights are denied unless a rule asks for them
+// specifically:
+//  - EXECUTE: never granted anywhere, and stripped from every rule when it is
+//    added. mongod and mongos never execve(2) files (config-file __exec
 //    expansion runs during option parsing, before the sandbox engages). Note
-//    Landlock's EXECUTE only gates execve()-style execution, not mmap'ing
+//    Landlock's EXECUTE only gates EXECUTE-style execution, not mmap'ing
 //    libraries, so dlopen() needs only READ_FILE and still works.
-//  - REFER: the server never renames or links files across directories; the
-//    renames it does perform (log rotation, WiredTiger's turtle file, FTDC's
-//    interim file) all stay within one directory, which REFER does not gate.
-//  - IOCTL_DEV: the server needs no device ioctls; the ioctls it does issue
-//    are on sockets and pipes, which are not filesystem device files.
+//  - REFER: granted only where a rule asks for it through extraRights, i.e.
+//    only on a hierarchy the server moves files around inside. Most of the
+//    renames the server performs (log rotation, WiredTiger's turtle file,
+//    FTDC's interim file) keep a file in its directory, which REFER does not
+//    gate; file-copy-based initial sync is the exception, moving files from a
+//    staging directory up into dbpath.
+//  - IOCTL_DEV: never granted. The server needs no device ioctls; the ioctls it
+//    does issue are on sockets and pipes, which are not filesystem device
+//    files.
 constexpr uint64_t kAccessFsAll = kAccessReadWrite | LANDLOCK_ACCESS_FS_EXECUTE |
     LANDLOCK_ACCESS_FS_REFER | LANDLOCK_ACCESS_FS_IOCTL_DEV;
 
@@ -222,6 +176,29 @@ uint64_t supportedFsAccess(long abi) {
 
 }  // namespace
 
+boost::filesystem::path canonicalizePathForLandlock(const std::string& path,
+                                                    const boost::filesystem::path& base) {
+    if (path.empty()) {
+        return {};
+    }
+
+    const auto absolutePath = boost::filesystem::absolute(path, base);
+    boost::system::error_code ec;
+    auto resolved = boost::filesystem::weakly_canonical(absolutePath, ec);
+
+    uassert(ErrorCodes::OperationFailed,
+            str::stream() << "Failed to resolve the path '" << path << "' (as '"
+                          << absolutePath.string() << "') for a Landlock rule: " << ec.message(),
+            !ec);
+
+    // For a path that exists, weakly_canonical() resolves a trailing dot element away; for
+    // one that does not, it survives into the result. See the header for why it must not.
+    if (resolved.filename_is_dot()) {
+        resolved = resolved.parent_path();
+    }
+    return resolved;
+}
+
 StatusWith<long> landlockAbiVersion() {
     const long abi = landlockCreateRuleset(nullptr, 0, LANDLOCK_CREATE_RULESET_VERSION);
     if (abi >= 0) {
@@ -240,12 +217,14 @@ StatusWith<long> landlockAbiVersion() {
                   str::stream() << "Failed to probe Landlock ABI: " << errorMessage(ec));
 }
 
-LandlockFilesystemRule LandlockFilesystemRule::readOnly(std::string path) {
-    return {std::move(path), kAccessRead};
+LandlockFilesystemRule LandlockFilesystemRule::readOnly(std::string path,
+                                                        boost::optional<uint64_t> extraRights) {
+    return {std::move(path), kAccessRead | extraRights.value_or(0)};
 }
 
-LandlockFilesystemRule LandlockFilesystemRule::readWrite(std::string path) {
-    return {std::move(path), kAccessReadWrite};
+LandlockFilesystemRule LandlockFilesystemRule::readWrite(std::string path,
+                                                         boost::optional<uint64_t> extraRights) {
+    return {std::move(path), kAccessReadWrite | extraRights.value_or(0)};
 }
 
 StatusWith<LandlockFilesystemRule> LandlockFilesystemRule::fromConfigString(
@@ -320,6 +299,9 @@ std::vector<std::string_view> LandlockRuleset::fsAccessRightNames(uint64_t mask)
 
 LandlockRuleset::~LandlockRuleset() {
     close(_rulesetFd);
+    for (const int fd : _pinnedPathFds) {
+        close(fd);
+    }
 }
 
 StatusWith<std::unique_ptr<LandlockRuleset>> LandlockRuleset::create() {
@@ -408,10 +390,10 @@ Status LandlockRuleset::addPathRule(const LandlockFilesystemRule& rule) {
     }
 
     LandlockPathBeneathAttr attr;
-    // EXECUTE is stripped from every grant: the server never executes files,
-    // so no rule may re-allow execution anywhere (it stays denied by default,
-    // since the ruleset handles it -- see kAccessFsAll).
-    attr.allowedAccess = rule.accessMask() & _handledFsAccess & ~LANDLOCK_ACCESS_FS_EXECUTE;
+    // EXECUTE and IOCTL_DEV are stripped from every grant: the server never executes files or
+    // calls ioctl() on character or block devices.
+    attr.allowedAccess = rule.accessMask() & _handledFsAccess &
+        ~(LANDLOCK_ACCESS_FS_EXECUTE | LANDLOCK_ACCESS_FS_IOCTL_DEV);
     if (!S_ISDIR(statbuf.st_mode)) {
         attr.allowedAccess &= kAccessFileCompatible;
     }
@@ -428,10 +410,20 @@ Status LandlockRuleset::addPathRule(const LandlockFilesystemRule& rule) {
                                     << "': " << errorMessage(lastSystemError()));
     }
 
+    // Hold the descriptor open for the life of this ruleset when the rule asked for it, so the
+    // path keeps resolving to the inode the rule was built from rather than to a replacement.
+    if (rule.pinsPath()) {
+        // Recorded before dismissing the guard, so a throwing push_back still closes the fd.
+        _pinnedPathFds.push_back(pathFd);
+        closePathFd.dismiss();
+    }
+
     LOGV2(13118805,
           "Landlock filepath rule applied",
           "ruleType"_attr = "path_beneath",
           "path"_attr = rule.path(),
+          "ino"_attr = static_cast<long long>(statbuf.st_ino),
+          "pinned"_attr = rule.pinsPath(),
           "allowedAccess"_attr = fsAccessRightNames(attr.allowedAccess));
     return Status::OK();
 }
