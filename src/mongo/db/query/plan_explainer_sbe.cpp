@@ -706,6 +706,9 @@ PlanExplainerSBEBase::PlanExplainerSBEBase(
 }
 
 bool PlanExplainerSBEBase::matchesCachedPlan() const {
+    if (_cachedPlanHash) {
+        tassert(13700200, "Expected _cachedPlanHash & _solution to be present together", _solution);
+    }
     // Compare against the pre-extension hash: a pushed-down winner's hash() reflects the extension,
     // but the plan cache stores the pre-extension hash.
     return _cachedPlanHash &&
