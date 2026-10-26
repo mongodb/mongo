@@ -1375,7 +1375,11 @@ void MigrationDestinationManager::_migrateThread(CancellationToken cancellationT
                                            {*opCtx->getTxnNumber()},
                                            /*autocommit=*/boost::none,
                                            TransactionParticipant::TransactionActions::kNone);
-            _migrateDriver(opCtx, skipToCritSecTaken || recovering);
+            if (skipToCritSecTaken || recovering) {
+                _recoverMigration(opCtx);
+            } else {
+                _migrateDriver(opCtx);
+            }
         } catch (...) {
             _setStateFail(str::stream() << "migrate failed: " << redact(exceptionToStatus()));
 
@@ -1409,8 +1413,7 @@ void MigrationDestinationManager::_migrateThread(CancellationToken cancellationT
     _migrateThreadFinishedPromise.reset();
 }
 
-void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
-                                                 bool skipToCritSecTaken) {
+void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
     invariant(isActive());
     invariant(_sessionId);
     invariant(_scopedReceiveChunk);
@@ -1428,7 +1431,9 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
         }
     }};
 
-    if (!skipToCritSecTaken) {
+    // Scoped so that the clients and operation contexts used to clone and catch up are destroyed
+    // before waiting for the critical section to be released.
+    {
         // If this is a configShard, throw if we are draining. This is to avoid creating the
         // db/collections on the local catalog once we have already completed cleanup after drain.
         if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
@@ -1534,7 +1539,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
                                       *_migrationId);
         }
 
-        timing->done(1);
+        timing->done(1 /* step number */);
         migrateThreadHangAtStep1.pauseWhileSet();
 
 
@@ -1572,7 +1577,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
             _cloneCollectionIndexesAndOptions(
                 altOpCtx.get(), _nss, donorCollectionOptionsAndIndexes, strictIndexSync);
 
-            timing->done(2);
+            timing->done(2 /* step number */);
             migrateThreadHangAtStep2.pauseWhileSet();
         }
 
@@ -1642,7 +1647,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
                                                     &ignoreResult));
             });
 
-            timing->done(3);
+            timing->done(3 /* step number */);
             migrateThreadHangAtStep3.pauseWhileSet();
         }
 
@@ -1688,7 +1693,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
             opCtx->checkForInterrupt();
             lastOpApplied = _migrationCloningProgress->getMaxOptime();
 
-            timing->done(4);
+            timing->done(4 /* step number */);
             migrateThreadHangAtStep4.pauseWhileSet();
 
             if (MONGO_unlikely(failMigrationOnRecipient.shouldFail())) {
@@ -1780,7 +1785,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
             auto updatedTime = fetchAndApplyBatch(opCtx, applyModsFn, fetchBatchFn);
             lastOpApplied = (updatedTime == repl::OpTime()) ? lastOpApplied : updatedTime;
 
-            timing->done(5);
+            timing->done(5 /* step number */);
             migrateThreadHangAtStep5.pauseWhileSet();
         }
 
@@ -1893,7 +1898,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
                 return;
             }
 
-            timing->done(6);
+            timing->done(6 /* step number */);
             migrateThreadHangAtStep6.pauseWhileSet();
         }
 
@@ -1904,7 +1909,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
             return;
         }
 
-        timing->done(7);
+        timing->done(7 /* step number */);
         migrateThreadHangAtStep7.pauseWhileSet();
 
         const auto critSecReason = criticalSectionReason(*_sessionId);
@@ -1997,7 +2002,22 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
                 _stateChangedCV.notify_all();
             }
         }
-    } else {
+    }
+
+    invariant(timeInCriticalSection);
+    _awaitReleaseAndCompleteMigration(outerOpCtx, *timeInCriticalSection);
+
+    timing->done(8 /* step number */);
+}
+
+void MigrationDestinationManager::_recoverMigration(OperationContext* outerOpCtx) {
+    invariant(isActive());
+    invariant(_sessionId);
+    invariant(_scopedReceiveChunk);
+    invariant(!_min.isEmpty());
+    invariant(!_max.isEmpty());
+
+    {
         outerOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
         auto newClient =
             outerOpCtx->getServiceContext()->getService()->makeClient("MigrationCoordinator");
@@ -2040,6 +2060,11 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
               "migrationId"_attr = _migrationId);
     }
 
+    _awaitReleaseAndCompleteMigration(outerOpCtx, Timer());
+}
+
+void MigrationDestinationManager::_awaitReleaseAndCompleteMigration(
+    OperationContext* outerOpCtx, const Timer& timeInCriticalSection) {
     outerOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
     auto newClient =
         outerOpCtx->getServiceContext()->getService()->makeClient("MigrationCoordinator");
@@ -2050,21 +2075,12 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
         cc().makeOperationContext(), outerOpCtx->getCancellationToken(), executor);
     auto opCtx = newOpCtxPtr.get();
 
-    if (skipToCritSecTaken) {
-        timeInCriticalSection.emplace();
-    }
-    invariant(timeInCriticalSection);
-
     // Wait until signaled to exit the critical section and then release it.
     runWithoutSession(outerOpCtx, [&] {
-        awaitCriticalSectionReleaseSignalAndCompleteMigration(opCtx, *timeInCriticalSection);
+        awaitCriticalSectionReleaseSignalAndCompleteMigration(opCtx, timeInCriticalSection);
     });
 
     _setState(kDone);
-
-    if (timing) {
-        timing->done(8);
-    }
 }
 
 bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx, const BSONObj& xfer) {

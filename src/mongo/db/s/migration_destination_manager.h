@@ -302,7 +302,24 @@ private:
      */
     void _migrateThread(CancellationToken cancellationToken, bool skipToCritSecTaken = false);
 
-    void _migrateDriver(OperationContext* opCtx, bool skipToCritSecTaken = false);
+    /**
+     * Runs the recipient side of the migration from the start: clones the range, catches up on the
+     * donor's modifications, enters the critical section and completes the migration.
+     */
+    void _migrateDriver(OperationContext* opCtx);
+
+    /**
+     * Resumes a migration whose recovery document has been persisted: reacquires the critical
+     * section and completes the migration.
+     */
+    void _recoverMigration(OperationContext* opCtx);
+
+    /**
+     * Waits until signaled to exit the critical section, completes the migration and sets the
+     * state to kDone. Must only be called while the critical section is held.
+     */
+    void _awaitReleaseAndCompleteMigration(OperationContext* outerOpCtx,
+                                           const Timer& timeInCriticalSection);
 
     bool _applyMigrateOp(OperationContext* opCtx, const BSONObj& xfer);
 
