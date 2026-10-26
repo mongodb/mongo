@@ -1,4 +1,5 @@
 load("@rules_cc//cc:action_names.bzl", "ACTION_NAMES")
+load("//bazel/toolchains/cc:macos_link_flags.bzl", "MACOS_LLD_LINK_FLAGS")
 load(
     "@rules_cc//cc:cc_toolchain_config_lib.bzl",
     "feature",
@@ -112,7 +113,7 @@ def get_apple_features(ctx):
                         flag_group(
                             flags = [
                                 "-lresolv",
-                            ],
+                            ] + MACOS_LLD_LINK_FLAGS,
                         ),
                     ],
                 ),

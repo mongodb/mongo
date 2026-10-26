@@ -22,8 +22,15 @@ from google.protobuf.message import DecodeError
 
 from bazel.wrapper_hook.release_distro import validate_release_distro_id
 from buildscripts import bazel_spawn_pb2
+from buildscripts.package_test.toolchain_versions import (
+    should_require_production_toolchain,
+    validate_toolchain_versions,
+)
 
 RELEASE_BINARY_PROVENANCE_ARTIFACT_NAME = "Release Binary Provenance"
+TOOLCHAIN_PROVENANCE_ARTIFACT_NAME = "Toolchain Provenance"
+BUILD_COMMAND_ARTIFACT_NAME = "Build Command"
+TOOLCHAIN_PROVENANCE_PATH = ".bazel_toolchain_provenance.json"
 RELEASE_EXECUTION_LOG_ARTIFACT_NAME = "Release Execution Log"
 RELEASE_BINARY_NAMES = ("mongod", "mongos")
 CRYPT_RELEASE_BINARY_NAMES = ("mongo_crypt_v1.so",)
@@ -145,10 +152,16 @@ def find_task_artifact_url_with_retry(
     )
 
 
-def fetch_task_artifact_text(task: Any, artifact_name: str) -> str:
+def fetch_task_artifact_text(
+    task: Any, artifact_name: str, refetch_task: Callable[[], Any] | None = None
+) -> str:
     """Fetch a text artifact from an Evergreen task."""
 
-    artifact_url = find_task_artifact_url(task, artifact_name)
+    artifact_url = (
+        find_task_artifact_url_with_retry(task, artifact_name, refetch_task)
+        if refetch_task is not None
+        else find_task_artifact_url(task, artifact_name)
+    )
     response = requests.get(artifact_url, timeout=300)
     response.raise_for_status()
     return response.text
@@ -270,6 +283,11 @@ def create_release_binary_provenance_from_archive_dist_test(
         "binaries": hash_release_binaries_in_archive(binary_archive_path),
     }
     validate_release_binary_provenance_distro(provenance, archive_task)
+    if not is_windows_build_distro(archive_task.distro_id):
+        toolchain_path = extract_file_from_tar_by_basename(
+            artifacts_path, TOOLCHAIN_PROVENANCE_PATH, download_dir
+        )
+        provenance["toolchain"] = json.loads(toolchain_path.read_text())
     return json.dumps(provenance)
 
 
@@ -423,17 +441,81 @@ def _ensure_release_binary_hashes_complete(
     return hashes
 
 
+def is_windows_build_distro(distro_id: str | None) -> bool:
+    """Identify Windows using independently obtained build-distro metadata."""
+    return isinstance(distro_id, str) and distro_id.removeprefix("release-").startswith("windows-")
+
+
+def validate_task_toolchain_provenance(
+    build_task: Any,
+    refetch_task: Callable[[], Any],
+    require_production: bool = False,
+) -> None:
+    """Validate a patch's toolchain with the primary build's command and distro."""
+    # Windows does not capture these artifacts yet. Only the Evergreen task's
+    # distro can grant this exemption, never a field in a supplied JSON file.
+    if is_windows_build_distro(build_task.distro_id):
+        return
+    build_command = fetch_task_artifact_text(build_task, BUILD_COMMAND_ARTIFACT_NAME, refetch_task)
+    toolchain = json.loads(
+        fetch_task_artifact_text(build_task, TOOLCHAIN_PROVENANCE_ARTIFACT_NAME, refetch_task)
+    )
+    validate_release_toolchain_provenance(
+        json.dumps(
+            {
+                "task_id": build_task.task_id,
+                "distro_id": build_task.distro_id,
+                "build_command": build_command,
+                "toolchain": toolchain,
+            }
+        ),
+        require_production,
+        build_task=build_task,
+    )
+
+
+def validate_release_toolchain_provenance(
+    provenance_text: str, require_production: bool = False, *, build_task: Any = None
+) -> None:
+    """Recheck recorded tool versions for the current build's production packages."""
+    provenance = json.loads(provenance_text)
+    if build_task is not None:
+        for key, actual in (("distro_id", build_task.distro_id), ("task_id", build_task.task_id)):
+            if provenance.get(key) != actual:
+                raise ValueError(
+                    f"Toolchain provenance {key} does not match Evergreen build task: {provenance.get(key)!r} != {actual!r}"
+                )
+        if is_windows_build_distro(build_task.distro_id):
+            return
+    build_command = provenance.get("build_command")
+    if isinstance(build_command, str):
+        require_production = require_production or should_require_production_toolchain(
+            {"bazel_args": build_command}
+        )
+    toolchain = provenance.get("toolchain")
+    if not isinstance(toolchain, dict):
+        raise ValueError("Release binary provenance is missing a toolchain object")
+    production = toolchain.get("production_release")
+    if not isinstance(production, bool):
+        raise ValueError("Toolchain provenance is missing a boolean production_release")
+    if require_production and not production:
+        raise ValueError("Release binary provenance is missing production toolchain metadata")
+    if production:
+        validate_toolchain_versions(toolchain)
+
+
 def make_release_binary_provenance(
     build_command_file: Path,
     dist_archive: Path,
     binary_names: Iterable[str] = RELEASE_BINARY_NAMES,
+    toolchain_provenance_file: Path | None = None,
 ) -> dict[str, Any]:
     """Create release binary provenance from a build command and release archive."""
 
     build_command = build_command_file.read_text()
     validate_release_build_command(build_command)
     distro_id = read_build_distro_id(build_command_file)
-    return {
+    provenance = {
         "distro_id": distro_id,
         "build_id": os.environ.get("build_id", ""),
         "build_variant": os.environ.get("build_variant", ""),
@@ -444,6 +526,10 @@ def make_release_binary_provenance(
         "build_command": build_command,
         "binaries": hash_release_binaries_in_archive(dist_archive, binary_names),
     }
+    if toolchain_provenance_file is not None and not is_windows_build_distro(distro_id):
+        provenance["toolchain"] = json.loads(toolchain_provenance_file.read_text())
+        validate_release_toolchain_provenance(json.dumps(provenance))
+    return provenance
 
 
 def should_create_release_binary_provenance() -> bool:
@@ -811,6 +897,7 @@ def create_provenance_file(
     execution_log_file: Path | None = None,
     binary_names: Iterable[str] = RELEASE_BINARY_NAMES,
     skip_if_build_command_not_release_safe: bool = False,
+    toolchain_provenance_file: Path | None = None,
 ) -> None:
     """Write release binary provenance JSON."""
 
@@ -832,7 +919,9 @@ def create_provenance_file(
     if execution_log_file is not None and not execution_log_file.is_file():
         raise RuntimeError(f"Release execution log file does not exist: {execution_log_file}")
 
-    provenance = make_release_binary_provenance(build_command_file, dist_archive, binary_names)
+    provenance = make_release_binary_provenance(
+        build_command_file, dist_archive, binary_names, toolchain_provenance_file
+    )
     output_file.write_text(json.dumps(provenance, indent=2, sort_keys=True) + "\n")
 
 
@@ -844,6 +933,9 @@ def main() -> None:
     create_parser.add_argument("--build-command-file", type=Path, required=True)
     create_parser.add_argument("--dist-archive", type=Path, required=True)
     create_parser.add_argument("--execution-log-file", type=Path)
+    create_parser.add_argument(
+        "--toolchain-provenance-file", type=Path, default=Path(TOOLCHAIN_PROVENANCE_PATH)
+    )
     create_parser.add_argument("--binary-name", action="append", dest="binary_names")
     create_parser.add_argument("--skip-if-build-command-not-release-safe", action="store_true")
     create_parser.add_argument("--output", type=Path, required=True)
@@ -857,6 +949,7 @@ def main() -> None:
             args.execution_log_file,
             args.binary_names or RELEASE_BINARY_NAMES,
             args.skip_if_build_command_not_release_safe,
+            args.toolchain_provenance_file,
         )
 
 

@@ -1,5 +1,6 @@
 """Exercise release distro checks with the real Evergreen compile wrapper."""
 
+import json
 import os
 import shutil
 import subprocess
@@ -11,11 +12,19 @@ from pathlib import Path
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+WINDOWS = sys.platform in {"win32", "cygwin"}
 
 
 class BazelCompileTest(unittest.TestCase):
+    successful_build_log = "build\n" if WINDOWS else "build\ncapture\n"
+
     def run_compile(
-        self, *, distro: str | None, **expansions: str
+        self,
+        *,
+        distro: str | None,
+        expected_capture: bool = True,
+        windows: bool = WINDOWS,
+        **expansions: str,
     ) -> tuple[subprocess.CompletedProcess, str]:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -33,9 +42,24 @@ class BazelCompileTest(unittest.TestCase):
                     "bazel_evergreen_shutils::export_ssl_paths_if_needed() { :; }\n"
                     "bazel_evergreen_shutils::ensure_server_and_print_pid() { :; }\n"
                     "bazel_evergreen_shutils::bazel_get_binary_path() { echo fake-bazel; }\n"
-                    "bazel_evergreen_shutils::retry_bazel_cmd() { echo build >> build.log; }\n"
+                    "bazel_evergreen_shutils::retry_bazel_cmd() {\n"
+                    '  case "$*" in\n'
+                    "    *//bazel/config:toolchain_provenance*)\n"
+                    "      echo capture >> build.log\n"
+                    "      mkdir -p bazel-bin/bazel/config\n"
+                    '      echo \'{"compiler_version":"19.1.7"}\' > bazel-bin/bazel/config/toolchain_provenance.json ;;\n'
+                    "    *) echo build >> build.log ;;\n"
+                    "  esac\n"
+                    "}\n"
                     "bazel_evergreen_shutils::write_last_engflow_link() { :; }\n"
                 )
+            with (evergreen / "bazel_evergreen_shutils.sh").open("a") as helpers:
+                helpers.write(
+                    "bazel_evergreen_shutils::is_windows() { "
+                    + ("true" if windows else "false")
+                    + "; }\n"
+                )
+            expected_capture = expected_capture and not windows
             env = {
                 **os.environ,
                 "PYTHONPATH": str(REPO_ROOT),
@@ -62,6 +86,12 @@ class BazelCompileTest(unittest.TestCase):
             if result.returncode == 0:
                 captured_distro = src / ".bazel_provenance_build_invocation.distro_id"
                 self.assertEqual(f"{distro}\n", captured_distro.read_text())
+                capture_path = src / ".bazel_toolchain_provenance.json"
+                self.assertEqual(expected_capture, capture_path.exists())
+                if expected_capture:
+                    self.assertEqual(
+                        {"compiler_version": "19.1.7"}, json.loads(capture_path.read_text())
+                    )
             return result, log.read_text() if log.exists() else ""
 
     def test_release_profiles_fail_before_build_on_regular_or_missing_distro(self) -> None:
@@ -89,6 +119,31 @@ class BazelCompileTest(unittest.TestCase):
             with self.subTest(profile=profile):
                 result, log = self.run_compile(
                     distro="release-rhel93-arm64", bazel_args=f"--config={profile}"
+                )
+                self.assertEqual(0, result.returncode, result.stderr)
+                self.assertEqual(self.successful_build_log, log)
+
+    def test_capture_excludes_windows_hosts(self) -> None:
+        for windows in (False, True):
+            with self.subTest(windows=windows):
+                result, log = self.run_compile(distro="regular", windows=windows)
+                self.assertEqual(0, result.returncode, result.stderr)
+                self.assertEqual("build\n" if windows else "build\ncapture\n", log)
+
+    def test_analysis_only_flags_use_primary_build_expansion(self) -> None:
+        for flags in (
+            '--config="compiledb"',
+            "--config='compiledb'",
+            '--config="$CAPTURE_CONFIG"',
+            '--repo_env="no_c++_toolchain=$CAPTURE_NO_CPP"',
+        ):
+            with self.subTest(flags=flags):
+                result, log = self.run_compile(
+                    distro="regular",
+                    expected_capture=False,
+                    bazel_args=flags,
+                    CAPTURE_CONFIG="compiledb",
+                    CAPTURE_NO_CPP="1",
                 )
                 self.assertEqual(0, result.returncode, result.stderr)
                 self.assertEqual("build\n", log)
@@ -121,7 +176,7 @@ class BazelCompileTest(unittest.TestCase):
                         push_bucket="downloads",
                     )
                     self.assertEqual(0, result.returncode, result.stderr)
-                    self.assertEqual("build\n", log)
+                    self.assertEqual(self.successful_build_log, log)
 
     def test_explicit_release_on_master_still_requires_release_distro(self) -> None:
         for distro in ("regular", "release-build-host"):
@@ -130,7 +185,9 @@ class BazelCompileTest(unittest.TestCase):
                 self.assertEqual(
                     distro.startswith("release-"), result.returncode == 0, result.stderr
                 )
-                self.assertEqual("build\n" if distro.startswith("release-") else "", log)
+                self.assertEqual(
+                    self.successful_build_log if distro.startswith("release-") else "", log
+                )
 
     def test_release_projects_still_select_release_profiles(self) -> None:
         for project in ("mongodb-mongo-v8.0", "mongo-release", "mongodb-mongo-master-nightly"):
@@ -150,7 +207,7 @@ class BazelCompileTest(unittest.TestCase):
     def test_non_release_build_allows_regular_distro(self) -> None:
         result, log = self.run_compile(distro="regular", bazel_args="--config=evg --release=True")
         self.assertEqual(0, result.returncode, result.stderr)
-        self.assertEqual("build\n", log)
+        self.assertEqual(self.successful_build_log, log)
 
     def test_cross_build_uses_executing_distro(self) -> None:
         flags = "--config=linux-s390x-rhel9-cross-rbe-arm64 --config=public-release-local"
@@ -160,7 +217,9 @@ class BazelCompileTest(unittest.TestCase):
                 self.assertEqual(
                     distro.startswith("release-"), result.returncode == 0, result.stderr
                 )
-                self.assertEqual("build\n" if distro.startswith("release-") else "", log)
+                self.assertEqual(
+                    self.successful_build_log if distro.startswith("release-") else "", log
+                )
 
     def test_ibm_release_variant_assignments_in_patch_and_waterfall(self) -> None:
         config = yaml.safe_load(
@@ -195,7 +254,7 @@ class BazelCompileTest(unittest.TestCase):
                             is_patch=is_patch,
                         )
                         self.assertEqual(0, result.returncode, result.stderr)
-                        self.assertEqual("build\n", log)
+                        self.assertEqual(self.successful_build_log, log)
 
     def test_development_libraries_do_not_select_release_profiles(self) -> None:
         config = yaml.safe_load(
@@ -225,7 +284,7 @@ class BazelCompileTest(unittest.TestCase):
                             },
                         )
                         self.assertEqual(0, result.returncode, result.stderr)
-                        self.assertEqual("build\n", log)
+                        self.assertEqual(self.successful_build_log, log)
                         self.assertNotIn("Release configuration(s)", result.stderr)
             for variant in variants:
                 for entry in variant["tasks"]:
@@ -257,7 +316,7 @@ class BazelCompileTest(unittest.TestCase):
                                 is_patch=is_patch,
                             )
                             self.assertEqual(0, result.returncode, result.stderr)
-                            self.assertEqual("build\n", log)
+                            self.assertEqual(self.successful_build_log, log)
                             self.assertNotIn("Release configuration(s)", result.stderr)
 
                     # Test-only variant settings must not bypass explicit release checks.

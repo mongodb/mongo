@@ -15,6 +15,7 @@ load(
     "variable_with_value",
 )
 load("@rules_cc//cc:action_names.bzl", "ACTION_NAMES")
+load("//bazel/toolchains/cc:macos_link_flags.bzl", "MACOS_LLD_LINK_FLAGS")
 load(
     "//bazel/toolchains/cc:mongo_custom_features.bzl",
     "get_common_features",
@@ -196,7 +197,7 @@ def _impl(ctx):
         "-B" + prefix + "/tools",
         "-fuse-ld=lld",
         "-Wl,-platform_version,macos," + ctx.attr.min_macos_version + ",14.0",
-    ]
+    ] + MACOS_LLD_LINK_FLAGS
 
     # Feature definitions
     supports_pic_feature = feature(
@@ -653,19 +654,6 @@ def _impl(ctx):
         ],
     )
 
-    disable_warnings_for_third_party_libraries_clang_feature = feature(
-        name = "disable_warnings_for_third_party_libraries_clang",
-        enabled = ctx.attr.compiler == "clang",
-        flag_sets = [
-            flag_set(
-                actions = all_compile_actions,
-                flag_groups = [flag_group(flags = [
-                    "-Wno-character-conversion",
-                ])],
-            ),
-        ],
-    )
-
     # Collect all features. get_common_features() supplies the per-warning
     # -Wno-* suppressions (unused-function, defaulted-function-deleted,
     # unused-private-field, etc.), the warnings_as_errors_compile feature
@@ -703,7 +691,6 @@ def _impl(ctx):
         macos_fsized_deallocation_feature,
     ] + get_common_features(ctx) + [
         user_compile_flags_feature,
-        disable_warnings_for_third_party_libraries_clang_feature,
     ] + ([supports_start_end_lib_feature] if ctx.attr.supports_start_end_lib else [])
 
     # Artifact name patterns for macOS

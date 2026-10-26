@@ -1,0 +1,38 @@
+{
+    "linux/x86_64": {
+        "compiler": "clang",
+        "compiler_version": "19.1.7",
+        "linker": "lld",
+        "linker_version": "19.1.7"
+    },
+    "linux/aarch64": {
+        "compiler": "clang",
+        "compiler_version": "19.1.7",
+        "linker": "lld",
+        "linker_version": "19.1.7"
+    },
+    "linux/ppc64le": {
+        "compiler": "clang",
+        "compiler_version": "19.1.7",
+        "linker": "lld",
+        "linker_version": "19.1.7"
+    },
+    "linux/s390x": {
+        "compiler": "clang",
+        "compiler_version": "19.1.7",
+        "linker": "lld",
+        "linker_version": "19.1.7"
+    },
+    "macOS/x86_64": {
+        "compiler": "clang",
+        "compiler_version": "19.1.7",
+        "linker": "lld",
+        "linker_version": "19.1.7"
+    },
+    "macOS/arm64": {
+        "compiler": "clang",
+        "compiler_version": "19.1.7",
+        "linker": "lld",
+        "linker_version": "19.1.7"
+    }
+}

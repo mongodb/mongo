@@ -14,6 +14,14 @@ py_test(
     ],
 )
 
+py_test(
+    name = "test_toolchain_versions",
+    size = "small",
+    srcs = ["test_toolchain_versions.py"],
+    data = ["//evergreen:bazel_evergreen_shutils.sh"],
+    deps = ["//buildscripts/package_test:toolchain_versions"],
+)
+
 mongo_toolchain_py_cxx_test(
     name = "test_clang_tidy",
     srcs = [

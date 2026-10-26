@@ -1,0 +1,12 @@
+load("@rules_python//python:defs.bzl", "py_test")
+
+py_test(
+    name = "mongo_apple_toolchain_test",
+    size = "small",
+    srcs = ["mongo_apple_toolchain_test.py"],
+    data = [
+        "BUILD.tmpl",
+        "mongo_apple_toolchain.bzl",
+        "//bazel/toolchains/cc:libcxx_config.bzl",
+    ],
+)

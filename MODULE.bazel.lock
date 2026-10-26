@@ -532,7 +532,7 @@
     },
     "//bazel/toolchains/cc/mongo_apple:mongo_apple_toolchain.bzl%setup_mongo_apple_toolchain_extension": {
       "general": {
-        "bzlTransitiveDigest": "ijcGrTStmGaR4CXckKEgYQz1PwRZDtjo3fAZgmPJb6U=",
+        "bzlTransitiveDigest": "1gm+CiL4lc7IsQxeLwXk5Siuce0sw5856nLoowfm8PQ=",
         "usagesDigest": "o5ayVVBJX4YUvvlZNW05kDxuT1rZH4Tg9DrqaLQqmo8=",
         "recordedInputs": [
           "REPO_MAPPING:,build_bazel_apple_support apple_support+"
@@ -547,7 +547,7 @@
     },
     "//bazel/toolchains/cc/mongo_apple_cross:mongo_apple_cross_toolchain.bzl%setup_mongo_apple_cross_toolchain_extension": {
       "general": {
-        "bzlTransitiveDigest": "QN0Pu/Oax6Tbwp2j7Zndu7aYs6VOFYyq7Vse6xS+NOE=",
+        "bzlTransitiveDigest": "XuDTc/bqzKPEWU39PQv2TiLi+MCeZccyAnj9YfYgRxk=",
         "usagesDigest": "TQUXr7YdBAoCOVEWALiX3xd9BVKg3TqqAlCTgEhYK/8=",
         "recordedInputs": [
           "REPO_MAPPING:,build_bazel_apple_support apple_support+"

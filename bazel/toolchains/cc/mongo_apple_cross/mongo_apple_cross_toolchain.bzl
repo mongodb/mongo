@@ -14,16 +14,16 @@ This split ensures that normal Linux builds never pay the download cost.
 """
 
 load("@build_bazel_apple_support//configs:platforms.bzl", "APPLE_PLATFORMS_CONSTRAINTS")
+load("//bazel/toolchains/cc:libcxx_config.bzl", "enable_libcxx_vendor_availability")
+load("//bazel/toolchains/cc:toolchain_versions.bzl", "production_llvm_version")
 
 # S3 bucket and paths for pre-built toolchain archives
 _S3_BUCKET = "https://mdb-build-public.s3.amazonaws.com"
 _S3_PREFIX = "macos_cross_compile"
 
 # LLVM toolchain archive (stripped to only what cross-compilation needs)
-_LLVM_URL = _S3_BUCKET + "/" + _S3_PREFIX + "/llvm-22.1.1-cross-linux-arm64.tar.xz"
-_LLVM_SHA256 = "172159dbf9db36f6a45e0836126213a354be9d784b3717faeec27b9e5e905af9"
-_LLVM_STRIP_PREFIX = "LLVM-22.1.1-Linux-ARM64"
-_LLVM_VERSION = "22"
+_LLVM_S3_PREFIX = "toolchains"
+_LLVM_SHA256 = "d6a582ed956f94774909542c4d0ccdc0fe818caf8c2c9d2c9ae10a091c900fb2"
 
 # macOS SDK archive
 _MACOS_SDK_URL = _S3_BUCKET + "/" + _S3_PREFIX + "/macos-sdk-15.2.tar.xz"
@@ -106,11 +106,12 @@ mongo_apple_cross_toolchain_config = repository_rule(
 def _download_llvm(repository_ctx):
     """Downloads and extracts the LLVM toolchain, returning its path."""
     repository_ctx.report_progress("Downloading LLVM cross-compilation toolchain")
+    version = production_llvm_version(repository_ctx, "macOS/arm64")
     repository_ctx.download_and_extract(
-        url = _LLVM_URL,
+        url = _S3_BUCKET + "/" + _LLVM_S3_PREFIX + "/llvm-" + version + "-cross-linux-arm64.tar.xz",
         sha256 = _LLVM_SHA256,
         output = "llvm",
-        stripPrefix = _LLVM_STRIP_PREFIX,
+        stripPrefix = "LLVM-" + version + "-Linux-ARM64",
     )
     return str(repository_ctx.path("llvm"))
 
@@ -152,7 +153,7 @@ def _get_apple_sdk_path(repository_ctx):
 def _get_llvm_version(repository_ctx, llvm_path, downloaded):
     """Gets the LLVM version number."""
     if downloaded:
-        return _LLVM_VERSION
+        return production_llvm_version(repository_ctx, "macOS/arm64").split(".")[0]
 
     result = repository_ctx.execute([llvm_path + "/bin/clang", "--version"])
     if result.return_code == 0:
@@ -239,12 +240,10 @@ def _symlink_toolchain_files(repository_ctx, llvm_path, llvm_version, sdk_path):
     repository_ctx.symlink(llvm_path + "/include/c++/v1", "include/c++/v1")
 
     # Override __config_site to enable vendor availability annotations.
-    config_site_content = repository_ctx.read(llvm_path + "/include/c++/v1/__config_site")
-    config_site_content = config_site_content.replace(
-        "#define _LIBCPP_HAS_VENDOR_AVAILABILITY_ANNOTATIONS 0",
-        "#define _LIBCPP_HAS_VENDOR_AVAILABILITY_ANNOTATIONS 1",
+    repository_ctx.file(
+        "include/config_override/__config_site",
+        enable_libcxx_vendor_availability(repository_ctx.read(llvm_path + "/include/c++/v1/__config_site")),
     )
-    repository_ctx.file("include/config_override/__config_site", config_site_content)
 
     # Symlink Clang builtin headers (needed for stddef.h, stdarg.h, etc.)
     repository_ctx.symlink(
