@@ -287,8 +287,16 @@ void JSContext::onOutOfMemory() {
   // window would dereference a null `commonNames` here and take the process
   // down. Also short-circuit on !commonNames so startup-path OOMs surface as a
   // clean allocation failure instead of a segfault.
+  //
+  // `commonNames` is itself allocated partway through `initializeAtoms`, and
+  // its atom members (including `out_of_memory_`) are interned one by one after
+  // that, so a non-null `commonNames` does not yet imply `out_of_memory_` is
+  // available. Check the atom itself too, or an OOM between the container's
+  // allocation and that atom being interned would still build a Value from a
+  // null JSString* below.
   if (MOZ_UNLIKELY(!runtime()->hasInitializedSelfHosting() ||
-                   !runtime()->commonNames)) {
+                   !runtime()->commonNames ||
+                   !names().out_of_memory_)) {
     return;
   }
 

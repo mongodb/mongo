@@ -113,12 +113,17 @@ void signal_oom() {
  * path
  */
 void record_mmap_alloc(size_t bytes) {
+    // Bypass accounting entirely when tracking is disabled.
+    if (!track_mmap_bytes) {
+        return;
+    }
+
     mmap_bytes += bytes;
 
     size_t mb = get_max_bytes();
     size_t tb = get_total_bytes();
 
-    if (track_mmap_bytes && mb > 0 && tb > mb) {
+    if (mb > 0 && tb > mb) {
         LOGV2(10920001,
               "Out of memory on MozJS mmap allocation",
               "bytes"_attr = bytes,
@@ -129,6 +134,11 @@ void record_mmap_alloc(size_t bytes) {
 }
 
 void record_mmap_free(size_t bytes) {
+    // Bypass accounting entirely when tracking is disabled.
+    if (!track_mmap_bytes) {
+        return;
+    }
+
     MOZ_ASSERT(bytes <= mmap_bytes, "Freed mmap byte count exceeds tracked allocated bytes");
     mmap_bytes -= std::min(mmap_bytes, bytes);
 }

@@ -299,7 +299,11 @@ static void ShutdownImpl(JS::detail::FrontendOnly frontendOnly) {
     js::gc::CheckMemorySubsystemOnShutDown();
   }
 
-  libraryInitState = InitState::ShutDown;
+  // MONGODB MODIFICATION: Return the state machine to Uninitialized instead of
+  // parking in ShutDown to allow re-initialization. This is needed for unit tests
+  // that repeatedly create and destroy ScriptEngines (full JS_Init/JS_ShutDown
+  // cycles) within one process.
+  libraryInitState = InitState::Uninitialized;
 }
 
 JS_PUBLIC_API void JS_ShutDown(void) {
